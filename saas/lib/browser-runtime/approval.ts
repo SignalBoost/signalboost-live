@@ -69,6 +69,29 @@ function signature(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url')
 }
 
+function canonicalApprovalClaimsJson(value: unknown): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    const serialized = JSON.stringify(value)
+    if (serialized === undefined) {
+      throw new Error('Browser approval token claims must be JSON serializable')
+    }
+    return serialized
+  }
+
+  const source = value as UnknownRecord
+  const canonical: UnknownRecord = {}
+  for (const key of Object.keys(source).sort()) {
+    canonical[key] = source[key]
+  }
+  return JSON.stringify(canonical)
+}
+
+function assertCanonicalApprovalPayload(payload: string, claims: UnknownRecord): void {
+  if (encode(canonicalApprovalClaimsJson(claims)) !== payload) {
+    throw new Error('Browser approval token claims must use canonical JSON encoding')
+  }
+}
+
 function assertCanonicalString(value: unknown, label: string): asserts value is string {
   if (
     typeof value !== 'string' ||
@@ -222,7 +245,7 @@ export function digestBrowserApprovalToken(token: string): string {
 
 export function issueBrowserApprovalToken(claims: BrowserApprovalClaims, secret: string): string {
   if (!secret) throw new Error('Browser approval signing secret is required')
-  const payload = encode(JSON.stringify(claims))
+  const payload = encode(canonicalApprovalClaimsJson(claims))
   const token = `${payload}.${signature(payload, secret)}`
   if (token.length > MAX_APPROVAL_TOKEN_LENGTH) {
     throw new Error(`Browser approval token exceeds ${MAX_APPROVAL_TOKEN_LENGTH} characters`)
@@ -257,6 +280,7 @@ export function verifyBrowserApprovalToken(
   }
 
   const claimsRecord = parsedClaims as UnknownRecord
+  assertCanonicalApprovalPayload(payload, claimsRecord)
   assertExactClaimKeys(claimsRecord)
   const claims = claimsRecord as unknown as BrowserApprovalClaims
   if (claims.version !== 1) throw new Error('Unsupported browser approval token version')

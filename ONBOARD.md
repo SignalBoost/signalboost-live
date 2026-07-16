@@ -191,6 +191,7 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 - require approval claims to match the task's exact `issuedAt` and `expiresAt` values, reject malformed timestamps, and reject approval windows that do not end after they begin;
 - limit every signed approval window to no more than one hour, accepting the exact one-hour boundary and rejecting any longer window before browser launch;
 - accept only bounded canonical signed approval envelopes: exactly two base64url segments, a finite token size, no unsupported claim fields, and no more than 128 signed step/origin scope entries;
+- encode signed approval claims using deterministic canonical JSON and reject alternate whitespace, key ordering, duplicate-key, or otherwise equivalent JSON encodings before any approval is authorized;
 - capture evidence before the approval boundary;
 - stop phase 1 at a checkpoint before any protected save;
 - persist a serializable execution record containing the exact completed and remaining step lists while retaining the live browser session through a separate runtime registry;
@@ -695,6 +696,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Hardened the Mission 001 Browser Runtime session launch boundary. Session factories and launch-profile providers now receive only a detached, frozen provider/adapter/mode/approved-origin scope; approval tokens, task and incident identity, timestamps, executable steps, and metadata remain inside the runtime and never cross the browser-launch boundary.
 - 2026-07-16: Hardened Mission 001 Browser Runtime approval envelopes: tokens are bounded before signature or JSON work, must use canonical two-segment base64url form, reject unsupported signed claims, and cap signed step/origin scopes at 128 entries. This does not broaden origins or enable production/provider execution.
 - 2026-07-16: Bounded Mission 001 Browser Runtime approvals to a maximum one-hour validity window. Longer signed windows fail closed before session launch; this narrows authorization and does not enable production/provider execution.
+- 2026-07-16: Canonicalized Mission 001 Browser Runtime approval claim JSON. Issuance now uses deterministic top-level key ordering, and verification rejects validly signed alternate encodings or duplicate-key payloads before claim authorization. This narrows approval acceptance and does not enable production/provider execution.
 
 ## 20. Mandatory Final Reminder
 

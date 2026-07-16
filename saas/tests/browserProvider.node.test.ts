@@ -17,6 +17,7 @@ import {
   versionKey,
   mapBrowserProviderCapabilityToSupervisorCapability,
   createBrowserProviderWorkerDescriptor,
+  createBrowserProviderPolicyReviewSnapshot,
 } from '../lib/browser-provider/index.ts'
 
 test('canonical public entry point exports expected symbols and compatibility aliases', () => {
@@ -95,6 +96,32 @@ test('Supervisor mapping and worker descriptor preserve policy boundaries', () =
   const worker = createBrowserProviderWorkerDescriptor(VercelBrowserAdapter)
   assert.equal(worker.maximumConcurrentWork, 0)
   assert.deepEqual(worker.executionDependencies, [])
+})
+
+test('policy review snapshot is detached, immutable, non-executable, and production-disabled', () => {
+  const snapshot = createBrowserProviderPolicyReviewSnapshot(VercelBrowserAdapter)
+  assert.equal(snapshot.providerId, 'vercel')
+  assert.equal(snapshot.productionExecutionEnabled, false)
+  assert.equal(snapshot.maximumConcurrentWork, 0)
+  assert.deepEqual(snapshot.executionDependencies, [])
+  assert.equal(snapshot.capabilityCount, VercelBrowserAdapter.capabilities.length)
+  assert.deepEqual(snapshot.capabilities.map(capability => capability.capabilityId), [...snapshot.capabilities.map(capability => capability.capabilityId)].sort())
+  for (const capability of snapshot.capabilities) {
+    assert.equal(capability.readOnly, true)
+    assert.deepEqual(capability.allowedEnvironments, ['sandbox', 'preview'])
+    assert.equal(capability.allowedEnvironments.includes('production' as never), false)
+  }
+  assert.doesNotMatch(JSON.stringify(snapshot), /selector|routeTemplate|exactOrigin|credential|secret|token/i)
+  assert.throws(() => ((snapshot.capabilities as unknown as object[]).push({})), /not extensible|read only|Cannot add/)
+  assert.throws(() => ((snapshot.capabilities[0].approvedOriginIds as string[])[0] = 'changed'), /Cannot assign|read only|not extensible/)
+  assert.throws(() => createBrowserProviderPolicyReviewSnapshot({ ...VercelBrowserAdapter, supportsProduction: () => true }), /invalid_provider/)
+})
+
+test('Supervisor HA page renders BPAL policy metadata without execution controls or live provider access', async () => {
+  const page = await readFile(new URL('../app/dashboard/supervisor/ha/page.tsx', import.meta.url), 'utf8')
+  assert.match(page, /createBrowserProviderPolicyReviewSnapshot/)
+  assert.match(page, /productionBrowserExecutionDisabled/)
+  assert.doesNotMatch(page, /<button|onClick\s*=|fetch\(|resumeBrowserTask|runBrowserTask|credential|secret/i)
 })
 
 test('BPAL source has one canonical implementation and forbidden imports are absent', async () => {

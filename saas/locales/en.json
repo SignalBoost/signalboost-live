@@ -454,5 +454,62 @@
     "noActiveLease": "No Active Lease",
     "coordinationStoreHealth": "Coordination Store Health",
     "abandonedBrowserExecutions": "Abandoned Browser Executions"
+  },
+  "browserProvider": {
+    "vercel": {
+      "displayName": "Vercel",
+      "capabilities": {
+        "read_deployment_status": {
+          "name": "Read Deployment Status",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "inspect_deployment_failure": {
+          "name": "Inspect Deployment Failure",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "inspect_deployment_logs": {
+          "name": "Inspect Deployment Logs",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "inspect_domain_status": {
+          "name": "Inspect Domain Status",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "inspect_project_metadata": {
+          "name": "Inspect Project Metadata",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "inspect_environment_variable_metadata": {
+          "name": "Inspect Environment Variable Metadata",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "capture_dashboard_evidence": {
+          "name": "Capture Dashboard Evidence",
+          "description": "Read-only Vercel browser metadata"
+        },
+        "compare_dashboard_with_api": {
+          "name": "Compare Dashboard With Api",
+          "description": "Read-only Vercel browser metadata"
+        }
+      },
+      "origins": {
+        "dashboard": "Vercel dashboard"
+      },
+      "navigation": {
+        "deployments": "Vercel dashboard view",
+        "deploymentDetails": "Vercel dashboard view",
+        "logs": "Vercel dashboard view",
+        "domains": "Vercel dashboard view",
+        "projectSettings": "Vercel dashboard view",
+        "environmentVariables": "Vercel dashboard view"
+      }
+    },
+    "health": {
+      "healthy": "Healthy",
+      "degraded": "Degraded",
+      "outage": "Outage",
+      "unknown": "Unknown",
+      "suspended": "Suspended"
+    }
   }
 }

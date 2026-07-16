@@ -454,5 +454,62 @@
     "noActiveLease": "Brak aktywnej dzierżawy",
     "coordinationStoreHealth": "Stan magazynu koordynacji",
     "abandonedBrowserExecutions": "Porzucone egzekucje przeglądarki"
+  },
+  "browserProvider": {
+    "vercel": {
+      "displayName": "Vercel",
+      "capabilities": {
+        "read_deployment_status": {
+          "name": "Read Deployment Status",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "inspect_deployment_failure": {
+          "name": "Inspect Deployment Failure",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "inspect_deployment_logs": {
+          "name": "Inspect Deployment Logs",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "inspect_domain_status": {
+          "name": "Inspect Domain Status",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "inspect_project_metadata": {
+          "name": "Inspect Project Metadata",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "inspect_environment_variable_metadata": {
+          "name": "Inspect Environment Variable Metadata",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "capture_dashboard_evidence": {
+          "name": "Capture Dashboard Evidence",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        },
+        "compare_dashboard_with_api": {
+          "name": "Compare Dashboard With Api",
+          "description": "Metadane przeglądarki Vercel tylko do odczytu"
+        }
+      },
+      "origins": {
+        "dashboard": "Panel Vercel"
+      },
+      "navigation": {
+        "deployments": "Widok panelu Vercel",
+        "deploymentDetails": "Widok panelu Vercel",
+        "logs": "Widok panelu Vercel",
+        "domains": "Widok panelu Vercel",
+        "projectSettings": "Widok panelu Vercel",
+        "environmentVariables": "Widok panelu Vercel"
+      }
+    },
+    "health": {
+      "healthy": "Sprawny",
+      "degraded": "Ograniczony",
+      "outage": "Awaria",
+      "unknown": "Nieznany",
+      "suspended": "Zawieszony"
+    }
   }
 }

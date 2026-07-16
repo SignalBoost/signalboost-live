@@ -644,6 +644,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added deterministic Vercel Thinker planning for Mission 001 supervisor incidents: read-only deployment/event/log planning, env-name-only inspection to reduce false-positive missing-variable diagnoses, production alias inspection for canceled production deployments, and latest-failed-deployment Observer selection. Thinker remains non-executing; protected repairs still require policy approval.
 - 2026-07-16: Hardened Mission 001 Browser Runtime approval time binding: signed approvals now match the exact task issue/expiry window and fail closed on malformed timestamps, invalid verification clocks, or non-positive approval windows.
 
+- 2026-07-16: Added user provider configuration storage for the universal integration engine: `user_provider_configs` records the active provider and BYOK state, stores credential envelopes encrypted with the Vault AES-256-GCM helper, and `/api/execute-runner` decrypts saved user keys only in memory before invoking the provider-neutral runner.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

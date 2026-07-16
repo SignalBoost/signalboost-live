@@ -1,0 +1,12 @@
+import type { SerializableValue } from '../incident-schema.ts'
+import { ExecutionPersistenceError } from './errors.ts'
+import { canonicalTimestamp, serializableObject } from './serialization.ts'
+export const auditRecordSchemaVersion = 'supervisor-audit-event-v1'
+export interface PersistentAuditEvent { eventId: string; executionId?: string; dispatchId?: string; incidentId: string; eventType: string; occurredAt: string; payload: Record<string, SerializableValue>; schemaVersion: string; createdAt: string }
+export interface PersistentEvidenceRecord { evidenceId: string; executionId: string; stepId?: string; evidenceType: string; artifactReference: string; digest?: string; capturedAt: string; metadata: Record<string, SerializableValue>; schemaVersion: string }
+export function parseAuditEvent(input: unknown): PersistentAuditEvent { const r = obj(input); return { eventId:s(r.eventId,'eventId'), executionId:o(r.executionId), dispatchId:o(r.dispatchId), incidentId:s(r.incidentId,'incidentId'), eventType:s(r.eventType,'eventType'), occurredAt:canonicalTimestamp(r.occurredAt,'occurredAt'), payload:serializableObject(r.payload ?? {},'payload'), schemaVersion:ver(r.schemaVersion), createdAt:canonicalTimestamp(r.createdAt,'createdAt') } }
+export function parseEvidenceRecord(input: unknown): PersistentEvidenceRecord { const r = obj(input); return { evidenceId:s(r.evidenceId,'evidenceId'), executionId:s(r.executionId,'executionId'), stepId:o(r.stepId), evidenceType:s(r.evidenceType,'evidenceType'), artifactReference:s(r.artifactReference,'artifactReference'), digest:o(r.digest), capturedAt:canonicalTimestamp(r.capturedAt,'capturedAt'), metadata:serializableObject(r.metadata ?? {},'metadata'), schemaVersion:ver(r.schemaVersion) } }
+function obj(i: unknown) { if (!i || typeof i !== 'object' || Array.isArray(i) || Object.getPrototypeOf(i) !== Object.prototype) throw new ExecutionPersistenceError('invalid_record','Record must be a plain object'); return i as Record<string, unknown> }
+function s(v: unknown, p: string) { if (typeof v !== 'string' || !v.trim()) throw new ExecutionPersistenceError('invalid_field',`${p} is required`); return v }
+function o(v: unknown) { return v === undefined || v === null || v === '' ? undefined : String(v) }
+function ver(v: unknown) { const s = String(v || ''); if (s !== auditRecordSchemaVersion) throw new ExecutionPersistenceError('invalid_schema_version','Invalid audit schema version'); return s }

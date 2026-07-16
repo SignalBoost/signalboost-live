@@ -174,3 +174,33 @@ The flow is deliberately bounded:
 Browser execution is enabled only for the isolated repository sandbox. Production BrowserExecutor execution remains disabled. Vercel browser automation remains disabled. Real provider credentials are prohibited, no external authenticated websites may be targeted, and no production provider mutations are introduced.
 
 Known limitation: retained execution state is in-process test infrastructure. Sprint 17 should add durable sandbox-only execution persistence and operator-visible sanitized audit history; it should not enable production/provider browser execution.
+
+## Sprint 17 — Durable Sandbox Execution Records and Operator Audit History
+
+Sprint 17 adds persistent, restart-safe, sanitized history for Mission 001 Supervisor dispatches and isolated sandbox Browser Runtime executions. The durable records are audit history only: they cannot authorize, replay, resume, approve, retry, or launch any browser task.
+
+### Persistence scope
+
+- `supervisor_executions` stores one sanitized serializable execution summary per sandbox execution.
+- `supervisor_audit_events` stores immutable lifecycle events such as dispatch, package promotion, pause, continuation, terminal status, persistence failure, expiry, and restart abandonment.
+- `supervisor_evidence` stores safe evidence references, metadata, and optional digests only. It does not store image binaries, raw HTML, cookies, authorization headers, browser storage, local filesystem paths, passwords, tokens, or provider secrets.
+
+### Status model
+
+Allowed terminal-safe transitions are centralized: `requested → started → paused_for_approval → continuation_started → completed`, with failure exits to `failed`, `verification_failed`, `rejected`, `expired`, or `abandoned_after_restart`. Terminal records do not return to running. `completed` requires `verificationStatus: verified`; verification failure is never persisted as successful completion.
+
+### Restart behavior
+
+Live browser sessions, Page objects, Browser objects, and BrowserContext objects remain in memory only. Serializable records may persist, but a process restart means the retained session is gone. Reconciliation marks non-terminal sandbox executions as `abandoned_after_restart` or expired and appends audit history. The system never reconstructs or resumes an in-memory browser session from an audit record; retry requires a new execution ID and new approvals.
+
+### Operator visibility
+
+Authenticated admin/operator routes under `/api/internal/supervisor/executions` provide bounded, read-only list and detail access. The dashboard page at `/dashboard/supervisor/executions` labels the records as sandbox audit history and intentionally includes no Retry, Resume, Approve, Execute, or production-run controls.
+
+### Production boundary and limitations
+
+Only sandbox execution history is supported. Production browser execution, Vercel browser automation, real-provider credentials, real provider mutations, automatic production repair, and provider API writes remain disabled. Screenshots may contain sensitive values in future non-sandbox scenarios, so future sprints must add artifact-level redaction review before broadening beyond the harmless sandbox portal.
+
+### Next recommended sprint
+
+Sprint 18 should add CI-reviewed operational hardening around the read-only history surface: richer timeline filtering, artifact-reference viewer with redaction review, reconciliation scheduling, and Supabase policy tests. It should still avoid production/provider browser automation unless a separate governed approval and provider-specific safety design is reviewed.

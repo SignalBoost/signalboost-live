@@ -215,6 +215,15 @@ The harmless local scenario opens `/browser-sandbox/login`, fills only `sandbox:
 
 Known limitation: the execution and retained-session stores remain in-process test infrastructure. Production BrowserExecutor, Vercel browser automation, live provider credentials, and external provider mutations remain prohibited. The next recommended sprint is sandbox execution persistence plus operator-visible audit history, not production/provider browser execution.
 
+### Sprint 17 — Durable Sandbox Execution Records and Operator Audit History
+
+Sprint 17 adds sanitized durable history for Mission 001 sandbox executions only. The persistence layer records serializable execution summaries, immutable sanitized audit events, and safe evidence references/digests in Supabase-backed tables plus a provider-neutral store interface. These records are audit-only: they cannot authorize, replay, resume, approve, retry, or launch a browser task.
+
+Live browser sessions remain in memory only. A restart invalidates paused continuations; reconciliation must mark non-terminal sandbox executions `abandoned_after_restart` or expired and require a new execution ID plus new approvals. Completed records require verified deterministic Browser Runtime verification, and verification failure must never be stored as success.
+
+Authenticated operator read-only access is exposed through `/api/internal/supervisor/executions` and `/api/internal/supervisor/executions/[executionId]`, with an admin-only dashboard history page at `/dashboard/supervisor/executions`. No Sprint 17 route or UI may resume, approve, retry, execute, launch a browser, mutate a provider, use real credentials, or enable production repair. Production BrowserExecutor execution, Vercel browser automation, and real-provider automation remain disabled.
+
+
 ### Owner/Admin
 
 High-privilege administration. Use strict owner/admin role gates.
@@ -680,6 +689,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added Mission 001 Sprint 14 policy-to-executor bridge: provider-neutral executor registry, dispatcher validation, sanitized dispatch audit events, in-memory at-most-once dispatch protection, and non-mutating API/browser/manual executor stubs. This proves routing only; Browser Runtime and API mutations remain disabled, and durable process-restart dispatch tracking is deferred.
 - 2026-07-16: Added Mission 001 Sprint 15 Browser Runtime dry-run adapter: BrowserExecutor now translates approved browser scope into a validated, fingerprinted dry-run package only. It does not launch Playwright/Chromium, resolve credentials, access providers, or execute Browser Runtime tasks; live execution is deferred to an isolated sandbox-only sprint.
 - 2026-07-16: Added Mission 001 Sprint 16 isolated sandbox browser execution: dry-run packages can be promoted only to the exact local repository sandbox origin with Browser Runtime signed phase-one and continuation approvals, deterministic verification, evidence capture, sanitized audit events, and no production/provider credential access. Production BrowserExecutor and Vercel browser automation remain disabled; Sprint 17 should add sandbox persistence and operator-visible audit history only.
+- 2026-07-16: Added Mission 001 Sprint 17 durable sandbox audit history: sanitized Supabase execution, audit-event, and evidence-reference records; admin-only read APIs and operator UI; restart reconciliation that abandons non-terminal records without resuming browser sessions; and explicit confirmation that persisted records cannot authorize replay or production/provider automation.
 
 ## 20. Mandatory Final Reminder
 

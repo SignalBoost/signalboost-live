@@ -633,6 +633,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Bound Mission 001 phase-two approvals to one exact retained execution ID and the originating phase-one approval-token digest. Cross-execution replay and phase-one token substitution now fail closed before a retained session can be consumed.
 
 - 2026-07-16: Added a local Mission001 GitHub commit helper that reads a GitHub PAT from an untracked root `.env` file, plus a safe `.env.example` placeholder and usage instructions. Real PAT values must remain local and must never be committed.
+- 2026-07-16: Added Mission 001 Sprint 11 supervisor core contracts: provider-neutral incident and repair-plan validation, Observer/Thinker/Policy/Executor/Verifier/Audit interfaces, deterministic conservative policy behavior, fail-closed orchestration skeleton, and contract tests. Live Vercel observation and execution remain deferred.
 
 ## 20. Mandatory Final Reminder
 

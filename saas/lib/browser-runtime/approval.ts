@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import type { BrowserTask, BrowserTaskMode } from './contracts.ts'
+import { validateBrowserTaskShape } from './task-validation.ts'
 
 export interface BrowserApprovalClaims {
   version: 1
@@ -225,6 +226,7 @@ export function verifyBrowserApprovalToken(
     'Browser approval token allowedOrigins',
   )
 
+  validateBrowserTaskShape(task, taskAllowedOrigins)
   validateContinuationClaims(claims, task)
 
   if (claims.taskId !== task.taskId) throw new Error('Approval token taskId mismatch')

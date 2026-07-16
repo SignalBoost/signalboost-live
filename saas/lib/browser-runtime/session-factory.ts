@@ -54,9 +54,29 @@ export interface BrowserSessionFactoryOptions {
   viewport?: { width: number; height: number }
 }
 
+interface ResolvedBrowserSessionOptions {
+  headless: boolean
+  launchTimeoutMs: number
+  actionTimeoutMs: number
+  executablePath?: string
+  launchArgs: string[]
+  viewport: { width: number; height: number }
+}
+
 const DEFAULT_LAUNCH_TIMEOUT_MS = 30_000
 const DEFAULT_ACTION_TIMEOUT_MS = 15_000
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 }
+
+function assertPositiveInteger(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`)
+  }
+}
+
+function validateViewport(viewport: { width: number; height: number }): void {
+  assertPositiveInteger(viewport.width, 'Browser viewport width')
+  assertPositiveInteger(viewport.height, 'Browser viewport height')
+}
 
 function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -74,18 +94,20 @@ function createPagePort(page: BrowserEnginePage, actionTimeoutMs: number): Brows
     url: () => page.url(),
     goto: url => withTimeout(page.goto(url, { timeoutMs: actionTimeoutMs }), actionTimeoutMs, 'Browser navigation'),
     click: selector => withTimeout(page.click(selector, { timeoutMs: actionTimeoutMs }), actionTimeoutMs, 'Browser click'),
-    fill: (selector, value) => withTimeout(page.fill(selector, value, { timeoutMs: actionTimeoutMs }), actionTimeoutMs, 'Browser fill'),
-    waitForSelector: (selector, timeoutMs = actionTimeoutMs) =>
-      withTimeout(page.waitForSelector(selector, { timeoutMs }), timeoutMs, 'Browser selector wait'),
+    fill: (selector, value) =>
+      withTimeout(page.fill(selector, value, { timeoutMs: actionTimeoutMs }), actionTimeoutMs, 'Browser fill'),
+    waitForSelector: (selector, timeoutMs = actionTimeoutMs) => {
+      assertPositiveInteger(timeoutMs, 'Browser selector timeout')
+      return withTimeout(page.waitForSelector(selector, { timeoutMs }), timeoutMs, 'Browser selector wait')
+    },
   }
 }
 
-function mergeProfile(
-  defaults: Required<Pick<BrowserSessionFactoryOptions, 'headless' | 'launchTimeoutMs' | 'actionTimeoutMs' | 'launchArgs' | 'viewport'>> &
-    Pick<BrowserSessionFactoryOptions, 'executablePath'>,
+function resolveOptions(
+  defaults: ResolvedBrowserSessionOptions,
   profile?: BrowserLaunchProfile,
-) {
-  return {
+): ResolvedBrowserSessionOptions {
+  const options: ResolvedBrowserSessionOptions = {
     headless: profile?.headless ?? defaults.headless,
     launchTimeoutMs: profile?.launchTimeoutMs ?? defaults.launchTimeoutMs,
     actionTimeoutMs: profile?.actionTimeoutMs ?? defaults.actionTimeoutMs,
@@ -93,31 +115,44 @@ function mergeProfile(
     launchArgs: [...(profile?.launchArgs ?? defaults.launchArgs)],
     viewport: { ...(profile?.viewport ?? defaults.viewport) },
   }
+
+  assertPositiveInteger(options.launchTimeoutMs, 'Browser launch timeout')
+  assertPositiveInteger(options.actionTimeoutMs, 'Browser action timeout')
+  validateViewport(options.viewport)
+  return options
 }
 
 export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
   private readonly launcher: BrowserEngineLauncher
   private readonly profileProvider?: BrowserLaunchProfileProvider
-  private readonly defaults: Required<
-    Pick<BrowserSessionFactoryOptions, 'headless' | 'launchTimeoutMs' | 'actionTimeoutMs' | 'launchArgs' | 'viewport'>
-  > & Pick<BrowserSessionFactoryOptions, 'executablePath'>
+  private readonly defaults: ResolvedBrowserSessionOptions
 
   constructor(options: BrowserSessionFactoryOptions) {
+    if (!options?.launcher) throw new Error('A browser engine launcher is required')
+
+    const viewport = { ...(options.viewport ?? DEFAULT_VIEWPORT) }
+    const launchTimeoutMs = options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS
+    const actionTimeoutMs = options.actionTimeoutMs ?? DEFAULT_ACTION_TIMEOUT_MS
+
+    assertPositiveInteger(launchTimeoutMs, 'Browser launch timeout')
+    assertPositiveInteger(actionTimeoutMs, 'Browser action timeout')
+    validateViewport(viewport)
+
     this.launcher = options.launcher
     this.profileProvider = options.profileProvider
     this.defaults = {
       headless: options.headless ?? true,
-      launchTimeoutMs: options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS,
-      actionTimeoutMs: options.actionTimeoutMs ?? DEFAULT_ACTION_TIMEOUT_MS,
+      launchTimeoutMs,
+      actionTimeoutMs,
       executablePath: options.executablePath,
       launchArgs: [...(options.launchArgs ?? [])],
-      viewport: options.viewport ?? DEFAULT_VIEWPORT,
+      viewport,
     }
   }
 
   async open(task: BrowserTask): Promise<BrowserSessionPort> {
     const profile = this.profileProvider?.resolve(task)
-    const options = mergeProfile(this.defaults, profile)
+    const options = resolveOptions(this.defaults, profile)
     const browser = await withTimeout(
       this.launcher.launch({
         headless: options.headless,
@@ -145,11 +180,7 @@ export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
         'Browser context creation',
       )
 
-      const page = await withTimeout(
-        context.newPage(),
-        options.launchTimeoutMs,
-        'Browser page creation',
-      )
+      const page = await withTimeout(context.newPage(), options.launchTimeoutMs, 'Browser page creation')
 
       return {
         page: createPagePort(page, options.actionTimeoutMs),

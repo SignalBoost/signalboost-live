@@ -1,0 +1,2 @@
+import type { ProviderWorker } from './provider-worker-schema.ts'
+export const vercelProviderWorker: ProviderWorker = { providerKind:'vercel', supportedWorkItemTypes:['deployment_incident','execution'], supportedCapabilities:['vercel.deployment.read','vercel.env.inspect'], adapterVersion:'vercel-observer-thinker-v1', health:'healthy', maximumConcurrentWork:2, executionDependencies:['VercelObserver','VercelThinker'] }

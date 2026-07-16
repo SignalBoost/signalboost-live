@@ -2,9 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { BrowserExecutor } from '../lib/supervisor/executors/browser-executor.ts'
-import { BrowserRuntimeDryRunAdapter, promoteSandboxPackage, sandboxBrowserExecutionSchemaVersion } from '../lib/supervisor/executors/browser/index.ts'
-import { digestBrowserApprovalToken, issueBrowserApprovalToken, type BrowserApprovalClaims } from '../lib/browser-runtime/approval.ts'
-import { createBrowserExecutionId, InMemoryBrowserExecutionStore, InMemoryBrowserSessionRegistry } from '../lib/browser-runtime/execution-state.ts'
+import {
+  BrowserRuntimeDryRunAdapter,
+  InMemorySandboxApprovalReplayGuard,
+  promoteSandboxPackage,
+  sandboxBrowserExecutionSchemaVersion,
+} from '../lib/supervisor/executors/browser/index.ts'
+import {
+  digestBrowserApprovalToken,
+  issueBrowserApprovalToken,
+  type BrowserApprovalClaims,
+} from '../lib/browser-runtime/approval.ts'
+import {
+  createBrowserExecutionId,
+  InMemoryBrowserExecutionStore,
+  InMemoryBrowserSessionRegistry,
+} from '../lib/browser-runtime/execution-state.ts'
 import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
 
 const origin = 'http://localhost:4173'
@@ -35,7 +48,7 @@ const ids = steps.map(s => s.stepId)
 function dry() { return new BrowserRuntimeDryRunAdapter().createPackage({ incident: incident as any, repairPlan: plan, approvedStepIds: ids, dispatch, requestedExecutorKind: 'browser', clock }) }
 function sign(task: BrowserTask, allowedStepIds: string[], phase: 1|2, nonce: string, extra: Partial<BrowserApprovalClaims> = {}) { return issueBrowserApprovalToken({ version: 1, taskId: task.taskId, incidentId: task.incidentId, provider: task.provider, adapterId: task.adapterId, mode: task.mode, allowedStepIds, allowedOrigins: task.allowedOrigins, issuedAt: task.issuedAt, expiresAt: task.expiresAt, nonce, phase, checkpointStepId: 'approval-checkpoint', ...extra }, secret) }
 function request(token = 'malformed', pkg = dry(), continuationApprovalToken?: string) { return { dryRunPackage: pkg, packageFingerprint: pkg.packageFingerprint, dispatchId: pkg.dispatchId, incidentId: pkg.incidentId, planId: pkg.planId, sandboxOrigin: origin, browserTaskApprovalToken: token, continuationApprovalToken, executionMode: 'sandbox_execute', requestedAt: now.toISOString(), schemaVersion: sandboxBrowserExecutionSchemaVersion } }
-function ports(calls: string[] = []) { let currentUrl = 'about:blank'; let closed = false; return { calls, wasClosed: () => closed, sessions: { async open() { return { page: { url: () => currentUrl, goto: async (url: string) => { currentUrl = url; calls.push(`goto:${url}`) }, click: async (selector: string) => { calls.push(`click:${selector}`) }, fill: async (selector: string, value: string) => { calls.push(`fill:${selector}:${value}`) }, waitForSelector: async (selector: string) => { calls.push(`wait:${selector}`) } }, close: async () => { closed = true; calls.push('close') } } } }, context: { resolveSecretRef: async (ref: string) => { calls.push(`secret:${ref}`); return ref.endsWith('/password') ? 'test-password' : ref.endsWith('/email') ? 'sandbox@example.test' : 'approved-sandbox-value' }, captureScreenshot: async (label: string) => { calls.push(`screenshot:${label}`); return `artifact://sandbox/${label}` } } } }
+function ports(calls: string[] = []) { let currentUrl = 'about:blank'; let closed = false; return { calls, wasClosed: () => closed, sessions: { async open() { calls.push('open'); return { page: { url: () => currentUrl, goto: async (url: string) => { currentUrl = url; calls.push(`goto:${url}`) }, click: async (selector: string) => { calls.push(`click:${selector}`) }, fill: async (selector: string, value: string) => { calls.push(`fill:${selector}:${value}`) }, waitForSelector: async (selector: string) => { calls.push(`wait:${selector}`) } }, close: async () => { closed = true; calls.push('close') } } } }, context: { resolveSecretRef: async (ref: string) => { calls.push(`secret:${ref}`); return ref.endsWith('/password') ? 'test-password' : ref.endsWith('/email') ? 'sandbox@example.test' : 'approved-sandbox-value' }, captureScreenshot: async (label: string) => { calls.push(`screenshot:${label}`); return `artifact://sandbox/${label}` } } } }
 
 test('valid sandbox package promotes deterministically and rejects tampering, wrong envs, and origins', () => {
   const pkg = dry(); const promoted = promoteSandboxPackage(request('placeholder', pkg), policy); const promoted2 = promoteSandboxPackage(request('placeholder', pkg), policy)
@@ -77,8 +90,78 @@ test('valid continuation executes only remaining steps and cross execution repla
   assert.equal(p.wasClosed(), true)
 })
 
+test('sandbox execution rejects a reused phase-one approval before opening another session', async () => {
+  const calls: string[] = []
+  const p = ports(calls)
+  const executor = new BrowserExecutor({
+    sandbox: {
+      policy,
+      signingSecret: secret,
+      sessions: p.sessions,
+      context: p.context,
+      executionStore: new InMemoryBrowserExecutionStore(),
+      sessionRegistry: new InMemoryBrowserSessionRegistry(),
+      approvalReplayGuard: new InMemorySandboxApprovalReplayGuard(),
+      now: clock,
+    },
+    clock,
+  })
+  const pkg = dry()
+  const promoted = promoteSandboxPackage(request('placeholder', pkg), policy)
+  const phaseOne = sign(
+    promoted.task,
+    ids.slice(0, ids.indexOf('approval-checkpoint') + 1),
+    1,
+    'phase-one-single-use',
+  )
+  const first = await executor.execute({ incident: incident as any, plan, approvedStepIds: ids, executionContext: { executionId: 'EXEC-SBX-REPLAY-1', metadata: { browserExecutionMode: 'sandbox_execute', sandboxExecutionRequest: request(phaseOne, pkg) } }, dispatch })
+  assert.equal(first.status, 'paused_for_approval')
+  const callsAfterFirst = calls.length
+
+  const replayed = await executor.execute({ incident: incident as any, plan, approvedStepIds: ids, executionContext: { executionId: 'EXEC-SBX-REPLAY-2', metadata: { browserExecutionMode: 'sandbox_execute', sandboxExecutionRequest: request(phaseOne, pkg) } }, dispatch })
+  assert.equal(replayed.status, 'failed')
+  assert.equal(calls.length, callsAfterFirst)
+  assert.equal(calls.filter(call => call === 'open').length, 1)
+  assert.match(JSON.stringify(replayed.evidence), /already been used/)
+})
+
+test('sandbox continuation rejects a reused nonce before the protected action', async () => {
+  const calls: string[] = []
+  const p = ports(calls)
+  const executor = new BrowserExecutor({
+    sandbox: {
+      policy,
+      signingSecret: secret,
+      sessions: p.sessions,
+      context: p.context,
+      executionStore: new InMemoryBrowserExecutionStore(),
+      sessionRegistry: new InMemoryBrowserSessionRegistry(),
+      approvalReplayGuard: new InMemorySandboxApprovalReplayGuard(),
+      now: clock,
+    },
+    clock,
+  })
+  const pkg = dry()
+  const promoted = promoteSandboxPackage(request('placeholder', pkg), policy)
+  const preIds = ids.slice(0, ids.indexOf('approval-checkpoint') + 1)
+  const postIds = ids.slice(ids.indexOf('approval-checkpoint') + 1)
+  const reusedNonce = 'must-be-unique-across-approvals'
+  const phaseOne = sign(promoted.task, preIds, 1, reusedNonce)
+  const paused = await executor.execute({ incident: incident as any, plan, approvedStepIds: ids, executionContext: { executionId: 'EXEC-SBX-NONCE-1', metadata: { browserExecutionMode: 'sandbox_execute', sandboxExecutionRequest: request(phaseOne, pkg) } }, dispatch })
+  const executionId = (paused.evidence[0].data as any).runtimeResult.executionId as string
+  const phaseTwo = sign(promoted.task, postIds, 2, reusedNonce, {
+    executionId,
+    preApprovalTokenDigest: digestBrowserApprovalToken(phaseOne),
+  })
+
+  const rejected = await executor.execute({ incident: incident as any, plan, approvedStepIds: ids, executionContext: { executionId: 'EXEC-SBX-NONCE-2', metadata: { browserExecutionMode: 'sandbox_execute', browserExecutionId: executionId, sandboxExecutionRequest: request(phaseOne, pkg, phaseTwo) } }, dispatch })
+  assert.equal(rejected.status, 'failed')
+  assert.equal(calls.some(call => call === 'click:[data-action="protected-save"]'), false)
+  assert.match(JSON.stringify(rejected.evidence), /already been used/)
+})
+
 test('sandbox adapter layer has no production browser/provider SDK imports and audit payloads are serializable without secrets', () => {
-  for (const file of ['sandbox-execution-adapter.ts','sandbox-package-promoter.ts','sandbox-origin-policy.ts','sandbox-execution-schema.ts']) {
+  for (const file of ['approval-replay-guard.ts','sandbox-execution-adapter.ts','sandbox-package-promoter.ts','sandbox-origin-policy.ts','sandbox-execution-schema.ts']) {
     const src = readFileSync(new URL(`../lib/supervisor/executors/browser/${file}`, import.meta.url), 'utf8')
     assert.doesNotMatch(src, /playwright|chromium|browser-use|stagehand|@vercel|stripe|supabase.*from|createClient/i)
   }

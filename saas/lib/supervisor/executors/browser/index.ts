@@ -1,3 +1,4 @@
+export * from './approval-replay-guard.ts'
 export * from './browser-runtime-adapter.ts'
 export * from './browser-runtime-adapter-errors.ts'
 export * from './browser-runtime-compatibility.ts'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import GovernancePanel from './GovernancePanel'
 import JsonBlueprint from './JsonBlueprint'
 import JsonEditor from './JsonEditor'
@@ -10,46 +10,65 @@ import TagSelector from './TagSelector'
 
 const parseJson = value => { try { return JSON.parse(value) } catch { return { _invalidJsonDraft: value } } }
 
-function EndpointDropdown({ provider, value, onChange }) {
+function EndpointField({ provider, value, onChange }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const endpoints = provider?.endpoints || []
-  const selected = endpoints.find(endpoint => endpoint.url === value)
-  const filtered = endpoints.filter(endpoint => `${endpoint.url} ${endpoint.example}`.toLowerCase().includes(query.toLowerCase()))
+  const filtered = endpoints.filter(endpoint => {
+    const needle = query.trim().toLowerCase()
+    return !needle || `${endpoint.url} ${endpoint.example}`.toLowerCase().includes(needle)
+  })
 
   return (
     <div className="relative">
       <label className="grid gap-2 text-sm font-bold text-slate-200">
-        Endpoint
+        Endpoint Template
         <input
           disabled={!provider}
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
           autoComplete="off"
-          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          value={open ? query : selected?.url || ''}
-          onFocus={() => { setOpen(true); setQuery('') }}
-          onChange={event => { setQuery(event.target.value); setOpen(true) }}
-          placeholder={provider ? 'Filter provider endpoint templates' : 'Select provider first'}
+          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 font-mono text-sm text-white outline-none ring-cyan-300/40 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+          value={value}
+          onFocus={() => {
+            setQuery('')
+            setOpen(true)
+          }}
+          onChange={event => {
+            const nextValue = event.target.value
+            onChange(nextValue)
+            setQuery(nextValue)
+            setOpen(true)
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Escape') setOpen(false)
+          }}
+          placeholder={provider ? 'Provider endpoint template' : 'Select provider first'}
         />
       </label>
+
       {open && provider && (
         <div role="listbox" className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl">
-          {filtered.map(endpoint => (
+          {filtered.map(endpointOption => (
             <button
-              key={endpoint.id}
+              key={endpointOption.id}
               type="button"
               role="option"
-              aria-selected={endpoint.url === value}
-              onClick={() => { onChange(endpoint.url); setQuery(''); setOpen(false) }}
+              aria-selected={endpointOption.url === value}
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => {
+                onChange(endpointOption.url)
+                setQuery('')
+                setOpen(false)
+              }}
               className="w-full rounded-xl px-3 py-3 text-left text-slate-100 hover:bg-cyan-400/10"
             >
-              <span className="block break-all font-mono text-sm text-cyan-100">{endpoint.url}</span>
-              <span className="text-xs text-slate-400">{endpoint.example}</span>
+              <span className="block break-all font-mono text-sm text-cyan-100">{endpointOption.url}</span>
+              <span className="text-xs text-slate-400">{endpointOption.example}</span>
             </button>
           ))}
-          {!filtered.length && <p className="px-3 py-4 text-sm text-slate-400">No matching endpoints.</p>}
+          {!filtered.length && <p className="px-3 py-4 text-sm text-slate-400">No matching provider endpoints. You may keep your manual override.</p>}
         </div>
       )}
     </div>
@@ -105,25 +124,31 @@ export default function ToolBuilder() {
   const [logsOpen, setLogsOpen] = useState(false)
   const [testStatus, setTestStatus] = useState('Ready')
 
-  useEffect(() => {
-    if (!provider) {
+  function handleProviderChange(nextProvider) {
+    setProvider(nextProvider)
+
+    if (!nextProvider) {
       setAuth({})
       setMethod('')
       setEndpoint('')
       return
     }
 
+    const nextMethod = nextProvider.defaultMethod || nextProvider.methods?.[0] || 'GET'
+    const nextEndpoint = nextProvider.defaultEndpoint || nextProvider.endpoints?.[0]?.url || ''
     const nextAuth = Object.fromEntries(
-      (provider.authSchema || []).map(field => [
+      (nextProvider.authSchema || []).map(field => [
         field.key,
-        field.type === 'oauth_ref' ? `${provider.id}_oauth_connection` : `${provider.id}_${field.key}`,
+        field.type === 'oauth_ref'
+          ? `${nextProvider.id}_oauth_connection`
+          : `${nextProvider.id}_${field.key}`,
       ]),
     )
 
+    setMethod(nextMethod)
+    setEndpoint(nextEndpoint)
     setAuth(nextAuth)
-    setMethod(provider.defaultMethod || provider.methods?.[0] || 'GET')
-    setEndpoint(provider.endpoints?.[0]?.url || '')
-  }, [provider])
+  }
 
   const blueprint = useMemo(() => ({
     name,
@@ -162,7 +187,7 @@ export default function ToolBuilder() {
         <header className="rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-2xl">
           <p className="text-xs font-black uppercase tracking-[.22em] text-amber-200">Integrations</p>
           <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Enterprise Integration Builder</h1>
-          <p className="mt-3 max-w-3xl text-slate-300">Select only approved providers and tags from live catalogs. Provider selection automatically loads its method, endpoint, authentication schema, variables, and JSON blueprint values.</p>
+          <p className="mt-3 max-w-3xl text-slate-300">Select an approved provider to load its default method, endpoint, authentication schema, variables, and JSON blueprint values. Method and endpoint remain editable after selection.</p>
         </header>
 
         <section className="grid gap-6 xl:grid-cols-3">
@@ -171,7 +196,7 @@ export default function ToolBuilder() {
             <div className="grid gap-5">
               <label className="grid gap-2 text-sm font-bold text-slate-200">Integration Name<input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label>
               <label className="grid gap-2 text-sm font-bold text-slate-200">Description<textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={description} onChange={event => setDescription(event.target.value)} /></label>
-              <ProviderDropdown value={provider?.id || ''} onChange={setProvider} />
+              <ProviderDropdown value={provider?.id || ''} onChange={handleProviderChange} />
               <TagSelector value={tags} onChange={setTags} />
               <AuthFields provider={provider} value={auth} onChange={setAuth} />
             </div>
@@ -183,10 +208,10 @@ export default function ToolBuilder() {
               <label className="grid gap-2 text-sm font-bold text-slate-200">
                 HTTP Method
                 <select disabled={!provider} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white disabled:opacity-50" value={method} onChange={event => setMethod(event.target.value)}>
-                  {(provider?.methods || []).map(item => <option key={item}>{item}</option>)}
+                  {(provider?.methods || []).map(item => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
-              <EndpointDropdown provider={provider} value={endpoint} onChange={setEndpoint} />
+              <EndpointField provider={provider} value={endpoint} onChange={setEndpoint} />
               <JsonEditor value={requestBody} onChange={setRequestBody} variables={provider?.variables || []} />
               <ResponseMapper value={responseMapping} onChange={setResponseMapping} />
             </div>
@@ -201,7 +226,7 @@ export default function ToolBuilder() {
 
         <JsonBlueprint blueprint={blueprint} />
 
-        {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black">Recent Logs</h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• Loaded provider metadata from /api/providers.</p><p>• Loaded selectable tags from /tags/list.</p><p>• Synchronized provider defaults into the compiled blueprint.</p></div></div></div>}
+        {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black">Recent Logs</h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• Loaded provider metadata from /api/providers.</p><p>• Applied provider method and endpoint defaults atomically.</p><p>• Synchronized manual overrides into the compiled blueprint.</p></div></div></div>}
       </div>
     </main>
   )

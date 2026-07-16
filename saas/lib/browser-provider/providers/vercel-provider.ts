@@ -94,6 +94,13 @@ const navigation: readonly NavigationProfile[] = [
 
 const selectors: readonly ProviderSelector[] = [
   {
+    id: 'dashboard.project-count',
+    group: 'projects',
+    selector: '[data-testid="project-count"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
     id: 'deployments.status',
     group: 'deployments',
     selector: '[data-testid="deployment-status"]',
@@ -168,36 +175,43 @@ const verification: readonly VerificationProfile[] = [
 const evidence: readonly EvidenceProfile[] = [
   {
     id: 'deployment-failure',
-    expectedScreenshots: ['deployment-detail'],
-    expectedReads: ['status', 'logs'],
+    expectedScreenshots: ['logs'],
+    expectedReads: ['deployments.status', 'deployments.logs'],
     expectedMetadata: ['deploymentId'],
     schemaVersion: BPAL_SCHEMA_VERSION,
   },
   {
     id: 'deployment-success',
     expectedScreenshots: ['deployment-detail'],
-    expectedReads: ['status'],
+    expectedReads: ['deployments.status'],
     expectedMetadata: ['deploymentId'],
     schemaVersion: BPAL_SCHEMA_VERSION,
   },
   {
     id: 'dashboard-overview',
-    expectedScreenshots: ['dashboard'],
-    expectedReads: ['project-count'],
+    expectedScreenshots: ['dashboard-overview'],
+    expectedReads: ['dashboard.project-count'],
     expectedMetadata: ['team'],
     schemaVersion: BPAL_SCHEMA_VERSION,
   },
   {
     id: 'project-metadata',
     expectedScreenshots: ['project-settings'],
-    expectedReads: ['project-name'],
+    expectedReads: ['projects.name'],
+    expectedMetadata: ['projectId'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'environment-metadata',
+    expectedScreenshots: ['environment-metadata'],
+    expectedReads: ['settings.environment'],
     expectedMetadata: ['projectId'],
     schemaVersion: BPAL_SCHEMA_VERSION,
   },
   {
     id: 'domain-state',
     expectedScreenshots: ['domains'],
-    expectedReads: ['domain-status'],
+    expectedReads: ['domains.status'],
     expectedMetadata: ['domain'],
     schemaVersion: BPAL_SCHEMA_VERSION,
   },
@@ -272,7 +286,7 @@ const capabilities: readonly ProviderCapability[] = [
   capability('read-environment-variable-metadata', {
     supportsApi: false,
     verificationProfile: 'environment-metadata-visible',
-    evidenceProfile: 'project-metadata',
+    evidenceProfile: 'environment-metadata',
     navigationProfile: 'environment-metadata',
     allowedOrigins: ['settings'],
   }),

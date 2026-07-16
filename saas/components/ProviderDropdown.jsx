@@ -1,53 +1,156 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
-const MOCK_PROVIDERS = [
-  { id: 'openai', name: 'OpenAI', icon: '◌', methods: ['POST', 'GET'], variables: ['input.prompt', 'input.language', 'input.customerId'], authSchema: [{ key: 'apiKey', label: 'API Key', type: 'secret' }], endpoints: [{ id: 'responses', url: 'https://api.openai.com/v1/responses', example: 'Create a model response' }, { id: 'files', url: 'https://api.openai.com/v1/files', example: 'Upload or list files' }] },
-  { id: 'stripe', name: 'Stripe', icon: '◇', methods: ['GET', 'POST', 'DELETE'], variables: ['customer.email', 'customer.id', 'invoice.id'], authSchema: [{ key: 'secretKey', label: 'Secret Key', type: 'secret' }], endpoints: [{ id: 'customers', url: 'https://api.stripe.com/v1/customers', example: 'Create customer records' }, { id: 'checkout', url: 'https://api.stripe.com/v1/checkout/sessions', example: 'Start checkout sessions' }] },
-  { id: 'github', name: 'GitHub', icon: '◆', methods: ['GET', 'POST', 'PATCH', 'PUT'], variables: ['repo.owner', 'repo.name', 'pull.number'], authSchema: [{ key: 'oauth', label: 'OAuth Connection', type: 'oauth' }], endpoints: [{ id: 'issues', url: 'https://api.github.com/repos/{{repo.owner}}/{{repo.name}}/issues', example: 'Create or query issues' }, { id: 'pulls', url: 'https://api.github.com/repos/{{repo.owner}}/{{repo.name}}/pulls', example: 'Open pull requests' }] },
-  { id: 'resend', name: 'Resend', icon: '✉', methods: ['POST', 'GET'], variables: ['email.to', 'email.subject', 'campaign.id'], authSchema: [{ key: 'apiKey', label: 'API Key', type: 'secret' }], endpoints: [{ id: 'emails', url: 'https://api.resend.com/emails', example: 'Send transactional email' }, { id: 'domains', url: 'https://api.resend.com/domains', example: 'Manage sending domains' }] },
-]
-
-export async function fetchProviders() {
-  return Promise.resolve(MOCK_PROVIDERS)
+function normalizeProviders(payload) {
+  const raw = Array.isArray(payload) ? payload : Array.isArray(payload?.providers) ? payload.providers : []
+  return raw.filter(provider => provider && typeof provider.id === 'string' && typeof provider.name === 'string')
 }
 
 export default function ProviderDropdown({ value, onChange }) {
+  const inputId = useId()
+  const listboxId = `${inputId}-options`
   const rootRef = useRef(null)
   const [providers, setProviders] = useState([])
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const loadedRef = useRef(false)
 
-  useEffect(() => { fetchProviders().then(setProviders) }, [])
+  async function loadProviders({ force = false } = {}) {
+    if (loading || (loadedRef.current && !force)) return
+    setLoading(true)
+    setError('')
+    try {
+      const response = await fetch('/api/providers', {
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+      })
+      if (!response.ok) throw new Error(`Provider lookup failed (${response.status})`)
+      const nextProviders = normalizeProviders(await response.json())
+      if (!nextProviders.length) throw new Error('Provider catalog is empty')
+      setProviders(nextProviders)
+      loadedRef.current = true
+    } catch (loadError) {
+      setProviders([])
+      setError(loadError instanceof Error ? loadError.message : 'Provider catalog is unavailable')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadProviders()
+  }, [])
+
   useEffect(() => {
     function onPointerDown(event) {
-      if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false)
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false)
+        setQuery('')
+        setActiveIndex(-1)
+      }
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [])
 
-  const selected = providers.find(provider => provider.id === value)
+  const selected = providers.find(provider => provider.id === value) || null
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return providers.filter(provider => `${provider.name} ${provider.id} ${provider.methods.join(' ')}`.toLowerCase().includes(needle))
+    if (!needle) return providers
+    return providers.filter(provider => {
+      const methods = Array.isArray(provider.methods) ? provider.methods.join(' ') : ''
+      return `${provider.name} ${provider.id} ${methods}`.toLowerCase().includes(needle)
+    })
   }, [providers, query])
+
+  function selectProvider(provider) {
+    onChange(provider)
+    setQuery('')
+    setOpen(false)
+    setActiveIndex(-1)
+  }
+
+  function onKeyDown(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setOpen(true)
+      setActiveIndex(current => Math.min(current + 1, filtered.length - 1))
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveIndex(current => Math.max(current - 1, 0))
+    } else if (event.key === 'Enter' && open && activeIndex >= 0 && filtered[activeIndex]) {
+      event.preventDefault()
+      selectProvider(filtered[activeIndex])
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+      setQuery('')
+      setActiveIndex(-1)
+    }
+  }
 
   return (
     <div ref={rootRef} className="relative">
-      <label htmlFor="integration-provider-combobox" className="grid gap-2 text-sm font-bold text-slate-200">Provider
-        <input id="integration-provider-combobox" role="combobox" aria-expanded={open} aria-controls="integration-provider-options" aria-autocomplete="list" className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 transition focus:ring-2" value={open ? query : selected?.name || ''} onFocus={() => { setOpen(true); setQuery('') }} onChange={event => { setQuery(event.target.value); setOpen(true) }} placeholder="Search providers" aria-label="Search provider" />
+      <label htmlFor={inputId} className="grid gap-2 text-sm font-bold text-slate-200">
+        Provider
+        <input
+          id={inputId}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
+          autoComplete="off"
+          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 transition focus:ring-2"
+          value={open ? query : selected?.name || ''}
+          onFocus={() => {
+            setOpen(true)
+            setQuery('')
+            setActiveIndex(-1)
+            loadProviders()
+          }}
+          onChange={event => {
+            setQuery(event.target.value)
+            setOpen(true)
+            setActiveIndex(-1)
+          }}
+          onKeyDown={onKeyDown}
+          placeholder={loading ? 'Loading providers…' : 'Search available providers'}
+          aria-label="Search available providers"
+        />
       </label>
+
       {open && (
-        <div id="integration-provider-options" role="listbox" className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl">
-          {filtered.map(provider => (
-            <button key={provider.id} type="button" role="option" aria-selected={provider.id === value} onClick={() => { onChange(provider); setQuery(''); setOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-slate-100 transition hover:bg-cyan-400/10">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-300/10 text-cyan-200">{provider.icon}</span>
-              <span><span className="block font-bold">{provider.name}</span><span className="text-xs text-slate-400">{provider.methods.join(' · ')}</span></span>
+        <div id={listboxId} role="listbox" className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl">
+          {loading && <p className="px-3 py-4 text-sm text-slate-400">Loading providers…</p>}
+          {!loading && filtered.map((provider, index) => (
+            <button
+              id={`${listboxId}-${index}`}
+              key={provider.id}
+              type="button"
+              role="option"
+              aria-selected={provider.id === value}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => selectProvider(provider)}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-slate-100 transition ${activeIndex === index ? 'bg-cyan-400/10' : 'hover:bg-cyan-400/10'}`}
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-300/10 text-cyan-200">{provider.icon || '•'}</span>
+              <span>
+                <span className="block font-bold">{provider.name}</span>
+                <span className="text-xs text-slate-400">{provider.methods?.join(' · ') || provider.defaultMethod}</span>
+              </span>
             </button>
           ))}
-          {!filtered.length && <p className="px-3 py-4 text-sm text-slate-400">No providers found.</p>}
+          {!loading && !filtered.length && !error && <p className="px-3 py-4 text-sm text-slate-400">No matching providers.</p>}
+          {error && (
+            <div className="grid gap-2 px-3 py-3 text-sm text-amber-200">
+              <span>{error}</span>
+              <button type="button" onClick={() => loadProviders({ force: true })} className="w-fit rounded-lg border border-amber-300/30 px-3 py-1.5 font-bold">Retry</button>
+            </div>
+          )}
         </div>
       )}
     </div>

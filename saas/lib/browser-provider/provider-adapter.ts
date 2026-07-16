@@ -169,6 +169,7 @@ function assertNavigation(value: unknown): asserts value is NavigationProfile {
   assertBoundedText(value.pathTemplate, 'navigation_path', 512)
   if (
     !value.pathTemplate.startsWith('/') ||
+    value.pathTemplate.startsWith('//') ||
     value.pathTemplate.includes('://') ||
     value.pathTemplate.includes('?') ||
     value.pathTemplate.includes('#') ||

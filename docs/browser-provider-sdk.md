@@ -15,9 +15,17 @@ Registration is a fail-closed trust boundary. Adapters must use an exact, versio
 
 The registry stores a detached, deeply frozen snapshot. Later changes to the caller-owned adapter object cannot alter registered origins, selectors, capabilities, verification assertions, evidence requirements, health, localization, or version metadata.
 
+## Capability routing boundary
+
+Every registered capability must include the logical origin used by its navigation profile in `allowedOrigins`. A capability cannot advertise browser-on-demand or automatic browser failover without browser support, and it must expose at least one usable transport (`supportsApi` or `supportsBrowser`). These cross-profile checks run after the adapter has passed exact-shape validation and before it is published by the registry.
+
+Logical origin IDs remain separate even when they currently resolve to the same canonical HTTPS host. This preserves least-privilege routing and prevents a future consumer from treating a deployment, settings, domains, or dashboard route as interchangeable merely because the provider serves them from one host.
+
 ## Vercel
 
 The initial adapter defines read-only metadata for deployment status/logs/failures, domains, project metadata, environment-variable metadata, dashboard evidence, and dashboard/API comparison. It does not execute or authenticate.
+
+The Vercel capability table uses explicit mappings rather than array-position inference. Dashboard evidence is bound to `/dashboard`, project metadata is bound to the settings logical origin used by its navigation profile, and every capability passes the navigation-origin confinement rule.
 
 ## Expansion
 

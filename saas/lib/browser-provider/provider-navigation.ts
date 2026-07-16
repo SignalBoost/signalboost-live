@@ -1,6 +1,7 @@
 import type { OriginId } from './provider-origin.ts'
 
 export type NavigationId =
+  | 'dashboard-overview'
   | 'deployment-list'
   | 'deployment-detail'
   | 'project-settings'

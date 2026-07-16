@@ -92,7 +92,8 @@ export function createBrowserProviderPolicyReviewSnapshot(adapter: BrowserProvid
   const capabilities = adapter.capabilities
     .map(capability => {
       const mapped = mapBrowserProviderCapabilityToSupervisorCapability(capability)
-      if (!capability.readOnly || mapped.allowedEnvironments.includes('production')) {
+      const environments = mapped.allowedEnvironments ?? []
+      if (!capability.readOnly || environments.length !== 2 || !environments.includes('sandbox') || !environments.includes('preview') || environments.includes('production')) {
         throw new BrowserProviderError('invalid_provider')
       }
 

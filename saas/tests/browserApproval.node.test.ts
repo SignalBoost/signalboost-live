@@ -76,14 +76,35 @@ test('approval verification rejects malformed issuedAt timestamps', () => {
   const task = makeTask({ issuedAt: 'not-a-timestamp' })
   const claims = makeClaims(task)
 
-  assert.throws(() => verify(task, claims), /issuedAt must be a valid timestamp/)
+  assert.throws(() => verify(task, claims), /issuedAt must be a canonical UTC ISO timestamp/)
 })
 
 test('approval verification rejects malformed expiresAt timestamps', () => {
   const task = makeTask({ expiresAt: 'not-a-timestamp' })
   const claims = makeClaims(task)
 
-  assert.throws(() => verify(task, claims), /expiresAt must be a valid timestamp/)
+  assert.throws(() => verify(task, claims), /expiresAt must be a canonical UTC ISO timestamp/)
+})
+
+test('approval verification rejects impossible calendar dates that Date.parse normalizes', () => {
+  const task = makeTask({ issuedAt: '2026-02-30T00:00:00.000Z' })
+  const claims = makeClaims(task)
+
+  assert.throws(() => verify(task, claims), /issuedAt must be a canonical UTC ISO timestamp/)
+})
+
+test('approval verification rejects parseable shorthand timestamps', () => {
+  const task = makeTask({ issuedAt: '0' })
+  const claims = makeClaims(task)
+
+  assert.throws(() => verify(task, claims), /issuedAt must be a canonical UTC ISO timestamp/)
+})
+
+test('approval verification rejects non-canonical ISO offsets', () => {
+  const task = makeTask({ issuedAt: '2026-07-16T05:00:00+00:00' })
+  const claims = makeClaims(task)
+
+  assert.throws(() => verify(task, claims), /issuedAt must be a canonical UTC ISO timestamp/)
 })
 
 test('approval verification rejects non-positive approval windows', () => {

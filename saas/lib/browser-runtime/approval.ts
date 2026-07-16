@@ -28,7 +28,9 @@ export interface BrowserApprovalVerificationScope {
 }
 
 const MAX_ISSUED_AT_CLOCK_SKEW_MS = 60_000
+const MAX_APPROVAL_STRING_LENGTH = 256
 const CANONICAL_APPROVAL_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+const SHA256_HEX = /^[a-f0-9]{64}$/
 
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url')
@@ -40,6 +42,101 @@ function decode(value: string): string {
 
 function signature(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url')
+}
+
+function assertCanonicalString(value: unknown, label: string): asserts value is string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MAX_APPROVAL_STRING_LENGTH ||
+    value !== value.trim()
+  ) {
+    throw new Error(`${label} must be a non-empty canonical string`)
+  }
+}
+
+function validateUniqueStrings(value: unknown, label: string): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${label} must be a non-empty array of unique non-empty strings`)
+  }
+
+  const values: string[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    assertCanonicalString(item, `${label} entry`)
+    if (seen.has(item)) {
+      throw new Error(`${label} must be a non-empty array of unique non-empty strings`)
+    }
+    seen.add(item)
+    values.push(item)
+  }
+  return values
+}
+
+function validateCanonicalOrigins(value: unknown, label: string): string[] {
+  const origins = validateUniqueStrings(value, label)
+  for (const origin of origins) {
+    let parsed: URL
+    try {
+      parsed = new URL(origin)
+    } catch {
+      throw new Error(`${label} must contain only canonical HTTP(S) origins`)
+    }
+
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+      parsed.username !== '' ||
+      parsed.password !== '' ||
+      parsed.pathname !== '/' ||
+      parsed.search !== '' ||
+      parsed.hash !== '' ||
+      parsed.origin !== origin
+    ) {
+      throw new Error(`${label} must contain only canonical HTTP(S) origins`)
+    }
+  }
+  return origins
+}
+
+function validateContinuationClaims(claims: BrowserApprovalClaims, task: BrowserTask): void {
+  if (claims.phase !== undefined && claims.phase !== 1 && claims.phase !== 2) {
+    throw new Error('Unsupported browser approval token phase')
+  }
+
+  if (claims.phase === undefined) {
+    if (
+      claims.checkpointStepId !== undefined ||
+      claims.executionId !== undefined ||
+      claims.preApprovalTokenDigest !== undefined
+    ) {
+      throw new Error('Browser approval continuation claims require an explicit phase')
+    }
+    return
+  }
+
+  assertCanonicalString(claims.checkpointStepId, 'Browser approval token checkpointStepId')
+  const checkpointExists = task.steps.some(
+    step => step.kind === 'checkpoint' && step.id === claims.checkpointStepId,
+  )
+  if (!checkpointExists) {
+    throw new Error('Browser approval token checkpointStepId is not an approved task checkpoint')
+  }
+
+  if (claims.phase === 1) {
+    if (claims.executionId !== undefined || claims.preApprovalTokenDigest !== undefined) {
+      throw new Error('Browser approval phase 1 must not include execution binding claims')
+    }
+    return
+  }
+
+  assertCanonicalString(claims.executionId, 'Browser approval token executionId')
+  assertCanonicalString(
+    claims.preApprovalTokenDigest,
+    'Browser approval token preApprovalTokenDigest',
+  )
+  if (!SHA256_HEX.test(claims.executionId) || !SHA256_HEX.test(claims.preApprovalTokenDigest)) {
+    throw new Error('Browser approval phase 2 requires SHA-256 execution binding claims')
+  }
 }
 
 function parseApprovalTimestamp(value: string, label: 'issuedAt' | 'expiresAt'): number {
@@ -81,10 +178,55 @@ export function verifyBrowserApprovalToken(
     throw new Error('Invalid browser approval token signature')
   }
 
-  const claims = JSON.parse(decode(payload)) as BrowserApprovalClaims
-  const exactStepIds = scope.expectedStepIds ?? task.steps.map(step => step.id)
+  let parsedClaims: unknown
+  try {
+    parsedClaims = JSON.parse(decode(payload))
+  } catch {
+    throw new Error('Malformed browser approval token claims')
+  }
+  if (!parsedClaims || typeof parsedClaims !== 'object' || Array.isArray(parsedClaims)) {
+    throw new Error('Malformed browser approval token claims')
+  }
 
+  const claims = parsedClaims as BrowserApprovalClaims
   if (claims.version !== 1) throw new Error('Unsupported browser approval token version')
+
+  assertCanonicalString(task.taskId, 'Browser task taskId')
+  assertCanonicalString(task.incidentId, 'Browser task incidentId')
+  assertCanonicalString(task.provider, 'Browser task provider')
+  assertCanonicalString(task.adapterId, 'Browser task adapterId')
+  assertCanonicalString(claims.taskId, 'Browser approval token taskId')
+  assertCanonicalString(claims.incidentId, 'Browser approval token incidentId')
+  assertCanonicalString(claims.provider, 'Browser approval token provider')
+  assertCanonicalString(claims.adapterId, 'Browser approval token adapterId')
+  assertCanonicalString(claims.nonce, 'Browser approval token nonce')
+
+  if (!Array.isArray(task.steps) || task.steps.length === 0) {
+    throw new Error('Browser task must contain at least one step')
+  }
+  const taskStepIds = validateUniqueStrings(
+    task.steps.map(step => step?.id),
+    'Browser task step IDs',
+  )
+  const exactStepIds = validateUniqueStrings(
+    scope.expectedStepIds ?? taskStepIds,
+    'Browser approval expected step IDs',
+  )
+  const allowedStepIds = validateUniqueStrings(
+    claims.allowedStepIds,
+    'Browser approval token allowedStepIds',
+  )
+  const taskAllowedOrigins = validateCanonicalOrigins(
+    task.allowedOrigins,
+    'Browser task allowedOrigins',
+  )
+  const allowedOrigins = validateCanonicalOrigins(
+    claims.allowedOrigins,
+    'Browser approval token allowedOrigins',
+  )
+
+  validateContinuationClaims(claims, task)
+
   if (claims.taskId !== task.taskId) throw new Error('Approval token taskId mismatch')
   if (claims.incidentId !== task.incidentId) throw new Error('Approval token incidentId mismatch')
   if (claims.provider !== task.provider) throw new Error('Approval token provider mismatch')
@@ -104,10 +246,10 @@ export function verifyBrowserApprovalToken(
   if (issuedAtMs > nowMs + MAX_ISSUED_AT_CLOCK_SKEW_MS) {
     throw new Error('Browser approval token issued in the future')
   }
-  if (JSON.stringify(claims.allowedStepIds) !== JSON.stringify(exactStepIds)) {
+  if (JSON.stringify(allowedStepIds) !== JSON.stringify(exactStepIds)) {
     throw new Error('Approval token does not authorize the exact browser steps')
   }
-  if (JSON.stringify(claims.allowedOrigins) !== JSON.stringify(task.allowedOrigins)) {
+  if (JSON.stringify(allowedOrigins) !== JSON.stringify(taskAllowedOrigins)) {
     throw new Error('Approval token origin scope mismatch')
   }
   if (scope.expectedPhase !== undefined && claims.phase !== scope.expectedPhase) {

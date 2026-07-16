@@ -290,9 +290,6 @@ export async function resumeBrowserTask(input: {
     const suppliedPreApprovalTokenDigest = digestBrowserApprovalToken(input.task.approvalToken)
 
     if (record.executionId !== input.executionId) throw new Error('Resumable record executionId mismatch')
-    if (expectedExecutionId !== input.executionId) {
-      throw new Error('Resumable executionId does not match the task approval')
-    }
     if (record.taskId !== input.task.taskId) throw new Error('Resumable taskId mismatch')
     if (record.incidentId !== input.task.incidentId) throw new Error('Resumable incidentId mismatch')
     if (record.provider !== input.task.provider) throw new Error('Resumable provider mismatch')
@@ -303,6 +300,9 @@ export async function resumeBrowserTask(input: {
     }
     if (record.preApprovalTokenDigest !== suppliedPreApprovalTokenDigest) {
       throw new Error('Resumable pre-approval token mismatch')
+    }
+    if (expectedExecutionId !== input.executionId) {
+      throw new Error('Resumable executionId does not match the task approval')
     }
     if (!sameJson(record.allowedOrigins, input.task.allowedOrigins)) {
       throw new Error('Resumable origin scope mismatch')

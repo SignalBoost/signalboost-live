@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  BROWSER_APPROVAL_MAX_LIFETIME_MS,
   BROWSER_APPROVAL_MAX_SCOPE_ITEMS,
   BROWSER_APPROVAL_MAX_TOKEN_LENGTH,
   issueBrowserApprovalToken,
@@ -122,5 +123,29 @@ test('approval issuance refuses an unbounded signed envelope', () => {
   assert.throws(
     () => issueBrowserApprovalToken(claims, signingSecret),
     /exceeds 262144 characters/,
+  )
+})
+
+test('approval verification accepts the exact maximum approval lifetime', () => {
+  const task = makeTask()
+  assert.equal(
+    Date.parse(task.expiresAt) - Date.parse(task.issuedAt),
+    BROWSER_APPROVAL_MAX_LIFETIME_MS,
+  )
+  const token = issueBrowserApprovalToken(makeClaims(task), signingSecret)
+
+  assert.doesNotThrow(() => verifyBrowserApprovalToken(token, task, signingSecret, now))
+})
+
+test('approval verification rejects approval lifetimes above the maximum', () => {
+  const task = makeTask()
+  task.expiresAt = new Date(
+    Date.parse(task.issuedAt) + BROWSER_APPROVAL_MAX_LIFETIME_MS + 1,
+  ).toISOString()
+  const token = issueBrowserApprovalToken(makeClaims(task), signingSecret)
+
+  assert.throws(
+    () => verifyBrowserApprovalToken(token, task, signingSecret, now),
+    /lifetime must not exceed 3600000ms/,
   )
 })

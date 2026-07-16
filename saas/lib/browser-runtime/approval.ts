@@ -29,6 +29,7 @@ export interface BrowserApprovalVerificationScope {
 }
 
 const MAX_ISSUED_AT_CLOCK_SKEW_MS = 60_000
+const MAX_APPROVAL_LIFETIME_MS = 60 * 60 * 1_000
 const MAX_APPROVAL_STRING_LENGTH = 256
 const MAX_APPROVAL_SCOPE_ITEMS = 128
 const MAX_APPROVAL_TOKEN_LENGTH = 262_144
@@ -312,6 +313,9 @@ export function verifyBrowserApprovalToken(
   if (expiresAtMs <= issuedAtMs) {
     throw new Error('Browser approval token expiry must be after issuedAt')
   }
+  if (expiresAtMs - issuedAtMs > MAX_APPROVAL_LIFETIME_MS) {
+    throw new Error(`Browser approval token lifetime must not exceed ${MAX_APPROVAL_LIFETIME_MS}ms`)
+  }
   if (expiresAtMs <= nowMs) throw new Error('Browser approval token expired')
   if (issuedAtMs > nowMs + MAX_ISSUED_AT_CLOCK_SKEW_MS) {
     throw new Error('Browser approval token issued in the future')
@@ -345,6 +349,7 @@ export function verifyBrowserApprovalToken(
 }
 
 export {
+  MAX_APPROVAL_LIFETIME_MS as BROWSER_APPROVAL_MAX_LIFETIME_MS,
   MAX_APPROVAL_SCOPE_ITEMS as BROWSER_APPROVAL_MAX_SCOPE_ITEMS,
   MAX_APPROVAL_TOKEN_LENGTH as BROWSER_APPROVAL_MAX_TOKEN_LENGTH,
 }

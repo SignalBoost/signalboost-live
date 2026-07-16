@@ -43,7 +43,7 @@ function makeTask(suffix: string): BrowserTask {
     provider: 'sandbox',
     adapterId: 'signalboost.sandbox.v1',
     mode: 'prepare_change',
-    issuedAt: '2026-07-16T02:30:00.000Z',
+    issuedAt: '2026-07-16T03:00:00.000Z',
     expiresAt,
     allowedOrigins: ['https://sandbox.example.test'],
     steps: [

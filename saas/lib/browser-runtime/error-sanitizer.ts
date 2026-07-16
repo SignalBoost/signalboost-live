@@ -1,5 +1,6 @@
 const REDACTED = '[redacted]'
 const MAX_ERROR_LENGTH = 600
+const SENSITIVE_ASSIGNMENT = /((?:"|')?(?:authorization|cookie|password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret)(?:"|')?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}]+)/gi
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -27,6 +28,15 @@ function redactKnownSecrets(message: string, knownSecrets: Iterable<string>): st
   return sanitized
 }
 
+function redactSensitiveAssignment(
+  _match: string,
+  prefix: string,
+  value: string,
+): string {
+  const quote = value[0] === '"' || value[0] === "'" ? value[0] : ''
+  return `${prefix}${quote}${REDACTED}${quote}`
+}
+
 /**
  * Produces the only error text permitted to leave Browser Runtime.
  *
@@ -47,9 +57,7 @@ export function sanitizeBrowserRuntimeError(
     .replace(/\bxox[baprs]-[a-z0-9-]+\b/gi, REDACTED)
     .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s\/@:]+:[^\s\/@]+@/gi, `$1${REDACTED}@`)
     .replace(/([?&](?:token|key|secret|password|access_token|refresh_token|api_key)=)[^&#\s]+/gi, `$1${REDACTED}`)
-    .replace(/(authorization\s*[:=]\s*)(?:bearer\s+)?[^\s,;]+/gi, `$1${REDACTED}`)
-    .replace(/(cookie\s*[:=]\s*)[^,\r\n]+/gi, `$1${REDACTED}`)
-    .replace(/((?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret)\s*[:=]\s*)[^\s,;]+/gi, `$1${REDACTED}`)
+    .replace(SENSITIVE_ASSIGNMENT, redactSensitiveAssignment)
     .replace(/\r?\n\s*at\s+[^\r\n]+/g, '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
     .replace(/\s+/g, ' ')

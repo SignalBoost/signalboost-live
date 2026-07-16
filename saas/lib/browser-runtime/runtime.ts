@@ -169,10 +169,25 @@ export async function runBrowserTask(input: {
       const step = task.steps[index]
       if (step.kind === 'checkpoint') {
         events.push(evidence(events.length + 1, step.id, 'checkpoint', step.label))
-        let executionId: string | undefined
+        const pausedResult = finalizeInitialResult(task, {
+          taskId: task.taskId,
+          incidentId: task.incidentId,
+          provider: task.provider,
+          status: 'paused',
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          completedStepIds,
+          pausedAtStepId: step.id,
+          evidence: events,
+          verification: 'pending',
+        }, input.now)
+
+        if (pausedResult.verification === 'pending' || pausedResult.verification.status !== 'verified') {
+          return pausedResult
+        }
 
         if (resumableRequested && input.executionStore && input.sessionRegistry) {
-          executionId = createBrowserExecutionId(task, step.id)
+          const executionId = createBrowserExecutionId(task, step.id)
           const remainingSteps = task.steps.slice(index + 1)
           await input.executionStore.save({
             executionId,
@@ -198,21 +213,11 @@ export async function runBrowserTask(input: {
             await input.executionStore.delete(executionId).catch(() => undefined)
             throw error
           }
+
+          return { ...pausedResult, executionId }
         }
 
-        return finalizeInitialResult(task, {
-          taskId: task.taskId,
-          incidentId: task.incidentId,
-          provider: task.provider,
-          status: 'paused',
-          startedAt,
-          finishedAt: new Date().toISOString(),
-          completedStepIds,
-          pausedAtStepId: step.id,
-          executionId,
-          evidence: events,
-          verification: 'pending',
-        }, input.now)
+        return pausedResult
       }
 
       await executeStep({ step, task, session, context, events })

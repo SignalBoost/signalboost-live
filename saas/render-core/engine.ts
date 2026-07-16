@@ -27,6 +27,11 @@ export async function runRender(
   if (!executor) return { ok: false, code: 'no_executor', message: `No renderer registered for ${input.providerId}.` }
 
   const providerCostCents = Math.max(0, Math.ceil(executor.estimateCostCents(input)))
+  if (funding.mode === 'wallet' && providerCostCents > 0 && !input.paidProviderApprovalId) {
+    log.log('render.approval_required', { providerId: input.providerId, providerCostCents })
+    return { ok: false, code: 'approval_required', message: 'Paid provider renders require server-side payment confirmation and owner approval.' }
+  }
+
   const apiKey = funding.mode === 'byok' ? (funding.apiKey || null) : host.resolvePlatformKey(input.providerId)
   if (!apiKey) return { ok: false, code: 'no_key', message: 'No API key available for this provider.' }
 

@@ -637,6 +637,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Added Mission 001 Sprint 12 Vercel Observer: a read-only provider observer with injected secret resolution, narrow Vercel client, deterministic deployment-state normalization, bounded read retries, sanitized normalized incidents, stable deduplication keys, and focused no-network tests. It does not diagnose or repair incidents.
 
+- 2026-07-16: Hardened paid provider gates: wallet-funded non-zero render providers now require a server-side approval reference before reservation/provider execution, and the FAL/Kling marketing-sales video host requires the `COSA_PAID_VIDEO_PROVIDER_APPROVED` runtime flag before submitting paid video jobs.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

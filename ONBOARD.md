@@ -637,6 +637,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Added Mission 001 Sprint 12 Vercel Observer: a read-only provider observer with injected secret resolution, narrow Vercel client, deterministic deployment-state normalization, bounded read retries, sanitized normalized incidents, stable deduplication keys, and focused no-network tests. It does not diagnose or repair incidents.
 
+- 2026-07-16: Added root website-generation AI adapter switchboard (`lib/ai/adapters.ts`) and `/api/generate` provider selection. The route defaults to OpenAI while supporting Anthropic through the same adapter contract and environment-variable pattern.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

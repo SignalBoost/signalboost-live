@@ -1,34 +1,28 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { getAiProviderAdapter } from '@/lib/ai/adapters'
 
 export async function POST(req: Request) {
   try {
-    const { prompt, mode = 'default', language = 'en' } = await req.json()
+    const { prompt, mode = 'default', language = 'en', provider } = await req.json()
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Missing prompt.' }, { status: 400 })
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ result: `SignalBoost draft (${mode}, ${language}): ${prompt}` })
-    }
-
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are SignalBoost AI. Generate concise, brand-safe content for the unified Marketplace + SaaS cockpit. Respond in ${language}.`,
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.8,
+    const adapter = getAiProviderAdapter(provider)
+    const result = await adapter.generateWebsite({
+      prompt: prompt.trim(),
+      mode,
+      language,
     })
 
-    return NextResponse.json({ result: completion.choices[0].message?.content || 'No response.' })
+    return NextResponse.json({
+      result: result.text,
+      provider: result.provider,
+      model: result.model,
+    })
   } catch (error) {
-    console.error('Generate API error:', error)
+    console.error('Generate API error:', error instanceof Error ? error.message : 'Unknown error')
     return NextResponse.json({ error: 'Generation failed.' }, { status: 500 })
   }
 }

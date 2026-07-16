@@ -7,6 +7,8 @@ import type {
   BrowserVerificationReport,
 } from './contracts.ts'
 
+const INVALID_VERIFICATION_TIMESTAMP = '1970-01-01T00:00:00.000Z'
+
 function expectedEvidenceKind(step: BrowserTaskStep): BrowserEvidence['kind'] {
   if (step.kind === 'navigate') return 'navigation'
   if (step.kind === 'screenshot') return 'screenshot'
@@ -35,6 +37,21 @@ function sameOrderedValues(left: string[], right: string[]): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
+function resolveVerificationClock(now: Date): { valid: boolean; verifiedAt: string } {
+  const nowMs = now.getTime()
+  if (!Number.isFinite(nowMs)) {
+    return {
+      valid: false,
+      verifiedAt: INVALID_VERIFICATION_TIMESTAMP,
+    }
+  }
+
+  return {
+    valid: true,
+    verifiedAt: new Date(nowMs).toISOString(),
+  }
+}
+
 interface VerificationShape {
   checkpointRulePassed: boolean
   checkpointRuleSummary: string
@@ -51,11 +68,17 @@ function verifyAgainstShape(
   now: Date,
 ): BrowserVerificationReport {
   const checks: BrowserVerificationCheck[] = []
+  const verificationClock = resolveVerificationClock(now)
 
   function check(id: string, passed: boolean, summary: string): void {
     checks.push({ id, passed, summary })
   }
 
+  check(
+    'verification-clock',
+    verificationClock.valid,
+    'Verification clock is a valid timestamp.',
+  )
   check('task-id', result.taskId === task.taskId, 'Result task ID matches the approved task.')
   check('incident-id', result.incidentId === task.incidentId, 'Result incident ID matches the approved task.')
   check('provider', result.provider === task.provider, 'Result provider matches the approved task.')
@@ -140,7 +163,7 @@ function verifyAgainstShape(
     incidentId: task.incidentId,
     provider: task.provider,
     status: errors.length === 0 ? 'verified' : 'failed',
-    verifiedAt: now.toISOString(),
+    verifiedAt: verificationClock.verifiedAt,
     checks,
     errors,
   }

@@ -31,6 +31,7 @@ export function issueContinuationApproval(input: {
   /**
    * Optional caller policy guard. This may reject a task whose remaining lifetime
    * exceeds the requested TTL, but it never rewrites the signed task expiry.
+   * When omitted, the retained BrowserTask remains the sole time authority.
    */
   ttlMs?: number
 }) {

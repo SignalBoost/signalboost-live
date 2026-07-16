@@ -2,75 +2,105 @@
 
 ## Sprint 11 — Supervisor Core Contracts and Orchestrator Skeleton
 
-Sprint 11 establishes the provider-neutral supervisor foundation that will eventually connect:
+Sprint 11 established the provider-neutral supervisor foundation:
 
 Observer → Thinker → Policy Engine → Executor → Verifier → Audit
 
-This sprint is intentionally contract-only and deterministic. It does **not** perform live Vercel observation, call an LLM, launch a browser, invoke Browser Runtime repairs, or change production/provider state.
+It is intentionally contract-only and deterministic. The supervisor core does **not** perform live Vercel observation, call an LLM, launch a browser, invoke Browser Runtime repairs, or change production/provider state.
 
-## New files
+## Sprint 12 — Vercel Observer and Normalized Incident Ingestion
 
-- `saas/lib/supervisor/incident-schema.ts` — strict runtime validation for serializable incidents and evidence.
-- `saas/lib/supervisor/repair-plan-schema.ts` — strict runtime validation for bounded repair plans, explicit step actions, secret-reference enforcement, and browser-origin requirements.
-- `saas/lib/supervisor/execution-contracts.ts` — provider-neutral Observer, Thinker, PolicyEngine, Executor, Verifier, and AuditSink interfaces.
-- `saas/lib/supervisor/policy-engine.ts` — deterministic conservative default policy engine for disabled, passive, and autopilot modes.
-- `saas/lib/supervisor/orchestrator.ts` — fail-closed orchestration skeleton coordinating injected dependencies only.
-- `saas/lib/supervisor/errors.ts` — supervisor-specific error classes.
-- `saas/lib/supervisor/index.ts` — public exports.
-- `saas/tests/supervisorCore.node.test.ts` — focused contract, policy, schema, and orchestrator tests.
+Sprint 12 adds the first real provider Observer: a read-only Vercel deployment observer under `saas/lib/supervisor/providers/vercel/`.
 
-## Dependency boundaries
+This sprint is observation-only. It detects provider facts, normalizes them into the existing `SupervisorIncident` schema, validates every incident with the Sprint 11 schema, and stops there. It does **not** diagnose root causes, propose repair steps, invoke an LLM/Thinker, launch Playwright or Browser Runtime, execute plans, mutate Vercel configuration, redeploy projects, change environment variables, or bypass the Supervisor orchestrator.
 
-- The Observer contract receives only provider observation context and returns validated incidents. It does not receive an Executor, Browser Runtime, browser session, or browser handle.
-- The Thinker contract receives one validated incident and returns a repair-plan candidate. It does not receive an Executor, Browser Runtime, browser session, or browser handle.
-- The PolicyEngine receives a validated incident, validated repair plan, supervisor mode, and policy context, then returns a deterministic scoped decision.
-- The Executor receives only the validated incident, validated repair plan, policy decision, explicit approved step IDs, and execution context.
-- The Verifier receives the incident, repair plan, and execution result.
-- The AuditSink receives immutable serializable audit events.
-- The supervisor core does not import Playwright, Chromium, browser-use, Stagehand, OpenAI, Gemini, Vercel SDK, Stripe SDK, or Supabase clients.
+### Vercel Observer responsibilities
 
-## Policy behavior
+- Resolve the Vercel token through an injected secret resolver.
+- Query recent deployments through an injected read-only Vercel client.
+- Normalize Vercel deployment states to `queued`, `building`, `ready`, `failed`, `canceled`, or `unknown`.
+- Apply deterministic incident detectors.
+- Return zero or more validated `SupervisorIncident` objects.
+- Convert authentication, authorization, rate-limit, and provider-outage failures into normalized provider incidents.
 
-### Disabled mode
+### Read-only boundary
 
-- Blocks every execution.
+The Vercel client interface exposes only:
 
-### Passive mode
+- `getProjectMetadata`
+- `listRecentDeployments`
+- `getDeployment`
 
-- May approve read-only plans automatically.
-- Requires approval for protected actions.
-- Requires approval for medium, high, or critical risk plans.
-- Requires approval for production modifications.
-- Blocks destructive operations.
+It intentionally does not expose deployment creation, redeploy, cancel, project update, environment-variable mutation, deletion, token rotation, domain mutation, or generic arbitrary request methods.
 
-### Autopilot mode
+### Incident types
 
-- May approve read-only plans automatically.
-- May approve low-risk reversible sandbox actions with explicit step scope.
-- Requires approval for production modifications.
-- Requires approval for sensitive billing, payment, account ownership, permission, domain-transfer, and secret-rotation operations.
-- Blocks destructive operations.
-- Blocks critical-risk plans.
-- Treats ambiguous plans conservatively and does not auto-approve them.
+Sprint 12 detects:
 
-## Tests added
+- failed deployment
+- repeated deployment failure
+- stuck queued/building deployment
+- canceled production deployment
+- unknown provider state
+- API authentication or authorization failure
+- provider API unavailable / rate-limited after bounded retries
 
-`saas/tests/supervisorCore.node.test.ts` proves invalid incidents and plans are rejected, non-serializable metadata is rejected, plaintext secrets in plan parameters are rejected while `secretRef` is accepted, browser plans require `targetOrigin`, default policy decisions are conservative, and the orchestrator fails closed on invalid Thinker output, approval-required decisions, unknown approved step IDs, verification failure, and pre-execution audit failure.
+### Severity rules
 
-The tests also assert that Observer and Thinker contracts do not include Executor or Browser Runtime dependencies.
+Severity is deterministic and centralized in the Vercel incident mapper:
 
-## Deliberately not implemented yet
+- failed sandbox or preview deployment: `warning`
+- failed production deployment: `critical`
+- repeated sandbox or preview failures: `warning`
+- repeated production failures: `critical`
+- stuck sandbox or preview deployment: `warning`
+- stuck production deployment: `critical`
+- canceled production deployment: `warning`
+- unknown provider state: `warning`
+- authentication or authorization failure: `critical`
+- provider outage or rate limit: `warning`
 
-- No live Vercel observation.
-- No Vercel SDK/API execution.
-- No LLM/Thinker provider integration.
-- No Browser Runtime launch.
-- No production repair autonomy.
-- No durable supervisor queue.
-- No UI for supervisor approvals.
+### Deduplication behavior
 
-Live Vercel observation and execution are deferred to the next sprint.
+Incident IDs are stable and deterministic:
 
-## Next recommended sprint
+- failed deployment: provider + project + deployment ID + incident type
+- repeated failures: provider + project + environment + consecutive failure-sequence fingerprint
+- stuck deployment: provider + project + deployment ID + threshold category
+- connection failure: provider connection ID + normalized error category
 
-Sprint 12 should connect a read-only Vercel observer and policy-reviewed incident ingestion path while preserving the same boundaries: Observer detects facts, Thinker proposes only, Policy scopes approved steps, and any protected execution remains behind owner approval and audit controls.
+A short deterministic fingerprint is also stored in safe metadata for correlation.
+
+### Retry rules
+
+The Observer retries only safe read operations. Retry behavior is bounded by configuration, uses an injected sleeper for deterministic tests, honors safe Retry-After metadata where available, and never retries authentication, authorization, or invalid configuration failures. Exhausted retryable failures produce one provider-unavailable incident.
+
+### Sanitation rules
+
+All Vercel-provided strings routed to incidents pass through a sanitation layer that redacts authorization headers, bearer tokens, obvious API-token assignments, cookies, environment-variable values, stack-trace tails, and excessive message length. Incidents never store raw build logs, raw API responses, Authorization headers, cookies, or the resolved token.
+
+### Files added
+
+- `saas/lib/supervisor/providers/vercel/vercel-client.ts`
+- `saas/lib/supervisor/providers/vercel/vercel-types.ts`
+- `saas/lib/supervisor/providers/vercel/vercel-observer.ts`
+- `saas/lib/supervisor/providers/vercel/incident-mapper.ts`
+- `saas/lib/supervisor/providers/vercel/deployment-classifier.ts`
+- `saas/lib/supervisor/providers/vercel/errors.ts`
+- `saas/lib/supervisor/providers/vercel/index.ts`
+- `saas/lib/supervisor/providers/index.ts`
+- `saas/tests/vercelObserver.node.test.ts`
+
+### Tests added
+
+`saas/tests/vercelObserver.node.test.ts` covers healthy observations, sandbox/preview/production failed deployments, repeated failures with configurable thresholds, stuck deployment age rules, canceled production deployments, unknown states, authentication failures, bounded rate-limit retries, stable deduplication keys, token/header/raw-response redaction, incident schema validation, Observer dependency boundaries, read-only client surface, and no-network test behavior.
+
+### Known limitations
+
+- The Observer is registered through module exports for dependency injection, but it is not connected to automatic execution.
+- No internal API route was added because Sprint 12 can be satisfied through direct dependency injection, and adding a route without fully reusing existing admin/provider-connection lookup abstractions would create unnecessary security risk.
+- The client is intentionally narrow and read-only; additional safe read endpoints can be added in later sprints only when required by a detector.
+
+### Deferred to Sprint 13
+
+Sprint 13 should add a governed incident-ingestion workflow around the Observer: provider-connection lookup, server-side secret resolution, optional admin-only manual observation endpoint if the existing authentication/rate-limit/audit abstractions are reused safely, persistence/audit of normalized incidents, and owner-visible review surfaces. Sprint 13 should still stop before diagnosis or repair unless a separately reviewed Observer → Thinker handoff is explicitly approved.

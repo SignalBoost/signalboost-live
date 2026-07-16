@@ -1,4 +1,5 @@
 import { digestBrowserApprovalToken, verifyBrowserApprovalToken } from './approval.ts'
+import { sanitizeBrowserRuntimeError } from './error-sanitizer.ts'
 import {
   createBrowserExecutionId,
   fingerprintBrowserTask,
@@ -107,8 +108,9 @@ async function executeStep(input: {
   session: BrowserSessionPort
   context: BrowserAdapterContext
   events: BrowserEvidence[]
+  knownSecrets: Set<string>
 }): Promise<void> {
-  const { step, task, session, context, events } = input
+  const { step, task, session, context, events, knownSecrets } = input
 
   if (step.kind === 'navigate') {
     assertAllowedOrigin(step.url, task.allowedOrigins, `Navigation target for step ${step.id}`)
@@ -123,6 +125,7 @@ async function executeStep(input: {
   } else if (step.kind === 'fill') {
     assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
     const value = await context.resolveSecretRef(step.valueRef)
+    knownSecrets.add(value)
     assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
     await session.page.fill(step.selector, value)
     const currentUrl = assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'after')
@@ -154,11 +157,13 @@ export async function runBrowserTask(input: {
   const startedAt = new Date().toISOString()
   const completedStepIds: string[] = []
   const events: BrowserEvidence[] = []
+  const knownSecrets = new Set<string>([signingSecret, input.task.approvalToken])
   let session: Awaited<ReturnType<BrowserSessionFactory['open']>> | null = null
   let keepSessionForResume = false
 
   try {
     task = createBrowserExecutionTaskSnapshot(input.task)
+    knownSecrets.add(task.approvalToken)
 
     if (Boolean(input.executionStore) !== Boolean(input.sessionRegistry)) {
       throw new Error('Resumable execution requires both an execution store and a session registry')
@@ -244,7 +249,7 @@ export async function runBrowserTask(input: {
         return pausedResult
       }
 
-      await executeStep({ step, task, session, context, events })
+      await executeStep({ step, task, session, context, events, knownSecrets })
       completedStepIds.push(step.id)
     }
 
@@ -260,7 +265,7 @@ export async function runBrowserTask(input: {
       verification: 'pending',
     }, input.now)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown browser runtime error'
+    const message = sanitizeBrowserRuntimeError(error, knownSecrets)
     events.push(evidence(events.length + 1, 'runtime', 'error', message))
     return finalizeInitialResult(task, {
       taskId: task.taskId,
@@ -295,12 +300,18 @@ export async function resumeBrowserTask(input: {
   let startedAt = new Date().toISOString()
   const completedStepIds: string[] = []
   const events: BrowserEvidence[] = []
+  const knownSecrets = new Set<string>([
+    input.signingSecret,
+    input.secondApprovalToken,
+    input.task.approvalToken,
+  ])
   let checkpointStepId = 'unknown-checkpoint'
   let session: BrowserSessionPort | null = null
   let recordValidated = false
 
   try {
     task = createBrowserExecutionTaskSnapshot(input.task)
+    knownSecrets.add(task.approvalToken)
     const loadedRecord = await input.executionStore.load(input.executionId)
     record = loadedRecord ? createBrowserExecutionRecordSnapshot(loadedRecord) : null
     startedAt = record?.startedAt ?? startedAt
@@ -375,7 +386,14 @@ export async function resumeBrowserTask(input: {
     assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, record.checkpointStepId, 'after')
 
     for (const step of record.remainingSteps) {
-      await executeStep({ step, task, session, context: input.context, events })
+      await executeStep({
+        step,
+        task,
+        session,
+        context: input.context,
+        events,
+        knownSecrets,
+      })
       completedStepIds.push(step.id)
     }
 
@@ -401,7 +419,7 @@ export async function resumeBrowserTask(input: {
     await input.executionStore.delete(input.executionId)
     return result
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown browser runtime error'
+    const message = sanitizeBrowserRuntimeError(error, knownSecrets)
     events.push(evidence(events.length + 1, 'runtime', 'error', message))
 
     if (session) {

@@ -21,11 +21,19 @@ Every registered capability must include the logical origin used by its navigati
 
 Logical origin IDs remain separate even when they currently resolve to the same canonical HTTPS host. This preserves least-privilege routing and prevents a future consumer from treating a deployment, settings, domains, or dashboard route as interchangeable merely because the provider serves them from one host.
 
+## Evidence routing boundary
+
+Evidence profiles must use registered navigation profile IDs for screenshots and registered selector IDs for reads. A capability may reference an evidence profile only when every required screenshot route remains inside that capability's declared logical origins. Missing routes, missing selectors, or evidence requirements that escape the approved origin scope fail closed before provider registration.
+
+Evidence requirements are metadata only. They do not launch a browser, capture a screenshot, read a provider page, resolve credentials, or authorize execution.
+
 ## Vercel
 
 The initial adapter defines read-only metadata for deployment status/logs/failures, domains, project metadata, environment-variable metadata, dashboard evidence, and dashboard/API comparison. It does not execute or authenticate.
 
 The Vercel capability table uses explicit mappings rather than array-position inference. Dashboard evidence is bound to `/dashboard`, project metadata is bound to the settings logical origin used by its navigation profile, and every capability passes the navigation-origin confinement rule.
+
+Vercel evidence now references canonical navigation and selector IDs. Environment-variable metadata has a dedicated evidence profile instead of reusing project-name evidence, dashboard evidence uses the dashboard navigation profile, and deployment/domain evidence cannot require a screenshot outside the capability's allowed logical origin.
 
 ## Expansion
 

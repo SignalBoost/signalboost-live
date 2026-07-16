@@ -98,7 +98,7 @@ test('Supervisor mapping and worker descriptor preserve policy boundaries', () =
   assert.deepEqual(worker.executionDependencies, [])
 })
 
-test('policy review snapshot is detached, immutable, non-executable, and production-disabled', () => {
+test('policy review snapshot is detached, immutable, identity-bound, non-executable, and production-disabled', () => {
   const snapshot = createBrowserProviderPolicyReviewSnapshot(VercelBrowserAdapter)
   assert.equal(snapshot.providerId, 'vercel')
   assert.equal(snapshot.productionExecutionEnabled, false)
@@ -115,6 +115,9 @@ test('policy review snapshot is detached, immutable, non-executable, and product
   assert.throws(() => ((snapshot.capabilities as unknown as object[]).push({})), /not extensible|read only|Cannot add/)
   assert.throws(() => ((snapshot.capabilities[0].approvedOriginIds as string[])[0] = 'changed'), /Cannot assign|read only|not extensible/)
   assert.throws(() => createBrowserProviderPolicyReviewSnapshot({ ...VercelBrowserAdapter, supportsProduction: () => true }), /invalid_provider/)
+  assert.throws(() => createBrowserProviderPolicyReviewSnapshot({ ...VercelBrowserAdapter, capabilities: [VercelBrowserAdapter.capabilities[0], VercelBrowserAdapter.capabilities[0]] }), /invalid_provider/)
+  assert.throws(() => createBrowserProviderPolicyReviewSnapshot({ ...VercelBrowserAdapter, capabilities: [{ ...VercelBrowserAdapter.capabilities[0], providerId: 'other' }] }), /invalid_provider/)
+  assert.throws(() => createBrowserProviderPolicyReviewSnapshot({ ...VercelBrowserAdapter, getVersion: () => ({ ...VercelBrowserAdapter.getVersion(), capabilityVersion: 'other' }) }), /invalid_provider/)
 })
 
 test('Supervisor HA page renders BPAL policy metadata without execution controls or live provider access', async () => {

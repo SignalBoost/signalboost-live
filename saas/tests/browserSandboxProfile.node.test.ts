@@ -1,29 +1,25 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
+import type { BrowserSessionLaunchRequest } from '../lib/browser-runtime/contracts.ts'
 import { SandboxBrowserLaunchProfileProvider } from '../lib/browser-runtime/launch-profile.ts'
 import { DefaultBrowserSessionFactory, type BrowserEngineLaunchOptions } from '../lib/browser-runtime/session-factory.ts'
 
-function task(overrides: Partial<BrowserTask> = {}): BrowserTask {
+function request(
+  overrides: Partial<BrowserSessionLaunchRequest> = {},
+): BrowserSessionLaunchRequest {
   return {
-    taskId: 'TASK-SANDBOX-1',
-    incidentId: 'INC-SANDBOX-1',
     provider: 'sandbox',
     adapterId: 'signalboost.sandbox.v1',
     mode: 'observe',
-    issuedAt: '2026-07-15T00:00:00.000Z',
-    expiresAt: '2026-07-16T00:00:00.000Z',
     allowedOrigins: ['http://127.0.0.1:4173'],
-    steps: [],
-    approvalToken: 'test-token',
     ...overrides,
   }
 }
 
-test('sandbox profile accepts the bounded sandbox task', () => {
+test('sandbox profile accepts the bounded sandbox launch scope', () => {
   const provider = new SandboxBrowserLaunchProfileProvider()
-  const profile = provider.resolve(task())
+  const profile = provider.resolve(request())
 
   assert.equal(profile.id, 'sandbox.chromium.v1')
   assert.equal(profile.headless, true)
@@ -34,21 +30,21 @@ test('sandbox profile accepts the bounded sandbox task', () => {
 test('sandbox profile rejects non-sandbox providers and adapters', () => {
   const provider = new SandboxBrowserLaunchProfileProvider()
 
-  assert.throws(() => provider.resolve(task({ provider: 'vercel' })), /rejected provider/)
-  assert.throws(() => provider.resolve(task({ adapterId: 'vercel.dashboard.v1' })), /rejected adapter/)
+  assert.throws(() => provider.resolve(request({ provider: 'vercel' })), /rejected provider/)
+  assert.throws(() => provider.resolve(request({ adapterId: 'vercel.dashboard.v1' })), /rejected adapter/)
 })
 
 test('sandbox profile rejects production execution and unapproved origins', () => {
   const provider = new SandboxBrowserLaunchProfileProvider()
 
-  assert.throws(() => provider.resolve(task({ mode: 'execute_change' })), /does not allow execute_change/)
+  assert.throws(() => provider.resolve(request({ mode: 'execute_change' })), /does not allow execute_change/)
   assert.throws(
-    () => provider.resolve(task({ allowedOrigins: ['https://vercel.com'] })),
+    () => provider.resolve(request({ allowedOrigins: ['https://vercel.com'] })),
     /rejected origin/,
   )
 })
 
-test('session factory applies the task-specific sandbox profile', async () => {
+test('session factory applies the bounded sandbox launch profile', async () => {
   let launchOptions: BrowserEngineLaunchOptions | undefined
   let contextViewport: { width: number; height: number } | undefined
 
@@ -79,7 +75,7 @@ test('session factory applies the task-specific sandbox profile', async () => {
     },
   })
 
-  const session = await factory.open(task())
+  const session = await factory.open(request())
   await session.close()
 
   assert.equal(launchOptions?.headless, true)

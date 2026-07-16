@@ -320,11 +320,11 @@ export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistryLif
     this.sessions.clear()
     for (const retained of retainedSessions) retained.expiry.cancel()
 
-    this.shutdownPromise = Promise.resolve()
-      .then(() => Promise.allSettled(
-        retainedSessions.map(retained => retained.session.close()),
-      ))
-      .then(() => undefined)
+    this.shutdownPromise = Promise.allSettled(
+      retainedSessions.map(retained =>
+        Promise.resolve().then(() => retained.session.close()),
+      ),
+    ).then(() => undefined)
 
     return this.shutdownPromise
   }

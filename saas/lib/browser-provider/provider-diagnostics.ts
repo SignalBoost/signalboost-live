@@ -82,7 +82,7 @@ export function createBrowserProviderDiagnosticsSnapshot(
   const providers = registry.list().map(provider => {
     const worker = createBrowserProviderWorkerDescriptor(provider)
     if (provider.supportsProduction() || worker.maximumConcurrentWork !== 0 || worker.executionDependencies.length > 0) {
-      throw new BrowserProviderError('invalid_provider', 'BPAL diagnostics require a zero-execution, production-disabled provider')
+      throw new BrowserProviderError('invalid_provider')
     }
 
     const capabilities: BrowserProviderCapabilityDiagnostics[] = provider.capabilities.map(capability => {
@@ -90,7 +90,7 @@ export function createBrowserProviderDiagnosticsSnapshot(
       const allowedEnvironments = policy.allowedEnvironments ?? []
       const verificationProfileId = policy.verificationProfileId
       if (!capability.readOnly || allowedEnvironments.includes('production') || !verificationProfileId) {
-        throw new BrowserProviderError('invalid_provider', 'BPAL diagnostics may expose only verified read-only, non-production policy')
+        throw new BrowserProviderError('invalid_provider')
       }
 
       return {

@@ -1,6 +1,314 @@
-import type { BrowserProviderAdapter, LocalizedText } from '../provider-adapter.ts'; import { BPAL_SCHEMA_VERSION } from '../provider-version.ts'
-const v={provider:'1.0.0',capability:'1.0.0',schema:BPAL_SCHEMA_VERSION} as const
-const names:LocalizedText={en:'Vercel',es:'Vercel',pt:'Vercel',pl:'Vercel',ru:'Vercel'}
-const caps=['read-deployment-status','read-deployment-logs','read-deployment-failure','read-domain-status','read-project-metadata','read-environment-variable-metadata','capture-dashboard-evidence','compare-dashboard-vs-api'] as const
-const origin=(id:any)=>({id,origin:'https://vercel.com',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION} as const)
-export const vercelProvider:BrowserProviderAdapter={id:'vercel',displayName:names,version:v,health:{state:'unknown',checkedAt:'1970-01-01T00:00:00.000Z'},executionModes:['read_only'],autoFailoverSupported:false,browserOnDemandSupported:true,readOnlySupported:true,productionSupported:true,origins:[origin('dashboard'),origin('projects'),origin('deployments'),origin('domains'),origin('settings'),origin('login'),origin('metadata')],navigation:[{id:'deployment-list',origin:'deployments',pathTemplate:'/dashboard/deployments',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION},{id:'deployment-detail',origin:'deployments',pathTemplate:'/dashboard/deployments/:id',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION},{id:'project-settings',origin:'settings',pathTemplate:'/dashboard/:team/:project/settings',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION},{id:'domains',origin:'domains',pathTemplate:'/dashboard/:team/:project/settings/domains',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION},{id:'environment-metadata',origin:'settings',pathTemplate:'/dashboard/:team/:project/settings/environment-variables',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION},{id:'logs',origin:'deployments',pathTemplate:'/dashboard/:team/:project/deployments/:id/logs',readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION}],selectors:[['deployments.status','deployments','[data-testid="deployment-status"]'],['deployments.logs','logs','[data-testid="deployment-logs"]'],['domains.status','domains','[data-testid="domain-status"]'],['projects.name','projects','[data-testid="project-name"]'],['settings.environment','settings','[data-testid="environment-variables"]'],['authentication.login','authentication','form[action*="login"]']].map(([id,group,selector])=>({id,group,selector,readOnly:true,schemaVersion:BPAL_SCHEMA_VERSION} as any)),verification:[{id:'deployment-healthy',assertions:['status=ready'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'deployment-failed',assertions:['status=error'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'domain-configured',assertions:['domain=configured'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'project-visible',assertions:['project=visible'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'environment-metadata-visible',assertions:['metadata=visible'],schemaVersion:BPAL_SCHEMA_VERSION}],evidence:[{id:'deployment-failure',expectedScreenshots:['deployment-detail'],expectedReads:['status','logs'],expectedMetadata:['deploymentId'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'deployment-success',expectedScreenshots:['deployment-detail'],expectedReads:['status'],expectedMetadata:['deploymentId'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'dashboard-overview',expectedScreenshots:['dashboard'],expectedReads:['project-count'],expectedMetadata:['team'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'project-metadata',expectedScreenshots:['project-settings'],expectedReads:['project-name'],expectedMetadata:['projectId'],schemaVersion:BPAL_SCHEMA_VERSION},{id:'domain-state',expectedScreenshots:['domains'],expectedReads:['domain-status'],expectedMetadata:['domain'],schemaVersion:BPAL_SCHEMA_VERSION}],capabilities:caps.map((id,i)=>({id,operation:id,descriptionKey:`provider.vercel.capability.${id}`,risk:'read_only',maturity:'sandbox_verified',readOnly:true,supportsApi:id==='compare-dashboard-vs-api',supportsBrowser:true,supportsAutoFailover:false,supportsBrowserOnDemand:true,verificationProfile:(i<3?(i===0?'deployment-healthy':'deployment-failed'):i===3?'domain-configured':i===4?'project-visible':'environment-metadata-visible') as any,evidenceProfile:(i===0?'deployment-success':i<3?'deployment-failure':i===3?'domain-state':i===6?'dashboard-overview':'project-metadata') as any,navigationProfile:(i===0?'deployment-list':i<3?'logs':i===3?'domains':i===4?'project-settings':i===5?'environment-metadata':'deployment-detail') as any,allowedOrigins:[i===3?'domains':i===4?'projects':i===5?'settings':i===6?'dashboard':'deployments'] as any,version:v}))}
+import type { BrowserProviderAdapter, LocalizedText } from '../provider-adapter.ts'
+import type { ProviderCapability } from '../provider-capability.ts'
+import type { EvidenceProfile } from '../provider-evidence.ts'
+import type { NavigationProfile } from '../provider-navigation.ts'
+import type { OriginId, OriginProfile } from '../provider-origin.ts'
+import type { ProviderSelector } from '../provider-selector.ts'
+import type { VerificationProfile } from '../provider-verification.ts'
+import { BPAL_SCHEMA_VERSION } from '../provider-version.ts'
+
+const version = {
+  provider: '1.0.0',
+  capability: '1.0.0',
+  schema: BPAL_SCHEMA_VERSION,
+} as const
+
+const displayName: LocalizedText = {
+  en: 'Vercel',
+  es: 'Vercel',
+  pt: 'Vercel',
+  pl: 'Vercel',
+  ru: 'Vercel',
+}
+
+function origin(id: OriginId): OriginProfile {
+  return {
+    id,
+    origin: 'https://vercel.com',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  }
+}
+
+const origins: readonly OriginProfile[] = [
+  origin('dashboard'),
+  origin('projects'),
+  origin('deployments'),
+  origin('domains'),
+  origin('settings'),
+  origin('login'),
+  origin('metadata'),
+]
+
+const navigation: readonly NavigationProfile[] = [
+  {
+    id: 'dashboard-overview',
+    origin: 'dashboard',
+    pathTemplate: '/dashboard',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'deployment-list',
+    origin: 'deployments',
+    pathTemplate: '/dashboard/deployments',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'deployment-detail',
+    origin: 'deployments',
+    pathTemplate: '/dashboard/deployments/:id',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'project-settings',
+    origin: 'settings',
+    pathTemplate: '/dashboard/:team/:project/settings',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'domains',
+    origin: 'domains',
+    pathTemplate: '/dashboard/:team/:project/settings/domains',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'environment-metadata',
+    origin: 'settings',
+    pathTemplate: '/dashboard/:team/:project/settings/environment-variables',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'logs',
+    origin: 'deployments',
+    pathTemplate: '/dashboard/:team/:project/deployments/:id/logs',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+]
+
+const selectors: readonly ProviderSelector[] = [
+  {
+    id: 'deployments.status',
+    group: 'deployments',
+    selector: '[data-testid="deployment-status"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'deployments.logs',
+    group: 'logs',
+    selector: '[data-testid="deployment-logs"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'domains.status',
+    group: 'domains',
+    selector: '[data-testid="domain-status"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'projects.name',
+    group: 'projects',
+    selector: '[data-testid="project-name"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'settings.environment',
+    group: 'settings',
+    selector: '[data-testid="environment-variables"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'authentication.login',
+    group: 'authentication',
+    selector: 'form[action*="login"]',
+    readOnly: true,
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+]
+
+const verification: readonly VerificationProfile[] = [
+  {
+    id: 'deployment-healthy',
+    assertions: ['status=ready'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'deployment-failed',
+    assertions: ['status=error'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'domain-configured',
+    assertions: ['domain=configured'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'project-visible',
+    assertions: ['project=visible'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'environment-metadata-visible',
+    assertions: ['metadata=visible'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+]
+
+const evidence: readonly EvidenceProfile[] = [
+  {
+    id: 'deployment-failure',
+    expectedScreenshots: ['deployment-detail'],
+    expectedReads: ['status', 'logs'],
+    expectedMetadata: ['deploymentId'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'deployment-success',
+    expectedScreenshots: ['deployment-detail'],
+    expectedReads: ['status'],
+    expectedMetadata: ['deploymentId'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'dashboard-overview',
+    expectedScreenshots: ['dashboard'],
+    expectedReads: ['project-count'],
+    expectedMetadata: ['team'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'project-metadata',
+    expectedScreenshots: ['project-settings'],
+    expectedReads: ['project-name'],
+    expectedMetadata: ['projectId'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+  {
+    id: 'domain-state',
+    expectedScreenshots: ['domains'],
+    expectedReads: ['domain-status'],
+    expectedMetadata: ['domain'],
+    schemaVersion: BPAL_SCHEMA_VERSION,
+  },
+]
+
+function capability(
+  id: string,
+  options: Pick<
+    ProviderCapability,
+    | 'supportsApi'
+    | 'verificationProfile'
+    | 'evidenceProfile'
+    | 'navigationProfile'
+    | 'allowedOrigins'
+  >,
+): ProviderCapability {
+  return {
+    id,
+    operation: id,
+    descriptionKey: `provider.vercel.capability.${id}`,
+    risk: 'read_only',
+    maturity: 'sandbox_verified',
+    readOnly: true,
+    supportsApi: options.supportsApi,
+    supportsBrowser: true,
+    supportsAutoFailover: false,
+    supportsBrowserOnDemand: true,
+    verificationProfile: options.verificationProfile,
+    evidenceProfile: options.evidenceProfile,
+    navigationProfile: options.navigationProfile,
+    allowedOrigins: options.allowedOrigins,
+    version,
+  }
+}
+
+const capabilities: readonly ProviderCapability[] = [
+  capability('read-deployment-status', {
+    supportsApi: false,
+    verificationProfile: 'deployment-healthy',
+    evidenceProfile: 'deployment-success',
+    navigationProfile: 'deployment-list',
+    allowedOrigins: ['deployments'],
+  }),
+  capability('read-deployment-logs', {
+    supportsApi: false,
+    verificationProfile: 'deployment-failed',
+    evidenceProfile: 'deployment-failure',
+    navigationProfile: 'logs',
+    allowedOrigins: ['deployments'],
+  }),
+  capability('read-deployment-failure', {
+    supportsApi: false,
+    verificationProfile: 'deployment-failed',
+    evidenceProfile: 'deployment-failure',
+    navigationProfile: 'logs',
+    allowedOrigins: ['deployments'],
+  }),
+  capability('read-domain-status', {
+    supportsApi: false,
+    verificationProfile: 'domain-configured',
+    evidenceProfile: 'domain-state',
+    navigationProfile: 'domains',
+    allowedOrigins: ['domains'],
+  }),
+  capability('read-project-metadata', {
+    supportsApi: false,
+    verificationProfile: 'project-visible',
+    evidenceProfile: 'project-metadata',
+    navigationProfile: 'project-settings',
+    allowedOrigins: ['settings'],
+  }),
+  capability('read-environment-variable-metadata', {
+    supportsApi: false,
+    verificationProfile: 'environment-metadata-visible',
+    evidenceProfile: 'project-metadata',
+    navigationProfile: 'environment-metadata',
+    allowedOrigins: ['settings'],
+  }),
+  capability('capture-dashboard-evidence', {
+    supportsApi: false,
+    verificationProfile: 'project-visible',
+    evidenceProfile: 'dashboard-overview',
+    navigationProfile: 'dashboard-overview',
+    allowedOrigins: ['dashboard'],
+  }),
+  capability('compare-dashboard-vs-api', {
+    supportsApi: true,
+    verificationProfile: 'deployment-healthy',
+    evidenceProfile: 'deployment-success',
+    navigationProfile: 'deployment-detail',
+    allowedOrigins: ['deployments'],
+  }),
+]
+
+export const vercelProvider: BrowserProviderAdapter = {
+  id: 'vercel',
+  displayName,
+  version,
+  health: {
+    state: 'unknown',
+    checkedAt: '1970-01-01T00:00:00.000Z',
+  },
+  executionModes: ['read_only'],
+  autoFailoverSupported: false,
+  browserOnDemandSupported: true,
+  readOnlySupported: true,
+  productionSupported: true,
+  origins,
+  navigation,
+  selectors,
+  verification,
+  evidence,
+  capabilities,
+}

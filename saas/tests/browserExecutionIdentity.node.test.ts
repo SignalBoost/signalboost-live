@@ -146,12 +146,21 @@ test('verification binds paused and resumed results to the exact continuation ex
     pausedVerification.checks.some(check => check.id === 'execution-id' && check.passed),
   )
 
+  const defaultPausedReport = verifyBrowserTaskResult(task, paused, now)
+  assert.equal(defaultPausedReport.status, 'verified')
+
   const missingPaused = structuredClone(paused)
   delete missingPaused.executionId
   const missingPausedReport = verifyBrowserTaskResult(task, missingPaused, now, executionId)
   assert.equal(missingPausedReport.status, 'failed')
   assert.ok(
     missingPausedReport.checks.some(check => check.id === 'execution-id' && !check.passed),
+  )
+
+  const missingPausedDefaultReport = verifyBrowserTaskResult(task, missingPaused, now)
+  assert.equal(missingPausedDefaultReport.status, 'failed')
+  assert.ok(
+    missingPausedDefaultReport.checks.some(check => check.id === 'execution-id' && !check.passed),
   )
 
   const tamperedPaused = structuredClone(paused)

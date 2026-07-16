@@ -79,10 +79,20 @@ function evidence(
   }
 }
 
-function finalizeInitialResult(task: BrowserTask, result: BrowserTaskResult, now?: Date): BrowserTaskResult {
+function finalizeInitialResult(
+  task: BrowserTask,
+  result: BrowserTaskResult,
+  now?: Date,
+  requiredExecutionId?: string,
+): BrowserTaskResult {
   return {
     ...result,
-    verification: verifyBrowserTaskResult(task, result, now ?? new Date()),
+    verification: verifyBrowserTaskResult(
+      task,
+      result,
+      now ?? new Date(),
+      requiredExecutionId,
+    ),
   }
 }
 
@@ -191,6 +201,9 @@ export async function runBrowserTask(input: {
       const step = task.steps[index]
       if (step.kind === 'checkpoint') {
         events.push(evidence(events.length + 1, step.id, 'checkpoint', step.label))
+        const executionId = resumableRequested
+          ? createBrowserExecutionId(task, step.id)
+          : undefined
         const pausedResult = finalizeInitialResult(task, {
           taskId: task.taskId,
           incidentId: task.incidentId,
@@ -200,17 +213,18 @@ export async function runBrowserTask(input: {
           finishedAt: new Date().toISOString(),
           completedStepIds,
           pausedAtStepId: step.id,
+          executionId,
           evidence: events,
           verification: 'pending',
-        }, input.now)
+        }, input.now, executionId)
 
         if (pausedResult.verification === 'pending' || pausedResult.verification.status !== 'verified') {
           return pausedResult
         }
 
         if (resumableRequested && input.executionStore && input.sessionRegistry) {
+          if (!executionId) throw new Error('Resumable browser execution ID is missing')
           const retentionStartedAt = input.now ?? new Date()
-          const executionId = createBrowserExecutionId(task, step.id)
           const remainingSteps = task.steps.slice(index + 1)
           await input.executionStore.save({
             executionId,
@@ -243,7 +257,7 @@ export async function runBrowserTask(input: {
             throw error
           }
 
-          return { ...pausedResult, executionId }
+          return pausedResult
         }
 
         return pausedResult

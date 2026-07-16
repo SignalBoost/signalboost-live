@@ -89,14 +89,11 @@ function assertExactClaimKeys(value: UnknownRecord): void {
 }
 
 function validateUniqueStrings(value: unknown, label: string): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    value.length > MAX_APPROVAL_SCOPE_ITEMS
-  ) {
-    throw new Error(
-      `${label} must be a non-empty bounded array of unique non-empty strings`,
-    )
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${label} must be a non-empty array of unique non-empty strings`)
+  }
+  if (value.length > MAX_APPROVAL_SCOPE_ITEMS) {
+    throw new Error(`${label} must contain no more than ${MAX_APPROVAL_SCOPE_ITEMS} entries`)
   }
 
   const values: string[] = []
@@ -104,9 +101,7 @@ function validateUniqueStrings(value: unknown, label: string): string[] {
   for (const item of value) {
     assertCanonicalString(item, `${label} entry`)
     if (seen.has(item)) {
-      throw new Error(
-        `${label} must be a non-empty bounded array of unique non-empty strings`,
-      )
+      throw new Error(`${label} must be a non-empty array of unique non-empty strings`)
     }
     seen.add(item)
     values.push(item)

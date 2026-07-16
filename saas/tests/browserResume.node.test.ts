@@ -36,7 +36,12 @@ function makeTask(): BrowserTask {
     steps: [
       { id: 'navigate', kind: 'navigate', url: 'https://sandbox.example.test/settings' },
       { id: 'ready', kind: 'screenshot', label: 'ready-before-save' },
-      { id: 'approval-checkpoint', kind: 'checkpoint', label: 'Owner approval required', requiresApproval: true },
+      {
+        id: 'approval-checkpoint',
+        kind: 'checkpoint',
+        label: 'Owner approval required',
+        requiresApproval: true,
+      },
       { id: 'protected-save', kind: 'click', selector: '#protected-save' },
       { id: 'wait-success', kind: 'wait_for', selector: '#save-success' },
       { id: 'after-save', kind: 'screenshot', label: 'after-save' },
@@ -88,18 +93,36 @@ function ports(calls: string[]) {
         return {
           page: {
             url: () => currentUrl,
-            goto: async (url: string) => { currentUrl = url; calls.push(`goto:${url}`) },
-            click: async (selector: string) => { calls.push(`click:${selector}`) },
-            fill: async (selector: string) => { calls.push(`fill:${selector}`) },
-            waitForSelector: async (selector: string) => { calls.push(`wait:${selector}`) },
+            goto: async (url: string) => {
+              currentUrl = url
+              calls.push(`goto:${url}`)
+            },
+            click: async (selector: string) => {
+              calls.push(`click:${selector}`)
+            },
+            fill: async (selector: string) => {
+              calls.push(`fill:${selector}`)
+            },
+            waitForSelector: async (selector: string) => {
+              calls.push(`wait:${selector}`)
+            },
           },
-          close: async () => { closed = true; calls.push('close') },
+          close: async () => {
+            closed = true
+            calls.push('close')
+          },
         }
       },
     },
     context: {
-      resolveSecretRef: async (ref: string) => { calls.push(`secret:${ref}`); return 'resolved' },
-      captureScreenshot: async (label: string) => { calls.push(`screenshot:${label}`); return `artifact://${label}` },
+      resolveSecretRef: async (ref: string) => {
+        calls.push(`secret:${ref}`)
+        return 'resolved'
+      },
+      captureScreenshot: async (label: string) => {
+        calls.push(`screenshot:${label}`)
+        return `artifact://${label}`
+      },
     },
     wasClosed: () => closed,
   }
@@ -108,7 +131,12 @@ function ports(calls: string[]) {
 test('resumable execution pauses, resumes exact remaining steps, and verifies completion', async () => {
   const calls: string[] = []
   const task = makeTask()
-  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1')
+  task.approvalToken = sign(
+    task,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1',
+  )
   const executionStore = new InMemoryBrowserExecutionStore()
   const sessionRegistry = new InMemoryBrowserSessionRegistry()
   const runtimePorts = ports(calls)
@@ -168,14 +196,21 @@ test('resumable execution pauses, resumes exact remaining steps, and verifies co
   ])
   assert.equal(runtimePorts.wasClosed(), true)
   assert.notEqual(completed.verification, 'pending')
-  if (completed.verification !== 'pending') assert.equal(completed.verification.status, 'verified')
+  if (completed.verification !== 'pending') {
+    assert.equal(completed.verification.status, 'verified')
+  }
   assert.equal(await executionStore.load(paused.executionId!), null)
 })
 
 test('invalid second approval does not execute or consume the retained session', async () => {
   const calls: string[] = []
   const task = makeTask()
-  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-invalid')
+  task.approvalToken = sign(
+    task,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-invalid',
+  )
   const executionStore = new InMemoryBrowserExecutionStore()
   const sessionRegistry = new InMemoryBrowserSessionRegistry()
   const runtimePorts = ports(calls)
@@ -192,7 +227,13 @@ test('invalid second approval does not execute or consume the retained session',
   assert.ok(paused.executionId)
 
   const scope = continuationScope(task, paused.executionId!)
-  const wrongToken = sign(task, ['wait-success', 'protected-save', 'after-save'], 2, 'wrong-order', scope)
+  const wrongToken = sign(
+    task,
+    ['wait-success', 'protected-save', 'after-save'],
+    2,
+    'wrong-order',
+    scope,
+  )
   const rejected = await resumeBrowserTask({
     task,
     executionId: paused.executionId!,
@@ -227,7 +268,12 @@ test('invalid second approval does not execute or consume the retained session',
 test('task tampering invalidates and closes the retained execution', async () => {
   const calls: string[] = []
   const task = makeTask()
-  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-tamper')
+  task.approvalToken = sign(
+    task,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-tamper',
+  )
   const executionStore = new InMemoryBrowserExecutionStore()
   const sessionRegistry = new InMemoryBrowserSessionRegistry()
   const runtimePorts = ports(calls)
@@ -244,7 +290,11 @@ test('task tampering invalidates and closes the retained execution', async () =>
   assert.ok(paused.executionId)
 
   const tamperedTask = structuredClone(task)
-  tamperedTask.steps[3] = { id: 'protected-save', kind: 'click', selector: '#different-target' }
+  tamperedTask.steps[3] = {
+    id: 'protected-save',
+    kind: 'click',
+    selector: '#different-target',
+  }
   const secondApprovalToken = sign(
     tamperedTask,
     remainingStepIds,
@@ -278,8 +328,18 @@ test('phase-two approval cannot be replayed across distinct paused executions', 
   const portsB = ports(callsB)
   const taskA = makeTask()
   const taskB = makeTask()
-  taskA.approvalToken = sign(taskA, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-A')
-  taskB.approvalToken = sign(taskB, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-B')
+  taskA.approvalToken = sign(
+    taskA,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-A',
+  )
+  taskB.approvalToken = sign(
+    taskB,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-B',
+  )
 
   const pausedA = await runBrowserTask({
     task: taskA,
@@ -370,7 +430,12 @@ test('phase-two approval cannot be replayed across distinct paused executions', 
 test('changing the phase-one approval invalidates the retained execution', async () => {
   const calls: string[] = []
   const task = makeTask()
-  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-original')
+  task.approvalToken = sign(
+    task,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-original',
+  )
   const originalPreApprovalToken = task.approvalToken
   const executionStore = new InMemoryBrowserExecutionStore()
   const sessionRegistry = new InMemoryBrowserSessionRegistry()
@@ -423,7 +488,7 @@ test('changing the phase-one approval invalidates the retained execution', async
   assert.equal(await executionStore.load(paused.executionId!), null)
 })
 
-test('unverified phase one never retains a resumable execution or session', async () => {
+test('invalid phase one fails before opening or retaining a browser session', async () => {
   const calls: string[] = []
   const task = makeTask()
   task.steps.splice(3, 0, {
@@ -432,13 +497,18 @@ test('unverified phase one never retains a resumable execution or session', asyn
     label: 'This invalidates the bounded phase-one shape',
     requiresApproval: true,
   })
-  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-unverified')
+  task.approvalToken = sign(
+    task,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-unverified',
+  )
   const executionStore = new InMemoryBrowserExecutionStore()
   const sessionRegistry = new InMemoryBrowserSessionRegistry()
   const runtimePorts = ports(calls)
   const expectedExecutionId = createBrowserExecutionId(task, 'approval-checkpoint')
 
-  const paused = await runBrowserTask({
+  const rejected = await runBrowserTask({
     task,
     signingSecret: secret,
     sessions: runtimePorts.sessions,
@@ -448,11 +518,14 @@ test('unverified phase one never retains a resumable execution or session', asyn
     now,
   })
 
-  assert.equal(paused.status, 'paused')
-  assert.equal(paused.executionId, undefined)
-  assert.notEqual(paused.verification, 'pending')
-  if (paused.verification !== 'pending') assert.equal(paused.verification.status, 'failed')
-  assert.equal(runtimePorts.wasClosed(), true)
-  assert.equal(calls.some(call => call.startsWith('click:')), false)
+  assert.equal(rejected.status, 'failed')
+  assert.equal(rejected.executionId, undefined)
+  assert.match(rejected.error || '', /at most one approval checkpoint/)
+  assert.notEqual(rejected.verification, 'pending')
+  if (rejected.verification !== 'pending') {
+    assert.equal(rejected.verification.status, 'failed')
+  }
+  assert.equal(runtimePorts.wasClosed(), false)
+  assert.deepEqual(calls, [])
   assert.equal(await executionStore.load(expectedExecutionId), null)
 })

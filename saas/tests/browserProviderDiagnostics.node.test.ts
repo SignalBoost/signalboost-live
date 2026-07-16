@@ -46,10 +46,13 @@ test('BPAL policy review exposes only read-only, non-production capability metad
   }
 })
 
-test('BPAL diagnostics fail closed if a registered adapter claims production execution', () => {
+test('BPAL registration fails closed before diagnostics can expose a production adapter', () => {
   const registry = new BrowserProviderRegistry()
-  registry.register({ ...VercelBrowserAdapter, supportsProduction: () => true })
-  assert.throws(() => createBrowserProviderDiagnosticsSnapshot(registry), /production-disabled provider/)
+  assert.throws(
+    () => registry.register({ ...VercelBrowserAdapter, supportsProduction: () => true }),
+    /invalid_provider/,
+  )
+  assert.deepEqual(registry.list(), [])
 })
 
 test('Supervisor provider diagnostics page is admin-gated and contains no execution controls', async () => {

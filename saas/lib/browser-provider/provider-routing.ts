@@ -15,13 +15,15 @@ function invalid(detail: string): never {
  * the provider is published.
  */
 export function assertProviderCapabilityRouting(provider: BrowserProviderAdapter): void {
-  const navigationById = new Map(provider.navigation.map(profile => [profile.id, profile]))
+  const navigationById = new Map<string, BrowserProviderAdapter['navigation'][number]>(
+    provider.navigation.map(profile => [profile.id, profile]),
+  )
   const selectorById = new Map(provider.selectors.map(selector => [selector.id, selector]))
   const evidenceById = new Map(provider.evidence.map(profile => [profile.id, profile]))
 
   for (const evidence of provider.evidence) {
     for (const navigationId of evidence.expectedScreenshots) {
-      if (!navigationById.has(navigationId as never)) {
+      if (!navigationById.has(navigationId)) {
         invalid('evidence_screenshot_navigation_reference')
       }
     }
@@ -45,7 +47,7 @@ export function assertProviderCapabilityRouting(provider: BrowserProviderAdapter
     if (!evidence) invalid('capability_evidence_reference')
 
     for (const navigationId of evidence.expectedScreenshots) {
-      const evidenceNavigation = navigationById.get(navigationId as never)
+      const evidenceNavigation = navigationById.get(navigationId)
       if (!evidenceNavigation) invalid('evidence_screenshot_navigation_reference')
       if (!capability.allowedOrigins.includes(evidenceNavigation.origin)) {
         invalid('capability_evidence_navigation_origin_mismatch')

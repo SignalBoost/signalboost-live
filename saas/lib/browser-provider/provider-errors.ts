@@ -8,7 +8,7 @@ export type BrowserProviderErrorCode =
 export class BrowserProviderError extends Error {
   readonly code: BrowserProviderErrorCode
 
-  constructor(code: BrowserProviderErrorCode, message = code) {
+  constructor(code: BrowserProviderErrorCode, message: string = code) {
     super(message)
     this.name = 'BrowserProviderError'
     this.code = code

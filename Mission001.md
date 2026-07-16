@@ -204,3 +204,14 @@ Only sandbox execution history is supported. Production browser execution, Verce
 ### Next recommended sprint
 
 Sprint 18 should add CI-reviewed operational hardening around the read-only history surface: richer timeline filtering, artifact-reference viewer with redaction review, reconciliation scheduling, and Supabase policy tests. It should still avoid production/provider browser automation unless a separate governed approval and provider-specific safety design is reviewed.
+
+## Browser Runtime Sprint 21 — Sanitized Terminal Failures
+
+Sprint 21 hardens the portable Browser Runtime failure boundary without enabling any new execution target or provider capability.
+
+- Every initial and resumed terminal failure now passes through one bounded sanitizer before entering `BrowserTaskResult.error` or error evidence.
+- The sanitizer removes exact in-memory signing secrets, approval tokens, continuation tokens, and resolved fill values, plus common bearer/API-key/cookie/password/private-key/URL-credential patterns.
+- Stack frames, control characters, and unbounded provider or browser-engine output are removed or truncated.
+- Sanitized errors retain enough non-sensitive context for deterministic verification and operator diagnosis.
+
+This slice remains sandbox-compatible and provider-neutral. It does not broaden allowed origins, authorize production execution, resolve new credentials, change approval semantics, or perform any provider mutation.

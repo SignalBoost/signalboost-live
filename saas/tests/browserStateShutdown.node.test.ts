@@ -60,7 +60,7 @@ function makeRecord(executionId: string): BrowserExecutionRecord {
 function makeSession(
   closeCalls: string[],
   label: string,
-  options: { rejectClose?: boolean } = {},
+  options: { rejectClose?: boolean; throwClose?: boolean } = {},
 ): BrowserSessionPort {
   return {
     page: {
@@ -70,9 +70,11 @@ function makeSession(
       fill: async () => undefined,
       waitForSelector: async () => undefined,
     },
-    close: async () => {
+    close: () => {
       closeCalls.push(label)
-      if (options.rejectClose) throw new Error(`close failed: ${label}`)
+      if (options.throwClose) throw new Error(`close threw: ${label}`)
+      if (options.rejectClose) return Promise.reject(new Error(`close rejected: ${label}`))
+      return Promise.resolve()
     },
   }
 }
@@ -104,30 +106,37 @@ test('session registry shutdown closes every session, cancels timers, and is ide
 
   await registry.retain(
     'execution-one',
-    makeSession(closeCalls, 'first', { rejectClose: true }),
+    makeSession(closeCalls, 'first', { throwClose: true }),
     expiresAt,
     retainedAt,
   )
   await registry.retain(
     'execution-two',
-    makeSession(closeCalls, 'second'),
+    makeSession(closeCalls, 'second', { rejectClose: true }),
     expiresAt,
     retainedAt,
   )
-  assert.equal(scheduler.size, 2)
+  await registry.retain(
+    'execution-three',
+    makeSession(closeCalls, 'third'),
+    expiresAt,
+    retainedAt,
+  )
+  assert.equal(scheduler.size, 3)
 
   const firstShutdown = registry.shutdown()
   const secondShutdown = registry.shutdown()
   assert.equal(firstShutdown, secondShutdown)
   await firstShutdown
 
-  assert.deepEqual(closeCalls, ['first', 'second'])
+  assert.deepEqual(closeCalls, ['first', 'second', 'third'])
   assert.equal(scheduler.size, 0)
   assert.equal(await registry.take('execution-one'), null)
   assert.equal(await registry.take('execution-two'), null)
+  assert.equal(await registry.take('execution-three'), null)
 
   await registry.shutdown()
-  assert.deepEqual(closeCalls, ['first', 'second'])
+  assert.deepEqual(closeCalls, ['first', 'second', 'third'])
 })
 
 test('session registry rejects and closes sessions retained after shutdown begins', async () => {

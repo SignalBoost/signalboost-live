@@ -74,7 +74,7 @@ const defaultExpiryScheduler: BrowserExpiryScheduler = {
         }
         callback()
       }, currentDelayMs)
-      timer.unref?.()
+      ;(timer as unknown as { unref?: () => void }).unref?.()
     }
 
     arm()
@@ -155,10 +155,11 @@ export class InMemoryBrowserExecutionStore implements BrowserExecutionStore {
 
   async save(record: BrowserExecutionRecord, retainedAt = new Date()): Promise<void> {
     const delayMs = retentionDelay(record.expiresAt, retainedAt)
-    const snapshot = structuredClone(record)
-    const existing = this.records.get(record.executionId)
-    existing?.expiry.cancel()
+    if (this.records.has(record.executionId)) {
+      throw new Error(`Browser execution already retained for execution ${record.executionId}`)
+    }
 
+    const snapshot = structuredClone(record)
     const stored: StoredExecution = {
       record: snapshot,
       expiry: pendingExpiryHandle(),

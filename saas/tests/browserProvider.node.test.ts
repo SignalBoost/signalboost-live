@@ -30,7 +30,7 @@ test('registries are deterministic and reject unknown capabilities', () => {
   assert.equal(capabilities.list()[0].id, 'capture-dashboard-evidence')
   assert.throws(() => capabilities.get('missing'), /unknown_capability/)
   assert.equal(createOriginRegistry(vercelProvider.origins).list()[0].id, 'dashboard')
-  assert.equal(createNavigationRegistry(vercelProvider.navigation).list()[0].id, 'deployment-detail')
+  assert.equal(createNavigationRegistry(vercelProvider.navigation).list()[0].id, 'dashboard-overview')
   assert.equal(createSelectorRegistry(vercelProvider.selectors).list()[0].id, 'authentication.login')
   assert.equal(createVerificationRegistry(vercelProvider.verification).list()[0].id, 'deployment-failed')
   assert.equal(createEvidenceRegistry(vercelProvider.evidence).list()[0].id, 'dashboard-overview')
@@ -52,6 +52,25 @@ test('versioning, health, maturity, risk and read-only are deterministic', () =>
     () => createCapabilityRegistry([{ ...provider.capabilities[0], readOnly: false } as never]),
     /immutable_read_only/,
   )
+})
+
+test('provider capabilities are bound to their declared navigation origins', () => {
+  const provider = new ProviderRegistry().register(vercelProvider)
+  const navigationById = new Map(provider.navigation.map(profile => [profile.id, profile]))
+
+  for (const capability of provider.capabilities) {
+    const navigation = navigationById.get(capability.navigationProfile)
+    assert.ok(navigation)
+    assert.ok(capability.allowedOrigins.includes(navigation.origin))
+    assert.ok(capability.supportsApi || capability.supportsBrowser)
+  }
+
+  const projectMetadata = provider.capabilities.find(item => item.id === 'read-project-metadata')
+  assert.deepEqual(projectMetadata?.allowedOrigins, ['settings'])
+
+  const dashboardEvidence = provider.capabilities.find(item => item.id === 'capture-dashboard-evidence')
+  assert.equal(dashboardEvidence?.navigationProfile, 'dashboard-overview')
+  assert.deepEqual(dashboardEvidence?.allowedOrigins, ['dashboard'])
 })
 
 test('provider registration creates a detached deeply frozen snapshot', () => {
@@ -99,6 +118,31 @@ test('provider registration rejects ambiguous metadata and dangling references',
     /capability_navigation_reference/,
   )
 
+  const mismatchedNavigationOrigin = cloneProvider()
+  mismatchedNavigationOrigin.capabilities[0].allowedOrigins = ['dashboard']
+  assert.throws(
+    () => new ProviderRegistry().register(mismatchedNavigationOrigin),
+    /capability_navigation_origin_mismatch/,
+  )
+
+  const missingTransport = cloneProvider()
+  missingTransport.capabilities[0].supportsApi = false
+  missingTransport.capabilities[0].supportsBrowser = false
+  missingTransport.capabilities[0].supportsBrowserOnDemand = false
+  assert.throws(
+    () => new ProviderRegistry().register(missingTransport),
+    /capability_transport_missing/,
+  )
+
+  const browserOnDemandWithoutBrowser = cloneProvider()
+  browserOnDemandWithoutBrowser.capabilities[0].supportsApi = true
+  browserOnDemandWithoutBrowser.capabilities[0].supportsBrowser = false
+  browserOnDemandWithoutBrowser.capabilities[0].supportsBrowserOnDemand = true
+  assert.throws(
+    () => new ProviderRegistry().register(browserOnDemandWithoutBrowser),
+    /capability_on_demand_requires_browser/,
+  )
+
   const nonCanonicalOrigin = cloneProvider()
   nonCanonicalOrigin.origins[0].origin = 'https://vercel.com/dashboard'
   assert.throws(() => new ProviderRegistry().register(nonCanonicalOrigin), /origin_url/)
@@ -123,6 +167,7 @@ test('localization complete and forbidden dependencies absent', async () => {
   const files = [
     'provider-adapter.ts',
     'provider-registry.ts',
+    'provider-routing.ts',
     'provider-capability.ts',
     'provider-origin.ts',
     'provider-navigation.ts',

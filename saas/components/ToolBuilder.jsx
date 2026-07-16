@@ -1,108 +1,94 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import GovernancePanel from './GovernancePanel'
+import JsonBlueprint from './JsonBlueprint'
+import JsonEditor from './JsonEditor'
+import ProviderDropdown from './ProviderDropdown'
+import ResponseMapper from './ResponseMapper'
+import TagSelector from './TagSelector'
 
-const PROVIDERS = ['OpenAI', 'Anthropic', 'Vercel', 'Supabase', 'Stripe', 'GitHub', 'Resend', 'Awin', 'Travelpayouts', 'Custom REST API']
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+const parseJson = value => { try { return JSON.parse(value) } catch { return { _invalidJsonDraft: value } } }
 
-const field = { width: '100%', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, background: 'rgba(15,23,42,.82)', color: '#f8fafc', padding: '11px 12px', outline: 'none' }
-const label = { display: 'grid', gap: 7, color: '#cbd5e1', fontSize: 13, fontWeight: 800 }
-const card = { border: '1px solid rgba(148,163,184,.16)', borderRadius: 20, background: 'rgba(2,6,23,.72)', padding: 20, boxShadow: '0 24px 70px rgba(0,0,0,.24)' }
+function EndpointDropdown({ provider, value, onChange }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const endpoints = provider?.endpoints || []
+  const selected = endpoints.find(endpoint => endpoint.url === value)
+  const filtered = endpoints.filter(endpoint => `${endpoint.url} ${endpoint.example}`.toLowerCase().includes(query.toLowerCase()))
+  return <div className="relative"><label className="grid gap-2 text-sm font-bold text-slate-200">Endpoint<input disabled={!provider} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none disabled:cursor-not-allowed disabled:opacity-50" value={open ? query : selected?.url || ''} onFocus={() => { setOpen(true); setQuery('') }} onChange={event => { setQuery(event.target.value); setOpen(true) }} placeholder={provider ? 'Search absolute endpoint templates' : 'Select provider first'} /></label>{open && provider && <div className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl">{filtered.map(endpoint => <button key={endpoint.id} type="button" onClick={() => { onChange(endpoint.url); setOpen(false) }} className="w-full rounded-xl px-3 py-3 text-left text-slate-100 hover:bg-cyan-400/10"><span className="block break-all font-mono text-sm text-cyan-100">{endpoint.url}</span><span className="text-xs text-slate-400">Example: {endpoint.example}</span></button>)}{!filtered.length && <p className="px-3 py-4 text-sm text-slate-400">No endpoints found.</p>}</div>}</div>
+}
 
-function slugify(value) {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+function AuthFields({ provider, value, onChange }) {
+  const schema = provider?.authSchema || []
+  if (!provider) return <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-slate-400">Choose a provider to auto-populate authentication fields.</div>
+  return <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center justify-between"><h3 className="font-black text-white">Authentication</h3><span className="text-xs text-slate-400" title="Values are represented as backend-only references in the blueprint.">Secrets never leave backend</span></div>{schema.map(field => field.type === 'oauth' ? <button key={field.key} type="button" onClick={() => onChange({ ...value, [field.key]: 'oauth_connection_ref' })} className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3 py-3 font-bold text-cyan-100">Connect {provider.name} OAuth</button> : <label key={field.key} className="grid gap-2 text-sm font-bold text-slate-200">{field.label}<input type="text" className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none" value={value[field.key] || ''} onChange={event => onChange({ ...value, [field.key]: event.target.value })} placeholder={`${field.label} credential reference`} /></label>)}</div>
 }
 
 export default function ToolBuilder() {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [providerQuery, setProviderQuery] = useState('')
-  const [provider, setProvider] = useState('')
+  const [name, setName] = useState('Customer enrichment workflow')
+  const [description, setDescription] = useState('Governed integration blueprint with backend-only secrets, endpoint metadata, and supervisor monitoring.')
+  const [tags, setTags] = useState(['governed'])
+  const [provider, setProvider] = useState(null)
+  const [auth, setAuth] = useState({})
   const [method, setMethod] = useState('POST')
   const [endpoint, setEndpoint] = useState('')
-  const [authType, setAuthType] = useState('bearer')
-  const [tagInput, setTagInput] = useState('')
-  const [tags, setTags] = useState([])
-  const [requestTemplate, setRequestTemplate] = useState('{\n  "prompt": "{{input.prompt}}"\n}')
-  const [outputPath, setOutputPath] = useState('data.output')
-  const [copied, setCopied] = useState(false)
+  const [requestBody, setRequestBody] = useState(`{\n  "customerId": "{{input.customerId}}"\n}`)
+  const [responseMapping, setResponseMapping] = useState({ source: 'response.data.id', target: 'integration.output.userId' })
+  const [governance, setGovernance] = useState({ supervisorMonitoring: true })
+  const [logsOpen, setLogsOpen] = useState(false)
+  const [testStatus, setTestStatus] = useState('Ready')
 
-  const providers = useMemo(() => PROVIDERS.filter(item => item.toLowerCase().includes(providerQuery.toLowerCase())), [providerQuery])
-  const compiled = useMemo(() => ({
-    id: slugify(name || `${provider || 'custom'}-tool`),
-    name: name || 'Untitled integration tool',
+  useEffect(() => {
+    if (provider) {
+      setAuth({})
+      setMethod(provider.methods[0])
+      setEndpoint(provider.endpoints[0]?.url || '')
+    }
+  }, [provider])
+
+  const blueprint = useMemo(() => ({
+    name,
     description,
-    provider: provider || null,
     tags,
-    transport: {
-      method,
-      endpoint,
-      auth: { type: authType, credential_ref: authType === 'none' ? null : `${slugify(provider || 'provider')}_credential` },
+    provider_key: provider?.id || null,
+    endpoint_template: endpoint,
+    http_method: method,
+    auth: {
+      type: provider?.authSchema?.[0]?.type === 'oauth' ? 'oauth' : 'bearer',
+      credential_refs: Object.fromEntries(Object.entries(auth).map(([key, value]) => [key, value || `${provider?.id || 'provider'}_${key}`])),
     },
-    request_template: (() => { try { return JSON.parse(requestTemplate) } catch { return requestTemplate } })(),
-    response_mapping: { output_path: outputPath },
-    governance: { requires_approval: method !== 'GET', secrets_backend_only: true },
-  }), [name, description, provider, tags, method, endpoint, authType, requestTemplate, outputPath])
+    request_template: parseJson(requestBody),
+    response_mapping: {
+      output_paths: responseMapping.target && responseMapping.source
+        ? { [responseMapping.target]: responseMapping.source }
+        : {},
+    },
+    governance: {
+      requires_approval: method !== 'GET',
+      secrets_backend_only: true,
+      supervisor_monitoring: governance.supervisorMonitoring,
+    },
+  }), [name, description, tags, provider, auth, endpoint, method, requestBody, responseMapping, governance])
 
-  function addTag(value = tagInput) {
-    const next = value.trim().toLowerCase()
-    if (next && !tags.includes(next)) setTags(current => [...current, next])
-    setTagInput('')
+  async function testIntegration() {
+    setTestStatus('Calling /integration/test with current config…')
+    await new Promise(resolve => setTimeout(resolve, 500))
+    setTestStatus('Mock test passed — replace placeholder with POST /integration/test.')
   }
 
-  async function copyJson() {
-    await navigator.clipboard.writeText(JSON.stringify(compiled, null, 2))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1400)
-  }
+  return <main className="min-h-full px-4 py-8 text-white sm:px-6 lg:px-8"><div className="mx-auto grid max-w-[1600px] gap-6"><header className="rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-2xl"><p className="text-xs font-black uppercase tracking-[.22em] text-amber-200">Integrations</p><h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Enterprise Integration Builder</h1><p className="mt-3 max-w-3xl text-slate-300">Build provider-backed, approval-aware integration blueprints with searchable metadata, dynamic provider schemas, no-code endpoint selection, and a live JSON compiler.</p></header>
 
-  return (
-    <main style={{ minHeight: '100%', padding: '28px clamp(14px,3vw,34px) 48px', color: '#f8fafc', background: 'radial-gradient(circle at top right, rgba(26,240,255,.08), transparent 28%), transparent' }}>
-      <div style={{ width: 'min(1440px,100%)', margin: '0 auto', display: 'grid', gap: 20 }}>
-        <header>
-          <p style={{ margin: 0, color: '#ffc300', fontWeight: 900, letterSpacing: '.16em', fontSize: 11, textTransform: 'uppercase' }}>Integrations</p>
-          <h1 style={{ margin: '6px 0 8px', fontSize: 'clamp(28px,4vw,46px)', letterSpacing: '-.04em' }}>Interactive Tool Builder</h1>
-          <p style={{ margin: 0, color: '#94a3b8', maxWidth: 760 }}>Define a provider action, inject searchable tags, and compile a provider-neutral JSON blueprint in real time.</p>
-        </header>
+    <section className="grid gap-6 xl:grid-cols-3">
+      <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl"><h2 className="mb-5 text-xl font-black">Integration Metadata</h2><div className="grid gap-5"><label className="grid gap-2 text-sm font-bold text-slate-200">Integration Name<input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-2 text-sm font-bold text-slate-200">Description<textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={description} onChange={event => setDescription(event.target.value)} /></label><TagSelector value={tags} onChange={setTags} /><ProviderDropdown value={provider?.id || ''} onChange={setProvider} /><AuthFields provider={provider} value={auth} onChange={setAuth} /></div></div>
 
-        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(320px,.95fr)', gap: 20, alignItems: 'start' }} className="tool-builder-grid">
-          <div style={{ ...card, display: 'grid', gap: 18 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14 }} className="tool-builder-two">
-              <label style={label}>Tool name<input style={field} value={name} onChange={e => setName(e.target.value)} placeholder="Generate campaign video" /></label>
-              <label style={label}>HTTP method<select style={field} value={method} onChange={e => setMethod(e.target.value)}>{METHODS.map(item => <option key={item}>{item}</option>)}</select></label>
-            </div>
+      <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl"><h2 className="mb-5 text-xl font-black">Endpoint & Request</h2><div className="grid gap-5"><label className="grid gap-2 text-sm font-bold text-slate-200">HTTP Method<select disabled={!provider} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white disabled:opacity-50" value={method} onChange={event => setMethod(event.target.value)}>{(provider?.methods || ['POST']).map(item => <option key={item}>{item}</option>)}</select></label><EndpointDropdown provider={provider} value={endpoint} onChange={setEndpoint} /><JsonEditor value={requestBody} onChange={setRequestBody} variables={provider?.variables || []} /><ResponseMapper value={responseMapping} onChange={setResponseMapping} /></div></div>
 
-            <label style={label}>Description<textarea style={{ ...field, minHeight: 84, resize: 'vertical' }} value={description} onChange={e => setDescription(e.target.value)} placeholder="What this tool does and when COSA should use it" /></label>
+      <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl"><h2 className="mb-5 text-xl font-black">Governance & Supervisor</h2><GovernancePanel value={governance} onChange={setGovernance} onTest={testIntegration} onLogs={() => setLogsOpen(true)} /><p className="mt-4 rounded-2xl border border-white/10 bg-white/[.04] p-3 text-sm text-slate-300">{testStatus}</p></div>
+    </section>
 
-            <div style={{ position: 'relative' }}>
-              <label style={label}>Provider search<input style={field} value={providerQuery} onChange={e => setProviderQuery(e.target.value)} placeholder="Search providers..." /></label>
-              {providerQuery && !provider && <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, marginTop: 6, maxHeight: 220, overflow: 'auto', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, background: '#07101f', padding: 6 }}>
-                {providers.map(item => <button key={item} type="button" onClick={() => { setProvider(item); setProviderQuery(item) }} style={{ width: '100%', textAlign: 'left', border: 0, borderRadius: 9, background: 'transparent', color: '#e2e8f0', padding: '10px 11px', cursor: 'pointer' }}>{item}</button>)}
-                {!providers.length && <div style={{ padding: 10, color: '#94a3b8' }}>No provider found.</div>}
-              </div>}
-            </div>
+    <JsonBlueprint blueprint={blueprint} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 180px', gap: 14 }} className="tool-builder-two">
-              <label style={label}>Endpoint<input style={field} value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="https://api.provider.com/v1/action" /></label>
-              <label style={label}>Authentication<select style={field} value={authType} onChange={e => setAuthType(e.target.value)}><option value="bearer">Bearer token</option><option value="api_key">API key</option><option value="basic">Basic auth</option><option value="none">None</option></select></label>
-            </div>
-
-            <div style={label}>Tags
-              <div style={{ display: 'flex', gap: 8 }}><input style={field} value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} placeholder="Type a tag and press Enter" /><button type="button" onClick={() => addTag()} style={{ border: 0, borderRadius: 12, padding: '0 18px', background: '#ffc300', color: '#111827', fontWeight: 900, cursor: 'pointer' }}>Add</button></div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{tags.map(tag => <button key={tag} type="button" onClick={() => setTags(current => current.filter(item => item !== tag))} style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 999, background: 'rgba(26,240,255,.08)', color: '#67e8f9', padding: '6px 10px', cursor: 'pointer' }}>{tag} ×</button>)}</div>
-            </div>
-
-            <label style={label}>Request template<textarea spellCheck={false} style={{ ...field, minHeight: 180, resize: 'vertical', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }} value={requestTemplate} onChange={e => setRequestTemplate(e.target.value)} /></label>
-            <label style={label}>Response output path<input style={field} value={outputPath} onChange={e => setOutputPath(e.target.value)} placeholder="data.output" /></label>
-          </div>
-
-          <aside style={{ ...card, position: 'sticky', top: 88, display: 'grid', gap: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}><div><div style={{ color: '#67e8f9', fontSize: 12, fontWeight: 900, letterSpacing: '.1em', textTransform: 'uppercase' }}>Live compiler</div><h2 style={{ margin: '4px 0 0', fontSize: 20 }}>Tool blueprint JSON</h2></div><button type="button" onClick={copyJson} style={{ border: '1px solid rgba(255,195,0,.35)', borderRadius: 10, background: 'rgba(255,195,0,.1)', color: '#ffc300', padding: '9px 12px', fontWeight: 900, cursor: 'pointer' }}>{copied ? 'Copied' : 'Copy JSON'}</button></div>
-            <pre style={{ margin: 0, maxHeight: '68vh', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', borderRadius: 14, background: '#020617', border: '1px solid rgba(148,163,184,.14)', padding: 16, color: '#dbeafe', fontSize: 12.5, lineHeight: 1.6 }}>{JSON.stringify(compiled, null, 2)}</pre>
-          </aside>
-        </section>
-      </div>
-      <style>{`@media(max-width:980px){.tool-builder-grid{grid-template-columns:1fr!important}.tool-builder-grid aside{position:static!important}}@media(max-width:640px){.tool-builder-two{grid-template-columns:1fr!important}}`}</style>
-    </main>
-  )
+    {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black">Recent Logs</h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• Loaded provider metadata from the current provider catalog.</p><p>• Endpoint schema synchronized after provider selection.</p><p>• Test action queued for placeholder /integration/test.</p></div></div></div>}
+  </div></main>
 }

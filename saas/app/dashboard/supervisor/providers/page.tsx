@@ -52,15 +52,16 @@ export default async function SupervisorProviderDiagnosticsPage() {
                   <div>
                     <p style={kicker}>{tApproval.provider}</p>
                     <h2 style={{ margin: '4px 0' }}>{providerName}</h2>
+                    <code>{provider.adapterVersion} · {provider.schemaVersion}</code>
                   </div>
                   <span style={badge}>{health}</span>
                 </div>
 
                 <dl style={grid}>
+                  <Field label={tApproval.provider} value={provider.providerId} />
                   <Field label={tHa.executionMethod} value="read_only" />
-                  <Field label={tHa.policyVersion} value={provider.version.capabilityVersion} />
-                  <Field label={tHa.capabilityMaturity} value={provider.adapterVersion} />
                   <Field label={tHa.providerWorker} value={`${provider.worker.maximumConcurrentWork} · ${tHa.noActiveWork}`} />
+                  <Field label={tApproval.approvalStatus} value={health} />
                 </dl>
 
                 <h3>{tApproval.targetOrigin}</h3>
@@ -91,8 +92,9 @@ export default async function SupervisorProviderDiagnosticsPage() {
                         <Field label={tApproval.verificationRequirements} value={capability.verificationProfileId} />
                         <Field label={tApproval.evidence} value={capability.evidenceProfileId} />
                         <Field label={tApproval.targetOrigin} value={capability.allowedOriginIds.join(', ')} />
-                        <Field label={tApproval.approvalStatus} value={capability.requiresHumanApproval ? tHa.humanApprovalRequired : tHa.apiOnly} />
+                        <Field label={tApproval.approvalStatus} value={String(capability.requiresHumanApproval)} />
                       </dl>
+                      {capability.requiresHumanApproval ? <p style={warning}>{tHa.humanApprovalRequired}</p> : null}
                       <p style={warning}>{tHa.productionBrowserExecutionDisabled}</p>
                     </section>
                   ))}

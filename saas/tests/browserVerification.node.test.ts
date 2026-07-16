@@ -193,6 +193,21 @@ test('fails verification when task identity or completed-step order is tampered'
   assert.ok(report.checks.some(item => item.id === 'completed-steps' && !item.passed))
 })
 
+test('verification fails closed on an invalid clock without throwing', () => {
+  const task = buildSandboxProtectedSaveTask({
+    ...base,
+    taskId: 'task-sandbox-invalid-verification-clock',
+  })
+  const result = resultForTask(task)
+
+  const report = verifyBrowserTaskResult(task, result, new Date(Number.NaN))
+
+  assert.equal(report.status, 'failed')
+  assert.equal(report.verifiedAt, '1970-01-01T00:00:00.000Z')
+  assert.ok(report.checks.some(item => item.id === 'verification-clock' && !item.passed))
+  assert.ok(report.errors.includes('Verification clock is a valid timestamp.'))
+})
+
 test('runtime returns a verified report when phase one pauses at its approval checkpoint', async () => {
   const task = signExecutableTask(buildSandboxBrowserTask({
     ...base,
@@ -263,6 +278,37 @@ test('runtime returns a failed verification report when approval validation fail
   if (result.verification !== 'pending') {
     assert.equal(result.verification.status, 'failed')
     assert.ok(result.verification.errors.length > 0)
+  }
+  assert.equal(ports.wasClosed(), false)
+})
+
+test('runtime returns a terminal failed report when the verification clock is invalid', async () => {
+  const task = signExecutableTask(buildSandboxBrowserTask({
+    ...base,
+    taskId: 'task-sandbox-runtime-invalid-clock',
+    approvalToken: '',
+  }), 'runtime-invalid-clock')
+  const ports = executablePorts()
+
+  const result = await runBrowserTask({
+    task,
+    signingSecret,
+    now: new Date(Number.NaN),
+    sessions: ports.sessions,
+    context: ports.context,
+  })
+
+  assert.equal(result.status, 'failed')
+  assert.match(result.error || '', /verification time must be valid/)
+  assert.notEqual(result.verification, 'pending')
+  if (result.verification !== 'pending') {
+    assert.equal(result.verification.status, 'failed')
+    assert.equal(result.verification.verifiedAt, '1970-01-01T00:00:00.000Z')
+    assert.ok(
+      result.verification.checks.some(
+        item => item.id === 'verification-clock' && !item.passed,
+      ),
+    )
   }
   assert.equal(ports.wasClosed(), false)
 })

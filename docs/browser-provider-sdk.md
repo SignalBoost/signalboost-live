@@ -9,6 +9,12 @@ The Browser Provider Abstraction Layer (BPAL) is a provider-neutral metadata SDK
 - Origin, navigation, selector, verification, and evidence registries: the only canonical provider metadata sources.
 - Provider versioning: provider, capability, and schema versions are explicit and deterministic.
 
+## Registration boundary
+
+Registration is a fail-closed trust boundary. Adapters must use an exact, versioned shape; canonical HTTPS origins; unique profile and capability identifiers; read-only capability risk; and references that resolve to declared origins, navigation, verification, and evidence profiles. Unknown fields, duplicate identifiers or operations, invalid timestamps, noncanonical origins, mismatched versions, and dangling references are rejected before the adapter becomes visible.
+
+The registry stores a detached, deeply frozen snapshot. Later changes to the caller-owned adapter object cannot alter registered origins, selectors, capabilities, verification assertions, evidence requirements, health, localization, or version metadata.
+
 ## Vercel
 
 The initial adapter defines read-only metadata for deployment status/logs/failures, domains, project metadata, environment-variable metadata, dashboard evidence, and dashboard/API comparison. It does not execute or authenticate.

@@ -228,6 +228,16 @@ Provider work is routed through provider-isolated worker contracts so a Vercel w
 
 Browser sessions remain memory-bound and non-migratable. No audit or persistence record can resume a lost browser session. Replacement work must claim a new lease/fence, create a new execution ID, obtain new Browser Runtime approvals, and use new nonce/token material. Production and real-provider Browser execution remain disabled. New operator-facing Supervisor HA labels must exist in English, Spanish, Portuguese, Polish, and Russian.
 
+
+### Sprint 19 — Durable Federated Supervisor Coordination Store
+
+Mission 001 durable coordination replaces process-local Supervisor ownership in production. Supabase/Postgres tables now persist Supervisor instances, runtime identities, work items, leases, monotonically increasing fencing generations, and immutable sanitized coordination events. Production must use the durable store through dependency injection and fail closed when it is unavailable; it must never silently fall back to an in-memory coordination authority.
+
+Atomic lease acquisition is performed by a Postgres RPC/transaction that locks the target work item, verifies owner health and provider/tenant-scoped availability, rejects unexpired active leases, increments the work-item fencing generation exactly once, inserts the lease, and transitions the work item to `leased`. Renewal, release, transition, dispatch, continuation, and completion paths must assert the exact lease ID, instance ID, runtime ID, and fencing token before any protected action. Stale owners cannot dispatch or complete work.
+
+Durable records are coordination/audit metadata only. They cannot authorize replay, cannot reconstruct a lost browser session, cannot persist Browser/Page/Context objects, and cannot store approval tokens, credentials, cookies, secrets, authorization headers, or browser storage. Browser owner loss marks browser work abandoned; retries require a new execution ID, new policy decision, and fresh Browser Runtime approvals. Production and real-provider Browser execution remain disabled.
+
+RLS is enabled for coordination tables. Anonymous reads are denied, public client writes are not granted, mutation RPCs are reserved for server/service-role paths, and authenticated operator visibility is read-only and sanitized. All new operator-facing labels must exist in English, Spanish, Portuguese, Polish, and Russian.
 ### Sprint 17 — Durable Sandbox Execution Records and Operator Audit History
 
 Sprint 17 adds sanitized durable history for Mission 001 sandbox executions only. The persistence layer records serializable execution summaries, immutable sanitized audit events, and safe evidence references/digests in Supabase-backed tables plus a provider-neutral store interface. These records are audit-only: they cannot authorize, replay, resume, approve, retry, or launch a browser task.
@@ -710,6 +720,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added bounded single-use approval replay protection to the Mission 001 sandbox Browser Runtime adapter. Verified phase-one and continuation token digests and nonces are consumed before browser session launch or protected continuation; replay and capacity exhaustion fail closed. This remains local/test-only and does not enable production/provider execution.
 
 - 2026-07-16: Added Mission 001 Sprint 18 federated high-availability Supervisor contracts: active-active instance identity, durable work-item leases, monotonically increasing fencing tokens, provider-isolated worker routing, versioned API-first smart-failover policy, dispatcher fence checks, five-language operator labels, and documentation confirming production/real-provider Browser execution remains disabled.
+
+- 2026-07-16: Added Mission 001 durable federated coordination store: Supabase/Postgres-backed Supervisor instances, work items, atomic lease RPCs, monotonic fencing, exact owner renewal/release/transition checks, expired-lease reconciliation, read-only operator APIs, five-language HA labels, and fail-closed production wiring. Production never falls back to in-memory coordination, stale owners cannot execute, and lost browser sessions cannot resume.
 
 ## 20. Mandatory Final Reminder
 

@@ -1,4 +1,4 @@
-import type { BrowserTask } from './contracts.ts'
+import type { BrowserSessionLaunchRequest } from './contracts.ts'
 
 export interface BrowserLaunchProfile {
   id: string
@@ -11,7 +11,7 @@ export interface BrowserLaunchProfile {
 }
 
 export interface BrowserLaunchProfileProvider {
-  resolve(task: BrowserTask): BrowserLaunchProfile
+  resolve(request: BrowserSessionLaunchRequest): BrowserLaunchProfile
 }
 
 export interface SandboxLaunchProfileOptions {
@@ -48,21 +48,21 @@ export class SandboxBrowserLaunchProfileProvider implements BrowserLaunchProfile
     }
   }
 
-  resolve(task: BrowserTask): BrowserLaunchProfile {
-    if (task.adapterId !== this.adapterId) {
-      throw new Error(`Sandbox profile rejected adapter: ${task.adapterId}`)
+  resolve(request: BrowserSessionLaunchRequest): BrowserLaunchProfile {
+    if (request.adapterId !== this.adapterId) {
+      throw new Error(`Sandbox profile rejected adapter: ${request.adapterId}`)
     }
-    if (task.provider.toLowerCase() !== 'sandbox') {
-      throw new Error(`Sandbox profile rejected provider: ${task.provider}`)
+    if (request.provider.toLowerCase() !== 'sandbox') {
+      throw new Error(`Sandbox profile rejected provider: ${request.provider}`)
     }
-    if (task.mode === 'execute_change') {
+    if (request.mode === 'execute_change') {
       throw new Error('Sandbox profile does not allow execute_change tasks')
     }
-    if (task.allowedOrigins.length === 0) {
+    if (request.allowedOrigins.length === 0) {
       throw new Error('Sandbox task requires at least one allowed origin')
     }
 
-    for (const candidate of task.allowedOrigins) {
+    for (const candidate of request.allowedOrigins) {
       const origin = normalizeOrigin(candidate)
       if (!this.allowedOrigins.has(origin)) {
         throw new Error(`Sandbox profile rejected origin: ${origin}`)

@@ -6,6 +6,7 @@ import {
 import {
   createBrowserExecutionRecordSnapshot,
   createBrowserExecutionTaskSnapshot,
+  createBrowserSessionLaunchRequestSnapshot,
 } from './execution-task.ts'
 import type {
   BrowserAdapterContext,
@@ -179,7 +180,7 @@ export async function runBrowserTask(input: {
         : undefined,
     })
     task.allowedOrigins.map(normalizeOrigin)
-    session = await sessions.open(task)
+    session = await sessions.open(createBrowserSessionLaunchRequestSnapshot(task))
 
     for (let index = 0; index < task.steps.length; index += 1) {
       const step = task.steps[index]

@@ -7,19 +7,13 @@ import {
   type BrowserEngineLauncher,
   type BrowserEnginePage,
 } from '../lib/browser-runtime/session-factory.ts'
-import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
+import type { BrowserSessionLaunchRequest } from '../lib/browser-runtime/contracts.ts'
 
-const task: BrowserTask = {
-  taskId: 'task-1',
-  incidentId: 'incident-1',
+const request: BrowserSessionLaunchRequest = {
   provider: 'sandbox',
   adapterId: 'sandbox.v1',
   mode: 'observe',
-  issuedAt: '2026-07-15T00:00:00.000Z',
-  expiresAt: '2026-07-16T00:00:00.000Z',
   allowedOrigins: ['https://sandbox.example'],
-  steps: [],
-  approvalToken: 'test-token',
 }
 
 interface FixtureOptions {
@@ -87,7 +81,7 @@ function fixture(options: FixtureOptions = {}) {
 test('opens an isolated session, delegates page actions, and closes once', async () => {
   const { calls, launcher } = fixture()
   const factory = new DefaultBrowserSessionFactory({ launcher })
-  const session = await factory.open(task)
+  const session = await factory.open(request)
 
   await session.page.goto('https://sandbox.example/dashboard')
   await session.page.click('#settings')
@@ -109,6 +103,51 @@ test('opens an isolated session, delegates page actions, and closes once', async
   ])
 })
 
+test('exposes only a detached frozen launch scope to profile providers', async () => {
+  const { calls, launcher } = fixture()
+  const supplied = {
+    ...request,
+    allowedOrigins: [...request.allowedOrigins],
+    taskId: 'must-not-cross',
+    incidentId: 'must-not-cross',
+    issuedAt: 'must-not-cross',
+    expiresAt: 'must-not-cross',
+    approvalToken: 'must-not-cross',
+    steps: [{ id: 'must-not-cross', kind: 'click', selector: '#must-not-cross' }],
+    metadata: { mustNotCross: true },
+  }
+
+  const factory = new DefaultBrowserSessionFactory({
+    launcher,
+    profileProvider: {
+      resolve(launchRequest) {
+        assert.equal(Object.isFrozen(launchRequest), true)
+        assert.equal(Object.isFrozen(launchRequest.allowedOrigins), true)
+        assert.deepEqual(Object.keys(launchRequest).sort(), [
+          'adapterId',
+          'allowedOrigins',
+          'mode',
+          'provider',
+        ])
+        assert.equal('taskId' in launchRequest, false)
+        assert.equal('incidentId' in launchRequest, false)
+        assert.equal('issuedAt' in launchRequest, false)
+        assert.equal('expiresAt' in launchRequest, false)
+        assert.equal('approvalToken' in launchRequest, false)
+        assert.equal('steps' in launchRequest, false)
+        assert.equal('metadata' in launchRequest, false)
+        supplied.allowedOrigins.push('https://evil.example')
+        assert.deepEqual(launchRequest.allowedOrigins, ['https://sandbox.example'])
+        return { id: 'minimal.test.v1' }
+      },
+    },
+  })
+
+  const session = await factory.open(supplied)
+  await session.close()
+  assert.deepEqual(calls.slice(-2), ['context.close', 'browser.close'])
+})
+
 test('uses explicitly configured launch and viewport values', async () => {
   const { calls, launcher } = fixture()
   const factory = new DefaultBrowserSessionFactory({
@@ -120,7 +159,7 @@ test('uses explicitly configured launch and viewport values', async () => {
     viewport: { width: 1280, height: 720 },
   })
 
-  const session = await factory.open(task)
+  const session = await factory.open(request)
   assert.equal(calls[0], 'launch:false:8000')
   assert.equal(calls[1], 'newContext:block:false:false:true:1280x720')
   await session.close()
@@ -129,14 +168,14 @@ test('uses explicitly configured launch and viewport values', async () => {
 test('closes the browser when context creation fails', async () => {
   const { calls, launcher } = fixture({ failContext: true })
   const factory = new DefaultBrowserSessionFactory({ launcher })
-  await assert.rejects(() => factory.open(task), /context failed/)
+  await assert.rejects(() => factory.open(request), /context failed/)
   assert.equal(calls.at(-1), 'browser.close')
 })
 
 test('closes the context and browser when page creation fails', async () => {
   const { calls, launcher } = fixture({ failPage: true })
   const factory = new DefaultBrowserSessionFactory({ launcher })
-  await assert.rejects(() => factory.open(task), /page failed/)
+  await assert.rejects(() => factory.open(request), /page failed/)
   assert.deepEqual(calls.slice(-2), ['context.close', 'browser.close'])
 })
 
@@ -144,7 +183,7 @@ test('closes a browser that resolves after the launch deadline', async () => {
   const { calls, launcher } = fixture({ delayLaunchMs: 30 })
   const factory = new DefaultBrowserSessionFactory({ launcher, launchTimeoutMs: 5 })
 
-  await assert.rejects(() => factory.open(task), /Browser launch timed out after 5ms/)
+  await assert.rejects(() => factory.open(request), /Browser launch timed out after 5ms/)
   await sleep(40)
 
   assert.equal(calls.filter(call => call === 'browser.close').length, 1)
@@ -154,7 +193,7 @@ test('closes a context that resolves after the context deadline', async () => {
   const { calls, launcher } = fixture({ delayContextMs: 30 })
   const factory = new DefaultBrowserSessionFactory({ launcher, launchTimeoutMs: 5 })
 
-  await assert.rejects(() => factory.open(task), /Browser context creation timed out after 5ms/)
+  await assert.rejects(() => factory.open(request), /Browser context creation timed out after 5ms/)
   await sleep(40)
 
   assert.equal(calls.filter(call => call === 'context.close').length, 1)
@@ -165,7 +204,7 @@ test('closes the active context and browser when page creation exceeds its deadl
   const { calls, launcher } = fixture({ delayPageMs: 30 })
   const factory = new DefaultBrowserSessionFactory({ launcher, launchTimeoutMs: 5 })
 
-  await assert.rejects(() => factory.open(task), /Browser page creation timed out after 5ms/)
+  await assert.rejects(() => factory.open(request), /Browser page creation timed out after 5ms/)
   await sleep(40)
 
   assert.equal(calls.filter(call => call === 'context.close').length, 1)

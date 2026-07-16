@@ -1,5 +1,6 @@
 import type {
   BrowserEvidence,
+  BrowserSessionLaunchRequest,
   BrowserTask,
   BrowserTaskStep,
 } from './contracts.ts'
@@ -45,6 +46,25 @@ export function createBrowserExecutionTaskSnapshot(task: BrowserTask): BrowserTa
     allowedOrigins: freezeArray([...task.allowedOrigins]),
     steps: freezeArray(task.steps.map(cloneStep)),
     approvalToken: task.approvalToken,
+  }
+
+  Object.freeze(snapshot)
+  return snapshot
+}
+
+/**
+ * Produces the only task-derived object permitted to cross the browser session
+ * launch boundary. Authorizing and executable fields are deliberately omitted,
+ * and the detached launch scope is frozen before an injected factory sees it.
+ */
+export function createBrowserSessionLaunchRequestSnapshot(
+  source: BrowserSessionLaunchRequest,
+): BrowserSessionLaunchRequest {
+  const snapshot: BrowserSessionLaunchRequest = {
+    provider: source.provider,
+    adapterId: source.adapterId,
+    mode: source.mode,
+    allowedOrigins: freezeArray([...source.allowedOrigins]),
   }
 
   Object.freeze(snapshot)

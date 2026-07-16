@@ -26,6 +26,13 @@ export interface RenderInput {
   providerId: string
   kind: RenderKind
   params: Record<string, unknown>
+  /**
+   * Required for wallet-funded renders with a non-zero provider cost. This is
+   * the server-side payment/owner approval gate for paid platform providers.
+   * BYOK renders are funded by the user's own key and do not consume platform
+   * provider spend.
+   */
+  paidProviderApprovalId?: string
 }
 
 export interface RenderProduced {
@@ -76,6 +83,6 @@ export type RenderResult = {
   url?: string
   providerCostCents?: number
   charged?: boolean
-  code?: 'no_executor' | 'insufficient_funds' | 'daily_cap' | 'no_key' | 'provider_failed' | 'error'
+  code?: 'no_executor' | 'approval_required' | 'insufficient_funds' | 'daily_cap' | 'no_key' | 'provider_failed' | 'error'
   message?: string
 }

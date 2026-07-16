@@ -100,8 +100,8 @@ function getPullRequestTarget(event) {
   const baseBranch = explicitBaseBranch
     || event.pull_request?.base?.ref
     || process.env.GITHUB_BASE_REF
-    || runGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], '').split('/').pop()
-    || runGit(['branch', '--show-current'], '')
+    || (process.env.GITHUB_ACTIONS ? runGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], '').split('/').pop() : '')
+    || (process.env.GITHUB_ACTIONS ? runGit(['branch', '--show-current'], '') : productionTarget.branch)
 
   return { targetRepository, baseBranch }
 }

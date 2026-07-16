@@ -20,12 +20,14 @@ import {
 const ORG = 'signalboost'
 const TEXT_MODEL = 'fal-ai/kling-video/v3/standard/text-to-video'
 const VIDEO_BUCKET = 'marketing-sales-video'
+const PAID_VIDEO_PROVIDER_APPROVED = /^(1|true|yes)$/i.test(process.env.COSA_PAID_VIDEO_PROVIDER_APPROVED || '')
 
 fal.config({ credentials: process.env.FAL_KEY })
 
 // ---- injected provider: real fal/Kling queue ----
 const submit: VideoSubmit = async (prompt, opts) => {
   try {
+    if (!PAID_VIDEO_PROVIDER_APPROVED) return { ok: false, error: 'paid video provider use requires owner approval' }
     if (!process.env.FAL_KEY) return { ok: false, error: 'FAL_KEY not configured' }
     const input: Record<string, unknown> = {
       prompt,

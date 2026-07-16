@@ -38,7 +38,7 @@ function fakeHost(balanceCents: number) {
 }
 
 const actor = { userId: 'u1' }
-const input = { providerId: 'fake', kind: 'voice' as const, params: { text: 'hello world' } }
+const input = { providerId: 'fake', kind: 'voice' as const, params: { text: 'hello world' }, paidProviderApprovalId: 'approval-1' }
 
 test('wallet mode: reserves before producing, returns url', async () => {
   registerRenderer(fakeExecutor())
@@ -48,6 +48,17 @@ test('wallet mode: reserves before producing, returns url', async () => {
   assert.equal(state.reserved, 11)
   assert.equal(state.persisted, 1)
   if (res.ok) assert.equal(res.charged, true)
+})
+
+
+test('wallet mode blocks paid providers without owner approval', async () => {
+  registerRenderer(fakeExecutor())
+  const { host, state } = fakeHost(1000)
+  const res = await runRender(host, actor, { providerId: 'fake', kind: 'voice', params: { text: 'hello world' } }, { mode: 'wallet' })
+  assert.equal(res.ok, false)
+  if (!res.ok) assert.equal(res.code, 'approval_required')
+  assert.equal(state.reserved, 0)
+  assert.equal(state.persisted, 0)
 })
 
 test('insufficient funds: never calls the provider', async () => {

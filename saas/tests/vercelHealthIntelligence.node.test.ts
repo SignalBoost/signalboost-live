@@ -20,7 +20,7 @@ async function governed(deployments, mutate) {
   await store.enqueueWorkItem({ workItemId:'work-1', workItemType:'vercel_deployment_health', incidentId:'inc-work', provider:'vercel', projectId:'prj_1', resourceId:'dpl_1', environment:'production', state:'queued', priority:1, createdAt:now.toISOString(), availableAt:now.toISOString(), attempt:0, maxAttempts:1, policyVersion:'ha-policy-v1', capabilityVersion:'vercel-browser-capabilities-v1', adapterVersion:'vercel-browser-adapter-v1', schemaVersion:'supervisor-work-item-v1' })
   const lease = await store.acquireLease({ workItemId:'work-1', ownerInstanceId:'owner-1', ownerRuntimeId:'runtime-1', leaseDurationMs:60_000, now })
   const ctx = { coordinationStore:store, workItemId:'work-1', ownerInstanceId:'owner-1', ownerRuntimeId:'runtime-1', leaseId:lease.leaseId, fencingToken:lease.fencingToken, executionMode:'api_only' }
-  if (mutate) mutate(ctx, store)
+  if (mutate) await mutate(ctx, store)
   return s.workflow.run(ctx)
 }
 
@@ -54,4 +54,27 @@ test('operator page has no mutation controls and localization is complete for Ve
     assert.ok(json.vercelHealth.providerMutationDisabled)
     assert.ok(json.vercelHealth.labels.auditTimeline)
   }
+})
+
+test('evidence timestamps are driven by the injected clock for deterministic verification', async () => {
+  const s = deps([{ id:'dpl_1', state:'ERROR', target:'production', createdAt: now.getTime(), error:{ message:'build failed' } }])
+  const run = await s.workflow.run()
+  assert.equal(run.evidence.every(e => e.capturedAt === now.toISOString()), true)
+  assert.equal(run.verification.checkedAt, now.toISOString())
+})
+
+test('governed run fails closed when durable work transition or audit persistence fails', async () => {
+  const transitionRejected = await governed([{ id:'dpl_1', state:'ERROR', target:'production', createdAt: now.getTime() }], async (_ctx, store) => {
+    await store.transitionWorkItem({ workItemId:'work-1', from:'leased', to:'paused_for_approval', owner:{ leaseId:'lease-work-1-1', ownerInstanceId:'owner-1', ownerRuntimeId:'runtime-1', fencingToken:1 }, now })
+  })
+  assert.equal(transitionRejected.status, 'rejected')
+
+  const s = deps([{ id:'dpl_1', state:'ERROR', target:'production', createdAt: now.getTime() }])
+  const store = new InMemoryCoordinationStore({ now: () => now })
+  await store.registerInstance({ instanceId:'owner-1', runtimeId:'runtime-1', startedAt:now.toISOString(), heartbeatAt:now.toISOString(), softwareVersion:'test', schemaVersion:'supervisor-instance-v1', supportedProviderKinds:['vercel'], status:'healthy' })
+  await store.enqueueWorkItem({ workItemId:'work-audit', workItemType:'vercel_deployment_health', incidentId:'inc-work', provider:'vercel', projectId:'prj_1', resourceId:'dpl_1', environment:'production', state:'queued', priority:1, createdAt:now.toISOString(), availableAt:now.toISOString(), attempt:0, maxAttempts:1, policyVersion:'ha-policy-v1', capabilityVersion:'vercel-browser-capabilities-v1', adapterVersion:'vercel-browser-adapter-v1', schemaVersion:'supervisor-work-item-v1' })
+  const lease = await store.acquireLease({ workItemId:'work-audit', ownerInstanceId:'owner-1', ownerRuntimeId:'runtime-1', leaseDurationMs:60_000, now })
+  const auditRejected = await s.workflow.run({ coordinationStore:store, workItemId:'work-audit', ownerInstanceId:'owner-1', ownerRuntimeId:'runtime-1', leaseId:lease.leaseId, fencingToken:lease.fencingToken, executionMode:'api_only', auditSink:{ write: async () => { throw new Error('audit_down') } } })
+  assert.equal(auditRejected.status, 'rejected')
+  assert.match(auditRejected.verification.summary, /audit_down/)
 })

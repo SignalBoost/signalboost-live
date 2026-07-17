@@ -7,19 +7,19 @@ const mainModules = [
     title: 'Audit Cockpit',
     description: 'Review public websites and turn findings into an ordered business action plan.',
     items: ['Compliance checks', 'Manual data review', 'Risk scoring'],
-    href: '/website/audit',
+    href: 'https://saas.signalboostapp.com/dashboard/audit',
   },
   {
     title: 'Cybersecurity Station',
     description: 'Inspect public-facing security signals without intrusive access.',
     items: ['Threat analysis', 'Manual patching guidance', 'Security insights'],
-    href: '/website/cybersecurity',
+    href: 'https://saas.signalboostapp.com/website-optimizer',
   },
   {
     title: 'Optimization Hub',
     description: 'Improve workflows, efficiency, and resource use with guided recommendations.',
     items: ['Workflow tuning', 'Efficiency tips', 'Resource management'],
-    href: '/website/optimization',
+    href: 'https://saas.signalboostapp.com/website-optimizer',
   },
 ] as const
 
@@ -137,7 +137,6 @@ export default function Home() {
 
           <div className="platform-node">SignalBoost Platform</div>
           <div className="connector-line" aria-hidden="true" />
-
           <div className="portable-grid">
             {portables.map((portable) => (
               <Link href={portable.href} className="portable-card" key={portable.title}>

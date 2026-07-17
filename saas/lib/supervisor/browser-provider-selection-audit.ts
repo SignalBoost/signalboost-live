@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   BROWSER_PROVIDER_DIAGNOSTICS_SCHEMA_VERSION,
   createBrowserProviderDiagnosticsSnapshot,
@@ -12,6 +13,7 @@ import {
   parseAuditEvent,
   type PersistentAuditEvent,
 } from './persistence/audit-record-schema.ts'
+import { canonicalTimestamp } from './persistence/serialization.ts'
 
 export const BROWSER_PROVIDER_SELECTION_EXPLANATION_SCHEMA_VERSION =
   'browser-provider-selection-explanation-v1' as const
@@ -87,6 +89,10 @@ function deepFreeze<T>(value: T): T {
 function requireString(value: string, field: string): string {
   if (!value.trim()) throw new BrowserProviderSelectionAuditError('invalid_audit_identity', `${field} is required`)
   return value
+}
+
+function optionalIdentity(value: string | undefined): string | undefined {
+  return value === undefined || value === '' ? undefined : String(value)
 }
 
 function findProvider(
@@ -196,6 +202,25 @@ function reasonCodesFor(
   return reasons
 }
 
+function createAuditEventId(input: {
+  incidentId: string
+  executionId?: string
+  dispatchId?: string
+  occurredAt: string
+  explanation: BrowserProviderSelectionExplanation
+}): string {
+  const digest = createHash('sha256')
+    .update(JSON.stringify({
+      incidentId: input.incidentId,
+      executionId: input.executionId ?? null,
+      dispatchId: input.dispatchId ?? null,
+      occurredAt: input.occurredAt,
+      explanation: input.explanation,
+    }))
+    .digest('hex')
+  return `browser-provider-selection:${digest}`
+}
+
 export function explainBrowserProviderSelection(
   input: Pick<CreateBrowserProviderSelectionAuditEventInput, 'providerId' | 'decision' | 'diagnosticsSnapshot'>,
 ): BrowserProviderSelectionExplanation {
@@ -250,13 +275,22 @@ export function createBrowserProviderSelectionAuditEvent(
   input: CreateBrowserProviderSelectionAuditEventInput,
 ): Readonly<PersistentAuditEvent> {
   const explanation = explainBrowserProviderSelection(input)
-  const occurredAt = input.occurredAt ?? input.decision.decidedAt
+  const occurredAt = canonicalTimestamp(input.occurredAt ?? input.decision.decidedAt, 'occurredAt')
+  const incidentId = requireString(input.incidentId, 'incidentId')
+  const executionId = optionalIdentity(input.executionId)
+  const dispatchId = optionalIdentity(input.dispatchId)
   const payload = explanation as unknown as Record<string, SerializableValue>
   const event = parseAuditEvent({
-    eventId: `browser-provider-selection:${explanation.decisionId}`,
-    executionId: input.executionId,
-    dispatchId: input.dispatchId,
-    incidentId: requireString(input.incidentId, 'incidentId'),
+    eventId: createAuditEventId({
+      incidentId,
+      executionId,
+      dispatchId,
+      occurredAt,
+      explanation,
+    }),
+    executionId,
+    dispatchId,
+    incidentId,
     eventType: 'browser_provider_capability_selection_explained',
     occurredAt,
     payload,

@@ -29,7 +29,7 @@ function base(key: string, cfg: VercelObserverConfig, env: VercelEnvironment, ki
 }
 export function failedDeploymentIncident(cfg: VercelObserverConfig, d: VercelDeployment): SupervisorIncident {
   const env = normalizeEnvironment(d, cfg.environment); const error = typeof d.error === 'string' ? { message: d.error } : (d.error || {})
-  return base(`vercel:${cfg.projectId}:${d.id}:failed_deployment`, cfg, env, 'failed', `Vercel deployment ${d.id} failed.`, { incidentType: 'failed_deployment', deploymentId: d.id, providerState: sanitizeString(d.state, 80), createdAt: iso(d.createdAt) || '', completedAt: iso(d.ready) || '', sanitizedErrorCode: sanitizeString(error.code, 120), sanitizedErrorMessage: sanitizeString(error.message, 300), deploymentUrl: safeUrl(d.url) || '', commitSha: sanitizeString(d.meta?.githubCommitSha, 80), branchName: sanitizeString(d.meta?.githubCommitRef, 160) }, d.id)
+  return base(`vercel:${cfg.projectId}:${d.id}:failed_deployment`, cfg, env, 'failed', `Vercel deployment ${d.id} failed.`, { incidentType: 'deployment_failed', deploymentId: d.id, providerState: sanitizeString(d.state, 80), createdAt: iso(d.createdAt) || '', completedAt: iso(d.ready) || '', sanitizedErrorCode: sanitizeString(error.code, 120), sanitizedErrorMessage: sanitizeString(error.message, 300), deploymentUrl: safeUrl(d.url) || '', commitSha: sanitizeString(d.meta?.githubCommitSha, 80), branchName: sanitizeString(d.meta?.githubCommitRef, 160) }, d.id)
 }
 export function repeatedFailureIncident(cfg: VercelObserverConfig, failures: VercelDeployment[], states: NormalizedDeploymentState[]): SupervisorIncident {
   const env = normalizeEnvironment(failures[0], cfg.environment); const ids = failures.map(d => d.id); const fp = hash(ids.join('|'))

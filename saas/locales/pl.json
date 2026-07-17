@@ -511,5 +511,13 @@
       "unknown": "Nieznany",
       "suspended": "Zawieszony"
     }
+  },
+  "vercelHealth": {
+    "kicker": "Tylko do odczytu: Vercel",
+    "title": "Inteligencja kondycji wdrożeń Vercel",
+    "subtitle": "Obserwowane wdrożenia, dowody, weryfikacja i trwała historia operatora. Tutaj nie ma ponownych wdrożeń, zapisów, zmian środowiska ani automatyzacji przeglądarki.",
+    "empty": "Brak zapisanych uruchomień kontroli kondycji.",
+    "evidence": "Dowody",
+    "adminOnly": "Wymagany dostęp administratora."
   }
 }

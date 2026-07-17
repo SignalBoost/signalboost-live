@@ -511,5 +511,13 @@
       "unknown": "Desconocido",
       "suspended": "Suspendido"
     }
+  },
+  "vercelHealth": {
+    "kicker": "Flujo Vercel de solo lectura",
+    "title": "Inteligencia de salud de despliegues Vercel",
+    "subtitle": "Despliegues observados, evidencia, verificación e historial persistido para operadores. Aquí no hay redeploys, guardados, cambios de entorno ni automatización de navegador.",
+    "empty": "Aún no hay ejecuciones de salud registradas.",
+    "evidence": "Evidencia",
+    "adminOnly": "Se requiere acceso de administrador."
   }
 }

@@ -660,6 +660,12 @@ Examples:
 
 ---
 
+### Vercel Deployment Health Intelligence
+
+The Vercel Deployment Health Intelligence workflow is a read-only operator workflow, not a repair or Browser execution path. It observes recent Vercel deployments through the Vercel API, detects failed/repeated/stuck/canceled/unknown deployment health incidents, generates deterministic read-only diagnostic plans, reads deployment details/events/log summaries, environment-variable names only, and production aliases when required, verifies evidence coverage, and persists every run to Supabase for operator review. It must never redeploy, cancel, mutate projects, read environment variable values, rotate secrets, save provider settings, call Browser Runtime, or use Playwright/Chromium.
+
+Required runtime inputs are `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`, and optional `VERCEL_TEAM_ID`; operators can review history in the admin-only Supervisor Vercel health page and can trigger/read the internal API only as admins.
+
 ## 18. Mandatory ONBOARD Maintenance Rule
 
 `ONBOARD.md` must stay current.
@@ -686,6 +692,8 @@ This keeps the onboarding document current and prevents future developers or AI 
 ## 19. Onboarding Change Log
 
 Use this section for short notes when architecture, provider behavior, platform workflow, or governance rules change.
+
+- 2026-07-17: Added Vercel Deployment Health Intelligence as an end-to-end read-only workflow: Vercel API observation, deterministic diagnostics, deployment/event/env-name/alias evidence collection, verification, Supabase persistence, admin API, and operator visibility. The workflow cannot redeploy, mutate Vercel, read env values, or execute browser automation.
 
 - 2026-07-07: Added explicit Console Hub provider-template doctrine. Provider templates are live app action definitions, not just documentation. Developers must inspect provider templates and matching executors/routes before asking the owner to explain provider architecture.
 - 2026-07-07: Added stronger onboarding enforcement doctrine. PRs must acknowledge ONBOARD was read before repo scan, and critical changes must keep ONBOARD current or the check must fail with a clear reason and fix instructions.

@@ -511,5 +511,13 @@
       "unknown": "Unknown",
       "suspended": "Suspended"
     }
+  },
+  "vercelHealth": {
+    "kicker": "Read-only Vercel workflow",
+    "title": "Vercel Deployment Health Intelligence",
+    "subtitle": "Observed deployments, evidence, verification, and persisted operator history. No redeploys, saves, env changes, or browser automation are available here.",
+    "empty": "No health runs recorded yet.",
+    "evidence": "Evidence",
+    "adminOnly": "Admin access required."
   }
 }

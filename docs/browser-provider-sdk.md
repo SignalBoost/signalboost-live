@@ -15,15 +15,21 @@ The Browser Provider Abstraction Layer (BPAL) is the single provider-neutral met
 - `BrowserProviderRegistry`: deterministic dependency-injected registry for register, unregister, lookup, listing, health, version, and capability access; duplicate registrations and unknown providers fail closed.
 - Capability model: lowercase canonical risk/maturity values, read-only support flags, origin/navigation/evidence/verification identities, versioning, and suspended fail-closed behavior.
 - Origin model: exact HTTPS origins only, no credentials, query strings, fragments, paths, or wildcards.
-- Navigation model: bounded fixed paths or route templates with required parameters; no arbitrary URLs or executable instructions.
+- Navigation model: bounded fixed paths or route templates with exact declared parameters; protocol-relative paths, encoded traversal, backslashes, queries, fragments, arbitrary URLs, and executable instructions are rejected.
 - Selector model: structured role, label, test ID, exact text, or narrowly validated CSS selectors organized by provider domain.
 - Evidence and verification models: deterministic metadata profiles only; no callbacks, code, screenshot binaries, or success claims before execution.
 - Health and versioning: provider health is separate from platform/deployment health and uses `healthy`, `degraded`, `outage`, `unknown`, and `suspended`.
 - Diagnostics snapshot: `createBrowserProviderDiagnosticsSnapshot` produces a deterministic, deeply frozen, read-only policy view for Supervisor/operator review and fails closed if a provider claims production execution or executable worker capacity.
 
+## Registration integrity
+
+Registration is the canonical cross-model integrity boundary. The registry stores detached frozen copies rather than caller-owned metadata and rejects provider identity/version mismatches, production-enabled adapters, foreign-provider records, duplicate or dangling references, missing Browser navigation/origin scope, navigation-to-origin escapes, capability/profile support mismatches, unsupported selector capability IDs, and evidence or verification profiles without deterministic requirements. A failed registration leaves the registry unchanged.
+
+Capability bindings are explicit. Every Browser-capable capability must resolve to one registered navigation profile, one or more approved exact origins, a verification profile that declares support for the capability, and an evidence profile that declares support for the capability. Provider-level Browser-on-demand and automatic-failover claims must match the registered capability set, while production Browser execution remains prohibited.
+
 ## Vercel
 
-The canonical `VercelBrowserAdapter` is read-only and non-executing. It provides metadata for deployment status, deployment failures, deployment logs, domain status, project metadata, environment-variable metadata, dashboard evidence capture, and dashboard/API comparison. It does not log in, mutate provider state, handle provider credentials, import Playwright, invoke Browser Runtime, or support production browser execution.
+The canonical `VercelBrowserAdapter` is read-only and non-executing. It provides metadata for deployment status, deployment failures, deployment logs, domain status, project metadata, environment-variable metadata, dashboard evidence capture, and dashboard/API comparison. Its capability-to-navigation, verification, and evidence bindings are explicit and registration-validated. It does not log in, mutate provider state, handle provider credentials, import Playwright, invoke Browser Runtime, or support production browser execution.
 
 ## Supervisor integration
 
@@ -33,7 +39,7 @@ The admin-only `/dashboard/supervisor/providers` screen renders the diagnostics 
 
 ## CI guard
 
-`npm run validate:bpal` runs `scripts/validate-bpal-guard.mjs`, which fails if a second registry, second root adapter contract, second Vercel adapter, forbidden BPAL execution/credential dependencies, direct Vercel knowledge inside Browser Runtime, or duplicate Vercel capability IDs are introduced.
+`npm run validate:bpal` runs `scripts/validate-bpal-guard.mjs`, which fails if a second registry, second root adapter contract, second Vercel adapter, forbidden BPAL execution/credential dependencies, direct Vercel knowledge inside Browser Runtime, or duplicate Vercel capability IDs are introduced. Runtime tests additionally exercise registration isolation, cross-reference integrity, navigation confinement, and explicit Vercel capability bindings.
 
 ## Localization
 

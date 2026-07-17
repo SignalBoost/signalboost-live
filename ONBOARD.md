@@ -734,6 +734,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Consolidated overlapping Browser Provider Abstraction Layer implementations into one canonical metadata-only BPAL under `saas/lib/browser-provider/`, added a canonical public entry point, read-only non-executing Vercel adapter, Supervisor metadata mapping, five-language `browserProvider.*` labels, and `npm run validate:bpal` duplication/execution guard. Production/provider Browser execution remains disabled and BPAL handles no credentials or mutations.
 - 2026-07-16: Added the admin-only BPAL Supervisor diagnostics and policy-review surface. It renders only deterministic, deeply frozen read-only provider metadata, exact origins, capability policy, evidence, and verification identities; it has zero execution capacity and no production/provider Browser, credential, secret, request, or mutation path.
+- 2026-07-16: Hardened Mission 001 BPAL registration as the canonical cross-model integrity boundary: provider support decisions and metadata are detached and frozen at registration; capability, origin, navigation, selector, evidence, and verification references are validated fail-closed; navigation templates reject traversal and alternate-origin forms; and Vercel capability bindings are explicit. This remains metadata-only, read-only, non-production, and adds no browser execution, credentials, provider requests, or mutations.
 
 ## 20. Mandatory Final Reminder
 

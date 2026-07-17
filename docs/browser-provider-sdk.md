@@ -37,9 +37,15 @@ The canonical `VercelBrowserAdapter` is read-only and non-executing. It provides
 
 The admin-only `/dashboard/supervisor/providers` screen renders the diagnostics snapshot for operator policy review. It exposes provider health, versions, exact origins, capability risk/maturity, API/browser/manual channel declarations, evidence and verification profile identities, and approval requirements. It contains no forms, mutation controls, provider requests, credentials, or browser execution path. The Supervisor HA page links to this screen.
 
+## Durable capability-selection explanations
+
+`explainBrowserProviderSelection` binds a Supervisor `ExecutionDecision` back to the exact detached BPAL diagnostics record that justified it. It fails closed on provider, capability-version, policy-version, risk, maturity, verification, channel, origin, automatic-failover, Browser-on-demand, or production-environment mismatches. The resulting explanation is deterministic, deeply frozen, and includes only policy metadata: selected channel, decision code, exact approved origins, navigation/evidence/verification identities, approval requirement, and bounded reason codes.
+
+`createBrowserProviderSelectionAuditEvent` converts that explanation into the existing `PersistentAuditEvent` contract for `ExecutionRecordStore.appendAuditEvent`. The event cannot authorize, approve, replay, resume, dispatch, launch, or execute work. It contains no credentials, tokens, provider responses, browser objects, screenshot binaries, or mutable callbacks, and production Browser execution remains explicitly false.
+
 ## CI guard
 
-`npm run validate:bpal` runs `scripts/validate-bpal-guard.mjs`, which fails if a second registry, second root adapter contract, second Vercel adapter, forbidden BPAL execution/credential dependencies, direct Vercel knowledge inside Browser Runtime, or duplicate Vercel capability IDs are introduced. Runtime tests additionally exercise registration isolation, cross-reference integrity, navigation confinement, and explicit Vercel capability bindings.
+`npm run validate:bpal` runs `scripts/validate-bpal-guard.mjs`, which fails if a second registry, second root adapter contract, second Vercel adapter, forbidden BPAL execution/credential dependencies, direct Vercel knowledge inside Browser Runtime, or duplicate Vercel capability IDs are introduced. Runtime tests additionally exercise registration isolation, cross-reference integrity, navigation confinement, explicit Vercel capability bindings, durable selection explanations, and fail-closed decision binding.
 
 ## Localization
 
@@ -47,4 +53,4 @@ Operator-facing BPAL labels use the `browserProvider.*` / `browserProvider.verce
 
 ## Next sprint
 
-The recommended next sprint is to bind BPAL diagnostics to durable Supervisor audit records and capability-selection explanations without enabling production/provider Browser execution, credentials, or mutations.
+The recommended next sprint is to render these read-only capability-selection explanations in the existing authenticated execution-history detail surface and to attach them at the governed selector call site, without adding approval, retry, resume, execution, credential, provider-request, or production Browser controls.

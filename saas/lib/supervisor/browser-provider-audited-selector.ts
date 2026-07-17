@@ -61,6 +61,27 @@ function detachDecision(decision: ExecutionDecision): Readonly<ExecutionDecision
   return deepFreeze(structuredClone(decision))
 }
 
+function toSelectionInput(input: SelectBrowserProviderExecutionWithAuditInput): SelectInput {
+  return {
+    workItemId: input.workItemId,
+    executionMode: input.executionMode,
+    capabilityId: input.capabilityId,
+    capabilityVersion: input.capabilityVersion,
+    environment: input.environment,
+    apiAttempted: input.apiAttempted,
+    apiFailureCategory: input.apiFailureCategory,
+    retryCount: input.retryCount,
+    maxRetries: input.maxRetries,
+    browserReason: input.browserReason ? structuredClone(input.browserReason) : undefined,
+    ownerInstanceId: input.ownerInstanceId,
+    ownerRuntimeId: input.ownerRuntimeId,
+    fencingToken: input.fencingToken,
+    now: new Date(input.now.getTime()),
+    decisionTtlMs: input.decisionTtlMs,
+    flags: input.flags ? { ...input.flags } : undefined,
+  }
+}
+
 /**
  * Canonical governed selection boundary for BPAL-backed Supervisor decisions.
  *
@@ -96,14 +117,7 @@ export async function selectBrowserProviderExecutionWithAudit(
     dependencies.activePolicyVersion ?? 'ha-policy-v1',
   )
 
-  const {
-    incidentId: _incidentId,
-    providerId: _providerId,
-    executionId,
-    dispatchId,
-    ...selectionInput
-  } = input
-  const decision = detachDecision(selector.select(selectionInput))
+  const decision = detachDecision(selector.select(toSelectionInput(input)))
   const diagnosticsSnapshot = createBrowserProviderDiagnosticsSnapshot(registry)
   const explanation = explainBrowserProviderSelection({
     providerId,
@@ -114,8 +128,8 @@ export async function selectBrowserProviderExecutionWithAudit(
     incidentId,
     providerId,
     decision,
-    executionId,
-    dispatchId,
+    executionId: input.executionId,
+    dispatchId: input.dispatchId,
     diagnosticsSnapshot,
   })
 

@@ -221,6 +221,14 @@ Known limitation: the execution and retained-session stores remain in-process te
 
 
 
+### Mission 001 — Platform Self-Diagnostics
+
+Mission 001 includes a read-only Health Monitor for the Supervisor architecture itself. It evaluates Supervisor health, lease/fencing integrity, dispatcher status, Observer/Thinker/verification/audit/persistence latency, BPAL registry integrity, provider registration integrity, scheduler/webhook processing, queue depth, active/stale work, expired leases, missed heartbeats, reconciliation backlog, verification failures, audit failures, five-language localization completeness, and CI validation state.
+
+The monitor reports every subsystem as `healthy`, `warning`, `critical`, `unknown`, or `maintenance`, calculates an overall platform health score from availability, reliability, verification rate, audit success, scheduler success, webhook success, Supervisor health, provider health, and queue health, and emits deterministic alerts for stale leases, missing heartbeats, verification/audit failures, growing queues, repeated webhook/scheduler/provider failures, broken BPAL/provider/capability registration, localization regression, and CI regression.
+
+Health snapshots, subsystem metrics, alerts, recoveries, and trend buckets are persisted as sanitized metadata only. No raw logs, credentials, provider secrets, browser objects, provider responses, mutation handles, repair controls, provider mutations, Browser Runtime execution, or approval-gate bypass are introduced. The Supervisor Operations Center remains admin-only and read-only while displaying Platform Health, Subsystem Health, Trend Graphs, Recent Alerts, Recent Recoveries, Current Warnings, and Health History.
+
 ### Mission 001 — Canonical Browser Provider Abstraction Layer
 
 The canonical Browser Provider Abstraction Layer (BPAL) now lives only in `saas/lib/browser-provider/`, with `saas/lib/browser-provider/index.ts` as the public entry point. BPAL is metadata and policy support only: it defines provider adapter contracts, registry behavior, capabilities, origins, navigation profiles, selectors, evidence profiles, verification profiles, health, versioning, and Supervisor/worker metadata mapping. It does not execute browser tasks, import Playwright, invoke Browser Runtime, resolve credentials, call provider SDK clients, log into Vercel, mutate provider state, or enable production Browser execution.
@@ -698,6 +706,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-17: Added Mission 001 platform self-diagnostics: the Supervisor Operations Center now computes read-only platform health snapshots, subsystem status, alert/recovery history, trend buckets, and self-verification for Supervisor, lease, fencing, dispatcher, Observer/Thinker/verification/audit/persistence latency, BPAL/provider registration, scheduler/webhook processing, queue depth, stale work, expired leases, missed heartbeats, localization completeness, and CI state. The Health Monitor persists snapshots/alerts/recoveries/metrics only as sanitized metadata and adds no repair controls, provider mutations, Browser Runtime execution, credentials, raw logs, or approval-gate bypass.
 Use this section for short notes when architecture, provider behavior, platform workflow, or governance rules change.
 
 - 2026-07-17: Enhanced the Mission 001 Supervisor Operations Center with query-driven operational filtering/search, explicit Supervisor Cluster and Metrics sections, verification percentages, and dashboard test coverage while preserving read-only, admin-authenticated, non-mutating Supervisor/BPAL/Vercel data reuse.

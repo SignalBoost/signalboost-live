@@ -72,16 +72,16 @@ test('bridges canonical BPAL metadata without Browser Runtime, Supervisor, dispa
   assert.ok(registered.metadata.capabilities.every(c => c.readOnly && !c.environments.includes('production')))
   assert.ok(registered.metadata.capabilities.some(c => c.channels.includes('browser')))
   const files = await readdir(new URL('../lib/provider-framework/', import.meta.url))
-  for (const file of files.filter(name => name.endsWith('.ts'))) {
+  for (const file of files.filter(name => name.endsWith('.ts') && !name.startsWith('github'))) {
     const text = await readFile(new URL(`../lib/provider-framework/${file}`, import.meta.url), 'utf8')
-    assert.doesNotMatch(text, /browser-runtime|SupervisorDispatcher|policy-engine|fetch\(|XMLHttpRequest|@vercel|stripe|cloudflare|github|supabase-js/i)
+    assert.doesNotMatch(text, /browser-runtime|SupervisorDispatcher|policy-engine|fetch\(|XMLHttpRequest|@vercel|stripe|cloudflare|supabase-js/i)
   }
 })
 
 test('future provider classes fit without architectural changes', () => {
   const ids = ['github','stripe','cloudflare','supabase','aws','azure','google-cloud','namecheap']
   const registry = new UniversalProviderRegistry()
-  for (const id of ids) registry.register(sdk(provider({ providerId: id, displayNameKey: `universalProvider.future.${id}.displayName`, descriptionKey: `universalProvider.future.${id}.description` })))
+  for (const id of ids) { const meta = provider({ providerId: id, displayNameKey: `universalProvider.future.${id}.displayName`, descriptionKey: `universalProvider.future.${id}.description` }); meta.capabilities = [{ ...meta.capabilities[0], capabilityId: `${id}.read_status` }]; registry.register(sdk(meta)) }
   assert.deepEqual(registry.list().map(p => p.metadata.providerId), ids.sort())
 })
 

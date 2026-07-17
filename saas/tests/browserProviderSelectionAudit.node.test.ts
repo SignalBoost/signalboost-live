@@ -124,6 +124,14 @@ test('BPAL selection audit fails closed on mismatched or forbidden Browser decis
   assert.throws(
     () => explainBrowserProviderSelection({
       providerId: 'vercel',
+      decision: browserDecision({ approvedStepIds: ['save-production'] }),
+    }),
+    (error: unknown) => error instanceof BrowserProviderSelectionAuditError && error.code === 'decision_binding_mismatch',
+  )
+
+  assert.throws(
+    () => explainBrowserProviderSelection({
+      providerId: 'vercel',
       decision: browserDecision({ auditMetadata: { environment: 'production' } }),
     }),
     (error: unknown) => error instanceof BrowserProviderSelectionAuditError && error.code === 'environment_not_allowed',

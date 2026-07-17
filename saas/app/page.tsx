@@ -9,7 +9,6 @@ const LINKS = {
   cybersecurity: '/dashboard/cybersecurity',
   optimization: '/website-optimizer',
   agency: '/agency',
-  integrations: '/integrations',
   license: 'mailto:partners@signalboostapp.com?subject=Licensing%20SignalBoost%20modules',
 }
 /* --------------------------------------------------------------------------- */
@@ -33,7 +32,7 @@ const MODULES = [
 // Portable, sellable engines — outcome one-liners only, no mechanics exposed.
 const PORTABLES = [
   { glyph: '✦', name: 'Campaign Studio', desc: 'One brief → a finished, branded campaign.', tag: 'live', href: LINKS.agency },
-  { glyph: '⛓', name: 'Integrations Hub', desc: 'Secure connections for CRMs, CMSs, payments, calendars, AI providers, enterprise systems, and APIs.', tag: 'live', href: LINKS.integrations },
+  { glyph: '⛓', name: 'Integrations Hub', desc: 'Secure connections for CRMs, CMSs, payments, calendars, AI providers, enterprise systems, and APIs.', tag: 'live', href: '' },
   { glyph: '◍', name: 'Render Engine', desc: 'Voiceover + branded video, prepaid-credit safe.', tag: 'live', href: '' },
   { glyph: '◈', name: 'Console Hub', desc: 'Key vault, webhooks, logs, deployments, audit.', tag: 'live', href: '' },
   { glyph: '◎', name: 'Marketing + Sales', desc: 'Campaign + sales workflows, embeddable.', tag: 'live', href: '' },

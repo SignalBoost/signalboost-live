@@ -510,6 +510,29 @@
       "outage": "Сбой",
       "unknown": "Неизвестно",
       "suspended": "Приостановлен"
+    },
+    "risk": {
+      "read_only": "Только чтение",
+      "low_risk_reversible": "Обратимое с низким риском",
+      "medium": "Средний",
+      "high": "Высокий",
+      "forbidden": "Запрещено"
+    },
+    "maturity": {
+      "experimental": "Экспериментально",
+      "sandbox_verified": "Проверено в песочнице",
+      "human_approved": "Одобрено человеком",
+      "auto_failover_ready": "Готово к автоматическому переключению",
+      "suspended": "Приостановлено"
+    },
+    "channel": {
+      "api": "API",
+      "browser": "Браузер",
+      "manual": "Вручную"
+    },
+    "boolean": {
+      "true": "Да",
+      "false": "Нет"
     }
   },
   "vercelHealth": {

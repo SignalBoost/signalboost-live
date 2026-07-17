@@ -545,7 +545,16 @@
       "origins": "Approved origins",
       "evidenceProfile": "Evidence profile",
       "verificationProfile": "Verification profile",
-      "auditTimeline": "Audit timeline"
-    }
+      "auditTimeline": "Audit timeline",
+      "triggerSource": "Trigger source",
+      "triggerTime": "Trigger time",
+      "fingerprint": "Fingerprint",
+      "deduplication": "Deduplication",
+      "lastHeartbeat": "Last heartbeat",
+      "reconciliation": "Reconciliation",
+      "readOnly": "Read-only execution"
+    },
+    "triggerVisibility": "Automatic triggers are durably deduplicated before a Supervisor lease can run read-only health intelligence.",
+    "readOnlyNotice": "Execution is read-only; Vercel mutations, repairs, and production Browser execution are disabled."
   }
 }

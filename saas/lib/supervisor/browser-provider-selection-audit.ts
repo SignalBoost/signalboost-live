@@ -13,6 +13,7 @@ import {
   parseAuditEvent,
   type PersistentAuditEvent,
 } from './persistence/audit-record-schema.ts'
+import { canonicalTimestamp } from './persistence/serialization.ts'
 
 export const BROWSER_PROVIDER_SELECTION_EXPLANATION_SCHEMA_VERSION =
   'browser-provider-selection-explanation-v1' as const
@@ -270,7 +271,7 @@ export function createBrowserProviderSelectionAuditEvent(
   input: CreateBrowserProviderSelectionAuditEventInput,
 ): Readonly<PersistentAuditEvent> {
   const explanation = explainBrowserProviderSelection(input)
-  const occurredAt = input.occurredAt ?? input.decision.decidedAt
+  const occurredAt = canonicalTimestamp(input.occurredAt ?? input.decision.decidedAt, 'occurredAt')
   const incidentId = requireString(input.incidentId, 'incidentId')
   const payload = explanation as unknown as Record<string, SerializableValue>
   const event = parseAuditEvent({

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   BROWSER_PROVIDER_DIAGNOSTICS_SCHEMA_VERSION,
   createBrowserProviderDiagnosticsSnapshot,
@@ -196,6 +197,25 @@ function reasonCodesFor(
   return reasons
 }
 
+function createAuditEventId(input: {
+  incidentId: string
+  executionId?: string
+  dispatchId?: string
+  occurredAt: string
+  explanation: BrowserProviderSelectionExplanation
+}): string {
+  const digest = createHash('sha256')
+    .update(JSON.stringify({
+      incidentId: input.incidentId,
+      executionId: input.executionId ?? null,
+      dispatchId: input.dispatchId ?? null,
+      occurredAt: input.occurredAt,
+      explanation: input.explanation,
+    }))
+    .digest('hex')
+  return `browser-provider-selection:${digest}`
+}
+
 export function explainBrowserProviderSelection(
   input: Pick<CreateBrowserProviderSelectionAuditEventInput, 'providerId' | 'decision' | 'diagnosticsSnapshot'>,
 ): BrowserProviderSelectionExplanation {
@@ -251,12 +271,19 @@ export function createBrowserProviderSelectionAuditEvent(
 ): Readonly<PersistentAuditEvent> {
   const explanation = explainBrowserProviderSelection(input)
   const occurredAt = input.occurredAt ?? input.decision.decidedAt
+  const incidentId = requireString(input.incidentId, 'incidentId')
   const payload = explanation as unknown as Record<string, SerializableValue>
   const event = parseAuditEvent({
-    eventId: `browser-provider-selection:${explanation.decisionId}`,
+    eventId: createAuditEventId({
+      incidentId,
+      executionId: input.executionId,
+      dispatchId: input.dispatchId,
+      occurredAt,
+      explanation,
+    }),
     executionId: input.executionId,
     dispatchId: input.dispatchId,
-    incidentId: requireString(input.incidentId, 'incidentId'),
+    incidentId,
     eventType: 'browser_provider_capability_selection_explained',
     occurredAt,
     payload,

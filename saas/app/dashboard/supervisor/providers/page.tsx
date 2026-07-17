@@ -13,6 +13,10 @@ function localize(dict: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : key
 }
 
+function localizeToken(dict: Record<string, unknown>, namespace: string, value: string): string {
+  return localize(dict, `${namespace}.${value}`)
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return <div><dt style={muted}>{label}</dt><dd style={fieldValue}>{value}</dd></div>
 }
@@ -29,6 +33,7 @@ export default async function SupervisorProviderDiagnosticsPage() {
   const dict = await loadLanguage(locale)
   const tHa = dict.supervisorHa as Record<string, string>
   const tApproval = dict.supervisorApprovals as Record<string, string>
+  const dictRecord = dict as Record<string, unknown>
 
   if (!access.isAdmin) {
     return <main style={page}><h1>{tHa.providerWorker}</h1><p>{tApproval.sessionNoLongerAvailable}</p></main>
@@ -44,8 +49,8 @@ export default async function SupervisorProviderDiagnosticsPage() {
         <p style={warning}>{tHa.productionBrowserExecutionDisabled}</p>
         <div style={{ display: 'grid', gap: 18 }}>
           {snapshot.providers.map(provider => {
-            const providerName = localize(dict as Record<string, unknown>, provider.displayNameKey)
-            const health = localize(dict as Record<string, unknown>, `browserProvider.health.${provider.health.state}`)
+            const providerName = localize(dictRecord, provider.displayNameKey)
+            const health = localize(dictRecord, `browserProvider.health.${provider.health.state}`)
             return (
               <article key={provider.providerId} style={card}>
                 <div style={headerRow}>
@@ -59,7 +64,7 @@ export default async function SupervisorProviderDiagnosticsPage() {
 
                 <dl style={grid}>
                   <Field label={tApproval.provider} value={provider.providerId} />
-                  <Field label={tHa.executionMethod} value="read_only" />
+                  <Field label={tHa.executionMethod} value={localizeToken(dictRecord, 'browserProvider.risk', 'read_only')} />
                   <Field label={tHa.providerWorker} value={`${provider.worker.maximumConcurrentWork} · ${tHa.noActiveWork}`} />
                   <Field label={tApproval.approvalStatus} value={health} />
                 </dl>
@@ -68,7 +73,7 @@ export default async function SupervisorProviderDiagnosticsPage() {
                 <ul>
                   {provider.origins.map(origin => (
                     <li key={origin.originId}>
-                      <strong>{localize(dict as Record<string, unknown>, origin.labelKey)}</strong>{' '}
+                      <strong>{localize(dictRecord, origin.labelKey)}</strong>{' '}
                       <code>{origin.originId}</code> · <code>{origin.exactOrigin}</code>
                     </li>
                   ))}
@@ -79,20 +84,20 @@ export default async function SupervisorProviderDiagnosticsPage() {
                     <section key={capability.capabilityId} style={capabilityCard}>
                       <div style={headerRow}>
                         <div>
-                          <h3 style={{ margin: 0 }}>{localize(dict as Record<string, unknown>, capability.displayNameKey)}</h3>
-                          {capability.descriptionKey ? <p style={muted}>{localize(dict as Record<string, unknown>, capability.descriptionKey)}</p> : null}
+                          <h3 style={{ margin: 0 }}>{localize(dictRecord, capability.displayNameKey)}</h3>
+                          {capability.descriptionKey ? <p style={muted}>{localize(dictRecord, capability.descriptionKey)}</p> : null}
                         </div>
                         <code>{capability.capabilityId}</code>
                       </div>
                       <dl style={grid}>
-                        <Field label={tApproval.riskLevel} value={capability.riskClass} />
-                        <Field label={tHa.capabilityMaturity} value={capability.maturity} />
-                        <Field label={tHa.executionMethod} value={Object.entries(capability.channels).filter(([, enabled]) => enabled).map(([channel]) => channel).join(' / ')} />
+                        <Field label={tApproval.riskLevel} value={localizeToken(dictRecord, 'browserProvider.risk', capability.riskClass)} />
+                        <Field label={tHa.capabilityMaturity} value={localizeToken(dictRecord, 'browserProvider.maturity', capability.maturity)} />
+                        <Field label={tHa.executionMethod} value={Object.entries(capability.channels).filter(([, enabled]) => enabled).map(([channel]) => localizeToken(dictRecord, 'browserProvider.channel', channel)).join(' / ')} />
                         <Field label={tHa.policyVersion} value={capability.policyVersion} />
                         <Field label={tApproval.verificationRequirements} value={capability.verificationProfileId} />
                         <Field label={tApproval.evidence} value={capability.evidenceProfileId} />
                         <Field label={tApproval.targetOrigin} value={capability.allowedOriginIds.join(', ')} />
-                        <Field label={tApproval.approvalStatus} value={String(capability.requiresHumanApproval)} />
+                        <Field label={tApproval.approvalStatus} value={localizeToken(dictRecord, 'browserProvider.boolean', String(capability.requiresHumanApproval))} />
                       </dl>
                       {capability.requiresHumanApproval ? <p style={warning}>{tHa.humanApprovalRequired}</p> : null}
                       <p style={warning}>{tHa.productionBrowserExecutionDisabled}</p>

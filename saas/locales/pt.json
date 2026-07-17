@@ -510,6 +510,29 @@
       "outage": "Indisponível",
       "unknown": "Desconhecido",
       "suspended": "Suspenso"
+    },
+    "risk": {
+      "read_only": "Somente leitura",
+      "low_risk_reversible": "Reversível de baixo risco",
+      "medium": "Médio",
+      "high": "Alto",
+      "forbidden": "Proibido"
+    },
+    "maturity": {
+      "experimental": "Experimental",
+      "sandbox_verified": "Verificado em sandbox",
+      "human_approved": "Aprovado por humano",
+      "auto_failover_ready": "Pronto para failover automático",
+      "suspended": "Suspenso"
+    },
+    "channel": {
+      "api": "API",
+      "browser": "Navegador",
+      "manual": "Manual"
+    },
+    "boolean": {
+      "true": "Sim",
+      "false": "Não"
     }
   },
   "vercelHealth": {

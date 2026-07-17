@@ -25,20 +25,17 @@ type HomepagePartner = {
   featured?: boolean;
 };
 
-// Live tool + licensing inbox (same as the Campaign Studio public page).
 const CAMPAIGN_STUDIO = "/campaign-studio";
 const LICENSE_CONTACT =
   "mailto:partners@signalboostapp.com?subject=Licensing%20SignalBoost%20modules";
 
-// Portable, sellable engines. Outcome one-liners only — no mechanics exposed.
-// `tag`: 'live' = shipped, 'preview' = available by request.
 type Portable = {
   key: string;
   glyph: string;
   name: string;
   desc: string;
   tag: "live" | "preview";
-  href?: string; // only Campaign Studio has a public product page today
+  href?: string;
 };
 
 const PORTABLES: Portable[] = [
@@ -46,43 +43,50 @@ const PORTABLES: Portable[] = [
     key: "campaignStudio",
     glyph: "✦",
     name: "Campaign Studio",
-    desc: "One brief in — a finished, branded campaign out: script, voiceover, and video.",
+    desc: "One brief → a finished, branded campaign.",
     tag: "live",
     href: CAMPAIGN_STUDIO,
+  },
+  {
+    key: "integrationsHub",
+    glyph: "⛓",
+    name: "Integrations Hub",
+    desc: "Connect CRMs, CMSs, payment gateways, calendars, AI providers, enterprise systems, and APIs through one secure integration layer.",
+    tag: "live",
   },
   {
     key: "render",
     glyph: "◍",
     name: "Render Engine",
-    desc: "Portable voiceover and branded video rendering with prepaid-credit safety built in.",
+    desc: "Voiceover + branded video, prepaid-credit safe.",
     tag: "live",
   },
   {
     key: "console",
     glyph: "◈",
     name: "Console Hub",
-    desc: "Operator console with an encrypted key vault, webhooks, logs, deployments, and audit.",
+    desc: "Key vault, webhooks, logs, deployments, audit.",
     tag: "live",
   },
   {
     key: "marketingSales",
     glyph: "◎",
     name: "Marketing + Sales",
-    desc: "Campaign orchestration and sales workflows as one embeddable module.",
+    desc: "Campaign + sales workflows, embeddable.",
     tag: "live",
   },
   {
     key: "chiefOfStaff",
     glyph: "❖",
-    name: "Chief-of-Staff Engine",
-    desc: "An AI operator that observes, plans, and executes — always under human approval.",
+    name: "Chief-of-Staff",
+    desc: "AI operator that plans and executes, human-approved.",
     tag: "preview",
   },
   {
     key: "browserRuntime",
     glyph: "◇",
     name: "Browser Runtime",
-    desc: "Bounded, verifiable browser automation with mandatory approval checkpoints.",
+    desc: "Bounded, verifiable browser automation.",
     tag: "preview",
   },
 ];
@@ -91,8 +95,6 @@ function fallbackText(value: string, fallback: string) {
   return /^[a-zA-Z][\w$]*(\.[\w$]+)+$/.test(value) ? fallback : value;
 }
 
-// Reusable Fathom-style floating panel. Every homepage section is wrapped in
-// one so the whole page reads as a stack of embedded cards on a soft surface.
 function Panel({ children }: { children: React.ReactNode }) {
   return <section style={styles.panel}>{children}</section>;
 }
@@ -121,12 +123,9 @@ export default function HomeApp({ afterHero }: HomeAppProps) {
       <div style={styles.bgGrain} aria-hidden="true" />
 
       <div style={styles.pageStack}>
-        {/* Hero (already a self-contained panel) */}
         <ConciergeHero />
-
         {afterHero}
 
-        {/* ---- Browse by category ---- */}
         <Panel>
           <div style={styles.sectionHeaderZone}>
             <span style={styles.sectionBadge}>{fallbackText(t("home.marketplaceBadge"), "Partner marketplace")}</span>
@@ -135,10 +134,14 @@ export default function HomeApp({ afterHero }: HomeAppProps) {
 
           <div style={styles.categoryGrid}>
             {categories.map((category) => (
-              <Link key={category.key}
+              <Link
+                key={category.key}
                 href={`/marketplace?category=${category.key}`}
                 style={styles.categoryCard}
-                aria-label={fallbackText(t("home.browseCategoryAria"), `Browse ${category.label} partners`).replace("{label}", fallbackText(t(`categories.${category.key}`), category.label))}
+                aria-label={fallbackText(t("home.browseCategoryAria"), `Browse ${category.label} partners`).replace(
+                  "{label}",
+                  fallbackText(t(`categories.${category.key}`), category.label),
+                )}
               >
                 <span style={styles.categoryCardCopy}>
                   <span style={styles.categoryName}>{fallbackText(t(`categories.${category.key}`), category.label)}</span>
@@ -158,7 +161,6 @@ export default function HomeApp({ afterHero }: HomeAppProps) {
           </div>
         </Panel>
 
-        {/* ---- Workspace modules ---- */}
         <Panel>
           <div style={styles.sectionHeaderZone}>
             <span style={styles.sectionBadge}>{fallbackText(t("home.modulesBadge"), "Workspace modules")}</span>
@@ -167,7 +169,6 @@ export default function HomeApp({ afterHero }: HomeAppProps) {
           <ModuleGrid />
         </Panel>
 
-        {/* ---- License the engines (portable modules for sale) ---- */}
         <Panel>
           <div style={styles.sectionHeaderZone}>
             <span style={styles.sectionBadge}>{fallbackText(t("home.portablesBadge"), "Portable engines")}</span>
@@ -175,48 +176,56 @@ export default function HomeApp({ afterHero }: HomeAppProps) {
             <p style={styles.portablesSub}>
               {fallbackText(
                 t("home.portablesSub"),
-                "Self-contained, AI-driven and human-monitored modules you can license and embed in your own stack.",
+                "Extend your console with lightweight, human-monitored micro-modules.",
               )}
             </p>
           </div>
 
           <div style={styles.portablesGrid}>
-            {PORTABLES.map((p) => {
-              const desc = fallbackText(t(`portables.${p.key}`), p.desc);
-              const tagLabel =
-                p.tag === "live"
-                  ? fallbackText(t("home.portableLive"), "Live")
-                  : fallbackText(t("home.portablePreview"), "Preview");
+            {PORTABLES.map((portable) => {
+              const desc = fallbackText(t(`portables.${portable.key}`), portable.desc);
+              const tagLabel = portable.tag === "live"
+                ? fallbackText(t("home.portableLive"), "Live")
+                : fallbackText(t("home.portablePreview"), "Preview");
+
               const inner = (
                 <>
                   <div style={styles.portableTop}>
-                    <span style={styles.portableIcon} aria-hidden="true">{p.glyph}</span>
-                    <span style={p.tag === "live" ? styles.tagLive : styles.tagPreview}>{tagLabel}</span>
+                    <span style={styles.portableIcon} aria-hidden="true">{portable.glyph}</span>
+                    <span style={portable.tag === "live" ? styles.tagLive : styles.tagPreview}>{tagLabel}</span>
                   </div>
-                  <span style={styles.portableName}>{p.name}</span>
+                  <span style={styles.portableName}>{portable.name}</span>
                   <span style={styles.portableDesc}>{desc}</span>
-                  {p.href ? <span style={styles.portableLink} aria-hidden="true">{fallbackText(t("home.portableSeeLive"), "See it live")} →</span> : null}
+                  {portable.href ? (
+                    <span style={styles.portableLink} aria-hidden="true">
+                      {fallbackText(t("home.portableSeeLive"), "See it live")} →
+                    </span>
+                  ) : null}
                 </>
               );
-              return p.href ? (
-                <Link key={p.key} href={p.href} style={styles.portableCard}>{inner}</Link>
+
+              return portable.href ? (
+                <Link key={portable.key} href={portable.href} style={styles.portableCard}>{inner}</Link>
               ) : (
-                <div key={p.key} style={styles.portableCard}>{inner}</div>
+                <div key={portable.key} style={styles.portableCard}>{inner}</div>
               );
             })}
           </div>
 
+          <p style={styles.portablesTagline}>
+            {fallbackText(
+              t("home.portablesTagline"),
+              "AI-driven architecture, human-monitored — multilingual: EN • ES • PT • PL • RU.",
+            )}
+          </p>
+
           <div style={styles.portablesCtaRow}>
             <a style={styles.licenseButton} href={LICENSE_CONTACT}>
-              {fallbackText(t("home.portablesLicenseCta"), "License the engines")} →
+              {fallbackText(t("home.portablesLicenseCta"), "License → Campaign Studio")}
             </a>
-            <Link href={CAMPAIGN_STUDIO} style={styles.browseAllButton}>
-              {fallbackText(t("home.portablesStudioCta"), "See Campaign Studio live")}
-            </Link>
           </div>
         </Panel>
 
-        {/* ---- How it works ---- */}
         <Panel>
           <div style={styles.sectionHeaderZone}>
             <span style={styles.sectionBadge}>{fallbackText(t("home.howBadge"), "How it works")}</span>
@@ -249,7 +258,6 @@ export default function HomeApp({ afterHero }: HomeAppProps) {
 
 const styles: Record<string, React.CSSProperties> = {
   mainCanvas: { position: "relative", backgroundColor: "#06060a", minHeight: "100vh", overflowX: "hidden" },
-
   bgGlow: {
     position: "fixed",
     inset: 0,
@@ -267,7 +275,6 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundImage:
       "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
   },
-
   pageStack: {
     position: "relative",
     zIndex: 1,
@@ -278,7 +285,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: "20px",
   },
-
   panel: {
     position: "relative",
     borderRadius: "28px",
@@ -289,11 +295,9 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05)",
     padding: "clamp(28px, 4vw, 56px)",
   },
-
   sectionHeaderZone: { textAlign: "center", marginBottom: "36px" },
   sectionBadge: { fontSize: "11px", fontWeight: 700, color: "#dfa837", letterSpacing: "0.2em", textTransform: "uppercase" },
   sectionHeading: { fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 600, color: "#ffffff", marginTop: "8px", letterSpacing: "-0.02em" },
-
   categoryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: "14px" },
   categoryCard: {
     display: "flex",
@@ -312,7 +316,6 @@ const styles: Record<string, React.CSSProperties> = {
   categoryName: { fontSize: "16px", fontWeight: 800, color: "#f8fafc" },
   categoryMeta: { fontSize: "12px", color: "#dfa837", fontWeight: 800, marginTop: "4px" },
   categoryArrow: { color: "#f5c542", fontSize: "18px", fontWeight: 900, flexShrink: 0 },
-
   browseAllRow: { display: "flex", justifyContent: "center", marginTop: "36px" },
   browseAllButton: {
     display: "inline-flex",
@@ -328,8 +331,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     textDecoration: "none",
   },
-
-  // ---- Portable engines ----
   portablesSub: {
     maxWidth: "640px",
     margin: "12px auto 0",
@@ -338,7 +339,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#94a3b8",
     fontWeight: 500,
   },
-  portablesGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" },
+  portablesGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" },
   portableCard: {
     display: "flex",
     flexDirection: "column",
@@ -386,8 +387,16 @@ const styles: Record<string, React.CSSProperties> = {
   portableName: { fontSize: "18px", fontWeight: 800, color: "#f8fafc", marginTop: "4px" },
   portableDesc: { fontSize: "13.5px", lineHeight: 1.55, color: "#9aa4b9", fontWeight: 500 },
   portableLink: { marginTop: "auto", fontSize: "12px", fontWeight: 800, color: "#f5c542", letterSpacing: "0.02em" },
-
-  portablesCtaRow: { display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "36px" },
+  portablesTagline: {
+    margin: "28px auto 0",
+    maxWidth: "760px",
+    textAlign: "center",
+    color: "#cbd5e1",
+    fontSize: "13px",
+    lineHeight: 1.6,
+    fontWeight: 700,
+  },
+  portablesCtaRow: { display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "24px" },
   licenseButton: {
     display: "inline-flex",
     alignItems: "center",
@@ -402,7 +411,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     textDecoration: "none",
   },
-
   stepsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" },
   stepGlassCard: {
     backgroundColor: "rgba(10, 10, 15, 0.4)",

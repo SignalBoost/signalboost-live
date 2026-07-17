@@ -21,6 +21,7 @@ import onboardingLocales from './onboardingLocales.json'
 import marketingSalesLocales from './marketingSalesLocales.json'
 import auditCenterLocales from './auditCenterLocales.json'
 import supervisorSocLocales from './supervisorSocLocales.json'
+import homepageLocales from './homepageLocales.json'
 import { mergeDict, mergePageLocales } from './pageLocales'
 
 export type DictValue = string | string[] | Dict
@@ -64,6 +65,11 @@ function loadSupervisorSoc(lang: string): Dict {
   return table[lang] || table.en || {}
 }
 
+function loadHomepage(lang: string): Dict {
+  const table = homepageLocales as unknown as Record<string, Dict>
+  return table[lang] || table.en || {}
+}
+
 function isDict(value: DictValue | undefined): value is Dict {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -87,8 +93,9 @@ export async function loadLanguage(lang: string): Promise<Dict> {
   const enAudit = mergeDict(loadAudit('en'), loadAuditCenter('en'))
   const enMarketingSales = loadMarketingSales('en')
   const enSupervisorSoc = loadSupervisorSoc('en')
+  const enHomepage = loadHomepage('en')
   if (lang === 'en' || !dictionaries[lang]) {
-    return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), marketingSales: enMarketingSales, ...enSupervisorSoc, __lang: 'en' }
+    return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), marketingSales: enMarketingSales, homepage: enHomepage, ...enSupervisorSoc, __lang: 'en' }
   }
 
   try {
@@ -98,10 +105,11 @@ export async function loadLanguage(lang: string): Promise<Dict> {
     merged.audit = mergeWithEnglishFallback(enAudit, mergeDict(loadAudit(lang), loadAuditCenter(lang)))
     merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(lang))
     merged.marketingSales = mergeWithEnglishFallback(enMarketingSales, loadMarketingSales(lang))
+    merged.homepage = mergeWithEnglishFallback(enHomepage, loadHomepage(lang))
     Object.assign(merged, mergeWithEnglishFallback(enSupervisorSoc, loadSupervisorSoc(lang)))
     merged.__lang = lang
     return merged
   } catch {
-    return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), marketingSales: enMarketingSales, ...enSupervisorSoc, __lang: 'en' }
+    return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), marketingSales: enMarketingSales, homepage: enHomepage, ...enSupervisorSoc, __lang: 'en' }
   }
 }

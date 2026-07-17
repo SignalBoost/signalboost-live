@@ -95,6 +95,23 @@ test('BPAL selection explanation becomes a valid durable Supervisor audit event'
   await store.appendAuditEvent(event)
 })
 
+test('BPAL selection audit preserves manual explanations when production Browser execution is denied', () => {
+  const explanation = explainBrowserProviderSelection({
+    providerId: 'vercel',
+    decision: browserDecision({
+      selectedChannel: 'manual',
+      decisionCode: 'require_human_approval',
+      auditMetadata: { environment: 'production' },
+    }),
+  })
+
+  assert.equal(explanation.environment, 'production')
+  assert.equal(explanation.selectedChannel, 'manual')
+  assert.ok(explanation.reasonCodes.includes('human_approval_required'))
+  assert.ok(explanation.reasonCodes.includes('production_browser_execution_disabled'))
+  assert.equal(explanation.productionExecutionEnabled, false)
+})
+
 test('BPAL selection audit fails closed on mismatched or forbidden Browser decisions', () => {
   assert.throws(
     () => explainBrowserProviderSelection({

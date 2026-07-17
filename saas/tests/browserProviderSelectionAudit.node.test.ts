@@ -151,11 +151,26 @@ test('BPAL selection explanation becomes a valid durable Supervisor audit event'
     decision: browserDecision(),
     occurredAt: '2026-07-16T18:00:00-07:00',
   })
+  const emptyOptionalIdsEvent = createBrowserProviderSelectionAuditEvent({
+    incidentId: 'incident-1',
+    executionId: '',
+    dispatchId: '',
+    providerId: 'vercel',
+    decision: browserDecision(),
+  })
+  const omittedOptionalIdsEvent = createBrowserProviderSelectionAuditEvent({
+    incidentId: 'incident-1',
+    providerId: 'vercel',
+    decision: browserDecision(),
+  })
 
   assert.match(event.eventId, /^browser-provider-selection:[a-f0-9]{64}$/)
   assert.notEqual(event.eventId, reboundEvent.eventId)
   assert.equal(event.eventId, equivalentTimeEvent.eventId)
   assert.equal(equivalentTimeEvent.occurredAt, '2026-07-17T01:00:00.000Z')
+  assert.equal(emptyOptionalIdsEvent.eventId, omittedOptionalIdsEvent.eventId)
+  assert.equal(emptyOptionalIdsEvent.executionId, undefined)
+  assert.equal(emptyOptionalIdsEvent.dispatchId, undefined)
   assert.equal(event.eventType, 'browser_provider_capability_selection_explained')
   assert.equal(event.schemaVersion, auditRecordSchemaVersion)
   assert.equal(event.incidentId, 'incident-1')

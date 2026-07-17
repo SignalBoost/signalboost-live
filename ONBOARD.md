@@ -771,6 +771,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added durable Mission 001 BPAL capability-selection explanations and audit events. Supervisor decisions are bound fail-closed to the exact detached provider capability, policy, environment, origin, verification, channel, and empty executable-step scope; persisted records are metadata-only and cannot authorize or execute Browser Runtime or provider work.
 - 2026-07-16: Added the governed Mission 001 BPAL selector boundary. BPAL-backed Supervisor channel selection now validates one exact registered provider capability against the same detached diagnostics snapshot, uses content-bound audit event identity, and durably appends the metadata-only selection audit before returning a decision. Unknown provider/capability scope and audit persistence failures fail closed. This does not enable provider requests, credentials, approvals, Browser Runtime execution, mutations, or production Browser execution.
 
+- 2026-07-17: Added COSA multi-stage video pipeline stabilization scaffolding: BullMQ/Redis queues for video rendering, voice-over, and brand overlay workers; a secured `cos-voice-dispatch` cron route for `waiting_for_voice` campaigns; S3-compatible render bucket pre-flight verification with optional provisioning/fallback; and local-vs-cloud render routing based on queue depth and CPU load. This preserves owner approval gates and prevents render jobs from enqueueing when storage is unavailable.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 import { renderBrandOverlayVideo } from '@/lib/cos/video-compose'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
@@ -8,7 +9,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
-  const ctx = await requireAdmin()
+  const cronSecret = process.env.CRON_SECRET
+  const isCron = Boolean(cronSecret) && req.headers.get('x-cos-cron-secret') === cronSecret
+  const ctx = isCron ? { admin: getAdminSupabase(), user: { id: 'cos-voice-dispatch-cron' } as any } : await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
   let body: any = {}

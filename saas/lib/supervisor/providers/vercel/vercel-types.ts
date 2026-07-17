@@ -43,6 +43,9 @@ export interface VercelReadOnlyClient {
   getProjectMetadata(input: { projectId: string; teamId?: string; token: string }): Promise<VercelProjectMetadata>
   listRecentDeployments(input: VercelDeploymentQuery & { token: string }): Promise<VercelDeploymentsPage>
   getDeployment(input: { deploymentId: string; teamId?: string; token: string }): Promise<VercelDeployment>
+  getDeploymentEvents?(input: { deploymentId: string; teamId?: string; token: string }): Promise<{ events: unknown[] }>
+  listProjectEnvNames?(input: { projectId: string; teamId?: string; target: VercelEnvironment; token: string }): Promise<{ names: string[] }>
+  listProductionAliases?(input: { projectId: string; teamId?: string; token: string }): Promise<{ aliases: string[] }>
 }
 
 export interface VercelObservationDeps { config: VercelObserverConfig; secretResolver: SecretResolver; client: VercelReadOnlyClient }

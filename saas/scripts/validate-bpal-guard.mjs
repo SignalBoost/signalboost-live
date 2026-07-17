@@ -14,6 +14,12 @@ count(/\bVercelBrowserAdapter\b\s*[:=]/, ['lib/browser-provider/vercel/vercel-br
 for(const file of files.filter(f=>rel(f).startsWith(canonical))){const text=read(file); if(/playwright|browser-runtime|credential|secret|password|token|mutation client/i.test(text)) errors.push(`Forbidden BPAL dependency/secret/execution term in ${rel(file)}`)}
 for(const file of files.filter(f=>rel(f).startsWith('lib/browser-runtime'))){if(/vercel/i.test(read(file)))errors.push(`Direct Vercel knowledge inside Browser Runtime: ${rel(file)}`)}
 const data = readFileSync(join(root,'lib/browser-provider/vercel/vercel-data.ts'),'utf8')
-for(const name of ['vercelCapabilityIds']){const m=data.match(new RegExp(`const ${name}=\\[([^\\]]+)\\]`)); if(m){const ids=[...m[1].matchAll(/'([^']+)'/g)].map(x=>x[1]); if(new Set(ids).size!==ids.length)errors.push(`Duplicate IDs in ${name}`)}}
+for(const name of ['vercelCapabilityIds']){
+  const declaration = new RegExp(`(?:export\\s+)?const\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\]\\s+as\\s+const\\b`)
+  const match = data.match(declaration)
+  if(!match){errors.push(`Unable to inspect canonical ID declaration ${name}`); continue}
+  const ids=[...match[1].matchAll(/'([^']+)'/g)].map(value=>value[1])
+  if(new Set(ids).size!==ids.length)errors.push(`Duplicate IDs in ${name}`)
+}
 if(errors.length){console.error(errors.join('\n')); process.exit(1)}
 console.log('BPAL guard passed')

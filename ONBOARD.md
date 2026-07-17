@@ -706,6 +706,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-17: Added Mission 001 Universal Provider Runtime execution support for a read-only GitHub adapter: canonical registry capability resolution now rejects duplicate capabilities, GitHub observations run through durable Supervisor ownership/lease/fencing checks, read-only GitHub API normalization/verification/scheduler/webhook helpers persist only sanitized evidence/audit metadata, and the Supervisor Operations Center exposes GitHub status without mutation controls or credential display.
 - 2026-07-17: Added Mission 001 platform self-diagnostics: the Supervisor Operations Center now computes read-only platform health snapshots, subsystem status, alert/recovery history, trend buckets, and self-verification for Supervisor, lease, fencing, dispatcher, Observer/Thinker/verification/audit/persistence latency, BPAL/provider registration, scheduler/webhook processing, queue depth, stale work, expired leases, missed heartbeats, localization completeness, and CI state. The Health Monitor persists snapshots/alerts/recoveries/metrics only as sanitized metadata and adds no repair controls, provider mutations, Browser Runtime execution, credentials, raw logs, or approval-gate bypass.
 Use this section for short notes when architecture, provider behavior, platform workflow, or governance rules change.
 

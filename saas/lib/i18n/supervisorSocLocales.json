@@ -144,7 +144,18 @@
       "verification_failures_label": "Verification failures",
       "audit_failures": "Audit failures",
       "localization_completeness": "Localization completeness",
-      "ci_validation": "CI validation state"
+      "ci_validation": "CI validation state",
+      "githubProvider": "GitHub Provider",
+      "githubConnectionHealth": "GitHub connection health",
+      "githubRepositoryCount": "Repository count",
+      "githubActiveObservations": "Active GitHub observations",
+      "githubFailedObservations": "Failed GitHub observations",
+      "githubWebhookStatus": "GitHub webhook status",
+      "githubSchedulerStatus": "GitHub scheduler status",
+      "githubRateLimit": "API rate-limit status",
+      "githubRecentWorkflowFailures": "Recent workflow failures",
+      "githubRecentPullRequestFindings": "Recent pull-request findings",
+      "githubReadOnlyNotice": "GitHub runtime is read-only. No merge, workflow dispatch, repository, secret, environment, or permission mutation controls are available."
     }
   },
   "es": {
@@ -292,7 +303,18 @@
       "verification_failures_label": "Verification failures",
       "audit_failures": "Audit failures",
       "localization_completeness": "Localization completeness",
-      "ci_validation": "CI validation state"
+      "ci_validation": "CI validation state",
+      "githubProvider": "Proveedor GitHub",
+      "githubConnectionHealth": "Salud de conexión GitHub",
+      "githubRepositoryCount": "Cantidad de repositorios",
+      "githubActiveObservations": "Observaciones GitHub activas",
+      "githubFailedObservations": "Observaciones GitHub fallidas",
+      "githubWebhookStatus": "Estado de webhook GitHub",
+      "githubSchedulerStatus": "Estado de programador GitHub",
+      "githubRateLimit": "Estado de límite de API",
+      "githubRecentWorkflowFailures": "Fallos recientes de workflow",
+      "githubRecentPullRequestFindings": "Hallazgos recientes de pull request",
+      "githubReadOnlyNotice": "El runtime de GitHub es de solo lectura. No hay controles para merge, dispatch de workflows, repositorios, secretos, entornos ni permisos."
     }
   },
   "pt": {
@@ -440,7 +462,18 @@
       "verification_failures_label": "Verification failures",
       "audit_failures": "Audit failures",
       "localization_completeness": "Localization completeness",
-      "ci_validation": "CI validation state"
+      "ci_validation": "CI validation state",
+      "githubProvider": "Provedor GitHub",
+      "githubConnectionHealth": "Saúde da conexão GitHub",
+      "githubRepositoryCount": "Contagem de repositórios",
+      "githubActiveObservations": "Observações GitHub ativas",
+      "githubFailedObservations": "Observações GitHub com falha",
+      "githubWebhookStatus": "Status do webhook GitHub",
+      "githubSchedulerStatus": "Status do agendador GitHub",
+      "githubRateLimit": "Status do limite da API",
+      "githubRecentWorkflowFailures": "Falhas recentes de workflow",
+      "githubRecentPullRequestFindings": "Achados recentes de pull request",
+      "githubReadOnlyNotice": "O runtime GitHub é somente leitura. Não há controles para merge, disparo de workflow, repositório, segredo, ambiente ou permissão."
     }
   },
   "pl": {
@@ -588,7 +621,18 @@
       "verification_failures_label": "Verification failures",
       "audit_failures": "Audit failures",
       "localization_completeness": "Localization completeness",
-      "ci_validation": "CI validation state"
+      "ci_validation": "CI validation state",
+      "githubProvider": "Dostawca GitHub",
+      "githubConnectionHealth": "Kondycja połączenia GitHub",
+      "githubRepositoryCount": "Liczba repozytoriów",
+      "githubActiveObservations": "Aktywne obserwacje GitHub",
+      "githubFailedObservations": "Nieudane obserwacje GitHub",
+      "githubWebhookStatus": "Status webhooka GitHub",
+      "githubSchedulerStatus": "Status harmonogramu GitHub",
+      "githubRateLimit": "Status limitu API",
+      "githubRecentWorkflowFailures": "Ostatnie awarie workflow",
+      "githubRecentPullRequestFindings": "Ostatnie ustalenia pull requestów",
+      "githubReadOnlyNotice": "Runtime GitHub jest tylko do odczytu. Brak kontrolek merge, workflow dispatch, repozytoriów, sekretów, środowisk i uprawnień."
     }
   },
   "ru": {
@@ -736,7 +780,18 @@
       "verification_failures_label": "Verification failures",
       "audit_failures": "Audit failures",
       "localization_completeness": "Localization completeness",
-      "ci_validation": "CI validation state"
+      "ci_validation": "CI validation state",
+      "githubProvider": "Провайдер GitHub",
+      "githubConnectionHealth": "Состояние подключения GitHub",
+      "githubRepositoryCount": "Количество репозиториев",
+      "githubActiveObservations": "Активные наблюдения GitHub",
+      "githubFailedObservations": "Неудачные наблюдения GitHub",
+      "githubWebhookStatus": "Статус webhook GitHub",
+      "githubSchedulerStatus": "Статус планировщика GitHub",
+      "githubRateLimit": "Статус лимита API",
+      "githubRecentWorkflowFailures": "Недавние сбои workflow",
+      "githubRecentPullRequestFindings": "Недавние выводы по pull request",
+      "githubReadOnlyNotice": "Среда GitHub доступна только для чтения. Нет элементов merge, workflow dispatch, изменения репозитория, секретов, сред или прав."
     }
   }
 }

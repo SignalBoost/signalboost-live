@@ -2,6 +2,7 @@ import type { BrowserApprovalClaims } from '../../../browser-runtime/approval.ts
 import { SandboxExecutionError } from './sandbox-execution-errors.ts'
 
 export interface SandboxApprovalReplayUse {
+  // Callers must provide the SHA-256 digest, never the raw approval token.
   tokenDigest: string
   claims: Pick<BrowserApprovalClaims, 'taskId' | 'nonce' | 'phase' | 'expiresAt'>
 }
@@ -122,7 +123,7 @@ export class InMemorySandboxApprovalReplayGuard implements SandboxApprovalReplay
       if (approval.expiresAtMs > nowMs) continue
       this.approvalsByDigest.delete(digest)
       if (this.digestByNonce.get(approval.nonce) === digest) {
-        this.digestByNonce.delete(approval.nonce)
+        this.digestByNonce.delete(digest)
       }
     }
   }

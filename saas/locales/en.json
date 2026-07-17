@@ -518,6 +518,34 @@
     "subtitle": "Observed deployments, evidence, verification, and persisted operator history. No redeploys, saves, env changes, or browser automation are available here.",
     "empty": "No health runs recorded yet.",
     "evidence": "Evidence",
-    "adminOnly": "Admin access required."
+    "adminOnly": "Admin access required.",
+    "productionBrowserDisabled": "Production Browser execution is disabled.",
+    "providerMutationDisabled": "Provider mutation is disabled.",
+    "labels": {
+      "provider": "Provider",
+      "project": "Project",
+      "deployment": "Deployment",
+      "environment": "Environment",
+      "workItem": "Work item",
+      "owner": "Owner",
+      "lease": "Lease",
+      "fence": "Fencing generation",
+      "incident": "Incident type",
+      "severity": "Severity",
+      "plan": "Plan",
+      "channel": "Selected channel",
+      "apiFailure": "API failure category",
+      "comparison": "Comparison status",
+      "verification": "Verification status",
+      "approvedSteps": "Approved steps",
+      "bpal": "BPAL capability",
+      "capability": "Capability",
+      "risk": "Risk",
+      "maturity": "Maturity",
+      "origins": "Approved origins",
+      "evidenceProfile": "Evidence profile",
+      "verificationProfile": "Verification profile",
+      "auditTimeline": "Audit timeline"
+    }
   }
 }

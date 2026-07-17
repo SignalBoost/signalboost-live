@@ -518,6 +518,34 @@
     "subtitle": "Despliegues observados, evidencia, verificación e historial persistido para operadores. Aquí no hay redeploys, guardados, cambios de entorno ni automatización de navegador.",
     "empty": "Aún no hay ejecuciones de salud registradas.",
     "evidence": "Evidencia",
-    "adminOnly": "Se requiere acceso de administrador."
+    "adminOnly": "Se requiere acceso de administrador.",
+    "productionBrowserDisabled": "La ejecución de navegador en producción está deshabilitada.",
+    "providerMutationDisabled": "La mutación del proveedor está deshabilitada.",
+    "labels": {
+      "provider": "Provider",
+      "project": "Project",
+      "deployment": "Deployment",
+      "environment": "Environment",
+      "workItem": "Work item",
+      "owner": "Owner",
+      "lease": "Lease",
+      "fence": "Fencing generation",
+      "incident": "Incident type",
+      "severity": "Severity",
+      "plan": "Plan",
+      "channel": "Selected channel",
+      "apiFailure": "API failure category",
+      "comparison": "Comparison status",
+      "verification": "Verification status",
+      "approvedSteps": "Approved steps",
+      "bpal": "BPAL capability",
+      "capability": "Capability",
+      "risk": "Risk",
+      "maturity": "Maturity",
+      "origins": "Approved origins",
+      "evidenceProfile": "Evidence profile",
+      "verificationProfile": "Verification profile",
+      "auditTimeline": "Audit timeline"
+    }
   }
 }

@@ -518,6 +518,34 @@
     "subtitle": "Наблюдаемые деплои, доказательства, проверка и сохранённая история оператора. Здесь нет redeploy, сохранений, изменений окружения или браузерной автоматизации.",
     "empty": "Записанных проверок состояния пока нет.",
     "evidence": "Доказательства",
-    "adminOnly": "Требуется доступ администратора."
+    "adminOnly": "Требуется доступ администратора.",
+    "productionBrowserDisabled": "Выполнение браузера в production отключено.",
+    "providerMutationDisabled": "Изменения у провайдера отключены.",
+    "labels": {
+      "provider": "Provider",
+      "project": "Project",
+      "deployment": "Deployment",
+      "environment": "Environment",
+      "workItem": "Work item",
+      "owner": "Owner",
+      "lease": "Lease",
+      "fence": "Fencing generation",
+      "incident": "Incident type",
+      "severity": "Severity",
+      "plan": "Plan",
+      "channel": "Selected channel",
+      "apiFailure": "API failure category",
+      "comparison": "Comparison status",
+      "verification": "Verification status",
+      "approvedSteps": "Approved steps",
+      "bpal": "BPAL capability",
+      "capability": "Capability",
+      "risk": "Risk",
+      "maturity": "Maturity",
+      "origins": "Approved origins",
+      "evidenceProfile": "Evidence profile",
+      "verificationProfile": "Verification profile",
+      "auditTimeline": "Audit timeline"
+    }
   }
 }

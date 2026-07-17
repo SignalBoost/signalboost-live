@@ -91,6 +91,10 @@ function requireString(value: string, field: string): string {
   return value
 }
 
+function optionalIdentity(value: string | undefined): string | undefined {
+  return value === undefined || value === '' ? undefined : String(value)
+}
+
 function findProvider(
   snapshot: BrowserProviderDiagnosticsSnapshot,
   providerId: string,
@@ -273,17 +277,19 @@ export function createBrowserProviderSelectionAuditEvent(
   const explanation = explainBrowserProviderSelection(input)
   const occurredAt = canonicalTimestamp(input.occurredAt ?? input.decision.decidedAt, 'occurredAt')
   const incidentId = requireString(input.incidentId, 'incidentId')
+  const executionId = optionalIdentity(input.executionId)
+  const dispatchId = optionalIdentity(input.dispatchId)
   const payload = explanation as unknown as Record<string, SerializableValue>
   const event = parseAuditEvent({
     eventId: createAuditEventId({
       incidentId,
-      executionId: input.executionId,
-      dispatchId: input.dispatchId,
+      executionId,
+      dispatchId,
       occurredAt,
       explanation,
     }),
-    executionId: input.executionId,
-    dispatchId: input.dispatchId,
+    executionId,
+    dispatchId,
     incidentId,
     eventType: 'browser_provider_capability_selection_explained',
     occurredAt,

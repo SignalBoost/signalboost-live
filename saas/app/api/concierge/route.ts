@@ -23,7 +23,19 @@ function admin() { return createClient(process.env['NEXT_PUBLIC_SUPABASE_URL']!,
 function latestUserText(body: any): string { const messages = Array.isArray(body?.messages) ? body.messages : []; for (let i = messages.length - 1; i >= 0; i--) { if (messages[i]?.role !== 'user') continue; const content = messages[i]?.content; if (typeof content === 'string') return content; if (Array.isArray(content)) return content.map((block: any) => typeof block?.text === 'string' ? block.text : '').join('\n').trim() } return '' }
 function attachmentMime(a: AttachmentInfo): string { const explicit = String(a?.type || a?.mimeType || '').toLowerCase(); if (explicit) return explicit; const fromDataUrl = /^data:([^;,]+)/i.exec(String(a?.dataUrl || ''))?.[1]; if (fromDataUrl) return fromDataUrl.toLowerCase(); const name = String(a?.name || '').toLowerCase(); if (/\.(png|jpe?g|gif|webp|svg)$/.test(name)) return 'image/unknown'; return '' }
 function attachmentSummary(attachments: any): string { if (!Array.isArray(attachments) || attachments.length === 0) return ''; return attachments.map((a: AttachmentInfo) => `${a?.name || 'attached file'}${attachmentMime(a) ? ` (${attachmentMime(a)})` : ''}`).join(', ') }
-function isVideoCreationRequest(text: string): boolean { const t = String(text || '').toLowerCase(); const mentionsVideo = /\b(video|vídeo|clip|reel|short|tiktok|youtube|filme|movie)\b/i.test(t); const createVerb = /(faça|faca|crie|criar|cria|gere|gerar|gera|render|renderizar|produza|produzir|make|create|generate|render|animate|turn\s+.*\s+into|transforme|transformar)/i.test(t); const watchVerb = /(watch|assistir|ver\s+o\s+vídeo|ver\s+o\s+video|find|search|procure|buscar|encontre|mostre\s+um\s+video|mostrar\s+um\s+video)/i.test(t); return mentionsVideo && createVerb && !watchVerb }
+function isVideoCreationRequest(text: string): boolean {
+  const t = String(text || '').toLowerCase()
+  // Hard block: never treat an explicit text / social / email / message deliverable
+  // as a video request — even when the body merely mentions the word "video" (e.g. a
+  // LinkedIn outreach that lists a "video generation" product). This stops text/social
+  // requests from being misrouted into the paid COSA video pipeline.
+  const textDeliverable = /\b(not a video|no video|text[-\s]?only|text[-\s]?message|linkedin|twitter|facebook|instagram|dm to|direct message|outreach message|cold (?:email|message|dm|outreach)|e-?mail|newsletter|blog post|caption|post copy|copywriting)\b/i.test(t)
+  if (textDeliverable) return false
+  const mentionsVideo = /\b(video|vídeo|clip|reel|short|tiktok|youtube|filme|movie)\b/i.test(t)
+  const createVerb = /(faça|faca|crie|criar|cria|gere|gerar|gera|render|renderizar|produza|produzir|make|create|generate|render|animate|turn\s+.*\s+into|transforme|transformar)/i.test(t)
+  const watchVerb = /(watch|assistir|ver\s+o\s+vídeo|ver\s+o\s+video|find|search|procure|buscar|encontre|mostre\s+um\s+video|mostrar\s+um\s+video)/i.test(t)
+  return mentionsVideo && createVerb && !watchVerb
+}
 function isPressCreationRequest(text: string): boolean { const t = String(text || '').toLowerCase(); return /(press|print|newspaper|publisher|publication|editor|magazine|trade press|media kit|article|jornal|revista|periódico|periodico|imprensa)/i.test(t) && /(start|create|launch|prepare|publish|campaign|outreach|crie|crear|iniciar|campanha|campaña)/i.test(t) && !isVideoCreationRequest(text) }
 function languageFrom(body: any, text: string): string { const ctxLang = String(body?.context?.language || '').toLowerCase(); const t = String(text || '').toLowerCase(); if (/portugu[eê]s|portuguese|pt-br|brasil|brazil/.test(t)) return 'pt'; if (/espanhol|español|spanish|latam/.test(t)) return 'es'; if (/polish|polski|polon[eê]s/.test(t)) return 'pl'; if (/russian|russo|рус/.test(t)) return 'ru'; if (['pt', 'es', 'pl', 'ru', 'en'].includes(ctxLang)) return ctxLang; return 'en' }
 function channelFrom(text: string): string { return /(short|tiktok|reel|reels|vertical|9:16|story|stories)/i.test(String(text || '')) ? 'short_video' : 'youtube' }

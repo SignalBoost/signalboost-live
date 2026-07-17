@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
-/* ---- Real routes (edit here if any change) -------------------------------- */
 const LINKS = {
   audit: '/dashboard/audit',
   cybersecurity: '/dashboard/cybersecurity',
@@ -11,9 +12,7 @@ const LINKS = {
   agency: '/agency',
   license: 'mailto:partners@signalboostapp.com?subject=Licensing%20SignalBoost%20modules',
 }
-/* --------------------------------------------------------------------------- */
 
-// The platform ships in exactly these 5 languages.
 const LANGUAGES = [
   ['🇺🇸', 'English'],
   ['🇲🇽', 'Español'],
@@ -22,29 +21,27 @@ const LANGUAGES = [
   ['🇷🇺', 'Русский'],
 ] as const
 
-// Public-face modules.
 const MODULES = [
-  { title: 'Audit Cockpit', desc: 'Scan public sites, surface conversion friction, get an ordered action plan.', icon: '◎', href: LINKS.audit, accent: '#f6c453' },
-  { title: 'Cybersecurity Station', desc: 'Exposure signals, headers, cookies, and HTTPS posture — no intrusive access.', icon: '◇', href: LINKS.cybersecurity, accent: '#8b8cff' },
-  { title: 'Optimization Hub', desc: 'Localized channel assets, optimization workflows, approval-ready launches.', icon: '✦', href: LINKS.optimization, accent: '#e7a93f' },
+  { key: 'audit', icon: '◎', href: LINKS.audit, accent: '#f6c453' },
+  { key: 'security', icon: '◇', href: LINKS.cybersecurity, accent: '#8b8cff' },
+  { key: 'optimization', icon: '✦', href: LINKS.optimization, accent: '#e7a93f' },
 ] as const
 
-// Portable, sellable engines — outcome one-liners only, no mechanics exposed.
 const PORTABLES = [
-  { glyph: '✦', name: 'Campaign Studio', desc: 'One brief → a finished, branded campaign.', tag: 'live', href: LINKS.agency },
-  { glyph: '⛓', name: 'Integrations Hub', desc: 'Secure connections for CRMs, CMSs, payments, calendars, AI providers, enterprise systems, and APIs.', tag: 'live', href: '' },
-  { glyph: '◍', name: 'Render Engine', desc: 'Voiceover + branded video, prepaid-credit safe.', tag: 'live', href: '' },
-  { glyph: '◈', name: 'Console Hub', desc: 'Key vault, webhooks, logs, deployments, audit.', tag: 'live', href: '' },
-  { glyph: '◎', name: 'Marketing + Sales', desc: 'Campaign + sales workflows, embeddable.', tag: 'live', href: '' },
-  { glyph: '❖', name: 'Chief-of-Staff', desc: 'AI operator that plans and executes, human-approved.', tag: 'preview', href: '' },
-  { glyph: '◇', name: 'Browser Runtime', desc: 'Bounded, verifiable browser automation.', tag: 'preview', href: '' },
+  { key: 'campaign', glyph: '✦', tag: 'live', href: LINKS.agency },
+  { key: 'integrations', glyph: '⛓', tag: 'live', href: '' },
+  { key: 'render', glyph: '◍', tag: 'live', href: '' },
+  { key: 'console', glyph: '◈', tag: 'live', href: '' },
+  { key: 'marketingSales', glyph: '◎', tag: 'live', href: '' },
+  { key: 'chiefOfStaff', glyph: '❖', tag: 'preview', href: '' },
+  { key: 'browser', glyph: '◇', tag: 'preview', href: '' },
 ] as const
 
 const STATS = [
-  { value: 9726, suffix: '', label: 'workflows' },
-  { value: 2.4, suffix: 'M', label: 'actions', decimals: 1 },
-  { value: 148, suffix: '', label: 'markets' },
-  { value: 99.97, suffix: '%', label: 'uptime', decimals: 2 },
+  { value: 9726, suffix: '', key: 'workflows' },
+  { value: 2.4, suffix: 'M', key: 'actions', decimals: 1 },
+  { value: 148, suffix: '', key: 'markets' },
+  { value: 99.97, suffix: '%', key: 'uptime', decimals: 2 },
 ] as const
 
 function useCountUp(target: number, decimals = 0, duration = 1400) {
@@ -75,6 +72,9 @@ function Stat({ value, suffix, label, decimals = 0 }: { value: number; suffix: s
 }
 
 export default function Home() {
+  const { dict } = useI18n()
+  const copy = (path: string, fallback: string) => t(dict, `homepage.${path}`, fallback)
+
   return (
     <main className="home">
       <div className="cosmic-bg" aria-hidden="true" />
@@ -92,51 +92,65 @@ export default function Home() {
       <div className="content">
         <header className="hero">
           <div className="hero-left">
-            <span className="kicker">AI-driven · Human-monitored</span>
-            <h1>One console. Every growth signal.</h1>
+            <span className="kicker">{copy('kicker', 'AI powered · People in control')}</span>
+            <h1>{copy('title', 'One place for every growth task.')}</h1>
           </div>
           <div className="hero-right">
-            <div className="langs" aria-label="Available in 5 languages">
+            <div className="langs" aria-label={copy('languagesAria', 'Available in five languages')}>
               {LANGUAGES.map(([flag, name]) => <span key={name} className="lang"><b>{flag}</b>{name}</span>)}
             </div>
-            <div className="stats">{STATS.map((s) => <Stat key={s.label} {...s} />)}</div>
+            <div className="stats">
+              {STATS.map((s) => (
+                <Stat
+                  key={s.key}
+                  {...s}
+                  label={copy(`stats.${s.key}`, s.key)}
+                />
+              ))}
+            </div>
           </div>
         </header>
 
         <section className="zone">
-          <span className="zone-label">Public modules</span>
+          <span className="zone-label">{copy('publicModules', 'Public tools')}</span>
           <div className="grid grid-3">
-            {MODULES.map((m) => (
-              <Link key={m.title} href={m.href} className="mcard" style={{ ['--accent' as string]: m.accent }}>
-                <div className="mcard-top"><span className="mcard-icon">{m.icon}</span><span className="live-pill"><i /> Live</span></div>
-                <h2>{m.title}</h2>
-                <p>{m.desc}</p>
-                <span className="mcard-open">Open ↗</span>
-              </Link>
-            ))}
+            {MODULES.map((m) => {
+              const title = copy(`modules.${m.key}.title`, m.key)
+              const desc = copy(`modules.${m.key}.desc`, '')
+              return (
+                <Link key={m.key} href={m.href} className="mcard" style={{ ['--accent' as string]: m.accent }}>
+                  <div className="mcard-top"><span className="mcard-icon">{m.icon}</span><span className="live-pill"><i /> {copy('live', 'Live')}</span></div>
+                  <h2>{title}</h2>
+                  <p>{desc}</p>
+                  <span className="mcard-open">{copy('open', 'Open')} ↗</span>
+                </Link>
+              )
+            })}
           </div>
         </section>
 
         <section className="zone">
           <div className="zone-head">
-            <span className="zone-label">Portable engines — license the engines behind SignalBoost</span>
+            <span className="zone-label">{copy('portableEngines', 'Portable tools — license the tools behind SignalBoost')}</span>
             <div className="zone-cta">
-              <a className="license-btn" href={LINKS.license}>License →</a>
-              <Link href={LINKS.agency} className="studio-btn">Campaign Studio</Link>
+              <a className="license-btn" href={LINKS.license}>{copy('license', 'License')} →</a>
+              <Link href={LINKS.agency} className="studio-btn">{copy('campaignStudio', 'Campaign Studio')}</Link>
             </div>
           </div>
           <div className="grid grid-7">
             {PORTABLES.map((p) => {
+              const name = copy(`portables.${p.key}.name`, p.key)
+              const desc = copy(`portables.${p.key}.desc`, '')
               const inner = (
                 <>
-                  <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.tag === 'live' ? 'tag-live' : 'tag-preview'}>{p.tag === 'live' ? 'Live' : 'Preview'}</span></div>
-                  <h3>{p.name}</h3>
-                  <p>{p.desc}</p>
+                  <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.tag === 'live' ? 'tag-live' : 'tag-preview'}>{p.tag === 'live' ? copy('live', 'Live') : copy('preview', 'Preview')}</span></div>
+                  <h3>{name}</h3>
+                  <p>{desc}</p>
                 </>
               )
               return p.href
-                ? <Link key={p.name} href={p.href} className="qcard is-link">{inner}</Link>
-                : <div key={p.name} className="qcard">{inner}</div>
+                ? <Link key={p.key} href={p.href} className="qcard is-link">{inner}</Link>
+                : <div key={p.key} className="qcard">{inner}</div>
             })}
           </div>
         </section>

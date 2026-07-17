@@ -556,5 +556,14 @@
     },
     "triggerVisibility": "Automatic triggers are durably deduplicated before a Supervisor lease can run read-only health intelligence.",
     "readOnlyNotice": "Execution is read-only; Vercel mutations, repairs, and production Browser execution are disabled."
+  },
+  "universalProvider": {
+    "operator": {
+      "ownerTeam": "Supervisor operations",
+      "documentation": "Provider framework documentation"
+    },
+    "vercel": {
+      "description": "Read-only Vercel provider metadata adapted into the universal provider framework."
+    }
   }
 }

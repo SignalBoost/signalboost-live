@@ -15,3 +15,4 @@ export * from './vercel/index.ts'
 import { BrowserProviderRegistry } from './provider-registry.ts'
 import { VercelBrowserAdapter } from './vercel/vercel-browser-adapter.ts'
 export function createDefaultBrowserProviderRegistry(){ const registry=new BrowserProviderRegistry(); registry.register(VercelBrowserAdapter); return registry }
+export { createUniversalMetadataFromBrowserProvider, createUniversalSdkFromBrowserProvider } from '../provider-framework/browser-provider-bridge.ts'

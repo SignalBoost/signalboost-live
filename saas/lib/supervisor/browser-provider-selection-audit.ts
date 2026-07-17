@@ -142,7 +142,13 @@ function validateDecisionBinding(
   const environment = typeof decision.auditMetadata.environment === 'string'
     ? decision.auditMetadata.environment
     : ''
-  if (!environment || !capability.allowedEnvironments.includes(environment)) {
+  if (!['sandbox', 'preview', 'production'].includes(environment)) {
+    throw new BrowserProviderSelectionAuditError('environment_not_allowed')
+  }
+  if (
+    (decision.selectedChannel === 'api' || decision.selectedChannel === 'browser')
+    && !capability.allowedEnvironments.includes(environment)
+  ) {
     throw new BrowserProviderSelectionAuditError('environment_not_allowed')
   }
 

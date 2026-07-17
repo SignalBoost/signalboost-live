@@ -45,6 +45,8 @@ The admin-only `/dashboard/supervisor/providers` screen renders the diagnostics 
 
 `selectBrowserProviderExecutionWithAudit` is the governed BPAL selection call site. It resolves one exact registered provider capability, maps only that provider's detached metadata into the Supervisor policy selector, validates the decision against the same diagnostics snapshot, and awaits durable audit persistence before returning the frozen decision, explanation, and audit event. Unknown provider/capability scope and audit-store failures are terminal. The service has no Browser Runtime, Playwright, provider client, network, credential, approval-token, or mutation dependency. A production Browser request is reduced to manual review unless production execution is separately enabled by policy; the persisted explanation still declares `productionExecutionEnabled: false`.
 
+Durable selection audits remain subject to the existing coordination-table RLS boundary: anonymous reads and public client writes are denied, mutation paths remain server/service-role only, and authenticated operator visibility is read-only and sanitized.
+
 ## CI guard
 
 `npm run validate:bpal` runs `scripts/validate-bpal-guard.mjs`, which fails if a second registry, second root adapter contract, second Vercel adapter, forbidden BPAL execution/credential dependencies, direct Vercel knowledge inside Browser Runtime, or duplicate Vercel capability IDs are introduced. Runtime tests additionally exercise registration isolation, cross-reference integrity, navigation confinement, explicit Vercel capability bindings, durable selection explanations, fail-closed decision binding, and audit-before-return selection behavior.

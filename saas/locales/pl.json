@@ -518,6 +518,34 @@
     "subtitle": "Obserwowane wdrożenia, dowody, weryfikacja i trwała historia operatora. Tutaj nie ma ponownych wdrożeń, zapisów, zmian środowiska ani automatyzacji przeglądarki.",
     "empty": "Brak zapisanych uruchomień kontroli kondycji.",
     "evidence": "Dowody",
-    "adminOnly": "Wymagany dostęp administratora."
+    "adminOnly": "Wymagany dostęp administratora.",
+    "productionBrowserDisabled": "Wykonywanie przeglądarki w produkcji jest wyłączone.",
+    "providerMutationDisabled": "Mutacje dostawcy są wyłączone.",
+    "labels": {
+      "provider": "Provider",
+      "project": "Project",
+      "deployment": "Deployment",
+      "environment": "Environment",
+      "workItem": "Work item",
+      "owner": "Owner",
+      "lease": "Lease",
+      "fence": "Fencing generation",
+      "incident": "Incident type",
+      "severity": "Severity",
+      "plan": "Plan",
+      "channel": "Selected channel",
+      "apiFailure": "API failure category",
+      "comparison": "Comparison status",
+      "verification": "Verification status",
+      "approvedSteps": "Approved steps",
+      "bpal": "BPAL capability",
+      "capability": "Capability",
+      "risk": "Risk",
+      "maturity": "Maturity",
+      "origins": "Approved origins",
+      "evidenceProfile": "Evidence profile",
+      "verificationProfile": "Verification profile",
+      "auditTimeline": "Audit timeline"
+    }
   }
 }

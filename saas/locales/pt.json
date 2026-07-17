@@ -518,6 +518,34 @@
     "subtitle": "Implantações observadas, evidências, verificação e histórico persistido para operadores. Não há redeploys, salvamentos, mudanças de ambiente nem automação de navegador aqui.",
     "empty": "Ainda não há execuções de saúde registradas.",
     "evidence": "Evidências",
-    "adminOnly": "Acesso de administrador obrigatório."
+    "adminOnly": "Acesso de administrador obrigatório.",
+    "productionBrowserDisabled": "A execução de navegador em produção está desativada.",
+    "providerMutationDisabled": "A mutação do provedor está desativada.",
+    "labels": {
+      "provider": "Provider",
+      "project": "Project",
+      "deployment": "Deployment",
+      "environment": "Environment",
+      "workItem": "Work item",
+      "owner": "Owner",
+      "lease": "Lease",
+      "fence": "Fencing generation",
+      "incident": "Incident type",
+      "severity": "Severity",
+      "plan": "Plan",
+      "channel": "Selected channel",
+      "apiFailure": "API failure category",
+      "comparison": "Comparison status",
+      "verification": "Verification status",
+      "approvedSteps": "Approved steps",
+      "bpal": "BPAL capability",
+      "capability": "Capability",
+      "risk": "Risk",
+      "maturity": "Maturity",
+      "origins": "Approved origins",
+      "evidenceProfile": "Evidence profile",
+      "verificationProfile": "Verification profile",
+      "auditTimeline": "Audit timeline"
+    }
   }
 }

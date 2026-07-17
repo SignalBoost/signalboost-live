@@ -136,8 +136,16 @@ test('BPAL selection explanation becomes a valid durable Supervisor audit event'
     providerId: 'vercel',
     decision: browserDecision(),
   })
+  const reboundEvent = createBrowserProviderSelectionAuditEvent({
+    incidentId: 'incident-2',
+    executionId: 'execution-1',
+    dispatchId: 'dispatch-1',
+    providerId: 'vercel',
+    decision: browserDecision(),
+  })
 
-  assert.equal(event.eventId, 'browser-provider-selection:decision-work-1-7-use_browser_with_guardrails')
+  assert.match(event.eventId, /^browser-provider-selection:[a-f0-9]{64}$/)
+  assert.notEqual(event.eventId, reboundEvent.eventId)
   assert.equal(event.eventType, 'browser_provider_capability_selection_explained')
   assert.equal(event.schemaVersion, auditRecordSchemaVersion)
   assert.equal(event.incidentId, 'incident-1')

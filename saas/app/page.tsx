@@ -9,6 +9,7 @@ const LINKS = {
   cybersecurity: '/dashboard/cybersecurity',
   optimization: '/website-optimizer',
   agency: '/agency',
+  integrations: '/integrations',
   license: 'mailto:partners@signalboostapp.com?subject=Licensing%20SignalBoost%20modules',
 }
 /* --------------------------------------------------------------------------- */
@@ -32,6 +33,7 @@ const MODULES = [
 // Portable, sellable engines — outcome one-liners only, no mechanics exposed.
 const PORTABLES = [
   { glyph: '✦', name: 'Campaign Studio', desc: 'One brief → a finished, branded campaign.', tag: 'live', href: LINKS.agency },
+  { glyph: '⛓', name: 'Integrations Hub', desc: 'Secure connections for CRMs, CMSs, payments, calendars, AI providers, enterprise systems, and APIs.', tag: 'live', href: LINKS.integrations },
   { glyph: '◍', name: 'Render Engine', desc: 'Voiceover + branded video, prepaid-credit safe.', tag: 'live', href: '' },
   { glyph: '◈', name: 'Console Hub', desc: 'Key vault, webhooks, logs, deployments, audit.', tag: 'live', href: '' },
   { glyph: '◎', name: 'Marketing + Sales', desc: 'Campaign + sales workflows, embeddable.', tag: 'live', href: '' },
@@ -89,7 +91,6 @@ export default function Home() {
       </div>
 
       <div className="content">
-        {/* hero */}
         <header className="hero">
           <div className="hero-left">
             <span className="kicker">AI-driven · Human-monitored</span>
@@ -103,7 +104,6 @@ export default function Home() {
           </div>
         </header>
 
-        {/* public modules */}
         <section className="zone">
           <span className="zone-label">Public modules</span>
           <div className="grid grid-3">
@@ -118,7 +118,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* portable engines */}
         <section className="zone">
           <div className="zone-head">
             <span className="zone-label">Portable engines — license the engines behind SignalBoost</span>
@@ -127,7 +126,7 @@ export default function Home() {
               <Link href={LINKS.agency} className="studio-btn">Campaign Studio</Link>
             </div>
           </div>
-          <div className="grid grid-6">
+          <div className="grid grid-7">
             {PORTABLES.map((p) => {
               const inner = (
                 <>
@@ -145,10 +144,6 @@ export default function Home() {
       </div>
 
       <style jsx>{`
-        /* No forced 100svh: this page sits under the navbar + quick-access bar,
-           so it's sized to the space that's actually left. min-height keeps the
-           wave backdrop filling the view; content stays compact so nothing scrolls.
-           (Any few-px gap below shows the same dark bg — invisible.) */
         .home{position:relative;min-height:calc(100svh - 150px);background:#030611;color:#fff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
         .cosmic-bg{position:absolute;inset:0;z-index:0;background:#030611 radial-gradient(circle at 50% -10%,rgba(255,199,44,.1),transparent 58%)}
         .waves{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.2;pointer-events:none}
@@ -156,9 +151,7 @@ export default function Home() {
         .wave-gold{bottom:-20%;opacity:.78}.wave-indigo{top:4%;opacity:.6;animation-duration:23s;animation-direction:alternate-reverse}
         @keyframes drift{0%{transform:translate3d(-2%,1%,0) scale(1.02)}50%{transform:translate3d(3%,-2%,0) scale(1.06)}100%{transform:translate3d(-1%,2%,0) scale(1.03)}}
         @media (prefers-reduced-motion:reduce){.wave{animation:none}}
-
         .content{position:relative;z-index:1;width:min(1240px,calc(100% - 40px));margin:0 auto;padding:16px 0 20px;display:flex;flex-direction:column;gap:16px}
-
         .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
         .kicker{font-size:10px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#e8bd59}
         .hero-left h1{margin:6px 0 0;font-size:clamp(22px,3.2vw,40px);letter-spacing:-.04em;line-height:1.02}
@@ -167,7 +160,6 @@ export default function Home() {
         .lang{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#c3ccdf;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px 10px}
         .stats{display:flex;gap:16px}
         .stat{text-align:right}.stat strong{display:block;font-size:15px;color:#fff}.stat span{font-size:9px;color:#7f899e;text-transform:uppercase;letter-spacing:.12em}
-
         .zone{display:flex;flex-direction:column;gap:10px}
         .zone-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
         .zone-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#9aa4b9}
@@ -175,11 +167,9 @@ export default function Home() {
         .license-btn,.studio-btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 15px;border-radius:999px;font-weight:800;font-size:12px;text-decoration:none}
         .license-btn{color:#0b0b10;background:linear-gradient(180deg,#f5c451,#e2a233);border:1px solid rgba(231,189,92,.5)}
         .studio-btn{color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
-
         .grid{display:grid;gap:12px}
         .grid-3{grid-template-columns:repeat(3,1fr)}
-        .grid-6{grid-template-columns:repeat(6,1fr)}
-
+        .grid-7{grid-template-columns:repeat(7,minmax(0,1fr))}
         .mcard{display:flex;flex-direction:column;gap:5px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:16px;background:linear-gradient(145deg,rgba(18,23,39,.9),rgba(7,10,20,.8));backdrop-filter:blur(16px);text-decoration:none;color:#fff;transition:transform .18s,border-color .18s}
         .mcard:hover{transform:translateY(-3px)}
         .mcard-top{display:flex;align-items:center;justify-content:space-between}
@@ -189,8 +179,7 @@ export default function Home() {
         .mcard h2{margin:2px 0 0;font-size:16px}
         .mcard p{margin:0;color:#9aa4b9;font-size:12px;line-height:1.4}
         .mcard-open{margin-top:auto;padding-top:6px;font-size:11px;font-weight:800;color:var(--accent)}
-
-        .qcard{display:flex;flex-direction:column;gap:4px;padding:12px 13px;border:1px solid rgba(246,196,83,.16);border-radius:14px;background:linear-gradient(145deg,rgba(18,23,39,.9),rgba(7,10,20,.8));backdrop-filter:blur(14px);text-decoration:none;color:#fff;transition:transform .16s,border-color .16s}
+        .qcard{display:flex;flex-direction:column;gap:4px;padding:12px 13px;border:1px solid rgba(246,196,83,.16);border-radius:14px;background:linear-gradient(145deg,rgba(18,23,39,.9),rgba(7,10,20,.8));backdrop-filter:blur(14px);text-decoration:none;color:#fff;transition:transform .16s,border-color .16s;min-width:0}
         .qcard.is-link:hover{transform:translateY(-3px);border-color:#f5c451}
         .qcard-top{display:flex;align-items:center;justify-content:space-between}
         .qcard-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;border:1px solid rgba(246,196,83,.4);color:#f5c542;font-size:14px}
@@ -198,11 +187,9 @@ export default function Home() {
         .tag-preview{font-size:8.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#aeb6c9;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:2px 6px}
         .qcard h3{margin:2px 0 0;font-size:13.5px}
         .qcard p{margin:0;color:#9aa4b9;font-size:11px;line-height:1.35}
-
-        /* Tablet: portables wrap to 3 across; page can scroll if needed. */
-        @media(max-width:1080px){.home{min-height:auto;overflow:visible}.grid-6{grid-template-columns:repeat(3,1fr)}}
-        @media(max-width:820px){.grid-3{grid-template-columns:repeat(2,1fr)}.hero{align-items:flex-start}.hero-right{align-items:flex-start}.langs{justify-content:flex-start}}
-        @media(max-width:560px){.grid-3,.grid-6{grid-template-columns:1fr}.stats{flex-wrap:wrap}}
+        @media(max-width:1180px){.home{min-height:auto;overflow:visible}.grid-7{grid-template-columns:repeat(4,1fr)}}
+        @media(max-width:820px){.grid-3{grid-template-columns:repeat(2,1fr)}.grid-7{grid-template-columns:repeat(2,1fr)}.hero{align-items:flex-start}.hero-right{align-items:flex-start}.langs{justify-content:flex-start}}
+        @media(max-width:560px){.grid-3,.grid-7{grid-template-columns:1fr}.stats{flex-wrap:wrap}}
       `}</style>
     </main>
   )

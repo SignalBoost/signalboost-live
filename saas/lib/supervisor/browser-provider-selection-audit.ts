@@ -134,7 +134,7 @@ function validateDecisionBinding(
     || capability.riskClass !== decision.riskClass
     || capability.maturity !== decision.maturity
     || capability.verificationProfileId !== decision.verificationProfileId
-    || new Set(decision.approvedStepIds).size !== decision.approvedStepIds.length
+    || decision.approvedStepIds.length !== 0
   ) {
     throw new BrowserProviderSelectionAuditError('decision_binding_mismatch')
   }

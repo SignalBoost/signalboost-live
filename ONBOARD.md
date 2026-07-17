@@ -247,6 +247,9 @@ Mission 001 durable coordination replaces process-local Supervisor ownership in 
 Atomic lease acquisition is performed by a Postgres RPC/transaction that locks the target work item, verifies owner health and provider/tenant-scoped availability, rejects unexpired active leases, increments the work-item fencing generation exactly once, inserts the lease, and transitions the work item to `leased`. Renewal, release, transition, dispatch, continuation, and completion paths must assert the exact lease ID, instance ID, runtime ID, and fencing token before any protected action. Stale owners cannot dispatch or complete work.
 
 Durable records are coordination/audit metadata only. They cannot authorize replay, cannot reconstruct a lost browser session, cannot persist Browser/Page/Context objects, and cannot store approval tokens, credentials, cookies, secrets, authorization headers, or browser storage. Browser owner loss marks browser work abandoned; retries require a new execution ID, new policy decision, and fresh Browser Runtime approvals. Production and real-provider Browser execution remain disabled.
+
+RLS is enabled for coordination tables. Anonymous reads are denied, public client writes are not granted, mutation RPCs are reserved for server/service-role paths, and authenticated operator visibility is read-only and sanitized. All new operator-facing labels must exist in English, Spanish, Portuguese, Polish, and Russian.
+
 ### Sprint 17 — Durable Sandbox Execution Records and Operator Audit History
 
 Sprint 17 adds sanitized durable history for Mission 001 sandbox executions only. The persistence layer records serializable execution summaries, immutable sanitized audit events, and safe evidence references/digests in Supabase-backed tables plus a provider-neutral store interface. These records are audit-only: they cannot authorize, replay, resume, approve, retry, or launch a browser task.

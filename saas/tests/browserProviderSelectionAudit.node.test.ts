@@ -109,7 +109,7 @@ test('BPAL selection audit fails closed on mismatched or forbidden Browser decis
       providerId: 'vercel',
       decision: browserDecision({ auditMetadata: { environment: 'production' } }),
     }),
-    (error: unknown) => error instanceof BrowserProviderSelectionAuditError && error.code === 'browser_selection_not_allowed',
+    (error: unknown) => error instanceof BrowserProviderSelectionAuditError && error.code === 'environment_not_allowed',
   )
 
   assert.throws(
@@ -118,6 +118,14 @@ test('BPAL selection audit fails closed on mismatched or forbidden Browser decis
       decision: browserDecision({ decisionCode: 'use_browser_automatically', executionMode: 'smart_failover' }),
     }),
     (error: unknown) => error instanceof BrowserProviderSelectionAuditError && error.code === 'browser_auto_failover_not_allowed',
+  )
+
+  assert.throws(
+    () => explainBrowserProviderSelection({
+      providerId: 'vercel',
+      decision: browserDecision({ decisionCode: 'use_api' }),
+    }),
+    (error: unknown) => error instanceof BrowserProviderSelectionAuditError && error.code === 'decision_channel_mismatch',
   )
 })
 

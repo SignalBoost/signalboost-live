@@ -107,30 +107,50 @@ function findCapability(
   return capability
 }
 
+function validateDecisionChannel(decision: ExecutionDecision): void {
+  const allowedCodes: Record<ExecutionDecision['selectedChannel'], readonly ExecutionDecision['decisionCode'][]> = {
+    api: ['use_api', 'retry_api'],
+    browser: ['use_browser_automatically', 'use_browser_with_guardrails'],
+    manual: ['require_human_approval', 'use_manual_operator'],
+    none: ['block'],
+  }
+  if (!allowedCodes[decision.selectedChannel].includes(decision.decisionCode)) {
+    throw new BrowserProviderSelectionAuditError('decision_channel_mismatch')
+  }
+}
+
 function validateDecisionBinding(
   provider: BrowserProviderDiagnostics,
   capability: BrowserProviderCapabilityDiagnostics,
   decision: ExecutionDecision,
-): void {
+): string {
+  validateDecisionChannel(decision)
   if (
     provider.support.productionExecutionEnabled
     || capability.productionExecutionEnabled
+    || decision.schemaVersion !== 'execution-channel-decision-v1'
     || capability.capabilityVersion !== decision.capabilityVersion
     || capability.policyVersion !== decision.policyVersion
     || capability.riskClass !== decision.riskClass
     || capability.maturity !== decision.maturity
     || capability.verificationProfileId !== decision.verificationProfileId
+    || new Set(decision.approvedStepIds).size !== decision.approvedStepIds.length
   ) {
     throw new BrowserProviderSelectionAuditError('decision_binding_mismatch')
   }
 
-  const environment = decision.auditMetadata.environment
+  const environment = typeof decision.auditMetadata.environment === 'string'
+    ? decision.auditMetadata.environment
+    : ''
+  if (!environment || !capability.allowedEnvironments.includes(environment)) {
+    throw new BrowserProviderSelectionAuditError('environment_not_allowed')
+  }
+
   if (decision.selectedChannel === 'browser') {
     if (
       !capability.channels.browser
       || !capability.navigationProfileId
       || capability.allowedOriginIds.length === 0
-      || environment === 'production'
     ) {
       throw new BrowserProviderSelectionAuditError('browser_selection_not_allowed')
     }
@@ -148,9 +168,7 @@ function validateDecisionBinding(
   if (decision.selectedChannel === 'manual' && !capability.channels.manual) {
     throw new BrowserProviderSelectionAuditError('manual_selection_not_allowed')
   }
-  if (decision.selectedChannel === 'none' && decision.decisionCode !== 'block') {
-    throw new BrowserProviderSelectionAuditError('invalid_block_selection')
-  }
+  return environment
 }
 
 function reasonCodesFor(
@@ -186,16 +204,13 @@ export function explainBrowserProviderSelection(
   const providerId = requireString(input.providerId, 'providerId')
   const provider = findProvider(snapshot, providerId)
   const capability = findCapability(provider, input.decision)
-  validateDecisionBinding(provider, capability, input.decision)
+  const environment = validateDecisionBinding(provider, capability, input.decision)
 
   const exactOrigins = capability.allowedOriginIds.map(originId => {
     const origin = provider.origins.find(candidate => candidate.originId === originId)
     if (!origin) throw new BrowserProviderSelectionAuditError('unknown_origin')
     return origin.exactOrigin
   })
-  const environment = typeof input.decision.auditMetadata.environment === 'string'
-    ? input.decision.auditMetadata.environment
-    : 'unknown'
 
   return deepFreeze({
     schemaVersion: BROWSER_PROVIDER_SELECTION_EXPLANATION_SCHEMA_VERSION,

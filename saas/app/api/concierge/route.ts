@@ -32,7 +32,7 @@ function attachmentSummary(attachments: any): string { if (!Array.isArray(attach
 // a genuine "make a video for LinkedIn" still goes to the video pipeline.
 function isSocialOutreachRequest(text: string): boolean {
   const t = String(text || '').toLowerCase()
-  const platform = /\b(linkedin|linked\s?in|twitter|x post|facebook|instagram|social)\b/i.test(t)
+  const platform = /\b(linkedin|linked\s?in|twitter|x post|tweet|facebook|instagram|tiktok|reddit|social)\b/i.test(t)
   const textNoun = /\b(message|post|outreach|dm|direct message|caption|copy|announcement|newsletter)\b/i.test(t)
   const mentionsVideo = /\b(video|vídeo|reel|short|clip|tiktok|youtube|filme|movie)\b/i.test(t)
   const explicitlyText = /\b(not a video|no video|text[-\s]?only|text[-\s]?message)\b/i.test(t)
@@ -42,16 +42,18 @@ function isSocialOutreachRequest(text: string): boolean {
 function socialPlatformFrom(text: string): string {
   const t = String(text || '').toLowerCase()
   if (/linkedin|linked\s?in/.test(t)) return 'linkedin'
-  if (/instagram/.test(t)) return 'instagram'
-  if (/facebook/.test(t)) return 'facebook'
-  if (/twitter|x post|\bon x\b/.test(t)) return 'twitter'
+  if (/\breddit\b|subreddit|\br\//.test(t)) return 'reddit'
+  if (/facebook|\bfb\b/.test(t)) return 'facebook'
+  if (/twitter|\bx post\b|\bon x\b|\btweet\b/.test(t)) return 'twitter'
+  if (/instagram|\big\b/.test(t)) return 'instagram'
+  if (/tiktok/.test(t)) return 'tiktok'
   return 'linkedin'
 }
 
 function socialQueueRow(a: { platform: string; title: string; body: string; lang: string; now: string }) {
   const recommendationId = id('rec_social_outreach')
   const audience = `Prospects, partners, and buyers on ${a.platform}.`
-  const channel = a.platform === 'linkedin' ? 'linkedin' : 'social'
+  const channel = a.platform
   return {
     recommendation_id: recommendationId,
     department: 'marketing',

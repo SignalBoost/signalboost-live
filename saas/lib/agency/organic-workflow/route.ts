@@ -1,12 +1,13 @@
-// saas/app/api/agency/organic-workflow/route.ts
-// BYOK organic campaign generator — the user supplies their own AI provider
-// key and pays the provider directly. No platform key is ever used here.
-// Keys live only in memory for the duration of the request. Never logged, never stored.
+// saas/lib/agency/organic-workflow/route.ts
+// Canonical BYOK organic campaign provider bridge.
+// App Router exports this handler from /api/agency/organic-workflow.
+// Keys are used only in memory and are never logged or returned.
 
 import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
-import { getTextAdapter, getUserProvider } from '@/lib/agency/userProviders'
+import { getTextAdapter, getUserProvider, liveTextProviderIds } from '@/lib/agency/userProviders'
 import { resolveUserProviderKey } from '@/lib/agency/userProviderKeys'
+import { runWithFallback, type Attempt } from '@/lib/agency/fallback'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -31,6 +32,7 @@ type OrganicResult = {
   error_code?: 'missing_key' | 'invalid_key' | 'provider_error' | 'invalid_output' | 'rate_limited' | 'bad_request'
   assets?: OrganicAssets
   channelMode?: string
+  source?: string
 }
 
 const LANG_NAMES: Record<string, string> = {
@@ -114,7 +116,6 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null)
-
   const company = clean(body?.company, 120)
   const announcement = clean(body?.announcement, 1200)
   const audience = clean(body?.audience, 300)
@@ -122,28 +123,37 @@ export async function POST(request: Request) {
   const lang = clean(body?.lang, 5).toLowerCase()
   const langName = LANG_NAMES[lang] || 'English'
 
-  const requestedProvider = clean(body?.apiProvider, 60).toLowerCase()
-  const template = getUserProvider(requestedProvider)
-  const apiProvider = template && template.status === 'live' && template.capability === 'text' ? template.id : 'anthropic'
-
-  let apiKey = clean(body?.apiKey, 400)
-
-  if (!apiKey) {
-    // Plug-and-play: logged-in users can use a key they connected once.
-    const access = await getAccess().catch(() => null)
-    if (access?.userId) {
-      apiKey = (await resolveUserProviderKey(access.userId, apiProvider)) || ''
-    }
-  }
-
-  if (!apiKey || apiKey.length < 20) {
-    const result: OrganicResult = { ok: false, error: 'An AI provider API key is required. You pay your provider directly per generation.', error_code: 'missing_key' }
-    return NextResponse.json(result, { status: 402 })
-  }
-
   if (!company || !announcement) {
     const result: OrganicResult = { ok: false, error: 'company and announcement are required', error_code: 'bad_request' }
     return NextResponse.json(result, { status: 400 })
+  }
+
+  const requestedRaw = clean(body?.apiProvider, 60).toLowerCase()
+  const requestedTemplate = getUserProvider(requestedRaw)
+  const requestedProvider = requestedTemplate?.status === 'live' && requestedTemplate.capability === 'text'
+    ? requestedTemplate.id
+    : 'anthropic'
+  const explicitKey = clean(body?.apiKey, 400)
+  const access = await getAccess().catch(() => null)
+  const userId = access?.userId || ''
+
+  async function resolveKeyFor(provider: string): Promise<string | null> {
+    if (provider === requestedProvider && explicitKey.length >= 20) return explicitKey
+    if (!userId) return null
+    const saved = await resolveUserProviderKey(userId, provider)
+    return saved && saved.length >= 20 ? saved : null
+  }
+
+  const ordered = [requestedProvider, ...liveTextProviderIds().filter((provider) => provider !== requestedProvider)]
+  const withKeys: Array<{ provider: string; key: string }> = []
+  for (const provider of ordered) {
+    const key = await resolveKeyFor(provider)
+    if (key) withKeys.push({ provider, key })
+  }
+
+  if (withKeys.length === 0) {
+    const result: OrganicResult = { ok: false, error: 'An AI provider API key is required. You pay your provider directly per generation.', error_code: 'missing_key' }
+    return NextResponse.json(result, { status: 402 })
   }
 
   const prompt = [
@@ -170,30 +180,40 @@ export async function POST(request: Request) {
   ].filter(Boolean).join('\n')
 
   const systemPrompt = 'You are a marketing copy engine. Always return only valid JSON. No markdown fences, no commentary.'
+  const attempts: Attempt[] = withKeys.map(({ provider, key }) => ({
+    source: `ai:${provider}`,
+    run: async () => {
+      const adapter = getTextAdapter(provider)
+      if (!adapter) throw new Error('no_adapter')
+      const call = await adapter.generate(key, systemPrompt, prompt, 3000)
+      if (!call.ok) throw new Error(call.code || 'provider_error')
+      const assets = extractJson(call.text || '')
+      if (!assets) throw new Error('invalid_output')
+      return JSON.stringify(assets)
+    },
+  }))
 
-  const adapter = getTextAdapter(apiProvider)
-  if (!adapter) {
-    const result: OrganicResult = { ok: false, error: 'Provider not supported yet.', error_code: 'bad_request' }
-    return NextResponse.json(result, { status: 400 })
+  const fallback = await runWithFallback(attempts)
+  if (fallback.ok && fallback.text) {
+    const result: OrganicResult = {
+      ok: true,
+      assets: JSON.parse(fallback.text) as OrganicAssets,
+      channelMode: 'FREE_ORGANIC_MODE',
+      source: fallback.source,
+    }
+    return NextResponse.json(result)
   }
 
-  const call = await adapter.generate(apiKey, systemPrompt, prompt, 3000)
-
-  if (!call.ok) {
-    const status = call.code === 'invalid_key' ? 401 : 502
-    const message = call.code === 'invalid_key'
-      ? 'Your API key was rejected by the provider. Check the key and try again.'
-      : 'The AI provider request failed. Please try again in a moment.'
-    const result: OrganicResult = { ok: false, error: message, error_code: call.code }
-    return NextResponse.json(result, { status })
+  const reason = fallback.reason || ''
+  if (reason.includes('invalid_key')) {
+    const result: OrganicResult = { ok: false, error: 'Your API key was rejected by the provider. Check the key and try again.', error_code: 'invalid_key' }
+    return NextResponse.json(result, { status: 401 })
   }
-
-  const assets = extractJson(call.text || '')
-  if (!assets) {
+  if (reason.includes('invalid_output')) {
     const result: OrganicResult = { ok: false, error: 'generation returned invalid output', error_code: 'invalid_output' }
     return NextResponse.json(result, { status: 502 })
   }
 
-  const result: OrganicResult = { ok: true, assets, channelMode: 'FREE_ORGANIC_MODE' }
-  return NextResponse.json(result)
+  const result: OrganicResult = { ok: false, error: 'The AI provider request failed. Please try again in a moment.', error_code: 'provider_error' }
+  return NextResponse.json(result, { status: 502 })
 }

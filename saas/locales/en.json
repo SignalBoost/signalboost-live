@@ -333,6 +333,25 @@
       "reviews": "Review collector",
       "audio": "Native audio",
       "video": "Video editor"
+    },
+    "publicTools": {
+      "label": "Public Tools",
+      "status": {
+        "free": "Free",
+        "live": "Live"
+      },
+      "siteReview": {
+        "title": "Site Review",
+        "description": "Check public websites, find problems, and get a clear action list."
+      },
+      "securityCheck": {
+        "title": "Security Check",
+        "description": "Check links, headers, cookies, and HTTPS without entering private systems."
+      },
+      "improveYourSite": {
+        "title": "Improve Your Site",
+        "description": "Create local content, improve pages, review changes, and launch when ready."
+      }
     }
   },
   "enterprise": {
@@ -620,6 +639,12 @@
       "es": "Español",
       "pl": "Polski",
       "ru": "Русский"
+    },
+    "publicTools": {
+      "label": "Public Tools",
+      "siteReview": "Site Review",
+      "securityCheck": "Security Check",
+      "improveYourSite": "Improve Your Site"
     }
   }
 }

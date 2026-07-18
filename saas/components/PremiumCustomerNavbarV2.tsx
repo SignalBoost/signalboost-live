@@ -26,6 +26,15 @@ const LANGUAGES = ['en', 'pt', 'es', 'pl', 'ru'] as const
 
 const GROUPS: NavGroup[] = [
   {
+    id: 'public-tools',
+    labelKey: 'nav.publicTools.label',
+    items: [
+      { icon: '◎', labelKey: 'nav.publicTools.siteReview', href: '/dashboard/audit' },
+      { icon: '🛡️', labelKey: 'nav.publicTools.securityCheck', href: '/cybersecurity-check' },
+      { icon: '✦', labelKey: 'nav.publicTools.improveYourSite', href: '/dashboard/improve' },
+    ],
+  },
+  {
     id: 'campaigns',
     labelKey: 'nav.campaigns',
     items: [

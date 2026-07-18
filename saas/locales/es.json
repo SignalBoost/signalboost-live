@@ -333,6 +333,25 @@
       "reviews": "Recolector de reseñas",
       "audio": "Audio nativo",
       "video": "Editor de video"
+    },
+    "publicTools": {
+      "label": "Herramientas públicas",
+      "status": {
+        "free": "Gratis",
+        "live": "Activo"
+      },
+      "siteReview": {
+        "title": "Revisión del sitio",
+        "description": "Revisa sitios web públicos, encuentra problemas y recibe una lista clara de acciones."
+      },
+      "securityCheck": {
+        "title": "Control de seguridad",
+        "description": "Revisa enlaces, cabeceras, cookies y HTTPS sin entrar en sistemas privados."
+      },
+      "improveYourSite": {
+        "title": "Mejora tu sitio",
+        "description": "Crea contenido local, mejora páginas, revisa los cambios y publica cuando esté listo."
+      }
     }
   },
   "enterprise": {
@@ -620,6 +639,12 @@
       "es": "Español",
       "pl": "Polski",
       "ru": "Русский"
+    },
+    "publicTools": {
+      "label": "Herramientas públicas",
+      "siteReview": "Revisión del sitio",
+      "securityCheck": "Control de seguridad",
+      "improveYourSite": "Mejora tu sitio"
     }
   }
 }

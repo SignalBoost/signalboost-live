@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "prebuild": "npm run validate:next-routes",
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
@@ -29,7 +30,8 @@
     "validate:bpal": "node scripts/validate-bpal-guard.mjs",
     "test:provider-framework": "node --test tests/universalProviderFramework.node.test.ts",
     "test:dashboard": "node --test tests/supervisorOperationsCenter.node.test.ts",
-    "validate:providers": "node scripts/validate-provider-runtime.mjs"
+    "validate:providers": "node scripts/validate-provider-runtime.mjs",
+    "validate:next-routes": "node scripts/validate-next-route-config.mjs"
   },
   "dependencies": {
     "next": "16.2.6",

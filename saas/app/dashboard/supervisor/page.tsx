@@ -6,6 +6,7 @@ import { loadLanguage } from '@/lib/i18n/loadLanguage'
 import { createPlatformHealthSnapshot } from '@/lib/supervisor/platform-health'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
+import GlobalAiKillSwitch from '@/components/supervisor/GlobalAiKillSwitch'
 
 type Row = Record<string, any>
 const safeLang = (value?: string) => { const lang = (value || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru'].includes(lang) ? lang : 'en' }
@@ -33,6 +34,8 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     readTable(db, 'supervisor_instances').catch(() => []), readTable(db, 'supervisor_work_items').catch(() => []), readTable(db, 'supervisor_leases').catch(() => []), readTable(db, 'vercel_observation_triggers').catch(() => []),
   ])
   const health = createPlatformHealthSnapshot({ runs, instances, workItems, leases, triggers, ciState: 'unknown', localizationComplete: true })
+  const { data: systemStatus } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()
+  const aiAutonomyEnabled = systemStatus?.ai_autonomous_execution_enabled !== false
   const bpal = createBrowserProviderDiagnosticsSnapshot(); const providers = bpal.providers.filter(p => matches(p.providerId, 'provider'))
   const activeInstances = instances.filter(i => ['starting','healthy','draining'].includes(String(i.status)))
   const filteredWorkItems = workItems.filter(w => matches(w.provider, 'provider') && matches(w.environment, 'environment') && matches(w.state, 'status') && textHas(w.project_id, w.projectId, w.work_item_id, w.workItemId, w.incident_id, w.provider))
@@ -53,6 +56,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const stateLabel = platform === 'green' ? t.green : platform === 'yellow' ? t.yellow : t.red
   return <main style={page}>
     <section style={hero}><p style={kicker}>{t.kicker}</p><h1 style={{ margin:'6px 0' }}>{t.title}</h1><p style={muted}>{t.subtitle}</p><p style={notice}>{t.readOnly}</p></section>
+    <GlobalAiKillSwitch enabled={aiAutonomyEnabled} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed }} />
     <div style={grid2}>
       <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={`${health.status} · ${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
       <Card title={t.healthMetrics}><dl style={fields}><Field k={t.totalObservations} v={runs.length}/><Field k={t.successfulObservations} v={successful.length}/><Field k={t.verificationSuccess} v={verificationSuccess}/><Field k={t.avgObservationDuration} v={avg(durations)}/><Field k={t.avgVerificationDuration} v={avg(durations)}/><Field k={t.providerAvailability} v={providers.map(p => `${p.providerId}: ${p.health.state}`).join(' · ')}/><Field k={t.queueDepth} v={activeWork.length}/></dl></Card>

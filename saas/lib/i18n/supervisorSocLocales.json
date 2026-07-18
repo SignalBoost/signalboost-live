@@ -155,7 +155,15 @@
       "githubRateLimit": "API rate-limit status",
       "githubRecentWorkflowFailures": "Recent workflow failures",
       "githubRecentPullRequestFindings": "Recent pull-request findings",
-      "githubReadOnlyNotice": "GitHub runtime is read-only. No merge, workflow dispatch, repository, secret, environment, or permission mutation controls are available."
+      "githubReadOnlyNotice": "GitHub runtime is read-only. No merge, workflow dispatch, repository, secret, environment, or permission mutation controls are available.",
+      "aiKillSwitch": "Global AI Kill Switch & Restore",
+      "aiAutonomyActive": "AI AUTONOMY ACTIVE",
+      "aiAutonomyDisabled": "AI AUTONOMY DISABLED",
+      "aiKillSwitchDescription": "This emergency override blocks autonomous AI execution, automated webhooks, background cron jobs, and Supervisor ingress. Human traffic continues normally.",
+      "engageGlobalKillSwitch": "🛑 ENGAGE GLOBAL KILL SWITCH",
+      "restoreAiAutonomy": "✅ RESTORE AI AUTONOMY",
+      "updatingAiStatus": "Updating global AI status…",
+      "aiStatusUpdateFailed": "Could not update the global AI status."
     }
   },
   "es": {
@@ -314,7 +322,15 @@
       "githubRateLimit": "Estado de límite de API",
       "githubRecentWorkflowFailures": "Fallos recientes de workflow",
       "githubRecentPullRequestFindings": "Hallazgos recientes de pull request",
-      "githubReadOnlyNotice": "El runtime de GitHub es de solo lectura. No hay controles para merge, dispatch de workflows, repositorios, secretos, entornos ni permisos."
+      "githubReadOnlyNotice": "El runtime de GitHub es de solo lectura. No hay controles para merge, dispatch de workflows, repositorios, secretos, entornos ni permisos.",
+      "aiKillSwitch": "Interruptor global de IA y restauración",
+      "aiAutonomyActive": "AUTONOMÍA DE IA ACTIVA",
+      "aiAutonomyDisabled": "AUTONOMÍA DE IA DESACTIVADA",
+      "aiKillSwitchDescription": "Esta anulación de emergencia bloquea la ejecución autónoma de IA, los webhooks automatizados, los trabajos cron en segundo plano y el ingreso del Supervisor. El tráfico humano continúa normalmente.",
+      "engageGlobalKillSwitch": "🛑 ACTIVAR INTERRUPTOR GLOBAL",
+      "restoreAiAutonomy": "✅ RESTAURAR AUTONOMÍA DE IA",
+      "updatingAiStatus": "Actualizando el estado global de IA…",
+      "aiStatusUpdateFailed": "No se pudo actualizar el estado global de IA."
     }
   },
   "pt": {
@@ -473,7 +489,15 @@
       "githubRateLimit": "Status do limite da API",
       "githubRecentWorkflowFailures": "Falhas recentes de workflow",
       "githubRecentPullRequestFindings": "Achados recentes de pull request",
-      "githubReadOnlyNotice": "O runtime GitHub é somente leitura. Não há controles para merge, disparo de workflow, repositório, segredo, ambiente ou permissão."
+      "githubReadOnlyNotice": "O runtime GitHub é somente leitura. Não há controles para merge, disparo de workflow, repositório, segredo, ambiente ou permissão.",
+      "aiKillSwitch": "Interruptor global de IA e restauração",
+      "aiAutonomyActive": "AUTONOMIA DE IA ATIVA",
+      "aiAutonomyDisabled": "AUTONOMIA DE IA DESATIVADA",
+      "aiKillSwitchDescription": "Esta substituição de emergência bloqueia a execução autônoma de IA, webhooks automatizados, tarefas cron em segundo plano e a entrada do Supervisor. O tráfego humano continua normalmente.",
+      "engageGlobalKillSwitch": "🛑 ATIVAR INTERRUPTOR GLOBAL",
+      "restoreAiAutonomy": "✅ RESTAURAR AUTONOMIA DE IA",
+      "updatingAiStatus": "Atualizando o estado global da IA…",
+      "aiStatusUpdateFailed": "Não foi possível atualizar o estado global da IA."
     }
   },
   "pl": {
@@ -632,7 +656,15 @@
       "githubRateLimit": "Status limitu API",
       "githubRecentWorkflowFailures": "Ostatnie awarie workflow",
       "githubRecentPullRequestFindings": "Ostatnie ustalenia pull requestów",
-      "githubReadOnlyNotice": "Runtime GitHub jest tylko do odczytu. Brak kontrolek merge, workflow dispatch, repozytoriów, sekretów, środowisk i uprawnień."
+      "githubReadOnlyNotice": "Runtime GitHub jest tylko do odczytu. Brak kontrolek merge, workflow dispatch, repozytoriów, sekretów, środowisk i uprawnień.",
+      "aiKillSwitch": "Globalny wyłącznik AI i przywracanie",
+      "aiAutonomyActive": "AUTONOMIA AI AKTYWNA",
+      "aiAutonomyDisabled": "AUTONOMIA AI WYŁĄCZONA",
+      "aiKillSwitchDescription": "To awaryjne zastąpienie blokuje autonomiczne wykonywanie AI, zautomatyzowane webhooki, zadania cron w tle i wejście Supervisora. Ruch użytkowników działa normalnie.",
+      "engageGlobalKillSwitch": "🛑 WŁĄCZ GLOBALNY WYŁĄCZNIK",
+      "restoreAiAutonomy": "✅ PRZYWRÓĆ AUTONOMIĘ AI",
+      "updatingAiStatus": "Aktualizowanie globalnego stanu AI…",
+      "aiStatusUpdateFailed": "Nie udało się zaktualizować globalnego stanu AI."
     }
   },
   "ru": {
@@ -791,7 +823,15 @@
       "githubRateLimit": "Статус лимита API",
       "githubRecentWorkflowFailures": "Недавние сбои workflow",
       "githubRecentPullRequestFindings": "Недавние выводы по pull request",
-      "githubReadOnlyNotice": "Среда GitHub доступна только для чтения. Нет элементов merge, workflow dispatch, изменения репозитория, секретов, сред или прав."
+      "githubReadOnlyNotice": "Среда GitHub доступна только для чтения. Нет элементов merge, workflow dispatch, изменения репозитория, секретов, сред или прав.",
+      "aiKillSwitch": "Глобальный аварийный выключатель ИИ и восстановление",
+      "aiAutonomyActive": "АВТОНОМНОСТЬ ИИ АКТИВНА",
+      "aiAutonomyDisabled": "АВТОНОМНОСТЬ ИИ ОТКЛЮЧЕНА",
+      "aiKillSwitchDescription": "Этот аварийный переключатель блокирует автономное выполнение ИИ, автоматические вебхуки, фоновые cron-задачи и вход Supervisor. Обычный пользовательский трафик продолжает работать.",
+      "engageGlobalKillSwitch": "🛑 ВКЛЮЧИТЬ ГЛОБАЛЬНЫЙ ВЫКЛЮЧАТЕЛЬ",
+      "restoreAiAutonomy": "✅ ВОССТАНОВИТЬ АВТОНОМНОСТЬ ИИ",
+      "updatingAiStatus": "Обновление глобального статуса ИИ…",
+      "aiStatusUpdateFailed": "Не удалось обновить глобальный статус ИИ."
     }
   }
 }

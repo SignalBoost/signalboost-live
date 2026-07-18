@@ -687,6 +687,10 @@ Mission 002 adds the provider-neutral Universal Provider Framework under `saas/l
 
 Future providers such as GitHub, Stripe, Cloudflare, Supabase, AWS, Azure, Google Cloud, and Namecheap must be onboarded through the canonical universal provider registry plus provider-specific safe SDK/observer/thinker/test code. Browser Runtime, Supervisor, Dispatcher, Policy, Verification, Audit, and dashboards must consume provider capabilities through framework metadata rather than hardcoded provider-specific branches. Existing BPAL metadata remains the Mission 001 browser-provider foundation and is bridged into the universal framework instead of replaced.
 
+### Mission 001 — Global AI Kill Switch and Restore
+
+The global `system_status.ai_autonomous_execution_enabled` flag is the emergency stop control for autonomous AI ingress. The Supabase migration seeds one `global` row, enables RLS, and permits mutation only to authenticated database owners/admins; the server-side admin route separately requires the established application admin gate and writes an audit event. The SaaS Edge Proxy (the Next.js 16 successor to Middleware) checks this flag for autonomous cron, webhook, Supervisor, and autonomous-supervisor API ingress and returns HTTP 503 with the global-disable message when autonomy is disabled or its status cannot be verified. Normal human traffic does not perform this check and continues normally. The admin-only Supervisor Operations Center contains the visible kill/restore control. Restoring the flag only re-enables ingress; it never bypasses existing owner approval gates.
+
 ## 18. Mandatory ONBOARD Maintenance Rule
 
 `ONBOARD.md` must stay current.
@@ -712,6 +716,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-18: Added Mission 001 Global AI Kill Switch and Restore toggle: Supabase flag, Vercel Edge Middleware ingress block, and admin UI override to ensure fail-safe human parity and recovery. Autonomous cron, webhook, and Supervisor ingress now fails closed when status cannot be verified; restoring autonomy never bypasses any approval gate.
 - 2026-07-18: Added an explicitly approved GitHub auto-merge helper in the Console Hub GitHub executor. `autoMergeOnApproval(branchOrPR, approve)` refuses to run without an approval flag/command, fetches PR or branch details, merges to `main`, records branch/commit/status details, and falls back to an `ours` merge commit only when GitHub reports a conflict. This changes provider action behavior but preserves the required human approval gate before merge.
 - 2026-07-18: Added the Concierge approval-path rule: when users ask where to approve pending campaigns, outreach drafts, or content/video assets, responses must name the exact local approval queue, give the absolute SaaS URL, and state the exact approval action instead of generic navigation advice.
 - 2026-07-17: Added Mission 001 Universal Provider Runtime execution support for a read-only GitHub adapter: canonical registry capability resolution now rejects duplicate capabilities, GitHub observations run through durable Supervisor ownership/lease/fencing checks, read-only GitHub API normalization/verification/scheduler/webhook helpers persist only sanitized evidence/audit metadata, and the Supervisor Operations Center exposes GitHub status without mutation controls or credential display.

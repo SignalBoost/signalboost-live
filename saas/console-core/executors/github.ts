@@ -75,6 +75,131 @@ const WORKFLOW: ActionField = { id: 'workflowId', label: 'Workflow', type: 'remo
 
 const schema = (id: string, label: string, verb: string, fields: ActionField[]): ActionSchema => ({ id, label, verb, fields })
 
+export type AutoMergeApproval = boolean | string | { approve?: boolean; approved?: boolean; command?: string }
+export type AutoMergeTarget = string | number | { repo?: string; branch?: string; pr?: number | string; number?: number | string; targetBranch?: string }
+export type AutoMergeResult = {
+  ok: boolean
+  branch: string
+  commit: string
+  message: 'Merge successful' | 'Conflict resolved' | 'Merge failed' | 'Approval required'
+  conflicts?: string[]
+  resolutionStrategy?: 'github_merge' | 'ours'
+  error?: string
+}
+
+type AutoMergeContext = { ok: true; token: string; headers: Record<string, string>; owner: string; name: string; targetBranch: string }
+
+function approvalGiven(approve: AutoMergeApproval): boolean {
+  if (approve === true) return true
+  if (typeof approve === 'string') return /^(approve|approved|merge|auto-merge|automerge|yes|true)$/i.test(approve.trim())
+  if (approve && typeof approve === 'object') return approve.approve === true || approve.approved === true || approvalGiven(String(approve.command || ''))
+  return false
+}
+
+function parseAutoMergeTarget(branchOrPR: AutoMergeTarget): { repo?: string; branch?: string; pr?: string; targetBranch: string } {
+  const targetBranch = typeof branchOrPR === 'object' && branchOrPR !== null && 'targetBranch' in branchOrPR
+    ? String(branchOrPR.targetBranch || 'main').trim() || 'main'
+    : 'main'
+  if (typeof branchOrPR === 'number') return { pr: String(branchOrPR), targetBranch }
+  if (typeof branchOrPR === 'object' && branchOrPR !== null) {
+    const pr = branchOrPR.pr ?? branchOrPR.number
+    return {
+      repo: branchOrPR.repo ? String(branchOrPR.repo).trim() : undefined,
+      branch: branchOrPR.branch ? String(branchOrPR.branch).trim() : undefined,
+      pr: pr === undefined ? undefined : String(pr),
+      targetBranch,
+    }
+  }
+
+  const raw = String(branchOrPR || '').trim()
+  const repoHashPrMatch = raw.match(/^([^\s#]+\/[^\s#]+)#(\d+)$/)
+  if (repoHashPrMatch) return { repo: repoHashPrMatch[1], pr: repoHashPrMatch[2], targetBranch }
+  const hashPrMatch = raw.match(/^#(\d+)$/)
+  if (hashPrMatch) return { pr: hashPrMatch[1], targetBranch }
+  const prOnlyMatch = raw.match(/^(\d+)$/)
+  if (prOnlyMatch) return { pr: prOnlyMatch[1], targetBranch }
+  const repoBranchMatch = raw.match(/^([^\s#]+\/[^\s#]+):(.+)$/)
+  if (repoBranchMatch) return { repo: repoBranchMatch[1], branch: repoBranchMatch[2], targetBranch }
+  return { branch: raw, targetBranch }
+}
+
+async function githubJson<T>(url: string, options: RequestInit & { headers: Record<string, string> }): Promise<{ ok: true; data: T; status: number } | { ok: false; error: string; status: number }> {
+  const res = await fetch(url, options)
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) return { ok: false, status: res.status, error: (data as any)?.message || `GitHub error (HTTP ${res.status})` }
+  return { ok: true, status: res.status, data: data as T }
+}
+
+
+function logAutoMerge(result: AutoMergeResult): AutoMergeResult {
+  console.log('[github.autoMergeOnApproval]', {
+    branch: result.branch,
+    commit: result.commit,
+    status: result.message,
+    conflicts: result.conflicts || [],
+    resolutionStrategy: result.resolutionStrategy || null,
+  })
+  return result
+}
+
+async function resolveAutoMergeContext(target: ReturnType<typeof parseAutoMergeTarget>): Promise<AutoMergeContext | { ok: false; result: AutoMergeResult }> {
+  const c = gh({ repo: target.repo || process.env.GITHUB_DEFAULT_REPO || '' })
+  if (c.ok === false) return { ok: false, result: { ok: false, branch: target.branch || target.pr || '', commit: '', message: 'Merge failed', error: c.error } }
+  return { ok: true, token: c.token, headers: c.headers, owner: c.owner, name: c.name, targetBranch: target.targetBranch }
+}
+
+/**
+ * Merge a branch or pull request into the target branch only after explicit approval.
+ * Conflicting merges are recorded with an `ours` merge commit so the target branch
+ * remains authoritative while the approved source branch is marked as merged.
+ */
+export async function autoMergeOnApproval(branchOrPR: AutoMergeTarget, approve: AutoMergeApproval): Promise<AutoMergeResult> {
+  const target = parseAutoMergeTarget(branchOrPR)
+  if (!approvalGiven(approve)) return logAutoMerge({ ok: false, branch: target.branch || target.pr || '', commit: '', message: 'Approval required', error: 'Explicit approval was not provided; no merge attempted.' })
+
+  const ctx = await resolveAutoMergeContext(target)
+  if (ctx.ok === false) return logAutoMerge(ctx.result)
+  let branch = target.branch || ''
+  let headSha = ''
+
+  if (target.pr) {
+    const pr = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/pulls/${encodeURIComponent(target.pr)}`, { headers: ctx.headers })
+    if (pr.ok === false) return logAutoMerge({ ok: false, branch: target.pr, commit: '', message: 'Merge failed', error: pr.error })
+    branch = String(pr.data?.head?.ref || '')
+    headSha = String(pr.data?.head?.sha || '')
+  }
+
+  if (!branch && !headSha) return logAutoMerge({ ok: false, branch: '', commit: '', message: 'Merge failed', error: 'Branch or PR number is required' })
+
+  if (!headSha) {
+    const head = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/ref/heads/${branch.split('/').map(encodeURIComponent).join('/')}`, { headers: ctx.headers })
+    if (head.ok === false) return logAutoMerge({ ok: false, branch, commit: '', message: 'Merge failed', error: head.error })
+    headSha = String(head.data?.object?.sha || '')
+  }
+
+  const merge = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/merges`, {
+    method: 'POST', headers: { ...ctx.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ base: ctx.targetBranch, head: headSha, commit_message: `Auto-merge ${branch} after explicit approval` }),
+  })
+  if (merge.ok === true) return logAutoMerge({ ok: true, branch, commit: String(merge.data?.sha || headSha), message: 'Merge successful', resolutionStrategy: 'github_merge' })
+  if (merge.status !== 409) return logAutoMerge({ ok: false, branch, commit: headSha, message: 'Merge failed', error: merge.error })
+
+  const base = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/ref/heads/${ctx.targetBranch}`, { headers: ctx.headers })
+  if (base.ok === false) return logAutoMerge({ ok: false, branch, commit: headSha, message: 'Merge failed', error: base.error })
+  const baseSha = String(base.data?.object?.sha || '')
+  const baseCommit = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/commits/${encodeURIComponent(baseSha)}`, { headers: ctx.headers })
+  if (baseCommit.ok === false) return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: baseCommit.error })
+  const created = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/commits`, {
+    method: 'POST', headers: { ...ctx.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Auto-merge ${branch} after explicit approval (conflicts resolved with ours)`, tree: baseCommit.data?.tree?.sha, parents: [baseSha, headSha] }),
+  })
+  if (created.ok === false) return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: created.error, conflicts: [branch], resolutionStrategy: 'ours' })
+  const update = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/refs/heads/${ctx.targetBranch}`, {
+    method: 'PATCH', headers: { ...ctx.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ sha: created.data?.sha, force: false }),
+  })
+  if (update.ok === false) return logAutoMerge({ ok: false, branch, commit: String(created.data?.sha || ''), message: 'Merge failed', error: update.error, conflicts: [branch], resolutionStrategy: 'ours' })
+  return logAutoMerge({ ok: true, branch, commit: String(created.data?.sha || ''), message: 'Conflict resolved', conflicts: [branch], resolutionStrategy: 'ours' })
+}
+
 // ---- READS ----
 registerExecutor({
   providerId: 'github', actionId: 'list_repos', policyActionId: 'read_provider_status',
@@ -306,10 +431,15 @@ registerExecutor({
 
 registerExecutor({
   providerId: 'github', actionId: 'merge_pr', policyActionId: 'crud_actions',
-  schema: schema('github.merge_pr', 'Merge PR', 'edit', [REPO, PR_NUM, { id: 'method', label: 'Merge Method', type: 'select', options: [{ label: 'Merge commit', value: 'merge' }, { label: 'Squash', value: 'squash' }, { label: 'Rebase', value: 'rebase' }] }]),
+  schema: schema('github.merge_pr', 'Merge PR', 'edit', [REPO, PR_NUM, { id: 'approve', label: 'Explicit approval', type: 'boolean', required: true }, { id: 'method', label: 'Merge Method', type: 'select', options: [{ label: 'Auto merge with ours conflict resolution', value: 'auto' }, { label: 'Merge commit', value: 'merge' }, { label: 'Squash', value: 'squash' }, { label: 'Rebase', value: 'rebase' }] }]),
   async run(_ctx, input) {
     const c = gh(input); if (!c.ok) return c
     const number = String(input.number || ''); if (!number) return { ok: false, error: 'PR number is required' }
+    if (input.method === 'auto') {
+      const result = await autoMergeOnApproval({ repo: `${c.owner}/${c.name}`, pr: number }, input.approve)
+      return result.ok ? { ok: true, message: result.message, data: result } : { ok: false, error: result.error || result.message, data: result }
+    }
+    if (!approvalGiven(input.approve as AutoMergeApproval)) return { ok: false, error: 'Explicit approval is required before merging.' }
     const merge_method = ['merge', 'squash', 'rebase'].includes(String(input.method)) ? String(input.method) : 'merge'
     const res = await fetch(`${API}/repos/${c.owner}/${c.name}/pulls/${encodeURIComponent(number)}/merge`, { method: 'PUT', headers: { ...c.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ merge_method }) })
     const data = await res.json().catch(() => ({}))

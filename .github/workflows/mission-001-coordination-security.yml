@@ -1,0 +1,36 @@
+name: Mission 001 Coordination Security
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/supervisor/**'
+      - 'saas/supabase/migrations/**'
+      - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
+      - '.github/workflows/mission-001-coordination-security.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/supervisor/**'
+      - 'saas/supabase/migrations/**'
+      - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
+      - '.github/workflows/mission-001-coordination-security.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  coordination-security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - run: node --test tests/supervisorCoordinationSecurity.node.test.ts
+      - run: npm run typecheck

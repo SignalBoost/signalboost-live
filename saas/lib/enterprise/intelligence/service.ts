@@ -6,7 +6,7 @@ import {
   releaseRefreshLock,
   resolveOrganization,
 } from '@/lib/enterprise/memory/service'
-import { getApprovedCampaignReuse } from '@/lib/enterprise/memory/campaignReuse'
+import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { determineEnterpriseMemoryRefreshRequirements } from '@/lib/enterprise/memory/refreshPolicy'
 import type { EnterpriseApprovalPackage, EnterpriseIntelligenceRequest, EnterpriseWorkspace } from './types'
 
@@ -73,20 +73,35 @@ function packageFromIntelligence(
   }
 }
 
-async function attachApprovedCampaignHistory(
+function memoryTaskTags(pkg: EnterpriseApprovalPackage): string[] {
+  return [
+    pkg.workspace,
+    pkg.classification.industry,
+    ...pkg.classification.audiences,
+    pkg.classification.region,
+    pkg.campaignPlan.goal,
+    pkg.campaignPlan.format,
+    pkg.campaignPlan.offerType,
+    pkg.campaignPlan.ctaStrategy,
+    ...pkg.campaignPlan.platforms,
+  ].map(value => value.trim().toLowerCase()).filter(Boolean)
+}
+
+async function attachEnterpriseMemory(
   pkg: EnterpriseApprovalPackage,
   organizationId: string,
-  workspace: EnterpriseWorkspace,
 ): Promise<EnterpriseApprovalPackage> {
-  const campaigns = await getApprovedCampaignReuse(organizationId, workspace).catch(() => [])
-  if (!campaigns.length) return pkg
-  return {
-    ...pkg,
-    memoryContext: {
-      source: 'approved_campaign_history',
-      campaigns,
-    },
-  }
+  const { memoryContext: _staleMemoryContext, ...basePackage } = pkg
+  const memoryContext = await retrieveEnterpriseMemoryContext({
+    organizationId,
+    workspace: pkg.workspace,
+    taskTags: memoryTaskTags(pkg),
+    limit: 8,
+  }).catch(() => null)
+
+  return memoryContext
+    ? { ...basePackage, memoryContext }
+    : basePackage as EnterpriseApprovalPackage
 }
 
 // Issue #205 Section 1.4 — memory-aware entry point. Consults Enterprise Memory
@@ -105,32 +120,29 @@ export async function buildEnterpriseIntelligence(request: EnterpriseIntelligenc
   const requirements = determineEnterpriseMemoryRefreshRequirements(organization, snapshot)
 
   if (!requirements.snapshotStale && snapshot) {
-    return attachApprovedCampaignHistory(
+    return attachEnterpriseMemory(
       snapshot.snapshot as unknown as EnterpriseApprovalPackage,
       organization.id,
-      request.workspace,
     )
   }
 
   const jobId = await acquireRefreshLock(fingerprint, organization.id)
   if (!jobId) {
     if (snapshot) {
-      return attachApprovedCampaignHistory(
+      return attachEnterpriseMemory(
         snapshot.snapshot as unknown as EnterpriseApprovalPackage,
         organization.id,
-        request.workspace,
       )
     }
     const intelligence = await analyzePublicUrl(request.sourceUrl)
-    return attachApprovedCampaignHistory(packageFromIntelligence(request, intelligence), organization.id, request.workspace)
+    return attachEnterpriseMemory(packageFromIntelligence(request, intelligence), organization.id)
   }
 
   try {
     const intelligence = await analyzePublicUrl(request.sourceUrl)
-    const pkg = await attachApprovedCampaignHistory(
+    const pkg = await attachEnterpriseMemory(
       packageFromIntelligence(request, intelligence),
       organization.id,
-      request.workspace,
     )
     await mergeIntelligence({
       organizationId: organization.id,
@@ -149,10 +161,9 @@ export async function buildEnterpriseIntelligence(request: EnterpriseIntelligenc
   } catch (error) {
     await releaseRefreshLock(jobId, 'failed')
     if (snapshot) {
-      return attachApprovedCampaignHistory(
+      return attachEnterpriseMemory(
         snapshot.snapshot as unknown as EnterpriseApprovalPackage,
         organization.id,
-        request.workspace,
       )
     }
     throw error

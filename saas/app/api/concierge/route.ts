@@ -51,12 +51,13 @@ function socialPlatformFrom(text: string): string {
 function socialQueueRow(a: { platform: string; title: string; body: string; lang: string; now: string }) {
   const recommendationId = id('rec_social_outreach')
   const audience = `Prospects, partners, and buyers on ${a.platform}.`
+  const channel = a.platform === 'linkedin' ? 'linkedin' : 'social'
   return {
     recommendation_id: recommendationId,
     department: 'marketing',
     title: a.title,
     objective: a.body,
-    channel: 'social',
+    channel,
     audience,
     languages: [a.lang],
     assets: [{ type: 'social_post', platform: a.platform, body: a.body }],
@@ -66,14 +67,14 @@ function socialQueueRow(a: { platform: string; title: string; body: string; lang
       title: `Publish ${a.platform} outreach post`,
       status: 'drafted',
       input: { platform: a.platform, language: a.lang },
-      output: { platform: a.platform, body: a.body },
+      output: { platform: a.platform, title: a.title, draft: a.body, body: a.body },
     }],
     recommendation: {
       id: recommendationId,
       department: 'marketing',
       title: a.title,
       summary: a.body,
-      recommended_channel: 'social',
+      recommended_channel: channel,
       priority: 'medium',
       confidence: 90,
       expected_roi: 'medium',

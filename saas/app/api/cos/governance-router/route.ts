@@ -186,7 +186,10 @@ export async function GET() {
   const unresolvedDecisions = decisions.filter(d => d.status === 'logged')
 
   const primary = buildPipeline('primary', 'Primary COSA video pipeline', 'COS -> campaign queue -> render -> voice -> brand -> approval', { active: active.length, failed: failed.length, avgAgeMin: avg(activeAges), errorRate: videoCampaigns.length ? failed.length / Math.max(1, videoCampaigns.length) : 0, costBase: 12, costPerActive: 4.5, waitingFinal: waitingFinal.length, source: 'cos_campaign_queue' })
-  const backup = buildPipeline('backup', 'Backup internal FFmpeg and direct-to-COSA router', 'Provider fallback -> internal FFmpeg preview -> queue recovery', { active: campaigns.filter(c => String(c?.metadata?.source || '').includes('cos_chat')).length, failed: campaigns.filter(c => String(c?.metadata?.source || '').includes('cos_chat') && isFailed(c)).length, avgAgeMin: avg(campaigns.slice(0, 10).map(c => minutesSince(c.created_at) || 0)), errorRate: 0.04, costBase: 3, costPerActive: 1.2, source: 'internal_ffmpeg_fallback' })
+  const chatCampaigns = campaigns.filter(c => String(c?.metadata?.source || '').includes('cos_chat'))
+  const chatActive = chatCampaigns.filter(isRendering)
+  const chatFailed = chatCampaigns.filter(isFailed)
+  const backup = buildPipeline('backup', 'Backup internal FFmpeg and direct-to-COSA router', 'Provider fallback -> internal FFmpeg preview -> queue recovery', { active: chatActive.length, failed: chatFailed.length, avgAgeMin: avg(chatActive.map(c => minutesSince(campaignVideo(c)?.started_at || c.created_at) || 0)), errorRate: chatCampaigns.length ? chatFailed.length / Math.max(1, chatCampaigns.length) : 0, costBase: 3, costPerActive: 1.2, source: 'internal_ffmpeg_fallback' })
   const secondary = buildPipeline('secondary', 'Secondary autonomous governance watchdog', '24x7 cron watchdog -> auto-fix -> rare life-critical escalation', { active: unresolvedDecisions.length, failed: decisions.filter(d => d.status === 'rejected').length, avgAgeMin: avg(unresolvedDecisions.map(d => minutesSince(d.created_at) || 0)), errorRate: decisions.length ? decisions.filter(d => d.status === 'rejected').length / Math.max(1, decisions.length) : 0, costBase: 1, costPerActive: 0.5, source: 'cos_decisions' })
   const pipelines = [primary, backup, secondary]
 

@@ -1,6 +1,7 @@
 export * from './executor-types.ts'
 export * from './errors.ts'
 export * from './executor-registry.ts'
+export * from './dispatch-store.ts'
 export * from './supervisor-dispatcher.ts'
 export * from './api-executor.ts'
 export * from './browser-executor.ts'

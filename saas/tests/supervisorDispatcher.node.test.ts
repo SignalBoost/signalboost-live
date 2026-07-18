@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { APIExecutor, BrowserExecutor, ExecutorRegistry, InMemoryDispatchStore, ManualExecutor, SupervisorDispatcher, executorSchemaVersion } from '../lib/supervisor/index.ts'
+import { APIExecutor, BrowserExecutor, ExecutorRegistry, InMemoryDispatchStore, ManualExecutor, SupabaseDispatchStore, SupervisorDispatcher, executorSchemaVersion } from '../lib/supervisor/index.ts'
 import type { DispatchAuditEvent, SupervisorDispatchRequest, SupervisorExecutor, SupervisorExecutorInput, SupervisorExecutorResult } from '../lib/supervisor/index.ts'
 
 const incident = () => ({ incidentId: 'INC-D-001', provider: 'vercel', environment: 'sandbox', severity: 'warning', detectedAt: '2026-07-16T00:00:00.000Z', source: 'api', errorMessage: 'Deployment failed.', evidence: [{ evidenceId: 'EV-1', type: 'log', capturedAt: '2026-07-16T00:00:00.000Z', summary: 'safe' }], metadata: {} })
@@ -10,8 +10,24 @@ const plan = (o = {}) => ({ planId: 'PLAN-D-001', incidentId: 'INC-D-001', diagn
 const policy = (o = {}) => ({ outcome: 'approved', reason: 'test approved', evaluatedAt: '2026-07-16T00:02:00.000Z', policyVersion: 'test', approvedStepIds: ['read-1'], ...o })
 function request(o: Partial<SupervisorDispatchRequest> = {}): SupervisorDispatchRequest { return { incident: incident() as any, plan: plan() as any, policyDecision: policy() as any, approvedStepIds: ['read-1'], executionContext: { executionId: 'EXEC-D-001', metadata: { secretRef: 'safe-ref' } }, dispatchId: `DISP-${Math.random()}`, requestedExecutorKind: 'api', ...o } }
 function setup(register = true, executor: SupervisorExecutor = new APIExecutor()) { const events: DispatchAuditEvent[] = []; const registry = new ExecutorRegistry(); if (register) registry.register(executor.kind, executor); return { events, registry, dispatcher: new SupervisorDispatcher({ registry, audit: { write: async e => { events.push(e) } }, dispatchStore: new InMemoryDispatchStore() }) } }
+function sharedLedgerDb() {
+  const ids = new Set<string>()
+  return {
+    from(table: string) {
+      assert.equal(table, 'supervisor_dispatch_ledger')
+      return {
+        insert: async (row: any) => {
+          await new Promise(resolve => setTimeout(resolve, 1))
+          if (ids.has(row.dispatch_id)) return { error: { code: '23505', message: 'duplicate key value violates unique constraint' } }
+          ids.add(row.dispatch_id)
+          return { error: null }
+        },
+      }
+    },
+  }
+}
 
-test('blocked policy outcome never dispatches', async () => { let calls=0; const s=setup(true,{kind:'api',execute:()=>{calls++; throw Error('no')}}); const r=await s.dispatcher.dispatch(request({policyDecision:policy({outcome:'blocked',approvedStepIds:[]}) as any, approvedStepIds:[]})); assert.equal(r.status,'failed'); assert.equal(calls,0) })
+ test('blocked policy outcome never dispatches', async () => { let calls=0; const s=setup(true,{kind:'api',execute:()=>{calls++; throw Error('no')}}); const r=await s.dispatcher.dispatch(request({policyDecision:policy({outcome:'blocked',approvedStepIds:[]}) as any, approvedStepIds:[]})); assert.equal(r.status,'failed'); assert.equal(calls,0) })
 test('approval-required outcome never dispatches', async () => { let calls=0; const s=setup(true,{kind:'api',execute:()=>{calls++; throw Error('no')}}); const r=await s.dispatcher.dispatch(request({policyDecision:policy({outcome:'approval_required',approvedStepIds:[]}) as any, approvedStepIds:[]})); assert.equal(r.status,'failed'); assert.equal(calls,0) })
 test('approved API plan routes to API executor', async () => { const s=setup(true,new APIExecutor()); const r=await s.dispatcher.dispatch(request()); assert.equal(r.executorKind,'api'); assert.equal(r.status,'not_implemented'); assert.deepEqual(r.executedStepIds,['read-1']) })
 test('approved browser plan routes to browser executor stub', async () => { const s=setup(true,new BrowserExecutor()); const p=plan({requiresBrowser:true,targetOrigin:'https://example.com',steps:[step({stepId:'nav-1',action:'navigate',parameters:{url:'https://example.com/'}})]}); const r=await s.dispatcher.dispatch(request({plan:p as any, policyDecision:policy({approvedStepIds:['nav-1']}) as any, approvedStepIds:['nav-1'], requestedExecutorKind:'browser'})); assert.equal(r.executorKind,'browser'); assert.equal(r.status,'dry_run_ready'); assert.match(r.evidence[0].summary,/No browser was launched/) })
@@ -30,6 +46,9 @@ test('invalid executor result fails closed', async () => { const s=setup(true,{k
 test('audit failure before execution prevents execution', async () => { let calls=0; const registry=new ExecutorRegistry(); registry.register('api',{kind:'api',execute:()=>{calls++; return new APIExecutor().execute(arguments as any)}} as any); const d=new SupervisorDispatcher({registry,audit:{write:async()=>{throw new Error('audit down')}},dispatchStore:new InMemoryDispatchStore()}); const r=await d.dispatch(request()); assert.equal(r.status,'failed'); assert.equal(calls,0) })
 test('duplicate dispatchId is rejected', async () => { const s=setup(); const req=request({dispatchId:'same'}); assert.equal((await s.dispatcher.dispatch(req)).status,'not_implemented'); assert.equal((await s.dispatcher.dispatch(req)).status,'failed') })
 test('concurrent duplicate dispatch attempts invoke the executor only once', async () => { let calls=0; const s=setup(true,{kind:'api',execute:async(i)=>{calls++; await new Promise(r=>setTimeout(r,20)); return new APIExecutor().execute(i)}}); const req=request({dispatchId:'concurrent'}); await Promise.all([s.dispatcher.dispatch(req),s.dispatcher.dispatch(req)]); assert.equal(calls,1) })
+test('durable store rejects the same dispatch across separate dispatcher instances', async () => { let calls=0; const db=sharedLedgerDb(); const registry=new ExecutorRegistry(); registry.register('api',{kind:'api',execute:async(i)=>{calls++; await new Promise(r=>setTimeout(r,10)); return new APIExecutor().execute(i)}}); const audit={write:async()=>{}}; const first=new SupervisorDispatcher({registry,audit,dispatchStore:new SupabaseDispatchStore(db)}); const second=new SupervisorDispatcher({registry,audit,dispatchStore:new SupabaseDispatchStore(db)}); const req=request({dispatchId:'durable-cross-instance'}); const results=await Promise.all([first.dispatch(req),second.dispatch(req)]); assert.equal(calls,1); assert.equal(results.filter(r=>r.status==='failed').length,1) })
+test('durable store survives dispatcher replacement', async () => { let calls=0; const db=sharedLedgerDb(); const registry=new ExecutorRegistry(); registry.register('api',{kind:'api',execute:(i)=>{calls++; return new APIExecutor().execute(i)}}); const req=request({dispatchId:'durable-restart'}); const first=new SupervisorDispatcher({registry,audit:{write:async()=>{}},dispatchStore:new SupabaseDispatchStore(db)}); assert.equal((await first.dispatch(req)).status,'not_implemented'); const replacement=new SupervisorDispatcher({registry,audit:{write:async()=>{}},dispatchStore:new SupabaseDispatchStore(db)}); assert.equal((await replacement.dispatch(req)).status,'failed'); assert.equal(calls,1) })
+test('dispatch ledger failure fails closed before executor invocation', async () => { let calls=0; const db={from:()=>({insert:async()=>({error:{code:'XX000',message:'database unavailable'}})})}; const registry=new ExecutorRegistry(); registry.register('api',{kind:'api',execute:(i)=>{calls++; return new APIExecutor().execute(i)}}); const dispatcher=new SupervisorDispatcher({registry,audit:{write:async()=>{}},dispatchStore:new SupabaseDispatchStore(db)}); const result=await dispatcher.dispatch(request({dispatchId:'ledger-down'})); assert.equal(result.status,'failed'); assert.equal(calls,0) })
 test('API executor performs no network calls', async () => { const orig=globalThis.fetch; globalThis.fetch=async()=>{throw new Error('network forbidden')}; try { assert.equal((await setup().dispatcher.dispatch(request())).status,'not_implemented') } finally { globalThis.fetch=orig } })
 test('browser executor imports no Playwright or Chromium code', () => { const src=readFileSync(new URL('../lib/supervisor/executors/browser-executor.ts', import.meta.url),'utf8'); assert.doesNotMatch(src,/Playwright|Chromium|Stagehand|browser-use/) })
 test('dispatcher has no Thinker dependency', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/executors/supervisor-dispatcher.ts', import.meta.url),'utf8'),/Thinker|proposeRepairPlan/))

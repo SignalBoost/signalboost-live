@@ -5,6 +5,7 @@ import { ExecutorRegistry } from './executor-registry.ts'
 import { DispatchValidationError, ExecutorRegistryError } from './errors.ts'
 import { ownershipIdentity } from '../coordination/index.ts'
 import { browserReasons } from '../execution-policy/index.ts'
+import { InMemoryDispatchStore, type DispatchStore } from './dispatch-store.ts'
 import { apiCompatibleActions, browserCompatibleActions, dispatcherAuditSchemaVersion, executorSchemaVersion, isExecutorKind, manualCompatibleActions, type DispatchAuditEvent, type DispatchAuditEventType, type DispatchAuditSink, type ExecutorKind, type SupervisorDispatchRequest, type SupervisorExecutorResult } from './executor-types.ts'
 
 const secretPattern = /(secret|token|password|authorization|cookie|api[_-]?key|private[_-]?key|bearer\s+[a-z0-9._-]+)/i
@@ -51,13 +52,12 @@ export function validateExecutorResult(result: SupervisorExecutorResult, dispatc
   for (const sid of result.executedStepIds) if (!approved.has(sid)) throw new DispatchValidationError('Executor reported unapproved step')
   if (!isPlainSerializable(result as unknown)) throw new DispatchValidationError('Executor result must be serializable')
 }
-export class InMemoryDispatchStore { private consumed = new Set<string>(); consume(id: string): boolean { if (this.consumed.has(id)) return false; this.consumed.add(id); return true } has(id: string): boolean { return this.consumed.has(id) } }
-export interface SupervisorDispatcherDeps { registry: ExecutorRegistry; audit: DispatchAuditSink; dispatchStore?: InMemoryDispatchStore }
+export interface SupervisorDispatcherDeps { registry: ExecutorRegistry; audit: DispatchAuditSink; dispatchStore?: DispatchStore }
 export class SupervisorDispatcher {
   private readonly deps: SupervisorDispatcherDeps
-  private defaultStore?: InMemoryDispatchStore
+  private defaultStore?: DispatchStore
   constructor(deps: SupervisorDispatcherDeps) { this.deps = deps }
-  private get store() { if (this.deps.dispatchStore) return this.deps.dispatchStore; if (!this.defaultStore) this.defaultStore = new InMemoryDispatchStore(); return this.defaultStore }
+  private get store(): DispatchStore { if (this.deps.dispatchStore) return this.deps.dispatchStore; if (!this.defaultStore) this.defaultStore = new InMemoryDispatchStore(); return this.defaultStore }
   async dispatch(raw: SupervisorDispatchRequest): Promise<SupervisorExecutorResult> {
     const kind = isExecutorKind(raw.requestedExecutorKind) ? raw.requestedExecutorKind : 'manual'
     try { await this.audit(raw, 'dispatch_requested', { requestedExecutorKind: raw.requestedExecutorKind, approvedStepIds: raw.approvedStepIds }) } catch (e) { return fail(raw.dispatchId || 'unknown', kind, `Audit failed before execution: ${e instanceof Error ? e.message : 'unknown'}`) }
@@ -69,8 +69,16 @@ export class SupervisorDispatcher {
       }
       let executor
       try { executor = this.deps.registry.resolve(request.requestedExecutorKind) } catch (e) { await this.audit(raw, 'executor_missing', { reason: e instanceof Error ? e.message : 'missing' }); throw e }
+      const claimed = await this.store.claim({
+        dispatchId: request.dispatchId,
+        incidentId: request.incident.incidentId,
+        executorKind: request.requestedExecutorKind,
+        claimedAt: now(),
+        workItemId: request.executionDecision?.workItemId,
+        executionId: request.executionContext.executionId,
+      })
+      if (!claimed) { await this.audit(raw, 'duplicate_dispatch_rejected', { dispatchId: request.dispatchId }); throw new DispatchValidationError('Duplicate dispatchId rejected.') }
       await this.audit(raw, 'dispatch_started', { executorKind: request.requestedExecutorKind, approvedStepIds: request.approvedStepIds })
-      if (!this.store.consume(request.dispatchId)) { await this.audit(raw, 'duplicate_dispatch_rejected', { dispatchId: request.dispatchId }); throw new DispatchValidationError('Duplicate dispatchId rejected.') }
       let result: SupervisorExecutorResult
       try { result = await executor.execute({ incident: request.incident, plan: request.plan, approvedStepIds: [...request.approvedStepIds], executionContext: request.executionContext, dispatch: { dispatchId: request.dispatchId, requestedExecutorKind: request.requestedExecutorKind, requestedAt: now() } }) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Executor exception', [], request.approvedStepIds) }
       try { validateExecutorResult(result, request.dispatchId, request.requestedExecutorKind, request.approvedStepIds) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Invalid executor result', [], request.approvedStepIds) }
@@ -84,7 +92,6 @@ export class SupervisorDispatcher {
     if (raw.policyDecision.outcome !== 'approved') throw new DispatchValidationError('Only approved policy outcomes may dispatch.')
     if (!isExecutorKind(raw.requestedExecutorKind)) throw new ExecutorRegistryError(`Unknown executor kind: ${String(raw.requestedExecutorKind)}`)
     if (!raw.dispatchId || typeof raw.dispatchId !== 'string') throw new DispatchValidationError('dispatchId is required')
-    if (this.store.has(raw.dispatchId)) throw new DispatchValidationError('Duplicate dispatchId rejected.')
     if (!Array.isArray(raw.approvedStepIds) || raw.approvedStepIds.length === 0) throw new DispatchValidationError('Approved step scope must be non-empty.')
     if (new Set(raw.approvedStepIds).size !== raw.approvedStepIds.length) throw new DispatchValidationError('Duplicate approved step IDs rejected.')
     const planIds = new Set(plan.steps.map(s => s.stepId)); for (const sid of raw.approvedStepIds) if (!planIds.has(sid)) throw new DispatchValidationError('Unknown approved step ID rejected.')

@@ -2,6 +2,7 @@
 // This module is part of the Enterprise Memory boundary; routes never touch enterprise tables.
 
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { averageConfidence, calibrateConfidence } from './confidenceCalibration'
 import {
   buildApprovedLifecyclePayload,
   buildMeasuredLifecyclePayload,
@@ -56,5 +57,24 @@ export async function recordMeasuredCampaignLifecycle(campaign: any, args: {
   cost: unknown
   measuredAt: string
 }) {
-  return upsert(campaign, buildMeasuredLifecyclePayload(campaign, args))
+  const payload = buildMeasuredLifecyclePayload(campaign, args)
+  const result = await upsert(campaign, payload)
+  if (!result.recorded) return result
+
+  const metadata = campaign?.metadata && typeof campaign.metadata === 'object' ? campaign.metadata : {}
+  const predicted = averageConfidence(campaign?.confidence || metadata.confidence || metadata.enterprise?.confidence)
+  const observed = Number(payload.performanceData?.performanceScore) || 0
+  const calibration = calibrateConfidence(predicted, observed)
+  const admin = getAdminSupabase()
+  const { error } = await admin.from('enterprise_confidence_history').insert({
+    organization_id: result.identity.organizationId,
+    workspace: result.identity.workspace,
+    confidence: {
+      campaignId: result.identity.campaignId,
+      source: 'campaign_measurement',
+      ...calibration,
+    },
+  })
+  if (error) throw new Error(error.message)
+  return { ...result, calibration }
 }

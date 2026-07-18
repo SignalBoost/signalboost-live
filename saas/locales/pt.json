@@ -588,5 +588,38 @@
     "vercel": {
       "description": "Metadados do provedor Vercel somente leitura adaptados à estrutura universal de provedores."
     }
+  },
+  "nav": {
+    "home": "Início",
+    "campaigns": "Campanhas",
+    "campaignStudio": "Estúdio de Campanhas",
+    "marketingSales": "Marketing + Vendas",
+    "studio": "Estúdio",
+    "operations": "Operações",
+    "supervisorSOC": "SOC do Supervisor (Interruptor de Emergência)",
+    "consoleHub": "Central de Controle",
+    "saasStation": "Estação SaaS",
+    "auditCockpit": "Cockpit de Auditoria",
+    "security": "Segurança",
+    "cybersecurity": "Cibersegurança",
+    "website": "Site",
+    "admin": "Administração",
+    "ownerAdmin": "Proprietário/Admin",
+    "coreHelp": "Ajuda Central",
+    "pricing": "Preços",
+    "logOut": "Sair",
+    "searchPlaceholder": "Pesquisar seções",
+    "searchLabel": "Pesquisar navegação",
+    "noSearchResults": "Nenhuma seção correspondente",
+    "languageLabel": "Idioma",
+    "menu": "Menu",
+    "getStarted": "Começar",
+    "languages": {
+      "en": "English",
+      "pt": "Português",
+      "es": "Español",
+      "pl": "Polski",
+      "ru": "Русский"
+    }
   }
 }

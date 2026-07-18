@@ -588,5 +588,38 @@
     "vercel": {
       "description": "Метаданные провайдера Vercel только для чтения, адаптированные к универсальной платформе провайдеров."
     }
+  },
+  "nav": {
+    "home": "Главная",
+    "campaigns": "Кампании",
+    "campaignStudio": "Студия кампаний",
+    "marketingSales": "Маркетинг + Продажи",
+    "studio": "Студия",
+    "operations": "Операции",
+    "supervisorSOC": "SOC супервизора (аварийный выключатель)",
+    "consoleHub": "Центр консоли",
+    "saasStation": "SaaS-станция",
+    "auditCockpit": "Кабина аудита",
+    "security": "Безопасность",
+    "cybersecurity": "Кибербезопасность",
+    "website": "Веб-сайт",
+    "admin": "Администрирование",
+    "ownerAdmin": "Владелец/Администратор",
+    "coreHelp": "Основная помощь",
+    "pricing": "Тарифы",
+    "logOut": "Выйти",
+    "searchPlaceholder": "Поиск разделов",
+    "searchLabel": "Поиск по навигации",
+    "noSearchResults": "Подходящих разделов нет",
+    "languageLabel": "Язык",
+    "menu": "Меню",
+    "getStarted": "Начать",
+    "languages": {
+      "en": "English",
+      "pt": "Português",
+      "es": "Español",
+      "pl": "Polski",
+      "ru": "Русский"
+    }
   }
 }

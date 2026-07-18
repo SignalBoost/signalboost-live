@@ -588,5 +588,38 @@
     "vercel": {
       "description": "Metadane dostawcy Vercel tylko do odczytu dostosowane do uniwersalnej struktury dostawców."
     }
+  },
+  "nav": {
+    "home": "Strona główna",
+    "campaigns": "Kampanie",
+    "campaignStudio": "Studio kampanii",
+    "marketingSales": "Marketing + Sprzedaż",
+    "studio": "Studio",
+    "operations": "Operacje",
+    "supervisorSOC": "SOC nadzorcy (wyłącznik awaryjny)",
+    "consoleHub": "Centrum konsoli",
+    "saasStation": "Stacja SaaS",
+    "auditCockpit": "Kokpit audytu",
+    "security": "Bezpieczeństwo",
+    "cybersecurity": "Cyberbezpieczeństwo",
+    "website": "Strona internetowa",
+    "admin": "Administracja",
+    "ownerAdmin": "Właściciel/Admin",
+    "coreHelp": "Główna pomoc",
+    "pricing": "Cennik",
+    "logOut": "Wyloguj",
+    "searchPlaceholder": "Szukaj sekcji",
+    "searchLabel": "Przeszukaj nawigację",
+    "noSearchResults": "Brak pasujących sekcji",
+    "languageLabel": "Język",
+    "menu": "Menu",
+    "getStarted": "Rozpocznij",
+    "languages": {
+      "en": "English",
+      "pt": "Português",
+      "es": "Español",
+      "pl": "Polski",
+      "ru": "Русский"
+    }
   }
 }

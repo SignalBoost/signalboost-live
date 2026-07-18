@@ -588,5 +588,38 @@
     "vercel": {
       "description": "Read-only Vercel provider metadata adapted into the universal provider framework."
     }
+  },
+  "nav": {
+    "home": "Home",
+    "campaigns": "Campaigns",
+    "campaignStudio": "Campaign Studio",
+    "marketingSales": "Marketing + Sales",
+    "studio": "Studio",
+    "operations": "Operations",
+    "supervisorSOC": "Supervisor SOC (Kill Switch)",
+    "consoleHub": "Console Hub",
+    "saasStation": "SaaS Station",
+    "auditCockpit": "Audit Cockpit",
+    "security": "Security",
+    "cybersecurity": "Cybersecurity",
+    "website": "Website",
+    "admin": "Admin",
+    "ownerAdmin": "Owner/Admin",
+    "coreHelp": "Core Help",
+    "pricing": "Pricing",
+    "logOut": "Log out",
+    "searchPlaceholder": "Search sections",
+    "searchLabel": "Search navigation",
+    "noSearchResults": "No matching sections",
+    "languageLabel": "Language",
+    "menu": "Menu",
+    "getStarted": "Get started",
+    "languages": {
+      "en": "English",
+      "pt": "Português",
+      "es": "Español",
+      "pl": "Polski",
+      "ru": "Русский"
+    }
   }
 }

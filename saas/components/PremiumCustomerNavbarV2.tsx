@@ -10,6 +10,7 @@ import { supabase } from '@/utils/supabase/client'
 type NavItem = {
   icon: string
   labelKey: string
+  fallbackLabel: string
   href?: string
   requiresOwner?: boolean
   action?: 'logout'
@@ -18,6 +19,7 @@ type NavItem = {
 type NavGroup = {
   id: string
   labelKey: string
+  fallbackLabel: string
   items: NavItem[]
 }
 
@@ -28,47 +30,83 @@ const GROUPS: NavGroup[] = [
   {
     id: 'public-tools',
     labelKey: 'nav.publicTools.label',
+    fallbackLabel: 'Public Tools',
     items: [
-      { icon: '◎', labelKey: 'nav.publicTools.siteReview', href: '/dashboard/audit' },
-      { icon: '🛡️', labelKey: 'nav.publicTools.securityCheck', href: '/cybersecurity-check' },
-      { icon: '✦', labelKey: 'nav.publicTools.improveYourSite', href: '/dashboard/improve' },
+      { icon: '◎', labelKey: 'nav.publicTools.siteReview', fallbackLabel: 'Site Review', href: '/dashboard/audit' },
+      { icon: '🛡️', labelKey: 'nav.publicTools.securityCheck', fallbackLabel: 'Security Check', href: '/cybersecurity-check' },
+      { icon: '✦', labelKey: 'nav.publicTools.improveYourSite', fallbackLabel: 'Improve Your Site', href: '/dashboard/improve' },
     ],
   },
   {
     id: 'campaigns',
     labelKey: 'nav.campaigns',
+    fallbackLabel: 'Campaigns',
     items: [
-      { icon: '🎥', labelKey: 'nav.campaignStudio', href: '/agency' },
-      { icon: '📈', labelKey: 'nav.marketingSales', href: '/dashboard/sales' },
-      { icon: '🎬', labelKey: 'nav.studio', href: '/dashboard/video' },
+      { icon: '🎥', labelKey: 'nav.campaignStudio', fallbackLabel: 'Campaign Studio', href: '/agency' },
+      { icon: '📈', labelKey: 'nav.marketingSales', fallbackLabel: 'Marketing + Sales', href: '/dashboard/sales' },
+      { icon: '🧭', labelKey: 'nav.marketingSetup', fallbackLabel: 'Marketing + Sales Setup', href: '/onboarding' },
+      { icon: '📧', labelKey: 'nav.emailOutreach', fallbackLabel: 'Email Outreach', href: '/dashboard/outreach' },
+      { icon: '📣', labelKey: 'nav.campaignConsole', fallbackLabel: 'Campaign Console', href: '/dashboard/cosa' },
+      { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: 'Video Pipeline', href: '/dashboard/cosa/video-pipeline' },
+      { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: 'Press & Print Media', href: '/dashboard/marketing/press-print' },
+      { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: 'Press Outreach', href: '/dashboard/marketing/press-outreach' },
+      { icon: '📢', labelKey: 'nav.promote', fallbackLabel: 'Promote', href: '/dashboard/promote' },
     ],
   },
   {
     id: 'operations',
     labelKey: 'nav.operations',
+    fallbackLabel: 'Operations',
     items: [
-      { icon: '🛑', labelKey: 'nav.supervisorSOC', href: '/dashboard/supervisor', requiresOwner: true },
-      { icon: '🎛️', labelKey: 'nav.consoleHub', href: '/hub', requiresOwner: true },
-      { icon: '🏢', labelKey: 'nav.saasStation', href: '/dashboard' },
-      { icon: '📋', labelKey: 'nav.auditCockpit', href: '/hub/audit' },
+      { icon: '🏠', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', href: '/dashboard' },
+      { icon: '📅', labelKey: 'nav.calendar', fallbackLabel: 'Calendar', href: '/dashboard/calendar' },
+      { icon: '📑', labelKey: 'nav.spreadsheets', fallbackLabel: 'Spreadsheets', href: '/dashboard/spreadsheets' },
+      { icon: '⭐', labelKey: 'nav.reviews', fallbackLabel: 'Reviews', href: '/dashboard/reviews' },
+      { icon: '🤖', labelKey: 'nav.concierge', fallbackLabel: 'Concierge', href: '/dashboard/assistant' },
+      { icon: '💬', labelKey: 'nav.feedback', fallbackLabel: 'Feedback', href: '/dashboard/feedback' },
+      { icon: '🔌', labelKey: 'nav.integrations', fallbackLabel: 'Integrations', href: '/integrations' },
+      { icon: '📋', labelKey: 'nav.infrastructure', fallbackLabel: 'Infrastructure Changes', href: '/dashboard/infrastructure' },
+      { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: 'Supervisor SOC', href: '/dashboard/supervisor', requiresOwner: true },
+      { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: 'Console Hub', href: '/hub', requiresOwner: true },
+    ],
+  },
+  {
+    id: 'studio',
+    labelKey: 'nav.studio',
+    fallbackLabel: 'Studio',
+    items: [
+      { icon: '🌐', labelKey: 'nav.websiteBuilder', fallbackLabel: 'Build a Website', href: '/dashboard/builder' },
+      { icon: '✨', labelKey: 'nav.improveContent', fallbackLabel: 'Improve Content', href: '/dashboard/improve' },
+      { icon: '🚀', labelKey: 'nav.launchpad', fallbackLabel: 'Launchpad', href: '/dashboard/launchpad' },
+      { icon: '🏢', labelKey: 'nav.buildBusiness', fallbackLabel: 'Build a Business', href: '/dashboard/launchpad/business' },
+      { icon: '🛒', labelKey: 'nav.onlineStore', fallbackLabel: 'Online Store', href: '/dashboard/launchpad/store' },
+      { icon: '🎙️', labelKey: 'nav.podcastLaunchpad', fallbackLabel: 'Podcast Launchpad', href: '/dashboard/launchpad/podcast' },
+      { icon: '🎚️', labelKey: 'nav.podcastStudio', fallbackLabel: 'Podcast Studio', href: '/dashboard/podcast/studio' },
+      { icon: '🎬', labelKey: 'nav.videoStudio', fallbackLabel: 'Video Studio', href: '/dashboard/video' },
+      { icon: '🎧', labelKey: 'nav.audioStudio', fallbackLabel: 'Audio Studio', href: '/dashboard/audio' },
+      { icon: '🎨', labelKey: 'nav.creativeStudio', fallbackLabel: 'Creative Studio', href: '/dashboard/creative' },
     ],
   },
   {
     id: 'security',
     labelKey: 'nav.security',
+    fallbackLabel: 'Security',
     items: [
-      { icon: '🛡️', labelKey: 'nav.cybersecurity', href: '/dashboard/cybersecurity' },
-      { icon: '🌐', labelKey: 'nav.website', href: '/dashboard/builder' },
+      { icon: '🛡️', labelKey: 'nav.cybersecurity', fallbackLabel: 'Cybersecurity', href: '/dashboard/cybersecurity' },
+      { icon: '📋', labelKey: 'nav.auditConsole', fallbackLabel: 'Audit Console', href: '/dashboard/audit' },
+      { icon: '🎛️', labelKey: 'nav.auditCockpit', fallbackLabel: 'Audit Cockpit', href: '/hub/audit' },
     ],
   },
   {
     id: 'admin',
     labelKey: 'nav.admin',
+    fallbackLabel: 'Help & Account',
     items: [
-      { icon: '👑', labelKey: 'nav.ownerAdmin', href: '/admin', requiresOwner: true },
-      { icon: '❓', labelKey: 'nav.coreHelp', href: '/support' },
-      { icon: '💳', labelKey: 'nav.pricing', href: '/pricing' },
-      { icon: '↪', labelKey: 'nav.logOut', action: 'logout' },
+      { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: 'Owner/Admin', href: '/admin', requiresOwner: true },
+      { icon: '❓', labelKey: 'nav.coreHelp', fallbackLabel: 'Help', href: '/support' },
+      { icon: '📖', labelKey: 'nav.documentation', fallbackLabel: 'Documentation', href: '/docs' },
+      { icon: '💳', labelKey: 'nav.pricing', fallbackLabel: 'Pricing', href: '/pricing' },
+      { icon: '↪', labelKey: 'nav.logOut', fallbackLabel: 'Log out', action: 'logout' },
     ],
   },
 ]
@@ -107,8 +145,8 @@ export default function PremiumCustomerNavbarV2() {
   )
   const searchableItems = useMemo(
     () => [
-      { icon: '⌂', label: t('nav.home'), href: '/' },
-      ...groups.flatMap(group => group.items.filter(item => item.href).map(item => ({ ...item, label: t(item.labelKey) }))),
+      { icon: '⌂', label: t('nav.home', 'Home'), href: '/' },
+      ...groups.flatMap(group => group.items.filter(item => item.href).map(item => ({ ...item, label: t(item.labelKey, item.fallbackLabel) }))),
     ],
     [groups, t],
   )
@@ -179,12 +217,12 @@ export default function PremiumCustomerNavbarV2() {
   }
 
   function renderItem(item: NavItem, mobile = false) {
-    const label = t(item.labelKey)
+    const label = t(item.labelKey, item.fallbackLabel)
     if (item.action === 'logout') {
       return user ? <button key={item.labelKey} type="button" onClick={handleLogout} className={mobile ? 'sbnav-mobile-row' : 'sbnav-row'}>{item.icon}<span>{label}</span></button> : null
     }
     if (!item.href) return null
-    return <Link key={item.labelKey} href={item.href} onClick={() => { setOpenMenu(null); setMobileOpen(false) }} className={mobile ? 'sbnav-mobile-row' : 'sbnav-row'}>{item.icon}<span>{label}</span></Link>
+    return <Link key={`${item.labelKey}-${item.href}`} href={item.href} onClick={() => { setOpenMenu(null); setMobileOpen(false) }} className={mobile ? 'sbnav-mobile-row' : 'sbnav-row'}>{item.icon}<span>{label}</span></Link>
   }
 
   return (
@@ -198,7 +236,7 @@ export default function PremiumCustomerNavbarV2() {
         .sbnav-menu { position: relative; }
         .sbnav-trigger { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 999px; padding: 8px 11px; background: transparent; cursor: pointer; color: rgba(226,232,240,.76); font-size: 13px; font-weight: 700; white-space: nowrap; }
         .sbnav-trigger:hover, .sbnav-trigger-active { color: #fff; background: rgba(167,139,250,.16); border-color: ${PURPLE}; }
-        .sbnav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 120; display: grid; gap: 3px; min-width: 220px; padding: 8px; border: 1px solid rgba(167,139,250,.45); border-radius: 14px; background: #0f172a; box-shadow: 0 18px 45px rgba(0,0,0,.42); }
+        .sbnav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 120; display: grid; gap: 3px; min-width: 240px; max-height: min(70vh, 560px); overflow-y: auto; padding: 8px; border: 1px solid rgba(167,139,250,.45); border-radius: 14px; background: #0f172a; box-shadow: 0 18px 45px rgba(0,0,0,.42); }
         .sbnav-row, .sbnav-mobile-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 9px; padding: 9px 10px; background: transparent; cursor: pointer; text-align: left; color: rgba(226,232,240,.84); font-size: 13px; }
         .sbnav-row:hover, .sbnav-mobile-row:hover { background: rgba(255,255,255,.07); color: #fff; }
         .sbnav-search { position: relative; margin-left: auto; width: min(260px, 24vw); }
@@ -209,37 +247,37 @@ export default function PremiumCustomerNavbarV2() {
         .sbnav-auth, .sbnav-burger { border: 0; border-radius: 999px; padding: 8px 13px; background: ${PURPLE}; color: #160b2b; font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
         .sbnav-burger { display: none; border-radius: 10px; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.2); }
         .sbnav-mobile { display: none; }
-        @media (max-width: 1050px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
+        @media (max-width: 1180px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
       `}</style>
       <nav className="sbnav" ref={navRef}>
         <Link href="/" className="sbnav-brand"><span className="sbnav-brand-mark" aria-hidden>⌁</span><span>SignalBoostAi</span></Link>
         <div className="sbnav-desktop">
-          <Link href="/" className={`sbnav-trigger ${itemIsActive(pathname, '/') ? 'sbnav-trigger-active' : ''}`}>{t('nav.home')}</Link>
+          <Link href="/" className={`sbnav-trigger ${itemIsActive(pathname, '/') ? 'sbnav-trigger-active' : ''}`}>{t('nav.home', 'Home')}</Link>
           {groups.map(group => {
             const open = openMenu === group.id
             const active = group.items.some(item => itemIsActive(pathname, item.href))
             return <div className="sbnav-menu" key={group.id}>
-              <button type="button" className={`sbnav-trigger ${active ? 'sbnav-trigger-active' : ''}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpenMenu(open ? null : group.id)}>{t(group.labelKey)} <span aria-hidden>▾</span></button>
+              <button type="button" className={`sbnav-trigger ${active ? 'sbnav-trigger-active' : ''}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpenMenu(open ? null : group.id)}>{t(group.labelKey, group.fallbackLabel)} <span aria-hidden>▾</span></button>
               {open ? <div className="sbnav-dropdown" role="menu">{group.items.map(item => renderItem(item))}</div> : null}
             </div>
           })}
         </div>
         <div className="sbnav-search">
-          <input type="search" value={query} placeholder={t('nav.searchPlaceholder')} aria-label={t('nav.searchLabel')} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
-          {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults')}</span>}</div> : null}
+          <input type="search" value={query} placeholder={t('nav.searchPlaceholder', 'Search sections')} aria-label={t('nav.searchLabel', 'Search navigation')} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
+          {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', 'No matching sections')}</span>}</div> : null}
         </div>
-        <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel')} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`)}</option>)}</select>
-        {user ? null : <button type="button" className="sbnav-auth" onClick={() => setShowAuth(true)}>{t('nav.getStarted')}</button>}
-        <button type="button" className="sbnav-burger" aria-label={t('nav.menu')} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
+        <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', 'Language')} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}</select>
+        {user ? null : <button type="button" className="sbnav-auth" onClick={() => setShowAuth(true)}>{t('nav.getStarted', 'Get started')}</button>}
+        <button type="button" className="sbnav-burger" aria-label={t('nav.menu', 'Menu')} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>
       {mobileOpen ? <div className="sbnav-mobile">
         <div className="sbnav-search sbnav-mobile-search">
-          <input type="search" value={query} placeholder={t('nav.searchPlaceholder')} aria-label={t('nav.searchLabel')} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
-          {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults')}</span>}</div> : null}
+          <input type="search" value={query} placeholder={t('nav.searchPlaceholder', 'Search sections')} aria-label={t('nav.searchLabel', 'Search navigation')} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
+          {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', 'No matching sections')}</span>}</div> : null}
         </div>
-        <Link href="/" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">⌂<span>{t('nav.home')}</span></Link>
-        {groups.map(group => <div key={group.id} className="sbnav-mobile-group"><span className="sbnav-mobile-label">{t(group.labelKey)}</span>{group.items.map(item => renderItem(item, true))}</div>)}
-        {user ? null : <button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setShowAuth(true) }}>{t('nav.getStarted')}</button>}
+        <Link href="/" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">⌂<span>{t('nav.home', 'Home')}</span></Link>
+        {groups.map(group => <div key={group.id} className="sbnav-mobile-group"><span className="sbnav-mobile-label">{t(group.labelKey, group.fallbackLabel)}</span>{group.items.map(item => renderItem(item, true))}</div>)}
+        {user ? null : <button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setShowAuth(true) }}>{t('nav.getStarted', 'Get started')}</button>}
       </div> : null}
       {showAuth ? <AuthModal onClose={() => setShowAuth(false)} /> : null}
     </>

@@ -6,6 +6,7 @@ import { loadLanguage } from '@/lib/i18n/loadLanguage'
 import { createPlatformHealthSnapshot } from '@/lib/supervisor/platform-health'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
+import { GlobalAiKillSwitch } from '@/components/supervisor/GlobalAiKillSwitch'
 
 type Row = Record<string, any>
 const safeLang = (value?: string) => { const lang = (value || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru'].includes(lang) ? lang : 'en' }
@@ -29,8 +30,9 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const access = await getAccess(); const dict = await loadLanguage(safeLang((await cookies()).get('sb_locale')?.value)); const t = (dict as any).supervisorSoc as Record<string,string>
   if (!access.isAdmin) return <main style={page}><h1>{t.title}</h1><p>{t.adminOnly}</p></main>
   const db = getAdminSupabase(); const runs = await new SupabaseVercelHealthStore(db).listRuns({ limit: 50 }).catch(() => [])
-  const [instances, workItems, leases, triggers] = await Promise.all([
+  const [instances, workItems, leases, triggers, systemStatus] = await Promise.all([
     readTable(db, 'supervisor_instances').catch(() => []), readTable(db, 'supervisor_work_items').catch(() => []), readTable(db, 'supervisor_leases').catch(() => []), readTable(db, 'vercel_observation_triggers').catch(() => []),
+    readTable(db, 'system_status', 'ai_autonomous_execution_enabled').catch(() => []),
   ])
   const health = createPlatformHealthSnapshot({ runs, instances, workItems, leases, triggers, ciState: 'unknown', localizationComplete: true })
   const bpal = createBrowserProviderDiagnosticsSnapshot(); const providers = bpal.providers.filter(p => matches(p.providerId, 'provider'))
@@ -53,6 +55,10 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const stateLabel = platform === 'green' ? t.green : platform === 'yellow' ? t.yellow : t.red
   return <main style={page}>
     <section style={hero}><p style={kicker}>{t.kicker}</p><h1 style={{ margin:'6px 0' }}>{t.title}</h1><p style={muted}>{t.subtitle}</p><p style={notice}>{t.readOnly}</p></section>
+    <GlobalAiKillSwitch
+      initiallyEnabled={systemStatus[0]?.ai_autonomous_execution_enabled === true}
+      copy={{ killSwitchTitle: t.killSwitchTitle, killSwitchDescription: t.killSwitchDescription, killSwitchEnabled: t.killSwitchEnabled, killSwitchDisabled: t.killSwitchDisabled, killSwitchButton: t.killSwitchButton, killSwitchEngaging: t.killSwitchEngaging, killSwitchEngaged: t.killSwitchEngaged, killSwitchError: t.killSwitchError }}
+    />
     <div style={grid2}>
       <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={`${health.status} · ${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
       <Card title={t.healthMetrics}><dl style={fields}><Field k={t.totalObservations} v={runs.length}/><Field k={t.successfulObservations} v={successful.length}/><Field k={t.verificationSuccess} v={verificationSuccess}/><Field k={t.avgObservationDuration} v={avg(durations)}/><Field k={t.avgVerificationDuration} v={avg(durations)}/><Field k={t.providerAvailability} v={providers.map(p => `${p.providerId}: ${p.health.state}`).join(' · ')}/><Field k={t.queueDepth} v={activeWork.length}/></dl></Card>

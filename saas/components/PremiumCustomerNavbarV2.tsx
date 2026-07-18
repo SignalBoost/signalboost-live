@@ -240,6 +240,9 @@ const navRef = useRef<HTMLElement>(null)
   const pricingLabel = t(dict, 'nav.pricing', 'Pricing')
   const campaignStudioLabel = t(dict, 'nav.campaignStudio', 'Campaign Studio')
   const menuLabel = t(dict, 'nav.menu', 'Menu')
+  // Keep the emergency route in the shared shell rather than a feature-local menu.
+  // The route itself retains its server-side admin gate; this only controls discovery.
+  const supervisorSocLabel = 'Supervisor SOC (Kill Switch)'
   const groups = [...(user ? visibleCustomerGroups(ownerAccess) : []), ...PRODUCT_GROUPS, ...(ownerAccess ? [OWNER_GROUP] : []), HELP_GROUP]
 
   useEffect(() => {
@@ -432,6 +435,7 @@ const navRef = useRef<HTMLElement>(null)
         <div className="sbnav-desktop">
           <Link href="/" className="sbnav-trigger" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>
           <Link href="/agency" className="sbnav-trigger" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: pathname === '/agency' ? 'rgba(255,195,0,.22)' : 'rgba(255,195,0,.12)', border: `1px solid ${GOLD}66`, borderRadius: 999, color: '#fff', fontWeight: 800, whiteSpace: 'nowrap', textDecoration: 'none', boxShadow: `0 0 18px ${GOLD}33` }}><span aria-hidden>🎥</span>{campaignStudioLabel}</Link>
+          {ownerAccess ? <Link href="/dashboard/supervisor" className="sbnav-trigger" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,113,113,.18)', border: `1px solid ${RED}aa`, borderRadius: 999, color: '#fff', fontWeight: 900, whiteSpace: 'nowrap', textDecoration: 'none', boxShadow: `0 0 20px ${RED}44` }}><span aria-hidden>🛑</span>{supervisorSocLabel}</Link> : null}
           {groups.map((group) => <MenuGroup key={group.id} group={group} />)}
           <Link href="/pricing" className="sbnav-trigger" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link>
         </div>
@@ -491,6 +495,7 @@ const navRef = useRef<HTMLElement>(null)
           <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
             <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>🏠 {homeLabel}</Link>
             <Link href="/agency" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14, background: `${GOLD}1f`, border: `1px solid ${GOLD}55`, borderRadius: 12 }}>🎥 {campaignStudioLabel}</Link>
+            {ownerAccess ? <Link href="/dashboard/supervisor" onClick={() => setMobileOpen(false)} style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 900, fontSize: 14, background: 'rgba(248,113,113,.18)', border: `1px solid ${RED}aa`, borderRadius: 12, boxShadow: `0 0 20px ${RED}33` }}>🛑 {supervisorSocLabel}</Link> : null}
             <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>💳 {pricingLabel}</Link>
           </div>
 

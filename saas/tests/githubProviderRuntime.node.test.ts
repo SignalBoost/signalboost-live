@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
-import { GitHubReadOnlyAdapter, GitHubProvider, UniversalProviderRegistry, redactProviderConnection, InMemoryProviderConnectionStore, createGitHubScheduleWork, ingestGitHubWebhook, InMemoryWebhookDeliveryStore, runGitHubObservationWork, type GitHubConnection } from '../lib/provider-framework/index.ts'
+import { BUILT_IN_UNIVERSAL_PROVIDERS, createUniversalProviderRegistry, universalProviderRegistry, GitHubReadOnlyAdapter, GitHubProvider, UniversalProviderRegistry, redactProviderConnection, InMemoryProviderConnectionStore, createGitHubScheduleWork, ingestGitHubWebhook, InMemoryWebhookDeliveryStore, runGitHubObservationWork, type GitHubConnection } from '../lib/provider-framework/index.ts'
 import { InMemoryCoordinationStore, ownershipIdentity } from '../lib/supervisor/coordination/index.ts'
 
 function response(body: unknown, status=200, headers: Record<string,string>={}) { return new Response(JSON.stringify(body), { status, headers: { 'x-ratelimit-limit':'5000', 'x-ratelimit-remaining':'4999', 'x-ratelimit-reset':'1893456000', ...headers } }) }
@@ -16,6 +16,15 @@ test('registers GitHub provider through canonical registry and rejects duplicate
   assert.throws(() => registry.register(GitHubProvider), /duplicate_provider/)
   const duplicate = { ...GitHubProvider, metadata: { ...GitHubProvider.metadata, providerId:'github-copy' } }
   assert.throws(() => registry.register(duplicate), /duplicate_capability/)
+})
+
+test('canonical bootstrap makes built-in GitHub capabilities discoverable without manual registration', () => {
+  assert.deepEqual(BUILT_IN_UNIVERSAL_PROVIDERS.map(provider => provider.metadata.providerId), ['github'])
+  assert.equal(universalProviderRegistry.get('github').metadata.providerId, 'github')
+  assert.equal(universalProviderRegistry.getByCapability('github.workflow_runs.read').metadata.providerId, 'github')
+  const isolated = createUniversalProviderRegistry()
+  assert.notEqual(isolated, universalProviderRegistry)
+  assert.equal(isolated.findCapability('github', 'github.security_alerts.summary').readOnly, true)
 })
 
 test('validates connection, lists repositories, reads metadata, rate limits, and rejects mutations without leaking tokens', async () => {
@@ -65,7 +74,7 @@ test('webhook ingestion verifies signature, deduplicates, rejects unsupported ev
 })
 
 test('supervisor lifecycle validates ownership, lease, fencing, verification, evidence, and audit transitions', async () => {
-  const store = new InMemoryCoordinationStore(); const registry = new UniversalProviderRegistry(); registry.register(GitHubProvider)
+  const store = new InMemoryCoordinationStore(); const registry = createUniversalProviderRegistry()
   await store.registerInstance({ instanceId:'s1', runtimeId:'r1', startedAt:'2026-07-17T00:00:00.000Z', heartbeatAt:'2026-07-17T00:00:00.000Z', softwareVersion:'test', schemaVersion:'v1', supportedProviderKinds:['github'], status:'healthy' })
   const work = createGitHubScheduleWork({ organizationId:'org_1', providerId:'github', resourceId:'signalboost-live', capability:'github.repository.read', windowStart:'2026-07-17T00:00:00.000Z', queueDepth:0, rateLimitRemaining:100 })!
   await store.enqueueWorkItem({ ...work, projectId:'SignalBoost' })

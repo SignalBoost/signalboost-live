@@ -51,3 +51,10 @@ export class SupabaseDispatchStore implements DispatchStore {
     throw new Error(`dispatch_claim_failed:${safe(error.message || error.code || 'unknown', 120)}`)
   }
 }
+
+export function createSupervisorDispatchStore(input: { supabase?: any; runtime?: string } = {}): DispatchStore {
+  const runtime = input.runtime ?? process.env.NODE_ENV ?? 'development'
+  if (input.supabase) return new SupabaseDispatchStore(input.supabase)
+  if (runtime === 'production') throw new Error('durable_dispatch_store_required')
+  return new InMemoryDispatchStore()
+}

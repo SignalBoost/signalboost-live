@@ -12,6 +12,32 @@ const videoIntentTokens = {
   caption_overlay: ['caption', 'subtitle', 'srt', 'vtt', 'overlay', 'burn'],
   video_export: ['export', 'render', 'mp4', 'download', 'ffmpeg', 'transcode'],
 }
+const approvalUrlBase = 'https://saas.signalboostapp.com'
+const assetIdPattern = /\b(?:asset|campaign|draft|id|row|item)\s*(?:id)?\s*[:#-]?\s*([a-z0-9][a-z0-9_-]{5,})\b/i
+
+const approvalDestinations = [
+  {
+    kind: 'press_outreach',
+    tokens: ['press', 'press release', 'journalist', 'editor', 'publication', 'newspaper', 'magazine', 'outreach draft'],
+    queueName: 'Press Outreach Owner Approval Queue',
+    url: `${approvalUrlBase}/dashboard/marketing/press-outreach`,
+    action: (label: string) => `Scroll to the '${label}' approval card and click 'Approve & mark published' directly below the message preview.`,
+  },
+  {
+    kind: 'video_asset',
+    tokens: ['video', 'mp4', 'render', 'asset', 'content asset', 'branded preview'],
+    queueName: 'COSA Video Pipeline Approval Queue',
+    url: `${approvalUrlBase}/dashboard/cosa/video-pipeline`,
+    action: (label: string) => `Open the '${label}' row, review the final branded MP4 preview, and click 'Approve and publish' on that asset card.`,
+  },
+  {
+    kind: 'cosa_campaign',
+    tokens: ['campaign', 'cosa', 'pending campaign', 'draft campaign', 'marketing campaign', 'content draft'],
+    queueName: 'COSA Campaign Console',
+    url: `${approvalUrlBase}/dashboard/cosa`,
+    action: (label: string) => `Scroll to the '${label}' section and click 'Approve campaign' underneath the preview box.`,
+  },
+] as const
 
 type ConciergeOptions = {
   tier?: string
@@ -21,6 +47,28 @@ type ConciergeOptions = {
   // query failure). When set, overage/quota guidance is presented as unverified
   // rather than asserting a (possibly understated) 0-used position.
   usageUnavailable?: boolean
+}
+
+function extractApprovalAssetLabel(query: string) {
+  const id = query.match(assetIdPattern)?.[1]
+  if (id) return id
+  const quoted = query.match(/['"`]([^'"`]{3,120})['"`]/)?.[1]?.trim()
+  return quoted || 'specific pending item'
+}
+
+function directApprovalAnswer(query: string) {
+  const normalized = query.toLowerCase()
+  const asksForApprovalPath =
+    /\b(where|how|approve|approval|pending|review)\b/.test(normalized) &&
+    /\b(approve|approval|pending|review|draft|campaign|asset|outreach)\b/.test(normalized)
+
+  if (!asksForApprovalPath) return null
+
+  const destination = approvalDestinations.find((item) => item.tokens.some((token) => normalized.includes(token)))
+  if (!destination) return null
+
+  const label = extractApprovalAssetLabel(query)
+  return `To approve this draft, go directly to the ${destination.queueName} here: ${destination.url}. ${destination.action(label)}`
 }
 
 function normalizeLocale(locale: string): SupportedVideoLocale {
@@ -38,6 +86,19 @@ export function classifyConciergeIntent(query: string) {
 
 export function answerSignalBoostConcierge(query: string, locale = 'en', options: ConciergeOptions = {}) {
   const safeLocale = normalizeLocale(locale)
+  const approvalAnswer = directApprovalAnswer(query)
+  if (approvalAnswer) {
+    return {
+      locale: safeLocale,
+      scope: 'SignalBoost Marketplace + SaaS',
+      telemetryEvent: 'concierge.approval_path.logged',
+      intents: ['approval_path'],
+      pipeline: null,
+      reply: approvalAnswer,
+      nextActions: [],
+    }
+  }
+
   const normalized = query.toLowerCase()
   const intents = classifyConciergeIntent(query)
   const matches = moduleMatcher

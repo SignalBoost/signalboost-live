@@ -541,6 +541,12 @@ Rules:
 - Press dispatch from the studio always inserts `press_campaigns` rows as `pending_owner_review` (`force_owner_review`). The journalist email is sent only after owner approval in `/dashboard/marketing/press-outreach` (`PressOutreachStudio`), via `dispatchPressReleaseToEditor` (Resend, owner BCC).
 - Public generation and press-queue endpoints are IP rate-limited and origin-checked. Keep those guards when editing.
 
+Concierge approval-path rule:
+
+- When a user asks where to approve a pending campaign, outreach draft, or content asset, Concierge must not give generic navigation advice.
+- Concierge must name the exact console or queue, provide the absolute `https://saas.signalboostapp.com/...` URL, and state the precise button/action for that asset.
+- Current approval paths: COSA campaigns use the COSA Campaign Console at `/dashboard/cosa` and the `Approve campaign` button; press/outreach drafts use the Press Outreach Owner Approval Queue at `/dashboard/marketing/press-outreach` and the `Approve & mark published` button; final video/content assets use the COSA Video Pipeline Approval Queue at `/dashboard/cosa/video-pipeline` and the `Approve and publish` action.
+
 ---
 
 ## 13. Vault and Secret Rules
@@ -706,6 +712,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-18: Added the Concierge approval-path rule: when users ask where to approve pending campaigns, outreach drafts, or content/video assets, responses must name the exact local approval queue, give the absolute SaaS URL, and state the exact approval action instead of generic navigation advice.
 - 2026-07-17: Added Mission 001 Universal Provider Runtime execution support for a read-only GitHub adapter: canonical registry capability resolution now rejects duplicate capabilities, GitHub observations run through durable Supervisor ownership/lease/fencing checks, read-only GitHub API normalization/verification/scheduler/webhook helpers persist only sanitized evidence/audit metadata, and the Supervisor Operations Center exposes GitHub status without mutation controls or credential display.
 - 2026-07-17: Added Mission 001 platform self-diagnostics: the Supervisor Operations Center now computes read-only platform health snapshots, subsystem status, alert/recovery history, trend buckets, and self-verification for Supervisor, lease, fencing, dispatcher, Observer/Thinker/verification/audit/persistence latency, BPAL/provider registration, scheduler/webhook processing, queue depth, stale work, expired leases, missed heartbeats, localization completeness, and CI state. The Health Monitor persists snapshots/alerts/recoveries/metrics only as sanitized metadata and adds no repair controls, provider mutations, Browser Runtime execution, credentials, raw logs, or approval-gate bypass.
 Use this section for short notes when architecture, provider behavior, platform workflow, or governance rules change.

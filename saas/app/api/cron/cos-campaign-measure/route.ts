@@ -6,18 +6,13 @@
 // first-party click counts (from cos_campaign_clicks, logged by /api/track),
 // and estimated cost (see campaign-cost.ts). Cost, traffic, and performance
 // all land together on the campaign record.
-// TOKEN OWNER RESOLUTION: chat-created video campaigns carry
-// approved_by='cos_internal_preparation' (a marker, not a user), so the OAuth
-// token owner is resolved from published[*].publishedBy (the real user who
-// clicked Publish) first, falling back to approved_by only when it looks like
-// a real user id. Honest by construction: platforms without a usable token
-// are marked unsupported with the reason, never faked.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { measureCampaignPerformance } from '@/lib/cos/campaign-queue/measure'
 import { estimateCampaignCost } from '@/lib/cos/campaign-queue/campaign-cost'
 import { getCampaignTraffic } from '@/lib/cos/campaign-queue/campaign-traffic'
+import { recordMeasuredCampaignLifecycle } from '@/lib/enterprise/memory/lifecycleRecorder'
 import type { SocialPlatform } from '@/lib/outreach/social-connectors'
 
 export const dynamic = 'force-dynamic'
@@ -62,13 +57,13 @@ export async function GET(req: NextRequest) {
     const entries = Object.entries(published) as Array<[string, any]>
 
     if (entries.length === 0) { skipped++; continue }
-    if (campaign.metadata?.performance) { skipped++; continue } // already measured
+    if (campaign.metadata?.performance) { skipped++; continue }
 
     const allOldEnough = entries.every(([, entry]) => {
       const t = entry?.publishedAt ? new Date(entry.publishedAt).getTime() : 0
       return t > 0 && t <= cutoff
     })
-    if (!allOldEnough) { skipped++; continue } // give it more time to accumulate real views
+    if (!allOldEnough) { skipped++; continue }
 
     const performance: Record<string, any> = {}
     for (const [key, entry] of entries) {
@@ -97,12 +92,20 @@ export async function GET(req: NextRequest) {
 
     const traffic = await getCampaignTraffic(sb, campaign.id)
     const cost = estimateCampaignCost(campaign)
-
+    const measuredAt = new Date().toISOString()
     const anySupported = Object.values(performance).some((m: any) => m.supported && !m.error)
-    await sb.from('cos_campaign_queue').update({
+    const updatedCampaign = {
+      ...campaign,
       status: anySupported ? 'measured' : campaign.status,
-      metadata: { ...(campaign.metadata || {}), performance, traffic, cost, measured_at: new Date().toISOString() },
+      metadata: { ...(campaign.metadata || {}), performance, traffic, cost, measured_at: measuredAt },
+    }
+
+    await sb.from('cos_campaign_queue').update({
+      status: updatedCampaign.status,
+      metadata: updatedCampaign.metadata,
     }).eq('id', campaign.id)
+
+    await recordMeasuredCampaignLifecycle(updatedCampaign, { performance, traffic, cost, measuredAt }).catch(() => null)
     measured++
   }
 

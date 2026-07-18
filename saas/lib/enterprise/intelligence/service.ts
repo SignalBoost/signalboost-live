@@ -1,12 +1,12 @@
 import { analyzePublicUrl } from '@/lib/enterprise/url-intelligence'
 import {
   acquireRefreshLock,
-  determineRefreshRequirements,
   getIntelligenceSnapshot,
   mergeIntelligence,
   releaseRefreshLock,
   resolveOrganization,
 } from '@/lib/enterprise/memory/service'
+import { determineEnterpriseMemoryRefreshRequirements } from '@/lib/enterprise/memory/refreshPolicy'
 import type { EnterpriseApprovalPackage, EnterpriseIntelligenceRequest, EnterpriseWorkspace } from './types'
 
 function schemaLanguage(value?: string) {
@@ -87,7 +87,7 @@ export async function buildEnterpriseIntelligence(request: EnterpriseIntelligenc
 
   const { organization, fingerprint } = resolved
   const snapshot = await getIntelligenceSnapshot(organization.id, request.workspace)
-  const requirements = determineRefreshRequirements(organization, snapshot)
+  const requirements = determineEnterpriseMemoryRefreshRequirements(organization, snapshot)
 
   // Reuse valid intelligence.
   if (!requirements.snapshotStale && snapshot) {

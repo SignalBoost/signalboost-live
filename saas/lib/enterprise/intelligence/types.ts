@@ -1,4 +1,5 @@
 import type { UrlIntelligenceResult } from '@/lib/enterprise/url-intelligence/types'
+import type { CampaignReuseInsight } from '@/lib/enterprise/memory/campaignReuse'
 
 export type EnterpriseWorkspace = 'cosa' | 'campaign-studio' | 'business' | 'creator' | 'podcast' | 'store'
 
@@ -33,6 +34,10 @@ export type EnterpriseApprovalPackage = {
     description: string
     metadata: string[]
   }>
+  memoryContext?: {
+    source: 'approved_campaign_history'
+    campaigns: CampaignReuseInsight[]
+  }
   confidence: Record<string, number>
   requiresConfirmation: string[]
   intelligence: UrlIntelligenceResult

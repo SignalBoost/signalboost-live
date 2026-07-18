@@ -40,6 +40,12 @@ export const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
   youtube: 'youtube_channels',
   short_video: 'youtube_channels',
   linkedin: 'linkedin_company',
+  twitter: 'twitter_x',
+  x: 'twitter_x',
+  facebook: 'facebook_pages',
+  instagram: 'instagram_business',
+  tiktok: 'tiktok',
+  reddit: 'reddit',
 }
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']

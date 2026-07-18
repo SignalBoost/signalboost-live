@@ -1,6 +1,7 @@
 export * from './types.ts'
 export * from './validation.ts'
 export * from './registry.ts'
+export * from './bootstrap.ts'
 export * from './browser-provider-bridge.ts'
 export * from './github.ts'
 export * from './github-config.ts'

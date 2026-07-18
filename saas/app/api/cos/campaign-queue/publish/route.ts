@@ -12,6 +12,7 @@ import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { sendEmail } from '@/lib/email'
 import { campaignLanguage, resolveFinalVideoForLanguage, verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
+import { recordPublishedCampaignLifecycle } from '@/lib/enterprise/memory/lifecycleRecorder'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,12 +36,10 @@ export async function POST(req: NextRequest) {
   const { data: campaign, error } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', id).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
 
-  // THE GATE: never publish anything that has not been approved.
   if (campaign.status !== 'approved') {
     return NextResponse.json({ ok: false, error: 'Campaign must be approved before publishing.' }, { status: 409 })
   }
 
-  // VERSION BINDING: the live content must still match what the human approved.
   const binding = verifyApprovalBinding(campaign)
   if (!binding.ok) {
     return NextResponse.json({ ok: false, error: binding.reason }, { status: 409 })
@@ -110,17 +109,15 @@ export async function POST(req: NextRequest) {
       from: 'saasMarketing',
       to: ctx.user.email,
       subject: `🎬 Your video is live on ${platformLabel}: ${title || campaign.title}`,
-      html: `
-        <p>COSA finished the full pipeline for <strong>${title || campaign.title}</strong> and it is now live on ${platformLabel}.</p>
-        <p><a href="${result.liveUrl}">${result.liveUrl}</a></p>
-        <p>Clicks on the description link are being tracked automatically.</p>
-      `.trim(),
+      html: `<p>COSA finished the full pipeline for <strong>${title || campaign.title}</strong> and it is now live on ${platformLabel}.</p><p><a href="${result.liveUrl}">${result.liveUrl}</a></p><p>Clicks on the description link are being tracked automatically.</p>`.trim(),
     })
     notified = Boolean(sent?.ok)
     if (!sent?.ok) notifyError = sent?.error
   }
 
-  await ctx.admin.from('cos_campaign_queue').update({
+  const publishedEntry = { result, publishedAt, language: language || null, videoUrl, notified, notifyError: notifyError || null, publishedBy: ctx.user.id }
+  const updatedCampaign = {
+    ...campaign,
     status: 'running',
     metadata: {
       ...(campaign.metadata || {}),
@@ -128,10 +125,13 @@ export async function POST(req: NextRequest) {
       tracking_url: trackingUrl,
       published: {
         ...((campaign.metadata && campaign.metadata.published) || {}),
-        [publishedKey]: { result, publishedAt, language: language || null, videoUrl, notified, notifyError: notifyError || null, publishedBy: ctx.user.id },
+        [publishedKey]: publishedEntry,
       },
     },
-  }).eq('id', id)
+  }
+
+  await ctx.admin.from('cos_campaign_queue').update({ status: updatedCampaign.status, metadata: updatedCampaign.metadata }).eq('id', id)
+  await recordPublishedCampaignLifecycle(updatedCampaign, publishedEntry).catch(() => null)
 
   await auditAdminAction({
     admin: ctx.admin,

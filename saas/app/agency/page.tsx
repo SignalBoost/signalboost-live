@@ -1,7 +1,7 @@
 'use client'
 
 import AgencyPricing from '@/components/agency/AgencyPricing'
-import PublicAgencyClient from '@/components/agency/PublicAgencyClient'
+import AgencyStudioModeClient from '@/components/agency/AgencyStudioModeClient'
 import RenderCredits from '@/components/agency/RenderCredits'
 import VoiceStudio from '@/components/agency/VoiceStudio'
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -24,7 +24,7 @@ export default function AgencyPage() {
           </div>
         </div>
       </section>
-      <div id="agency-client"><PublicAgencyClient copy={copy.client} /></div>
+      <div id="agency-client"><AgencyStudioModeClient copy={copy.client} /></div>
       <VoiceStudio />
       <RenderCredits />
       <AgencyPricing copy={copy.pricing} />

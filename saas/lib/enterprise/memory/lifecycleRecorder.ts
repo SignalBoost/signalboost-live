@@ -52,7 +52,7 @@ export async function recordPublishedCampaignLifecycle(campaign: any, published:
 
 export async function recordMeasuredCampaignLifecycle(campaign: any, args: {
   performance: Record<string, unknown>
-  traffic: Record<string, unknown>
+  traffic: unknown
   cost: unknown
   measuredAt: string
 }) {

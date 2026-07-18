@@ -691,6 +691,8 @@ Future providers such as GitHub, Stripe, Cloudflare, Supabase, AWS, Azure, Googl
 
 The global `system_status.ai_autonomous_execution_enabled` flag is the emergency stop control for autonomous AI ingress. The Supabase migration seeds one `global` row, enables RLS, and permits mutation only to authenticated database owners/admins; the server-side admin route separately requires the established application admin gate and writes an audit event. The SaaS Edge Proxy (the Next.js 16 successor to Middleware) checks this flag for autonomous cron, webhook, Supervisor, and autonomous-supervisor API ingress and returns HTTP 503 with the global-disable message when autonomy is disabled or its status cannot be verified. Normal human traffic does not perform this check and continues normally. The admin-only Supervisor Operations Center contains the visible kill/restore control. Restoring the flag only re-enables ingress; it never bypasses existing owner approval gates.
 
+Emergency navigation is part of the shared `PremiumCustomerNavbarV2` AppShell navigation: authenticated owners/admins receive a persistent, high-visibility `🛑 Supervisor SOC (Kill Switch)` link to `/dashboard/supervisor` in both the desktop global navigation and the responsive hamburger menu. The client-side visibility condition is discovery-only; the Supervisor route and kill/restore API retain their established server-side admin gates. No global Command palette currently exists in this application.
+
 ## 18. Mandatory ONBOARD Maintenance Rule
 
 `ONBOARD.md` must stay current.
@@ -716,6 +718,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-18: Added persistent emergency routing: injected a globally accessible, owner/admin-gated `🛑 Supervisor SOC (Kill Switch)` link to the Mission 001 Supervisor SOC and Kill Switch into the shared AppShell navigation and responsive hamburger menu to ensure immediate human override capability during AI failures. The server-side Supervisor and kill/restore authorization gates remain unchanged.
 - 2026-07-18: Added Mission 001 Global AI Kill Switch and Restore toggle: Supabase flag, Vercel Edge Middleware ingress block, and admin UI override to ensure fail-safe human parity and recovery. Autonomous cron, webhook, and Supervisor ingress now fails closed when status cannot be verified; restoring autonomy never bypasses any approval gate.
 - 2026-07-18: Added an explicitly approved GitHub auto-merge helper in the Console Hub GitHub executor. `autoMergeOnApproval(branchOrPR, approve)` refuses to run without an approval flag/command, fetches PR or branch details, merges to `main`, records branch/commit/status details, and falls back to an `ours` merge commit only when GitHub reports a conflict. This changes provider action behavior but preserves the required human approval gate before merge.
 - 2026-07-18: Added the Concierge approval-path rule: when users ask where to approve pending campaigns, outreach drafts, or content/video assets, responses must name the exact local approval queue, give the absolute SaaS URL, and state the exact approval action instead of generic navigation advice.

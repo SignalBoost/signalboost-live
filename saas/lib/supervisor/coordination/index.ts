@@ -44,3 +44,4 @@ export function ownershipIdentity(l:Lease):OwnershipIdentity{return {leaseId:l.l
 export { SupabaseCoordinationStore } from './supabase-coordination-store.ts'
 export { createSupervisorCoordinationStore } from './durable-coordination-store.ts'
 export { reconcileSupervisorCoordination } from './reconciliation.ts'
+export * from './startup-reconciliation.ts'

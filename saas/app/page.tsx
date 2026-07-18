@@ -6,9 +6,9 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
 const LINKS = {
-  audit: '/dashboard/audit',
-  cybersecurity: '/dashboard/cybersecurity',
-  optimization: '/website-optimizer',
+  siteReview: '/dashboard/audit',
+  securityCheck: '/cybersecurity-check',
+  improveYourSite: '/dashboard/improve',
   agency: '/agency',
   license: 'mailto:partners@signalboostapp.com?subject=Licensing%20SignalBoost%20modules',
 }
@@ -21,10 +21,10 @@ const LANGUAGES = [
   ['🇷🇺', 'Русский'],
 ] as const
 
-const MODULES = [
-  { key: 'audit', icon: '◎', href: LINKS.audit, accent: '#f6c453' },
-  { key: 'security', icon: '◇', href: LINKS.cybersecurity, accent: '#8b8cff' },
-  { key: 'optimization', icon: '✦', href: LINKS.optimization, accent: '#e7a93f' },
+const PUBLIC_TOOLS = [
+  { key: 'siteReview', icon: '◎', href: LINKS.siteReview, accent: '#f6c453', status: 'free' },
+  { key: 'securityCheck', icon: '◇', href: LINKS.securityCheck, accent: '#8b8cff', status: 'free' },
+  { key: 'improveYourSite', icon: '✦', href: LINKS.improveYourSite, accent: '#e7a93f', status: 'live' },
 ] as const
 
 const PORTABLES = [
@@ -112,14 +112,15 @@ export default function Home() {
         </header>
 
         <section className="zone">
-          <span className="zone-label">{copy('publicModules', 'Public tools')}</span>
+          <span className="zone-label">{t(dict, 'home.publicTools.label', 'Public Tools')}</span>
           <div className="grid grid-3">
-            {MODULES.map((m) => {
-              const title = copy(`modules.${m.key}.title`, m.key)
-              const desc = copy(`modules.${m.key}.desc`, '')
+            {PUBLIC_TOOLS.map((tool) => {
+              const title = t(dict, `home.publicTools.${tool.key}.title`, tool.key)
+              const desc = t(dict, `home.publicTools.${tool.key}.description`, '')
+              const status = t(dict, `home.publicTools.status.${tool.status}`, tool.status)
               return (
-                <Link key={m.key} href={m.href} className="mcard" style={{ ['--accent' as string]: m.accent }}>
-                  <div className="mcard-top"><span className="mcard-icon">{m.icon}</span><span className="live-pill"><i /> {copy('live', 'Live')}</span></div>
+                <Link key={tool.key} href={tool.href} className="mcard" style={{ ['--accent' as string]: tool.accent }}>
+                  <div className="mcard-top"><span className="mcard-icon">{tool.icon}</span><span className={tool.status === 'free' ? 'free-pill' : 'live-pill'}>{tool.status === 'live' ? <i /> : null} {status}</span></div>
                   <h2>{title}</h2>
                   <p>{desc}</p>
                   <span className="mcard-open">{copy('open', 'Open')} ↗</span>
@@ -189,6 +190,7 @@ export default function Home() {
         .mcard-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;border:1px solid var(--accent);color:var(--accent);font-size:16px}
         .live-pill{display:flex;align-items:center;gap:6px;color:#aeb6c9;font-size:11px}
         .live-pill i{width:6px;height:6px;border-radius:50%;background:#47dfab;box-shadow:0 0 10px #47dfab}
+        .free-pill{color:#0b0b10;background:#f5c451;border-radius:999px;padding:3px 7px;font-size:8.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
         .mcard h2{margin:2px 0 0;font-size:16px}
         .mcard p{margin:0;color:#9aa4b9;font-size:12px;line-height:1.4}
         .mcard-open{margin-top:auto;padding-top:6px;font-size:11px;font-weight:800;color:var(--accent)}

@@ -333,6 +333,25 @@
       "reviews": "Kolektor opinii",
       "audio": "Natywne audio",
       "video": "Edytor wideo"
+    },
+    "publicTools": {
+      "label": "Narzędzia publiczne",
+      "status": {
+        "free": "Darmowe",
+        "live": "Działa"
+      },
+      "siteReview": {
+        "title": "Przegląd strony",
+        "description": "Sprawdź publiczne strony internetowe, znajdź problemy i otrzymaj jasną listę działań."
+      },
+      "securityCheck": {
+        "title": "Kontrola bezpieczeństwa",
+        "description": "Sprawdź linki, nagłówki, pliki cookie i HTTPS bez wchodzenia do prywatnych systemów."
+      },
+      "improveYourSite": {
+        "title": "Ulepsz swoją stronę",
+        "description": "Twórz lokalne treści, ulepszaj strony, sprawdzaj zmiany i publikuj, gdy wszystko jest gotowe."
+      }
     }
   },
   "enterprise": {
@@ -620,6 +639,12 @@
       "es": "Español",
       "pl": "Polski",
       "ru": "Русский"
+    },
+    "publicTools": {
+      "label": "Narzędzia publiczne",
+      "siteReview": "Przegląd strony",
+      "securityCheck": "Kontrola bezpieczeństwa",
+      "improveYourSite": "Ulepsz swoją stronę"
     }
   }
 }

@@ -1,14 +1,11 @@
 // saas/app/api/cos/campaign-queue/email-action/route.ts
 // Secure owner email actions for COSA video approvals.
-// Supports:
-//   - approve: approve final branded preview and trigger auto-publish
-//   - hold: keep campaign in waiting_approval and mark it on hold
-//   - changes: collect comments/edit request and keep campaign in waiting_approval
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-core'
+import { recordApprovedCampaignLifecycle } from '@/lib/enterprise/memory/lifecycleRecorder'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -83,23 +80,20 @@ async function approveCampaign(req: NextRequest, sb: ReturnType<typeof admin>, c
   const now = new Date().toISOString()
   const metadata = {
     ...(campaign.metadata || {}),
-    emailApproval: {
-      state: 'approved',
-      approvedAt: now,
-      ownerEmail,
-      ownerUserId,
-      source: 'email_link',
-    },
+    emailApproval: { state: 'approved', approvedAt: now, ownerEmail, ownerUserId, source: 'email_link' },
   }
 
+  const approvedCampaign = { ...campaign, status: 'approved', approved_by: ownerUserId, approved_at: now, metadata }
   const { error } = await sb.from('cos_campaign_queue').update({
-    status: 'approved',
-    approved_by: ownerUserId,
-    approved_at: now,
-    metadata,
+    status: approvedCampaign.status,
+    approved_by: approvedCampaign.approved_by,
+    approved_at: approvedCampaign.approved_at,
+    metadata: approvedCampaign.metadata,
   }).eq('id', campaign.id)
 
   if (error) return html('Approval failed', `<h1 style="margin-top:0">Approval failed</h1><p>${error.message}</p>`, 500)
+
+  await recordApprovedCampaignLifecycle(approvedCampaign, 'owner_email_link').catch(() => null)
 
   let autoPublish: any = null
   try {
@@ -115,14 +109,7 @@ async function holdCampaign(req: NextRequest, sb: ReturnType<typeof admin>, camp
   const now = new Date().toISOString()
   const metadata = {
     ...(campaign.metadata || {}),
-    emailApproval: {
-      state: 'hold',
-      heldAt: now,
-      ownerEmail,
-      ownerUserId,
-      source: 'email_link',
-      note: 'Owner placed this campaign on hold from email. Do not publish until owner approves later.',
-    },
+    emailApproval: { state: 'hold', heldAt: now, ownerEmail, ownerUserId, source: 'email_link', note: 'Owner placed this campaign on hold from email. Do not publish until owner approves later.' },
   }
   const { error } = await sb.from('cos_campaign_queue').update({ status: 'waiting_approval', metadata }).eq('id', campaign.id)
   if (error) return html('Hold failed', `<h1 style="margin-top:0">Hold failed</h1><p>${error.message}</p>`, 500)
@@ -138,17 +125,8 @@ async function saveChanges(req: NextRequest, sb: ReturnType<typeof admin>, campa
   const prior = Array.isArray(campaign.metadata?.editRequests) ? campaign.metadata.editRequests : []
   const metadata = {
     ...(campaign.metadata || {}),
-    emailApproval: {
-      state: 'changes_requested',
-      requestedAt: now,
-      ownerEmail: p.email,
-      ownerUserId: p.owner,
-      source: 'email_link',
-    },
-    editRequests: [
-      ...prior,
-      { at: now, source: 'email_link', ownerEmail: p.email, comments },
-    ],
+    emailApproval: { state: 'changes_requested', requestedAt: now, ownerEmail: p.email, ownerUserId: p.owner, source: 'email_link' },
+    editRequests: [...prior, { at: now, source: 'email_link', ownerEmail: p.email, comments }],
   }
   const { error } = await sb.from('cos_campaign_queue').update({ status: 'waiting_approval', metadata }).eq('id', campaign.id)
   if (error) return html('Edit request failed', `<h1 style="margin-top:0">Edit request failed</h1><p>${error.message}</p>`, 500)
@@ -159,11 +137,9 @@ export async function GET(req: NextRequest) {
   const p = actionParams(req)
   if (!p.id || !p.owner || !p.email || !p.token) return html('Invalid link', '<h1 style="margin-top:0">Invalid approval link</h1><p>The email approval link is missing required fields.</p>', 400)
   if (!validToken(p.token, p.id, p.owner, p.email)) return html('Invalid token', '<h1 style="margin-top:0">Invalid or expired approval link</h1><p>Open the dashboard and request a fresh approval email.</p>', 403)
-
   const sb = admin()
   const loaded = await loadCampaign(sb, p.id)
   if (!loaded.ok) return html('Campaign not found', `<h1 style="margin-top:0">Campaign not found</h1><p>${loaded.error}</p>`, 404)
-
   if (p.action === 'approve') return approveCampaign(req, sb, loaded.campaign, p.owner, p.email)
   if (p.action === 'hold') return holdCampaign(req, sb, loaded.campaign, p.owner, p.email)
   return changesForm(req, p, loaded.campaign)
@@ -173,11 +149,9 @@ export async function POST(req: NextRequest) {
   const p = actionParams(req)
   if (!p.id || !p.owner || !p.email || !p.token) return html('Invalid link', '<h1 style="margin-top:0">Invalid approval link</h1><p>The email approval link is missing required fields.</p>', 400)
   if (!validToken(p.token, p.id, p.owner, p.email)) return html('Invalid token', '<h1 style="margin-top:0">Invalid or expired approval link</h1><p>Open the dashboard and request a fresh approval email.</p>', 403)
-
   const form = await req.formData().catch(() => null)
   const comments = clean(form?.get('comments') || '', 1600)
   if (!comments) return html('Comments required', '<h1 style="margin-top:0">Comments required</h1><p>Please enter the changes you want COSA to make.</p>', 400)
-
   const sb = admin()
   const loaded = await loadCampaign(sb, p.id)
   if (!loaded.ok) return html('Campaign not found', `<h1 style="margin-top:0">Campaign not found</h1><p>${loaded.error}</p>`, 404)

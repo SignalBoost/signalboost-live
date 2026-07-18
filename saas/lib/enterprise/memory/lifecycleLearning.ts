@@ -1,6 +1,8 @@
 // Maps COS campaign lifecycle rows into bounded Enterprise Memory writes.
 // Pure helpers keep route integration deterministic and easy to regression test.
 
+import { calculateCampaignPerformanceScore } from './campaignLearning'
+
 export type CampaignLifecycleIdentity = {
   organizationId: string
   campaignId: string
@@ -69,11 +71,15 @@ export function buildMeasuredLifecyclePayload(campaign: any, args: {
   measuredAt: string
 }) {
   const traffic = object(args.traffic)
-  const clicks = Number(traffic.clicks || traffic.total || 0)
+  const clicks = Math.max(0, Number(traffic.clicks || traffic.total || 0) || 0)
   const impressions = Object.values(args.performance || {}).reduce<number>(
     (sum, row: any) => sum + Math.max(0, Number(row?.viewCount) || 0),
     0,
   )
+  const costRecord = object(args.cost)
+  const cost = Math.max(0, Number(costRecord.total || costRecord.cost || args.cost) || 0)
+  const revenue = Math.max(0, Number(traffic.revenue || 0) || 0)
+  const performanceScore = calculateCampaignPerformanceScore({ impressions, clicks, revenue, cost })
   return {
     objective: clean(campaign?.objective || campaign?.title, 1000),
     channel: clean(campaign?.channel, 120),
@@ -83,7 +89,9 @@ export function buildMeasuredLifecyclePayload(campaign: any, args: {
       traffic,
       cost: args.cost,
       measuredAt: args.measuredAt,
-      metrics: { impressions, clicks },
+      metrics: { impressions, clicks, revenue, cost },
+      performanceScore,
+      score: performanceScore,
     },
   }
 }

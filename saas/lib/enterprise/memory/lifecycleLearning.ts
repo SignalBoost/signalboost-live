@@ -13,7 +13,7 @@ function clean(value: unknown, max = 4000): string {
 
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
-    ? { ...(value as object) }
+    ? { ...(value as Record<string, unknown>) }
     : {}
 }
 
@@ -70,7 +70,10 @@ export function buildMeasuredLifecyclePayload(campaign: any, args: {
 }) {
   const traffic = object(args.traffic)
   const clicks = Number(traffic.clicks || traffic.total || 0)
-  const impressions = Object.values(args.performance || {}).reduce((sum, row: any) => sum + Math.max(0, Number(row?.viewCount) || 0), 0)
+  const impressions = Object.values(args.performance || {}).reduce<number>(
+    (sum, row: any) => sum + Math.max(0, Number(row?.viewCount) || 0),
+    0,
+  )
   return {
     objective: clean(campaign?.objective || campaign?.title, 1000),
     channel: clean(campaign?.channel, 120),

@@ -27,7 +27,8 @@ The closure pull request must not merge unless all required repository checks ar
 - [x] Real-provider browser automation and live provider credentials remain disabled.
 - [x] BPAL remains metadata/policy support only and cannot execute browser work.
 - [x] Five required languages remain English, Spanish, Portuguese, Polish, and Russian.
-- [x] The closure change lives under `saas/`, forcing SaaS CI to run typecheck, production build, the complete unit suite, and enterprise guards.
+- [x] The closure change lives under `saas/`, forcing SaaS CI to run typecheck, production build, unit tests, and enterprise guards.
+- [x] The closure diagnostics explicitly run `npm run test:supervisor` and `npm run validate:bpal`.
 
 ## Required closure evidence
 
@@ -35,11 +36,13 @@ The closure PR must show successful results for:
 
 - SaaS CI — Typecheck (`tsc --noEmit`).
 - SaaS CI — Production build (`next build`).
-- SaaS CI — Unit tests.
-- SaaS CI — Issue #205 enterprise guards.
+- SaaS CI — Unit tests (`npm test`).
+- SaaS CI — Issue #205 enterprise guards (`npm run verify:issue-205`).
+- V1 Red Diagnostics — Supervisor core and policy suite (`npm run test:supervisor`).
+- V1 Red Diagnostics — BPAL safety guard (`npm run validate:bpal`).
 - Pipeline Integrity.
 - Repository targeting and onboarding enforcement.
-- Provider framework and BPAL validation where triggered.
+- Provider framework validation.
 - Playwright checks where triggered.
 - Vercel preview/deployment status.
 

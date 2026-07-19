@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
-// COSA Step 1 worker: create base video only.
-// Voice/captions belong to Step 2 and must never block the base render.
+// COSA Step 1 worker: create a clean, text-free base video only.
+// Voice, customer-facing captions, and the final brand banner belong to later
+// stages. Owner instructions, goals, prompts, and URLs must never be burned into
+// this base artifact.
 
 import { createClient } from '@supabase/supabase-js'
 import { spawn } from 'node:child_process'
@@ -16,6 +18,7 @@ const renderUrl = String(process.env.COS_VIDEO_RENDER_WEBHOOK_URL || '').trim()
 const renderToken = String(process.env.COS_VIDEO_RENDER_WEBHOOK_TOKEN || '').trim()
 const staleMs = Math.max(60_000, Number(process.env.COS_VIDEO_STALE_MS || 10 * 60 * 1000))
 const maxJobs = Math.max(1, Math.min(10, Number(process.env.COS_VIDEO_MAX_JOBS_PER_RUN || 5)))
+const BASE_VISUAL_SCHEMA_VERSION = 'signalboost-base-v2-clean-background'
 
 if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
 
@@ -36,18 +39,6 @@ function run(command, args) {
       else reject(new Error(`${command} exited with ${code}: ${stderr.slice(-1600)}`))
     })
   })
-}
-
-function escapeDrawtext(value) {
-  return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160)
 }
 
 async function ensureBucket() {
@@ -107,13 +98,7 @@ async function claimJob() {
   const now = new Date().toISOString()
   const { data: claimed, error: claimError } = await supabase
     .from('cos_video_production_jobs')
-    .update({
-      status: 'rendering',
-      lifecycle_state: 'rendering',
-      error: null,
-      last_heartbeat_at: now,
-      updated_at: now,
-    })
+    .update({ status: 'rendering', lifecycle_state: 'rendering', error: null, last_heartbeat_at: now, updated_at: now })
     .eq('id', job.id)
     .eq('status', 'queued')
     .select('*')
@@ -126,18 +111,20 @@ async function claimJob() {
 async function callWebhook(job) {
   const response = await fetch(renderUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(renderToken ? { Authorization: `Bearer ${renderToken}` } : {}),
-    },
+    headers: { 'Content-Type': 'application/json', ...(renderToken ? { Authorization: `Bearer ${renderToken}` } : {}) },
     body: JSON.stringify({
       job_id: job.id,
-      title: job.title,
-      hook: job.hook,
-      audience: job.audience,
       production_tier: job.production_tier,
       platforms: job.platforms,
-      render_spec: { ...(job.render_spec || {}), base_video_only: true, audio: false, captions: false },
+      render_spec: {
+        ...(job.render_spec || {}),
+        base_video_only: true,
+        audio: false,
+        captions: false,
+        on_screen_text: false,
+        prompt_text_allowed: false,
+        visual_schema_version: BASE_VISUAL_SCHEMA_VERSION,
+      },
     }),
   })
 
@@ -152,42 +139,28 @@ async function renderLocal(job) {
   const vertical = ratio === '9:16'
   const size = vertical ? '1080x1920' : '1920x1080'
   const duration = Math.max(8, Math.min(45, Number(job?.render_spec?.duration_seconds || 24)))
-  const title = escapeDrawtext(job.title || 'SignalBoostAi')
-  const hook = escapeDrawtext(job.hook || 'AI-powered business growth')
+  const bandOne = vertical ? 420 : 720
+  const bandTwo = vertical ? 330 : 560
   const dir = await mkdtemp(join(tmpdir(), 'signalboost-base-video-'))
   const output = join(dir, 'base.mp4')
 
   try {
     const filter = [
       'format=yuv420p',
-      `drawbox=x=0:y=0:w=iw:h=ih:color=0x020617:t=fill`,
-      `drawbox=x='mod(t*90,iw+500)-500':y=0:w=500:h=ih:color=0x0b3b66@0.45:t=fill`,
-      `drawbox=x='iw-mod(t*70,iw+420)':y=0:w=420:h=ih:color=0x6b4f00@0.35:t=fill`,
-      `drawtext=text='SignalBoostAi':fontcolor=0xffc300:fontsize=${vertical ? 58 : 64}:x=(w-text_w)/2:y=h*0.20`,
-      `drawtext=text='${title}':fontcolor=white:fontsize=${vertical ? 44 : 58}:x=(w-text_w)/2:y=(h-text_h)/2-80`,
-      `drawtext=text='${hook}':fontcolor=0x1af0ff:fontsize=${vertical ? 34 : 42}:x=(w-text_w)/2:y=(h-text_h)/2+40`,
-      `drawtext=text='www.saas.signalboostapp.com':fontcolor=0xffc300:fontsize=${vertical ? 30 : 34}:x=(w-text_w)/2:y=h-150`,
+      `drawbox=x='mod(t*52,iw+${bandOne})-${bandOne}':y=0:w=${bandOne}:h=ih:color=0x12446d@0.30:t=fill`,
+      `drawbox=x='iw-mod(t*39,iw+${bandTwo})':y=0:w=${bandTwo}:h=ih:color=0x8a6900@0.14:t=fill`,
+      'vignette=PI/5',
     ].join(',')
 
     await run(process.env.FFMPEG_PATH || 'ffmpeg', [
-      '-y',
-      '-f', 'lavfi',
-      '-i', `color=c=0x020617:s=${size}:r=30:d=${duration}`,
-      '-vf', filter,
-      '-an',
-      '-c:v', 'libx264',
-      '-preset', 'veryfast',
-      '-crf', '22',
-      '-pix_fmt', 'yuv420p',
-      '-movflags', '+faststart',
-      output,
+      '-y', '-f', 'lavfi', '-i', `color=c=0x050b18:s=${size}:r=30:d=${duration}`,
+      '-vf', filter, '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22',
+      '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output,
     ])
 
     const bytes = await readFile(output)
     const objectPath = `cos-video-production/${job.id}/base.mp4`
-    const { error: uploadError } = await supabase.storage
-      .from(renderBucket)
-      .upload(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
+    const { error: uploadError } = await supabase.storage.from(renderBucket).upload(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
     if (uploadError) throw new Error(`Supabase Storage upload failed: ${uploadError.message}`)
     return { outputUrl: objectPath, thumbnailUrl: null }
   } finally {
@@ -206,35 +179,24 @@ async function processJob(job) {
     const { error } = await supabase
       .from('cos_video_production_jobs')
       .update({
-        status: 'rendered',
-        lifecycle_state: 'rendered',
-        output_url: result.outputUrl,
-        thumbnail_url: result.thumbnailUrl,
-        completed_at: now,
-        last_heartbeat_at: now,
-        error: null,
+        status: 'rendered', lifecycle_state: 'rendered', output_url: result.outputUrl,
+        thumbnail_url: result.thumbnailUrl, completed_at: now, last_heartbeat_at: now, error: null,
         watchdog_signal: {
           ...(job.watchdog_signal || {}),
-          stage: 'base_video_complete',
-          baseVideoOnly: true,
-          renderedAt: now,
+          stage: 'base_video_complete', baseVideoOnly: true, onScreenText: false,
+          visualSchemaVersion: BASE_VISUAL_SCHEMA_VERSION, renderedAt: now,
         },
         updated_at: now,
       })
       .eq('id', job.id)
     if (error) throw error
-    console.log(`Rendered base video for job ${job.id}`)
+    console.log(`Rendered clean text-free base video for job ${job.id}`)
   } catch (error) {
     const message = errorText(error)
     console.error(`Job ${job.id} failed:`, message)
     await supabase
       .from('cos_video_production_jobs')
-      .update({
-        status: 'failed',
-        lifecycle_state: 'failed',
-        error: message.slice(0, 1800),
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: 'failed', lifecycle_state: 'failed', error: message.slice(0, 1800), updated_at: new Date().toISOString() })
       .eq('id', job.id)
   }
 }

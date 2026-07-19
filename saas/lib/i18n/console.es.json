@@ -1047,5 +1047,15 @@
       "unlockVault": "Desbloquear bóveda",
       "verifying": "Verificando..."
     }
+  },
+  "auditBatch": {
+    "progress": "Aplicando correcciones aprobadas",
+    "fixed": "corregido",
+    "applying": "aplicando",
+    "completed": "Completado",
+    "findingsFixed": "hallazgos corregidos",
+    "filesFixed": "archivos corregidos",
+    "approveFailed": "No se pudieron aprobar las correcciones de esta ejecución.",
+    "completeFailed": "Las correcciones se procesaron, pero no se pudo guardar el resumen."
   }
 }

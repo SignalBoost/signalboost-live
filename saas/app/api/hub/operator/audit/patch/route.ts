@@ -32,6 +32,7 @@ const PATCH_SYSTEM = [
   'Preserve unrelated imports, formatting, comments, exports, and behavior.',
   'Never invent packages, modules, files, translation libraries, APIs, or repository conventions.',
   'Do not import react-i18next; this repository does not use it.',
+  "For i18n-raw-string findings, use the repository t(\'namespace.key\', \'fallback\') convention with a stable audit or console key; the fallback must preserve the visible text.",
   'Return ONLY the complete corrected file contents with no markdown fences or explanation.',
 ].join(' ')
 

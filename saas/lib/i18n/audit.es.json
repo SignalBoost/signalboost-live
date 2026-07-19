@@ -982,5 +982,15 @@
     "notTracked": "Sin datos aún",
     "telemetrySignal": "Señal lista para telemetría",
     "conciergeRecs": "Recomendaciones de conserjería"
+  },
+  "batch": {
+    "progress": "Aplicando correcciones aprobadas",
+    "fixed": "corregido",
+    "applying": "aplicando",
+    "completed": "Completado",
+    "findingsFixed": "hallazgos corregidos",
+    "filesFixed": "archivos corregidos",
+    "approveFailed": "No se pudieron aprobar las correcciones de esta ejecución.",
+    "completeFailed": "Las correcciones se procesaron, pero no se pudo guardar el resumen."
   }
 }

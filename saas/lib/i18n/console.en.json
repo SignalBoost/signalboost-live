@@ -1047,5 +1047,15 @@
       "unlockVault": "Unlock Vault",
       "verifying": "Verifying..."
     }
+  },
+  "auditBatch": {
+    "progress": "Applying approved fixes",
+    "fixed": "fixed",
+    "applying": "applying",
+    "completed": "Completed",
+    "findingsFixed": "findings fixed",
+    "filesFixed": "files fixed",
+    "approveFailed": "Could not approve fixes for this run.",
+    "completeFailed": "Fixes were processed but the summary could not be saved."
   }
 }

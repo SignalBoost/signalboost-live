@@ -2,8 +2,8 @@
 
 // saas/components/audit/AuditFixConsent.tsx
 // Explicit post-audit consent boundary shared by repository scans and live
-// readiness reports. Choosing Yes prepares or opens a remediation plan only.
-// This component never calls a provider, writes code, or changes production.
+// readiness reports. Choosing Yes is the single final approval for the run.
+// The parent workflow applies only repository PR fixes; production remains untouched.
 
 import { useId, useState } from 'react'
 
@@ -17,31 +17,31 @@ type ConsentCopy = {
 const COPY: Record<string, ConsentCopy> = {
   en: {
     question: 'Would you like SignalBoost AI to prepare fixes for these issues?',
-    body: 'Actionable issues found: {count}. Choosing Yes prepares a remediation plan only. No code, provider setting, or production resource will change until you review and approve the exact change.',
+    body: 'Actionable issues found: {count}. Choosing Yes is final approval to prepare and apply every safe repository fix in this run. Each fix is logged and proposed through a pull request; production resources do not change.',
     yes: 'Yes — prepare fixes',
     no: 'Not now',
   },
   es: {
     question: '¿Quieres que SignalBoost AI prepare correcciones para estos problemas?',
-    body: 'Problemas que se pueden corregir: {count}. Al elegir Sí, solo se prepara un plan de corrección. No se cambiará código, configuración de proveedores ni recursos de producción hasta que revises y apruebes el cambio exacto.',
+    body: 'Problemas que se pueden corregir: {count}. Al elegir Sí, das la aprobación final para preparar y aplicar todas las correcciones seguras del repositorio. Cada corrección queda registrada y se propone mediante un pull request; los recursos de producción no cambian.',
     yes: 'Sí — preparar correcciones',
     no: 'Ahora no',
   },
   pt: {
     question: 'Você quer que a SignalBoost AI prepare correções para estes problemas?',
-    body: 'Problemas que podem ser corrigidos: {count}. Ao escolher Sim, somente um plano de correção será preparado. Nenhum código, configuração de provedor ou recurso de produção será alterado até você revisar e aprovar a mudança exata.',
+    body: 'Problemas que podem ser corrigidos: {count}. Ao escolher Sim, você dá a aprovação final para preparar e aplicar todas as correções seguras do repositório. Cada correção é registrada e proposta por pull request; os recursos de produção não mudam.',
     yes: 'Sim — preparar correções',
     no: 'Agora não',
   },
   pl: {
     question: 'Czy chcesz, aby SignalBoost AI przygotowała poprawki do tych problemów?',
-    body: 'Liczba problemów możliwych do naprawienia: {count}. Wybranie Tak przygotuje tylko plan naprawy. Kod, ustawienia dostawców ani zasoby produkcyjne nie zostaną zmienione, dopóki nie sprawdzisz i nie zatwierdzisz dokładnej zmiany.',
+    body: 'Liczba problemów możliwych do naprawienia: {count}. Wybranie Tak jest ostateczną zgodą na przygotowanie i zastosowanie wszystkich bezpiecznych poprawek repozytorium. Każda poprawka jest rejestrowana i proponowana w pull requeście; zasoby produkcyjne nie są zmieniane.',
     yes: 'Tak — przygotuj poprawki',
     no: 'Nie teraz',
   },
   ru: {
     question: 'Хотите, чтобы SignalBoost AI подготовил исправления для этих проблем?',
-    body: 'Количество проблем, которые можно исправить: {count}. При выборе «Да» будет подготовлен только план исправления. Код, настройки провайдеров и производственные ресурсы не изменятся, пока вы не проверите и не одобрите точное изменение.',
+    body: 'Количество проблем, которые можно исправить: {count}. Выбор «Да» является окончательным одобрением подготовки и применения всех безопасных исправлений репозитория. Каждое исправление журналируется и предлагается через pull request; производственные ресурсы не изменяются.',
     yes: 'Да — подготовить исправления',
     no: 'Не сейчас',
   },

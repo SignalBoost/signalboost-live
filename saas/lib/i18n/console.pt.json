@@ -1047,5 +1047,15 @@
       "unlockVault": "Desbloquear cofre",
       "verifying": "Verificando..."
     }
+  },
+  "auditBatch": {
+    "progress": "Aplicando correções aprovadas",
+    "fixed": "corrigido",
+    "applying": "aplicando",
+    "completed": "Concluído",
+    "findingsFixed": "constatações corrigidas",
+    "filesFixed": "arquivos corrigidos",
+    "approveFailed": "Não foi possível aprovar as correções desta execução.",
+    "completeFailed": "As correções foram processadas, mas não foi possível salvar o resumo."
   }
 }

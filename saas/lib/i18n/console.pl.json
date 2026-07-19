@@ -1047,5 +1047,15 @@
       "unlockVault": "Odblokuj sejf",
       "verifying": "Weryfikacja..."
     }
+  },
+  "auditBatch": {
+    "progress": "Stosowanie zatwierdzonych poprawek",
+    "fixed": "poprawiono",
+    "applying": "stosowanie",
+    "completed": "Ukończono",
+    "findingsFixed": "poprawione wyniki",
+    "filesFixed": "poprawione pliki",
+    "approveFailed": "Nie można zatwierdzić poprawek dla tego uruchomienia.",
+    "completeFailed": "Poprawki przetworzono, ale nie można było zapisać podsumowania."
   }
 }

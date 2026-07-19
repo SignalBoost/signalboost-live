@@ -982,5 +982,15 @@
     "notTracked": "Brak danych",
     "telemetrySignal": "Sygnał gotowy na telemetrię",
     "conciergeRecs": "Rekomendacje concierge"
+  },
+  "batch": {
+    "progress": "Stosowanie zatwierdzonych poprawek",
+    "fixed": "poprawiono",
+    "applying": "stosowanie",
+    "completed": "Ukończono",
+    "findingsFixed": "poprawione wyniki",
+    "filesFixed": "poprawione pliki",
+    "approveFailed": "Nie można zatwierdzić poprawek dla tego uruchomienia.",
+    "completeFailed": "Poprawki przetworzono, ale nie można było zapisać podsumowania."
   }
 }

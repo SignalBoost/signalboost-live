@@ -14,8 +14,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import PatchPreview from '@/components/audit/PatchPreview'
-import RemediationBanner from '@/components/audit/RemediationBanner'
+import GlobalFixApproval from '@/components/audit/GlobalFixApproval'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
 // the drawer without the global app shell/navbar. Each is code-split via lazy().
@@ -288,7 +287,7 @@ export default function AuditCenterPage() {
   const [reportEntered, setReportEntered] = useState(false)
   const [refreshTick, setRefreshTick] = useState(0)
 
-  // Finding drawer + patch flow
+  // Finding detail drawer. Remediation is approved once per audit run above.
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null)
   const [entered, setEntered] = useState(false)
 
@@ -483,9 +482,9 @@ export default function AuditCenterPage() {
 
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
-        {/* Ready to Remediate — appears the moment a scan completes with findings. */}
+        {/* A single owner approval prepares and applies every actionable finding. */}
         {!loading && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
-          <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
+          <GlobalFixApproval runId={selectedRunId} findings={findings} lang={lang} onComplete={loadHistory} />
         )}
 
         {error && (
@@ -719,11 +718,6 @@ export default function AuditCenterPage() {
                 {copy.viewSource} ↗
               </a>
 
-              {selectedFinding.recommendation && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <PatchPreview finding={selectedFinding} />
-                </div>
-              )}
             </div>
           </div>
         )

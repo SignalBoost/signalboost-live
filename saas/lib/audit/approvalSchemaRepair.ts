@@ -6,8 +6,24 @@
 // hub_exec_sql executes one prepared statement per invocation, so the migration
 // is intentionally split into an ordered sequence instead of one multi-command
 // string. A failed step stops the repair; the next owner retry safely resumes.
+//
+// STEP 1 is a DROP: `create or replace function` cannot change the return
+// signature of an existing function, so a stale approve_audit_run_remediation
+// (e.g. an earlier version that returned a different shape or wrote a nonexistent
+// audit_runs.approved column) would make every repair fail at the create-function
+// step. Dropping it first is safe and idempotent — the function is recreated later
+// in this same sequence.
+//
+// The function statement carries two required correctness details:
+//   * "timestamp" is quoted — it is a reserved word and is rejected as a bare
+//     output-column name in the returns-table list.
+//   * #variable_conflict use_column — the output columns run_id / approved_by
+//     share names with real table columns used in the body; without it the body
+//     raises "column reference run_id is ambiguous" at run time.
 
 export const AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS = [
+  String.raw`drop function if exists public.approve_audit_run_remediation(uuid, uuid)`,
+
   String.raw`create table if not exists public.audit_remediation_approvals (
     id uuid primary key default gen_random_uuid(),
     run_id uuid not null references public.audit_runs(id) on delete cascade,
@@ -39,12 +55,13 @@ export const AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS = [
     run_id uuid,
     approved_by uuid,
     findings_fixed integer,
-    timestamp text
+    "timestamp" text
   )
   language plpgsql
   security definer
   set search_path = public
   as $repair$
+  #variable_conflict use_column
   declare
     v_count integer;
     v_timestamp timestamptz := now();
@@ -54,9 +71,9 @@ export const AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS = [
     where id = p_run_id and status = 'complete';
 
     if not found then
-      if exists (select 1 from public.audit_remediation_approvals where run_id = p_run_id) then
+      if exists (select 1 from public.audit_remediation_approvals a where a.run_id = p_run_id) then
         return query select false, 'already_approved', 'This audit run was already approved.', p_run_id, null::uuid, 0, to_char(v_timestamp at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS');
-      elsif exists (select 1 from public.audit_runs where id = p_run_id) then
+      elsif exists (select 1 from public.audit_runs r where r.id = p_run_id) then
         return query select false, 'run_not_complete', 'Only a completed audit run can be approved.', p_run_id, null::uuid, 0, to_char(v_timestamp at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS');
       else
         return query select false, 'run_not_found', 'Audit run not found.', p_run_id, null::uuid, 0, to_char(v_timestamp at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS');

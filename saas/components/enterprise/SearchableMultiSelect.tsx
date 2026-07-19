@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useId, useMemo, useState } from 'react'
 import type { EnterpriseOption } from '@/lib/enterprise/masterConfig'
 
@@ -40,7 +42,7 @@ export function SearchableMultiSelect({ label, options, values, onChange, placeh
             <span><strong style={{ display: 'block', fontSize: 13 }}>{option.label}</strong>{option.description && <small style={{ color: 'rgba(255,255,255,.55)' }}>{option.description}</small>}</span>
           </button>
         })}
-        {filtered.length === 0 && <p style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}>No matching options.</p>}
+        {filtered.length === 0 && <p style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}><LocalizedText fallback={"No matching options."} /></p>}
       </div>
       <button type="button" onClick={() => { setOpen(false); setQuery('') }} style={{ width: '100%', marginTop: 7, border: '1px solid rgba(255,255,255,.14)', borderRadius: 9, background: 'rgba(255,255,255,.06)', color: '#fff', padding: 8, cursor: 'pointer' }}>Done</button>
     </div>}

@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -66,12 +68,12 @@ function videoStatusText(video: any) {
 function VideoBox({ campaign, busy, onRenderVideo, onCheckStatus }: { campaign: CampaignRow; busy: boolean; onRenderVideo: (id: string) => void; onCheckStatus: (id: string) => void }) {
   const video = (campaign.metadata as any)?.video || null
   if (!['youtube', 'short_video'].includes(campaign.channel || '')) return null
-  if (!video) return <button disabled={busy} onClick={() => onRenderVideo(campaign.id)} style={secondary}>Render video</button>
+  if (!video) return <button disabled={busy} onClick={() => onRenderVideo(campaign.id)} style={secondary}><LocalizedText fallback={"Render video"} /></button>
   const finalUrl = video.branded === true && video.voicedUrl ? String(video.voicedUrl) : ''
   return <div style={{ marginTop: 12, border: '1px solid rgba(26,240,255,.25)', borderRadius: 12, background: 'rgba(26,240,255,.06)', padding: 12 }}>
-    {video.status === 'rendering' && <div><p style={{ color: CYAN, fontSize: 13, margin: 0 }}>{copy.rendering}</p><button disabled={busy} onClick={() => onCheckStatus(campaign.id)} style={{ ...secondary, marginTop: 8 }}>Check status</button></div>}
+    {video.status === 'rendering' && <div><p style={{ color: CYAN, fontSize: 13, margin: 0 }}>{copy.rendering}</p><button disabled={busy} onClick={() => onCheckStatus(campaign.id)} style={{ ...secondary, marginTop: 8 }}><LocalizedText fallback={"Check status"} /></button></div>}
     {video.status === 'ready' && finalUrl && <div><p style={{ color: CYAN, fontSize: 12, margin: '0 0 8px' }}>{copy.brandedPreview}</p><p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: '0 0 8px' }}>Displaying: branded final · Branded: yes · Captions/voice included</p><video src={finalUrl} controls style={{ width: '100%', borderRadius: 10, maxHeight: 300, background: '#000' }} /></div>}
-    {video.status === 'ready' && !finalUrl && <div><p style={{ color: GOLD, fontSize: 13, margin: 0, fontWeight: 900 }}>Final branded video is not ready yet.</p><p style={{ color: 'rgba(255,255,255,.7)', fontSize: 12, margin: '8px 0 0' }}>{videoStatusText(video)}</p><p style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, margin: '8px 0 0' }}>The raw 5-second base render is hidden because it is not the campaign video.</p></div>}
+    {video.status === 'ready' && !finalUrl && <div><p style={{ color: GOLD, fontSize: 13, margin: 0, fontWeight: 900 }}><LocalizedText fallback={"Final branded video is not ready yet."} /></p><p style={{ color: 'rgba(255,255,255,.7)', fontSize: 12, margin: '8px 0 0' }}>{videoStatusText(video)}</p><p style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, margin: '8px 0 0' }}>The raw 5-second base render is hidden because it is not the campaign video.</p></div>}
     {video.status === 'failed' && <p style={{ color: '#fca5a5', fontSize: 13, margin: 0 }}>Video render failed: {String(video.error || 'unknown error')}</p>}
     {video.voiceError && <p style={{ color: '#fca5a5', fontSize: 12, margin: '10px 0 0' }}>⚠ {String(video.voiceError)}</p>}
   </div>
@@ -91,10 +93,10 @@ function CampaignCard({ campaign, busy, onPatch, onGenerateDraft, onGenerateAll,
     <VideoBox campaign={campaign} busy={busy} onRenderVideo={onRenderVideo} onCheckStatus={onCheckStatus} />
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.06)', flexWrap: 'wrap' }}>
       {waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondary}>Reject</button>}
-      {waiting && (!['youtube', 'short_video'].includes(campaign.channel || '') || finalVideoReady) && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primary}>Approve campaign</button>}
+      {waiting && (!['youtube', 'short_video'].includes(campaign.channel || '') || finalVideoReady) && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primary}><LocalizedText fallback={"Approve campaign"} /></button>}
       {waiting && ['youtube', 'short_video'].includes(campaign.channel || '') && !finalVideoReady && <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, alignSelf: 'center' }}>Approval locked — waiting for final branded video with voice, captions, SignalBoostAi, and www.saas.signalboostapp.com.</span>}
-      {!hasDraft(campaign) && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primary}>Generate review draft</button>}
-      <button disabled={busy} onClick={() => onGenerateAll(campaign.id)} style={secondary}>Generate all languages</button>
+      {!hasDraft(campaign) && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primary}><LocalizedText fallback={"Generate review draft"} /></button>}
+      <button disabled={busy} onClick={() => onGenerateAll(campaign.id)} style={secondary}><LocalizedText fallback={"Generate all languages"} /></button>
     </div>
   </section>
 }
@@ -151,7 +153,7 @@ export default function MarketingSalesCosaPage() {
 
   return <main style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.97))' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}><div><p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Marketing / Sales Console</p><h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 34 }}>{copy.title}</h1><p style={{ ...muted, maxWidth: 760 }}>{copy.intro}</p></div><button disabled={busy || loading} onClick={() => load()} style={secondary}>{loading ? copy.loading : copy.refresh}</button></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}><div><p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Marketing / Sales Console"} /></p><h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 34 }}>{copy.title}</h1><p style={{ ...muted, maxWidth: 760 }}>{copy.intro}</p></div><button disabled={busy || loading} onClick={() => load()} style={secondary}>{loading ? copy.loading : copy.refresh}</button></div>
       <CosaCampaignConfigurator busy={busy} onSubmit={createStructuredCampaign} />
       <div style={{ color: 'rgba(255,255,255,.56)', fontSize: 12, marginTop: 12 }}>Waiting {stats.waiting} · Approved {stats.approved} · Running {stats.running} · Drafted {stats.drafted} · Outreach {outreach.length}</div>
       {message && <p style={{ color: message.includes('Could not') ? '#fca5a5' : CYAN, margin: '12px 0 0' }}>{message}</p>}

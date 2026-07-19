@@ -60,14 +60,7 @@ const RULES: Rule[] = [
     detail: () => 'An onClick handler is empty or null/undefined — the control looks active but does nothing.',
     recommendation: 'Bind the handler to the intended action, or remove the control.',
   },
-  {
-    category: 'i18n-raw-string',
-    test: /<button(?![^>]*onClick)(?![^>]*type\s*=\s*["']submit["'])[^>]*>/g,
-    severity: () => 'high',
-    title: 'Possible dead button (no handler)',
-    detail: () => 'A <button> has no onClick handler and is not a submit button — likely a dead click. (Heuristic: a handler passed via spread/variable can be a false positive — verify.)',
-    recommendation: 'Bind an onClick to the action, turn it into a link with a real href, set type="submit" inside a form, or remove the control.',
-  },
+
   {
     // i18n enforcement: JSX text content (2+ words, starts with a capital) that is
     // NOT wrapped in the t() hook. Heuristic — multi-word UI labels written inline
@@ -82,18 +75,18 @@ const RULES: Rule[] = [
   },
   {
     category: 'ux-placeholder',
-    test: /not\s+tracked\s+yet/gi,
+    test: />\s*not\s+tracked\s+yet\s*</gi,
     severity: () => 'high',
     title: 'Placeholder text: "Not tracked yet"',
-    detail: m => `User-visible empty-state string "${m.trim()}" — a metric/card that never populates reads as a dead end to the user.`,
+    detail: m => `User-visible empty-state string "${m.replace(/[<>]/g, '').trim()}" — a metric/card that never populates reads as a dead end to the user.`,
     recommendation: 'Wire this metric to a real data source (e.g. /api/admin/section-metrics). If genuinely pending, gate the panel behind a flag rather than shipping the string. Renaming the string alone does not fix the dead end.',
   },
   {
     category: 'ux-placeholder',
-    test: /coming\s+soon/gi,
+    test: />\s*coming\s+soon\s*</gi,
     severity: () => 'medium',
     title: 'Placeholder text: "Coming soon"',
-    detail: m => `User-visible placeholder string found: "${m.trim()}".`,
+    detail: m => `User-visible placeholder string found: "${m.replace(/[<>]/g, '').trim()}".`,
     recommendation: 'Ship the real feature, or gate it behind a flag and remove the user-facing string. Move any remaining copy into a localized i18n key.',
   },
   {

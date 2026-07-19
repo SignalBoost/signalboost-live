@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 function LockedControl({ label, help }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/[.06] p-4">
@@ -22,8 +24,8 @@ export default function GovernancePanel({ value, onChange, onTest, onLogs }) {
       <LockedControl label="Requires Approval" help="Sensitive and mutating actions always remain behind an HMI approval gate." />
       <LockedControl label="Secrets Backend Only" help="Secrets are represented only by backend references and can never be exposed in this blueprint." />
       <Toggle label="Enable Supervisor Monitoring" checked={value.supervisorMonitoring} onChange={next => onChange({ ...value, supervisorMonitoring: next })} help="Routes test and runtime telemetry to the supervisor log stream." />
-      <button type="button" onClick={onTest} className="rounded-2xl bg-amber-300 px-4 py-3 font-black text-slate-950 shadow-lg shadow-amber-900/20">Test Integration</button>
-      <button type="button" onClick={onLogs} className="rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 font-black text-cyan-100">View Logs</button>
+      <button type="button" onClick={onTest} className="rounded-2xl bg-amber-300 px-4 py-3 font-black text-slate-950 shadow-lg shadow-amber-900/20"><LocalizedText fallback={"Test Integration"} /></button>
+      <button type="button" onClick={onLogs} className="rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 font-black text-cyan-100"><LocalizedText fallback={"View Logs"} /></button>
     </section>
   )
 }

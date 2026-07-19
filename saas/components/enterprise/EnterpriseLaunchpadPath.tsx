@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { EnterpriseLaunchpadConfigurator, type LaunchpadApprovalPackage, type LaunchpadWorkspace } from './EnterpriseLaunchpadConfigurator'
@@ -47,7 +49,7 @@ export function EnterpriseLaunchpadPath({ workspace, badge, title, subtitle, ste
     {approval && <section aria-live="polite" style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20 }}>Approved launch path</h2>
+          <h2 style={{ margin: 0, fontSize: 20 }}><LocalizedText fallback={"Approved launch path"} /></h2>
           <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,.55)', fontSize: 13 }}>{approval.organization} · {approval.industry}</p>
         </div>
         <strong style={{ color: '#ffc300' }}>{completed}/{steps.length} complete</strong>

@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useMemo, useState } from 'react'
 import { SearchableMultiSelect, SearchableSelect, SourceUrlField, SuggestionCardGrid, validateSourceUrl, type SuggestionCard } from '@/components/enterprise'
 import { enterpriseOptions } from '@/lib/enterprise/masterConfig'
@@ -76,11 +78,11 @@ export function EnterpriseLaunchpadConfigurator({ workspace, busy = false, onApp
   }
 
   return <section className="sb-glass-panel" style={{ padding: 20, display: 'grid', gap: 14 }} aria-labelledby={`${workspace}-profile`}>
-    <h2 id={`${workspace}-profile`} style={{ margin: 0, fontSize: 18 }}>Enterprise launch profile</h2>
+    <h2 id={`${workspace}-profile`} style={{ margin: 0, fontSize: 18 }}><LocalizedText fallback={"Enterprise launch profile"} /></h2>
     <SourceUrlField label="Website or GitHub source" helperText="Analyze a public source to build a structured launch profile." value={sourceUrl} onChange={(value) => { setSourceUrl(value); setData(null) }} required />
     <div><button type="button" className="sb-button-secondary" onClick={analyze} disabled={busy || analyzing || Boolean(validateSourceUrl(sourceUrl))}>{analyzing ? 'Analyzing source…' : 'Analyze and prefill'}</button></div>
     {data && <div role="status" aria-live="polite" style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 14, padding: 14, background: 'rgba(26,240,255,.06)' }}>
-      <strong style={{ color: '#1af0ff' }}>Enterprise intelligence ready</strong><h3 style={{ margin: '8px 0 4px' }}>{data.organization || data.title || 'Analyzed organization'}</h3>
+      <strong style={{ color: '#1af0ff' }}><LocalizedText fallback={"Enterprise intelligence ready"} /></strong><h3 style={{ margin: '8px 0 4px' }}>{data.organization || data.title || 'Analyzed organization'}</h3>
       <p style={{ margin: 0, color: 'rgba(255,255,255,.68)' }}>{data.description || 'No public description was available.'}</p>
       <p style={{ margin: '10px 0 0', fontSize: 12 }}>Industry {data.detected.industry.confidence}% · Region {data.detected.region.confidence}% · Language {schemaLanguage(data.metadata.language)}</p>
       {data.requiresConfirmation.length > 0 && <p style={{ color: '#ffc300', margin: '8px 0 0', fontSize: 12 }}>Review recommended for: {data.requiresConfirmation.join(', ')}.</p>}

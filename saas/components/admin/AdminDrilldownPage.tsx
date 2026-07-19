@@ -1,3 +1,4 @@
+import { LocalizedText } from '@/components/i18n/LocalizedText'
 import Link from 'next/link'
 
 type EventRow = { label: string; status: string; detail: string }
@@ -23,7 +24,7 @@ export default function AdminDrilldownPage({ title, status, timestamp, action, e
       <header className="sb-cockpit-hero">
         <span className="sb-eyebrow">Owner/admin investigation</span>
         <h2>{title}</h2>
-        <p>Current status: <strong>{status}</strong></p>
+        <p><LocalizedText fallback={"Current status:"} /><strong>{status}</strong></p>
         <p>Timestamp: <time dateTime={checkedAt}>{checkedAt}</time></p>
         <p>Recommended action: {action}</p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
@@ -38,7 +39,7 @@ export default function AdminDrilldownPage({ title, status, timestamp, action, e
 
       <section className="sb-orbit-table" aria-label="Latest related logs or events">
         <div className="sb-orbit-table__header">
-          <h3>Latest related logs or events</h3>
+          <h3><LocalizedText fallback={"Latest related logs or events"} /></h3>
           <span>{checkedAt}</span>
         </div>
         <table>

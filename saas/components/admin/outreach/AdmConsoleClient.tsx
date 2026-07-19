@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react'
 import CosaCampaignFeed, { type CosaCampaignFeedItem } from '@/components/cosa/CosaCampaignFeed'
 
@@ -150,9 +152,7 @@ export default function AdmConsoleClient() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-white/60">
-        Loading ADM Console...
-      </div>
+      <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-white/60"><LocalizedText fallback={"Loading ADM Console..."} /></div>
     )
   }
 
@@ -168,12 +168,12 @@ export default function AdmConsoleClient() {
       <section className="rounded-[20px] border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-7 shadow-2xl shadow-black/50 backdrop-blur-md">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span className="sb-eyebrow">ADM Console</span>
+            <span className="sb-eyebrow"><LocalizedText fallback={"ADM Console"} /></span>
             <h1 className="sb-h2 mt-3">Dashboards → Security Logs → Outreach Control → Predictive Insights.</h1>
             <p className="sb-body max-w-2xl">{data?.hmi.summary || 'AI outreach command center with human approval, predictive needs, and security visibility.'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button disabled={busy} onClick={syncDigits} className="sb-button-secondary" style={{ opacity: busy ? 0.5 : 1 }}>Sync Digits</button>
+            <button disabled={busy} onClick={syncDigits} className="sb-button-secondary" style={{ opacity: busy ? 0.5 : 1 }}><LocalizedText fallback={"Sync Digits"} /></button>
             <button disabled={busy} onClick={() => togglePanic(!data?.metrics.panicSwitch)} className="sb-button-primary" style={{ border: 'none', opacity: busy ? 0.5 : 1 }}>
               {data?.metrics.panicSwitch ? 'Disable Panic Switch' : 'Enable Panic Switch'}
             </button>
@@ -199,8 +199,8 @@ export default function AdmConsoleClient() {
       <section aria-label="Security Logs" className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <span className="sb-eyebrow">Security Logs</span>
-            <h2 className="sb-h3 mt-2">Safety before scale.</h2>
+            <span className="sb-eyebrow"><LocalizedText fallback={"Security Logs"} /></span>
+            <h2 className="sb-h3 mt-2"><LocalizedText fallback={"Safety before scale."} /></h2>
           </div>
           <span className="rounded-full border border-cyan-300/30 px-3 py-1 text-xs text-cyan-300/85">
             24h events: {data?.metrics.security24h ?? 0}
@@ -212,9 +212,9 @@ export default function AdmConsoleClient() {
       <section aria-label="Outreach Control" className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
-            <span className="sb-eyebrow">Outreach Control</span>
-            <h2 className="sb-h3 mt-2">Analyze a business.</h2>
-            <p className="mt-2 text-xs text-white/45">AI suggestion: start with businesses that show urgency but weak proof.</p>
+            <span className="sb-eyebrow"><LocalizedText fallback={"Outreach Control"} /></span>
+            <h2 className="sb-h3 mt-2"><LocalizedText fallback={"Analyze a business."} /></h2>
+            <p className="mt-2 text-xs text-white/45"><LocalizedText fallback={"AI suggestion: start with businesses that show urgency but weak proof."} /></p>
             <div className="mt-4 flex flex-col gap-3">
               <input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Business name" className="sb-input w-full rounded-xl px-3 py-2.5 text-sm" />
               <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="Public website or social URL" className="sb-input w-full rounded-xl px-3 py-2.5 text-sm" />
@@ -223,7 +223,7 @@ export default function AdmConsoleClient() {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
-            <h3 className="sb-h3">Approval Queue</h3>
+            <h3 className="sb-h3"><LocalizedText fallback={"Approval Queue"} /></h3>
             <div className="mt-4">
               <CosaCampaignFeed
                 campaigns={campaignFeed}
@@ -243,7 +243,7 @@ export default function AdmConsoleClient() {
             <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <span className="sb-eyebrow">Generated Assets</span>
+                  <span className="sb-eyebrow"><LocalizedText fallback={"Generated Assets"} /></span>
                   <h3 className="mt-2 text-xl font-semibold text-white">{selected.business_name}</h3>
                   <p className="mt-1 text-sm text-white/45">{selected.business_url}</p>
                   <p className="mt-2 text-sm font-bold" style={{ color: selected.contact_email ? '#1af0ff' : '#f59e0b' }}>
@@ -267,21 +267,21 @@ export default function AdmConsoleClient() {
               </div>
 
               <div className="sb-ai-feedback mt-5">
-                <strong>AI feedback</strong>
-                <p>This campaign looks strong for urgency, but you could add a testimonial before sending.</p>
+                <strong><LocalizedText fallback={"AI feedback"} /></strong>
+                <p><LocalizedText fallback={"This campaign looks strong for urgency, but you could add a testimonial before sending."} /></p>
               </div>
 
               <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
-                <h4 className="m-0 font-semibold text-white">Outreach Message</h4>
+                <h4 className="m-0 font-semibold text-white"><LocalizedText fallback={"Outreach Message"} /></h4>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/70">{selected.outreach_message}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder="Optional email recipient" className="sb-input min-w-[180px] flex-1 rounded-xl px-3 py-2.5 text-sm" />
-                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}>Send Now</button>
+                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}><LocalizedText fallback={"Send Now"} /></button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-white/40">No outreach records yet.</div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-white/40"><LocalizedText fallback={"No outreach records yet."} /></div>
           )}
         </div>
       </section>

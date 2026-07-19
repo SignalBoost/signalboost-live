@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useState } from 'react'
 
 const PROVIDERS = [
@@ -74,7 +76,7 @@ export default function ProviderSettings() {
 
       <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <input type="checkbox" checked={byokEnabled} onChange={(event) => setByokEnabled(event.target.checked)} disabled={loading} />
-        <span>Bring Your Own Keys active</span>
+        <span><LocalizedText fallback={"Bring Your Own Keys active"} /></span>
       </label>
 
       <label style={{ display: 'grid', gap: 8 }}>
@@ -89,7 +91,7 @@ export default function ProviderSettings() {
         />
       </label>
 
-      <button type="submit" disabled={loading}>Save Config</button>
+      <button type="submit" disabled={loading}><LocalizedText fallback={"Save Config"} /></button>
       {status ? <p role="status">{status}</p> : null}
     </form>
   )

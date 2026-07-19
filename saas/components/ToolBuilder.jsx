@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import GovernancePanel from './GovernancePanel'
 import JsonBlueprint from './JsonBlueprint'
@@ -26,9 +28,7 @@ function EndpointField({ provider, value, onChange }) {
 
   return (
     <div className="relative">
-      <label className="grid gap-2 text-sm font-bold text-slate-200">
-        Endpoint Template
-        <input
+      <label className="grid gap-2 text-sm font-bold text-slate-200"><LocalizedText fallback={"Endpoint Template"} /><input
           disabled={!provider}
           role="combobox"
           aria-expanded={open}
@@ -73,7 +73,7 @@ function EndpointField({ provider, value, onChange }) {
               <span className="text-xs text-slate-400">{endpointOption.example}</span>
             </button>
           ))}
-          {!filtered.length && <p className="px-3 py-4 text-sm text-slate-400">No matching provider endpoints. You may keep your manual override.</p>}
+          {!filtered.length && <p className="px-3 py-4 text-sm text-slate-400"><LocalizedText fallback={"No matching provider endpoints. You may keep your manual override."} /></p>}
         </div>
       )}
     </div>
@@ -82,7 +82,7 @@ function EndpointField({ provider, value, onChange }) {
 
 function AuthFields({ provider, value, onChange }) {
   const schema = provider?.authSchema || []
-  if (!provider) return <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-slate-400">Choose a provider to load its authentication configuration.</div>
+  if (!provider) return <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-slate-400"><LocalizedText fallback={"Choose a provider to load its authentication configuration."} /></div>
 
   return (
     <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4">
@@ -231,15 +231,15 @@ export default function ToolBuilder() {
       <div className="mx-auto grid max-w-[1600px] gap-6">
         <header className="rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-2xl">
           <p className="text-xs font-black uppercase tracking-[.22em] text-amber-200">Integrations</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Enterprise Integration Builder</h1>
-          <p className="mt-3 max-w-3xl text-slate-300">Select an approved provider to load its default method, endpoint, authentication schema, variables, and JSON blueprint values. Method and endpoint remain editable after selection.</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl"><LocalizedText fallback={"Enterprise Integration Builder"} /></h1>
+          <p className="mt-3 max-w-3xl text-slate-300"><LocalizedText fallback={"Select an approved provider to load its default method, endpoint, authentication schema, variables, and JSON blueprint values. Method and endpoint remain editable after selection."} /></p>
         </header>
 
         <section className="grid gap-6 xl:grid-cols-3">
           <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl">
-            <h2 className="mb-5 text-xl font-black">Integration Metadata</h2>
+            <h2 className="mb-5 text-xl font-black"><LocalizedText fallback={"Integration Metadata"} /></h2>
             <div className="grid gap-5">
-              <label className="grid gap-2 text-sm font-bold text-slate-200">Integration Name<input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label>
+              <label className="grid gap-2 text-sm font-bold text-slate-200"><LocalizedText fallback={"Integration Name"} /><input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label>
               <label className="grid gap-2 text-sm font-bold text-slate-200">Description<textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={description} onChange={event => setDescription(event.target.value)} /></label>
               <ProviderDropdown
                 providers={providers}
@@ -255,11 +255,9 @@ export default function ToolBuilder() {
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl">
-            <h2 className="mb-5 text-xl font-black">Endpoint & Request</h2>
+            <h2 className="mb-5 text-xl font-black"><LocalizedText fallback={"Endpoint & Request"} /></h2>
             <div className="grid gap-5">
-              <label className="grid gap-2 text-sm font-bold text-slate-200">
-                HTTP Method
-                <select disabled={!provider} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white disabled:opacity-50" value={method} onChange={event => setMethod(event.target.value)}>
+              <label className="grid gap-2 text-sm font-bold text-slate-200"><LocalizedText fallback={"HTTP Method"} /><select disabled={!provider} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white disabled:opacity-50" value={method} onChange={event => setMethod(event.target.value)}>
                   {(provider?.methods || []).map(item => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
@@ -270,7 +268,7 @@ export default function ToolBuilder() {
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl">
-            <h2 className="mb-5 text-xl font-black">Governance & Supervisor</h2>
+            <h2 className="mb-5 text-xl font-black"><LocalizedText fallback={"Governance & Supervisor"} /></h2>
             <GovernancePanel value={governance} onChange={setGovernance} onTest={testIntegration} onLogs={() => setLogsOpen(true)} />
             <p className="mt-4 rounded-2xl border border-white/10 bg-white/[.04] p-3 text-sm text-slate-300">{testStatus}</p>
           </div>
@@ -278,7 +276,7 @@ export default function ToolBuilder() {
 
         <JsonBlueprint blueprint={blueprint} />
 
-        {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black">Recent Logs</h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• ToolBuilder loaded and owns the provider catalog.</p><p>• ProviderDropdown reports only the selected catalog provider.</p><p>• Method, endpoint, auth, variables, and JSON share one provider source.</p></div></div></div>}
+        {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black"><LocalizedText fallback={"Recent Logs"} /></h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• ToolBuilder loaded and owns the provider catalog.</p><p>• ProviderDropdown reports only the selected catalog provider.</p><p>• Method, endpoint, auth, variables, and JSON share one provider source.</p></div></div></div>}
       </div>
     </main>
   )

@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 function normalizeTags(payload) {
@@ -156,7 +158,7 @@ export default function TagSelector({ value = [], onChange }) {
               {tag}
             </button>
           ))}
-          {!loading && !filtered.length && !error && <p className="px-3 py-3 text-sm text-slate-400">No matching tags.</p>}
+          {!loading && !filtered.length && !error && <p className="px-3 py-3 text-sm text-slate-400"><LocalizedText fallback={"No matching tags."} /></p>}
           {error && (
             <div className="grid gap-2 px-3 py-3 text-sm text-amber-200">
               <span>{error}</span>

@@ -1,5 +1,7 @@
 'use client';
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react';
 
 const numberFormat = new Intl.NumberFormat('en-US');
@@ -63,7 +65,7 @@ function PieChart({ data }) {
   let offset = 25;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-900">Traffic sources</h3>
+      <h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Traffic sources"} /></h3>
       <svg viewBox="0 0 42 42" className="mx-auto my-4 h-44 w-44 -rotate-90">
         {data.map((item, index) => {
           const dash = (item.value / total) * 100;
@@ -88,7 +90,7 @@ function FunnelChart({ funnel }) {
   const max = stages[0]?.[1] || 1;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-900">Campaign funnel</h3>
+      <h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Campaign funnel"} /></h3>
       <div className="mt-5 space-y-4">
         {stages.map(([label, value], index) => (
           <div key={label}>
@@ -108,7 +110,7 @@ function TrendLine({ trend }) {
   const points = (key) => trend.map((row, index) => `${(index / Math.max(1, trend.length - 1)) * (width - 40) + 20},${height - 20 - ((row[key] || 0) / max) * (height - 50)}`).join(' ');
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-      <h3 className="text-lg font-semibold text-slate-900">Engagement trend</h3>
+      <h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Engagement trend"} /></h3>
       <svg viewBox={`0 0 ${width} ${height}`} className="mt-4 h-64 w-full">
         {[0, 1, 2, 3].map((line) => <line key={line} x1="20" x2={width - 20} y1={20 + line * 45} y2={20 + line * 45} stroke="#e2e8f0" />)}
         <polyline points={points('likes')} fill="none" stroke="#2563eb" strokeWidth="4" />
@@ -182,15 +184,15 @@ export default function OutreachAnalyticsPanel() {
   return (
     <section className="space-y-6 rounded-3xl bg-slate-50 p-6 text-slate-800">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div><p className="text-sm font-semibold uppercase tracking-wide text-blue-600">COS Outreach Analytics</p><h2 className="text-3xl font-bold text-slate-950">Raw performance, regional reach, and milestone-ready notifications</h2><p className="mt-2 text-slate-600">OAuth2-backed API routes read YouTube, Google Analytics, and Meta credentials from environment variables while keeping raw numbers visible.</p></div>
+        <div><p className="text-sm font-semibold uppercase tracking-wide text-blue-600"><LocalizedText fallback={"COS Outreach Analytics"} /></p><h2 className="text-3xl font-bold text-slate-950">Raw performance, regional reach, and milestone-ready notifications</h2><p className="mt-2 text-slate-600">OAuth2-backed API routes read YouTube, Google Analytics, and Meta credentials from environment variables while keeping raw numbers visible.</p></div>
         <div className="text-sm font-medium text-slate-500">{status}</div>
       </div>
 
       {error ? <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 font-medium text-amber-950">{error}</div> : null}
 
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-5">
-        <label className="text-sm">Start date<input className="mt-1 w-full rounded-lg border p-2" type="date" value={filters.startDate} onChange={(event) => setFilters({ ...filters, startDate: event.target.value })} /></label>
-        <label className="text-sm">End date<input className="mt-1 w-full rounded-lg border p-2" type="date" value={filters.endDate} onChange={(event) => setFilters({ ...filters, endDate: event.target.value })} /></label>
+        <label className="text-sm"><LocalizedText fallback={"Start date"} /><input className="mt-1 w-full rounded-lg border p-2" type="date" value={filters.startDate} onChange={(event) => setFilters({ ...filters, startDate: event.target.value })} /></label>
+        <label className="text-sm"><LocalizedText fallback={"End date"} /><input className="mt-1 w-full rounded-lg border p-2" type="date" value={filters.endDate} onChange={(event) => setFilters({ ...filters, endDate: event.target.value })} /></label>
         <label className="text-sm">Region<input className="mt-1 w-full rounded-lg border p-2" placeholder="all, United States…" value={filters.region} onChange={(event) => setFilters({ ...filters, region: event.target.value || 'all' })} /></label>
         <label className="text-sm">Campaign<input className="mt-1 w-full rounded-lg border p-2" placeholder="Campaign name" value={filters.campaign} onChange={(event) => setFilters({ ...filters, campaign: event.target.value })} /></label>
         <div className="flex items-end gap-2"><button className="rounded-lg bg-slate-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(error)} onClick={() => exportData('csv', exportPayload)}>CSV</button><button className="rounded-lg border px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(error)} onClick={() => exportData('json', exportPayload)}>JSON</button></div>
@@ -198,10 +200,10 @@ export default function OutreachAnalyticsPanel() {
 
       {!error ? <>
         <div className="grid gap-6 lg:grid-cols-2"><FunnelChart funnel={funnel} /><PieChart data={trafficSources} /><TrendLine trend={mockEngagementTrend} />
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-lg font-semibold text-slate-900">Views by region heatmap</h3><div className="mt-4 grid gap-3">{tableRows.map((row) => <div key={row.region} className="rounded-xl p-3 text-white" style={{ background: `rgba(37, 99, 235, ${0.25 + (row.views / heatMax) * 0.75})` }}><div className="flex justify-between"><strong>{row.region}</strong><span>{numberFormat.format(row.views)} views</span></div></div>)}</div></div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Views by region heatmap"} /></h3><div className="mt-4 grid gap-3">{tableRows.map((row) => <div key={row.region} className="rounded-xl p-3 text-white" style={{ background: `rgba(37, 99, 235, ${0.25 + (row.views / heatMax) * 0.75})` }}><div className="flex justify-between"><strong>{row.region}</strong><span>{numberFormat.format(row.views)} views</span></div></div>)}</div></div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Region</th><th className="p-3">Views</th><th className="p-3">Watch time</th><th className="p-3">Clicks</th><th className="p-3">Conversions</th><th className="p-3">Likes</th><th className="p-3">Shares</th><th className="p-3">Comments</th></tr></thead><tbody>{tableRows.map((row) => <tr key={row.region} className="border-t"><td className="p-3 font-medium">{row.region}</td><td className="p-3">{numberFormat.format(row.views)}</td><td className="p-3">{numberFormat.format(row.watchTimeMinutes)}m</td><td className="p-3">{numberFormat.format(row.clicks)}</td><td className="p-3">{numberFormat.format(row.conversions)}</td><td className="p-3">{numberFormat.format(row.likes)}</td><td className="p-3">{numberFormat.format(row.shares)}</td><td className="p-3">{numberFormat.format(row.comments)}</td></tr>)}</tbody></table></div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Region</th><th className="p-3">Views</th><th className="p-3"><LocalizedText fallback={"Watch time"} /></th><th className="p-3">Clicks</th><th className="p-3">Conversions</th><th className="p-3">Likes</th><th className="p-3">Shares</th><th className="p-3">Comments</th></tr></thead><tbody>{tableRows.map((row) => <tr key={row.region} className="border-t"><td className="p-3 font-medium">{row.region}</td><td className="p-3">{numberFormat.format(row.views)}</td><td className="p-3">{numberFormat.format(row.watchTimeMinutes)}m</td><td className="p-3">{numberFormat.format(row.clicks)}</td><td className="p-3">{numberFormat.format(row.conversions)}</td><td className="p-3">{numberFormat.format(row.likes)}</td><td className="p-3">{numberFormat.format(row.shares)}</td><td className="p-3">{numberFormat.format(row.comments)}</td></tr>)}</tbody></table></div>
       </> : null}
     </section>
   );

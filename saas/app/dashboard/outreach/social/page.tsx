@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react'
 
 type Destination = { accountRef: string | null; accountName: string | null; kind: string | null; hasAccessToken: boolean; discoveredAt: string | null }
@@ -92,23 +94,23 @@ function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () =
     <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
       <button style={button} disabled={!platform.configured} onClick={() => { window.location.href = `/api/outreach/social/oauth?platform=${encodeURIComponent(platform.platform)}` }}>{platform.connected ? 'Reconnect' : 'Connect'}</button>
       <button style={ghost} disabled={!platform.connected || discovering} onClick={discoverDestinations}>{discovering ? 'Discovering…' : 'Auto-discover destinations'}</button>
-      <button style={ghost} onClick={() => { window.location.href = `/api/outreach/social/oauth?platform=${encodeURIComponent(platform.platform)}&json=1` }}>OAuth debug JSON</button>
+      <button style={ghost} onClick={() => { window.location.href = `/api/outreach/social/oauth?platform=${encodeURIComponent(platform.platform)}&json=1` }}><LocalizedText fallback={"OAuth debug JSON"} /></button>
     </div>
 
     {platform.destinations?.length ? <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
-      <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 850, margin: 0 }}>Discovered destinations</p>
+      <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 850, margin: 0 }}><LocalizedText fallback={"Discovered destinations"} /></p>
       {platform.destinations.map((d, i) => <button key={`${d.accountRef}-${i}`} style={ghost} onClick={() => { setAccountRef(d.accountRef || ''); setAccountName(d.accountName || ''); if (d.accountRef) saveRef(d.accountRef, d.accountName || '') }}>{d.accountName || d.accountRef} · {d.kind}{d.hasAccessToken ? ' · token' : ''}</button>)}
     </div> : null}
 
     {platform.needsAccountRef ? <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
-      <label style={{ color: 'rgba(255,255,255,.65)', fontSize: 12, fontWeight: 800 }}>Destination account reference</label>
+      <label style={{ color: 'rgba(255,255,255,.65)', fontSize: 12, fontWeight: 800 }}><LocalizedText fallback={"Destination account reference"} /></label>
       <input value={accountRef} onChange={e => setAccountRef(e.target.value)} placeholder="LinkedIn org id, Facebook page id, IG business id, or subreddit" style={{ background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10 }} />
       <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Friendly account name" style={{ background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10 }} />
       <button style={ghost} disabled={saving || !platform.connected} onClick={() => saveRef()}>{saving ? 'Saving…' : 'Save destination'}</button>
     </div> : null}
 
     {message ? <p style={{ color: goodMessage(message) ? '#22c55e' : '#fb923c', margin: '10px 0 0', fontSize: 12 }}>{message}</p> : null}
-    <details style={{ marginTop: 12 }}><summary style={{ color: '#1af0ff', cursor: 'pointer', fontSize: 12, fontWeight: 850 }}>Scopes and telemetry</summary><pre style={{ whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.26)', color: 'rgba(226,232,240,.82)', padding: 12, borderRadius: 12, overflow: 'auto', fontSize: 11 }}>{JSON.stringify(platform, null, 2)}</pre></details>
+    <details style={{ marginTop: 12 }}><summary style={{ color: '#1af0ff', cursor: 'pointer', fontSize: 12, fontWeight: 850 }}><LocalizedText fallback={"Scopes and telemetry"} /></summary><pre style={{ whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.26)', color: 'rgba(226,232,240,.82)', padding: 12, borderRadius: 12, overflow: 'auto', fontSize: 11 }}>{JSON.stringify(platform, null, 2)}</pre></details>
   </article>
 }
 
@@ -146,8 +148,8 @@ export default function EnterpriseSocialOutreachPage() {
   return <main style={{ maxWidth: 1320, margin: '0 auto', padding: '24px 22px', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'radial-gradient(circle at top left, rgba(26,240,255,.14), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'start' }}>
-        <div><p style={{ margin: 0, color: '#ffc300', fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}>Enterprise plug-and-play</p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Social Outreach Connector Cockpit</h1><p style={{ color: 'rgba(255,255,255,.66)', maxWidth: 880, lineHeight: 1.6 }}>A buyer can configure provider apps, connect social accounts, auto-discover destinations, and publish approved social outreach campaigns without rebuilding the backend.</p></div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button style={button} onClick={load}>{loading ? 'Loading…' : 'Refresh readiness'}</button><button style={ghost} onClick={setup}>Run setup</button></div>
+        <div><p style={{ margin: 0, color: '#ffc300', fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}><LocalizedText fallback={"Enterprise plug-and-play"} /></p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Social Outreach Connector Cockpit</h1><p style={{ color: 'rgba(255,255,255,.66)', maxWidth: 880, lineHeight: 1.6 }}>A buyer can configure provider apps, connect social accounts, auto-discover destinations, and publish approved social outreach campaigns without rebuilding the backend.</p></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button style={button} onClick={load}>{loading ? 'Loading…' : 'Refresh readiness'}</button><button style={ghost} onClick={setup}><LocalizedText fallback={"Run setup"} /></button></div>
       </div>
       {message ? <p style={{ color: goodMessage(message) ? '#22c55e' : '#fb923c', fontWeight: 850 }}>{message}</p> : null}
     </section>
@@ -159,8 +161,8 @@ export default function EnterpriseSocialOutreachPage() {
       <div style={panel}>{chip('schema', data?.schemaReady ? '#22c55e' : '#fb923c')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.schemaReady ? 'ready' : 'not ready'}</h2></div>
     </section>
 
-    <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}>Enterprise safety rules</h2><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>{Object.entries(data?.rules || {}).map(([key, value]) => chip(`${key}: ${value ? 'yes' : 'no'}`, value ? '#22c55e' : '#fb923c'))}</div></section>
+    <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={"Enterprise safety rules"} /></h2><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>{Object.entries(data?.rules || {}).map(([key, value]) => chip(`${key}: ${value ? 'yes' : 'no'}`, value ? '#22c55e' : '#fb923c'))}</div></section>
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>{platforms.map(platform => <PlatformCard key={platform.platform} platform={platform} onSaved={load} />)}{!loading && !platforms.length ? <div style={panel}><p style={{ color: '#fff' }}>{message || 'No platform capability data returned.'}</p></div> : null}</section>
-    <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}>Operational note</h2><p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>Currently publish-ready: {ready.map(p => p.label).join(', ') || 'none'}. Other platforms are structurally supported and become live after provider credentials, OAuth connection, and automated/manual destination selection.</p></section>
+    <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={"Operational note"} /></h2><p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>Currently publish-ready: {ready.map(p => p.label).join(', ') || 'none'}. Other platforms are structurally supported and become live after provider credentials, OAuth connection, and automated/manual destination selection.</p></section>
   </main>
 }

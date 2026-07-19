@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import Link from 'next/link'
 import { FormEvent, useState, type CSSProperties } from 'react'
 
@@ -68,38 +70,38 @@ export default function DirectPressCampaignPage() {
     <main style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
         <p className="sb-eyebrow" style={{ margin: 0 }}>Marketing + Sales · Press & Print Media</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Start a staff-led press campaign</h1>
-        <p style={body}>Use this when the team will identify the publication, prepare the article or ad, coordinate with the editor or media contact, and handle the campaign directly. No rich-media workflow is required.</p>
-        <Link href="/dashboard/marketing/press-print" className="sb-button-secondary" style={{ textDecoration: 'none', display: 'inline-flex', marginTop: 12 }}>Back to Press & Print Media</Link>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"Start a staff-led press campaign"} /></h1>
+        <p style={body}><LocalizedText fallback={"Use this when the team will identify the publication, prepare the article or ad, coordinate with the editor or media contact, and handle the campaign directly. No rich-media workflow is required."} /></p>
+        <Link href="/dashboard/marketing/press-print" className="sb-button-secondary" style={{ textDecoration: 'none', display: 'inline-flex', marginTop: 12 }}><LocalizedText fallback={"Back to Press & Print Media"} /></Link>
       </section>
 
       <form onSubmit={submit} style={card}>
         <label style={field}>
           <span className="sb-caption">Channel</span>
           <select value={channel} onChange={(event) => setChannel(event.target.value as PressChannel)} style={input}>
-            <option value="online-newspapers">Online newspaper / digital publisher</option>
-            <option value="print-newspapers">Print newspaper / offline placement</option>
-            <option value="trade-press">Magazine / IT trade press</option>
+            <option value="online-newspapers"><LocalizedText fallback={"Online newspaper / digital publisher"} /></option>
+            <option value="print-newspapers"><LocalizedText fallback={"Print newspaper / offline placement"} /></option>
+            <option value="trade-press"><LocalizedText fallback={"Magazine / IT trade press"} /></option>
           </select>
         </label>
         <label style={field}>
-          <span className="sb-caption">Publication name</span>
+          <span className="sb-caption"><LocalizedText fallback={"Publication name"} /></span>
           <input value={publication} onChange={(event) => setPublication(event.target.value)} style={input} placeholder="Example: local newspaper, IT magazine, trade publication" />
         </label>
         <label style={field}>
-          <span className="sb-caption">Editor / media contact</span>
+          <span className="sb-caption"><LocalizedText fallback={"Editor / media contact"} /></span>
           <input value={contact} onChange={(event) => setContact(event.target.value)} style={input} placeholder="Name, email, phone, media-kit link, or notes" />
         </label>
         <label style={field}>
-          <span className="sb-caption">Headline / campaign title</span>
+          <span className="sb-caption"><LocalizedText fallback={"Headline / campaign title"} /></span>
           <input value={headline} onChange={(event) => setHeadline(event.target.value)} style={input} placeholder="Working headline or ad title" />
         </label>
         <label style={field}>
-          <span className="sb-caption">Article / ad notes</span>
+          <span className="sb-caption"><LocalizedText fallback={"Article / ad notes"} /></span>
           <textarea value={notes} onChange={(event) => setNotes(event.target.value)} style={{ ...input, minHeight: 140 }} placeholder="What the team will prepare, submit, or publish." />
         </label>
         <label style={field}>
-          <span className="sb-caption">CTA URL</span>
+          <span className="sb-caption"><LocalizedText fallback={"CTA URL"} /></span>
           <input value={ctaUrl} onChange={(event) => setCtaUrl(event.target.value)} style={input} />
         </label>
         <button disabled={busy} type="submit" style={primary}>{busy ? 'Creating…' : 'Create press campaign record'}</button>

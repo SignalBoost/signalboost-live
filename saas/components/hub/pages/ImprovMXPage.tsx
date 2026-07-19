@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type DomainRow = {
@@ -169,14 +171,10 @@ export default function ImprovMXPage() {
     <div style={{ padding: 18, color: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0 }}>ImprovMX Email Forwarding</h2>
-          <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 4 }}>
-            Live domains and aliases loaded through the protected SignalBoost backend.
-          </div>
+          <h2 style={{ margin: 0 }}><LocalizedText fallback={"ImprovMX Email Forwarding"} /></h2>
+          <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 4 }}><LocalizedText fallback={"Live domains and aliases loaded through the protected SignalBoost backend."} /></div>
         </div>
-        <button onClick={() => void loadDomains()} style={{ padding: '9px 13px', borderRadius: 9, cursor: 'pointer' }}>
-          Refresh live data
-        </button>
+        <button onClick={() => void loadDomains()} style={{ padding: '9px 13px', borderRadius: 9, cursor: 'pointer' }}><LocalizedText fallback={"Refresh live data"} /></button>
       </div>
 
       {error && (
@@ -187,13 +185,11 @@ export default function ImprovMXPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14, marginBottom: 18 }}>
         <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,.10)', padding: 16, borderRadius: 12 }}>
-          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}>
-            List Domains
-          </div>
+          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={"List Domains"} /></div>
           {loadingDomains ? (
             <div style={{ color: 'rgba(255,255,255,.55)' }}>Fetching live ImprovMX domains…</div>
           ) : domains.length === 0 ? (
-            <div style={{ color: 'rgba(255,255,255,.55)' }}>No connected domains returned.</div>
+            <div style={{ color: 'rgba(255,255,255,.55)' }}><LocalizedText fallback={"No connected domains returned."} /></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
               {domains.map(item => {
@@ -229,25 +225,23 @@ export default function ImprovMXPage() {
         </div>
 
         <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,.10)', padding: 16, borderRadius: 12 }}>
-          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}>
-            Domain Status Overview
-          </div>
+          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={"Domain Status Overview"} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ background: '#070b14', padding: 16, borderRadius: 9, textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800 }}>{domains.length}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}>Total Monitored</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={"Total Monitored"} /></div>
             </div>
             <div style={{ background: '#070b14', padding: 16, borderRadius: 9, textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#34d399' }}>{activeDomains}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}>Active Routes</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={"Active Routes"} /></div>
             </div>
           </div>
         </div>
       </div>
 
-      <label style={{ display: 'block', marginBottom: 6 }}>Selected domain</label>
+      <label style={{ display: 'block', marginBottom: 6 }}><LocalizedText fallback={"Selected domain"} /></label>
       <select value={domain} onChange={event => setDomain(event.target.value)} style={{ ...inputStyle, marginBottom: 18 }}>
-        <option value="">Select a domain</option>
+        <option value=""><LocalizedText fallback={"Select a domain"} /></option>
         {domainOptions.map(name => <option key={name} value={name}>{name}</option>)}
       </select>
 

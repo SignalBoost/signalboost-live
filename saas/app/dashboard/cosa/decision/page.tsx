@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useState } from 'react'
 
 const GOLD = '#ffc300'
@@ -44,11 +46,9 @@ export default function CosaMarketingDecisionPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>COSA marketing decision engine</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>COSA chooses the hero, format, storyboard, traffic path, and monetization path</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}>
-          The owner should not have to choose the creative direction. COSA should use mined signals, prediction rules, and marketing logic to recommend the strongest direction before rendering.
-        </p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"COSA marketing decision engine"} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"COSA chooses the hero, format, storyboard, traffic path, and monetization path"} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}><LocalizedText fallback={"The owner should not have to choose the creative direction. COSA should use mined signals, prediction rules, and marketing logic to recommend the strongest direction before rendering."} /></p>
         <button onClick={loadDecision} disabled={loading} style={primaryButton}>{loading ? 'Loading...' : 'Refresh COSA decision'}</button>
       </section>
 
@@ -63,7 +63,7 @@ export default function CosaMarketingDecisionPage() {
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}>Prediction summary</p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Prediction summary"} /></p>
             <h2 style={{ color: '#fff', fontSize: 24, lineHeight: 1.25, margin: '10px 0 0' }}>{decision.prediction_summary}</h2>
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}>{decision.creative_brief}</p>
           </section>

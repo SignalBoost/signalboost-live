@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -50,7 +52,7 @@ export default function Sidebar() {
         <summary className="cursor-pointer text-slate-300">{t(dict, 'support.help', 'Help')}</summary>
         <div className="mt-3 flex flex-col gap-2">
           <Link href="/faq" className="text-slate-400 hover:text-white">FAQ</Link>
-          <Link href="/support" className="text-slate-400 hover:text-white">Contact Support</Link>
+          <Link href="/support" className="text-slate-400 hover:text-white"><LocalizedText fallback={"Contact Support"} /></Link>
           <Link href="/docs" className="text-slate-400 hover:text-white">Documentation</Link>
         </div>
       </details>

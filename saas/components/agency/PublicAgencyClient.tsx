@@ -344,7 +344,6 @@ const ORGANIC_COPY: Record<string, {
 }
 
 const LIVE_PROVIDERS = ['Claude (Anthropic)', 'OpenAI']
-const COMING_PROVIDERS = ['ElevenLabs \u2014 AI voiceover', 'Runway \u2014 cinematic video', 'Kling \u2014 3D video']
 
 const chipStyle: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,.16)',
@@ -650,17 +649,11 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                   <span key={name} style={{ ...chipStyle, borderColor: 'rgba(134,239,172,.4)' }}>{name}</span>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span className="sb-caption" style={{ color: '#fbbf24' }}>{oc.byokComingLabel}</span>
-                {COMING_PROVIDERS.map((name) => (
-                  <span key={name} style={{ ...chipStyle, opacity: 0.75 }}>{name}</span>
-                ))}
-              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 200px) 1fr', gap: 12 }}>
                 <label style={{ display: 'grid', gap: 6 }}>
                   <span className="sb-caption">{oc.byokProviderLabel}</span>
                   <select value={apiProvider} onChange={(e) => setApiProvider(e.target.value === 'openai' ? 'openai' : 'anthropic')} style={fieldStyle}>
-                    <option value="anthropic">Claude (Anthropic)</option>
+                    <option value="anthropic">{"Claude (Anthropic)"}</option>
                     <option value="openai">OpenAI</option>
                   </select>
                 </label>

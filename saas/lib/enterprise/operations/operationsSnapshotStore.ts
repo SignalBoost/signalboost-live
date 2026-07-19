@@ -20,6 +20,27 @@ export function parseOperationsIntelligenceSnapshot(value: unknown): OperationsI
 export class SupabaseOperationsSnapshotStore {
   constructor(private readonly client: SupabaseClient) {}
 
+  async save(snapshot: OperationsIntelligenceSnapshot): Promise<OperationsIntelligenceSnapshot> {
+    const validated = parseOperationsIntelligenceSnapshot(snapshot)
+    const organizationId = validated.organizationId.trim()
+    const generatedAt = new Date(validated.generatedAt).toISOString()
+    const normalized = Object.freeze({ ...validated, organizationId, generatedAt }) as OperationsIntelligenceSnapshot
+
+    const { error } = await this.client
+      .from(TABLE)
+      .upsert({
+        organization_id: organizationId,
+        generated_at: generatedAt,
+        snapshot: normalized,
+      }, {
+        onConflict: 'organization_id,generated_at',
+        ignoreDuplicates: false,
+      })
+
+    if (error) throw new Error(`Unable to save operations snapshot: ${error.message}`)
+    return normalized
+  }
+
   async getLatest(organizationId: string): Promise<OperationsIntelligenceSnapshot | null> {
     const normalized = organizationId.trim()
     if (!normalized) throw new Error('organizationId is required.')

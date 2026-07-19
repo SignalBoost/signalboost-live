@@ -110,6 +110,7 @@ const GROUPS: NavGroup[] = [
     labelKey: 'nav.admin',
     fallbackLabel: 'Admin',
     items: [
+      { icon: '🤖', labelKey: 'nav.cosAssistant', fallbackLabel: 'COS Assistant', href: '/dashboard/assistant', requiresOwner: true },
       { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: 'Owner/Admin', href: '/admin', requiresOwner: true },
       { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: 'Supervisor SOC', href: '/dashboard/supervisor', requiresOwner: true },
       { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: 'Console Hub', href: '/hub', requiresOwner: true },

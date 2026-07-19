@@ -1,6 +1,7 @@
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 import { useEffect, useMemo, useState } from 'react'
 
@@ -118,6 +119,7 @@ function TimelineRow({ item }: { item: any }) {
 }
 
 export default function CosGovernanceDashboardPage() {
+  const { t } = useTranslation()
   const [data, setData] = useState<Gov | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -153,7 +155,7 @@ export default function CosGovernanceDashboardPage() {
   return <main style={{ maxWidth: 1380, margin: '0 auto', display: 'grid', gap: 18, padding: '24px 22px' }}>
     <section style={{ ...panel, background: 'radial-gradient(circle at top left, rgba(26,240,255,.14), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 16, flexWrap: 'wrap' }}>
-        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}><LocalizedText fallback={"COS Governance"} /></p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Fully Autonomous Hybrid-Dynamic COS Router</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 900, lineHeight: 1.65 }}>COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.</p></div>
+        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}><LocalizedText fallback={"COS Governance"} /></p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>{t('console.cos.fullyAutonomousHybridDynamicCosRouter', 'Fully Autonomous Hybrid-Dynamic COS Router')}</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 900, lineHeight: 1.65 }}>COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.</p></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={load} disabled={loading} style={primary}>{loading ? 'Loading…' : 'Refresh cockpit'}</button>{chip(data?.mode || 'fully-autonomous-except-life-critical', cyan)}{chip('24x7 watchdog active', green)}</div>
       </div>
       {message ? <p style={{ color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('could not') ? red : green, margin: '12px 0 0', fontWeight: 800 }}>{message}</p> : null}

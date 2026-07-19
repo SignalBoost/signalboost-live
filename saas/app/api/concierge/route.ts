@@ -26,14 +26,12 @@ function latestUserText(body: any): string { const messages = Array.isArray(body
 function attachmentMime(a: AttachmentInfo): string { const explicit = String(a?.type || a?.mimeType || '').toLowerCase(); if (explicit) return explicit; const fromDataUrl = /^data:([^;,]+)/i.exec(String(a?.dataUrl || ''))?.[1]; if (fromDataUrl) return fromDataUrl.toLowerCase(); const name = String(a?.name || '').toLowerCase(); if (/\.(png|jpe?g|gif|webp|svg)$/.test(name)) return 'image/unknown'; return '' }
 function attachmentSummary(attachments: any): string { if (!Array.isArray(attachments) || attachments.length === 0) return ''; return attachments.map((a: AttachmentInfo) => `${a?.name || 'attached file'}${attachmentMime(a) ? ` (${attachmentMime(a)})` : ''}`).join(', ') }
 
-// ── Concierge social / LinkedIn outreach router ──────────────────────────────
-// A TEXT social/outreach post (LinkedIn, X, etc.) → an owner-approvable draft in
-// cos_campaign_queue. Never a video. Checked BEFORE the video router in POST, and
-// only fires when there's a clear text-deliverable noun (message/post/outreach…) so
-// a genuine "make a video for LinkedIn" still goes to the video pipeline.
+// Route only when the owner names a concrete publishing platform. Generic
+// "social media" requests stay with the COS/support brain instead of being
+// silently converted into LinkedIn work.
 function isSocialOutreachRequest(text: string): boolean {
   const t = String(text || '').toLowerCase()
-  const platform = /\b(linkedin|linked\s?in|twitter|x post|tweet|facebook|instagram|tiktok|reddit|social)\b/i.test(t)
+  const platform = /\b(linkedin|linked\s?in|twitter|x post|tweet|facebook|instagram|tiktok|reddit)\b/i.test(t)
   const textNoun = /\b(message|post|outreach|dm|direct message|caption|copy|announcement|newsletter)\b/i.test(t)
   const mentionsVideo = /\b(video|vídeo|reel|short|clip|tiktok|youtube|filme|movie)\b/i.test(t)
   const explicitlyText = /\b(not a video|no video|text[-\s]?only|text[-\s]?message)\b/i.test(t)
@@ -48,7 +46,7 @@ function socialPlatformFrom(text: string): string {
   if (/twitter|\bx post\b|\bon x\b|\btweet\b/.test(t)) return 'twitter'
   if (/instagram|\big\b/.test(t)) return 'instagram'
   if (/tiktok/.test(t)) return 'tiktok'
-  return 'linkedin'
+  return ''
 }
 
 function socialQueueRow(a: { platform: string; title: string; body: string; brief: string; lang: string; now: string }) {
@@ -111,22 +109,17 @@ function socialQueueRow(a: { platform: string; title: string; body: string; brie
   }
 }
 
-// Grounded, factual context so generated posts never invent features.
 const SOCIAL_PLATFORM_CONTEXT = `SignalBoost is an AI-driven, human-monitored growth platform at saas.signalboostapp.com: it turns reviews into branded content, builds AI websites, runs image/video/audio studios, and automates multilingual campaigns (English, Spanish, Portuguese, Polish, Russian).`
 
-const SOCIAL_POST_FALLBACK: Record<string, (p: string) => string> = {
-  en: (p) => `Draft ${p} post (edit before publishing):\n\nSignalBoost helps businesses grow with AI — turning reviews into branded content, building websites, and running multilingual campaigns, all human-monitored. Want to see what it could do for your brand? Let's connect.`,
-  es: (p) => `Borrador de publicación para ${p} (edítalo antes de publicar):\n\nSignalBoost ayuda a las empresas a crecer con IA: convierte reseñas en contenido de marca, crea sitios web y ejecuta campañas multilingües, siempre con supervisión humana. ¿Quieres ver qué puede hacer por tu marca? Conectemos.`,
-  pt: (p) => `Rascunho de post para ${p} (edite antes de publicar):\n\nA SignalBoost ajuda empresas a crescer com IA: transforma avaliações em conteúdo de marca, cria sites e executa campanhas multilíngues, sempre com supervisão humana. Quer ver o que ela pode fazer pela sua marca? Vamos conversar.`,
-  pl: (p) => `Wersja robocza posta na ${p} (edytuj przed publikacją):\n\nSignalBoost pomaga firmom rosnąć dzięki AI: zamienia opinie w treści marki, buduje strony i prowadzi wielojęzyczne kampanie — zawsze pod nadzorem człowieka. Chcesz zobaczyć, co może zrobić dla Twojej marki? Połączmy się.`,
-  ru: (p) => `Черновик поста для ${p} (отредактируйте перед публикацией):\n\nSignalBoost помогает бизнесу расти с помощью ИИ: превращает отзывы в брендовый контент, создаёт сайты и запускает многоязычные кампании — всегда под контролем человека. Хотите узнать, что это даст вашему бренду? Давайте свяжемся.`,
+function briefBasedFallback(brief: string, platform: string): string {
+  const cleaned = String(brief || '').replace(/\s+/g, ' ').trim()
+  return cleaned
+    ? `Draft for ${platform}, based on the owner's brief:\n\n${cleaned}`
+    : `Draft for ${platform} is waiting for the owner's brief.`
 }
 
-// Turn the owner's free-form brief into a ready-to-publish post for the chosen
-// platform, in the requested language. Never echoes the raw brief; on any model
-// failure it returns a safe localized draft the owner can edit.
 async function generateSocialPost(brief: string, platform: string, lang: string): Promise<string> {
-  const fallback = (SOCIAL_POST_FALLBACK[lang] || SOCIAL_POST_FALLBACK.en)(platform)
+  const fallback = briefBasedFallback(brief, platform)
   const prompt = `You are SignalBoost's marketing writer. Write ONE ready-to-publish ${platform} post based on the owner's brief below. Ground it only in the platform context — do not invent features. Match the tone of ${platform}. Keep it concise and natural. Write it in this language: ${lang}.
 
 Return ONLY the post text — no preamble, no surrounding quotes, no markdown fences, no "here is your post".
@@ -137,7 +130,7 @@ ${SOCIAL_PLATFORM_CONTEXT}
 OWNER BRIEF:
 ${brief}`
   try {
-    const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 900 })
+    const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 900 })
     const cleaned = String(raw || '').trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/i, '').trim()
     return cleaned.length >= 20 ? cleaned : fallback
   } catch {
@@ -161,11 +154,11 @@ async function createConciergeSocialCampaign(text: string, platform: string, lan
 function socialReply(lang: string, platform: string, campaignId: string): string {
   const p = platform.charAt(0).toUpperCase() + platform.slice(1)
   const map: Record<string, string> = {
-    en: `Your ${p} outreach message is saved as an owner-approvable draft (id ${campaignId}). It's held in the campaign queue for your approval — nothing posts until you approve it. Want me to refine the copy?`,
-    es: `Tu mensaje de difusión para ${p} se guardó como borrador para tu aprobación (id ${campaignId}). Está en la cola de campañas y no se publicará hasta que lo apruebes. ¿Quieres que ajuste el texto?`,
-    pt: `Sua mensagem de divulgação para ${p} foi salva como rascunho para sua aprovação (id ${campaignId}). Está na fila de campanhas e nada é publicado até você aprovar. Quer que eu ajuste o texto?`,
-    pl: `Twoja wiadomość ${p} została zapisana jako wersja robocza do zatwierdzenia (id ${campaignId}). Czeka w kolejce kampanii — nic nie zostanie opublikowane, dopóki jej nie zatwierdzisz. Mam dopracować treść?`,
-    ru: `Ваше сообщение для ${p} сохранено как черновик для вашего одобрения (id ${campaignId}). Оно в очереди кампаний и не будет опубликовано без вашего одобрения. Доработать текст?`,
+    en: `Your ${p} outreach draft was generated from your brief and saved for owner approval (id ${campaignId}). Nothing will publish until you approve it.`,
+    es: `Tu borrador para ${p} se generó a partir de tus instrucciones y se guardó para la aprobación del propietario (id ${campaignId}). No se publicará nada hasta que lo apruebes.`,
+    pt: `Seu rascunho para ${p} foi gerado a partir das suas instruções e salvo para aprovação do proprietário (id ${campaignId}). Nada será publicado até você aprovar.`,
+    pl: `Wersja robocza dla ${p} została utworzona na podstawie Twoich instrukcji i zapisana do zatwierdzenia przez właściciela (id ${campaignId}). Nic nie zostanie opublikowane bez zatwierdzenia.`,
+    ru: `Черновик для ${p} создан по вашим инструкциям и сохранён для одобрения владельцем (id ${campaignId}). Ничего не будет опубликовано без одобрения.`,
   }
   return map[lang] || map.en
 }

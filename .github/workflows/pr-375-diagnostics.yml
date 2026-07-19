@@ -1,0 +1,56 @@
+name: PR 375 Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/pr-375-diagnostics.yml'
+      - 'saas/**'
+      - 'app/**'
+      - 'components/**'
+      - 'lib/**'
+      - 'package*.json'
+      - 'tsconfig*.json'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Root diagnostics
+        shell: bash
+        run: |
+          set +e
+          npm install --no-audit --no-fund > root-install.log 2>&1
+          echo $? > root-install.exit
+          npm run typecheck > root-typecheck.log 2>&1
+          echo $? > root-typecheck.exit
+      - name: SaaS diagnostics
+        shell: bash
+        run: |
+          set +e
+          cd saas
+          npm install --no-audit --no-fund > ../saas-install.log 2>&1
+          echo $? > ../saas-install.exit
+          npm test > ../saas-test.log 2>&1
+          echo $? > ../saas-test.exit
+          npm run verify:issue-205 > ../issue-205.log 2>&1
+          echo $? > ../issue-205.exit
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr-375-diagnostics
+          path: |
+            *.log
+            *.exit
+      - name: Preserve failure status
+        shell: bash
+        run: |
+          test "$(cat root-typecheck.exit)" = 0
+          test "$(cat saas-test.exit)" = 0
+          test "$(cat issue-205.exit)" = 0

@@ -26,6 +26,8 @@ jobs:
           set +e
           npm test > unit.log 2>&1; echo $? > unit.exit
           npm run verify:issue-205 > guards.log 2>&1; echo $? > guards.exit
+          npm run test:supervisor > supervisor.log 2>&1; echo $? > supervisor.exit
+          npm run validate:bpal > bpal.log 2>&1; echo $? > bpal.exit
           exit 0
       - uses: actions/upload-artifact@v4
         with:
@@ -35,4 +37,13 @@ jobs:
             saas/unit.exit
             saas/guards.log
             saas/guards.exit
-      - run: test "$(cat unit.exit)" = 0 -a "$(cat guards.exit)" = 0
+            saas/supervisor.log
+            saas/supervisor.exit
+            saas/bpal.log
+            saas/bpal.exit
+      - shell: bash
+        run: |
+          test "$(cat unit.exit)" = 0
+          test "$(cat guards.exit)" = 0
+          test "$(cat supervisor.exit)" = 0
+          test "$(cat bpal.exit)" = 0

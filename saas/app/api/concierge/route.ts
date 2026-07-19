@@ -54,10 +54,6 @@ export async function POST(req: NextRequest) {
   const input = latestUserText(body)
   const language = languageFrom(body)
 
-  // Start the read-only shadow path immediately, but never wait for it before
-  // returning a healthy Primary response. runBackupCos has its own hard deadline.
-  const backupPromise = runBackupCos(input, language).catch(() => null)
-
   let primary: Response | null = null
   try {
     primary = await supportPost(new NextRequest(req.clone()))
@@ -65,22 +61,28 @@ export async function POST(req: NextRequest) {
     primary = null
   }
 
+  // Primary authentication, authorization, validation, and rate-limit decisions
+  // are terminal. Backup COS must never turn a governed 4xx denial into HTTP 200,
+  // and it must not invoke the redundant provider for a denied request.
+  if (primary && primary.status >= 400 && primary.status < 500) return primary
+
   const primarySnapshot = primary
     ? await responseSnapshot(primary)
     : { reply: '', source: '' }
   const immediateReasons = detectPrimaryCorruption({
-    status: primary?.status || 500,
+    status: primary?.status ?? 500,
     reply: primarySnapshot.reply,
     source: primarySnapshot.source,
   })
 
   if (primary && immediateReasons.length === 0) {
     const healthyPrimary = primary
-    // Complete the shadow comparison after the healthy response is sent. This
-    // preserves continuity evidence without making normal Concierge latency
-    // depend on the redundant provider.
+
+    // Run the optional read-only shadow comparison only after the healthy Primary
+    // response is ready. It cannot delay the user response and remains bounded by
+    // runBackupCos's hard deadline.
     after(async () => {
-      const backup = await backupPromise
+      const backup = await runBackupCos(input, language).catch(() => null)
       if (!backup?.ok) return
       const shadowReasons = detectPrimaryCorruption({
         status: healthyPrimary.status,
@@ -103,11 +105,10 @@ export async function POST(req: NextRequest) {
   }
 
   // A failed, empty, canned, or error-degraded Primary response is quarantined
-  // for this request. Only now may Backup COS delay the response, and its wait is
-  // bounded by the runtime deadline.
-  const backup = await backupPromise
+  // for this request. Only degraded requests invoke and await Backup COS.
+  const backup = await runBackupCos(input, language).catch(() => null)
   const reasons = detectPrimaryCorruption({
-    status: primary?.status || 500,
+    status: primary?.status ?? 500,
     reply: primarySnapshot.reply,
     source: primarySnapshot.source,
     backup,

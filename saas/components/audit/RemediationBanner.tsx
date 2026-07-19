@@ -114,13 +114,13 @@ const COPY: Record<string, Copy> = {
 
 export default function RemediationBanner({
   count,
-  runId,
+  runId = null,
   lang = 'en',
   initialResult = null,
   onComplete,
 }: {
   count: number
-  runId: string | null
+  runId?: string | null
   lang?: string
   initialResult?: AuditRemediationResult | null
   onComplete?: (result: AuditRemediationResult) => void
@@ -128,11 +128,13 @@ export default function RemediationBanner({
   const copy = COPY[lang] || COPY.en
   const [phase, setPhase] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [result, setResult] = useState<AuditRemediationResult | null>(initialResult)
+  const [resolvedRunId, setResolvedRunId] = useState<string | null>(runId)
   const [error, setError] = useState('')
   const [upgrade, setUpgrade] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
+    setResolvedRunId(runId)
     setResult(initialResult)
     setPhase(initialResult ? 'done' : 'idle')
     setError('')
@@ -140,8 +142,49 @@ export default function RemediationBanner({
     setDismissed(false)
   }, [initialResult, runId])
 
+  async function resolveLatestRun(): Promise<string | null> {
+    try {
+      const response = await fetch('/api/hub/operator/audit/runs', { credentials: 'include', cache: 'no-store' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.ok || !Array.isArray(data.runs)) return null
+      const candidates = data.runs.filter((entry: any) => entry?.status === 'complete')
+      const matched = candidates.find((entry: any) => Number(entry?.findings_count || 0) === count) || candidates[0]
+      return typeof matched?.id === 'string' ? matched.id : null
+    } catch {
+      return null
+    }
+  }
+
+  useEffect(() => {
+    if (runId || initialResult || count <= 0) return
+    let alive = true
+    void (async () => {
+      const id = await resolveLatestRun()
+      if (!alive || !id) return
+      setResolvedRunId(id)
+      try {
+        const detail = await fetch(`/api/hub/operator/audit/runs?runId=${encodeURIComponent(id)}`, { credentials: 'include', cache: 'no-store' })
+        const data = await detail.json().catch(() => null)
+        if (alive && detail.ok && data?.remediation?.kind === 'audit_batch_remediation') {
+          setResult(data.remediation as AuditRemediationResult)
+          setPhase('done')
+        }
+      } catch {
+        // Resolving persisted approval is best-effort; the approval button remains available.
+      }
+    })()
+    return () => { alive = false }
+    // count identifies the completed scan shown by the existing dashboard page.
+  }, [count, initialResult, runId])
+
   async function approveAll() {
-    if (!runId) return
+    const targetRunId = resolvedRunId || runId || await resolveLatestRun()
+    if (!targetRunId) {
+      setError(copy.noRun)
+      setPhase('error')
+      return
+    }
+    setResolvedRunId(targetRunId)
     setPhase('running')
     setError('')
     setUpgrade(false)
@@ -150,7 +193,7 @@ export default function RemediationBanner({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ runId }),
+        body: JSON.stringify({ runId: targetRunId }),
       })
       const data = await response.json().catch(() => null)
       if (response.status === 402 && data?.code === 'patch_not_in_plan') {
@@ -178,7 +221,7 @@ export default function RemediationBanner({
 
   if (phase === 'running') {
     return (
-      <section className="mt-4 rounded-md border border-accent/40 bg-surface p-4 ring-1 ring-accent/15">
+      <section id="audit-batch-remediation" className="mt-4 rounded-md border border-accent/40 bg-surface p-4 ring-1 ring-accent/15">
         <div className="flex items-center gap-2 text-sm font-semibold text-text">
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" aria-hidden />
           {copy.running}
@@ -194,7 +237,7 @@ export default function RemediationBanner({
 
   if (phase === 'done' && result) {
     return (
-      <section className="mt-4 rounded-md border border-[#34d399]/45 bg-surface p-4 ring-1 ring-[#34d399]/15">
+      <section id="audit-batch-remediation" className="mt-4 rounded-md border border-[#34d399]/45 bg-surface p-4 ring-1 ring-[#34d399]/15">
         <div className="text-sm font-semibold text-[#86efac]">✓ {copy.done}</div>
         <p className="mt-1.5 max-w-[820px] text-[12.5px] leading-relaxed text-text-muted">
           {result.autoMergeQueued ? copy.queued : copy.prReady}
@@ -214,7 +257,7 @@ export default function RemediationBanner({
 
   if (phase === 'error') {
     return (
-      <section className="mt-4 rounded-md border border-danger bg-surface p-4">
+      <section id="audit-batch-remediation" className="mt-4 rounded-md border border-danger bg-surface p-4">
         <div className="text-sm font-semibold text-danger">{copy.error}</div>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-danger">{error}</p>
         {upgrade ? (
@@ -227,17 +270,17 @@ export default function RemediationBanner({
   }
 
   return (
-    <section className="mt-4 overflow-hidden rounded-md border border-accent/40 bg-surface/50 p-4 ring-1 ring-accent/15 backdrop-blur-sm" style={{ borderLeft: '3px solid var(--sb-accent, #ffc300)' }}>
+    <section id="audit-batch-remediation" className="mt-4 overflow-hidden rounded-md border border-accent/40 bg-surface/50 p-4 ring-1 ring-accent/15 backdrop-blur-sm" style={{ borderLeft: '3px solid var(--sb-accent, #ffc300)' }}>
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-[260px] flex-1">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
             <h3 className="text-sm font-semibold tracking-tight text-text">{copy.question.replace('{count}', String(count))}</h3>
           </div>
-          <p className="mt-1.5 max-w-[820px] text-[12.5px] leading-relaxed text-text-muted">{runId ? copy.body : copy.noRun}</p>
+          <p className="mt-1.5 max-w-[820px] text-[12.5px] leading-relaxed text-text-muted">{copy.body}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
-          <button type="button" onClick={approveAll} disabled={!runId} className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={approveAll} className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
             {copy.approve}
           </button>
           <button type="button" onClick={() => setDismissed(true)} className="inline-flex items-center justify-center rounded-md border border-border bg-bg px-4 py-2 text-sm font-semibold text-text-muted transition-fast hover:border-accent hover:text-text">

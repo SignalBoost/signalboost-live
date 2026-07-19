@@ -596,6 +596,14 @@ ChatGPT/OpenAI reasoning may be used as a lead audit/review layer when configure
 
 Do not hard-code vendor hierarchy as a permanent fact if the repo configuration changes. Verify current model/provider configuration before changing audit behavior.
 
+Audit remediation consent and patch workflow:
+
+- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.
+- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.
+- Code findings must still go through a generated preview, visible diff, and explicit `Confirm & Push Pull Request` action. Provider and infrastructure findings remain behind the PR Cockpit owner `Merge/Approve` gate.
+- The Executive Risk Summary must overlay persisted `audit_finding_state` rows before scoring or counting actionable work. Findings marked `resolved`, `accepted`, or `wont_fix` must not continue to appear as active fix offers; `in_progress` remains actionable.
+- Repository patch preflight must resolve `@/*` imports against the correct workspace: root `app/`, `lib/`, and `components/` paths use the repository-root alias, while `saas/*` paths use the SaaS alias. Genuine missing imports must continue to fail closed.
+
 ---
 
 ## 15. Design System Guardrails
@@ -726,6 +734,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.
 - 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.
 - 2026-07-18: Added persistent emergency routing: injected a globally accessible, owner/admin-gated `🛑 Supervisor SOC (Kill Switch)` link to the Mission 001 Supervisor SOC and Kill Switch into the shared AppShell navigation and responsive hamburger menu to ensure immediate human override capability during AI failures. The server-side Supervisor and kill/restore authorization gates remain unchanged.

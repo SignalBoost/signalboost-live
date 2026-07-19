@@ -11,6 +11,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
+import AuditFixConsent from '@/components/audit/AuditFixConsent'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -39,11 +40,14 @@ export type ExecutiveSummaryView = {
 }
 
 export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView }) {
-  const { t } = useTranslation()
+  const { t, lang } = useTranslation()
   const tt = (key: string, fallback: string, params?: Record<string, string | number>) =>
     interpolate(t(key, fallback), params)
 
   const s = data.score
+  const actionableFindings = data.findings.filter(f =>
+    !f.evidenceRequired && !['resolved', 'accepted', 'wont_fix'].includes(f.status),
+  )
 
   return (
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
@@ -74,6 +78,13 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
           <Sev label={t('audit.common.evidenceRequired', 'Evidence required')} n={data.evidenceRequired} color={'rgba(255,255,255,.6)'} />
         </div>
       </section>
+
+      {/* Explicit user consent before remediation preparation. */}
+      <AuditFixConsent
+        count={actionableFindings.length}
+        lang={lang}
+        acceptHref="/hub/audit/remediation"
+      />
 
       {/* Narrative (only when the model produced one) */}
       {data.narrative ? (

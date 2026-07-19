@@ -55,6 +55,15 @@ test('bootstrap registers the Azure provider into the canonical registry', () =>
   assert.ok(azure.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
 })
 
+test('bootstrap registers the Google Cloud provider into the canonical registry', () => {
+  const registry = buildUniversalProviderRegistry()
+  const googleCloud = registry.get('google-cloud')
+  assert.equal(googleCloud.metadata.providerId, 'google-cloud')
+  assert.ok(googleCloud.metadata.capabilities.length >= 10)
+  assert.ok(googleCloud.metadata.capabilities.every((c) => c.readOnly), 'all Google Cloud capabilities must be read-only')
+  assert.ok(googleCloud.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
+})
+
 test('registered providers are discoverable via toMetadata()', () => {
   const ids = buildUniversalProviderRegistry().toMetadata().map((m) => m.providerId)
   assert.ok(ids.includes('github'))
@@ -63,6 +72,7 @@ test('registered providers are discoverable via toMetadata()', () => {
   assert.ok(ids.includes('cloudflare'))
   assert.ok(ids.includes('aws'))
   assert.ok(ids.includes('azure'))
+  assert.ok(ids.includes('google-cloud'))
 })
 
 test('capability discovery resolves known read-only capabilities', () => {
@@ -73,6 +83,7 @@ test('capability discovery resolves known read-only capabilities', () => {
   const cloudflare = registry.findCapability('cloudflare', 'cloudflare.zones.list')
   const aws = registry.findCapability('aws', 'aws.ec2.instances.list')
   const azure = registry.findCapability('azure', 'azure.compute.virtual_machines.list')
+  const googleCloud = registry.findCapability('google-cloud', 'google_cloud.compute.instances.list')
   assert.equal(github.readOnly, true)
   assert.equal(github.riskClass, 'read_only')
   assert.equal(stripe.readOnly, true)
@@ -85,6 +96,8 @@ test('capability discovery resolves known read-only capabilities', () => {
   assert.equal(aws.riskClass, 'read_only')
   assert.equal(azure.readOnly, true)
   assert.equal(azure.riskClass, 'read_only')
+  assert.equal(googleCloud.readOnly, true)
+  assert.equal(googleCloud.riskClass, 'read_only')
 })
 
 test('getUniversalProviderRegistry returns a stable singleton', () => {

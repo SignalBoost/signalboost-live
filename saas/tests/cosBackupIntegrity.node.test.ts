@@ -83,7 +83,7 @@ test('Concierge returns healthy Primary without waiting for Backup COS', async (
   assert.match(source, /primary = await supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
   assert.match(source, /if \(primary && immediateReasons\.length === 0\)/)
   assert.match(source, /after\(async \(\) =>/)
-  assert.match(source, /return primary/)
+  assert.match(source, /return healthyPrimary/)
   assert.doesNotMatch(source, /Promise\.all\s*\(\s*\[\s*primaryPromise\s*,\s*backupPromise/)
 })
 

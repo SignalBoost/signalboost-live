@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { getTrafficAnalytics } from '@/lib/analytics/outreach';
+import { getTrafficAnalytics } from '@/lib/analytics/outreach'
+import { secureAnalyticsRoute } from '@/lib/analytics/route'
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  return NextResponse.json(await getTrafficAnalytics(request.url));
+  return secureAnalyticsRoute(request, getTrafficAnalytics)
 }

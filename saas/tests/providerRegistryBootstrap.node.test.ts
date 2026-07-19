@@ -2,115 +2,68 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildUniversalProviderRegistry, getUniversalProviderRegistry } from '../lib/provider-framework/provider-registry-bootstrap.ts'
 
-test('bootstrap registers the GitHub provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const github = registry.get('github')
-  assert.equal(github.metadata.providerId, 'github')
-  assert.ok(github.metadata.capabilities.length >= 13)
-  assert.ok(github.metadata.capabilities.every((c) => c.readOnly), 'all GitHub capabilities must be read-only')
-})
+const expectedProviders = [
+  ['github', 13],
+  ['stripe', 10],
+  ['supabase', 8],
+  ['cloudflare', 10],
+  ['aws', 10],
+  ['azure', 10],
+  ['google-cloud', 10],
+  ['namecheap', 10],
+  ['digitalocean', 10],
+  ['vercel', 10],
+  ['netlify', 10],
+  ['railway', 10],
+  ['render', 10],
+  ['flyio', 10],
+  ['cloudinary', 10],
+  ['bunnycdn', 10],
+  ['upstash', 10],
+  ['neon', 10],
+  ['planetscale', 10],
+  ['mongodb-atlas', 10],
+] as const
 
-test('bootstrap registers the Stripe provider into the canonical registry', () => {
+test('bootstrap registers every provider into the canonical registry', () => {
   const registry = buildUniversalProviderRegistry()
-  const stripe = registry.get('stripe')
-  assert.equal(stripe.metadata.providerId, 'stripe')
-  assert.ok(stripe.metadata.capabilities.length >= 10)
-  assert.ok(stripe.metadata.capabilities.every((c) => c.readOnly), 'all Stripe capabilities must be read-only')
-  assert.ok(stripe.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
-})
-
-test('bootstrap registers the Supabase provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const supabase = registry.get('supabase')
-  assert.equal(supabase.metadata.providerId, 'supabase')
-  assert.ok(supabase.metadata.capabilities.length >= 8)
-  assert.ok(supabase.metadata.capabilities.every((c) => c.readOnly), 'all Supabase capabilities must be read-only')
-  assert.ok(supabase.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
-})
-
-test('bootstrap registers the Cloudflare provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const cloudflare = registry.get('cloudflare')
-  assert.equal(cloudflare.metadata.providerId, 'cloudflare')
-  assert.ok(cloudflare.metadata.capabilities.length >= 10)
-  assert.ok(cloudflare.metadata.capabilities.every((c) => c.readOnly), 'all Cloudflare capabilities must be read-only')
-  assert.ok(cloudflare.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
-})
-
-test('bootstrap registers the AWS provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const aws = registry.get('aws')
-  assert.equal(aws.metadata.providerId, 'aws')
-  assert.ok(aws.metadata.capabilities.length >= 10)
-  assert.ok(aws.metadata.capabilities.every((c) => c.readOnly), 'all AWS capabilities must be read-only')
-  assert.ok(aws.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
-})
-
-test('bootstrap registers the Azure provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const azure = registry.get('azure')
-  assert.equal(azure.metadata.providerId, 'azure')
-  assert.ok(azure.metadata.capabilities.length >= 10)
-  assert.ok(azure.metadata.capabilities.every((c) => c.readOnly), 'all Azure capabilities must be read-only')
-  assert.ok(azure.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
-})
-
-test('bootstrap registers the Google Cloud provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const googleCloud = registry.get('google-cloud')
-  assert.equal(googleCloud.metadata.providerId, 'google-cloud')
-  assert.ok(googleCloud.metadata.capabilities.length >= 10)
-  assert.ok(googleCloud.metadata.capabilities.every((c) => c.readOnly), 'all Google Cloud capabilities must be read-only')
-  assert.ok(googleCloud.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
-})
-
-test('bootstrap registers the Namecheap provider into the canonical registry', () => {
-  const registry = buildUniversalProviderRegistry()
-  const namecheap = registry.get('namecheap')
-  assert.equal(namecheap.metadata.providerId, 'namecheap')
-  assert.ok(namecheap.metadata.capabilities.length >= 10)
-  assert.ok(namecheap.metadata.capabilities.every((c) => c.readOnly), 'all Namecheap capabilities must be read-only')
-  assert.ok(namecheap.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
+  for (const [providerId, minimumCapabilities] of expectedProviders) {
+    const provider = registry.get(providerId)
+    assert.equal(provider.metadata.providerId, providerId)
+    assert.ok(provider.metadata.capabilities.length >= minimumCapabilities)
+    assert.ok(provider.metadata.capabilities.every((capability) => capability.readOnly), `${providerId} capabilities must be read-only`)
+    assert.ok(provider.metadata.capabilities.every((capability) => capability.riskClass === 'read_only'))
+  }
 })
 
 test('registered providers are discoverable via toMetadata()', () => {
-  const ids = buildUniversalProviderRegistry().toMetadata().map((m) => m.providerId)
-  assert.ok(ids.includes('github'))
-  assert.ok(ids.includes('stripe'))
-  assert.ok(ids.includes('supabase'))
-  assert.ok(ids.includes('cloudflare'))
-  assert.ok(ids.includes('aws'))
-  assert.ok(ids.includes('azure'))
-  assert.ok(ids.includes('google-cloud'))
-  assert.ok(ids.includes('namecheap'))
+  const ids = new Set(buildUniversalProviderRegistry().toMetadata().map((metadata) => metadata.providerId))
+  for (const [providerId] of expectedProviders) assert.ok(ids.has(providerId), `${providerId} must be discoverable`)
 })
 
-test('capability discovery resolves known read-only capabilities', () => {
+test('hosted provider capability discovery resolves known read-only capabilities', () => {
   const registry = buildUniversalProviderRegistry()
-  const github = registry.findCapability('github', 'github.repositories.list')
-  const stripe = registry.findCapability('stripe', 'stripe.balance.read')
-  const supabase = registry.findCapability('supabase', 'supabase.database.health.read')
-  const cloudflare = registry.findCapability('cloudflare', 'cloudflare.zones.list')
-  const aws = registry.findCapability('aws', 'aws.ec2.instances.list')
-  const azure = registry.findCapability('azure', 'azure.compute.virtual_machines.list')
-  const googleCloud = registry.findCapability('google-cloud', 'google_cloud.compute.instances.list')
-  const namecheap = registry.findCapability('namecheap', 'namecheap.domains.list')
-  assert.equal(github.readOnly, true)
-  assert.equal(github.riskClass, 'read_only')
-  assert.equal(stripe.readOnly, true)
-  assert.equal(stripe.riskClass, 'read_only')
-  assert.equal(supabase.readOnly, true)
-  assert.equal(supabase.riskClass, 'read_only')
-  assert.equal(cloudflare.readOnly, true)
-  assert.equal(cloudflare.riskClass, 'read_only')
-  assert.equal(aws.readOnly, true)
-  assert.equal(aws.riskClass, 'read_only')
-  assert.equal(azure.readOnly, true)
-  assert.equal(azure.riskClass, 'read_only')
-  assert.equal(googleCloud.readOnly, true)
-  assert.equal(googleCloud.riskClass, 'read_only')
-  assert.equal(namecheap.readOnly, true)
-  assert.equal(namecheap.riskClass, 'read_only')
+  const knownCapabilities = [
+    ['digitalocean', 'digitalocean.droplets.list'],
+    ['vercel', 'vercel.projects.list'],
+    ['netlify', 'netlify.sites.list'],
+    ['railway', 'railway.projects.list'],
+    ['render', 'render.services.list'],
+    ['flyio', 'flyio.apps.list'],
+    ['cloudinary', 'cloudinary.resources.list'],
+    ['bunnycdn', 'bunnycdn.pull_zones.list'],
+    ['upstash', 'upstash.redis.databases.list'],
+    ['neon', 'neon.projects.list'],
+    ['planetscale', 'planetscale.databases.list'],
+    ['mongodb-atlas', 'mongodb_atlas.clusters.list'],
+  ] as const
+
+  for (const [providerId, capabilityId] of knownCapabilities) {
+    const capability = registry.findCapability(providerId, capabilityId)
+    assert.equal(capability.readOnly, true)
+    assert.equal(capability.riskClass, 'read_only')
+    assert.equal(capability.requiresApproval, false)
+  }
 })
 
 test('getUniversalProviderRegistry returns a stable singleton', () => {

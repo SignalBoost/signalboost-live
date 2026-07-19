@@ -31,12 +31,19 @@ function pushUnique(reasons: string[], reason: string) {
 }
 
 export function detectPrimaryCorruption(input: PrimaryCosSnapshot): string[] {
+  const status = Number(input.status)
+
+  // Authentication, authorization, validation, rate-limit, and other client
+  // denials belong to the governed Primary route. Continuity must never convert
+  // a Primary 4xx response into a successful Backup COS answer.
+  if (Number.isFinite(status) && status >= 400 && status < 500) return []
+
   const reasons: string[] = []
   const reply = String(input.reply || '').trim()
   const lowerReply = reply.toLowerCase()
   const source = String(input.source || '').trim().toLowerCase()
 
-  if (input.status >= 500) pushUnique(reasons, 'primary_http_failure')
+  if (!Number.isFinite(status) || status >= 500) pushUnique(reasons, 'primary_http_failure')
   if (!reply) pushUnique(reasons, 'primary_empty_reply')
   if (source === 'error-degraded' || source.endsWith('-degraded')) {
     pushUnique(reasons, 'primary_degraded_response')

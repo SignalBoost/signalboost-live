@@ -13,7 +13,6 @@ export type { BackupCosAnswer } from './policy'
 
 export const COS_CONTINUITY_SCHEMA = 'signalboost-cos-continuity-v1' as const
 
-const FALLBACK_BRAIN = `COS is SignalBoost's private Chief of Staff for the verified owner and administrators. Interpret the complete request in context. Use approved memory and evidence. Never invent facts. Never execute tools, publish, send, spend, mutate providers, or change infrastructure in backup mode. Return a useful read-only answer and clearly state when an action requires the primary governed tool path.`
 const DEFAULT_BACKUP_TIMEOUT_MS = 12_000
 
 export type CosRecoveryLog = {
@@ -60,10 +59,10 @@ async function loadApprovedBrain(): Promise<string> {
       const value = await readFile(candidate, 'utf8')
       if (value.includes('signalboost-cos-brain-v1')) return value
     } catch {
-      // Try the next packaged location.
+      // Try the next traced deployment location.
     }
   }
-  return FALLBACK_BRAIN
+  throw new Error('Approved COS brain snapshot is unavailable.')
 }
 
 function extractJson(value: string): Record<string, unknown> | null {

@@ -122,6 +122,7 @@ export default function RemediationBanner({
   count: number
   runId?: string | null
   lang?: string
+  targetId?: string
   initialResult?: AuditRemediationResult | null
   onComplete?: (result: AuditRemediationResult) => void
 }) {

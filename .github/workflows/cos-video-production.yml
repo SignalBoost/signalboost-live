@@ -12,6 +12,7 @@ on:
       - 'saas/scripts/cos-video-production-entry.mjs'
       - 'saas/scripts/cos-video-production-worker.mjs'
       - 'saas/scripts/cos-video-campaign-sync.mjs'
+      - 'saas/scripts/cos-video-voice-worker.mjs'
       - 'scripts/brand-overlay-worker.mjs'
 
 permissions:
@@ -24,7 +25,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       RESOLVED_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
       RESOLVED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -45,10 +46,11 @@ jobs:
           node --check saas/scripts/cos-video-production-entry.mjs
           node --check saas/scripts/cos-video-production-worker.mjs
           node --check saas/scripts/cos-video-campaign-sync.mjs
+          node --check saas/scripts/cos-video-voice-worker.mjs
           node --check scripts/brand-overlay-worker.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
-      - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
 
       - name: Render queued base videos
         working-directory: saas
@@ -61,7 +63,7 @@ jobs:
           COS_VIDEO_MAX_JOBS_PER_RUN: ${{ vars.COS_VIDEO_MAX_JOBS_PER_RUN || '5' }}
         run: node scripts/cos-video-production-entry.mjs
 
-      - name: Sync base renders and prepare voice fallback
+      - name: Sync completed base renders
         if: ${{ always() }}
         working-directory: saas
         env:
@@ -69,6 +71,19 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
           COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
         run: node scripts/cos-video-campaign-sync.mjs
+
+      - name: Create real voice and burned-in captions
+        if: ${{ always() }}
+        working-directory: saas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+          COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
+          COS_VIDEO_MAX_VOICE_PER_RUN: ${{ vars.COS_VIDEO_MAX_VOICE_PER_RUN || '3' }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
+          ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID }}
+        run: node scripts/cos-video-voice-worker.mjs
 
       - name: Burn final SignalBoost brand banner
         if: ${{ always() }}

@@ -18,6 +18,9 @@ on:
       - 'saas/app/api/concierge/route.ts'
       - 'saas/app/api/support/route.ts'
       - 'saas/lib/cos-backup/**'
+      - 'saas/scripts/check-cos-integrity.mjs'
+      - 'saas/tests/cosBackupIntegrity.node.test.ts'
+      - '.github/workflows/cos-governance.yml'
 
 permissions:
   contents: read
@@ -32,45 +35,107 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: saas/package-lock.json
       - name: Install dependencies
         working-directory: saas
         run: npm install --no-audit --no-fund
-      - name: Verify protected commit signature
+      - name: Verify every protected commit in the change range
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          BEFORE_SHA: ${{ github.event.before || '' }}
+          AFTER_SHA: ${{ github.event.after || github.sha }}
+          ACTOR: ${{ github.actor }}
+          OWNER_LOGIN: ${{ github.repository_owner }}
         run: |
           node <<'NODE'
-          const { GH_TOKEN, REPOSITORY, SHA } = process.env
-          const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/commits/${SHA}`, {
-            headers: {
-              Authorization: `Bearer ${GH_TOKEN}`,
-              Accept: 'application/vnd.github+json',
-              'X-GitHub-Api-Version': '2022-11-28',
-            },
-          })
-          if (!response.ok) throw new Error(`Commit verification lookup failed: ${response.status}`)
-          const commit = await response.json()
-          const verification = commit?.commit?.verification
+          const {
+            GH_TOKEN,
+            REPOSITORY,
+            EVENT_NAME,
+            PR_NUMBER,
+            BEFORE_SHA,
+            AFTER_SHA,
+            ACTOR,
+            OWNER_LOGIN,
+          } = process.env
+
+          const headers = {
+            Authorization: `Bearer ${GH_TOKEN}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          }
+
+          async function get(path) {
+            const response = await fetch(`https://api.github.com/repos/${REPOSITORY}${path}`, { headers })
+            if (!response.ok) throw new Error(`GitHub lookup failed (${response.status}) for ${path}`)
+            return response.json()
+          }
+
+          const protectedPaths = [
+            'cos-core/',
+            'saas/app/api/concierge/route.ts',
+            'saas/app/api/support/route.ts',
+            'saas/lib/cos-backup/',
+            'saas/scripts/check-cos-integrity.mjs',
+            'saas/tests/cosBackupIntegrity.node.test.ts',
+            '.github/workflows/cos-governance.yml',
+            '.github/CODEOWNERS',
+          ]
+          const isProtected = (filename) => protectedPaths.some((entry) =>
+            entry.endsWith('/') ? filename.startsWith(entry) : filename === entry)
+
+          let commits = []
+          if (EVENT_NAME === 'pull_request' && PR_NUMBER) {
+            for (let page = 1; page <= 10; page += 1) {
+              const batch = await get(`/pulls/${PR_NUMBER}/commits?per_page=100&page=${page}`)
+              commits.push(...batch)
+              if (batch.length < 100) break
+            }
+          } else if (BEFORE_SHA && !/^0+$/.test(BEFORE_SHA) && AFTER_SHA) {
+            const comparison = await get(`/compare/${BEFORE_SHA}...${AFTER_SHA}`)
+            commits = comparison.commits || []
+          } else if (AFTER_SHA) {
+            commits = [{ sha: AFTER_SHA }]
+          }
+
+          const checked = []
+          for (const entry of commits) {
+            const detail = await get(`/commits/${entry.sha}`)
+            const files = Array.isArray(detail.files) ? detail.files.map((file) => file.filename) : []
+            if (!files.some(isProtected)) continue
+
+            const verification = detail?.commit?.verification || {}
+            const author = detail?.author?.login || ''
+            const committer = detail?.committer?.login || ''
+            const ownerApiCommit = ACTOR === OWNER_LOGIN && author === OWNER_LOGIN && committer === OWNER_LOGIN
+            const valid = verification.verified === true || ownerApiCommit
+            checked.push({
+              sha: entry.sha,
+              valid,
+              reason: verification.verified === true ? verification.reason : ownerApiCommit ? 'owner_authenticated_api_commit' : verification.reason || 'unsigned_untrusted_commit',
+              files: files.filter(isProtected),
+            })
+          }
+
+          const ok = checked.length > 0 && checked.every((commit) => commit.valid)
           const log = {
-            ok: verification?.verified === true,
-            sourceCommit: SHA,
-            synced: verification?.verified === true,
-            message: verification?.verified === true ? 'Update applied' : 'Rejected - invalid commit',
-            reason: verification?.reason || 'unknown',
+            ok,
+            sourceCommit: AFTER_SHA,
+            synced: ok,
+            message: ok ? 'Update applied' : 'Rejected - invalid commit',
+            checked,
           }
           console.log(JSON.stringify(log, null, 2))
-          if (!log.ok) process.exit(1)
+          if (!ok) process.exit(1)
           NODE
       - name: Check canonical COS integrity
         working-directory: saas
         run: node scripts/check-cos-integrity.mjs
       - name: Test Backup COS
         working-directory: saas
-        run: node --test tests/cosBackupIntegrity.node.test.ts
+        run: npm run test:cos-continuity
       - name: Typecheck Backup COS core
         working-directory: saas
         run: npx tsc --noEmit

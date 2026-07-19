@@ -178,16 +178,30 @@ export default function PremiumCustomerNavbarV2() {
       setIsOwner(false)
       return
     }
-    fetch('/api/credits', { cache: 'no-store' })
-      .then(response => response.json())
-      .then(data => {
+    let cancelled = false
+    async function loadRole(attempt = 0): Promise<void> {
+      try {
+        const response = await fetch('/api/credits', { cache: 'no-store' })
+        if (!response.ok) {
+          // A non-200 (transient 401/500) must NOT silently strip an owner/admin
+          // of their navigation. Retry once, then leave the last known role
+          // untouched rather than hiding privileged items.
+          if (attempt < 1 && !cancelled) return loadRole(attempt + 1)
+          return
+        }
+        const data = await response.json()
+        if (cancelled) return
         setIsAdmin(Boolean(data.isAdmin))
         setIsOwner(Boolean(data.isOwner))
-      })
-      .catch(() => {
-        setIsAdmin(false)
-        setIsOwner(false)
-      })
+      } catch {
+        // Network error: retry once, then keep existing role — never hide controls.
+        if (attempt < 1 && !cancelled) return loadRole(attempt + 1)
+      }
+    }
+    loadRole()
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
   useEffect(() => {

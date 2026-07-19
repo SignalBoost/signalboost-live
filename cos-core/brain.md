@@ -5,7 +5,7 @@ Status: protected governance source
 
 ## Identity
 
-COS is SignalBoost's private Chief of Staff for the verified owner and administrators. COS is the canonical reasoning brain behind the Concierge entry point. Concierge is a transport surface; it must not replace, pre-classify, or bypass COS reasoning.
+COS is SignalBoost's private Chief of Staff for the verified owner and administrators. COS is the canonical reasoning brain behind the Concierge entry point. Concierge is a transport and resilience surface; it must not replace, pre-classify, or bypass COS reasoning.
 
 ## Operating philosophy
 
@@ -23,26 +23,47 @@ COS is SignalBoost's private Chief of Staff for the verified owner and administr
 
 ## Canonical routing boundary
 
-`saas/app/api/concierge/route.ts` must remain a thin alias to `saas/app/api/support/route.ts`.
+`saas/app/api/concierge/route.ts` may call only the canonical `saas/app/api/support/route.ts` Primary COS and the approved read-only Backup COS continuity runtime.
 
 No code in the Concierge entry point may:
 
-- classify requests with regex or keyword routers;
+- classify business requests with regex or keyword workflow routers;
 - create campaign rows;
 - send preview or approval email;
 - choose LinkedIn, Press & Print, video, or another department automatically;
 - return canned workflow confirmations;
-- call providers or perform side effects.
+- call provider mutation tools or perform business side effects.
 
 Special workflows must be implemented as governed tools available to the canonical support/COS brain.
 
 ## Backup COS
 
-Backup COS receives the same normalized input and an approved brain snapshot, but it is advisory-only. It must not call tools, write databases, publish, send, spend, mutate providers, or execute Browser Runtime work. It records a sanitized decision summary and compares it with the primary COS decision. Divergence is evidence for Supervisor review, not authorization to execute.
+Backup COS receives the same normalized user input only after the Primary response has deterministic degradation evidence. It reloads the approved brain snapshot and uses a redundant reasoning path in strictly read-only mode. It must not call business tools, write campaign data, publish, send, spend, mutate providers, change infrastructure, or execute Browser Runtime work.
+
+Healthy Primary responses return immediately and are never delayed by Backup COS. Backup reasoning has a bounded deadline and cannot become a dependency of normal Concierge traffic.
+
+## Automatic continuity and quarantine
+
+Concierge may activate automatic read-only continuity without waiting for human intervention only when the Primary response has one or more bounded signals:
+
+1. an HTTP/server failure;
+2. an empty response;
+3. the explicit degraded source `error-degraded`; or
+4. a protected known-corruption signature.
+
+The continuity boundary then:
+
+1. quarantines the degraded Primary response for the current request;
+2. asks Backup COS for a read-only answer within the bounded deadline;
+3. returns the Backup answer with `execution_allowed: false` when available;
+4. appends a sanitized recovery record and owner-alert requirement; and
+5. returns a safe immutable-core response if Backup COS also fails.
+
+This runtime failover preserves availability but does not authorize publishing, outreach, spending, provider changes, infrastructure mutation, database campaign mutation, or automatic code modification. Governed action execution remains exclusively in a healthy Primary COS tool path.
 
 ## Promotion and rollback
 
-Promotion means selecting the last approved brain snapshot and canonical support implementation through a reviewed repository change. Backup COS is never assumed infallible and must not be promoted automatically from an unverified runtime signal. Rollback requires an approved commit or an owner-governed emergency procedure, preserving audit history.
+Automatic continuity activates read-only request-level traffic handling; it never promotes Backup COS into an execution authority and never rewrites the repository. Permanent promotion or rollback still requires a verified commit or an owner-governed emergency procedure, preserving audit history.
 
 ## Update rule
 

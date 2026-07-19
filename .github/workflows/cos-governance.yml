@@ -1,0 +1,67 @@
+name: COS Governance Guard
+
+on:
+  pull_request:
+    paths:
+      - 'cos-core/**'
+      - 'saas/app/api/concierge/route.ts'
+      - 'saas/app/api/support/route.ts'
+      - 'saas/lib/cos-backup/**'
+      - 'saas/scripts/check-cos-integrity.mjs'
+      - '.github/workflows/cos-governance.yml'
+      - '.github/CODEOWNERS'
+  push:
+    branches: [main]
+    paths:
+      - 'cos-core/**'
+      - 'saas/app/api/concierge/route.ts'
+      - 'saas/app/api/support/route.ts'
+      - 'saas/lib/cos-backup/**'
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify protected commit signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node <<'NODE'
+          const { GH_TOKEN, REPOSITORY, SHA } = process.env
+          const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/commits/${SHA}`, {
+            headers: {
+              Authorization: `Bearer ${GH_TOKEN}`,
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+            },
+          })
+          if (!response.ok) throw new Error(`Commit verification lookup failed: ${response.status}`)
+          const commit = await response.json()
+          const verification = commit?.commit?.verification
+          const log = {
+            ok: verification?.verified === true,
+            sourceCommit: SHA,
+            synced: verification?.verified === true,
+            message: verification?.verified === true ? 'Update applied' : 'Rejected - invalid commit',
+            reason: verification?.reason || 'unknown',
+          }
+          console.log(JSON.stringify(log, null, 2))
+          if (!log.ok) process.exit(1)
+          NODE
+      - name: Check canonical COS integrity
+        working-directory: saas
+        run: node scripts/check-cos-integrity.mjs
+      - name: Typecheck Backup COS core
+        working-directory: saas
+        run: npx tsc --noEmit

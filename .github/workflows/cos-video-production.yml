@@ -13,6 +13,7 @@ on:
       - 'saas/scripts/cos-video-production-worker.mjs'
       - 'saas/scripts/cos-video-campaign-sync.mjs'
       - 'saas/scripts/cos-video-voice-worker.mjs'
+      - 'saas/scripts/cos-video-voice-metadata-normalize.mjs'
       - 'scripts/brand-overlay-worker.mjs'
 
 permissions:
@@ -47,6 +48,7 @@ jobs:
           node --check saas/scripts/cos-video-production-worker.mjs
           node --check saas/scripts/cos-video-campaign-sync.mjs
           node --check saas/scripts/cos-video-voice-worker.mjs
+          node --check saas/scripts/cos-video-voice-metadata-normalize.mjs
           node --check scripts/brand-overlay-worker.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
@@ -84,6 +86,14 @@ jobs:
           ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
           ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID }}
         run: node scripts/cos-video-voice-worker.mjs
+
+      - name: Normalize real voice metadata
+        if: ${{ always() }}
+        working-directory: saas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/cos-video-voice-metadata-normalize.mjs
 
       - name: Burn final SignalBoost brand banner
         if: ${{ always() }}

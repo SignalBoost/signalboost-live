@@ -43,4 +43,4 @@ Required order (from ONBOARD.md, non-negotiable):
 - Type-check against the repo tsconfig (strict: false) before delivering. Never claim builds/tests/deploys succeeded without verification.
 - State out-of-band steps explicitly (Vercel env vars, Supabase SQL, provider dashboards).
 
-If your task changes architecture, providers, approval gates, env handling, Supabase schema, or developer instructions, you MUST update `ONBOARD.md` in the same change (Section 18) and add a change-log entry (Section 19).
+Keep `ONBOARD.md` accurate when a change benefits from durable architecture or operator documentation, but an `ONBOARD.md` edit or PR-body acknowledgement is not required for commit or merge.

@@ -23,6 +23,51 @@ test('global approval is scoped to a valid current run and prevents duplicate ap
   assert.match(migration, /unique \(run_id\)/)
 })
 
+test('owner approval invokes governed remediation and already-approved retries remain valid', () => {
+  const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
+  assert.match(route, /runApprovedAuditRemediation/)
+  assert.match(route, /const alreadyApproved = event\?\.reason === 'already_approved'/)
+  assert.match(route, /if \(!event\?\.approved && !alreadyApproved\)/)
+  assert.match(route, /code: 'audit_remediation_failed'/)
+  assert.match(route, /retryable: true/)
+  assert.match(route, /remediation\.findingsApplied \+ remediation\.findingsAlreadyResolved/)
+})
+
+test('approved remediation writes only to one ai branch and one pull request', () => {
+  const engine = read('../lib/audit/approvedRunRemediation.ts')
+  assert.match(engine, /const REPO = 'SignalBoost\/signalboost-live'/)
+  assert.match(engine, /const BASE_BRANCH = 'main'/)
+  assert.match(engine, /ai\/audit-run-/)
+  assert.match(engine, /commitFileToBranch/)
+  assert.match(engine, /enablePullRequestAutoMerge/)
+  assert.match(engine, /mergeMethod: SQUASH/)
+  assert.match(engine, /required repository checks pass/)
+  assert.doesNotMatch(engine, /branch:\s*['"]main['"]/)
+  assert.doesNotMatch(engine, /refs\/heads\/main/)
+})
+
+test('deterministic remediation applies only exact i18n raw JSX text', () => {
+  const engine = read('../lib/audit/approvedRunRemediation.ts')
+  assert.match(engine, /category\.toLowerCase\(\) === 'i18n-raw-string'/)
+  assert.match(engine, /LocalizedText/)
+  assert.match(engine, /rawJsxTextPresent/)
+  assert.match(engine, /findBadImports/)
+  assert.match(engine, /preservedFraction/)
+  assert.match(engine, /Only exact i18n raw-text findings are supported/)
+  assert.doesNotMatch(engine, /callAuditModel/)
+})
+
+test('recovery cron processes only the newest durably approved run', () => {
+  const cron = read('../app/api/cron/audit-approved-remediation/route.ts')
+  const vercel = read('../vercel.json')
+  assert.match(cron, /\.eq\('status', 'approved'\)/)
+  assert.match(cron, /\.order\('created_at', \{ ascending: false \}\)/)
+  assert.match(cron, /\.limit\(1\)/)
+  assert.match(cron, /audit_remediation_approvals/)
+  assert.match(cron, /runApprovedAuditRemediation/)
+  assert.match(vercel, /"path": "\/api\/cron\/audit-approved-remediation"[\s\S]*?"schedule": "\*\/10 \* \* \* \*"/)
+})
+
 test('approval event includes the required immutable audit fields and rollback marker', () => {
   const migration = read('../supabase/migrations/20260719_audit_run_global_approval.sql')
   for (const field of ['runId', 'approvedBy', 'findingsFixed', 'status', 'timestamp']) assert.match(migration, new RegExp(`'${field}'`))
@@ -41,7 +86,8 @@ test('approved batch marks only the selected run findings as fixed in the same R
 test('schema drift fails closed with actionable repair state', () => {
   const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
   assert.match(route, /audit_approval_schema_not_ready/)
-  assert.match(route, /column "approved" of relation "audit_runs" does not exist/)
+  assert.match(route, /column \"approved\" of relation \"audit_runs\" does not exist/)
+  assert.match(route, /column reference \"run_id\" is ambiguous/)
   assert.match(route, /requiredMigrations: REQUIRED_MIGRATIONS/)
   assert.match(route, /repairCompleted: schemaRepaired/)
   assert.match(route, /repairFailedStep: schemaRepairFailedStep/)
@@ -63,7 +109,8 @@ test('known schema drift runs fixed SQL as one statement per RPC and retries app
   assert.doesNotMatch(route, /query:\s*body\.|query:\s*payload\.|query:\s*req\./)
 
   assert.match(repair, /export const AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS = \[/)
-  assert.equal((repair.match(/String\.raw`/g) || []).length, 8)
+  assert.equal((repair.match(/String\.raw`/g) || []).length, 9)
+  assert.match(repair, /drop function if exists public\.approve_audit_run_remediation/)
   assert.match(repair, /create table if not exists public\.audit_remediation_approvals/)
   assert.match(repair, /set status = 'approved'/)
   assert.match(repair, /grant execute on function public\.approve_audit_run_remediation\(uuid, uuid\) to service_role/)

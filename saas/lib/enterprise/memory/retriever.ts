@@ -1,4 +1,3 @@
-import { getAdminSupabase } from '../../../utils/supabase/server.ts'
 import {
   rankEnterpriseMemoryCandidates,
   type EnterpriseMemoryCandidate,
@@ -174,6 +173,7 @@ export async function retrieveEnterpriseMemoryContext(args: {
 }): Promise<EnterpriseMemoryContext | null> {
   const organizationId = args.organizationId.trim()
   if (!organizationId) return null
+  const { getAdminSupabase } = await import('../../../utils/supabase/server.ts')
   const admin = getAdminSupabase()
 
   const [organizationResult, intelligenceResult, repositoriesResult, campaignsResult, approvalsResult, confidenceResult] = await Promise.all([

@@ -1,13 +1,10 @@
 // saas/tests/renderCredits.node.test.ts
-//
-// Pins the render-credit pricing math: the markup and credit conversion that
-// decide the platform's margin. The DB atomic deduct and daily cap are exercised
-// against a live DB elsewhere; here we lock the pure math that must never drift.
-//
-// Run: node --test tests/renderCredits.node.test.ts
+// Pins customer pricing math, unlimited owner entitlements, and owner-only access.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { RENDER_MARKUP, creditsForProviderCost } from '../lib/credits/renderPricing.ts'
 
 test('markup is 3x', () => {
@@ -19,9 +16,8 @@ test('a provider cost of 100c charges the user 300 credits (3x)', () => {
 })
 
 test('rounds up so the platform never undercharges', () => {
-  // 33c * 3 = 99 -> 99; 33.4c would ceil provider first
   assert.equal(creditsForProviderCost(33), 99)
-  assert.equal(creditsForProviderCost(33.4), 102) // ceil(34)*3
+  assert.equal(creditsForProviderCost(33.4), 102)
 })
 
 test('zero or negative provider cost never charges negative credits', () => {
@@ -29,6 +25,63 @@ test('zero or negative provider cost never charges negative credits', () => {
   assert.equal(creditsForProviderCost(-50), 0)
 })
 
-test('a typical $4 render (400c) costs the user 1200 credits (~$12 at 1c/credit)', () => {
+test('a typical $4 render costs a customer 1200 credits', () => {
   assert.equal(creditsForProviderCost(400), 1200)
+})
+
+test('verified owner bypasses deductions only after usage is durably accounted', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/credits/renderCredits.ts'), 'utf8')
+  assert.match(source, /entitlements\.unlimitedCredits/)
+  assert.match(source, /credits_charged:\s*0/)
+  assert.match(source, /provider_cost_cents:\s*Math\.ceil/)
+  assert.match(source, /if \(error \|\| !row\?\.id\)/)
+  assert.match(source, /Could not record owner render usage\./)
+  assert.match(source, /ledgerId:\s*row\.id/)
+  assert.match(source, /unlimited:\s*true/)
+  assert.doesNotMatch(source, /owner_unlimited_/)
+})
+
+test('owner entitlement is granted only through OWNER_EMAILS', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/ownerEntitlements.ts'), 'utf8')
+  assert.match(source, /OWNER_EMAILS/)
+  assert.match(source, /auth\.admin\.getUserById/)
+  assert.doesNotMatch(source, /team_members/)
+  assert.doesNotMatch(source, /ADMIN_EMAILS/)
+})
+
+test('canonical protected access treats only owner as admin', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/access.ts'), 'utf8')
+  assert.match(source, /isAdmin:\s*isOwner/)
+  assert.match(source, /if \(!ctx\.isOwner\)/)
+  assert.doesNotMatch(source, /ADMIN_EMAILS/)
+  assert.doesNotMatch(source, /team_members/)
+})
+
+test('admin layout is owner-only', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'app/admin/layout.tsx'), 'utf8')
+  assert.match(source, /if \(!access\.isOwner\) redirect\('\/dashboard'\)/)
+  assert.doesNotMatch(source, /access\.isAdmin/)
+})
+
+test('Hub permission middleware rejects workspace admins and synthesizes only owner', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/permission-middleware.ts'), 'utf8')
+  assert.match(source, /if \(!access\.isOwner/)
+  assert.match(source, /role:\s*'owner'/)
+  assert.doesNotMatch(source, /hub_workspace_users/)
+  assert.doesNotMatch(source, /access\.role === 'admin'/)
+})
+
+test('root marketing admin gate uses only owner allowlist', async () => {
+  const source = await readFile(path.resolve(process.cwd(), '../lib/auth/marketingAdmin.ts'), 'utf8')
+  assert.match(source, /OWNER_EMAILS/)
+  assert.match(source, /OWNER_EMAIL/)
+  assert.doesNotMatch(source, /ADMIN_EMAILS/)
+  assert.doesNotMatch(source, /role === 'admin'/)
+})
+
+test('render-credit API exposes unlimited owner state', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/agency/render-credits/route.ts'), 'utf8')
+  assert.match(source, /access\.isOwner/)
+  assert.match(source, /unlimited:\s*true/)
+  assert.match(source, /balance:\s*null/)
 })

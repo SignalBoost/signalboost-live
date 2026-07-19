@@ -29,12 +29,16 @@ test('a typical $4 render costs a customer 1200 credits', () => {
   assert.equal(creditsForProviderCost(400), 1200)
 })
 
-test('verified owner bypasses deductions while usage remains accounted', async () => {
+test('verified owner bypasses deductions only after usage is durably accounted', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'lib/credits/renderCredits.ts'), 'utf8')
   assert.match(source, /entitlements\.unlimitedCredits/)
   assert.match(source, /credits_charged:\s*0/)
   assert.match(source, /provider_cost_cents:\s*Math\.ceil/)
+  assert.match(source, /if \(error \|\| !row\?\.id\)/)
+  assert.match(source, /Could not record owner render usage\./)
+  assert.match(source, /ledgerId:\s*row\.id/)
   assert.match(source, /unlimited:\s*true/)
+  assert.doesNotMatch(source, /owner_unlimited_/)
 })
 
 test('owner entitlement is granted only through OWNER_EMAILS', async () => {

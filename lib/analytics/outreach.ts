@@ -1,9 +1,6 @@
-export type AnalyticsFilters = {
-  startDate?: string;
-  endDate?: string;
-  region?: string;
-  campaign?: string;
-};
+import type { AnalyticsFilters } from '@/lib/analytics/request';
+
+export type { AnalyticsFilters } from '@/lib/analytics/request';
 
 export type RegionalViews = { region: string; views: number };
 export type RegionalClicks = { region: string; clicks: number };
@@ -13,39 +10,6 @@ export type TrafficSource = { source: 'organic' | 'paid' | 'referral' | 'direct'
 const YOUTUBE_ANALYTICS_URL = 'https://youtubeanalytics.googleapis.com/v2/reports';
 const GA_DATA_URL = 'https://analyticsdata.googleapis.com/v1beta';
 const META_GRAPH_URL = 'https://graph.facebook.com/v20.0';
-
-const mockViews: RegionalViews[] = [
-  { region: 'US', views: 5400 },
-  { region: 'Brazil', views: 2800 },
-  { region: 'Nicaragua', views: 1200 },
-];
-
-const mockClicks: RegionalClicks[] = [
-  { region: 'US', clicks: 1100 },
-  { region: 'Brazil', clicks: 600 },
-  { region: 'Nicaragua', clicks: 300 },
-];
-
-const mockTraffic: TrafficSource[] = [
-  { source: 'organic', count: 3200 },
-  { source: 'paid', count: 1800 },
-  { source: 'referral', count: 900 },
-];
-
-const mockConversions: RegionalConversions[] = [
-  { region: 'US', conversions: 90 },
-  { region: 'Brazil', conversions: 40 },
-  { region: 'Nicaragua', conversions: 25 },
-];
-
-function readFilters(searchParams: URLSearchParams): AnalyticsFilters {
-  return {
-    startDate: searchParams.get('startDate') || undefined,
-    endDate: searchParams.get('endDate') || undefined,
-    region: searchParams.get('region') || undefined,
-    campaign: searchParams.get('campaign') || undefined,
-  };
-}
 
 function compactQuery(params: Record<string, string | undefined>) {
   const query = new URLSearchParams();
@@ -82,8 +46,7 @@ function campaignField(filters: AnalyticsFilters) {
     : {};
 }
 
-export async function getViewsAnalytics(requestUrl: string): Promise<RegionalViews[]> {
-  const filters = readFilters(new URL(requestUrl).searchParams);
+export async function getViewsAnalytics(filters: AnalyticsFilters = {}): Promise<RegionalViews[]> {
   const token = process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
   const channelId = process.env.YOUTUBE_CHANNEL_ID;
   const startDate = filters.startDate || '2026-06-01';
@@ -104,11 +67,10 @@ export async function getViewsAnalytics(requestUrl: string): Promise<RegionalVie
   );
 
   const regions = youtube?.rows?.map(([region, views]) => ({ region, views: Number(views || 0) })) || [];
-  return matchesRegion(regions.length ? regions : mockViews, filters.region);
+  return matchesRegion(regions, filters.region);
 }
 
-export async function getClicksAnalytics(requestUrl: string): Promise<RegionalClicks[]> {
-  const filters = readFilters(new URL(requestUrl).searchParams);
+export async function getClicksAnalytics(filters: AnalyticsFilters = {}): Promise<RegionalClicks[]> {
   const propertyId = process.env.GA4_PROPERTY_ID;
   const token = process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
   const ga = propertyId ? await fetchJson<{ rows?: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }> }>(
@@ -130,11 +92,10 @@ export async function getClicksAnalytics(requestUrl: string): Promise<RegionalCl
     clicks: Number(row.metricValues?.[0]?.value || 0),
   })) || [];
 
-  return matchesRegion(regions.length ? regions : mockClicks, filters.region);
+  return matchesRegion(regions, filters.region);
 }
 
-export async function getTrafficAnalytics(requestUrl: string): Promise<TrafficSource[]> {
-  const filters = readFilters(new URL(requestUrl).searchParams);
+export async function getTrafficAnalytics(filters: AnalyticsFilters = {}): Promise<TrafficSource[]> {
   const propertyId = process.env.GA4_PROPERTY_ID;
   const token = process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
   const ga = propertyId ? await fetchJson<{ rows?: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }> }>(
@@ -156,11 +117,10 @@ export async function getTrafficAnalytics(requestUrl: string): Promise<TrafficSo
     count: Number(row.metricValues?.[0]?.value || 0),
   })) || [];
 
-  return sources.length ? sources : mockTraffic;
+  return sources;
 }
 
-export async function getConversionsAnalytics(requestUrl: string): Promise<RegionalConversions[]> {
-  const filters = readFilters(new URL(requestUrl).searchParams);
+export async function getConversionsAnalytics(filters: AnalyticsFilters = {}): Promise<RegionalConversions[]> {
   const propertyId = process.env.GA4_PROPERTY_ID;
   const token = process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
   const metaAccountId = process.env.META_AD_ACCOUNT_ID;
@@ -199,5 +159,5 @@ export async function getConversionsAnalytics(requestUrl: string): Promise<Regio
   });
 
   const regions = Array.from(combined.values()).filter((row) => row.conversions > 0);
-  return matchesRegion(regions.length ? regions : mockConversions, filters.region);
+  return matchesRegion(regions, filters.region);
 }

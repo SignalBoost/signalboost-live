@@ -1,0 +1,57 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+
+test('audit reports explicitly ask whether the user wants AI-prepared fixes', () => {
+  const consent = read('../components/audit/AuditFixConsent.tsx')
+
+  for (const prompt of [
+    'Would you like SignalBoost AI to prepare fixes for these issues?',
+    '¿Quieres que SignalBoost AI prepare correcciones para estos problemas?',
+    'Você quer que a SignalBoost AI prepare correções para estes problemas?',
+    'Czy chcesz, aby SignalBoost AI przygotowała poprawki do tych problemów?',
+    'Хотите, чтобы SignalBoost AI подготовил исправления для этих проблем?',
+  ]) assert.ok(consent.includes(prompt), `missing localized consent prompt: ${prompt}`)
+
+  for (const answer of [
+    'Yes — prepare fixes', 'Not now',
+    'Sí — preparar correcciones', 'Ahora no',
+    'Sim — preparar correções',
+    'Tak — przygotuj poprawki', 'Nie teraz',
+    'Да — подготовить исправления', 'Не сейчас',
+  ]) assert.ok(consent.includes(answer), `missing localized consent answer: ${answer}`)
+})
+
+test('consent is visible in both live reports and repository-scan remediation', () => {
+  const executive = read('../components/audit/ExecutiveSummary.tsx')
+  const banner = read('../components/audit/RemediationBanner.tsx')
+
+  assert.match(executive, /import AuditFixConsent/)
+  assert.match(executive, /const actionableFindings = data\.findings\.filter/)
+  assert.match(executive, /!f\.evidenceRequired/)
+  assert.match(executive, /\['resolved', 'accepted', 'wont_fix'\]\.includes\(f\.status\)/)
+  assert.match(executive, /acceptHref="\/hub\/audit\/remediation"/)
+
+  assert.match(banner, /import AuditFixConsent/)
+  assert.match(banner, /onAccept=\{scrollToFindings\}/)
+  assert.match(banner, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/)
+})
+
+test('the consent step cannot mutate code, providers, or production', () => {
+  const consent = read('../components/audit/AuditFixConsent.tsx')
+  assert.doesNotMatch(consent, /fetch\(|XMLHttpRequest|stageInfrastructurePR|proposeInfrastructurePR|\/api\/hub\/action|method:\s*['"]POST['"]|confirmPush/i)
+  assert.match(consent, /prepares a remediation plan only/)
+  assert.match(consent, /until you review and approve the exact change/)
+})
+
+test('existing code-fix flow still requires preview before explicit pull-request confirmation', () => {
+  const patch = read('../components/audit/PatchPreview.tsx')
+  const previewCall = patch.indexOf("mode: 'preview'")
+  const commitCall = patch.indexOf("mode: 'commit'")
+  assert.ok(previewCall >= 0, 'preview phase missing')
+  assert.ok(commitCall > previewCall, 'commit must remain after preview')
+  assert.match(patch, /Confirm & Push Pull Request/)
+  assert.match(patch, /onClick=\{confirmPush\}/)
+})

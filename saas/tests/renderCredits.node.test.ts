@@ -1,5 +1,5 @@
 // saas/tests/renderCredits.node.test.ts
-// Pins customer pricing math and the verified-owner unlimited entitlement wiring.
+// Pins customer pricing math, unlimited owner entitlements, and owner-only access.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -37,12 +37,26 @@ test('verified owner bypasses deductions while usage remains accounted', async (
   assert.match(source, /unlimited:\s*true/)
 })
 
-test('owner entitlement uses OWNER_EMAILS and team_members owner role', async () => {
+test('owner entitlement is granted only through OWNER_EMAILS', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'lib/auth/ownerEntitlements.ts'), 'utf8')
   assert.match(source, /OWNER_EMAILS/)
-  assert.match(source, /team_members/)
-  assert.match(source, /role[^\n]*owner|owner[^\n]*role/)
   assert.match(source, /auth\.admin\.getUserById/)
+  assert.doesNotMatch(source, /team_members/)
+  assert.doesNotMatch(source, /ADMIN_EMAILS/)
+})
+
+test('canonical protected access treats only owner as admin', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/access.ts'), 'utf8')
+  assert.match(source, /isAdmin:\s*isOwner/)
+  assert.match(source, /if \(!ctx\.isOwner\)/)
+  assert.doesNotMatch(source, /ADMIN_EMAILS/)
+  assert.doesNotMatch(source, /team_members/)
+})
+
+test('admin layout is owner-only', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'app/admin/layout.tsx'), 'utf8')
+  assert.match(source, /if \(!access\.isOwner\) redirect\('\/dashboard'\)/)
+  assert.doesNotMatch(source, /access\.isAdmin/)
 })
 
 test('render-credit API exposes unlimited owner state', async () => {

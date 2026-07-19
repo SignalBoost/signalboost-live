@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { POST as supportPost } from '@/app/api/support/route'
 import { getAccess } from '@/lib/auth/access'
 import { proposeCampaign } from '@/lib/ai/proposeCampaign'
+import { callModel } from '@/lib/ai/modelRouter'
 import { sendPressPrintPreviewEmail } from '@/lib/marketing/pressPrintEmail'
 import { discoverPublisherTarget } from '@/lib/marketing/publisherDiscovery'
 
@@ -47,10 +48,10 @@ function socialPlatformFrom(text: string): string {
   if (/twitter|\bx post\b|\bon x\b|\btweet\b/.test(t)) return 'twitter'
   if (/instagram|\big\b/.test(t)) return 'instagram'
   if (/tiktok/.test(t)) return 'tiktok'
-  return 'linkedin'
+  return ''
 }
 
-function socialQueueRow(a: { platform: string; title: string; body: string; lang: string; now: string }) {
+function socialQueueRow(a: { platform: string; title: string; body: string; brief: string; lang: string; now: string }) {
   const recommendationId = id('rec_social_outreach')
   const audience = `Prospects, partners, and buyers on ${a.platform}.`
   const channel = a.platform
@@ -103,19 +104,55 @@ function socialQueueRow(a: { platform: string; title: string; body: string; lang
       concierge_requested_at: a.now,
       audience,
       body: a.body,
+      owner_brief: a.brief,
     },
     created_at: a.now,
     updated_at: a.now,
   }
 }
 
-async function createConciergeSocialCampaign(text: string, lang = 'en'): Promise<{ id: string; platform: string }> {
-  const platform = socialPlatformFrom(text)
-  const firstLine = String(text || '').split('\n').map((s) => s.trim()).find(Boolean) || `${platform} outreach post`
+// Grounded, factual context so generated posts never invent features.
+const SOCIAL_PLATFORM_CONTEXT = `SignalBoost is an AI-driven, human-monitored growth platform at saas.signalboostapp.com: it turns reviews into branded content, builds AI websites, runs image/video/audio studios, and automates multilingual campaigns (English, Spanish, Portuguese, Polish, Russian).`
+
+const SOCIAL_POST_FALLBACK: Record<string, (p: string) => string> = {
+  en: (p) => `Draft ${p} post (edit before publishing):\n\nSignalBoost helps businesses grow with AI — turning reviews into branded content, building websites, and running multilingual campaigns, all human-monitored. Want to see what it could do for your brand? Let's connect.`,
+  es: (p) => `Borrador de publicación para ${p} (edítalo antes de publicar):\n\nSignalBoost ayuda a las empresas a crecer con IA: convierte reseñas en contenido de marca, crea sitios web y ejecuta campañas multilingües, siempre con supervisión humana. ¿Quieres ver qué puede hacer por tu marca? Conectemos.`,
+  pt: (p) => `Rascunho de post para ${p} (edite antes de publicar):\n\nA SignalBoost ajuda empresas a crescer com IA: transforma avaliações em conteúdo de marca, cria sites e executa campanhas multilíngues, sempre com supervisão humana. Quer ver o que ela pode fazer pela sua marca? Vamos conversar.`,
+  pl: (p) => `Wersja robocza posta na ${p} (edytuj przed publikacją):\n\nSignalBoost pomaga firmom rosnąć dzięki AI: zamienia opinie w treści marki, buduje strony i prowadzi wielojęzyczne kampanie — zawsze pod nadzorem człowieka. Chcesz zobaczyć, co może zrobić dla Twojej marki? Połączmy się.`,
+  ru: (p) => `Черновик поста для ${p} (отредактируйте перед публикацией):\n\nSignalBoost помогает бизнесу расти с помощью ИИ: превращает отзывы в брендовый контент, создаёт сайты и запускает многоязычные кампании — всегда под контролем человека. Хотите узнать, что это даст вашему бренду? Давайте свяжемся.`,
+}
+
+// Turn the owner's free-form brief into a ready-to-publish post for the chosen
+// platform, in the requested language. Never echoes the raw brief; on any model
+// failure it returns a safe localized draft the owner can edit.
+async function generateSocialPost(brief: string, platform: string, lang: string): Promise<string> {
+  const fallback = (SOCIAL_POST_FALLBACK[lang] || SOCIAL_POST_FALLBACK.en)(platform)
+  const prompt = `You are SignalBoost's marketing writer. Write ONE ready-to-publish ${platform} post based on the owner's brief below. Ground it only in the platform context — do not invent features. Match the tone of ${platform}. Keep it concise and natural. Write it in this language: ${lang}.
+
+Return ONLY the post text — no preamble, no surrounding quotes, no markdown fences, no "here is your post".
+
+PLATFORM CONTEXT:
+${SOCIAL_PLATFORM_CONTEXT}
+
+OWNER BRIEF:
+${brief}`
+  try {
+    const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 900 })
+    const cleaned = String(raw || '').trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/i, '').trim()
+    return cleaned.length >= 20 ? cleaned : fallback
+  } catch {
+    return fallback
+  }
+}
+
+async function createConciergeSocialCampaign(text: string, platform: string, lang = 'en'): Promise<{ id: string; platform: string }> {
+  const brief = String(text || '')
+  const post = await generateSocialPost(brief, platform, lang)
+  const firstLine = brief.split('\n').map((s) => s.trim()).find(Boolean) || `${platform} outreach post`
   const title = firstLine.slice(0, 120)
   const now = new Date().toISOString()
   const sb = admin()
-  const row = socialQueueRow({ platform, title, body: text, lang, now })
+  const row = socialQueueRow({ platform, title, body: post, brief, lang, now })
   const { data, error } = await sb.from('cos_campaign_queue').insert(row).select('id').single()
   if (error) throw new Error(error.message)
   return { id: data.id, platform }
@@ -169,11 +206,12 @@ export async function POST(req: NextRequest) {
     const attachments = Array.isArray(body?.attachments) ? body.attachments : []
 
     if (isSocialOutreachRequest(text)) {
+      const platform = socialPlatformFrom(text)
       const ctx = await getAccess()
-      if (ctx.isOwner) {
+      if (ctx.isOwner && platform) {
         const lang = languageFrom(body, text)
         try {
-          const campaign = await createConciergeSocialCampaign(text, lang)
+          const campaign = await createConciergeSocialCampaign(text, platform, lang)
           return NextResponse.json({ reply: socialReply(lang, campaign.platform, campaign.id), source: 'concierge-cos-social-outreach-router', campaignId: campaign.id, platform: campaign.platform, execution_locked: true, approval_required: true, publish_locked: true })
         } catch (err) {
           const message = errorMessage(err)

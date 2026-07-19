@@ -1,8 +1,8 @@
 // saas/lib/audit/findingState.ts
 //
 // Pure helpers for per-finding triage state. No I/O, no React. The route reads/
-// writes audit_finding_state; this only normalizes and indexes rows so the UI
-// can overlay status + owner onto the deterministically-derived findings.
+// writes audit_finding_state; this only normalizes, indexes, and overlays rows so
+// report generators and UIs use the same persisted status/owner/due-date state.
 
 export type FindingStatusValue = 'open' | 'in_progress' | 'resolved' | 'accepted' | 'wont_fix'
 
@@ -46,4 +46,20 @@ export function indexStates(rows: FindingStateRow[]): FindingStateMap {
     map[r.finding_id] = { status: normalizeStatus(r.status), owner: r.owner || '', note: r.note || '', dueDate: r.due_date || '' }
   }
   return map
+}
+
+/** Overlay saved triage state without mutating the deterministic finding input. */
+export function overlayFindingStates<
+  T extends { id: string; status: string; owner?: string; dueDate?: string },
+>(findings: T[], states: FindingStateMap = {}): T[] {
+  return (findings || []).map(finding => {
+    const state = states[finding.id]
+    if (!state) return finding
+    return {
+      ...finding,
+      status: state.status,
+      owner: state.owner || finding.owner,
+      dueDate: state.dueDate || finding.dueDate,
+    } as T
+  })
 }

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "bootstrap",
+  "primaryHash": "bootstrap",
+  "backupMode": "observe_only"
+}

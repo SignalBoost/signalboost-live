@@ -48,3 +48,11 @@ saas/vercel.json @SignalBoostAi
 saas/supabase/ @SignalBoostAi
 saas/components/audit/ @SignalBoostAi
 saas/app/cybersecurity-check/ @SignalBoostAi
+
+# Canonical COS brain, Backup COS, and governance controls
+cos-core/ @SignalBoostAi
+app/api/support/ @SignalBoostAi
+app/api/concierge/ @SignalBoostAi
+lib/cos/ @SignalBoostAi
+scripts/cos-governance.mjs @SignalBoostAi
+scripts/supervise-cos.mjs @SignalBoostAi

@@ -701,6 +701,12 @@ The global `system_status.ai_autonomous_execution_enabled` flag is the emergency
 
 Emergency navigation is part of the shared `PremiumCustomerNavbarV2` AppShell navigation: authenticated owners/admins receive a persistent, high-visibility `🛑 Supervisor SOC (Kill Switch)` link to `/dashboard/supervisor` in both the desktop global navigation and the responsive hamburger menu. The client-side visibility condition is discovery-only; the Supervisor route and kill/restore API retain their established server-side admin gates. No global Command palette currently exists in this application.
 
+### Backup COS and Canonical Brain
+
+The canonical COS operating philosophy is version-controlled at `cos-core/brain.md`. It is a protected governance artifact: normal developers must not edit it, GitHub code-owner review and branch protection must require a verified governance signature, and the Pipeline Integrity `COS Core Governance` check fails closed for an unsigned core change. `scripts/cos-governance.mjs sync <commit>` accepts only a verified signer listed in `COS_GOVERNANCE_ALLOWED_SIGNERS`, then atomically updates the brain sync marker and the Backup COS manifest while emitting the required sanitized sync record (`ok`, `sourceCommit`, `synced`, and `message`). Invalid commits leave both artifacts unchanged.
+
+`app/api/support/route.ts` is the primary COS ingress. `app/api/concierge/route.ts` must remain a thin re-export only; `scripts/supervise-cos.mjs` detects regex routers, hard-coded request workflows, or other bypasses and can restore the canonical thin entry point with `--restore`, emitting an owner-facing alert. Backup COS lives in `lib/cos/backupCos.ts`, receives the same validated reasoning inputs, never executes actions, stores only bounded sanitized decision fingerprints, and flags decision divergence for Supervisor review. Promotion is a governed incident response: restore the approved primary/brain/manifest from the last signed commit, then deploy through the existing owner-approved release path; the backup manifest itself cannot authorize execution.
+
 ## 18. Mandatory ONBOARD Maintenance Rule
 
 `ONBOARD.md` must stay current.
@@ -725,6 +731,8 @@ This keeps the onboarding document current and prevents future developers or AI 
 ---
 
 ## 19. Onboarding Change Log
+
+- 2026-07-19: Added the Backup COS governance foundation: a protected canonical brain, signer-verified sync/manifest workflow with sanitized sync logs, observe-only Backup COS decision comparison, a Supervisor guard that keeps Concierge as a thin COS entry point, and code-owner/CI tripwires. No COS path can use the backup manifest to execute actions or bypass existing approval gates; owner-approved deployment remains required for production promotion.
 
 - 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.

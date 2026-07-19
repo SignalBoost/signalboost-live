@@ -36,3 +36,13 @@ jobs:
 
       - name: Verify route handler / page structure
         run: node scripts/verify-route-handlers.mjs
+
+      - name: Supervisor — enforce canonical COS ingress
+        run: node scripts/supervise-cos.mjs
+
+      - name: COS Core Governance
+        # Signature allowlist is an organization variable. With no allowlist,
+        # unchanged core files pass; any core mutation fails closed.
+        env:
+          COS_GOVERNANCE_ALLOWED_SIGNERS: ${{ vars.COS_GOVERNANCE_ALLOWED_SIGNERS }}
+        run: node scripts/cos-governance.mjs guard

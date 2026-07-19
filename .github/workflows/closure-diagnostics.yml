@@ -1,0 +1,44 @@
+name: V1 Closure Diagnostics
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/closure-diagnostics.yml'
+      - 'app/**'
+      - 'components/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'tsconfig.json'
+
+permissions:
+  contents: read
+
+jobs:
+  root-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: npm install --no-audit --no-fund
+      - name: Capture root typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > root-typecheck.log 2>&1
+          status=$?
+          cat root-typecheck.log
+          echo "$status" > root-typecheck.exit
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: root-typecheck-diagnostics
+          path: |
+            root-typecheck.log
+            root-typecheck.exit
+      - name: Enforce root typecheck
+        shell: bash
+        run: test "$(cat root-typecheck.exit)" = "0"

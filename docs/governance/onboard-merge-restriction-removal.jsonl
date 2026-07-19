@@ -1,0 +1,4 @@
+{"file":".github/workflows/onboard-acknowledgement.yml","line":"1-40","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 10:29:12"}
+{"file":".github/workflows/onboard-check.yml","line":"1-91","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 10:29:12"}
+{"file":".githooks/pre-commit","line":"1-24","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 10:29:12"}
+{"file":".githooks/prepare-commit-msg","line":"1-16","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 10:29:12"}

@@ -15,6 +15,7 @@ on:
       - 'saas/scripts/cos-video-language-purity-prep.mjs'
       - 'saas/scripts/cos-video-fast-final-worker-v2.mjs'
       - 'saas/scripts/cos-video-brand-banner-upgrade.mjs'
+      - 'saas/scripts/cos-video-approval-rearm.mjs'
 
 permissions:
   contents: read
@@ -50,6 +51,7 @@ jobs:
           node --check saas/scripts/cos-video-language-purity-prep.mjs
           node --check saas/scripts/cos-video-fast-final-worker-v2.mjs
           node --check saas/scripts/cos-video-brand-banner-upgrade.mjs
+          node --check saas/scripts/cos-video-approval-rearm.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
       - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
@@ -104,3 +106,11 @@ jobs:
           COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
           COS_VIDEO_BANNER_UPGRADE_LIMIT: ${{ vars.COS_VIDEO_BANNER_UPGRADE_LIMIT || '2' }}
         run: node scripts/cos-video-brand-banner-upgrade.mjs
+
+      - name: Re-arm owner approval email for changed final artifacts
+        if: ${{ always() }}
+        working-directory: saas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/cos-video-approval-rearm.mjs

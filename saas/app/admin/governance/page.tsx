@@ -1,11 +1,13 @@
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 export default function Page() {
+  const { t } = useTranslation()
   const [data, setData] = useState<any>(null)
   useEffect(() => {
     let active = true
@@ -32,7 +34,7 @@ export default function Page() {
             <span>Status: {p.status || 'unknown'} · Source: {p.telemetry?.source || 'live/default mix'}</span>
           </article>
         )) : (
-          <article className="sb-neon-panel"><p><LocalizedText fallback={"Example governance pipeline"} /></p><strong>Demo</strong><span>No live governance telemetry returned yet.</span></article>
+          <article className="sb-neon-panel"><p><LocalizedText fallback={"Example governance pipeline"} /></p><strong>Demo</strong><span>{t('console.governance.noLiveTelemetry', 'No live governance telemetry returned yet.')}</span></article>
         )}
       </section>
       <section className="sb-orbit-table" aria-label="Governance timeline">

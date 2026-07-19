@@ -9,14 +9,14 @@
 // NOT here — this module stays deterministic so the summary is identical on every
 // run and never depends on a model being reachable.
 
-import { runFindings, type AuditSnapshot } from './findingsEngine'
+import { runFindings, type AuditSnapshot } from './findingsEngine.ts'
 import {
   scoreFromFindings,
   type Finding,
   type AuditScore,
   type Severity,
-} from './reportModel'
-import { isHandled, type FindingStateMap } from './findingState'
+} from './reportModel.ts'
+import { isHandled, type FindingStateMap } from './findingState.ts'
 
 export interface ExecutiveSummaryData {
   generatedAt: string

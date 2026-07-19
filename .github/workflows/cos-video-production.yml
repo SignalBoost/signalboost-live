@@ -12,6 +12,7 @@ on:
       - 'saas/scripts/cos-video-production-entry.mjs'
       - 'saas/scripts/cos-video-production-worker.mjs'
       - 'saas/scripts/cos-video-campaign-sync.mjs'
+      - 'saas/scripts/cos-video-language-purity-prep.mjs'
       - 'saas/scripts/cos-video-fast-final-worker-v2.mjs'
 
 permissions:
@@ -45,6 +46,7 @@ jobs:
           node --check saas/scripts/cos-video-production-entry.mjs
           node --check saas/scripts/cos-video-production-worker.mjs
           node --check saas/scripts/cos-video-campaign-sync.mjs
+          node --check saas/scripts/cos-video-language-purity-prep.mjs
           node --check saas/scripts/cos-video-fast-final-worker-v2.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
@@ -69,6 +71,14 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
           COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
         run: node scripts/cos-video-campaign-sync.mjs
+
+      - name: Enforce campaign language purity
+        if: ${{ always() }}
+        working-directory: saas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/cos-video-language-purity-prep.mjs
 
       - name: Create clean full-screen final review videos
         if: ${{ always() }}

@@ -59,6 +59,22 @@ test('admin layout is owner-only', async () => {
   assert.doesNotMatch(source, /access\.isAdmin/)
 })
 
+test('Hub permission middleware rejects workspace admins and synthesizes only owner', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/permission-middleware.ts'), 'utf8')
+  assert.match(source, /if \(!access\.isOwner/)
+  assert.match(source, /role:\s*'owner'/)
+  assert.doesNotMatch(source, /hub_workspace_users/)
+  assert.doesNotMatch(source, /access\.role === 'admin'/)
+})
+
+test('root marketing admin gate uses only owner allowlist', async () => {
+  const source = await readFile(path.resolve(process.cwd(), '../lib/auth/marketingAdmin.ts'), 'utf8')
+  assert.match(source, /OWNER_EMAILS/)
+  assert.match(source, /OWNER_EMAIL/)
+  assert.doesNotMatch(source, /ADMIN_EMAILS/)
+  assert.doesNotMatch(source, /role === 'admin'/)
+})
+
 test('render-credit API exposes unlimited owner state', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/agency/render-credits/route.ts'), 'utf8')
   assert.match(source, /access\.isOwner/)

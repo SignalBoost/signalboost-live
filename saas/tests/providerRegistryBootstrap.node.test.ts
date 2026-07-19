@@ -64,6 +64,15 @@ test('bootstrap registers the Google Cloud provider into the canonical registry'
   assert.ok(googleCloud.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
 })
 
+test('bootstrap registers the Namecheap provider into the canonical registry', () => {
+  const registry = buildUniversalProviderRegistry()
+  const namecheap = registry.get('namecheap')
+  assert.equal(namecheap.metadata.providerId, 'namecheap')
+  assert.ok(namecheap.metadata.capabilities.length >= 10)
+  assert.ok(namecheap.metadata.capabilities.every((c) => c.readOnly), 'all Namecheap capabilities must be read-only')
+  assert.ok(namecheap.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
+})
+
 test('registered providers are discoverable via toMetadata()', () => {
   const ids = buildUniversalProviderRegistry().toMetadata().map((m) => m.providerId)
   assert.ok(ids.includes('github'))
@@ -73,6 +82,7 @@ test('registered providers are discoverable via toMetadata()', () => {
   assert.ok(ids.includes('aws'))
   assert.ok(ids.includes('azure'))
   assert.ok(ids.includes('google-cloud'))
+  assert.ok(ids.includes('namecheap'))
 })
 
 test('capability discovery resolves known read-only capabilities', () => {
@@ -84,6 +94,7 @@ test('capability discovery resolves known read-only capabilities', () => {
   const aws = registry.findCapability('aws', 'aws.ec2.instances.list')
   const azure = registry.findCapability('azure', 'azure.compute.virtual_machines.list')
   const googleCloud = registry.findCapability('google-cloud', 'google_cloud.compute.instances.list')
+  const namecheap = registry.findCapability('namecheap', 'namecheap.domains.list')
   assert.equal(github.readOnly, true)
   assert.equal(github.riskClass, 'read_only')
   assert.equal(stripe.readOnly, true)
@@ -98,6 +109,8 @@ test('capability discovery resolves known read-only capabilities', () => {
   assert.equal(azure.riskClass, 'read_only')
   assert.equal(googleCloud.readOnly, true)
   assert.equal(googleCloud.riskClass, 'read_only')
+  assert.equal(namecheap.readOnly, true)
+  assert.equal(namecheap.riskClass, 'read_only')
 })
 
 test('getUniversalProviderRegistry returns a stable singleton', () => {

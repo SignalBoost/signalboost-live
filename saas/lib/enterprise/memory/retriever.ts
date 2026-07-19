@@ -1,9 +1,9 @@
-import { getAdminSupabase } from '@/utils/supabase/server'
+import { getAdminSupabase } from '../../../utils/supabase/server.ts'
 import {
   rankEnterpriseMemoryCandidates,
   type EnterpriseMemoryCandidate,
   type RankedEnterpriseMemory,
-} from './retrievalRanking'
+} from './retrievalRanking.ts'
 
 export type EnterpriseMemoryContext = {
   source: 'enterprise_memory'

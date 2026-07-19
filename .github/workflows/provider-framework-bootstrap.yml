@@ -38,8 +38,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: saas/package-lock.json
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm run validate:providers
       - run: npm run test:provider-framework

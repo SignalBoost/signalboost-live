@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+// Node 24 executes TypeScript directly and requires the explicit extension.
+// @ts-expect-error TS5097: the root compiler does not enable allowImportingTsExtensions.
 import { parseAnalyticsRequest } from '../lib/analytics/request.ts'
+// @ts-expect-error TS5097: the root compiler does not enable allowImportingTsExtensions.
 import { isPlatformOperator } from '../lib/auth/platformOperatorPolicy.ts'
 
 test('analytics parser rejects malformed, unknown, and unsafe query input', () => {

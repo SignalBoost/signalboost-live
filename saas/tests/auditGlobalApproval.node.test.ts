@@ -68,6 +68,17 @@ test('recovery cron processes only the newest durably approved run', () => {
   assert.match(vercel, /"path": "\/api\/cron\/audit-approved-remediation"[\s\S]*?"schedule": "\*\/10 \* \* \* \*"/)
 })
 
+test('owner history refresh recovers the newest approved run without changing approval', () => {
+  const runs = read('../app/api/hub/operator/audit/runs/route.ts')
+  assert.match(runs, /if \(!ctx\.isOwner \|\| !ctx\.userId\)/)
+  assert.match(runs, /const newestApproved = \(runs\.data \|\| \[\]\)\.find/)
+  assert.match(runs, /run\?\.status === 'approved'/)
+  assert.match(runs, /recoverApprovedRun\(admin, String\(newestApproved\.id\), ctx\.userId\)/)
+  assert.match(runs, /run\.data\.status === 'approved'/)
+  assert.match(runs, /remediation: payloads\.remediation \|\| recovery/)
+  assert.doesNotMatch(runs, /approve_audit_run_remediation/)
+})
+
 test('approval event includes the required immutable audit fields and rollback marker', () => {
   const migration = read('../supabase/migrations/20260719_audit_run_global_approval.sql')
   for (const field of ['runId', 'approvedBy', 'findingsFixed', 'status', 'timestamp']) assert.match(migration, new RegExp(`'${field}'`))

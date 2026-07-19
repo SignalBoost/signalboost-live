@@ -1,15 +1,16 @@
-// saas/app/api/hub/operator/audit/runs/route.ts
-// Run history + run detail for the Audit Console (Step 2).
-//   GET                 -> { ok, runs }            (recent 30 runs)
-//   GET ?runId=<uuid>   -> { ok, run, findings }   (one run + its findings)
-// Owner-gated; reads via the service-role admin client.
+// Audit run history and detail. Because approval is already durable, an owner
+// history refresh may safely recover the newest approved run's single remediation
+// PR. The operation is idempotent and never approves a run or writes to main.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { runApprovedAuditRemediation, type ApprovedRunRemediationResult } from '@/lib/audit/approvedRunRemediation'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { localizeKnownFindingText, normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
 
@@ -38,9 +39,50 @@ function localizeLogPayload(payload: any, lang: string) {
   }
 }
 
+function splitAuditPayloads(rows: any[]) {
+  let scan: any = null
+  let remediation: ApprovedRunRemediationResult | null = null
+  for (const row of rows || []) {
+    const payload = row?.payload
+    if (!payload || typeof payload !== 'object') continue
+    if (!remediation && payload.kind === 'audit_batch_remediation' && payload.approval === 'final') {
+      remediation = payload as ApprovedRunRemediationResult
+      continue
+    }
+    if (!scan && Array.isArray(payload.findings)) scan = payload
+    if (scan && remediation) break
+  }
+  return { scan, remediation }
+}
+
+async function recoverApprovedRun(admin: any, runId: string, actorUserId: string) {
+  try {
+    return await runApprovedAuditRemediation({ admin, runId, actorUserId })
+  } catch (error) {
+    return {
+      kind: 'audit_batch_remediation',
+      ok: false,
+      approval: 'final',
+      runId,
+      status: 'failed',
+      branch: '',
+      prUrl: '',
+      prNumber: 0,
+      autoMergeQueued: false,
+      autoMergeError: '',
+      findingsTotal: 0,
+      findingsApplied: 0,
+      findingsAlreadyResolved: 0,
+      filesChanged: 0,
+      skipped: [{ file: '(recovery)', findingCount: 0, reason: error instanceof Error ? error.message : 'Approved remediation recovery failed.' }],
+      approvedAt: new Date().toISOString(),
+    } satisfies ApprovedRunRemediationResult
+  }
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await getAccess()
-  if (!ctx.isOwner) {
+  if (!ctx.isOwner || !ctx.userId) {
     return NextResponse.json({ ok: false, error: 'Owner access required.' }, { status: 403 })
   }
 
@@ -53,16 +95,34 @@ export async function GET(req: NextRequest) {
     if (run.error || !run.data) {
       return NextResponse.json({ ok: false, error: 'Run not found.' }, { status: 404 })
     }
-    const f = await admin.from('audit_findings').select('*').eq('run_id', runId)
-    if (f.error) {
-      return NextResponse.json({ ok: false, error: f.error.message }, { status: 500 })
+
+    const recovery = run.data.status === 'approved'
+      ? await recoverApprovedRun(admin, runId, ctx.userId)
+      : null
+
+    const findingsResult = await admin.from('audit_findings').select('*').eq('run_id', runId)
+    if (findingsResult.error) {
+      return NextResponse.json({ ok: false, error: findingsResult.error.message }, { status: 500 })
     }
-    const findings = (f.data || []).slice().sort(
+    const findings = (findingsResult.data || []).slice().sort(
       (a: any, b: any) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9),
     ).map((row: any) => localizeFinding(row, lang))
-    // Full-payload snapshot (preferred rehydration source); null for pre-snapshot runs.
-    const logRow = await admin.from('audit_logs').select('payload').eq('run_id', runId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    return NextResponse.json({ ok: true, run: run.data, findings, log: localizeLogPayload(logRow.data?.payload ?? null, lang) })
+
+    const logRows = await admin
+      .from('audit_logs')
+      .select('payload')
+      .eq('run_id', runId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    const payloads = splitAuditPayloads(logRows.data || [])
+
+    return NextResponse.json({
+      ok: true,
+      run: run.data,
+      findings,
+      log: localizeLogPayload(payloads.scan, lang),
+      remediation: payloads.remediation || recovery,
+    })
   }
 
   const runs = await admin
@@ -74,5 +134,11 @@ export async function GET(req: NextRequest) {
   if (runs.error) {
     return NextResponse.json({ ok: false, error: runs.error.message }, { status: 500 })
   }
-  return NextResponse.json({ ok: true, runs: runs.data || [] })
+
+  const newestApproved = (runs.data || []).find((run: any) => run?.status === 'approved')
+  const recovery = newestApproved?.id
+    ? await recoverApprovedRun(admin, String(newestApproved.id), ctx.userId)
+    : null
+
+  return NextResponse.json({ ok: true, runs: runs.data || [], recovery })
 }

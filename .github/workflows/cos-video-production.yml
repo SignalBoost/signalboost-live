@@ -12,6 +12,7 @@ on:
       - 'saas/scripts/cos-video-production-entry.mjs'
       - 'saas/scripts/cos-video-production-worker.mjs'
       - 'saas/scripts/cos-video-campaign-sync.mjs'
+      - 'scripts/brand-overlay-worker.mjs'
 
 permissions:
   contents: read
@@ -23,7 +24,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       RESOLVED_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
       RESOLVED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -44,6 +45,7 @@ jobs:
           node --check saas/scripts/cos-video-production-entry.mjs
           node --check saas/scripts/cos-video-production-worker.mjs
           node --check saas/scripts/cos-video-campaign-sync.mjs
+          node --check scripts/brand-overlay-worker.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
       - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core
@@ -59,7 +61,7 @@ jobs:
           COS_VIDEO_MAX_JOBS_PER_RUN: ${{ vars.COS_VIDEO_MAX_JOBS_PER_RUN || '5' }}
         run: node scripts/cos-video-production-entry.mjs
 
-      - name: Sync completed renders to campaigns
+      - name: Sync base renders and prepare voice fallback
         if: ${{ always() }}
         working-directory: saas
         env:
@@ -67,3 +69,12 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
           COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
         run: node scripts/cos-video-campaign-sync.mjs
+
+      - name: Burn final SignalBoost brand banner
+        if: ${{ always() }}
+        env:
+          SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+          COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
+        run: node scripts/brand-overlay-worker.mjs

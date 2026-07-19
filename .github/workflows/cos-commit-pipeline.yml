@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: [24.x]
 
     steps:
       - name: Checkout repo
@@ -45,7 +45,7 @@ jobs:
         run: npm run build
 
       - name: Commit changes
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '24.x'
         run: |
           git config --global user.name "COS Agent"
           git config --global user.email "cos@signalboostapp.com"
@@ -54,12 +54,12 @@ jobs:
           git push origin ai-cos-branch
 
       - name: Deploy to Vercel
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '24.x'
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       # Slack Notifications
       - name: Notify Slack on success
-        if: success() && matrix.node-version == '20.x'
+        if: success() && matrix.node-version == '24.x'
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
@@ -83,7 +83,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on failure
-        if: failure() && matrix.node-version == '20.x'
+        if: failure() && matrix.node-version == '24.x'
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
@@ -106,7 +106,7 @@ jobs:
 
       # Teams Notifications
       - name: Notify Teams on success
-        if: success() && matrix.node-version == '20.x'
+        if: success() && matrix.node-version == '24.x'
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{
@@ -125,7 +125,7 @@ jobs:
           ${{ secrets.TEAMS_WEBHOOK_URL }}
 
       - name: Notify Teams on failure
-        if: failure() && matrix.node-version == '20.x'
+        if: failure() && matrix.node-version == '24.x'
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{
@@ -143,7 +143,7 @@ jobs:
 
       # Email Notification
       - name: Notify via Email
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '24.x'
         run: |
           echo "Subject: Outreach Video Published
           Hi Luis,

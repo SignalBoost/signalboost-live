@@ -68,7 +68,7 @@ export function approvalArtifactKey(video = {}) {
   const finalSchema = text(video?.finalSchemaVersion || video?.brandSchemaVersion)
   const bannerSchema = text(video?.brandBannerSchemaVersion || video?.brandDebug?.bannerSchema)
   return createHash('sha256')
-    .update([source.field, source.value, finalSchema, bannerSchema].join('\u0000'))
+    .update([source.value, finalSchema, bannerSchema].join('\u0000'))
     .digest('hex')
 }
 

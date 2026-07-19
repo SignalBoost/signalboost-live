@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
-import { AUDIT_APPROVAL_SCHEMA_REPAIR_SQL } from '@/lib/audit/approvalSchemaRepair'
+import { AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS } from '@/lib/audit/approvalSchemaRepair'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
@@ -48,22 +48,28 @@ export async function POST(req: NextRequest) {
   const admin = getAdminSupabase()
   let schemaRepairAttempted = false
   let schemaRepaired = false
+  let schemaRepairFailedStep: number | null = null
   let approval = await admin.rpc('approve_audit_run_remediation', {
     p_run_id: body.runId,
     p_approved_by: ctx.userId,
   })
 
-  // Production may briefly be ahead of a partially-applied Supabase migration.
-  // The owner has already given the final run-level approval by clicking this
-  // action. For only the known approval-schema drift, execute the repository's
-  // fixed, idempotent SQL through the existing service-role-only SQL RPC, then
-  // retry the same atomic approval once. Request content can never supply SQL.
+  // hub_exec_sql executes one prepared statement per RPC invocation. For only the
+  // known audit-approval schema drift, run the fixed repository-owned statements
+  // in order, stop at the first failure, reload PostgREST, and retry approval once.
+  // Neither the browser request nor an audit finding can supply executable SQL.
   if (approval.error && isApprovalSchemaDrift(String(approval.error.message || ''))) {
     schemaRepairAttempted = true
-    const repair = await admin.rpc('hub_exec_sql', { query: AUDIT_APPROVAL_SCHEMA_REPAIR_SQL })
-    const repairFailed = Boolean(repair.error) || Boolean(embeddedRpcError(repair.data))
 
-    if (!repairFailed) {
+    for (const [index, query] of AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.entries()) {
+      const repair = await admin.rpc('hub_exec_sql', { query })
+      if (repair.error || embeddedRpcError(repair.data)) {
+        schemaRepairFailedStep = index + 1
+        break
+      }
+    }
+
+    if (schemaRepairFailedStep === null) {
       schemaRepaired = true
       await admin.from('audit_logs').insert({
         run_id: body.runId,
@@ -73,10 +79,15 @@ export async function POST(req: NextRequest) {
           runId: body.runId,
           approvedBy: ctx.userId,
           migration: '20260719_repair_audit_approval_schema_drift.sql',
+          statementsApplied: AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.length,
           status: 'repaired',
           timestamp: new Date().toISOString(),
         },
       })
+
+      // Give PostgREST a brief bounded window to consume the explicit schema
+      // reload notification before the single allowed post-repair retry.
+      await new Promise(resolve => setTimeout(resolve, 250))
       approval = await admin.rpc('approve_audit_run_remediation', {
         p_run_id: body.runId,
         p_approved_by: ctx.userId,
@@ -87,12 +98,19 @@ export async function POST(req: NextRequest) {
   if (approval.error) {
     const message = String(approval.error.message || '')
     if (isApprovalSchemaDrift(message)) {
+      const repairDetail = schemaRepairFailedStep !== null
+        ? ` Automatic repair stopped at step ${schemaRepairFailedStep} of ${AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.length}.`
+        : schemaRepaired
+          ? ' Automatic repair completed, but Supabase has not exposed the repaired approval function yet. Retry once.'
+          : ''
       return NextResponse.json({
         ok: false,
         code: 'audit_approval_schema_not_ready',
-        error: 'Audit approval is temporarily unavailable because the Supabase approval schema is not current. Apply the required audit approval migrations, then retry.',
+        error: `Audit approval is temporarily unavailable because the Supabase approval schema is not current.${repairDetail}`,
         requiredMigrations: REQUIRED_MIGRATIONS,
         repairAttempted: schemaRepairAttempted,
+        repairCompleted: schemaRepaired,
+        repairFailedStep: schemaRepairFailedStep,
         retryable: true,
       }, { status: 503 })
     }

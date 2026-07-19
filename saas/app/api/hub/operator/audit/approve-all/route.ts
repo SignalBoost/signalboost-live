@@ -23,11 +23,21 @@ function isUuid(value: unknown): value is string {
 function isApprovalSchemaDrift(message: string): boolean {
   const normalized = message.toLowerCase()
   const missingObject = normalized.includes('does not exist') || normalized.includes('could not find') || normalized.includes('schema cache')
+  const staleFunctionRuntime = [
+    'column reference "run_id" is ambiguous',
+    'column reference "approved_by" is ambiguous',
+    'cannot change return type of existing function',
+    'structure of query does not match function result type',
+    'return type mismatch in function declared to return record',
+    'syntax error at or near "timestamp"',
+  ].some(fragment => normalized.includes(fragment))
+
   return (
     normalized.includes('column "approved" of relation "audit_runs" does not exist') ||
     (normalized.includes('approve_audit_run_remediation') && missingObject) ||
     (normalized.includes('audit_remediation_approvals') && missingObject) ||
-    (normalized.includes('column "fixed"') && missingObject)
+    (normalized.includes('column "fixed"') && missingObject) ||
+    staleFunctionRuntime
   )
 }
 
@@ -55,9 +65,10 @@ export async function POST(req: NextRequest) {
   })
 
   // hub_exec_sql executes one prepared statement per RPC invocation. For only the
-  // known audit-approval schema drift, run the fixed repository-owned statements
-  // in order, stop at the first failure, reload PostgREST, and retry approval once.
-  // Neither the browser request nor an audit finding can supply executable SQL.
+  // known audit-approval schema or stale-function failures, run the fixed
+  // repository-owned statements in order, stop at the first failure, reload
+  // PostgREST, and retry approval once. Neither the browser request nor an audit
+  // finding can supply executable SQL.
   if (approval.error && isApprovalSchemaDrift(String(approval.error.message || ''))) {
     schemaRepairAttempted = true
 
@@ -106,7 +117,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: false,
         code: 'audit_approval_schema_not_ready',
-        error: `Audit approval is temporarily unavailable because the Supabase approval schema is not current.${repairDetail}`,
+        error: `Audit approval is temporarily unavailable because the Supabase approval schema or function is not current.${repairDetail}`,
         requiredMigrations: REQUIRED_MIGRATIONS,
         repairAttempted: schemaRepairAttempted,
         repairCompleted: schemaRepaired,

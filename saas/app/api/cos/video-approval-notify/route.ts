@@ -142,9 +142,11 @@ export async function GET(req: NextRequest) {
       `.trim(),
     })
 
+    const attemptAt = new Date().toISOString()
+    const previousAttempts = Number(video?.approvalNotification?.attempts || 0)
     const patchVideo = {
       ...video,
-      approvalRequestedAt: new Date().toISOString(),
+      ...(sent?.ok ? { approvalRequestedAt: attemptAt } : {}),
       approvalNotification: {
         ok: Boolean(sent?.ok),
         email: owner.email,
@@ -152,6 +154,9 @@ export async function GET(req: NextRequest) {
         source: owner.source,
         finalOnly: true,
         emailActions: true,
+        attemptedAt: attemptAt,
+        attempts: previousAttempts + 1,
+        retryable: !sent?.ok,
         error: sent?.ok ? null : sent?.error || 'send failed',
       },
     }
@@ -160,10 +165,10 @@ export async function GET(req: NextRequest) {
       metadata: { ...(campaign.metadata || {}), video: patchVideo },
     }).eq('id', campaign.id)
 
-    results.push({ campaign: campaign.id, title, notified: Boolean(sent?.ok), finalVideo: true, emailActions: true, error: sent?.ok ? null : sent?.error || 'send failed' })
+    results.push({ campaign: campaign.id, title, notified: Boolean(sent?.ok), finalVideo: true, emailActions: true, retryable: !sent?.ok, attempts: previousAttempts + 1, error: sent?.ok ? null : sent?.error || 'send failed' })
   }
 
-  return NextResponse.json({ ok: true, scanned: campaigns?.length || 0, notified: results.length, results, approvalPage: approvalPage(req), rule: 'final branded videos only', ownerSource: owner.source })
+  return NextResponse.json({ ok: true, scanned: campaigns?.length || 0, notified: results.filter(result => result.notified).length, attempted: results.length, results, approvalPage: approvalPage(req), rule: 'final branded videos only', ownerSource: owner.source })
 }
 
 export async function POST(req: NextRequest) {

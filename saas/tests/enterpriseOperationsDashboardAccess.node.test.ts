@@ -5,6 +5,7 @@ import test from 'node:test'
 const routeUrl = new URL('../app/api/internal/enterprise/operations/route.ts', import.meta.url)
 const pageUrl = new URL('../app/dashboard/operations/page.tsx', import.meta.url)
 const loaderUrl = new URL('../components/enterprise/ExecutiveOperationsDashboardLoader.tsx', import.meta.url)
+const stateCopyUrl = new URL('../lib/i18n/operationsDashboardStateCopy.ts', import.meta.url)
 const securityUrl = new URL('../lib/outreach/security.ts', import.meta.url)
 
 async function source(url: URL) {
@@ -52,10 +53,11 @@ test('dashboard page passes only the organization scope into the read-only loade
 })
 
 test('dashboard loader uses GET-only no-store reads and exposes five-language fail-closed states', async () => {
-  const loader = await source(loaderUrl)
+  const [loader, stateCopy] = await Promise.all([source(loaderUrl), source(stateCopyUrl)])
 
+  assert.match(loader, /getOperationsDashboardStateCopy\(lang\)/)
   for (const locale of ['en', 'es', 'pt', 'pl', 'ru']) {
-    assert.match(loader, new RegExp(`\\b${locale}: \\{`))
+    assert.match(stateCopy, new RegExp(`\\b${locale}: \\{`))
   }
 
   assert.match(loader, /fetch\(`\/api\/internal\/enterprise\/operations\?organizationId=/)

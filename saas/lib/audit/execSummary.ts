@@ -9,14 +9,18 @@
 // NOT here — this module stays deterministic so the summary is identical on every
 // run and never depends on a model being reachable.
 
-import { runFindings, type AuditSnapshot } from './findingsEngine.ts'
+import { runFindings, type AuditSnapshot } from '@/lib/audit/findingsEngine'
 import {
   scoreFromFindings,
   type Finding,
   type AuditScore,
   type Severity,
-} from './reportModel.ts'
-import { isHandled, type FindingStateMap } from './findingState.ts'
+} from '@/lib/audit/reportModel'
+import {
+  isHandled,
+  overlayFindingStates,
+  type FindingStateMap,
+} from '@/lib/audit/findingState'
 
 export interface ExecutiveSummaryData {
   generatedAt: string
@@ -39,16 +43,7 @@ export function buildExecutiveSummary(
 ): ExecutiveSummaryData {
   const topN = opts?.topN ?? 5
   const result = runFindings(snapshot, { includeManualBaseline: true })
-  const findings = (result.findings || []).map(finding => {
-    const state = opts?.states?.[finding.id]
-    if (!state) return finding
-    return {
-      ...finding,
-      status: state.status,
-      owner: state.owner || finding.owner,
-      dueDate: state.dueDate || finding.dueDate,
-    }
-  })
+  const findings = overlayFindingStates(result.findings || [], opts?.states)
   const score = scoreFromFindings(findings)
 
   const topRisks = findings

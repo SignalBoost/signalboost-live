@@ -1,60 +1,39 @@
-# ONBOARD.md enforcement and branch protection
+# ONBOARD.md guidance and branch protection
 
-This repository enforces `ONBOARD.md` with PR templates, required GitHub Actions checks, CODEOWNERS, and branch protection. GitHub cannot stop someone from reading another file locally before `ONBOARD.md`, so merge protection is the operational control.
+## Merge-gate status
 
-## Required PR body acknowledgement
+As of 2026-07-19, `ONBOARD.md` is documentation and is not a merge prerequisite.
 
-Every pull request must include this exact line:
+Pull requests no longer need to:
 
-```text
-ONBOARD.md read before repo scan: YES
-```
+- change `ONBOARD.md`;
+- include an `ONBOARD.md` acknowledgement in the PR body; or
+- include a mechanical/refactor-only exception statement.
 
-The default pull request template includes the line. The required status check is stable as:
+The former ONBOARD checks remain as pass-through GitHub Actions jobs with their original workflow and job names. Keeping the status contexts stable prevents existing branch-protection rules from waiting forever for a deleted check, while ensuring the checks always succeed without inspecting changed files or PR text.
 
-```text
-Require ONBOARD.md Acknowledgement / onboarding-acknowledgement
-```
+The tracked local hooks also remain as compatibility no-ops. They do not modify, stage, or require `ONBOARD.md`, and they do not block commits.
 
-## Critical-file maintenance rule
+## Branch protection that remains recommended
 
-A second required workflow checks ONBOARD-sensitive paths. If a pull request changes COSA, video pipeline, provider templates, Vercel env handling, Supabase, storage buckets, audit, cybersecurity, infrastructure, workflow, approval-gate, secret/vault, or other onboarding-sensitive files, then the PR must do one of the following:
+The ONBOARD retirement does not remove other governance controls. The `main` branch should continue to use the repository's normal protections, including:
 
-1. Update `ONBOARD.md` in the same PR, or
-2. Include this exact PR-body statement when the change is only mechanical/refactor-only and does not change onboarding behavior:
+1. Require a pull request before merging.
+2. Require the repository's configured approvals and Code Owner review where applicable.
+3. Dismiss stale approvals after new commits when configured.
+4. Require the actual lint, typecheck, build, test, security, approval-boundary, and role-validation checks.
+5. Require branches to be up to date when appropriate.
+6. Restrict direct pushes to the intended maintainers.
+7. Preserve emergency/bypass policy according to repository ownership rules.
 
-```text
-No onboarding behavior change; mechanical/refactor-only update.
-```
+The legacy status contexts may remain configured because they now report success. They can be removed from branch protection later as a separate repository-settings cleanup, but removing them is not required for branches to merge.
 
-## Exact GitHub branch protection settings for `main`
+## Verification
 
-In GitHub, open **Settings → Branches → Branch protection rules → Add branch ruleset** or edit the existing rule for `main`, then enable these settings:
+To verify the retirement:
 
-1. **Branch name pattern:** `main`.
-2. Enable **Require a pull request before merging**.
-3. Enable **Require approvals** and set the approval count to at least `1`.
-4. Enable **Require review from Code Owners**. This makes `CODEOWNERS` require owner review for critical paths.
-5. Enable **Dismiss stale pull request approvals when new commits are pushed**.
-6. Enable **Require status checks to pass before merging**.
-7. Enable **Require branches to be up to date before merging**.
-8. Add this required status check exactly: `Require ONBOARD.md Acknowledgement`.
-9. Add this required status check for critical-file enforcement: `Critical files require ONBOARD.md update or no-change statement`.
-10. Enable **Restrict who can push to matching branches** and leave direct push access empty or limited to the repository owner/emergency admins only. This blocks direct pushes to `main` for developers.
-11. Enable **Do not allow bypassing the above settings** if available for the repository plan.
-12. Save the rule.
-
-## Owner review for critical paths
-
-`.github/CODEOWNERS` marks ONBOARD, workflows, COSA/COS, video, provider templates, Vercel/env/vault/secrets/infra, Supabase/storage buckets, audit, cybersecurity, and approval-gate paths as owned by the repository owner. Branch protection must enable **Require review from Code Owners** for this to block merges until the owner reviews critical-path PRs.
-
-## How to test enforcement
-
-1. Open a test branch from `main`.
-2. Make a harmless documentation change.
-3. Open a pull request and delete this line from the body: `ONBOARD.md read before repo scan: YES`.
-4. Confirm the `Require ONBOARD.md Acknowledgement / onboarding-acknowledgement` check fails.
-5. Add the exact acknowledgement line back to the PR body and confirm the check passes.
-6. Change a critical file such as `.github/workflows/onboard-check.yml` without changing `ONBOARD.md` and without adding the mechanical/refactor-only sentence.
-7. Confirm the critical-file check fails.
-8. Add either an `ONBOARD.md` update or the exact sentence `No onboarding behavior change; mechanical/refactor-only update.` and confirm the critical-file check passes.
+1. Open a pull request that does not modify `ONBOARD.md`.
+2. Do not add any ONBOARD acknowledgement or exception sentence to the PR body.
+3. Confirm both legacy ONBOARD workflows report success.
+4. Confirm all unrelated required checks still run normally.
+5. Confirm the pull request is mergeable once those unrelated required checks and reviews pass.

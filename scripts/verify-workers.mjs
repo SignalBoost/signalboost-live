@@ -71,7 +71,13 @@ for (const file of workerFiles) {
     fail(file, 'WRONG-KIND', `This .mjs file contains a YAML workflow (first statement: "${code.slice(0, 40)}"). A GitHub Actions .yml was pasted here. Restore the JavaScript worker; the YAML belongs in ${WORKFLOW_DIR}/.`)
     continue
   }
-  if (/^\s*(export\s+)?(type|interface)\s+\w+/m.test(text) || /import\s+type\s/.test(text) || /from\s+['"]@\//.test(text)) {
+  // Match TypeScript syntax only when it is actual code at the start of a line.
+  // Worker integrity scripts legitimately inspect TypeScript source and may keep
+  // strings such as "import X from '@/...'"; those strings are not TS imports.
+  const hasTypeDeclaration = /^\s*(export\s+)?(type|interface)\s+\w+/m.test(text)
+  const hasTypeOnlyImport = /^\s*import\s+type\s/m.test(text)
+  const hasAliasImport = /^\s*import\s+(?:[^'"\n]*?\s+from\s+)?['"]@\//m.test(text)
+  if (hasTypeDeclaration || hasTypeOnlyImport || hasAliasImport) {
     fail(file, 'WRONG-KIND', `This .mjs file contains TypeScript (type/interface declarations or "@/" path-alias imports). A .ts file was pasted here. Plain Node cannot run this — every scheduled run dies instantly. Restore the JavaScript worker.`)
     continue
   }

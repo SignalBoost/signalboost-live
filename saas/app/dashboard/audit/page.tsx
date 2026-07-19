@@ -485,7 +485,7 @@ export default function AuditCenterPage() {
 
         {/* Ready to Remediate — appears the moment a scan completes with findings. */}
         {!loading && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
-          <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
+          <RemediationBanner count={view.findingsCount} runId={selectedRunId} lang={lang} />
         )}
 
         {error && (

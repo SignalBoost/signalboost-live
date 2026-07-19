@@ -14,18 +14,15 @@ function between(value, start, end) {
   return value.slice(startIndex, endIndex)
 }
 
-test('approval notifier retries failed approval and live-link emails without republishing', async () => {
+test('approval notifier deduplicates only successful email delivery and retries failures', async () => {
   const notifier = await source('../app/api/cos/video-approval-notify/route.ts')
   assert.equal((notifier.match(/sendEmail\s*\(/g) || []).length, 2)
   assert.match(notifier, /if \(video\?\.approvalRequestedAt\) return false/)
   assert.match(notifier, /\.\.\.\(sent\?\.ok \? \{ approvalRequestedAt: attemptAt \} : \{\}\)/)
   assert.match(notifier, /attempts: previousAttempts \+ 1/)
   assert.match(notifier, /retryable: !sent\?\.ok/)
-  assert.match(notifier, /entry as any\)\?\.notified === true/)
-  assert.match(notifier, /const liveUrl = String\(\(entry as any\)\?\.result\?\.liveUrl/)
-  assert.match(notifier, /notifyAttempts/)
-  assert.match(notifier, /liveLinkEmails:/)
-  assert.doesNotMatch(notifier, /autoPublishApprovedCampaign|publishCampaignCore|publishSocialPost/)
+  assert.match(notifier, /stored live URL; never publish the video again/)
+  assert.doesNotMatch(notifier, /publishCampaignCore/)
   assert.match(notifier, /'approve'/)
   assert.match(notifier, /'hold'/)
   assert.match(notifier, /'changes'/)
@@ -65,6 +62,22 @@ test('publishing remains owner-gated and the real live URL is stored and emailed
   assert.match(publishCore, /result\.liveUrl/)
   assert.match(publishCore, /\[publishedKey\]: \{ result, publishedAt/)
   assert.match(publishCore, /<a href="\$\{result\.liveUrl\}">\$\{result\.liveUrl\}<\/a>/)
+})
+
+test('approved video recovery retries promptly, preserves owner email, and reports provider failures', async () => {
+  const cron = await source('../app/api/cron/cos-auto-publish-exact/route.ts')
+  const vercel = await source('../vercel.json')
+
+  assert.match(cron, /const RETRY_MINUTES = 10/)
+  assert.match(cron, /process\.env\.OWNER_EMAILS/)
+  assert.match(cron, /campaignOwnerEmail\(campaign\)/)
+  assert.match(cron, /lang === firstLanguage\(campaign\)/)
+  assert.match(cron, /specificVoiced\.length === 0/)
+  assert.match(cron, /COSA could not publish your approved video/)
+  assert.match(cron, /sameFailureAlreadySent/)
+  assert.match(cron, /publishCampaignCore already sends and records the live-link email/)
+  assert.doesNotMatch(cron, /subject: `Your SignalBoostAi video is live:/)
+  assert.match(vercel, /"path": "\/api\/cron\/cos-auto-publish-exact"[\s\S]*?"schedule": "\*\/10 \* \* \* \*"/)
 })
 
 test('the scheduled exact-publish route invokes the existing notifier before publishing', async () => {

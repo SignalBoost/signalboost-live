@@ -1,33 +1,34 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 const GOLD = '#ffc300'
 
 type ReviewState = 'pending' | 'approved' | 'revision'
 
-function messageFor(state: ReviewState) {
-  if (state === 'approved') return 'Approved for the next Studio step.'
-  if (state === 'revision') return 'Held for revision in Studio.'
-  return 'Waiting for local Studio review.'
-}
-
 export default function LocalVideoPreviewReview() {
   const [state, setState] = useState<ReviewState>('pending')
+  const { t } = useTranslation()
+  const reviewMessage = state === 'approved'
+    ? t('studioPreview.status.approved', 'Approved for the next Studio step.')
+    : state === 'revision'
+      ? t('studioPreview.status.revision', 'Held for revision in Studio.')
+      : t('studioPreview.status.pending', 'Waiting for local Studio review.')
 
   return (
-    <section style={card} aria-label="Studio video preview review">
+    <section style={card} aria-label={t('studioPreview.ariaLabel', 'Studio video preview review')}>
       <div>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Studio preview review</p>
-        <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 22 }}>Review this COS video preview here</h2>
+        <p className="sb-eyebrow" style={{ margin: 0 }}>{t('studioPreview.kicker', 'Studio preview review')}</p>
+        <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 22 }}>{t('studioPreview.title', 'Review this COS video preview here')}</h2>
         <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.65, margin: '8px 0 0', maxWidth: 760 }}>
-          Video preview decisions stay inside the Studio workflow, close to the generated asset.
+          {t('studioPreview.description', 'Video preview decisions stay inside the Studio workflow, close to the generated asset.')}
         </p>
-        <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0' }}>{messageFor(state)}</p>
+        <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0' }}>{reviewMessage}</p>
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" onClick={() => setState('approved')} style={primaryButton}>Approve preview</button>
-        <button type="button" onClick={() => setState('revision')} style={secondaryButton}>Hold for revision</button>
+        <button type="button" onClick={() => setState('approved')} style={primaryButton}>{t('studioPreview.actions.approve', 'Approve preview')}</button>
+        <button type="button" onClick={() => setState('revision')} style={secondaryButton}>{t('studioPreview.actions.revision', 'Hold for revision')}</button>
       </div>
     </section>
   )

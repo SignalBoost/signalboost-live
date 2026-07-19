@@ -60,15 +60,21 @@ async function recordOwnerUsage(args: {
     .select('id')
     .single()
 
-  if (error) {
-    console.error('Owner render usage accounting failed:', error.message)
-    // Accounting failure must not turn the owner's unlimited entitlement into a
-    // customer billing failure. Provider execution remains observable in logs.
+  if (error || !row?.id) {
+    console.error(
+      'Owner render usage accounting failed:',
+      error?.message || 'Ledger insert returned no id.',
+    )
+    return {
+      ok: false,
+      code: 'error',
+      message: 'Could not record owner render usage.',
+    }
   }
 
   return {
     ok: true,
-    ledgerId: row?.id || `owner_unlimited_${Date.now()}`,
+    ledgerId: row.id,
     creditsCharged: 0,
     newBalance: 0,
     unlimited: true,

@@ -12,7 +12,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -25,7 +25,7 @@ jobs:
           node --check saas/scripts/cos-video-production-worker.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
-      - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
+      - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - working-directory: saas
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -33,8 +33,5 @@ jobs:
           COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
           COS_VIDEO_RENDER_WEBHOOK_URL: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_URL }}
           COS_VIDEO_RENDER_WEBHOOK_TOKEN: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_TOKEN }}
-          COS_VIDEO_WORKER_POLL_MS: ${{ vars.COS_VIDEO_WORKER_POLL_MS || '6000' }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
-          ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID }}
+          COS_VIDEO_MAX_JOBS_PER_RUN: ${{ vars.COS_VIDEO_MAX_JOBS_PER_RUN || '5' }}
         run: node scripts/cos-video-production-entry.mjs

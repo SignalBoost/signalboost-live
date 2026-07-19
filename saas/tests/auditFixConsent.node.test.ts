@@ -24,7 +24,7 @@ test('audit reports explicitly ask whether the user wants AI-prepared fixes', ()
   ]) assert.ok(consent.includes(answer), `missing localized consent answer: ${answer}`)
 })
 
-test('consent is visible in both live reports and repository-scan remediation', () => {
+test('the repository audit offers one final approval instead of per-finding approvals', () => {
   const executive = read('../components/audit/ExecutiveSummary.tsx')
   const banner = read('../components/audit/RemediationBanner.tsx')
 
@@ -34,29 +34,30 @@ test('consent is visible in both live reports and repository-scan remediation', 
   assert.match(executive, /\['resolved', 'accepted', 'wont_fix'\]\.includes\(f\.status\)/)
   assert.match(executive, /acceptHref="\/hub\/audit\/remediation"/)
 
-  assert.match(banner, /import AuditFixConsent/)
-  assert.match(banner, /onAccept=\{scrollToFindings\}/)
-  assert.match(banner, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/)
+  assert.match(banner, /Approve all fixes/)
+  assert.match(banner, /This is the only approval required/)
+  assert.match(banner, /\/api\/hub\/operator\/audit\/remediate/)
+  assert.match(banner, /body: JSON\.stringify\(\{ runId: targetRunId \}\)/)
+  assert.match(banner, /Final approval recorded/)
 })
 
-test('the consent step cannot mutate code, providers, or production', () => {
+test('the informational consent component itself cannot mutate code, providers, or production', () => {
   const consent = read('../components/audit/AuditFixConsent.tsx')
   assert.doesNotMatch(consent, /fetch\(|XMLHttpRequest|stageInfrastructurePR|proposeInfrastructurePR|\/api\/hub\/action|method:\s*['"]POST['"]|confirmPush/i)
   assert.match(consent, /prepares a remediation plan only/)
   assert.match(consent, /until you review and approve the exact change/)
 })
 
-test('existing code-fix flow still requires preview before explicit pull-request confirmation', () => {
+test('individual finding cards no longer create one branch per finding', () => {
   const patch = read('../components/audit/PatchPreview.tsx')
-  const previewCall = patch.indexOf("mode: 'preview'")
-  const commitCall = patch.indexOf("mode: 'commit'")
-  assert.ok(previewCall >= 0, 'preview phase missing')
-  assert.ok(commitCall > previewCall, 'commit must remain after preview')
-  assert.match(patch, /Confirm & Push Pull Request/)
-  assert.match(patch, /onClick=\{confirmPush\}/)
+
+  assert.doesNotMatch(patch, /fetch\(|mode:\s*'preview'|mode:\s*'commit'|confirmPush|Confirm & Push Pull Request/)
+  assert.match(patch, /Included in the one-time audit approval/)
+  assert.match(patch, /No separate approval is required for this finding/)
+  assert.match(patch, /audit-batch-remediation/)
 })
 
-test('Stripe webhook and repository provider findings retain the shared patch-preview entry point', () => {
+test('Stripe webhook and repository findings retain the shared informational entry point', () => {
   const stripe = read('../components/audit/StripeReport.tsx')
   const dashboard = read('../app/dashboard/audit/page.tsx')
 
@@ -66,9 +67,8 @@ test('Stripe webhook and repository provider findings retain the shared patch-pr
   assert.match(dashboard, /<PatchPreview finding=\{selectedFinding\} \/>/)
 })
 
-test('audit patch generation is grounded in real repository modules before preview', () => {
+test('single-finding patch generation remains grounded for compatibility callers', () => {
   const route = read('../app/api/hub/operator/audit/patch/route.ts')
-  const patch = read('../components/audit/PatchPreview.tsx')
 
   assert.match(route, /listRepoTree\(REPO, BRANCH\)/)
   assert.match(route, /findBadImports/)
@@ -77,17 +77,35 @@ test('audit patch generation is grounded in real repository modules before previ
   assert.match(route, /react-i18next is not installed/)
   assert.match(route, /MAX_ATTEMPTS = 2/)
   assert.match(route, /patch_validation_failed/)
-  assert.match(patch, /category: finding\.category/)
 })
 
-test('stale audit findings and stale previews cannot create misleading pull requests', () => {
+test('stale single-finding previews cannot create misleading pull requests', () => {
   const route = read('../app/api/hub/operator/audit/patch/route.ts')
-  const patch = read('../components/audit/PatchPreview.tsx')
 
   assert.match(route, /finding_already_resolved/)
   assert.match(route, /patch_preview_stale/)
   assert.match(route, /contentHash\(current\.content\)/)
-  assert.match(patch, /baseHash: data\.baseHash/)
-  assert.match(patch, /baseHash: preview\.baseHash/)
-  assert.match(patch, /phase === 'resolved'/)
+})
+
+test('one approval groups all findings into one branch and one pull request', () => {
+  const route = read('../app/api/hub/operator/audit/remediate/route.ts')
+
+  assert.match(route, /function groupFindingsByFile/)
+  assert.match(route, /MAX_BATCH_FILES = 60/)
+  assert.match(route, /GENERATION_CONCURRENCY = 4/)
+  assert.match(route, /const branch = `ai\/audit-run-\$\{runId\.replace/)
+  assert.match(route, /commitFileToBranch\(\{/)
+  assert.match(route, /queueAutoMerge\(prNumber\)/)
+  assert.match(route, /approval: 'final'/)
+  assert.match(route, /kind: 'audit_batch_remediation'/)
+  assert.match(route, /This approval authorizes automatic merge/)
+})
+
+test('batch remediation keeps the scan snapshot separate from final approval state', () => {
+  const runs = read('../app/api/hub/operator/audit/runs/route.ts')
+
+  assert.match(runs, /function splitAuditPayloads/)
+  assert.match(runs, /payload\.kind === 'audit_batch_remediation'/)
+  assert.match(runs, /Array\.isArray\(payload\.findings\)/)
+  assert.match(runs, /remediation: payloads\.remediation/)
 })

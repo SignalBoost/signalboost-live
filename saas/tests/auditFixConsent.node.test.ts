@@ -65,3 +65,29 @@ test('Stripe webhook and repository provider findings retain the shared patch-pr
   assert.match(stripe, /file: 'saas\/app\/api\/webhook\/route\.ts'/)
   assert.match(dashboard, /<PatchPreview finding=\{selectedFinding\} \/>/)
 })
+
+test('audit patch generation is grounded in real repository modules before preview', () => {
+  const route = read('../app/api/hub/operator/audit/patch/route.ts')
+  const patch = read('../components/audit/PatchPreview.tsx')
+
+  assert.match(route, /listRepoTree\(REPO, BRANCH\)/)
+  assert.match(route, /findBadImports/)
+  assert.match(route, /missingUseClient/)
+  assert.match(route, /preservedFraction/)
+  assert.match(route, /react-i18next is not installed/)
+  assert.match(route, /MAX_ATTEMPTS = 2/)
+  assert.match(route, /patch_validation_failed/)
+  assert.match(patch, /category: finding\.category/)
+})
+
+test('stale audit findings and stale previews cannot create misleading pull requests', () => {
+  const route = read('../app/api/hub/operator/audit/patch/route.ts')
+  const patch = read('../components/audit/PatchPreview.tsx')
+
+  assert.match(route, /finding_already_resolved/)
+  assert.match(route, /patch_preview_stale/)
+  assert.match(route, /contentHash\(current\.content\)/)
+  assert.match(patch, /baseHash: data\.baseHash/)
+  assert.match(patch, /baseHash: preview\.baseHash/)
+  assert.match(patch, /phase === 'resolved'/)
+})

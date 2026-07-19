@@ -152,6 +152,14 @@ Marketing pages, public website, landing pages, brand copy, and user-facing prod
 
 Creative production layer: video, images, audio, voice, captions, thumbnails, previews, and media rendering workflows.
 
+### COSA Final-Video Approval Email Handoff
+
+When the finalizer or brand-banner worker creates a newer final branded artifact after an approval email was already sent, `saas/scripts/cos-video-approval-rearm.mjs` runs after the banner-upgrade step. It may only re-arm `draft` or `waiting_approval` video campaigns that are not approved, rejected, or archived; have a ready, branded, voiced final video; have a valid prior `metadata.video.approvalRequestedAt`; and have the newest valid `brandBannerUpgradedAt`, `brandedAt`, or `voiceCompletedAt` later than that request.
+
+Artifact identity must prefer the permanent `metadata.video.brandDebug.objectPath`, then `voiceObjectPath` or `finalObjectPath`. URL identity is only a fallback and must ignore signed query strings. The identity hash also binds the final and banner schema versions. Processing is bounded to recent artifacts and a small number of campaigns per run so old campaigns cannot create a notification backfill.
+
+The re-arm worker does not send email and does not publish. It atomically clears only the stale video-level `approvalRequestedAt` and `approvalNotification` markers once for the new artifact. The existing `/api/cos/video-approval-notify` route remains the only approval-email sender, and `/api/cos/campaign-queue/email-action` remains the secure approve, hold, and request-edits handler. Hold and request-edits keep the campaign unapproved. Publishing remains impossible without `approved_at` and `approved_by`; after a successful connector publication, the existing publish core stores and emails the real live URL.
+
 ### Launchpad
 
 Deployment and release coordination: Vercel, GitHub, Supabase, provider readiness, and integration validation.
@@ -718,6 +726,7 @@ This keeps the onboarding document current and prevents future developers or AI 
 
 ## 19. Onboarding Change Log
 
+- 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.
 - 2026-07-18: Added persistent emergency routing: injected a globally accessible, owner/admin-gated `🛑 Supervisor SOC (Kill Switch)` link to the Mission 001 Supervisor SOC and Kill Switch into the shared AppShell navigation and responsive hamburger menu to ensure immediate human override capability during AI failures. The server-side Supervisor and kill/restore authorization gates remain unchanged.
 - 2026-07-18: Added Mission 001 Global AI Kill Switch and Restore toggle: Supabase flag, Vercel Edge Middleware ingress block, and admin UI override to ensure fail-safe human parity and recovery. Autonomous cron, webhook, and Supervisor ingress now fails closed when status cannot be verified; restoring autonomy never bypasses any approval gate.

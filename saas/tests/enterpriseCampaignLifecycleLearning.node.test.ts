@@ -61,5 +61,10 @@ test('measurement payload aggregates only non-negative views', () => {
     measuredAt: '2026-07-18T12:00:00.000Z',
   })
   assert.equal(payload.executionStatus, 'measured')
-  assert.deepEqual((payload.performanceData as any).metrics, { impressions: 120, clicks: 9 })
+  assert.deepEqual((payload.performanceData as any).metrics, {
+    impressions: 120,
+    clicks: 9,
+    revenue: 0,
+    cost: 4,
+  })
 })

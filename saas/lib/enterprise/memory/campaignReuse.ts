@@ -1,5 +1,3 @@
-import { getAdminSupabase } from '../../../utils/supabase/server.ts'
-
 export type CampaignMemoryRow = {
   campaign_id?: string
   workspace?: string
@@ -70,6 +68,7 @@ export async function getApprovedCampaignReuse(
   limit = 3,
 ): Promise<CampaignReuseInsight[]> {
   if (!organizationId.trim()) return []
+  const { getAdminSupabase } = await import('../../../utils/supabase/server.ts')
   const admin = getAdminSupabase()
   const { data, error } = await admin
     .from('enterprise_campaign_memory')

@@ -1,7 +1,7 @@
 // Maps COS campaign lifecycle rows into bounded Enterprise Memory writes.
 // Pure helpers keep route integration deterministic and easy to regression test.
 
-import { calculateCampaignPerformanceScore } from './campaignLearning'
+import { calculateCampaignPerformanceScore } from './campaignLearning.ts'
 
 export type CampaignLifecycleIdentity = {
   organizationId: string

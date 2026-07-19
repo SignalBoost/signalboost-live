@@ -1,0 +1,45 @@
+name: Provider Framework Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/provider-framework/**'
+      - 'saas/tests/universalProviderFramework.node.test.ts'
+      - 'saas/tests/providerRegistryBootstrap.node.test.ts'
+      - 'saas/tests/githubProviderRuntime.node.test.ts'
+      - 'saas/tests/githubProductionPipeline.node.test.ts'
+      - 'saas/scripts/validate-provider-runtime.mjs'
+      - 'saas/package.json'
+      - '.github/workflows/provider-framework-bootstrap.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'saas/lib/provider-framework/**'
+      - 'saas/tests/universalProviderFramework.node.test.ts'
+      - 'saas/tests/providerRegistryBootstrap.node.test.ts'
+      - 'saas/tests/githubProviderRuntime.node.test.ts'
+      - 'saas/tests/githubProductionPipeline.node.test.ts'
+      - 'saas/scripts/validate-provider-runtime.mjs'
+      - 'saas/package.json'
+      - '.github/workflows/provider-framework-bootstrap.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  provider-framework-bootstrap:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - run: npm run validate:providers
+      - run: npm run test:provider-framework

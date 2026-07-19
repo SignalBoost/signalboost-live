@@ -12,9 +12,10 @@ const panel = { background: 'rgba(15,23,42,.78)', border: '1px solid rgba(255,25
 const ghost = { border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' } as const
 const primary = { ...ghost, border: 'none', background: GREEN, color: '#001018', fontWeight: 950 } as const
 const warning = { ...ghost, border: 'none', background: GOLD, color: '#000', fontWeight: 950 } as const
+const PUBLISHED_STATUSES = new Set(['running', 'completed', 'measured', 'learned'])
 
 type Tab = 'active' | 'published' | 'archived'
-type CardState = 'working' | 'ready' | 'approved' | 'problem'
+type CardState = 'working' | 'ready' | 'approved' | 'published' | 'problem'
 
 function fmt(value: any) {
   if (!value) return '-'
@@ -25,6 +26,7 @@ function fmt(value: any) {
 function deriveState(campaign: any): { state: CardState; step: number; note: string } {
   const video = campaign?.video || {}
   const stage = String(video?.stage || '').toLowerCase()
+  const status = String(campaign?.status || '').toLowerCase()
   const eligibility = String(campaign?.eligibility || '')
   const integrityKnown = video?.voiceStatus != null || video?.voiceEngine != null || video?.voiceFallback != null || video?.captionsBurned != null || video?.audioTrack != null
   const voiceVerified = video?.audioTrack === true && video?.captionsBurned === true
@@ -36,7 +38,8 @@ function deriveState(campaign: any): { state: CardState; step: number; note: str
   const hasBase = Boolean(video?.hasKlingUrl)
   const voiced = voiceVerified || (Array.isArray(video?.voicedLangs) && video.voicedLangs.length > 0)
 
-  if (campaign?.approved_at) return { state: 'approved', step: 3, note: 'Approved and published. The YouTube link was emailed to you.' }
+  if (campaign?.approved_at && PUBLISHED_STATUSES.has(status)) return { state: 'published', step: 3, note: 'Published. The live platform link is emailed after the provider confirms it.' }
+  if (campaign?.approved_at) return { state: 'approved', step: 3, note: 'Approved. Publishing is continuing automatically. The live link will be emailed when it is live.' }
   if (silentFallback) return { state: 'working', step: 2, note: 'Replacing the silent placeholder with real voice and burned-in captions.' }
   if (finalReady) return { state: 'ready', step: 3, note: 'Your video is ready. Watch it below, then approve to publish.' }
   if (eligibility.startsWith('STUCK') || stage === 'failed') return { state: 'problem', step: hasBase ? 2 : 1, note: 'Something went wrong. Press Fix automatically to restart this video.' }
@@ -49,7 +52,7 @@ function Steps({ step, state }: { step: number; state: CardState }) {
   return <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
     {['Create video', 'Voice & captions', 'Brand banner'].map((label, index) => {
       const n = index + 1
-      const done = state === 'ready' || state === 'approved' || n < step
+      const done = state === 'ready' || state === 'approved' || state === 'published' || n < step
       const active = state === 'working' && n === step
       const failed = state === 'problem' && n === step
       return <div key={label} style={{ display: 'flex', gap: 7, alignItems: 'center', padding: '6px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(0,0,0,.25)' }}>
@@ -93,6 +96,15 @@ export default function CosaVideoPipelinePage() {
       setData({ ...videoJson, campaigns })
       setArchived(Object.fromEntries((archiveJson.archived || []).map((x: any) => [String(x.id), String(x.archived_at || '')])))
       if (!quiet) setMessage('')
+
+      // Final branded videos receive one owner approval email. The server stores a
+      // durable success marker, so successful notifications are not duplicated;
+      // failed email attempts remain eligible for the next refresh retry.
+      void fetch('/api/cos/video-approval-notify', {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'include',
+      }).catch(() => null)
     } catch (e: any) {
       if (!quiet) setMessage(e?.message || 'Could not load videos.')
     } finally {
@@ -112,7 +124,19 @@ export default function CosaVideoPipelinePage() {
       const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, status: 'approved' }) })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error(json?.error || 'Approval failed.')
-      setMessage('Approved. Publishing continues automatically.')
+
+      const result = json?.autoPublish
+      if (Number(result?.published || 0) > 0) {
+        const liveResult = Array.isArray(result?.results) ? result.results.find((item: any) => item?.ok && item?.liveUrl) : null
+        setMessage(liveResult?.liveUrl
+          ? 'Approved and published. The live-link email is being sent.'
+          : 'Approved and published. Refresh to confirm the live platform link.')
+      } else if (Number(result?.attempted || 0) > 0) {
+        const failed = Array.isArray(result?.results) ? result.results.find((item: any) => !item?.ok) : null
+        setMessage(`Approved, but publishing needs attention: ${failed?.error || 'The platform did not accept the publish request.'}`)
+      } else {
+        setMessage('Approved. Publishing continues automatically. The live link will be emailed when it is live.')
+      }
       await load(true)
     } catch (e: any) { setMessage(e?.message || 'Approval failed.') } finally { setBusyId('') }
   }
@@ -140,12 +164,14 @@ export default function CosaVideoPipelinePage() {
   }
 
   const all = Array.isArray(data?.campaigns) ? data.campaigns : []
+  const isPublished = (campaign: any) => deriveState(campaign).state === 'published'
   const counts = useMemo(() => ({
-    active: all.filter((c: any) => !archived[c.id] && !c.approved_at).length,
-    published: all.filter((c: any) => !archived[c.id] && Boolean(c.approved_at)).length,
+    active: all.filter((c: any) => !archived[c.id] && !isPublished(c)).length,
+    published: all.filter((c: any) => !archived[c.id] && isPublished(c)).length,
     archived: all.filter((c: any) => Boolean(archived[c.id])).length,
   }), [all, archived])
-  const campaigns = all.filter((c: any) => tab === 'archived' ? Boolean(archived[c.id]) : tab === 'published' ? !archived[c.id] && Boolean(c.approved_at) : !archived[c.id] && !c.approved_at)
+  const campaigns = all.filter((c: any) => tab === 'archived' ? Boolean(archived[c.id]) : tab === 'published' ? !archived[c.id] && isPublished(c) : !archived[c.id] && !isPublished(c))
+  const messageIsError = /fail|could not|needs attention|not accept/i.test(message)
 
   return <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
@@ -157,7 +183,7 @@ export default function CosaVideoPipelinePage() {
         <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? 'Loading...' : 'Refresh now'}</button>
         <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}><LocalizedText fallback={"Back to campaigns"} /></a>
       </div>
-      {message && <p style={{ color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('could not') ? RED : GREEN, fontWeight: 800 }}>{message}</p>}
+      {message && <p style={{ color: messageIsError ? RED : GREEN, fontWeight: 800 }}>{message}</p>}
     </section>
 
     <section style={panel}>
@@ -167,8 +193,18 @@ export default function CosaVideoPipelinePage() {
         {campaigns.map((campaign: any) => {
           const video = campaign.video || {}
           const { state, step, note } = deriveState(campaign)
-          const previewUrl = state === 'ready' || state === 'approved' ? String(video?.previewUrl || video?.finalUrl || '') : ''
-          const badge = archived[campaign.id] ? { text: 'ARCHIVED', color: GOLD } : state === 'ready' ? { text: 'READY TO APPROVE', color: GREEN } : state === 'approved' ? { text: 'PUBLISHED', color: GREEN } : state === 'problem' ? { text: 'NEEDS A FIX', color: RED } : { text: 'IN PROGRESS', color: CYAN }
+          const previewUrl = state === 'ready' || state === 'approved' || state === 'published' ? String(video?.previewUrl || video?.finalUrl || '') : ''
+          const badge = archived[campaign.id]
+            ? { text: 'ARCHIVED', color: GOLD }
+            : state === 'ready'
+              ? { text: 'READY TO APPROVE', color: GREEN }
+              : state === 'published'
+                ? { text: 'PUBLISHED', color: GREEN }
+                : state === 'approved'
+                  ? { text: 'APPROVED — PUBLISHING', color: CYAN }
+                  : state === 'problem'
+                    ? { text: 'NEEDS A FIX', color: RED }
+                    : { text: 'IN PROGRESS', color: CYAN }
           return <article key={campaign.id} style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14, background: 'rgba(2,6,23,.45)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div><strong style={{ color: '#fff' }}>{campaign.title || campaign.id}</strong><p style={{ color: 'rgba(255,255,255,.5)', margin: '4px 0 0', fontSize: 12 }}>Created {fmt(campaign.created_at)}{campaign.approved_at ? ` · Approved ${fmt(campaign.approved_at)}` : ''}{archived[campaign.id] ? ` · Archived ${fmt(archived[campaign.id])}` : ''}</p></div>
@@ -183,7 +219,7 @@ export default function CosaVideoPipelinePage() {
               {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>Archive</button>}
               {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>Restore</button>}
             </div>
-            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={"Technical details"} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
+            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={"Technical details"} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, campaignStatus: campaign.status, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
           </article>
         })}
       </div>

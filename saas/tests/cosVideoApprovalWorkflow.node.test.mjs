@@ -14,14 +14,32 @@ function between(value, start, end) {
   return value.slice(startIndex, endIndex)
 }
 
-test('existing notifier remains the single approval-email sender and deduplicates by approvalRequestedAt', async () => {
+test('approval notifier retries failed approval and live-link emails without republishing', async () => {
   const notifier = await source('../app/api/cos/video-approval-notify/route.ts')
-  assert.equal((notifier.match(/sendEmail\s*\(/g) || []).length, 1)
+  assert.equal((notifier.match(/sendEmail\s*\(/g) || []).length, 2)
   assert.match(notifier, /if \(video\?\.approvalRequestedAt\) return false/)
-  assert.match(notifier, /approvalRequestedAt: new Date\(\)\.toISOString\(\)/)
+  assert.match(notifier, /\.\.\.\(sent\?\.ok \? \{ approvalRequestedAt: attemptAt \} : \{\}\)/)
+  assert.match(notifier, /attempts: previousAttempts \+ 1/)
+  assert.match(notifier, /retryable: !sent\?\.ok/)
+  assert.match(notifier, /entry as any\)\?\.notified === true/)
+  assert.match(notifier, /const liveUrl = String\(\(entry as any\)\?\.result\?\.liveUrl/)
+  assert.match(notifier, /notifyAttempts/)
+  assert.match(notifier, /liveLinkEmails:/)
+  assert.doesNotMatch(notifier, /autoPublishApprovedCampaign|publishCampaignCore|publishSocialPost/)
   assert.match(notifier, /'approve'/)
   assert.match(notifier, /'hold'/)
   assert.match(notifier, /'changes'/)
+})
+
+test('video studio requests approval email and distinguishes approval from real publishing', async () => {
+  const page = await source('../app/dashboard/cosa/video-pipeline/page.tsx')
+  assert.match(page, /fetch\('\/api\/cos\/video-approval-notify'/)
+  assert.match(page, /PUBLISHED_STATUSES\.has\(status\)/)
+  assert.match(page, /state: 'published'/)
+  assert.match(page, /state: 'approved'/)
+  assert.match(page, /APPROVED — PUBLISHING/)
+  assert.match(page, /Approved, but publishing needs attention:/)
+  assert.doesNotMatch(page, /if \(campaign\?\.approved_at\) return \{ state: 'approved', step: 3, note: 'Approved and published/)
 })
 
 test('email actions approve the same campaign while hold and edits never publish', async () => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 import { useEffect, useMemo, useState } from 'react'
 
@@ -118,6 +119,7 @@ function TimelineRow({ item }: { item: any }) {
 }
 
 export default function CosGovernanceDashboardPage() {
+  const { t } = useTranslation()
   const [data, setData] = useState<Gov | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -171,7 +173,7 @@ export default function CosGovernanceDashboardPage() {
 
     <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
       <div style={{ display: 'grid', gap: 14 }}>
-        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Predictive Alerts Panel"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Informational early warnings</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Predictive Alerts Panel"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>{t('console.cos.informationalEarlyWarnings', 'Informational early warnings')}</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
         <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: cyan, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Problem + Fix Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}><LocalizedText fallback={"Autonomous fixes and fallback logic"} /></h2></div>{chip(`${fixes.length} fixes`, green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{fixes.length ? fixes.map(item => <FixCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No fix attempts required.</p>}</div></section>
       </div>
       <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: orange, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Escalation Panel"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Life-critical exceptions only</h2></div>{chip(`${escalations.length} escalations`, escalations.length ? orange : green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{escalations.length ? escalations.map(item => <EscalationCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No life-critical escalation. Ordinary issues are handled autonomously.</p>}</div></section>

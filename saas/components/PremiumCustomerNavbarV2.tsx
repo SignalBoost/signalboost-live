@@ -136,6 +136,7 @@ export default function PremiumCustomerNavbarV2() {
   const [user, setUser] = useState<any>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
+  const [credits, setCredits] = useState<number | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -193,6 +194,7 @@ export default function PremiumCustomerNavbarV2() {
         if (cancelled) return
         setIsAdmin(Boolean(data.isAdmin))
         setIsOwner(Boolean(data.isOwner))
+        if (typeof data.credits === 'number') setCredits(data.credits)
       } catch {
         // Network error: retry once, then keep existing role — never hide controls.
         if (attempt < 1 && !cancelled) return loadRole(attempt + 1)
@@ -281,11 +283,12 @@ export default function PremiumCustomerNavbarV2() {
         .sbnav-search input { width: 100%; box-sizing: border-box; border: 1px solid rgba(167,139,250,.5); border-radius: 999px; padding: 8px 12px; background: rgba(15,23,42,.9); color: #fff; font: inherit; font-size: 13px; outline: none; }
         .sbnav-search input:focus { border-color: ${PURPLE}; box-shadow: 0 0 0 3px rgba(167,139,250,.16); }
         .sbnav-search-results { right: 0; left: auto; max-height: 320px; overflow-y: auto; }
+        .sbnav-credits { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,195,0,.55); border-radius: 999px; padding: 8px 12px; background: rgba(255,195,0,.10); color: #ffe08a; font-size: 13px; font-weight: 800; white-space: nowrap; }
         .sbnav-language { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 8px 10px; background: #0f172a; color: #e2e8f0; font: inherit; font-size: 12px; }
         .sbnav-auth, .sbnav-burger { border: 0; border-radius: 999px; padding: 8px 13px; background: ${PURPLE}; color: #160b2b; font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
         .sbnav-burger { display: none; border-radius: 10px; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.2); }
         .sbnav-mobile { display: none; }
-        @media (max-width: 1280px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; max-height: calc(100vh - 62px); overflow-y: auto; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
+        @media (max-width: 1280px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth, .sbnav-credits { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; max-height: calc(100vh - 62px); overflow-y: auto; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
       `}</style>
       <nav className="sbnav" ref={navRef}>
         <Link href="/" className="sbnav-brand"><span className="sbnav-brand-mark" aria-hidden>⌁</span><span>SignalBoostAi</span></Link>
@@ -309,12 +312,14 @@ export default function PremiumCustomerNavbarV2() {
           <input type="search" value={query} placeholder={t('nav.searchPlaceholder', 'Search sections')} aria-label={t('nav.searchLabel', 'Search navigation')} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
           {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', 'No matching sections')}</span>}</div> : null}
         </div>
+        {user ? <span className="sbnav-credits" aria-live="polite" title={t('nav.credits.label', 'credits')}>⚡ {ownerAccess ? t('nav.credits.unlimited', 'Unlimited') : (credits === null ? '…' : credits.toLocaleString())}</span> : null}
         <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', 'Language')} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}</select>
         {user ? null : <button type="button" className="sbnav-auth" onClick={() => setShowAuth(true)}>{t('nav.getStarted', 'Get started')}</button>}
         <button type="button" className="sbnav-burger" aria-label={t('nav.menu', 'Menu')} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>
       {mobileOpen ? (
         <div className="sbnav-mobile">
+          {user ? <div className="sbnav-mobile-row" aria-live="polite">⚡ <span>{ownerAccess ? t('nav.credits.unlimited', 'Unlimited') : (credits === null ? '…' : credits.toLocaleString())} {t('nav.credits.label', 'credits')}</span></div> : null}
           <div className="sbnav-search sbnav-mobile-search">
             <input type="search" value={query} placeholder={t('nav.searchPlaceholder', 'Search sections')} aria-label={t('nav.searchLabel', 'Search navigation')} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
             {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', 'No matching sections')}</span>}</div> : null}

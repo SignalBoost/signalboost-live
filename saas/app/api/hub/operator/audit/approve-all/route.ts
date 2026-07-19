@@ -1,14 +1,16 @@
-// One owner approval for every fix in one immutable audit run. The database RPC
-// atomically changes only that run from complete to approved and writes the
-// approval event, so retries and concurrent clicks cannot approve it twice.
+// One owner approval authorizes every safe fix in one immutable audit run.
+// Approval is persisted atomically, then deterministic remediation creates one
+// ai/* branch and one PR. Retries are idempotent for already-approved runs.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS } from '@/lib/audit/approvalSchemaRepair'
+import { runApprovedAuditRemediation } from '@/lib/audit/approvedRunRemediation'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 const REQUIRED_MIGRATIONS = [
   '20260719_audit_run_global_approval.sql',
@@ -25,6 +27,8 @@ function isApprovalSchemaDrift(message: string): boolean {
   const missingObject = normalized.includes('does not exist') || normalized.includes('could not find') || normalized.includes('schema cache')
   return (
     normalized.includes('column "approved" of relation "audit_runs" does not exist') ||
+    normalized.includes('column reference "run_id" is ambiguous') ||
+    normalized.includes('column reference run_id is ambiguous') ||
     (normalized.includes('approve_audit_run_remediation') && missingObject) ||
     (normalized.includes('audit_remediation_approvals') && missingObject) ||
     (normalized.includes('column "fixed"') && missingObject)
@@ -37,13 +41,22 @@ function embeddedRpcError(data: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
+function remediationError(remediation: Awaited<ReturnType<typeof runApprovedAuditRemediation>>): string {
+  const first = remediation.skipped.find(item => item.reason)?.reason
+  return first || 'The approved run could not create a remediation pull request.'
+}
+
 export async function POST(req: NextRequest) {
   const ctx = await getAccess()
-  if (!ctx.isOwner || !ctx.userId) return NextResponse.json({ ok: false, error: 'Owner access required.' }, { status: 403 })
+  if (!ctx.isOwner || !ctx.userId) {
+    return NextResponse.json({ ok: false, error: 'Owner access required.' }, { status: 403 })
+  }
 
   let body: { runId?: unknown } = {}
   try { body = await req.json() } catch { /* validated below */ }
-  if (!isUuid(body.runId)) return NextResponse.json({ ok: false, error: 'A valid audit run id is required.' }, { status: 400 })
+  if (!isUuid(body.runId)) {
+    return NextResponse.json({ ok: false, error: 'A valid audit run id is required.' }, { status: 400 })
+  }
 
   const admin = getAdminSupabase()
   let schemaRepairAttempted = false
@@ -54,13 +67,8 @@ export async function POST(req: NextRequest) {
     p_approved_by: ctx.userId,
   })
 
-  // hub_exec_sql executes one prepared statement per RPC invocation. For only the
-  // known audit-approval schema drift, run the fixed repository-owned statements
-  // in order, stop at the first failure, reload PostgREST, and retry approval once.
-  // Neither the browser request nor an audit finding can supply executable SQL.
   if (approval.error && isApprovalSchemaDrift(String(approval.error.message || ''))) {
     schemaRepairAttempted = true
-
     for (const [index, query] of AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.entries()) {
       const repair = await admin.rpc('hub_exec_sql', { query })
       if (repair.error || embeddedRpcError(repair.data)) {
@@ -84,9 +92,6 @@ export async function POST(req: NextRequest) {
           timestamp: new Date().toISOString(),
         },
       })
-
-      // Give PostgREST a brief bounded window to consume the explicit schema
-      // reload notification before the single allowed post-repair retry.
       await new Promise(resolve => setTimeout(resolve, 250))
       approval = await admin.rpc('approve_audit_run_remediation', {
         p_run_id: body.runId,
@@ -118,23 +123,41 @@ export async function POST(req: NextRequest) {
   }
 
   const event = Array.isArray(approval.data) ? approval.data[0] : approval.data
-  if (!event?.approved) {
-    const status = event?.reason === 'already_approved' ? 409 : 422
+  const alreadyApproved = event?.reason === 'already_approved'
+  if (!event?.approved && !alreadyApproved) {
+    const status = event?.reason === 'run_not_complete' ? 422 : 409
     return NextResponse.json({ ok: false, code: event?.reason || 'approval_refused', error: event?.message || 'This audit run cannot be approved.' }, { status })
   }
 
-  // `findingsFixed` is intentionally the exact persisted run count. The batch is
-  // scoped by p_run_id in the RPC; no historical or subsequently-created finding
-  // can be included. The approval record preserves the thin-entry-point rollback
-  // marker so Supervisor can restore the prior entry point if corruption is found.
+  const remediation = await runApprovedAuditRemediation({
+    admin,
+    runId: body.runId,
+    actorUserId: ctx.userId,
+  })
+  if (!remediation.ok) {
+    return NextResponse.json({
+      ok: false,
+      approved: true,
+      code: 'audit_remediation_failed',
+      error: `The run is approved, but the code fixes could not be prepared. ${remediationError(remediation)}`,
+      retryable: true,
+      remediation,
+      schemaRepaired,
+    }, { status: 502 })
+  }
+
+  const findingsFixed = remediation.findingsApplied + remediation.findingsAlreadyResolved
   return NextResponse.json({
     ok: true,
-    runId: event.run_id,
-    approvedBy: event.approved_by,
-    findingsFixed: event.findings_fixed,
+    runId: body.runId,
+    approvedBy: event?.approved_by || ctx.userId,
+    findingsFixed,
+    findingsApproved: Number(event?.findings_fixed || remediation.findingsTotal || 0),
     status: 'approved',
-    timestamp: event.timestamp,
+    timestamp: event?.timestamp || remediation.approvedAt,
+    alreadyApproved,
     schemaRepaired,
+    remediation,
     rollback: { entryPoint: 'thin', available: true },
   })
 }

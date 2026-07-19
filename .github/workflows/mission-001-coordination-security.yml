@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: saas/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - run: node --test tests/supervisorCoordinationSecurity.node.test.ts
       - run: npm run typecheck

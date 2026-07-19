@@ -9,27 +9,24 @@ on:
 jobs:
   build-and-commit:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+      - name: Use Node.js 24
+        uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Cache Vercel build output
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .vercel/cache
-          key: vercel-${{ runner.os }}-${{ matrix.node-version }}-${{ github.sha }}
+          key: vercel-${{ runner.os }}-24-${{ github.sha }}
           restore-keys: |
-            vercel-${{ runner.os }}-${{ matrix.node-version }}-
+            vercel-${{ runner.os }}-24-
 
       - name: Install dependencies
         run: npm ci
@@ -45,7 +42,7 @@ jobs:
         run: npm run build
 
       - name: Commit changes
-        if: matrix.node-version == '20.x'
+        if: success()
         run: |
           git config --global user.name "COS Agent"
           git config --global user.email "cos@signalboostapp.com"
@@ -54,12 +51,12 @@ jobs:
           git push origin ai-cos-branch
 
       - name: Deploy to Vercel
-        if: matrix.node-version == '20.x'
+        if: success()
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       # Slack Notifications
       - name: Notify Slack on success
-        if: success() && matrix.node-version == '20.x'
+        if: success()
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
@@ -71,7 +68,7 @@ jobs:
                   "fields": [
                     { "title": "Branch", "value": "${{ github.ref }}", "short": true },
                     { "title": "Commit", "value": "${{ github.sha }}", "short": true },
-                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
+                    { "title": "Node.js Version", "value": "24", "short": true },
                     { "title": "Video URL", "value": "https://youtube.com/watch?v=XYZ123", "short": false },
                     { "title": "Duration", "value": "${{ job.duration }}", "short": true },
                     { "title": "Triggered By", "value": "${{ github.actor }}", "short": true }
@@ -83,7 +80,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on failure
-        if: failure() && matrix.node-version == '20.x'
+        if: failure()
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
@@ -95,7 +92,7 @@ jobs:
                   "fields": [
                     { "title": "Branch", "value": "${{ github.ref }}", "short": true },
                     { "title": "Commit", "value": "${{ github.sha }}", "short": true },
-                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
+                    { "title": "Node.js Version", "value": "24", "short": true },
                     { "title": "Triggered By", "value": "${{ github.actor }}", "short": true }
                   ]
                 }
@@ -106,7 +103,7 @@ jobs:
 
       # Teams Notifications
       - name: Notify Teams on success
-        if: success() && matrix.node-version == '20.x'
+        if: success()
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{
@@ -115,7 +112,7 @@ jobs:
               "facts": [
                 { "name": "Branch", "value": "${{ github.ref }}" },
                 { "name": "Commit", "value": "${{ github.sha }}" },
-                { "name": "Node.js Version", "value": "${{ matrix.node-version }}" },
+                { "name": "Node.js Version", "value": "24" },
                 { "name": "Video URL", "value": "https://youtube.com/watch?v=XYZ123" },
                 { "name": "Duration", "value": "${{ job.duration }}" },
                 { "name": "Triggered By", "value": "${{ github.actor }}" }
@@ -125,7 +122,7 @@ jobs:
           ${{ secrets.TEAMS_WEBHOOK_URL }}
 
       - name: Notify Teams on failure
-        if: failure() && matrix.node-version == '20.x'
+        if: failure()
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{
@@ -134,7 +131,7 @@ jobs:
               "facts": [
                 { "name": "Branch", "value": "${{ github.ref }}" },
                 { "name": "Commit", "value": "${{ github.sha }}" },
-                { "name": "Node.js Version", "value": "${{ matrix.node-version }}" },
+                { "name": "Node.js Version", "value": "24" },
                 { "name": "Triggered By", "value": "${{ github.actor }}" }
               ]
             }]
@@ -143,7 +140,7 @@ jobs:
 
       # Email Notification
       - name: Notify via Email
-        if: matrix.node-version == '20.x'
+        if: success()
         run: |
           echo "Subject: Outreach Video Published
           Hi Luis,
@@ -153,7 +150,7 @@ jobs:
           Details:
           - Branch: ${{ github.ref }}
           - Commit: ${{ github.sha }}
-          - Node.js Version: ${{ matrix.node-version }}
+          - Node.js Version: 24
           - Duration: ${{ job.duration }}
           - Triggered By: ${{ github.actor }}
 

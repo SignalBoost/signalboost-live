@@ -3,7 +3,6 @@ name: Audit Remediation Regression
 on:
   pull_request:
     paths:
-      - 'ONBOARD.md'
       - 'saas/app/api/hub/audit/**'
       - 'saas/components/audit/**'
       - 'saas/lib/ai/tools/repoWriter.ts'
@@ -34,6 +33,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund

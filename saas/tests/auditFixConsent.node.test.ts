@@ -91,3 +91,15 @@ test('stale audit findings and stale previews cannot create misleading pull requ
   assert.match(patch, /baseHash: preview\.baseHash/)
   assert.match(patch, /phase === 'resolved'/)
 })
+
+
+test('approved audit fixes emit a structured file, line, action, and timestamp log', () => {
+  const route = read('../app/api/hub/operator/audit/patch/route.ts')
+
+  assert.match(route, /type AuditFixLog/)
+  assert.match(route, /file,/)
+  assert.match(route, /line: typeof body\.line === 'number' \? body\.line : null/)
+  assert.match(route, /action: 'Applied approved audit fix'/)
+  assert.match(route, /timestamp: auditTimestamp\(\)/)
+  assert.match(route, /event: 'audit_fix_applied'/)
+})

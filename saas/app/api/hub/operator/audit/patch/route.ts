@@ -46,6 +46,18 @@ type PatchBody = {
   recommendation?: string
   content?: string
   baseHash?: string
+  auditRunId?: string
+}
+
+type AuditFixLog = {
+  file: string
+  line: number | null
+  action: 'Applied approved audit fix'
+  timestamp: string
+}
+
+function auditTimestamp(date = new Date()): string {
+  return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
 }
 
 function stripFences(value: string): string {
@@ -249,12 +261,33 @@ export async function POST(req: NextRequest) {
     if (!commit.ok) {
       return NextResponse.json({ ok: false, error: commit.error || 'Commit refused.' }, { status: 422 })
     }
+
+    // A single run-level approval authorizes its approved fixes. This write is
+    // observability only: it never blocks a committed rollback-safe branch.
+    const fixLog: AuditFixLog = {
+      file,
+      line: typeof body.line === 'number' ? body.line : null,
+      action: 'Applied approved audit fix',
+      timestamp: auditTimestamp(),
+    }
+    try {
+      await getAdminSupabase().from('audit_logs').insert({
+        run_id: typeof body.auditRunId === 'string' ? body.auditRunId : null,
+        user_id: auth.ctx?.userId || null,
+        payload: { event: 'audit_fix_applied', fix: fixLog, branch: commit.branch, commitSha: commit.commitSha },
+      })
+    } catch {
+      // GitHub has already created a reviewable ai/* branch. Keep the fix
+      // available for Supervisor rollback even if observability is unavailable.
+    }
+
     return NextResponse.json({
       ok: true,
       mode: 'commit',
       branch: commit.branch,
       compareUrl: commit.compareUrl,
       commitSha: commit.commitSha,
+      fixLog,
     })
   }
 

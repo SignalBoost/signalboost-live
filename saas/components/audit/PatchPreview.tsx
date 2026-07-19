@@ -126,7 +126,7 @@ export default function PatchPreview({ finding }: { finding: PatchFinding }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           mode: 'commit', file: preview.path, content: preview.newContent,
-          title: preview.title, baseHash: preview.baseHash,
+          line: finding.line ?? undefined, title: preview.title, baseHash: preview.baseHash,
         }),
       })
       const data = await res.json().catch(() => null)

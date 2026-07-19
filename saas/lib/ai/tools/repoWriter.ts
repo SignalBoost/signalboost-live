@@ -228,11 +228,14 @@ const MODULE_SUFFIXES = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.
 export function findBadImports(content: string, filePath: string, paths: Set<string>, deps: Set<string>): string[] {
   const bad: string[] = []
   const fileDir = filePath.split('/').slice(0, -1).join('/')
+  const workspaceRoot = filePath === 'saas' || filePath.startsWith('saas/') ? 'saas/' : ''
   for (const spec of extractImports(content)) {
     if (spec.startsWith('node:')) continue
     let target = ''
     if (spec.startsWith('@/')) {
-      target = 'saas/' + spec.slice(2)
+      // The repository has two valid @/* alias roots: root-app files resolve
+      // from the repository root, while saas/* files resolve from saas/.
+      target = workspaceRoot + spec.slice(2)
     } else if (spec.startsWith('./') || spec.startsWith('../')) {
       target = normalizePath([fileDir, spec])
     } else {

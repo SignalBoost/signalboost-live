@@ -1,0 +1,46 @@
+name: Audit Remediation Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ONBOARD.md'
+      - 'saas/app/api/hub/audit/**'
+      - 'saas/components/audit/**'
+      - 'saas/lib/ai/tools/repoWriter.ts'
+      - 'saas/lib/audit/**'
+      - 'saas/tests/audit*.node.test.ts'
+      - 'saas/tests/repoWriterWorkspaceAliases.node.test.ts'
+      - 'saas/package.json'
+      - 'scripts/verify-workers.mjs'
+      - '.github/workflows/audit-remediation-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-remediation:
+    name: Verify audit consent and patch flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run focused audit tests
+        run: npm run test:audit-consent
+
+      - name: Verify worker guard
+        working-directory: .
+        run: node scripts/verify-workers.mjs

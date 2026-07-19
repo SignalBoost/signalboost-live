@@ -2,7 +2,8 @@
 //
 // Executive Risk Summary generator. PURE — snapshot in, structured summary out.
 // No I/O, no LLM, no React. Runs the full findings engine across every provider,
-// computes the readiness score and severity breakdown, and selects the top risks.
+// overlays persisted triage state when supplied, computes the readiness score and
+// severity breakdown, and selects the top active risks.
 //
 // The optional LLM narrative is produced by the route (server-side, resilient),
 // NOT here — this module stays deterministic so the summary is identical on every
@@ -15,15 +16,20 @@ import {
   type AuditScore,
   type Severity,
 } from '@/lib/audit/reportModel'
+import {
+  isHandled,
+  overlayFindingStates,
+  type FindingStateMap,
+} from '@/lib/audit/findingState'
 
 export interface ExecutiveSummaryData {
   generatedAt: string
   score: AuditScore
-  /** Top actionable risks (excludes evidence-required), highest severity first. */
+  /** Top actionable, unhandled risks (excludes evidence-required), highest severity first. */
   topRisks: Finding[]
   /** Count of evidence-required items (gaps to verify, not proven defects). */
   evidenceRequired: number
-  /** All findings, for drill-down. */
+  /** All findings, with persisted triage state overlaid when available. */
   findings: Finding[]
   /** Per-provider connection status snapshot, for the at-a-glance row. */
   providers: { id: string; status: string }[]
@@ -31,14 +37,17 @@ export interface ExecutiveSummaryData {
 
 const RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
 
-export function buildExecutiveSummary(snapshot: AuditSnapshot, opts?: { topN?: number }): ExecutiveSummaryData {
+export function buildExecutiveSummary(
+  snapshot: AuditSnapshot,
+  opts?: { topN?: number; states?: FindingStateMap },
+): ExecutiveSummaryData {
   const topN = opts?.topN ?? 5
   const result = runFindings(snapshot, { includeManualBaseline: true })
-  const findings = result.findings || []
+  const findings = overlayFindingStates(result.findings || [], opts?.states)
   const score = scoreFromFindings(findings)
 
   const topRisks = findings
-    .filter(f => !f.evidenceRequired)
+    .filter(f => !f.evidenceRequired && !isHandled(f.status))
     .sort((a, b) => RANK[a.severity] - RANK[b.severity])
     .slice(0, topN)
 

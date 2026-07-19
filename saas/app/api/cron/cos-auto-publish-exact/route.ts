@@ -21,6 +21,14 @@ const LIMIT = 5
 const RETRY_MINUTES = 10
 const QUOTA_RETRY_MINUTES = 24 * 60
 
+type FailureEmailResult = {
+  notified: boolean
+  attempted: boolean
+  error: string | null
+  email: string | null
+  attemptedAt: string | null
+}
+
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
   const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
@@ -136,13 +144,12 @@ function eligible(campaign: any): boolean {
 }
 
 async function sendFailureEmailOnce(args: {
-  sb: any
   campaign: any
   metadata: any
   error: string
   quotaBlockedUntil?: string | null
-}) {
-  const { sb, campaign, metadata, error, quotaBlockedUntil: blockedUntil = null } = args
+}): Promise<FailureEmailResult> {
+  const { campaign, metadata, error, quotaBlockedUntil: blockedUntil = null } = args
   const email = campaignOwnerEmail(campaign)
   const previous = metadata?.autoPublishExact?.failureNotification || {}
   const sameFailureAlreadySent = previous?.ok === true
@@ -150,7 +157,13 @@ async function sendFailureEmailOnce(args: {
     && String(previous?.quotaBlockedUntil || '') === String(blockedUntil || '')
 
   if (!email || sameFailureAlreadySent) {
-    return { notified: sameFailureAlreadySent, attempted: false, error: email ? null : 'Owner email is not configured.' }
+    return {
+      notified: sameFailureAlreadySent,
+      attempted: false,
+      error: email ? null : 'Owner email is not configured.',
+      email,
+      attemptedAt: null,
+    }
   }
 
   const sent = await sendEmail({
@@ -199,7 +212,6 @@ async function publishOne(sb: any, campaign: any) {
     const quota = res.status === 429 || String(errorText).toLowerCase().includes('quota')
     const quotaBlocked = quota ? new Date(Date.now() + QUOTA_RETRY_MINUTES * 60000).toISOString() : null
     const failureNotification = await sendFailureEmailOnce({
-      sb,
       campaign,
       metadata: freshMeta,
       error: errorText,
@@ -220,7 +232,7 @@ async function publishOne(sb: any, campaign: any) {
             ok: failureNotification.notified,
             attempted: failureNotification.attempted,
             error: errorText,
-            deliveryError: failureNotification.error || null,
+            deliveryError: failureNotification.error,
             quotaBlockedUntil: quotaBlocked,
             attemptedAt: failureNotification.attemptedAt || now,
             email: failureNotification.email || ownerEmail,
@@ -279,7 +291,6 @@ export async function GET(req: NextRequest) {
       const blockedUntil = quotaBlockedUntil(campaign)
       const errorText = `YouTube upload quota is paused until ${blockedUntil}`
       const notification = await sendFailureEmailOnce({
-        sb,
         campaign,
         metadata: campaign.metadata || {},
         error: errorText,
@@ -296,7 +307,7 @@ export async function GET(req: NextRequest) {
                 ok: notification.notified,
                 attempted: notification.attempted,
                 error: errorText,
-                deliveryError: notification.error || null,
+                deliveryError: notification.error,
                 quotaBlockedUntil: blockedUntil,
                 attemptedAt: notification.attemptedAt || new Date().toISOString(),
                 email: notification.email || campaignOwnerEmail(campaign),
@@ -305,7 +316,7 @@ export async function GET(req: NextRequest) {
           },
         }).eq('id', campaign.id)
       }
-      notifications.push({ campaign: campaign.id, notified: notification.notified, error: notification.error || null })
+      notifications.push({ campaign: campaign.id, notified: notification.notified, error: notification.error })
     }
 
     return NextResponse.json({

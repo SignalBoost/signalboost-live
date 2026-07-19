@@ -66,7 +66,7 @@ Automatic continuity is a request-level traffic promotion to the approved read-o
 
 Changes to this file, the Chief of Staff prompt, Backup COS policy, Concierge entry point, or COS integrity checks require:
 
-1. a verified GitHub commit signature;
+1. a GitHub-verified signature or an owner-authenticated GitHub API commit checked across the complete protected change range;
 2. CODEOWNERS review from `@SignalBoost`;
 3. passing COS integrity checks;
 4. a matching update to the protected snapshot when operating philosophy changes.

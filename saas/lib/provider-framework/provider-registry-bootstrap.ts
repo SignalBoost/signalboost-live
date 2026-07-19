@@ -15,8 +15,9 @@ import type { UniversalProviderSdk } from './types.ts'
 import { GitHubProvider } from './github.ts'
 import { StripeProvider } from './stripe.ts'
 import { SupabaseProvider } from './supabase.ts'
+import { CloudflareProvider } from './cloudflare.ts'
 
-const PROVIDERS: readonly UniversalProviderSdk[] = [GitHubProvider, StripeProvider, SupabaseProvider]
+const PROVIDERS: readonly UniversalProviderSdk[] = [GitHubProvider, StripeProvider, SupabaseProvider, CloudflareProvider]
 
 export function buildUniversalProviderRegistry(): UniversalProviderRegistry {
   const registry = new UniversalProviderRegistry()

@@ -1,0 +1,46 @@
+name: V1 Final Diagnostics
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/closure-final-diagnostics.yml'
+      - 'saas/**'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install SaaS dependencies
+        run: npm install --no-audit --no-fund
+      - name: Capture unit and enterprise guards
+        shell: bash
+        run: |
+          set +e
+          npm test > unit-tests.log 2>&1
+          unit_status=$?
+          npm run verify:issue-205 > enterprise-guards.log 2>&1
+          guard_status=$?
+          echo "$unit_status" > unit-tests.exit
+          echo "$guard_status" > enterprise-guards.exit
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-closure-diagnostics
+          path: |
+            saas/unit-tests.log
+            saas/unit-tests.exit
+            saas/enterprise-guards.log
+            saas/enterprise-guards.exit
+      - name: Enforce diagnostics
+        shell: bash
+        run: test "$(cat unit-tests.exit)" = "0" -a "$(cat enterprise-guards.exit)" = "0"

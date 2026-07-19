@@ -37,3 +37,21 @@ test('approved batch marks only the selected run findings as fixed in the same R
   assert.match(migration, /set fixed = true,\s*fixed_at = v_timestamp/)
   assert.match(migration, /where run_id = p_run_id;\s*get diagnostics v_count = row_count;/)
 })
+
+test('schema drift fails closed with an actionable migration response', () => {
+  const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
+  assert.match(route, /audit_approval_schema_not_ready/)
+  assert.match(route, /column \"approved\" of relation \"audit_runs\" does not exist/)
+  assert.match(route, /requiredMigrations: REQUIRED_MIGRATIONS/)
+  assert.match(route, /status: 503/)
+  assert.doesNotMatch(route, /error: approval\.error\.message/)
+})
+
+test('repair migration replaces the stale approved-column RPC with canonical status approval', () => {
+  const migration = read('../supabase/migrations/20260719_repair_audit_approval_schema_drift.sql')
+  assert.match(migration, /create or replace function public\.approve_audit_run_remediation/)
+  assert.match(migration, /set status = 'approved'/)
+  assert.match(migration, /where id = p_run_id and status = 'complete'/)
+  assert.doesNotMatch(migration, /set approved\s*=/)
+  assert.match(migration, /grant execute on function public\.approve_audit_run_remediation\(uuid, uuid\) to service_role/)
+})

@@ -1,9 +1,8 @@
-import { getAdminSupabase } from '@/utils/supabase/server'
 import {
   rankEnterpriseMemoryCandidates,
   type EnterpriseMemoryCandidate,
   type RankedEnterpriseMemory,
-} from './retrievalRanking'
+} from './retrievalRanking.ts'
 
 export type EnterpriseMemoryContext = {
   source: 'enterprise_memory'
@@ -50,6 +49,11 @@ function confidenceFromRecord(value: unknown): number {
   return scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0
 }
 
+function compositeIdentity(separator: string, ...parts: unknown[]): string {
+  const cleaned = parts.map(text)
+  return cleaned.every(Boolean) ? cleaned.join(separator) : ''
+}
+
 export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMemoryCandidate[] {
   const candidates: EnterpriseMemoryCandidate[] = []
   const organization = rows.organization
@@ -70,7 +74,7 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
   }
 
   for (const row of rows.intelligence || []) {
-    const id = text(row.id) || `${text(row.organization_id)}:${text(row.workspace)}`
+    const id = text(row.id) || compositeIdentity(':', row.organization_id, row.workspace)
     if (!id) continue
     const snapshot = object(row.snapshot)
     candidates.push({
@@ -85,17 +89,19 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
   }
 
   for (const row of rows.repositories || []) {
-    const id = text(row.id) || `${text(row.repo_owner)}/${text(row.repo_name)}`
+    const owner = text(row.repo_owner)
+    const name = text(row.repo_name)
+    const id = text(row.id) || compositeIdentity('/', owner, name)
     if (!id) continue
     candidates.push({
       id,
       kind: 'repository',
       confidence: number01(row.intelligence_confidence),
       occurredAt: text(row.analyzed_at) || text(row.last_repository_update) || null,
-      taskTags: tags(row.repo_owner, row.repo_name, row.primary_languages, row.frameworks, row.topics),
+      taskTags: tags(owner, name, row.primary_languages, row.frameworks, row.topics),
       payload: {
-        owner: text(row.repo_owner),
-        name: text(row.repo_name),
+        owner,
+        name,
         defaultBranch: text(row.default_branch),
         primaryLanguages: Array.isArray(row.primary_languages) ? structuredClone(row.primary_languages) : [],
         frameworks: Array.isArray(row.frameworks) ? structuredClone(row.frameworks) : [],
@@ -132,16 +138,18 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
   }
 
   for (const row of rows.approvals || []) {
-    const id = text(row.id) || `${text(row.campaign_id)}:${text(row.created_at)}`
+    const campaignId = text(row.campaign_id)
+    const createdAt = text(row.created_at)
+    const id = text(row.id) || compositeIdentity(':', campaignId, createdAt)
     if (!id) continue
     candidates.push({
       id,
       kind: 'approval',
       approved: text(row.decision) === 'approved',
-      occurredAt: text(row.created_at) || null,
-      taskTags: tags(row.campaign_id, row.decision),
+      occurredAt: createdAt || null,
+      taskTags: tags(campaignId, row.decision),
       payload: {
-        campaignId: text(row.campaign_id),
+        campaignId,
         decision: text(row.decision),
         approvedVersion: object(row.approved_version),
         evidence: text(row.evidence),
@@ -150,15 +158,17 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
   }
 
   for (const row of rows.confidence || []) {
-    const id = text(row.id) || `${text(row.workspace)}:${text(row.created_at)}`
+    const workspace = text(row.workspace)
+    const createdAt = text(row.created_at)
+    const id = text(row.id) || compositeIdentity(':', workspace, createdAt)
     if (!id) continue
     candidates.push({
       id,
       kind: 'confidence',
-      workspace: text(row.workspace) || null,
+      workspace: workspace || null,
       confidence: confidenceFromRecord(row.confidence),
-      occurredAt: text(row.created_at) || null,
-      taskTags: tags(row.workspace),
+      occurredAt: createdAt || null,
+      taskTags: tags(workspace),
       payload: { confidence: object(row.confidence) },
     })
   }
@@ -174,6 +184,7 @@ export async function retrieveEnterpriseMemoryContext(args: {
 }): Promise<EnterpriseMemoryContext | null> {
   const organizationId = args.organizationId.trim()
   if (!organizationId) return null
+  const { getAdminSupabase } = await import('../../../utils/supabase/server.ts')
   const admin = getAdminSupabase()
 
   const [organizationResult, intelligenceResult, repositoriesResult, campaignsResult, approvalsResult, confidenceResult] = await Promise.all([

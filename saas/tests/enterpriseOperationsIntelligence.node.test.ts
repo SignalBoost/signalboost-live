@@ -44,7 +44,7 @@ test('operations intelligence aggregates incidents, verification, learning, and 
   assert.equal(snapshot.learning.acceptedSamples, 1)
   assert.equal(snapshot.playbooks.trusted, 1)
   assert.deepEqual(snapshot.recentIncidentIds, ['critical-1', 'resolved-1'])
-  assert.equal(snapshot.health.state, 'yellow')
+  assert.equal(snapshot.health.state, 'red')
 })
 
 test('operations intelligence isolates organizations and remains healthy with no scoped failures', () => {

@@ -8,13 +8,15 @@ const conciergePath = path.join(root, 'app/api/concierge/route.ts')
 const supportPath = path.join(root, 'app/api/support/route.ts')
 const backupRuntimePath = path.join(root, 'lib/cos-backup/runtime.ts')
 const backupPolicyPath = path.join(root, 'lib/cos-backup/policy.ts')
+const nextConfigPath = path.join(root, 'next.config.mjs')
 const brainPath = path.resolve(root, '../cos-core/brain.md')
 
-const [concierge, support, backupRuntime, backupPolicy, brain] = await Promise.all([
+const [concierge, support, backupRuntime, backupPolicy, nextConfig, brain] = await Promise.all([
   readFile(conciergePath, 'utf8'),
   readFile(supportPath, 'utf8'),
   readFile(backupRuntimePath, 'utf8'),
   readFile(backupPolicyPath, 'utf8'),
+  readFile(nextConfigPath, 'utf8'),
   readFile(brainPath, 'utf8'),
 ])
 
@@ -24,7 +26,9 @@ if (!/POST as supportPost/.test(concierge)) failures.push('concierge_primary_bra
 if (!/runBackupCos/.test(concierge)) failures.push('concierge_backup_continuity_missing')
 if (!/detectPrimaryCorruption/.test(concierge)) failures.push('concierge_corruption_policy_missing')
 if (!/recordCosRecovery/.test(concierge)) failures.push('concierge_recovery_logging_missing')
+if (!/primary\.status >= 400 && primary\.status < 500\) return primary/.test(concierge)) failures.push('primary_4xx_passthrough_missing')
 if (!/\bafter\s*\(/.test(concierge)) failures.push('healthy_primary_nonblocking_shadow_missing')
+if (/const backupPromise = runBackupCos/.test(concierge)) failures.push('backup_started_before_primary_result')
 if (/Promise\.all\s*\(\s*\[\s*primaryPromise\s*,\s*backupPromise/.test(concierge)) failures.push('healthy_primary_blocked_by_backup')
 if (/createClient|\.from\(|\.insert\(|\.update\(|proposeCampaign|sendPress|publishCore|socialPlatformFrom|isPressCreationRequest/i.test(concierge)) failures.push('concierge_contains_direct_business_side_effect')
 
@@ -36,9 +40,16 @@ if (!/trusted senior advisor/.test(support)) failures.push('chief_of_staff_ident
 
 if (!/withDeadline/.test(backupRuntime) || !/COS_BACKUP_TIMEOUT_MS/.test(backupRuntime)) failures.push('backup_deadline_missing')
 if (!/loadApprovedBrain/.test(backupRuntime)) failures.push('backup_brain_loader_missing')
+if (!/Approved COS brain snapshot is unavailable/.test(backupRuntime)) failures.push('backup_missing_snapshot_fail_closed_missing')
+if (/FALLBACK_BRAIN/.test(backupRuntime)) failures.push('backup_unapproved_fallback_present')
 if (!/executionAllowed: false/.test(backupRuntime) && !/execution_allowed: false/.test(concierge)) failures.push('backup_execution_lock_missing')
 if (!/error-degraded/.test(backupPolicy)) failures.push('degraded_primary_detection_missing')
+if (!/status >= 400 && status < 500/.test(backupPolicy)) failures.push('continuity_policy_4xx_passthrough_missing')
 if (/@\/|next\/server|supabase|callModel/.test(backupPolicy)) failures.push('backup_policy_not_dependency_free')
+
+if (!/outputFileTracingRoot/.test(nextConfig)) failures.push('cos_brain_trace_root_missing')
+if (!/['"]\/api\/concierge['"]/.test(nextConfig)) failures.push('cos_brain_concierge_trace_missing')
+if (!/\.\.\/cos-core\/brain\.md/.test(nextConfig)) failures.push('cos_brain_snapshot_trace_missing')
 
 if (!/Schema: `signalboost-cos-brain-v1`/.test(brain)) failures.push('brain_schema_missing')
 if (!/Healthy Primary responses must return without waiting for Backup COS/.test(brain)) failures.push('nonblocking_continuity_boundary_missing')
@@ -46,12 +57,13 @@ if (!/execution_allowed: false/.test(brain)) failures.push('brain_execution_lock
 
 const report = {
   ok: failures.length === 0,
-  schema: 'signalboost-cos-integrity-v2',
+  schema: 'signalboost-cos-integrity-v3',
   brainDigest: createHash('sha256').update(brain).digest('hex'),
   conciergeDigest: createHash('sha256').update(concierge).digest('hex'),
   supportDigest: createHash('sha256').update(support).digest('hex'),
   backupRuntimeDigest: createHash('sha256').update(backupRuntime).digest('hex'),
   backupPolicyDigest: createHash('sha256').update(backupPolicy).digest('hex'),
+  nextConfigDigest: createHash('sha256').update(nextConfig).digest('hex'),
   failures,
 }
 

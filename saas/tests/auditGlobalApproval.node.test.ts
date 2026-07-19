@@ -30,3 +30,10 @@ test('approval event includes the required immutable audit fields and rollback m
   assert.match(migration, /rollbackEntryPoint/)
   assert.match(migration, /'thin'/)
 })
+
+test('approved batch marks only the selected run findings as fixed in the same RPC transaction', () => {
+  const migration = read('../supabase/migrations/20260719_audit_remediation_findings_approval.sql')
+  assert.match(migration, /add column if not exists fixed boolean not null default false/)
+  assert.match(migration, /set fixed = true,\s*fixed_at = v_timestamp/)
+  assert.match(migration, /where run_id = p_run_id;\s*get diagnostics v_count = row_count;/)
+})

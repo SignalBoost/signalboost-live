@@ -23,10 +23,24 @@ export interface SupervisorArtifactReview {
 
 const forbidden = /(authorization|bearer\s+[a-z0-9._-]+|cookie|set-cookie|password|passwd|secret|token|api[_-]?key|credential|session[_-]?id|localstorage|sessionstorage|file:\/\/|[a-z]:\\)/i
 const safeSchemes = /^(https:\/\/|artifact:\/\/|evidence:\/\/)/i
-const primitive = (value: Record<string, unknown> = {}) => Object.fromEntries(Object.entries(value)
-  .filter(([key, item]) => !forbidden.test(key) && (item === null || ['string','number','boolean'].includes(typeof item)))
-  .map(([key, item]) => [key, typeof item === 'string' && forbidden.test(item) ? '[redacted]' : item])
-  .sort(([a],[b]) => a.localeCompare(b))) as Record<string, string | number | boolean | null>
+
+type PrimitiveMetadataValue = string | number | boolean | null
+type PrimitiveMetadataEntry = [string, PrimitiveMetadataValue]
+
+const primitive = (value: Record<string, unknown> = {}): Record<string, PrimitiveMetadataValue> => {
+  const entries = Object.entries(value)
+    .filter((entry): entry is PrimitiveMetadataEntry => {
+      const [key, item] = entry
+      return !forbidden.test(key) && (item === null || ['string', 'number', 'boolean'].includes(typeof item))
+    })
+    .map(([key, item]): PrimitiveMetadataEntry => [
+      key,
+      typeof item === 'string' && forbidden.test(item) ? '[redacted]' : item,
+    ])
+    .sort(([a], [b]) => a.localeCompare(b))
+
+  return Object.fromEntries(entries)
+}
 
 export function reviewSupervisorArtifact(reference: SupervisorArtifactReference): SupervisorArtifactReview {
   const reasons: string[] = []
@@ -41,7 +55,7 @@ export function reviewSupervisorArtifact(reference: SupervisorArtifactReference)
   if (forbidden.test(rawMetadata)) reasons.push('sensitive_metadata_redacted')
   if (reference.artifactType === 'screenshot' || reference.artifactType === 'html') reasons.push('visual_redaction_review_required')
 
-  const hardFailure = reasons.some(reason => ['artifact_id_missing','unsafe_reference','invalid_digest'].includes(reason))
+  const hardFailure = reasons.some(reason => ['artifact_id_missing', 'unsafe_reference', 'invalid_digest'].includes(reason))
   const status: SupervisorArtifactReviewStatus = hardFailure ? 'rejected' : reasons.includes('visual_redaction_review_required') ? 'review_required' : 'approved'
   return Object.freeze({
     artifactId: id,

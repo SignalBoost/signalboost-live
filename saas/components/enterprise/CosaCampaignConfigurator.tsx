@@ -104,6 +104,14 @@ export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
     <p style={{ margin: 0, color: 'rgba(255,255,255,.55)', fontSize: 11 }}>COSA currently supports governed YouTube execution. Additional platforms will be enabled only when their queue mappings are implemented.</p>
     <SuggestionCardGrid label="Creative direction" suggestions={concepts} selectedId={concept} onSelect={setConcept} />
     {error && <p style={{ color: '#fca5a5', margin: 0 }}>{error}</p>}
-    <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button disabled={busy || analyzing || !ready} style={{ border: 'none', background: '#ffc300', color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: busy || analyzing ? 'wait' : 'pointer', opacity: busy || analyzing || !ready ? .55 : 1 }}>{busy ? 'Building campaign…' : 'Approve brief and build campaign'}</button></div>
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <button
+        type="submit"
+        disabled={busy || analyzing || !ready}
+        style={{ border: 'none', background: '#ffc300', color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: busy || analyzing ? 'wait' : 'pointer', opacity: busy || analyzing || !ready ? .55 : 1 }}
+      >
+        {busy ? 'Building campaign…' : 'Approve brief and build campaign'}
+      </button>
+    </div>
   </form>
 }

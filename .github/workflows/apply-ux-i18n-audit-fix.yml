@@ -1,0 +1,43 @@
+name: Apply UX i18n audit fix
+
+on:
+  push:
+    branches:
+      - fix/ux-i18n-audit-20260719
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ux-i18n-audit-20260719
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Apply verified localization and UX fixes
+        run: |
+          cat scripts/.tmp-ux-fix.part* | base64 --decode | gzip --decompress > /tmp/fix-ux-i18n-audit.mjs
+          node /tmp/fix-ux-i18n-audit.mjs
+          rm -f scripts/.tmp-ux-fix.part*
+          rm -f .github/workflows/apply-ux-i18n-audit-fix.yml
+          git diff --check
+
+      - name: Commit generated fixes
+        run: |
+          if git diff --quiet; then
+            echo "No changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix UX audit localization findings"
+          git push

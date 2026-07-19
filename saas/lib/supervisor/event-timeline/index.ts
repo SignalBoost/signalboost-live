@@ -42,24 +42,48 @@ export interface SupervisorTimeline {
   schemaVersion: 'supervisor-timeline-v1'
 }
 
+export interface SupervisorTimelineOptions {
+  incidentId?: string
+  correlationId?: string
+  provider?: string
+  kind?: SupervisorEventKind
+  severity?: SupervisorEventSeverity
+  actorType?: SupervisorTimelineEvent['actorType']
+  from?: string
+  to?: string
+  limit?: number
+}
+
+const forbidden = /(authorization|bearer\s+[a-z0-9._-]+|cookie|password|secret|token|api[_-]?key|credential|session[_-]?id|localstorage|sessionstorage)/i
 const primitiveMetadata = (value: Record<string, unknown> = {}) => Object.fromEntries(
   Object.entries(value)
-    .filter(([, item]) => item === null || ['string', 'number', 'boolean'].includes(typeof item))
+    .filter(([key, item]) => !forbidden.test(key) && (item === null || ['string', 'number', 'boolean'].includes(typeof item)))
+    .map(([key, item]) => [key, typeof item === 'string' && forbidden.test(item) ? '[redacted]' : item])
     .sort(([a], [b]) => a.localeCompare(b)),
 ) as Record<string, string | number | boolean | null>
 
-const validTime = (value: string) => Number.isFinite(Date.parse(value))
+const validTime = (value?: string) => Boolean(value && Number.isFinite(Date.parse(value)))
+const boundedLimit = (value?: number) => Math.min(250, Math.max(0, Math.floor(value ?? 200)))
 
 export function createSupervisorTimeline(
   sources: SupervisorTimelineSource[],
-  options: { incidentId?: string; correlationId?: string; limit?: number } = {},
+  options: SupervisorTimelineOptions = {},
 ): SupervisorTimeline {
   const deduplicated = new Map<string, SupervisorTimelineEvent>()
+  const from = validTime(options.from) ? Date.parse(options.from!) : Number.NEGATIVE_INFINITY
+  const to = validTime(options.to) ? Date.parse(options.to!) : Number.POSITIVE_INFINITY
+  if (from > to) throw new Error('invalid_timeline_window')
 
-  for (const source of sources) {
+  for (const source of sources.slice(0, 10_000)) {
     if (!source.source || !source.sourceId || !source.action || !validTime(source.occurredAt)) continue
+    const occurredAt = Date.parse(source.occurredAt)
+    if (occurredAt < from || occurredAt > to) continue
     if (options.incidentId && source.incidentId !== options.incidentId) continue
     if (options.correlationId && source.correlationId !== options.correlationId) continue
+    if (options.provider && source.provider !== options.provider) continue
+    if (options.kind && source.kind !== options.kind) continue
+    if (options.severity && (source.severity ?? 'info') !== options.severity) continue
+    if (options.actorType && (source.actorType ?? 'system') !== options.actorType) continue
 
     const eventId = `${source.source}:${source.sourceId}:${source.action}`
     if (deduplicated.has(eventId)) continue
@@ -81,12 +105,7 @@ export function createSupervisorTimeline(
     })
   }
 
-  const ordered = [...deduplicated.values()].sort((a, b) => {
-    const byTime = Date.parse(b.occurredAt) - Date.parse(a.occurredAt)
-    return byTime || a.eventId.localeCompare(b.eventId)
-  })
-  const events = ordered.slice(0, Math.max(0, options.limit ?? 200))
-
+  const events = [...deduplicated.values()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || a.eventId.localeCompare(b.eventId)).slice(0, boundedLimit(options.limit))
   return {
     events,
     totals: {

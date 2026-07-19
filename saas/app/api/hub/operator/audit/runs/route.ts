@@ -1,7 +1,7 @@
 // saas/app/api/hub/operator/audit/runs/route.ts
-// Run history + run detail for the Audit Console (Step 2).
-//   GET                 -> { ok, runs }            (recent 30 runs)
-//   GET ?runId=<uuid>   -> { ok, run, findings }   (one run + its findings)
+// Run history + run detail for the Audit Console.
+//   GET                 -> { ok, runs }                         (recent 30 runs)
+//   GET ?runId=<uuid>   -> { ok, run, findings, log, remediation }
 // Owner-gated; reads via the service-role admin client.
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -38,6 +38,22 @@ function localizeLogPayload(payload: any, lang: string) {
   }
 }
 
+function splitAuditPayloads(rows: any[]) {
+  let scan: any = null
+  let remediation: any = null
+  for (const row of rows || []) {
+    const payload = row?.payload
+    if (!payload || typeof payload !== 'object') continue
+    if (!remediation && payload.kind === 'audit_batch_remediation' && payload.approval === 'final') {
+      remediation = payload
+      continue
+    }
+    if (!scan && Array.isArray(payload.findings)) scan = payload
+    if (scan && remediation) break
+  }
+  return { scan, remediation }
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await getAccess()
   if (!ctx.isOwner) {
@@ -60,9 +76,25 @@ export async function GET(req: NextRequest) {
     const findings = (f.data || []).slice().sort(
       (a: any, b: any) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9),
     ).map((row: any) => localizeFinding(row, lang))
-    // Full-payload snapshot (preferred rehydration source); null for pre-snapshot runs.
-    const logRow = await admin.from('audit_logs').select('payload').eq('run_id', runId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    return NextResponse.json({ ok: true, run: run.data, findings, log: localizeLogPayload(logRow.data?.payload ?? null, lang) })
+
+    // A remediation result is also stored in audit_logs. Read several recent rows
+    // and keep the original scan snapshot separate so one-click approval never
+    // replaces the payload used to rehydrate the findings list.
+    const logRows = await admin
+      .from('audit_logs')
+      .select('payload')
+      .eq('run_id', runId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+    const payloads = splitAuditPayloads(logRows.data || [])
+
+    return NextResponse.json({
+      ok: true,
+      run: run.data,
+      findings,
+      log: localizeLogPayload(payloads.scan, lang),
+      remediation: payloads.remediation,
+    })
   }
 
   const runs = await admin

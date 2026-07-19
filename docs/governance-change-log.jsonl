@@ -1,0 +1,9 @@
+{"file":".github/workflows/onboard-check.yml","line":"60-80","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":".github/workflows/onboard-acknowledgement.yml","line":"22-39","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":".githooks/pre-commit","line":"10-23","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":".githooks/prepare-commit-msg","line":"10-15","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":".github/pull_request_template.md","line":"3-21","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":".githooks/README.md","line":"19-30","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":"docs/onboarding-enforcement.md","line":"5-62","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":"AGENTS.md","line":"48","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}
+{"file":"CLAUDE.md","line":"12","action":"Removed ONBOARD merge restriction","timestamp":"2026-07-19 04:35:50"}

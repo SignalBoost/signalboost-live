@@ -1,50 +1,56 @@
 # Sensitive areas require owner/code-owner review when branch protection enables
-# "Require review from Code Owners". Replace or supplement @SignalBoostAi with
-# the exact GitHub owner/team handle if this repository uses a different owner.
+# "Require review from Code Owners".
 
-ONBOARD.md @SignalBoostAi
-.github/ @SignalBoostAi
+ONBOARD.md @SignalBoost
+.github/ @SignalBoost
+
+# Canonical COS brain, entry point, backup and governance
+/cos-core/ @SignalBoost
+/saas/app/api/concierge/route.ts @SignalBoost
+/saas/app/api/support/route.ts @SignalBoost
+/saas/lib/cos-backup/ @SignalBoost
+/saas/scripts/check-cos-integrity.mjs @SignalBoost
 
 # COSA / COS / campaign orchestration and AI department
-*COSA* @SignalBoostAi
-*cosa* @SignalBoostAi
-*cos-* @SignalBoostAi
-auditor-router/ @SignalBoostAi
-compliance/ @SignalBoostAi
-services/cos-ai-department/ @SignalBoostAi
-k8s/cos-ai-department/ @SignalBoostAi
-monitoring/cos-ai-department/ @SignalBoostAi
+*COSA* @SignalBoost
+*cosa* @SignalBoost
+*cos-* @SignalBoost
+auditor-router/ @SignalBoost
+compliance/ @SignalBoost
+services/cos-ai-department/ @SignalBoost
+k8s/cos-ai-department/ @SignalBoost
+monitoring/cos-ai-department/ @SignalBoost
 
 # Video pipeline
-app/**/video/** @SignalBoostAi
-components/video/ @SignalBoostAi
-lib/video/ @SignalBoostAi
-scripts/*video* @SignalBoostAi
-saas/**/video* @SignalBoostAi
-saas/scripts/*video* @SignalBoostAi
-saas/marketing-sales-core/video.ts @SignalBoostAi
-saas/marketing-sales-host/video.ts @SignalBoostAi
+app/**/video/** @SignalBoost
+components/video/ @SignalBoost
+lib/video/ @SignalBoost
+scripts/*video* @SignalBoost
+saas/**/video* @SignalBoost
+saas/scripts/*video* @SignalBoost
+saas/marketing-sales-core/video.ts @SignalBoost
+saas/marketing-sales-host/video.ts @SignalBoost
 
 # Provider templates, infrastructure, secrets, Vercel env, Vault
-**/*provider* @SignalBoostAi
-**/*template* @SignalBoostAi
-**/*vercel* @SignalBoostAi
-**/*env* @SignalBoostAi
-**/*vault* @SignalBoostAi
-**/*secret* @SignalBoostAi
-**/*infra* @SignalBoostAi
-vercel.json @SignalBoostAi
-saas/vercel.json @SignalBoostAi
+**/*provider* @SignalBoost
+**/*template* @SignalBoost
+**/*vercel* @SignalBoost
+**/*env* @SignalBoost
+**/*vault* @SignalBoost
+**/*secret* @SignalBoost
+**/*infra* @SignalBoost
+vercel.json @SignalBoost
+saas/vercel.json @SignalBoost
 
 # Supabase, storage buckets, audit, cybersecurity, approval gates
-**/*supabase* @SignalBoostAi
-**/*storage* @SignalBoostAi
-**/*bucket* @SignalBoostAi
-**/*audit* @SignalBoostAi
-**/*auditor* @SignalBoostAi
-**/*cyber* @SignalBoostAi
-**/*security* @SignalBoostAi
-**/*approval* @SignalBoostAi
-saas/supabase/ @SignalBoostAi
-saas/components/audit/ @SignalBoostAi
-saas/app/cybersecurity-check/ @SignalBoostAi
+**/*supabase* @SignalBoost
+**/*storage* @SignalBoost
+**/*bucket* @SignalBoost
+**/*audit* @SignalBoost
+**/*auditor* @SignalBoost
+**/*cyber* @SignalBoost
+**/*security* @SignalBoost
+**/*approval* @SignalBoost
+saas/supabase/ @SignalBoost
+saas/components/audit/ @SignalBoost
+saas/app/cybersecurity-check/ @SignalBoost

@@ -44,6 +44,18 @@ test('stable artifact identity prefers object path and ignores signed URL rotati
   assert.equal(approvalArtifactKey(first), approvalArtifactKey(second))
 })
 
+test('same permanent path has one identity when its metadata field changes', () => {
+  const first = campaign().metadata.video
+  const moved = {
+    ...first,
+    brandDebug: {},
+    voiceObjectPath: first.brandDebug.objectPath,
+  }
+  assert.equal(stableArtifactDescriptor(first).field, 'brandDebug.objectPath')
+  assert.equal(stableArtifactDescriptor(moved).field, 'voiceObjectPath')
+  assert.equal(approvalArtifactKey(first), approvalArtifactKey(moved))
+})
+
 test('URL fallback removes signed query and fragment from artifact identity', () => {
   const first = campaign({ video: { brandDebug: {}, finalUrl: 'https://storage.test/cos-final/item.mp4?token=one#x' } }).metadata.video
   const second = { ...first, finalUrl: 'https://storage.test/cos-final/item.mp4?token=two#y' }

@@ -19,8 +19,9 @@ import { CloudflareProvider } from './cloudflare.ts'
 import { AwsProvider } from './aws.ts'
 import { AzureProvider } from './azure.ts'
 import { GoogleCloudProvider } from './google-cloud.ts'
+import { NamecheapProvider } from './namecheap.ts'
 
-const PROVIDERS: readonly UniversalProviderSdk[] = [GitHubProvider, StripeProvider, SupabaseProvider, CloudflareProvider, AwsProvider, AzureProvider, GoogleCloudProvider]
+const PROVIDERS: readonly UniversalProviderSdk[] = [GitHubProvider, StripeProvider, SupabaseProvider, CloudflareProvider, AwsProvider, AzureProvider, GoogleCloudProvider, NamecheapProvider]
 
 export function buildUniversalProviderRegistry(): UniversalProviderRegistry {
   const registry = new UniversalProviderRegistry()

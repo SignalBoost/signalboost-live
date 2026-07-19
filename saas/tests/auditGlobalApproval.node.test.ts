@@ -38,33 +38,40 @@ test('approved batch marks only the selected run findings as fixed in the same R
   assert.match(migration, /where run_id = p_run_id;\s*get diagnostics v_count = row_count;/)
 })
 
-test('schema drift fails closed with an actionable migration response', () => {
+test('schema drift fails closed with actionable repair state', () => {
   const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
   assert.match(route, /audit_approval_schema_not_ready/)
   assert.match(route, /column "approved" of relation "audit_runs" does not exist/)
   assert.match(route, /requiredMigrations: REQUIRED_MIGRATIONS/)
+  assert.match(route, /repairCompleted: schemaRepaired/)
+  assert.match(route, /repairFailedStep: schemaRepairFailedStep/)
   assert.match(route, /status: 503/)
   assert.doesNotMatch(route, /error: approval\.error\.message/)
 })
 
-test('known schema drift runs only the fixed repair SQL and retries approval once', () => {
+test('known schema drift runs fixed SQL as one statement per RPC and retries approval once', () => {
   const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
   const repair = read('../lib/audit/approvalSchemaRepair.ts')
 
-  assert.match(route, /AUDIT_APPROVAL_SCHEMA_REPAIR_SQL/)
-  assert.match(route, /admin\.rpc\('hub_exec_sql', \{ query: AUDIT_APPROVAL_SCHEMA_REPAIR_SQL \}\)/)
+  assert.match(route, /AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS/)
+  assert.match(route, /for \(const \[index, query\] of AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS\.entries\(\)\)/)
+  assert.match(route, /admin\.rpc\('hub_exec_sql', \{ query \}\)/)
+  assert.match(route, /schemaRepairFailedStep = index \+ 1/)
   assert.equal((route.match(/admin\.rpc\('approve_audit_run_remediation'/g) || []).length, 2)
   assert.match(route, /schemaRepairAttempted = true/)
   assert.match(route, /event: 'audit_approval_schema_repaired'/)
   assert.doesNotMatch(route, /query:\s*body\.|query:\s*payload\.|query:\s*req\./)
 
+  assert.match(repair, /export const AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS = \[/)
+  assert.equal((repair.match(/String\.raw`/g) || []).length, 8)
   assert.match(repair, /create table if not exists public\.audit_remediation_approvals/)
   assert.match(repair, /set status = 'approved'/)
   assert.match(repair, /grant execute on function public\.approve_audit_run_remediation\(uuid, uuid\) to service_role/)
   assert.match(repair, /notify pgrst, 'reload schema'/)
   assert.doesNotMatch(repair, /set approved\s*=/)
-  assert.doesNotMatch(repair, /AUDIT_APPROVAL_SCHEMA_REPAIR_SQL = String\.raw`\s*begin;/)
-  assert.doesNotMatch(repair, /commit;\s*`\.trim\(\)/)
+  assert.doesNotMatch(repair, /AUDIT_APPROVAL_SCHEMA_REPAIR_SQL/)
+  assert.doesNotMatch(repair, /String\.raw`\s*begin;/)
+  assert.doesNotMatch(repair, /commit;/)
 })
 
 test('repair migration replaces the stale approved-column RPC with canonical status approval', () => {

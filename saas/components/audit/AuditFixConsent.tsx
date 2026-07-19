@@ -5,7 +5,7 @@
 // readiness reports. Choosing Yes prepares or opens a remediation plan only.
 // This component never calls a provider, writes code, or changes production.
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 type ConsentCopy = {
   question: string
@@ -59,23 +59,24 @@ export default function AuditFixConsent({
   acceptHref?: string
 }) {
   const [dismissed, setDismissed] = useState(false)
+  const titleId = useId()
   if (dismissed || count <= 0) return null
 
   const copy = COPY[lang] || COPY.en
   const body = copy.body.replace('{count}', String(count))
-  const acceptClass = 'inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110'
+  const acceptClass = 'inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60'
 
   return (
     <section
       className="mb-4 overflow-hidden rounded-md border border-accent/40 bg-surface/50 p-4 ring-1 ring-accent/15 backdrop-blur-sm"
       style={{ borderLeft: '3px solid var(--sb-accent, #ffc300)' }}
-      aria-labelledby="audit-fix-consent-title"
+      aria-labelledby={titleId}
     >
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-[260px] flex-1">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-            <h3 id="audit-fix-consent-title" className="text-sm font-semibold tracking-tight text-text">
+            <h3 id={titleId} className="text-sm font-semibold tracking-tight text-text">
               {copy.question}
             </h3>
           </div>
@@ -88,7 +89,7 @@ export default function AuditFixConsent({
               {copy.yes}
             </a>
           ) : (
-            <button type="button" onClick={onAccept} className={acceptClass}>
+            <button type="button" onClick={onAccept} disabled={!onAccept} className={acceptClass}>
               {copy.yes}
             </button>
           )}

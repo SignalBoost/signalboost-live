@@ -87,8 +87,8 @@ export async function getAccess(): Promise<AccessContext> {
   const email = String(user.email || '').trim().toLowerCase()
   const role = envRole(email)
 
-  // Only OWNER_EMAILS may create an owner context. Database team roles and
-  // ADMIN_EMAILS cannot elevate an account into protected owner access.
+  // Only the canonical owner allowlist may create an owner context. Database
+  // team roles and legacy administrator configuration cannot elevate an account.
   return buildContext(user.id, email, role)
 }
 

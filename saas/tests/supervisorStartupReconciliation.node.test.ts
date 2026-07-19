@@ -100,6 +100,58 @@ test('reconciliation is idempotent and does not invalidate the same execution tw
   assert.deepEqual(second.invalidatedExecutionIds, [])
 })
 
+test('one lost execution invalidates once even when multiple expired work items reference it', async () => {
+  const store = new InMemoryCoordinationStore()
+  await store.registerInstance(instance)
+  await store.enqueueWorkItem(work({ workItemId: 'work-2', incidentId: 'incident-2' }))
+  await store.enqueueWorkItem(work({ workItemId: 'work-1', incidentId: 'incident-1' }))
+
+  for (const workItemId of ['work-1', 'work-2']) {
+    await store.acquireLease({
+      workItemId,
+      ownerInstanceId: instance.instanceId,
+      ownerRuntimeId: instance.runtimeId,
+      leaseDurationMs: 1_000,
+      now: new Date('2026-07-18T00:00:00.000Z'),
+    })
+  }
+
+  const invalidations: Array<{ executionId: string; workItemId: string }> = []
+  const report = await runSupervisorStartupReconciliation({
+    store,
+    now: new Date('2026-07-18T00:00:02.000Z'),
+    approvalInvalidator: {
+      invalidate: async ({ executionId, workItemId }) => { invalidations.push({ executionId, workItemId }) },
+    },
+  })
+
+  assert.deepEqual(report.reconciledWorkItemIds, ['work-1', 'work-2'])
+  assert.deepEqual(report.invalidatedExecutionIds, ['execution-1'])
+  assert.deepEqual(invalidations, [{ executionId: 'execution-1', workItemId: 'work-1' }])
+})
+
+test('approval invalidation failure rejects reconciliation instead of reporting a safe completion', async () => {
+  const store = new InMemoryCoordinationStore()
+  await store.registerInstance(instance)
+  await store.enqueueWorkItem(work())
+  await store.acquireLease({
+    workItemId: 'work-1',
+    ownerInstanceId: instance.instanceId,
+    ownerRuntimeId: instance.runtimeId,
+    leaseDurationMs: 1_000,
+    now: new Date('2026-07-18T00:00:00.000Z'),
+  })
+
+  await assert.rejects(
+    runSupervisorStartupReconciliation({
+      store,
+      now: new Date('2026-07-18T00:00:02.000Z'),
+      approvalInvalidator: { invalidate: async () => { throw new Error('invalidation_failed') } },
+    }),
+    /invalidation_failed/,
+  )
+})
+
 test('scheduler runs immediately and can be stopped', async () => {
   const store = new InMemoryCoordinationStore()
   let runs = 0

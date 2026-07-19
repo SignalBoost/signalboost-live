@@ -1,0 +1,40 @@
+name: Mission 001 Supervisor Security Reliability
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/supervisor/coordination/**'
+      - 'saas/supabase/migrations/**supervisor**'
+      - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
+      - 'saas/tests/supervisorStartupReconciliation.node.test.ts'
+      - '.github/workflows/mission-001-supervisor-security-reliability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/supervisor/coordination/**'
+      - 'saas/supabase/migrations/**supervisor**'
+      - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
+      - 'saas/tests/supervisorStartupReconciliation.node.test.ts'
+      - '.github/workflows/mission-001-supervisor-security-reliability.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  security-reliability:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - name: RLS RPC and restart reliability regressions
+        run: node --test tests/supervisorCoordinationSecurity.node.test.ts tests/supervisorStartupReconciliation.node.test.ts
+      - name: TypeScript
+        run: npm run typecheck

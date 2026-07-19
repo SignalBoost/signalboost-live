@@ -24,32 +24,20 @@ canonical route.
 
 ---
 
-## 0. Mandatory Enforcement
+## 0. Onboarding Guidance
 
-This repository treats onboarding as an operational control, not a suggestion.
+This repository treats onboarding as an operational expectation, not a merge gate.
 
-Every pull request that changes platform, COSA, provider, infrastructure, workflow, security, video, audit, dashboard, Supabase, or Vercel behavior must:
+Every contributor should read `ONBOARD.md` before scanning or changing repository files
+and should keep it current when a change affects architecture, workflow, provider
+templates, environment variables, approval gates, video pipeline, infrastructure, audit,
+cybersecurity, or developer/operator instructions. Pull requests may include an onboarding
+impact note when it helps reviewers, but neither an acknowledgement nor an `ONBOARD.md`
+update is required to merge.
 
-- Confirm in the PR body that `ONBOARD.md` was read before scanning or changing files.
-- Update `ONBOARD.md` when the change affects architecture, workflow, provider templates, environment variables, approval gates, video pipeline, infrastructure, audit, cybersecurity, or developer/operator instructions.
-- Explain the onboarding impact, or explicitly state that there is no onboarding behavior change.
-
-Mandatory acknowledgement text for PRs:
-
-```text
-ONBOARD.md read before repo scan: YES
-```
-
-If a PR fails onboarding enforcement, the failure message must explain:
-
-1. What failed.
-2. Why it failed.
-3. Which files triggered the rule.
-4. Exactly how to fix it.
-
-The failure should never be vague. Developers must know immediately what to do.
-
-Important limitation: GitHub cannot technically stop someone from cloning or opening a file locally before reading this page. The repository enforces this through PR checks, PR templates, branch protection, review doctrine, and owner expectations. Any contributor who bypasses the onboarding order is violating repository policy.
+GitHub Actions and local hooks do not block commits or merges based on `ONBOARD.md`.
+Branch protection, approvals, code-owner review, and unrelated quality and safety checks
+remain independently governed.
 
 ---
 
@@ -711,9 +699,9 @@ Emergency navigation is part of the shared `PremiumCustomerNavbarV2` AppShell na
 
 ## 18. Mandatory ONBOARD Maintenance Rule
 
-`ONBOARD.md` must stay current.
+`ONBOARD.md` should stay current.
 
-A PR must update this file when it changes any of the following:
+Contributors should update this file when a change affects any of the following:
 
 - COSA behavior, campaign flow, video rendering, approval, publishing, localization, prediction, or optimization.
 - Console Hub provider templates, provider routing, provider cards, provider executors, provider variable names, provider live panels, or provider action behavior.
@@ -722,18 +710,15 @@ A PR must update this file when it changes any of the following:
 - Audit, cybersecurity, approval gates, owner/admin gating, or compliance behavior.
 - Developer instructions, build/test/deploy process, or repo governance.
 
-If a critical file changes and no user-facing or architecture-facing behavior changed, still add a short maintenance note under the change log below saying:
+If a critical file changes and no user-facing or architecture-facing behavior changed, a maintenance note may be added under the change log below. This documentation guidance never blocks a commit or merge.
 
-```text
-No onboarding behavior change; mechanical/refactor-only update.
-```
-
-This keeps the onboarding document current and prevents future developers or AI agents from relying on stale assumptions.
+Keeping onboarding documentation current helps future developers and AI agents avoid stale assumptions.
 
 ---
 
 ## 19. Onboarding Change Log
 
+- 2026-07-19: Removed ONBOARD.md merge gating from GitHub Actions, local commit hooks, and pull-request guidance. ONBOARD.md remains recommended onboarding and maintenance documentation, while unrelated branch protection, code-owner review, and quality/safety checks remain in place.
 - 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.
 - 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.

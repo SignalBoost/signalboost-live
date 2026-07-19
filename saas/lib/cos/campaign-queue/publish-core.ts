@@ -2,7 +2,7 @@
 // SHARED publish engine for COS campaigns. Used by BOTH:
 //   1. POST /api/cos/campaign-queue/publish  (manual button in /dashboard/cosa)
 //   2. PATCH /api/cos/campaign-queue on status=approved (AUTO-PUBLISH: the owner
-//      approves, and the AI does the rest — publish, tracking link, email).
+//      approves, and the AI does the rest — publish and tracking link).
 //
 // THE GATE (identical everywhere): nothing publishes unless the OWNER approved
 // it (approved_at + approved_by set on the row; both are nulled on rejection).
@@ -23,14 +23,14 @@
 // link (/api/track?c=<id>&p=<platform>) appended, so every viewer click lands
 // in cos_campaign_clicks before redirecting to the real site.
 //
-// AUTO-NOTIFY: after a real (non-stub) publish, the owner is emailed the live
-// link automatically.
+// NOTIFICATION: this engine stores the provider-confirmed live URL. A separate
+// compatibility notifier sends only the publication location and retries email
+// delivery without publishing again.
 
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
-import { sendEmail } from '@/lib/email'
 import { auditAdminAction } from '@/lib/outreach/security'
 import { verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 
@@ -78,7 +78,7 @@ export type PublishCoreResult = {
 }
 
 export async function publishCampaignCore(input: PublishCoreInput): Promise<PublishCoreResult> {
-  const { admin, userId, userEmail } = input
+  const { admin, userId } = input
   const id = String(input.id || '').trim()
   if (!id) return { ok: false, status: 400, error: 'id is required' }
   const acceptUnbranded = input.acceptUnbranded === true
@@ -173,36 +173,26 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
   let result: any
   try {
     result = await publishSocialPost({ platform, text, videoUrl, title, accessToken: tok.accessToken } as any)
-  } catch (e: any) {
-    return { ok: false, status: 502, error: e?.message || 'Publish failed', platform }
+  } catch (error: any) {
+    return { ok: false, status: 502, error: error?.message || 'Publish failed', platform }
   }
   if (!result?.ok) {
     return { ok: false, status: 502, error: result?.mode || 'Publish failed', platform, result }
   }
 
+  const isReallyLive = Boolean(result.liveUrl) && !String(result.mode || '').includes('not_configured')
+  if (!isReallyLive) {
+    return {
+      ok: false,
+      status: 502,
+      error: 'Provider did not return a confirmed live publication URL.',
+      platform,
+      result,
+    }
+  }
+
   const publishedAt = new Date().toISOString()
   const publishedKey = language ? `${platform}::${language}` : platform
-  const isReallyLive = Boolean(result.liveUrl) && !String(result.mode || '').includes('not_configured')
-
-  // AUTO-NOTIFY: tell the owner it's live, with the actual watch/post link.
-  let notified = false
-  let notifyError: string | undefined
-  if (isReallyLive && userEmail) {
-    const platformLabel = SOCIAL_CONNECTORS[platform]?.label || platform
-    const sent = await sendEmail({
-      from: 'saasMarketing',
-      to: userEmail,
-      subject: `🎬 Your video is live on ${platformLabel}: ${title || campaign.title}`,
-      html: `
-        <p>COSA finished the full pipeline for <strong>${title || campaign.title}</strong> and it is now live on ${platformLabel}.</p>
-        <p><a href="${result.liveUrl}">${result.liveUrl}</a></p>
-        <p>Clicks on the description link are being tracked — traffic numbers will appear on the campaign record automatically.</p>
-        <p>Click through to verify it looks right. No further action needed unless something looks off.</p>
-      `.trim(),
-    })
-    notified = Boolean(sent?.ok)
-    if (!sent?.ok) notifyError = sent?.error
-  }
 
   // Re-read metadata just before writing so sequential multi-language publishes
   // merge into published{} instead of clobbering each other.
@@ -217,7 +207,14 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
       tracking_url: trackingUrl,
       published: {
         ...((freshMeta && freshMeta.published) || {}),
-        [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null, publishedUnbranded: acceptUnbranded && campaign.metadata?.video?.branded !== true },
+        [publishedKey]: {
+          result,
+          publishedAt,
+          language: language || null,
+          notified: false,
+          notifyError: null,
+          publishedUnbranded: acceptUnbranded && campaign.metadata?.video?.branded !== true,
+        },
       },
     },
   }).eq('id', id)
@@ -228,10 +225,10 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
     action: 'cos_campaign.publish',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { platform, language: language || null, result, notified, acceptUnbranded },
+    metadata: { platform, language: language || null, result, notified: false, acceptUnbranded },
   })
 
-  return { ok: true, status: 200, platform, language: language || null, publishedAt, result, readiness, notified, trackingUrl }
+  return { ok: true, status: 200, platform, language: language || null, publishedAt, result, readiness, notified: false, trackingUrl }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,17 +269,17 @@ export async function autoPublishApprovedCampaign(opts: {
   // Languages with their own voiced render publish with that exact video.
   // If none have one, publish only the first drafted language with the default
   // video. If there are no per-language drafts at all, publish once untargeted.
-  const withOwnVideo = draftedLangs.filter(l => voiced[l])
+  const withOwnVideo = draftedLangs.filter(language => voiced[language])
   const targets: Array<{ language?: string; videoUrl?: string }> =
     withOwnVideo.length > 0
-      ? withOwnVideo.map(l => ({ language: l, videoUrl: String(voiced[l]) }))
+      ? withOwnVideo.map(language => ({ language, videoUrl: String(voiced[language]) }))
       : draftedLangs.length > 0
         ? [{ language: draftedLangs[0] }]
         : [{}]
 
   let published = 0
   for (const target of targets) {
-    const res = await publishCampaignCore({
+    const result = await publishCampaignCore({
       admin,
       userId,
       userEmail,
@@ -290,15 +287,15 @@ export async function autoPublishApprovedCampaign(opts: {
       language: target.language,
       videoUrl: target.videoUrl,
     })
-    if (res.ok) published += 1
+    if (result.ok) published += 1
     summary.push({
       language: target.language || null,
-      ok: res.ok,
-      error: res.ok ? undefined : res.error,
-      liveUrl: res.ok ? (res.result?.liveUrl || undefined) : undefined,
+      ok: result.ok,
+      error: result.ok ? undefined : result.error,
+      liveUrl: result.ok ? (result.result?.liveUrl || undefined) : undefined,
     })
     // A hard approval/ownership gate failure will fail for every language — stop early.
-    if (!res.ok && res.status === 409 && String(res.error || '').includes('approved by the owner')) break
+    if (!result.ok && result.status === 409 && String(result.error || '').includes('approved by the owner')) break
   }
 
   // Record the outcome on the campaign so nothing fails silently.

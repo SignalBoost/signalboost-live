@@ -44,6 +44,14 @@ function validateContextualRoutes() {
 
 validateContextualRoutes()
 
-const nextConfig = {}
+const nextConfig = {
+  // Vercel builds from the `saas` directory, while the protected approved COS
+  // snapshot lives at repository root. Expand the trace root and explicitly bind
+  // that immutable snapshot to the Concierge server function.
+  outputFileTracingRoot: path.join(process.cwd(), '..'),
+  outputFileTracingIncludes: {
+    '/api/concierge': ['../cos-core/brain.md'],
+  },
+}
 
 export default nextConfig

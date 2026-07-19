@@ -56,14 +56,15 @@ test('existing code-fix flow still requires preview before explicit pull-request
   assert.match(patch, /onClick=\{confirmPush\}/)
 })
 
-test('Stripe webhook and repository provider findings retain the shared patch-preview entry point', () => {
+test('Stripe webhook findings retain the shared preview component while the audit dashboard uses global approval', () => {
   const stripe = read('../components/audit/StripeReport.tsx')
   const dashboard = read('../app/dashboard/audit/page.tsx')
 
   assert.match(stripe, /import PatchPreview from '\.\/PatchPreview'/)
   assert.match(stripe, /messageKey\.startsWith\('audit\.finding\.stripeWebhook'\)/)
   assert.match(stripe, /file: 'saas\/app\/api\/webhook\/route\.ts'/)
-  assert.match(dashboard, /<PatchPreview finding=\{selectedFinding\} \/>/)
+  assert.match(dashboard, /approveAllFixes/)
+  assert.doesNotMatch(dashboard, /<PatchPreview finding=\{selectedFinding\} \/>/)
 })
 
 test('audit patch generation is grounded in real repository modules before preview', () => {

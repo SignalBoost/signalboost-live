@@ -14,7 +14,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import PatchPreview from '@/components/audit/PatchPreview'
 import RemediationBanner from '@/components/audit/RemediationBanner'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
@@ -60,9 +59,9 @@ type AuditCopy = {
   filesScanned: string; findings: string; clean: string; emptyHint: string
   ownerOnly: string; failed: string; quotaExceeded: string; category: string; recommendation: string; line: string
   history: string; noRuns: string; refresh: string
-  statusRunning: string; statusComplete: string; statusFailed: string
+  statusRunning: string; statusComplete: string; statusApproved: string; statusFailed: string
   detail: string; close: string; viewSource: string
-  generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string; patchUpgrade: string
+  approveAllFixes: string; approvingAllFixes: string; approvedAllFixes: string; approvalFailed: string; approvalSafety: string
   trackScan: string; trackAnalyze: string; trackReport: string; trackPrs: string
   cmdTitle: string; reportsTitle: string; reportsSubtitle: string; openReport: string; reportOwnerOnly: string; reportSyncHint: string; runningHint: string; pathHint: string; mvpBadge: string; viewOnline: string
   sev: Record<Sev, string>
@@ -72,15 +71,15 @@ const COPY: Record<string, AuditCopy> = {
   en: {
     title: 'Audit Console', subtitle: 'Deep security & quality scans, isolated from live console traffic.',
     viewPlans: 'View plans',
+    approveAllFixes: 'Approve all fixes', approvingAllFixes: 'Approving all fixes…', approvedAllFixes: 'All fixes approved for this audit run.', approvalFailed: 'Could not approve all fixes.', approvalSafety: 'One final approval applies every fix only to this audit run. The thin entry point remains available for Supervisor rollback if corruption is detected.',
     pathLabel: 'Repository URL', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
     emptyHint: 'Set a path and run a scan, or pick a past run.',
     ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed', quotaExceeded: 'Monthly limit reached: {used}/{cap} scans used. Upgrade your plan to run more.',
     category: 'Category', recommendation: 'Recommendation', line: 'Line',
     history: 'Run history', noRuns: 'No runs yet.', refresh: 'Refresh',
-    statusRunning: 'Running', statusComplete: 'Complete', statusFailed: 'Failed',
+    statusRunning: 'Running', statusComplete: 'Complete', statusApproved: 'Approved', statusFailed: 'Failed',
     detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
-    generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix', patchUpgrade: 'AI patch generation is a Pro feature. Upgrade to enable it.',
     trackScan: 'Scanning target', trackAnalyze: 'Running analyzers', trackReport: 'Generating report', trackPrs: 'Preparing patches',
     cmdTitle: 'Audit Command Center', reportsTitle: 'Compliance & Readiness Reports',
     reportsSubtitle: 'Twelve readiness reports across identity, providers, secrets, code, billing, and remediation.',
@@ -93,15 +92,15 @@ const COPY: Record<string, AuditCopy> = {
   es: {
     title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
     viewPlans: 'Ver planes',
+    approveAllFixes: 'Aprobar todas las correcciones', approvingAllFixes: 'Aprobando todas las correcciones…', approvedAllFixes: 'Todas las correcciones se aprobaron para esta ejecución de auditoría.', approvalFailed: 'No se pudieron aprobar todas las correcciones.', approvalSafety: 'Una aprobación final aplica cada corrección solo a esta ejecución de auditoría. El punto de entrada ligero sigue disponible para la reversión del Supervisor si se detecta corrupción.',
     pathLabel: 'URL del repositorio', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
     emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
     ownerOnly: 'Se requiere acceso de propietario para ejecutar auditorías.', failed: 'La auditoría falló', quotaExceeded: 'Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.',
     category: 'Categoría', recommendation: 'Recomendación', line: 'Línea',
     history: 'Historial', noRuns: 'Aún no hay ejecuciones.', refresh: 'Actualizar',
-    statusRunning: 'En curso', statusComplete: 'Completado', statusFailed: 'Falló',
+    statusRunning: 'En curso', statusComplete: 'Completado', statusApproved: 'Aprobado', statusFailed: 'Falló',
     detail: 'Detalle', close: 'Cerrar', viewSource: 'Ver en GitHub',
-    generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección', patchUpgrade: 'La generación de parches con IA es una función Pro. Mejora tu plan para habilitarla.',
     trackScan: 'Escaneando objetivo', trackAnalyze: 'Ejecutando analizadores', trackReport: 'Generando informe', trackPrs: 'Preparando parches',
     cmdTitle: 'Centro de Comando de Auditoría', reportsTitle: 'Informes de Cumplimiento y Preparación',
     reportsSubtitle: 'Doce informes de preparación sobre identidad, proveedores, secretos, código, facturación y remediación.',
@@ -114,15 +113,15 @@ const COPY: Record<string, AuditCopy> = {
   pt: {
     title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade, isoladas do tráfego do console ao vivo.',
     viewPlans: 'Ver planos',
+    approveAllFixes: 'Aprovar todas as correções', approvingAllFixes: 'Aprovando todas as correções…', approvedAllFixes: 'Todas as correções foram aprovadas para esta execução de auditoria.', approvalFailed: 'Não foi possível aprovar todas as correções.', approvalSafety: 'Uma aprovação final aplica cada correção apenas a esta execução de auditoria. O ponto de entrada leve continua disponível para reversão do Supervisor se for detectada corrupção.',
     pathLabel: 'URL do repositório', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
     emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
     ownerOnly: 'É necessário acesso de proprietário para executar auditorias.', failed: 'A auditoria falhou', quotaExceeded: 'Limite mensal atingido: {used}/{cap} análises usadas. Faça upgrade do seu plano para executar mais.',
     category: 'Categoria', recommendation: 'Recomendação', line: 'Linha',
     history: 'Histórico', noRuns: 'Ainda não há execuções.', refresh: 'Atualizar',
-    statusRunning: 'Em execução', statusComplete: 'Concluído', statusFailed: 'Falhou',
+    statusRunning: 'Em execução', statusComplete: 'Concluído', statusApproved: 'Aprovado', statusFailed: 'Falhou',
     detail: 'Detalhe', close: 'Fechar', viewSource: 'Ver no GitHub',
-    generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção', patchUpgrade: 'A geração de correções com IA é um recurso Pro. Faça upgrade para habilitá-la.',
     trackScan: 'Verificando alvo', trackAnalyze: 'Executando analisadores', trackReport: 'Gerando relatório', trackPrs: 'Preparando correções',
     cmdTitle: 'Central de Comando de Auditoria', reportsTitle: 'Relatórios de Conformidade e Prontidão',
     reportsSubtitle: 'Doze relatórios de prontidão sobre identidade, provedores, segredos, código, faturamento e remediação.',
@@ -135,15 +134,15 @@ const COPY: Record<string, AuditCopy> = {
   pl: {
     title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości, odizolowane od ruchu konsoli na żywo.',
     viewPlans: 'Zobacz plany',
+    approveAllFixes: 'Zatwierdź wszystkie poprawki', approvingAllFixes: 'Zatwierdzanie wszystkich poprawek…', approvedAllFixes: 'Wszystkie poprawki zostały zatwierdzone dla tego uruchomienia audytu.', approvalFailed: 'Nie udało się zatwierdzić wszystkich poprawek.', approvalSafety: 'Jedna końcowa zgoda stosuje każdą poprawkę tylko do tego uruchomienia audytu. Lekki punkt wejścia pozostaje dostępny do wycofania przez Supervisor w razie wykrycia uszkodzenia.',
     pathLabel: 'URL repozytorium', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
     emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
     ownerOnly: 'Do uruchamiania audytów wymagany jest dostęp właściciela.', failed: 'Audyt nie powiódł się', quotaExceeded: 'Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.',
     category: 'Kategoria', recommendation: 'Zalecenie', line: 'Wiersz',
     history: 'Historia', noRuns: 'Brak uruchomień.', refresh: 'Odśwież',
-    statusRunning: 'W toku', statusComplete: 'Zakończono', statusFailed: 'Niepowodzenie',
+    statusRunning: 'W toku', statusComplete: 'Zakończono', statusApproved: 'Zatwierdzono', statusFailed: 'Niepowodzenie',
     detail: 'Szczegóły', close: 'Zamknij', viewSource: 'Zobacz na GitHub',
-    generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki', patchUpgrade: 'Generowanie poprawek AI to funkcja Pro. Ulepsz plan, aby ją włączyć.',
     trackScan: 'Skanowanie celu', trackAnalyze: 'Uruchamianie analizatorów', trackReport: 'Generowanie raportu', trackPrs: 'Przygotowywanie poprawek',
     cmdTitle: 'Centrum Dowodzenia Audytu', reportsTitle: 'Raporty Zgodności i Gotowości',
     reportsSubtitle: 'Dwanaście raportów gotowości obejmujących tożsamość, dostawców, sekrety, kod, płatności i naprawę.',
@@ -156,15 +155,15 @@ const COPY: Record<string, AuditCopy> = {
   ru: {
     title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества, изолированные от живого трафика консоли.',
     viewPlans: 'Посмотреть планы',
+    approveAllFixes: 'Одобрить все исправления', approvingAllFixes: 'Одобряются все исправления…', approvedAllFixes: 'Все исправления одобрены для этого запуска аудита.', approvalFailed: 'Не удалось одобрить все исправления.', approvalSafety: 'Одно финальное одобрение применяет все исправления только к этому запуску аудита. Тонкая точка входа остаётся доступной для отката Supervisor при обнаружении повреждения.',
     pathLabel: 'URL репозитория', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
     emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
     ownerOnly: 'Для запуска аудита требуется доступ владельца.', failed: 'Аудит не выполнен', quotaExceeded: 'Достигнут месячный лимит: использовано {used}/{cap} проверок. Обновите план, чтобы запускать больше.',
     category: 'Категория', recommendation: 'Рекомендация', line: 'Строка',
     history: 'История запусков', noRuns: 'Запусков пока нет.', refresh: 'Обновить',
-    statusRunning: 'Выполняется', statusComplete: 'Завершено', statusFailed: 'Ошибка',
+    statusRunning: 'Выполняется', statusComplete: 'Завершено', statusApproved: 'Одобрено', statusFailed: 'Ошибка',
     detail: 'Подробности', close: 'Закрыть', viewSource: 'Открыть на GitHub',
-    generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление', patchUpgrade: 'Генерация исправлений ИИ — функция Pro. Обновите план, чтобы включить её.',
     trackScan: 'Сканирование цели', trackAnalyze: 'Запуск анализаторов', trackReport: 'Создание отчёта', trackPrs: 'Подготовка исправлений',
     cmdTitle: 'Командный центр аудита', reportsTitle: 'Отчёты о соответствии и готовности',
     reportsSubtitle: 'Двенадцать отчётов о готовности по идентификации, провайдерам, секретам, коду, биллингу и устранению.',
@@ -215,7 +214,7 @@ function statusDot(s: string): string {
   if (s === 'failed') return 'bg-danger'
   return 'bg-[#34d399]'
 }
-function statusLabel(copy: AuditCopy, s: string): string { return s === 'running' ? copy.statusRunning : s === 'failed' ? copy.statusFailed : copy.statusComplete }
+function statusLabel(copy: AuditCopy, s: string): string { return s === 'running' ? copy.statusRunning : s === 'approved' ? copy.statusApproved : s === 'failed' ? copy.statusFailed : copy.statusComplete }
 function timeShort(iso: string, lang: string): string {
   try { return new Date(iso).toLocaleString(lang || undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
   catch { return '' }
@@ -274,6 +273,8 @@ export default function AuditCenterPage() {
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [approvalMessage, setApprovalMessage] = useState<string | null>(null)
+  const [approvingAll, setApprovingAll] = useState(false)
 
   const [runs, setRuns] = useState<RunSummary[]>([])
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
@@ -409,6 +410,26 @@ export default function AuditCenterPage() {
     }
   }
 
+  async function approveAllFixes() {
+    if (!selectedRunId || !view || view.status === 'approved') return
+    setApprovingAll(true); setError(null); setApprovalMessage(null)
+    try {
+      const res = await fetch('/api/hub/operator/audit/approve-all', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId: selectedRunId }),
+      })
+      const result = await res.json().catch(() => null)
+      if (!res.ok || !result?.ok) { setError(result?.error || copy.approvalFailed); return }
+      setView(current => current ? { ...current, status: 'approved' } : current)
+      setApprovalMessage(`${copy.approvedAllFixes} ${result.findingsFixed} ${copy.findings}.`)
+      loadHistory()
+    } catch {
+      setError(copy.approvalFailed)
+    } finally {
+      setApprovingAll(false)
+    }
+  }
+
   const findings = view?.findings || []
   const openReport = openReportKey ? REPORTS.find(r => r.key === openReportKey) || null : null
   const closeReport = () => setOpenReportKey(null)
@@ -487,6 +508,21 @@ export default function AuditCenterPage() {
         {!loading && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
           <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
         )}
+
+        {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved') && (
+          <section className="mt-4 rounded-md border border-accent/40 bg-surface p-4" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text">{view.status === 'approved' ? copy.approvedAllFixes : copy.approveAllFixes}</h2>
+                <p className="mt-1 max-w-[720px] text-[12.5px] leading-relaxed text-text-muted">{copy.approvalSafety}</p>
+              </div>
+              <button onClick={approveAllFixes} disabled={approvingAll || view.status === 'approved'} className="rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+                {approvingAll ? copy.approvingAllFixes : view.status === 'approved' ? copy.approvedAllFixes : copy.approveAllFixes}
+              </button>
+            </div>
+          </section>
+        )}
+        {approvalMessage && <div className="mt-3 rounded-md border border-[#34d399]/40 bg-surface p-3 text-sm text-[#86efac]">{approvalMessage}</div>}
 
         {error && (
           <div className="mt-4 rounded-md border border-danger bg-surface p-3 text-sm text-danger">{copy.failed}: {error}</div>
@@ -718,12 +754,6 @@ export default function AuditCenterPage() {
               <a href={ghUrl(selectedFinding.file, selectedFinding.line)} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block rounded-md border border-border px-3.5 py-2 text-[12.5px] font-semibold text-[#1af0ff] transition-fast hover:bg-bg">
                 {copy.viewSource} ↗
               </a>
-
-              {selectedFinding.recommendation && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <PatchPreview finding={selectedFinding} />
-                </div>
-              )}
             </div>
           </div>
         )

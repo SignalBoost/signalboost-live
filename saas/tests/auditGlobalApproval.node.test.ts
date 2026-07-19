@@ -1,0 +1,32 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+
+test('audit dashboard exposes one global approval and no per-finding patch approval control', () => {
+  const dashboard = read('../app/dashboard/audit/page.tsx')
+  assert.match(dashboard, /approveAllFixes/)
+  assert.match(dashboard, /Approve all fixes/)
+  assert.match(dashboard, /\/api\/hub\/operator\/audit\/approve-all/)
+  assert.doesNotMatch(dashboard, /import PatchPreview/)
+  assert.doesNotMatch(dashboard, /<PatchPreview/)
+})
+
+test('global approval is scoped to a valid current run and prevents duplicate approval', () => {
+  const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
+  const migration = read('../supabase/migrations/20260719_audit_run_global_approval.sql')
+  assert.match(route, /isUuid\(body\.runId\)/)
+  assert.match(route, /approve_audit_run_remediation/)
+  assert.match(route, /already_approved/)
+  assert.match(migration, /where id = p_run_id and status = 'complete'/)
+  assert.match(migration, /unique \(run_id\)/)
+})
+
+test('approval event includes the required immutable audit fields and rollback marker', () => {
+  const migration = read('../supabase/migrations/20260719_audit_run_global_approval.sql')
+  for (const field of ['runId', 'approvedBy', 'findingsFixed', 'status', 'timestamp']) assert.match(migration, new RegExp(`'${field}'`))
+  assert.match(migration, /'approved'/)
+  assert.match(migration, /rollbackEntryPoint/)
+  assert.match(migration, /'thin'/)
+})

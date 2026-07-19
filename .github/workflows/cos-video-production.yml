@@ -23,6 +23,9 @@ jobs:
   render:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      RESOLVED_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      RESOLVED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,12 +33,10 @@ jobs:
           node-version: 22
 
       - name: Preflight — required secrets
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          test -n "$SUPABASE_URL" || { echo "SUPABASE_URL secret is missing"; exit 1; }
-          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "SUPABASE_SERVICE_ROLE_KEY secret is missing"; exit 1; }
+          test -n "$RESOLVED_SUPABASE_URL" || { echo "Missing GitHub Actions secret: add SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL"; exit 1; }
+          test -n "$RESOLVED_SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing GitHub Actions secret: add SUPABASE_SERVICE_ROLE_KEY"; exit 1; }
+          echo "Supabase worker credentials are configured."
 
       - name: Preflight — worker file integrity
         run: |
@@ -46,8 +47,8 @@ jobs:
       - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - working-directory: saas
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
           COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
           COS_VIDEO_RENDER_WEBHOOK_URL: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_URL }}
           COS_VIDEO_RENDER_WEBHOOK_TOKEN: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_TOKEN }}

@@ -63,7 +63,7 @@ function platformLabel(publishedKey: string) {
 export async function GET(req: NextRequest) {
   const sb = admin()
   const owner = await resolveOwner(req, sb)
-  if (!owner.ok) {
+  if ('error' in owner) {
     return NextResponse.json(
       { ok: false, error: owner.error },
       { status: owner.error === 'Owner only.' ? 403 : 400 },

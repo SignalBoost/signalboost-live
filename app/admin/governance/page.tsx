@@ -58,7 +58,7 @@ export default function GovernancePage() {
 
       <section id="approvals" className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
         <h2 className="text-2xl font-bold">Controlled self-rebuild plans</h2>
-        {rebuildPlans.map((plan) => <article key={plan.id} className="mt-4 rounded-2xl border border-white/10 p-4"><h3 className="font-bold text-[#FFD700]">{plan.broken_component}</h3><p className="mt-2 text-white/70">{plan.proposed_fix}</p><p className="mt-2 text-sm text-white/50">Risk: {plan.risk_level}. {plan.estimated_impact}</p><span className="mt-4 inline-flex rounded-full border border-[#FFD700]/60 px-4 py-2 text-[#FFD700]" role="status">Approval required before production action</span></article>)}
+        {rebuildPlans.map((plan) => <article key={plan.id} className="mt-4 rounded-2xl border border-white/10 p-4"><h3 className="font-bold text-[#FFD700]">{plan.broken_component}</h3><p className="mt-2 text-white/70">{plan.proposed_fix}</p><p className="mt-2 text-sm text-white/50">Risk: {plan.risk_level}. {plan.estimated_impact}</p><button className="mt-4 rounded-full border border-[#FFD700]/60 px-4 py-2 text-[#FFD700]" type="button">Approval required before production action</button></article>)}
       </section>
 
       <section className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">

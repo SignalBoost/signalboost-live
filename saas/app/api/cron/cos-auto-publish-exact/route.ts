@@ -16,6 +16,15 @@ const LIMIT = 5
 const RETRY_MINUTES = 10
 const QUOTA_RETRY_MINUTES = 24 * 60
 
+type PublishAttemptResult = {
+  ok: boolean
+  language: string | null
+  error?: string
+  quotaBlockedUntil?: string | null
+  videoUrl?: string
+  liveUrl?: string
+}
+
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
   const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
@@ -149,7 +158,7 @@ async function recordFailure(sb: any, campaign: any, error: string, quotaBlocked
   }).eq('id', campaign.id)
 }
 
-async function publishOne(sb: any, campaign: any) {
+async function publishOne(sb: any, campaign: any): Promise<PublishAttemptResult> {
   const language = firstLanguage(campaign)
   const videoUrl = exactFinalVideo(campaign, language)
   if (!videoUrl) {
@@ -229,7 +238,7 @@ export async function GET(req: NextRequest) {
 
   const activeQuotaBlock = (data || [])
     .map(quotaBlockedUntil)
-    .filter(Boolean)
+    .filter((value): value is string => Boolean(value))
     .sort()[0] || null
 
   if (activeQuotaBlock) {
@@ -246,10 +255,10 @@ export async function GET(req: NextRequest) {
   }
 
   const targets = (data || []).filter(eligible).slice(0, LIMIT)
-  const results: any[] = []
+  const results: Array<PublishAttemptResult & { campaign: string; title: string }> = []
   for (const campaign of targets) {
     const result = await publishOne(sb, campaign)
-    results.push({ campaign: campaign.id, title: campaign.title, ...result })
+    results.push({ campaign: String(campaign.id), title: String(campaign.title || ''), ...result })
     if (!result.ok && result.quotaBlockedUntil) break
   }
 

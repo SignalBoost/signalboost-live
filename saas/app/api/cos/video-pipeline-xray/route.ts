@@ -39,8 +39,17 @@ function isShortVideoRequest(c: any) {
   const text = campaignText(c)
   return /(short|tiktok|reel|reels|vertical|9:16|story|stories)/i.test(text)
 }
+function isExplicitlyTextOnly(c: any) {
+  const channel = String(c?.channel || '').toLowerCase()
+  if (['linkedin', 'blog', 'email', 'outreach', 'landing_page', 'review_campaign'].includes(channel)) {
+    const text = campaignText(c)
+    return /(text\s*[-—:]?\s*not\s+a\s+video|not\s+a\s+video|no\s+video|text\s+only|texto\s+apenas|somente\s+texto|sin\s+video|bez\s+wideo|только\s+текст)/i.test(text)
+  }
+  return false
+}
 function looksLikeVideoRequest(c: any) {
   if (isVideoChannel(c)) return true
+  if (isExplicitlyTextOnly(c)) return false
   const text = campaignText(c)
   return /\b(video|vídeo|clip|youtube|filme|movie|wideo|видео)\b/i.test(text) || /(foto|photo|imagem|image|picture|screenshot).*(video|vídeo|clip)/i.test(text)
 }
@@ -98,21 +107,11 @@ function eligibility(c: any, job?: any): string {
   const v = c?.metadata?.video
   const created = c.created_at ? Date.parse(c.created_at) : 0
   if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff'
-  // Rejected campaigns are frozen out of every pipeline stage (voice, banner,
-  // publish). The STUCK prefix is what makes the dashboard show the
-  // "Reset and kick" button (it matches eligibility.startsWith('STUCK')).
-  // Reset wipes video metadata and flips the campaign back to waiting_approval.
   if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
   if (!isVideoChannel(c) && looksLikeVideoRequest(c) && !v) return `STUCK: video request was routed as ${String(c.channel || 'unknown')} instead of youtube/short_video. Press "Kick missing renders" to rescue it, move it into the video pipeline, and start rendering.`
   if (!v) return 'STAGE 0: waiting for auto-render start'
-  // STUCK prefix is required: the dashboard only renders the "Reset and kick"
-  // button when eligibility starts with STUCK. The old INVALID prefix told the
-  // owner to reset while hiding the only reset control — an unreachable cure.
   if (isFakeFinal(v)) return 'STUCK: fake final artifact from old emergency fallback. Press "Reset and kick" (or wait — the brand overlay worker now self-heals these every 10 min). Do not approve this video.'
   if (v.status === 'rendering') {
-    // Job-aware diagnostics: "render in progress" used to hide the real queue
-    // state. Surface it, and show the Reset button (STUCK prefix) when the
-    // job is dead or has waited far too long.
     if (job) {
       const jobStatus = String(job.status || 'unknown')
       const idleMin = minutesAgo(job.updated_at)
@@ -125,7 +124,7 @@ function eligibility(c: any, job?: any): string {
       if (jobStatus === 'queued' && idleMin !== null && idleMin > 30) {
         return `STUCK: render job has been queued for ${idleMin} min with no worker pickup. Check GitHub Actions → "COS Video Production" for red runs (missing secrets, disabled schedule). Press "Reset and kick" to requeue.`
       }
-      return `RENDERING: job ${jobStatus}${idleMin !== null ? ` (last update ${idleMin} min ago)` : ''} — GitHub Actions worker runs every 10 min.`
+      return `RENDERING: job ${jobStatus}${idleMin !== null ? ` (last update ${idleMin} min ago)` : ''} — immediate dispatch requested; the 10-minute schedule remains as backup.`
     }
     const startedMin = minutesAgo(v.started_at)
     if (startedMin !== null && startedMin > 30) return `STUCK: rendering for ${startedMin} min and the render job row cannot be found. Press "Reset and kick" to start over.`
@@ -188,13 +187,6 @@ export async function GET(req: NextRequest) {
     }
   }
   const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_VIDEO_RENDER_BUCKET: process.env.COS_VIDEO_RENDER_BUCKET || null, COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
-  // Two queries, merged:
-  // (a) video-channel campaigns straight from SQL — immune to being pushed
-  //     out of a recency window by the dozens of non-video drafts COSA
-  //     creates daily (the old single 40-row window starved video campaigns
-  //     off this page entirely on busy days);
-  // (b) a recent any-channel window, kept only to catch MISROUTED video
-  //     requests (video keywords but wrong channel) so they can be rescued.
   const [videoRes, broadRes] = await Promise.all([
     sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).order('created_at', { ascending: false }).limit(15),
     sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40),
@@ -208,9 +200,6 @@ export async function GET(req: NextRequest) {
     .sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
     .slice(0, 20)
 
-  // Fetch production job rows for campaigns mid-render so the xray (and the
-  // eligibility text driving the dashboard) reflects the REAL queue state
-  // instead of a blind "render in progress".
   const renderingIds = recent
     .map((c: any) => c?.metadata?.video)
     .filter((v: any) => v && v.status === 'rendering' && v.requestId)

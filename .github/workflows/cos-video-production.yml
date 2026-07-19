@@ -107,10 +107,13 @@ jobs:
           COS_VIDEO_BANNER_UPGRADE_LIMIT: ${{ vars.COS_VIDEO_BANNER_UPGRADE_LIMIT || '2' }}
         run: node scripts/cos-video-brand-banner-upgrade.mjs
 
-      - name: Re-arm owner approval email for changed final artifacts
+      - name: Re-arm approval email for changed final artifacts
         if: ${{ always() }}
         working-directory: saas
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+          COS_VIDEO_APPROVAL_REARM_SCAN_LIMIT: ${{ vars.COS_VIDEO_APPROVAL_REARM_SCAN_LIMIT || '50' }}
+          COS_VIDEO_APPROVAL_REARM_LIMIT: ${{ vars.COS_VIDEO_APPROVAL_REARM_LIMIT || '2' }}
+          COS_VIDEO_APPROVAL_REARM_MAX_AGE_HOURS: ${{ vars.COS_VIDEO_APPROVAL_REARM_MAX_AGE_HOURS || '336' }}
         run: node scripts/cos-video-approval-rearm.mjs

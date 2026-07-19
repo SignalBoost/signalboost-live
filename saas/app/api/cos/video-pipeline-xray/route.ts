@@ -40,16 +40,20 @@ function isShortVideoRequest(c: any) {
   return /(short|tiktok|reel|reels|vertical|9:16|story|stories)/i.test(text)
 }
 function isExplicitlyTextOnly(c: any) {
+  const text = campaignText(c)
+  const explicitTextMarker = /(text\s*[-—:]?\s*not\s+a\s+video|not\s+a\s+video|no\s+video|text\s+only|texto\s+apenas|somente\s+texto|sin\s+video|bez\s+wideo|только\s+текст)/i.test(text)
+  if (explicitTextMarker) return true
+
   const channel = String(c?.channel || '').toLowerCase()
-  if (['linkedin', 'blog', 'email', 'outreach', 'landing_page', 'review_campaign'].includes(channel)) {
-    const text = campaignText(c)
-    return /(text\s*[-—:]?\s*not\s+a\s+video|not\s+a\s+video|no\s+video|text\s+only|texto\s+apenas|somente\s+texto|sin\s+video|bez\s+wideo|только\s+текст)/i.test(text)
-  }
-  return false
+  const textChannels = ['linkedin', 'blog', 'email', 'outreach', 'landing_page', 'review_campaign']
+  if (!textChannels.includes(channel)) return false
+
+  const strongVideoIntent = /(create|make|generate|produce|render|criar|gerar|produzir|faça|hacer|crear|stwórz|utwórz|созда).{0,80}\b(video|vídeo|clip|youtube|shorts?|reels?|tiktok|wideo|видео)\b/i.test(text)
+  return !strongVideoIntent
 }
 function looksLikeVideoRequest(c: any) {
-  if (isVideoChannel(c)) return true
   if (isExplicitlyTextOnly(c)) return false
+  if (isVideoChannel(c)) return true
   const text = campaignText(c)
   return /\b(video|vídeo|clip|youtube|filme|movie|wideo|видео)\b/i.test(text) || /(foto|photo|imagem|image|picture|screenshot).*(video|vídeo|clip)/i.test(text)
 }
@@ -161,7 +165,7 @@ export async function GET(req: NextRequest) {
   }
   if (kick) {
     const { data: pendingAll } = await sb.from('cos_campaign_queue').select('*').gte('created_at', BACKLOG_CUTOFF).neq('status', 'rejected').is('metadata->video', null).order('created_at', { ascending: false }).limit(20)
-    const pending = (pendingAll || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 3)
+    const pending = (pendingAll || []).filter((c: any) => !isExplicitlyTextOnly(c) && (isVideoChannel(c) || looksLikeVideoRequest(c))).slice(0, 3)
     if (!pending.length) actions.push({ action: 'kick', ok: true, note: 'no campaigns eligible for render start' })
     for (const c of pending) {
       const rescued = !isVideoChannel(c)
@@ -192,11 +196,14 @@ export async function GET(req: NextRequest) {
     sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40),
   ])
   const byId = new Map<string, any>()
-  for (const c of (videoRes.data || [])) byId.set(String(c.id), c)
+  for (const c of (videoRes.data || [])) {
+    if (!isExplicitlyTextOnly(c)) byId.set(String(c.id), c)
+  }
   for (const c of (broadRes.data || [])) {
-    if (!byId.has(String(c.id)) && looksLikeVideoRequest(c)) byId.set(String(c.id), c)
+    if (!byId.has(String(c.id)) && !isExplicitlyTextOnly(c) && looksLikeVideoRequest(c)) byId.set(String(c.id), c)
   }
   const recent = Array.from(byId.values())
+    .filter((c: any) => !isExplicitlyTextOnly(c))
     .sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
     .slice(0, 20)
 

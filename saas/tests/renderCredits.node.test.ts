@@ -1,13 +1,10 @@
 // saas/tests/renderCredits.node.test.ts
-//
-// Pins the render-credit pricing math: the markup and credit conversion that
-// decide the platform's margin. The DB atomic deduct and daily cap are exercised
-// against a live DB elsewhere; here we lock the pure math that must never drift.
-//
-// Run: node --test tests/renderCredits.node.test.ts
+// Pins customer pricing math and the verified-owner unlimited entitlement wiring.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { RENDER_MARKUP, creditsForProviderCost } from '../lib/credits/renderPricing.ts'
 
 test('markup is 3x', () => {
@@ -19,9 +16,8 @@ test('a provider cost of 100c charges the user 300 credits (3x)', () => {
 })
 
 test('rounds up so the platform never undercharges', () => {
-  // 33c * 3 = 99 -> 99; 33.4c would ceil provider first
   assert.equal(creditsForProviderCost(33), 99)
-  assert.equal(creditsForProviderCost(33.4), 102) // ceil(34)*3
+  assert.equal(creditsForProviderCost(33.4), 102)
 })
 
 test('zero or negative provider cost never charges negative credits', () => {
@@ -29,6 +25,29 @@ test('zero or negative provider cost never charges negative credits', () => {
   assert.equal(creditsForProviderCost(-50), 0)
 })
 
-test('a typical $4 render (400c) costs the user 1200 credits (~$12 at 1c/credit)', () => {
+test('a typical $4 render costs a customer 1200 credits', () => {
   assert.equal(creditsForProviderCost(400), 1200)
+})
+
+test('verified owner bypasses deductions while usage remains accounted', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/credits/renderCredits.ts'), 'utf8')
+  assert.match(source, /entitlements\.unlimitedCredits/)
+  assert.match(source, /credits_charged:\s*0/)
+  assert.match(source, /provider_cost_cents:\s*Math\.ceil/)
+  assert.match(source, /unlimited:\s*true/)
+})
+
+test('owner entitlement uses OWNER_EMAILS and team_members owner role', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/ownerEntitlements.ts'), 'utf8')
+  assert.match(source, /OWNER_EMAILS/)
+  assert.match(source, /team_members/)
+  assert.match(source, /role[^\n]*owner|owner[^\n]*role/)
+  assert.match(source, /auth\.admin\.getUserById/)
+})
+
+test('render-credit API exposes unlimited owner state', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/agency/render-credits/route.ts'), 'utf8')
+  assert.match(source, /access\.isOwner/)
+  assert.match(source, /unlimited:\s*true/)
+  assert.match(source, /balance:\s*null/)
 })

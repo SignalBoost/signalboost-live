@@ -1,6 +1,8 @@
 // saas/app/api/hub/audit/executive-summary/route.ts
 // Executive Risk Summary — owner-gated JSON.
 // Deterministic score/risks always returned; LLM narrative is best-effort.
+// Persisted finding-state rows are overlaid before scoring so handled findings
+// do not keep appearing as active remediation work.
 //
 // Cost controls:
 //   • Prompt caching — the static system prefix (analyst instruction + sanitized
@@ -15,6 +17,7 @@ import { getReportSnapshot } from '@/lib/audit/snapshotCache'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { buildExecutiveSummary, execSummaryFacts } from '@/lib/audit/execSummary'
 import { processAuditSnapshot } from '@/lib/audit/processor'
+import { indexStates, type FindingStateRow } from '@/lib/audit/findingState'
 import { cachedSystem, recordUsage, type TokenUsage } from '@/lib/ai/usage'
 
 export const dynamic = 'force-dynamic'
@@ -76,8 +79,20 @@ export async function GET(req: Request) {
 
   try {
     const lang = normalizeLang(new URL(req.url).searchParams.get('lang'))
-    const snapshot = await getReportSnapshot(getAdminSupabase())
-    const summary = buildExecutiveSummary(snapshot)
+    const db = getAdminSupabase()
+    const snapshot = await getReportSnapshot(db)
+
+    // Triage-state loading is best-effort. A missing optional table must not make
+    // the report unavailable, but valid stored state must be respected when present.
+    let states = {}
+    try {
+      const { data, error } = await (db as any)
+        .from('audit_finding_state')
+        .select('finding_id,status,owner,note,due_date,updated_at,updated_by')
+      if (!error && Array.isArray(data)) states = indexStates(data as FindingStateRow[])
+    } catch { /* summary remains available without the optional overlay */ }
+
+    const summary = buildExecutiveSummary(snapshot, { states })
 
     let sanitizedContext = ''
     try {

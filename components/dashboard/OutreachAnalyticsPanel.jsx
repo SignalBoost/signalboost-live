@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 const numberFormat = new Intl.NumberFormat('en-US');
 const colors = ['#2563eb', '#16a34a', '#f97316', '#9333ea'];
+const emptyAnalytics = { views: [], clicks: [], traffic: [], conversions: [] };
 
 const mockEngagementTrend = [
   { date: '2026-06-01', likes: 180, shares: 30, comments: 20 },
@@ -16,6 +17,32 @@ function qs(filters) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => value && value !== 'all' && query.set(key, value));
   return query.toString();
+}
+
+async function fetchAnalytics(path) {
+  const response = await fetch(path, { cache: 'no-store' });
+  let payload;
+
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(`Analytics request failed (${response.status}).`);
+  }
+
+  if (!response.ok) {
+    const error = new Error(payload?.error || `Analytics request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+
+  if (!Array.isArray(payload)) throw new Error('Analytics service returned an invalid response.');
+  return payload;
+}
+
+function analyticsErrorMessage(error) {
+  if (error?.status === 401) return 'Sign in to view platform analytics.';
+  if (error?.status === 403) return 'Only a trusted platform operator can view provider-wide analytics.';
+  return error instanceof Error ? error.message : 'Analytics are unavailable.';
 }
 
 function exportData(type, payload) {
@@ -95,23 +122,34 @@ function TrendLine({ trend }) {
 
 export default function OutreachAnalyticsPanel() {
   const [filters, setFilters] = useState({ startDate: '2026-06-01', endDate: '2026-07-03', region: 'all', campaign: '' });
-  const [data, setData] = useState({ views: null, clicks: null, traffic: null, conversions: null });
+  const [data, setData] = useState(emptyAnalytics);
   const [status, setStatus] = useState('Loading analytics…');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
     async function load() {
       setStatus('Refreshing analytics…');
+      setError('');
       const query = qs(filters);
-      const [views, clicks, traffic, conversions] = await Promise.all([
-        fetch(`/api/analytics/views?${query}`).then((res) => res.json()),
-        fetch(`/api/analytics/clicks?${query}`).then((res) => res.json()),
-        fetch(`/api/analytics/traffic?${query}`).then((res) => res.json()),
-        fetch(`/api/analytics/conversions?${query}`).then((res) => res.json()),
-      ]);
-      if (active) {
-        setData({ views, clicks, traffic, conversions });
-        setStatus(`Last refreshed ${new Date().toLocaleTimeString()}`);
+
+      try {
+        const [views, clicks, traffic, conversions] = await Promise.all([
+          fetchAnalytics(`/api/analytics/views?${query}`),
+          fetchAnalytics(`/api/analytics/clicks?${query}`),
+          fetchAnalytics(`/api/analytics/traffic?${query}`),
+          fetchAnalytics(`/api/analytics/conversions?${query}`),
+        ]);
+        if (active) {
+          setData({ views, clicks, traffic, conversions });
+          setStatus(`Last refreshed ${new Date().toLocaleTimeString()}`);
+        }
+      } catch (loadError) {
+        if (active) {
+          setData(emptyAnalytics);
+          setError(analyticsErrorMessage(loadError));
+          setStatus('Analytics unavailable');
+        }
       }
     }
     load();
@@ -120,9 +158,9 @@ export default function OutreachAnalyticsPanel() {
   }, [filters]);
 
   const tableRows = useMemo(() => {
-    const clickMap = new Map((data.clicks || []).map((row) => [row.region, row]));
-    const conversionMap = new Map((data.conversions || []).map((row) => [row.region, row]));
-    return (data.views || []).map((row, index) => ({
+    const clickMap = new Map(data.clicks.map((row) => [row.region, row]));
+    const conversionMap = new Map(data.conversions.map((row) => [row.region, row]));
+    return data.views.map((row, index) => ({
       ...row,
       clicks: clickMap.get(row.region)?.clicks || 0,
       conversions: conversionMap.get(row.region)?.conversions || 0,
@@ -135,10 +173,10 @@ export default function OutreachAnalyticsPanel() {
 
   const heatMax = Math.max(1, ...tableRows.map((row) => row.views));
   const totalViews = tableRows.reduce((sum, row) => sum + row.views, 0);
-  const totalClicks = (data.clicks || []).reduce((sum, row) => sum + row.clicks, 0);
-  const totalConversions = (data.conversions || []).reduce((sum, row) => sum + row.conversions, 0);
+  const totalClicks = data.clicks.reduce((sum, row) => sum + row.clicks, 0);
+  const totalConversions = data.conversions.reduce((sum, row) => sum + row.conversions, 0);
   const funnel = { impressions: Math.max(totalViews * 3, totalClicks), clicks: totalClicks, conversions: totalConversions };
-  const trafficSources = (data.traffic || []).map((row) => ({ source: row.source, value: row.count }));
+  const trafficSources = data.traffic.map((row) => ({ source: row.source, value: row.count }));
   const exportPayload = { filters, tableRows, funnel, trafficSources, trend: mockEngagementTrend, conversions: data.conversions };
 
   return (
@@ -148,19 +186,23 @@ export default function OutreachAnalyticsPanel() {
         <div className="text-sm font-medium text-slate-500">{status}</div>
       </div>
 
+      {error ? <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 font-medium text-amber-950">{error}</div> : null}
+
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-5">
         <label className="text-sm">Start date<input className="mt-1 w-full rounded-lg border p-2" type="date" value={filters.startDate} onChange={(event) => setFilters({ ...filters, startDate: event.target.value })} /></label>
         <label className="text-sm">End date<input className="mt-1 w-full rounded-lg border p-2" type="date" value={filters.endDate} onChange={(event) => setFilters({ ...filters, endDate: event.target.value })} /></label>
         <label className="text-sm">Region<input className="mt-1 w-full rounded-lg border p-2" placeholder="all, United States…" value={filters.region} onChange={(event) => setFilters({ ...filters, region: event.target.value || 'all' })} /></label>
         <label className="text-sm">Campaign<input className="mt-1 w-full rounded-lg border p-2" placeholder="Campaign name" value={filters.campaign} onChange={(event) => setFilters({ ...filters, campaign: event.target.value })} /></label>
-        <div className="flex items-end gap-2"><button className="rounded-lg bg-slate-900 px-4 py-2 text-white" onClick={() => exportData('csv', exportPayload)}>CSV</button><button className="rounded-lg border px-4 py-2" onClick={() => exportData('json', exportPayload)}>JSON</button></div>
+        <div className="flex items-end gap-2"><button className="rounded-lg bg-slate-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(error)} onClick={() => exportData('csv', exportPayload)}>CSV</button><button className="rounded-lg border px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(error)} onClick={() => exportData('json', exportPayload)}>JSON</button></div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2"><FunnelChart funnel={funnel} /><PieChart data={trafficSources} /><TrendLine trend={mockEngagementTrend} />
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-lg font-semibold text-slate-900">Views by region heatmap</h3><div className="mt-4 grid gap-3">{tableRows.map((row) => <div key={row.region} className="rounded-xl p-3 text-white" style={{ background: `rgba(37, 99, 235, ${0.25 + (row.views / heatMax) * 0.75})` }}><div className="flex justify-between"><strong>{row.region}</strong><span>{numberFormat.format(row.views)} views</span></div></div>)}</div></div>
-      </div>
+      {!error ? <>
+        <div className="grid gap-6 lg:grid-cols-2"><FunnelChart funnel={funnel} /><PieChart data={trafficSources} /><TrendLine trend={mockEngagementTrend} />
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-lg font-semibold text-slate-900">Views by region heatmap</h3><div className="mt-4 grid gap-3">{tableRows.map((row) => <div key={row.region} className="rounded-xl p-3 text-white" style={{ background: `rgba(37, 99, 235, ${0.25 + (row.views / heatMax) * 0.75})` }}><div className="flex justify-between"><strong>{row.region}</strong><span>{numberFormat.format(row.views)} views</span></div></div>)}</div></div>
+        </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Region</th><th className="p-3">Views</th><th className="p-3">Watch time</th><th className="p-3">Clicks</th><th className="p-3">Conversions</th><th className="p-3">Likes</th><th className="p-3">Shares</th><th className="p-3">Comments</th></tr></thead><tbody>{tableRows.map((row) => <tr key={row.region} className="border-t"><td className="p-3 font-medium">{row.region}</td><td className="p-3">{numberFormat.format(row.views)}</td><td className="p-3">{numberFormat.format(row.watchTimeMinutes)}m</td><td className="p-3">{numberFormat.format(row.clicks)}</td><td className="p-3">{numberFormat.format(row.conversions)}</td><td className="p-3">{numberFormat.format(row.likes)}</td><td className="p-3">{numberFormat.format(row.shares)}</td><td className="p-3">{numberFormat.format(row.comments)}</td></tr>)}</tbody></table></div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Region</th><th className="p-3">Views</th><th className="p-3">Watch time</th><th className="p-3">Clicks</th><th className="p-3">Conversions</th><th className="p-3">Likes</th><th className="p-3">Shares</th><th className="p-3">Comments</th></tr></thead><tbody>{tableRows.map((row) => <tr key={row.region} className="border-t"><td className="p-3 font-medium">{row.region}</td><td className="p-3">{numberFormat.format(row.views)}</td><td className="p-3">{numberFormat.format(row.watchTimeMinutes)}m</td><td className="p-3">{numberFormat.format(row.clicks)}</td><td className="p-3">{numberFormat.format(row.conversions)}</td><td className="p-3">{numberFormat.format(row.likes)}</td><td className="p-3">{numberFormat.format(row.shares)}</td><td className="p-3">{numberFormat.format(row.comments)}</td></tr>)}</tbody></table></div>
+      </> : null}
     </section>
   );
 }

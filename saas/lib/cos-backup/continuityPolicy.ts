@@ -20,12 +20,19 @@ export type PrimaryCosSignal = {
 }
 
 export function detectPrimaryCorruption(input: PrimaryCosSignal): string[] {
+  const status = Number(input.status)
+
+  // Authentication, authorization, validation, rate-limit, and other client
+  // denials belong to the governed Primary route. Continuity must never convert
+  // a Primary 4xx response into a successful Backup COS answer.
+  if (Number.isFinite(status) && status >= 400 && status < 500) return []
+
   const reasons: string[] = []
   const reply = String(input.reply || '').trim()
   const source = String(input.source || '').trim().toLowerCase()
   const lowerReply = reply.toLowerCase()
 
-  if (!Number.isFinite(input.status) || input.status >= 500) reasons.push('primary_http_failure')
+  if (!Number.isFinite(status) || status >= 500) reasons.push('primary_http_failure')
   if (DEGRADED_PRIMARY_SOURCES.has(source)) reasons.push(`primary_degraded_source:${source}`)
   if (!reply) reasons.push('primary_empty_reply')
 

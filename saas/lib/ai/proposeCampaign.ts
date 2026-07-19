@@ -1,15 +1,8 @@
 // saas/lib/ai/proposeCampaign.ts
 // On-demand COS marketing campaign creation for the Chief of Staff chat tool.
-// Creates real cos_campaign_queue rows, injects the requested script/CTA as
-// draft output, and starts the internal render pipeline immediately — so
-// the owner reviews ACTUAL finished videos, not a text promise.
-//
-// APPROVAL MODEL (owner's vision): COSA prepares everything first; rows are
-// created as waiting_approval. The owner's single Approve click (dashboard)
-// stamps approved_by, and the cos-auto-publish cron then publishes
-// automatically once branding + quality gates pass, emailing the live link.
-// No human Publish click needed. approved_by is a uuid column: it is only
-// ever a real user uuid (stamped at approval) or null — never a marker string.
+// Creates real cos_campaign_queue rows and starts the internal render pipeline.
+// Owner instructions are retained as internal context only; customer-facing
+// campaign copy is sanitized before it can become narration or captions.
 
 import { createClient } from '@supabase/supabase-js'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
@@ -22,6 +15,7 @@ const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru']
 const GITHUB_OWNER = 'SignalBoost'
 const GITHUB_REPO = 'signalboost-live'
 const VIDEO_WORKFLOW = 'cos-video-production.yml'
+const COPY_SCHEMA_VERSION = 'signalboost-campaign-copy-v2-clean'
 
 type RegionalSpec = {
   lang: string
@@ -43,7 +37,7 @@ const REGIONAL_SPECS: RegionalSpec[] = [
     lang: 'es',
     region: 'latam',
     label: 'Spanish / LATAM',
-    audience: 'LATAM business owners, agencies, hotels, restaurants, consultants, and entrepreneurs. Use neutral Latin American Spanish, not Mexico-only Spanish.',
+    audience: 'LATAM business owners, agencies, hotels, restaurants, consultants, and entrepreneurs.',
     angle: 'Create professional marketing campaigns without a large marketing team, with practical mobile-first growth workflows.',
   },
   {
@@ -64,7 +58,7 @@ const REGIONAL_SPECS: RegionalSpec[] = [
     lang: 'ru',
     region: 'global_ru',
     label: 'Russian / Global Russian-speaking audience',
-    audience: 'Russian-speaking entrepreneurs, agencies, consultants, and business operators. Avoid political framing completely.',
+    audience: 'Russian-speaking entrepreneurs, agencies, consultants, and business operators.',
     angle: 'Structured AI campaign execution with speed, clarity, multilingual outreach, analytics, and human approval.',
   },
 ]
@@ -83,13 +77,62 @@ function langOf(value: any) {
   return allowedLanguages.includes(l) ? l : 'en'
 }
 
+function normalizeKey(value: any) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\u0400-\u04ff]+/g, ' ')
+    .trim()
+}
+
+function isProductionInstruction(fragment: string) {
+  const value = String(fragment || '').trim()
+  if (!value) return true
+  const lower = value.toLowerCase()
+
+  if (/(do not repeat|don['’]t repeat|must not repeat|not be repeated|do not mention|don['’]t mention|do not say|ignore previous|system prompt|user prompt|these instructions|the instructions|não repita|nao repita|não repetir|nao repetir|não mencione|nao mencione|não diga|nao diga|estas instruções|essas instruções|sin repetir|no repitas|no repetir|no menciones|no digas|estas instrucciones|nie powtarzaj|nie wspominaj|nie mów|tych instrukcji|не повторяй|не упоминай|не говори|эти инструкции)/i.test(lower)) return true
+
+  if (/^(instructions?|requirements?|prompt|system|assistant|voiceover|narration|captions?|subtitles?|scenes?|visuals?|format|duration|aspect ratio|tone|style|language|target audience|audience|cta|hook|instruções|requisitos|narração|legendas|cenas|formato|duração|idioma|público[- ]alvo|instrucciones|requisitos|narración|subtítulos|escenas|formato|duración|idioma|público objetivo|instrukcje|wymagania|narracja|napisy|sceny|format|czas trwania|język|grupa docelowa|инструкции|требования|озвучка|субтитры|сцены|формат|длительность|язык|аудитория)\s*[:\-–—]/i.test(value)) return true
+
+  const productionWords = /(prompt|instruction|requirement|assistant|the ai|this ai|voiceover|narration|caption|subtitle|on[- ]screen|screen text|scene|shot|camera|b[- ]roll|watermark|aspect ratio|duration|render|production|visual direction|logo placement|narração|legenda|texto na tela|cena|filmagem|câmera|duração|renderização|produção|direção visual|narración|subtítulo|texto en pantalla|escena|cámara|duración|producción|narracja|napisy|tekst na ekranie|scena|kamera|czas trwania|produkcja|озвучка|субтитры|текст на экране|сцена|камера|длительность|производство)/i
+  const directive = /^(please\s+)?(must|should|do not|don['’]t|never|use|show|include|add|create|make|generate|write|say|mention|avoid|keep|ensure|please|não|nao|use|mostre|inclua|adicione|crie|gere|escreva|diga|evite|mantenha|garanta|no|usa|muestra|incluye|añade|crea|genera|escribe|di|evita|mantén|asegura|nie|użyj|pokaz|dodaj|utwórz|wygeneruj|napisz|powiedz|unikaj|zachowaj|upewnij|не|используй|покажи|добавь|создай|сгенерируй|напиши|скажи|избегай|сохрани|убедись)\b/i
+  if (productionWords.test(value) && directive.test(value)) return true
+
+  return /(ai|assistant|model|cosa).{0,40}(must|should|do not|don['’]t|repeat|mention|say|include|use|não|nao|deve|repita|mencione|diga|no debe|repita|mencione|diga|powinien|nie może|powtarzaj|wspominaj|mów|должен|не должен|повторять|упоминать|говорить)/i.test(value)
+}
+
+function sanitizeCampaignCopy(value: any, max = 1400) {
+  const source = String(value || '').replace(/[•▪◦]/g, '\n').trim()
+  if (!source) return ''
+
+  const fragments = source
+    .split(/\n+|(?<=[.!?])\s+|\s*;\s+/)
+    .map((part) => part.replace(/^[-–—*#\d.)\s]+/, '').trim())
+    .filter(Boolean)
+
+  const kept: string[] = []
+  const seen = new Set<string>()
+  for (let fragment of fragments) {
+    fragment = fragment
+      .replace(/^(script|copy|campaign copy|mensagem|texto|guion|scenariusz|текст)\s*[:\-–—]\s*/i, '')
+      .replace(/\[[^\]]*(instruction|caption|subtitle|scene|prompt|instru|legenda|subtítulo|napisy|инструк)[^\]]*\]/gi, '')
+      .replace(/https?:\/\/\S+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (!fragment || isProductionInstruction(fragment)) continue
+    const key = normalizeKey(fragment)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    kept.push(fragment)
+  }
+
+  return text(kept.join(' '), '', max)
+}
+
 function channelOf(...values: any[]): CosChannel {
-  // Scan the FULL, untruncated request text. Routing used to run on the goal
-  // sliced to 1200 chars, so a long brief whose intro mentioned "fila de
-  // outreach" was routed to the outreach channel even though it explicitly
-  // requested a Reels/TikTok/Shorts video further down.
   const raw = values.map((v) => String(v || '')).join(' ').toLowerCase()
-  // Explicit video intent always wins over incidental mentions of text channels.
   if (raw.includes('short') || raw.includes('tiktok') || raw.includes('reel') || raw.includes('9:16') || raw.includes('vertical')) return 'short_video'
   if (raw.includes('youtube') || raw.includes('video') || raw.includes('vídeo') || raw.includes('wideo') || raw.includes('видео')) return 'youtube'
   if (raw.includes('linkedin')) return 'linkedin'
@@ -106,23 +149,37 @@ function departmentOf(channel: CosChannel): CosDepartment {
 }
 
 function titleFrom(args: any, channel: CosChannel) {
-  return text(args.title || args.goal || args.objective, channel === 'short_video' ? 'SignalBoostAi short promo video' : 'SignalBoostAi promotional video', 140)
+  const safe = sanitizeCampaignCopy(args.title || args.goal || args.objective, 140)
+  return safe || (channel === 'short_video' ? 'SignalBoostAi short promo video' : 'SignalBoostAi promotional video')
 }
 
-function scriptFrom(args: any) {
-  const explicit = text(args.voiceover || args.script || args.body || args.sourceMaterial || '', '', 1400)
+function fallbackScript(lang: string, subject: string, audience: string, offer: string) {
+  const topic = subject || 'professional marketing campaigns'
+  if (lang === 'pt') return `A SignalBoostAi ajuda ${audience} a transformar ${topic} em uma campanha profissional com mais rapidez. Crie os materiais, revise tudo e mantenha o controle antes da publicação. ${offer}`
+  if (lang === 'es') return `SignalBoostAi ayuda a ${audience} a convertir ${topic} en una campaña profesional con mayor rapidez. Crea los recursos, revisa todo y mantén el control antes de publicar. ${offer}`
+  if (lang === 'pl') return `SignalBoostAi pomaga ${audience} szybciej zamienić ${topic} w profesjonalną kampanię. Utwórz materiały, sprawdź wszystko i zachowaj kontrolę przed publikacją. ${offer}`
+  if (lang === 'ru') return `SignalBoostAi помогает ${audience} быстрее превратить ${topic} в профессиональную кампанию. Подготовьте материалы, проверьте всё и сохраняйте контроль до публикации. ${offer}`
+  return `SignalBoostAi helps ${audience} turn ${topic} into a professional campaign faster. Create the assets, review everything, and stay in control before publishing. ${offer}`
+}
+
+function scriptFrom(args: any, lang: string, audience: string, offer: string) {
+  // sourceMaterial is a brief, not automatically a voiceover. Only explicitly
+  // named customer copy fields can become the first-choice script.
+  const explicit = sanitizeCampaignCopy(args.voiceover || args.script || args.body || '', 1400)
   if (explicit) return explicit
-  return `SignalBoostAi helps businesses build websites, create branded content, turn reviews into marketing posts, and prepare outreach campaigns faster. From websites to content to growth workflows, SignalBoost gives small businesses and agencies one AI-powered system to look sharper and move faster. Start building smarter today at ${SAAS_URL}.`
+
+  const subject = sanitizeCampaignCopy(args.goal || args.objective || args.sourceMaterial || '', 420)
+  return sanitizeCampaignCopy(fallbackScript(lang, subject, audience, offer), 1400)
 }
 
 function visualPrompt(goal: string, audience: string, region?: string) {
   return [
     'Premium AI SaaS product demo b-roll for a business growth platform.',
-    `Theme: ${goal}.`,
-    `Audience: ${audience}.`,
+    `Theme: ${sanitizeCampaignCopy(goal, 220) || 'business growth and campaign automation'}.`,
+    `Audience: ${sanitizeCampaignCopy(audience, 180) || 'small businesses and agencies'}.`,
     region ? `Regional market: ${region}.` : '',
-    'Modern dark navy and black SaaS dashboards, gold and cyan accents, website previews, AI automation workflows, branded content cards, outreach dashboard, growth charts, small business owners, agency operators, hotel and restaurant entrepreneurs, smooth professional camera motion.',
-    'Absolutely no on-screen text, no words, no letters, no captions, no subtitles, no logos, no signage, no watermarks, no URLs.'
+    'Modern dark navy and black SaaS dashboards, gold and cyan accents, website previews, AI automation workflows, growth charts, small business owners, agency operators, hotel and restaurant entrepreneurs, smooth professional camera motion.',
+    'No on-screen words, no captions, no subtitles, no logos, no signage, no watermarks, and no URLs.',
   ].join(' ').slice(0, 900)
 }
 
@@ -148,17 +205,19 @@ function rowFromQueueItem(item: ReturnType<typeof queueItemFromRecommendation>) 
 function wantsRegionalBatch(args: any) {
   const body = `${args?.goal || ''} ${args?.objective || ''} ${args?.sourceMaterial || ''} ${args?.title || ''}`.toLowerCase()
   if (String(args?.language || args?.lang || '').toLowerCase() === 'all') return true
-  return (
-    body.includes('five separate') ||
-    body.includes('five regional') ||
-    body.includes('region-specific') ||
-    body.includes('multilingual') ||
-    (body.includes('latam') && body.includes('brazil') && body.includes('poland'))
-  )
+  return body.includes('five separate') || body.includes('five regional') || body.includes('region-specific') || body.includes('multilingual') || (body.includes('latam') && body.includes('brazil') && body.includes('poland'))
 }
 
 function regionalScript(spec: RegionalSpec, offer: string) {
-  return `SignalBoostAi helps ${spec.audience} start outreach and marketing campaigns with minimal manual work. ${spec.angle} A business owner describes what they want to promote, and COSA prepares the campaign plan, messaging, promotional video, captions, localized copy, outreach content, tracking links, and performance measurement. Every asset goes to review before publishing. Human approval preserved. Human control maintained. AI builds the campaign — humans stay in control. ${offer}`
+  return sanitizeCampaignCopy(`SignalBoostAi helps ${spec.audience} start professional marketing campaigns with less manual work. ${spec.angle} Campaign assets are prepared for review before publishing, so businesses move faster while preserving human control. ${offer}`, 1400)
+}
+
+function openingFor(lang: string) {
+  if (lang === 'pt') return 'A SignalBoostAi ajuda empresas a criar campanhas profissionais com mais rapidez.'
+  if (lang === 'es') return 'SignalBoostAi ayuda a las empresas a crear campañas profesionales con mayor rapidez.'
+  if (lang === 'pl') return 'SignalBoostAi pomaga firmom szybciej tworzyć profesjonalne kampanie.'
+  if (lang === 'ru') return 'SignalBoostAi помогает компаниям быстрее создавать профессиональные кампании.'
+  return 'SignalBoostAi helps businesses create professional campaigns faster.'
 }
 
 async function dispatchVideoWorker(): Promise<{ ok: boolean; skipped?: boolean; status?: number; error?: string }> {
@@ -193,15 +252,15 @@ export interface ProposeCampaignResult {
 }
 
 async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Promise<{ ok: boolean; campaignId?: string; render?: any; error?: string }> {
-  const baseGoal = text(args?.goal || args?.objective || args?.sourceMaterial, 'Create a SignalBoostAi promotional video campaign.', 1200)
+  const rawGoal = args?.goal || args?.objective || args?.sourceMaterial
+  const baseGoal = sanitizeCampaignCopy(rawGoal, 1200) || 'Promote SignalBoostAi to businesses that need faster, controlled marketing execution.'
   const channel = channelOf(args?.channel, args?.goal, args?.objective, args?.sourceMaterial)
   const lang = spec?.lang || langOf(args?.language || args?.lang)
-  const audience = spec?.audience || text(args?.audience, 'Small businesses, agencies, hotels, restaurants, and entrepreneurs.', 400)
-  const offer = text(args?.offer || args?.callToAction, `Start your free trial at ${SAAS_URL}.`, 300)
-  const regionNote = spec ? ` Region: ${spec.region}. Language: ${spec.label}.` : ''
-  const goal = spec ? `${spec.angle} ${regionNote} ${baseGoal}` : baseGoal
+  const audience = spec?.audience || sanitizeCampaignCopy(args?.audience, 400) || 'small businesses, agencies, hotels, restaurants, and entrepreneurs'
+  const offer = sanitizeCampaignCopy(args?.offer || args?.callToAction, 300) || `Start your free trial at ${SAAS_URL}.`
+  const goal = spec ? `${spec.angle} ${baseGoal}` : baseGoal
   const title = spec ? `SignalBoostAi demo — ${spec.label}` : titleFrom(args, channel)
-  const script = spec ? regionalScript(spec, offer) : scriptFrom(args)
+  const script = spec ? regionalScript(spec, offer) : scriptFrom(args, lang, audience, offer)
   const now = new Date().toISOString()
 
   const recommendation: CosRecommendation = {
@@ -214,7 +273,7 @@ async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Pr
     confidence: 90,
     expected_roi: 'medium',
     estimated_cost_usd: VIDEO_CHANNELS.has(channel) ? 12 : 5,
-    reason: 'Owner/COS requested an executable marketing campaign from chat. Prepare the full video for owner review; publishing happens automatically after the owner approves.',
+    reason: 'Owner/COS requested an executable marketing campaign from chat. Prepare the full video for owner review; publishing happens automatically after owner approval.',
     signals: [{ id: id('signal'), source: 'cos_chat_video_campaign_tool', metric: 'owner_campaign_request', value: title, confidence: 95, observed_at: now, evidence: [goal, script] }],
     approval_status: 'pending_approval',
     created_at: now,
@@ -233,7 +292,7 @@ async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Pr
     input: { ...(w.input || {}), language: lang, region: spec?.region || null },
     output: {
       title,
-      opening: 'SignalBoostAi helps businesses move faster with AI-powered marketing and growth workflows.',
+      opening: openingFor(lang),
       draft: script,
       call_to_action: offer,
     },
@@ -241,7 +300,10 @@ async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Pr
   row.metadata = {
     ...(row.metadata || {}),
     source: spec ? 'cos_chat_regional_video_batch_tool' : 'cos_chat_video_campaign_tool',
-    owner_review_note: 'Production runs automatically. After you Approve, publishing is automatic once the video is branded and passes quality gates; you will be emailed the live link.',
+    campaign_script: script,
+    campaign_copy_schema_version: COPY_SCHEMA_VERSION,
+    owner_brief_internal_only: true,
+    owner_review_note: 'Production runs automatically. After approval, publishing is automatic once the video is branded and passes quality gates.',
     required_burned_in_text: ['SignalBoostAi', SAAS_URL],
     regional_campaign: spec ? { language: spec.lang, region: spec.region, label: spec.label, angle: spec.angle } : null,
   }
@@ -250,7 +312,7 @@ async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Pr
   if (VIDEO_CHANNELS.has(channel)) {
     const aspect: '16:9' | '9:16' = channel === 'short_video' ? '9:16' : '16:9'
     const prompt = visualPrompt(goal, audience, spec?.region)
-    const started = await startSiteVideo(prompt, aspect, { lang, title, hook: goal })
+    const started = await startSiteVideo(prompt, aspect, { lang, title, hook: script.slice(0, 160) })
     render = started
     if (started.ok) {
       row.metadata.video = {

@@ -11,8 +11,6 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const COS_CONTINUITY_SCHEMA = 'signalboost-cos-continuity-v1' as const
 
-const FALLBACK_BRAIN = `COS is SignalBoost's private Chief of Staff for the verified owner and administrators. Interpret the complete request in context. Never invent facts. Backup mode is strictly read-only: never call tools, publish, send, spend, write campaign data, mutate providers, change infrastructure, or claim an action was executed. Return a useful answer and clearly state when the governed Primary COS tool path is required.`
-
 export type BackupCosAnswer = {
   ok: boolean
   answer: string
@@ -48,11 +46,11 @@ async function loadApprovedBrain(): Promise<string> {
       const value = await readFile(candidate, 'utf8')
       if (value.includes('signalboost-cos-brain-v1')) return value
     } catch {
-      // Try the next packaged location.
+      // Try the next traced deployment location.
     }
   }
 
-  return FALLBACK_BRAIN
+  throw new Error('Approved COS brain snapshot is unavailable.')
 }
 
 function extractJson(value: string): Record<string, unknown> | null {

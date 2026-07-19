@@ -75,6 +75,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await bodyPromise
+
+  // Primary authentication, authorization, validation, and rate-limit decisions
+  // are terminal. Backup COS must never turn a governed 4xx denial into HTTP 200.
+  if (primary && primary.status >= 400 && primary.status < 500) return primary
+
   const envelope = primary
     ? await responseEnvelope(primary)
     : { reply: '', source: '' }

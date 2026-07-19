@@ -38,16 +38,18 @@ Special workflows must be implemented as governed tools available to the canonic
 
 ## Backup COS
 
-Backup COS receives the same normalized user input only after the Primary response has deterministic degradation evidence. It reloads the approved brain snapshot and uses a redundant reasoning path in strictly read-only mode. It must not call business tools, write campaign data, publish, send, spend, mutate providers, change infrastructure, or execute Browser Runtime work.
+Backup COS receives the same normalized user input only after the Primary response has deterministic degradation evidence. It reloads this approved brain snapshot and uses a redundant reasoning path in strictly read-only mode. It must not call business tools, write campaign data, publish, send, spend, mutate providers, change infrastructure, or execute Browser Runtime work.
 
-Healthy Primary responses return immediately and are never delayed by Backup COS. Backup reasoning has a bounded deadline and cannot become a dependency of normal Concierge traffic.
+Healthy Primary responses return immediately and are never delayed by Backup COS. Primary authentication, authorization, validation, and rate-limit responses in the HTTP 4xx range are terminal and must be returned unchanged; continuity must never convert a governed denial into a successful Backup answer.
+
+Backup reasoning has a bounded deadline and cannot become a dependency of normal Concierge traffic. The approved snapshot is explicitly traced into the Concierge server deployment. If the protected snapshot is unavailable or invalid, Backup COS fails closed and the immutable-core response is used; no generic or unapproved substitute brain may run.
 
 ## Automatic continuity and quarantine
 
 Concierge may activate automatic read-only continuity without waiting for human intervention only when the Primary response has one or more bounded signals:
 
-1. an HTTP/server failure;
-2. an empty response;
+1. an HTTP/server failure outside the 4xx client-denial range;
+2. an empty successful or server-failed response;
 3. the explicit degraded source `error-degraded`; or
 4. a protected known-corruption signature.
 
@@ -57,7 +59,7 @@ The continuity boundary then:
 2. asks Backup COS for a read-only answer within the bounded deadline;
 3. returns the Backup answer with `execution_allowed: false` when available;
 4. appends a sanitized recovery record and owner-alert requirement; and
-5. returns a safe immutable-core response if Backup COS also fails.
+5. returns a safe immutable-core response if Backup COS or the approved snapshot is unavailable.
 
 This runtime failover preserves availability but does not authorize publishing, outreach, spending, provider changes, infrastructure mutation, database campaign mutation, or automatic code modification. Governed action execution remains exclusively in a healthy Primary COS tool path.
 
@@ -67,7 +69,7 @@ Automatic continuity activates read-only request-level traffic handling; it neve
 
 ## Update rule
 
-Changes to this file, the Chief of Staff prompt, Backup COS policy, Concierge entry point, or COS integrity checks require:
+Changes to this file, the Chief of Staff prompt, Backup COS policy, Concierge entry point, deployment tracing, or COS integrity checks require:
 
 1. a verified GitHub commit signature;
 2. CODEOWNERS review from `@SignalBoost`;

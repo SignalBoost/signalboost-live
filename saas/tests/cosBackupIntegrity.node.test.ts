@@ -58,6 +58,12 @@ test('continuity detector catches unavailable Primary responses', () => {
   assert.deepEqual(reasons, ['primary_http_failure', 'primary_empty_reply'])
 })
 
+test('continuity detector preserves Primary 4xx authorization and validation responses', () => {
+  assert.deepEqual(detectPrimaryCorruption({ status: 401, reply: '', source: '' }), [])
+  assert.deepEqual(detectPrimaryCorruption({ status: 403, reply: '', source: '' }), [])
+  assert.deepEqual(detectPrimaryCorruption({ status: 429, reply: '', source: 'error-degraded' }), [])
+})
+
 test('continuity detector leaves healthy Primary responses alone', () => {
   const reasons = detectPrimaryCorruption({
     status: 200,
@@ -73,13 +79,26 @@ test('continuity policy stays dependency-free for direct Node tests', async () =
   assert.doesNotMatch(source, /next\/server|supabase|callModel/)
 })
 
-test('Concierge preserves the Primary boundary and does not block healthy responses on Backup COS', async () => {
+test('Concierge preserves denials and does not block healthy responses on Backup COS', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8')
   assert.match(source, /POST as supportPost/)
   assert.match(source, /detectPrimaryCorruption/)
+  assert.match(source, /primary\.status >= 400 && primary\.status < 500\) return primary/)
   assert.match(source, /if \(primary && reasons\.length === 0\) return primary/)
   assert.match(source, /const backup = await runBackupWithDeadline/)
   assert.match(source, /execution_allowed: false/)
   assert.doesNotMatch(source, /Promise\.all\(\[primaryPromise,\s*backupPromise/)
   assert.doesNotMatch(source, /createClient|\.from\(|\.insert\(|\.update\(|proposeCampaign|socialPlatformFrom|isPressCreationRequest/i)
 })
+
+test('approved brain is traced into the Concierge deployment and runtime fails closed without it', async () => {
+  const [config, runtime] = await Promise.all([
+    readFile(path.resolve(process.cwd(), 'next.config.mjs'), 'utf8'),
+    readFile(path.resolve(process.cwd(), 'lib/cos-backup/runtime.ts'), 'utf8'),
+  ])
+  assert.match(config, /outputFileTracingRoot/)
+  assert.match(config, /['"]\/api\/concierge['"]/)
+  assert.match(config, /\.\.\/cos-core\/brain\.md/)
+  assert.match(runtime, /Approved COS brain snapshot is unavailable/)
+  assert.doesNotMatch(runtime, /FALLBACK_BRAIN/)
+}

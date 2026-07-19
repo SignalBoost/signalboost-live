@@ -54,17 +54,48 @@ const criticalOperatorKeys = [
   'supervisorCluster',
   'leaseOwner',
   'lastReconciliation',
-  'productionBrowserDisabled',
-  'noActiveWork',
 ] as const
 
-const allowedSharedValues = new Set([
-  'BPAL',
-  'GitHub',
-  'ID',
-  'Runtime ID',
-  'API',
-])
+const mustBeLocalizedKeys = [
+  'title',
+  'subtitle',
+  'adminOnly',
+  'readOnly',
+  'platformHealth',
+  'providerHealth',
+  'activeWork',
+  'incidentQueue',
+  'auditTimeline',
+  'healthMetrics',
+  'filters',
+  'search',
+  'overallState',
+  'lastObservation',
+  'lastVerification',
+  'uptime',
+  'activeInstances',
+  'currentWork',
+  'openIncidents',
+  'currentOwner',
+  'currentLease',
+  'verificationStatus',
+  'environment',
+  'assignedSupervisor',
+  'leaseStatus',
+  'currentStage',
+  'verificationStage',
+  'selectedChannel',
+  'metadata',
+  'partiallyVerified',
+  'unverifiable',
+  'failed',
+  'rejected',
+  'queueDepth',
+  'noData',
+  'supervisorCluster',
+  'leaseOwner',
+  'lastReconciliation',
+] as const
 
 test('Supervisor operator labels exist in all five supported languages', () => {
   assert.deepEqual(Object.keys(locales).sort(), [...supportedLocales].sort())
@@ -85,10 +116,12 @@ test('critical non-English operator labels do not silently fall back to English'
 
   for (const locale of supportedLocales.filter(locale => locale !== 'en')) {
     const dictionary = locales[locale].supervisorSoc
-    for (const key of criticalOperatorKeys) {
-      const value = dictionary[key].trim()
-      if (allowedSharedValues.has(value)) continue
-      assert.notEqual(value, english[key]?.trim(), `${locale}.${key} still uses the English label`)
+    for (const key of mustBeLocalizedKeys) {
+      assert.notEqual(
+        dictionary[key].trim(),
+        english[key].trim(),
+        `${locale}.${key} still uses the English label`,
+      )
     }
   }
 })

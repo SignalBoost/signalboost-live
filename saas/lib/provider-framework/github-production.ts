@@ -108,7 +108,7 @@ export async function enqueueGitHubObservation(input: {
     capability: input.capability,
     windowStart: input.windowStart,
     queueDepth: input.queueDepth ?? 0,
-    rateLimitRemaining: input.rateLimitRemaining ?? 1,
+    rateLimitRemaining: input.rateLimitRemaining ?? 5000,
     disabled: input.connection.disabled,
     revoked: input.connection.revoked,
   })

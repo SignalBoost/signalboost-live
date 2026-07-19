@@ -19,6 +19,9 @@ import { startSiteVideo } from '@/lib/operator/video'
 const SAAS_URL = 'www.saas.signalboostapp.com'
 const VIDEO_CHANNELS = new Set(['youtube', 'short_video'])
 const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru']
+const GITHUB_OWNER = 'SignalBoost'
+const GITHUB_REPO = 'signalboost-live'
+const VIDEO_WORKFLOW = 'cos-video-production.yml'
 
 type RegionalSpec = {
   lang: string
@@ -158,6 +161,28 @@ function regionalScript(spec: RegionalSpec, offer: string) {
   return `SignalBoostAi helps ${spec.audience} start outreach and marketing campaigns with minimal manual work. ${spec.angle} A business owner describes what they want to promote, and COSA prepares the campaign plan, messaging, promotional video, captions, localized copy, outreach content, tracking links, and performance measurement. Every asset goes to review before publishing. Human approval preserved. Human control maintained. AI builds the campaign — humans stay in control. ${offer}`
 }
 
+async function dispatchVideoWorker(): Promise<{ ok: boolean; skipped?: boolean; status?: number; error?: string }> {
+  const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN
+  if (!token) return { ok: false, skipped: true, error: 'GitHub Actions token is not configured; scheduled worker remains the fallback.' }
+  try {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${VIDEO_WORKFLOW}/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main' }),
+      cache: 'no-store',
+    })
+    if (response.status === 204) return { ok: true, status: response.status }
+    return { ok: false, status: response.status, error: (await response.text()).slice(0, 500) }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'GitHub Actions dispatch failed.' }
+  }
+}
+
 export interface ProposeCampaignResult {
   ok: boolean
   campaignId?: string
@@ -225,7 +250,7 @@ async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Pr
   if (VIDEO_CHANNELS.has(channel)) {
     const aspect: '16:9' | '9:16' = channel === 'short_video' ? '9:16' : '16:9'
     const prompt = visualPrompt(goal, audience, spec?.region)
-    const started = await startSiteVideo(prompt, aspect)
+    const started = await startSiteVideo(prompt, aspect, { lang, title, hook: goal })
     render = started
     if (started.ok) {
       row.metadata.video = {
@@ -271,22 +296,25 @@ export async function proposeCampaign(args: any, _approvedByUserId?: string | nu
     const failures = results.filter(r => !r.ok)
     const ids = results.map(r => r.campaignId).filter(Boolean) as string[]
     if (!ids.length) return { ok: false, error: failures[0]?.error || 'No regional campaigns were created.', render: { results } }
+    const hasQueuedVideo = results.some(r => r.render?.ok)
+    const dispatch = hasQueuedVideo ? await dispatchVideoWorker() : { ok: true, skipped: true }
     return {
       ok: failures.length === 0,
       campaignId: ids[0],
       campaignIds: ids,
       status: failures.length ? 'partial' : 'rendering',
-      render: { regionalBatch: true, created: ids.length, failed: failures.length, results },
+      render: { regionalBatch: true, created: ids.length, failed: failures.length, results, dispatch },
       error: failures.length ? `${failures.length} regional campaign(s) failed to create.` : undefined,
     }
   }
 
   const result = await createOneCampaign(admin, args)
   if (!result.ok) return { ok: false, error: result.error }
+  const dispatch = result.render?.ok ? await dispatchVideoWorker() : { ok: true, skipped: true }
   return {
     ok: true,
     campaignId: result.campaignId,
     status: result.render?.ok ? 'rendering' : 'created',
-    render: result.render,
+    render: result.render ? { ...result.render, dispatch } : result.render,
   }
 }

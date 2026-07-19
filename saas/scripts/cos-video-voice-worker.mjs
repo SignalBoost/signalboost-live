@@ -4,8 +4,9 @@
 // Quality rules:
 // 1. Owner/production instructions must never become spoken campaign copy.
 // 2. Captions must remain readable over every base visual.
-// 3. A final video is not voice-complete without a verified audio track,
-//    burned captions, and the current caption/copy schema versions.
+// 3. Old base renders containing prompt text are replaced with clean visuals.
+// 4. A final video is not voice-complete without verified audio, captions,
+//    and the current visual/caption/copy schema versions.
 
 import { createClient } from '@supabase/supabase-js'
 import { createWriteStream } from 'node:fs'
@@ -23,6 +24,7 @@ const elevenLabsVoice = String(process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvD
 const elevenLabsModel = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2').trim()
 const maxCampaigns = Math.max(1, Math.min(5, Number(process.env.COS_VIDEO_MAX_VOICE_PER_RUN || 3)))
 
+const BASE_VISUAL_SCHEMA_VERSION = 'signalboost-base-v2-clean-background'
 const CAPTION_SCHEMA_VERSION = 'signalboost-captions-v2-solid-panel'
 const COPY_SCHEMA_VERSION = 'signalboost-campaign-copy-v2-clean'
 
@@ -31,14 +33,7 @@ if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 
 const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 
-const VOICES = {
-  en: 'en-us',
-  es: 'es',
-  pt: 'pt-br',
-  pl: 'pl',
-  ru: 'ru',
-}
-
+const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru' }
 const FALLBACK_COPY = {
   en: 'SignalBoostAi helps small businesses turn ideas into professional marketing campaigns faster. Build your campaign, review every asset, and stay in control before anything is published.',
   es: 'SignalBoostAi ayuda a las pequeñas empresas a convertir ideas en campañas profesionales con mayor rapidez. Crea tu campaña, revisa cada recurso y mantén el control antes de publicar.',
@@ -61,9 +56,7 @@ function clean(value, max = 900) {
 }
 
 function langOf(campaign) {
-  const raw = Array.isArray(campaign?.languages) && campaign.languages.length
-    ? String(campaign.languages[0])
-    : 'en'
+  const raw = Array.isArray(campaign?.languages) && campaign.languages.length ? String(campaign.languages[0]) : 'en'
   const short = raw.toLowerCase().split(/[-_]/)[0]
   return Object.prototype.hasOwnProperty.call(VOICES, short) ? short : 'en'
 }
@@ -82,26 +75,21 @@ function productionInstruction(fragment) {
   if (!value) return true
   const lower = value.toLowerCase()
 
-  const explicitLeak = /(do not repeat|don['’]t repeat|must not repeat|not be repeated|do not mention|don['’]t mention|do not say|ignore previous|system prompt|user prompt|these instructions|the instructions|não repita|nao repita|não repetir|nao repetir|não mencione|nao mencione|não diga|nao diga|estas instruções|essas instruções|sin repetir|no repitas|no repetir|no menciones|no digas|estas instrucciones|nie powtarzaj|nie wspominaj|nie mów|tych instrukcji|не повторяй|не упоминай|не говори|эти инструкции)/i
-  if (explicitLeak.test(lower)) return true
+  if (/(do not repeat|don['’]t repeat|must not repeat|not be repeated|do not mention|don['’]t mention|do not say|ignore previous|system prompt|user prompt|these instructions|the instructions|não repita|nao repita|não repetir|nao repetir|não mencione|nao mencione|não diga|nao diga|estas instruções|essas instruções|sin repetir|no repitas|no repetir|no menciones|no digas|estas instrucciones|nie powtarzaj|nie wspominaj|nie mów|tych instrukcji|не повторяй|не упоминай|не говори|эти инструкции)/i.test(lower)) return true
 
-  const fieldLabel = /^(instructions?|requirements?|prompt|system|assistant|voiceover|narration|captions?|subtitles?|scenes?|visuals?|format|duration|aspect ratio|tone|style|language|target audience|audience|cta|hook|instruções|requisitos|narração|legendas|cenas|formato|duração|idioma|público[- ]alvo|instrucciones|requisitos|narración|subtítulos|escenas|formato|duración|idioma|público objetivo|instrukcje|wymagania|narracja|napisy|sceny|format|czas trwania|język|grupa docelowa|инструкции|требования|озвучка|субтитры|сцены|формат|длительность|язык|аудитория)\s*[:\-–—]/i
-  if (fieldLabel.test(value)) return true
+  if (/^(instructions?|requirements?|prompt|system|assistant|voiceover|narration|captions?|subtitles?|scenes?|visuals?|format|duration|aspect ratio|tone|style|language|target audience|audience|cta|hook|instruções|requisitos|narração|legendas|cenas|formato|duração|idioma|público[- ]alvo|instrucciones|requisitos|narración|subtítulos|escenas|formato|duración|idioma|público objetivo|instrukcje|wymagania|narracja|napisy|sceny|format|czas trwania|język|grupa docelowa|инструкции|требования|озвучка|субтитры|сцены|формат|длительность|язык|аудитория)\s*[:\-–—]/i.test(value)) return true
 
   const metaVocabulary = /(prompt|instruction|requirement|assistant|the ai|this ai|voiceover|narration|caption|subtitle|on[- ]screen|screen text|scene|shot|camera|b[- ]roll|watermark|aspect ratio|duration|render|production|visual direction|logo placement|narração|legenda|texto na tela|cena|filmagem|câmera|duração|renderização|produção|direção visual|narración|subtítulo|texto en pantalla|escena|cámara|duración|producción|narracja|napisy|tekst na ekranie|scena|kamera|czas trwania|produkcja|озвучка|субтитры|текст на экране|сцена|камера|длительность|производство)/i
   const directive = /^(please\s+)?(must|should|do not|don['’]t|never|use|show|include|add|create|make|generate|write|say|mention|avoid|keep|ensure|please|não|nao|use|mostre|inclua|adicione|crie|gere|escreva|diga|evite|mantenha|garanta|no|usa|muestra|incluye|añade|crea|genera|escribe|di|evita|mantén|asegura|nie|użyj|pokaz|dodaj|utwórz|wygeneruj|napisz|powiedz|unikaj|zachowaj|upewnij|не|используй|покажи|добавь|создай|сгенерируй|напиши|скажи|избегай|сохрани|убедись)\b/i
   if (metaVocabulary.test(value) && directive.test(value)) return true
 
-  const aiDirective = /(ai|assistant|model|cosa).{0,40}(must|should|do not|don['’]t|repeat|mention|say|include|use|não|nao|deve|repita|mencione|diga|no debe|repita|mencione|diga|powinien|nie może|powtarzaj|wspominaj|mów|должен|не должен|повторять|упоминать|говорить)/i
-  if (aiDirective.test(value)) return true
-
+  if (/(ai|assistant|model|cosa).{0,40}(must|should|do not|don['’]t|repeat|mention|say|include|use|não|nao|deve|repita|mencione|diga|no debe|repita|mencione|diga|powinien|nie może|powtarzaj|wspominaj|mów|должен|не должен|повторять|упоминать|говорить)/i.test(value)) return true
   return false
 }
 
 function sanitizeCampaignCopy(value, max = 900) {
   const source = clean(value, 4000)
   if (!source) return ''
-
   const fragments = source
     .replace(/[•▪◦]/g, '\n')
     .split(/\n+|(?<=[.!?])\s+|\s*;\s+/)
@@ -115,30 +103,26 @@ function sanitizeCampaignCopy(value, max = 900) {
       .replace(/^(script|copy|campaign copy|mensagem|texto|guion|scenariusz|текст)\s*[:\-–—]\s*/i, '')
       .replace(/\[[^\]]*(instruction|caption|subtitle|scene|prompt|instru|legenda|subtítulo|napisy|инструк)[^\]]*\]/gi, '')
       .trim()
-
     if (!fragment || productionInstruction(fragment)) continue
     const key = normalizeKey(fragment)
     if (!key || seen.has(key)) continue
     seen.add(key)
     kept.push(fragment)
   }
-
   return clean(kept.join(' '), max)
 }
 
 function scriptFrom(campaign) {
   const lang = langOf(campaign)
   const candidates = []
-
   const stored = sanitizeCampaignCopy(campaign?.metadata?.campaign_script || campaign?.metadata?.campaignScript || '', 900)
   if (stored) candidates.push(stored)
 
-  const workItems = Array.isArray(campaign?.work_items) ? campaign.work_items : []
-  for (const item of workItems) {
+  for (const item of Array.isArray(campaign?.work_items) ? campaign.work_items : []) {
     const output = item?.output || {}
     for (const value of [output.voiceover, output.script, output.draft, output.body, output.opening, output.call_to_action]) {
-      const text = sanitizeCampaignCopy(value, 900)
-      if (text) candidates.push(text)
+      const safe = sanitizeCampaignCopy(value, 900)
+      if (safe) candidates.push(safe)
     }
   }
 
@@ -149,12 +133,11 @@ function scriptFrom(campaign) {
     if (title) candidates.push(title)
     if (objective && normalizeKey(objective) !== normalizeKey(title)) candidates.push(objective)
     if (audience) {
-      const audienceLead = lang === 'pt' ? `Feita para ${audience}.`
+      candidates.push(lang === 'pt' ? `Feita para ${audience}.`
         : lang === 'es' ? `Creada para ${audience}.`
           : lang === 'pl' ? `Stworzona dla: ${audience}.`
             : lang === 'ru' ? `Создано для: ${audience}.`
-              : `Built for ${audience}.`
-      candidates.push(audienceLead)
+              : `Built for ${audience}.`)
     }
   }
 
@@ -169,15 +152,12 @@ function scriptFrom(campaign) {
       sentences.push(safe)
     }
   }
-
-  const combined = clean(sentences.join(' '), 850)
-  return combined || FALLBACK_COPY[lang] || FALLBACK_COPY.en
+  return clean(sentences.join(' '), 850) || FALLBACK_COPY[lang] || FALLBACK_COPY.en
 }
 
 function captionChunks(text, maxChars = 58) {
-  const sentences = String(text || '').split(/(?<=[.!?])\s+/).filter(Boolean)
   const chunks = []
-  for (const sentence of sentences) {
+  for (const sentence of String(text || '').split(/(?<=[.!?])\s+/).filter(Boolean)) {
     const words = sentence.split(/\s+/).filter(Boolean)
     let current = ''
     for (const word of words) {
@@ -185,9 +165,7 @@ function captionChunks(text, maxChars = 58) {
       if (next.length > maxChars && current) {
         chunks.push(current)
         current = word
-      } else {
-        current = next
-      }
+      } else current = next
     }
     if (current) chunks.push(current)
   }
@@ -204,10 +182,7 @@ function assTime(seconds) {
 }
 
 function assEscape(value) {
-  return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/[{}]/g, '')
-    .replace(/\r?\n/g, '\\N')
+  return String(value || '').replace(/\\/g, '\\\\').replace(/[{}]/g, '').replace(/\r?\n/g, '\\N')
 }
 
 function buildAss(campaign, text, duration) {
@@ -219,12 +194,7 @@ function buildAss(campaign, text, duration) {
   const marginH = vertical ? 82 : 150
   const chunks = captionChunks(text, vertical ? 35 : 58)
   const segment = Math.max(1.5, duration / Math.max(1, chunks.length))
-  const events = chunks.map((caption, index) => {
-    const start = index * segment
-    const end = Math.min(duration, (index + 1) * segment + 0.18)
-    return `Dialogue: 0,${assTime(start)},${assTime(end)},Caption,,0,0,0,,${assEscape(caption)}`
-  }).join('\n')
-
+  const events = chunks.map((caption, index) => `Dialogue: 0,${assTime(index * segment)},${assTime(Math.min(duration, (index + 1) * segment + 0.18))},Caption,,0,0,0,,${assEscape(caption)}`).join('\n')
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nScaledBorderAndShadow: yes\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,DejaVu Sans,${fontSize},&H00FFFFFF,&H000000FF,&H00020617,&H00020617,1,0,0,0,100,100,0,0,3,2,0,2,${marginH},${marginH},${marginV},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${events}\n`
 }
 
@@ -234,16 +204,10 @@ function run(command, args, options = {}) {
     const child = spawn(command, args, { stdio: ['ignore', options.capture ? 'pipe' : 'inherit', 'pipe'] })
     let stdout = ''
     let stderr = ''
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL')
-      reject(new Error(`${command} timed out after ${timeoutMs}ms`))
-    }, timeoutMs)
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`${command} timed out after ${timeoutMs}ms`)) }, timeoutMs)
     if (child.stdout) child.stdout.on('data', chunk => { stdout += chunk.toString() })
     child.stderr.on('data', chunk => { stderr += chunk.toString() })
-    child.on('error', error => {
-      clearTimeout(timer)
-      reject(error)
-    })
+    child.on('error', error => { clearTimeout(timer); reject(error) })
     child.on('close', code => {
       clearTimeout(timer)
       if (code === 0) resolve(stdout.trim())
@@ -258,13 +222,38 @@ async function download(urlValue, dest) {
   await pipeline(response.body, createWriteStream(dest))
 }
 
-async function sourceVideo(campaign, dest) {
+async function generateCleanBase(campaign, dest, duration) {
+  const vertical = String(campaign?.channel || '') === 'short_video'
+  const size = vertical ? '1080x1920' : '1920x1080'
+  const bandOne = vertical ? 420 : 720
+  const bandTwo = vertical ? 330 : 560
+  const filter = [
+    'format=yuv420p',
+    `drawbox=x='mod(t*52,iw+${bandOne})-${bandOne}':y=0:w=${bandOne}:h=ih:color=0x12446d@0.30:t=fill`,
+    `drawbox=x='iw-mod(t*39,iw+${bandTwo})':y=0:w=${bandTwo}:h=ih:color=0x8a6900@0.14:t=fill`,
+    'vignette=PI/5',
+  ].join(',')
+  await run('ffmpeg', [
+    '-y', '-f', 'lavfi', '-i', `color=c=0x050b18:s=${size}:r=30:d=${duration}`,
+    '-vf', filter, '-an', '-t', String(duration),
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22',
+    '-pix_fmt', 'yuv420p', '-movflags', '+faststart', dest,
+  ])
+  console.log(`COSA campaign ${campaign.id}: replaced legacy prompt-text base with clean visual background.`)
+}
+
+async function sourceVideo(campaign, dest, duration) {
   const video = campaign?.metadata?.video || {}
+  if (video.baseVisualSchemaVersion !== BASE_VISUAL_SCHEMA_VERSION) {
+    await generateCleanBase(campaign, dest, duration)
+    return { regenerated: true }
+  }
+
   const currentUrl = String(video.url || '').trim()
   if (currentUrl) {
     try {
       await download(currentUrl, dest)
-      return
+      return { regenerated: false }
     } catch (error) {
       console.warn(`Campaign ${campaign.id}: current base URL failed; trying storage job path: ${errText(error)}`)
     }
@@ -272,42 +261,27 @@ async function sourceVideo(campaign, dest) {
 
   const requestId = String(video.requestId || '').trim()
   if (!requestId) throw new Error('Base video URL and request ID are both missing')
-  const { data: job, error } = await sb
-    .from('cos_video_production_jobs')
-    .select('output_url')
-    .eq('id', requestId)
-    .single()
+  const { data: job, error } = await sb.from('cos_video_production_jobs').select('output_url').eq('id', requestId).single()
   if (error || !job?.output_url) throw new Error(error?.message || 'Rendered job output path is missing')
-
   const output = String(job.output_url)
   if (/^https?:\/\//i.test(output)) {
     await download(output, dest)
-    return
+    return { regenerated: false }
   }
   const { data: blob, error: storageError } = await sb.storage.from(renderBucket).download(output)
   if (storageError || !blob) throw new Error(`Could not download base object ${output}: ${storageError?.message || 'missing blob'}`)
   await writeFile(dest, Buffer.from(await blob.arrayBuffer()))
+  return { regenerated: false }
 }
 
 async function elevenLabs(text, dir) {
   if (!elevenLabsKey) return null
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenLabsVoice)}`, {
     method: 'POST',
-    headers: {
-      'xi-api-key': elevenLabsKey,
-      'Content-Type': 'application/json',
-      Accept: 'audio/mpeg',
-    },
-    body: JSON.stringify({
-      text,
-      model_id: elevenLabsModel,
-      voice_settings: { stability: 0.48, similarity_boost: 0.78 },
-    }),
+    headers: { 'xi-api-key': elevenLabsKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({ text, model_id: elevenLabsModel, voice_settings: { stability: 0.48, similarity_boost: 0.78 } }),
   })
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '')
-    throw new Error(`ElevenLabs HTTP ${response.status}: ${detail.slice(0, 300)}`)
-  }
+  if (!response.ok) throw new Error(`ElevenLabs HTTP ${response.status}: ${(await response.text().catch(() => '')).slice(0, 300)}`)
   const bytes = Buffer.from(await response.arrayBuffer())
   if (!bytes.length) throw new Error('ElevenLabs returned empty audio')
   const path = join(dir, 'voice.mp3')
@@ -334,12 +308,7 @@ async function narration(text, lang, dir) {
 }
 
 async function audioDuration(path) {
-  const output = await run('ffprobe', [
-    '-v', 'error',
-    '-show_entries', 'format=duration',
-    '-of', 'default=noprint_wrappers=1:nokey=1',
-    path,
-  ], { capture: true, timeoutMs: 30_000 })
+  const output = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', path], { capture: true, timeoutMs: 30_000 })
   return Math.max(1, Number(output) || 1)
 }
 
@@ -350,10 +319,7 @@ function assFilterPath(value) {
 async function uploadVoiced(campaign, lang, path) {
   const bytes = await readFile(path)
   const objectPath = `cos-voice/${campaign.id}/${lang}-${Date.now()}.mp4`
-  const upload = await sb.storage.from(renderBucket).upload(objectPath, bytes, {
-    contentType: 'video/mp4',
-    upsert: true,
-  })
+  const upload = await sb.storage.from(renderBucket).upload(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
   if (upload.error) throw new Error(`Voice video upload failed: ${upload.error.message}`)
   const signed = await sb.storage.from(renderBucket).createSignedUrl(objectPath, 60 * 60 * 24 * 7)
   if (signed.error || !signed.data?.signedUrl) throw new Error(`Could not sign voice video: ${signed.error?.message || 'missing signed URL'}`)
@@ -362,17 +328,14 @@ async function uploadVoiced(campaign, lang, path) {
 
 function isSilentPlaceholder(video) {
   const verified = video?.audioTrack === true && video?.captionsBurned === true
-  return !verified && (
-    video?.voiceFallback === true
-    || String(video?.voiceStatus || '').toUpperCase() === 'COMPLETED_FALLBACK'
-    || String(video?.voiceFallbackReason || '').toLowerCase().includes('base video promoted')
-  )
+  return !verified && (video?.voiceFallback === true || String(video?.voiceStatus || '').toUpperCase() === 'COMPLETED_FALLBACK' || String(video?.voiceFallbackReason || '').toLowerCase().includes('base video promoted'))
 }
 
 function needsVoice(campaign) {
   const video = campaign?.metadata?.video || {}
   if (video.status !== 'ready' || !video.url) return false
   if (isSilentPlaceholder(video)) return true
+  if (video.baseVisualSchemaVersion !== BASE_VISUAL_SCHEMA_VERSION) return true
   if (video.captionSchemaVersion !== CAPTION_SCHEMA_VERSION) return true
   if (video.copySchemaVersion !== COPY_SCHEMA_VERSION) return true
   if (video.audioTrack !== true || video.captionsBurned !== true) return true
@@ -391,10 +354,10 @@ async function processCampaign(campaign) {
   const assPath = join(dir, 'captions.ass')
 
   try {
-    await sourceVideo(campaign, basePath)
     const voice = await narration(text, lang, dir)
     const spoken = await audioDuration(voice.path)
     const duration = Math.max(8, Math.min(90, Math.ceil(spoken) + 1))
+    const source = await sourceVideo(campaign, basePath, duration)
     await writeFile(assPath, buildAss(campaign, text, duration), 'utf8')
 
     const vertical = String(campaign?.channel || '') === 'short_video'
@@ -403,16 +366,10 @@ async function processCampaign(campaign) {
     const videoFilter = `drawbox=x=0:y=${panelY}:w=iw:h=${panelH}:color=0x020617@0.96:t=fill,ass='${assFilterPath(assPath)}'`
 
     await run('ffmpeg', [
-      '-y',
-      '-stream_loop', '-1', '-i', basePath,
-      '-i', voice.path,
-      '-vf', videoFilter,
-      '-map', '0:v:0', '-map', '1:a:0',
-      '-t', String(duration),
+      '-y', '-stream_loop', '-1', '-i', basePath, '-i', voice.path,
+      '-vf', videoFilter, '-map', '0:v:0', '-map', '1:a:0', '-t', String(duration),
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
-      '-c:a', 'aac', '-b:a', '160k',
-      '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-      outputPath,
+      '-c:a', 'aac', '-b:a', '160k', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outputPath,
     ])
 
     const uploaded = await uploadVoiced(campaign, lang, outputPath)
@@ -426,69 +383,42 @@ async function processCampaign(campaign) {
 
     const patch = {
       ...currentVideo,
-      status: 'ready',
-      unbrandedVoiced,
-      voiced,
-      brandedLangs,
-      voicedUrl: null,
-      finalUrl: null,
+      status: 'ready', unbrandedVoiced, voiced, brandedLangs,
+      voicedUrl: null, finalUrl: null,
       previewUrl: currentVideo.url || null,
       previewKind: currentVideo.url ? 'base draft' : null,
-      branded: false,
-      brandSchemaVersion: null,
-      brandText: null,
-      brandedAt: null,
-      brandingLock: null,
-      brandingExhausted: false,
+      branded: false, brandSchemaVersion: null, brandText: null, brandedAt: null,
+      brandingLock: null, brandingExhausted: false,
       ghOverlayAttempts: { ...(currentVideo.ghOverlayAttempts || {}), [lang]: 0 },
-      voiceLock: null,
-      voiceStatus: 'COMPLETED',
+      voiceLock: null, voiceStatus: 'COMPLETED',
       voiceFallback: voice.engine !== 'elevenlabs',
       voiceFallbackReason: voice.engine === 'elevenlabs' ? null : 'ElevenLabs was unavailable; a real local narration track was created with espeak-ng.',
-      voiceEngine: voice.engine,
-      voiceObjectPath: uploaded.objectPath,
-      voiceCompletedAt: new Date().toISOString(),
-      captionsBurned: true,
-      audioTrack: true,
+      voiceEngine: voice.engine, voiceObjectPath: uploaded.objectPath,
+      voiceCompletedAt: new Date().toISOString(), captionsBurned: true, audioTrack: true,
+      baseVisualSchemaVersion: BASE_VISUAL_SCHEMA_VERSION,
+      baseVisualSource: source.regenerated ? 'clean-worker-generated-background' : 'approved-base-render',
       captionSchemaVersion: CAPTION_SCHEMA_VERSION,
       copySchemaVersion: COPY_SCHEMA_VERSION,
       voiceScriptSource: 'sanitized-customer-facing-campaign-copy',
-      voiceError: null,
-      brandDebug: null,
+      voiceError: null, brandDebug: null,
     }
 
-    const { error } = await sb
-      .from('cos_campaign_queue')
-      .update({ metadata: { ...(current.metadata || {}), video: patch } })
-      .eq('id', campaign.id)
+    const { error } = await sb.from('cos_campaign_queue').update({ metadata: { ...(current.metadata || {}), video: patch } }).eq('id', campaign.id)
     if (error) throw error
-
-    console.log(`COSA campaign ${campaign.id}: clean voice + high-contrast captions created (${lang}, ${voice.engine}, ${text.length} chars).`)
+    console.log(`COSA campaign ${campaign.id}: clean visual + sanitized voice + high-contrast captions created (${lang}, ${voice.engine}, ${text.length} chars).`)
     return { ok: true, id: campaign.id, lang, engine: voice.engine }
   } catch (error) {
     const failure = errText(error)
     console.error(`COSA campaign ${campaign.id}: voice/caption stage failed: ${failure}`)
     const fresh = (await sb.from('cos_campaign_queue').select('*').eq('id', campaign.id).single()).data || campaign
     const freshVideo = fresh?.metadata?.video || video
-    await sb.from('cos_campaign_queue').update({
-      metadata: {
-        ...(fresh.metadata || {}),
-        video: {
-          ...freshVideo,
-          branded: false,
-          voicedUrl: null,
-          finalUrl: null,
-          previewUrl: freshVideo.url || null,
-          previewKind: freshVideo.url ? 'base draft' : null,
-          voiceLock: null,
-          voiceStatus: 'FAILED',
-          voiceFallback: false,
-          captionsBurned: false,
-          audioTrack: false,
-          voiceError: `voice/caption worker error: ${failure.slice(0, 500)}`,
-        },
-      },
-    }).eq('id', campaign.id)
+    await sb.from('cos_campaign_queue').update({ metadata: { ...(fresh.metadata || {}), video: {
+      ...freshVideo, branded: false, voicedUrl: null, finalUrl: null,
+      previewUrl: freshVideo.url || null, previewKind: freshVideo.url ? 'base draft' : null,
+      voiceLock: null, voiceStatus: 'FAILED', voiceFallback: false,
+      captionsBurned: false, audioTrack: false,
+      voiceError: `voice/caption worker error: ${failure.slice(0, 500)}`,
+    } } }).eq('id', campaign.id)
     return { ok: false, id: campaign.id, error: failure }
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -502,11 +432,10 @@ const { data: campaigns, error } = await sb
   .neq('status', 'rejected')
   .order('created_at', { ascending: false })
   .limit(50)
-
 if (error) throw new Error(error.message)
 
 const candidates = (campaigns || []).filter(needsVoice).slice(0, maxCampaigns)
-console.log(`COSA voice worker scanned=${campaigns?.length || 0} candidates=${candidates.length} captionSchema=${CAPTION_SCHEMA_VERSION} copySchema=${COPY_SCHEMA_VERSION}`)
+console.log(`COSA voice worker scanned=${campaigns?.length || 0} candidates=${candidates.length} baseSchema=${BASE_VISUAL_SCHEMA_VERSION} captionSchema=${CAPTION_SCHEMA_VERSION} copySchema=${COPY_SCHEMA_VERSION}`)
 const results = []
 for (const campaign of candidates) results.push(await processCampaign(campaign))
 console.log(JSON.stringify({ ok: results.every(result => result.ok), processed: results.length, results }, null, 2))

@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
   })
 
   if (primary && immediateReasons.length === 0) {
+    const healthyPrimary = primary
     // Complete the shadow comparison after the healthy response is sent. This
     // preserves continuity evidence without making normal Concierge latency
     // depend on the redundant provider.
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       const backup = await backupPromise
       if (!backup?.ok) return
       const shadowReasons = detectPrimaryCorruption({
-        status: primary.status,
+        status: healthyPrimary.status,
         reply: primarySnapshot.reply,
         source: primarySnapshot.source,
         backup,
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
         recoveryStatus: 'primary_returned_shadow_alert',
       })
     })
-    return primary
+    return healthyPrimary
   }
 
   // A failed, empty, canned, or error-degraded Primary response is quarantined

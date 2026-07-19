@@ -24,14 +24,22 @@ function deriveState(campaign: any): { state: CardState; step: number; note: str
   const video = campaign?.video || {}
   const stage = String(video?.stage || '').toLowerCase()
   const eligibility = String(campaign?.eligibility || '')
-  const finalReady = video?.branded === true && Boolean(video?.finalUrl || video?.previewUrl) && video?.previewKind === 'branded final'
+  const integrityKnown = video?.voiceStatus != null || video?.voiceEngine != null || video?.voiceFallback != null || video?.captionsBurned != null || video?.audioTrack != null
+  const voiceVerified = video?.audioTrack === true && video?.captionsBurned === true
+  const silentFallback = video?.voiceFallback === true && !voiceVerified
+  const finalReady = video?.branded === true
+    && Boolean(video?.finalUrl || video?.previewUrl)
+    && video?.previewKind === 'branded final'
+    && (!integrityKnown || voiceVerified)
   const hasBase = Boolean(video?.hasKlingUrl)
-  const voiced = Array.isArray(video?.voicedLangs) && video.voicedLangs.length > 0
+  const voiced = voiceVerified || (Array.isArray(video?.voicedLangs) && video.voicedLangs.length > 0)
+
   if (campaign?.approved_at) return { state: 'approved', step: 3, note: 'Approved and published. The YouTube link was emailed to you.' }
+  if (silentFallback) return { state: 'working', step: 2, note: 'Replacing the silent placeholder with real voice and burned-in captions.' }
   if (finalReady) return { state: 'ready', step: 3, note: 'Your video is ready. Watch it below, then approve to publish.' }
   if (eligibility.startsWith('STUCK') || stage === 'failed') return { state: 'problem', step: hasBase ? 2 : 1, note: 'Something went wrong. Press Fix automatically to restart this video.' }
   if (!hasBase) return { state: 'working', step: 1, note: 'Step 1 of 3 — creating your base video.' }
-  if (!voiced) return { state: 'working', step: 2, note: 'Step 2 of 3 — adding voice and captions.' }
+  if (!voiced) return { state: 'working', step: 2, note: 'Step 2 of 3 — adding real voice and captions.' }
   return { state: 'working', step: 3, note: 'Step 3 of 3 — adding the SignalBoost brand banner.' }
 }
 
@@ -63,15 +71,24 @@ export default function CosaVideoPipelinePage() {
   async function load(quiet = false) {
     if (!quiet) setLoading(true)
     try {
-      const [videoRes, archiveRes] = await Promise.all([
+      const [videoRes, archiveRes, integrityRes] = await Promise.all([
         fetch('/api/cos/video-pipeline-xray', { cache: 'no-store', credentials: 'include' }),
         fetch('/api/cos/video-archive', { cache: 'no-store', credentials: 'include' }),
+        fetch('/api/cos/video-integrity', { cache: 'no-store', credentials: 'include' }),
       ])
       const videoJson = await videoRes.json().catch(() => null)
       const archiveJson = await archiveRes.json().catch(() => null)
+      const integrityJson = await integrityRes.json().catch(() => null)
       if (!videoRes.ok || !videoJson?.ok) throw new Error(videoJson?.error || 'Could not load videos.')
       if (!archiveRes.ok || !archiveJson?.ok) throw new Error(archiveJson?.error || 'Could not load archive.')
-      setData(videoJson)
+      if (!integrityRes.ok || !integrityJson?.ok) throw new Error(integrityJson?.error || 'Could not verify video audio and captions.')
+
+      const integrity = integrityJson.integrity || {}
+      const campaigns = (videoJson.campaigns || []).map((campaign: any) => ({
+        ...campaign,
+        video: campaign.video ? { ...campaign.video, ...(integrity[String(campaign.id)] || {}) } : campaign.video,
+      }))
+      setData({ ...videoJson, campaigns })
       setArchived(Object.fromEntries((archiveJson.archived || []).map((x: any) => [String(x.id), String(x.archived_at || '')])))
       if (!quiet) setMessage('')
     } catch (e: any) {
@@ -164,7 +181,7 @@ export default function CosaVideoPipelinePage() {
               {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>Archive</button>}
               {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>Restore</button>}
             </div>
-            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}>Technical details</summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, eligibility: campaign.eligibility }, null, 2)}</pre></details>
+            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}>Technical details</summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
           </article>
         })}
       </div>

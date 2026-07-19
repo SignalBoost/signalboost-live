@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { AUDIT_APPROVAL_SCHEMA_REPAIR_SQL } from '@/lib/audit/approvalSchemaRepair'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
@@ -21,13 +22,19 @@ function isUuid(value: unknown): value is string {
 
 function isApprovalSchemaDrift(message: string): boolean {
   const normalized = message.toLowerCase()
+  const missingObject = normalized.includes('does not exist') || normalized.includes('could not find') || normalized.includes('schema cache')
   return (
     normalized.includes('column "approved" of relation "audit_runs" does not exist') ||
-    normalized.includes('approve_audit_run_remediation') ||
-    normalized.includes('audit_remediation_approvals') ||
-    normalized.includes('column "fixed"') ||
-    normalized.includes('schema cache')
+    (normalized.includes('approve_audit_run_remediation') && missingObject) ||
+    (normalized.includes('audit_remediation_approvals') && missingObject) ||
+    (normalized.includes('column "fixed"') && missingObject)
   )
+}
+
+function embeddedRpcError(data: unknown): string | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  const value = (data as { error?: unknown }).error
+  return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
 export async function POST(req: NextRequest) {
@@ -38,10 +45,44 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { /* validated below */ }
   if (!isUuid(body.runId)) return NextResponse.json({ ok: false, error: 'A valid audit run id is required.' }, { status: 400 })
 
-  const approval = await getAdminSupabase().rpc('approve_audit_run_remediation', {
+  const admin = getAdminSupabase()
+  let schemaRepairAttempted = false
+  let schemaRepaired = false
+  let approval = await admin.rpc('approve_audit_run_remediation', {
     p_run_id: body.runId,
     p_approved_by: ctx.userId,
   })
+
+  // Production may briefly be ahead of a partially-applied Supabase migration.
+  // The owner has already given the final run-level approval by clicking this
+  // action. For only the known approval-schema drift, execute the repository's
+  // fixed, idempotent SQL through the existing service-role-only SQL RPC, then
+  // retry the same atomic approval once. Request content can never supply SQL.
+  if (approval.error && isApprovalSchemaDrift(String(approval.error.message || ''))) {
+    schemaRepairAttempted = true
+    const repair = await admin.rpc('hub_exec_sql', { query: AUDIT_APPROVAL_SCHEMA_REPAIR_SQL })
+    const repairFailed = Boolean(repair.error) || Boolean(embeddedRpcError(repair.data))
+
+    if (!repairFailed) {
+      schemaRepaired = true
+      await admin.from('audit_logs').insert({
+        run_id: body.runId,
+        user_id: ctx.userId,
+        payload: {
+          event: 'audit_approval_schema_repaired',
+          runId: body.runId,
+          approvedBy: ctx.userId,
+          migration: '20260719_repair_audit_approval_schema_drift.sql',
+          status: 'repaired',
+          timestamp: new Date().toISOString(),
+        },
+      })
+      approval = await admin.rpc('approve_audit_run_remediation', {
+        p_run_id: body.runId,
+        p_approved_by: ctx.userId,
+      })
+    }
+  }
 
   if (approval.error) {
     const message = String(approval.error.message || '')
@@ -51,6 +92,7 @@ export async function POST(req: NextRequest) {
         code: 'audit_approval_schema_not_ready',
         error: 'Audit approval is temporarily unavailable because the Supabase approval schema is not current. Apply the required audit approval migrations, then retry.',
         requiredMigrations: REQUIRED_MIGRATIONS,
+        repairAttempted: schemaRepairAttempted,
         retryable: true,
       }, { status: 503 })
     }
@@ -74,6 +116,7 @@ export async function POST(req: NextRequest) {
     findingsFixed: event.findings_fixed,
     status: 'approved',
     timestamp: event.timestamp,
+    schemaRepaired,
     rollback: { entryPoint: 'thin', available: true },
   })
 }

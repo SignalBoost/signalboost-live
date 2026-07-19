@@ -14,13 +14,18 @@ function between(value, start, end) {
   return value.slice(startIndex, endIndex)
 }
 
-test('approval notifier deduplicates only successful email delivery and retries failures', async () => {
+test('approval notifier retries failed approval and live-link emails without republishing', async () => {
   const notifier = await source('../app/api/cos/video-approval-notify/route.ts')
-  assert.equal((notifier.match(/sendEmail\s*\(/g) || []).length, 1)
+  assert.equal((notifier.match(/sendEmail\s*\(/g) || []).length, 2)
   assert.match(notifier, /if \(video\?\.approvalRequestedAt\) return false/)
   assert.match(notifier, /\.\.\.\(sent\?\.ok \? \{ approvalRequestedAt: attemptAt \} : \{\}\)/)
   assert.match(notifier, /attempts: previousAttempts \+ 1/)
   assert.match(notifier, /retryable: !sent\?\.ok/)
+  assert.match(notifier, /entry as any\)\?\.notified === true/)
+  assert.match(notifier, /const liveUrl = String\(\(entry as any\)\?\.result\?\.liveUrl/)
+  assert.match(notifier, /notifyAttempts/)
+  assert.match(notifier, /liveLinkEmails:/)
+  assert.doesNotMatch(notifier, /autoPublishApprovedCampaign|publishCampaignCore|publishSocialPost/)
   assert.match(notifier, /'approve'/)
   assert.match(notifier, /'hold'/)
   assert.match(notifier, /'changes'/)

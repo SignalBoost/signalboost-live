@@ -48,7 +48,7 @@ function socialPlatformFrom(text: string): string {
   if (/twitter|\bx post\b|\bon x\b|\btweet\b/.test(t)) return 'twitter'
   if (/instagram|\big\b/.test(t)) return 'instagram'
   if (/tiktok/.test(t)) return 'tiktok'
-  return ''
+  return 'linkedin'
 }
 
 function socialQueueRow(a: { platform: string; title: string; body: string; brief: string; lang: string; now: string }) {

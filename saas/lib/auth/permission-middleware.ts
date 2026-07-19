@@ -84,7 +84,9 @@ export function createProtectedRoute(
 ) {
   return async (req: NextRequest) => {
     const result = await requirePermission(req, requiredPermission)
-    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
+    if ('error' in result) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
+    }
     return handler(req, result.user)
   }
 }
@@ -95,7 +97,9 @@ export function createProtectedRouteAll(
 ) {
   return async (req: NextRequest) => {
     const result = await requireAllPermissions(req, requiredPermissions)
-    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
+    if ('error' in result) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
+    }
     return handler(req, result.user)
   }
 }
@@ -106,7 +110,9 @@ export function createProtectedRouteAny(
 ) {
   return async (req: NextRequest) => {
     const result = await requireAnyPermission(req, requiredPermissions)
-    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
+    if ('error' in result) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
+    }
     return handler(req, result.user)
   }
 }

@@ -7,4 +7,4 @@ Key constraints (details in ONBOARD.md / AGENTS.md):
 - 5-language i18n (en, pt, es, pl, ru) for every user-facing string.
 - BYOK model: user flows run on the user's own provider keys, never platform keys; keys are encrypted, never logged.
 - Owner approval gates on all dispatch/publish/spend/infrastructure actions are never skipped.
-- Update ONBOARD.md (Sections 18–19) whenever architecture, providers, gates, schema, or developer instructions change.
+- Keep ONBOARD.md useful as durable documentation when appropriate, but an ONBOARD.md edit or PR-body acknowledgement is not required for commit or merge.

@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-// Sync completed COSA base-video jobs back into their owning campaign rows and
-// advance the current cost-safe voice stage without depending on Vercel cron.
+// Sync completed COSA base-video jobs back into their owning campaign rows.
 //
-// Current voice policy intentionally uses the rendered base MP4 as the
-// unbranded voice/caption fallback. The GitHub brand-overlay worker then burns
-// the mandatory SignalBoostAi banner and creates the final review artifact.
+// This script owns only the Step 1 handoff. Real narration and captions are
+// created by cos-video-voice-worker.mjs. A silent base MP4 must never be placed
+// into unbrandedVoiced or marked as a completed voice artifact.
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -21,11 +20,6 @@ const supabase = createClient(url, key, {
 
 function message(error) {
   return error?.message || error?.error || String(error || 'unknown error')
-}
-
-function primaryLang(campaign) {
-  const langs = Array.isArray(campaign?.languages) ? campaign.languages.filter(Boolean) : []
-  return String(langs[0] || 'en')
 }
 
 async function usableVideoUrl(outputUrl) {
@@ -84,10 +78,8 @@ if (requestIds.length) {
 
 let ready = 0
 let failed = 0
-let voiceFallback = 0
 let unchanged = 0
 
-// Step 1 handoff: rendered job -> campaign base-video URL.
 for (const campaign of rendering) {
   const video = campaign.metadata.video || {}
   const requestId = String(video.requestId)
@@ -149,38 +141,4 @@ for (const campaign of rendering) {
   unchanged++
 }
 
-// Step 2 handoff: current cost-safe voice/caption stage simply promotes the
-// base artifact into unbrandedVoiced. Do this here for both newly reconciled
-// and already-ready campaigns, so old Step 2 cards self-heal immediately.
-for (const campaign of rows) {
-  const video = campaign?.metadata?.video || {}
-  if (video.status !== 'ready' || !video.url) continue
-  if (video.branded === true && video.voicedUrl) continue
-
-  const lang = primaryLang(campaign)
-  const brandedLangs = video.brandedLangs || {}
-  const unbrandedVoiced = { ...(video.unbrandedVoiced || {}) }
-  if (brandedLangs[lang] || unbrandedVoiced[lang]) continue
-
-  unbrandedVoiced[lang] = String(video.url)
-  try {
-    await updateCampaign(campaign, {
-      ...video,
-      status: 'ready',
-      unbrandedVoiced,
-      voicedUrl: null,
-      voiceLock: null,
-      voiceStatus: 'COMPLETED_FALLBACK',
-      voiceFallback: true,
-      voiceError: null,
-      voiceFallbackReason: `COST_SAFETY_FALLBACK: base video promoted for ${lang}; final brand overlay is next.`,
-    })
-    voiceFallback++
-    console.log(`COSA campaign ${campaign.id}: Step 2 fallback prepared for ${lang}.`)
-  } catch (error) {
-    console.error(`COSA campaign ${campaign.id}: Step 2 fallback failed: ${message(error)}`)
-    unchanged++
-  }
-}
-
-console.log(`COSA campaign sync complete. Base ready: ${ready}; failed: ${failed}; Step 2 prepared: ${voiceFallback}; unchanged: ${unchanged}.`)
+console.log(`COSA campaign sync complete. Base ready: ${ready}; failed: ${failed}; unchanged: ${unchanged}.`)

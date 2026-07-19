@@ -1,0 +1,96 @@
+name: Patch ONBOARD policy once
+
+on:
+  push:
+    branches:
+      - remove-onboard-merge-gate
+
+permissions:
+  contents: write
+
+jobs:
+  patch-onboard-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: remove-onboard-merge-gate
+          fetch-depth: 0
+
+      - name: Remove stale ONBOARD merge policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('ONBOARD.md')
+          text = path.read_text(encoding='utf-8')
+
+          section_zero = '''## 0. Repository Entry Guidance
+
+`ONBOARD.md` remains the recommended first read because it summarizes architecture, operating boundaries, and repository conventions. Reading or editing it is not a commit or merge prerequisite.
+
+Pull requests are not required to:
+
+- update `ONBOARD.md`;
+- include an `ONBOARD.md` acknowledgement in the PR body; or
+- include a mechanical/refactor-only exception statement.
+
+No CI workflow, local hook, merge validator, or branch check may fail solely because `ONBOARD.md` was not changed or because ONBOARD-specific text is absent from a PR body.
+
+This retirement applies only to ONBOARD gating. Existing lint, typecheck, build, test, security, approval-boundary, Code Owner, role-validation, and branch-protection controls remain unchanged.
+'''
+
+          section_eighteen = '''## 18. Optional ONBOARD Maintenance
+
+Keep `ONBOARD.md` accurate when durable architecture, provider, schema, workflow, security, or operator documentation would help future contributors. Such documentation is encouraged but is not required for commit or merge.
+
+Do not reintroduce a CI workflow, local hook, PR-template requirement, merge validator, or branch-protection condition that requires an `ONBOARD.md` change, acknowledgement, or exception statement.
+'''
+
+          text, count_zero = re.subn(
+              r'## 0\. Mandatory Enforcement\n.*?\n---\n\n## 1\.',
+              section_zero + '\n---\n\n## 1.',
+              text,
+              count=1,
+              flags=re.DOTALL,
+          )
+          text, count_eighteen = re.subn(
+              r'## 18\. Mandatory ONBOARD Maintenance Rule\n.*?\n---\n\n## 19\.',
+              section_eighteen + '\n---\n\n## 19.',
+              text,
+              count=1,
+              flags=re.DOTALL,
+          )
+
+          log_entry = '- 2026-07-19: Removed the ONBOARD.md commit and merge requirement. Legacy ONBOARD status contexts now pass through for branch-protection compatibility; local hooks no longer edit or block commits; all unrelated safety and governance checks remain unchanged.\n'
+          heading = '## 19. Onboarding Change Log\n\n'
+          if log_entry not in text:
+              if heading not in text:
+                  raise SystemExit('ONBOARD change-log heading not found')
+              text = text.replace(heading, heading + log_entry, 1)
+
+          if count_zero == 0 and '## 0. Repository Entry Guidance' not in text:
+              raise SystemExit('Mandatory enforcement section was not found')
+          if count_eighteen == 0 and '## 18. Optional ONBOARD Maintenance' not in text:
+              raise SystemExit('Mandatory maintenance section was not found')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit ONBOARD policy update
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- ONBOARD.md; then
+            echo "ONBOARD policy is already updated."
+            exit 0
+          fi
+          git config user.name "SignalBoost Governance Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add ONBOARD.md
+          git commit -m "Remove stale ONBOARD merge policy"
+          git push origin HEAD:remove-onboard-merge-gate

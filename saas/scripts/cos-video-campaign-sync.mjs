@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-// Sync completed COSA base-video jobs back into their owning campaign rows.
+// Sync completed COSA base-video jobs back into their owning campaign rows and
+// advance the current cost-safe voice stage without depending on Vercel cron.
 //
-// The production worker writes the MP4 to Supabase Storage and marks
-// cos_video_production_jobs rendered. The Video Studio, however, reads
-// cos_campaign_queue.metadata.video. This bridge makes that handoff explicit
-// and idempotent so a completed render cannot remain stuck on Step 1 merely
-// because a separate Vercel polling cron was delayed or unavailable.
+// Current voice policy intentionally uses the rendered base MP4 as the
+// unbranded voice/caption fallback. The GitHub brand-overlay worker then burns
+// the mandatory SignalBoostAi banner and creates the final review artifact.
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -13,9 +12,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 const renderBucket = String(process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders').trim()
 
-if (!url || !key) {
-  throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
-}
+if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
 if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 
 const supabase = createClient(url, key, {
@@ -24,6 +21,11 @@ const supabase = createClient(url, key, {
 
 function message(error) {
   return error?.message || error?.error || String(error || 'unknown error')
+}
+
+function primaryLang(campaign) {
+  const langs = Array.isArray(campaign?.languages) ? campaign.languages.filter(Boolean) : []
+  return String(langs[0] || 'en')
 }
 
 async function usableVideoUrl(outputUrl) {
@@ -41,40 +43,53 @@ async function usableVideoUrl(outputUrl) {
   return data.signedUrl
 }
 
-const { data: campaigns, error: campaignError } = await supabase
-  .from('cos_campaign_queue')
-  .select('id, metadata')
-  .filter('metadata->video->>status', 'eq', 'rendering')
-  .limit(50)
-
-if (campaignError) throw new Error(`Could not load rendering campaigns: ${campaignError.message}`)
-
-const candidates = (campaigns || []).filter((campaign) => {
-  const video = campaign?.metadata?.video
-  return Boolean(video?.requestId)
-})
-
-if (!candidates.length) {
-  console.log('COSA campaign sync: no rendering campaigns need reconciliation.')
-  process.exit(0)
+async function updateCampaign(campaign, video) {
+  const metadata = { ...(campaign.metadata || {}), video }
+  const { error } = await supabase
+    .from('cos_campaign_queue')
+    .update({ metadata })
+    .eq('id', campaign.id)
+  if (error) throw error
+  campaign.metadata = metadata
 }
 
-const requestIds = [...new Set(candidates.map((campaign) => String(campaign.metadata.video.requestId)))]
-const { data: jobs, error: jobError } = await supabase
-  .from('cos_video_production_jobs')
-  .select('id, status, output_url, error, queue_drop_reason, updated_at')
-  .in('id', requestIds)
+const { data: campaigns, error: campaignError } = await supabase
+  .from('cos_campaign_queue')
+  .select('id, channel, status, languages, metadata, created_at')
+  .in('channel', ['youtube', 'short_video'])
+  .neq('status', 'rejected')
+  .order('created_at', { ascending: false })
+  .limit(50)
 
-if (jobError) throw new Error(`Could not load video jobs: ${jobError.message}`)
+if (campaignError) throw new Error(`Could not load video campaigns: ${campaignError.message}`)
 
-const jobsById = new Map((jobs || []).map((job) => [String(job.id), job]))
+const rows = campaigns || []
+const rendering = rows.filter((campaign) => {
+  const video = campaign?.metadata?.video
+  return video?.status === 'rendering' && Boolean(video?.requestId)
+})
+
+const requestIds = [...new Set(rendering.map((campaign) => String(campaign.metadata.video.requestId)))]
+const jobsById = new Map()
+
+if (requestIds.length) {
+  const { data: jobs, error: jobError } = await supabase
+    .from('cos_video_production_jobs')
+    .select('id, status, output_url, error, queue_drop_reason, updated_at')
+    .in('id', requestIds)
+
+  if (jobError) throw new Error(`Could not load video jobs: ${jobError.message}`)
+  for (const job of jobs || []) jobsById.set(String(job.id), job)
+}
+
 let ready = 0
 let failed = 0
+let voiceFallback = 0
 let unchanged = 0
 
-for (const campaign of candidates) {
-  const metadata = campaign.metadata || {}
-  const video = metadata.video || {}
+// Step 1 handoff: rendered job -> campaign base-video URL.
+for (const campaign of rendering) {
+  const video = campaign.metadata.video || {}
   const requestId = String(video.requestId)
   const job = jobsById.get(requestId)
 
@@ -102,16 +117,9 @@ for (const campaign of candidates) {
         unbrandedVoiced: video.unbrandedVoiced || {},
         brandingLock: null,
       }
-
-      const { error } = await supabase
-        .from('cos_campaign_queue')
-        .update({ metadata: { ...metadata, video: updatedVideo } })
-        .eq('id', campaign.id)
-        .filter('metadata->video->>requestId', 'eq', requestId)
-
-      if (error) throw error
+      await updateCampaign(campaign, updatedVideo)
       ready++
-      console.log(`COSA campaign ${campaign.id}: base render ${requestId} synced to Step 2.`)
+      console.log(`COSA campaign ${campaign.id}: base render ${requestId} synced.`)
     } catch (error) {
       console.error(`COSA campaign ${campaign.id}: rendered job sync failed: ${message(error)}`)
       unchanged++
@@ -121,26 +129,19 @@ for (const campaign of candidates) {
 
   if (status === 'failed' || status === 'escalated' || status === 'dlq') {
     const renderError = String(job.error || job.queue_drop_reason || `render job ${status}`)
-    const updatedVideo = {
-      ...video,
-      status: 'failed',
-      error: renderError,
-      failed_at: now,
-      brandingLock: null,
-    }
-
-    const { error } = await supabase
-      .from('cos_campaign_queue')
-      .update({ metadata: { ...metadata, video: updatedVideo } })
-      .eq('id', campaign.id)
-      .filter('metadata->video->>requestId', 'eq', requestId)
-
-    if (error) {
-      console.error(`COSA campaign ${campaign.id}: failed-job sync failed: ${error.message}`)
-      unchanged++
-    } else {
+    try {
+      await updateCampaign(campaign, {
+        ...video,
+        status: 'failed',
+        error: renderError,
+        failed_at: now,
+        brandingLock: null,
+      })
       failed++
       console.log(`COSA campaign ${campaign.id}: render ${requestId} marked failed (${status}).`)
+    } catch (error) {
+      console.error(`COSA campaign ${campaign.id}: failed-job sync failed: ${message(error)}`)
+      unchanged++
     }
     continue
   }
@@ -148,4 +149,38 @@ for (const campaign of candidates) {
   unchanged++
 }
 
-console.log(`COSA campaign sync complete. Ready: ${ready}; failed: ${failed}; unchanged: ${unchanged}.`)
+// Step 2 handoff: current cost-safe voice/caption stage simply promotes the
+// base artifact into unbrandedVoiced. Do this here for both newly reconciled
+// and already-ready campaigns, so old Step 2 cards self-heal immediately.
+for (const campaign of rows) {
+  const video = campaign?.metadata?.video || {}
+  if (video.status !== 'ready' || !video.url) continue
+  if (video.branded === true && video.voicedUrl) continue
+
+  const lang = primaryLang(campaign)
+  const brandedLangs = video.brandedLangs || {}
+  const unbrandedVoiced = { ...(video.unbrandedVoiced || {}) }
+  if (brandedLangs[lang] || unbrandedVoiced[lang]) continue
+
+  unbrandedVoiced[lang] = String(video.url)
+  try {
+    await updateCampaign(campaign, {
+      ...video,
+      status: 'ready',
+      unbrandedVoiced,
+      voicedUrl: null,
+      voiceLock: null,
+      voiceStatus: 'COMPLETED_FALLBACK',
+      voiceFallback: true,
+      voiceError: null,
+      voiceFallbackReason: `COST_SAFETY_FALLBACK: base video promoted for ${lang}; final brand overlay is next.`,
+    })
+    voiceFallback++
+    console.log(`COSA campaign ${campaign.id}: Step 2 fallback prepared for ${lang}.`)
+  } catch (error) {
+    console.error(`COSA campaign ${campaign.id}: Step 2 fallback failed: ${message(error)}`)
+    unchanged++
+  }
+}
+
+console.log(`COSA campaign sync complete. Base ready: ${ready}; failed: ${failed}; Step 2 prepared: ${voiceFallback}; unchanged: ${unchanged}.`)

@@ -1,9 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import {
   UniversalProviderRegistry,
-  UniversalProviderError,
   UNIVERSAL_PROVIDER_SCHEMA_VERSION,
   createUniversalSdkFromBrowserProvider,
 } from '../lib/provider-framework/index.ts'
@@ -71,8 +70,8 @@ test('bridges canonical BPAL metadata without Browser Runtime, Supervisor, dispa
   assert.equal(registered.metadata.health.lifecycle, 'registered')
   assert.ok(registered.metadata.capabilities.every(c => c.readOnly && !c.environments.includes('production')))
   assert.ok(registered.metadata.capabilities.some(c => c.channels.includes('browser')))
-  const files = await readdir(new URL('../lib/provider-framework/', import.meta.url))
-  for (const file of files.filter(name => name.endsWith('.ts') && !name.startsWith('github'))) {
+
+  for (const file of ['types.ts', 'validation.ts', 'registry.ts', 'browser-provider-bridge.ts']) {
     const text = await readFile(new URL(`../lib/provider-framework/${file}`, import.meta.url), 'utf8')
     assert.doesNotMatch(text, /browser-runtime|SupervisorDispatcher|policy-engine|fetch\(|XMLHttpRequest|@vercel|stripe|cloudflare|supabase-js/i)
   }

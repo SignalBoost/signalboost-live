@@ -6,6 +6,7 @@ import {
   overlayFindingStates,
   type FindingStateMap,
 } from '../lib/audit/findingState.ts'
+import { buildExecutiveSummary } from '../lib/audit/execSummary.ts'
 
 type TestFinding = {
   id: string
@@ -53,6 +54,14 @@ test('executive summary overlays state before scoring and active-risk selection'
   assert.ok(overlayAt >= 0, 'executive summary must overlay persisted states')
   assert.ok(scoreAt > overlayAt, 'scoring must happen after persisted-state overlay')
   assert.match(source, /\.filter\(f => !f\.evidenceRequired && !isHandled\(f\.status\)\)/)
+})
+
+test('executive summary resolves the existing findings engine with a workspace-local import', () => {
+  const summary = buildExecutiveSummary({ providers: [] })
+
+  assert.equal(summary.score.score, 100)
+  assert.equal(summary.findings.length, 1)
+  assert.equal(summary.evidenceRequired, 1)
 })
 
 test('executive route loads audit_finding_state and passes it into the summary', () => {

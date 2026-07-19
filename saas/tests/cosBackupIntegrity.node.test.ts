@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { compareCosDecisions, createCosSyncLog } from '../lib/cos-backup/index.ts'
+import { detectPrimaryCorruption } from '../lib/cos-backup/continuityPolicy.ts'
 
 test('Backup COS is advisory-only and flags material divergence', () => {
   const result = compareCosDecisions({
@@ -34,14 +35,51 @@ test('sync log uses the required stable schema', () => {
   })
 })
 
-test('Concierge remains the exact canonical thin alias', async () => {
+test('continuity detector quarantines known canned corruption', () => {
+  const reasons = detectPrimaryCorruption({
+    status: 200,
+    reply: 'Concierge created the Press & Print campaign with a verified publisher target.',
+    source: 'anthropic-chief',
+  })
+  assert.equal(reasons.some((reason) => reason.startsWith('canned_response:')), true)
+})
+
+test('continuity detector catches degraded HTTP 200 responses', () => {
+  const reasons = detectPrimaryCorruption({
+    status: 200,
+    reply: 'I hit a snag handling that and could not finish.',
+    source: 'error-degraded',
+  })
+  assert.deepEqual(reasons, ['primary_degraded_source:error-degraded'])
+})
+
+test('continuity detector catches unavailable Primary responses', () => {
+  const reasons = detectPrimaryCorruption({ status: 500, reply: '', source: '' })
+  assert.deepEqual(reasons, ['primary_http_failure', 'primary_empty_reply'])
+})
+
+test('continuity detector leaves healthy Primary responses alone', () => {
+  const reasons = detectPrimaryCorruption({
+    status: 200,
+    reply: 'Here is the complete answer based on the current request.',
+    source: 'anthropic-chief',
+  })
+  assert.deepEqual(reasons, [])
+})
+
+test('continuity policy stays dependency-free for direct Node tests', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/cos-backup/continuityPolicy.ts'), 'utf8')
+  assert.doesNotMatch(source, /from\s+['"]@\//)
+  assert.doesNotMatch(source, /next\/server|supabase|callModel/)
+})
+
+test('Concierge preserves the Primary boundary and does not block healthy responses on Backup COS', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8')
-  assert.equal(source.trim(), [
-    "import { NextRequest } from 'next/server'",
-    "import { POST as supportPost } from '@/app/api/support/route'",
-    '',
-    'export async function POST(req: NextRequest) {',
-    '  return supportPost(req)',
-    '}',
-  ].join('\n'))
+  assert.match(source, /POST as supportPost/)
+  assert.match(source, /detectPrimaryCorruption/)
+  assert.match(source, /if \(primary && reasons\.length === 0\) return primary/)
+  assert.match(source, /const backup = await runBackupWithDeadline/)
+  assert.match(source, /execution_allowed: false/)
+  assert.doesNotMatch(source, /Promise\.all\(\[primaryPromise,\s*backupPromise/)
+  assert.doesNotMatch(source, /createClient|\.from\(|\.insert\(|\.update\(|proposeCampaign|socialPlatformFrom|isPressCreationRequest/i)
 })

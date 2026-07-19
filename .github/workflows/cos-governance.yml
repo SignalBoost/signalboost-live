@@ -32,8 +32,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: saas/package-lock.json
       - name: Install dependencies
         working-directory: saas
         run: npm install --no-audit --no-fund

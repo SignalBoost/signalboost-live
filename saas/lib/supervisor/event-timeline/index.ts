@@ -58,7 +58,10 @@ const forbidden = /(authorization|bearer\s+[a-z0-9._-]+|cookie|password|secret|t
 const primitiveMetadata = (value: Record<string, unknown> = {}) => Object.fromEntries(
   Object.entries(value)
     .filter(([key, item]) => !forbidden.test(key) && (item === null || ['string', 'number', 'boolean'].includes(typeof item)))
-    .map(([key, item]) => [key, typeof item === 'string' && forbidden.test(item) ? '[redacted]' : item])
+    .map(([key, item]): [string, string | number | boolean | null] => [
+      key,
+      typeof item === 'string' && forbidden.test(item) ? '[redacted]' : item as string | number | boolean | null,
+    ])
     .sort(([a], [b]) => a.localeCompare(b)),
 ) as Record<string, string | number | boolean | null>
 

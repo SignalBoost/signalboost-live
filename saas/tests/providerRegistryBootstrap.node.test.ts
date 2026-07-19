@@ -28,11 +28,21 @@ test('bootstrap registers the Supabase provider into the canonical registry', ()
   assert.ok(supabase.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
 })
 
+test('bootstrap registers the Cloudflare provider into the canonical registry', () => {
+  const registry = buildUniversalProviderRegistry()
+  const cloudflare = registry.get('cloudflare')
+  assert.equal(cloudflare.metadata.providerId, 'cloudflare')
+  assert.ok(cloudflare.metadata.capabilities.length >= 10)
+  assert.ok(cloudflare.metadata.capabilities.every((c) => c.readOnly), 'all Cloudflare capabilities must be read-only')
+  assert.ok(cloudflare.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
+})
+
 test('registered providers are discoverable via toMetadata()', () => {
   const ids = buildUniversalProviderRegistry().toMetadata().map((m) => m.providerId)
   assert.ok(ids.includes('github'))
   assert.ok(ids.includes('stripe'))
   assert.ok(ids.includes('supabase'))
+  assert.ok(ids.includes('cloudflare'))
 })
 
 test('capability discovery resolves known read-only capabilities', () => {
@@ -40,12 +50,15 @@ test('capability discovery resolves known read-only capabilities', () => {
   const github = registry.findCapability('github', 'github.repositories.list')
   const stripe = registry.findCapability('stripe', 'stripe.balance.read')
   const supabase = registry.findCapability('supabase', 'supabase.database.health.read')
+  const cloudflare = registry.findCapability('cloudflare', 'cloudflare.zones.list')
   assert.equal(github.readOnly, true)
   assert.equal(github.riskClass, 'read_only')
   assert.equal(stripe.readOnly, true)
   assert.equal(stripe.riskClass, 'read_only')
   assert.equal(supabase.readOnly, true)
   assert.equal(supabase.riskClass, 'read_only')
+  assert.equal(cloudflare.readOnly, true)
+  assert.equal(cloudflare.riskClass, 'read_only')
 })
 
 test('getUniversalProviderRegistry returns a stable singleton', () => {

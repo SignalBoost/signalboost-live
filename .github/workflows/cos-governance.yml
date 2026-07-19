@@ -8,6 +8,7 @@ on:
       - 'saas/app/api/support/route.ts'
       - 'saas/lib/cos-backup/**'
       - 'saas/scripts/check-cos-integrity.mjs'
+      - 'saas/tests/cosBackupIntegrity.node.test.ts'
       - '.github/workflows/cos-governance.yml'
       - '.github/CODEOWNERS'
   push:
@@ -31,6 +32,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - name: Install dependencies
+        working-directory: saas
+        run: npm install --no-audit --no-fund
       - name: Verify protected commit signature
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,6 +68,9 @@ jobs:
       - name: Check canonical COS integrity
         working-directory: saas
         run: node scripts/check-cos-integrity.mjs
+      - name: Test Backup COS
+        working-directory: saas
+        run: node --test tests/cosBackupIntegrity.node.test.ts
       - name: Typecheck Backup COS core
         working-directory: saas
         run: npx tsc --noEmit

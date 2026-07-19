@@ -1,3 +1,4 @@
+import { LocalizedText } from '@/components/i18n/LocalizedText'
 // saas/app/m/[id]/page.tsx
 // Public render of a PUBLISHED campaign. Only campaigns with status 'published'
 // resolve; anything else 404s. Passes the id to the client so a view can be
@@ -16,7 +17,7 @@ export default async function PublishedCampaignPage({ params }: { params: Promis
   if (!campaign) {
     return (
       <main style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', color: 'rgba(226,232,240,.65)' }}>
-        <p>Not found</p>
+        <p><LocalizedText fallback={"Not found"} /></p>
       </main>
     )
   }

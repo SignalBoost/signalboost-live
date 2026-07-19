@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import Link from 'next/link'
 import { Suspense, useEffect, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -211,8 +213,8 @@ function OutreachHubContent() {
 function ChannelWorkspace({ channel, noRecords }: { channel: ChannelConfig; noRecords: string }) {
   return (
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14, margin: '18px 0 24px' }}>
-      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}>Target publication types</h2><ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.targets.map((item) => <li key={item}>{item}</li>)}</ul></article>
-      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}>Channel workflow</h2><ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.workflow.map((item) => <li key={item}>{item}</li>)}</ol>{noRecords ? <p className="sb-caption" style={{ color: '#fde68a', marginTop: 12 }}>{noRecords}</p> : null}<Link href={channel.ctaHref} className="sb-button-primary" style={{ display: 'inline-flex', marginTop: 14, textDecoration: 'none' }}>{channel.cta}</Link></article>
+      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={"Target publication types"} /></h2><ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.targets.map((item) => <li key={item}>{item}</li>)}</ul></article>
+      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={"Channel workflow"} /></h2><ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.workflow.map((item) => <li key={item}>{item}</li>)}</ol>{noRecords ? <p className="sb-caption" style={{ color: '#fde68a', marginTop: 12 }}>{noRecords}</p> : null}<Link href={channel.ctaHref} className="sb-button-primary" style={{ display: 'inline-flex', marginTop: 14, textDecoration: 'none' }}>{channel.cta}</Link></article>
     </section>
   )
 }

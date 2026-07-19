@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 const GOLD = '#ffc300'
@@ -147,13 +149,13 @@ export default function CosaVideoPipelinePage() {
 
   return <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
-      <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em' }}>COSA VIDEO STUDIO</p>
-      <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}>Your videos</h1>
-      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65 }}>Active work stays clean. Published videos have their own view, and archived videos remain stored and can be restored.</p>
+      <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em' }}><LocalizedText fallback={"COSA VIDEO STUDIO"} /></p>
+      <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}><LocalizedText fallback={"Your videos"} /></h1>
+      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65 }}><LocalizedText fallback={"Active work stays clean. Published videos have their own view, and archived videos remain stored and can be restored."} /></p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
         {(['active', 'published', 'archived'] as Tab[]).map((name) => <button key={name} onClick={() => setTab(name)} style={{ ...ghost, background: tab === name ? 'rgba(255,195,0,.18)' : ghost.background, borderColor: tab === name ? GOLD : 'rgba(255,255,255,.18)' }}>{name[0].toUpperCase() + name.slice(1)} ({counts[name]})</button>)}
         <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? 'Loading...' : 'Refresh now'}</button>
-        <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Back to campaigns</a>
+        <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}><LocalizedText fallback={"Back to campaigns"} /></a>
       </div>
       {message && <p style={{ color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('could not') ? RED : GREEN, fontWeight: 800 }}>{message}</p>}
     </section>
@@ -176,12 +178,12 @@ export default function CosaVideoPipelinePage() {
             <p style={{ color: state === 'problem' ? RED : 'rgba(255,255,255,.75)', lineHeight: 1.6 }}>{note}</p>
             {previewUrl && <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-              {state === 'ready' && !archived[campaign.id] && <button onClick={() => approve(campaign.id)} disabled={busyId === campaign.id} style={primary}>Approve and publish</button>}
-              {state === 'problem' && !archived[campaign.id] && <button onClick={() => redo(campaign.id)} disabled={busyId === campaign.id} style={warning}>Fix automatically</button>}
+              {state === 'ready' && !archived[campaign.id] && <button onClick={() => approve(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={"Approve and publish"} /></button>}
+              {state === 'problem' && !archived[campaign.id] && <button onClick={() => redo(campaign.id)} disabled={busyId === campaign.id} style={warning}><LocalizedText fallback={"Fix automatically"} /></button>}
               {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>Archive</button>}
               {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>Restore</button>}
             </div>
-            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}>Technical details</summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
+            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={"Technical details"} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
           </article>
         })}
       </div>

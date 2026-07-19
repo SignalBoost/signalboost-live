@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 // saas/components/hub/ProviderMatrixSafetyBanner.tsx
 // Display-only banner for applying the Provider Matrix concept safely.
 // It does not read provider secrets, execute provider actions, or bypass Hub policy.
@@ -30,12 +32,8 @@ export default function ProviderMatrixSafetyBanner() {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ color: '#ffc300', fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>
-            Provider Matrix Guardrails
-          </div>
-          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 12.5, marginTop: 4 }}>
-            Provider status may be displayed here, but provider changes still run through Hub Actions or Infrastructure PR approval.
-          </div>
+          <div style={{ color: '#ffc300', fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Provider Matrix Guardrails"} /></div>
+          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 12.5, marginTop: 4 }}><LocalizedText fallback={"Provider status may be displayed here, but provider changes still run through Hub Actions or Infrastructure PR approval."} /></div>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>

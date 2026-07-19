@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 // saas/components/hub/ProviderActionForm.tsx
 // Hub Console — Universal form renderer for provider actions with active intercept pickers.
 
@@ -230,7 +232,7 @@ export default function ProviderActionForm({
                 {advancedFields.length > 0 && (
                   <div style={{ border: '1px solid rgba(255,255,255,.10)', borderRadius: 12, background: 'rgba(255,255,255,.03)', overflow: 'hidden' }}>
                     <button type="button" onClick={() => setShowAdvanced(v => !v)} className="hub-chip" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 13px', border: 0, borderRadius: 0, background: 'rgba(26,240,255,.06)', color: '#fff', cursor: 'pointer' }}>
-                      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(26,240,255,.82)' }}>Advanced options</span>
+                      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(26,240,255,.82)' }}><LocalizedText fallback={"Advanced options"} /></span>
                       <span style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{showAdvanced ? 'Hide' : 'Branch and selected files'}</span>
                     </button>
                     {showAdvanced && (
@@ -977,16 +979,13 @@ function CodexHandoffResult({ data }: { data: any }) {
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
       <div style={noticeStyle}>
-        <strong style={{ color: '#ffc300' }}>Handoff-only workflow:</strong> Copy this prompt, open Codex Cloud, and paste it into the Codex task box.
-      </div>
+        <strong style={{ color: '#ffc300' }}>Handoff-only workflow:</strong><LocalizedText fallback={"Copy this prompt, open Codex Cloud, and paste it into the Codex task box."} /></div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flex: '0 0 auto' }}>
         <button type="button" onClick={copyPrompt} className="hub-btn" style={primaryButtonStyle}>
           {copied ? 'Copied' : 'Copy Prompt'}
         </button>
-        <a href={codexCloudUrl} target="_blank" rel="noreferrer" className="hub-chip" style={{ ...secondaryButtonStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-          Open Codex Cloud
-        </a>
+        <a href={codexCloudUrl} target="_blank" rel="noreferrer" className="hub-chip" style={{ ...secondaryButtonStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}><LocalizedText fallback={"Open Codex Cloud"} /></a>
       </div>
 
       {copied && (
@@ -995,9 +994,7 @@ function CodexHandoffResult({ data }: { data: any }) {
         </div>
       )}
 
-      <label style={{ ...labelStyle, fontSize: 10.5, color: 'rgba(255,255,255,.62)' }}>
-        Generated Codex prompt
-      </label>
+      <label style={{ ...labelStyle, fontSize: 10.5, color: 'rgba(255,255,255,.62)' }}><LocalizedText fallback={"Generated Codex prompt"} /></label>
       <textarea readOnly value={prompt} style={{ ...jsonBoxStyle, width: '100%', resize: 'vertical', color: 'rgba(255,255,255,.86)', minHeight: 260 }} />
 
       <div style={{ fontSize: 11, color: 'rgba(255,255,255,.52)', flex: '0 0 auto' }}>

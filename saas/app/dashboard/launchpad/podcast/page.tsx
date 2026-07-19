@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useState } from 'react'
 import { EnterpriseLaunchpadConfigurator, type LaunchpadApprovalPackage } from '@/components/enterprise/EnterpriseLaunchpadConfigurator'
 
@@ -56,8 +58,8 @@ export default function PodcastLaunchpad() {
     <div style={{ maxWidth: 920, margin: '0 auto', paddingBottom: 80, display: 'grid', gap: 18 }}>
       <header className="sb-cockpit-hero">
         <p className="sb-hmi-kicker">🎙️ PODCAST</p>
-        <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>Podcast Enterprise Launchpad</h1>
-        <p className="sb-hmi-muted">Analyze a public organization or creator source, approve the structured show profile, and generate the governed podcast package.</p>
+        <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}><LocalizedText fallback={"Podcast Enterprise Launchpad"} /></h1>
+        <p className="sb-hmi-muted"><LocalizedText fallback={"Analyze a public organization or creator source, approve the structured show profile, and generate the governed podcast package."} /></p>
       </header>
       <EnterpriseLaunchpadConfigurator workspace="podcast" busy={loading} onApprove={approveAndGenerate} />
       {error && <p role="alert" style={{ color: '#fca5a5', margin: 0 }}>{error}</p>}
@@ -70,8 +72,8 @@ export default function PodcastLaunchpad() {
         <Card title="✅ Launch Checklist" items={sketch.launchChecklist} />
         <Card title="➡️ Next Step" text={sketch.nextStep} />
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button type="button" className="sb-button-secondary" onClick={() => { window.location.href = '/dashboard/podcast' }}>Create Podcast Page</button>
-          <button type="button" className="sb-button-secondary" onClick={() => { window.location.href = '/dashboard/podcast/studio' }}>Open Podcast Studio</button>
+          <button type="button" className="sb-button-secondary" onClick={() => { window.location.href = '/dashboard/podcast' }}><LocalizedText fallback={"Create Podcast Page"} /></button>
+          <button type="button" className="sb-button-secondary" onClick={() => { window.location.href = '/dashboard/podcast/studio' }}><LocalizedText fallback={"Open Podcast Studio"} /></button>
         </div>
       </div>}
     </div>

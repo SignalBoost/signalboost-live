@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useState } from 'react'
 
 const GOLD = '#ffc300'
@@ -47,11 +49,9 @@ export default function CosaVideoQualityPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>COSA video QA</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Verify whether COSA produces a better video</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}>
-          This test compares a basic text-only video against a COSA decision-driven video strategy. It checks hero, format, visual motion, URL, CTA, traffic plan, monetization plan, five languages, prediction, and approval gates.
-        </p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"COSA video QA"} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"Verify whether COSA produces a better video"} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}><LocalizedText fallback={"This test compares a basic text-only video against a COSA decision-driven video strategy. It checks hero, format, visual motion, URL, CTA, traffic plan, monetization plan, five languages, prediction, and approval gates."} /></p>
         <button onClick={runTest} disabled={loading} style={primaryButton}>{loading ? 'Running...' : 'Run quality test'}</button>
       </section>
 
@@ -71,7 +71,7 @@ export default function CosaVideoQualityPage() {
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}>Next actions</p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Next actions"} /></p>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               {comparison.next_actions.map((action, index) => <div key={index} style={listItem}>{action}</div>)}
             </div>

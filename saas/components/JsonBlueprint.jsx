@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 function StatusRow({ label, value, good = false, mono = false }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4">
@@ -22,9 +24,9 @@ export default function JsonBlueprint({ blueprint }) {
     <section className="rounded-3xl border border-white/10 bg-slate-950/75 p-6 shadow-2xl">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[.2em] text-amber-200">Digital Integration Summary</p>
+          <p className="text-xs font-black uppercase tracking-[.2em] text-amber-200"><LocalizedText fallback={"Digital Integration Summary"} /></p>
           <h2 className="mt-1 text-2xl font-black text-white">{blueprint.name || 'Enterprise integration'}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-400">All required integration details remain active internally. This view presents them in a clear business format without exposing JSON.</p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-400"><LocalizedText fallback={"All required integration details remain active internally. This view presents them in a clear business format without exposing JSON."} /></p>
         </div>
         <span className={`rounded-full border px-4 py-2 text-sm font-black ${ready ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100' : 'border-amber-300/30 bg-amber-300/10 text-amber-100'}`}>
           {ready ? '● Ready' : '● Configuration incomplete'}
@@ -44,19 +46,19 @@ export default function JsonBlueprint({ blueprint }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
-          <h3 className="font-black text-white">Request fields</h3>
+          <h3 className="font-black text-white"><LocalizedText fallback={"Request fields"} /></h3>
           <div className="mt-4 grid gap-2">
             {requestInputs.length ? requestInputs.map(([key, value]) => (
               <div key={key} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2">
                 <span className="font-bold text-slate-200">{key}</span>
                 <span className="max-w-[60%] truncate font-mono text-xs text-cyan-200">{String(value)}</span>
               </div>
-            )) : <p className="text-sm text-slate-400">No request inputs selected.</p>}
+            )) : <p className="text-sm text-slate-400"><LocalizedText fallback={"No request inputs selected."} /></p>}
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
-          <h3 className="font-black text-white">Response mapping</h3>
+          <h3 className="font-black text-white"><LocalizedText fallback={"Response mapping"} /></h3>
           <div className="mt-4 grid gap-2">
             {mappings.length ? mappings.map(([target, source]) => (
               <div key={target} className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
@@ -64,7 +66,7 @@ export default function JsonBlueprint({ blueprint }) {
                 <p className="my-1 text-center text-slate-500">↓</p>
                 <p className="font-mono text-xs text-amber-200">{target}</p>
               </div>
-            )) : <p className="text-sm text-slate-400">No response mapping configured.</p>}
+            )) : <p className="text-sm text-slate-400"><LocalizedText fallback={"No response mapping configured."} /></p>}
           </div>
         </div>
 
@@ -77,7 +79,7 @@ export default function JsonBlueprint({ blueprint }) {
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             {(blueprint.tags || []).map(tag => <span key={tag} className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">{tag}</span>)}
-            {!blueprint.tags?.length && <span className="text-sm text-slate-400">No tags selected.</span>}
+            {!blueprint.tags?.length && <span className="text-sm text-slate-400"><LocalizedText fallback={"No tags selected."} /></span>}
           </div>
         </div>
       </div>

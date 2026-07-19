@@ -1,0 +1,88 @@
+// Generated from the verified UX localization audit.
+// English remains the fallback; supported localized values are kept together.
+const COPY: Record<string, Record<string, string>> = {
+  "es": {
+    "Approval required before production action": "Se requiere aprobación antes de actuar en producción",
+    "COS Outreach Analytics": "Analítica de alcance de COS",
+    "Campaign funnel": "Embudo de campaña",
+    "Controlled self-rebuild plans": "Planes controlados de autorreconstrucción",
+    "End date": "Fecha de finalización",
+    "Engagement trend": "Tendencia de interacción",
+    "Governance audit logs": "Registros de auditoría de gobernanza",
+    "Keep alive": "Mantener activo",
+    "Known failure pattern library": "Biblioteca de patrones de fallos conocidos",
+    "Paused or throttled": "En pausa o limitado",
+    "Recent audit events": "Eventos de auditoría recientes",
+    "Recovery timeline": "Cronología de recuperación",
+    "Start date": "Fecha de inicio",
+    "System health investigation": "Investigación del estado del sistema",
+    "Telemetry signals monitored": "Señales de telemetría supervisadas",
+    "Traffic sources": "Fuentes de tráfico",
+    "Views by region heatmap": "Mapa de calor de vistas por región",
+    "Watch time": "Tiempo de visualización"
+  },
+  "pt": {
+    "Approval required before production action": "É necessária aprovação antes de agir em produção",
+    "COS Outreach Analytics": "Análises de alcance do COS",
+    "Campaign funnel": "Funil da campanha",
+    "Controlled self-rebuild plans": "Planos controlados de autorreconstrução",
+    "End date": "Data de término",
+    "Engagement trend": "Tendência de engajamento",
+    "Governance audit logs": "Logs de auditoria de governança",
+    "Keep alive": "Manter ativo",
+    "Known failure pattern library": "Biblioteca de padrões de falha conhecidos",
+    "Paused or throttled": "Pausado ou limitado",
+    "Recent audit events": "Eventos recentes de auditoria",
+    "Recovery timeline": "Linha do tempo de recuperação",
+    "Start date": "Data de início",
+    "System health investigation": "Investigação da integridade do sistema",
+    "Telemetry signals monitored": "Sinais de telemetria monitorados",
+    "Traffic sources": "Fontes de tráfego",
+    "Views by region heatmap": "Mapa de calor de visualizações por região",
+    "Watch time": "Tempo de exibição"
+  },
+  "pl": {
+    "Approval required before production action": "Przed działaniem produkcyjnym wymagana jest zgoda",
+    "COS Outreach Analytics": "Analityka kontaktów COS",
+    "Campaign funnel": "Lejek kampanii",
+    "Controlled self-rebuild plans": "Kontrolowane plany samoodbudowy",
+    "End date": "Data zakończenia",
+    "Engagement trend": "Trend zaangażowania",
+    "Governance audit logs": "Dzienniki audytu zarządzania",
+    "Keep alive": "Utrzymuj aktywność",
+    "Known failure pattern library": "Biblioteka znanych wzorców awarii",
+    "Paused or throttled": "Wstrzymane lub ograniczone",
+    "Recent audit events": "Ostatnie zdarzenia audytu",
+    "Recovery timeline": "Oś czasu odzyskiwania",
+    "Start date": "Data rozpoczęcia",
+    "System health investigation": "Badanie stanu systemu",
+    "Telemetry signals monitored": "Monitorowane sygnały telemetryczne",
+    "Traffic sources": "Źródła ruchu",
+    "Views by region heatmap": "Mapa cieplna wyświetleń według regionu",
+    "Watch time": "Czas oglądania"
+  },
+  "ru": {
+    "Approval required before production action": "Перед действием в рабочей среде требуется одобрение",
+    "COS Outreach Analytics": "Аналитика взаимодействий COS",
+    "Campaign funnel": "Воронка кампании",
+    "Controlled self-rebuild plans": "Контролируемые планы самовосстановления",
+    "End date": "Дата окончания",
+    "Engagement trend": "Динамика вовлеченности",
+    "Governance audit logs": "Журналы аудита управления",
+    "Keep alive": "Поддерживать активность",
+    "Known failure pattern library": "Библиотека известных шаблонов сбоев",
+    "Paused or throttled": "Приостановлено или ограничено",
+    "Recent audit events": "Последние события аудита",
+    "Recovery timeline": "Хронология восстановления",
+    "Start date": "Дата начала",
+    "System health investigation": "Проверка состояния системы",
+    "Telemetry signals monitored": "Отслеживаемые сигналы телеметрии",
+    "Traffic sources": "Источники трафика",
+    "Views by region heatmap": "Тепловая карта просмотров по регионам",
+    "Watch time": "Время просмотра"
+  }
+}
+
+export function auditUiText(lang: string, fallback: string): string {
+  return COPY[lang]?.[fallback] ?? fallback
+}

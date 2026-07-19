@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react'
 
 type Gov = {
@@ -53,7 +55,7 @@ function json(value: any) {
   try { return JSON.stringify(value ?? {}, null, 2) } catch { return String(value) }
 }
 function Details({ value }: { value: any }) {
-  return <details style={{ marginTop: 10 }}><summary style={{ color: cyan, cursor: 'pointer', fontSize: 12, fontWeight: 850 }}>Telemetry JSON</summary><pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', maxHeight: 230, overflow: 'auto', borderRadius: 12, padding: 12, background: 'rgba(0,0,0,.28)', color: 'rgba(226,232,240,.82)', fontSize: 11 }}>{json(value)}</pre></details>
+  return <details style={{ marginTop: 10 }}><summary style={{ color: cyan, cursor: 'pointer', fontSize: 12, fontWeight: 850 }}><LocalizedText fallback={"Telemetry JSON"} /></summary><pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', maxHeight: 230, overflow: 'auto', borderRadius: 12, padding: 12, background: 'rgba(0,0,0,.28)', color: 'rgba(226,232,240,.82)', fontSize: 11 }}>{json(value)}</pre></details>
 }
 
 function Pipeline({ item }: { item: any }) {
@@ -96,7 +98,7 @@ function EscalationCard({ item }: { item: any }) {
   return <article style={{ border: `1px solid ${orange}55`, borderRadius: 16, padding: 14, background: `${orange}0f` }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{String(item.intent || '').replace(/_/g, ' ')}</strong>{chip(item.status, orange)}</div>
     <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 12 }}>Pipeline {item.pipeline} · Risk {item.riskLevel} · Approver {item.approver}</p>
-    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>This panel is reserved for life-critical exceptions only.</p>
+    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}><LocalizedText fallback={"This panel is reserved for life-critical exceptions only."} /></p>
     <Details value={item.telemetry} />
   </article>
 }
@@ -151,7 +153,7 @@ export default function CosGovernanceDashboardPage() {
   return <main style={{ maxWidth: 1380, margin: '0 auto', display: 'grid', gap: 18, padding: '24px 22px' }}>
     <section style={{ ...panel, background: 'radial-gradient(circle at top left, rgba(26,240,255,.14), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 16, flexWrap: 'wrap' }}>
-        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}>COS Governance</p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Fully Autonomous Hybrid-Dynamic COS Router</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 900, lineHeight: 1.65 }}>COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.</p></div>
+        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}><LocalizedText fallback={"COS Governance"} /></p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Fully Autonomous Hybrid-Dynamic COS Router</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 900, lineHeight: 1.65 }}>COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.</p></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={load} disabled={loading} style={primary}>{loading ? 'Loading…' : 'Refresh cockpit'}</button>{chip(data?.mode || 'fully-autonomous-except-life-critical', cyan)}{chip('24x7 watchdog active', green)}</div>
       </div>
       {message ? <p style={{ color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('could not') ? red : green, margin: '12px 0 0', fontWeight: 800 }}>{message}</p> : null}
@@ -159,24 +161,24 @@ export default function CosGovernanceDashboardPage() {
       {data?.sourceErrors && (data.sourceErrors.campaigns || data.sourceErrors.decisions) ? <p style={{ color: orange, fontSize: 12 }}>Source warnings: {Object.entries(data.sourceErrors).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join(' · ')}</p> : null}
     </section>
 
-    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>{pipelines.map(item => <Pipeline key={item.id} item={item} />)}{!loading && !pipelines.length ? <div style={panel}>No pipeline telemetry returned.</div> : null}</section>
+    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>{pipelines.map(item => <Pipeline key={item.id} item={item} />)}{!loading && !pipelines.length ? <div style={panel}><LocalizedText fallback={"No pipeline telemetry returned."} /></div> : null}</section>
 
     <section style={panel}>
-      <p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Telemetry graph</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Failing nodes and autonomous reroute paths</h2>
+      <p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Telemetry graph"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Failing nodes and autonomous reroute paths</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 16 }}>{(data?.graph?.nodes || []).map((node: any) => <div key={node.id} style={{ border: `1px solid ${eventColor(node.status === 'healthy' ? 'green' : node.status === 'watch' ? 'yellow' : 'orange')}55`, borderRadius: 16, padding: 12 }}><strong style={{ color: '#fff' }}>{node.label}</strong><p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>Health {node.healthScore}% · {node.status}</p></div>)}</div>
       <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>{(data?.graph?.edges || []).map((edge: any, i: number) => <div key={i} style={{ color: edge.active ? cyan : 'rgba(255,255,255,.55)', fontSize: 12 }}><b>{edge.from}</b> {edge.active ? '━━▶' : '──▶'} <b>{edge.to}</b> · {edge.label}</div>)}</div>
     </section>
 
     <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
       <div style={{ display: 'grid', gap: 14 }}>
-        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Predictive Alerts Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Informational early warnings</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
-        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: cyan, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Problem + Fix Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Autonomous fixes and fallback logic</h2></div>{chip(`${fixes.length} fixes`, green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{fixes.length ? fixes.map(item => <FixCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No fix attempts required.</p>}</div></section>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Predictive Alerts Panel"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Informational early warnings</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: cyan, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Problem + Fix Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}><LocalizedText fallback={"Autonomous fixes and fallback logic"} /></h2></div>{chip(`${fixes.length} fixes`, green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{fixes.length ? fixes.map(item => <FixCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No fix attempts required.</p>}</div></section>
       </div>
-      <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: orange, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Escalation Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Life-critical exceptions only</h2></div>{chip(`${escalations.length} escalations`, escalations.length ? orange : green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{escalations.length ? escalations.map(item => <EscalationCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No life-critical escalation. Ordinary issues are handled autonomously.</p>}</div></section>
+      <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: orange, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Escalation Panel"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Life-critical exceptions only</h2></div>{chip(`${escalations.length} escalations`, escalations.length ? orange : green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{escalations.length ? escalations.map(item => <EscalationCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No life-critical escalation. Ordinary issues are handled autonomously.</p>}</div></section>
     </section>
 
     <section style={panel}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Unified Timeline View</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 22 }}>Full lifecycle visibility</h2><p style={{ color: 'rgba(255,255,255,.58)', margin: '5px 0 0', fontSize: 13 }}>Yellow = alert · Green = fix success · Orange = life-critical pending · Red = rejected.</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{['all', 'alert', 'fix', 'escalation', 'decision'].map(item => <button key={item} onClick={() => setFilter(item)} style={filter === item ? primary : ghost}>{item}</button>)}</div></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Unified Timeline View"} /></p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 22 }}>Full lifecycle visibility</h2><p style={{ color: 'rgba(255,255,255,.58)', margin: '5px 0 0', fontSize: 13 }}>Yellow = alert · Green = fix success · Orange = life-critical pending · Red = rejected.</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{['all', 'alert', 'fix', 'escalation', 'decision'].map(item => <button key={item} onClick={() => setFilter(item)} style={filter === item ? primary : ghost}>{item}</button>)}</div></div>
       <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>{timeline.length ? timeline.map((item: any) => <TimelineRow key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>{loading ? 'Loading timeline…' : 'No governance timeline events yet.'}</p>}</div>
     </section>
   </main>

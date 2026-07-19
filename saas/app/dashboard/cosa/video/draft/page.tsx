@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react'
 import LocalVideoPreviewReview from '@/components/studio/LocalVideoPreviewReview'
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
@@ -101,16 +103,14 @@ export default function CosaInstantVideoDraftPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>COSA Video Draft Studio</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>SignalBoost AI presenter video</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}>
-          COSA now creates a presenter-led platform tour. The default host is SignalBoost AI, the official guide that opens the video, explains the problem, gives a quick product tour, and closes with a clear CTA.
-        </p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"COSA Video Draft Studio"} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"SignalBoost AI presenter video"} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={"COSA now creates a presenter-led platform tour. The default host is SignalBoost AI, the official guide that opens the video, explains the problem, gives a quick product tour, and closes with a clear CTA."} /></p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={loadDraft} style={primaryButton}>Reload presenter draft</button>
-          <a href="/dashboard/cosa/video" style={{ ...secondaryButton, textDecoration: 'none' }}>Advanced campaign queue</a>
-          <a href="/dashboard/cosa/video/quality" style={{ ...secondaryButton, textDecoration: 'none' }}>Quality test</a>
-          <a href="/dashboard/cosa/decision" style={{ ...secondaryButton, textDecoration: 'none' }}>Marketing decision</a>
+          <button onClick={loadDraft} style={primaryButton}><LocalizedText fallback={"Reload presenter draft"} /></button>
+          <a href="/dashboard/cosa/video" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Advanced campaign queue"} /></a>
+          <a href="/dashboard/cosa/video/quality" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Quality test"} /></a>
+          <a href="/dashboard/cosa/decision" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Marketing decision"} /></a>
         </div>
       </section>
 
@@ -136,7 +136,7 @@ export default function CosaInstantVideoDraftPage() {
 
       <section style={gridTwo}>
         <section style={instructionCard}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>Presenter storyboard</p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Presenter storyboard"} /></p>
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
             {draft.scenes.map((scene, index) => (
               <div key={`${scene.label}-${index}`} style={sceneCard}>
@@ -150,7 +150,7 @@ export default function CosaInstantVideoDraftPage() {
         </section>
 
         <section style={instructionCard}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>Final presenter script</p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Final presenter script"} /></p>
           <pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.82)', background: 'rgba(0,0,0,.26)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, fontSize: 12, lineHeight: 1.6, margin: '12px 0 0', maxHeight: 560, overflow: 'auto' }}>{finalDraft}</pre>
         </section>
       </section>

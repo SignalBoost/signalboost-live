@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useId, useMemo, useState } from 'react'
 import type { EnterpriseOption } from '@/lib/enterprise/masterConfig'
 
@@ -83,7 +85,7 @@ export function SearchableSelect({ label, options, value, onChange, placeholder 
           <strong style={{ display: 'block', fontSize: 13 }}>{option.label}</strong>
           {option.description && <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 11 }}>{option.description}</span>}
         </button>)}
-        {filtered.length === 0 && <p role="status" style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}>No matching options.</p>}
+        {filtered.length === 0 && <p role="status" style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}><LocalizedText fallback={"No matching options."} /></p>}
       </div>
     </div>}
   </div>

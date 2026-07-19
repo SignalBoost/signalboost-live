@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { getAgencyCopy } from '@/lib/i18n/agencyCopy'
@@ -56,7 +58,7 @@ export function PendingApprovalsTable({
     <section className="fathom-glass" style={panel} aria-labelledby="press-pending-title">
       <div style={sectionHead}>
         <span style={pill}>{copy.pendingBadge}</span>
-        <h2 id="press-pending-title" style={h2}>Owner approval queue</h2>
+        <h2 id="press-pending-title" style={h2}><LocalizedText fallback={"Owner approval queue"} /></h2>
       </div>
       {campaigns.length === 0 ? <p style={muted}>{copy.emptyPending}</p> : (
         <div style={cards}>
@@ -71,9 +73,7 @@ export function PendingApprovalsTable({
               <h3 style={h3}>{campaign.headline || 'Press & Print campaign preview'}</h3>
               <p style={muted}><strong style={{ color: '#fff' }}>CTA:</strong> {campaign.cta_url || 'https://saas.signalboostapp.com'}</p>
               <pre style={preview}>{campaign.content_body}</pre>
-              <label style={label}>
-                Optional published/proof URL
-                <input
+              <label style={label}><LocalizedText fallback={"Optional published/proof URL"} /><input
                   value={publishUrls[campaign.id] ?? campaign.published_url ?? ''}
                   onChange={(event) => onUrlChange(campaign.id, event.target.value)}
                   placeholder="https://publication.example/article-or-proof"
@@ -174,7 +174,7 @@ export default function PressOutreachStudio() {
       <section className="fathom-glass" style={hero}>
         <p style={eyebrow}>{copy.eyebrow}</p>
         <h1 style={h1}>{copy.title}</h1>
-        <p style={lead}>Concierge is the public face. COS prepares the campaign, locks it for owner approval, and only publishes after owner approval unless the owner manually created it.</p>
+        <p style={lead}><LocalizedText fallback={"Concierge is the public face. COS prepares the campaign, locks it for owner approval, and only publishes after owner approval unless the owner manually created it."} /></p>
         <div style={gridStats}>
           <div style={statCard}><span>{copy.pendingMetric}</span><strong>{pending.length}</strong></div>
           <div style={statCard}><span>{copy.publishedMetric}</span><strong>{campaigns.filter((campaign) => campaign.status === 'published').length}</strong></div>

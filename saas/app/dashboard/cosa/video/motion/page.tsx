@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
 
 const SAAS_URL = 'www.' + 'saas.signalboostapp.com'
@@ -16,9 +18,9 @@ export default function CosaMotionPreviewPage() {
   return (
     <main style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={{ border: '1px solid rgba(255,195,0,.22)', borderRadius: 24, padding: 24, background: 'rgba(15,23,42,.88)' }}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>COSA guided tour</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 32 }}>SignalBoost platform tour</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7 }}>This tour uses the real video preview component with URL, narration, waveform, and animation.</p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"COSA guided tour"} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 32 }}><LocalizedText fallback={"SignalBoost platform tour"} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7 }}><LocalizedText fallback={"This tour uses the real video preview component with URL, narration, waveform, and animation."} /></p>
       </section>
       <VideoPreviewRenderer title="SignalBoost platform tour" scenes={scenes} callToAction={`Visit ${SAAS_URL}`} />
     </main>

@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useId, useMemo, useRef, useState, useEffect } from 'react'
 
 export default function ProviderDropdown({
@@ -130,7 +132,7 @@ export default function ProviderDropdown({
           ))}
 
           {!loading && !filtered.length && !error && (
-            <p className="px-3 py-4 text-sm text-slate-400">No matching providers.</p>
+            <p className="px-3 py-4 text-sm text-slate-400"><LocalizedText fallback={"No matching providers."} /></p>
           )}
 
           {error && (

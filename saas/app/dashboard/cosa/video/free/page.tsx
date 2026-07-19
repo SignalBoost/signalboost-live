@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SignalBoostGuide } from '@/lib/cos/ui/SignalBoostGuide'
 
@@ -106,15 +108,13 @@ export default function FreeSignalBoostAiVideoPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Free COSA Video Mode</p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Free COSA Video Mode"} /></p>
         <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Low-cost SignalBoost AI presenter short</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}>
-          This is the cheap/free version: animated SignalBoost AI mascot, browser narration, captions, fast scene changes, product cards, and CTA. It does not require HeyGen, D-ID, or paid avatar rendering.
-        </p>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={"This is the cheap/free version: animated SignalBoost AI mascot, browser narration, captions, fast scene changes, product cards, and CTA. It does not require HeyGen, D-ID, or paid avatar rendering."} /></p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button onClick={playing ? pause : start} style={primaryButton}>{playing ? 'Pause short' : 'Play free AI short'}</button>
-          <button onClick={next} style={secondaryButton}>Next scene</button>
-          <a href="/dashboard/cosa/video/draft" style={{ ...secondaryButton, textDecoration: 'none' }}>Presenter draft</a>
+          <button onClick={next} style={secondaryButton}><LocalizedText fallback={"Next scene"} /></button>
+          <a href="/dashboard/cosa/video/draft" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Presenter draft"} /></a>
         </div>
       </section>
 
@@ -154,17 +154,15 @@ export default function FreeSignalBoostAiVideoPage() {
           </div>
 
           <div style={{ position: 'absolute', left: 18, right: 18, top: 18, display: 'flex', justifyContent: 'space-between', zIndex: 4 }}>
-            <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}>SignalBoost AI</span>
+            <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}><LocalizedText fallback={"SignalBoost AI"} /></span>
             <span style={{ color: 'rgba(255,255,255,.58)', fontSize: 12 }}>{index + 1}/{scenes.length}</span>
           </div>
         </div>
 
         <section style={infoPanel}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>What this solves</p>
-          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}>Cheaper than avatar APIs, better than static cards</h2>
-          <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}>
-            This is not as advanced as paid AI-video services, but it gives you a recognizable host, fast captions, short-form framing, narration, product motion, and a CTA for very low cost.
-          </p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"What this solves"} /></p>
+          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}><LocalizedText fallback={"Cheaper than avatar APIs, better than static cards"} /></h2>
+          <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}><LocalizedText fallback={"This is not as advanced as paid AI-video services, but it gives you a recognizable host, fast captions, short-form framing, narration, product motion, and a CTA for very low cost."} /></p>
           <pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.82)', background: 'rgba(0,0,0,.26)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, fontSize: 12, lineHeight: 1.6, maxHeight: 340, overflow: 'auto' }}>{script}</pre>
         </section>
       </section>

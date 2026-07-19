@@ -1,5 +1,7 @@
 'use client'
 
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useState } from 'react'
 
 const GOLD = '#ffc300'
@@ -47,9 +49,7 @@ export default function CosaCreativeStrategyPage() {
       <section style={heroCard}>
         <p className="sb-eyebrow" style={{ margin: 0 }}>COSA + Marketing/Sales</p>
         <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Niche, hero, traffic, and monetization strategy</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 820 }}>
-          Before COSA creates a short video, it should decide who the niche is, who the hero is, what story catches attention, what action drives traffic, and how the traffic can later create value.
-        </p>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 820 }}><LocalizedText fallback={"Before COSA creates a short video, it should decide who the niche is, who the hero is, what story catches attention, what action drives traffic, and how the traffic can later create value."} /></p>
         <button onClick={loadStrategy} disabled={loading} style={primaryButton}>{loading ? 'Loading...' : 'Refresh strategy'}</button>
       </section>
 
@@ -65,7 +65,7 @@ export default function CosaCreativeStrategyPage() {
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}>Opening line</p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Opening line"} /></p>
             <h2 style={{ color: '#fff', fontSize: 26, margin: '10px 0 0', lineHeight: 1.2 }}>{strategy.opening_line}</h2>
             <p style={{ color: GOLD, fontWeight: 950, margin: '14px 0 0' }}>Destination: {strategy.destination_url}</p>
           </section>
@@ -78,7 +78,7 @@ export default function CosaCreativeStrategyPage() {
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}>Proof moment</p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Proof moment"} /></p>
             <p style={{ color: 'rgba(255,255,255,.8)', lineHeight: 1.7, margin: '10px 0 0' }}>{strategy.proof_moment}</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
               {strategy.languages.map((language) => <span key={language} style={pill}>{language.toUpperCase()}</span>)}

@@ -10,6 +10,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
+import PatchPreview from './PatchPreview'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -167,10 +168,29 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
         {data.findings.length === 0 ? (
           <div style={{ fontSize: 13, color: GREEN }}>{t('audit.stripe.findings.empty', 'No payments findings — nothing flagged.')}</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {data.findings.map((f, i) => (
-              <FindingCard key={f.id || i} finding={f} />
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {data.findings.map((f, i) => {
+              const text = resolveFinding(f, t, interpolate)
+              const patchable = f.messageKey.startsWith('audit.finding.stripeWebhook')
+
+              return (
+                <div key={f.id || i}>
+                  <FindingCard finding={f} />
+                  {patchable && (
+                    <div style={{ marginTop: 12 }}>
+                      <PatchPreview
+                        finding={{
+                          file: 'saas/app/api/webhook/route.ts',
+                          title: text.title,
+                          detail: text.detail,
+                          recommendation: text.recommendation,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </section>

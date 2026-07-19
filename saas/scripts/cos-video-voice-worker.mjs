@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// COSA Step 2 worker: add a real narration track and burned-in captions.
+// COSA Step 2 worker: create a real narration track and burned-in captions.
 //
-// A campaign must not be marked "Voice & captions" complete by merely reusing
-// the silent base MP4. This worker repairs those old fallback finals and creates
-// a genuine voiced/captioned intermediate for the brand-overlay worker.
+// Quality rules:
+// 1. Owner/production instructions must never become spoken campaign copy.
+// 2. Captions must remain readable over every base visual.
+// 3. A final video is not voice-complete without a verified audio track,
+//    burned captions, and the current caption/copy schema versions.
 
 import { createClient } from '@supabase/supabase-js'
 import { createWriteStream } from 'node:fs'
@@ -21,6 +23,9 @@ const elevenLabsVoice = String(process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvD
 const elevenLabsModel = String(process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2').trim()
 const maxCampaigns = Math.max(1, Math.min(5, Number(process.env.COS_VIDEO_MAX_VOICE_PER_RUN || 3)))
 
+const CAPTION_SCHEMA_VERSION = 'signalboost-captions-v2-solid-panel'
+const COPY_SCHEMA_VERSION = 'signalboost-campaign-copy-v2-clean'
+
 if (!url || !key) throw new Error('Supabase URL and service-role key are required')
 if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 
@@ -34,6 +39,14 @@ const VOICES = {
   ru: 'ru',
 }
 
+const FALLBACK_COPY = {
+  en: 'SignalBoostAi helps small businesses turn ideas into professional marketing campaigns faster. Build your campaign, review every asset, and stay in control before anything is published.',
+  es: 'SignalBoostAi ayuda a las pequeñas empresas a convertir ideas en campañas profesionales con mayor rapidez. Crea tu campaña, revisa cada recurso y mantén el control antes de publicar.',
+  pt: 'A SignalBoostAi ajuda pequenas empresas a transformar ideias em campanhas profissionais com mais rapidez. Crie sua campanha, revise cada material e mantenha o controle antes da publicação.',
+  pl: 'SignalBoostAi pomaga małym firmom szybciej zamieniać pomysły w profesjonalne kampanie. Utwórz kampanię, sprawdź każdy materiał i zachowaj kontrolę przed publikacją.',
+  ru: 'SignalBoostAi помогает малому бизнесу быстрее превращать идеи в профессиональные кампании. Создайте кампанию, проверьте каждый материал и сохраняйте контроль до публикации.',
+}
+
 function errText(error) {
   return error instanceof Error ? error.message : String(error || 'unknown error')
 }
@@ -41,7 +54,8 @@ function errText(error) {
 function clean(value, max = 900) {
   return String(value || '')
     .replace(/https?:\/\/\S+/gi, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
     .trim()
     .slice(0, max)
 }
@@ -54,25 +68,110 @@ function langOf(campaign) {
   return Object.prototype.hasOwnProperty.call(VOICES, short) ? short : 'en'
 }
 
+function normalizeKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\u0400-\u04ff]+/g, ' ')
+    .trim()
+}
+
+function productionInstruction(fragment) {
+  const value = String(fragment || '').trim()
+  if (!value) return true
+  const lower = value.toLowerCase()
+
+  const explicitLeak = /(do not repeat|don['’]t repeat|must not repeat|not be repeated|do not mention|don['’]t mention|do not say|ignore previous|system prompt|user prompt|these instructions|the instructions|não repita|nao repita|não repetir|nao repetir|não mencione|nao mencione|não diga|nao diga|estas instruções|essas instruções|sin repetir|no repitas|no repetir|no menciones|no digas|estas instrucciones|nie powtarzaj|nie wspominaj|nie mów|tych instrukcji|не повторяй|не упоминай|не говори|эти инструкции)/i
+  if (explicitLeak.test(lower)) return true
+
+  const fieldLabel = /^(instructions?|requirements?|prompt|system|assistant|voiceover|narration|captions?|subtitles?|scenes?|visuals?|format|duration|aspect ratio|tone|style|language|target audience|audience|cta|hook|instruções|requisitos|narração|legendas|cenas|formato|duração|idioma|público[- ]alvo|instrucciones|requisitos|narración|subtítulos|escenas|formato|duración|idioma|público objetivo|instrukcje|wymagania|narracja|napisy|sceny|format|czas trwania|język|grupa docelowa|инструкции|требования|озвучка|субтитры|сцены|формат|длительность|язык|аудитория)\s*[:\-–—]/i
+  if (fieldLabel.test(value)) return true
+
+  const metaVocabulary = /(prompt|instruction|requirement|assistant|the ai|this ai|voiceover|narration|caption|subtitle|on[- ]screen|screen text|scene|shot|camera|b[- ]roll|watermark|aspect ratio|duration|render|production|visual direction|logo placement|narração|legenda|texto na tela|cena|filmagem|câmera|duração|renderização|produção|direção visual|narración|subtítulo|texto en pantalla|escena|cámara|duración|producción|narracja|napisy|tekst na ekranie|scena|kamera|czas trwania|produkcja|озвучка|субтитры|текст на экране|сцена|камера|длительность|производство)/i
+  const directive = /^(please\s+)?(must|should|do not|don['’]t|never|use|show|include|add|create|make|generate|write|say|mention|avoid|keep|ensure|please|não|nao|use|mostre|inclua|adicione|crie|gere|escreva|diga|evite|mantenha|garanta|no|usa|muestra|incluye|añade|crea|genera|escribe|di|evita|mantén|asegura|nie|użyj|pokaz|dodaj|utwórz|wygeneruj|napisz|powiedz|unikaj|zachowaj|upewnij|не|используй|покажи|добавь|создай|сгенерируй|напиши|скажи|избегай|сохрани|убедись)\b/i
+  if (metaVocabulary.test(value) && directive.test(value)) return true
+
+  const aiDirective = /(ai|assistant|model|cosa).{0,40}(must|should|do not|don['’]t|repeat|mention|say|include|use|não|nao|deve|repita|mencione|diga|no debe|repita|mencione|diga|powinien|nie może|powtarzaj|wspominaj|mów|должен|не должен|повторять|упоминать|говорить)/i
+  if (aiDirective.test(value)) return true
+
+  return false
+}
+
+function sanitizeCampaignCopy(value, max = 900) {
+  const source = clean(value, 4000)
+  if (!source) return ''
+
+  const fragments = source
+    .replace(/[•▪◦]/g, '\n')
+    .split(/\n+|(?<=[.!?])\s+|\s*;\s+/)
+    .map((part) => part.replace(/^[-–—*#\d.)\s]+/, '').trim())
+    .filter(Boolean)
+
+  const kept = []
+  const seen = new Set()
+  for (let fragment of fragments) {
+    fragment = fragment
+      .replace(/^(script|copy|campaign copy|mensagem|texto|guion|scenariusz|текст)\s*[:\-–—]\s*/i, '')
+      .replace(/\[[^\]]*(instruction|caption|subtitle|scene|prompt|instru|legenda|subtítulo|napisy|инструк)[^\]]*\]/gi, '')
+      .trim()
+
+    if (!fragment || productionInstruction(fragment)) continue
+    const key = normalizeKey(fragment)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    kept.push(fragment)
+  }
+
+  return clean(kept.join(' '), max)
+}
+
 function scriptFrom(campaign) {
+  const lang = langOf(campaign)
+  const candidates = []
+
+  const stored = sanitizeCampaignCopy(campaign?.metadata?.campaign_script || campaign?.metadata?.campaignScript || '', 900)
+  if (stored) candidates.push(stored)
+
   const workItems = Array.isArray(campaign?.work_items) ? campaign.work_items : []
-  const drafts = []
   for (const item of workItems) {
     const output = item?.output || {}
     for (const value of [output.voiceover, output.script, output.draft, output.body, output.opening, output.call_to_action]) {
-      const text = clean(value, 1000)
-      if (text && !drafts.includes(text)) drafts.push(text)
+      const text = sanitizeCampaignCopy(value, 900)
+      if (text) candidates.push(text)
     }
   }
 
-  const fallback = [
-    clean(campaign?.title, 180),
-    clean(campaign?.objective, 420),
-    clean(campaign?.audience ? `Para ${campaign.audience}.` : '', 220),
-  ].filter(Boolean)
+  const objective = sanitizeCampaignCopy(campaign?.objective, 360)
+  const title = sanitizeCampaignCopy(campaign?.title, 180)
+  const audience = sanitizeCampaignCopy(campaign?.audience, 180)
+  if (!candidates.length) {
+    if (title) candidates.push(title)
+    if (objective && normalizeKey(objective) !== normalizeKey(title)) candidates.push(objective)
+    if (audience) {
+      const audienceLead = lang === 'pt' ? `Feita para ${audience}.`
+        : lang === 'es' ? `Creada para ${audience}.`
+          : lang === 'pl' ? `Stworzona dla: ${audience}.`
+            : lang === 'ru' ? `Создано для: ${audience}.`
+              : `Built for ${audience}.`
+      candidates.push(audienceLead)
+    }
+  }
 
-  const combined = clean((drafts.length ? drafts : fallback).join(' '), 850)
-  return combined || 'Conheça a SignalBoostAi e transforme ideias de marketing em campanhas prontas para revisão.'
+  const sentences = []
+  const seen = new Set()
+  for (const candidate of candidates) {
+    for (const part of candidate.split(/(?<=[.!?])\s+/)) {
+      const safe = sanitizeCampaignCopy(part, 500)
+      const key = normalizeKey(safe)
+      if (!safe || !key || seen.has(key)) continue
+      seen.add(key)
+      sentences.push(safe)
+    }
+  }
+
+  const combined = clean(sentences.join(' '), 850)
+  return combined || FALLBACK_COPY[lang] || FALLBACK_COPY.en
 }
 
 function captionChunks(text, maxChars = 58) {
@@ -92,7 +191,7 @@ function captionChunks(text, maxChars = 58) {
     }
     if (current) chunks.push(current)
   }
-  return (chunks.length ? chunks : [text]).slice(0, 10)
+  return (chunks.length ? chunks : [text]).slice(0, 12)
 }
 
 function assTime(seconds) {
@@ -106,6 +205,7 @@ function assTime(seconds) {
 
 function assEscape(value) {
   return String(value || '')
+    .replace(/\\/g, '\\\\')
     .replace(/[{}]/g, '')
     .replace(/\r?\n/g, '\\N')
 }
@@ -114,17 +214,18 @@ function buildAss(campaign, text, duration) {
   const vertical = String(campaign?.channel || '') === 'short_video'
   const width = vertical ? 1080 : 1920
   const height = vertical ? 1920 : 1080
-  const fontSize = vertical ? 48 : 54
-  const marginV = vertical ? 180 : 95
-  const chunks = captionChunks(text, vertical ? 38 : 58)
-  const segment = Math.max(1.4, duration / Math.max(1, chunks.length))
+  const fontSize = vertical ? 46 : 50
+  const marginV = vertical ? 185 : 105
+  const marginH = vertical ? 82 : 150
+  const chunks = captionChunks(text, vertical ? 35 : 58)
+  const segment = Math.max(1.5, duration / Math.max(1, chunks.length))
   const events = chunks.map((caption, index) => {
     const start = index * segment
-    const end = Math.min(duration, (index + 1) * segment + 0.15)
+    const end = Math.min(duration, (index + 1) * segment + 0.18)
     return `Dialogue: 0,${assTime(start)},${assTime(end)},Caption,,0,0,0,,${assEscape(caption)}`
   }).join('\n')
 
-  return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nScaledBorderAndShadow: yes\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,DejaVu Sans,${fontSize},&H00FFFFFF,&H000000FF,&H00111827,&HC0000000,1,0,0,0,100,100,0,0,3,3,1,2,70,70,${marginV},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${events}\n`
+  return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nScaledBorderAndShadow: yes\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,DejaVu Sans,${fontSize},&H00FFFFFF,&H000000FF,&H00020617,&H00020617,1,0,0,0,100,100,0,0,3,2,0,2,${marginH},${marginH},${marginV},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${events}\n`
 }
 
 function run(command, args, options = {}) {
@@ -259,18 +360,24 @@ async function uploadVoiced(campaign, lang, path) {
   return { objectPath, signedUrl: signed.data.signedUrl }
 }
 
-function isDishonestFallback(video) {
-  return video?.voiceFallback === true
+function isSilentPlaceholder(video) {
+  const verified = video?.audioTrack === true && video?.captionsBurned === true
+  return !verified && (
+    video?.voiceFallback === true
     || String(video?.voiceStatus || '').toUpperCase() === 'COMPLETED_FALLBACK'
-    || String(video?.voiceFallbackReason || '').includes('base video promoted')
+    || String(video?.voiceFallbackReason || '').toLowerCase().includes('base video promoted')
+  )
 }
 
 function needsVoice(campaign) {
   const video = campaign?.metadata?.video || {}
   if (video.status !== 'ready' || !video.url) return false
-  if (isDishonestFallback(video)) return true
+  if (isSilentPlaceholder(video)) return true
+  if (video.captionSchemaVersion !== CAPTION_SCHEMA_VERSION) return true
+  if (video.copySchemaVersion !== COPY_SCHEMA_VERSION) return true
+  if (video.audioTrack !== true || video.captionsBurned !== true) return true
   const lang = langOf(campaign)
-  if (video?.brandedLangs?.[lang] && video?.voiceEngine && video?.captionsBurned === true) return false
+  if (video?.brandedLangs?.[lang] && video?.voiceEngine) return false
   return !Boolean(video?.unbrandedVoiced?.[lang])
 }
 
@@ -290,11 +397,16 @@ async function processCampaign(campaign) {
     const duration = Math.max(8, Math.min(90, Math.ceil(spoken) + 1))
     await writeFile(assPath, buildAss(campaign, text, duration), 'utf8')
 
+    const vertical = String(campaign?.channel || '') === 'short_video'
+    const panelY = vertical ? 'h*0.64' : 'h*0.69'
+    const panelH = vertical ? 'h*0.31' : 'h*0.27'
+    const videoFilter = `drawbox=x=0:y=${panelY}:w=iw:h=${panelH}:color=0x020617@0.96:t=fill,ass='${assFilterPath(assPath)}'`
+
     await run('ffmpeg', [
       '-y',
       '-stream_loop', '-1', '-i', basePath,
       '-i', voice.path,
-      '-vf', `ass='${assFilterPath(assPath)}'`,
+      '-vf', videoFilter,
       '-map', '0:v:0', '-map', '1:a:0',
       '-t', String(duration),
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
@@ -338,6 +450,9 @@ async function processCampaign(campaign) {
       voiceCompletedAt: new Date().toISOString(),
       captionsBurned: true,
       audioTrack: true,
+      captionSchemaVersion: CAPTION_SCHEMA_VERSION,
+      copySchemaVersion: COPY_SCHEMA_VERSION,
+      voiceScriptSource: 'sanitized-customer-facing-campaign-copy',
       voiceError: null,
       brandDebug: null,
     }
@@ -348,7 +463,7 @@ async function processCampaign(campaign) {
       .eq('id', campaign.id)
     if (error) throw error
 
-    console.log(`COSA campaign ${campaign.id}: real voice + captions created (${lang}, ${voice.engine}).`)
+    console.log(`COSA campaign ${campaign.id}: clean voice + high-contrast captions created (${lang}, ${voice.engine}, ${text.length} chars).`)
     return { ok: true, id: campaign.id, lang, engine: voice.engine }
   } catch (error) {
     const failure = errText(error)
@@ -391,7 +506,7 @@ const { data: campaigns, error } = await sb
 if (error) throw new Error(error.message)
 
 const candidates = (campaigns || []).filter(needsVoice).slice(0, maxCampaigns)
-console.log(`COSA voice worker scanned=${campaigns?.length || 0} candidates=${candidates.length}`)
+console.log(`COSA voice worker scanned=${campaigns?.length || 0} candidates=${candidates.length} captionSchema=${CAPTION_SCHEMA_VERSION} copySchema=${COPY_SCHEMA_VERSION}`)
 const results = []
 for (const campaign of candidates) results.push(await processCampaign(campaign))
 console.log(JSON.stringify({ ok: results.every(result => result.ok), processed: results.length, results }, null, 2))

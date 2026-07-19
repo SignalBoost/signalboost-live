@@ -31,21 +31,27 @@ async function invalidateAffectedApprovals(
   invalidator: ContinuationApprovalInvalidator,
   at: Date,
 ): Promise<string[]> {
-  const affected = workItems
-    .filter((item): item is WorkItem & { executionId: string } => Boolean(item.executionId))
-    .sort((a, b) => a.workItemId.localeCompare(b.workItemId))
+  const affectedByExecution = new Map<string, WorkItem & { executionId: string }>()
+
+  for (const item of workItems
+    .filter((candidate): candidate is WorkItem & { executionId: string } => Boolean(candidate.executionId))
+    .sort((a, b) => a.workItemId.localeCompare(b.workItemId))) {
+    if (!affectedByExecution.has(item.executionId)) affectedByExecution.set(item.executionId, item)
+  }
 
   const invalidated: string[] = []
-  for (const item of affected) {
+  for (const executionId of uniqueSorted([...affectedByExecution.keys()])) {
+    const item = affectedByExecution.get(executionId)
+    if (!item) continue
     await invalidator.invalidate({
-      executionId: item.executionId,
+      executionId,
       workItemId: item.workItemId,
       reason: 'coordination_lease_expired',
       invalidatedAt: at.toISOString(),
     })
-    invalidated.push(item.executionId)
+    invalidated.push(executionId)
   }
-  return uniqueSorted(invalidated)
+  return invalidated
 }
 
 export async function runSupervisorStartupReconciliation(input: {

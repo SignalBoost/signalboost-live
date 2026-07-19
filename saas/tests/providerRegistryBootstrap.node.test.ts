@@ -46,6 +46,15 @@ test('bootstrap registers the AWS provider into the canonical registry', () => {
   assert.ok(aws.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
 })
 
+test('bootstrap registers the Azure provider into the canonical registry', () => {
+  const registry = buildUniversalProviderRegistry()
+  const azure = registry.get('azure')
+  assert.equal(azure.metadata.providerId, 'azure')
+  assert.ok(azure.metadata.capabilities.length >= 10)
+  assert.ok(azure.metadata.capabilities.every((c) => c.readOnly), 'all Azure capabilities must be read-only')
+  assert.ok(azure.metadata.capabilities.every((c) => c.riskClass === 'read_only'))
+})
+
 test('registered providers are discoverable via toMetadata()', () => {
   const ids = buildUniversalProviderRegistry().toMetadata().map((m) => m.providerId)
   assert.ok(ids.includes('github'))
@@ -53,6 +62,7 @@ test('registered providers are discoverable via toMetadata()', () => {
   assert.ok(ids.includes('supabase'))
   assert.ok(ids.includes('cloudflare'))
   assert.ok(ids.includes('aws'))
+  assert.ok(ids.includes('azure'))
 })
 
 test('capability discovery resolves known read-only capabilities', () => {
@@ -62,6 +72,7 @@ test('capability discovery resolves known read-only capabilities', () => {
   const supabase = registry.findCapability('supabase', 'supabase.database.health.read')
   const cloudflare = registry.findCapability('cloudflare', 'cloudflare.zones.list')
   const aws = registry.findCapability('aws', 'aws.ec2.instances.list')
+  const azure = registry.findCapability('azure', 'azure.compute.virtual_machines.list')
   assert.equal(github.readOnly, true)
   assert.equal(github.riskClass, 'read_only')
   assert.equal(stripe.readOnly, true)
@@ -72,6 +83,8 @@ test('capability discovery resolves known read-only capabilities', () => {
   assert.equal(cloudflare.riskClass, 'read_only')
   assert.equal(aws.readOnly, true)
   assert.equal(aws.riskClass, 'read_only')
+  assert.equal(azure.readOnly, true)
+  assert.equal(azure.riskClass, 'read_only')
 })
 
 test('getUniversalProviderRegistry returns a stable singleton', () => {

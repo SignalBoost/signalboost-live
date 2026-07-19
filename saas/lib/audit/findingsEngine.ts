@@ -20,8 +20,8 @@ import type {
   Severity,
   ConnectionStatus,
   IdentityKind,
-} from './reportModel'
-import { makeFindingId, STALE_ACCESS_DAYS, daysSince } from './reportModel'
+} from './reportModel.ts'
+import { makeFindingId, STALE_ACCESS_DAYS, daysSince } from './reportModel.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Normalized snapshot — what collectors fill, what rules read

@@ -309,14 +309,13 @@ async function generateFilePatch(params: {
   return { ok: true, file: params.file, content: proposed, findingCount: activeFindings.length }
 }
 
-function groupFindingsByFile(rows: any[]): Map<string, BatchFinding[]> {
-  const grouped = new Map<string, BatchFinding[]>()
-  for (const row of rows.slice(0, MAX_BATCH_FINDINGS)) {
+function normalizeFindings(rows: any[]): BatchFinding[] {
+  const findings: BatchFinding[] = []
+  for (const row of rows) {
     const file = typeof row?.file === 'string' ? row.file.trim().replace(/^\/+/, '') : ''
     const recommendation = typeof row?.recommendation === 'string' ? row.recommendation.trim() : ''
     if (!file || file.includes('..') || !recommendation) continue
-    const list = grouped.get(file) || []
-    list.push({
+    findings.push({
       id: typeof row?.id === 'string' ? row.id : undefined,
       file,
       severity: String(row?.severity || 'info'),
@@ -326,8 +325,16 @@ function groupFindingsByFile(rows: any[]): Map<string, BatchFinding[]> {
       recommendation,
       line: typeof row?.line === 'number' ? row.line : null,
     })
-    grouped.set(file, list)
-    if (grouped.size >= MAX_BATCH_FILES) break
+  }
+  return findings
+}
+
+function groupFindingsByFile(findings: BatchFinding[]): Map<string, BatchFinding[]> {
+  const grouped = new Map<string, BatchFinding[]>()
+  for (const finding of findings) {
+    const list = grouped.get(finding.file) || []
+    list.push(finding)
+    grouped.set(finding.file, list)
   }
   return grouped
 }
@@ -493,6 +500,13 @@ export async function POST(req: NextRequest) {
       error: `Automatic writes are connected only to ${REPO}. This run scanned ${parsedTarget.repo}.`,
     }, { status: 400 })
   }
+  if (parsedTarget?.branch && parsedTarget.branch !== BRANCH) {
+    return NextResponse.json({
+      ok: false,
+      code: 'unsupported_audit_branch',
+      error: `One-click remediation can merge only audits of ${REPO}@${BRANCH}. This run scanned branch ${parsedTarget.branch}.`,
+    }, { status: 409 })
+  }
 
   const findingsQuery = await admin
     .from('audit_findings')
@@ -502,9 +516,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: findingsQuery.error.message }, { status: 500 })
   }
 
-  const grouped = groupFindingsByFile(findingsQuery.data || [])
-  if (grouped.size === 0) {
+  const findings = normalizeFindings(findingsQuery.data || [])
+  const grouped = groupFindingsByFile(findings)
+  if (findings.length === 0 || grouped.size === 0) {
     return NextResponse.json({ ok: false, error: 'This audit has no actionable code findings.' }, { status: 409 })
+  }
+  if (findings.length > MAX_BATCH_FINDINGS || grouped.size > MAX_BATCH_FILES) {
+    return NextResponse.json({
+      ok: false,
+      code: 'batch_scope_too_large',
+      error: `This audit contains ${findings.length} actionable findings across ${grouped.size} files. One-click remediation currently supports at most ${MAX_BATCH_FINDINGS} findings across ${MAX_BATCH_FILES} files per run; no findings were omitted and no branch was created.`,
+      findingsCount: findings.length,
+      filesCount: grouped.size,
+      maxFindings: MAX_BATCH_FINDINGS,
+      maxFiles: MAX_BATCH_FILES,
+    }, { status: 413 })
   }
 
   const tree = await listRepoTree(REPO, BRANCH)
@@ -513,7 +539,15 @@ export async function POST(req: NextRequest) {
   }
   const paths = new Set<string>(tree.files)
   const deps = await dependencySets()
-  const entries = Array.from(grouped.entries()).filter(([file]) => paths.has(file)).slice(0, MAX_BATCH_FILES)
+  const missingPaths: SkippedFile[] = []
+  const entries: [string, BatchFinding[]][] = []
+  for (const [file, fileFindings] of grouped.entries()) {
+    if (!paths.has(file)) {
+      missingPaths.push({ ok: false, file, findingCount: fileFindings.length, reason: 'The audited file no longer exists on main.' })
+    } else {
+      entries.push([file, fileFindings])
+    }
+  }
 
   const generated = await mapPool(entries, GENERATION_CONCURRENCY, async ([file, fileFindings]) => {
     try {
@@ -536,13 +570,16 @@ export async function POST(req: NextRequest) {
 
   const branch = `ai/audit-run-${runId.replace(/-/g, '').slice(0, 12)}`
   const committed: GeneratedFile[] = []
-  const skipped: SkippedFile[] = generated.filter((result): result is SkippedFile => !result.ok)
+  const skipped: SkippedFile[] = [
+    ...missingPaths,
+    ...generated.filter((result): result is SkippedFile => result.ok === false),
+  ]
   let prNumber = 0
   let prUrl = ''
   let branchName = branch
 
   for (const result of generated) {
-    if (!result.ok) continue
+    if (result.ok === false) continue
     const commit = await commitFileToBranch({
       branch,
       path: result.file,
@@ -582,6 +619,7 @@ export async function POST(req: NextRequest) {
     '## Final audit approval',
     '',
     `The user gave one final approval for audit run \`${runId}\`.`,
+    `The approved audit target is \`${REPO}@${BRANCH}\`.`,
     'SignalBoost AI grouped findings by file, generated minimal edits, validated imports and repository paths, and committed all accepted changes to this single PR.',
     '',
     `- Approved findings applied: **${findingsApplied}**`,

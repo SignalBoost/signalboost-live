@@ -38,25 +38,29 @@ Special workflows must be implemented as governed tools available to the canonic
 
 ## Backup COS
 
-Backup COS receives the same normalized input and reloads the approved brain snapshot. It is advisory-only and read-only. It must not call business tools, write campaign data, publish, send, spend, mutate providers, or execute Browser Runtime work. It may use a redundant reasoning provider to produce a continuity answer and a sanitized decision summary.
+Backup COS receives the same normalized input and reloads this approved brain snapshot. It is advisory-only and read-only. It must not call business tools, write campaign data, publish, send, spend, mutate providers, or execute Browser Runtime work. It may use a redundant reasoning provider to produce a continuity answer and a sanitized decision summary.
 
-Healthy Primary responses must return without waiting for Backup COS. Shadow comparison work runs after the healthy response and is bounded by a hard deadline. A shadow quality divergence creates a sanitized owner-review record but cannot authorize execution or replace the already-returned healthy response.
+Healthy Primary responses must return without waiting for Backup COS. Primary authentication, authorization, validation, and rate-limit responses in the HTTP 4xx range are terminal and must be returned unchanged; Backup COS must not be invoked for a denied request.
 
-Primary responses are quarantined for the current request when they fail, are empty, match a protected canned-corruption signature, or return the explicit `error-degraded` source. Only then may Concierge await the bounded Backup COS result and return it in read-only continuity mode.
+Shadow comparison work may run after a healthy response and remains bounded by a hard deadline. A shadow quality divergence creates a sanitized owner-review record but cannot authorize execution or replace the already-returned healthy response.
+
+The approved brain snapshot is explicitly traced into the Concierge server deployment. If the snapshot is unavailable or invalid, Backup COS fails closed and Concierge uses the immutable-core response. No generic or unapproved substitute brain may run.
 
 ## Automatic continuity and quarantine
 
-When Primary COS fails or matches a protected corruption condition, Concierge may activate automatic read-only continuity without waiting for human intervention:
+Primary responses are quarantined for the current request only when they fail outside the 4xx client-denial range, are empty after a successful or server-failed response, match a protected canned-corruption signature, or return the explicit `error-degraded` source. Only then may Concierge invoke and await the bounded Backup COS result.
+
+When Primary COS matches a protected corruption condition, Concierge may activate automatic read-only continuity without waiting for human intervention:
 
 1. quarantine the Primary response for the current request;
-2. return the bounded Backup COS answer when available;
+2. return the bounded Backup COS answer when the approved snapshot and provider are available;
 3. set `execution_allowed: false`;
 4. log the source commit, divergence details, timestamp, and recovery status;
 5. require an owner alert and later review.
 
 This runtime failover keeps COS responsive but does not authorize publishing, outreach, spending, provider changes, infrastructure mutation, or automatic code modification. Governed action execution resumes only through a healthy Primary COS or a separately approved recovery change.
 
-If Backup COS also fails or exceeds its deadline, Concierge returns a safe immutable-core continuity response with no action execution.
+If Backup COS, its approved snapshot, or its provider call fails or exceeds the deadline, Concierge returns a safe immutable-core continuity response with no action execution.
 
 ## Promotion and rollback
 
@@ -64,7 +68,7 @@ Automatic continuity is a request-level traffic promotion to the approved read-o
 
 ## Update rule
 
-Changes to this file, the Chief of Staff prompt, Backup COS policy, Concierge entry point, or COS integrity checks require:
+Changes to this file, the Chief of Staff prompt, Backup COS policy, Concierge entry point, deployment tracing, or COS integrity checks require:
 
 1. a GitHub-verified signature or an owner-authenticated GitHub API commit checked across the complete protected change range;
 2. CODEOWNERS review from `@SignalBoost`;

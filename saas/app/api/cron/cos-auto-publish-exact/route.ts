@@ -18,7 +18,7 @@ export const maxDuration = 120
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const PLATFORM = 'youtube_channels'
 const LIMIT = 5
-const RETRY_MINUTES = 20
+const RETRY_MINUTES = 10
 const QUOTA_RETRY_MINUTES = 24 * 60
 
 function admin() {
@@ -55,12 +55,21 @@ function exactFinalVideo(campaign: any, lang: string): string | null {
   const voiced = video.voiced && typeof video.voiced === 'object' ? video.voiced : {}
   const brandedLangs = video.brandedLangs && typeof video.brandedLangs === 'object' ? video.brandedLangs : {}
   if (lang && brandedLangs[lang] && voiced[lang]) return String(voiced[lang])
-  const knownLangs = Array.from(new Set([
-    ...(Array.isArray(campaign.languages) ? campaign.languages.map(String) : []),
-    ...Object.keys(brandedLangs),
-    ...Object.keys(voiced),
-  ].filter(Boolean)))
-  if (knownLangs.length <= 1 && video.branded === true && video.voicedUrl) return String(video.voicedUrl)
+
+  // `voicedUrl` is the canonical primary-language final produced by the legacy and
+  // single-language pipelines. Campaigns may still list several requested languages
+  // before per-language renders exist, so counting campaign.languages here incorrectly
+  // made the primary final ineligible forever. Use the default final only for the
+  // campaign's first language and only when no language-specific voiced render exists.
+  const specificVoiced = Object.keys(voiced).filter(key => Boolean(voiced[key]))
+  if (
+    lang &&
+    lang === firstLanguage(campaign) &&
+    specificVoiced.length === 0 &&
+    video.branded === true &&
+    video.voicedUrl
+  ) return String(video.voicedUrl)
+
   return null
 }
 
@@ -73,6 +82,20 @@ function alreadyPublished(campaign: any, lang: string): boolean {
 function finalReady(campaign: any): boolean {
   const video = campaign?.metadata?.video || {}
   return video.status === 'ready' && video.branded === true && Boolean(video.voicedUrl)
+}
+
+function configuredOwnerEmail(): string | null {
+  const value = String((process.env.OWNER_EMAILS || '').split(',')[0] || '').trim().toLowerCase()
+  return value || null
+}
+
+function campaignOwnerEmail(campaign: any): string | null {
+  const value = campaign?.metadata?.autoPublishArm?.email
+    || campaign?.metadata?.approvalNotification?.email
+    || campaign?.metadata?.video?.approvalNotification?.email
+    || configuredOwnerEmail()
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized || null
 }
 
 function quotaBlockedUntil(campaign: any): string | null {
@@ -112,15 +135,56 @@ function eligible(campaign: any): boolean {
   return true
 }
 
+async function sendFailureEmailOnce(args: {
+  sb: any
+  campaign: any
+  metadata: any
+  error: string
+  quotaBlockedUntil?: string | null
+}) {
+  const { sb, campaign, metadata, error, quotaBlockedUntil: blockedUntil = null } = args
+  const email = campaignOwnerEmail(campaign)
+  const previous = metadata?.autoPublishExact?.failureNotification || {}
+  const sameFailureAlreadySent = previous?.ok === true
+    && String(previous?.error || '') === error
+    && String(previous?.quotaBlockedUntil || '') === String(blockedUntil || '')
+
+  if (!email || sameFailureAlreadySent) {
+    return { notified: sameFailureAlreadySent, attempted: false, error: email ? null : 'Owner email is not configured.' }
+  }
+
+  const sent = await sendEmail({
+    from: 'saasMarketing',
+    to: email,
+    subject: `COSA could not publish your approved video: ${String(campaign.title || 'approved video').slice(0, 90)}`,
+    html: `
+      <p>Your video is approved, but COSA could not publish it yet.</p>
+      <p><strong>${String(campaign.title || 'Approved video')}</strong></p>
+      <p>${error}</p>
+      ${blockedUntil ? `<p>Automatic retry is paused until ${blockedUntil}.</p>` : '<p>COSA will retry automatically.</p>'}
+      <p>No duplicate video will be created, and no live-link email will be sent until the provider confirms a real published URL.</p>
+    `.trim(),
+  })
+
+  return {
+    notified: Boolean(sent?.ok),
+    attempted: true,
+    error: sent?.ok ? null : sent?.error || 'send failed',
+    email,
+    attemptedAt: new Date().toISOString(),
+  }
+}
+
 async function publishOne(sb: any, campaign: any) {
   const lang = firstLanguage(campaign)
   const videoUrl = exactFinalVideo(campaign, lang)
   if (!videoUrl) return { ok: false, error: `No exact final video for ${lang || 'unknown language'}`, language: lang || null }
 
+  const ownerEmail = campaignOwnerEmail(campaign)
   const res = await publishCampaignCore({
     admin: sb,
     userId: String(campaign.approved_by),
-    userEmail: campaign?.metadata?.autoPublishArm?.email || campaign?.metadata?.approvalNotification?.email || campaign?.metadata?.video?.approvalNotification?.email || null,
+    userEmail: ownerEmail,
     id: campaign.id,
     language: lang,
     videoUrl,
@@ -131,21 +195,40 @@ async function publishOne(sb: any, campaign: any) {
   const freshMeta = freshRow?.metadata || campaign.metadata || {}
 
   if (!res.ok) {
-    const quota = res.status === 429 || String(res.error || '').toLowerCase().includes('quota')
+    const errorText = res.error || 'Publish failed'
+    const quota = res.status === 429 || String(errorText).toLowerCase().includes('quota')
     const quotaBlocked = quota ? new Date(Date.now() + QUOTA_RETRY_MINUTES * 60000).toISOString() : null
+    const failureNotification = await sendFailureEmailOnce({
+      sb,
+      campaign,
+      metadata: freshMeta,
+      error: errorText,
+      quotaBlockedUntil: quotaBlocked,
+    })
+
     await sb.from('cos_campaign_queue').update({
       metadata: {
         ...freshMeta,
         autoPublishExact: {
+          ...(freshMeta?.autoPublishExact || {}),
           lastAttemptAt: now,
           ...(quota ? { lastQuotaErrorAt: now, quotaBlockedUntil: quotaBlocked } : {}),
           ok: false,
-          error: res.error,
+          error: errorText,
           language: lang || null,
+          failureNotification: {
+            ok: failureNotification.notified,
+            attempted: failureNotification.attempted,
+            error: errorText,
+            deliveryError: failureNotification.error || null,
+            quotaBlockedUntil: quotaBlocked,
+            attemptedAt: failureNotification.attemptedAt || now,
+            email: failureNotification.email || ownerEmail,
+          },
         },
       },
     }).eq('id', campaign.id)
-    return { ok: false, error: res.error || 'Publish failed', language: lang, quotaBlockedUntil: quotaBlocked }
+    return { ok: false, error: errorText, language: lang, quotaBlockedUntil: quotaBlocked, failureEmailSent: failureNotification.notified }
   }
 
   const liveUrl = res.result?.liveUrl || null
@@ -153,25 +236,20 @@ async function publishOne(sb: any, campaign: any) {
     metadata: {
       ...freshMeta,
       autoPublishExact: {
+        ...(freshMeta?.autoPublishExact || {}),
         lastAttemptAt: now,
         ok: true,
+        error: null,
         language: lang,
         videoUrl,
         liveUrl,
+        failureNotification: null,
       },
     },
   }).eq('id', campaign.id)
 
-  const email = campaign?.metadata?.autoPublishArm?.email || campaign?.metadata?.approvalNotification?.email || campaign?.metadata?.video?.approvalNotification?.email
-  if (liveUrl && email) {
-    await sendEmail({
-      from: 'saasMarketing',
-      to: email,
-      subject: `Your SignalBoostAi video is live: ${campaign.title || 'approved video'}`,
-      html: `<p>Your approved video is live.</p><p><a href="${liveUrl}">${liveUrl}</a></p>`,
-    })
-  }
-
+  // publishCampaignCore already sends and records the live-link email. Do not send
+  // a second message here; the notification route retries only failed deliveries.
   return { ok: true, language: lang, videoUrl, liveUrl }
 }
 
@@ -193,8 +271,43 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok: false, error: error.message, approvalEmail }, { status: 500 })
 
-  const activeQuotaBlock = (data || []).map(quotaBlockedUntil).filter(Boolean).sort()[0] || null
+  const blockedCampaigns = (data || []).filter(campaign => Boolean(quotaBlockedUntil(campaign)))
+  const activeQuotaBlock = blockedCampaigns.map(quotaBlockedUntil).filter(Boolean).sort()[0] || null
   if (activeQuotaBlock) {
+    const notifications: any[] = []
+    for (const campaign of blockedCampaigns.slice(0, LIMIT)) {
+      const blockedUntil = quotaBlockedUntil(campaign)
+      const errorText = `YouTube upload quota is paused until ${blockedUntil}`
+      const notification = await sendFailureEmailOnce({
+        sb,
+        campaign,
+        metadata: campaign.metadata || {},
+        error: errorText,
+        quotaBlockedUntil: blockedUntil,
+      })
+      if (notification.attempted) {
+        const meta = campaign.metadata || {}
+        await sb.from('cos_campaign_queue').update({
+          metadata: {
+            ...meta,
+            autoPublishExact: {
+              ...(meta.autoPublishExact || {}),
+              failureNotification: {
+                ok: notification.notified,
+                attempted: notification.attempted,
+                error: errorText,
+                deliveryError: notification.error || null,
+                quotaBlockedUntil: blockedUntil,
+                attemptedAt: notification.attemptedAt || new Date().toISOString(),
+                email: notification.email || campaignOwnerEmail(campaign),
+              },
+            },
+          },
+        }).eq('id', campaign.id)
+      }
+      notifications.push({ campaign: campaign.id, notified: notification.notified, error: notification.error || null })
+    }
+
     return NextResponse.json({
       ok: true,
       approvalEmail,
@@ -202,6 +315,7 @@ export async function GET(req: NextRequest) {
       eligible: 0,
       published: 0,
       quotaBlockedUntil: activeQuotaBlock,
+      failureNotifications: notifications,
       results: [{ ok: false, status: 'blocked', error: `YouTube upload quota is paused until ${activeQuotaBlock}` }],
     })
   }

@@ -14,6 +14,7 @@ on:
       - 'saas/scripts/cos-video-campaign-sync.mjs'
       - 'saas/scripts/cos-video-language-purity-prep.mjs'
       - 'saas/scripts/cos-video-fast-final-worker-v2.mjs'
+      - 'saas/scripts/cos-video-brand-banner-upgrade.mjs'
 
 permissions:
   contents: read
@@ -25,7 +26,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       RESOLVED_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
       RESOLVED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -48,6 +49,7 @@ jobs:
           node --check saas/scripts/cos-video-campaign-sync.mjs
           node --check saas/scripts/cos-video-language-purity-prep.mjs
           node --check saas/scripts/cos-video-fast-final-worker-v2.mjs
+          node --check saas/scripts/cos-video-brand-banner-upgrade.mjs
 
       - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
       - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
@@ -92,3 +94,13 @@ jobs:
           ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
           ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID }}
         run: node scripts/cos-video-fast-final-worker-v2.mjs
+
+      - name: Enlarge permanent SignalBoost brand banner
+        if: ${{ always() }}
+        working-directory: saas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.RESOLVED_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.RESOLVED_SUPABASE_SERVICE_ROLE_KEY }}
+          COS_VIDEO_RENDER_BUCKET: ${{ vars.COS_VIDEO_RENDER_BUCKET || 'video-renders' }}
+          COS_VIDEO_BANNER_UPGRADE_LIMIT: ${{ vars.COS_VIDEO_BANNER_UPGRADE_LIMIT || '2' }}
+        run: node scripts/cos-video-brand-banner-upgrade.mjs

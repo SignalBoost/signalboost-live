@@ -4,8 +4,7 @@
 // Pre-patch trust flow for a single audit finding:
 //   Generate preview (NO write) → show code diff + plain-English Before/After →
 //   "🚀 Confirm & Push Pull Request" → commit to an ai/* branch → Review & Merge ↗.
-// Self-contained: owns the two-phase call to /api/hub/operator/audit/patch
-// (mode:'preview' then mode:'commit'). Tokens: bg-surface / bg-bg / border-border.
+// The server grounds and validates every preview against the current repository.
 
 import { useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
@@ -13,12 +12,13 @@ import { useTranslation } from '@/components/i18n/useTranslation'
 export type PatchFinding = {
   file: string
   line?: number | null
+  category?: string
   title: string
   detail?: string
   recommendation?: string
 }
 
-type Phase = 'idle' | 'previewing' | 'preview' | 'committing' | 'done' | 'error'
+type Phase = 'idle' | 'previewing' | 'preview' | 'committing' | 'done' | 'resolved' | 'error'
 
 type PreviewData = {
   path: string
@@ -27,6 +27,7 @@ type PreviewData = {
   newContent: string
   before: string
   after: string
+  baseHash: string
 }
 
 type DiffRow = { t: 'ctx' | 'add' | 'del'; a?: number; b?: number; text: string }
@@ -91,12 +92,17 @@ export default function PatchPreview({ finding }: { finding: PatchFinding }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           mode: 'preview', file: finding.file, line: finding.line ?? undefined,
-          title: finding.title, detail: finding.detail, recommendation: finding.recommendation,
+          category: finding.category, title: finding.title,
+          detail: finding.detail, recommendation: finding.recommendation,
         }),
       })
       const data = await res.json().catch(() => null)
       if (res.status === 402 && data?.code === 'patch_not_in_plan') {
         setUpgrade(true); setError(data?.error || t('audit.patch.upgrade', 'AI patch generation is a Pro feature.')); setPhase('error'); return
+      }
+      if (res.status === 409 && data?.code === 'finding_already_resolved') {
+        setError(data?.error || t('audit.patch.alreadyResolved', 'This finding is already fixed in the current code. Run a new audit to refresh the findings.'))
+        setPhase('resolved'); return
       }
       if (!res.ok || !data?.ok) {
         setError(data?.error || t('audit.patch.previewFailed', 'Could not generate a preview.')); setPhase('error'); return
@@ -104,7 +110,7 @@ export default function PatchPreview({ finding }: { finding: PatchFinding }) {
       setPreview({
         path: data.path, title: data.title,
         oldContent: data.oldContent || '', newContent: data.newContent || '',
-        before: data.before || '', after: data.after || '',
+        before: data.before || '', after: data.after || '', baseHash: data.baseHash || '',
       })
       setPhase('preview')
     } catch {
@@ -118,7 +124,10 @@ export default function PatchPreview({ finding }: { finding: PatchFinding }) {
     try {
       const res = await fetch('/api/hub/operator/audit/patch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ mode: 'commit', file: preview.path, content: preview.newContent, title: preview.title }),
+        body: JSON.stringify({
+          mode: 'commit', file: preview.path, content: preview.newContent,
+          title: preview.title, baseHash: preview.baseHash,
+        }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) {
@@ -144,6 +153,15 @@ export default function PatchPreview({ finding }: { finding: PatchFinding }) {
 
   if (phase === 'previewing') {
     return <div className="rounded-md border border-border bg-bg px-3 py-2.5 text-[13px] text-text-muted">{t('audit.patch.generating', 'Generating fix preview…')}</div>
+  }
+
+  if (phase === 'resolved') {
+    return (
+      <div className="rounded-md border border-[#34d399]/40 bg-bg px-3.5 py-3 text-[12.5px] leading-relaxed text-[#86efac]">
+        <div className="font-semibold">✓ {t('audit.patch.alreadyResolvedTitle', 'Already fixed')}</div>
+        <p className="mt-1 text-text-muted">{error}</p>
+      </div>
+    )
   }
 
   // ── Error ────────────────────────────────────────────────────────────────────

@@ -67,6 +67,12 @@ test('continuity policy quarantines HTTP, empty, and canned failures', () => {
   assert.equal(reasons.some((reason) => reason.startsWith('canned_response:')), true)
 })
 
+test('continuity policy preserves Primary 4xx authorization and validation responses', () => {
+  assert.deepEqual(detectPrimaryCorruption({ status: 401, reply: '', source: '' }), [])
+  assert.deepEqual(detectPrimaryCorruption({ status: 403, reply: '', source: '' }), [])
+  assert.deepEqual(detectPrimaryCorruption({ status: 429, reply: '', source: 'error-degraded' }), [])
+})
+
 test('continuity policy flags material short-answer shadow divergence', () => {
   assert.deepEqual(detectPrimaryCorruption({
     status: 200,
@@ -76,14 +82,15 @@ test('continuity policy flags material short-answer shadow divergence', () => {
   }), ['primary_backup_quality_divergence'])
 })
 
-test('Concierge returns healthy Primary without waiting for Backup COS', async () => {
+test('Concierge preserves Primary denials and returns healthy Primary without waiting for Backup COS', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8')
   assert.match(source, /POST as supportPost/)
-  assert.match(source, /const backupPromise = runBackupCos/)
   assert.match(source, /primary = await supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
+  assert.match(source, /primary\.status >= 400 && primary\.status < 500\) return primary/)
   assert.match(source, /if \(primary && immediateReasons\.length === 0\)/)
   assert.match(source, /after\(async \(\) =>/)
   assert.match(source, /return healthyPrimary/)
+  assert.doesNotMatch(source, /const backupPromise = runBackupCos/)
   assert.doesNotMatch(source, /Promise\.all\s*\(\s*\[\s*primaryPromise\s*,\s*backupPromise/)
 })
 
@@ -101,4 +108,16 @@ test('Backup provider wait is bounded and policy remains directly importable', a
   assert.match(runtimeSource, /withDeadline/)
   assert.match(runtimeSource, /COS_BACKUP_TIMEOUT_MS/)
   assert.doesNotMatch(policySource, /@\/|next\/server|supabase|callModel/)
+})
+
+test('approved brain is traced into Concierge and runtime fails closed without it', async () => {
+  const [config, runtimeSource] = await Promise.all([
+    readFile(path.resolve(process.cwd(), 'next.config.mjs'), 'utf8'),
+    readFile(path.resolve(process.cwd(), 'lib/cos-backup/runtime.ts'), 'utf8'),
+  ])
+  assert.match(config, /outputFileTracingRoot/)
+  assert.match(config, /['"]\/api\/concierge['"]/)
+  assert.match(config, /\.\.\/cos-core\/brain\.md/)
+  assert.match(runtimeSource, /Approved COS brain snapshot is unavailable/)
+  assert.doesNotMatch(runtimeSource, /FALLBACK_BRAIN/)
 })

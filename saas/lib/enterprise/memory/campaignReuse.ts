@@ -1,4 +1,4 @@
-import { getAdminSupabase } from '@/utils/supabase/server'
+import { getAdminSupabase } from '../../../utils/supabase/server.ts'
 
 export type CampaignMemoryRow = {
   campaign_id?: string

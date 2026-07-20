@@ -1,19 +1,12 @@
 name: Audit Remediation Regression
 
 on:
+  # Generated ai/audit-run-* pull requests change application source files, not
+  # necessarily audit infrastructure. A trigger-level paths filter would create
+  # a required workflow record with zero jobs, blocking the approved remediation.
+  # Run this focused validation for every PR targeting the protected branches.
   pull_request:
-    paths:
-      - 'ONBOARD.md'
-      - 'saas/app/api/hub/audit/**'
-      - 'saas/components/audit/**'
-      - 'saas/lib/ai/tools/repoWriter.ts'
-      - 'saas/lib/audit/**'
-      - 'saas/tests/audit*.node.test.ts'
-      - 'saas/tests/repoWriterWorkspaceAliases.node.test.ts'
-      - 'saas/package.json'
-      - 'saas/package-lock.json'
-      - 'scripts/verify-workers.mjs'
-      - '.github/workflows/audit-remediation-regression.yml'
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       global_approval:
@@ -58,13 +51,13 @@ jobs:
         run: npm ci --dangerously-allow-all-scripts
 
       - name: Run focused audit tests
-        run: npm run test:audit-consent
+        run: npm run test:audit-consent && node --test tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Run globally approved remediation batch
         if: github.event_name == 'workflow_dispatch' && inputs.global_approval
         # The batch validates every proposed remediation after owner approval.
         # Applying a patch remains guarded by PatchPreview's explicit PR confirmation.
-        run: npm run test:audit-consent
+        run: npm run test:audit-consent && node --test tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Verify worker guard
         working-directory: .

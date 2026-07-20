@@ -136,6 +136,29 @@ export async function recoverMergedApprovedRemediation(params: {
 
   const mergeCommitSha = String(pull.data?.merge_commit_sha || candidate.mergeCommitSha || '')
   const mergedAt = String(pull.data?.merged_at || candidate.mergedAt || new Date().toISOString())
+  if (candidate.status === 'partial' || candidate.lifecycleStatus === 'partial') {
+    const partial: ApprovedRunSystemResult = {
+      ...candidate,
+      ok: true,
+      status: 'partial',
+      lifecycleStatus: 'partial',
+      merged: true,
+      mergedAt,
+      mergeCommitSha,
+      autoMergeQueued: false,
+      autoMergeError: 'The pull request merged only a safe subset; unresolved findings remain open.',
+    }
+    const latest = (logs.data || [])[0]?.payload
+    if (latest?.lifecycleStatus !== 'partial' || latest?.mergeCommitSha !== mergeCommitSha || latest?.merged !== true) {
+      await params.admin.from('audit_logs').insert({
+        run_id: params.runId,
+        user_id: params.actorUserId,
+        payload: partial,
+      })
+    }
+    return partial
+  }
+
   const final = await finalize({
     ...params,
     prNumber: candidate.prNumber,

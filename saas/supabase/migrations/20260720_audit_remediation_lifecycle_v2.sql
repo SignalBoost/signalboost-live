@@ -110,6 +110,26 @@ begin
     return;
   end if;
 
+  if not exists (
+    select 1
+      from public.audit_logs l
+     where l.run_id = p_run_id
+       and l.payload ->> 'kind' = 'audit_batch_remediation'
+       and l.payload ->> 'approval' = 'final'
+       and l.payload ->> 'ok' = 'true'
+       and coalesce(l.payload ->> 'status', '') <> 'partial'
+       and coalesce(l.payload ->> 'lifecycleStatus', '') <> 'partial'
+       and coalesce(l.payload ->> 'findingsTotal', '') ~ '^[0-9]+$'
+       and coalesce(l.payload ->> 'findingsApplied', '') ~ '^[0-9]+$'
+       and coalesce(l.payload ->> 'findingsAlreadyResolved', '') ~ '^[0-9]+$'
+       and (l.payload ->> 'findingsApplied')::integer
+         + (l.payload ->> 'findingsAlreadyResolved')::integer
+         >= (l.payload ->> 'findingsTotal')::integer
+  ) then
+    return query select false, 0, to_char(v_timestamp at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS');
+    return;
+  end if;
+
   update public.audit_findings
      set fixed = true,
          fixed_at = coalesce(fixed_at, v_timestamp)

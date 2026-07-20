@@ -19,6 +19,10 @@ const COPY: Record<string, Record<string, string>> = {
     'Integration Name': 'Nombre de la integración',
     'HTTP Method': 'Método HTTP',
     'Save mapping': 'Guardar mapeo',
+    'Submission is blocked because no verified publisher target exists.': 'El envío está bloqueado porque no existe ningún destino de editor verificado.',
+    'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'COS supervisa, predice, redirige, reinicia y corrige automáticamente los problemas operativos ordinarios. La revisión humana solo aparece para excepciones críticas para la vida.',
+    'No predictive alerts.': 'No hay alertas predictivas.',
+    'View Logs': 'Ver registros',
   },
   pt: {
     'No live governance telemetry returned yet.': 'Nenhuma telemetria de governança ao vivo foi retornada ainda.',
@@ -38,6 +42,10 @@ const COPY: Record<string, Record<string, string>> = {
     'Integration Name': 'Nome da integração',
     'HTTP Method': 'Método HTTP',
     'Save mapping': 'Salvar mapeamento',
+    'Submission is blocked because no verified publisher target exists.': 'O envio está bloqueado porque não existe nenhum destino de editor verificado.',
+    'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'O COS monitora, prevê, redireciona, reinicia e corrige automaticamente problemas operacionais comuns. A revisão humana aparece apenas para exceções críticas à vida.',
+    'No predictive alerts.': 'Não há alertas preditivos.',
+    'View Logs': 'Ver registros',
   },
   pl: {
     'No live governance telemetry returned yet.': 'Nie zwrócono jeszcze bieżącej telemetrii zarządzania.',
@@ -57,6 +65,10 @@ const COPY: Record<string, Record<string, string>> = {
     'Integration Name': 'Nazwa integracji',
     'HTTP Method': 'Metoda HTTP',
     'Save mapping': 'Zapisz mapowanie',
+    'Submission is blocked because no verified publisher target exists.': 'Przesyłanie jest zablokowane, ponieważ nie istnieje żaden zweryfikowany docelowy wydawca.',
+    'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'COS automatycznie monitoruje, przewiduje, przekierowuje, restartuje i naprawia zwykłe problemy operacyjne. Weryfikacja przez człowieka pojawia się tylko w przypadku wyjątków krytycznych dla życia.',
+    'No predictive alerts.': 'Brak alertów predykcyjnych.',
+    'View Logs': 'Wyświetl dzienniki',
   },
   ru: {
     'No live governance telemetry returned yet.': 'Данные телеметрии управления в реальном времени пока не получены.',
@@ -76,6 +88,10 @@ const COPY: Record<string, Record<string, string>> = {
     'Integration Name': 'Название интеграции',
     'HTTP Method': 'Метод HTTP',
     'Save mapping': 'Сохранить сопоставление',
+    'Submission is blocked because no verified publisher target exists.': 'Отправка заблокирована, поскольку не существует проверенного целевого издателя.',
+    'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'COS автоматически отслеживает, прогнозирует, перенаправляет, перезапускает и исправляет обычные операционные проблемы. Проверка человеком появляется только для исключений, критически важных для жизни.',
+    'No predictive alerts.': 'Нет прогнозных оповещений.',
+    'View Logs': 'Просмотреть журналы',
   },
 }
 

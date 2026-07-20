@@ -1,8 +1,10 @@
 name: Audit Remediation Regression
 
 on:
-  # Ruleset workflows support pull-request and merge-queue events. GitHub ignores
-  # event filters for ruleset execution, so keep these triggers unfiltered.
+  # GitHub's enforced required-workflow runner invokes this workflow with `push`
+  # for protected branch commits. Keep all supported events unfiltered so the
+  # required job is present for audit branches, pull requests, and merge queues.
+  push:
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -18,9 +20,7 @@ permissions:
 
 jobs:
   audit-remediation:
-    # GitHub recommends an explicit true condition when a ruleset workflow is
-    # enforced across repository contexts; without it the run can contain zero jobs.
-    if: true
+    if: ${{ true }}
     name: Verify audit consent and patch flow
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -7,16 +7,18 @@ on:
 
 permissions:
   contents: read
+  checks: read
+  actions: read
 
 jobs:
   inspect-rulesets:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect required workflow rules and empty run
+      - name: Inspect invalid audit workflow run
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          EMPTY_RUN_ID: '29715110033'
+          EMPTY_RUN_ID: '29715386952'
         run: |
           set -euo pipefail
           api() {
@@ -28,19 +30,18 @@ jobs:
 
           run="$(api "https://api.github.com/repos/${GH_REPO}/actions/runs/${EMPTY_RUN_ID}")"
           echo 'EMPTY_RUN_METADATA:'
-          printf '%s' "$run" | jq -c '{id,name,path,event,status,conclusion,head_branch,head_sha,workflow_id,display_title,run_attempt,referenced_workflows}'
+          printf '%s' "$run" | jq -c '{id,name,path,event,status,conclusion,head_branch,head_sha,workflow_id,check_suite_id,display_title,run_attempt,referenced_workflows}'
 
           workflow_id="$(printf '%s' "$run" | jq -r '.workflow_id')"
           echo 'WORKFLOW_METADATA:'
           api "https://api.github.com/repos/${GH_REPO}/actions/workflows/${workflow_id}" | jq -c '{id,name,path,state,created_at,updated_at}'
 
-          list="$(api "https://api.github.com/repos/${GH_REPO}/rulesets?includes_parents=true")"
-          ids="$(printf '%s' "$list" | jq -r '.[].id')"
-          if [ -z "$ids" ]; then
-            echo 'RULESET_DIAGNOSTIC: no repository-visible rulesets returned'
-            exit 0
-          fi
-          for id in $ids; do
-            detail="$(api "https://api.github.com/repos/${GH_REPO}/rulesets/${id}?includes_parents=true")"
-            printf '%s' "$detail" | jq -c '{id,name,target,enforcement,source_type,source,required_workflows:[.rules[]? | select(.type == "workflows") | .parameters.workflows[]? | {path,ref,sha,repository_id}]}'
+          suite_id="$(printf '%s' "$run" | jq -r '.check_suite_id')"
+          echo 'CHECK_RUNS:'
+          checks="$(api "https://api.github.com/repos/${GH_REPO}/check-suites/${suite_id}/check-runs")"
+          printf '%s' "$checks" | jq -c '.check_runs[]? | {id,name,status,conclusion,details_url,output}'
+
+          for check_id in $(printf '%s' "$checks" | jq -r '.check_runs[]?.id'); do
+            echo "ANNOTATIONS_FOR_${check_id}:"
+            api "https://api.github.com/repos/${GH_REPO}/check-runs/${check_id}/annotations" | jq -c '.[]? | {path,start_line,end_line,annotation_level,title,message,raw_details}'
           done

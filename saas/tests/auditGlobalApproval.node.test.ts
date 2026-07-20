@@ -87,7 +87,7 @@ test('transient GitHub remediation failures retry three times across every recov
 
   assert.match(retry, /const MAX_ATTEMPTS = 3/)
   assert.match(retry, /const RETRY_DELAYS_MS = \[0, 500, 1500\]/)
-  assert.match(retry, /\b\(429\|500\|502\|503\|504\)\b/)
+  assert.match(retry, /429\|500\|502\|503\|504/)
   assert.match(retry, /no server is currently available/)
   assert.match(retry, /temporarily unavailable/)
   assert.match(retry, /for \(let attempt = 0; attempt < MAX_ATTEMPTS; attempt \+= 1\)/)

@@ -1,4 +1,5 @@
 import { recoverMergedApprovedRemediation } from '@/lib/audit/approvedRunMergedRecovery'
+import { recoverTransientPartialAuditWrites } from '@/lib/audit/approvedRunPartialRecovery'
 import {
   runApprovedAuditRemediationSystem,
   type ApprovedRunSystemResult,
@@ -45,6 +46,17 @@ export async function runApprovedAuditRemediationWithRetry(params: {
     }
 
     last = await runApprovedAuditRemediationSystem(params)
+
+    if (last.status === 'partial' || last.lifecycleStatus === 'partial') {
+      const recovered = await recoverTransientPartialAuditWrites({ ...params, result: last })
+      if (recovered) {
+        last = recovered
+        if (recovered.lifecycleStatus === 'checks_pending') {
+          last = await runApprovedAuditRemediationSystem(params)
+        }
+      }
+    }
+
     if (last.ok || !isTransientApprovedRemediationFailure(last)) return last
   }
 

@@ -31,33 +31,44 @@ type Copy = {
   fixed: string
   approved: string
   skipped: string
+  pipelineLabel: string
+  stepApproval: string
+  stepPrepare: string
+  stepChecks: string
+  stepMerge: string
+  stepVerified: string
 }
 
 const COPY: Record<string, Copy> = {
   en: {
     preparing: 'Preparing approved fixes', checksPending: 'GitHub checks are running', autoMergeQueued: 'Merge queued after checks', partial: 'Safe fixes prepared with exceptions', merged: 'Approved fixes merged', failed: 'Automated remediation needs attention',
     detailPreparing: 'The system is creating the protected remediation branch and pull request.', detailChecks: 'The pull request exists. Required repository checks must pass before merge.', detailQueued: 'GitHub will merge the pull request automatically after every protected requirement passes.', detailPartial: 'Safe supported fixes were prepared. Unsupported findings remain visible and were not forced.', detailMerged: 'The code reached main. Findings were marked fixed only after GitHub confirmed the merge.', detailFailed: 'Approval remains recorded. The recovery worker will retry transient failures; permanent errors remain visible.',
-    openPr: 'Open remediation PR', fixed: 'fixed', approved: 'approved', skipped: 'skipped',
+    openPr: 'Open remediation PR', fixed: 'fixed', approved: 'approved', skipped: 'skipped', pipelineLabel: 'Audit remediation pipeline',
+    stepApproval: 'Approval recorded', stepPrepare: 'Prepare fixes', stepChecks: 'PR and checks', stepMerge: 'Merge to main', stepVerified: 'Verified remediated',
   },
   es: {
     preparing: 'Preparando correcciones aprobadas', checksPending: 'Las verificaciones de GitHub están en curso', autoMergeQueued: 'Fusión en cola después de las verificaciones', partial: 'Correcciones seguras preparadas con excepciones', merged: 'Correcciones aprobadas fusionadas', failed: 'La corrección automática necesita atención',
     detailPreparing: 'El sistema está creando la rama protegida y la solicitud de incorporación de cambios.', detailChecks: 'La solicitud existe. Las verificaciones obligatorias deben aprobarse antes de fusionar.', detailQueued: 'GitHub fusionará automáticamente cuando se cumplan todos los requisitos protegidos.', detailPartial: 'Se prepararon las correcciones seguras compatibles. Los hallazgos no compatibles siguen visibles y no se forzaron.', detailMerged: 'El código llegó a main. Los hallazgos se marcaron como corregidos solo después de que GitHub confirmó la fusión.', detailFailed: 'La aprobación sigue registrada. El proceso de recuperación reintentará los fallos temporales; los errores permanentes siguen visibles.',
-    openPr: 'Abrir PR de corrección', fixed: 'corregidos', approved: 'aprobados', skipped: 'omitidos',
+    openPr: 'Abrir PR de corrección', fixed: 'corregidos', approved: 'aprobados', skipped: 'omitidos', pipelineLabel: 'Flujo de corrección de auditoría',
+    stepApproval: 'Aprobación registrada', stepPrepare: 'Preparar correcciones', stepChecks: 'PR y verificaciones', stepMerge: 'Fusionar a main', stepVerified: 'Corrección verificada',
   },
   pt: {
     preparing: 'Preparando correções aprovadas', checksPending: 'As verificações do GitHub estão em execução', autoMergeQueued: 'Fusão na fila após as verificações', partial: 'Correções seguras preparadas com exceções', merged: 'Correções aprovadas mescladas', failed: 'A correção automática precisa de atenção',
     detailPreparing: 'O sistema está criando a ramificação protegida e o pull request de correção.', detailChecks: 'O pull request existe. As verificações obrigatórias devem passar antes da fusão.', detailQueued: 'O GitHub fará a fusão automaticamente depois que todos os requisitos protegidos forem aprovados.', detailPartial: 'As correções seguras compatíveis foram preparadas. Os achados incompatíveis permanecem visíveis e não foram forçados.', detailMerged: 'O código chegou à main. Os achados só foram marcados como corrigidos depois que o GitHub confirmou a fusão.', detailFailed: 'A aprovação continua registrada. O processo de recuperação tentará novamente falhas temporárias; erros permanentes permanecem visíveis.',
-    openPr: 'Abrir PR de correção', fixed: 'corrigidos', approved: 'aprovados', skipped: 'ignorados',
+    openPr: 'Abrir PR de correção', fixed: 'corrigidos', approved: 'aprovados', skipped: 'ignorados', pipelineLabel: 'Fluxo de correção da auditoria',
+    stepApproval: 'Aprovação registrada', stepPrepare: 'Preparar correções', stepChecks: 'PR e verificações', stepMerge: 'Mesclar na main', stepVerified: 'Correção verificada',
   },
   pl: {
     preparing: 'Przygotowywanie zatwierdzonych poprawek', checksPending: 'Trwają kontrole GitHub', autoMergeQueued: 'Scalanie oczekuje na zakończenie kontroli', partial: 'Bezpieczne poprawki przygotowane z wyjątkami', merged: 'Zatwierdzone poprawki scalono', failed: 'Automatyczna naprawa wymaga uwagi',
     detailPreparing: 'System tworzy chronioną gałąź naprawczą i pull request.', detailChecks: 'Pull request istnieje. Wymagane kontrole repozytorium muszą przejść przed scaleniem.', detailQueued: 'GitHub scali pull request automatycznie po spełnieniu wszystkich chronionych wymagań.', detailPartial: 'Obsługiwane bezpieczne poprawki zostały przygotowane. Nieobsługiwane wyniki pozostają widoczne i nie zostały wymuszone.', detailMerged: 'Kod trafił do main. Wyniki oznaczono jako naprawione dopiero po potwierdzeniu scalenia przez GitHub.', detailFailed: 'Zatwierdzenie pozostaje zapisane. Proces odzyskiwania ponowi błędy przejściowe; błędy trwałe pozostają widoczne.',
-    openPr: 'Otwórz PR naprawczy', fixed: 'naprawiono', approved: 'zatwierdzono', skipped: 'pominięto',
+    openPr: 'Otwórz PR naprawczy', fixed: 'naprawiono', approved: 'zatwierdzono', skipped: 'pominięto', pipelineLabel: 'Proces naprawczy audytu',
+    stepApproval: 'Zapisano zgodę', stepPrepare: 'Przygotuj poprawki', stepChecks: 'PR i kontrole', stepMerge: 'Scal do main', stepVerified: 'Naprawa potwierdzona',
   },
   ru: {
     preparing: 'Подготовка одобренных исправлений', checksPending: 'Выполняются проверки GitHub', autoMergeQueued: 'Слияние поставлено в очередь после проверок', partial: 'Безопасные исправления подготовлены с исключениями', merged: 'Одобренные исправления объединены', failed: 'Автоматическое исправление требует внимания',
     detailPreparing: 'Система создаёт защищённую ветку исправлений и pull request.', detailChecks: 'Pull request создан. Перед слиянием должны пройти обязательные проверки репозитория.', detailQueued: 'GitHub автоматически выполнит слияние после прохождения всех защищённых требований.', detailPartial: 'Поддерживаемые безопасные исправления подготовлены. Неподдерживаемые находки остаются видимыми и не применяются принудительно.', detailMerged: 'Код попал в main. Находки отмечены исправленными только после подтверждения слияния GitHub.', detailFailed: 'Одобрение сохранено. Процесс восстановления повторит временные сбои; постоянные ошибки остаются видимыми.',
-    openPr: 'Открыть PR исправлений', fixed: 'исправлено', approved: 'одобрено', skipped: 'пропущено',
+    openPr: 'Открыть PR исправлений', fixed: 'исправлено', approved: 'одобрено', skipped: 'пропущено', pipelineLabel: 'Процесс исправления аудита',
+    stepApproval: 'Согласование записано', stepPrepare: 'Подготовка исправлений', stepChecks: 'PR и проверки', stepMerge: 'Слияние в main', stepVerified: 'Исправление подтверждено',
   },
 }
 
@@ -70,6 +81,34 @@ function stateCopy(copy: Copy, status: string) {
   return { title: copy.preparing, detail: copy.detailPreparing, tone: 'border-accent/40 text-accent' }
 }
 
+function activeStage(status: string, state: RemediationLifecycleState): number {
+  if (status === 'merged' || state.merged) return 4
+  if (status === 'auto_merge_queued') return 3
+  if (status === 'checks_pending' || status === 'partial') return 2
+  if (status === 'failed') return state.prUrl ? 2 : 1
+  return 1
+}
+
+function stageTone(index: number, current: number, status: string): 'done' | 'active' | 'warning' | 'failed' | 'pending' {
+  if (status === 'merged' || index < current) return 'done'
+  if (index > current) return 'pending'
+  if (status === 'failed') return 'failed'
+  if (status === 'partial') return 'warning'
+  return 'active'
+}
+
+function circleClass(tone: ReturnType<typeof stageTone>): string {
+  if (tone === 'done') return 'border-[#34d399] bg-[#34d399] text-bg'
+  if (tone === 'failed') return 'border-danger bg-danger text-bg'
+  if (tone === 'warning') return 'border-accent bg-accent text-bg'
+  if (tone === 'active') return 'border-[#1af0ff] bg-bg text-[#67e8f9] ring-2 ring-[#1af0ff]/20'
+  return 'border-border bg-bg text-text-muted/60'
+}
+
+function connectorClass(done: boolean): string {
+  return done ? 'bg-[#34d399]/70' : 'bg-border'
+}
+
 export default function RemediationLifecyclePanel({ state, lang, findingsApproved }: {
   state: RemediationLifecycleState | null
   lang: string
@@ -79,8 +118,10 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
   const copy = COPY[lang] || COPY.en
   const status = String(state.lifecycleStatus || (state.merged ? 'merged' : 'preparing'))
   const visual = stateCopy(copy, status)
+  const current = activeStage(status, state)
   const fixed = status === 'merged' ? Number(state.findingsApplied || 0) : 0
   const skipped = (state.skipped || []).reduce((sum, item) => sum + Math.max(0, Number(item.findingCount || 0)), 0)
+  const stages = [copy.stepApproval, copy.stepPrepare, copy.stepChecks, copy.stepMerge, copy.stepVerified]
 
   return (
     <div className={`mt-3 rounded-md border bg-bg p-3 ${visual.tone}`} aria-live="polite">
@@ -106,6 +147,26 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
           </a>
         )}
       </div>
+
+      <ol className="mt-4 grid gap-3 sm:grid-cols-5" aria-label={copy.pipelineLabel}>
+        {stages.map((label, index) => {
+          const tone = stageTone(index, current, status)
+          const done = tone === 'done'
+          return (
+            <li key={label} className="min-w-0">
+              <div className="flex items-center">
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold ${circleClass(tone)}`}>
+                  {done ? '✓' : index + 1}
+                </span>
+                {index < stages.length - 1 && <span className={`mx-2 hidden h-px flex-1 sm:block ${connectorClass(index < current || status === 'merged')}`} />}
+              </div>
+              <div className={`mt-1.5 text-[10.5px] font-semibold leading-snug ${tone === 'pending' ? 'text-text-muted/60' : tone === 'failed' ? 'text-danger' : tone === 'warning' ? 'text-accent' : 'text-text'}`}>
+                {label}
+              </div>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }

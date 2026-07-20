@@ -122,3 +122,23 @@ test('the required workflow executes consent, approval, and lifecycle regression
   assert.match(workflow, /npm run test:audit-global-approval/)
   assert.match(workflow, /node --test tests\/auditRemediationSystem\.node\.test\.ts/)
 })
+
+test('approved runs expose a visible remediation pipeline before the first lifecycle event', () => {
+  const dashboard = read('../app/dashboard/audit/page.tsx')
+  const panel = read('../components/audit/RemediationLifecyclePanel.tsx')
+  const runs = read('../app/api/hub/operator/audit/runs/route.ts')
+
+  assert.match(dashboard, /approvedWithoutLifecycle/)
+  assert.match(dashboard, /r\?\.status === 'approved'/)
+  assert.match(dashboard, /lifecycleStatus: 'preparing'/)
+  assert.match(dashboard, /cache: 'no-store'/)
+  assert.match(dashboard, /setApprovalMessage\(null\); setSelectedRunId\(id\)/)
+  assert.match(runs, /remediation: recovery \|\| payloads\.remediation/)
+  assert.doesNotMatch(runs, /remediation: payloads\.remediation \|\| recovery/)
+  assert.match(panel, /stepApproval: 'Approval recorded'/)
+  assert.match(panel, /stepPrepare: 'Prepare fixes'/)
+  assert.match(panel, /stepChecks: 'PR and checks'/)
+  assert.match(panel, /stepMerge: 'Merge to main'/)
+  assert.match(panel, /stepVerified: 'Verified remediated'/)
+  assert.match(panel, /aria-label=\{copy\.pipelineLabel\}/)
+})

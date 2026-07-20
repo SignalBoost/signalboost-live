@@ -315,7 +315,7 @@ export default function AuditCenterPage() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/hub/operator/audit/runs', { credentials: 'include' })
+      const res = await fetch('/api/hub/operator/audit/runs', { credentials: 'include', cache: 'no-store' })
       const data = await res.json().catch(() => null)
       if (res.ok && data?.ok) setRuns(data.runs || [])
     } catch { /* sidebar history is non-critical */ }
@@ -324,11 +324,13 @@ export default function AuditCenterPage() {
   useEffect(() => { loadHistory() }, [loadHistory])
 
   useEffect(() => {
-    const status = remediation?.lifecycleStatus
-    if (!selectedRunId || !status || ['merged', 'failed', 'partial'].includes(status)) return
-    const id = setInterval(() => { void openRun(selectedRunId) }, 10000)
-    return () => clearInterval(id)
-  }, [selectedRunId, remediation?.lifecycleStatus])
+  const status = String(remediation?.lifecycleStatus || '')
+  const approvedWithoutLifecycle = view?.status === 'approved' && !status
+  const terminal = ['merged', 'failed', 'partial'].includes(status)
+  if (!selectedRunId || (!approvedWithoutLifecycle && (!status || terminal))) return
+  const id = setInterval(() => { void openRun(selectedRunId) }, 10000)
+  return () => clearInterval(id)
+}, [selectedRunId, view?.status, remediation?.lifecycleStatus])
 
   // Elapsed-time heartbeat so a long run never looks frozen.
   useEffect(() => {
@@ -397,13 +399,18 @@ export default function AuditCenterPage() {
   }
 
   async function openRun(id: string) {
-    setError(null); setSelectedRunId(id)
+    setError(null); setApprovalMessage(null); setSelectedRunId(id)
     try {
-      const res = await fetch(`/api/hub/operator/audit/runs?runId=${encodeURIComponent(id)}`, { credentials: 'include' })
+      const res = await fetch(`/api/hub/operator/audit/runs?runId=${encodeURIComponent(id)}`, { credentials: 'include', cache: 'no-store' })
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) { setError(data?.error || copy.failed); return }
       const r = data.run
-      const remediationState = (data.remediation || null) as RemediationLifecycleState | null
+      const remediationState = (data.remediation || (r?.status === 'approved' ? {
+      lifecycleStatus: 'preparing',
+      findingsTotal: Number(r?.findings_count || 0),
+      findingsApplied: 0,
+      merged: false,
+    } : null)) as RemediationLifecycleState | null
       setRemediation(remediationState)
       const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null
       const findings = (log?.findings as Finding[]) || (data.findings as Finding[]) || []
@@ -431,7 +438,12 @@ export default function AuditCenterPage() {
       })
       const result = await res.json().catch(() => null)
       if (!res.ok || !result?.ok) { setError(result?.error || copy.approvalFailed); return }
-      const lifecycle = (result.remediation || null) as RemediationLifecycleState | null
+      const lifecycle = (result.remediation || {
+      lifecycleStatus: result.status || 'preparing',
+      findingsTotal: Number(result.findingsApproved || view.findingsCount || 0),
+      findingsApplied: Number(result.findingsFixed || 0),
+      merged: result.status === 'merged',
+    }) as RemediationLifecycleState
       setRemediation(lifecycle)
       const merged = result.status === 'merged' || lifecycle?.merged === true
       setView(current => current ? { ...current, status: merged ? 'remediated' : 'approved' } : current)

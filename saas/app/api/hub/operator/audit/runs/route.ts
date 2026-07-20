@@ -122,7 +122,9 @@ export async function GET(req: NextRequest) {
       run: run.data,
       findings,
       log: localizeLogPayload(payloads.scan, lang),
-      remediation: payloads.remediation || recovery,
+      // For approved runs, the recovery call is the freshest lifecycle state.
+      // Older durable logs remain the fallback for already-remediated history.
+      remediation: recovery || payloads.remediation,
     })
   }
 

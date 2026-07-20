@@ -184,7 +184,7 @@ export default function OutreachAnalyticsPanel() {
   return (
     <section className="space-y-6 rounded-3xl bg-slate-50 p-6 text-slate-800">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div><p className="text-sm font-semibold uppercase tracking-wide text-blue-600"><LocalizedText fallback={"COS Outreach Analytics"} /></p><h2 className="text-3xl font-bold text-slate-950">Raw performance, regional reach, and milestone-ready notifications</h2><p className="mt-2 text-slate-600">OAuth2-backed API routes read YouTube, Google Analytics, and Meta credentials from environment variables while keeping raw numbers visible.</p></div>
+        <div><p className="text-sm font-semibold uppercase tracking-wide text-blue-600"><LocalizedText fallback={"COS Outreach Analytics"} /></p><h2 className="text-3xl font-bold text-slate-950"><LocalizedText fallback={"Raw performance, regional reach, and milestone-ready notifications"} /></h2><p className="mt-2 text-slate-600">OAuth2-backed API routes read YouTube, Google Analytics, and Meta credentials from environment variables while keeping raw numbers visible.</p></div>
         <div className="text-sm font-medium text-slate-500">{status}</div>
       </div>
 

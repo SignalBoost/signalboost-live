@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 const url = (path: string) => new URL(path, import.meta.url)
 const read = (path: string) => readFileSync(url(path), 'utf8')
 
- test('Audit Console exposes one run-scoped approval and the AI performs the rest', () => {
+test('Audit Console exposes one run-scoped approval and the AI performs the rest', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')
   const approval = read('../app/api/hub/operator/audit/approve-all/route.ts')
   const system = read('../lib/audit/approvedRunRemediationSystem.ts')
@@ -13,7 +13,8 @@ const read = (path: string) => readFileSync(url(path), 'utf8')
   assert.match(dashboard, /approveAllFixes/)
   assert.match(dashboard, /\/api\/hub\/operator\/audit\/approve-all/)
   assert.match(dashboard, /Approve all fixes/)
-  assert.doesNotMatch(dashboard, /Confirm & Push Pull Request|Open remediation PR|<PatchPreview/)
+  assert.match(dashboard, /This is the only approval/)
+  assert.doesNotMatch(dashboard, /RemediationBanner|Confirm & Push Pull Request|Open remediation PR|<PatchPreview/)
 
   assert.match(approval, /approve_audit_run_remediation_v2/)
   assert.match(approval, /runApprovedAuditRemediationWithRetry/)
@@ -24,15 +25,13 @@ const read = (path: string) => readFileSync(url(path), 'utf8')
 })
 
 test('duplicate consent and manual patch surfaces are permanently removed', () => {
-  const banner = read('../components/audit/RemediationBanner.tsx')
   const executive = read('../components/audit/ExecutiveSummary.tsx')
   const stripe = read('../components/audit/StripeReport.tsx')
 
-  assert.match(banner, /return null/)
-  assert.doesNotMatch(banner, /AuditFixConsent|scrollIntoView|onAccept/)
   assert.doesNotMatch(executive, /AuditFixConsent|acceptHref|actionableFindings/)
   assert.doesNotMatch(stripe, /PatchPreview|Generate fix|Confirm & Push Pull Request/)
 
+  assert.equal(existsSync(url('../components/audit/RemediationBanner.tsx')), false)
   assert.equal(existsSync(url('../components/audit/AuditFixConsent.tsx')), false)
   assert.equal(existsSync(url('../components/audit/PatchPreview.tsx')), false)
   assert.equal(existsSync(url('../app/api/hub/operator/audit/patch/route.ts')), false)
@@ -75,5 +74,7 @@ test('ONBOARD defines approval-only autonomous remediation and forbids human PR 
   assert.match(onboard, /AI creates the protected branch and internal pull request/i)
   assert.match(onboard, /waits for required checks, merges automatically, verifies the result/i)
   assert.match(onboard, /must not expose a human GitHub PR review button/i)
-  assert.match(onboard, /must not require per-finding preview, confirm-push, assignment, owner, or due-date controls/i)
+  assert.match(onboard, /per-finding patch preview/i)
+  assert.match(onboard, /assignment, owner, or due-date controls/i)
+  assert.match(onboard, /without asking the owner to approve again/i)
 })

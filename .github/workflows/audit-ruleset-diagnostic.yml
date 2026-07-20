@@ -13,40 +13,16 @@ jobs:
   inspect-rulesets:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify repaired required workflow
+      - name: Inspect current workflow registration
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           WORKFLOW_ID: '316116766'
-          TARGET_SHA: '5987667cbe1d3d73a7ad7fd7d38b51c4f619eb10'
         run: |
           set -euo pipefail
-          api() {
-            curl --fail-with-body --silent --show-error \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" "$1"
-          }
-
-          runs=''
-          for attempt in 1 2 3 4 5; do
-            runs="$(api "https://api.github.com/repos/${GH_REPO}/actions/workflows/${WORKFLOW_ID}/runs?head_sha=${TARGET_SHA}&per_page=10")"
-            count="$(printf '%s' "$runs" | jq '.total_count')"
-            [ "$count" -gt 0 ] && break
-            sleep 2
-          done
-
-          echo 'TARGET_WORKFLOW_RUNS:'
-          printf '%s' "$runs" | jq -c '.workflow_runs[]? | {id,name,path,event,status,conclusion,head_branch,head_sha,display_title}'
-
-          found=0
-          for run_id in $(printf '%s' "$runs" | jq -r '.workflow_runs[]?.id'); do
-            found=1
-            echo "JOBS_FOR_${run_id}:"
-            api "https://api.github.com/repos/${GH_REPO}/actions/runs/${run_id}/jobs" | jq -c '{total_count,jobs:[.jobs[]? | {id,name,status,conclusion,steps:[.steps[]? | {name,status,conclusion}]}]}'
-          done
-
-          if [ "$found" -eq 0 ]; then
-            echo 'No required-workflow run found for target SHA.'
-            exit 1
-          fi
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GH_REPO}/actions/workflows/${WORKFLOW_ID}" \
+            | jq -c '{id,name,path,state,created_at,updated_at}'

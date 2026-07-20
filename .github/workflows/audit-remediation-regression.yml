@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   audit-remediation:
-    name: Verify audit consent and patch flow
+    name: Verify single-approval autonomous remediation
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # This is the only job allowed to execute dependency lifecycle scripts.
@@ -51,8 +51,8 @@ jobs:
         # dependency specs. The explicit policy is deliberately scoped to this job.
         run: npm ci --dangerously-allow-all-scripts
 
-      - name: Verify audit consent boundaries
-        run: npm run test:audit-consent
+      - name: Verify autonomous remediation boundary
+        run: npm run test:audit-remediation
 
       - name: Verify truthful global approval lifecycle
         run: npm run test:audit-global-approval
@@ -66,7 +66,7 @@ jobs:
       - name: Run globally approved remediation batch
         if: github.event_name == 'workflow_dispatch' && inputs.global_approval
         # This repeats every lifecycle contract under the manual validation gate.
-        run: npm run test:audit-consent && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
+        run: npm run test:audit-remediation && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Verify worker guard
         working-directory: .

@@ -1,16 +1,14 @@
 'use client'
 
 // saas/components/audit/StripeReport.tsx
-// Stripe / Payments Configuration report — presentational. Live vs test mode,
-// price tiers (mismatches flagged), webhook endpoints, env→price mismatches, and
-// stripe-category findings. Every label resolves through t('audit.stripe.*').
-// Styling: inline fathom-glass, matching the other audit reports.
+// Stripe / Payments Configuration report — read-only. Live vs test mode,
+// price tiers, webhook endpoints, env→price mismatches, and findings. Remediation
+// is handled only by the Audit Console's single run-level approval.
 
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
-import PatchPreview from './PatchPreview'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -72,7 +70,6 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
         </section>
       )}
 
-      {/* Summary stats */}
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
         <Stat label={t('audit.common.overallScore', 'Overall Readiness Score')} value={data.score.score} color={data.score.score >= 80 ? GREEN : data.score.score >= 60 ? GOLD : RED} />
         <Stat label={t('audit.stripe.summary.tiers', 'Price tiers')} value={s.tiers} />
@@ -80,7 +77,6 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
         <Stat label={t('audit.stripe.summary.mismatches', 'Price mismatches')} value={s.mismatches} color={s.mismatches ? RED : GREEN} />
       </section>
 
-      {/* Mode callout */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
           {t('audit.stripe.mode.title', 'Stripe mode')}
@@ -90,7 +86,6 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
         </span>
       </section>
 
-      {/* Tiers */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
           {t('audit.stripe.tiers.title', 'Price tiers')}
@@ -129,7 +124,6 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
         )}
       </section>
 
-      {/* Webhooks */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
           {t('audit.stripe.webhooks.title', 'Webhook endpoints')}
@@ -160,7 +154,6 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
         )}
       </section>
 
-      {/* Findings */}
       <section style={{ ...glass, padding: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
           {tt('audit.stripe.findings.title', 'Findings ({n})', { n: data.findings.length })}
@@ -169,28 +162,7 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
           <div style={{ fontSize: 13, color: GREEN }}>{t('audit.stripe.findings.empty', 'No payments findings — nothing flagged.')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {data.findings.map((f, i) => {
-              const text = resolveFinding(f, t, interpolate)
-              const patchable = f.messageKey.startsWith('audit.finding.stripeWebhook')
-
-              return (
-                <div key={f.id || i}>
-                  <FindingCard finding={f} />
-                  {patchable && (
-                    <div style={{ marginTop: 12 }}>
-                      <PatchPreview
-                        finding={{
-                          file: 'saas/app/api/webhook/route.ts',
-                          title: text.title,
-                          detail: text.detail,
-                          recommendation: text.recommendation,
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            {data.findings.map((finding, i) => <FindingCard key={finding.id || i} finding={finding} />)}
           </div>
         )}
       </section>

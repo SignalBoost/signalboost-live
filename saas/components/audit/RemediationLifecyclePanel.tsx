@@ -1,10 +1,13 @@
 'use client'
 
+// Read-only status for the autonomous audit remediation lifecycle. After the
+// owner's single approval, SignalBoost AI prepares, validates, merges, verifies,
+// and records the result. This component intentionally exposes no GitHub link or
+// additional human action.
+
 export type RemediationLifecycleState = {
   lifecycleStatus?: 'preparing' | 'checks_pending' | 'auto_merge_queued' | 'partial' | 'merged' | 'failed' | string
   merged?: boolean
-  prUrl?: string
-  prNumber?: number
   findingsTotal?: number
   findingsApplied?: number
   findingsAlreadyResolved?: number
@@ -27,7 +30,6 @@ type Copy = {
   detailPartial: string
   detailMerged: string
   detailFailed: string
-  openPr: string
   fixed: string
   approved: string
   skipped: string
@@ -41,34 +43,34 @@ type Copy = {
 
 const COPY: Record<string, Copy> = {
   en: {
-    preparing: 'Preparing approved fixes', checksPending: 'GitHub checks are running', autoMergeQueued: 'Merge queued after checks', partial: 'Safe fixes prepared with exceptions', merged: 'Approved fixes merged', failed: 'Automated remediation needs attention',
-    detailPreparing: 'The system is creating the protected remediation branch and pull request.', detailChecks: 'The pull request exists. Required repository checks must pass before merge.', detailQueued: 'GitHub will merge the pull request automatically after every protected requirement passes.', detailPartial: 'Safe supported fixes were prepared. Unsupported findings remain visible and were not forced.', detailMerged: 'The code reached main. Findings were marked fixed only after GitHub confirmed the merge.', detailFailed: 'Approval remains recorded. The recovery worker will retry transient failures; permanent errors remain visible.',
-    openPr: 'Open remediation PR', fixed: 'fixed', approved: 'approved', skipped: 'skipped', pipelineLabel: 'Audit remediation pipeline',
-    stepApproval: 'Approval recorded', stepPrepare: 'Prepare fixes', stepChecks: 'PR and checks', stepMerge: 'Merge to main', stepVerified: 'Verified remediated',
+    preparing: 'SignalBoost AI is preparing the approved fixes', checksPending: 'SignalBoost AI is validating the fixes', autoMergeQueued: 'Automatic merge is queued', partial: 'Safe fixes completed with exceptions', merged: 'Approved fixes completed', failed: 'Automated remediation needs attention',
+    detailPreparing: 'No further action is required. The AI is creating the protected remediation branch and internal pull request.', detailChecks: 'The AI is waiting for every protected repository check to pass.', detailQueued: 'The AI will merge automatically after every protected requirement passes.', detailPartial: 'The AI completed every supported safe fix. Unsupported findings remain visible and were not forced.', detailMerged: 'The AI merged the verified changes to main and marked findings fixed only after GitHub confirmed the merge.', detailFailed: 'Your approval remains recorded. The recovery worker retries temporary failures automatically; permanent errors remain visible.',
+    fixed: 'fixed', approved: 'approved', skipped: 'skipped', pipelineLabel: 'Autonomous audit remediation pipeline',
+    stepApproval: 'Approval recorded', stepPrepare: 'AI prepares fixes', stepChecks: 'AI validates', stepMerge: 'AI merges', stepVerified: 'AI verifies',
   },
   es: {
-    preparing: 'Preparando correcciones aprobadas', checksPending: 'Las verificaciones de GitHub están en curso', autoMergeQueued: 'Fusión en cola después de las verificaciones', partial: 'Correcciones seguras preparadas con excepciones', merged: 'Correcciones aprobadas fusionadas', failed: 'La corrección automática necesita atención',
-    detailPreparing: 'El sistema está creando la rama protegida y la solicitud de incorporación de cambios.', detailChecks: 'La solicitud existe. Las verificaciones obligatorias deben aprobarse antes de fusionar.', detailQueued: 'GitHub fusionará automáticamente cuando se cumplan todos los requisitos protegidos.', detailPartial: 'Se prepararon las correcciones seguras compatibles. Los hallazgos no compatibles siguen visibles y no se forzaron.', detailMerged: 'El código llegó a main. Los hallazgos se marcaron como corregidos solo después de que GitHub confirmó la fusión.', detailFailed: 'La aprobación sigue registrada. El proceso de recuperación reintentará los fallos temporales; los errores permanentes siguen visibles.',
-    openPr: 'Abrir PR de corrección', fixed: 'corregidos', approved: 'aprobados', skipped: 'omitidos', pipelineLabel: 'Flujo de corrección de auditoría',
-    stepApproval: 'Aprobación registrada', stepPrepare: 'Preparar correcciones', stepChecks: 'PR y verificaciones', stepMerge: 'Fusionar a main', stepVerified: 'Corrección verificada',
+    preparing: 'SignalBoost AI está preparando las correcciones aprobadas', checksPending: 'SignalBoost AI está validando las correcciones', autoMergeQueued: 'La fusión automática está en cola', partial: 'Correcciones seguras completadas con excepciones', merged: 'Correcciones aprobadas completadas', failed: 'La corrección automática necesita atención',
+    detailPreparing: 'No se requiere ninguna otra acción. La IA está creando la rama protegida y la solicitud interna de cambios.', detailChecks: 'La IA espera que se aprueben todas las verificaciones protegidas del repositorio.', detailQueued: 'La IA fusionará automáticamente después de que se cumplan todos los requisitos protegidos.', detailPartial: 'La IA completó todas las correcciones seguras compatibles. Los hallazgos no compatibles siguen visibles y no se forzaron.', detailMerged: 'La IA fusionó los cambios verificados en main y marcó los hallazgos como corregidos solo después de la confirmación de GitHub.', detailFailed: 'Tu aprobación sigue registrada. El proceso de recuperación reintenta automáticamente los fallos temporales; los errores permanentes siguen visibles.',
+    fixed: 'corregidos', approved: 'aprobados', skipped: 'omitidos', pipelineLabel: 'Flujo autónomo de corrección de auditoría',
+    stepApproval: 'Aprobación registrada', stepPrepare: 'La IA prepara', stepChecks: 'La IA valida', stepMerge: 'La IA fusiona', stepVerified: 'La IA verifica',
   },
   pt: {
-    preparing: 'Preparando correções aprovadas', checksPending: 'As verificações do GitHub estão em execução', autoMergeQueued: 'Fusão na fila após as verificações', partial: 'Correções seguras preparadas com exceções', merged: 'Correções aprovadas mescladas', failed: 'A correção automática precisa de atenção',
-    detailPreparing: 'O sistema está criando a ramificação protegida e o pull request de correção.', detailChecks: 'O pull request existe. As verificações obrigatórias devem passar antes da fusão.', detailQueued: 'O GitHub fará a fusão automaticamente depois que todos os requisitos protegidos forem aprovados.', detailPartial: 'As correções seguras compatíveis foram preparadas. Os achados incompatíveis permanecem visíveis e não foram forçados.', detailMerged: 'O código chegou à main. Os achados só foram marcados como corrigidos depois que o GitHub confirmou a fusão.', detailFailed: 'A aprovação continua registrada. O processo de recuperação tentará novamente falhas temporárias; erros permanentes permanecem visíveis.',
-    openPr: 'Abrir PR de correção', fixed: 'corrigidos', approved: 'aprovados', skipped: 'ignorados', pipelineLabel: 'Fluxo de correção da auditoria',
-    stepApproval: 'Aprovação registrada', stepPrepare: 'Preparar correções', stepChecks: 'PR e verificações', stepMerge: 'Mesclar na main', stepVerified: 'Correção verificada',
+    preparing: 'A SignalBoost AI está preparando as correções aprovadas', checksPending: 'A SignalBoost AI está validando as correções', autoMergeQueued: 'A fusão automática está na fila', partial: 'Correções seguras concluídas com exceções', merged: 'Correções aprovadas concluídas', failed: 'A correção automática precisa de atenção',
+    detailPreparing: 'Nenhuma outra ação é necessária. A IA está criando a ramificação protegida e o pull request interno.', detailChecks: 'A IA está aguardando todas as verificações protegidas do repositório passarem.', detailQueued: 'A IA fará a fusão automaticamente depois que todos os requisitos protegidos forem aprovados.', detailPartial: 'A IA concluiu todas as correções seguras compatíveis. Os achados incompatíveis permanecem visíveis e não foram forçados.', detailMerged: 'A IA mesclou as mudanças verificadas na main e marcou os achados como corrigidos somente após a confirmação do GitHub.', detailFailed: 'Sua aprovação continua registrada. O processo de recuperação repete automaticamente falhas temporárias; erros permanentes permanecem visíveis.',
+    fixed: 'corrigidos', approved: 'aprovados', skipped: 'ignorados', pipelineLabel: 'Fluxo autônomo de correção da auditoria',
+    stepApproval: 'Aprovação registrada', stepPrepare: 'A IA prepara', stepChecks: 'A IA valida', stepMerge: 'A IA mescla', stepVerified: 'A IA verifica',
   },
   pl: {
-    preparing: 'Przygotowywanie zatwierdzonych poprawek', checksPending: 'Trwają kontrole GitHub', autoMergeQueued: 'Scalanie oczekuje na zakończenie kontroli', partial: 'Bezpieczne poprawki przygotowane z wyjątkami', merged: 'Zatwierdzone poprawki scalono', failed: 'Automatyczna naprawa wymaga uwagi',
-    detailPreparing: 'System tworzy chronioną gałąź naprawczą i pull request.', detailChecks: 'Pull request istnieje. Wymagane kontrole repozytorium muszą przejść przed scaleniem.', detailQueued: 'GitHub scali pull request automatycznie po spełnieniu wszystkich chronionych wymagań.', detailPartial: 'Obsługiwane bezpieczne poprawki zostały przygotowane. Nieobsługiwane wyniki pozostają widoczne i nie zostały wymuszone.', detailMerged: 'Kod trafił do main. Wyniki oznaczono jako naprawione dopiero po potwierdzeniu scalenia przez GitHub.', detailFailed: 'Zatwierdzenie pozostaje zapisane. Proces odzyskiwania ponowi błędy przejściowe; błędy trwałe pozostają widoczne.',
-    openPr: 'Otwórz PR naprawczy', fixed: 'naprawiono', approved: 'zatwierdzono', skipped: 'pominięto', pipelineLabel: 'Proces naprawczy audytu',
-    stepApproval: 'Zapisano zgodę', stepPrepare: 'Przygotuj poprawki', stepChecks: 'PR i kontrole', stepMerge: 'Scal do main', stepVerified: 'Naprawa potwierdzona',
+    preparing: 'SignalBoost AI przygotowuje zatwierdzone poprawki', checksPending: 'SignalBoost AI sprawdza poprawki', autoMergeQueued: 'Automatyczne scalanie oczekuje', partial: 'Bezpieczne poprawki ukończono z wyjątkami', merged: 'Zatwierdzone poprawki ukończono', failed: 'Automatyczna naprawa wymaga uwagi',
+    detailPreparing: 'Nie jest wymagane żadne dalsze działanie. AI tworzy chronioną gałąź naprawczą i wewnętrzny pull request.', detailChecks: 'AI czeka na przejście wszystkich chronionych kontroli repozytorium.', detailQueued: 'AI scali zmiany automatycznie po spełnieniu wszystkich chronionych wymagań.', detailPartial: 'AI ukończyła wszystkie obsługiwane bezpieczne poprawki. Nieobsługiwane wyniki pozostają widoczne i nie zostały wymuszone.', detailMerged: 'AI scaliła zweryfikowane zmiany do main i oznaczyła wyniki jako naprawione dopiero po potwierdzeniu GitHub.', detailFailed: 'Twoja zgoda pozostaje zapisana. Proces odzyskiwania automatycznie ponawia błędy przejściowe; błędy trwałe pozostają widoczne.',
+    fixed: 'naprawiono', approved: 'zatwierdzono', skipped: 'pominięto', pipelineLabel: 'Autonomiczny proces naprawczy audytu',
+    stepApproval: 'Zapisano zgodę', stepPrepare: 'AI przygotowuje', stepChecks: 'AI sprawdza', stepMerge: 'AI scala', stepVerified: 'AI weryfikuje',
   },
   ru: {
-    preparing: 'Подготовка одобренных исправлений', checksPending: 'Выполняются проверки GitHub', autoMergeQueued: 'Слияние поставлено в очередь после проверок', partial: 'Безопасные исправления подготовлены с исключениями', merged: 'Одобренные исправления объединены', failed: 'Автоматическое исправление требует внимания',
-    detailPreparing: 'Система создаёт защищённую ветку исправлений и pull request.', detailChecks: 'Pull request создан. Перед слиянием должны пройти обязательные проверки репозитория.', detailQueued: 'GitHub автоматически выполнит слияние после прохождения всех защищённых требований.', detailPartial: 'Поддерживаемые безопасные исправления подготовлены. Неподдерживаемые находки остаются видимыми и не применяются принудительно.', detailMerged: 'Код попал в main. Находки отмечены исправленными только после подтверждения слияния GitHub.', detailFailed: 'Одобрение сохранено. Процесс восстановления повторит временные сбои; постоянные ошибки остаются видимыми.',
-    openPr: 'Открыть PR исправлений', fixed: 'исправлено', approved: 'одобрено', skipped: 'пропущено', pipelineLabel: 'Процесс исправления аудита',
-    stepApproval: 'Согласование записано', stepPrepare: 'Подготовка исправлений', stepChecks: 'PR и проверки', stepMerge: 'Слияние в main', stepVerified: 'Исправление подтверждено',
+    preparing: 'SignalBoost AI подготавливает одобренные исправления', checksPending: 'SignalBoost AI проверяет исправления', autoMergeQueued: 'Автоматическое слияние поставлено в очередь', partial: 'Безопасные исправления завершены с исключениями', merged: 'Одобренные исправления завершены', failed: 'Автоматическое исправление требует внимания',
+    detailPreparing: 'Дополнительные действия не требуются. ИИ создаёт защищённую ветку исправлений и внутренний pull request.', detailChecks: 'ИИ ожидает успешного прохождения всех защищённых проверок репозитория.', detailQueued: 'ИИ выполнит слияние автоматически после прохождения всех защищённых требований.', detailPartial: 'ИИ завершил все поддерживаемые безопасные исправления. Неподдерживаемые находки остаются видимыми и не применяются принудительно.', detailMerged: 'ИИ объединил проверенные изменения с main и отметил находки исправленными только после подтверждения GitHub.', detailFailed: 'Ваше одобрение сохранено. Процесс восстановления автоматически повторяет временные сбои; постоянные ошибки остаются видимыми.',
+    fixed: 'исправлено', approved: 'одобрено', skipped: 'пропущено', pipelineLabel: 'Автономный процесс исправления аудита',
+    stepApproval: 'Одобрение записано', stepPrepare: 'ИИ готовит', stepChecks: 'ИИ проверяет', stepMerge: 'ИИ объединяет', stepVerified: 'ИИ подтверждает',
   },
 }
 
@@ -85,7 +87,6 @@ function activeStage(status: string, state: RemediationLifecycleState): number {
   if (status === 'merged' || state.merged) return 4
   if (status === 'auto_merge_queued') return 3
   if (status === 'checks_pending' || status === 'partial') return 2
-  if (status === 'failed') return state.prUrl ? 2 : 1
   return 1
 }
 
@@ -125,26 +126,19 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
 
   return (
     <div className={`mt-3 rounded-md border bg-bg p-3 ${visual.tone}`} aria-live="polite">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <span className={`inline-block h-2 w-2 rounded-full ${status === 'merged' ? 'bg-[#34d399]' : status === 'failed' ? 'bg-danger' : 'animate-pulse bg-accent'}`} />
-            {visual.title}
-          </div>
-          <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-text-muted">{visual.detail}</p>
-          <div className="mt-2 flex flex-wrap gap-3 font-mono text-[10.5px] text-text-muted">
-            <span>{findingsApproved} {copy.approved}</span>
-            <span>{fixed} {copy.fixed}</span>
-            {skipped > 0 && <span>{skipped} {copy.skipped}</span>}
-          </div>
-          {state.autoMergeError && status === 'failed' && (
-            <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{state.autoMergeError}</p>
-          )}
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <span className={`inline-block h-2 w-2 rounded-full ${status === 'merged' ? 'bg-[#34d399]' : status === 'failed' ? 'bg-danger' : 'animate-pulse bg-accent'}`} />
+          {visual.title}
         </div>
-        {state.prUrl && (
-          <a href={state.prUrl} target="_blank" rel="noreferrer" className="rounded-md border border-current px-3 py-2 text-xs font-semibold transition-fast hover:bg-surface">
-            {copy.openPr}{state.prNumber ? ` #${state.prNumber}` : ''}
-          </a>
+        <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-text-muted">{visual.detail}</p>
+        <div className="mt-2 flex flex-wrap gap-3 font-mono text-[10.5px] text-text-muted">
+          <span>{findingsApproved} {copy.approved}</span>
+          <span>{fixed} {copy.fixed}</span>
+          {skipped > 0 && <span>{skipped} {copy.skipped}</span>}
+        </div>
+        {state.autoMergeError && status === 'failed' && (
+          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{state.autoMergeError}</p>
         )}
       </div>
 

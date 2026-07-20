@@ -14,7 +14,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import RemediationBanner from '@/components/audit/RemediationBanner'
 import RemediationLifecyclePanel, { type RemediationLifecycleState } from '@/components/audit/RemediationLifecyclePanel'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
@@ -72,7 +71,7 @@ const COPY: Record<string, AuditCopy> = {
   en: {
     title: 'Audit Console', subtitle: 'Deep security & quality scans, isolated from live console traffic.',
     viewPlans: 'View plans',
-    approveAllFixes: 'Approve all fixes', approvingAllFixes: 'Approving all fixes…', approvedAllFixes: 'All fixes approved for this audit run.', approvalFailed: 'Could not approve all fixes.', approvalSafety: 'One final approval applies every fix only to this audit run. The thin entry point remains available for Supervisor rollback if corruption is detected.',
+    approveAllFixes: 'Approve all fixes', approvingAllFixes: 'Approving all fixes…', approvedAllFixes: 'All fixes approved for this audit run.', approvalFailed: 'Could not approve all fixes.', approvalSafety: 'This is the only approval. After you approve, SignalBoost AI prepares every supported safe fix, creates the protected internal pull request, waits for checks, merges automatically, verifies the result, and records what was fixed. No further action is required.',
     pathLabel: 'Repository URL', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
     emptyHint: 'Set a path and run a scan, or pick a past run.',
@@ -93,7 +92,7 @@ const COPY: Record<string, AuditCopy> = {
   es: {
     title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
     viewPlans: 'Ver planes',
-    approveAllFixes: 'Aprobar todas las correcciones', approvingAllFixes: 'Aprobando todas las correcciones…', approvedAllFixes: 'Todas las correcciones se aprobaron para esta ejecución de auditoría.', approvalFailed: 'No se pudieron aprobar todas las correcciones.', approvalSafety: 'Una aprobación final aplica cada corrección solo a esta ejecución de auditoría. El punto de entrada ligero sigue disponible para la reversión del Supervisor si se detecta corrupción.',
+    approveAllFixes: 'Aprobar todas las correcciones', approvingAllFixes: 'Aprobando todas las correcciones…', approvedAllFixes: 'Todas las correcciones se aprobaron para esta ejecución de auditoría.', approvalFailed: 'No se pudieron aprobar todas las correcciones.', approvalSafety: 'Esta es la única aprobación. Después de aprobar, SignalBoost AI prepara todas las correcciones seguras compatibles, crea la solicitud interna protegida, espera las verificaciones, fusiona automáticamente, verifica el resultado y registra lo corregido. No se requiere ninguna otra acción.',
     pathLabel: 'URL del repositorio', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
     emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
@@ -114,7 +113,7 @@ const COPY: Record<string, AuditCopy> = {
   pt: {
     title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade, isoladas do tráfego do console ao vivo.',
     viewPlans: 'Ver planos',
-    approveAllFixes: 'Aprovar todas as correções', approvingAllFixes: 'Aprovando todas as correções…', approvedAllFixes: 'Todas as correções foram aprovadas para esta execução de auditoria.', approvalFailed: 'Não foi possível aprovar todas as correções.', approvalSafety: 'Uma aprovação final aplica cada correção apenas a esta execução de auditoria. O ponto de entrada leve continua disponível para reversão do Supervisor se for detectada corrupção.',
+    approveAllFixes: 'Aprovar todas as correções', approvingAllFixes: 'Aprovando todas as correções…', approvedAllFixes: 'Todas as correções foram aprovadas para esta execução de auditoria.', approvalFailed: 'Não foi possível aprovar todas as correções.', approvalSafety: 'Esta é a única aprovação. Depois da aprovação, a SignalBoost AI prepara todas as correções seguras compatíveis, cria o pull request interno protegido, aguarda as verificações, faz a fusão automaticamente, verifica o resultado e registra o que foi corrigido. Nenhuma outra ação é necessária.',
     pathLabel: 'URL do repositório', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
     emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
@@ -135,7 +134,7 @@ const COPY: Record<string, AuditCopy> = {
   pl: {
     title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości, odizolowane od ruchu konsoli na żywo.',
     viewPlans: 'Zobacz plany',
-    approveAllFixes: 'Zatwierdź wszystkie poprawki', approvingAllFixes: 'Zatwierdzanie wszystkich poprawek…', approvedAllFixes: 'Wszystkie poprawki zostały zatwierdzone dla tego uruchomienia audytu.', approvalFailed: 'Nie udało się zatwierdzić wszystkich poprawek.', approvalSafety: 'Jedna końcowa zgoda stosuje każdą poprawkę tylko do tego uruchomienia audytu. Lekki punkt wejścia pozostaje dostępny do wycofania przez Supervisor w razie wykrycia uszkodzenia.',
+    approveAllFixes: 'Zatwierdź wszystkie poprawki', approvingAllFixes: 'Zatwierdzanie wszystkich poprawek…', approvedAllFixes: 'Wszystkie poprawki zostały zatwierdzone dla tego uruchomienia audytu.', approvalFailed: 'Nie udało się zatwierdzić wszystkich poprawek.', approvalSafety: 'To jest jedyna zgoda. Po zatwierdzeniu SignalBoost AI przygotuje wszystkie obsługiwane bezpieczne poprawki, utworzy chroniony wewnętrzny pull request, poczeka na kontrole, automatycznie scali zmiany, zweryfikuje wynik i zapisze naprawione elementy. Nie jest wymagane żadne dalsze działanie.',
     pathLabel: 'URL repozytorium', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
     emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
@@ -156,7 +155,7 @@ const COPY: Record<string, AuditCopy> = {
   ru: {
     title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества, изолированные от живого трафика консоли.',
     viewPlans: 'Посмотреть планы',
-    approveAllFixes: 'Одобрить все исправления', approvingAllFixes: 'Одобряются все исправления…', approvedAllFixes: 'Все исправления одобрены для этого запуска аудита.', approvalFailed: 'Не удалось одобрить все исправления.', approvalSafety: 'Одно финальное одобрение применяет все исправления только к этому запуску аудита. Тонкая точка входа остаётся доступной для отката Supervisor при обнаружении повреждения.',
+    approveAllFixes: 'Одобрить все исправления', approvingAllFixes: 'Одобряются все исправления…', approvedAllFixes: 'Все исправления одобрены для этого запуска аудита.', approvalFailed: 'Не удалось одобрить все исправления.', approvalSafety: 'Это единственное одобрение. После одобрения SignalBoost AI подготовит все поддерживаемые безопасные исправления, создаст защищённый внутренний pull request, дождётся проверок, автоматически выполнит слияние, проверит результат и запишет исправленные элементы. Дополнительные действия не требуются.',
     pathLabel: 'URL репозитория', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
     emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
@@ -529,11 +528,6 @@ export default function AuditCenterPage() {
         )}
 
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
-
-        {/* Ready to Remediate — appears the moment a scan completes with findings. */}
-        {!loading && !remediation && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
-          <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
-        )}
 
         {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved' || view.status === 'remediated') && (
           <section className="mt-4 rounded-md border border-accent/40 bg-surface p-4" aria-live="polite">

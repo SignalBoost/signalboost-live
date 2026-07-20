@@ -14,7 +14,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import RemediationBanner from '@/components/audit/RemediationBanner'
 import RemediationLifecyclePanel, { type RemediationLifecycleState } from '@/components/audit/RemediationLifecyclePanel'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
@@ -529,11 +528,6 @@ export default function AuditCenterPage() {
         )}
 
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
-
-        {/* Ready to Remediate — appears the moment a scan completes with findings. */}
-        {!loading && !remediation && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
-          <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
-        )}
 
         {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved' || view.status === 'remediated') && (
           <section className="mt-4 rounded-md border border-accent/40 bg-surface p-4" aria-live="polite">

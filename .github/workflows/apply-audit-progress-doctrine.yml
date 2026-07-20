@@ -1,0 +1,58 @@
+name: Apply Audit Progress Doctrine
+
+on:
+  push:
+    branches:
+      - feat/audit-live-progress-heartbeat
+    paths:
+      - '.github/workflows/apply-audit-progress-doctrine.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/audit-live-progress-heartbeat
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Update audit operating doctrine
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = 'ONBOARD.md'
+          let value = fs.readFileSync(path, 'utf8')
+
+          const oldDoctrine = `Audit remediation consent and patch workflow:\n\n- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.\n- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.\n- Code findings must still go through a generated preview, visible diff, and explicit \`Confirm & Push Pull Request\` action. Provider and infrastructure findings remain behind the PR Cockpit owner \`Merge/Approve\` gate.\n- The Executive Risk Summary must overlay persisted \`audit_finding_state\` rows before scoring or counting actionable work. Findings marked \`resolved\`, \`accepted\`, or \`wont_fix\` must not continue to appear as active fix offers; \`in_progress\` remains actionable.\n- Repository patch preflight must resolve \`@/*\` imports against the correct workspace: root \`app/\`, \`lib/\`, and \`components/\` paths use the repository-root alias, while \`saas/*\` paths use the SaaS alias. Genuine missing imports must continue to fail closed.\n`
+
+          const newDoctrine = `Audit remediation operating model:\n\n- SignalBoost is AI-driven first with human backup and optional manual control. AI is the default operator after approval; a human may take over by choice or when AI execution fails.\n- One run-scoped owner approval authorizes the supported safe-fix lifecycle for that immutable audit run. SignalBoost AI prepares fixes, creates the protected branch and internal pull request, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.\n- Manual takeover, when exposed, must continue from the same audit run, branch, pull request, checks, logs, and verification state. It must pause autonomous merge before human edits or merge actions and must allow control to return to AI without creating a second implementation.\n- Manual controls are secondary and optional. The normal AI path must never present a GitHub pull request, merge button, preview, assignment, owner, or due-date control as a required next step.\n- Progress reporting must be truthful. The dashboard may show stage-based completion, but it must not invent provider percentages. Motion is allowed only while fresh server heartbeat data is arriving; delayed and stale heartbeats must stop the motion and say that activity is delayed or missing.\n- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.\n- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes without a verified safe executor remain unmodified and visible.\n- The Executive Risk Summary must overlay persisted finding state before scoring. Repository write preflight must resolve \`@/*\` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before checks and merge.\n- \`GITHUB_WRITE_TOKEN\` is backend-only and must never appear in client code, logs, screenshots, report exports, or UI.\n`
+
+          if (!value.includes(oldDoctrine)) throw new Error('Expected legacy audit doctrine not found')
+          value = value.replace(oldDoctrine, newDoctrine)
+
+          const oldLog = '- 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.'
+          const newLog = '- 2026-07-20: Defined the permanent Audit operating model as AI-driven first with optional human takeover on the same run/branch/PR state. Added truthful stage progress plus a real server heartbeat: motion appears only while fresh activity checks arrive, delayed/stale states stop motion and identify the missing heartbeat, and no random provider completion percentage is fabricated.'
+          if (!value.includes(oldLog)) throw new Error('Expected legacy audit changelog entry not found')
+          value = value.replace(oldLog, newLog)
+
+          fs.writeFileSync(path, value)
+          NODE
+
+      - name: Commit doctrine update
+        run: |
+          if git diff --quiet; then
+            echo "Doctrine already updated."
+            exit 0
+          fi
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add ONBOARD.md
+          git commit -m "Document AI-first audit progress and human backup"
+          git push origin HEAD:feat/audit-live-progress-heartbeat

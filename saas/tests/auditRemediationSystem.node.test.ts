@@ -26,7 +26,7 @@ test('transient partial writes resume on the same deterministic branch', () => {
 
   assert.match(retry, /recoverTransientPartialAuditWrites/)
   assert.match(retry, /last\.status === 'partial'/)
-  assert.match(retry, /recovered\.lifecycleStatus === 'checks_pending'/)
+  assert.match(retry, /last\.lifecycleStatus === 'checks_pending'/)
   assert.match(partial, /params\.result\.branch/)
   assert.match(partial, /commitFileToBranch/)
   assert.match(partial, /AI audit remediation: resume approved run/)
@@ -36,12 +36,15 @@ test('transient partial writes resume on the same deterministic branch', () => {
 })
 
 test('non-transient safety skips remain partial and are never force-applied', () => {
+  const retry = read('../lib/audit/approvedRunRemediationRetry.ts')
   const partial = read('../lib/audit/approvedRunPartialRecovery.ts')
 
   assert.match(partial, /category\.toLowerCase\(\) !== 'i18n-raw-string'/)
   assert.match(partial, /unsupported \+= 1/)
-  assert.match(partial, /hasSafetySkip/)
-  assert.match(partial, /lifecycleStatus: hasSafetySkip \? 'partial'/)
+  assert.match(retry, /restoreSafetySkips/)
+  assert.match(retry, /original\.skipped\.filter\(item => !transientReason\(item\.reason\)\)/)
+  assert.match(retry, /hasSafetySkip/)
+  assert.match(retry, /lifecycleStatus: 'partial'/)
 })
 
 test('findings are finalized only from a confirmed merged GitHub PR', () => {
@@ -57,7 +60,7 @@ test('findings are finalized only from a confirmed merged GitHub PR', () => {
   assert.match(lifecycle, /audit_run_remediated/)
 })
 
-test('the required workflow executes both consent and lifecycle regressions', () => {
+test('the required workflow executes consent, approval, and lifecycle regressions', () => {
   const workflow = read('../../.github/workflows/audit-remediation-regression.yml')
   assert.match(workflow, /npm run test:audit-consent/)
   assert.match(workflow, /npm run test:audit-global-approval/)

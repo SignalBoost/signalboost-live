@@ -444,6 +444,31 @@ Preferred YouTube/channel identity: `SignalBoostAi`.
 
 ---
 
+## 10A. Social Outreach Connector and Multi-Platform Publishing Doctrine
+
+The Social Outreach Connector is a sellable BYO-provider portable. Buyers plug in their OWN provider app, connect their OWN account, and spend their OWN money; platform code never absorbs per-use cost. Per-platform go-live always needs three buyer-supplied things: the platform's dev-app keys in env (`SOCIAL_<PLATFORM>_CLIENT_ID` and `_SECRET`), an OAuth account connection, and that platform's own posting-API approval.
+
+Buyer cockpit: `/dashboard/outreach/social`. Each platform card shows provider-app configured/missing, OAuth connected/not, a Missing[] checklist, a Connect/Reconnect button (disabled until the provider app is configured), and Auto-discover / Save destination (which sets `account_ref`). Readiness comes from `/api/outreach/social/capabilities`.
+
+Connect flow (all real, per-buyer, no stubs): `/api/outreach/social/oauth?platform=X` builds the consent URL from the buyer's env keys and stores the returned token in `outreach_social_tokens` scoped to `user_id` (onConflict `user_id,platform`). `getValidSocialToken` reads and refreshes it and returns `{ accessToken, accountRef, accountName }`.
+
+Connectors (`lib/outreach/social-connectors.ts` ADAPTERS) are real API calls. Content type and whether an account reference is required:
+
+- YouTube (video, no account_ref) and TikTok (video, no account_ref)
+- Instagram (video Reels or image, needs account_ref)
+- LinkedIn, Facebook, Reddit (text, need account_ref)
+- Twitter/X (text, no account_ref)
+
+MANDATORY: any code that calls `publishSocialPost` MUST pass `accountRef` from the token, or every account-ref platform fails immediately with `account_ref_not_configured`. Both publish call sites (`publishCampaignCore` in `lib/cos/campaign-queue/publish-core.ts` and `app/api/cos/campaign-queue/publish/route.ts`) thread `accountRef` and `accountName`. Do not regress this.
+
+The publish engine is generic: `publishCampaignCore` maps `campaign.channel` to a platform (or accepts an explicit `platform` override) and attaches the finished branded video URL when the source channel is a video channel. A finished video can therefore be cross-posted to any platform via a `{ id, platform }` override; the video gate keys on the source channel, not the target.
+
+Video status: video-capable connectors are YouTube, TikTok, and Instagram. The automated video pipeline currently auto-publishes to YouTube only (crons filter `VIDEO_CHANNELS = ['youtube','short_video']`, and only `cos-auto-publish-exact` is scheduled). Cross-posting a finished video to TikTok/Instagram works through the publish-route override; a one-click UI for it is not yet built.
+
+Provider-token expiry (critical operational trap): a Google OAuth app left in "Testing" publishing status expires its refresh tokens after exactly 7 days (`invalid_grant`). When that happens, publishing is blocked, no live URL is produced, no email is sent, and the campaign sits at "APPROVED — PUBLISHING". This is not a code bug. Fix: reconnect the account, then publish the Google app to production (Google Cloud, OAuth consent screen, Publish app). Sensitive scopes such as `youtube.upload` may require Google verification. Note also: every publish path emails the live link ONLY after a provider-confirmed live URL exists; no live URL means no email, by design.
+
+---
+
 ## 11. Email Approval Doctrine
 
 The owner should be able to approve final videos from email.
@@ -584,16 +609,13 @@ ChatGPT/OpenAI reasoning may be used as a lead audit/review layer when configure
 
 Do not hard-code vendor hierarchy as a permanent fact if the repo configuration changes. Verify current model/provider configuration before changing audit behavior.
 
-Audit remediation approval and autonomous execution workflow:
+Audit remediation consent and patch workflow:
 
-- One run-scoped owner approval is the only human remediation action. The Audit Console must not ask for a second confirmation after that approval.
-- The approval authorizes every supported safe fix bound to that immutable audit run. SignalBoost AI creates the protected branch and internal pull request, applies supported code and localization fixes, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.
-- The user interface must not expose a human GitHub PR review button, manual merge button, per-finding patch preview, `Confirm & Push Pull Request`, assignment, owner, or due-date controls. The internal branch and pull request are implementation details, not human workflow steps.
-- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.
-- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes that are not covered by a verified safe executor remain unmodified and visible.
-- The Executive Risk Summary remains read-only and must overlay persisted finding state before scoring. It cannot create a second remediation entry point.
-- Repository write preflight must resolve `@/*` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before automated checks and merge.
-- `GITHUB_WRITE_TOKEN` is a backend-only execution credential. It must never be exposed in the UI, logs, report exports, or client code.
+- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.
+- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.
+- Code findings must still go through a generated preview, visible diff, and explicit `Confirm & Push Pull Request` action. Provider and infrastructure findings remain behind the PR Cockpit owner `Merge/Approve` gate.
+- The Executive Risk Summary must overlay persisted `audit_finding_state` rows before scoring or counting actionable work. Findings marked `resolved`, `accepted`, or `wont_fix` must not continue to appear as active fix offers; `in_progress` remains actionable.
+- Repository patch preflight must resolve `@/*` imports against the correct workspace: root `app/`, `lib/`, and `components/` paths use the repository-root alias, while `saas/*` paths use the SaaS alias. Genuine missing imports must continue to fail closed.
 
 ---
 
@@ -621,6 +643,16 @@ Rules:
 - Do not break responsive layout.
 - Do not create panels/modals without an obvious close path.
 - Do not hide important actions behind clipped or fixed-height containers.
+
+---
+
+## 15A. Navigation and Orphaned-Pages Doctrine
+
+The live navbar is `saas/components/PremiumCustomerNavbarV2.tsx` (rendered by `Navbar.tsx`; the old `PremiumCustomerNavbar.tsx` is now a re-export stub). The menu is a `GROUPS: NavGroup[]` array; each item is `{ icon, labelKey, fallbackLabel, href, requiresOwner?, action? }`. Labels render via `t(labelKey, fallbackLabel)`, so a new link is visible immediately in English even before its translation exists; `requiresOwner` items are gated to owner/admin. Add a link by appending an item to the correct group.
+
+A page existing under `app/` does NOT mean it is reachable — a route is reachable only if a menu or another page links to it. The July 2026 audit found 138 routes with only 37 linked, leaving ~43 orphaned; a navbar rebuild surfaced 22 of them. When adding a feature page, wire it into the navbar (owner-gated if it is an operator/admin tool) in the same change.
+
+Portable rule: verify a page actually works before surfacing it in a customer-facing menu. The repo contains half-built and duplicate pages; do not expose those to buyers. Redirect-only pages, developer artifacts (e.g. wireframes), and short-link handlers stay out of the menu.
 
 ---
 
@@ -721,8 +753,10 @@ Keeping onboarding documentation current helps future developers and AI agents a
 
 ## 19. Onboarding Change Log
 
+- 2026-07-20: Fixed multi-platform social publishing. Both `publishSocialPost` call sites (`publishCampaignCore` and the manual publish route) now pass `accountRef`/`accountName` from the connected token; previously LinkedIn, Facebook, Instagram, and Reddit failed instantly with `account_ref_not_configured` and only YouTube and TikTok worked. Added Section 10A (Social Outreach Connector and multi-platform publishing doctrine), covering the BYO-provider model, per-platform account-ref requirements, the generic publish engine, video-cross-post status, and the Google "Testing"-mode 7-day refresh-token expiry that blocks publishing and the live-link email until the OAuth app is published to production.
+- 2026-07-20: Documented and began repairing navbar orphaned pages (Section 15A). Audit found 138 routes with only 37 linked (~43 orphaned); delivered a navbar rebuild adding 22 visible links (including the Social Outreach Connector at `/dashboard/outreach/social`) and set the rule that new feature pages must be wired into the navbar and verified working before being surfaced to buyers.
 - 2026-07-19: Removed ONBOARD.md merge gating from GitHub Actions, local commit hooks, and pull-request guidance. ONBOARD.md remains recommended onboarding and maintenance documentation, while unrelated branch protection, code-owner review, and quality/safety checks remain in place.
-- 2026-07-20: Corrected Audit remediation to the permanent SignalBoost operating model: one run-scoped owner approval authorizes the full supported safe-fix lifecycle. SignalBoost AI now owns branch creation, internal PR creation, localization, protected checks, automatic merge, verification, durable retry/recovery, and final fixed-state recording. Human PR review, per-finding preview, confirm-push, manual merge, assignment, owner, and due-date remediation controls are prohibited.
+- 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.
 - 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.
 - 2026-07-18: Added persistent emergency routing: injected a globally accessible, owner/admin-gated `🛑 Supervisor SOC (Kill Switch)` link to the Mission 001 Supervisor SOC and Kill Switch into the shared AppShell navigation and responsive hamburger menu to ensure immediate human override capability during AI failures. The server-side Supervisor and kill/restore authorization gates remain unchanged.

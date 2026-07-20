@@ -1,10 +1,14 @@
 // One owner approval authorizes every safe fix in one immutable audit run.
-// Approval is persisted atomically, then deterministic remediation creates one
-// ai/* branch and one PR. Retries are idempotent for already-approved runs.
+// Approval records consent only. The remediation controller creates one governed
+// PR, waits for protected checks, merges it, and only then marks findings fixed.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS } from '@/lib/audit/approvalSchemaRepair'
+import {
+  installAuditRemediationLifecycle,
+  isAuditLifecycleFunctionMissing,
+} from '@/lib/audit/remediationLifecycleRepair'
 import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
@@ -16,6 +20,7 @@ const REQUIRED_MIGRATIONS = [
   '20260719_audit_run_global_approval.sql',
   '20260719_audit_remediation_findings_approval.sql',
   '20260719_repair_audit_approval_schema_drift.sql',
+  '20260720_audit_remediation_lifecycle_v2.sql',
 ] as const
 
 function isUuid(value: unknown): value is string {
@@ -23,13 +28,13 @@ function isUuid(value: unknown): value is string {
 }
 
 function isApprovalSchemaDrift(message: string): boolean {
-  const normalized = message.toLowerCase()
+  const normalized = String(message || '').toLowerCase()
   const missingObject = normalized.includes('does not exist') || normalized.includes('could not find') || normalized.includes('schema cache')
   return (
+    isAuditLifecycleFunctionMissing(normalized) ||
     normalized.includes('column "approved" of relation "audit_runs" does not exist') ||
     normalized.includes('column reference "run_id" is ambiguous') ||
     normalized.includes('column reference run_id is ambiguous') ||
-    (normalized.includes('approve_audit_run_remediation') && missingObject) ||
     (normalized.includes('audit_remediation_approvals') && missingObject) ||
     (normalized.includes('column "fixed"') && missingObject)
   )
@@ -41,9 +46,19 @@ function embeddedRpcError(data: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
+async function installBaseApprovalSchema(admin: any): Promise<{ ok: boolean; failedStep: number | null; error: string }> {
+  for (const [index, query] of AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.entries()) {
+    const result = await admin.rpc('hub_exec_sql', { query })
+    const error = result.error?.message || embeddedRpcError(result.data)
+    if (error) return { ok: false, failedStep: index + 1, error: String(error) }
+  }
+  await new Promise(resolve => setTimeout(resolve, 250))
+  return { ok: true, failedStep: null, error: '' }
+}
+
 function remediationError(remediation: Awaited<ReturnType<typeof runApprovedAuditRemediationWithRetry>>): string {
   const first = remediation.skipped.find(item => item.reason)?.reason
-  return first || 'The approved run could not create a remediation pull request.'
+  return first || remediation.autoMergeError || 'The approved run could not complete its governed remediation workflow.'
 }
 
 export async function POST(req: NextRequest) {
@@ -59,41 +74,28 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = getAdminSupabase()
-  let schemaRepairAttempted = false
-  let schemaRepaired = false
-  let schemaRepairFailedStep: number | null = null
-  let approval = await admin.rpc('approve_audit_run_remediation', {
+  let repairAttempted = false
+  let repairCompleted = false
+  let repairFailedStep: number | null = null
+
+  let approval = await admin.rpc('approve_audit_run_remediation_v2', {
     p_run_id: body.runId,
     p_approved_by: ctx.userId,
   })
 
   if (approval.error && isApprovalSchemaDrift(String(approval.error.message || ''))) {
-    schemaRepairAttempted = true
-    for (const [index, query] of AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.entries()) {
-      const repair = await admin.rpc('hub_exec_sql', { query })
-      if (repair.error || embeddedRpcError(repair.data)) {
-        schemaRepairFailedStep = index + 1
-        break
-      }
+    repairAttempted = true
+    const baseRepair = await installBaseApprovalSchema(admin)
+    if (!baseRepair.ok) {
+      repairFailedStep = baseRepair.failedStep
+    } else {
+      const lifecycleRepair = await installAuditRemediationLifecycle(admin)
+      if (!lifecycleRepair.ok) repairFailedStep = AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.length + (lifecycleRepair.failedStep || 0)
+      else repairCompleted = true
     }
 
-    if (schemaRepairFailedStep === null) {
-      schemaRepaired = true
-      await admin.from('audit_logs').insert({
-        run_id: body.runId,
-        user_id: ctx.userId,
-        payload: {
-          event: 'audit_approval_schema_repaired',
-          runId: body.runId,
-          approvedBy: ctx.userId,
-          migration: '20260719_repair_audit_approval_schema_drift.sql',
-          statementsApplied: AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.length,
-          status: 'repaired',
-          timestamp: new Date().toISOString(),
-        },
-      })
-      await new Promise(resolve => setTimeout(resolve, 250))
-      approval = await admin.rpc('approve_audit_run_remediation', {
+    if (repairFailedStep === null) {
+      approval = await admin.rpc('approve_audit_run_remediation_v2', {
         p_run_id: body.runId,
         p_approved_by: ctx.userId,
       })
@@ -103,19 +105,16 @@ export async function POST(req: NextRequest) {
   if (approval.error) {
     const message = String(approval.error.message || '')
     if (isApprovalSchemaDrift(message)) {
-      const repairDetail = schemaRepairFailedStep !== null
-        ? ` Automatic repair stopped at step ${schemaRepairFailedStep} of ${AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS.length}.`
-        : schemaRepaired
-          ? ' Automatic repair completed, but Supabase has not exposed the repaired approval function yet. Retry once.'
-          : ''
       return NextResponse.json({
         ok: false,
         code: 'audit_approval_schema_not_ready',
-        error: `Audit approval is temporarily unavailable because the Supabase approval schema is not current.${repairDetail}`,
+        error: repairFailedStep === null
+          ? 'Audit approval lifecycle is not ready yet. Retry once after the schema cache reloads.'
+          : `Audit approval lifecycle repair stopped at step ${repairFailedStep}.`,
         requiredMigrations: REQUIRED_MIGRATIONS,
-        repairAttempted: schemaRepairAttempted,
-        repairCompleted: schemaRepaired,
-        repairFailedStep: schemaRepairFailedStep,
+        repairAttempted,
+        repairCompleted,
+        repairFailedStep,
         retryable: true,
       }, { status: 503 })
     }
@@ -126,7 +125,11 @@ export async function POST(req: NextRequest) {
   const alreadyApproved = event?.reason === 'already_approved'
   if (!event?.approved && !alreadyApproved) {
     const status = event?.reason === 'run_not_complete' ? 422 : 409
-    return NextResponse.json({ ok: false, code: event?.reason || 'approval_refused', error: event?.message || 'This audit run cannot be approved.' }, { status })
+    return NextResponse.json({
+      ok: false,
+      code: event?.reason || 'approval_refused',
+      error: event?.message || 'This audit run cannot be approved.',
+    }, { status })
   }
 
   const remediation = await runApprovedAuditRemediationWithRetry({
@@ -139,24 +142,27 @@ export async function POST(req: NextRequest) {
       ok: false,
       approved: true,
       code: 'audit_remediation_failed',
-      error: `The run is approved, but the code fixes could not be prepared. ${remediationError(remediation)}`,
+      error: `Approval was recorded, but the automated remediation system did not complete. ${remediationError(remediation)}`,
       retryable: true,
       remediation,
-      schemaRepaired,
+      repairCompleted,
     }, { status: 502 })
   }
 
-  const findingsFixed = remediation.findingsApplied + remediation.findingsAlreadyResolved
+  const findingsApproved = Number(event?.findings_approved || remediation.findingsTotal || 0)
+  const findingsFixed = remediation.merged ? remediation.findingsApplied : 0
+
   return NextResponse.json({
     ok: true,
     runId: body.runId,
+    approved: true,
     approvedBy: event?.approved_by || ctx.userId,
+    findingsApproved,
     findingsFixed,
-    findingsApproved: Number(event?.findings_fixed || remediation.findingsTotal || 0),
-    status: 'approved',
+    status: remediation.lifecycleStatus,
     timestamp: event?.timestamp || remediation.approvedAt,
     alreadyApproved,
-    schemaRepaired,
+    repairCompleted,
     remediation,
     rollback: { entryPoint: 'thin', available: true },
   })

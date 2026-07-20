@@ -445,6 +445,18 @@ async function reconcilePullRequest(params: {
   }
 
   let pr = fetched.value
+
+  if (params.result.status === 'partial' || params.result.lifecycleStatus === 'partial') {
+    const partial = systemResult(params.result, {
+      ok: true,
+      status: 'partial',
+      lifecycleStatus: 'partial',
+      autoMergeQueued: false,
+      autoMergeError: '',
+    })
+    await writeLifecycleLog(params.admin, params.runId, params.actorUserId, partial)
+    return partial
+  }
   if (pr.merged) {
     const finalized = await finalizeMergedRun({
       admin: params.admin,
@@ -486,17 +498,6 @@ async function reconcilePullRequest(params: {
     return failed
   }
 
-  if (params.result.status === 'partial' || params.result.lifecycleStatus === 'partial') {
-  const partial = systemResult(params.result, {
-    ok: true,
-    status: 'partial',
-    lifecycleStatus: 'partial',
-    autoMergeQueued: false,
-    autoMergeError: '',
-  })
-  await writeLifecycleLog(params.admin, params.runId, params.actorUserId, partial)
-  return partial
-}
 
 const autoMerge = await queueAutoMerge(pr.number)
   if (!autoMerge.queued) {

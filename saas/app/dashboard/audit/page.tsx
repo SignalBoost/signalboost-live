@@ -15,6 +15,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import RemediationBanner from '@/components/audit/RemediationBanner'
+import RemediationLifecyclePanel, { type RemediationLifecycleState } from '@/components/audit/RemediationLifecyclePanel'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
 // the drawer without the global app shell/navbar. Each is code-split via lazy().
@@ -275,6 +276,7 @@ export default function AuditCenterPage() {
   const [error, setError] = useState<string | null>(null)
   const [approvalMessage, setApprovalMessage] = useState<string | null>(null)
   const [approvingAll, setApprovingAll] = useState(false)
+  const [remediation, setRemediation] = useState<RemediationLifecycleState | null>(null)
 
   const [runs, setRuns] = useState<RunSummary[]>([])
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
@@ -321,6 +323,13 @@ export default function AuditCenterPage() {
 
   useEffect(() => { loadHistory() }, [loadHistory])
 
+  useEffect(() => {
+    const status = remediation?.lifecycleStatus
+    if (!selectedRunId || !status || ['merged', 'failed', 'partial'].includes(status)) return
+    const id = setInterval(() => { void openRun(selectedRunId) }, 10000)
+    return () => clearInterval(id)
+  }, [selectedRunId, remediation?.lifecycleStatus])
+
   // Elapsed-time heartbeat so a long run never looks frozen.
   useEffect(() => {
     if (!loading) return
@@ -330,7 +339,7 @@ export default function AuditCenterPage() {
   }, [loading])
 
   async function runNew() {
-    setLoading(true); setError(null); setView(null); setSelectedRunId(null)
+    setLoading(true); setError(null); setView(null); setSelectedRunId(null); setRemediation(null); setApprovalMessage(null)
     setPhase('SCAN_TARGET'); setProgress({ done: 0, total: 0 })
     try {
       const res = await fetch('/api/hub/operator/audit', {
@@ -394,6 +403,8 @@ export default function AuditCenterPage() {
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) { setError(data?.error || copy.failed); return }
       const r = data.run
+      const remediationState = (data.remediation || null) as RemediationLifecycleState | null
+      setRemediation(remediationState)
       const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null
       const findings = (log?.findings as Finding[]) || (data.findings as Finding[]) || []
       setView({
@@ -401,17 +412,17 @@ export default function AuditCenterPage() {
         filesScanned: Array.isArray(log?.filesScanned) ? log!.filesScanned!.length : (r?.files_scanned || 0),
         findingsCount: typeof log?.findingsCount === 'number' ? log!.findingsCount! : (r?.findings_count || 0),
         prefix: log?.prefix ?? r?.prefix,
-        status: r?.status,
+        status: remediationState?.lifecycleStatus === 'merged' ? 'remediated' : r?.status,
       })
       setProgress({ done: 0, total: 0 })
-      setPhase(r?.status === 'complete' ? 'DONE' : null)
+      setPhase(r?.status === 'complete' || r?.status === 'remediated' ? 'DONE' : null)
     } catch {
       setError(copy.failed)
     }
   }
 
   async function approveAllFixes() {
-    if (!selectedRunId || !view || view.status === 'approved') return
+    if (!selectedRunId || !view || view.status === 'approved' || view.status === 'remediated') return
     setApprovingAll(true); setError(null); setApprovalMessage(null)
     try {
       const res = await fetch('/api/hub/operator/audit/approve-all', {
@@ -420,8 +431,11 @@ export default function AuditCenterPage() {
       })
       const result = await res.json().catch(() => null)
       if (!res.ok || !result?.ok) { setError(result?.error || copy.approvalFailed); return }
-      setView(current => current ? { ...current, status: 'approved' } : current)
-      setApprovalMessage(`${copy.approvedAllFixes} ${result.findingsFixed} ${copy.findings}.`)
+      const lifecycle = (result.remediation || null) as RemediationLifecycleState | null
+      setRemediation(lifecycle)
+      const merged = result.status === 'merged' || lifecycle?.merged === true
+      setView(current => current ? { ...current, status: merged ? 'remediated' : 'approved' } : current)
+      setApprovalMessage(merged ? `${copy.approvedAllFixes} ${result.findingsFixed} ${copy.findings}.` : null)
       loadHistory()
     } catch {
       setError(copy.approvalFailed)
@@ -505,21 +519,22 @@ export default function AuditCenterPage() {
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
         {/* Ready to Remediate — appears the moment a scan completes with findings. */}
-        {!loading && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
+        {!loading && !remediation && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
           <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
         )}
 
-        {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved') && (
+        {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved' || view.status === 'remediated') && (
           <section className="mt-4 rounded-md border border-accent/40 bg-surface p-4" aria-live="polite">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-text">{view.status === 'approved' ? copy.approvedAllFixes : copy.approveAllFixes}</h2>
+                <h2 className="text-sm font-semibold text-text">{view.status === 'approved' || view.status === 'remediated' ? copy.approvedAllFixes : copy.approveAllFixes}</h2>
                 <p className="mt-1 max-w-[720px] text-[12.5px] leading-relaxed text-text-muted">{copy.approvalSafety}</p>
               </div>
-              <button onClick={approveAllFixes} disabled={approvingAll || view.status === 'approved'} className="rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
-                {approvingAll ? copy.approvingAllFixes : view.status === 'approved' ? copy.approvedAllFixes : copy.approveAllFixes}
+              <button onClick={approveAllFixes} disabled={approvingAll || view.status === 'approved' || view.status === 'remediated'} className="rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+                {approvingAll ? copy.approvingAllFixes : view.status === 'approved' || view.status === 'remediated' ? copy.approvedAllFixes : copy.approveAllFixes}
               </button>
             </div>
+            <RemediationLifecyclePanel state={remediation} lang={lang} findingsApproved={view.findingsCount} />
           </section>
         )}
         {approvalMessage && <div className="mt-3 rounded-md border border-[#34d399]/40 bg-surface p-3 text-sm text-[#86efac]">{approvalMessage}</div>}

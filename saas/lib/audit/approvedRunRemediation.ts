@@ -158,7 +158,13 @@ function groupByFile(findings: AuditFinding[]): Map<string, AuditFinding[]> {
 function existingRemediation(rows: any[]): ApprovedRunRemediationResult | null {
   for (const row of rows || []) {
     const payload = row?.payload
-    if (payload?.kind === 'audit_batch_remediation' && payload?.approval === 'final' && payload?.ok === true) {
+    if (
+      payload?.kind === 'audit_batch_remediation' &&
+      payload?.approval === 'final' &&
+      payload?.ok === true &&
+      payload?.status !== 'partial' &&
+      payload?.lifecycleStatus !== 'partial'
+    ) {
       return payload as ApprovedRunRemediationResult
     }
   }
@@ -384,7 +390,7 @@ export async function runApprovedAuditRemediation(params: {
     'The owner already approved this run. Automatic merge is requested only after required repository checks pass.',
   ].join('\n')
   await updatePullRequest(prNumber, `AI audit remediation — run ${runId.slice(0, 8)}`, prBody)
-  const autoMerge = await queueAutoMerge(prNumber)
+  const autoMerge = { queued: false, error: 'Deferred to the end-to-end remediation controller.' }
   const isPartial = findingsApplied + alreadyResolved < findings.length
   const payload: ApprovedRunRemediationResult = {
     kind: 'audit_batch_remediation', ok: true, approval: 'final', runId,

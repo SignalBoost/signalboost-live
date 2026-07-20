@@ -20,6 +20,21 @@ test('merged PR recovery runs before any deleted source branch is read', () => {
   assert.doesNotMatch(merged, /contents\/\$\{encoded\}\?ref=/)
 })
 
+test('legacy preparation cannot merge before lifecycle support files are committed', () => {
+  const engine = read('../lib/audit/approvedRunRemediation.ts')
+  const system = read('../lib/audit/approvedRunRemediationSystem.ts')
+
+  assert.match(engine, /Deferred to the end-to-end remediation controller/)
+  assert.doesNotMatch(engine, /const autoMerge = await queueAutoMerge\(prNumber\)/)
+  assert.match(engine, /payload\?\.status !== 'partial'/)
+  assert.match(engine, /payload\?\.lifecycleStatus !== 'partial'/)
+
+  const localization = system.indexOf('ensureLocalizationCatalogs({')
+  const reconciliation = system.indexOf('return reconcilePullRequest({')
+  assert.ok(localization >= 0, 'localization preparation is missing')
+  assert.ok(reconciliation > localization, 'merge reconciliation must happen after localization')
+})
+
 test('transient partial writes resume on the same deterministic branch', () => {
   const retry = read('../lib/audit/approvedRunRemediationRetry.ts')
   const partial = read('../lib/audit/approvedRunPartialRecovery.ts')
@@ -51,6 +66,7 @@ test('findings are finalized only from a confirmed merged GitHub PR', () => {
   const merged = read('../lib/audit/approvedRunMergedRecovery.ts')
   const system = read('../lib/audit/approvedRunRemediationSystem.ts')
   const lifecycle = read('../lib/audit/remediationLifecycleRepair.ts')
+  const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
 
   assert.match(merged, /if \(!pull\.data\?\.merged\) return null/)
   assert.match(system, /if \(pr\.merged\)/)
@@ -58,6 +74,28 @@ test('findings are finalized only from a confirmed merged GitHub PR', () => {
   assert.match(lifecycle, /finalize_audit_run_remediation_v2/)
   assert.match(lifecycle, /set fixed = true/)
   assert.match(lifecycle, /audit_run_remediated/)
+  assert.match(route, /const findingsFixed = remediation\.merged \? remediation\.findingsApplied : 0/)
+  assert.doesNotMatch(route, /findingsApplied \+ remediation\.findingsAlreadyResolved/)
+})
+
+test('the Audit Console displays and refreshes the real remediation lifecycle', () => {
+  const dashboard = read('../app/dashboard/audit/page.tsx')
+  const panel = read('../components/audit/RemediationLifecyclePanel.tsx')
+
+  assert.match(dashboard, /RemediationLifecyclePanel/)
+  assert.match(dashboard, /setRemediation\(lifecycle\)/)
+  assert.match(dashboard, /setInterval\(\(\) => \{ void openRun\(selectedRunId\) \}, 10000\)/)
+  assert.match(dashboard, /remediationState\?\.lifecycleStatus === 'merged'/)
+  assert.match(dashboard, /state=\{remediation\}/)
+  assert.match(dashboard, /!remediation && view/)
+
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) {
+    assert.match(panel, new RegExp(`\\b${lang}: \\{`))
+  }
+  assert.match(panel, /state\.prUrl/)
+  assert.match(panel, /status === 'merged'/)
+  assert.match(panel, /status === 'failed'/)
+  assert.match(panel, /status === 'partial'/)
 })
 
 test('the required workflow executes consent, approval, and lifecycle regressions', () => {

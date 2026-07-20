@@ -4,6 +4,8 @@
 // returns a genuine provider id. Missing tokens, destination refs, media, or API
 // errors return ok:false and never create fake success records.
 
+export type PublishMode = 'link' | 'native'
+
 export type SocialPlatform =
   | 'facebook_pages'
   | 'instagram_business'
@@ -25,6 +27,7 @@ export type SocialPostPayload = {
   description?: string
   tags?: string[]
   privacyStatus?: 'public' | 'unlisted' | 'private'
+  publishMode?: PublishMode
 }
 
 export type SocialEngagementMetrics = { likes: number; shares: number; comments: number }
@@ -96,6 +99,63 @@ async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: str
   if (!uploadRes.ok) { const e = await uploadRes.json().catch(() => ({})); throw new Error(e?.error?.message || `YouTube video upload failed: ${uploadRes.status}`) }
   const uploadData = await uploadRes.json()
   return { id: String(uploadData.id), url: `https://www.youtube.com/watch?v=${uploadData.id}` }
+}
+
+async function publishFacebookVideo(p: SocialPostPayload, token: string): Promise<RawPost> {
+  if (!p.videoUrl) throw new Error('facebook_video_requires_video')
+  const res = await fetch(`https://graph.facebook.com/v20.0/${p.accountRef}/videos`, {
+    method: 'POST',
+    body: new URLSearchParams({ file_url: p.videoUrl, description: p.text || '', access_token: token }),
+  })
+  const d = await res.json().catch(() => ({} as any))
+  if (!res.ok || d.error || !d.id) throw new Error(d?.error?.message || `facebook_video_failed_${res.status}`)
+  return { id: String(d.id), url: `https://www.facebook.com/${d.id}` }
+}
+
+async function publishLinkedInVideo(p: SocialPostPayload, token: string): Promise<RawPost> {
+  if (!p.videoUrl) throw new Error('linkedin_video_requires_video')
+  const owner = `urn:li:organization:${p.accountRef}`
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'LinkedIn-Version': '202401',
+    'X-Restli-Protocol-Version': '2.0.0',
+    'Content-Type': 'application/json',
+  }
+  const videoRes = await fetch(p.videoUrl)
+  if (!videoRes.ok) throw new Error(`linkedin_video_fetch_failed_${videoRes.status}`)
+  const videoBuffer = Buffer.from(await videoRes.arrayBuffer())
+  const fileSizeBytes = videoBuffer.byteLength
+  const initRes = await fetch('https://api.linkedin.com/rest/videos?action=initializeUpload', {
+    method: 'POST', headers,
+    body: JSON.stringify({ initializeUploadRequest: { owner, fileSizeBytes, uploadCaptions: false, uploadThumbnail: false } }),
+  })
+  const initData = await initRes.json().catch(() => ({} as any))
+  const videoUrn = initData?.value?.video
+  const uploadToken = initData?.value?.uploadToken || ''
+  const instructions = Array.isArray(initData?.value?.uploadInstructions) ? initData.value.uploadInstructions : []
+  if (!initRes.ok || !videoUrn || !instructions.length) throw new Error(initData?.message || `linkedin_video_init_failed_${initRes.status}`)
+  const uploadedPartIds: string[] = []
+  for (const ins of instructions) {
+    const firstByte = Number(ins.firstByte || 0)
+    const lastByte = Number(ins.lastByte >= 0 ? ins.lastByte : fileSizeBytes - 1)
+    const chunk = videoBuffer.subarray(firstByte, lastByte + 1)
+    const upRes = await fetch(String(ins.uploadUrl), { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' }, body: chunk })
+    if (!upRes.ok) throw new Error(`linkedin_video_chunk_failed_${upRes.status}`)
+    const etag = upRes.headers.get('etag')
+    if (etag) uploadedPartIds.push(etag.replace(/"/g, ''))
+  }
+  const finRes = await fetch('https://api.linkedin.com/rest/videos?action=finalizeUpload', {
+    method: 'POST', headers,
+    body: JSON.stringify({ finalizeUploadRequest: { video: videoUrn, uploadToken, uploadedPartIds } }),
+  })
+  if (!finRes.ok) { const e = await finRes.json().catch(() => ({} as any)); throw new Error(e?.message || `linkedin_video_finalize_failed_${finRes.status}`) }
+  const postRes = await fetch('https://api.linkedin.com/rest/posts', {
+    method: 'POST', headers,
+    body: JSON.stringify({ author: owner, commentary: p.text || '', visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, content: { media: { title: (p.title || 'Video').slice(0, 400), id: videoUrn } }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false }),
+  })
+  const id = postRes.headers.get('x-restli-id') || postRes.headers.get('x-linkedin-id')
+  if (!postRes.ok || !id) { const e = await postRes.json().catch(() => ({} as any)); throw new Error(e?.message || `linkedin_video_post_failed_${postRes.status}`) }
+  return { id, url: `https://www.linkedin.com/feed/update/${id}` }
 }
 
 export const ADAPTERS: Record<SocialPlatform, Adapter> = {
@@ -221,6 +281,32 @@ export function platformNeedsAccountRef(platform: SocialPlatform): boolean { ret
 
 function failed(mode: string) { return { ok: false, providerPostId: '', liveUrl: null as string | null, metrics: NO_METRICS, mode } }
 
+// UNIFORM HYBRID PUBLISH MODES — applies to EVERY provider.
+// Each provider advertises the modes it supports and a safe default. 'link' posts
+// the caption + tracking link to media hosted elsewhere; 'native' uploads the media
+// into the post itself. Media-host providers (YouTube/TikTok/Instagram) are inherently
+// native. Text-first providers (LinkedIn/Facebook) offer BOTH so a buyer picks per
+// provider, changeable anytime, defaulting to the lean 'link' mode. Providers without
+// a native uploader yet advertise 'link' only.
+const PLATFORM_MODES: Record<SocialPlatform, { availableModes: PublishMode[]; defaultMode: PublishMode }> = {
+  youtube_channels: { availableModes: ['native'], defaultMode: 'native' },
+  tiktok: { availableModes: ['native'], defaultMode: 'native' },
+  instagram_business: { availableModes: ['native'], defaultMode: 'native' },
+  linkedin_company: { availableModes: ['link', 'native'], defaultMode: 'link' },
+  facebook_pages: { availableModes: ['link', 'native'], defaultMode: 'link' },
+  twitter_x: { availableModes: ['link'], defaultMode: 'link' },
+  reddit: { availableModes: ['link'], defaultMode: 'link' },
+}
+
+const NATIVE_PUBLISHERS: Partial<Record<SocialPlatform, (p: SocialPostPayload, accessToken: string) => Promise<RawPost>>> = {
+  facebook_pages: publishFacebookVideo,
+  linkedin_company: publishLinkedInVideo,
+}
+
+export function platformAvailableModes(platform: SocialPlatform): PublishMode[] { return PLATFORM_MODES[platform]?.availableModes || ['link'] }
+export function platformDefaultMode(platform: SocialPlatform): PublishMode { return PLATFORM_MODES[platform]?.defaultMode || 'link' }
+export function platformSupportsNativeVideo(platform: SocialPlatform): boolean { return platformAvailableModes(platform).includes('native') }
+
 export async function publishSocialPost(payload: SocialPostPayload): Promise<{ ok: boolean; providerPostId: string; liveUrl: string | null; metrics: SocialEngagementMetrics; mode: string }> {
   if (!payload.text.trim() && !payload.imageUrl && !payload.videoUrl) throw new Error('Social post requires text, image, or video content.')
   const adapter = ADAPTERS[payload.platform]
@@ -237,10 +323,30 @@ export async function publishSocialPost(payload: SocialPostPayload): Promise<{ o
       if (!adapter.tokenUrl) return failed('oauth_refresh_not_supported')
       accessToken = await refreshOAuth2(payload.platform, adapter.tokenUrl, payload.refreshToken)
     }
-    const raw = await adapter.publish(payload, accessToken as string)
+    // Uniform hybrid dispatch: buyer's chosen mode wins when the provider supports it,
+    // else the provider default. Native uploads the video; on failure we fall back to a
+    // link post wherever 'link' is available, so a post always goes out.
+    const modeCfg = PLATFORM_MODES[payload.platform] || { availableModes: ['link'] as PublishMode[], defaultMode: 'link' as PublishMode }
+    const requestedMode = payload.publishMode
+    const mode: PublishMode = requestedMode && modeCfg.availableModes.includes(requestedMode) ? requestedMode : modeCfg.defaultMode
+    const nativePublisher = NATIVE_PUBLISHERS[payload.platform]
+    let raw: RawPost | null = null
+    let nativeUsed = false
+    if (mode === 'native' && nativePublisher && payload.videoUrl) {
+      try {
+        raw = await nativePublisher(payload, accessToken as string)
+        nativeUsed = true
+      } catch (nativeErr) {
+        if (!modeCfg.availableModes.includes('link')) {
+          return failed(`${payload.platform}_native_error:${nativeErr instanceof Error ? nativeErr.message : 'native_publish_failed'}`)
+        }
+        raw = null
+      }
+    }
+    if (!raw) raw = await adapter.publish(payload, accessToken as string)
     if (!raw?.id) return failed(`${payload.platform}_no_id`)
     const liveUrl = raw.url || adapter.permalink(raw.id, payload.accountRef)
-    return { ok: true, providerPostId: raw.id, liveUrl, metrics: NO_METRICS, mode: `${payload.platform}_live` }
+    return { ok: true, providerPostId: raw.id, liveUrl, metrics: NO_METRICS, mode: `${payload.platform}_${nativeUsed ? 'native_video' : 'live'}` }
   } catch (err) {
     return failed(`${payload.platform}_error:${err instanceof Error ? err.message : 'publish_failed'}`)
   }

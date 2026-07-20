@@ -35,6 +35,7 @@ const GROUPS: NavGroup[] = [
       { icon: '◎', labelKey: 'nav.publicTools.siteReview', fallbackLabel: 'Site Review', href: '/dashboard/audit' },
       { icon: '🛡️', labelKey: 'nav.publicTools.securityCheck', fallbackLabel: 'Security Check', href: '/cybersecurity-check' },
       { icon: '✦', labelKey: 'nav.publicTools.improveYourSite', fallbackLabel: 'Improve Your Site', href: '/dashboard/improve' },
+      { icon: '🚀', labelKey: 'nav.publicTools.websiteOptimizer', fallbackLabel: 'Website Optimizer', href: '/website-optimizer' },
     ],
   },
   {
@@ -51,6 +52,13 @@ const GROUPS: NavGroup[] = [
       { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: 'Press & Print Media', href: '/dashboard/marketing/press-print' },
       { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: 'Press Outreach', href: '/dashboard/marketing/press-outreach' },
       { icon: '📢', labelKey: 'nav.promote', fallbackLabel: 'Promote', href: '/dashboard/promote' },
+      { icon: '🔗', labelKey: 'nav.socialConnections', fallbackLabel: 'Social Connections', href: '/dashboard/outreach/social' },
+      { icon: '🗃️', labelKey: 'nav.allCampaigns', fallbackLabel: 'All Campaigns', href: '/dashboard/campaigns' },
+      { icon: '💡', labelKey: 'nav.opportunities', fallbackLabel: 'Opportunities', href: '/dashboard/opportunities' },
+      { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: 'Sales Pipeline', href: '/dashboard/sales/pipeline' },
+      { icon: '📨', labelKey: 'nav.myOutreach', fallbackLabel: 'My Outreach', href: '/dashboard/my-outreach' },
+      { icon: '⛏️', labelKey: 'nav.cosMining', fallbackLabel: 'COS Mining', href: '/dashboard/cos-mining' },
+      { icon: '🖥️', labelKey: 'nav.marketingConsole', fallbackLabel: 'Marketing + Sales Console', href: '/dashboard/marketing-sales/console' },
     ],
   },
   {
@@ -66,6 +74,9 @@ const GROUPS: NavGroup[] = [
       { icon: '💬', labelKey: 'nav.feedback', fallbackLabel: 'Feedback', href: '/dashboard/feedback' },
       { icon: '🔌', labelKey: 'nav.integrations', fallbackLabel: 'Integrations', href: '/integrations' },
       { icon: '📋', labelKey: 'nav.infrastructure', fallbackLabel: 'Infrastructure Changes', href: '/dashboard/infrastructure' },
+      { icon: '👥', labelKey: 'nav.team', fallbackLabel: 'Team', href: '/dashboard/team' },
+      { icon: '📊', labelKey: 'nav.operationsDashboard', fallbackLabel: 'Operations Dashboard', href: '/dashboard/operations' },
+      { icon: '🧩', labelKey: 'nav.enterpriseIntegrations', fallbackLabel: 'Enterprise Integrations', href: '/enterprise-integration-builder' },
     ],
   },
   {
@@ -83,6 +94,10 @@ const GROUPS: NavGroup[] = [
       { icon: '🎬', labelKey: 'nav.videoStudio', fallbackLabel: 'Video Studio', href: '/dashboard/video' },
       { icon: '🎧', labelKey: 'nav.audioStudio', fallbackLabel: 'Audio Studio', href: '/dashboard/audio' },
       { icon: '🎨', labelKey: 'nav.creativeStudio', fallbackLabel: 'Creative Studio', href: '/dashboard/creative' },
+      { icon: '🎨', labelKey: 'nav.cosaCreative', fallbackLabel: 'COSA Creative', href: '/dashboard/cosa/creative' },
+      { icon: '🆓', labelKey: 'nav.freeVideo', fallbackLabel: 'Free Video', href: '/dashboard/cosa/video/free' },
+      { icon: '🎞️', labelKey: 'nav.motionVideo', fallbackLabel: 'Motion Video', href: '/dashboard/cosa/video/motion' },
+      { icon: '🎙️', labelKey: 'nav.podcasters', fallbackLabel: 'Podcasters', href: '/podcasters' },
     ],
   },
   {
@@ -102,6 +117,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { icon: '❓', labelKey: 'nav.coreHelp', fallbackLabel: 'Contact Support', href: '/support' },
       { icon: '📖', labelKey: 'nav.documentation', fallbackLabel: 'Documentation', href: '/docs' },
+      { icon: '❔', labelKey: 'nav.faq', fallbackLabel: 'FAQ', href: '/faq' },
+      { icon: '📝', labelKey: 'nav.requestPlan', fallbackLabel: 'Request a Plan', href: '/request-plan' },
       { icon: '↪', labelKey: 'nav.logOut', fallbackLabel: 'Log out', action: 'logout' },
     ],
   },
@@ -114,6 +131,10 @@ const GROUPS: NavGroup[] = [
       { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: 'Owner/Admin', href: '/admin', requiresOwner: true },
       { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: 'Supervisor SOC', href: '/dashboard/supervisor', requiresOwner: true },
       { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: 'Console Hub', href: '/hub', requiresOwner: true },
+      { icon: '🔐', labelKey: 'nav.vault', fallbackLabel: 'Key Vault', href: '/vault', requiresOwner: true },
+      { icon: '🧠', labelKey: 'nav.cosHub', fallbackLabel: 'COS Hub', href: '/hub/cos', requiresOwner: true },
+      { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: 'Onboarding Admin', href: '/admin/onboarding', requiresOwner: true },
+      { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: 'Supervisor HA', href: '/dashboard/supervisor/ha', requiresOwner: true },
     ],
   },
 ]

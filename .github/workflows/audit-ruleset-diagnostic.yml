@@ -1,0 +1,38 @@
+name: Audit Ruleset Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/audit-ruleset-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-rulesets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect required workflow rules
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          list="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GH_REPO}/rulesets?includes_parents=true")"
+          ids="$(printf '%s' "$list" | jq -r '.[].id')"
+          if [ -z "$ids" ]; then
+            echo 'RULESET_DIAGNOSTIC: no rulesets returned'
+            exit 0
+          fi
+          for id in $ids; do
+            detail="$(curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GH_REPO}/rulesets/${id}?includes_parents=true")"
+            printf '%s' "$detail" | jq -c '{id,name,target,enforcement,source_type,source,required_workflows:[.rules[]? | select(.type == "workflows") | .parameters.workflows[]? | {path,ref,sha,repository_id}]}'
+          done

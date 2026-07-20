@@ -25,26 +25,34 @@ jobs:
           from pathlib import Path
 
           path = Path('saas/lib/audit/approvedRunRemediationSystem.ts')
-          content = path.read_text()
-          old = """  const partial = params.result.status === 'partial'
-          const pending = systemResult(params.result, {
-            ok: true,
-            status: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
-            lifecycleStatus: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
-            autoMergeQueued: autoMerge.queued,
-            autoMergeError: autoMerge.queued ? '' : autoMerge.error,
-          })"""
-          new = """  const pending = systemResult(params.result, {
-            ok: true,
-            status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
-            lifecycleStatus: autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
-            autoMergeQueued: autoMerge.queued,
-            autoMergeError: autoMerge.queued ? '' : autoMerge.error,
-          })"""
-          count = content.count(old)
-          if count != 1:
-            raise SystemExit(f'expected one unreachable partial block, found {count}')
-          path.write_text(content.replace(old, new))
+          lines = path.read_text().splitlines()
+          partial_line = "const partial = params.result.status === 'partial'"
+          status_old = "status: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',"
+          status_new = "status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',"
+          lifecycle_old = "lifecycleStatus: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',"
+          lifecycle_new = "lifecycleStatus: autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',"
+
+          counts = {
+            'partial': sum(line.strip() == partial_line for line in lines),
+            'status': sum(line.strip() == status_old for line in lines),
+            'lifecycle': sum(line.strip() == lifecycle_old for line in lines),
+          }
+          if counts != {'partial': 1, 'status': 1, 'lifecycle': 1}:
+            raise SystemExit(f'unexpected compiler block counts: {counts}')
+
+          output = []
+          for line in lines:
+            stripped = line.strip()
+            indent = line[:len(line) - len(line.lstrip())]
+            if stripped == partial_line:
+              continue
+            if stripped == status_old:
+              output.append(indent + status_new)
+            elif stripped == lifecycle_old:
+              output.append(indent + lifecycle_new)
+            else:
+              output.append(line)
+          path.write_text('\n'.join(output) + '\n')
           PY
 
       - name: Commit compiler fix

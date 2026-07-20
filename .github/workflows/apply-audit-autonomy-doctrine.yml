@@ -1,0 +1,101 @@
+name: Apply Audit Autonomy Doctrine
+
+on:
+  push:
+    branches:
+      - fix/audit-single-approval-autonomous-remediation
+    paths:
+      - '.github/workflows/apply-audit-autonomy-doctrine.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/audit-single-approval-autonomous-remediation
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Apply permanent single-approval architecture
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          function replaceRequired(value, before, after, label) {
+            if (value.includes(after)) return value
+            if (!value.includes(before)) throw new Error(`Missing expected ${label} block`)
+            return value.replace(before, after)
+          }
+
+          const dashboardPath = 'saas/app/dashboard/audit/page.tsx'
+          let dashboard = fs.readFileSync(dashboardPath, 'utf8')
+          dashboard = replaceRequired(
+            dashboard,
+            "import RemediationBanner from '@/components/audit/RemediationBanner'\n",
+            '',
+            'RemediationBanner import',
+          )
+          dashboard = replaceRequired(
+            dashboard,
+            `        {/* Ready to Remediate — appears the moment a scan completes with findings. */}\n        {!loading && !remediation && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (\n          <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />\n        )}\n\n`,
+            '',
+            'duplicate remediation consent',
+          )
+
+          const copyReplacements = new Map([
+            [
+              "approvalSafety: 'One final approval applies every fix only to this audit run. The thin entry point remains available for Supervisor rollback if corruption is detected.'",
+              "approvalSafety: 'This is the only approval. After you approve, SignalBoost AI prepares every supported safe fix, creates the protected internal pull request, waits for checks, merges automatically, verifies the result, and records what was fixed. No further action is required.'",
+            ],
+            [
+              "approvalSafety: 'Una aprobación final aplica cada corrección solo a esta ejecución de auditoría. El punto de entrada ligero sigue disponible para la reversión del Supervisor si se detecta corrupción.'",
+              "approvalSafety: 'Esta es la única aprobación. Después de aprobar, SignalBoost AI prepara todas las correcciones seguras compatibles, crea la solicitud interna protegida, espera las verificaciones, fusiona automáticamente, verifica el resultado y registra lo corregido. No se requiere ninguna otra acción.'",
+            ],
+            [
+              "approvalSafety: 'Uma aprovação final aplica cada correção apenas a esta execução de auditoria. O ponto de entrada leve continua disponível para reversão do Supervisor se for detectada corrupção.'",
+              "approvalSafety: 'Esta é a única aprovação. Depois da aprovação, a SignalBoost AI prepara todas as correções seguras compatíveis, cria o pull request interno protegido, aguarda as verificações, faz a fusão automaticamente, verifica o resultado e registra o que foi corrigido. Nenhuma outra ação é necessária.'",
+            ],
+            [
+              "approvalSafety: 'Jedna końcowa zgoda stosuje każdą poprawkę tylko do tego uruchomienia audytu. Lekki punkt wejścia pozostaje dostępny do wycofania przez Supervisor w razie wykrycia uszkodzenia.'",
+              "approvalSafety: 'To jest jedyna zgoda. Po zatwierdzeniu SignalBoost AI przygotuje wszystkie obsługiwane bezpieczne poprawki, utworzy chroniony wewnętrzny pull request, poczeka na kontrole, automatycznie scali zmiany, zweryfikuje wynik i zapisze naprawione elementy. Nie jest wymagane żadne dalsze działanie.'",
+            ],
+            [
+              "approvalSafety: 'Одно финальное одобрение применяет все исправления только к этому запуску аудита. Тонкая точка входа остаётся доступной для отката Supervisor при обнаружении повреждения.'",
+              "approvalSafety: 'Это единственное одобрение. После одобрения SignalBoost AI подготовит все поддерживаемые безопасные исправления, создаст защищённый внутренний pull request, дождётся проверок, автоматически выполнит слияние, проверит результат и запишет исправленные элементы. Дополнительные действия не требуются.'",
+            ],
+          ])
+          for (const [before, after] of copyReplacements) {
+            dashboard = replaceRequired(dashboard, before, after, 'localized approval copy')
+          }
+          fs.writeFileSync(dashboardPath, dashboard)
+
+          const onboardPath = 'ONBOARD.md'
+          let onboard = fs.readFileSync(onboardPath, 'utf8')
+          const oldDoctrine = `Audit remediation consent and patch workflow:\n\n- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.\n- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.\n- Code findings must still go through a generated preview, visible diff, and explicit \`Confirm & Push Pull Request\` action. Provider and infrastructure findings remain behind the PR Cockpit owner \`Merge/Approve\` gate.\n- The Executive Risk Summary must overlay persisted \`audit_finding_state\` rows before scoring or counting actionable work. Findings marked \`resolved\`, \`accepted\`, or \`wont_fix\` must not continue to appear as active fix offers; \`in_progress\` remains actionable.\n- Repository patch preflight must resolve \`@/*\` imports against the correct workspace: root \`app/\`, \`lib/\`, and \`components/\` paths use the repository-root alias, while \`saas/*\` paths use the SaaS alias. Genuine missing imports must continue to fail closed.\n`
+          const newDoctrine = `Audit remediation approval and autonomous execution workflow:\n\n- One run-scoped owner approval is the only human remediation action. The Audit Console must not ask for a second confirmation after that approval.\n- The approval authorizes every supported safe fix bound to that immutable audit run. SignalBoost AI creates the protected branch and internal pull request, applies supported code and localization fixes, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.\n- The user interface must not expose a human GitHub PR review button, manual merge button, per-finding patch preview, \`Confirm & Push Pull Request\`, assignment, owner, or due-date controls. The internal branch and pull request are implementation details, not human workflow steps.\n- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.\n- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes that are not covered by a verified safe executor remain unmodified and visible.\n- The Executive Risk Summary remains read-only and must overlay persisted finding state before scoring. It cannot create a second remediation entry point.\n- Repository write preflight must resolve \`@/*\` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before automated checks and merge.\n- \`GITHUB_WRITE_TOKEN\` is a backend-only execution credential. It must never be exposed in the UI, logs, report exports, or client code.\n`
+          onboard = replaceRequired(onboard, oldDoctrine, newDoctrine, 'audit remediation doctrine')
+
+          const oldLog = '- 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.'
+          const newLog = '- 2026-07-20: Corrected Audit remediation to the permanent SignalBoost operating model: one run-scoped owner approval authorizes the full supported safe-fix lifecycle. SignalBoost AI now owns branch creation, internal PR creation, localization, protected checks, automatic merge, verification, durable retry/recovery, and final fixed-state recording. Human PR review, per-finding preview, confirm-push, manual merge, assignment, owner, and due-date remediation controls are prohibited.'
+          onboard = replaceRequired(onboard, oldLog, newLog, 'audit remediation change log')
+          fs.writeFileSync(onboardPath, onboard)
+          NODE
+
+      - name: Commit permanent architecture update
+        run: |
+          if git diff --quiet; then
+            echo "Architecture already applied."
+            exit 0
+          fi
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add ONBOARD.md saas/app/dashboard/audit/page.tsx
+          git commit -m "Enforce approval-only autonomous audit remediation"
+          git push origin HEAD:fix/audit-single-approval-autonomous-remediation

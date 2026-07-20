@@ -43,23 +43,15 @@ function chip(text: string, color = '#94a3b8') {
 function statusColor(p: Platform) { if (p.publishReady) return '#22c55e'; if (p.configured) return '#ffc300'; return '#fb923c' }
 function goodMessage(value: string) { return /saved|ready|discover/i.test(value) }
 
-function PlatformCard({ platform, onSaved, modeInfo }: { platform: Platform; onSaved: () => void; modeInfo?: { availableModes?: string[]; publishMode?: string; canChoose?: boolean } }) {
+function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () => void }) {
   const [accountRef, setAccountRef] = useState(platform.token?.accountRef || '')
-  const [mode, setMode] = useState(modeInfo?.publishMode || 'link')
-  useEffect(() => { if (modeInfo?.publishMode) setMode(modeInfo.publishMode) }, [modeInfo?.publishMode])
   const [accountName, setAccountName] = useState(platform.token?.accountName || '')
   const [saving, setSaving] = useState(false)
   const [discovering, setDiscovering] = useState(false)
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+  const [staging, setStaging] = useState(false)
   const [message, setMessage] = useState('')
-  async function saveMode(next: string) {
-    setMode(next); setMessage('')
-    try {
-      const res = await fetch('/api/outreach/social/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ platform: platform.platform, publish_mode: next }) })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not save publish mode.')
-      setMessage(`Publish mode set to ${next === 'native' ? 'Native video upload' : 'Link + caption'}.`); onSaved()
-    } catch (e: any) { setMessage(e?.message || 'Could not save publish mode.') }
-  }
   const color = statusColor(platform)
 
   async function saveRef(ref = accountRef, name = accountName) {
@@ -87,6 +79,18 @@ function PlatformCard({ platform, onSaved, modeInfo }: { platform: Platform; onS
     finally { setDiscovering(false) }
   }
 
+  async function stageKeysPr() {
+    setStaging(true); setMessage('')
+    try {
+      const res = await fetch('/api/outreach/social/connect-via-pr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ platform: platform.platform, clientId, clientSecret }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not stage the keys PR.')
+      setClientId(''); setClientSecret('')
+      setMessage('Keys PR staged — review and merge it on the Infrastructure page, then click Connect.')
+    } catch (err: any) { setMessage(err?.message || 'Could not stage the keys PR.') }
+    finally { setStaging(false) }
+  }
+
   return <article style={{ ...panel, borderColor: `${color}55` }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
       <div><h3 style={{ color: '#fff', margin: 0 }}>{platform.label}</h3><p style={{ color: 'rgba(255,255,255,.58)', margin: '6px 0 0', fontSize: 12 }}>{platform.platform} · {platform.contentKind}{platform.needsAccountRef ? ' · destination required' : ''}</p></div>
@@ -102,16 +106,37 @@ function PlatformCard({ platform, onSaved, modeInfo }: { platform: Platform; onS
 
     {platform.missing.length ? <div style={{ marginTop: 12 }}><p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, margin: '0 0 6px' }}>Missing:</p><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{platform.missing.map(item => chip(item, '#fb923c'))}</div></div> : null}
 
-    {modeInfo?.canChoose ? <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 850 }}><LocalizedText fallback={"Video mode"} /></span>
-      {(modeInfo.availableModes || ['link']).map(m => <button key={m} onClick={() => saveMode(m)} style={{ ...ghost, ...(mode === m ? { background: 'rgba(255,195,0,.18)', borderColor: '#ffc300', color: '#ffc300' } : {}) }}>{m === 'native' ? 'Native video upload' : 'Link + caption'}</button>)}
-    </div> : null}
-
     <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
       <button style={button} disabled={!platform.configured} onClick={() => { window.location.href = `/api/outreach/social/oauth?platform=${encodeURIComponent(platform.platform)}` }}>{platform.connected ? 'Reconnect' : 'Connect'}</button>
       <button style={ghost} disabled={!platform.connected || discovering} onClick={discoverDestinations}>{discovering ? 'Discovering…' : 'Auto-discover destinations'}</button>
       <button style={ghost} onClick={() => { window.location.href = `/api/outreach/social/oauth?platform=${encodeURIComponent(platform.platform)}&json=1` }}><LocalizedText fallback={"OAuth debug JSON"} /></button>
     </div>
+
+    <details style={{ marginTop: 12 }}>
+      <summary style={{ color: '#1af0ff', cursor: 'pointer', fontSize: 12, fontWeight: 850 }}><LocalizedText fallback={"Connection method — API · COS+PR · Browser Agent"} /></summary>
+      <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
+        <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, margin: 0 }}><LocalizedText fallback={"Pick how to connect this platform. All three reach the same result — choose what you prefer."} /></p>
+
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>API <span style={{ color: '#22c55e', fontWeight: 700 }}>· cheapest</span></p>
+          <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: 0 }}><LocalizedText fallback={"Once the provider-app keys are set, use Connect above to authorize. No cost beyond the platform's own API."} /></p>
+        </div>
+
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>COS + PR</p>
+          <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: '0 0 8px' }}><LocalizedText fallback={"Stage your provider-app Client ID and Secret as an infrastructure PR — review and merge it on the Infrastructure page, then Connect."} /></p>
+          <input value={clientId} onChange={e => setClientId(e.target.value)} placeholder="Client ID" style={{ background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10, width: '100%', boxSizing: 'border-box' }} />
+          <input value={clientSecret} onChange={e => setClientSecret(e.target.value)} placeholder="Client Secret" type="password" style={{ background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10, width: '100%', boxSizing: 'border-box', marginTop: 8 }} />
+          <button style={{ ...ghost, marginTop: 8 }} disabled={staging || !clientId || !clientSecret} onClick={stageKeysPr}>{staging ? 'Staging…' : 'Stage keys PR'}</button>
+        </div>
+
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>Browser Agent <span style={{ color: '#ffc300', fontWeight: 700 }}>· premium</span></p>
+          <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: '0 0 8px' }}><LocalizedText fallback={"Assisted setup that drives the platform's own screens and pauses for you to log in, solve 2FA/CAPTCHA, and authorize. Costs more than API; optional."} /></p>
+          <button style={ghost} disabled title="Assisted browser setup — not yet enabled"><LocalizedText fallback={"Assisted setup (coming)"} /></button>
+        </div>
+      </div>
+    </details>
 
     {platform.destinations?.length ? <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
       <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 850, margin: 0 }}><LocalizedText fallback={"Discovered destinations"} /></p>
@@ -132,7 +157,6 @@ function PlatformCard({ platform, onSaved, modeInfo }: { platform: Platform; onS
 
 export default function EnterpriseSocialOutreachPage() {
   const [data, setData] = useState<Capabilities | null>(null)
-  const [modes, setModes] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
 
@@ -143,11 +167,6 @@ export default function EnterpriseSocialOutreachPage() {
       const json = await res.json().catch(() => ({ ok: false, error: 'Invalid capabilities response' }))
       if (!res.ok || !json.ok) throw new Error(json.error || 'Could not load social capabilities.')
       setData(json)
-      try {
-        const mres = await fetch('/api/outreach/social/settings', { cache: 'no-store', credentials: 'include' })
-        const mjson = await mres.json().catch(() => ({}))
-        if (mjson?.ok) setModes(Object.fromEntries((mjson.platforms || []).map((p: any) => [p.platform, p])))
-      } catch {}
     } catch (err: any) { setMessage(err?.message || 'Could not load social capabilities.') }
     finally { setLoading(false) }
   }
@@ -184,7 +203,7 @@ export default function EnterpriseSocialOutreachPage() {
     </section>
 
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={"Enterprise safety rules"} /></h2><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>{Object.entries(data?.rules || {}).map(([key, value]) => chip(`${key}: ${value ? 'yes' : 'no'}`, value ? '#22c55e' : '#fb923c'))}</div></section>
-    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>{platforms.map(platform => <PlatformCard key={platform.platform} platform={platform} onSaved={load} modeInfo={modes[platform.platform]} />)}{!loading && !platforms.length ? <div style={panel}><p style={{ color: '#fff' }}>{message || 'No platform capability data returned.'}</p></div> : null}</section>
+    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>{platforms.map(platform => <PlatformCard key={platform.platform} platform={platform} onSaved={load} />)}{!loading && !platforms.length ? <div style={panel}><p style={{ color: '#fff' }}>{message || 'No platform capability data returned.'}</p></div> : null}</section>
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={"Operational note"} /></h2><p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>Currently publish-ready: {ready.map(p => p.label).join(', ') || 'none'}. Other platforms are structurally supported and become live after provider credentials, OAuth connection, and automated/manual destination selection.</p></section>
   </main>
 }

@@ -1,0 +1,96 @@
+name: Audit Lifecycle UI Patch
+
+on:
+  push:
+    branches:
+      - fix/audit-system-end-to-end
+    paths:
+      - '.github/workflows/audit-ui-lifecycle-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/audit-system-end-to-end
+          fetch-depth: 0
+
+      - name: Connect lifecycle state to the Audit Console
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('saas/app/dashboard/audit/page.tsx')
+          content = path.read_text()
+
+          replacements = [
+            (
+              "import RemediationBanner from '@/components/audit/RemediationBanner'",
+              "import RemediationBanner from '@/components/audit/RemediationBanner'\nimport RemediationLifecyclePanel, { type RemediationLifecycleState } from '@/components/audit/RemediationLifecyclePanel'",
+            ),
+            (
+              "  const [approvalMessage, setApprovalMessage] = useState<string | null>(null)\n  const [approvingAll, setApprovingAll] = useState(false)",
+              "  const [approvalMessage, setApprovalMessage] = useState<string | null>(null)\n  const [approvingAll, setApprovingAll] = useState(false)\n  const [remediation, setRemediation] = useState<RemediationLifecycleState | null>(null)",
+            ),
+            (
+              "  useEffect(() => { loadHistory() }, [loadHistory])",
+              "  useEffect(() => { loadHistory() }, [loadHistory])\n\n  useEffect(() => {\n    const status = remediation?.lifecycleStatus\n    if (!selectedRunId || !status || ['merged', 'failed', 'partial'].includes(status)) return\n    const id = setInterval(() => { void openRun(selectedRunId) }, 10000)\n    return () => clearInterval(id)\n  }, [selectedRunId, remediation?.lifecycleStatus])",
+            ),
+            (
+              "    setLoading(true); setError(null); setView(null); setSelectedRunId(null)",
+              "    setLoading(true); setError(null); setView(null); setSelectedRunId(null); setRemediation(null); setApprovalMessage(null)",
+            ),
+            (
+              "      const r = data.run\n      const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null",
+              "      const r = data.run\n      const remediationState = (data.remediation || null) as RemediationLifecycleState | null\n      setRemediation(remediationState)\n      const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null",
+            ),
+            (
+              "        status: r?.status,",
+              "        status: remediationState?.merged ? 'remediated' : r?.status,",
+            ),
+            (
+              "      setPhase(r?.status === 'complete' ? 'DONE' : null)",
+              "      setPhase(r?.status === 'complete' || r?.status === 'remediated' ? 'DONE' : null)",
+            ),
+            (
+              "    if (!selectedRunId || !view || view.status === 'approved') return",
+              "    if (!selectedRunId || !view || view.status === 'approved' || view.status === 'remediated') return",
+            ),
+            (
+              "      setView(current => current ? { ...current, status: 'approved' } : current)\n      setApprovalMessage(`${copy.approvedAllFixes} ${result.findingsFixed} ${copy.findings}.`)\n      loadHistory()",
+              "      const lifecycle = (result.remediation || null) as RemediationLifecycleState | null\n      setRemediation(lifecycle)\n      const merged = result.status === 'merged' || lifecycle?.merged === true\n      setView(current => current ? { ...current, status: merged ? 'remediated' : 'approved' } : current)\n      setApprovalMessage(merged ? `${copy.approvedAllFixes} ${result.findingsFixed} ${copy.findings}.` : null)\n      loadHistory()",
+            ),
+            (
+              "        {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved') && (",
+              "        {!loading && view && view.findingsCount > 0 && selectedRunId && (phase === 'DONE' || view.status === 'complete' || view.status === 'approved' || view.status === 'remediated') && (",
+            ),
+            (
+              "                <h2 className=\"text-sm font-semibold text-text\">{view.status === 'approved' ? copy.approvedAllFixes : copy.approveAllFixes}</h2>",
+              "                <h2 className=\"text-sm font-semibold text-text\">{view.status === 'approved' || view.status === 'remediated' ? copy.approvedAllFixes : copy.approveAllFixes}</h2>",
+            ),
+            (
+              "              <button onClick={approveAllFixes} disabled={approvingAll || view.status === 'approved'} className=\"rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60\">\n                {approvingAll ? copy.approvingAllFixes : view.status === 'approved' ? copy.approvedAllFixes : copy.approveAllFixes}\n              </button>\n            </div>\n          </section>",
+              "              <button onClick={approveAllFixes} disabled={approvingAll || view.status === 'approved' || view.status === 'remediated'} className=\"rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60\">\n                {approvingAll ? copy.approvingAllFixes : view.status === 'approved' || view.status === 'remediated' ? copy.approvedAllFixes : copy.approveAllFixes}\n              </button>\n            </div>\n            <RemediationLifecyclePanel state={remediation} lang={lang} findingsApproved={view.findingsCount} />\n          </section>",
+            ),
+          ]
+
+          for old, new in replacements:
+            count = content.count(old)
+            if count != 1:
+              raise SystemExit(f'expected one match, found {count}: {old[:100]!r}')
+            content = content.replace(old, new)
+
+          path.write_text(content)
+          PY
+
+      - name: Commit Audit Console lifecycle UI
+        run: |
+          git config user.name 'SignalBoost Audit Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add saas/app/dashboard/audit/page.tsx
+          git commit -m 'Show live approved audit remediation status'
+          git push origin HEAD:fix/audit-system-end-to-end

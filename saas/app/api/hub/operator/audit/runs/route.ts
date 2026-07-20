@@ -14,6 +14,13 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+const HEARTBEAT_KIND = 'audit_remediation_heartbeat'
+
+type RemediationWithHeartbeat = ApprovedRunRemediationResult & {
+  lifecycleStatus?: string
+  mergedAt?: string
+  activityHeartbeatAt?: string
+}
 
 function localizeFinding(row: any, lang: string) {
   const localized = localizeKnownFindingText({
@@ -42,18 +49,20 @@ function localizeLogPayload(payload: any, lang: string) {
 
 function splitAuditPayloads(rows: any[]) {
   let scan: any = null
-  let remediation: ApprovedRunRemediationResult | null = null
+  let remediation: RemediationWithHeartbeat | null = null
+  let remediationUpdatedAt = ''
   for (const row of rows || []) {
     const payload = row?.payload
     if (!payload || typeof payload !== 'object') continue
     if (!remediation && payload.kind === 'audit_batch_remediation' && payload.approval === 'final') {
-      remediation = payload as ApprovedRunRemediationResult
+      remediation = payload as RemediationWithHeartbeat
+      remediationUpdatedAt = typeof row?.created_at === 'string' ? row.created_at : ''
       continue
     }
     if (!scan && Array.isArray(payload.findings)) scan = payload
     if (scan && remediation) break
   }
-  return { scan, remediation }
+  return { scan, remediation, remediationUpdatedAt }
 }
 
 async function recoverApprovedRun(admin: any, runId: string, actorUserId: string) {
@@ -77,7 +86,23 @@ async function recoverApprovedRun(admin: any, runId: string, actorUserId: string
       filesChanged: 0,
       skipped: [{ file: '(recovery)', findingCount: 0, reason: error instanceof Error ? error.message : 'Approved remediation recovery failed.' }],
       approvedAt: new Date().toISOString(),
-    } satisfies ApprovedRunRemediationResult
+      lifecycleStatus: 'failed',
+      activityHeartbeatAt: '',
+    } satisfies RemediationWithHeartbeat
+  }
+}
+
+function withActivity(
+  remediation: RemediationWithHeartbeat | null,
+  persistedHeartbeatAt: string,
+  updatedAt: string,
+) {
+  if (!remediation) return null
+  const activityCheckedAt = remediation.activityHeartbeatAt || persistedHeartbeatAt || ''
+  return {
+    ...remediation,
+    activityCheckedAt,
+    lifecycleUpdatedAt: updatedAt || remediation.mergedAt || remediation.approvedAt || activityCheckedAt,
   }
 }
 
@@ -109,13 +134,31 @@ export async function GET(req: NextRequest) {
       (a: any, b: any) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9),
     ).map((row: any) => localizeFinding(row, lang))
 
-    const logRows = await admin
-      .from('audit_logs')
-      .select('payload')
-      .eq('run_id', runId)
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const [logRows, heartbeatRow] = await Promise.all([
+      admin
+        .from('audit_logs')
+        .select('payload,created_at')
+        .eq('run_id', runId)
+        .order('created_at', { ascending: false })
+        .limit(200),
+      admin
+        .from('audit_logs')
+        .select('created_at')
+        .eq('run_id', runId)
+        .eq('payload->>kind', HEARTBEAT_KIND)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
     const payloads = splitAuditPayloads(logRows.data || [])
+    const persistedHeartbeatAt = typeof heartbeatRow.data?.created_at === 'string'
+      ? heartbeatRow.data.created_at
+      : ''
+    const remediation = withActivity(
+      (recovery || payloads.remediation) as RemediationWithHeartbeat | null,
+      persistedHeartbeatAt,
+      payloads.remediationUpdatedAt || String(run.data.updated_at || run.data.created_at || ''),
+    )
 
     return NextResponse.json({
       ok: true,
@@ -124,7 +167,7 @@ export async function GET(req: NextRequest) {
       log: localizeLogPayload(payloads.scan, lang),
       // For approved runs, the recovery call is the freshest lifecycle state.
       // Older durable logs remain the fallback for already-remediated history.
-      remediation: recovery || payloads.remediation,
+      remediation,
     })
   }
 
@@ -139,9 +182,14 @@ export async function GET(req: NextRequest) {
   }
 
   const newestApproved = (runs.data || []).find((run: any) => run?.status === 'approved')
-  const recovery = newestApproved?.id
+  const recovered = newestApproved?.id
     ? await recoverApprovedRun(admin, String(newestApproved.id), ctx.userId)
     : null
+  const recovery = withActivity(
+    recovered as RemediationWithHeartbeat | null,
+    '',
+    String(newestApproved?.updated_at || newestApproved?.created_at || ''),
+  )
 
   return NextResponse.json({ ok: true, runs: runs.data || [], recovery })
 }

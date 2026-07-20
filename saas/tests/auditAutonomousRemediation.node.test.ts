@@ -24,7 +24,7 @@ test('Audit Console exposes one run-scoped approval and the AI performs the rest
   assert.match(system, /finalize_audit_run_remediation_v2/)
 })
 
-test('duplicate consent and manual patch surfaces are permanently removed', () => {
+test('the default AI path has no required duplicate consent or patch UI', () => {
   const executive = read('../components/audit/ExecutiveSummary.tsx')
   const stripe = read('../components/audit/StripeReport.tsx')
 
@@ -37,15 +37,59 @@ test('duplicate consent and manual patch surfaces are permanently removed', () =
   assert.equal(existsSync(url('../app/api/hub/operator/audit/patch/route.ts')), false)
 })
 
-test('remediation lifecycle is status-only and exposes no GitHub action', () => {
+test('remediation lifecycle does not present GitHub as a required next step', () => {
   const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
 
-  assert.match(lifecycle, /No further action is required/)
   assert.match(lifecycle, /AI will merge automatically/)
   assert.doesNotMatch(lifecycle, /prUrl|prNumber|openPr|Open remediation PR|target="_blank"|href=/)
 })
 
-test('remediation roadmap is read-only and cannot assign manual work', () => {
+test('remediation lifecycle shows truthful dynamic progress and a real worker heartbeat', () => {
+  const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
+  const runs = read('../app/api/hub/operator/audit/runs/route.ts')
+  const approval = read('../app/api/hub/operator/audit/approve-all/route.ts')
+  const heartbeat = read('../lib/audit/remediationHeartbeat.ts')
+  const retry = read('../lib/audit/approvedRunRemediationRetry.ts')
+
+  assert.match(lifecycle, /activityCheckedAt\?: string/)
+  assert.match(lifecycle, /lifecycleUpdatedAt\?: string/)
+  assert.match(lifecycle, /role="progressbar"/)
+  assert.match(lifecycle, /aria-valuenow=\{progress\}/)
+  assert.match(lifecycle, /window\.setInterval\(\(\) => setNow\(Date\.now\(\)\), 1000\)/)
+  assert.match(lifecycle, /heartbeatAge > 45/)
+  assert.match(lifecycle, /No recent system heartbeat/)
+  assert.match(lifecycle, /sb-audit-progress-flow/)
+  assert.match(lifecycle, /activity\.live &&/)
+  assert.match(lifecycle, /prefers-reduced-motion/)
+
+  assert.match(heartbeat, /HEARTBEAT_INTERVAL_MS = 20_000/)
+  assert.match(heartbeat, /audit_remediation_heartbeat/)
+  assert.match(heartbeat, /approved_remediation_worker/)
+  assert.match(heartbeat, /\.eq\('payload->>kind', HEARTBEAT_KIND\)/)
+  assert.match(retry, /recordApprovedRemediationHeartbeat/)
+  assert.match(retry, /withWorkerHeartbeat/)
+
+  assert.match(runs, /activityHeartbeatAt \|\| persistedHeartbeatAt/)
+  assert.match(runs, /\.eq\('payload->>kind', HEARTBEAT_KIND\)/)
+  assert.match(runs, /lifecycleUpdatedAt:/)
+  assert.doesNotMatch(runs, /const checkedAt = new Date\(\)\.toISOString\(\)/)
+
+  assert.match(approval, /remediation\.activityHeartbeatAt/)
+  assert.match(approval, /remediationWithActivity/)
+  assert.doesNotMatch(approval, /const checkedAt = new Date\(\)\.toISOString\(\)/)
+})
+
+test('progress is stage-based and never pretends to know exact provider completion', () => {
+  const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
+
+  assert.match(lifecycle, /function stageProgress/)
+  assert.match(lifecycle, /status === 'checks_pending'\) return 55/)
+  assert.match(lifecycle, /status === 'auto_merge_queued'\) return 75/)
+  assert.match(lifecycle, /Stage changed/)
+  assert.doesNotMatch(lifecycle, /Math\.random|setProgress\(|fakeProgress|simulatedProgress/)
+})
+
+test('remediation roadmap remains read-only in the default AI path', () => {
   const page = read('../app/hub/audit/remediation/page.tsx')
   const roadmap = read('../components/audit/RemediationRoadmap.tsx')
 
@@ -67,14 +111,16 @@ test('approval is durable and recovery does not ask the owner again', () => {
   assert.doesNotMatch(runs, /approve_audit_run_remediation_v2/)
 })
 
-test('ONBOARD defines approval-only autonomous remediation and forbids human PR UI', () => {
+test('ONBOARD defines AI-first execution, optional human takeover, and truthful progress', () => {
   const onboard = read('../../ONBOARD.md')
 
-  assert.match(onboard, /one run-scoped owner approval/i)
-  assert.match(onboard, /AI creates the protected branch and internal pull request/i)
-  assert.match(onboard, /waits for required checks, merges automatically, verifies the result/i)
-  assert.match(onboard, /must not expose a human GitHub PR review button/i)
-  assert.match(onboard, /per-finding patch preview/i)
-  assert.match(onboard, /assignment, owner, or due-date controls/i)
+  assert.match(onboard, /AI-driven first with human backup and optional manual control/i)
+  assert.match(onboard, /same audit run, branch, pull request, checks, logs, and verification state/i)
+  assert.match(onboard, /pause autonomous merge/i)
+  assert.match(onboard, /Manual controls are secondary and optional/i)
+  assert.match(onboard, /as a required next step/i)
+  assert.match(onboard, /stage-based completion/i)
+  assert.match(onboard, /fresh server heartbeat data/i)
+  assert.match(onboard, /delayed and stale heartbeats must stop the motion/i)
   assert.match(onboard, /without asking the owner to approve again/i)
 })

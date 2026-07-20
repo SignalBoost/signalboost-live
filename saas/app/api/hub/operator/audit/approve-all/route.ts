@@ -61,6 +61,15 @@ function remediationError(remediation: Awaited<ReturnType<typeof runApprovedAudi
   return first || remediation.autoMergeError || 'The approved run could not complete its governed remediation workflow.'
 }
 
+function withActivity<T extends Record<string, any>>(remediation: T) {
+  const activityCheckedAt = String(remediation.activityHeartbeatAt || '')
+  return {
+    ...remediation,
+    activityCheckedAt,
+    lifecycleUpdatedAt: remediation.mergedAt || remediation.approvedAt || activityCheckedAt,
+  }
+}
+
 export async function POST(req: NextRequest) {
   const ctx = await getAccess()
   if (!ctx.isOwner || !ctx.userId) {
@@ -137,6 +146,8 @@ export async function POST(req: NextRequest) {
     runId: body.runId,
     actorUserId: ctx.userId,
   })
+  const remediationWithActivity = withActivity(remediation)
+
   if (!remediation.ok) {
     return NextResponse.json({
       ok: false,
@@ -144,7 +155,7 @@ export async function POST(req: NextRequest) {
       code: 'audit_remediation_failed',
       error: `Approval was recorded, but the automated remediation system did not complete. ${remediationError(remediation)}`,
       retryable: true,
-      remediation,
+      remediation: remediationWithActivity,
       repairCompleted,
     }, { status: 502 })
   }
@@ -163,7 +174,7 @@ export async function POST(req: NextRequest) {
     timestamp: event?.timestamp || remediation.approvedAt,
     alreadyApproved,
     repairCompleted,
-    remediation,
+    remediation: remediationWithActivity,
     rollback: { entryPoint: 'thin', available: true },
   })
 }

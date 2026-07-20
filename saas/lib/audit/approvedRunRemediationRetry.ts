@@ -1,5 +1,6 @@
 import { recoverMergedApprovedRemediation } from '@/lib/audit/approvedRunMergedRecovery'
 import { recoverTransientPartialAuditWrites } from '@/lib/audit/approvedRunPartialRecovery'
+import { recordApprovedRemediationHeartbeat } from '@/lib/audit/remediationHeartbeat'
 import {
   runApprovedAuditRemediationSystem,
   type ApprovedRunSystemResult,
@@ -7,6 +8,8 @@ import {
 
 const MAX_ATTEMPTS = 3
 const RETRY_DELAYS_MS = [0, 500, 1500] as const
+
+type HeartbeatResult = ApprovedRunSystemResult & { activityHeartbeatAt?: string }
 
 function transientReason(value: string): boolean {
   const normalized = String(value || '').toLowerCase()
@@ -53,11 +56,25 @@ function restoreSafetySkips(
   }
 }
 
+async function withWorkerHeartbeat(params: {
+  admin: any
+  runId: string
+  actorUserId: string
+}, result: ApprovedRunSystemResult): Promise<HeartbeatResult> {
+  const activityHeartbeatAt = await recordApprovedRemediationHeartbeat({
+    admin: params.admin,
+    runId: params.runId,
+    actorUserId: params.actorUserId,
+    lifecycleStatus: result.lifecycleStatus,
+  })
+  return { ...result, activityHeartbeatAt }
+}
+
 export async function runApprovedAuditRemediationWithRetry(params: {
   admin: any
   runId: string
   actorUserId: string
-}): Promise<ApprovedRunSystemResult> {
+}): Promise<HeartbeatResult> {
   let last: ApprovedRunSystemResult | null = null
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -67,7 +84,9 @@ export async function runApprovedAuditRemediationWithRetry(params: {
     const merged = await recoverMergedApprovedRemediation(params)
     if (merged) {
       last = merged
-      if (merged.ok || !isTransientApprovedRemediationFailure(merged)) return merged
+      if (merged.ok || !isTransientApprovedRemediationFailure(merged)) {
+        return withWorkerHeartbeat(params, merged)
+      }
       continue
     }
 
@@ -91,8 +110,10 @@ export async function runApprovedAuditRemediationWithRetry(params: {
       }
     }
 
-    if (last.ok || !isTransientApprovedRemediationFailure(last)) return last
+    if (last.ok || !isTransientApprovedRemediationFailure(last)) {
+      return withWorkerHeartbeat(params, last)
+    }
   }
 
-  return last as ApprovedRunSystemResult
+  return withWorkerHeartbeat(params, last as ApprovedRunSystemResult)
 }

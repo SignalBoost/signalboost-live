@@ -15,8 +15,10 @@ test('audit remediation required workflow supports its actual push event', () =>
   assert.doesNotMatch(workflow, /^\s+branches:\s*/m)
 })
 
-test('the required workflow job is explicitly enabled', () => {
-  assert.match(workflow, /audit-remediation:\s*\n\s+if: \$\{\{ true \}\}/)
+test('the required job uses only contexts available before runner allocation', () => {
+  assert.doesNotMatch(workflow, /audit-remediation:\s*\n\s+if:/)
+  assert.doesNotMatch(workflow, /\$\{\{\s*runner\./)
+  assert.match(workflow, /npm_config_cache: \/tmp\/signalboost-audit-npm-cache/)
   assert.match(
     workflow,
     /Run focused audit tests[\s\S]*node --test tests\/auditRemediationWorkflowTrigger\.node\.test\.ts/,

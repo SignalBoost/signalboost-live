@@ -1,0 +1,119 @@
+name: Audit Remediation Pipeline Patch
+
+on:
+  push:
+    branches:
+      - fix/audit-remediation-pipeline-ui
+    paths:
+      - '.github/workflows/audit-remediation-pipeline-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/audit-remediation-pipeline-ui
+          fetch-depth: 0
+
+      - name: Connect approval to visible remediation lifecycle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path = Path('saas/app/dashboard/audit/page.tsx')
+          page = page_path.read_text()
+
+          replacements = [
+            (
+              """      const res = await fetch('/api/hub/operator/audit/runs', { credentials: 'include' })""",
+              """      const res = await fetch('/api/hub/operator/audit/runs', { credentials: 'include', cache: 'no-store' })""",
+            ),
+            (
+              """  useEffect(() => {
+            const status = remediation?.lifecycleStatus
+            if (!selectedRunId || !status || ['merged', 'failed', 'partial'].includes(status)) return
+            const id = setInterval(() => { void openRun(selectedRunId) }, 10000)
+            return () => clearInterval(id)
+          }, [selectedRunId, remediation?.lifecycleStatus])""",
+              """  useEffect(() => {
+            const status = String(remediation?.lifecycleStatus || '')
+            const approvedWithoutLifecycle = view?.status === 'approved' && !status
+            const terminal = ['merged', 'failed', 'partial'].includes(status)
+            if (!selectedRunId || (!approvedWithoutLifecycle && (!status || terminal))) return
+            const id = setInterval(() => { void openRun(selectedRunId) }, 10000)
+            return () => clearInterval(id)
+          }, [selectedRunId, view?.status, remediation?.lifecycleStatus])""",
+            ),
+            (
+              """    setError(null); setSelectedRunId(id)""",
+              """    setError(null); setApprovalMessage(null); setSelectedRunId(id)""",
+            ),
+            (
+              """      const res = await fetch(`/api/hub/operator/audit/runs?runId=${encodeURIComponent(id)}`, { credentials: 'include' })""",
+              """      const res = await fetch(`/api/hub/operator/audit/runs?runId=${encodeURIComponent(id)}`, { credentials: 'include', cache: 'no-store' })""",
+            ),
+            (
+              """      const remediationState = (data.remediation || null) as RemediationLifecycleState | null""",
+              """      const remediationState = (data.remediation || (r?.status === 'approved' ? {
+                lifecycleStatus: 'preparing',
+                findingsTotal: Number(r?.findings_count || 0),
+                findingsApplied: 0,
+                merged: false,
+              } : null)) as RemediationLifecycleState | null""",
+            ),
+            (
+              """      const lifecycle = (result.remediation || null) as RemediationLifecycleState | null""",
+              """      const lifecycle = (result.remediation || {
+                lifecycleStatus: result.status || 'preparing',
+                findingsTotal: Number(result.findingsApproved || view.findingsCount || 0),
+                findingsApplied: Number(result.findingsFixed || 0),
+                merged: result.status === 'merged',
+              }) as RemediationLifecycleState""",
+            ),
+          ]
+
+          for old, new in replacements:
+            count = page.count(old)
+            if count != 1:
+              raise SystemExit(f'page replacement expected once, found {count}: {old[:80]!r}')
+            page = page.replace(old, new)
+
+          page_path.write_text(page)
+
+          test_path = Path('saas/tests/auditRemediationSystem.node.test.ts')
+          test = test_path.read_text().rstrip()
+          marker = "test('approved runs expose a visible remediation pipeline before the first lifecycle event'"
+          if marker not in test:
+            test += """
+
+          test('approved runs expose a visible remediation pipeline before the first lifecycle event', () => {
+            const dashboard = read('../app/dashboard/audit/page.tsx')
+            const panel = read('../components/audit/RemediationLifecyclePanel.tsx')
+
+            assert.match(dashboard, /approvedWithoutLifecycle/)
+            assert.match(dashboard, /r\?\.status === 'approved'/)
+            assert.match(dashboard, /lifecycleStatus: 'preparing'/)
+            assert.match(dashboard, /cache: 'no-store'/)
+            assert.match(panel, /stepApproval: 'Approval recorded'/)
+            assert.match(panel, /stepPrepare: 'Prepare fixes'/)
+            assert.match(panel, /stepChecks: 'PR and checks'/)
+            assert.match(panel, /stepMerge: 'Merge to main'/)
+            assert.match(panel, /stepVerified: 'Verified remediated'/)
+            assert.match(panel, /aria-label=\{copy\.pipelineLabel\}/)
+          })
+          """
+          test_path.write_text(test + '\n')
+          PY
+
+      - name: Remove one-time patch workflow and commit
+        run: |
+          git config user.name 'SignalBoost Audit Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/audit-remediation-pipeline-patch.yml
+          git add saas/app/dashboard/audit/page.tsx saas/tests/auditRemediationSystem.node.test.ts
+          git commit -m 'Connect audit approval to remediation pipeline'
+          git push origin HEAD:fix/audit-remediation-pipeline-ui

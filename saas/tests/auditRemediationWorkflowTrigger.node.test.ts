@@ -7,13 +7,15 @@ const workflow = readFileSync(
   'utf8',
 )
 
-test('audit remediation checks run for generated source-fix pull requests', () => {
-  assert.match(workflow, /pull_request:\s*\n\s+branches: \[main, master\]/)
+test('audit remediation ruleset supports pull requests and merge queues', () => {
+  assert.match(workflow, /^\s{2}pull_request:\s*$/m)
+  assert.match(workflow, /^\s{2}merge_group:\s*$/m)
   assert.doesNotMatch(workflow, /^\s+paths:\s*$/m)
-  assert.doesNotMatch(workflow, /audit-remediation:\s*\n\s+if:/)
+  assert.doesNotMatch(workflow, /^\s+branches:\s*/m)
 })
 
-test('the workflow executes its trigger regression guard', () => {
+test('the required ruleset job is explicitly enabled', () => {
+  assert.match(workflow, /audit-remediation:\s*\n(?:\s*#.*\n)*\s+if: true/)
   assert.match(
     workflow,
     /Run focused audit tests[\s\S]*node --test tests\/auditRemediationWorkflowTrigger\.node\.test\.ts/,

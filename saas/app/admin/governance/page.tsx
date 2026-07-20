@@ -32,7 +32,7 @@ export default function Page() {
             <span>Status: {p.status || 'unknown'} · Source: {p.telemetry?.source || 'live/default mix'}</span>
           </article>
         )) : (
-          <article className="sb-neon-panel"><p><LocalizedText fallback={"Example governance pipeline"} /></p><strong>Demo</strong><span>No live governance telemetry returned yet.</span></article>
+          <article className="sb-neon-panel"><p><LocalizedText fallback={"Example governance pipeline"} /></p><strong>Demo</strong><span><LocalizedText fallback={"No live governance telemetry returned yet."} /></span></article>
         )}
       </section>
       <section className="sb-orbit-table" aria-label="Governance timeline">

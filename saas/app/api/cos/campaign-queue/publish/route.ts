@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
+import { resolvePublishMode } from '@/lib/outreach/publish-mode'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
@@ -90,9 +91,10 @@ export async function POST(req: NextRequest) {
   const tok = await getValidSocialToken(ctx.admin, ctx.user.id, platform)
   if (!tok.ok || !tok.accessToken) return NextResponse.json({ ok: false, error: tok.error || 'Could not obtain a valid token.' }, { status: 400 })
 
+  const publishMode = await resolvePublishMode(ctx.admin, ctx.user.id, platform)
   let result: any
   try {
-    result = await publishSocialPost({ platform, text, videoUrl, title, accountRef: tok.accountRef, accountName: tok.accountName, accessToken: tok.accessToken } as any)
+    result = await publishSocialPost({ platform, text, videoUrl, title, publishMode, accountRef: tok.accountRef, accountName: tok.accountName, accessToken: tok.accessToken } as any)
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'Publish failed', platform }, { status: 502 })
   }

@@ -37,12 +37,44 @@ test('duplicate consent and manual patch surfaces are permanently removed', () =
   assert.equal(existsSync(url('../app/api/hub/operator/audit/patch/route.ts')), false)
 })
 
-test('remediation lifecycle is status-only and exposes no GitHub action', () => {
+test('remediation lifecycle is status-only and exposes no required GitHub action', () => {
   const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
 
-  assert.match(lifecycle, /No further action is required/)
   assert.match(lifecycle, /AI will merge automatically/)
   assert.doesNotMatch(lifecycle, /prUrl|prNumber|openPr|Open remediation PR|target="_blank"|href=/)
+})
+
+test('remediation lifecycle shows truthful dynamic progress and a real heartbeat', () => {
+  const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
+  const runs = read('../app/api/hub/operator/audit/runs/route.ts')
+  const approval = read('../app/api/hub/operator/audit/approve-all/route.ts')
+
+  assert.match(lifecycle, /activityCheckedAt\?: string/)
+  assert.match(lifecycle, /lifecycleUpdatedAt\?: string/)
+  assert.match(lifecycle, /role="progressbar"/)
+  assert.match(lifecycle, /aria-valuenow=\{progress\}/)
+  assert.match(lifecycle, /window\.setInterval\(\(\) => setNow\(Date\.now\(\)\), 1000\)/)
+  assert.match(lifecycle, /heartbeatAge > 45/)
+  assert.match(lifecycle, /No recent system heartbeat/)
+  assert.match(lifecycle, /sb-audit-progress-flow/)
+  assert.match(lifecycle, /activity\.live &&/)
+  assert.match(lifecycle, /prefers-reduced-motion/)
+
+  assert.match(runs, /select\('payload,created_at'\)/)
+  assert.match(runs, /activityCheckedAt: checkedAt/)
+  assert.match(runs, /lifecycleUpdatedAt:/)
+  assert.match(approval, /remediationWithActivity/)
+  assert.match(approval, /activityCheckedAt: checkedAt/)
+})
+
+test('progress is stage-based and never pretends to know exact provider completion', () => {
+  const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
+
+  assert.match(lifecycle, /function stageProgress/)
+  assert.match(lifecycle, /status === 'checks_pending'\) return 55/)
+  assert.match(lifecycle, /status === 'auto_merge_queued'\) return 75/)
+  assert.match(lifecycle, /Stage changed/)
+  assert.doesNotMatch(lifecycle, /Math\.random|setProgress\(|fakeProgress|simulatedProgress/)
 })
 
 test('remediation roadmap is read-only and cannot assign manual work', () => {
@@ -67,7 +99,7 @@ test('approval is durable and recovery does not ask the owner again', () => {
   assert.doesNotMatch(runs, /approve_audit_run_remediation_v2/)
 })
 
-test('ONBOARD defines approval-only autonomous remediation and forbids human PR UI', () => {
+test('ONBOARD defines approval-only autonomous remediation and forbids required human PR UI', () => {
   const onboard = read('../../ONBOARD.md')
 
   assert.match(onboard, /one run-scoped owner approval/i)

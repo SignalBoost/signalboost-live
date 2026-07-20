@@ -131,6 +131,7 @@ test('approved runs expose a visible remediation pipeline before the first lifec
   assert.match(dashboard, /r\?\.status === 'approved'/)
   assert.match(dashboard, /lifecycleStatus: 'preparing'/)
   assert.match(dashboard, /cache: 'no-store'/)
+  assert.match(dashboard, /setApprovalMessage\(null\); setSelectedRunId\(id\)/)
   assert.match(panel, /stepApproval: 'Approval recorded'/)
   assert.match(panel, /stepPrepare: 'Prepare fixes'/)
   assert.match(panel, /stepChecks: 'PR and checks'/)
@@ -138,4 +139,3 @@ test('approved runs expose a visible remediation pipeline before the first lifec
   assert.match(panel, /stepVerified: 'Verified remediated'/)
   assert.match(panel, /aria-label=\{copy\.pipelineLabel\}/)
 })
-

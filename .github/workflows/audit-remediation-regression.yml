@@ -20,16 +20,16 @@ permissions:
 
 jobs:
   audit-remediation:
-    if: ${{ true }}
     name: Verify audit consent and patch flow
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # This is the only job allowed to execute dependency lifecycle scripts.
+    # Job-level env cannot use runner.* because the runner does not exist yet.
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'false'
       NODE_VERSION: '24.x'
       NPM_POLICY: dangerously-allow-all-scripts
-      npm_config_cache: ${{ runner.temp }}/npm-cache
+      npm_config_cache: /tmp/signalboost-audit-npm-cache
       npm_config_ignore_scripts: 'false'
       npm_config_install_links: 'true'
     defaults:

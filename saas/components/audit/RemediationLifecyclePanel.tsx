@@ -77,9 +77,9 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
 }) {
   if (!state) return null
   const copy = COPY[lang] || COPY.en
-  const status = state.merged ? 'merged' : String(state.lifecycleStatus || 'preparing')
+  const status = String(state.lifecycleStatus || (state.merged ? 'merged' : 'preparing'))
   const visual = stateCopy(copy, status)
-  const fixed = state.merged ? Number(state.findingsApplied || 0) : 0
+  const fixed = status === 'merged' ? Number(state.findingsApplied || 0) : 0
   const skipped = (state.skipped || []).reduce((sum, item) => sum + Math.max(0, Number(item.findingCount || 0)), 0)
 
   return (

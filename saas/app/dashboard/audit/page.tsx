@@ -412,7 +412,7 @@ export default function AuditCenterPage() {
         filesScanned: Array.isArray(log?.filesScanned) ? log!.filesScanned!.length : (r?.files_scanned || 0),
         findingsCount: typeof log?.findingsCount === 'number' ? log!.findingsCount! : (r?.findings_count || 0),
         prefix: log?.prefix ?? r?.prefix,
-        status: remediationState?.merged ? 'remediated' : r?.status,
+        status: remediationState?.lifecycleStatus === 'merged' ? 'remediated' : r?.status,
       })
       setProgress({ done: 0, total: 0 })
       setPhase(r?.status === 'complete' || r?.status === 'remediated' ? 'DONE' : null)
@@ -519,7 +519,7 @@ export default function AuditCenterPage() {
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
         {/* Ready to Remediate — appears the moment a scan completes with findings. */}
-        {!loading && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
+        {!loading && !remediation && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
           <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
         )}
 

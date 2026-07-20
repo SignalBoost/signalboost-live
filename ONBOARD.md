@@ -584,13 +584,16 @@ ChatGPT/OpenAI reasoning may be used as a lead audit/review layer when configure
 
 Do not hard-code vendor hierarchy as a permanent fact if the repo configuration changes. Verify current model/provider configuration before changing audit behavior.
 
-Audit remediation consent and patch workflow:
+Audit remediation approval and autonomous execution workflow:
 
-- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.
-- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.
-- Code findings must still go through a generated preview, visible diff, and explicit `Confirm & Push Pull Request` action. Provider and infrastructure findings remain behind the PR Cockpit owner `Merge/Approve` gate.
-- The Executive Risk Summary must overlay persisted `audit_finding_state` rows before scoring or counting actionable work. Findings marked `resolved`, `accepted`, or `wont_fix` must not continue to appear as active fix offers; `in_progress` remains actionable.
-- Repository patch preflight must resolve `@/*` imports against the correct workspace: root `app/`, `lib/`, and `components/` paths use the repository-root alias, while `saas/*` paths use the SaaS alias. Genuine missing imports must continue to fail closed.
+- One run-scoped owner approval is the only human remediation action. The Audit Console must not ask for a second confirmation after that approval.
+- The approval authorizes every supported safe fix bound to that immutable audit run. SignalBoost AI creates the protected branch and internal pull request, applies supported code and localization fixes, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.
+- The user interface must not expose a human GitHub PR review button, manual merge button, per-finding patch preview, `Confirm & Push Pull Request`, assignment, owner, or due-date controls. The internal branch and pull request are implementation details, not human workflow steps.
+- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.
+- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes that are not covered by a verified safe executor remain unmodified and visible.
+- The Executive Risk Summary remains read-only and must overlay persisted finding state before scoring. It cannot create a second remediation entry point.
+- Repository write preflight must resolve `@/*` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before automated checks and merge.
+- `GITHUB_WRITE_TOKEN` is a backend-only execution credential. It must never be exposed in the UI, logs, report exports, or client code.
 
 ---
 
@@ -719,7 +722,7 @@ Keeping onboarding documentation current helps future developers and AI agents a
 ## 19. Onboarding Change Log
 
 - 2026-07-19: Removed ONBOARD.md merge gating from GitHub Actions, local commit hooks, and pull-request guidance. ONBOARD.md remains recommended onboarding and maintenance documentation, while unrelated branch protection, code-owner review, and quality/safety checks remain in place.
-- 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.
+- 2026-07-20: Corrected Audit remediation to the permanent SignalBoost operating model: one run-scoped owner approval authorizes the full supported safe-fix lifecycle. SignalBoost AI now owns branch creation, internal PR creation, localization, protected checks, automatic merge, verification, durable retry/recovery, and final fixed-state recording. Human PR review, per-finding preview, confirm-push, manual merge, assignment, owner, and due-date remediation controls are prohibited.
 - 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.
 - 2026-07-18: Added persistent emergency routing: injected a globally accessible, owner/admin-gated `🛑 Supervisor SOC (Kill Switch)` link to the Mission 001 Supervisor SOC and Kill Switch into the shared AppShell navigation and responsive hamburger menu to ensure immediate human override capability during AI failures. The server-side Supervisor and kill/restore authorization gates remain unchanged.

@@ -1,0 +1,44 @@
+import {
+  runApprovedAuditRemediation,
+  type ApprovedRunRemediationResult,
+} from '@/lib/audit/approvedRunRemediation'
+
+const MAX_ATTEMPTS = 3
+const RETRY_DELAYS_MS = [0, 500, 1500] as const
+
+function transientReason(value: string): boolean {
+  const normalized = String(value || '').toLowerCase()
+  return (
+    /\b(429|500|502|503|504)\b/.test(normalized) ||
+    normalized.includes('no server is currently available') ||
+    normalized.includes('temporarily unavailable') ||
+    normalized.includes('github request failed') ||
+    normalized.includes('timeout') ||
+    normalized.includes('timed out') ||
+    normalized.includes('connection reset') ||
+    normalized.includes('socket hang up')
+  )
+}
+
+export function isTransientApprovedRemediationFailure(result: ApprovedRunRemediationResult): boolean {
+  if (result.ok) return false
+  return result.skipped.some(item => transientReason(item.reason)) || transientReason(result.autoMergeError)
+}
+
+export async function runApprovedAuditRemediationWithRetry(params: {
+  admin: any
+  runId: string
+  actorUserId: string
+}): Promise<ApprovedRunRemediationResult> {
+  let last: ApprovedRunRemediationResult | null = null
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const delay = RETRY_DELAYS_MS[attempt]
+    if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay))
+
+    last = await runApprovedAuditRemediation(params)
+    if (last.ok || !isTransientApprovedRemediationFailure(last)) return last
+  }
+
+  return last as ApprovedRunRemediationResult
+}

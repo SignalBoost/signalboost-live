@@ -157,7 +157,7 @@ export default function InfrastructurePage() {
     <div style={{ minHeight: '100vh', background: INK, color: '#e8eefc', padding: '28px 22px 80px', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
       <div style={{ maxWidth: 920, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0.3, margin: 0 }}>{t('console.pr.title', 'Open Pull Requests')}</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0.3, margin: 0 }}>{t('console.pr.title', 'Infrastructure Changes')}</h1>
           <button onClick={load} style={ghostBtn}>{t('console.pr.refresh', 'Refresh')}</button>
         </div>
         <p style={{ color: 'rgba(232,238,252,0.55)', fontSize: 13, marginTop: 6 }}>
@@ -169,7 +169,7 @@ export default function InfrastructurePage() {
 
         {!loading && openPrs.length === 0 && (
           <div style={{ ...banner, borderColor: HAIR, color: 'rgba(232,238,252,0.6)' }}>
-            {t('console.pr.empty', 'No open PRs. The Chief of Staff will queue changes here for approval.')}
+            {t('console.pr.empty', 'No open infrastructure changes. The Chief of Staff will queue changes here for approval.')}
           </div>
         )}
 

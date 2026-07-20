@@ -44,10 +44,12 @@ test('remediation lifecycle does not present GitHub as a required next step', ()
   assert.doesNotMatch(lifecycle, /prUrl|prNumber|openPr|Open remediation PR|target="_blank"|href=/)
 })
 
-test('remediation lifecycle shows truthful dynamic progress and a real heartbeat', () => {
+test('remediation lifecycle shows truthful dynamic progress and a real worker heartbeat', () => {
   const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
   const runs = read('../app/api/hub/operator/audit/runs/route.ts')
   const approval = read('../app/api/hub/operator/audit/approve-all/route.ts')
+  const heartbeat = read('../lib/audit/remediationHeartbeat.ts')
+  const retry = read('../lib/audit/approvedRunRemediationRetry.ts')
 
   assert.match(lifecycle, /activityCheckedAt\?: string/)
   assert.match(lifecycle, /lifecycleUpdatedAt\?: string/)
@@ -60,11 +62,21 @@ test('remediation lifecycle shows truthful dynamic progress and a real heartbeat
   assert.match(lifecycle, /activity\.live &&/)
   assert.match(lifecycle, /prefers-reduced-motion/)
 
-  assert.match(runs, /select\('payload,created_at'\)/)
-  assert.match(runs, /activityCheckedAt: checkedAt/)
+  assert.match(heartbeat, /HEARTBEAT_INTERVAL_MS = 20_000/)
+  assert.match(heartbeat, /audit_remediation_heartbeat/)
+  assert.match(heartbeat, /approved_remediation_worker/)
+  assert.match(heartbeat, /\.eq\('payload->>kind', HEARTBEAT_KIND\)/)
+  assert.match(retry, /recordApprovedRemediationHeartbeat/)
+  assert.match(retry, /withWorkerHeartbeat/)
+
+  assert.match(runs, /activityHeartbeatAt \|\| persistedHeartbeatAt/)
+  assert.match(runs, /\.eq\('payload->>kind', HEARTBEAT_KIND\)/)
   assert.match(runs, /lifecycleUpdatedAt:/)
+  assert.doesNotMatch(runs, /const checkedAt = new Date\(\)\.toISOString\(\)/)
+
+  assert.match(approval, /remediation\.activityHeartbeatAt/)
   assert.match(approval, /remediationWithActivity/)
-  assert.match(approval, /activityCheckedAt: checkedAt/)
+  assert.doesNotMatch(approval, /const checkedAt = new Date\(\)\.toISOString\(\)/)
 })
 
 test('progress is stage-based and never pretends to know exact provider completion', () => {

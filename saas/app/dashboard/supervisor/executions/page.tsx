@@ -8,7 +8,7 @@ export default async function SupervisorExecutionsPage() {
   const user = await getCurrentUser()
   const access = await getAccess()
   if (!user) redirect('/login')
-  if (!access.isAdmin) return <main style={{ padding: 32, color: '#fff' }}><h1><LocalizedText fallback={"Supervisor execution history"} /></h1><p>Admin access required.</p></main>
+  if (!access.isAdmin) return <main style={{ padding: 32, color: '#fff' }}><h1><LocalizedText fallback={"Supervisor execution history"} /></h1><p><LocalizedText fallback={"Admin access required."} /></p></main>
   const store = new SupabaseExecutionRecordStore(getAdminSupabase())
   const { items } = await store.listExecutions({ limit: 50, environment: 'sandbox' })
   return <main style={{ minHeight: '100vh', padding: 32, color: '#fff', background: 'linear-gradient(135deg,#06111f,#05070c)' }}>

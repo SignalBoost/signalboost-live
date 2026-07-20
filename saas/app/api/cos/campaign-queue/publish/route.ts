@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
   let result: any
   try {
-    result = await publishSocialPost({ platform, text, videoUrl, title, accessToken: tok.accessToken } as any)
+    result = await publishSocialPost({ platform, text, videoUrl, title, accountRef: tok.accountRef, accountName: tok.accountName, accessToken: tok.accessToken } as any)
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'Publish failed', platform }, { status: 502 })
   }

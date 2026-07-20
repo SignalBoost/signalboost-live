@@ -3,7 +3,7 @@
 // already exist in Supabase.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { runApprovedAuditRemediation } from '@/lib/audit/approvedRunRemediation'
+import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, recovered: false, runId: latest.data.id, reason: 'The latest approved run has no durable approval record.' })
   }
 
-  const remediation = await runApprovedAuditRemediation({
+  const remediation = await runApprovedAuditRemediationWithRetry({
     admin,
     runId: latest.data.id,
     actorUserId: String(approval.data.approved_by),

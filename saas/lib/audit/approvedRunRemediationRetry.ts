@@ -1,7 +1,7 @@
 import {
-  runApprovedAuditRemediation,
-  type ApprovedRunRemediationResult,
-} from '@/lib/audit/approvedRunRemediation'
+  runApprovedAuditRemediationSystem,
+  type ApprovedRunSystemResult,
+} from '@/lib/audit/approvedRunRemediationSystem'
 
 const MAX_ATTEMPTS = 3
 const RETRY_DELAYS_MS = [0, 500, 1500] as const
@@ -20,7 +20,7 @@ function transientReason(value: string): boolean {
   )
 }
 
-export function isTransientApprovedRemediationFailure(result: ApprovedRunRemediationResult): boolean {
+export function isTransientApprovedRemediationFailure(result: ApprovedRunSystemResult): boolean {
   if (result.ok) return false
   return result.skipped.some(item => transientReason(item.reason)) || transientReason(result.autoMergeError)
 }
@@ -29,16 +29,16 @@ export async function runApprovedAuditRemediationWithRetry(params: {
   admin: any
   runId: string
   actorUserId: string
-}): Promise<ApprovedRunRemediationResult> {
-  let last: ApprovedRunRemediationResult | null = null
+}): Promise<ApprovedRunSystemResult> {
+  let last: ApprovedRunSystemResult | null = null
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const delay = RETRY_DELAYS_MS[attempt]
     if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay))
 
-    last = await runApprovedAuditRemediation(params)
+    last = await runApprovedAuditRemediationSystem(params)
     if (last.ok || !isTransientApprovedRemediationFailure(last)) return last
   }
 
-  return last as ApprovedRunRemediationResult
+  return last as ApprovedRunSystemResult
 }

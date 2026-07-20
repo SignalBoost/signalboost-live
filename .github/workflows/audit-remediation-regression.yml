@@ -1,19 +1,12 @@
 name: Audit Remediation Regression
 
 on:
+  # Generated ai/audit-run-* pull requests change application source files, not
+  # necessarily audit infrastructure. A trigger-level paths filter would create
+  # a required workflow record with zero jobs, blocking the approved remediation.
+  # Run this focused validation for every PR targeting the protected branches.
   pull_request:
-    paths:
-      - 'ONBOARD.md'
-      - 'saas/app/api/hub/audit/**'
-      - 'saas/components/audit/**'
-      - 'saas/lib/ai/tools/repoWriter.ts'
-      - 'saas/lib/audit/**'
-      - 'saas/tests/audit*.node.test.ts'
-      - 'saas/tests/repoWriterWorkspaceAliases.node.test.ts'
-      - 'saas/package.json'
-      - 'saas/package-lock.json'
-      - 'scripts/verify-workers.mjs'
-      - '.github/workflows/audit-remediation-regression.yml'
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       global_approval:

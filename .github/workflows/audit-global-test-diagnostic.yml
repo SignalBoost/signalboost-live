@@ -1,0 +1,37 @@
+name: Audit Global Test Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/audit-global-test-diagnostic.yml'
+      - 'saas/tests/auditGlobalApproval.node.test.ts'
+      - 'saas/lib/audit/**'
+      - 'saas/app/api/hub/operator/audit/approve-all/route.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Capture exact regression output
+        working-directory: saas
+        run: |
+          set +e
+          node --test tests/auditGlobalApproval.node.test.ts > audit-global-test.log 2>&1
+          status=$?
+          cat audit-global-test.log
+          echo "$status" > audit-global-test.status
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-global-test-diagnostic
+          path: |
+            saas/audit-global-test.log
+            saas/audit-global-test.status
+          if-no-files-found: error

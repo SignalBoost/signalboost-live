@@ -546,11 +546,10 @@ const autoMerge = await queueAutoMerge(pr.number)
     }
   }
 
-  const partial = params.result.status === 'partial'
   const pending = systemResult(params.result, {
     ok: true,
-    status: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
-    lifecycleStatus: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+    status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
+    lifecycleStatus: autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
     autoMergeQueued: autoMerge.queued,
     autoMergeError: autoMerge.queued ? '' : autoMerge.error,
   })

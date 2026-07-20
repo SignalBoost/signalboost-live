@@ -43,17 +43,19 @@ function localizeLogPayload(payload: any, lang: string) {
 function splitAuditPayloads(rows: any[]) {
   let scan: any = null
   let remediation: ApprovedRunRemediationResult | null = null
+  let remediationUpdatedAt = ''
   for (const row of rows || []) {
     const payload = row?.payload
     if (!payload || typeof payload !== 'object') continue
     if (!remediation && payload.kind === 'audit_batch_remediation' && payload.approval === 'final') {
       remediation = payload as ApprovedRunRemediationResult
+      remediationUpdatedAt = typeof row?.created_at === 'string' ? row.created_at : ''
       continue
     }
     if (!scan && Array.isArray(payload.findings)) scan = payload
     if (scan && remediation) break
   }
-  return { scan, remediation }
+  return { scan, remediation, remediationUpdatedAt }
 }
 
 async function recoverApprovedRun(admin: any, runId: string, actorUserId: string) {
@@ -78,6 +80,19 @@ async function recoverApprovedRun(admin: any, runId: string, actorUserId: string
       skipped: [{ file: '(recovery)', findingCount: 0, reason: error instanceof Error ? error.message : 'Approved remediation recovery failed.' }],
       approvedAt: new Date().toISOString(),
     } satisfies ApprovedRunRemediationResult
+  }
+}
+
+function withActivity(
+  remediation: Record<string, any> | null,
+  checkedAt: string,
+  updatedAt: string,
+): (Record<string, any> & { activityCheckedAt: string; lifecycleUpdatedAt: string }) | null {
+  if (!remediation) return null
+  return {
+    ...remediation,
+    activityCheckedAt: checkedAt,
+    lifecycleUpdatedAt: updatedAt || remediation.mergedAt || remediation.approvedAt || checkedAt,
   }
 }
 
@@ -111,11 +126,17 @@ export async function GET(req: NextRequest) {
 
     const logRows = await admin
       .from('audit_logs')
-      .select('payload')
+      .select('payload,created_at')
       .eq('run_id', runId)
       .order('created_at', { ascending: false })
       .limit(50)
     const payloads = splitAuditPayloads(logRows.data || [])
+    const checkedAt = new Date().toISOString()
+    const remediation = withActivity(
+      recovery || payloads.remediation,
+      checkedAt,
+      payloads.remediationUpdatedAt || String(run.data.updated_at || run.data.created_at || ''),
+    )
 
     return NextResponse.json({
       ok: true,
@@ -124,7 +145,7 @@ export async function GET(req: NextRequest) {
       log: localizeLogPayload(payloads.scan, lang),
       // For approved runs, the recovery call is the freshest lifecycle state.
       // Older durable logs remain the fallback for already-remediated history.
-      remediation: recovery || payloads.remediation,
+      remediation,
     })
   }
 
@@ -139,9 +160,15 @@ export async function GET(req: NextRequest) {
   }
 
   const newestApproved = (runs.data || []).find((run: any) => run?.status === 'approved')
-  const recovery = newestApproved?.id
+  const recovered = newestApproved?.id
     ? await recoverApprovedRun(admin, String(newestApproved.id), ctx.userId)
     : null
+  const checkedAt = new Date().toISOString()
+  const recovery = withActivity(
+    recovered,
+    checkedAt,
+    String(newestApproved?.updated_at || newestApproved?.created_at || ''),
+  )
 
   return NextResponse.json({ ok: true, runs: runs.data || [], recovery })
 }

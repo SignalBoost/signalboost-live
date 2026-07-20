@@ -152,6 +152,16 @@ export default function CosaVideoPipelinePage() {
     } catch (e: any) { setMessage(e?.message || 'Could not restart video.') } finally { setBusyId('') }
   }
 
+  async function crosspost(id: string, platform: string) {
+    setBusyId(id); setMessage('')
+    try {
+      const res = await fetch('/api/cos/campaign-queue/crosspost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, platform }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Cross-post failed.')
+      setMessage(json.liveUrl ? `Posted. Live link: ${json.liveUrl}` : 'Posted. The live link will be emailed shortly.')
+    } catch (e: any) { setMessage(e?.message || 'Cross-post failed.') } finally { setBusyId('') }
+  }
+
   async function archiveAction(id: string, action: 'archive' | 'restore') {
     setBusyId(id)
     try {
@@ -216,6 +226,8 @@ export default function CosaVideoPipelinePage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
               {state === 'ready' && !archived[campaign.id] && <button onClick={() => approve(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={"Approve and publish"} /></button>}
               {state === 'problem' && !archived[campaign.id] && <button onClick={() => redo(campaign.id)} disabled={busyId === campaign.id} style={warning}><LocalizedText fallback={"Fix automatically"} /></button>}
+              {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'tiktok')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={"Post to TikTok"} /></button>}
+              {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'instagram_business')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={"Post to Instagram"} /></button>}
               {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>Archive</button>}
               {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>Restore</button>}
             </div>

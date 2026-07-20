@@ -1,12 +1,10 @@
 name: Audit Remediation Regression
 
 on:
-  # Generated ai/audit-run-* pull requests change application source files, not
-  # necessarily audit infrastructure. A trigger-level paths filter would create
-  # a required workflow record with zero jobs, blocking the approved remediation.
-  # Run this focused validation for every PR targeting the protected branches.
+  # Ruleset workflows support pull-request and merge-queue events. GitHub ignores
+  # event filters for ruleset execution, so keep these triggers unfiltered.
   pull_request:
-    branches: [main, master]
+  merge_group:
   workflow_dispatch:
     inputs:
       global_approval:
@@ -20,6 +18,9 @@ permissions:
 
 jobs:
   audit-remediation:
+    # GitHub recommends an explicit true condition when a ruleset workflow is
+    # enforced across repository contexts; without it the run can contain zero jobs.
+    if: true
     name: Verify audit consent and patch flow
     runs-on: ubuntu-latest
     timeout-minutes: 10

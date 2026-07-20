@@ -92,3 +92,48 @@ test('stale audit findings and stale previews cannot create misleading pull requ
   assert.match(patch, /baseHash: preview\.baseHash/)
   assert.match(patch, /phase === 'resolved'/)
 })
+
+test('approved audit findings include four localized values plus the English fallback', () => {
+  const rootCatalog = read('../../lib/i18n/approvedAuditRemediationCopy.ts')
+  const saasCatalog = read('../lib/i18n/approvedAuditRemediationCopy.ts')
+  const rootLocalizedText = read('../../components/i18n/LocalizedText.tsx')
+  const saasLocalizedText = read('../components/i18n/LocalizedText.tsx')
+
+  const rootPhrases = [
+    'No dead cards: every subsystem links here with state, root cause, routing mode, and approval gate.',
+    'Raw performance, regional reach, and milestone-ready notifications',
+  ]
+  const saasPhrases = [
+    'No live governance telemetry returned yet.',
+    'No verified free newspaper, magazine, or publication contact is recorded. Automated campaigns should stop here unless the user explicitly asked for paid advertising.',
+    'Mark submitted to publisher',
+    'Social Outreach Connector Cockpit',
+    'Admin access required.',
+    'Fully Autonomous Hybrid-Dynamic COS Router',
+    'Failing nodes and autonomous reroute paths',
+    'Informational early warnings',
+    'No fix attempts required.',
+    'No life-critical escalation. Ordinary issues are handled autonomously.',
+    'Full lifecycle visibility',
+    'Blueprint output',
+    'Build provider-backed, approval-aware integration blueprints with searchable metadata, dynamic provider schemas, no-code endpoint selection, and a live JSON compiler.',
+    'Test Integration',
+    'Integration Name',
+    'HTTP Method',
+    'Save mapping',
+  ]
+
+  for (const lang of ['es', 'pt', 'pl', 'ru']) {
+    assert.match(rootCatalog, new RegExp(`\\b${lang}: \\{`))
+    assert.match(saasCatalog, new RegExp(`\\b${lang}: \\{`))
+  }
+  for (const phrase of rootPhrases) {
+    assert.equal(rootCatalog.split(phrase).length - 1, 4, `root phrase must have ES/PT/PL/RU values: ${phrase}`)
+  }
+  for (const phrase of saasPhrases) {
+    assert.equal(saasCatalog.split(phrase).length - 1, 4, `SaaS phrase must have ES/PT/PL/RU values: ${phrase}`)
+  }
+  for (const component of [rootLocalizedText, saasLocalizedText]) {
+    assert.match(component, /approvedAuditRemediationText\(lang, fallback\) \?\? auditUiText\(lang, fallback\)/)
+  }
+})

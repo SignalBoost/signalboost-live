@@ -172,7 +172,7 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
 
   let result: any
   try {
-    result = await publishSocialPost({ platform, text, videoUrl, title, accessToken: tok.accessToken } as any)
+    result = await publishSocialPost({ platform, text, videoUrl, title, accountRef: tok.accountRef, accountName: tok.accountName, accessToken: tok.accessToken } as any)
   } catch (error: any) {
     return { ok: false, status: 502, error: error?.message || 'Publish failed', platform }
   }

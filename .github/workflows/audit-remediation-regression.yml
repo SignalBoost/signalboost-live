@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       global_approval:
-        description: 'Run the approved audit-remediation validation batch. Source changes still require the existing preview and PR confirmation gate.'
+        description: 'Run the owner-approved audit-remediation lifecycle validation batch.'
         required: true
         default: false
         type: boolean
@@ -52,13 +52,12 @@ jobs:
         run: npm ci --dangerously-allow-all-scripts
 
       - name: Run focused audit tests
-        run: npm run test:audit-consent && node --test tests/auditRemediationWorkflowTrigger.node.test.ts
+        run: npm run test:audit-consent && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Run globally approved remediation batch
         if: github.event_name == 'workflow_dispatch' && inputs.global_approval
-        # The batch validates every proposed remediation after owner approval.
-        # Applying a patch remains guarded by PatchPreview's explicit PR confirmation.
-        run: npm run test:audit-consent && node --test tests/auditRemediationWorkflowTrigger.node.test.ts
+        # This validates the same lifecycle used after durable owner approval.
+        run: npm run test:audit-consent && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Verify worker guard
         working-directory: .

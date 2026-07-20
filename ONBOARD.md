@@ -586,6 +586,30 @@ Design rule for any new provider or feature: expose the same setup as (a) an AI 
 
 ---
 
+## 12D. Documentation Map & Cross-Reference Rule
+
+CROSS-REFERENCE RULE (bidirectional, mandatory): ONBOARD.md is both the operating doctrine AND the index for every other document in this repo. Any AI or developer who reads ONBOARD.md follows the map below out to the per-portable docs; any AI or developer who opens one of those docs must read ONBOARD.md first — each doc carries a one-line header pointing back here, and CLAUDE.md / AGENTS.md route all agents to ONBOARD before any work. No portable doc stands alone.
+
+Per-portable documentation (compliance, security, buyer, architecture):
+
+- Console Hub — `saas/console-core/README.md`, `saas/console-core/operator/README.md`, `saas/docs/console/buyer-install.md`, `saas/docs/console/buyer-env-vars.md`, `saas/docs/console/package-extraction.md`, `saas/docs/console/pr-cockpit-security-model.md`, `saas/docs/console/TESTING.md`, `saas/lib/infra-pr/README.md`.
+- Integrations / Social Outreach Connector — `saas/docs/enterprise-social-outreach-plug-and-play.md`, `saas/docs/outreach-engine-architecture.md`, `saas/docs/outreach-unification-plan.md`, `saas/docs/provider-integration.md`, and ONBOARD Section 10A.
+- Marketing + Sales — `saas/docs/marketing-sales-module-design.md`.
+- Chief of Staff (COS) — `saas/lib/cos/README.md`, `cos-core/brain.md`, `services/cos-ai-department/README.md`, `compliance/cos-ai-department/policy.yaml`.
+- Browser Agent — `docs/browser-provider-sdk.md` (SDK only). GAP: its compliance/legal doc is NOT YET WRITTEN — the only portable missing one.
+- Render Module — no dedicated doc yet; see `saas/render-core` code.
+- Campaign Studio (BYOK) — `saas/docs/user-guide.md`, `saas/docs/developer-guide.md`, and ONBOARD Section 12B.
+
+Cross-cutting compliance / security / governance:
+
+- Live Compliance Readiness Matrix — `/hub/audit/compliance` (`saas/lib/audit/complianceReport.ts`): 8 control families crosswalked to SOC 2 / ISO 27001 / NIST CSF / CIS, status derived from the live audit engine, CSV export.
+- `docs/command-control-charter.md`, `docs/AUDIT_MATRIX.md`, `saas/docs/AUDIT_CENTER_BACKLOG.md`, `saas/docs/cybersecurity-monitoring.md`, `docs/red-team/mission-001-red-team-review.md`, `docs/onboarding-enforcement.md`.
+- Commercial-readiness audits: `docs/portables/README.md` (code audit) and `docs/portables/compliance-checklist.md` (commercial/legal/operational audit).
+
+The single open gap in this map is the Browser Agent compliance doc; every other portable already has its compliance/security documentation.
+
+---
+
 ## 13. Vault and Secret Rules
 
 Secrets must never be hard-coded.
@@ -769,6 +793,7 @@ Keeping onboarding documentation current helps future developers and AI agents a
 
 ## 19. Onboarding Change Log
 
+- 2026-07-20: Added Section 12D — Documentation Map & bidirectional Cross-Reference Rule. ONBOARD is now the explicit index for every per-portable compliance/security/buyer doc (Console, Integrations/Social, Marketing+Sales, COS, Campaign Studio) plus the cross-cutting governance/audit docs and the two commercial-readiness audits (docs/portables/README.md, compliance-checklist.md). Rule: reading ONBOARD routes out to these docs and reading any doc routes back to ONBOARD (per-doc header pointers + CLAUDE.md/AGENTS.md funnel). Recorded the one open gap: the Browser Agent compliance doc is not yet written; all other portables have theirs.
 - 2026-07-20: Added Section 12C — Plug-and-Play Provider Onboarding via three interchangeable paths (AI infra-PR, manual, Browser Agent), buyer's choice, AI never mandatory. Codifies that provider setup (keys, OAuth connect, product/price provisioning, schema) must be self-serve for buyers of any portable, with manual as a first-class always-available path and the Browser Agent as an optional co-pilot for external-platform steps. Flags the AI-path gap to fix next: infrastructure-PR step-output chaining (`{{steps[...]}}`) does not resolve, so dependent multi-step PRs (e.g. Stripe product → price) fail while independent steps succeed.
 - 2026-07-20: Fixed multi-platform social publishing. Both `publishSocialPost` call sites (`publishCampaignCore` and the manual publish route) now pass `accountRef`/`accountName` from the connected token; previously LinkedIn, Facebook, Instagram, and Reddit failed instantly with `account_ref_not_configured` and only YouTube and TikTok worked. Added Section 10A (Social Outreach Connector and multi-platform publishing doctrine), covering the BYO-provider model, per-platform account-ref requirements, the generic publish engine, video-cross-post status, and the Google "Testing"-mode 7-day refresh-token expiry that blocks publishing and the live-link email until the OAuth app is published to production.
 - 2026-07-20: Documented and began repairing navbar orphaned pages (Section 15A). Audit found 138 routes with only 37 linked (~43 orphaned); delivered a navbar rebuild adding 22 visible links (including the Social Outreach Connector at `/dashboard/outreach/social`) and set the rule that new feature pages must be wired into the navbar and verified working before being surfaced to buyers.

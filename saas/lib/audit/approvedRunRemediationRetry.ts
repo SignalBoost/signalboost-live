@@ -1,3 +1,4 @@
+import { recoverMergedApprovedRemediation } from '@/lib/audit/approvedRunMergedRecovery'
 import {
   runApprovedAuditRemediationSystem,
   type ApprovedRunSystemResult,
@@ -35,6 +36,13 @@ export async function runApprovedAuditRemediationWithRetry(params: {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const delay = RETRY_DELAYS_MS[attempt]
     if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay))
+
+    const merged = await recoverMergedApprovedRemediation(params)
+    if (merged) {
+      last = merged
+      if (merged.ok || !isTransientApprovedRemediationFailure(merged)) return merged
+      continue
+    }
 
     last = await runApprovedAuditRemediationSystem(params)
     if (last.ok || !isTransientApprovedRemediationFailure(last)) return last

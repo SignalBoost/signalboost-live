@@ -28,6 +28,7 @@
 // delivery without publishing again.
 
 import { getValidSocialToken } from '@/lib/outreach/social-token'
+import { resolvePublishMode } from '@/lib/outreach/publish-mode'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
@@ -170,9 +171,10 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
     return { ok: false, status: 400, error: tok.error || 'Could not obtain a valid token.' }
   }
 
+  const publishMode = await resolvePublishMode(admin, userId, platform)
   let result: any
   try {
-    result = await publishSocialPost({ platform, text, videoUrl, title, accountRef: tok.accountRef, accountName: tok.accountName, accessToken: tok.accessToken } as any)
+    result = await publishSocialPost({ platform, text, videoUrl, title, publishMode, accountRef: tok.accountRef, accountName: tok.accountName, accessToken: tok.accessToken } as any)
   } catch (error: any) {
     return { ok: false, status: 502, error: error?.message || 'Publish failed', platform }
   }

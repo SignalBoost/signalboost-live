@@ -51,12 +51,21 @@ jobs:
         # dependency specs. The explicit policy is deliberately scoped to this job.
         run: npm ci --dangerously-allow-all-scripts
 
-      - name: Run focused audit tests
-        run: npm run test:audit-consent && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
+      - name: Verify audit consent boundaries
+        run: npm run test:audit-consent
+
+      - name: Verify truthful global approval lifecycle
+        run: npm run test:audit-global-approval
+
+      - name: Verify end-to-end remediation recovery
+        run: node --test tests/auditRemediationSystem.node.test.ts
+
+      - name: Verify required workflow trigger
+        run: node --test tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Run globally approved remediation batch
         if: github.event_name == 'workflow_dispatch' && inputs.global_approval
-        # This validates the same lifecycle used after durable owner approval.
+        # This repeats every lifecycle contract under the manual validation gate.
         run: npm run test:audit-consent && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Verify worker guard

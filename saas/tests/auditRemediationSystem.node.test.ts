@@ -96,7 +96,7 @@ test('findings are finalized only from a confirmed merged GitHub PR', () => {
   assert.doesNotMatch(route, /findingsApplied \+ remediation\.findingsAlreadyResolved/)
 })
 
-test('the Audit Console displays and refreshes the real remediation lifecycle', () => {
+test('the Audit Console displays and refreshes the real autonomous remediation lifecycle', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')
   const panel = read('../components/audit/RemediationLifecyclePanel.tsx')
 
@@ -105,25 +105,27 @@ test('the Audit Console displays and refreshes the real remediation lifecycle', 
   assert.match(dashboard, /setInterval\(\(\) => \{ void openRun\(selectedRunId\) \}, 10000\)/)
   assert.match(dashboard, /remediationState\?\.lifecycleStatus === 'merged'/)
   assert.match(dashboard, /state=\{remediation\}/)
-  assert.match(dashboard, /!remediation && view/)
+  assert.match(dashboard, /This is the only approval/)
+  assert.doesNotMatch(dashboard, /RemediationBanner|PatchPreview|Confirm & Push Pull Request|Open remediation PR/)
 
   for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) {
     assert.match(panel, new RegExp(`\\b${lang}: \\{`))
   }
-  assert.match(panel, /state\.prUrl/)
+  assert.doesNotMatch(panel, /prUrl|prNumber|openPr|href=/)
   assert.match(panel, /status === 'merged'/)
   assert.match(panel, /status === 'failed'/)
   assert.match(panel, /status === 'partial'/)
 })
 
-test('the required workflow executes consent, approval, and lifecycle regressions', () => {
+test('the required workflow executes autonomous-boundary, approval, and lifecycle regressions', () => {
   const workflow = read('../../.github/workflows/audit-remediation-regression.yml')
-  assert.match(workflow, /npm run test:audit-consent/)
+  assert.match(workflow, /npm run test:audit-remediation/)
   assert.match(workflow, /npm run test:audit-global-approval/)
   assert.match(workflow, /node --test tests\/auditRemediationSystem\.node\.test\.ts/)
+  assert.doesNotMatch(workflow, /test:audit-consent/)
 })
 
-test('approved runs expose a visible remediation pipeline before the first lifecycle event', () => {
+test('approved runs expose a visible status pipeline before the first lifecycle event', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')
   const panel = read('../components/audit/RemediationLifecyclePanel.tsx')
   const runs = read('../app/api/hub/operator/audit/runs/route.ts')
@@ -136,9 +138,10 @@ test('approved runs expose a visible remediation pipeline before the first lifec
   assert.match(runs, /remediation: recovery \|\| payloads\.remediation/)
   assert.doesNotMatch(runs, /remediation: payloads\.remediation \|\| recovery/)
   assert.match(panel, /stepApproval: 'Approval recorded'/)
-  assert.match(panel, /stepPrepare: 'Prepare fixes'/)
-  assert.match(panel, /stepChecks: 'PR and checks'/)
-  assert.match(panel, /stepMerge: 'Merge to main'/)
-  assert.match(panel, /stepVerified: 'Verified remediated'/)
+  assert.match(panel, /stepPrepare: 'AI prepares fixes'/)
+  assert.match(panel, /stepChecks: 'AI validates'/)
+  assert.match(panel, /stepMerge: 'AI merges'/)
+  assert.match(panel, /stepVerified: 'AI verifies'/)
   assert.match(panel, /aria-label=\{copy\.pipelineLabel\}/)
+  assert.match(panel, /No further action is required/)
 })

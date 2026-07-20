@@ -15,12 +15,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Lint current main audit workflow
+      - name: Print actionlint findings for current main workflow
         run: |
           set -euo pipefail
-          git fetch origin main
-          git show origin/main:.github/workflows/audit-remediation-regression.yml > /tmp/audit-remediation-regression.yml
+          git fetch --depth=1 origin main
+          git show FETCH_HEAD:.github/workflows/audit-remediation-regression.yml > /tmp/audit-remediation-regression.yml
           bash <(curl --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          ./actionlint -oneline /tmp/audit-remediation-regression.yml
+          set +e
+          ./actionlint -oneline /tmp/audit-remediation-regression.yml > /tmp/actionlint.out 2>&1
+          status=$?
+          set -e
+          echo "ACTIONLINT_STATUS=${status}"
+          cat /tmp/actionlint.out

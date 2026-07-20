@@ -7,18 +7,18 @@ on:
 
 permissions:
   contents: read
-  checks: read
   actions: read
 
 jobs:
   inspect-rulesets:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect invalid audit workflow run
+      - name: Verify repaired required workflow
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          EMPTY_RUN_ID: '29715386952'
+          WORKFLOW_ID: '316116766'
+          TARGET_SHA: '5942c040044689f38c48867983d6583dc9fb9786'
         run: |
           set -euo pipefail
           api() {
@@ -28,20 +28,25 @@ jobs:
               -H "X-GitHub-Api-Version: 2022-11-28" "$1"
           }
 
-          run="$(api "https://api.github.com/repos/${GH_REPO}/actions/runs/${EMPTY_RUN_ID}")"
-          echo 'EMPTY_RUN_METADATA:'
-          printf '%s' "$run" | jq -c '{id,name,path,event,status,conclusion,head_branch,head_sha,workflow_id,check_suite_id,display_title,run_attempt,referenced_workflows}'
-
-          workflow_id="$(printf '%s' "$run" | jq -r '.workflow_id')"
-          echo 'WORKFLOW_METADATA:'
-          api "https://api.github.com/repos/${GH_REPO}/actions/workflows/${workflow_id}" | jq -c '{id,name,path,state,created_at,updated_at}'
-
-          suite_id="$(printf '%s' "$run" | jq -r '.check_suite_id')"
-          echo 'CHECK_RUNS:'
-          checks="$(api "https://api.github.com/repos/${GH_REPO}/check-suites/${suite_id}/check-runs")"
-          printf '%s' "$checks" | jq -c '.check_runs[]? | {id,name,status,conclusion,details_url,output}'
-
-          for check_id in $(printf '%s' "$checks" | jq -r '.check_runs[]?.id'); do
-            echo "ANNOTATIONS_FOR_${check_id}:"
-            api "https://api.github.com/repos/${GH_REPO}/check-runs/${check_id}/annotations" | jq -c '.[]? | {path,start_line,end_line,annotation_level,title,message,raw_details}'
+          runs=''
+          for attempt in 1 2 3 4 5; do
+            runs="$(api "https://api.github.com/repos/${GH_REPO}/actions/workflows/${WORKFLOW_ID}/runs?head_sha=${TARGET_SHA}&per_page=10")"
+            count="$(printf '%s' "$runs" | jq '.total_count')"
+            [ "$count" -gt 0 ] && break
+            sleep 2
           done
+
+          echo 'TARGET_WORKFLOW_RUNS:'
+          printf '%s' "$runs" | jq -c '.workflow_runs[]? | {id,name,path,event,status,conclusion,head_branch,head_sha,display_title}'
+
+          found=0
+          for run_id in $(printf '%s' "$runs" | jq -r '.workflow_runs[]?.id'); do
+            found=1
+            echo "JOBS_FOR_${run_id}:"
+            api "https://api.github.com/repos/${GH_REPO}/actions/runs/${run_id}/jobs" | jq -c '{total_count,jobs:[.jobs[]? | {id,name,status,conclusion,steps:[.steps[]? | {name,status,conclusion}]}]}'
+          done
+
+          if [ "$found" -eq 0 ]; then
+            echo 'No required-workflow run found for target SHA.'
+            exit 1
+          fi

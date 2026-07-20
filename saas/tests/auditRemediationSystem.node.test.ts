@@ -50,9 +50,13 @@ test('transient partial writes resume on the same deterministic branch', () => {
   assert.doesNotMatch(partial, /branch:\s*['"]main['"]/)
 })
 
-test('non-transient safety skips remain partial and are never force-applied', () => {
+test('non-transient safety skips remain partial and are never force-applied or finalized', () => {
   const retry = read('../lib/audit/approvedRunRemediationRetry.ts')
   const partial = read('../lib/audit/approvedRunPartialRecovery.ts')
+  const system = read('../lib/audit/approvedRunRemediationSystem.ts')
+  const merged = read('../lib/audit/approvedRunMergedRecovery.ts')
+  const lifecycle = read('../lib/audit/remediationLifecycleRepair.ts')
+  const migration = read('../supabase/migrations/20260720_audit_remediation_lifecycle_v2.sql')
 
   assert.match(partial, /category\.toLowerCase\(\) !== 'i18n-raw-string'/)
   assert.match(partial, /unsupported \+= 1/)
@@ -60,6 +64,20 @@ test('non-transient safety skips remain partial and are never force-applied', ()
   assert.match(retry, /original\.skipped\.filter\(item => !transientReason\(item\.reason\)\)/)
   assert.match(retry, /hasSafetySkip/)
   assert.match(retry, /lifecycleStatus: 'partial'/)
+
+  const partialGuard = system.indexOf("params.result.status === 'partial'")
+  const mergedPath = system.indexOf('if (pr.merged)')
+  assert.ok(partialGuard >= 0, 'partial merge guard is missing')
+  assert.ok(mergedPath > partialGuard, 'partial runs must be refused before merged-PR finalization')
+  assert.match(merged, /candidate\.status === 'partial' \|\| candidate\.lifecycleStatus === 'partial'/)
+  assert.match(merged, /unresolved findings remain open/)
+
+  for (const sql of [lifecycle, migration]) {
+    assert.match(sql, /l\.payload ->> 'kind' = 'audit_batch_remediation'/)
+    assert.match(sql, /coalesce\(l\.payload ->> 'status', ''\) <> 'partial'/)
+    assert.match(sql, /coalesce\(l\.payload ->> 'lifecycleStatus', ''\) <> 'partial'/)
+    assert.match(sql, /findingsApplied'[\s\S]*findingsAlreadyResolved'[\s\S]*findingsTotal'/)
+  }
 })
 
 test('findings are finalized only from a confirmed merged GitHub PR', () => {

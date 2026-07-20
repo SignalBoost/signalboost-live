@@ -1,17 +1,14 @@
 'use client'
 
 // saas/components/audit/ExecutiveSummary.tsx
-// Executive Risk Summary — presentational. Renders the deterministic readiness
-// score, severity breakdown, top risks, provider status, and the optional LLM
-// narrative. Every visible label resolves through t('audit.*'); the narrative is
-// dynamic model prose (already generated in the active language by the route).
-// Styling: inline fathom-glass, matching components/audit/IdentityAccessReport.tsx.
+// Executive Risk Summary — read-only report. Remediation approval belongs only
+// to the run-scoped Audit Console, where one owner approval starts the complete
+// autonomous remediation lifecycle.
 
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
-import AuditFixConsent from '@/components/audit/AuditFixConsent'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -40,14 +37,8 @@ export type ExecutiveSummaryView = {
 }
 
 export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView }) {
-  const { t, lang } = useTranslation()
-  const tt = (key: string, fallback: string, params?: Record<string, string | number>) =>
-    interpolate(t(key, fallback), params)
-
+  const { t } = useTranslation()
   const s = data.score
-  const actionableFindings = data.findings.filter(f =>
-    !f.evidenceRequired && !['resolved', 'accepted', 'wont_fix'].includes(f.status),
-  )
 
   return (
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
@@ -60,7 +51,6 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
         </p>
       </div>
 
-      {/* Score + breakdown */}
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>
@@ -79,14 +69,6 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
         </div>
       </section>
 
-      {/* Explicit user consent before remediation preparation. */}
-      <AuditFixConsent
-        count={actionableFindings.length}
-        lang={lang}
-        acceptHref="/hub/audit/remediation"
-      />
-
-      {/* Narrative (only when the model produced one) */}
       {data.narrative ? (
         <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
@@ -98,7 +80,6 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
         </section>
       ) : null}
 
-      {/* Top risks */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
           {t('audit.exec.topRisksTitle', 'Top Risks')}
@@ -112,7 +93,6 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
         )}
       </section>
 
-      {/* Provider status */}
       {data.providers.length > 0 && (
         <section style={{ ...glass, padding: 20 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>

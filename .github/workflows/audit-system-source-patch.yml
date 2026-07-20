@@ -28,17 +28,17 @@ jobs:
           content = path.read_text()
 
           old_existing = """    if (payload?.kind === 'audit_batch_remediation' && payload?.approval === 'final' && payload?.ok === true) {
-              return payload as ApprovedRunRemediationResult
-            }"""
+                return payload as ApprovedRunRemediationResult
+              }"""
           new_existing = """    if (
-              payload?.kind === 'audit_batch_remediation' &&
-              payload?.approval === 'final' &&
-              payload?.ok === true &&
-              payload?.status !== 'partial' &&
-              payload?.lifecycleStatus !== 'partial'
-            ) {
-              return payload as ApprovedRunRemediationResult
-            }"""
+                payload?.kind === 'audit_batch_remediation' &&
+                payload?.approval === 'final' &&
+                payload?.ok === true &&
+                payload?.status !== 'partial' &&
+                payload?.lifecycleStatus !== 'partial'
+              ) {
+                return payload as ApprovedRunRemediationResult
+              }"""
 
           old_merge = "  const autoMerge = await queueAutoMerge(prNumber)"
           new_merge = "  const autoMerge = { queued: false, error: 'Deferred to the end-to-end remediation controller.' }"

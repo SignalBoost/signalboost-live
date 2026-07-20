@@ -150,9 +150,7 @@ export async function POST(req: NextRequest) {
   }
 
   const findingsApproved = Number(event?.findings_approved || remediation.findingsTotal || 0)
-  const findingsFixed = remediation.merged
-    ? remediation.findingsApplied + remediation.findingsAlreadyResolved
-    : 0
+  const findingsFixed = remediation.merged ? remediation.findingsApplied : 0
 
   return NextResponse.json({
     ok: true,

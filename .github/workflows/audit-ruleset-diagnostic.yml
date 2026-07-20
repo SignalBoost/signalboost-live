@@ -18,7 +18,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           WORKFLOW_ID: '316116766'
-          TARGET_SHA: '5942c040044689f38c48867983d6583dc9fb9786'
+          TARGET_SHA: '5987667cbe1d3d73a7ad7fd7d38b51c4f619eb10'
         run: |
           set -euo pipefail
           api() {

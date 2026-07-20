@@ -43,12 +43,23 @@ function chip(text: string, color = '#94a3b8') {
 function statusColor(p: Platform) { if (p.publishReady) return '#22c55e'; if (p.configured) return '#ffc300'; return '#fb923c' }
 function goodMessage(value: string) { return /saved|ready|discover/i.test(value) }
 
-function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () => void }) {
+function PlatformCard({ platform, onSaved, modeInfo }: { platform: Platform; onSaved: () => void; modeInfo?: { availableModes?: string[]; publishMode?: string; canChoose?: boolean } }) {
   const [accountRef, setAccountRef] = useState(platform.token?.accountRef || '')
+  const [mode, setMode] = useState(modeInfo?.publishMode || 'link')
+  useEffect(() => { if (modeInfo?.publishMode) setMode(modeInfo.publishMode) }, [modeInfo?.publishMode])
   const [accountName, setAccountName] = useState(platform.token?.accountName || '')
   const [saving, setSaving] = useState(false)
   const [discovering, setDiscovering] = useState(false)
   const [message, setMessage] = useState('')
+  async function saveMode(next: string) {
+    setMode(next); setMessage('')
+    try {
+      const res = await fetch('/api/outreach/social/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ platform: platform.platform, publish_mode: next }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not save publish mode.')
+      setMessage(`Publish mode set to ${next === 'native' ? 'Native video upload' : 'Link + caption'}.`); onSaved()
+    } catch (e: any) { setMessage(e?.message || 'Could not save publish mode.') }
+  }
   const color = statusColor(platform)
 
   async function saveRef(ref = accountRef, name = accountName) {
@@ -91,6 +102,11 @@ function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () =
 
     {platform.missing.length ? <div style={{ marginTop: 12 }}><p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, margin: '0 0 6px' }}>Missing:</p><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{platform.missing.map(item => chip(item, '#fb923c'))}</div></div> : null}
 
+    {modeInfo?.canChoose ? <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 850 }}><LocalizedText fallback={"Video mode"} /></span>
+      {(modeInfo.availableModes || ['link']).map(m => <button key={m} onClick={() => saveMode(m)} style={{ ...ghost, ...(mode === m ? { background: 'rgba(255,195,0,.18)', borderColor: '#ffc300', color: '#ffc300' } : {}) }}>{m === 'native' ? 'Native video upload' : 'Link + caption'}</button>)}
+    </div> : null}
+
     <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
       <button style={button} disabled={!platform.configured} onClick={() => { window.location.href = `/api/outreach/social/oauth?platform=${encodeURIComponent(platform.platform)}` }}>{platform.connected ? 'Reconnect' : 'Connect'}</button>
       <button style={ghost} disabled={!platform.connected || discovering} onClick={discoverDestinations}>{discovering ? 'Discovering…' : 'Auto-discover destinations'}</button>
@@ -116,6 +132,7 @@ function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () =
 
 export default function EnterpriseSocialOutreachPage() {
   const [data, setData] = useState<Capabilities | null>(null)
+  const [modes, setModes] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
 
@@ -126,6 +143,11 @@ export default function EnterpriseSocialOutreachPage() {
       const json = await res.json().catch(() => ({ ok: false, error: 'Invalid capabilities response' }))
       if (!res.ok || !json.ok) throw new Error(json.error || 'Could not load social capabilities.')
       setData(json)
+      try {
+        const mres = await fetch('/api/outreach/social/settings', { cache: 'no-store', credentials: 'include' })
+        const mjson = await mres.json().catch(() => ({}))
+        if (mjson?.ok) setModes(Object.fromEntries((mjson.platforms || []).map((p: any) => [p.platform, p])))
+      } catch {}
     } catch (err: any) { setMessage(err?.message || 'Could not load social capabilities.') }
     finally { setLoading(false) }
   }
@@ -162,7 +184,7 @@ export default function EnterpriseSocialOutreachPage() {
     </section>
 
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={"Enterprise safety rules"} /></h2><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>{Object.entries(data?.rules || {}).map(([key, value]) => chip(`${key}: ${value ? 'yes' : 'no'}`, value ? '#22c55e' : '#fb923c'))}</div></section>
-    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>{platforms.map(platform => <PlatformCard key={platform.platform} platform={platform} onSaved={load} />)}{!loading && !platforms.length ? <div style={panel}><p style={{ color: '#fff' }}>{message || 'No platform capability data returned.'}</p></div> : null}</section>
+    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>{platforms.map(platform => <PlatformCard key={platform.platform} platform={platform} onSaved={load} modeInfo={modes[platform.platform]} />)}{!loading && !platforms.length ? <div style={panel}><p style={{ color: '#fff' }}>{message || 'No platform capability data returned.'}</p></div> : null}</section>
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={"Operational note"} /></h2><p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>Currently publish-ready: {ready.map(p => p.label).join(', ') || 'none'}. Other platforms are structurally supported and become live after provider credentials, OAuth connection, and automated/manual destination selection.</p></section>
   </main>
 }

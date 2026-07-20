@@ -1,30 +1,12 @@
-'use client'
-
 // saas/components/audit/RemediationBanner.tsx
-// Post-scan consent bridge. The audit must ask before preparing remediation.
-// Accepting only scrolls to the existing per-finding preview/approval workflow;
-// it does not write code or change provider/production state.
+// Intentional compatibility boundary. The Audit Console now renders exactly one
+// run-scoped approval control. No second consent, scroll-to-fix, preview, or
+// manual remediation action may be rendered here.
 
-import AuditFixConsent from '@/components/audit/AuditFixConsent'
-
-export default function RemediationBanner({
-  count,
-  lang = 'en',
-  targetId = 'audit-findings',
-}: {
+export default function RemediationBanner(_props: {
   count: number
   lang?: string
   targetId?: string
 }) {
-  const scrollToFindings = () => {
-    if (typeof document === 'undefined') return
-    const el = document.getElementById(targetId)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  return (
-    <div className="mt-4">
-      <AuditFixConsent count={count} lang={lang} onAccept={scrollToFindings} />
-    </div>
-  )
+  return null
 }

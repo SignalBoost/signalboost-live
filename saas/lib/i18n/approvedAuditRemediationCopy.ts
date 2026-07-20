@@ -24,6 +24,7 @@ const COPY: Record<string, Record<string, string>> = {
     'No predictive alerts.': 'No hay alertas predictivas.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Haga clic en esto solo después de que el artículo/anuncio se haya publicado o colocado realmente. Añada el enlace o la fecha de comprobante si está disponible.',
     'View Logs': 'Ver registros',
+    'Confirm published / completed': 'Confirmar publicación / finalización',
   },
   pt: {
     'No live governance telemetry returned yet.': 'Nenhuma telemetria de governança ao vivo foi retornada ainda.',
@@ -48,6 +49,7 @@ const COPY: Record<string, Record<string, string>> = {
     'No predictive alerts.': 'Não há alertas preditivos.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Clique nisto somente depois que o artigo/anúncio tiver sido realmente publicado ou veiculado. Adicione o link ou a data de comprovação, se disponível.',
     'View Logs': 'Ver registros',
+    'Confirm published / completed': 'Confirmar publicação / conclusão',
   },
   pl: {
     'No live governance telemetry returned yet.': 'Nie zwrócono jeszcze bieżącej telemetrii zarządzania.',
@@ -72,6 +74,7 @@ const COPY: Record<string, Record<string, string>> = {
     'No predictive alerts.': 'Brak alertów predykcyjnych.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Kliknij to dopiero po faktycznym opublikowaniu lub umieszczeniu artykułu/reklamy. Dodaj link lub datę potwierdzenia, jeśli są dostępne.',
     'View Logs': 'Wyświetl dzienniki',
+    'Confirm published / completed': 'Potwierdź opublikowanie / ukończenie',
   },
   ru: {
     'No live governance telemetry returned yet.': 'Данные телеметрии управления в реальном времени пока не получены.',
@@ -96,6 +99,7 @@ const COPY: Record<string, Record<string, string>> = {
     'No predictive alerts.': 'Нет прогнозных оповещений.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Нажимайте это только после того, как статья/реклама действительно опубликована или размещена. Добавьте ссылку или дату подтверждения, если они доступны.',
     'View Logs': 'Просмотреть журналы',
+    'Confirm published / completed': 'Подтвердить публикацию / завершение',
   },
 }
 

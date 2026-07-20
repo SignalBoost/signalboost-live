@@ -79,6 +79,26 @@ test('owner history refresh recovers the newest approved run without changing ap
   assert.doesNotMatch(runs, /approve_audit_run_remediation/)
 })
 
+test('transient GitHub remediation failures retry three times across every recovery path', () => {
+  const retry = read('../lib/audit/approvedRunRemediationRetry.ts')
+  const approval = read('../app/api/hub/operator/audit/approve-all/route.ts')
+  const runs = read('../app/api/hub/operator/audit/runs/route.ts')
+  const cron = read('../app/api/cron/audit-approved-remediation/route.ts')
+
+  assert.match(retry, /const MAX_ATTEMPTS = 3/)
+  assert.match(retry, /const RETRY_DELAYS_MS = \[0, 500, 1500\]/)
+  assert.match(retry, /\b\(429\|500\|502\|503\|504\)\b/)
+  assert.match(retry, /no server is currently available/)
+  assert.match(retry, /temporarily unavailable/)
+  assert.match(retry, /for \(let attempt = 0; attempt < MAX_ATTEMPTS; attempt \+= 1\)/)
+  assert.match(retry, /isTransientApprovedRemediationFailure/)
+  assert.doesNotMatch(retry, /approve_audit_run_remediation/)
+
+  for (const route of [approval, runs, cron]) {
+    assert.match(route, /runApprovedAuditRemediationWithRetry/)
+  }
+})
+
 test('approval event includes the required immutable audit fields and rollback marker', () => {
   const migration = read('../supabase/migrations/20260719_audit_run_global_approval.sql')
   for (const field of ['runId', 'approvedBy', 'findingsFixed', 'status', 'timestamp']) assert.match(migration, new RegExp(`'${field}'`))

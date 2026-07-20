@@ -1,17 +1,17 @@
 'use client'
 
 // saas/app/hub/audit/remediation/page.tsx
-// Remediation Roadmap page — fetches the roadmap AND per-finding triage state,
-// renders the roadmap with status/owner controls, and persists changes
-// (optimistic update + POST to /api/hub/audit/finding-state).
+// Read-only remediation roadmap. The only human remediation action is the
+// run-scoped approval in /dashboard/audit. All subsequent work is performed by
+// the approved autonomous remediation controller.
 
-import { useEffect, useState, useCallback, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import RemediationRoadmap, { type RemediationRoadmapView } from '@/components/audit/RemediationRoadmap'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
-import { indexStates, normalizeStatus, type FindingStateMap, type FindingStateRow } from '@/lib/audit/findingState'
+import { indexStates, type FindingStateMap, type FindingStateRow } from '@/lib/audit/findingState'
 
 type ReportResponse = { ok: boolean; report?: RemediationRoadmapView; error?: string }
 type StatesResponse = { ok: boolean; states?: FindingStateRow[]; error?: string }
@@ -30,8 +30,8 @@ export default function RemediationPage() {
       setLoading(true)
       try {
         const [rRes, sRes] = await Promise.all([
-          fetch('/api/hub/audit/remediation', { credentials: 'include' }),
-          fetch('/api/hub/audit/finding-state', { credentials: 'include' }),
+          fetch('/api/hub/audit/remediation', { credentials: 'include', cache: 'no-store' }),
+          fetch('/api/hub/audit/finding-state', { credentials: 'include', cache: 'no-store' }),
         ])
         const rJson = (await rRes.json().catch(() => null)) as ReportResponse | null
         const sJson = (await sRes.json().catch(() => null)) as StatesResponse | null
@@ -54,29 +54,6 @@ export default function RemediationPage() {
     return () => { alive = false }
   }, [t])
 
-  const onChange = useCallback((findingId: string, patch: { status?: string; owner?: string; dueDate?: string }) => {
-    // Optimistic update.
-    setStates(prev => {
-      const cur = prev[findingId] || { status: 'open' as const, owner: '', note: '', dueDate: '' }
-      return {
-        ...prev,
-        [findingId]: {
-          status: patch.status !== undefined ? normalizeStatus(patch.status) : cur.status,
-          owner: patch.owner !== undefined ? patch.owner : cur.owner,
-          note: cur.note,
-          dueDate: patch.dueDate !== undefined ? patch.dueDate : cur.dueDate,
-        },
-      }
-    })
-    // Persist (fire-and-forget; UI already reflects the change).
-    fetch('/api/hub/audit/finding-state', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ findingId, ...patch }),
-    }).catch(() => { /* keep optimistic state; a reload re-syncs from the server */ })
-  }, [])
-
   if (loading) {
     return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>{t('audit.remediation.loading', 'Building remediation roadmap…')}</main>
   }
@@ -86,17 +63,17 @@ export default function RemediationPage() {
   if (!data) return null
 
   const csv = toCsv(
-    ['Tier', 'Severity', 'Provider', 'Title', 'Status', 'Owner', 'Recommendation'],
+    ['Tier', 'Severity', 'Provider', 'Title', 'Status', 'Recommendation'],
     data.items.map(({ finding, tier }) => {
       const st = states[finding.id]
-      return [tier, finding.severity, finding.provider, finding.fallback.title, st?.status || 'open', st?.owner || '', finding.fallback.recommendation]
+      return [tier, finding.severity, finding.provider, finding.fallback.title, st?.status || finding.status || 'open', finding.fallback.recommendation]
     }),
   )
 
   return (
     <>
       <ReportExportBar filename="remediation-roadmap" csv={csv} />
-      <RemediationRoadmap data={data} states={states} onChange={onChange} />
+      <RemediationRoadmap data={data} states={states} />
     </>
   )
 }

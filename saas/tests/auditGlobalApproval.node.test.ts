@@ -114,8 +114,9 @@ test('recovery cron and owner history resume the same approved lifecycle', () =>
   assert.match(runs, /if \(!ctx\.isOwner \|\| !ctx\.userId\)/)
   assert.match(runs, /const newestApproved = \(runs\.data \|\| \[\]\)\.find/)
   assert.match(runs, /recoverApprovedRun\(admin, String\(newestApproved\.id\), ctx\.userId\)/)
-  assert.match(runs, /remediation: recovery \|\| payloads\.remediation/)
-  assert.doesNotMatch(runs, /remediation: payloads\.remediation \|\| recovery/)
+  assert.match(runs, /recovery \|\| payloads\.remediation/)
+  assert.match(runs, /withActivity/)
+  assert.doesNotMatch(runs, /payloads\.remediation \|\| recovery/)
   assert.doesNotMatch(runs, /approve_audit_run_remediation_v2/)
 })
 

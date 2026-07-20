@@ -36,8 +36,11 @@ jobs:
           const fs = require('node:fs')
 
           function replaceRequired(value, before, after, label) {
-            if (value.includes(after)) return value
-            if (!value.includes(before)) throw new Error(`Missing expected ${label} block`)
+            if (after && value.includes(after)) return value
+            if (!value.includes(before)) {
+              if (!after) return value
+              throw new Error(`Missing expected ${label} block`)
+            }
             return value.replace(before, after)
           }
 

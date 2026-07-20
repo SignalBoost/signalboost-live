@@ -1,0 +1,147 @@
+name: Audit Partial Finalization Guard Patch
+
+on:
+  push:
+    branches:
+      - fix/audit-system-end-to-end
+    paths:
+      - '.github/workflows/audit-partial-finalization-guard-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/audit-system-end-to-end
+          fetch-depth: 0
+
+      - name: Refuse finalization for partial remediation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Database-level fail-closed guard. Even a manually merged partial PR
+          # cannot mark skipped findings fixed.
+          guard = """
+              if not exists (
+                select 1
+                  from public.audit_logs l
+                 where l.run_id = p_run_id
+                   and l.payload ->> 'kind' = 'audit_batch_remediation'
+                   and l.payload ->> 'approval' = 'final'
+                   and l.payload ->> 'ok' = 'true'
+                   and coalesce(l.payload ->> 'status', '') <> 'partial'
+                   and coalesce(l.payload ->> 'lifecycleStatus', '') <> 'partial'
+                   and coalesce(l.payload ->> 'findingsTotal', '') ~ '^[0-9]+$'
+                   and coalesce(l.payload ->> 'findingsApplied', '') ~ '^[0-9]+$'
+                   and coalesce(l.payload ->> 'findingsAlreadyResolved', '') ~ '^[0-9]+$'
+                   and (l.payload ->> 'findingsApplied')::integer
+                     + (l.payload ->> 'findingsAlreadyResolved')::integer
+                     >= (l.payload ->> 'findingsTotal')::integer
+              ) then
+                return query select false, 0, to_char(v_timestamp at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS');
+                return;
+              end if;
+          """
+
+          for filename in [
+            'saas/lib/audit/remediationLifecycleRepair.ts',
+            'saas/supabase/migrations/20260720_audit_remediation_lifecycle_v2.sql',
+          ]:
+            path = Path(filename)
+            content = path.read_text()
+            needle = """    if not exists (select 1 from public.audit_remediation_approvals a where a.run_id = p_run_id) then
+              return query select false, 0, to_char(v_timestamp at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS');
+              return;
+            end if;
+          """
+            count = content.count(needle)
+            if count != 1:
+              raise SystemExit(f'{filename}: expected one approval guard, found {count}')
+            content = content.replace(needle, needle + guard)
+            path.write_text(content)
+
+          # Move the application-level partial guard before the merged-PR path.
+          system_path = Path('saas/lib/audit/approvedRunRemediationSystem.ts')
+          lines = system_path.read_text().splitlines()
+          condition = "if (params.result.status === 'partial' || params.result.lifecycleStatus === 'partial') {"
+          starts = [i for i, line in enumerate(lines) if line.strip() == condition]
+          if len(starts) != 1:
+            raise SystemExit(f'expected one partial guard, found {len(starts)}')
+          start = starts[0]
+          end = None
+          for i in range(start + 1, min(start + 30, len(lines))):
+            if lines[i].strip() == '}' and any(x.strip() == 'return partial' for x in lines[start:i]):
+              end = i
+              break
+          if end is None:
+            raise SystemExit('could not find partial guard end')
+          del lines[start:end + 1]
+          insert_at = next(i for i, line in enumerate(lines) if line.strip() == 'let pr = fetched.value') + 1
+          block = [
+            '',
+            "  if (params.result.status === 'partial' || params.result.lifecycleStatus === 'partial') {",
+            '    const partial = systemResult(params.result, {',
+            '      ok: true,',
+            "      status: 'partial',",
+            "      lifecycleStatus: 'partial',",
+            '      autoMergeQueued: false,',
+            "      autoMergeError: '',",
+            '    })',
+            '    await writeLifecycleLog(params.admin, params.runId, params.actorUserId, partial)',
+            '    return partial',
+            '  }',
+          ]
+          lines[insert_at:insert_at] = block
+          system_path.write_text('\n'.join(lines) + '\n')
+
+          # Merged-PR recovery also refuses to finalize a partial batch.
+          merged_path = Path('saas/lib/audit/approvedRunMergedRecovery.ts')
+          content = merged_path.read_text()
+          needle = """  const mergeCommitSha = String(pull.data?.merge_commit_sha || candidate.mergeCommitSha || '')
+            const mergedAt = String(pull.data?.merged_at || candidate.mergedAt || new Date().toISOString())
+          """
+          replacement = needle + """  if (candidate.status === 'partial' || candidate.lifecycleStatus === 'partial') {
+              const partial: ApprovedRunSystemResult = {
+                ...candidate,
+                ok: true,
+                status: 'partial',
+                lifecycleStatus: 'partial',
+                merged: true,
+                mergedAt,
+                mergeCommitSha,
+                autoMergeQueued: false,
+                autoMergeError: 'The pull request merged only a safe subset; unresolved findings remain open.',
+              }
+              const latest = (logs.data || [])[0]?.payload
+              if (latest?.lifecycleStatus !== 'partial' || latest?.mergeCommitSha !== mergeCommitSha || latest?.merged !== true) {
+                await params.admin.from('audit_logs').insert({
+                  run_id: params.runId,
+                  user_id: params.actorUserId,
+                  payload: partial,
+                })
+              }
+              return partial
+            }
+          """
+          count = content.count(needle)
+          if count != 1:
+            raise SystemExit(f'expected one merged metadata block, found {count}')
+          merged_path.write_text(content.replace(needle, replacement))
+          PY
+
+      - name: Commit finalization guards
+        run: |
+          git config user.name 'SignalBoost Audit Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add \
+            saas/lib/audit/approvedRunRemediationSystem.ts \
+            saas/lib/audit/approvedRunMergedRecovery.ts \
+            saas/lib/audit/remediationLifecycleRepair.ts \
+            saas/supabase/migrations/20260720_audit_remediation_lifecycle_v2.sql
+          git commit -m 'Refuse audit finalization for partial runs'
+          git push origin HEAD:fix/audit-system-end-to-end

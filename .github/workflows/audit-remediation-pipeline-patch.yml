@@ -1,11 +1,9 @@
 name: Audit Remediation Pipeline Patch
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/audit-remediation-pipeline-ui
-    paths:
-      - '.github/workflows/audit-remediation-pipeline-patch.yml'
+      - main
 
 permissions:
   contents: write

@@ -463,9 +463,7 @@ MANDATORY: any code that calls `publishSocialPost` MUST pass `accountRef` from t
 
 The publish engine is generic: `publishCampaignCore` maps `campaign.channel` to a platform (or accepts an explicit `platform` override) and attaches the finished branded video URL when the source channel is a video channel. A finished video can therefore be cross-posted to any platform via a `{ id, platform }` override; the video gate keys on the source channel, not the target.
 
-Video status: video-capable connectors are YouTube, TikTok, and Instagram. The automated video pipeline currently auto-publishes to YouTube only (crons filter `VIDEO_CHANNELS = ['youtube','short_video']`, and only `cos-auto-publish-exact` is scheduled). Cross-posting a finished video to TikTok/Instagram works through the publish-route override; a one-click UI for it is not yet built. 
-
-Hybrid publish modes (uniform, ALL providers): every provider advertises a publish mode — `link` (caption + tracking link to media hosted elsewhere) or `native` (upload the media into the post) — with a safe default. Media-host providers (YouTube, TikTok, Instagram) are native-only; text-first providers (LinkedIn, Facebook) offer BOTH and default to `link`; Twitter/X and Reddit are `link`-only until native video is built. The buyer's per-provider choice is stored in `outreach_social_settings` (user_id, platform, publish_mode) and set from a Link/Native toggle on the connector cockpit. `resolvePublishMode` reads it at publish time and `publishSocialPost` dispatches accordingly; if a native upload fails and `link` is available, it falls back to a link post automatically, so a post always goes out. New providers MUST declare `availableModes`/`defaultMode` in `PLATFORM_MODES`, and register a `NATIVE_PUBLISHERS` entry if they support native upload.
+Video status: video-capable connectors are YouTube, TikTok, and Instagram. The automated video pipeline currently auto-publishes to YouTube only (crons filter `VIDEO_CHANNELS = ['youtube','short_video']`, and only `cos-auto-publish-exact` is scheduled). Cross-posting a finished video to TikTok/Instagram works through the publish-route override; a one-click UI for it is not yet built.
 
 Provider-token expiry (critical operational trap): a Google OAuth app left in "Testing" publishing status expires its refresh tokens after exactly 7 days (`invalid_grant`). When that happens, publishing is blocked, no live URL is produced, no email is sent, and the campaign sits at "APPROVED — PUBLISHING". This is not a code bug. Fix: reconnect the account, then publish the Google app to production (Google Cloud, OAuth consent screen, Publish app). Sensitive scopes such as `youtube.upload` may require Google verification. Note also: every publish path emails the live link ONLY after a provider-confirmed live URL exists; no live URL means no email, by design.
 
@@ -572,6 +570,22 @@ Concierge approval-path rule:
 
 ---
 
+## 12C. Plug-and-Play Provider Onboarding — Three Paths (AI, Manual, Browser Agent)
+
+Provider onboarding — adding a provider's keys, connecting an account, provisioning products/prices, or running the schema a provider needs — is a first-class, self-serve, PLUG-AND-PLAY capability for BOTH SignalBoost and every buyer of a portable. A buyer brings their OWN provider app, account, and money (BYO). The platform is AI-driven but NEVER AI-only: the buyer must be able to complete every setup task through whichever of three paths they prefer, and switch at any time.
+
+1. AI-driven (Chief of Staff / infrastructure PRs). COS drafts an infrastructure PR (Section 12); the human reviews the planned steps and merges; steps then execute against provider APIs (Vercel env, Stripe, Supabase, etc.). Nothing fires until the human merges. Requirement: multi-step PRs where a later step consumes an earlier step's output (e.g. create Stripe product → create its price) MUST resolve step-output references (`{{steps[...]}}`). Independent steps already work; dependent chaining is the known gap being fixed.
+
+2. Manual (human). The buyer can perform every setup task themselves — add the env var in Vercel, create the Stripe product, run the SQL — with ZERO dependence on AI. Manual is a FIRST-CLASS, ALWAYS-AVAILABLE mode chosen by preference, not merely an AI-failure fallback. It is the reliability floor and the enterprise-trust signal. Rule: no onboarding step may hard-depend on AI.
+
+3. Browser Agent (assisted co-pilot) — optional, by choice. For steps that live on an external platform (creating a dev app, clicking OAuth "Authorize"), a buyer MAY choose the Browser Agent to drive the browser to the right page and pre-fill forms, pausing for the human at login / 2FA / CAPTCHA / final approve. It is the more costly path, offered by choice, never mandatory. Foundation: the governed dry-run/sandbox Browser Runtime, where policy approval never auto-grants live runtime execution (see the Browser Runtime sections).
+
+Hard boundary for ALL three paths: none can supply a buyer's identity, receive their 2FA code, solve a CAPTCHA, or obtain the platform's own API approval (e.g. LinkedIn / TikTok / Meta review). Those remain human + platform-side by design.
+
+Design rule for any new provider or feature: expose the same setup as (a) an AI infra-PR action/template, (b) a documented manual path, AND (c) — where it involves external browser steps — a Browser-Agent-eligible flow. Never ship an onboarding step that only works via AI.
+
+---
+
 ## 13. Vault and Secret Rules
 
 Secrets must never be hard-coded.
@@ -611,17 +625,13 @@ ChatGPT/OpenAI reasoning may be used as a lead audit/review layer when configure
 
 Do not hard-code vendor hierarchy as a permanent fact if the repo configuration changes. Verify current model/provider configuration before changing audit behavior.
 
-Audit remediation operating model:
+Audit remediation consent and patch workflow:
 
-- SignalBoost is AI-driven first with human backup and optional manual control. AI is the default operator after approval; a human may take over by choice or when AI execution fails.
-- One run-scoped owner approval authorizes the supported safe-fix lifecycle for that immutable audit run. SignalBoost AI prepares fixes, creates the protected branch and internal pull request, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.
-- Manual takeover, when exposed, must continue from the same audit run, branch, pull request, checks, logs, and verification state. It must pause autonomous merge before human edits or merge actions and must allow control to return to AI without creating a second implementation.
-- Manual controls are secondary and optional. The normal AI path must never present a GitHub pull request, merge button, preview, assignment, owner, or due-date control as a required next step.
-- Progress reporting must be truthful. The dashboard may show stage-based completion, but it must not invent provider percentages. Motion is allowed only while fresh server heartbeat data is arriving; delayed and stale heartbeats must stop the motion and say that activity is delayed or missing.
-- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.
-- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes without a verified safe executor remain unmodified and visible.
-- The Executive Risk Summary must overlay persisted finding state before scoring. Repository write preflight must resolve `@/*` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before checks and merge.
-- `GITHUB_WRITE_TOKEN` is backend-only and must never appear in client code, logs, screenshots, report exports, or UI.
+- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.
+- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.
+- Code findings must still go through a generated preview, visible diff, and explicit `Confirm & Push Pull Request` action. Provider and infrastructure findings remain behind the PR Cockpit owner `Merge/Approve` gate.
+- The Executive Risk Summary must overlay persisted `audit_finding_state` rows before scoring or counting actionable work. Findings marked `resolved`, `accepted`, or `wont_fix` must not continue to appear as active fix offers; `in_progress` remains actionable.
+- Repository patch preflight must resolve `@/*` imports against the correct workspace: root `app/`, `lib/`, and `components/` paths use the repository-root alias, while `saas/*` paths use the SaaS alias. Genuine missing imports must continue to fail closed.
 
 ---
 
@@ -759,11 +769,11 @@ Keeping onboarding documentation current helps future developers and AI agents a
 
 ## 19. Onboarding Change Log
 
-- 2026-07-20: Added the uniform hybrid publish-mode system across ALL social providers (extends Section 10A). A per-buyer per-provider `link` vs `native` choice is stored in the new `outreach_social_settings` table, set from a Link/Native toggle on the connector cockpit, resolved by `resolvePublishMode`, and threaded through both publish paths. Added native video uploaders for LinkedIn (`/rest/videos` initialize/upload/finalize then `/rest/posts`) and Facebook (`/{page}/videos` file_url), with automatic fallback to a link post when a native upload fails so a post always goes out.
+- 2026-07-20: Added Section 12C — Plug-and-Play Provider Onboarding via three interchangeable paths (AI infra-PR, manual, Browser Agent), buyer's choice, AI never mandatory. Codifies that provider setup (keys, OAuth connect, product/price provisioning, schema) must be self-serve for buyers of any portable, with manual as a first-class always-available path and the Browser Agent as an optional co-pilot for external-platform steps. Flags the AI-path gap to fix next: infrastructure-PR step-output chaining (`{{steps[...]}}`) does not resolve, so dependent multi-step PRs (e.g. Stripe product → price) fail while independent steps succeed.
 - 2026-07-20: Fixed multi-platform social publishing. Both `publishSocialPost` call sites (`publishCampaignCore` and the manual publish route) now pass `accountRef`/`accountName` from the connected token; previously LinkedIn, Facebook, Instagram, and Reddit failed instantly with `account_ref_not_configured` and only YouTube and TikTok worked. Added Section 10A (Social Outreach Connector and multi-platform publishing doctrine), covering the BYO-provider model, per-platform account-ref requirements, the generic publish engine, video-cross-post status, and the Google "Testing"-mode 7-day refresh-token expiry that blocks publishing and the live-link email until the OAuth app is published to production.
 - 2026-07-20: Documented and began repairing navbar orphaned pages (Section 15A). Audit found 138 routes with only 37 linked (~43 orphaned); delivered a navbar rebuild adding 22 visible links (including the Social Outreach Connector at `/dashboard/outreach/social`) and set the rule that new feature pages must be wired into the navbar and verified working before being surfaced to buyers.
 - 2026-07-19: Removed ONBOARD.md merge gating from GitHub Actions, local commit hooks, and pull-request guidance. ONBOARD.md remains recommended onboarding and maintenance documentation, while unrelated branch protection, code-owner review, and quality/safety checks remain in place.
-- 2026-07-20: Defined the permanent Audit operating model as AI-driven first with optional human takeover on the same run/branch/PR state. Added truthful stage progress plus a real server heartbeat: motion appears only while fresh activity checks arrive, delayed/stale states stop motion and identify the missing heartbeat, and no random provider completion percentage is fabricated.
+- 2026-07-19: Restored the Audit remediation consent boundary and working code-fix path. Audit reports and repository scans now explicitly ask whether the user wants SignalBoost AI to prepare fixes in English, Spanish, Portuguese, Polish, and Russian; accepting opens review only and never mutates production. Persisted handled finding states are overlaid before executive scoring/counts, code changes still require preview plus `Confirm & Push Pull Request`, root and SaaS `@/*` aliases are validated against their correct workspaces, and the worker integrity guard no longer mistakes quoted TypeScript source strings for executable imports.
 - 2026-07-19: Restored the COSA final-video approval email handoff with a bounded metadata-only re-arm worker after banner upgrade. Stable object-path identity, schema binding, newest valid artifact timestamp selection, recent-artifact limits, archive/rejection/approval exclusions, and optimistic concurrency prevent duplicate or historical approval emails. The existing Vercel notifier, email-action endpoint, owner approval gate, connector publisher, and live-link email sender remain the only execution path.
 - 2026-07-19: Hardened root-app analytics routes: provider-wide analytics now require a trusted platform operator (not marketing-admin access), reject all caller-selected organization identifiers and malformed/unknown query parameters, pass normalized bounded filters rather than raw URLs, return no fabricated fallback metrics, and send no-store responses. These routes remain read-only and do not alter the governed execution pipeline or approval boundaries.
 - 2026-07-18: Added persistent emergency routing: injected a globally accessible, owner/admin-gated `🛑 Supervisor SOC (Kill Switch)` link to the Mission 001 Supervisor SOC and Kill Switch into the shared AppShell navigation and responsive hamburger menu to ensure immediate human override capability during AI failures. The server-side Supervisor and kill/restore authorization gates remain unchanged.

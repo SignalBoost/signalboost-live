@@ -1,54 +1,56 @@
-name: Audit System Compile Diagnostic
+name: Audit System Compile Fix
 
 on:
-  pull_request:
+  push:
+    branches:
+      - fix/audit-system-end-to-end
     paths:
       - '.github/workflows/audit-system-compile-diagnostic.yml'
-      - 'saas/app/dashboard/audit/page.tsx'
-      - 'saas/components/audit/RemediationLifecyclePanel.tsx'
-      - 'saas/lib/audit/**'
-      - 'saas/app/api/hub/operator/audit/approve-all/route.ts'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: saas/package-lock.json
-      - name: Install dependencies
-        working-directory: saas
-        run: npm ci
-      - name: Capture typecheck output
-        working-directory: saas
+          ref: fix/audit-system-end-to-end
+          fetch-depth: 0
+
+      - name: Remove unreachable partial branch after the merge guard
         run: |
-          set +e
-          npm run typecheck > audit-system-typecheck.log 2>&1
-          status=$?
-          cat audit-system-typecheck.log
-          echo "$status" > audit-system-typecheck.status
-          exit 0
-      - name: Capture production build output
-        working-directory: saas
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('saas/lib/audit/approvedRunRemediationSystem.ts')
+          content = path.read_text()
+          old = """  const partial = params.result.status === 'partial'
+          const pending = systemResult(params.result, {
+            ok: true,
+            status: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
+            lifecycleStatus: partial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+            autoMergeQueued: autoMerge.queued,
+            autoMergeError: autoMerge.queued ? '' : autoMerge.error,
+          })"""
+          new = """  const pending = systemResult(params.result, {
+            ok: true,
+            status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
+            lifecycleStatus: autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+            autoMergeQueued: autoMerge.queued,
+            autoMergeError: autoMerge.queued ? '' : autoMerge.error,
+          })"""
+          count = content.count(old)
+          if count != 1:
+            raise SystemExit(f'expected one unreachable partial block, found {count}')
+          path.write_text(content.replace(old, new))
+          PY
+
+      - name: Commit compiler fix
         run: |
-          set +e
-          npm run build > audit-system-build.log 2>&1
-          status=$?
-          tail -n 250 audit-system-build.log
-          echo "$status" > audit-system-build.status
-          exit 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: audit-system-compile-diagnostic
-          path: |
-            saas/audit-system-typecheck.log
-            saas/audit-system-typecheck.status
-            saas/audit-system-build.log
-            saas/audit-system-build.status
-          if-no-files-found: error
+          git config user.name 'SignalBoost Audit Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add saas/lib/audit/approvedRunRemediationSystem.ts
+          git commit -m 'Remove unreachable audit partial branch'
+          git push origin HEAD:fix/audit-system-end-to-end

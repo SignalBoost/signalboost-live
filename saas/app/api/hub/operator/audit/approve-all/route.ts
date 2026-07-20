@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS } from '@/lib/audit/approvalSchemaRepair'
-import { runApprovedAuditRemediation } from '@/lib/audit/approvedRunRemediation'
+import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
@@ -41,7 +41,7 @@ function embeddedRpcError(data: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-function remediationError(remediation: Awaited<ReturnType<typeof runApprovedAuditRemediation>>): string {
+function remediationError(remediation: Awaited<ReturnType<typeof runApprovedAuditRemediationWithRetry>>): string {
   const first = remediation.skipped.find(item => item.reason)?.reason
   return first || 'The approved run could not create a remediation pull request.'
 }
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, code: event?.reason || 'approval_refused', error: event?.message || 'This audit run cannot be approved.' }, { status })
   }
 
-  const remediation = await runApprovedAuditRemediation({
+  const remediation = await runApprovedAuditRemediationWithRetry({
     admin,
     runId: body.runId,
     actorUserId: ctx.userId,

@@ -4,7 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
-import { runApprovedAuditRemediation, type ApprovedRunRemediationResult } from '@/lib/audit/approvedRunRemediation'
+import type { ApprovedRunRemediationResult } from '@/lib/audit/approvedRunRemediation'
+import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { localizeKnownFindingText, normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
 
@@ -57,7 +58,7 @@ function splitAuditPayloads(rows: any[]) {
 
 async function recoverApprovedRun(admin: any, runId: string, actorUserId: string) {
   try {
-    return await runApprovedAuditRemediation({ admin, runId, actorUserId })
+    return await runApprovedAuditRemediationWithRetry({ admin, runId, actorUserId })
   } catch (error) {
     return {
       kind: 'audit_batch_remediation',

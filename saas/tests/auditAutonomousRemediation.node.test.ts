@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 
+// Audit completion must report active risk, not replay fixed scan findings.
 const url = (path: string) => new URL(path, import.meta.url)
 const read = (path: string) => readFileSync(url(path), 'utf8')
 
@@ -141,7 +142,6 @@ test('failed GitHub checks and stalled stages never look actively pending', () =
   assert.match(lifecycle, /No forward progress — recovery required/)
   assert.match(lifecycle, /GitHub checks failed — AI repair required/)
 })
-
 
 test('completed remediation presents zero active findings while retaining audit evidence', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')

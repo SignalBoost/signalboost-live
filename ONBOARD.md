@@ -599,6 +599,7 @@ Per-portable documentation (compliance, security, buyer, architecture):
 - Browser Agent — `docs/browser-provider-sdk.md` (SDK only). GAP: its compliance/legal doc is NOT YET WRITTEN — the only portable missing one.
 - Render Module — no dedicated doc yet; see `saas/render-core` code.
 - Campaign Studio (BYOK) — `saas/docs/user-guide.md`, `saas/docs/developer-guide.md`, and ONBOARD Section 12B.
+- Press & Media — `docs/portables/press-media-portable-design.md` (provider-adapter framework: `free_submission` editor submission plus the `pr_wire` paid adapter driven by `provider_registry` + `universalRunner` with a vault-encrypted BYO key). Cockpit at `/dashboard/marketing/press-providers`; see ONBOARD Sections 12, 12C, 13.
 
 Cross-cutting compliance / security / governance:
 
@@ -799,6 +800,8 @@ Keeping onboarding documentation current helps future developers and AI agents a
 ---
 
 ## 19. Onboarding Change Log
+
+- 2026-07-21: Added the Press & Media portable. Free side (`free_submission` editor submission) plus the paid `pr_wire` adapter, both behind a host-agnostic `*-core` / `*-host` split (`saas/press-media-core`, `saas/press-media-host`) and surfaced at `/dashboard/marketing/press-providers`. pr_wire reuses the canonical provider engine — `provider_registry` rows executed by `saas/lib/engine/universalRunner.ts` — and the wire's API key is vault-encrypted into `user_provider_keys` via `lib/vault/crypto` (BYO-key; the platform never fronts spend). Owner Connect is the manual §12C path (`saas/app/api/agency/press-providers/connect/route.ts` authors the `provider_registry` row and stores the key; `saas/lib/agency/pressProviderConnect.ts`); paid dispatch holds for owner budget approval; no plaintext secret sits in a registry row — it is resolved by `vault://` reference at call time. Indexed the design doc in Section 12D.
 
 - 2026-07-20: Made audit-remediation progress fail truthfully: the controller now distinguishes pending, failed, repairing, and successful GitHub checks; updates stale failed branches from current main; prevents worker heartbeats from resetting stage-change time; marks unchanged stages stalled after 15 minutes; and preserves AI-first execution with optional human takeover on the same governed state.
 

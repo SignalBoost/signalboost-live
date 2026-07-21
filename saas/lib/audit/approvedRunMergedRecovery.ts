@@ -8,6 +8,7 @@ import {
   isAuditLifecycleFunctionMissing,
 } from '@/lib/audit/remediationLifecycleRepair'
 
+const OWNER = 'SignalBoost'
 const REPO = 'SignalBoost/signalboost-live'
 
 function githubToken(): string | null {
@@ -70,7 +71,51 @@ function normalizeCandidate(payload: any): ApprovedRunSystemResult | null {
     mergedAt: String(payload.mergedAt || ''),
     mergeCommitSha: String(payload.mergeCommitSha || ''),
     localizationFilesChanged: Number(payload.localizationFilesChanged || 0),
+    checkState: payload.checkState || 'unknown',
+    failedChecks: Array.isArray(payload.failedChecks) ? payload.failedChecks : [],
+    pendingChecks: Array.isArray(payload.pendingChecks) ? payload.pendingChecks : [],
+    repairMessage: String(payload.repairMessage || ''),
   }
+}
+
+async function resolveMergedPullRequest(candidate: ApprovedRunSystemResult): Promise<{
+  ok: boolean
+  data: any
+  error: string
+}> {
+  const direct = await github(`/repos/${REPO}/pulls/${candidate.prNumber}`)
+  if (direct.ok && direct.data?.merged) return { ok: true, data: direct.data, error: '' }
+
+  const branch = String(candidate.branch || '').trim()
+  if (!branch) {
+    return direct.ok
+      ? { ok: true, data: direct.data, error: '' }
+      : { ok: false, data: null, error: direct.error }
+  }
+
+  const listed = await github(
+    `/repos/${REPO}/pulls?head=${OWNER}:${encodeURIComponent(branch)}&state=closed&sort=updated&direction=desc&per_page=20`,
+  )
+  if (!listed.ok) {
+    return direct.ok
+      ? { ok: true, data: direct.data, error: '' }
+      : { ok: false, data: null, error: listed.error || direct.error }
+  }
+
+  for (const row of Array.isArray(listed.data) ? listed.data : []) {
+    const prNumber = Number(row?.number || 0)
+    if (!prNumber) continue
+    if (prNumber === candidate.prNumber && direct.ok) {
+      if (direct.data?.merged) return { ok: true, data: direct.data, error: '' }
+      continue
+    }
+    const detail = await github(`/repos/${REPO}/pulls/${prNumber}`)
+    if (detail.ok && detail.data?.merged) return { ok: true, data: detail.data, error: '' }
+  }
+
+  return direct.ok
+    ? { ok: true, data: direct.data, error: '' }
+    : { ok: false, data: null, error: direct.error }
 }
 
 async function finalize(params: {
@@ -122,23 +167,28 @@ export async function recoverMergedApprovedRemediation(params: {
   }
   if (!candidate) return null
 
-  const pull = await github(`/repos/${REPO}/pulls/${candidate.prNumber}`)
-  if (!pull.ok) {
+  const resolvedPull = await resolveMergedPullRequest(candidate)
+  if (!resolvedPull.ok) {
     return {
       ...candidate,
       ok: false,
       lifecycleStatus: 'failed',
       merged: false,
-      autoMergeError: pull.error,
+      autoMergeError: resolvedPull.error,
     }
   }
-  if (!pull.data?.merged) return null
+  if (!resolvedPull.data?.merged) return null
 
-  const mergeCommitSha = String(pull.data?.merge_commit_sha || candidate.mergeCommitSha || '')
-  const mergedAt = String(pull.data?.merged_at || candidate.mergedAt || new Date().toISOString())
+  const pull = resolvedPull.data
+  const resolvedPrNumber = Number(pull?.number || candidate.prNumber)
+  const resolvedPrUrl = String(pull?.html_url || candidate.prUrl)
+  const mergeCommitSha = String(pull?.merge_commit_sha || candidate.mergeCommitSha || '')
+  const mergedAt = String(pull?.merged_at || candidate.mergedAt || new Date().toISOString())
   if (candidate.status === 'partial' || candidate.lifecycleStatus === 'partial') {
     const partial: ApprovedRunSystemResult = {
       ...candidate,
+      prNumber: resolvedPrNumber,
+      prUrl: resolvedPrUrl,
       ok: true,
       status: 'partial',
       lifecycleStatus: 'partial',
@@ -149,7 +199,12 @@ export async function recoverMergedApprovedRemediation(params: {
       autoMergeError: 'The pull request merged only a safe subset; unresolved findings remain open.',
     }
     const latest = (logs.data || [])[0]?.payload
-    if (latest?.lifecycleStatus !== 'partial' || latest?.mergeCommitSha !== mergeCommitSha || latest?.merged !== true) {
+    if (
+      latest?.lifecycleStatus !== 'partial' ||
+      latest?.mergeCommitSha !== mergeCommitSha ||
+      latest?.merged !== true ||
+      Number(latest?.prNumber || 0) !== resolvedPrNumber
+    ) {
       await params.admin.from('audit_logs').insert({
         run_id: params.runId,
         user_id: params.actorUserId,
@@ -161,13 +216,15 @@ export async function recoverMergedApprovedRemediation(params: {
 
   const final = await finalize({
     ...params,
-    prNumber: candidate.prNumber,
-    prUrl: String(pull.data?.html_url || candidate.prUrl),
+    prNumber: resolvedPrNumber,
+    prUrl: resolvedPrUrl,
     mergeCommitSha,
   })
   if (!final.ok) {
     return {
       ...candidate,
+      prNumber: resolvedPrNumber,
+      prUrl: resolvedPrUrl,
       ok: false,
       lifecycleStatus: 'failed',
       merged: true,
@@ -179,6 +236,8 @@ export async function recoverMergedApprovedRemediation(params: {
 
   const recovered: ApprovedRunSystemResult = {
     ...candidate,
+    prNumber: resolvedPrNumber,
+    prUrl: resolvedPrUrl,
     ok: true,
     lifecycleStatus: 'merged',
     merged: true,
@@ -186,13 +245,18 @@ export async function recoverMergedApprovedRemediation(params: {
     mergeCommitSha,
     findingsApplied: final.findingsFixed,
     autoMergeError: '',
+    checkState: 'success',
+    failedChecks: [],
+    pendingChecks: [],
+    repairMessage: '',
   }
 
   const latest = (logs.data || [])[0]?.payload
   if (
     latest?.lifecycleStatus !== 'merged' ||
     latest?.mergeCommitSha !== mergeCommitSha ||
-    Number(latest?.findingsApplied || 0) !== final.findingsFixed
+    Number(latest?.findingsApplied || 0) !== final.findingsFixed ||
+    Number(latest?.prNumber || 0) !== resolvedPrNumber
   ) {
     await params.admin.from('audit_logs').insert({
       run_id: params.runId,

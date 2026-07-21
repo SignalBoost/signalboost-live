@@ -10,6 +10,7 @@ import { Resend } from 'resend'
 import { callModel } from '@/lib/ai/modelRouter'
 import { runUniversalProvider } from '@/lib/engine/universalRunner'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { resolvePressProviderKey } from '@/lib/agency/pressProviderConnect'
 import type {
   AiPort, EmailPort, OwnerNotifyPort, PortBundle, RunnerPort, RunnerResult, RunnerProviderConfig,
   CampaignBrief, GenerateSpec, MediaCampaign, DispatchState, ProofResult,
@@ -120,12 +121,13 @@ export function createOwnerNotifyPort(): OwnerNotifyPort {
 // A wire brand's endpoint/headers/payload live in a provider_registry row; the key is resolved
 // by reference (env:// today; vault:// wired with the connect flow). No hand-rolled HTTP here,
 // and no plaintext key — the secret is resolved only at call time, backend-only.
-function resolveHostCredential(reference: unknown): string {
+async function resolveHostCredential(reference: unknown): Promise<string> {
   const ref = typeof reference === 'string'
     ? reference
     : ((reference as any)?.ref || (reference as any)?.secretRef || (reference as any)?.name || '')
-  if (typeof ref === 'string' && ref.startsWith('env://')) return process.env[ref.slice(6)] || ''
-  // vault:// resolution is wired with the provider connect flow; env:// is the supported path today.
+  if (typeof ref !== 'string') return ''
+  if (ref.startsWith('env://')) return process.env[ref.slice(6)] || ''
+  if (ref.startsWith('vault://')) return (await resolvePressProviderKey(ref.slice(8))) || ''
   return ''
 }
 
@@ -137,7 +139,7 @@ export function createRunnerPort(): RunnerPort {
           providerId,
           actionId: action,
           variables,
-          credentials: { api_key: `env://PRESS_${providerId.toUpperCase()}_API_KEY` },
+          credentials: { api_key: `vault://${providerId}` },
           resolveCredential: async (reference) => resolveHostCredential(reference),
         })
         return {

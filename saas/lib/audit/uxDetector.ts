@@ -26,6 +26,41 @@ const ADMINISH = /(^|\/)app\/(admin|hub|dashboard)\//
 const MAX_UX_FILES = 2000   // effectively a full-repo sweep of app/ + components/
 const CONCURRENCY  = 8
 
+// ---------------------------------------------------------------------------
+// i18n raw-string rule — SINGLE SOURCE OF TRUTH.
+//
+// The exact pattern that flags a hardcoded JSX text node. It is exported as a
+// string (not a shared RegExp object) so the remediation engine can build its
+// own fresh RegExp from it and ask "does the detector STILL flag this phrase?"
+// using the identical rule that produced the finding. Detection and remediation
+// must never drift apart — that drift is what let findings be reported "fixed"
+// while the next scan re-flagged them. Any change to this pattern updates both
+// the scanner and the remediation check at once.
+//
+// Matches: JSX text content (2+ words, starts with a capital) NOT wrapped in the
+// t() hook. Single words, expressions ({...}), and punctuation-only nodes are
+// ignored.
+export const I18N_RAW_STRING_SOURCE = ">\\s*([A-Z][A-Za-z']+(?:\\s+[A-Za-z'’.,!?:&/()-]+){1,})\\s*<"
+
+// The normalized phrase a match produces — used verbatim in finding.detail, so
+// the remediation engine can compare against the stored finding text exactly.
+function normalizePhrase(match: string): string {
+  return match.replace(/[<>]/g, '').trim()
+}
+
+// Every distinct hardcoded phrase the i18n rule flags in a file. Builds a fresh
+// RegExp per call (no shared lastIndex state → safe under concurrent scans).
+export function i18nRawStringPhrases(content: string): string[] {
+  const rx = new RegExp(I18N_RAW_STRING_SOURCE, 'g')
+  const out = new Set<string>()
+  let m: RegExpExecArray | null
+  while ((m = rx.exec(content)) !== null) {
+    out.add(normalizePhrase(m[0]))
+    if (m.index === rx.lastIndex) rx.lastIndex++ // guard against zero-width
+  }
+  return [...out]
+}
+
 interface Rule {
   category: string
   test: RegExp                       // must be global
@@ -65,12 +100,13 @@ const RULES: Rule[] = [
     // i18n enforcement: JSX text content (2+ words, starts with a capital) that is
     // NOT wrapped in the t() hook. Heuristic — multi-word UI labels written inline
     // instead of t('namespace.key', '…') trip this. Single words, expressions
-    // ({...}), and punctuation-only nodes are ignored.
+    // ({...}), and punctuation-only nodes are ignored. Pattern shared with the
+    // remediation engine via I18N_RAW_STRING_SOURCE (fresh RegExp per file).
     category: 'i18n-raw-string',
-    test: />\s*([A-Z][A-Za-z']+(?:\s+[A-Za-z'’.,!?:&/()-]+){1,})\s*</g,
+    test: new RegExp(I18N_RAW_STRING_SOURCE, 'g'),
     severity: () => 'high',
     title: 'Raw text not wired to i18n',
-    detail: m => `User-facing text "${m.replace(/[<>]/g, '').trim()}" is hardcoded in JSX rather than wrapped in the i18n hook.`,
+    detail: m => `User-facing text "${normalizePhrase(m)}" is hardcoded in JSX rather than wrapped in the i18n hook.`,
     recommendation: "Wrap it with t('namespace.key', 'fallback') via useTranslation() and add the key to the locale dictionaries (audit.{lang}.json / console.{lang}.json). Heuristic — verify it is genuinely user-facing copy.",
   },
   {

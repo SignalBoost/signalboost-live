@@ -162,6 +162,17 @@ export default function CosaVideoPipelinePage() {
     } catch (e: any) { setMessage(e?.message || 'Cross-post failed.') } finally { setBusyId('') }
   }
 
+  async function republish(id: string) {
+    setBusyId(id); setMessage('')
+    try {
+      const res = await fetch('/api/cos/campaign-queue/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Retry failed.')
+      setMessage(json.liveUrl ? `Published. Live link: ${json.liveUrl}` : 'Re-queued. The live link will be emailed when it goes live.')
+      await load(true)
+    } catch (e: any) { setMessage(e?.message || 'Retry failed.') } finally { setBusyId('') }
+  }
+
   async function archiveAction(id: string, action: 'archive' | 'restore') {
     setBusyId(id)
     try {
@@ -226,6 +237,7 @@ export default function CosaVideoPipelinePage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
               {state === 'ready' && !archived[campaign.id] && <button onClick={() => approve(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={"Approve and publish"} /></button>}
               {state === 'problem' && !archived[campaign.id] && <button onClick={() => redo(campaign.id)} disabled={busyId === campaign.id} style={warning}><LocalizedText fallback={"Fix automatically"} /></button>}
+              {state === 'approved' && !archived[campaign.id] && <button onClick={() => republish(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={"Publish now"} /></button>}
               {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'tiktok')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={"Post to TikTok"} /></button>}
               {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'instagram_business')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={"Post to Instagram"} /></button>}
               {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>Archive</button>}

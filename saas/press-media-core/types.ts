@@ -71,11 +71,22 @@ export interface OwnerNotifyPort {
 export interface HttpPort {
   fetchJson(url: string, init?: unknown): Promise<unknown>   // for wire / ad-platform API adapters
 }
+// Config-driven provider execution. The host wraps the platform's canonical universal runner
+// (provider_registry rows + secret resolution), so a paid adapter never hand-rolls HTTP or
+// touches a key — it names a registered action and the host runs it. Adding a wire brand is a
+// provider_registry row, not code. `action` is a provider_registry action_id.
+export interface RunnerResult { ok: boolean; status: number; outputs: Record<string, unknown>; ref?: string; error?: string }
+export interface RunnerProviderConfig { connected: boolean; priceCents: number; currency: string }
+export interface RunnerPort {
+  run(providerId: string, action: string, variables: Record<string, unknown>): Promise<RunnerResult>
+  loadConfig(providerId: string): Promise<RunnerProviderConfig | null>
+}
 export interface PortBundle {
   ai: AiPort
   email: EmailPort
   notify: OwnerNotifyPort
   http?: HttpPort
+  runner?: RunnerPort                // config-driven execution for paid providers (universal runner)
   config?: Record<string, string>    // the buyer's connected credentials for this provider
 }
 

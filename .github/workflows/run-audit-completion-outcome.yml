@@ -1,0 +1,49 @@
+name: Run Audit Completion Outcome
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/audit-completion-outcome
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Apply permanent completion-state presentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/apply-audit-completion-outcome.yml').read_text()
+          marker = "          node <<'NODE'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          NODE", start)
+          block = source[start:end]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          Path('/tmp/apply-audit-completion-outcome.cjs').write_text('\n'.join(lines) + '\n')
+          PY
+          node /tmp/apply-audit-completion-outcome.cjs
+          rm -f .github/workflows/run-audit-completion-outcome.yml
+
+      - name: Verify focused audit regressions
+        working-directory: saas
+        run: npm ci --dangerously-allow-all-scripts && npm run test:audit-remediation && npm run typecheck
+
+      - name: Commit permanent source changes
+        run: |
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Show verified audit outcome instead of fixed findings"
+          git push origin HEAD:fix/audit-completion-outcome

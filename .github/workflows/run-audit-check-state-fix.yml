@@ -23,6 +23,10 @@ jobs:
 
       - name: Extract and run the permanent migration
         run: |
+          if [ -f audit-migration-error.txt ]; then
+            echo "Diagnostic already captured."
+            exit 0
+          fi
           python3 - <<'PY'
           from pathlib import Path
           source = Path('.github/workflows/apply-audit-check-state-fix.yml').read_text()
@@ -33,10 +37,22 @@ jobs:
           lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
           Path('/tmp/apply-audit-check-state-fix.cjs').write_text('\n'.join(lines) + '\n')
           PY
-          node /tmp/apply-audit-check-state-fix.cjs
-          rm -f .github/workflows/run-audit-check-state-fix.yml
+          set +e
+          node /tmp/apply-audit-check-state-fix.cjs > audit-migration-error.txt 2>&1
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            git config user.name "SignalBoost Automation"
+            git config user.email "actions@users.noreply.github.com"
+            git add audit-migration-error.txt
+            git commit -m "Capture audit migration failure"
+            git push origin HEAD:fix/audit-check-failure-progress
+            exit 1
+          fi
+          rm -f audit-migration-error.txt .github/workflows/run-audit-check-state-fix.yml
 
       - name: Commit permanent fix
+        if: success()
         run: |
           git config user.name "SignalBoost Automation"
           git config user.email "actions@users.noreply.github.com"

@@ -148,6 +148,15 @@ export default function AssistantPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(false)
   const [conversations, setConversations] = useState<ConvSummary[]>([])
+  const [cosStatus, setCosStatus] = useState<{ mode: string; detail: string; isOwner: boolean } | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/cos/status', { credentials: 'include', cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => { if (alive && j?.ok) setCosStatus({ mode: String(j.mode), detail: String(j.detail || ''), isOwner: Boolean(j.isOwner) }) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   const suggestions = [
     c(COPY.suggestions.s1, l),
@@ -381,6 +390,19 @@ export default function AssistantPage() {
             <p className="sb-eyebrow">✨ {c(COPY.eyebrow, l)}</p>
             <h1 style={{ fontSize: 'clamp(20px,3.5vw,30px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1.1, margin: '6px 0 6px' }}>{c(COPY.title, l)}</h1>
             <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>{c(COPY.subtitle, l)}</p>
+            {cosStatus && (() => {
+              const m = cosStatus.mode
+              const ok = m === 'cos'
+              const accent = ok ? '#22c55e' : m === 'degraded' ? '#fca5a5' : '#fdba74'
+              const bg = ok ? 'rgba(34,197,94,.14)' : m === 'degraded' ? 'rgba(239,68,68,.16)' : 'rgba(251,146,60,.16)'
+              const label = ok ? '🧠 COS ACTIVE — owner' : m === 'degraded' ? '⚠️ COS DEGRADED — AI key missing' : '⚠️ CONCIERGE MODE — not recognized as owner'
+              return (
+                <div style={{ marginTop: 10 }}>
+                  <span title={cosStatus.detail} style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 999, background: bg, border: `1px solid ${accent}`, color: accent, fontSize: 12, fontWeight: 900, letterSpacing: '.02em' }}>{label}</span>
+                  {!ok && <p style={{ color: accent, fontSize: 11.5, margin: '6px 0 0', lineHeight: 1.5, maxWidth: 620 }}>{cosStatus.detail}</p>}
+                </div>
+              )
+            })()}
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button onClick={() => (historyOpen ? setHistoryOpen(false) : openHistory())} className="sb-button-secondary" style={{ fontSize: 12, padding: '9px 14px', whiteSpace: 'nowrap' }}>🕘 {c(COPY.history, l)}</button>

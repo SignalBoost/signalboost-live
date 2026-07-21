@@ -5,6 +5,7 @@
 import { commitFileToBranch, findBadImports, preservedFraction } from '@/lib/ai/tools/repoWriter'
 import { readRepoFile } from '@/lib/ai/tools/repoReader'
 import { listRepoTree, parseRepoUrl, readRepoFileFrom } from '@/lib/audit/repoTarget'
+import { i18nRawStringPhrases } from '@/lib/audit/uxDetector'
 
 const REPO = 'SignalBoost/signalboost-live'
 const BASE_BRANCH = 'main'
@@ -75,6 +76,17 @@ function rawJsxTextPresent(content: string, text: string): boolean {
   return rawJsxTextPattern(text).test(content)
 }
 
+// The authoritative "is this still a raw string?" test — asks the SAME i18n rule
+// that generated the finding whether it still flags the phrase in the file. This
+// is stronger than the exact >text< substring check: it stays true through
+// whitespace / adjacent-character drift, so a finding is only ever treated as
+// resolved when the detector agrees it is gone. That is what stops the loop where
+// a run reported "fixed" yet the next scan re-flagged the same text.
+function detectorFlagsPhrase(content: string, phrase: string): boolean {
+  if (!phrase) return false
+  return i18nRawStringPhrases(content).includes(phrase)
+}
+
 function localizedImportFor(file: string): string {
   return "import { LocalizedText } from '@/components/i18n/LocalizedText'"
 }
@@ -100,8 +112,20 @@ function applyFinding(content: string, finding: AuditFinding): { content: string
   }
 
   const text = rawTextFromFinding(finding)
+
+  // "Resolved" must mean the detector no longer flags this phrase — not merely
+  // that an exact >text< substring is absent. The old exact-only check silently
+  // marked findings resolved whenever the on-disk text drifted from the stored
+  // phrase, so they were reported fixed while the next scan re-flagged them.
+  if (!detectorFlagsPhrase(content, text)) {
+    return { content, applied: false, alreadyResolved: true, reason: 'The i18n detector no longer flags this text on main.' }
+  }
+
+  // The detector still flags it, but the exact JSX node could not be located for a
+  // safe deterministic replacement. Do NOT claim it resolved — leave it visible so
+  // the run reports partial ("completed with exceptions") instead of a false fix.
   if (!rawJsxTextPresent(content, text)) {
-    return { content, applied: false, alreadyResolved: true, reason: 'The exact raw JSX text is no longer present on main.' }
+    return { content, applied: false, alreadyResolved: false, reason: 'Raw text is still flagged but could not be matched for a safe automatic fix.' }
   }
 
   const replacement = `><LocalizedText fallback={${JSON.stringify(text)}} /><`
@@ -322,7 +346,7 @@ export async function runApprovedAuditRemediation(params: {
     proposed = ensureLocalizedImport(file, proposed)
     const badImports = findBadImports(proposed, file, paths, file.startsWith('saas/') ? deps.saas : deps.root)
     const kept = preservedFraction(current.content, proposed)
-    const unresolved = fileFindings.filter(isSupportedFinding).filter(finding => rawJsxTextPresent(proposed, rawTextFromFinding(finding)))
+    const unresolved = fileFindings.filter(isSupportedFinding).filter(finding => detectorFlagsPhrase(proposed, rawTextFromFinding(finding)))
     if (badImports.length || kept < 0.5 || unresolved.length) {
       skipped.push({
         file,

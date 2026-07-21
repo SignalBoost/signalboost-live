@@ -1,0 +1,45 @@
+name: Run Audit Check State Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/audit-check-failure-progress
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Extract and run the permanent migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/apply-audit-check-state-fix.yml').read_text()
+          marker = "          node <<'NODE'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          NODE", start)
+          block = source[start:end]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          Path('/tmp/apply-audit-check-state-fix.cjs').write_text('\n'.join(lines) + '\n')
+          PY
+          node /tmp/apply-audit-check-state-fix.cjs
+          rm -f .github/workflows/run-audit-check-state-fix.yml
+
+      - name: Commit permanent fix
+        run: |
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Make audit check progress truthful and self-healing"
+          git push origin HEAD:fix/audit-check-failure-progress

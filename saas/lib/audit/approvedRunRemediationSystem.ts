@@ -29,6 +29,8 @@ const SAAS_CATALOG = 'saas/lib/i18n/approvedAuditRemediationCopy.ts'
 export type AuditRemediationLifecycleStatus =
   | 'preparing'
   | 'checks_pending'
+  | 'checks_failed'
+  | 'repairing'
   | 'auto_merge_queued'
   | 'partial'
   | 'merged'
@@ -40,6 +42,10 @@ export type ApprovedRunSystemResult = ApprovedRunRemediationResult & {
   mergedAt: string
   mergeCommitSha: string
   localizationFilesChanged: number
+  checkState: 'unknown' | 'pending' | 'failed' | 'success'
+  failedChecks: string[]
+  pendingChecks: string[]
+  repairMessage: string
 }
 
 type GhResult = {
@@ -59,6 +65,8 @@ type PullRequestRef = {
   mergeCommitSha: string
   mergeable: boolean | null
   mergeableState: string
+  baseSha: string
+  headRef: string
 }
 
 type AuditFindingRow = {
@@ -136,6 +144,8 @@ function pullRequestRef(data: any): PullRequestRef {
     mergeCommitSha: String(data?.merge_commit_sha || ''),
     mergeable: typeof data?.mergeable === 'boolean' ? data.mergeable : null,
     mergeableState: String(data?.mergeable_state || ''),
+    baseSha: String(data?.base?.sha || ''),
+    headRef: String(data?.head?.ref || ''),
   }
 }
 
@@ -146,6 +156,66 @@ async function getPullRequest(prNumber: number): Promise<{ ok: boolean; value?: 
       ? { ok: true, value: pullRequestRef(result.data), error: '' }
       : { ok: false, error: result.error }
   })
+}
+
+
+
+type CheckSummary = {
+  state: 'unknown' | 'pending' | 'failed' | 'success'
+  failed: string[]
+  pending: string[]
+  error: string
+}
+
+const PASSING_CHECK_CONCLUSIONS = new Set(['success', 'neutral', 'skipped'])
+
+async function getCheckSummary(headSha: string): Promise<CheckSummary> {
+  if (!headSha) return { state: 'unknown', failed: [], pending: [], error: 'The remediation head commit is missing.' }
+  const [runs, statuses] = await Promise.all([
+    github(`/repos/${REPO}/commits/${encodeURIComponent(headSha)}/check-runs?per_page=100`),
+    github(`/repos/${REPO}/commits/${encodeURIComponent(headSha)}/status`),
+  ])
+  if (!runs.ok && !statuses.ok) {
+    return { state: 'unknown', failed: [], pending: [], error: [runs.error, statuses.error].filter(Boolean).join(' | ') }
+  }
+
+  const failed = new Set<string>()
+  const pending = new Set<string>()
+  let observed = 0
+  for (const run of Array.isArray(runs.data?.check_runs) ? runs.data.check_runs : []) {
+    observed += 1
+    const name = String(run?.name || 'GitHub check')
+    if (String(run?.status || '') !== 'completed') pending.add(name)
+    else if (!PASSING_CHECK_CONCLUSIONS.has(String(run?.conclusion || ''))) failed.add(name)
+  }
+  for (const status of Array.isArray(statuses.data?.statuses) ? statuses.data.statuses : []) {
+    observed += 1
+    const name = String(status?.context || 'GitHub status')
+    const state = String(status?.state || '')
+    if (state === 'pending') pending.add(name)
+    else if (state === 'failure' || state === 'error') failed.add(name)
+  }
+
+  if (failed.size) return { state: 'failed', failed: [...failed].sort(), pending: [...pending].sort(), error: '' }
+  if (pending.size || observed === 0) return { state: 'pending', failed: [], pending: [...pending].sort(), error: '' }
+  return { state: 'success', failed: [], pending: [], error: '' }
+}
+
+async function branchIsBehind(pr: PullRequestRef): Promise<{ behind: boolean; error: string }> {
+  if (!pr.baseSha || !pr.headSha) return { behind: false, error: '' }
+  const compared = await github(`/repos/${REPO}/compare/${encodeURIComponent(pr.baseSha)}...${encodeURIComponent(pr.headSha)}`)
+  if (!compared.ok) return { behind: false, error: compared.error }
+  return { behind: Number(compared.data?.behind_by || 0) > 0, error: '' }
+}
+
+async function updatePullRequestBranch(pr: PullRequestRef): Promise<{ updated: boolean; error: string }> {
+  const result = await github(`/repos/${REPO}/pulls/${pr.number}/update-branch`, {
+    method: 'PUT',
+    body: JSON.stringify({ expected_head_sha: pr.headSha }),
+  })
+  if (result.ok) return { updated: true, error: '' }
+  if (result.status === 409 || result.status === 422) return { updated: false, error: result.error }
+  return { updated: false, error: result.error }
 }
 
 async function ensurePullRequest(branch: string, title: string, body: string): Promise<{ ok: boolean; value?: PullRequestRef; error: string }> {
@@ -402,6 +472,10 @@ function systemResult(
     mergedAt: '',
     mergeCommitSha: '',
     localizationFilesChanged: 0,
+    checkState: 'unknown',
+    failedChecks: [],
+    pendingChecks: [],
+    repairMessage: '',
     ...patch,
   }
 }
@@ -411,6 +485,7 @@ async function writeLifecycleLog(admin: any, runId: string, actorUserId: string,
     .from('audit_logs')
     .select('payload')
     .eq('run_id', runId)
+    .eq('payload->>kind', 'audit_batch_remediation')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -421,7 +496,10 @@ async function writeLifecycleLog(admin: any, runId: string, actorUserId: string,
     previous?.prNumber === payload.prNumber &&
     previous?.mergeCommitSha === payload.mergeCommitSha &&
     previous?.findingsApplied === payload.findingsApplied &&
-    previous?.filesChanged === payload.filesChanged
+    previous?.filesChanged === payload.filesChanged &&
+    previous?.checkState === payload.checkState &&
+    JSON.stringify(previous?.failedChecks || []) === JSON.stringify(payload.failedChecks || []) &&
+    previous?.repairMessage === payload.repairMessage
   ) return
   await admin.from('audit_logs').insert({ run_id: runId, user_id: actorUserId, payload })
 }
@@ -499,8 +577,46 @@ async function reconcilePullRequest(params: {
   }
 
 
-const autoMerge = await queueAutoMerge(pr.number)
-  if (!autoMerge.queued) {
+  const checks = await getCheckSummary(pr.headSha)
+  if (checks.state === 'failed') {
+    const behind = await branchIsBehind(pr)
+    if (behind.behind) {
+      const update = await updatePullRequestBranch(pr)
+      if (update.updated) {
+        const repairing = systemResult(params.result, {
+ok: true,
+status: 'pr_ready',
+lifecycleStatus: 'repairing',
+checkState: 'pending',
+failedChecks: checks.failed,
+pendingChecks: [],
+repairMessage: 'SignalBoost AI updated the remediation branch with the current main branch. Protected checks are restarting.',
+autoMergeQueued: false,
+autoMergeError: '',
+        })
+        await writeLifecycleLog(params.admin, params.runId, params.actorUserId, repairing)
+        return repairing
+      }
+    }
+
+    const checksFailed = systemResult(params.result, {
+      ok: true,
+      status: 'pr_ready',
+      lifecycleStatus: 'checks_failed',
+      checkState: 'failed',
+      failedChecks: checks.failed,
+      pendingChecks: checks.pending,
+      repairMessage: '',
+      autoMergeQueued: false,
+      autoMergeError: `Protected checks failed: ${checks.failed.join(', ') || 'unknown check'}${behind.error ? `. Branch comparison also failed: ${behind.error}` : ''}`,
+    })
+    await writeLifecycleLog(params.admin, params.runId, params.actorUserId, checksFailed)
+    return checksFailed
+  }
+
+
+  const autoMerge = await queueAutoMerge(pr.number)
+  if (!autoMerge.queued && checks.state === 'success') {
     const directMerge = await mergeCleanPullRequest(pr)
     if (directMerge.error) {
       const failed = systemResult(params.result, {
@@ -550,9 +666,13 @@ const autoMerge = await queueAutoMerge(pr.number)
   const pending = systemResult(params.result, {
     ok: true,
     status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
-    lifecycleStatus: autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+    lifecycleStatus: checks.state === 'success' && autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+    checkState: checks.state,
+    failedChecks: checks.failed,
+    pendingChecks: checks.pending,
+    repairMessage: '',
     autoMergeQueued: autoMerge.queued,
-    autoMergeError: autoMerge.queued ? '' : autoMerge.error,
+    autoMergeError: autoMerge.queued ? '' : (autoMerge.error || checks.error),
   })
   await writeLifecycleLog(params.admin, params.runId, params.actorUserId, pending)
   return pending
@@ -576,6 +696,8 @@ export async function runApprovedAuditRemediationSystem(params: {
       mergeCommitSha: 'already-resolved-on-main',
       mergeable: true,
       mergeableState: 'clean',
+      baseSha: '',
+      headRef: '',
     }
     const finalized = await finalizeMergedRun({ ...params, pr: syntheticPr })
     const result = systemResult(base, finalized.ok ? {

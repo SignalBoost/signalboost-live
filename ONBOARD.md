@@ -649,13 +649,18 @@ ChatGPT/OpenAI reasoning may be used as a lead audit/review layer when configure
 
 Do not hard-code vendor hierarchy as a permanent fact if the repo configuration changes. Verify current model/provider configuration before changing audit behavior.
 
-Audit remediation consent and patch workflow:
+Audit remediation operating model:
 
-- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.
-- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.
-- Code findings must still go through a generated preview, visible diff, and explicit `Confirm & Push Pull Request` action. Provider and infrastructure findings remain behind the PR Cockpit owner `Merge/Approve` gate.
-- The Executive Risk Summary must overlay persisted `audit_finding_state` rows before scoring or counting actionable work. Findings marked `resolved`, `accepted`, or `wont_fix` must not continue to appear as active fix offers; `in_progress` remains actionable.
-- Repository patch preflight must resolve `@/*` imports against the correct workspace: root `app/`, `lib/`, and `components/` paths use the repository-root alias, while `saas/*` paths use the SaaS alias. Genuine missing imports must continue to fail closed.
+- SignalBoost is AI-driven first with human backup and optional manual control. AI is the default operator after approval; a human may take over by choice or when AI execution fails.
+- One run-scoped owner approval authorizes the supported safe-fix lifecycle for that immutable audit run. SignalBoost AI prepares fixes, creates the protected branch and internal pull request, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.
+- Manual takeover, when exposed, must continue from the same audit run, branch, pull request, checks, logs, and verification state. It must pause autonomous merge before human edits or merge actions and must allow control to return to AI without creating a second implementation.
+- Manual controls are secondary and optional. The normal AI path must never present a GitHub pull request, merge button, preview, assignment, owner, or due-date control as a required next step.
+- Progress reporting must be truthful. Worker heartbeat means the controller is checking; it does not prove forward progress. Failed checks must be named as failed, unchanged stages older than 15 minutes must be marked stalled, and dashboard reads must never manufacture activity.
+- When protected checks fail on a remediation branch that is behind main, the AI must update the same branch from current main and restart checks. Other failed checks remain visible for AI repair or optional human takeover; they must never be described as still running.
+- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.
+- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes without a verified safe executor remain unmodified and visible.
+- The Executive Risk Summary must overlay persisted finding state before scoring. Repository write preflight must resolve `@/*` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before checks and merge.
+- `GITHUB_WRITE_TOKEN` is backend-only and must never appear in client code, logs, screenshots, report exports, or UI.
 
 ---
 
@@ -792,6 +797,8 @@ Keeping onboarding documentation current helps future developers and AI agents a
 ---
 
 ## 19. Onboarding Change Log
+
+- 2026-07-20: Made audit-remediation progress fail truthfully: the controller now distinguishes pending, failed, repairing, and successful GitHub checks; updates stale failed branches from current main; prevents worker heartbeats from resetting stage-change time; marks unchanged stages stalled after 15 minutes; and preserves AI-first execution with optional human takeover on the same governed state.
 
 - 2026-07-20: Added Section 12D — Documentation Map & bidirectional Cross-Reference Rule. ONBOARD is now the explicit index for every per-portable compliance/security/buyer doc (Console, Integrations/Social, Marketing+Sales, COS, Campaign Studio) plus the cross-cutting governance/audit docs and the two commercial-readiness audits (docs/portables/README.md, compliance-checklist.md). Rule: reading ONBOARD routes out to these docs and reading any doc routes back to ONBOARD (per-doc header pointers + CLAUDE.md/AGENTS.md funnel). Recorded the one open gap: the Browser Agent compliance doc is not yet written; all other portables have theirs.
 - 2026-07-20: Added Section 12C — Plug-and-Play Provider Onboarding via three interchangeable paths (AI infra-PR, manual, Browser Agent), buyer's choice, AI never mandatory. Codifies that provider setup (keys, OAuth connect, product/price provisioning, schema) must be self-serve for buyers of any portable, with manual as a first-class always-available path and the Browser Agent as an optional co-pilot for external-platform steps. Flags the AI-path gap to fix next: infrastructure-PR step-output chaining (`{{steps[...]}}`) does not resolve, so dependent multi-step PRs (e.g. Stripe product → price) fail while independent steps succeed.

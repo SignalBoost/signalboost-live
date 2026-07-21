@@ -1,18 +1,16 @@
 // saas/app/api/agency/press-media/route.ts
-// ACTIVATION of the Press & Media portable. This is the first live surface that calls the
-// host engine (saas/press-media-host). It is ADDITIVE — it does not touch the existing
-// /api/agency/press-dispatch flow, so the verified press-outreach path is unchanged.
+// Press & Media portable — live surface. Calls the host engine (saas/press-media-host).
+// ADDITIVE: does not touch the existing /api/agency/press-dispatch flow.
 //
-// Actions (POST):
-//   (default) run       → generate + validate + cost + SPEND GATE + queue (owner-gated auto-dispatch)
-//   dispatch            → OWNER-ONLY: send an approved campaign through its provider adapter
-//   record_url          → OWNER-ONLY: record the REAL published link (resolves the maybe-URL proof)
-//
-// All persistence lands in the existing press_campaigns table, so GET
-// /api/agency/press-dispatch already lists these campaigns for the PressOutreachStudio queue.
+// GET  → provider cockpit data: the five adapter types with live/coming status read from the
+//        registry, a summary, and recent press_campaigns (so the UI mirrors the social cockpit).
+// POST → actions:
+//        (default) run  → generate + validate + cost + SPEND GATE + queue (owner-gated auto-dispatch)
+//        dispatch        → OWNER-ONLY: send an approved campaign through its provider adapter
+//        record_url      → OWNER-ONLY: record the REAL published link (resolves the maybe-URL proof)
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
-import { ownerOverrideIsValid } from '@/lib/agency/pressOutreach'
+import { ownerOverrideIsValid, getPressAdminClient } from '@/lib/agency/pressOutreach'
 import { getPressMediaHost } from '@/press-media-host'
 import type { CampaignBrief, MediaTarget, MediaTargetType } from '@/press-media-core'
 
@@ -21,6 +19,17 @@ export const dynamic = 'force-dynamic'
 const RATE_WINDOW_MS = 10 * 60_000
 const RATE_MAX = 4
 const rateBuckets = new Map<string, { count: number; resetAt: number }>()
+
+// The five adapter TYPES from the design doc (§4). Display metadata for the cockpit; the
+// registry decides which are actually live. When an adapter is registered, its card flips
+// to live automatically — no change here.
+const ROADMAP = [
+  { id: 'free_submission', label: 'Free editor submission', type: 'free_submission', cost: 'free', proof: 'maybe_url', needs: ['editor email or submit form'], blurb: 'Submit AI-written releases to verified editors and free / trade press. Zero cost; the editor decides if and when it runs.' },
+  { id: 'pr_wire', label: 'PR wire distribution', type: 'pr_wire', cost: 'per release', proof: 'distribution report', needs: ['API key'], blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Guaranteed distribution with a report back — billed per release on your own provider account.' },
+  { id: 'media_database', label: 'Media database', type: 'media_database', cost: 'subscription', proof: 'feeds target validation', needs: ['API key'], blurb: 'Cision, Muck Rack, Meltwater. Supplies verified journalist contacts that feed target validation for the other providers.' },
+  { id: 'ad_platform', label: 'Ad platform', type: 'ad_platform', cost: 'budget', proof: 'real-time ad report', needs: ['OAuth', 'budget'], blurb: 'Google, LinkedIn, Meta, Taboola, Outbrain. Budgeted paid distribution with a real-time report — spend runs on your own ad account.' },
+  { id: 'direct_io', label: 'Direct insertion order', type: 'direct_io', cost: 'insertion order', proof: 'tearsheet', needs: ['manual'], blurb: 'Print, IT magazines, TV, radio via a publisher or media agency. Insertion-order workflow; proof is a tearsheet or affidavit, weeks later.' },
+]
 
 function clientIpKey(req: Request) {
   const forwarded = req.headers.get('x-forwarded-for') || ''
@@ -50,6 +59,26 @@ function coreTarget(value: unknown): MediaTargetType {
 
 function str(value: unknown): string { return String(value ?? '').trim() }
 
+export async function GET() {
+  try {
+    const host = getPressMediaHost()
+    const liveIds = new Set(host.registry.ids())
+    const providers = ROADMAP.map((p) => ({ ...p, live: liveIds.has(p.id) }))
+    const live = providers.filter((p) => p.live).length
+
+    let campaigns: any[] = []
+    try {
+      const supabase = getPressAdminClient()
+      const { data } = await supabase.from('press_campaigns').select('*').order('updated_at', { ascending: false }).limit(30)
+      campaigns = data || []
+    } catch { /* campaigns are optional context for the cockpit */ }
+
+    return NextResponse.json({ ok: true, providers, summary: { total: providers.length, live, coming: providers.length - live }, campaigns })
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error?.message || 'capabilities_failed' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   let body: any
   try {
@@ -64,7 +93,6 @@ export async function POST(req: NextRequest) {
   const host = getPressMediaHost()
 
   try {
-    // OWNER-ONLY: push an approved campaign through its provider adapter.
     if (action === 'dispatch') {
       if (!ownerApproved) return NextResponse.json({ ok: false, error: 'owner_approval_required' }, { status: 403 })
       const campaignId = str(body?.campaign_id || body?.id)
@@ -73,7 +101,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: result.ok ? 200 : 400 })
     }
 
-    // OWNER-ONLY: record the real published link later (two-stage proof resolution).
     if (action === 'record_url') {
       if (!ownerApproved) return NextResponse.json({ ok: false, error: 'owner_approval_required' }, { status: 403 })
       const campaignId = str(body?.campaign_id || body?.id)
@@ -83,8 +110,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: result.ok ? 200 : 400 })
     }
 
-    // DEFAULT: run a campaign. Non-owner submissions are rate-limited and can only ever queue
-    // for owner review — the engine never auto-dispatches without ownerApproved.
     if (!ownerApproved && rateLimited(`press-media-run:${clientIpKey(req)}`)) {
       return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     }

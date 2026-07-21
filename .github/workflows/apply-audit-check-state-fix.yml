@@ -1,0 +1,399 @@
+name: Apply Audit Check State Fix
+
+on:
+  push:
+    branches:
+      - fix/audit-check-failure-progress
+    paths:
+      - '.github/workflows/apply-audit-check-state-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/audit-check-failure-progress
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Apply truthful failed-check and stalled-progress handling
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          function replaceRequired(value, before, after, label) {
+            if (value.includes(after)) return value
+            if (!value.includes(before)) throw new Error(`Missing expected ${label}`)
+            return value.replace(before, after)
+          }
+
+          const systemPath = 'saas/lib/audit/approvedRunRemediationSystem.ts'
+          let system = fs.readFileSync(systemPath, 'utf8')
+
+          system = replaceRequired(system,
+`export type AuditRemediationLifecycleStatus =
+  | 'preparing'
+  | 'checks_pending'
+  | 'auto_merge_queued'
+  | 'partial'
+  | 'merged'
+  | 'failed'`,
+`export type AuditRemediationLifecycleStatus =
+  | 'preparing'
+  | 'checks_pending'
+  | 'checks_failed'
+  | 'repairing'
+  | 'auto_merge_queued'
+  | 'partial'
+  | 'merged'
+  | 'failed'`, 'lifecycle status union')
+
+          system = replaceRequired(system,
+`  localizationFilesChanged: number
+}`,
+`  localizationFilesChanged: number
+  checkState: 'unknown' | 'pending' | 'failed' | 'success'
+  failedChecks: string[]
+  pendingChecks: string[]
+  repairMessage: string
+}`, 'system result check fields')
+
+          system = replaceRequired(system,
+`  mergeable: boolean | null
+  mergeableState: string
+}`,
+`  mergeable: boolean | null
+  mergeableState: string
+  baseSha: string
+  headRef: string
+}`, 'pull request ref fields')
+
+          system = replaceRequired(system,
+`    mergeable: typeof data?.mergeable === 'boolean' ? data.mergeable : null,
+    mergeableState: String(data?.mergeable_state || ''),`,
+`    mergeable: typeof data?.mergeable === 'boolean' ? data.mergeable : null,
+    mergeableState: String(data?.mergeable_state || ''),
+    baseSha: String(data?.base?.sha || ''),
+    headRef: String(data?.head?.ref || ''),`, 'pull request ref values')
+
+          const checkHelpers = `
+
+type CheckSummary = {
+  state: 'unknown' | 'pending' | 'failed' | 'success'
+  failed: string[]
+  pending: string[]
+  error: string
+}
+
+const PASSING_CHECK_CONCLUSIONS = new Set(['success', 'neutral', 'skipped'])
+
+async function getCheckSummary(headSha: string): Promise<CheckSummary> {
+  if (!headSha) return { state: 'unknown', failed: [], pending: [], error: 'The remediation head commit is missing.' }
+  const [runs, statuses] = await Promise.all([
+    github(\`/repos/\${REPO}/commits/\${encodeURIComponent(headSha)}/check-runs?per_page=100\`),
+    github(\`/repos/\${REPO}/commits/\${encodeURIComponent(headSha)}/status\`),
+  ])
+  if (!runs.ok && !statuses.ok) {
+    return { state: 'unknown', failed: [], pending: [], error: [runs.error, statuses.error].filter(Boolean).join(' | ') }
+  }
+
+  const failed = new Set<string>()
+  const pending = new Set<string>()
+  let observed = 0
+  for (const run of Array.isArray(runs.data?.check_runs) ? runs.data.check_runs : []) {
+    observed += 1
+    const name = String(run?.name || 'GitHub check')
+    if (String(run?.status || '') !== 'completed') pending.add(name)
+    else if (!PASSING_CHECK_CONCLUSIONS.has(String(run?.conclusion || ''))) failed.add(name)
+  }
+  for (const status of Array.isArray(statuses.data?.statuses) ? statuses.data.statuses : []) {
+    observed += 1
+    const name = String(status?.context || 'GitHub status')
+    const state = String(status?.state || '')
+    if (state === 'pending') pending.add(name)
+    else if (state === 'failure' || state === 'error') failed.add(name)
+  }
+
+  if (failed.size) return { state: 'failed', failed: [...failed].sort(), pending: [...pending].sort(), error: '' }
+  if (pending.size || observed === 0) return { state: 'pending', failed: [], pending: [...pending].sort(), error: '' }
+  return { state: 'success', failed: [], pending: [], error: '' }
+}
+
+async function branchIsBehind(pr: PullRequestRef): Promise<{ behind: boolean; error: string }> {
+  if (!pr.baseSha || !pr.headSha) return { behind: false, error: '' }
+  const compared = await github(\`/repos/\${REPO}/compare/\${encodeURIComponent(pr.baseSha)}...\${encodeURIComponent(pr.headSha)}\`)
+  if (!compared.ok) return { behind: false, error: compared.error }
+  return { behind: Number(compared.data?.behind_by || 0) > 0, error: '' }
+}
+
+async function updatePullRequestBranch(pr: PullRequestRef): Promise<{ updated: boolean; error: string }> {
+  const result = await github(\`/repos/\${REPO}/pulls/\${pr.number}/update-branch\`, {
+    method: 'PUT',
+    body: JSON.stringify({ expected_head_sha: pr.headSha }),
+  })
+  if (result.ok) return { updated: true, error: '' }
+  if (result.status === 409 || result.status === 422) return { updated: false, error: result.error }
+  return { updated: false, error: result.error }
+}
+`
+          system = replaceRequired(system,
+`async function ensurePullRequest(branch: string, title: string, body: string): Promise<{ ok: boolean; value?: PullRequestRef; error: string }> {`,
+checkHelpers + `
+async function ensurePullRequest(branch: string, title: string, body: string): Promise<{ ok: boolean; value?: PullRequestRef; error: string }> {`, 'check helpers insertion')
+
+          system = replaceRequired(system,
+`    mergeCommitSha: '',
+    localizationFilesChanged: 0,
+    ...patch,`,
+`    mergeCommitSha: '',
+    localizationFilesChanged: 0,
+    checkState: 'unknown',
+    failedChecks: [],
+    pendingChecks: [],
+    repairMessage: '',
+    ...patch,`, 'system result defaults')
+
+          system = replaceRequired(system,
+`    .select('payload')
+    .eq('run_id', runId)
+    .order('created_at', { ascending: false })`,
+`    .select('payload')
+    .eq('run_id', runId)
+    .eq('payload->>kind', 'audit_batch_remediation')
+    .order('created_at', { ascending: false })`, 'lifecycle log query')
+
+          system = replaceRequired(system,
+`    previous?.findingsApplied === payload.findingsApplied &&
+    previous?.filesChanged === payload.filesChanged`,
+`    previous?.findingsApplied === payload.findingsApplied &&
+    previous?.filesChanged === payload.filesChanged &&
+    previous?.checkState === payload.checkState &&
+    JSON.stringify(previous?.failedChecks || []) === JSON.stringify(payload.failedChecks || []) &&
+    previous?.repairMessage === payload.repairMessage`, 'lifecycle log dedup')
+
+          const checkHandling = `
+
+  const checks = await getCheckSummary(pr.headSha)
+  if (checks.state === 'failed') {
+    const behind = await branchIsBehind(pr)
+    if (behind.behind) {
+      const update = await updatePullRequestBranch(pr)
+      if (update.updated) {
+        const repairing = systemResult(params.result, {
+          ok: true,
+          status: 'pr_ready',
+          lifecycleStatus: 'repairing',
+          checkState: 'pending',
+          failedChecks: checks.failed,
+          pendingChecks: [],
+          repairMessage: 'SignalBoost AI updated the remediation branch with the current main branch. Protected checks are restarting.',
+          autoMergeQueued: false,
+          autoMergeError: '',
+        })
+        await writeLifecycleLog(params.admin, params.runId, params.actorUserId, repairing)
+        return repairing
+      }
+    }
+
+    const checksFailed = systemResult(params.result, {
+      ok: true,
+      status: 'pr_ready',
+      lifecycleStatus: 'checks_failed',
+      checkState: 'failed',
+      failedChecks: checks.failed,
+      pendingChecks: checks.pending,
+      repairMessage: '',
+      autoMergeQueued: false,
+      autoMergeError: \`Protected checks failed: \${checks.failed.join(', ') || 'unknown check'}\${behind.error ? \`. Branch comparison also failed: \${behind.error}\` : ''}\`,
+    })
+    await writeLifecycleLog(params.admin, params.runId, params.actorUserId, checksFailed)
+    return checksFailed
+  }
+`
+          system = replaceRequired(system,
+`
+
+const autoMerge = await queueAutoMerge(pr.number)`,
+checkHandling + `
+
+  const autoMerge = await queueAutoMerge(pr.number)`, 'failed-check handling')
+
+          system = replaceRequired(system,
+`  if (!autoMerge.queued) {
+    const directMerge = await mergeCleanPullRequest(pr)`,
+`  if (!autoMerge.queued && checks.state === 'success') {
+    const directMerge = await mergeCleanPullRequest(pr)`, 'direct merge check gate')
+
+          system = replaceRequired(system,
+`  const pending = systemResult(params.result, {
+    ok: true,
+    status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
+    lifecycleStatus: autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+    autoMergeQueued: autoMerge.queued,
+    autoMergeError: autoMerge.queued ? '' : autoMerge.error,
+  })`,
+`  const pending = systemResult(params.result, {
+    ok: true,
+    status: autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
+    lifecycleStatus: checks.state === 'success' && autoMerge.queued ? 'auto_merge_queued' : 'checks_pending',
+    checkState: checks.state,
+    failedChecks: checks.failed,
+    pendingChecks: checks.pending,
+    repairMessage: '',
+    autoMergeQueued: autoMerge.queued,
+    autoMergeError: autoMerge.queued ? '' : (autoMerge.error || checks.error),
+  })`, 'pending check result')
+
+          fs.writeFileSync(systemPath, system)
+
+          const panelPath = 'saas/components/audit/RemediationLifecyclePanel.tsx'
+          let panel = fs.readFileSync(panelPath, 'utf8')
+          panel = replaceRequired(panel,
+`  lifecycleStatus?: 'preparing' | 'checks_pending' | 'auto_merge_queued' | 'partial' | 'merged' | 'failed' | string`,
+`  lifecycleStatus?: 'preparing' | 'checks_pending' | 'checks_failed' | 'repairing' | 'auto_merge_queued' | 'partial' | 'merged' | 'failed' | string`, 'panel status union')
+          panel = replaceRequired(panel,
+`  lifecycleUpdatedAt?: string
+}`,
+`  lifecycleUpdatedAt?: string
+  checkState?: 'unknown' | 'pending' | 'failed' | 'success'
+  failedChecks?: string[]
+  pendingChecks?: string[]
+  repairMessage?: string
+}`, 'panel check fields')
+          panel = replaceRequired(panel,
+`  heartbeatStale: string
+  activityComplete: string`,
+`  heartbeatStale: string
+  checksFailedActivity: string
+  repairingActivity: string
+  stalledActivity: string
+  failedChecksLabel: string
+  activityComplete: string`, 'copy fields')
+
+          const localeAdditions = [
+            ["heartbeatStale: 'No recent system heartbeat',", "heartbeatStale: 'No recent system heartbeat', checksFailedActivity: 'GitHub checks failed — AI repair required', repairingActivity: 'AI is repairing the remediation branch', stalledActivity: 'No forward progress — recovery required', failedChecksLabel: 'Failed checks',"],
+            ["heartbeatStale: 'Sin señal reciente del sistema',", "heartbeatStale: 'Sin señal reciente del sistema', checksFailedActivity: 'Fallaron las verificaciones de GitHub — la IA debe reparar', repairingActivity: 'La IA está reparando la rama de corrección', stalledActivity: 'Sin progreso — se requiere recuperación', failedChecksLabel: 'Verificaciones fallidas',"],
+            ["heartbeatStale: 'Sem sinal recente do sistema',", "heartbeatStale: 'Sem sinal recente do sistema', checksFailedActivity: 'As verificações do GitHub falharam — a IA precisa reparar', repairingActivity: 'A IA está reparando a ramificação de correção', stalledActivity: 'Sem progresso — recuperação necessária', failedChecksLabel: 'Verificações com falha',"],
+            ["heartbeatStale: 'Brak ostatniego sygnału systemu',", "heartbeatStale: 'Brak ostatniego sygnału systemu', checksFailedActivity: 'Kontrole GitHub nie powiodły się — AI musi naprawić', repairingActivity: 'AI naprawia gałąź poprawek', stalledActivity: 'Brak postępu — wymagane odzyskiwanie', failedChecksLabel: 'Nieudane kontrole',"],
+            ["heartbeatStale: 'Нет недавнего сигнала системы',", "heartbeatStale: 'Нет недавнего сигнала системы', checksFailedActivity: 'Проверки GitHub не пройдены — ИИ должен исправить', repairingActivity: 'ИИ исправляет ветку изменений', stalledActivity: 'Нет прогресса — требуется восстановление', failedChecksLabel: 'Неудачные проверки',"],
+          ]
+          for (const [before, after] of localeAdditions) panel = replaceRequired(panel, before, after, `locale activity copy ${before}`)
+
+          panel = replaceRequired(panel,
+`  if (status === 'failed') return { title: copy.failed, detail: copy.detailFailed, tone: 'border-danger/50 text-danger' }
+  if (status === 'partial')`,
+`  if (status === 'failed' || status === 'checks_failed') return { title: copy.failed, detail: copy.detailFailed, tone: 'border-danger/50 text-danger' }
+  if (status === 'repairing') return { title: copy.checksPending, detail: copy.detailChecks, tone: 'border-accent/50 text-accent' }
+  if (status === 'partial')`, 'state copy check statuses')
+          panel = replaceRequired(panel,
+`  if (status === 'checks_pending' || status === 'partial') return 2`,
+`  if (status === 'checks_pending' || status === 'checks_failed' || status === 'repairing' || status === 'partial') return 2`, 'active stage checks')
+          panel = replaceRequired(panel,
+`  if (status === 'failed') return Math.max(20, activeStage(status, state) * 20)`,
+`  if (status === 'failed' || status === 'checks_failed') return Math.max(20, activeStage(status, state) * 20)`, 'progress failed checks')
+          panel = replaceRequired(panel,
+`  if (status === 'failed') return 'failed'
+  if (status === 'partial') return 'warning'`,
+`  if (status === 'failed' || status === 'checks_failed') return 'failed'
+  if (status === 'partial' || status === 'repairing') return 'warning'`, 'stage tone checks')
+          panel = replaceRequired(panel,
+`function activityState(copy: Copy, status: string, heartbeatAge: number | null) {
+  if (status === 'merged' || status === 'partial') return { label: copy.activityComplete, color: '#34d399', live: false }
+  if (status === 'failed') return { label: copy.activityStopped, color: '#fca5a5', live: false }
+  if (heartbeatAge === null)`,
+`function activityState(copy: Copy, status: string, heartbeatAge: number | null, changedAge: number | null) {
+  if (status === 'merged' || status === 'partial') return { label: copy.activityComplete, color: '#34d399', live: false }
+  if (status === 'failed') return { label: copy.activityStopped, color: '#fca5a5', live: false }
+  if (status === 'checks_failed') return { label: copy.checksFailedActivity, color: '#fca5a5', live: false }
+  if (changedAge !== null && changedAge > 900) return { label: copy.stalledActivity, color: '#fca5a5', live: false }
+  if (status === 'repairing') return { label: copy.repairingActivity, color: '#ffc300', live: heartbeatAge !== null && heartbeatAge <= 25 }
+  if (heartbeatAge === null)`, 'activity state check failure and stall')
+          panel = replaceRequired(panel,
+`  const activity = activityState(copy, status, heartbeatAge)
+  const progressColor = status === 'failed' ? '#fca5a5'`,
+`  const activity = activityState(copy, status, heartbeatAge, changedAge)
+  const progressColor = status === 'failed' || status === 'checks_failed' ? '#fca5a5'`, 'activity call and progress color')
+          panel = replaceRequired(panel,
+`          <span className={\`inline-block h-2 w-2 rounded-full \${status === 'merged' ? 'bg-[#34d399]' : status === 'failed' ? 'bg-danger' : 'animate-pulse bg-accent'}\`} />`,
+`          <span className={\`inline-block h-2 w-2 rounded-full \${status === 'merged' ? 'bg-[#34d399]' : status === 'failed' || status === 'checks_failed' ? 'bg-danger' : 'animate-pulse bg-accent'}\`} />`, 'title status dot')
+          panel = replaceRequired(panel,
+`        {state.autoMergeError && status === 'failed' && (
+          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{state.autoMergeError}</p>
+        )}`,
+`        {state.autoMergeError && (status === 'failed' || status === 'checks_failed') && (
+          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{state.autoMergeError}</p>
+        )}
+        {state.repairMessage && status === 'repairing' && (
+          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-accent">{state.repairMessage}</p>
+        )}
+        {Array.isArray(state.failedChecks) && state.failedChecks.length > 0 && (
+          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{copy.failedChecksLabel}: {state.failedChecks.join(', ')}</p>
+        )}`, 'failure and repair details')
+          fs.writeFileSync(panelPath, panel)
+
+          const autonomousTestPath = 'saas/tests/auditAutonomousRemediation.node.test.ts'
+          let autonomousTest = fs.readFileSync(autonomousTestPath, 'utf8')
+          autonomousTest += `
+
+test('failed GitHub checks and stalled stages never look actively pending', () => {
+  const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
+  const system = read('../lib/audit/approvedRunRemediationSystem.ts')
+
+  assert.match(system, /getCheckSummary/)
+  assert.match(system, /checks\.state === 'failed'/)
+  assert.match(system, /lifecycleStatus: 'checks_failed'/)
+  assert.match(system, /updatePullRequestBranch/)
+  assert.match(system, /lifecycleStatus: 'repairing'/)
+  assert.match(system, /\.eq\('payload->>kind', 'audit_batch_remediation'\)/)
+  assert.match(lifecycle, /status === 'checks_failed'/)
+  assert.match(lifecycle, /changedAge > 900/)
+  assert.match(lifecycle, /No forward progress — recovery required/)
+  assert.match(lifecycle, /GitHub checks failed — AI repair required/)
+})
+`
+          fs.writeFileSync(autonomousTestPath, autonomousTest)
+
+          const systemTestPath = 'saas/tests/auditRemediationSystem.node.test.ts'
+          let systemTest = fs.readFileSync(systemTestPath, 'utf8')
+          systemTest += `
+
+test('reconciliation distinguishes pending, failed, repairing, and successful checks', () => {
+  const system = read('../lib/audit/approvedRunRemediationSystem.ts')
+  assert.match(system, /check-runs\?per_page=100/)
+  assert.match(system, /commits\/\\\$\{encodeURIComponent\(headSha\)\}\/status/)
+  assert.match(system, /PASSING_CHECK_CONCLUSIONS/)
+  assert.match(system, /Protected checks failed:/)
+  assert.match(system, /pulls\/\\\$\{pr\.number\}\/update-branch/)
+  assert.match(system, /checks\.state === 'success'/)
+  assert.doesNotMatch(system, /const directMerge = await mergeCleanPullRequest\(pr\)[\s\S]{0,80}checks\.state/)
+})
+`
+          fs.writeFileSync(systemTestPath, systemTest)
+
+          const onboardPath = 'ONBOARD.md'
+          let onboard = fs.readFileSync(onboardPath, 'utf8')
+          const oldDoctrine = `Audit remediation consent and patch workflow:\n\n- When an audit scan or readiness report has actionable findings, the user-facing workflow must explicitly ask whether the user wants SignalBoost AI to prepare fixes. The prompt must provide affirmative and defer options in English, Spanish, Portuguese, Polish, and Russian.\n- Choosing the affirmative option may only prepare or open the remediation review path. It must not write code, mutate providers, change environment variables, run migrations, or alter production.\n- Code findings must still go through a generated preview, visible diff, and explicit \`Confirm & Push Pull Request\` action. Provider and infrastructure findings remain behind the PR Cockpit owner \`Merge/Approve\` gate.\n- The Executive Risk Summary must overlay persisted \`audit_finding_state\` rows before scoring or counting actionable work. Findings marked \`resolved\`, \`accepted\`, or \`wont_fix\` must not continue to appear as active fix offers; \`in_progress\` remains actionable.\n- Repository patch preflight must resolve \`@/*\` imports against the correct workspace: root \`app/\`, \`lib/\`, and \`components/\` paths use the repository-root alias, while \`saas/*\` paths use the SaaS alias. Genuine missing imports must continue to fail closed.\n`
+          const newDoctrine = `Audit remediation operating model:\n\n- SignalBoost is AI-driven first with human backup and optional manual control. AI is the default operator after approval; a human may take over by choice or when AI execution fails.\n- One run-scoped owner approval authorizes the supported safe-fix lifecycle for that immutable audit run. SignalBoost AI prepares fixes, creates the protected branch and internal pull request, waits for required checks, merges automatically, verifies the result, and marks findings fixed only after merge confirmation.\n- Manual takeover, when exposed, must continue from the same audit run, branch, pull request, checks, logs, and verification state. It must pause autonomous merge before human edits or merge actions and must allow control to return to AI without creating a second implementation.\n- Manual controls are secondary and optional. The normal AI path must never present a GitHub pull request, merge button, preview, assignment, owner, or due-date control as a required next step.\n- Progress reporting must be truthful. Worker heartbeat means the controller is checking; it does not prove forward progress. Failed checks must be named as failed, unchanged stages older than 15 minutes must be marked stalled, and dashboard reads must never manufacture activity.\n- When protected checks fail on a remediation branch that is behind main, the AI must update the same branch from current main and restart checks. Other failed checks remain visible for AI repair or optional human takeover; they must never be described as still running.\n- Approval is durable. Transient GitHub, schema, or worker failures are retried by the remediation controller and recovery cron without asking the owner to approve again.\n- Unsupported or evidence-required findings remain visible, are reported as skipped, and must never be forced. Provider or infrastructure changes without a verified safe executor remain unmodified and visible.\n- The Executive Risk Summary must overlay persisted finding state before scoring. Repository write preflight must resolve \`@/*\` imports against the correct workspace, reject invented modules, preserve the original file, and write only to protected AI branches before checks and merge.\n- \`GITHUB_WRITE_TOKEN\` is backend-only and must never appear in client code, logs, screenshots, report exports, or UI.\n`
+          onboard = replaceRequired(onboard, oldDoctrine, newDoctrine, 'ONBOARD audit doctrine')
+          const changeHeader = '## 19. Onboarding Change Log\n'
+          const changeEntry = '\n- 2026-07-20: Made audit-remediation progress fail truthfully: the controller now distinguishes pending, failed, repairing, and successful GitHub checks; updates stale failed branches from current main; prevents worker heartbeats from resetting stage-change time; marks unchanged stages stalled after 15 minutes; and preserves AI-first execution with optional human takeover on the same governed state.\n'
+          if (!onboard.includes(changeEntry.trim())) onboard = onboard.replace(changeHeader, changeHeader + changeEntry)
+          fs.writeFileSync(onboardPath, onboard)
+
+          fs.rmSync('.github/workflows/apply-audit-check-state-fix.yml')
+          NODE
+
+      - name: Commit permanent audit lifecycle fix
+        run: |
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add ONBOARD.md saas/lib/audit/approvedRunRemediationSystem.ts saas/components/audit/RemediationLifecyclePanel.tsx saas/tests/auditAutonomousRemediation.node.test.ts saas/tests/auditRemediationSystem.node.test.ts .github/workflows/apply-audit-check-state-fix.yml
+          git commit -m "Make audit check progress truthful and self-healing"
+          git push origin HEAD:fix/audit-check-failure-progress

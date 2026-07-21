@@ -7,7 +7,7 @@
 // Plug-and-play: a new provider is one line —
 //   const host = createPressMediaHost((r) => { r.register(createPrWireAdapter()) })
 // The engine, spend gate, approval queue and proof handling never change.
-import { createDefaultMediaRegistry, type MediaProviderRegistry } from '@/press-media-core'
+import { createDefaultMediaRegistry, createPrWireAdapter, type MediaProviderRegistry } from '@/press-media-core'
 import { createHostPorts } from './ports'
 import {
   runCampaign, dispatchApprovedCampaign, recordPublishedUrl,
@@ -30,7 +30,8 @@ type PortBundleLike = ReturnType<typeof createHostPorts>
 
 export function createPressMediaHost(register?: (registry: MediaProviderRegistry) => void): PressMediaHost {
   const registry = createDefaultMediaRegistry()
-  if (register) register(registry)                 // host adds paid adapters here
+  registry.register(createPrWireAdapter())         // SignalBoost host: first paid provider (connect activates it)
+  if (register) register(registry)                 // a buyer-host can add more paid adapters here
   const ports = createHostPorts()
   const ctx: PressMediaContext = { registry, ports }
 

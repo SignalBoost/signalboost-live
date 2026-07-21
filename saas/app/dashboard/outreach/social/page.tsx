@@ -131,7 +131,7 @@ function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () =
         </div>
 
         <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
-          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>Browser Agent <span style={{ color: '#ffc300', fontWeight: 700 }}>· premium</span></p>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}><LocalizedText fallback={"Browser Agent"} /><span style={{ color: '#ffc300', fontWeight: 700 }}>· premium</span></p>
           <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: '0 0 8px' }}><LocalizedText fallback={"Assisted setup that drives the platform's own screens and pauses for you to log in, solve 2FA/CAPTCHA, and authorize. Costs more than API; optional."} /></p>
           <button style={ghost} disabled title="Assisted browser setup — not yet enabled"><LocalizedText fallback={"Assisted setup (coming)"} /></button>
         </div>

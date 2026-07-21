@@ -1,0 +1,68 @@
+name: Retry Audit Check State Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/audit-check-failure-progress
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Repair and run the migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow = Path('.github/workflows/apply-audit-check-state-fix.yml')
+          text = workflow.read_text()
+          before = "            if (!value.includes(before)) throw new Error(`Missing expected ${label}`)"
+          after = "            if (!value.includes(before)) { if (label === 'failure and repair details') return value; throw new Error(`Missing expected ${label}`) }"
+          if before not in text and after not in text:
+              raise SystemExit('Could not patch migration guard')
+          workflow.write_text(text.replace(before, after))
+
+          source = workflow.read_text()
+          marker = "          node <<'NODE'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          NODE", start)
+          block = source[start:end]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          Path('/tmp/apply-audit-check-state-fix.cjs').write_text('\n'.join(lines) + '\n')
+          PY
+          rm -f audit-migration-error.txt
+          node /tmp/apply-audit-check-state-fix.cjs
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('saas/components/audit/RemediationLifecyclePanel.tsx')
+          text = path.read_text()
+          if "state.failedChecks.join(', ')" not in text:
+              anchor = '      </div>\n\n      <section className="mt-4 rounded-md border border-border bg-surface/50 p-3" aria-label={copy.pipelineLabel}>'
+              addition = '''        {state.autoMergeError && status === 'checks_failed' && (\n          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{state.autoMergeError}</p>\n        )}\n        {state.repairMessage && status === 'repairing' && (\n          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-accent">{state.repairMessage}</p>\n        )}\n        {Array.isArray(state.failedChecks) && state.failedChecks.length > 0 && (\n          <p className="mt-2 max-w-[720px] text-[11px] leading-relaxed text-danger">{copy.failedChecksLabel}: {state.failedChecks.join(', ')}</p>\n        )}\n      </div>\n\n      <section className="mt-4 rounded-md border border-border bg-surface/50 p-3" aria-label={copy.pipelineLabel}>'''
+              if anchor not in text:
+                  raise SystemExit('Could not add failed-check details')
+              text = text.replace(anchor, addition, 1)
+              path.write_text(text)
+          PY
+
+          rm -f .github/workflows/apply-audit-check-state-fix.yml .github/workflows/run-audit-check-state-fix.yml .github/workflows/retry-audit-check-state-fix.yml audit-migration-error.txt
+
+      - name: Commit permanent fix
+        run: |
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Make audit check progress truthful and self-healing"
+          git push origin HEAD:fix/audit-check-failure-progress

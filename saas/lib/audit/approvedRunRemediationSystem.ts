@@ -696,6 +696,8 @@ export async function runApprovedAuditRemediationSystem(params: {
       mergeCommitSha: 'already-resolved-on-main',
       mergeable: true,
       mergeableState: 'clean',
+      baseSha: '',
+      headRef: '',
     }
     const finalized = await finalizeMergedRun({ ...params, pr: syntheticPr })
     const result = systemResult(base, finalized.ok ? {

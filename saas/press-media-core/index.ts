@@ -4,6 +4,7 @@
 export * from './types'
 export * from './registry'
 export { createFreeSubmissionAdapter } from './adapters/free-submission'
+export { createPrWireAdapter } from './adapters/pr-wire'
 
 import { createRegistry, MediaProviderRegistry } from './registry'
 import { createFreeSubmissionAdapter } from './adapters/free-submission'

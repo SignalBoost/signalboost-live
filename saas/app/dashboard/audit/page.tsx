@@ -41,6 +41,8 @@ type Finding = {
   detail: string
   recommendation: string
   line?: number | null
+  fixed?: boolean
+  fixed_at?: string | null
 }
 type RunSummary = {
   id: string
@@ -56,7 +58,7 @@ type Sev = 'critical' | 'high' | 'medium' | 'low' | 'info'
 type AuditCopy = {
   title: string; subtitle: string; viewPlans: string
   pathLabel: string; maxLabel: string; run: string; running: string
-  filesScanned: string; findings: string; clean: string; emptyHint: string
+  filesScanned: string; findings: string; clean: string; remediatedClean: string; emptyHint: string
   ownerOnly: string; failed: string; quotaExceeded: string; category: string; recommendation: string; line: string
   history: string; noRuns: string; refresh: string
   statusRunning: string; statusComplete: string; statusApproved: string; statusFailed: string
@@ -74,6 +76,7 @@ const COPY: Record<string, AuditCopy> = {
     approveAllFixes: 'Approve all fixes', approvingAllFixes: 'Approving all fixes…', approvedAllFixes: 'All fixes approved for this audit run.', approvalFailed: 'Could not approve all fixes.', approvalSafety: 'This is the only approval. After you approve, SignalBoost AI prepares every supported safe fix, creates the protected internal pull request, waits for checks, merges automatically, verifies the result, and records what was fixed. No further action is required.',
     pathLabel: 'Repository URL', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
+    remediatedClean: 'No active findings remain — all approved findings were fixed and verified.',
     emptyHint: 'Set a path and run a scan, or pick a past run.',
     ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed', quotaExceeded: 'Monthly limit reached: {used}/{cap} scans used. Upgrade your plan to run more.',
     category: 'Category', recommendation: 'Recommendation', line: 'Line',
@@ -95,6 +98,7 @@ const COPY: Record<string, AuditCopy> = {
     approveAllFixes: 'Aprobar todas las correcciones', approvingAllFixes: 'Aprobando todas las correcciones…', approvedAllFixes: 'Todas las correcciones se aprobaron para esta ejecución de auditoría.', approvalFailed: 'No se pudieron aprobar todas las correcciones.', approvalSafety: 'Esta es la única aprobación. Después de aprobar, SignalBoost AI prepara todas las correcciones seguras compatibles, crea la solicitud interna protegida, espera las verificaciones, fusiona automáticamente, verifica el resultado y registra lo corregido. No se requiere ninguna otra acción.',
     pathLabel: 'URL del repositorio', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
+    remediatedClean: 'No quedan hallazgos activos: todos los hallazgos aprobados fueron corregidos y verificados.',
     emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
     ownerOnly: 'Se requiere acceso de propietario para ejecutar auditorías.', failed: 'La auditoría falló', quotaExceeded: 'Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.',
     category: 'Categoría', recommendation: 'Recomendación', line: 'Línea',
@@ -116,6 +120,7 @@ const COPY: Record<string, AuditCopy> = {
     approveAllFixes: 'Aprovar todas as correções', approvingAllFixes: 'Aprovando todas as correções…', approvedAllFixes: 'Todas as correções foram aprovadas para esta execução de auditoria.', approvalFailed: 'Não foi possível aprovar todas as correções.', approvalSafety: 'Esta é a única aprovação. Depois da aprovação, a SignalBoost AI prepara todas as correções seguras compatíveis, cria o pull request interno protegido, aguarda as verificações, faz a fusão automaticamente, verifica o resultado e registra o que foi corrigido. Nenhuma outra ação é necessária.',
     pathLabel: 'URL do repositório', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
+    remediatedClean: 'Não restam constatações ativas — todas as constatações aprovadas foram corrigidas e verificadas.',
     emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
     ownerOnly: 'É necessário acesso de proprietário para executar auditorias.', failed: 'A auditoria falhou', quotaExceeded: 'Limite mensal atingido: {used}/{cap} análises usadas. Faça upgrade do seu plano para executar mais.',
     category: 'Categoria', recommendation: 'Recomendação', line: 'Linha',
@@ -137,6 +142,7 @@ const COPY: Record<string, AuditCopy> = {
     approveAllFixes: 'Zatwierdź wszystkie poprawki', approvingAllFixes: 'Zatwierdzanie wszystkich poprawek…', approvedAllFixes: 'Wszystkie poprawki zostały zatwierdzone dla tego uruchomienia audytu.', approvalFailed: 'Nie udało się zatwierdzić wszystkich poprawek.', approvalSafety: 'To jest jedyna zgoda. Po zatwierdzeniu SignalBoost AI przygotuje wszystkie obsługiwane bezpieczne poprawki, utworzy chroniony wewnętrzny pull request, poczeka na kontrole, automatycznie scali zmiany, zweryfikuje wynik i zapisze naprawione elementy. Nie jest wymagane żadne dalsze działanie.',
     pathLabel: 'URL repozytorium', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
+    remediatedClean: 'Nie pozostały żadne aktywne wyniki — wszystkie zatwierdzone wyniki zostały naprawione i zweryfikowane.',
     emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
     ownerOnly: 'Do uruchamiania audytów wymagany jest dostęp właściciela.', failed: 'Audyt nie powiódł się', quotaExceeded: 'Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.',
     category: 'Kategoria', recommendation: 'Zalecenie', line: 'Wiersz',
@@ -158,6 +164,7 @@ const COPY: Record<string, AuditCopy> = {
     approveAllFixes: 'Одобрить все исправления', approvingAllFixes: 'Одобряются все исправления…', approvedAllFixes: 'Все исправления одобрены для этого запуска аудита.', approvalFailed: 'Не удалось одобрить все исправления.', approvalSafety: 'Это единственное одобрение. После одобрения SignalBoost AI подготовит все поддерживаемые безопасные исправления, создаст защищённый внутренний pull request, дождётся проверок, автоматически выполнит слияние, проверит результат и запишет исправленные элементы. Дополнительные действия не требуются.',
     pathLabel: 'URL репозитория', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
+    remediatedClean: 'Активных замечаний не осталось — все одобренные замечания исправлены и проверены.',
     emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
     ownerOnly: 'Для запуска аудита требуется доступ владельца.', failed: 'Аудит не выполнен', quotaExceeded: 'Достигнут месячный лимит: использовано {used}/{cap} проверок. Обновите план, чтобы запускать больше.',
     category: 'Категория', recommendation: 'Рекомендация', line: 'Строка',
@@ -412,7 +419,7 @@ export default function AuditCenterPage() {
     } : null)) as RemediationLifecycleState | null
       setRemediation(remediationState)
       const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null
-      const findings = (log?.findings as Finding[]) || (data.findings as Finding[]) || []
+      const findings = (data.findings as Finding[]) || (log?.findings as Finding[]) || []
       setView({
         findings,
         filesScanned: Array.isArray(log?.filesScanned) ? log!.filesScanned!.length : (r?.files_scanned || 0),
@@ -420,8 +427,12 @@ export default function AuditCenterPage() {
         prefix: log?.prefix ?? r?.prefix,
         status: remediationState?.lifecycleStatus === 'merged' ? 'remediated' : r?.status,
       })
+      if (remediationState?.lifecycleStatus === 'merged') {
+        setRuns(current => current.map(item => item.id === id ? { ...item, status: 'remediated' } : item))
+        void loadHistory()
+      }
       setProgress({ done: 0, total: 0 })
-      setPhase(r?.status === 'complete' || r?.status === 'remediated' ? 'DONE' : null)
+      setPhase(r?.status === 'complete' || r?.status === 'remediated' || remediationState?.lifecycleStatus === 'merged' ? 'DONE' : null)
     } catch {
       setError(copy.failed)
     }
@@ -455,7 +466,7 @@ export default function AuditCenterPage() {
     }
   }
 
-  const findings = view?.findings || []
+  const findings = (view?.findings || []).filter(finding => !finding.fixed)
   const openReport = openReportKey ? REPORTS.find(r => r.key === openReportKey) || null : null
   const closeReport = () => setOpenReportKey(null)
   const hasSynced = refreshTick > 0
@@ -589,10 +600,10 @@ export default function AuditCenterPage() {
               <>
                 <div className="mb-3 flex flex-wrap gap-3">
                   <Stat label={copy.filesScanned} value={String(view.filesScanned)} accent="text-[#1af0ff]" />
-                  <Stat label={copy.findings} value={String(view.findingsCount)} accent="text-accent" />
+                  <Stat label={copy.findings} value={String(findings.length)} accent="text-accent" />
                 </div>
                 {findings.length === 0 ? (
-                  <div className="rounded-md border border-border bg-surface p-4 text-sm text-text-muted">{copy.clean}</div>
+                  <div className="rounded-md border border-border bg-surface p-4 text-sm text-text-muted">{view.status === 'remediated' ? copy.remediatedClean : copy.clean}</div>
                 ) : (
                   <div className="max-h-[calc(100vh-380px)] overflow-y-auto rounded-md border border-border bg-surface p-1.5">
                     {findings.map((f, i) => {
@@ -659,7 +670,7 @@ export default function AuditCenterPage() {
                     {r.mvp && <span className="rounded-full bg-accent px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-bg">{copy.mvpBadge}</span>}
                     {isExec && view && (
                       <span className="rounded-full border border-border bg-bg px-2 py-0.5 text-[10px] font-bold text-accent">
-                        {view.findingsCount} {copy.findings}
+                        {findings.length} {copy.findings}
                       </span>
                     )}
                   </div>

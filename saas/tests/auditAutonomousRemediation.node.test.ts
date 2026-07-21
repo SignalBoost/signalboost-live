@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 
+// Audit completion must report active risk, not replay fixed scan findings.
 const url = (path: string) => new URL(path, import.meta.url)
 const read = (path: string) => readFileSync(url(path), 'utf8')
 
@@ -140,4 +141,19 @@ test('failed GitHub checks and stalled stages never look actively pending', () =
   assert.match(lifecycle, /changedAge > 900/)
   assert.match(lifecycle, /No forward progress — recovery required/)
   assert.match(lifecycle, /GitHub checks failed — AI repair required/)
+})
+
+test('completed remediation presents zero active findings while retaining audit evidence', () => {
+  const dashboard = read('../app/dashboard/audit/page.tsx')
+  const onboard = read('../../ONBOARD.md')
+
+  assert.match(dashboard, /fixed\?: boolean/)
+  assert.match(dashboard, /const findings = \(data\.findings as Finding\[\]\) \|\| \(log\?\.findings as Finding\[\]\) \|\| \[\]/)
+  assert.match(dashboard, /filter\(finding => !finding\.fixed\)/)
+  assert.match(dashboard, /value=\{String\(findings\.length\)\}/)
+  assert.match(dashboard, /view\.status === 'remediated' \? copy\.remediatedClean : copy\.clean/)
+  assert.match(dashboard, /\{findings\.length\} \{copy\.findings\}/)
+  assert.match(dashboard, /status: 'remediated'/)
+  assert.match(onboard, /fixed findings remain durable audit evidence but must not be presented as active findings/i)
+  assert.match(onboard, /live audit_findings\.fixed state instead of the immutable scan log/i)
 })

@@ -24,6 +24,8 @@ const COPY: Record<string, Record<string, string>> = {
     'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'COS supervisa, predice, redirige, reinicia y corrige automáticamente los problemas operativos ordinarios. La revisión humana solo aparece para excepciones críticas para la vida.',
     'No predictive alerts.': 'No hay alertas predictivas.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Haga clic en esto solo después de que el artículo/anuncio se haya publicado o colocado realmente. Añada el enlace o la fecha de comprobante si está disponible.',
+    'This campaign is marked published/completed. No more action is needed here.': 'Esta campaña está marcada como publicada/completada. No se necesita ninguna acción más aquí.',
+    'Browser Agent': 'Agente del navegador',
     'View Logs': 'Ver registros',
   },
   pt: {
@@ -49,6 +51,8 @@ const COPY: Record<string, Record<string, string>> = {
     'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'O COS monitora, prevê, redireciona, reinicia e corrige automaticamente problemas operacionais comuns. A revisão humana aparece apenas para exceções críticas à vida.',
     'No predictive alerts.': 'Não há alertas preditivos.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Clique nisto somente depois que o artigo/anúncio tiver sido realmente publicado ou veiculado. Adicione o link ou a data de comprovação, se disponível.',
+    'This campaign is marked published/completed. No more action is needed here.': 'Esta campanha está marcada como publicada/concluída. Nenhuma outra ação é necessária aqui.',
+    'Browser Agent': 'Agente do navegador',
     'View Logs': 'Ver registros',
   },
   pl: {
@@ -74,6 +78,8 @@ const COPY: Record<string, Record<string, string>> = {
     'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'COS automatycznie monitoruje, przewiduje, przekierowuje, restartuje i naprawia zwykłe problemy operacyjne. Weryfikacja przez człowieka pojawia się tylko w przypadku wyjątków krytycznych dla życia.',
     'No predictive alerts.': 'Brak alertów predykcyjnych.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Kliknij to dopiero po faktycznym opublikowaniu lub umieszczeniu artykułu/reklamy. Dodaj link lub datę potwierdzenia, jeśli są dostępne.',
+    'This campaign is marked published/completed. No more action is needed here.': 'Ta kampania jest oznaczona jako opublikowana/ukończona. Nie są tu potrzebne żadne dalsze działania.',
+    'Browser Agent': 'Agent przeglądarki',
     'View Logs': 'Wyświetl dzienniki',
   },
   ru: {
@@ -99,6 +105,8 @@ const COPY: Record<string, Record<string, string>> = {
     'COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.': 'COS автоматически отслеживает, прогнозирует, перенаправляет, перезапускает и исправляет обычные операционные проблемы. Проверка человеком появляется только для исключений, критически важных для жизни.',
     'No predictive alerts.': 'Нет прогнозных оповещений.',
     'Only click this after the article/ad is actually published or placed. Add the proof link/date if available.': 'Нажимайте это только после того, как статья/реклама действительно опубликована или размещена. Добавьте ссылку или дату подтверждения, если они доступны.',
+    'This campaign is marked published/completed. No more action is needed here.': 'Эта кампания отмечена как опубликованная/завершенная. Здесь больше никаких действий не требуется.',
+    'Browser Agent': 'Агент браузера',
     'View Logs': 'Просмотреть журналы',
   },
 }

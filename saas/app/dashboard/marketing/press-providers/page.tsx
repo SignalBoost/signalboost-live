@@ -6,9 +6,10 @@
 // coming) and drives the free provider end-to-end via /api/agency/press-media.
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
+import PressProviderConnectForm from './PressProviderConnectForm'
 import { useEffect, useMemo, useState } from 'react'
 
-type Provider = { id: string; label: string; type: string; cost: string; proof: string; needs: string[]; blurb: string; live: boolean }
+type Provider = { id: string; label: string; type: string; cost: string; proof: string; needs: string[]; blurb: string; live: boolean; registered?: boolean }
 type Campaign = {
   id: string; status: string; media_target_type: string; headline?: string | null; publication_name?: string | null
   editor_contact?: string | null; publication_contact?: string | null; cta_url?: string | null; published_url?: string | null
@@ -45,6 +46,7 @@ function ProviderCard({ provider, onRan }: { provider: Provider; onRan: () => vo
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const color = provider.live ? '#22c55e' : '#fb923c'
+  const isPaid = provider.id !== 'free_submission'
 
   async function run() {
     setBusy(true); setMessage('')
@@ -96,6 +98,9 @@ function ProviderCard({ provider, onRan }: { provider: Provider; onRan: () => vo
         </label>
         <button style={button} disabled={busy || !goal.trim()} onClick={run}>{busy ? 'Working…' : 'Generate & run'}</button>
       </div> : null}
+      {isPaid ? <PressProviderConnectForm providerId={provider.id} connected onChanged={onRan} /> : null}
+    </div> : provider.registered ? <div style={{ marginTop: 14 }}>
+      <PressProviderConnectForm providerId={provider.id} onChanged={onRan} />
     </div> : <div style={{ marginTop: 14 }}>
       <button style={ghost} disabled title="Connect your own provider account — coming"><LocalizedText fallback={"Connect provider (coming)"} /></button>
       <details style={{ marginTop: 12 }}>

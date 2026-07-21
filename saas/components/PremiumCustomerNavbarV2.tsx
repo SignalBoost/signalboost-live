@@ -51,6 +51,7 @@ const GROUPS: NavGroup[] = [
       { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: 'Video Pipeline', href: '/dashboard/cosa/video-pipeline' },
       { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: 'Press & Print Media', href: '/dashboard/marketing/press-print' },
       { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: 'Press Outreach', href: '/dashboard/marketing/press-outreach' },
+      { icon: '📰', labelKey: 'nav.pressProviders', fallbackLabel: 'Press Providers', href: '/dashboard/marketing/press-providers' },
       { icon: '📢', labelKey: 'nav.promote', fallbackLabel: 'Promote', href: '/dashboard/promote' },
       { icon: '🔗', labelKey: 'nav.socialConnections', fallbackLabel: 'Social Connections', href: '/dashboard/outreach/social' },
       { icon: '🗃️', labelKey: 'nav.allCampaigns', fallbackLabel: 'All Campaigns', href: '/dashboard/campaigns' },

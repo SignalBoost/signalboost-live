@@ -10,6 +10,7 @@ import {
 
 const OWNER = 'SignalBoost'
 const REPO = 'SignalBoost/signalboost-live'
+const BASE_BRANCH = 'main'
 
 function githubToken(): string | null {
   return process.env.GITHUB_WRITE_TOKEN || null
@@ -78,18 +79,29 @@ function normalizeCandidate(payload: any): ApprovedRunSystemResult | null {
   }
 }
 
+function targetsProductionBase(pull: any): boolean {
+  return String(pull?.base?.ref || '') === BASE_BRANCH
+}
+
+function failClosedWrongBase(pull: any): any {
+  if (!pull?.merged || targetsProductionBase(pull)) return pull
+  return { ...pull, merged: false }
+}
+
 async function resolveMergedPullRequest(candidate: ApprovedRunSystemResult): Promise<{
   ok: boolean
   data: any
   error: string
 }> {
   const direct = await github(`/repos/${REPO}/pulls/${candidate.prNumber}`)
-  if (direct.ok && direct.data?.merged) return { ok: true, data: direct.data, error: '' }
+  if (direct.ok && direct.data?.merged && targetsProductionBase(direct.data)) {
+    return { ok: true, data: direct.data, error: '' }
+  }
 
   const branch = String(candidate.branch || '').trim()
   if (!branch) {
     return direct.ok
-      ? { ok: true, data: direct.data, error: '' }
+      ? { ok: true, data: failClosedWrongBase(direct.data), error: '' }
       : { ok: false, data: null, error: direct.error }
   }
 
@@ -98,7 +110,7 @@ async function resolveMergedPullRequest(candidate: ApprovedRunSystemResult): Pro
   )
   if (!listed.ok) {
     return direct.ok
-      ? { ok: true, data: direct.data, error: '' }
+      ? { ok: true, data: failClosedWrongBase(direct.data), error: '' }
       : { ok: false, data: null, error: listed.error || direct.error }
   }
 
@@ -106,15 +118,19 @@ async function resolveMergedPullRequest(candidate: ApprovedRunSystemResult): Pro
     const prNumber = Number(row?.number || 0)
     if (!prNumber) continue
     if (prNumber === candidate.prNumber && direct.ok) {
-      if (direct.data?.merged) return { ok: true, data: direct.data, error: '' }
+      if (direct.data?.merged && targetsProductionBase(direct.data)) {
+        return { ok: true, data: direct.data, error: '' }
+      }
       continue
     }
     const detail = await github(`/repos/${REPO}/pulls/${prNumber}`)
-    if (detail.ok && detail.data?.merged) return { ok: true, data: detail.data, error: '' }
+    if (detail.ok && detail.data?.merged && targetsProductionBase(detail.data)) {
+      return { ok: true, data: detail.data, error: '' }
+    }
   }
 
   return direct.ok
-    ? { ok: true, data: direct.data, error: '' }
+    ? { ok: true, data: failClosedWrongBase(direct.data), error: '' }
     : { ok: false, data: null, error: direct.error }
 }
 

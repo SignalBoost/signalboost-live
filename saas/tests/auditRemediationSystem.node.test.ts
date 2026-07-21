@@ -31,6 +31,18 @@ test('replacement remediation PRs on the same branch are recovered and finalized
   assert.match(merged, /Number\(latest\?\.prNumber \|\| 0\) !== resolvedPrNumber/)
 })
 
+test('replacement remediation PRs must merge into main before finalization', () => {
+  const merged = read('../lib/audit/approvedRunMergedRecovery.ts')
+
+  assert.match(merged, /const BASE_BRANCH = 'main'/)
+  assert.match(merged, /function targetsProductionBase/)
+  assert.match(merged, /pull\?\.base\?\.ref/)
+  assert.match(merged, /direct\.data\?\.merged && targetsProductionBase\(direct\.data\)/)
+  assert.match(merged, /detail\.data\?\.merged && targetsProductionBase\(detail\.data\)/)
+  assert.match(merged, /function failClosedWrongBase/)
+  assert.match(merged, /return \{ \.\.\.pull, merged: false \}/)
+})
+
 test('legacy preparation cannot merge before lifecycle support files are committed', () => {
   const engine = read('../lib/audit/approvedRunRemediation.ts')
   const system = read('../lib/audit/approvedRunRemediationSystem.ts')

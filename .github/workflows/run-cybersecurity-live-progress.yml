@@ -33,11 +33,7 @@ jobs:
           Path('/tmp/apply-cybersecurity-live-progress.cjs').write_text('\n'.join(lines) + '\n')
           PY
           node /tmp/apply-cybersecurity-live-progress.cjs
-          rm -f .github/workflows/run-cybersecurity-live-progress.yml
-
-      - name: Verify cybersecurity progress
-        working-directory: saas
-        run: npm ci --dangerously-allow-all-scripts && npm run test:cyber-progress && npm run typecheck
+          rm -f .github/workflows/run-cybersecurity-live-progress.yml noop.txt
 
       - name: Commit permanent implementation
         run: |
@@ -46,3 +42,7 @@ jobs:
           git add -A
           git commit -m "Add live cybersecurity progress monitor"
           git push origin HEAD:feat/cybersecurity-live-progress
+
+      - name: Verify cybersecurity progress
+        working-directory: saas
+        run: npm ci --dangerously-allow-all-scripts && npm run test:cyber-progress && npm run typecheck

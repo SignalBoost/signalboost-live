@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
+// Re-run against the current main integration surface, including Press & Media host dependencies.
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('Cybersecurity dependency scans stream real server progress', () => {

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import CyberActivityPanel, { type CyberActivityState } from '@/components/cybersecurity/CyberActivityPanel'
 
 type Advisory = {
   id: string
@@ -298,6 +299,7 @@ export default function CybersecurityCenterPage() {
   const [monitors, setMonitors] = useState<MonitorRow[]>([])
   const [alerts, setAlerts] = useState<AlertRow[]>([])
   const [remediationRequests, setRemediationRequests] = useState<RemediationRequest[]>([])
+  const [activity, setActivity] = useState<CyberActivityState | null>(null)
 
   async function loadDashboard() {
     try {
@@ -315,20 +317,76 @@ export default function CybersecurityCenterPage() {
   useEffect(() => { loadDashboard() }, [])
 
   async function runScan() {
+    const startedAt = new Date().toISOString()
     setLoading(true)
     setError(null)
     setRemediationMessage(null)
     setReport(null)
     setScanId(null)
+    setActivity({ operation: 'dependency_scan', status: 'running', stage: 'starting', progress: 4, startedAt, updatedAt: startedAt, stageChangedAt: startedAt })
     try {
-      const res = await fetch('/api/hub/cyber/dependencies', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim(), maxPackages }) })
-      const json = await res.json().catch(() => null)
-      if (!res.ok || !json?.report) { setError(json?.error || copy.scanFailed); return }
-      setReport(json.report)
-      setScanId(json.scanId || null)
+      const res = await fetch('/api/hub/cyber/dependencies', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+        body: JSON.stringify({ url: url.trim(), maxPackages, stream: true }),
+      })
+      if (!res.ok || !res.body) {
+        const json = await res.json().catch(() => null)
+        throw new Error(json?.error || copy.scanFailed)
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let completed = false
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let newline = buffer.indexOf('\n')
+        while (newline >= 0) {
+          const line = buffer.slice(0, newline).trim()
+          buffer = buffer.slice(newline + 1)
+          newline = buffer.indexOf('\n')
+          if (!line) continue
+          let event: any
+          try { event = JSON.parse(line) } catch { continue }
+          const at = String(event.at || new Date().toISOString())
+          if (event.type === 'progress' || event.type === 'heartbeat') {
+            setActivity(current => {
+              const previousStage = current?.stage || 'starting'
+              const nextStage = String(event.stage || previousStage)
+              return {
+                operation: 'dependency_scan',
+                status: 'running',
+                stage: nextStage,
+                progress: Number(event.progress ?? current?.progress ?? 4),
+                message: String(event.message || current?.message || ''),
+                startedAt: current?.startedAt || startedAt,
+                updatedAt: at,
+                stageChangedAt: nextStage === previousStage ? (current?.stageChangedAt || startedAt) : at,
+                done: typeof event.done === 'number' ? event.done : current?.done,
+                total: typeof event.total === 'number' ? event.total : current?.total,
+              }
+            })
+          } else if (event.type === 'complete') {
+            completed = true
+            setReport(event.report as Report)
+            setScanId(event.scanId || null)
+            setActivity(current => ({ operation: 'dependency_scan', status: 'completed', stage: 'complete', progress: 100, message: String(event.message || ''), startedAt: current?.startedAt || startedAt, updatedAt: at, stageChangedAt: at, done: event.report?.summary?.packagesScanned, total: event.report?.summary?.packagesScanned }))
+          } else if (event.type === 'error') {
+            throw new Error(String(event.error || copy.scanFailed))
+          }
+        }
+      }
+      if (!completed) throw new Error(copy.scanFailed)
       await loadDashboard()
     } catch (err) {
-      setError(err instanceof Error ? err.message : copy.scanFailed)
+      const message = err instanceof Error ? err.message : copy.scanFailed
+      setError(message)
+      const at = new Date().toISOString()
+      setActivity(current => ({ operation: 'dependency_scan', status: 'failed', stage: 'failed', progress: current?.progress || 0, message, error: message, startedAt: current?.startedAt || startedAt, updatedAt: at, stageChangedAt: at }))
     } finally { setLoading(false) }
   }
 
@@ -459,6 +517,8 @@ export default function CybersecurityCenterPage() {
             <div className="flex flex-wrap gap-2"><button onClick={runScan} disabled={loading} className="rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg hover:brightness-110 disabled:opacity-60">{loading ? copy.scanning : copy.runScan}</button><button onClick={addMonitor} disabled={monitoring} className="rounded-md border border-border bg-bg px-4 py-2 text-sm font-semibold text-text hover:bg-surface disabled:opacity-60">{monitoring ? copy.adding : copy.addMonitor}</button></div>
           </div>
         </section>
+
+        <CyberActivityPanel activity={activity} lang={lang} />
 
         {error ? <div className="mt-4 rounded-md border border-danger bg-surface p-4 text-sm text-danger">{error}</div> : null}
         {remediationMessage ? <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">{remediationMessage}</div> : null}

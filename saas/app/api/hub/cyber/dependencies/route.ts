@@ -126,16 +126,65 @@ async function loadDashboardData() {
   return { scans: scans.error ? [] : (scans.data || []), monitors: monitors.error ? [] : (monitors.data || []), alerts: alerts.error ? [] : (alerts.data || []), remediationRequests: remediationRequests.error ? [] : (remediationRequests.data || []) }
 }
 
+function streamDependencyScan(body: { url?: string; maxPackages?: number }, userId: string | null) {
+  const encoder = new TextEncoder()
+  let closed = false
+  let latest = { stage: 'starting', progress: 4, message: 'Starting dependency advisory scan.', done: 0, total: 0, at: new Date().toISOString() }
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (payload: Record<string, unknown>) => {
+        if (closed) return
+        try { controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`)) } catch { closed = true }
+      }
+      const heartbeat = setInterval(() => send({ type: 'heartbeat', ...latest, at: new Date().toISOString() }), 10_000)
+
+      void (async () => {
+        try {
+          const report = await scanDependencyAdvisories({
+            url: body.url,
+            maxPackages: body.maxPackages,
+            onProgress(progress) { latest = { ...latest, ...progress, done: progress.done || 0, total: progress.total || 0 }; send({ type: 'progress', ...progress }) },
+          })
+          if (!report.ok) { send({ type: 'error', stage: 'failed', progress: latest.progress, error: report.error || 'Cybersecurity scan failed.', at: new Date().toISOString() }); return }
+          latest = { stage: 'saving', progress: 94, message: 'Saving scan results.', done: report.summary.packagesScanned, total: report.summary.packagesScanned, at: new Date().toISOString() }
+          send({ type: 'progress', ...latest })
+          const stored = await storeScan(report, userId)
+          latest = { ...latest, stage: 'alerts', progress: 97, message: 'Updating the cybersecurity alert inbox.', at: new Date().toISOString() }
+          send({ type: 'progress', ...latest })
+          const alertsCreated = await createAlertsForReport({ report, userId, scanId: stored.id })
+          send({ type: 'complete', stage: 'complete', progress: 100, message: 'Cybersecurity scan completed.', report, scanId: stored.id, alertsCreated, at: new Date().toISOString() })
+        } catch (error) {
+          send({ type: 'error', stage: 'failed', progress: latest.progress, error: error instanceof Error ? error.message : 'Cybersecurity scan failed.', at: new Date().toISOString() })
+        } finally {
+          clearInterval(heartbeat)
+          if (!closed) { closed = true; controller.close() }
+        }
+      })()
+    },
+    cancel() { closed = true },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-store, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  })
+}
+
 async function prepareFixPlan(admin: any, remediationId: string, lang: ReportLang) { const { data: row, error } = await admin.from('remediation_requests').select('id,repo,target,findings,severity_summary,status,human_approved').eq('id', remediationId).single(); if (error || !row) return { ok: false, error: error?.message || 'Remediation request not found.' }; const plan = buildFixPlan(row, lang); const now = new Date().toISOString(); const update = await admin.from('remediation_requests').update({ fix_plan: plan, fix_plan_status: 'ready_for_review', fix_plan_created_at: now, implementation_status: 'not_started', updated_at: now }).eq('id', remediationId).select('id,fix_plan,fix_plan_status,fix_plan_created_at').single(); if (update.error) return { ok: false, error: update.error.message }; return { ok: true, remediationRequest: update.data } }
 
 export async function GET() { const guard = await requireAdmin(); if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }); try { return NextResponse.json({ ok: true, ...(await loadDashboardData()) }) } catch { return NextResponse.json({ ok: true, scans: [], monitors: [], alerts: [], remediationRequests: [] }) } }
 
 export async function POST(req: Request) {
   const guard = await requireAdmin(); if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }); const userId = userIdFromGuard(guard)
-  let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number; scanId?: string | null; report?: any; notes?: string; remediationId?: string; lang?: string } = {}
+  let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number; scanId?: string | null; report?: any; notes?: string; remediationId?: string; lang?: string; stream?: boolean } = {}
   try { body = await req.json() } catch { /* defaults */ }
   const lang = langFromRequest(req, body)
 
+  if (body.stream === true && !body.action) return streamDependencyScan(body, userId)
   if (body.action === 'create_monitor') { const repoUrl = String(body.url || '').trim(); if (!repoUrl) return NextResponse.json({ ok: false, error: 'Repository URL is required.' }, { status: 400 }); try { const admin = getAdminSupabase(); const { data, error } = await admin.from('cyber_monitored_repositories').insert({ user_id: userId, label: String(body.label || '').trim() || null, repo_url: repoUrl, frequency: safeFrequency(body.frequency), is_enabled: true }).select('id,label,repo_url,frequency,is_enabled,created_at').single(); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true, monitor: data }) } catch (err) { const message = err instanceof Error ? err.message : 'Could not create monitor.'; return NextResponse.json({ ok: false, error: message }, { status: 500 }) } }
   if (body.action === 'prepare_fix_plan') { if (!body.remediationId) return NextResponse.json({ ok: false, error: 'remediationId is required.' }, { status: 400 }); const result = await prepareFixPlan(getAdminSupabase(), body.remediationId, lang); return NextResponse.json(result, { status: result.ok ? 200 : 400 }) }
   if (body.action === 'request_remediation') { const report = body.report || {}; const findings = remediationFindings(report); if (findings.length === 0) return NextResponse.json({ ok: false, error: 'No detected findings were supplied for remediation.' }, { status: 400 }); try { const summary = summarizeReport(report); const repo = report.repo || report.target || null; const target = report.target || null; const copy = cyberPlanCopy(lang); const repoLabel = repo || 'repository'; const plan = buildFixPlan({ repo, target, findings, severity_summary: summary }, lang); const now = new Date().toISOString(); const admin = getAdminSupabase(); const { data, error } = await admin.from('remediation_requests').insert({ user_id: userId, source_area: 'cybersecurity', source_type: 'dependency_scan', source_id: body.scanId || null, repo, target, title: copy.requestTitle(repoLabel), summary: copy.requestSummary(summary.advisories), severity_summary: summary, findings, status: 'awaiting_human_review', human_approval_required: true, human_approved: false, approval_notes: String(body.notes || '').trim() || null, fix_plan: plan, fix_plan_status: 'ready_for_review', fix_plan_created_at: now, fix_plan_approved: false, implementation_status: 'not_started' }).select('id,title,status,fix_plan,fix_plan_status,created_at').single(); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true, remediationRequest: data }) } catch (err) { const message = err instanceof Error ? err.message : 'Could not create remediation plan.'; return NextResponse.json({ ok: false, error: message }, { status: 500 }) } }

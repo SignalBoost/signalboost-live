@@ -47,6 +47,21 @@ export interface DependencyScanReport {
   error?: string
 }
 
+export type DependencyScanProgress = {
+  stage: 'starting' | 'repository' | 'manifests' | 'packages' | 'advisories' | 'report'
+  progress: number
+  message: string
+  done?: number
+  total?: number
+  at: string
+}
+
+export type DependencyScanProgressHandler = (progress: DependencyScanProgress) => void
+
+function emitProgress(handler: DependencyScanProgressHandler | undefined, progress: Omit<DependencyScanProgress, 'at'>) {
+  handler?.({ ...progress, at: new Date().toISOString() })
+}
+
 const DEFAULT_REPO = process.env.AUDIT_GITHUB_REPO || 'SignalBoost/signalboost-live'
 const MAX_MANIFESTS = 25
 const MAX_PACKAGES = 250
@@ -100,7 +115,8 @@ function fromPackageLock(content: string, sourceFile: string, out: Map<string, D
   } catch { /* ignore */ }
 }
 
-async function collectPackages(target: RepoTarget, maxPackages: number): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string }> {
+async function collectPackages(target: RepoTarget, maxPackages: number, onProgress?: DependencyScanProgressHandler): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string }> {
+  emitProgress(onProgress, { stage: 'repository', progress: 10, message: 'Connecting to GitHub and reading the repository tree.' })
   const tree = await listRepoTree(target.repo, target.branch)
   if (!tree.ok) return { ok: false, branch: tree.branch, packages: [], error: tree.error }
   target.branch = tree.branch
@@ -111,12 +127,21 @@ async function collectPackages(target: RepoTarget, maxPackages: number): Promise
     .filter(f => !/node_modules\//i.test(f))
     .slice(0, MAX_MANIFESTS)
 
+  emitProgress(onProgress, { stage: 'manifests', progress: 22, message: 'Package manifests located.', done: 0, total: manifests.length })
   const out = new Map<string, DependencyPackage>()
-  for (const file of manifests) {
+  for (let index = 0; index < manifests.length; index += 1) {
+    const file = manifests[index]
     const res = await readRepoFileFrom(target.repo, target.branch, file)
     if (!res.ok || !res.content) continue
     if (file.endsWith('package-lock.json')) fromPackageLock(res.content, file, out)
     else if (file.endsWith('package.json')) fromPackageJson(res.content, file, out)
+    emitProgress(onProgress, {
+      stage: 'manifests',
+      progress: Math.min(55, 22 + Math.round(((index + 1) / Math.max(1, manifests.length)) * 33)),
+      message: 'Reading package manifests.',
+      done: index + 1,
+      total: manifests.length,
+    })
     if (out.size >= maxPackages) break
   }
 
@@ -215,22 +240,27 @@ function summarize(packages: DependencyPackage[], advisories: DependencyAdvisory
   return summary
 }
 
-export async function scanDependencyAdvisories(opts?: { url?: string; maxPackages?: number }): Promise<DependencyScanReport> {
+export async function scanDependencyAdvisories(opts?: { url?: string; maxPackages?: number; onProgress?: DependencyScanProgressHandler }): Promise<DependencyScanReport> {
   const target = targetFromInput(opts?.url)
   const maxPackages = Math.max(1, Math.min(Number(opts?.maxPackages || 120), MAX_PACKAGES))
   const generatedAt = new Date().toISOString()
   const targetLabel = target.raw || `https://github.com/${target.repo}`
+  emitProgress(opts?.onProgress, { stage: 'starting', progress: 4, message: 'Starting dependency advisory scan.' })
 
   try {
-    const collected = await collectPackages(target, maxPackages)
+    const collected = await collectPackages(target, maxPackages, opts?.onProgress)
     if (!collected.ok) {
       return { ok: false, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: [], advisories: [], summary: summarize([], []), error: collected.error || 'Could not collect packages.' }
     }
+    emitProgress(opts?.onProgress, { stage: 'packages', progress: 60, message: `Dependency inventory ready: ${collected.packages.length} exact package version(s).`, done: collected.packages.length, total: collected.packages.length })
+    emitProgress(opts?.onProgress, { stage: 'advisories', progress: 68, message: 'Checking exact package versions against OSV advisories.' })
     const advisories = await queryOsv(collected.packages)
+    emitProgress(opts?.onProgress, { stage: 'advisories', progress: 86, message: `Advisory check completed: ${advisories.length} finding(s).`, done: collected.packages.length, total: collected.packages.length })
     advisories.sort((a, b) => {
       const rank: Record<CyberSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 }
       return rank[a.severity] - rank[b.severity] || a.packageName.localeCompare(b.packageName)
     })
+    emitProgress(opts?.onProgress, { stage: 'report', progress: 90, message: 'Building the cybersecurity report.' })
     return { ok: true, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: collected.packages, advisories, summary: summarize(collected.packages, advisories) }
   } catch (err) {
     return { ok: false, generatedAt, target: targetLabel, repo: target.repo, branch: target.branch, packages: [], advisories: [], summary: summarize([], []), error: err instanceof Error ? err.message : 'Dependency advisory scan failed.' }

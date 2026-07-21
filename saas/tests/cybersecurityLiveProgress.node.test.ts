@@ -13,7 +13,7 @@ test('Cybersecurity dependency scans stream real server progress', () => {
   assert.match(scanner, /stage: 'repository'/)
   assert.match(scanner, /stage: 'manifests'/)
   assert.match(scanner, /stage: 'advisories'/)
-  assert.match(scanner, /done: index + 1/)
+  assert.match(scanner, /done: index \+ 1/)
   assert.match(route, /application\/x-ndjson/)
   assert.match(route, /type: 'heartbeat'/)
   assert.match(route, /setInterval\(\(\) => send/)

@@ -13,11 +13,22 @@ test('merged PR recovery runs before any deleted source branch is read', () => {
   assert.ok(mergedCall >= 0, 'merged remediation preflight is missing')
   assert.ok(systemCall > mergedCall, 'merged PR recovery must run before source preparation')
 
-  assert.match(merged, /pull\.data\?\.merged/)
+  assert.match(merged, /resolvedPull\.data\?\.merged/)
   assert.match(merged, /finalize_audit_run_remediation_v2/)
   assert.match(merged, /lifecycleStatus: 'merged'/)
   assert.match(merged, /merge_commit_sha/)
   assert.doesNotMatch(merged, /contents\/\$\{encoded\}\?ref=/)
+})
+
+test('replacement remediation PRs on the same branch are recovered and finalized', () => {
+  const merged = read('../lib/audit/approvedRunMergedRecovery.ts')
+
+  assert.match(merged, /resolveMergedPullRequest/)
+  assert.match(merged, /pulls\?head=\$\{OWNER\}:\$\{encodeURIComponent\(branch\)\}&state=closed/)
+  assert.match(merged, /detail\.data\?\.merged/)
+  assert.match(merged, /resolvedPrNumber/)
+  assert.match(merged, /prNumber: resolvedPrNumber/)
+  assert.match(merged, /Number\(latest\?\.prNumber \|\| 0\) !== resolvedPrNumber/)
 })
 
 test('legacy preparation cannot merge before lifecycle support files are committed', () => {
@@ -86,7 +97,7 @@ test('findings are finalized only from a confirmed merged GitHub PR', () => {
   const lifecycle = read('../lib/audit/remediationLifecycleRepair.ts')
   const route = read('../app/api/hub/operator/audit/approve-all/route.ts')
 
-  assert.match(merged, /if \(!pull\.data\?\.merged\) return null/)
+  assert.match(merged, /if \(!resolvedPull\.data\?\.merged\) return null/)
   assert.match(system, /if \(pr\.merged\)/)
   assert.match(system, /mergeableState !== 'clean'/)
   assert.match(lifecycle, /finalize_audit_run_remediation_v2/)

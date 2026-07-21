@@ -8,8 +8,10 @@
 //                     'published' once a provider confirms the outcome)
 import { Resend } from 'resend'
 import { callModel } from '@/lib/ai/modelRouter'
+import { runUniversalProvider } from '@/lib/engine/universalRunner'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import type {
-  AiPort, EmailPort, OwnerNotifyPort, PortBundle,
+  AiPort, EmailPort, OwnerNotifyPort, PortBundle, RunnerPort, RunnerResult, RunnerProviderConfig,
   CampaignBrief, GenerateSpec, MediaCampaign, DispatchState, ProofResult,
 } from '@/press-media-core'
 
@@ -114,12 +116,70 @@ export function createOwnerNotifyPort(): OwnerNotifyPort {
   }
 }
 
+// ── RunnerPort: config-driven paid-provider execution via the platform's universal runner ──
+// A wire brand's endpoint/headers/payload live in a provider_registry row; the key is resolved
+// by reference (env:// today; vault:// wired with the connect flow). No hand-rolled HTTP here,
+// and no plaintext key — the secret is resolved only at call time, backend-only.
+function resolveHostCredential(reference: unknown): string {
+  const ref = typeof reference === 'string'
+    ? reference
+    : ((reference as any)?.ref || (reference as any)?.secretRef || (reference as any)?.name || '')
+  if (typeof ref === 'string' && ref.startsWith('env://')) return process.env[ref.slice(6)] || ''
+  // vault:// resolution is wired with the provider connect flow; env:// is the supported path today.
+  return ''
+}
+
+export function createRunnerPort(): RunnerPort {
+  return {
+    async run(providerId: string, action: string, variables: Record<string, unknown>): Promise<RunnerResult> {
+      try {
+        const res = await runUniversalProvider({
+          providerId,
+          actionId: action,
+          variables,
+          credentials: { api_key: `env://PRESS_${providerId.toUpperCase()}_API_KEY` },
+          resolveCredential: async (reference) => resolveHostCredential(reference),
+        })
+        return {
+          ok: Boolean(res.ok),
+          status: res.status,
+          outputs: (res.outputs as Record<string, unknown>) || {},
+          ref: res.outputs?.ref != null ? String(res.outputs.ref) : undefined,
+          error: res.error,
+        }
+      } catch (err: any) {
+        return { ok: false, status: 0, outputs: {}, error: err?.message || 'runner_failed' }
+      }
+    },
+
+    async loadConfig(providerId: string): Promise<RunnerProviderConfig | null> {
+      try {
+        const db = getAdminSupabase()
+        const { data } = await db
+          .from('provider_registry')
+          .select('metadata, is_active')
+          .eq('provider_id', providerId)
+          .eq('action_id', 'submit_release')
+          .eq('is_active', true)
+          .limit(1)
+        const row = Array.isArray(data) ? data[0] : null
+        if (!row) return { connected: false, priceCents: 0, currency: 'USD' }
+        const meta = (row.metadata || {}) as any
+        return { connected: true, priceCents: Number(meta.price_cents || 0), currency: String(meta.currency || 'USD') }
+      } catch {
+        return null
+      }
+    },
+  }
+}
+
 // ── Bundle the real Ports (optionally with a provider's connected credentials) ──
 export function createHostPorts(config?: Record<string, string>): PortBundle {
   return {
     ai: createAiPort(),
     email: createEmailPort(),
     notify: createOwnerNotifyPort(),
+    runner: createRunnerPort(),
     config,
   }
 }

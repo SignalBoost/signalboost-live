@@ -1,0 +1,154 @@
+name: Apply Cybersecurity Live Progress
+
+on:
+  push:
+    branches:
+      - feat/cybersecurity-live-progress
+    paths:
+      - '.github/workflows/apply-cybersecurity-live-progress.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/cybersecurity-live-progress
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Apply server-driven cybersecurity progress
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          function replaceRequired(value, before, after, label) {
+            if (value.includes(after)) return value
+            if (!value.includes(before)) throw new Error(`Missing expected ${label}`)
+            return value.replace(before, after)
+          }
+
+          // 1. Dependency scanner emits truthful server-side stages.
+          const scannerPath = 'saas/lib/cyber/dependencyScanner.ts'
+          let scanner = fs.readFileSync(scannerPath, 'utf8')
+          scanner = replaceRequired(scanner,
+            '\nconst DEFAULT_REPO',
+            `\nexport type DependencyScanProgress = {\n  stage: 'starting' | 'repository' | 'manifests' | 'packages' | 'advisories' | 'report'\n  progress: number\n  message: string\n  done?: number\n  total?: number\n  at: string\n}\n\nexport type DependencyScanProgressHandler = (progress: DependencyScanProgress) => void\n\nfunction emitProgress(handler: DependencyScanProgressHandler | undefined, progress: Omit<DependencyScanProgress, 'at'>) {\n  handler?.({ ...progress, at: new Date().toISOString() })\n}\n\nconst DEFAULT_REPO`,
+            'scanner progress types')
+          scanner = replaceRequired(scanner,
+            `async function collectPackages(target: RepoTarget, maxPackages: number): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string }> {\n  const tree = await listRepoTree(target.repo, target.branch)`,
+            `async function collectPackages(target: RepoTarget, maxPackages: number, onProgress?: DependencyScanProgressHandler): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string }> {\n  emitProgress(onProgress, { stage: 'repository', progress: 10, message: 'Connecting to GitHub and reading the repository tree.' })\n  const tree = await listRepoTree(target.repo, target.branch)`,
+            'collectPackages signature')
+          scanner = replaceRequired(scanner,
+            `.slice(0, MAX_MANIFESTS)\n\n  const out = new Map<string, DependencyPackage>()\n  for (const file of manifests) {`,
+            `.slice(0, MAX_MANIFESTS)\n\n  emitProgress(onProgress, { stage: 'manifests', progress: 22, message: 'Package manifests located.', done: 0, total: manifests.length })\n  const out = new Map<string, DependencyPackage>()\n  for (let index = 0; index < manifests.length; index += 1) {\n    const file = manifests[index]`,
+            'manifest progress loop')
+          scanner = replaceRequired(scanner,
+            `    if (out.size >= maxPackages) break\n  }\n\n  return { ok: true, branch: target.branch, packages: Array.from(out.values()).slice(0, maxPackages) }`,
+            `    emitProgress(onProgress, {\n      stage: 'manifests',\n      progress: Math.min(55, 22 + Math.round(((index + 1) / Math.max(1, manifests.length)) * 33)),\n      message: 'Reading package manifests.',\n      done: index + 1,\n      total: manifests.length,\n    })\n    if (out.size >= maxPackages) break\n  }\n\n  return { ok: true, branch: target.branch, packages: Array.from(out.values()).slice(0, maxPackages) }`,
+            'manifest progress events')
+          scanner = replaceRequired(scanner,
+            `export async function scanDependencyAdvisories(opts?: { url?: string; maxPackages?: number }): Promise<DependencyScanReport> {`,
+            `export async function scanDependencyAdvisories(opts?: { url?: string; maxPackages?: number; onProgress?: DependencyScanProgressHandler }): Promise<DependencyScanReport> {`,
+            'scanner options')
+          scanner = replaceRequired(scanner,
+            `  const targetLabel = target.raw || \`https://github.com/\${target.repo}\`\n\n  try {\n    const collected = await collectPackages(target, maxPackages)`,
+            `  const targetLabel = target.raw || \`https://github.com/\${target.repo}\`\n  emitProgress(opts?.onProgress, { stage: 'starting', progress: 4, message: 'Starting dependency advisory scan.' })\n\n  try {\n    const collected = await collectPackages(target, maxPackages, opts?.onProgress)`,
+            'scanner start event')
+          scanner = replaceRequired(scanner,
+            `    const advisories = await queryOsv(collected.packages)`,
+            `    emitProgress(opts?.onProgress, { stage: 'packages', progress: 60, message: \`Dependency inventory ready: \${collected.packages.length} exact package version(s).\`, done: collected.packages.length, total: collected.packages.length })\n    emitProgress(opts?.onProgress, { stage: 'advisories', progress: 68, message: 'Checking exact package versions against OSV advisories.' })\n    const advisories = await queryOsv(collected.packages)\n    emitProgress(opts?.onProgress, { stage: 'advisories', progress: 86, message: \`Advisory check completed: \${advisories.length} finding(s).\`, done: collected.packages.length, total: collected.packages.length })`,
+            'OSV progress events')
+          scanner = replaceRequired(scanner,
+            `    return { ok: true, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: collected.packages, advisories, summary: summarize(collected.packages, advisories) }`,
+            `    emitProgress(opts?.onProgress, { stage: 'report', progress: 90, message: 'Building the cybersecurity report.' })\n    return { ok: true, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: collected.packages, advisories, summary: summarize(collected.packages, advisories) }`,
+            'report progress event')
+          fs.writeFileSync(scannerPath, scanner)
+
+          // 2. Scan route streams progress and independent heartbeat events.
+          const routePath = 'saas/app/api/hub/cyber/dependencies/route.ts'
+          let route = fs.readFileSync(routePath, 'utf8')
+          route = replaceRequired(route,
+            `async function prepareFixPlan(admin: any, remediationId: string, lang: ReportLang)`,
+            `function streamDependencyScan(body: { url?: string; maxPackages?: number }, userId: string | null) {\n  const encoder = new TextEncoder()\n  let closed = false\n  let latest = { stage: 'starting', progress: 4, message: 'Starting dependency advisory scan.', done: 0, total: 0, at: new Date().toISOString() }\n\n  const stream = new ReadableStream<Uint8Array>({\n    start(controller) {\n      const send = (payload: Record<string, unknown>) => {\n        if (closed) return\n        try { controller.enqueue(encoder.encode(\`\${JSON.stringify(payload)}\\n\`)) } catch { closed = true }\n      }\n      const heartbeat = setInterval(() => send({ type: 'heartbeat', ...latest, at: new Date().toISOString() }), 10_000)\n\n      void (async () => {\n        try {\n          const report = await scanDependencyAdvisories({\n            url: body.url,\n            maxPackages: body.maxPackages,\n            onProgress(progress) { latest = { ...latest, ...progress, done: progress.done || 0, total: progress.total || 0 }; send({ type: 'progress', ...progress }) },\n          })\n          if (!report.ok) { send({ type: 'error', stage: 'failed', progress: latest.progress, error: report.error || 'Cybersecurity scan failed.', at: new Date().toISOString() }); return }\n          latest = { stage: 'saving', progress: 94, message: 'Saving scan results.', done: report.summary.packagesScanned, total: report.summary.packagesScanned, at: new Date().toISOString() }\n          send({ type: 'progress', ...latest })\n          const stored = await storeScan(report, userId)\n          latest = { ...latest, stage: 'alerts', progress: 97, message: 'Updating the cybersecurity alert inbox.', at: new Date().toISOString() }\n          send({ type: 'progress', ...latest })\n          const alertsCreated = await createAlertsForReport({ report, userId, scanId: stored.id })\n          send({ type: 'complete', stage: 'complete', progress: 100, message: 'Cybersecurity scan completed.', report, scanId: stored.id, alertsCreated, at: new Date().toISOString() })\n        } catch (error) {\n          send({ type: 'error', stage: 'failed', progress: latest.progress, error: error instanceof Error ? error.message : 'Cybersecurity scan failed.', at: new Date().toISOString() })\n        } finally {\n          clearInterval(heartbeat)\n          if (!closed) { closed = true; controller.close() }\n        }\n      })()\n    },\n    cancel() { closed = true },\n  })\n\n  return new Response(stream, {\n    headers: {\n      'Content-Type': 'application/x-ndjson; charset=utf-8',\n      'Cache-Control': 'no-store, no-transform',\n      'X-Accel-Buffering': 'no',\n    },\n  })\n}\n\nasync function prepareFixPlan(admin: any, remediationId: string, lang: ReportLang)`,
+            'stream scan function')
+          route = replaceRequired(route,
+            `let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number; scanId?: string | null; report?: any; notes?: string; remediationId?: string; lang?: string } = {}`,
+            `let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number; scanId?: string | null; report?: any; notes?: string; remediationId?: string; lang?: string; stream?: boolean } = {}`,
+            'stream request type')
+          route = replaceRequired(route,
+            `  const lang = langFromRequest(req, body)\n\n  if (body.action === 'create_monitor')`,
+            `  const lang = langFromRequest(req, body)\n\n  if (body.stream === true && !body.action) return streamDependencyScan(body, userId)\n  if (body.action === 'create_monitor')`,
+            'stream request branch')
+          fs.writeFileSync(routePath, route)
+
+          // 3. Cybersecurity page consumes real NDJSON progress.
+          const pagePath = 'saas/app/dashboard/cybersecurity/page.tsx'
+          let page = fs.readFileSync(pagePath, 'utf8')
+          page = replaceRequired(page,
+            `import { useTranslation } from '@/components/i18n/useTranslation'`,
+            `import { useTranslation } from '@/components/i18n/useTranslation'\nimport CyberActivityPanel, { type CyberActivityState } from '@/components/cybersecurity/CyberActivityPanel'`,
+            'CyberActivityPanel import')
+          page = replaceRequired(page,
+            `  const [remediationRequests, setRemediationRequests] = useState<RemediationRequest[]>([])`,
+            `  const [remediationRequests, setRemediationRequests] = useState<RemediationRequest[]>([])\n  const [activity, setActivity] = useState<CyberActivityState | null>(null)`,
+            'activity state')
+
+          const runStart = page.indexOf('  async function runScan() {')
+          const runEnd = page.indexOf('\n  async function addMonitor()', runStart)
+          if (runStart < 0 || runEnd < 0) throw new Error('Could not locate runScan')
+          const newRunScan = `  async function runScan() {\n    const startedAt = new Date().toISOString()\n    setLoading(true)\n    setError(null)\n    setRemediationMessage(null)\n    setReport(null)\n    setScanId(null)\n    setActivity({ operation: 'dependency_scan', status: 'running', stage: 'starting', progress: 4, startedAt, updatedAt: startedAt, stageChangedAt: startedAt })\n    try {\n      const res = await fetch('/api/hub/cyber/dependencies', {\n        method: 'POST',\n        credentials: 'include',\n        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },\n        body: JSON.stringify({ url: url.trim(), maxPackages, stream: true }),\n      })\n      if (!res.ok || !res.body) {\n        const json = await res.json().catch(() => null)\n        throw new Error(json?.error || copy.scanFailed)\n      }\n\n      const reader = res.body.getReader()\n      const decoder = new TextDecoder()\n      let buffer = ''\n      let completed = false\n      while (true) {\n        const { done, value } = await reader.read()\n        if (done) break\n        buffer += decoder.decode(value, { stream: true })\n        let newline = buffer.indexOf('\\n')\n        while (newline >= 0) {\n          const line = buffer.slice(0, newline).trim()\n          buffer = buffer.slice(newline + 1)\n          newline = buffer.indexOf('\\n')\n          if (!line) continue\n          let event: any\n          try { event = JSON.parse(line) } catch { continue }\n          const at = String(event.at || new Date().toISOString())\n          if (event.type === 'progress' || event.type === 'heartbeat') {\n            setActivity(current => {\n              const previousStage = current?.stage || 'starting'\n              const nextStage = String(event.stage || previousStage)\n              return {\n                operation: 'dependency_scan',\n                status: 'running',\n                stage: nextStage,\n                progress: Number(event.progress ?? current?.progress ?? 4),\n                message: String(event.message || current?.message || ''),\n                startedAt: current?.startedAt || startedAt,\n                updatedAt: at,\n                stageChangedAt: nextStage === previousStage ? (current?.stageChangedAt || startedAt) : at,\n                done: typeof event.done === 'number' ? event.done : current?.done,\n                total: typeof event.total === 'number' ? event.total : current?.total,\n              }\n            })\n          } else if (event.type === 'complete') {\n            completed = true\n            setReport(event.report as Report)\n            setScanId(event.scanId || null)\n            setActivity(current => ({ operation: 'dependency_scan', status: 'completed', stage: 'complete', progress: 100, message: String(event.message || ''), startedAt: current?.startedAt || startedAt, updatedAt: at, stageChangedAt: at, done: event.report?.summary?.packagesScanned, total: event.report?.summary?.packagesScanned }))\n          } else if (event.type === 'error') {\n            throw new Error(String(event.error || copy.scanFailed))\n          }\n        }\n      }\n      if (!completed) throw new Error(copy.scanFailed)\n      await loadDashboard()\n    } catch (err) {\n      const message = err instanceof Error ? err.message : copy.scanFailed\n      setError(message)\n      const at = new Date().toISOString()\n      setActivity(current => ({ operation: 'dependency_scan', status: 'failed', stage: 'failed', progress: current?.progress || 0, message, error: message, startedAt: current?.startedAt || startedAt, updatedAt: at, stageChangedAt: at }))\n    } finally { setLoading(false) }\n  }\n`
+          page = page.slice(0, runStart) + newRunScan + page.slice(runEnd)
+          page = replaceRequired(page,
+            `        </section>\n\n        {error ?`,
+            `        </section>\n\n        <CyberActivityPanel activity={activity} lang={lang} />\n\n        {error ?`,
+            'activity panel placement')
+          fs.writeFileSync(pagePath, page)
+
+          // 4. Architecture doctrine and regression coverage.
+          const onboardPath = 'ONBOARD.md'
+          let onboard = fs.readFileSync(onboardPath, 'utf8')
+          onboard = replaceRequired(onboard,
+            `- Progress reporting must be truthful. Worker heartbeat means the controller is checking; it does not prove forward progress. Failed checks must be named as failed, unchanged stages older than 15 minutes must be marked stalled, and dashboard reads must never manufacture activity.`,
+            `- Progress reporting must be truthful. Worker heartbeat means the controller is checking; it does not prove forward progress. Failed checks must be named as failed, unchanged stages older than 15 minutes must be marked stalled, and dashboard reads must never manufacture activity.\n- The Cybersecurity Center must show server-driven live activity for dependency scans. Repository access, manifest reads, dependency inventory, advisory checks, result persistence, and alert updates must emit real stages; browser timers may display elapsed time but must never invent completion percentages. Heartbeats update activity freshness without resetting stage-change time.`,
+            'cyber progress doctrine')
+          fs.writeFileSync(onboardPath, onboard)
+
+          const testPath = 'saas/tests/cybersecurityLiveProgress.node.test.ts'
+          fs.writeFileSync(testPath, `import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\n\nconst read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')\n\ntest('Cybersecurity dependency scans stream real server progress', () => {\n  const scanner = read('../lib/cyber/dependencyScanner.ts')\n  const route = read('../app/api/hub/cyber/dependencies/route.ts')\n  const page = read('../app/dashboard/cybersecurity/page.tsx')\n\n  assert.match(scanner, /DependencyScanProgressHandler/)\n  assert.match(scanner, /stage: 'repository'/)\n  assert.match(scanner, /stage: 'manifests'/)\n  assert.match(scanner, /stage: 'advisories'/)\n  assert.match(scanner, /done: index \+ 1/)\n  assert.match(route, /application\\/x-ndjson/)\n  assert.match(route, /type: 'heartbeat'/)\n  assert.match(route, /setInterval\\(\\(\\) => send/)\n  assert.match(route, /type: 'complete'/)\n  assert.match(page, /CyberActivityPanel/)\n  assert.match(page, /stream: true/)\n  assert.match(page, /res\\.body\\.getReader\\(\\)/)\n  assert.match(page, /event\\.type === 'progress' \\|\\| event\\.type === 'heartbeat'/)\n  assert.doesNotMatch(page, /Math\\.random|fakeProgress|simulatedProgress/)\n})\n\ntest('Cybersecurity activity monitor distinguishes heartbeat from progress', () => {\n  const panel = read('../components/cybersecurity/CyberActivityPanel.tsx')\n  const onboard = read('../../ONBOARD.md')\n  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(panel, new RegExp('\\\\b' + lang + ': \\\\{'))\n  assert.match(panel, /role=\"progressbar\"/)\n  assert.match(panel, /heartbeatAge !== null && heartbeatAge > 45/)\n  assert.match(panel, /stageAge !== null && stageAge > 900/)\n  assert.match(panel, /sb-cyber-progress-flow/)\n  assert.match(panel, /prefers-reduced-motion/)\n  assert.match(onboard, /Cybersecurity Center must show server-driven live activity/)\n  assert.match(onboard, /must never invent completion percentages/)\n})\n`)
+
+          const packagePath = 'saas/package.json'
+          let pkg = fs.readFileSync(packagePath, 'utf8')
+          pkg = replaceRequired(pkg,
+            `tests/platformHealthMonitor.node.test.ts tests/auditAutonomousRemediation.node.test.ts`,
+            `tests/platformHealthMonitor.node.test.ts tests/cybersecurityLiveProgress.node.test.ts tests/auditAutonomousRemediation.node.test.ts`,
+            'full test inclusion')
+          pkg = replaceRequired(pkg,
+            `tests/enterpriseOperationsDashboardAccess.node.test.ts tests/auditAutonomousRemediation.node.test.ts`,
+            `tests/enterpriseOperationsDashboardAccess.node.test.ts tests/cybersecurityLiveProgress.node.test.ts tests/auditAutonomousRemediation.node.test.ts`,
+            'dashboard test inclusion')
+          pkg = replaceRequired(pkg,
+            `    \"test:audit-global-approval\": \"node --test tests/auditGlobalApproval.node.test.ts\"`,
+            `    \"test:audit-global-approval\": \"node --test tests/auditGlobalApproval.node.test.ts\",\n    \"test:cyber-progress\": \"node --test tests/cybersecurityLiveProgress.node.test.ts\"`,
+            'cyber progress script')
+          fs.writeFileSync(packagePath, pkg)
+
+          fs.rmSync('.github/workflows/apply-cybersecurity-live-progress.yml')
+          NODE
+
+      - name: Verify cybersecurity progress
+        working-directory: saas
+        run: npm ci --dangerously-allow-all-scripts && npm run test:cyber-progress && npm run typecheck
+
+      - name: Commit permanent implementation
+        run: |
+          git config user.name "SignalBoost Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Add live cybersecurity progress monitor"
+          git push origin HEAD:feat/cybersecurity-live-progress

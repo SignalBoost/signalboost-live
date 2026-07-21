@@ -147,3 +147,15 @@ test('approved runs expose a visible live status pipeline before the first lifec
   assert.match(panel, /aria-label=\{copy\.pipelineLabel\}/)
   assert.match(panel, /Live monitor: waiting for GitHub checks/)
 })
+
+
+test('reconciliation distinguishes pending, failed, repairing, and successful checks', () => {
+  const system = read('../lib/audit/approvedRunRemediationSystem.ts')
+  assert.match(system, /check-runs?per_page=100/)
+  assert.match(system, /commits/\${encodeURIComponent(headSha)}/status/)
+  assert.match(system, /PASSING_CHECK_CONCLUSIONS/)
+  assert.match(system, /Protected checks failed:/)
+  assert.match(system, /pulls/\${pr.number}/update-branch/)
+  assert.match(system, /checks.state === 'success'/)
+  assert.doesNotMatch(system, /const directMerge = await mergeCleanPullRequest(pr)[sS]{0,80}checks.state/)
+})

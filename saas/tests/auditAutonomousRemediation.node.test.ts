@@ -124,3 +124,20 @@ test('ONBOARD defines AI-first execution, optional human takeover, and truthful 
   assert.match(onboard, /delayed and stale heartbeats must stop the motion/i)
   assert.match(onboard, /without asking the owner to approve again/i)
 })
+
+
+test('failed GitHub checks and stalled stages never look actively pending', () => {
+  const lifecycle = read('../components/audit/RemediationLifecyclePanel.tsx')
+  const system = read('../lib/audit/approvedRunRemediationSystem.ts')
+
+  assert.match(system, /getCheckSummary/)
+  assert.match(system, /checks.state === 'failed'/)
+  assert.match(system, /lifecycleStatus: 'checks_failed'/)
+  assert.match(system, /updatePullRequestBranch/)
+  assert.match(system, /lifecycleStatus: 'repairing'/)
+  assert.match(system, /.eq('payload->>kind', 'audit_batch_remediation')/)
+  assert.match(lifecycle, /status === 'checks_failed'/)
+  assert.match(lifecycle, /changedAge > 900/)
+  assert.match(lifecycle, /No forward progress — recovery required/)
+  assert.match(lifecycle, /GitHub checks failed — AI repair required/)
+})

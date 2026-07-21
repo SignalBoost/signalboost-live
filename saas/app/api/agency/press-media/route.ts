@@ -63,7 +63,17 @@ export async function GET() {
   try {
     const host = getPressMediaHost()
     const liveIds = new Set(host.registry.ids())
-    const providers = ROADMAP.map((p) => ({ ...p, live: liveIds.has(p.id) }))
+    // Free is live once registered; a paid provider is "live" only once actually connected
+    // (an active provider_registry row exists) — otherwise it stays "coming soon".
+    const providers = await Promise.all(ROADMAP.map(async (p) => {
+      const registered = liveIds.has(p.id)
+      let live = registered && p.id === 'free_submission'
+      if (registered && p.id !== 'free_submission' && host.ports.runner) {
+        const cfg = await host.ports.runner.loadConfig(p.id).catch(() => null)
+        live = Boolean(cfg?.connected)
+      }
+      return { ...p, live, registered }
+    }))
     const live = providers.filter((p) => p.live).length
 
     let campaigns: any[] = []

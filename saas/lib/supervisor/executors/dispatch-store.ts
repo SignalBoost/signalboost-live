@@ -31,7 +31,15 @@ const safe = (value: unknown, max = 240) => String(value ?? '').replace(/[\r\n\t
  * already claimed the exact dispatch ID and execution must not begin.
  */
 export class SupabaseDispatchStore implements DispatchStore {
-  constructor(private readonly db: any) {}
+  private readonly db: any
+
+  // NOTE: written as an explicit field, not a constructor parameter property.
+  // Parameter properties emit an assignment, so they are NOT erasable syntax and
+  // Node's strip-only TypeScript mode refuses to load the file — which takes the
+  // whole test suite down with it. Keep it this way.
+  constructor(db: any) {
+    this.db = db
+  }
 
   async claim(input: DispatchClaim): Promise<boolean> {
     const { error } = await this.db.from('supervisor_dispatch_ledger').insert({

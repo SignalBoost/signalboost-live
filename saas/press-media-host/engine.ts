@@ -12,6 +12,7 @@
 // without explicit owner budget approval; proof is provider-shaped (no universal instant
 // URL); real targets only (the adapter's validateTarget decides); nothing is published
 // silently — the owner records the real link later via recordPublishedUrl.
+import { findPlaceholders } from '@/press-media-core'
 import type {
   MediaProviderRegistry, PortBundle, CampaignBrief, MediaTarget, MediaCampaign,
   MediaTargetType, DispatchState, CostEstimate,
@@ -43,6 +44,8 @@ export interface RunCampaignResult {
   state?: DispatchState | 'gated' | 'blocked' | 'queued'
   cost?: CostEstimate
   proofPending?: boolean
+  creative?: string                // the draft, so the owner can read it before it is sent
+  placeholders?: string[]          // unfilled [FACTS] the generator refused to invent
   ref?: string
   reason?: string
   error?: string
@@ -102,9 +105,10 @@ export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs)
   const check = await adapter.validateTarget(args.target, ctx.ports)
   if (!check.ok) return { ok: false, state: 'blocked', reason: check.reason || 'invalid_target' }
 
-  // 2) Generate the creative through the injected AiPort.
-  const gen = await adapter.generate(args.brief, ctx.ports)
-  const creative = (gen?.creative || '').trim()
+  // 2) Copy. Manual is a FIRST-CLASS choice, not a fallback: if the owner supplied their own
+  //    text the AI is never called. Otherwise generate through the injected AiPort.
+  const manual = String(args.manualCopy || '').trim()
+  const creative = manual || (await adapter.generate(args.brief, ctx.ports).then((g) => (g?.creative || '').trim()).catch(() => ''))
 
   // 3) Cost + SPEND GATE. Free (0) bypasses; paid requires explicit owner budget approval.
   const preliminary: MediaCampaign = { id: '', providerId, target: args.target, creative, brief: args.brief }
@@ -132,6 +136,12 @@ export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs)
     article_notes: creative || null,
     cta_url: args.brief.ctaUrl || null,
     preview_sent_at: now,
+    // §7 structured columns — provider identity + the estimate the spend gate ruled on.
+    provider_id: providerId,
+    provider_type: adapter.describe().type,
+    cost_estimate: cost.amount,
+    cost_currency: cost.currency,
+    spend_approved_at: paid && args.ownerBudgetApproved ? now : null,
   }
 
   const { data: inserted, error: insertError } = await supabase.from('press_campaigns').insert(row).select('*').single()
@@ -145,6 +155,8 @@ export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs)
     return {
       ok: true,
       campaignId: stored.id,
+      creative,
+      placeholders: findPlaceholders(creative),
       status: 'pending_owner_review',
       state: gated ? 'gated' : 'queued',
       cost,
@@ -160,7 +172,15 @@ export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs)
   const status = stateToStatus(result.state)
   const proof = await adapter.fetchProof(result.ref, ctx.ports).catch(() => null)
 
-  const update: any = { status, updated_at: new Date().toISOString() }
+  const update: any = {
+    status,
+    updated_at: new Date().toISOString(),
+    dispatch_ref: result.ref || null,
+    dispatch_state: result.state,
+    proof_type: proof ? proof.proofType : null,
+    proof_payload: proof && proof.payload != null ? proof.payload : null,
+  }
+  if (result.state === 'scheduled') update.scheduled_at = new Date().toISOString()
   if (result.state === 'published') update.published_at = new Date().toISOString()
   await supabase.from('press_campaigns').update(update).eq('id', stored.id)
 
@@ -193,8 +213,20 @@ export async function dispatchApprovedCampaign(ctx: PressMediaContext, campaignI
   const status = stateToStatus(result.state)
   const proof = await adapter.fetchProof(result.ref, ctx.ports).catch(() => null)
 
-  const update: any = { status, updated_at: new Date().toISOString() }
-  if (result.state === 'published') update.published_at = new Date().toISOString()
+  const approvedAt = new Date().toISOString()
+  const update: any = {
+    status,
+    updated_at: approvedAt,
+    dispatch_ref: result.ref || null,
+    dispatch_state: result.state,
+    proof_type: proof ? proof.proofType : null,
+    proof_payload: proof && proof.payload != null ? proof.payload : null,
+  }
+  // The owner approving a paid campaign IS the budget sign-off — record when it happened.
+  const storedRow = stored as any
+  if (!storedRow.spend_approved_at && Number(storedRow.cost_estimate || 0) > 0) update.spend_approved_at = approvedAt
+  if (result.state === 'scheduled') update.scheduled_at = approvedAt
+  if (result.state === 'published') update.published_at = approvedAt
   await supabase.from('press_campaigns').update(update).eq('id', stored.id)
 
   return {
@@ -218,7 +250,7 @@ export async function recordPublishedUrl(ctx: PressMediaContext, campaignId: str
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('press_campaigns')
-    .update({ status: 'published' as PressCampaignStatus, published_url: clean, published_at: now, updated_at: now })
+    .update({ status: 'published' as PressCampaignStatus, published_url: clean, published_at: now, updated_at: now, dispatch_state: 'published' })
     .eq('id', campaignId)
     .select('*')
     .single()
@@ -232,4 +264,28 @@ export async function recordPublishedUrl(ctx: PressMediaContext, campaignId: str
     .catch(() => {})
 
   return { ok: true, campaignId: stored.id, status: 'published', state: 'published', proofPending: false }
+}
+
+// ── updateCampaignCopy: the owner edits a queued draft before it goes anywhere. This is the
+//    review step that keeps an unverified sentence from reaching a journalist. ──
+export async function updateCampaignCopy(ctx: PressMediaContext, campaignId: string, copy: string): Promise<RunCampaignResult> {
+  const body = String(copy || '').trim()
+  if (!body) return { ok: false, error: 'copy_required' }
+
+  const supabase = getPressAdminClient()
+  const { data, error } = await supabase
+    .from('press_campaigns')
+    .update({ content_body: body, article_notes: body, updated_at: new Date().toISOString() })
+    .eq('id', campaignId)
+    .select('*')
+    .single()
+  if (error || !data) return { ok: false, error: error?.message || 'campaign_not_found' }
+
+  return {
+    ok: true,
+    campaignId: (data as PressCampaign).id,
+    status: (data as PressCampaign).status,
+    creative: body,
+    placeholders: findPlaceholders(body),
+  }
 }

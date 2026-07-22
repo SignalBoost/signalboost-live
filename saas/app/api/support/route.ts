@@ -15,6 +15,7 @@ import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
+import { createPressCampaignFromAgent } from '@/lib/ai/tools/pressCampaign'
 import { runAudit } from '@/lib/audit/runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { findNextUntranslatedComponent, formatSweepForAI } from '@/lib/ai/tools/i18nSweep'
@@ -461,6 +462,28 @@ const TOOL_PROPOSE_MARKETING_CAMPAIGN: ChatTool = {
     },
   },
 }
+const TOOL_PROPOSE_PRESS_CAMPAIGN: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'proposePressCampaign',
+    description: 'Prepare a press campaign and place it in the owner approval queue at /dashboard/marketing/press-providers. Fill every field you can from what the owner told you. NEVER invent an editor email, publication, product name, quote, or statistic — if a real verified contact is not known, say so instead of calling this tool. This never sends anything: it creates a draft the owner must approve.',
+    parameters: {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'What the release should announce, in one or two sentences.' },
+        editorEmail: { type: 'string', description: 'A real, verified editor email. Required unless submitFormUrl is given. Never invent one.' },
+        submitFormUrl: { type: 'string', description: "The publication's real submission form URL." },
+        publicationName: { type: 'string', description: 'The target publication name.' },
+        mediaTargetType: { type: 'string', description: 'One of: digital_press, newspaper_print, magazine_print, trade_press, broadcast.' },
+        audience: { type: 'string', description: 'Who the announcement is aimed at.' },
+        ctaUrl: { type: 'string', description: 'Call-to-action URL.' },
+        language: { type: 'string', description: 'Language code such as en, es, pt, pl, or ru.' },
+        providerId: { type: 'string', description: 'Provider to use; defaults to free_submission.' },
+      },
+      required: ['goal'],
+    },
+  },
+}
 const TOOL_UPDATE_PLAN_STATUS: ChatTool = {
   type: 'function',
   function: {
@@ -657,6 +680,7 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_DELETE_BRANCHES,
   TOOL_PROPOSE_PLAN,
   TOOL_PROPOSE_MARKETING_CAMPAIGN,
+  TOOL_PROPOSE_PRESS_CAMPAIGN,
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
   TOOL_CREATE_OUTREACH_DRAFT,
@@ -1083,6 +1107,14 @@ if (name === 'proposeMarketingCampaign') {
     if (typeof result === 'string') return result
     if (result && typeof result === 'object') return JSON.stringify(result, null, 2)
     return 'Marketing campaign proposal tool returned no content.'
+  }
+if (name === 'proposePressCampaign') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await createPressCampaignFromAgent(args)
+    if (!result.ok) return `Press campaign NOT created: ${result.error || result.reason || 'unknown error'}. Nothing was queued and nothing was sent.`
+    const gaps = result.placeholders?.length ? ` Unfilled facts the draft refused to invent: ${result.placeholders.join(' ')}.` : ''
+    return `Press campaign draft queued for owner approval (id ${result.campaignId}, provider ${result.provider}, status ${result.status}). Nothing has been sent — approve it at /dashboard/marketing/press-providers.${gaps}`
   }
 if (name === 'updateGrowthPlanStatus') {
     let planId = ''

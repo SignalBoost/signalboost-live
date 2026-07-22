@@ -23,12 +23,12 @@ function buildCampaignFromPrompt(prompt: string) {
 
   return {
     id: id('cosa_video'),
-    title: presenter.title || 'SignalBoost enterprise product video',
+    title: presenter.title || 'Product video',
     aspect: decision.recommended_format === 'niche_short_9x16' ? '9:16' : '16:9',
     duration: `${Math.floor((presenter.duration_seconds || 30) / 60)}:${String((presenter.duration_seconds || 30) % 60).padStart(2, '0')}`,
     niche: DEFAULT_AUDIENCE,
     format: decision.recommended_format || 'platform_tour_16x9',
-    hero: decision.recommended_hero || 'SignalBoost AI presenter',
+    hero: decision.recommended_hero || 'AI presenter',
     quality: Math.max(75, Math.min(96, decision.confidence_score || 82)),
     status: 'needs_approval',
     hook: firstScene?.presenter_line || decision.creative_brief || 'See how SignalBoost turns scattered business work into approved action.',

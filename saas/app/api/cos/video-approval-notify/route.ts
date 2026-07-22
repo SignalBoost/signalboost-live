@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       const sent = await sendEmail({
         from: 'saasMarketing',
         to: owner.email,
-        subject: `Published on ${label}: ${String(campaign.title || 'SignalBoost video').slice(0, 90)}`,
+        subject: `Published on ${label}: ${String(campaign.title || 'Video').slice(0, 90)}`,
         html: `<p><strong>${label}</strong></p><p><a href="${liveUrl}">${liveUrl}</a></p>`,
       })
 

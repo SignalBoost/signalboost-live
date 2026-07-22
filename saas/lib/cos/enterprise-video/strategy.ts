@@ -1,6 +1,10 @@
 import type { EnterpriseVideoStrategy, EnterpriseVideoStrategyInput, EnterpriseVideoTier } from './types'
+import { hostBrandName, hostBrandUrl } from '@/lib/portable/companyIdentity'
 
-const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
+// Brand/URL come from the HOST, not a hardcoded constant. On this deployment the host resolves
+// to the platform brand (mandatory branding, unchanged); a buyer sets PORTABLE_BRAND_NAME /
+// PORTABLE_BRAND_URL and their own brand is stamped instead of the seller's.
+const DEFAULT_URL = hostBrandUrl()
 
 function tier(input?: EnterpriseVideoTier): EnterpriseVideoTier {
   return input || 'enterprise'
@@ -8,8 +12,8 @@ function tier(input?: EnterpriseVideoTier): EnterpriseVideoTier {
 
 export function buildEnterpriseVideoStrategy(input: EnterpriseVideoStrategyInput = {}): EnterpriseVideoStrategy {
   const targetTier = tier(input.budget_tier)
-  const brand = input.brand_name || 'SignalBoost'
-  const product = input.product_or_service || 'SignalBoost SaaS platform'
+  const brand = input.brand_name || hostBrandName()
+  const product = input.product_or_service || `${hostBrandName()} platform`
   const audience = input.audience || 'business operators, marketing leaders, and enterprise buyers'
   const platforms = input.target_platforms?.length ? input.target_platforms : ['YouTube', 'Shorts', 'LinkedIn', 'Google Ads']
 

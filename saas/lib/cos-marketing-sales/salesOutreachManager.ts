@@ -92,7 +92,7 @@ export class SalesOutreachManager {
       channel: 'email',
       dayOffset: item.dayOffset,
       status: domainThrottle.allowed ? 'requires_owner_approval' : 'blocked_by_domain_throttle',
-      subject: subjects[index] || subjects[0] || 'SignalBoost follow-up',
+      subject: subjects[index] || subjects[0] || 'Follow-up',
       body: bodies[index] || bodies[0] || 'Owner approval is required before any external action.',
       reason: domainThrottle.allowed ? 'Owner approval required before any external action.' : domainThrottle.reason,
     }))

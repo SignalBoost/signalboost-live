@@ -276,7 +276,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                   /\.(mp4|webm|ogg)(\?.*)?$/i.test(embed) ? (
                     <video src={embed} controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <iframe src={embed} title={h || 'SignalBoost video preview'} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+                    <iframe src={embed} title={h || 'Video preview'} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
                   )
                 ) : (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff', padding: 20 }}>

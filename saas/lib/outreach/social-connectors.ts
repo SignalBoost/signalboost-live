@@ -85,7 +85,7 @@ async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: str
   const contentType = uploadMimeForVideoUrl(payload.videoUrl, videoRes.headers.get('content-type'))
   const contentLength = videoBuffer.byteLength
   const rawTitle = String(payload.title || payload.text || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim()
-  const ytTitle = (rawTitle.length > 100 ? rawTitle.slice(0, 97).trimEnd() + '…' : rawTitle) || 'SignalBoost Video'
+  const ytTitle = (rawTitle.length > 100 ? rawTitle.slice(0, 97).trimEnd() + '…' : rawTitle) || 'Video'
   const metadata = { snippet: { title: ytTitle, description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' }, status: { privacyStatus: payload.privacyStatus || 'public', selfDeclaredMadeForKids: false } }
   const initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
     method: 'POST',

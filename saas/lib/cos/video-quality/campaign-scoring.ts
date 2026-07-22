@@ -29,7 +29,7 @@ export function candidateFromCampaign(campaign: any): VideoQualityCandidate {
   const output = scriptOutput(campaign)
   const decision = buildMarketingDecision({
     campaign_goal: campaignGoalFor(campaign),
-    product_or_service: campaign.title || 'SignalBoost',
+    product_or_service: campaign.title || '[YOUR PRODUCT OR SERVICE]',
     audience: campaign.audience || 'small business owners',
   })
 
@@ -46,7 +46,7 @@ export function candidateFromCampaign(campaign: any): VideoQualityCandidate {
   return {
     id: campaign.id,
     label: campaign.title || 'Campaign draft',
-    title: output?.title || campaign.title || 'SignalBoost campaign',
+    title: output?.title || campaign.title || 'Campaign',
     hero: decision.recommended_hero,
     format: decision.recommended_format,
     scenes,

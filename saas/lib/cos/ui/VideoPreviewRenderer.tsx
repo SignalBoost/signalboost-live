@@ -122,7 +122,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
               COSA Social Video Preview · Scene {sceneIndex + 1}/{safeScenes.length} · {audioEnabled ? 'Audio on' : 'Audio off'}
             </p>
             <h3 style={{ color: '#fff', fontSize: 26, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', maxWidth: 720 }}>
-              {title || 'SignalBoost Campaign Preview'}
+              {title || 'Campaign preview'}
             </h3>
           </div>
 

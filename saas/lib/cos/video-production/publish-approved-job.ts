@@ -42,7 +42,7 @@ export async function publishApprovedVideoProductionJob(args: {
 
   const videoUrl = await signedVideoUrl(admin, renderBucket, String(job.output_url))
   const destinationUrl = String(job.search_package?.destination_url || 'https://saas.signalboostapp.com')
-  const title = String(job.title || 'SignalBoost video campaign')
+  const title = String(job.title || 'Video campaign')
   const description = String(job.search_package?.description || job.hook || title)
   const postText = `${description}\n\nLearn more: ${destinationUrl}`.trim()
   const tags = Array.isArray(job.search_package?.tags) ? job.search_package.tags.map(String).slice(0, 20) : ['SignalBoost', 'AI', 'marketing']

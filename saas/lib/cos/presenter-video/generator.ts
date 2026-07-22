@@ -12,7 +12,7 @@ function toneFor(input?: PresenterTone): PresenterTone {
 
 export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): PresenterVideoDraft {
   const destination = input.destination_url || DEFAULT_URL
-  const product = input.product_or_service || 'SignalBoost platform'
+  const product = input.product_or_service || '[YOUR PRODUCT OR SERVICE]'
   const audience = input.audience || 'your company'
   const tone = toneFor(input.tone)
   const duration = Math.max(15, Math.min(45, Number(input.duration_seconds || 25)))

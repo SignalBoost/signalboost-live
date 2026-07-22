@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   const result = await publishSocialPost({
     platform,
     text: String(body?.text || outreach.outreach_message || ''),
-    title: body?.title ? String(body.title) : String(outreach.business_name || 'SignalBoost outreach'),
+    title: body?.title ? String(body.title) : String(outreach.business_name || 'Outreach'),
     imageUrl,
     videoUrl,
     accessToken: tok.accessToken,

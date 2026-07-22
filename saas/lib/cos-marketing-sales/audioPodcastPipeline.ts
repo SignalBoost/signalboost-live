@@ -84,7 +84,7 @@ export function buildPodcastSequence(input: PodcastInput): PodcastSequence {
     segment('explanation', 'host_a', 70, copy.explain),
     segment('mid_roll_ad', 'announcer', 30, midRoll),
     segment('host_dialogue', 'host_b', 65, copy.cta),
-    segment('cta', 'host_a', 25, `Platform: ${input.platformName || 'SignalBoost'}.`),
+    segment('cta', 'host_a', 25, `Platform: ${input.platformName || '[YOUR COMPANY]'}.`),
     segment('outro', 'host_b', 20, copy.outro),
   ]
 

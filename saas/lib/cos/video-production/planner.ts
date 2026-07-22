@@ -13,7 +13,7 @@ function tier(value?: VideoProductionTier): VideoProductionTier {
 export function buildVideoProductionJob(input: VideoProductionInput = {}): VideoProductionJob {
   const productionTier = tier(input.production_tier)
   const destinationUrl = input.destination_url || DEFAULT_URL
-  const title = input.title || 'SignalBoost enterprise product video'
+  const title = input.title || 'Product video'
   const hook = input.hook || 'See how SignalBoost turns scattered business work into approved action.'
   const audience = input.audience || 'business owners, marketing leaders, and enterprise operators'
   const platforms = input.platforms?.length ? input.platforms : ['YouTube', 'Shorts', 'LinkedIn', 'Google Ads']

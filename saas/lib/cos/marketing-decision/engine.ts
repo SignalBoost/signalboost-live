@@ -1,4 +1,5 @@
 import type { MarketingDecision, MarketingDecisionInput, MarketingFormatChoice, MarketingHeroChoice, MarketingSceneDesign, MarketingSignal } from './types'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -78,7 +79,7 @@ export function buildMarketingDecision(input: MarketingDecisionInput = {}): Mark
   const hero = chooseHero(input, format)
   const scenes = chooseScenes(input, format)
   const confidence = Math.min(92, Math.max(52, averageConfidence(signals) + (signals.length ? 8 : 0)))
-  const product = input.product_or_service || '[YOUR PRODUCT OR SERVICE]'
+  const product = input.product_or_service || `${hostBrandName()} platform`
   const audience = input.audience || 'small business owners and operators'
 
   return {

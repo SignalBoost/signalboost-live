@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
 import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
 import { getTemplate, PROVIDER_TEMPLATES } from '@/lib/hub/provider-templates'
+import { validateStepRefs, resolveStepRefs, type ResolvedRef } from '@/lib/hub/pr-step-refs'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ export interface InfraPRStepResult {
   error?: string
   data?: unknown
   ranAt: string
+  /** Step-output references substituted into this step's payload before it ran. */
+  resolvedRefs?: ResolvedRef[]
 }
 
 export interface InfraPR {
@@ -157,6 +160,14 @@ export async function stageInfrastructurePR(input: {
       return { ok: false, error: `Unknown template "${step.templateId}".${hint}` }
     }
   }
+
+  // Same fail-fast contract for step-output references ({{steps[N].field}}).
+  // Malformed, self- and forward-references are structurally impossible to
+  // satisfy, so they are rejected here rather than at merge — the assistant can
+  // reorder or correct in the same turn, and the owner never reviews a PR that
+  // was always going to die halfway through.
+  const refError = validateStepRefs(norm.steps)
+  if (refError) return { ok: false, error: refError }
 
   const risk: InfraRisk = (['low', 'medium', 'high'] as const).includes(input.risk as InfraRisk)
     ? (input.risk as InfraRisk)
@@ -303,6 +314,11 @@ export async function mergeInfrastructurePR(input: {
   let failed = false
   let failError = ''
 
+  // Outputs of the steps that have already run, index-aligned to `steps`, so a
+  // later step can consume an earlier one's result via {{steps[N].field}}.
+  // A failed step contributes no output — the run stops there anyway.
+  const outputs: unknown[] = []
+
   // Sequential, stop-on-first-failure. Order matters: e.g. set Vercel var →
   // sync Supabase → trigger redeploy. A later step never runs on a broken state.
   for (const step of steps) {
@@ -310,12 +326,40 @@ export async function mergeInfrastructurePR(input: {
       ? '/api/hub/action/engine'
       : '/api/hub/action'
 
+    // Substitute step-output references BEFORE the provider call. If a reference
+    // cannot be resolved the step fails here, unsent: a literal "{{steps[0].id}}"
+    // must never reach Stripe, Vercel or Supabase.
+    const resolution = resolveStepRefs((step.payload || {}) as Record<string, unknown>, outputs)
+    if (!resolution.ok) {
+      const failure: InfraPRStepResult = {
+        templateId: step.templateId,
+        label: step.label || step.templateId,
+        ok: false,
+        error: `Step input could not be resolved: ${resolution.error}`,
+        ranAt: new Date().toISOString(),
+      }
+      results.push(failure)
+      await recordAuditEvent({
+        actor: input.approvedBy || 'console',
+        action: `pr.merge:${step.templateId}`,
+        status: normalizeStatus('FAILURE'),
+        message: failure.error || 'unresolved step reference',
+        metadata: { prId: id, unresolved: true },
+      }).catch(() => {})
+      failed = true
+      failError = failure.error || 'unresolved step reference'
+      break
+    }
+
+    const resolvedPayload = resolution.payload || {}
+    const resolvedRefs = resolution.resolved && resolution.resolved.length ? resolution.resolved : undefined
+
     let result: InfraPRStepResult
     try {
       const r = await fetch(`${origin}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', cookie },
-        body: JSON.stringify({ templateId: step.templateId, payload: step.payload || {} }),
+        body: JSON.stringify({ templateId: step.templateId, payload: resolvedPayload }),
         cache: 'no-store',
       })
       const body = await r.json().catch(() => ({} as any))
@@ -328,6 +372,7 @@ export async function mergeInfrastructurePR(input: {
         error: ok ? undefined : (body?.error || `HTTP ${r.status}`),
         data: body?.data,
         ranAt: new Date().toISOString(),
+        resolvedRefs,
       }
     } catch (err) {
       result = {
@@ -336,16 +381,19 @@ export async function mergeInfrastructurePR(input: {
         ok: false,
         error: err instanceof Error ? err.message : 'request failed',
         ranAt: new Date().toISOString(),
+        resolvedRefs,
       }
     }
 
     results.push(result)
+    // Only a successful step publishes an output for later steps to reference.
+    if (result.ok) outputs.push(result.data)
     await recordAuditEvent({
       actor: input.approvedBy || 'console',
       action: `pr.merge:${step.templateId}`,
       status: normalizeStatus(result.ok ? 'SUCCESS' : 'FAILURE'),
       message: result.message || result.error || '',
-      metadata: { prId: id },
+      metadata: resolvedRefs ? { prId: id, resolvedRefs } : { prId: id },
     }).catch(() => {})
 
     if (!result.ok) { failed = true; failError = result.error || 'step failed'; break }

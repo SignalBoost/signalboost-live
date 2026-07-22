@@ -33,8 +33,10 @@ const PORTABLES = [
   { key: 'render', glyph: '◍', tag: 'live', href: '' },
   { key: 'console', glyph: '◈', tag: 'live', href: '' },
   { key: 'marketingSales', glyph: '◎', tag: 'live', href: '' },
+  { key: 'press', glyph: '◉', tag: 'live', href: '' },
   { key: 'chiefOfStaff', glyph: '❖', tag: 'preview', href: '' },
   { key: 'browser', glyph: '◇', tag: 'preview', href: '' },
+  { key: 'selfHealing', glyph: '⟲', tag: 'preview', href: '' },
 ] as const
 
 const STATS = [

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { ownerOverrideIsValid, getPressAdminClient } from '@/lib/agency/pressOutreach'
 import { getPressMediaHost } from '@/press-media-host'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import type { CampaignBrief, MediaTarget, MediaTargetType } from '@/press-media-core'
 
 export const dynamic = 'force-dynamic'
@@ -83,7 +84,16 @@ export async function GET() {
       campaigns = data || []
     } catch { /* campaigns are optional context for the cockpit */ }
 
-    return NextResponse.json({ ok: true, providers, summary: { total: providers.length, live, coming: providers.length - live }, campaigns })
+    // The company profile is the fact-set the generator is allowed to state. Surfaced so the
+    // owner can see at a glance whether the AI has real facts or will emit placeholders.
+    let profile: any = null
+    try {
+      const db = getAdminSupabase()
+      const { data } = await db.from('press_company_profile').select('*').limit(1)
+      profile = (Array.isArray(data) ? data[0] : null) || null
+    } catch { /* profile is optional context */ }
+
+    return NextResponse.json({ ok: true, providers, summary: { total: providers.length, live, coming: providers.length - live }, campaigns, profile })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || 'capabilities_failed' }, { status: 500 })
   }
@@ -103,6 +113,39 @@ export async function POST(req: NextRequest) {
   const host = getPressMediaHost()
 
   try {
+    // OWNER-ONLY: save the company facts the generator may state.
+    if (action === 'save_profile') {
+      if (!ownerApproved) return NextResponse.json({ ok: false, error: 'owner_approval_required' }, { status: 403 })
+      const db = getAdminSupabase()
+      const row = {
+        singleton: true,
+        legal_name: str(body?.legal_name) || null,
+        brand_name: str(body?.brand_name) || null,
+        website: str(body?.website) || null,
+        products: str(body?.products) || null,
+        boilerplate: str(body?.boilerplate) || null,
+        spokesperson_name: str(body?.spokesperson_name) || null,
+        spokesperson_title: str(body?.spokesperson_title) || null,
+        approved_quote: str(body?.approved_quote) || null,
+        permitted_claims: str(body?.permitted_claims) || null,
+        forbidden_claims: str(body?.forbidden_claims) || null,
+        updated_at: new Date().toISOString(),
+      }
+      const { error } = await db.from('press_company_profile').upsert(row, { onConflict: 'singleton' })
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return NextResponse.json({ ok: true })
+    }
+
+    // OWNER-ONLY: edit a queued draft before it is dispatched (the review step).
+    if (action === 'update_copy') {
+      if (!ownerApproved) return NextResponse.json({ ok: false, error: 'owner_approval_required' }, { status: 403 })
+      const campaignId = str(body?.campaign_id || body?.id)
+      const copy = String(body?.copy ?? body?.content_body ?? '')
+      if (!campaignId) return NextResponse.json({ ok: false, error: 'campaign_id_required' }, { status: 400 })
+      const result = await host.updateCampaignCopy(campaignId, copy)
+      return NextResponse.json(result, { status: result.ok ? 200 : 400 })
+    }
+
     if (action === 'dispatch') {
       if (!ownerApproved) return NextResponse.json({ ok: false, error: 'owner_approval_required' }, { status: 403 })
       const campaignId = str(body?.campaign_id || body?.id)
@@ -125,10 +168,13 @@ export async function POST(req: NextRequest) {
     }
 
     const goal = str(body?.goal || body?.objective || body?.brief)
-    if (!goal) return NextResponse.json({ ok: false, error: 'goal_required' }, { status: 400 })
+    const manualCopy = String(body?.manual_copy ?? body?.copy ?? '').trim()
+    // Manual mode is a first-class choice: with your own copy, no goal is needed and the AI is
+    // never called. Otherwise a goal is required for generation.
+    if (!goal && !manualCopy) return NextResponse.json({ ok: false, error: 'goal_or_copy_required' }, { status: 400 })
 
     const brief: CampaignBrief = {
-      goal,
+      goal: goal || 'Owner-supplied copy',
       audience: str(body?.audience) || undefined,
       ctaUrl: str(body?.cta_url || body?.ctaUrl) || undefined,
       language: str(body?.language || body?.lang) || undefined,
@@ -144,6 +190,7 @@ export async function POST(req: NextRequest) {
       providerId: str(body?.provider_id || body?.providerId) || undefined,
       brief,
       target,
+      manualCopy: manualCopy || undefined,
       ownerApproved,
       ownerBudgetApproved: Boolean(body?.owner_budget_approved || body?.ownerBudgetApproved),
       autoDispatch: Boolean(body?.auto_dispatch || body?.autoDispatch),

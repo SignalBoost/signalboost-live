@@ -9,6 +9,8 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 import { createSignalBoostMarketingHost } from './signalboostHost'
 import { runDirector, type GeneratedCampaign } from '@/marketing-sales-core/director'
 import { LANGS, type Lang, type Actor, type MarketingHost } from '@/marketing-sales-core/types'
+import { buildFactualPreamble } from '@/portable-kernel'
+import { resolveCompanyFacts, hostBrandName } from '@/lib/portable/companyIdentity'
 
 const ORG = 'signalboost'
 const MODEL = process.env.MARKETING_SALES_MODEL || 'claude-sonnet-4-6'
@@ -20,7 +22,7 @@ const THEMES: Theme[] = [
   { key: 'audit',   prompt: 'Promote the free SaaS operations & security audit (Audit Center): invite SaaS founders to run a free audit and receive a prioritized findings report.' },
   { key: 'website', prompt: 'Promote the free Website Optimizer: invite small businesses to scan their website and get a clear, prioritized list of fixes.' },
   { key: 'reviews', prompt: 'Promote the review collection tool: help service and local businesses collect and showcase real customer reviews.' },
-  { key: 'video',   prompt: 'Promote SignalBoost with a short vertical video concept: the title is a punchy on-screen hook line, and the body describes the voiceover and what is shown on screen for a ~5 second clip. Keep it concrete and grounded in real SignalBoost offerings.' },
+  { key: 'video',   prompt: `Promote ${hostBrandName()} with a short vertical video concept: the title is a punchy on-screen hook line, and the body describes the voiceover and what is shown on screen for a ~5 second clip. Keep it concrete and grounded in real offerings.` },
 ]
 
 // The optimization step: read which theme's published campaigns drew the most real
@@ -50,8 +52,14 @@ function makeGenerate(host: MarketingHost) {
 
     const theme = await pickTheme(host)
     const client = new Anthropic({ apiKey })
+    // Who this AI works for, and the rule that it may not invent facts. Same kernel the press
+    // portable uses — a generator with no company context invents product names (that is how a
+    // release naming a non-existent product once reached an editor).
+    const facts = await resolveCompanyFacts().catch(() => null)
     const system = [
-      'You are the marketing director for SignalBoost, a SaaS operations and security platform.',
+      buildFactualPreamble(facts),
+      '',
+      `You are the marketing director for ${hostBrandName()}.`,
       'Write ONE short promotional campaign for the given theme, in FIVE languages: en, es, pt, pl, ru.',
       'For each language produce a native-quality title (max ~60 chars) and a body of 2-4 sentences.',
       'Write natively in each language — do NOT machine-translate from English.',

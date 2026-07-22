@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import CompanyIdentityPrompt from '@/components/company/CompanyIdentityPrompt'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
 
 export const FREE_ORGANIC_MODE = true
@@ -613,6 +614,10 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
           <h2 className="sb-h2">{copy.title}</h2>
           <p className="sb-body" style={{ maxWidth: 820 }}>{copy.body}</p>
         </div>
+
+        {/* Whose work is this? A signed-in user names their company so generated assets carry
+            THEIR brand, never the platform's. Invisible to signed-out visitors. */}
+        <CompanyIdentityPrompt />
 
         <section className="sb-card" style={{ padding: 20 }}>
           <span className="sb-eyebrow">{copy.organicModeTitle}</span>

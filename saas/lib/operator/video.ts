@@ -92,7 +92,7 @@ function cleanText(value: string, max = 240): string {
 
 function titleFromPrompt(prompt: string): string {
   const clean = cleanText(prompt, 80)
-  return clean || 'SignalBoostAi campaign preview'
+  return clean || 'Campaign preview'
 }
 
 function hookFromPrompt(prompt: string): string {

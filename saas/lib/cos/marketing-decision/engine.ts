@@ -78,7 +78,7 @@ export function buildMarketingDecision(input: MarketingDecisionInput = {}): Mark
   const hero = chooseHero(input, format)
   const scenes = chooseScenes(input, format)
   const confidence = Math.min(92, Math.max(52, averageConfidence(signals) + (signals.length ? 8 : 0)))
-  const product = input.product_or_service || 'SignalBoost SaaS console'
+  const product = input.product_or_service || '[YOUR PRODUCT OR SERVICE]'
   const audience = input.audience || 'small business owners and operators'
 
   return {

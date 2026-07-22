@@ -24,7 +24,7 @@ export function buildCosChatIntelligence(input: CosChatIntelligenceInput = {}): 
   const text = input.user_text || ''
   const defaults = defaultMarketingDecisionInput()
   const audience = inferAudience(text, input.audience)
-  const product = input.product_or_service || 'SignalBoost SaaS platform'
+  const product = input.product_or_service || '[YOUR PRODUCT OR SERVICE]'
   const region = input.region || 'global'
 
   const marketingDecision = buildMarketingDecision({

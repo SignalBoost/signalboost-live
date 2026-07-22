@@ -91,8 +91,10 @@ type NormalizedDigitalNewspaperAdInput = Required<DigitalNewspaperAdInput>
 
 function normalizeInput(input: DigitalNewspaperAdInput, landingPage: AdLandingPage): NormalizedDigitalNewspaperAdInput {
   return {
-    productName: input.productName?.trim() || 'SignalBoostAi',
-    offer: input.offer?.trim() || 'AI websites, reviews, outreach, and campaign tools for small businesses',
+    // NEVER default a user's ad to the platform's own brand or pitch: an unnamed ad must show
+    // a visible gap the user can fill, not somebody else's company.
+    productName: input.productName?.trim() || '[YOUR COMPANY]',
+    offer: input.offer?.trim() || '[WHAT YOU OFFER]',
     audience: input.audience?.trim() || 'local businesses that want more visibility and better digital marketing',
     region: input.region?.trim() || 'local market',
     language: input.language || 'en',
@@ -206,6 +208,6 @@ export function buildDigitalNewspaperAdPackage(input: DigitalNewspaperAdInput = 
       'Map each target to category, contact form, or ad submission page.',
       'Add owner approval before any real posting workflow.',
       'Only add API posting where the publisher explicitly provides API or written permission.',
-    ],
+    ]
   }
 }

@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     rawText: body.rawText,
     securityBrief: body.securityBrief,
     locale: body.locale || 'en',
-    platformName: body.platformName || 'SignalBoost',
+    platformName: body.platformName || '[YOUR COMPANY]',
     midRollOffer: body.midRollOffer,
   })
 

@@ -58,6 +58,14 @@
       "browser": {
         "name": "Browser Tool",
         "desc": "Safe browser work with clear limits and checks."
+      },
+      "press": {
+        "name": "Press & Media",
+        "desc": "Reach verified editors and paid wires from one governed engine."
+      },
+      "selfHealing": {
+        "name": "Self-Healing Supervisor",
+        "desc": "Detects its own failures, diagnoses them, and repairs within limits you approve."
       }
     }
   },
@@ -79,18 +87,56 @@
       "uptime": "disponibilidad"
     },
     "modules": {
-      "audit": { "title": "Revisión del Sitio", "desc": "Revisa sitios públicos, encuentra problemas y recibe una lista clara de acciones." },
-      "security": { "title": "Control de Seguridad", "desc": "Revisa enlaces, cabeceras, cookies y HTTPS sin entrar en sistemas privados." },
-      "optimization": { "title": "Mejora tu Sitio", "desc": "Crea contenido local, mejora páginas, revisa cambios y publica cuando esté listo." }
+      "audit": {
+        "title": "Revisión del Sitio",
+        "desc": "Revisa sitios públicos, encuentra problemas y recibe una lista clara de acciones."
+      },
+      "security": {
+        "title": "Control de Seguridad",
+        "desc": "Revisa enlaces, cabeceras, cookies y HTTPS sin entrar en sistemas privados."
+      },
+      "optimization": {
+        "title": "Mejora tu Sitio",
+        "desc": "Crea contenido local, mejora páginas, revisa cambios y publica cuando esté listo."
+      }
     },
     "portables": {
-      "campaign": { "name": "Estudio de Campañas", "desc": "Una solicitud corta se convierte en una campaña terminada." },
-      "integrations": { "name": "Centro de Integraciones", "desc": "Conexiones seguras para ventas, sitios web, pagos, calendarios, IA y APIs." },
-      "render": { "name": "Creador de Video", "desc": "Voz y video con marca y uso prepago seguro." },
-      "console": { "name": "Centro de Control", "desc": "Claves, webhooks, registros, versiones y controles de actividad." },
-      "marketingSales": { "name": "Marketing + Ventas", "desc": "Marketing y ventas en una sola herramienta." },
-      "chiefOfStaff": { "name": "Asistente de IA", "desc": "Planifica y hace el trabajo aprobado." },
-      "browser": { "name": "Herramienta de Navegador", "desc": "Trabajo seguro en el navegador con límites y controles claros." }
+      "campaign": {
+        "name": "Estudio de Campañas",
+        "desc": "Una solicitud corta se convierte en una campaña terminada."
+      },
+      "integrations": {
+        "name": "Centro de Integraciones",
+        "desc": "Conexiones seguras para ventas, sitios web, pagos, calendarios, IA y APIs."
+      },
+      "render": {
+        "name": "Creador de Video",
+        "desc": "Voz y video con marca y uso prepago seguro."
+      },
+      "console": {
+        "name": "Centro de Control",
+        "desc": "Claves, webhooks, registros, versiones y controles de actividad."
+      },
+      "marketingSales": {
+        "name": "Marketing + Ventas",
+        "desc": "Marketing y ventas en una sola herramienta."
+      },
+      "chiefOfStaff": {
+        "name": "Asistente de IA",
+        "desc": "Planifica y hace el trabajo aprobado."
+      },
+      "browser": {
+        "name": "Herramienta de Navegador",
+        "desc": "Trabajo seguro en el navegador con límites y controles claros."
+      },
+      "press": {
+        "name": "Prensa y Medios",
+        "desc": "Llega a editores verificados y cables de pago desde un solo motor supervisado."
+      },
+      "selfHealing": {
+        "name": "Supervisor Autorreparable",
+        "desc": "Detecta sus propios fallos, los diagnostica y repara dentro de los límites que apruebes."
+      }
     }
   },
   "pt": {
@@ -111,18 +157,56 @@
       "uptime": "disponibilidade"
     },
     "modules": {
-      "audit": { "title": "Revisão do Site", "desc": "Verifique sites públicos, encontre problemas e receba uma lista clara de ações." },
-      "security": { "title": "Verificação de Segurança", "desc": "Verifique links, cabeçalhos, cookies e HTTPS sem entrar em sistemas privados." },
-      "optimization": { "title": "Melhore seu Site", "desc": "Crie conteúdo local, melhore páginas, revise mudanças e publique quando estiver pronto." }
+      "audit": {
+        "title": "Revisão do Site",
+        "desc": "Verifique sites públicos, encontre problemas e receba uma lista clara de ações."
+      },
+      "security": {
+        "title": "Verificação de Segurança",
+        "desc": "Verifique links, cabeçalhos, cookies e HTTPS sem entrar em sistemas privados."
+      },
+      "optimization": {
+        "title": "Melhore seu Site",
+        "desc": "Crie conteúdo local, melhore páginas, revise mudanças e publique quando estiver pronto."
+      }
     },
     "portables": {
-      "campaign": { "name": "Estúdio de Campanhas", "desc": "Um pedido curto vira uma campanha pronta." },
-      "integrations": { "name": "Central de Integrações", "desc": "Conexões seguras para vendas, sites, pagamentos, calendários, IA e APIs." },
-      "render": { "name": "Criador de Vídeo", "desc": "Voz e vídeo com marca e uso pré-pago seguro." },
-      "console": { "name": "Central de Controle", "desc": "Chaves, webhooks, registros, versões e controles de atividade." },
-      "marketingSales": { "name": "Marketing + Vendas", "desc": "Marketing e vendas em uma só ferramenta." },
-      "chiefOfStaff": { "name": "Assistente de IA", "desc": "Planeja e faz o trabalho aprovado." },
-      "browser": { "name": "Ferramenta de Navegador", "desc": "Trabalho seguro no navegador com limites e controles claros." }
+      "campaign": {
+        "name": "Estúdio de Campanhas",
+        "desc": "Um pedido curto vira uma campanha pronta."
+      },
+      "integrations": {
+        "name": "Central de Integrações",
+        "desc": "Conexões seguras para vendas, sites, pagamentos, calendários, IA e APIs."
+      },
+      "render": {
+        "name": "Criador de Vídeo",
+        "desc": "Voz e vídeo com marca e uso pré-pago seguro."
+      },
+      "console": {
+        "name": "Central de Controle",
+        "desc": "Chaves, webhooks, registros, versões e controles de atividade."
+      },
+      "marketingSales": {
+        "name": "Marketing + Vendas",
+        "desc": "Marketing e vendas em uma só ferramenta."
+      },
+      "chiefOfStaff": {
+        "name": "Assistente de IA",
+        "desc": "Planeja e faz o trabalho aprovado."
+      },
+      "browser": {
+        "name": "Ferramenta de Navegador",
+        "desc": "Trabalho seguro no navegador com limites e controles claros."
+      },
+      "press": {
+        "name": "Imprensa e Mídia",
+        "desc": "Alcance editores verificados e wires pagos a partir de um único motor governado."
+      },
+      "selfHealing": {
+        "name": "Supervisor Auto-Reparável",
+        "desc": "Detecta as próprias falhas, diagnostica e repara dentro dos limites que você aprovar."
+      }
     }
   },
   "pl": {
@@ -143,18 +227,56 @@
       "uptime": "dostępność"
     },
     "modules": {
-      "audit": { "title": "Sprawdź Stronę", "desc": "Sprawdź publiczne strony, znajdź problemy i otrzymaj jasną listę działań." },
-      "security": { "title": "Sprawdź Bezpieczeństwo", "desc": "Sprawdź linki, nagłówki, pliki cookie i HTTPS bez wejścia do prywatnych systemów." },
-      "optimization": { "title": "Ulepsz Stronę", "desc": "Twórz lokalne treści, ulepszaj strony, sprawdzaj zmiany i publikuj, gdy wszystko jest gotowe." }
+      "audit": {
+        "title": "Sprawdź Stronę",
+        "desc": "Sprawdź publiczne strony, znajdź problemy i otrzymaj jasną listę działań."
+      },
+      "security": {
+        "title": "Sprawdź Bezpieczeństwo",
+        "desc": "Sprawdź linki, nagłówki, pliki cookie i HTTPS bez wejścia do prywatnych systemów."
+      },
+      "optimization": {
+        "title": "Ulepsz Stronę",
+        "desc": "Twórz lokalne treści, ulepszaj strony, sprawdzaj zmiany i publikuj, gdy wszystko jest gotowe."
+      }
     },
     "portables": {
-      "campaign": { "name": "Studio Kampanii", "desc": "Krótka prośba staje się gotową kampanią." },
-      "integrations": { "name": "Centrum Integracji", "desc": "Bezpieczne połączenia dla sprzedaży, stron, płatności, kalendarzy, AI i API." },
-      "render": { "name": "Twórca Wideo", "desc": "Głos i film z marką oraz bezpiecznym limitem przedpłaty." },
-      "console": { "name": "Centrum Sterowania", "desc": "Klucze, webhooki, logi, wydania i kontrola działań." },
-      "marketingSales": { "name": "Marketing + Sprzedaż", "desc": "Marketing i sprzedaż w jednym narzędziu." },
-      "chiefOfStaff": { "name": "Asystent AI", "desc": "Planuje i wykonuje zatwierdzoną pracę." },
-      "browser": { "name": "Narzędzie Przeglądarki", "desc": "Bezpieczna praca w przeglądarce z jasnymi limitami i kontrolą." }
+      "campaign": {
+        "name": "Studio Kampanii",
+        "desc": "Krótka prośba staje się gotową kampanią."
+      },
+      "integrations": {
+        "name": "Centrum Integracji",
+        "desc": "Bezpieczne połączenia dla sprzedaży, stron, płatności, kalendarzy, AI i API."
+      },
+      "render": {
+        "name": "Twórca Wideo",
+        "desc": "Głos i film z marką oraz bezpiecznym limitem przedpłaty."
+      },
+      "console": {
+        "name": "Centrum Sterowania",
+        "desc": "Klucze, webhooki, logi, wydania i kontrola działań."
+      },
+      "marketingSales": {
+        "name": "Marketing + Sprzedaż",
+        "desc": "Marketing i sprzedaż w jednym narzędziu."
+      },
+      "chiefOfStaff": {
+        "name": "Asystent AI",
+        "desc": "Planuje i wykonuje zatwierdzoną pracę."
+      },
+      "browser": {
+        "name": "Narzędzie Przeglądarki",
+        "desc": "Bezpieczna praca w przeglądarce z jasnymi limitami i kontrolą."
+      },
+      "press": {
+        "name": "Prasa i Media",
+        "desc": "Docieraj do zweryfikowanych redaktorów i płatnych wire'ów z jednego nadzorowanego silnika."
+      },
+      "selfHealing": {
+        "name": "Samonaprawiający się nadzorca",
+        "desc": "Wykrywa własne awarie, diagnozuje je i naprawia w granicach, które zatwierdzisz."
+      }
     }
   },
   "ru": {
@@ -175,18 +297,56 @@
       "uptime": "доступность"
     },
     "modules": {
-      "audit": { "title": "Проверка Сайта", "desc": "Проверьте открытые сайты, найдите проблемы и получите понятный план действий." },
-      "security": { "title": "Проверка Безопасности", "desc": "Проверьте ссылки, заголовки, cookie и HTTPS без входа в закрытые системы." },
-      "optimization": { "title": "Улучшить Сайт", "desc": "Создавайте местный контент, улучшайте страницы, проверяйте изменения и публикуйте после проверки." }
+      "audit": {
+        "title": "Проверка Сайта",
+        "desc": "Проверьте открытые сайты, найдите проблемы и получите понятный план действий."
+      },
+      "security": {
+        "title": "Проверка Безопасности",
+        "desc": "Проверьте ссылки, заголовки, cookie и HTTPS без входа в закрытые системы."
+      },
+      "optimization": {
+        "title": "Улучшить Сайт",
+        "desc": "Создавайте местный контент, улучшайте страницы, проверяйте изменения и публикуйте после проверки."
+      }
     },
     "portables": {
-      "campaign": { "name": "Студия Кампаний", "desc": "Короткий запрос становится готовой кампанией." },
-      "integrations": { "name": "Центр Интеграций", "desc": "Безопасные связи для продаж, сайтов, платежей, календарей, ИИ и API." },
-      "render": { "name": "Создание Видео", "desc": "Голос и фирменное видео с безопасной предоплатой." },
-      "console": { "name": "Центр Управления", "desc": "Ключи, вебхуки, журналы, выпуски и проверка действий." },
-      "marketingSales": { "name": "Маркетинг + Продажи", "desc": "Маркетинг и продажи в одном инструменте." },
-      "chiefOfStaff": { "name": "ИИ Помощник", "desc": "Планирует и выполняет одобренную работу." },
-      "browser": { "name": "Инструмент Браузера", "desc": "Безопасная работа в браузере с ясными пределами и проверками." }
+      "campaign": {
+        "name": "Студия Кампаний",
+        "desc": "Короткий запрос становится готовой кампанией."
+      },
+      "integrations": {
+        "name": "Центр Интеграций",
+        "desc": "Безопасные связи для продаж, сайтов, платежей, календарей, ИИ и API."
+      },
+      "render": {
+        "name": "Создание Видео",
+        "desc": "Голос и фирменное видео с безопасной предоплатой."
+      },
+      "console": {
+        "name": "Центр Управления",
+        "desc": "Ключи, вебхуки, журналы, выпуски и проверка действий."
+      },
+      "marketingSales": {
+        "name": "Маркетинг + Продажи",
+        "desc": "Маркетинг и продажи в одном инструменте."
+      },
+      "chiefOfStaff": {
+        "name": "ИИ Помощник",
+        "desc": "Планирует и выполняет одобренную работу."
+      },
+      "browser": {
+        "name": "Инструмент Браузера",
+        "desc": "Безопасная работа в браузере с ясными пределами и проверками."
+      },
+      "press": {
+        "name": "Пресса и медиа",
+        "desc": "Выход на проверенных редакторов и платные ленты из одного управляемого движка."
+      },
+      "selfHealing": {
+        "name": "Самовосстанавливающийся супервизор",
+        "desc": "Обнаруживает сбои, ставит диагноз и устраняет их в пределах, которые вы одобрили."
+      }
     }
   }
 }

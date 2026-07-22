@@ -10,14 +10,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import PressProviderConnectForm from './PressProviderConnectForm'
+import PressCompanyProfileForm from './PressCompanyProfileForm'
 
 type Provider = { id: string; label: string; type: string; cost: string; proof: string; needs: string[]; blurb: string; live: boolean; registered?: boolean }
 type Campaign = {
   id: string; status: string; media_target_type: string; headline?: string | null; publication_name?: string | null
   editor_contact?: string | null; publication_contact?: string | null; cta_url?: string | null; published_url?: string | null
-  source?: string | null; updated_at?: string | null
+  source?: string | null; updated_at?: string | null; content_body?: string | null
 }
-type Cockpit = { ok: boolean; providers: Provider[]; summary: { total: number; live: number; coming: number }; campaigns: Campaign[]; error?: string }
+type Cockpit = { ok: boolean; providers: Provider[]; summary: { total: number; live: number; coming: number }; campaigns: Campaign[]; profile?: any; error?: string }
 type Note = { text: string; ok: boolean } | null
 
 const panel: React.CSSProperties = { background: 'rgba(15,23,42,.86)', border: '1px solid rgba(148,163,184,.18)', borderRadius: 18, padding: 18 }
@@ -60,6 +61,7 @@ const COPY: Record<string, any> = {
     submitted: 'Submitted to the editor — proof stays pending until you record the published link.',
     queued: 'Queued for owner approval', dispatched: 'Dispatched through the provider.', recorded: 'Published link recorded.',
     errRun: 'Could not run the campaign.', errAction: 'Action failed.', errLoad: 'Could not load press providers.', noData: 'No provider data returned.',
+    aiMode: 'AI writes it', manualMode: 'I write it myself', yourCopy: 'Paste your own release copy', reviewDraft: 'Review draft', saveCopy: 'Save copy', savedCopy: 'Copy saved.', gaps: 'Unfilled facts — replace these before sending:',
     p: {
       free_submission: { label: 'Free editor submission', blurb: 'Submit AI-written releases to verified editors and free / trade press. Zero cost; the editor decides if and when it runs.' },
       pr_wire: { label: 'PR wire distribution', blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Guaranteed distribution with a report back — billed per release on your own account.' },
@@ -89,6 +91,7 @@ const COPY: Record<string, any> = {
     submitted: 'Enviado al editor: la prueba queda pendiente hasta que registres el enlace publicado.',
     queued: 'En espera de aprobación del propietario', dispatched: 'Enviado a través del proveedor.', recorded: 'Enlace publicado registrado.',
     errRun: 'No se pudo lanzar la campaña.', errAction: 'La acción falló.', errLoad: 'No se pudieron cargar los proveedores.', noData: 'No se recibieron datos de proveedores.',
+    aiMode: 'La IA lo escribe', manualMode: 'Lo escribo yo', yourCopy: 'Pega tu propio texto del comunicado', reviewDraft: 'Revisar borrador', saveCopy: 'Guardar texto', savedCopy: 'Texto guardado.', gaps: 'Datos sin completar: sustitúyelos antes de enviar:',
     p: {
       free_submission: { label: 'Envío gratuito al editor', blurb: 'Envía comunicados escritos por IA a editores verificados y prensa gratuita o sectorial. Sin coste; el editor decide si se publica y cuándo.' },
       pr_wire: { label: 'Distribución por cable de prensa', blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Distribución garantizada con informe — se factura por comunicado en tu propia cuenta.' },
@@ -118,6 +121,7 @@ const COPY: Record<string, any> = {
     submitted: 'Enviado ao editor — a prova fica pendente até você registrar o link publicado.',
     queued: 'Na fila para aprovação do proprietário', dispatched: 'Enviado pelo provedor.', recorded: 'Link publicado registrado.',
     errRun: 'Não foi possível executar a campanha.', errAction: 'A ação falhou.', errLoad: 'Não foi possível carregar os provedores.', noData: 'Nenhum dado de provedor retornado.',
+    aiMode: 'A IA escreve', manualMode: 'Eu escrevo', yourCopy: 'Cole o seu próprio texto do comunicado', reviewDraft: 'Revisar rascunho', saveCopy: 'Salvar texto', savedCopy: 'Texto salvo.', gaps: 'Dados não preenchidos — substitua antes de enviar:',
     p: {
       free_submission: { label: 'Envio gratuito ao editor', blurb: 'Envie releases escritos por IA a editores verificados e à imprensa gratuita ou setorial. Custo zero; o editor decide se e quando publica.' },
       pr_wire: { label: 'Distribuição por wire de imprensa', blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Distribuição garantida com relatório — cobrado por release na sua própria conta.' },
@@ -147,6 +151,7 @@ const COPY: Record<string, any> = {
     submitted: 'Wysłano do redaktora — dowód pozostaje w toku, dopóki nie zapiszesz opublikowanego linku.',
     queued: 'Oczekuje na zatwierdzenie właściciela', dispatched: 'Wysłano przez dostawcę.', recorded: 'Zapisano opublikowany link.',
     errRun: 'Nie udało się uruchomić kampanii.', errAction: 'Akcja nie powiodła się.', errLoad: 'Nie udało się wczytać dostawców.', noData: 'Brak danych o dostawcach.',
+    aiMode: 'Pisze AI', manualMode: 'Piszę sam', yourCopy: 'Wklej własny tekst komunikatu', reviewDraft: 'Przejrzyj projekt', saveCopy: 'Zapisz tekst', savedCopy: 'Tekst zapisany.', gaps: 'Nieuzupełnione dane — uzupełnij przed wysłaniem:',
     p: {
       free_submission: { label: 'Bezpłatne zgłoszenie do redakcji', blurb: 'Wysyłaj komunikaty napisane przez AI do zweryfikowanych redaktorów i darmowej lub branżowej prasy. Zero kosztów; redaktor decyduje, czy i kiedy opublikuje.' },
       pr_wire: { label: 'Dystrybucja przez wire prasowy', blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Gwarantowana dystrybucja z raportem — rozliczana za komunikat na Twoim koncie.' },
@@ -176,6 +181,7 @@ const COPY: Record<string, any> = {
     submitted: 'Отправлено редактору — подтверждение остаётся в ожидании, пока вы не запишете ссылку на публикацию.',
     queued: 'В очереди на одобрение владельца', dispatched: 'Отправлено через провайдера.', recorded: 'Ссылка на публикацию записана.',
     errRun: 'Не удалось запустить кампанию.', errAction: 'Действие не выполнено.', errLoad: 'Не удалось загрузить провайдеров.', noData: 'Данные о провайдерах не получены.',
+    aiMode: 'Пишет ИИ', manualMode: 'Напишу сам', yourCopy: 'Вставьте свой текст релиза', reviewDraft: 'Проверить черновик', saveCopy: 'Сохранить текст', savedCopy: 'Текст сохранён.', gaps: 'Незаполненные факты — замените перед отправкой:',
     p: {
       free_submission: { label: 'Бесплатная отправка редактору', blurb: 'Отправляйте написанные ИИ релизы проверенным редакторам и бесплатной или отраслевой прессе. Без затрат; редактор решает, публиковать ли и когда.' },
       pr_wire: { label: 'Распространение через пресс-вайр', blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Гарантированное распространение с отчётом — оплата за релиз на вашем аккаунте.' },
@@ -196,6 +202,10 @@ function ProviderCard({ provider, onRan, t }: { provider: Provider; onRan: () =>
   const [ctaUrl, setCtaUrl] = useState('')
   const [language, setLanguage] = useState('')
   const [autoDispatch, setAutoDispatch] = useState(false)
+  const [manual, setManual] = useState(false)        // manual is a CHOICE, not just a fallback
+  const [ownCopy, setOwnCopy] = useState('')
+  const [draft, setDraft] = useState('')
+  const [gaps, setGaps] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<Note>(null)
   const color = provider.live ? '#22c55e' : '#fb923c'
@@ -210,10 +220,13 @@ function ProviderCard({ provider, onRan, t }: { provider: Provider; onRan: () =>
         body: JSON.stringify({
           provider_id: provider.id, goal, editor_email: editorEmail, publication_name: publicationName,
           audience, cta_url: ctaUrl, language, auto_dispatch: autoDispatch,
+          manual_copy: manual ? ownCopy : undefined,
         }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.ok) throw new Error(json.error || json.reason || t.errRun)
+      setDraft(json.creative || '')
+      setGaps(Array.isArray(json.placeholders) ? json.placeholders : [])
       setNote({ ok: true, text: json.state === 'submitted' ? t.submitted : `${t.queued} (${json.status}).` })
       setGoal(''); onRan()
     } catch (err: any) { setNote({ ok: false, text: err?.message || t.errRun }) }
@@ -240,7 +253,13 @@ function ProviderCard({ provider, onRan, t }: { provider: Provider; onRan: () =>
     {provider.live ? <div style={{ marginTop: 14 }}>
       <button style={button} onClick={() => setOpen((v) => !v)}>{open ? t.close : t.run}</button>
       {open ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-        <textarea value={goal} onChange={(e) => setGoal(e.target.value)} placeholder={t.goal} rows={3} style={{ ...field, resize: 'vertical' }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={{ ...(manual ? ghost : button), flex: 1, fontSize: 12 }} onClick={() => setManual(false)}>{t.aiMode}</button>
+          <button style={{ ...(manual ? button : ghost), flex: 1, fontSize: 12 }} onClick={() => setManual(true)}>{t.manualMode}</button>
+        </div>
+        {manual
+          ? <textarea value={ownCopy} onChange={(e) => setOwnCopy(e.target.value)} placeholder={t.yourCopy} rows={6} style={{ ...field, resize: 'vertical' }} />
+          : <textarea value={goal} onChange={(e) => setGoal(e.target.value)} placeholder={t.goal} rows={3} style={{ ...field, resize: 'vertical' }} />}
         <input value={editorEmail} onChange={(e) => setEditorEmail(e.target.value)} placeholder={t.editorEmail} style={field} />
         <input value={publicationName} onChange={(e) => setPublicationName(e.target.value)} placeholder={t.publication} style={field} />
         <input value={audience} onChange={(e) => setAudience(e.target.value)} placeholder={t.audience} style={field} />
@@ -250,7 +269,11 @@ function ProviderCard({ provider, onRan, t }: { provider: Provider; onRan: () =>
           <input type="checkbox" checked={autoDispatch} onChange={(e) => setAutoDispatch(e.target.checked)} />
           {t.sendNow}
         </label>
-        <button style={button} disabled={busy || !goal.trim()} onClick={run}>{busy ? t.working : t.generate}</button>
+        <button style={button} disabled={busy || (manual ? !ownCopy.trim() : !goal.trim())} onClick={run}>{busy ? t.working : t.generate}</button>
+        {draft ? <div style={{ display: 'grid', gap: 6 }}>
+          {gaps.length ? <p style={{ color: '#fb923c', fontSize: 12, fontWeight: 850, margin: 0 }}>{t.gaps} {gaps.join(' ')}</p> : null}
+          <textarea readOnly value={draft} rows={8} style={{ ...field, resize: 'vertical', fontSize: 12 }} />
+        </div> : null}
       </div> : null}
       {isPaid ? <PressProviderConnectForm providerId={provider.id} connected onChanged={onRan} /> : null}
     </div> : provider.registered ? <div style={{ marginTop: 14 }}>
@@ -277,7 +300,24 @@ function CampaignRow({ campaign, onChanged, t }: { campaign: Campaign; onChanged
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<Note>(null)
+  const [reviewing, setReviewing] = useState(false)
+  const [copy, setCopy] = useState(campaign.content_body || '')
   const color = statusColor(campaign)
+  const gaps = (campaign.content_body || '').match(/\[[A-Z][A-Z0-9 _/-]{2,40}\]/g) || []
+
+  async function saveCopy() {
+    setBusy(true); setNote(null)
+    try {
+      const res = await fetch('/api/agency/press-media', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ action: 'update_copy', campaign_id: campaign.id, copy }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || t.errAction)
+      setNote({ ok: true, text: t.savedCopy }); onChanged()
+    } catch (err: any) { setNote({ ok: false, text: err?.message || t.errAction }) }
+    finally { setBusy(false) }
+  }
 
   async function act(action: 'dispatch' | 'record_url') {
     setBusy(true); setNote(null)
@@ -304,12 +344,20 @@ function CampaignRow({ campaign, onChanged, t }: { campaign: Campaign; onChanged
     </div>
 
     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-      {campaign.status === 'pending_owner_review' ? <button style={button} disabled={busy} onClick={() => act('dispatch')}>{busy ? t.working : t.approve}</button> : null}
+      {campaign.status === 'pending_owner_review' ? <>
+        <button style={ghost} onClick={() => setReviewing((v) => !v)}>{reviewing ? t.close : t.reviewDraft}</button>
+        <button style={button} disabled={busy} onClick={() => act('dispatch')}>{busy ? t.working : t.approve}</button>
+      </> : null}
       {campaign.published_url ? <a href={campaign.published_url} target="_blank" rel="noreferrer" style={{ ...ghost, textDecoration: 'none' }}>{t.openLink}</a> : <>
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t.recordUrl} style={{ ...field, width: 260 }} />
         <button style={ghost} disabled={busy || !/^https?:\/\//i.test(url)} onClick={() => act('record_url')}>{busy ? t.working : t.record}</button>
       </>}
     </div>
+    {reviewing ? <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
+      {gaps.length ? <p style={{ color: '#fb923c', fontSize: 12, fontWeight: 850, margin: 0 }}>{t.gaps} {Array.from(new Set(gaps)).join(' ')}</p> : null}
+      <textarea value={copy} onChange={(e) => setCopy(e.target.value)} rows={10} style={{ ...field, resize: 'vertical', fontSize: 12 }} />
+      <button style={button} disabled={busy || !copy.trim()} onClick={saveCopy}>{busy ? t.working : t.saveCopy}</button>
+    </div> : null}
     {note ? <p style={noteStyle(note)}>{note.text}</p> : null}
   </div>
 }
@@ -352,6 +400,8 @@ export default function PressMediaProviderCockpit() {
       </div>
       {note ? <p style={{ color: note.ok ? '#22c55e' : '#fb923c', fontWeight: 850 }}>{note.text}</p> : null}
     </section>
+
+    <PressCompanyProfileForm profile={data?.profile} onSaved={load} />
 
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
       <div style={panel}>{chip(t.types, '#1af0ff')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.total ?? '-'}</h2></div>

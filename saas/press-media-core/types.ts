@@ -57,6 +57,8 @@ export interface CostEstimate { amount: number; currency: string }
 export interface DispatchResult { state: DispatchState; ref: string; detail?: string }
 export interface ProofResult { proofType: ProofType; payload: unknown; pending: boolean }
 
+import type { CompanyProfilePort } from '@/portable-kernel'
+
 // ── Injected host services (Ports). Adapters depend on these, never on concrete SDKs. ──
 export interface AiPort {
   generate(brief: CampaignBrief, spec: GenerateSpec): Promise<{ creative: string }>
@@ -81,12 +83,15 @@ export interface RunnerPort {
   run(providerId: string, action: string, variables: Record<string, unknown>): Promise<RunnerResult>
   loadConfig(providerId: string): Promise<RunnerProviderConfig | null>
 }
+// WHO THE AI WORKS FOR comes from the shared kernel (CompanyProfilePort): the engine never
+// assumes an employer, it asks the host. Same contract in every portable.
 export interface PortBundle {
   ai: AiPort
   email: EmailPort
   notify: OwnerNotifyPort
   http?: HttpPort
   runner?: RunnerPort                // config-driven execution for paid providers (universal runner)
+  company?: CompanyProfilePort       // the employer whose facts the AI may state
   config?: Record<string, string>    // the buyer's connected credentials for this provider
 }
 

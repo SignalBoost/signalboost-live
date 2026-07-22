@@ -10,7 +10,7 @@
 import { createDefaultMediaRegistry, createPrWireAdapter, createAdPlatformAdapter, createDirectIoAdapter, createMediaDatabaseAdapter, type MediaProviderRegistry } from '@/press-media-core'
 import { createHostPorts } from './ports'
 import {
-  runCampaign, dispatchApprovedCampaign, recordPublishedUrl,
+  runCampaign, dispatchApprovedCampaign, recordPublishedUrl, updateCampaignCopy,
   type PressMediaContext, type RunCampaignArgs, type RunCampaignResult,
 } from './engine'
 
@@ -23,6 +23,7 @@ export interface PressMediaHost {
   runCampaign(args: RunCampaignArgs): Promise<RunCampaignResult>
   dispatchApprovedCampaign(campaignId: string): Promise<RunCampaignResult>
   recordPublishedUrl(campaignId: string, url: string): Promise<RunCampaignResult>
+  updateCampaignCopy(campaignId: string, copy: string): Promise<RunCampaignResult>
 }
 
 // Local structural alias so we don't re-export the core PortBundle name here.
@@ -46,6 +47,7 @@ export function createPressMediaHost(register?: (registry: MediaProviderRegistry
     runCampaign: (args) => runCampaign(ctx, args),
     dispatchApprovedCampaign: (campaignId) => dispatchApprovedCampaign(ctx, campaignId),
     recordPublishedUrl: (campaignId, url) => recordPublishedUrl(ctx, campaignId, url),
+    updateCampaignCopy: (campaignId, copy) => updateCampaignCopy(ctx, campaignId, copy),
   }
 }
 

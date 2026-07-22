@@ -37,8 +37,15 @@ export async function POST(req: NextRequest) {
   const { data: campaign, error } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', id).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
 
-  if (campaign.status !== 'approved') {
-    return NextResponse.json({ ok: false, error: 'Campaign must be approved before publishing.' }, { status: 409 })
+  // THE GATE (identical to publish-core): approval is proven by approved_at +
+  // approved_by, never inferred from `status`. Status is a lifecycle field that
+  // legitimately moves approved → queued → running as the worker and the first
+  // publish advance it, so a narrower band would block later languages and
+  // cross-posts of a campaign the owner did approve.
+  const ownerApproved = Boolean(campaign.approved_at) && Boolean(campaign.approved_by)
+  const publishableStatus = ['approved', 'queued', 'running'].includes(String(campaign.status))
+  if (!ownerApproved || !publishableStatus) {
+    return NextResponse.json({ ok: false, error: 'Campaign must be approved by the owner before publishing.' }, { status: 409 })
   }
 
   const binding = verifyApprovalBinding(campaign)
@@ -76,6 +83,21 @@ export async function POST(req: NextRequest) {
     videoUrl = exactFinal
   }
 
+  // Now that the band accepts running/queued, the same platform+language could be
+  // published twice by a double click or a repeated call. Refuse rather than
+  // creating a second live post, unless the caller explicitly asks to republish.
+  const publishKey = language ? `${platform}::${language}` : platform
+  const priorPublish: any = (campaign.metadata?.published || {})[publishKey]
+  const priorLiveUrl = String(priorPublish?.result?.liveUrl || '').trim()
+  if (priorLiveUrl && body?.republish !== true) {
+    return NextResponse.json({
+      ok: false,
+      error: `This campaign is already live on ${SOCIAL_CONNECTORS[platform]?.label || platform}${language ? ` in ${language}` : ''}: ${priorLiveUrl}. Pass republish: true to post it again.`,
+      platform,
+      liveUrl: priorLiveUrl,
+    }, { status: 409 })
+  }
+
   const readiness = scoreCampaignReadiness(campaign)
   const readinessOk = readiness.grade === 'improved' || readiness.grade === 'marketing_grade_ready'
   if (!readinessOk) {
@@ -101,7 +123,6 @@ export async function POST(req: NextRequest) {
   if (!result?.ok) return NextResponse.json({ ok: false, error: result?.mode || 'Publish failed', platform, result }, { status: 502 })
 
   const publishedAt = new Date().toISOString()
-  const publishedKey = language ? `${platform}::${language}` : platform
   const isReallyLive = Boolean(result.liveUrl) && !String(result.mode || '').includes('not_configured')
   let notified = false
   let notifyError: string | undefined
@@ -127,7 +148,7 @@ export async function POST(req: NextRequest) {
       tracking_url: trackingUrl,
       published: {
         ...((campaign.metadata && campaign.metadata.published) || {}),
-        [publishedKey]: publishedEntry,
+        [publishKey]: publishedEntry,
       },
     },
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { diagnoseIncidentWithGemini } from '@/lib/autonomous-supervisor/diagnostic'
+import { diagnoseIncident } from '@/lib/autonomous-supervisor/diagnostic'
 import {
   normalizeVercelIncident,
   stageApprovedInvestigation,
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const incident = await normalizeVercelIncident(body)
   if (!incident) return NextResponse.json({ ok: true, ignored: true, reason: 'Not a failed Vercel deployment event.' })
 
-  const diagnostic = await diagnoseIncidentWithGemini(incident)
+  const diagnostic = await diagnoseIncident(incident)
   const approvalDispatch = await stageApprovedInvestigation(incident, diagnostic)
   const result: SupervisorRunResult = { ok: true, incident, diagnostic, approvalDispatch }
   return NextResponse.json(result)

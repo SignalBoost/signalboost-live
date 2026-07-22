@@ -31,6 +31,7 @@ export interface RunCampaignArgs {
   providerId?: string              // default 'free_submission'
   brief: CampaignBrief
   target: MediaTarget
+  manualCopy?: string              // the owner's own copy — when supplied, the AI is not used at all
   ownerApproved?: boolean          // an owner is acting (or override token validated upstream)
   ownerBudgetApproved?: boolean    // explicit budget sign-off — REQUIRED to auto-dispatch a paid provider
   autoDispatch?: boolean           // if cleared, send now instead of only queuing for approval

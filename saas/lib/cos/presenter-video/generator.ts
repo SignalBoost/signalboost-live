@@ -1,4 +1,5 @@
 import type { PresenterTone, PresenterVideoDraft, PresenterVideoInput } from './types'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
 
@@ -12,7 +13,7 @@ function toneFor(input?: PresenterTone): PresenterTone {
 
 export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): PresenterVideoDraft {
   const destination = input.destination_url || DEFAULT_URL
-  const product = input.product_or_service || '[YOUR PRODUCT OR SERVICE]'
+  const product = input.product_or_service || `${hostBrandName()} platform`
   const audience = input.audience || 'your company'
   const tone = toneFor(input.tone)
   const duration = Math.max(15, Math.min(45, Number(input.duration_seconds || 25)))
@@ -57,10 +58,10 @@ export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): Prese
 
   return {
     id: id('presenter_video'),
-    presenter_name: 'SignalBoost AI',
+    presenter_name: `${hostBrandName()} AI`,
     presenter_role: 'official platform guide',
     tone,
-    title: 'SignalBoost AI guided platform tour',
+    title: `${hostBrandName()} AI guided platform tour`,
     duration_seconds: duration,
     opening_hook: scenes[0].presenter_line,
     scenes,

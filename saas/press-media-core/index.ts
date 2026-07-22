@@ -2,6 +2,7 @@
 // Press & Media portable core — barrel. Host wires the Ports (AI/email/notify) and adds
 // paid adapters; the free reference adapter is registered by default.
 export * from './types'
+export * from './rules'
 export * from './registry'
 export { createFreeSubmissionAdapter } from './adapters/free-submission'
 export { createPrWireAdapter } from './adapters/pr-wire'

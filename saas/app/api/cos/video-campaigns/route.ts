@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +13,8 @@ function id(prefix: string) {
 
 function buildCampaignFromPrompt(prompt: string) {
   const intelligence = buildCosChatIntelligence({
-    user_text: prompt || 'Create a SignalBoost enterprise product video campaign.',
-    product_or_service: 'SignalBoost SaaS platform',
+    user_text: prompt || `Create a ${hostBrandName()} product video campaign.`,
+    product_or_service: `${hostBrandName()} platform`,
     audience: DEFAULT_AUDIENCE,
   })
 
@@ -31,8 +32,8 @@ function buildCampaignFromPrompt(prompt: string) {
     hero: decision.recommended_hero || 'AI presenter',
     quality: Math.max(75, Math.min(96, decision.confidence_score || 82)),
     status: 'needs_approval',
-    hook: firstScene?.presenter_line || decision.creative_brief || 'See how SignalBoost turns scattered business work into approved action.',
-    funnel: decision.traffic_plan?.[0] || 'Send viewers to the SignalBoost SaaS platform.',
+    hook: firstScene?.presenter_line || decision.creative_brief || `See how ${hostBrandName()} turns scattered business work into approved action.`,
+    funnel: decision.traffic_plan?.[0] || `Send viewers to the ${hostBrandName()} platform.`,
     scenes: presenter.scenes.map(scene => `${scene.caption}: ${scene.presenter_line}`),
     workflow_status: 'need_approval',
   }

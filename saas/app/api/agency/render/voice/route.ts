@@ -36,9 +36,12 @@ export async function POST(req: Request) {
   const result = await runRender(host, { userId: access.userId }, { providerId: 'elevenlabs', kind: 'voice', params: { text, voiceId } }, funding)
 
   if (!result.ok) {
+    // approval_required is a governance stop, not a provider fault. Reporting it
+    // as 502 sends operators to debug ElevenLabs for what is actually a spend gate.
     const status = result.code === 'insufficient_funds' ? 402
       : result.code === 'daily_cap' ? 429
       : result.code === 'no_key' ? 402
+      : result.code === 'approval_required' ? 409
       : 502
     return NextResponse.json({ ok: false, error: result.message, code: result.code }, { status })
   }

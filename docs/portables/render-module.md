@@ -21,3 +21,10 @@ adapters, and has a metered render service on their own infrastructure.
 That is the entire point — a buyer replaces `render-host` and keeps the engine.
 
 ## Pipeline
+
+```
+price ──► approval gate ──► resolve key ──► reserve ──► produce ──► persist ──► settle
+            (wallet only)                   (wallet only)                        │
+                                                 ▲                               │
+                                                 └──────── refund on failure ────┘
+```

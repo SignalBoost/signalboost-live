@@ -1,6 +1,7 @@
 import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision'
 import { buildPresenterVideoDraft } from '../presenter-video'
 import type { CosChatIntelligence, CosChatIntelligenceInput } from './types'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
 
@@ -24,7 +25,7 @@ export function buildCosChatIntelligence(input: CosChatIntelligenceInput = {}): 
   const text = input.user_text || ''
   const defaults = defaultMarketingDecisionInput()
   const audience = inferAudience(text, input.audience)
-  const product = input.product_or_service || '[YOUR PRODUCT OR SERVICE]'
+  const product = input.product_or_service || `${hostBrandName()} platform`
   const region = input.region || 'global'
 
   const marketingDecision = buildMarketingDecision({

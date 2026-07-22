@@ -1,114 +1,93 @@
 'use client'
 
-// saas/app/dashboard/marketing/press-providers/PressProviderConnectForm.tsx
-// Owner "Connect" UI for a paid press provider (manual path, ONBOARD §12C). Posts to
-// /api/agency/press-providers/connect — which vault-encrypts the key and writes the wire's
-// provider_registry config. Fully localized (EN/ES/PT/PL/RU) via the platform useI18n() lang.
-import { useState } from 'react'
+// saas/app/dashboard/marketing/press-providers/PressCompanyProfileForm.tsx
+// The facts the generator is allowed to state. Without these the model has no way to know your
+// real product names and will invent them — that is exactly how a release naming a non-existent
+// product reached an editor. Anything left blank becomes a visible [PLACEHOLDER] in the draft
+// instead of an invention. Localized in all five platform languages.
+import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 const COPY: Record<string, Record<string, string>> = {
-  en: { title: 'Connect this provider', apiKey: 'API key', brand: 'Brand (e.g. Business Wire, EIN Presswire)', endpoint: 'Submit endpoint URL', report: 'Report endpoint URL (optional)', price: 'Price per release', currency: 'Currency', advanced: 'Advanced (optional)', payload: 'Payload template (JSON)', refPath: 'Response ID path (default $.id)', connect: 'Connect', connecting: 'Connecting…', connected: 'Connected', perRelease: 'per release', disconnect: 'Disconnect', disconnecting: 'Disconnecting…', keyNote: 'Your key is encrypted and shown only once — the platform never spends on your behalf.', done: 'Connected — you can run campaigns on this wire now.', errGeneric: "Couldn't connect. Check the key and endpoint.", errOwner: 'Sign in as the owner to connect a provider.', errKey: 'An API key is required.', errEndpoint: 'A valid https submit endpoint is required.', errTemplate: "The payload template isn't valid JSON." },
-  es: { title: 'Conectar este proveedor', apiKey: 'Clave API', brand: 'Marca (p. ej. Business Wire, EIN Presswire)', endpoint: 'URL del endpoint de envío', report: 'URL del endpoint de informe (opcional)', price: 'Precio por comunicado', currency: 'Moneda', advanced: 'Avanzado (opcional)', payload: 'Plantilla de payload (JSON)', refPath: 'Ruta del ID de respuesta (por defecto $.id)', connect: 'Conectar', connecting: 'Conectando…', connected: 'Conectado', perRelease: 'por comunicado', disconnect: 'Desconectar', disconnecting: 'Desconectando…', keyNote: 'Tu clave se cifra y solo se muestra una vez; la plataforma nunca gasta por ti.', done: 'Conectado: ya puedes lanzar campañas en este cable.', errGeneric: 'No se pudo conectar. Revisa la clave y el endpoint.', errOwner: 'Inicia sesión como propietario para conectar un proveedor.', errKey: 'Se requiere una clave API.', errEndpoint: 'Se requiere un endpoint de envío https válido.', errTemplate: 'La plantilla de payload no es JSON válido.' },
-  pt: { title: 'Conectar este provedor', apiKey: 'Chave de API', brand: 'Marca (ex.: Business Wire, EIN Presswire)', endpoint: 'URL do endpoint de envio', report: 'URL do endpoint de relatório (opcional)', price: 'Preço por comunicado', currency: 'Moeda', advanced: 'Avançado (opcional)', payload: 'Modelo de payload (JSON)', refPath: 'Caminho do ID de resposta (padrão $.id)', connect: 'Conectar', connecting: 'Conectando…', connected: 'Conectado', perRelease: 'por comunicado', disconnect: 'Desconectar', disconnecting: 'Desconectando…', keyNote: 'Sua chave é criptografada e exibida apenas uma vez; a plataforma nunca gasta por você.', done: 'Conectado — você já pode executar campanhas neste wire.', errGeneric: 'Não foi possível conectar. Verifique a chave e o endpoint.', errOwner: 'Entre como proprietário para conectar um provedor.', errKey: 'É necessária uma chave de API.', errEndpoint: 'É necessário um endpoint de envio https válido.', errTemplate: 'O modelo de payload não é um JSON válido.' },
-  pl: { title: 'Podłącz tego dostawcę', apiKey: 'Klucz API', brand: 'Marka (np. Business Wire, EIN Presswire)', endpoint: 'URL punktu końcowego wysyłki', report: 'URL punktu końcowego raportu (opcjonalnie)', price: 'Cena za komunikat', currency: 'Waluta', advanced: 'Zaawansowane (opcjonalnie)', payload: 'Szablon ładunku (JSON)', refPath: 'Ścieżka ID odpowiedzi (domyślnie $.id)', connect: 'Podłącz', connecting: 'Łączenie…', connected: 'Podłączono', perRelease: 'za komunikat', disconnect: 'Odłącz', disconnecting: 'Odłączanie…', keyNote: 'Twój klucz jest szyfrowany i pokazywany tylko raz; platforma nigdy nie wydaje w Twoim imieniu.', done: 'Podłączono — możesz teraz uruchamiać kampanie na tym wire.', errGeneric: 'Nie udało się połączyć. Sprawdź klucz i punkt końcowy.', errOwner: 'Zaloguj się jako właściciel, aby podłączyć dostawcę.', errKey: 'Wymagany jest klucz API.', errEndpoint: 'Wymagany jest prawidłowy punkt końcowy wysyłki https.', errTemplate: 'Szablon ładunku nie jest prawidłowym JSON-em.' },
-  ru: { title: 'Подключить этого провайдера', apiKey: 'API-ключ', brand: 'Бренд (напр. Business Wire, EIN Presswire)', endpoint: 'URL эндпоинта отправки', report: 'URL эндпоинта отчёта (необязательно)', price: 'Цена за релиз', currency: 'Валюта', advanced: 'Дополнительно (необязательно)', payload: 'Шаблон полезной нагрузки (JSON)', refPath: 'Путь к ID ответа (по умолчанию $.id)', connect: 'Подключить', connecting: 'Подключение…', connected: 'Подключено', perRelease: 'за релиз', disconnect: 'Отключить', disconnecting: 'Отключение…', keyNote: 'Ключ шифруется и показывается только один раз; платформа никогда не тратит за вас.', done: 'Подключено — теперь можно запускать кампании на этом wire.', errGeneric: 'Не удалось подключить. Проверьте ключ и эндпоинт.', errOwner: 'Войдите как владелец, чтобы подключить провайдера.', errKey: 'Требуется API-ключ.', errEndpoint: 'Требуется корректный https-эндпоинт отправки.', errTemplate: 'Шаблон полезной нагрузки — некорректный JSON.' },
+  en: { title: 'Company facts', why: 'The generator may only state what you put here. Anything missing appears as a visible [PLACEHOLDER] in the draft — never as an invented detail.', legal: 'Legal name', brand: 'Brand name', website: 'Website', products: 'Product names — one per line (the ONLY names the AI may use)', boilerplate: 'Boilerplate — the standard "About us" paragraph', spokesName: 'Spokesperson name', spokesTitle: 'Spokesperson title', quote: 'Approved quote — used verbatim, or no quote at all', permitted: 'Permitted claims — one per line', forbidden: 'Claims never to make — one per line', save: 'Save facts', saving: 'Saving…', saved: 'Saved. New drafts will use these facts.', err: 'Could not save.', errOwner: 'Sign in as the owner to edit company facts.', empty: 'No facts saved yet — drafts will be full of placeholders until you fill this in.', edit: 'Edit', close: 'Close' },
+  es: { title: 'Datos de la empresa', why: 'El generador solo puede afirmar lo que pongas aquí. Lo que falte aparecerá como [MARCADOR] visible en el borrador, nunca como un dato inventado.', legal: 'Razón social', brand: 'Nombre de marca', website: 'Sitio web', products: 'Nombres de productos: uno por línea (los ÚNICOS que la IA puede usar)', boilerplate: 'Texto estándar: el párrafo "Acerca de"', spokesName: 'Nombre del portavoz', spokesTitle: 'Cargo del portavoz', quote: 'Cita aprobada: se usa literalmente o no se usa ninguna', permitted: 'Afirmaciones permitidas: una por línea', forbidden: 'Afirmaciones prohibidas: una por línea', save: 'Guardar datos', saving: 'Guardando…', saved: 'Guardado. Los nuevos borradores usarán estos datos.', err: 'No se pudo guardar.', errOwner: 'Inicia sesión como propietario para editar los datos.', empty: 'Aún no hay datos guardados: los borradores estarán llenos de marcadores hasta que los completes.', edit: 'Editar', close: 'Cerrar' },
+  pt: { title: 'Dados da empresa', why: 'O gerador só pode afirmar o que você colocar aqui. O que faltar aparece como [MARCADOR] visível no rascunho, nunca como um dado inventado.', legal: 'Razão social', brand: 'Nome da marca', website: 'Site', products: 'Nomes de produtos — um por linha (os ÚNICOS que a IA pode usar)', boilerplate: 'Texto padrão — o parágrafo "Sobre a empresa"', spokesName: 'Nome do porta-voz', spokesTitle: 'Cargo do porta-voz', quote: 'Citação aprovada — usada literalmente, ou nenhuma', permitted: 'Afirmações permitidas — uma por linha', forbidden: 'Afirmações proibidas — uma por linha', save: 'Salvar dados', saving: 'Salvando…', saved: 'Salvo. Os novos rascunhos usarão estes dados.', err: 'Não foi possível salvar.', errOwner: 'Entre como proprietário para editar os dados.', empty: 'Nenhum dado salvo ainda — os rascunhos ficarão cheios de marcadores até você preencher.', edit: 'Editar', close: 'Fechar' },
+  pl: { title: 'Dane firmy', why: 'Generator może podać wyłącznie to, co tu wpiszesz. Braki pojawią się w projekcie jako widoczny [SYMBOL] — nigdy jako zmyślony szczegół.', legal: 'Nazwa prawna', brand: 'Nazwa marki', website: 'Strona WWW', products: 'Nazwy produktów — po jednej w wierszu (JEDYNE, których AI może użyć)', boilerplate: 'Standardowy akapit „O firmie”', spokesName: 'Imię i nazwisko rzecznika', spokesTitle: 'Stanowisko rzecznika', quote: 'Zatwierdzony cytat — użyty dosłownie albo wcale', permitted: 'Dozwolone twierdzenia — po jednym w wierszu', forbidden: 'Twierdzenia zakazane — po jednym w wierszu', save: 'Zapisz dane', saving: 'Zapisywanie…', saved: 'Zapisano. Nowe projekty użyją tych danych.', err: 'Nie udało się zapisać.', errOwner: 'Zaloguj się jako właściciel, aby edytować dane.', empty: 'Brak zapisanych danych — projekty będą pełne symboli, dopóki tego nie uzupełnisz.', edit: 'Edytuj', close: 'Zamknij' },
+  ru: { title: 'Факты о компании', why: 'Генератор может утверждать только то, что вы укажете здесь. Недостающее появится в черновике как видимый [ЗАПОЛНИТЕЛЬ] — никогда как выдуманная деталь.', legal: 'Юридическое название', brand: 'Название бренда', website: 'Сайт', products: 'Названия продуктов — по одному в строке (ЕДИНСТВЕННЫЕ, которые может использовать ИИ)', boilerplate: 'Стандартный абзац «О компании»', spokesName: 'Имя представителя', spokesTitle: 'Должность представителя', quote: 'Утверждённая цитата — дословно или никак', permitted: 'Разрешённые утверждения — по одному в строке', forbidden: 'Запрещённые утверждения — по одному в строке', save: 'Сохранить факты', saving: 'Сохранение…', saved: 'Сохранено. Новые черновики будут использовать эти факты.', err: 'Не удалось сохранить.', errOwner: 'Войдите как владелец, чтобы изменить факты.', empty: 'Факты ещё не сохранены — черновики будут полны заполнителей, пока вы их не заполните.', edit: 'Изменить', close: 'Закрыть' },
 }
 
-const field: React.CSSProperties = { background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10, width: '100%', boxSizing: 'border-box', fontSize: 13 }
+const panel: React.CSSProperties = { background: 'rgba(15,23,42,.86)', border: '1px solid rgba(148,163,184,.18)', borderRadius: 18, padding: 18 }
 const button: React.CSSProperties = { border: 'none', background: '#ffc300', color: '#020617', borderRadius: 12, padding: '9px 12px', fontWeight: 900, cursor: 'pointer' }
 const ghost: React.CSSProperties = { border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '8px 12px', fontWeight: 800, cursor: 'pointer' }
+const field: React.CSSProperties = { background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10, width: '100%', boxSizing: 'border-box', fontSize: 13 }
 
-function errText(code: string, t: Record<string, string>) {
-  if (code === 'owner_session_required' || code === 'owner_approval_required') return t.errOwner
-  if (code === 'api_key_required') return t.errKey
-  if (code === 'valid_endpoint_required') return t.errEndpoint
-  if (code === 'payload_template_invalid_json') return t.errTemplate
-  return t.errGeneric
-}
-
-export default function PressProviderConnectForm(props: {
-  providerId: string
-  connected?: boolean
-  brand?: string | null
-  priceCents?: number
-  currency?: string
-  onChanged?: () => void
-}) {
+export default function PressCompanyProfileForm({ profile, onSaved }: { profile: any; onSaved?: () => void }) {
   const { lang } = useI18n()
   const t = COPY[lang] || COPY.en
-
-  const [apiKey, setApiKey] = useState('')
-  const [brand, setBrand] = useState('')
-  const [endpoint, setEndpoint] = useState('')
-  const [report, setReport] = useState('')
-  const [price, setPrice] = useState('')
-  const [currency, setCurrency] = useState('USD')
-  const [refPath, setRefPath] = useState('')
-  const [payload, setPayload] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  const [ok, setOk] = useState(false)
+  const [note, setNote] = useState<{ text: string; ok: boolean } | null>(null)
+  const [f, setF] = useState({
+    legal_name: '', brand_name: '', website: '', products: '', boilerplate: '',
+    spokesperson_name: '', spokesperson_title: '', approved_quote: '', permitted_claims: '', forbidden_claims: '',
+  })
 
-  async function connect() {
-    setBusy(true); setMessage(''); setOk(false)
+  useEffect(() => {
+    if (!profile) return
+    setF({
+      legal_name: profile.legal_name || '', brand_name: profile.brand_name || '', website: profile.website || '',
+      products: profile.products || '', boilerplate: profile.boilerplate || '',
+      spokesperson_name: profile.spokesperson_name || '', spokesperson_title: profile.spokesperson_title || '',
+      approved_quote: profile.approved_quote || '', permitted_claims: profile.permitted_claims || '',
+      forbidden_claims: profile.forbidden_claims || '',
+    })
+  }, [profile])
+
+  async function save() {
+    setBusy(true); setNote(null)
     try {
-      const res = await fetch('/api/agency/press-providers/connect', {
+      const res = await fetch('/api/agency/press-media', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({
-          provider_id: props.providerId, api_key: apiKey, brand, endpoint,
-          report_endpoint: report, ref_path: refPath, payload_template: payload || undefined,
-          price_cents: price ? Math.round(parseFloat(price) * 100) : 0, currency,
-        }),
+        body: JSON.stringify({ action: 'save_profile', ...f }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json.ok) throw new Error(errText(json.error || '', t))
-      setOk(true); setMessage(t.done); setApiKey(''); props.onChanged?.()
-    } catch (err: any) { setMessage(err?.message || t.errGeneric) }
+      if (!res.ok || !json.ok) throw new Error(json.error === 'owner_approval_required' ? t.errOwner : t.err)
+      setNote({ ok: true, text: t.saved }); onSaved?.()
+    } catch (err: any) { setNote({ ok: false, text: err?.message || t.err }) }
     finally { setBusy(false) }
   }
 
-  async function disconnect() {
-    setBusy(true); setMessage('')
-    try {
-      const res = await fetch('/api/agency/press-providers/connect', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ provider_id: props.providerId }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json.ok) throw new Error(errText(json.error || '', t))
-      props.onChanged?.()
-    } catch (err: any) { setMessage(err?.message || t.errGeneric) }
-    finally { setBusy(false) }
-  }
+  const hasFacts = Boolean(f.brand_name || f.products || f.boilerplate)
+  const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value })
 
-  if (props.connected) {
-    const priceLabel = props.priceCents ? `${(props.priceCents / 100).toFixed(2)} ${props.currency || 'USD'} ${t.perRelease}` : ''
-    return <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
-      <span style={{ color: '#22c55e', fontWeight: 900, fontSize: 12 }}>● {t.connected}{props.brand ? ` · ${props.brand}` : ''}{priceLabel ? ` · ${priceLabel}` : ''}</span>
-      <button style={ghost} disabled={busy} onClick={disconnect}>{busy ? t.disconnecting : t.disconnect}</button>
-      {message ? <span style={{ color: '#fb923c', fontSize: 12 }}>{message}</span> : null}
+  return <section style={{ ...panel, borderColor: hasFacts ? 'rgba(34,197,94,.35)' : 'rgba(251,146,60,.45)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start', flexWrap: 'wrap' }}>
+      <div>
+        <h2 style={{ color: '#fff', margin: 0, fontSize: 18 }}>{t.title}</h2>
+        <p style={{ color: 'rgba(255,255,255,.6)', margin: '6px 0 0', fontSize: 12, maxWidth: 760, lineHeight: 1.6 }}>{t.why}</p>
+        {!hasFacts ? <p style={{ color: '#fb923c', margin: '8px 0 0', fontSize: 12, fontWeight: 800 }}>{t.empty}</p> : null}
+      </div>
+      <button style={ghost} onClick={() => setOpen((v) => !v)}>{open ? t.close : t.edit}</button>
     </div>
-  }
 
-  return <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-    <p style={{ color: '#fff', fontWeight: 850, fontSize: 13, margin: 0 }}>{t.title}</p>
-    <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={t.apiKey} type="password" style={field} />
-    <input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder={t.brand} style={field} />
-    <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={t.endpoint} style={field} />
-    <div style={{ display: 'flex', gap: 8 }}>
-      <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder={t.price} inputMode="decimal" style={{ ...field, flex: 2 }} />
-      <input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} placeholder={t.currency} style={{ ...field, flex: 1 }} />
-    </div>
-    <button style={{ ...ghost, justifySelf: 'start', fontSize: 12 }} onClick={() => setShowAdvanced((v) => !v)}>{t.advanced}</button>
-    {showAdvanced ? <div style={{ display: 'grid', gap: 8 }}>
-      <input value={report} onChange={(e) => setReport(e.target.value)} placeholder={t.report} style={field} />
-      <input value={refPath} onChange={(e) => setRefPath(e.target.value)} placeholder={t.refPath} style={field} />
-      <textarea value={payload} onChange={(e) => setPayload(e.target.value)} placeholder={t.payload} rows={3} style={{ ...field, resize: 'vertical', fontFamily: 'monospace' }} />
+    {open ? <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={f.legal_name} onChange={set('legal_name')} placeholder={t.legal} style={{ ...field, flex: 1, minWidth: 200 }} />
+        <input value={f.brand_name} onChange={set('brand_name')} placeholder={t.brand} style={{ ...field, flex: 1, minWidth: 200 }} />
+        <input value={f.website} onChange={set('website')} placeholder={t.website} style={{ ...field, flex: 1, minWidth: 200 }} />
+      </div>
+      <textarea value={f.products} onChange={set('products')} placeholder={t.products} rows={3} style={{ ...field, resize: 'vertical' }} />
+      <textarea value={f.boilerplate} onChange={set('boilerplate')} placeholder={t.boilerplate} rows={3} style={{ ...field, resize: 'vertical' }} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={f.spokesperson_name} onChange={set('spokesperson_name')} placeholder={t.spokesName} style={{ ...field, flex: 1, minWidth: 200 }} />
+        <input value={f.spokesperson_title} onChange={set('spokesperson_title')} placeholder={t.spokesTitle} style={{ ...field, flex: 1, minWidth: 200 }} />
+      </div>
+      <textarea value={f.approved_quote} onChange={set('approved_quote')} placeholder={t.quote} rows={2} style={{ ...field, resize: 'vertical' }} />
+      <textarea value={f.permitted_claims} onChange={set('permitted_claims')} placeholder={t.permitted} rows={2} style={{ ...field, resize: 'vertical' }} />
+      <textarea value={f.forbidden_claims} onChange={set('forbidden_claims')} placeholder={t.forbidden} rows={2} style={{ ...field, resize: 'vertical' }} />
+      <button style={button} disabled={busy} onClick={save}>{busy ? t.saving : t.save}</button>
     </div> : null}
-    <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, margin: 0 }}>{t.keyNote}</p>
-    <button style={button} disabled={busy || !apiKey.trim() || !endpoint.trim()} onClick={connect}>{busy ? t.connecting : t.connect}</button>
-    {message ? <p style={{ color: ok ? '#22c55e' : '#fb923c', fontSize: 12, margin: 0 }}>{message}</p> : null}
-  </div>
+
+    {note ? <p style={{ color: note.ok ? '#22c55e' : '#fb923c', margin: '10px 0 0', fontSize: 12 }}>{note.text}</p> : null}
+  </section>
 }

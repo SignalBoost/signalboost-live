@@ -23,3 +23,14 @@ export {
   type SqlExecutor,
   type EnterpriseDispatchStoreOptions,
 } from './enterprise-dispatch-store.ts'
+export {
+  createSiemAuditSink,
+  teeAuditSinks,
+  formatSiemRecord,
+  formatEcsJson,
+  formatCef,
+  type SiemTransport,
+  type SiemFormat,
+  type SiemSeverity,
+  type SiemAuditSinkConfig,
+} from './siem-audit-sink.ts'

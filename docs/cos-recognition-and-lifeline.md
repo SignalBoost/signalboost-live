@@ -66,10 +66,18 @@ This is the one change that stops the *lie*; it is tracked as the next step so i
 carefully rather than alongside unrelated edits.
 
 ## 6. Related items surfaced this session
-- **Infra-PR step-chaining fix (done)**: `saas/lib/hub/pr-engine.ts` now resolves
-  `{{steps[N].field}}` from prior step outputs, so dependent multi-step PRs (Stripe
-  product → price) work; unresolved refs fail loudly *before* hitting the provider
-  instead of shipping a literal placeholder.
+- **Infra-PR step-chaining fix**: implemented 2026-07-22. The resolver lives in
+  `saas/lib/hub/pr-step-refs.ts` and is wired into `saas/lib/hub/pr-engine.ts` at two
+  points — staging (references are validated, so self-, forward-, and malformed refs are
+  rejected before the owner sees the PR) and merge (each `{{steps[N].field}}` is resolved
+  from the `data` the earlier step returned). Dependent multi-step PRs (Stripe product →
+  price) work; unresolved refs fail *before* hitting the provider instead of shipping a
+  literal placeholder; the stored PR keeps the reference text, so the approved record and
+  the dedup fingerprint are unchanged. Covered by `saas/tests/prStepRefs.node.test.ts`.
+  NOTE: an earlier revision of this line read "(done)" while no resolver existed anywhere
+  in the repo — the precise confabulated-completion failure this whole document exists to
+  prevent, sitting inside the document itself. Verify against code, never against a note
+  that says something is done.
 - **Governance audit item (verify + fix)**: campaign rendering (`startSiteVideo`) is
   reported to begin while the campaign is still `waiting_approval` — i.e. render spend
   *before* approval, which violates the approval-gated-spending doctrine. Treat as a real

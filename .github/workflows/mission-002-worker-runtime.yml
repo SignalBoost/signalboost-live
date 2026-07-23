@@ -1,0 +1,25 @@
+name: Mission 002 Worker Runtime
+on:
+  pull_request:
+    paths: ['saas/lib/supervisor/missions/**','saas/tests/mission*','saas/supabase/migrations/**mission_002**','.github/workflows/mission-002-worker-runtime.yml']
+  push:
+    branches: [main]
+    paths: ['saas/lib/supervisor/missions/**','saas/tests/mission*','saas/supabase/migrations/**mission_002**','.github/workflows/mission-002-worker-runtime.yml']
+permissions: { contents: read }
+jobs:
+  mission-runtime:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: saas } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: saas/package-lock.json }
+      - run: npm ci
+      - run: npm run test:mission-lifecycle
+      - run: npm run test:mission-durable-outbox
+      - run: npm run test:mission-worker-runtime
+      - run: npm run test:mission-phase3
+      - run: npm run test:supervisor
+      - run: npm run check:enterprise-approval
+      - run: npm run validate:bpal
+      - run: npm run typecheck

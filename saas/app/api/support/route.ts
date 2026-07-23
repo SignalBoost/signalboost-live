@@ -1212,6 +1212,86 @@ if (name === 'deleteConversationHistory') {
   }
 return `Unknown tool: ${name}`
 }
+// ── Post-generation confabulation guard ───────────────────────────────────────
+//
+// The prompt already forbids a non-owner reply from claiming an owner action it
+// cannot perform (see conciergePrompt). This is the deterministic backstop for
+// when the model ignores that instruction under pressure: if a Concierge/degraded
+// reply ASSERTS a completed owner action but no owner tool actually fired this
+// turn, the claim is false by construction — a non-owner session has no owner
+// tools — so we replace the whole reply with an honest can't-do message.
+//
+// It runs ONLY for non-owner sessions. A real owner's tool calls are genuine, so
+// their replies are never rewritten. The check is intentionally conservative:
+// it fires on explicit completed-action claims, not on offers or descriptions.
+
+// Phrases that assert a completed owner-only action, across the 5 platform
+// languages. Matched case-insensitively against the reply text.
+const OWNER_ACTION_CLAIM = new RegExp(
+  [
+    // English
+    'pr (has been |is |was )?staged', 'staged (the |a |an )?(infrastructure )?pr', 'infrastructure pr (staged|created|opened)',
+    'committed (the |your )?(code|file|change)', 'pushed (the |a )?(branch|commit)', 'created (the |a |your )?campaign',
+    'launched (the |your )?campaign', 'campaign (has been |is |was )?(created|launched|published)',
+    'sent (the |your )?(outreach|email|press release)', 'added (the |a |your )?(env|environment) (var|variable)',
+    'changed (the |your )?(setting|billing|env|environment)', 'rotated (the |your )?key', 'deployed', 'redeployed',
+    // Spanish
+    'pr (ha sido |fue )?(preparad|program)', 'campaña (creada|lanzada|publicada|ha sido creada)', 'código (confirmado|subido|comprometido)',
+    'envié (el |la |tu )?(correo|email|difusión|comunicado)', 'variable de entorno (añadida|agregada|creada)',
+    // Portuguese
+    'pr (foi )?(preparad|program|criad|abert)', 'campanha (criada|lançada|publicada|foi criada)', 'código (confirmado|enviado|commitad)',
+    'enviei (o |a |seu )?(e-?mail|comunicado|divulgação)', 'variável de ambiente (adicionada|criada)',
+    // Polish
+    'pr (został|jest) (przygotowan|utworzon|otwart)', 'kampani(a|ę) (utworzon|uruchomion|opublikowan)', 'kod (zatwierdzon|wypchnięt|scommitowan)',
+    'wysłał(em|am) (e-?mail|wiadomość|komunikat)', 'zmienną środowiskową (dodan|utworzon)',
+    // Russian
+    'pr (подготовлен|создан|открыт)', 'кампани(я|ю) (создан|запущен|опубликован)', 'код (закоммичен|отправлен|зафиксирован)',
+    'отправил(а)? (письмо|рассылку|пресс-?релиз)', 'переменную окружения (добавил|создал)',
+  ].join('|'),
+  'i',
+)
+
+// The owner-only tools whose real execution would justify such a claim. If ANY
+// of these fired this turn, the claim may be legitimate and we leave the reply
+// alone. (For a non-owner these are filtered out anyway, so the set is normally
+// empty — which is exactly the condition the guard catches.)
+const OWNER_ACTION_TOOLS = new Set<string>([
+  'proposeInfrastructurePR', 'proposeCodeCommit', 'proposeMarketingCampaign',
+  'createPressCampaign', 'deleteBranches',
+])
+
+function honestCantDo(languageCode: string): string {
+  const M: Record<string, string> = {
+    en: "I can't perform that action here — it requires the owner's own signed-in Chief of Staff session. Nothing was staged, committed, sent, or changed. If you're the owner, you may be in Concierge mode — check that OWNER_EMAILS in Vercel includes your exact login email.",
+    es: "No puedo realizar esa acción aquí — requiere la sesión de Chief of Staff del propietario con su sesión iniciada. No se preparó, confirmó, envió ni cambió nada. Si eres el propietario, puede que estés en modo Concierge — verifica que OWNER_EMAILS en Vercel incluya tu correo de inicio de sesión exacto.",
+    pt: "Não posso executar essa ação aqui — ela requer a sessão de Chief of Staff do proprietário autenticado. Nada foi preparado, confirmado, enviado ou alterado. Se você é o proprietário, pode estar no modo Concierge — verifique se OWNER_EMAILS na Vercel inclui seu e-mail de login exato.",
+    pl: "Nie mogę wykonać tej akcji tutaj — wymaga ona zalogowanej sesji Chief of Staff właściciela. Nic nie zostało przygotowane, zatwierdzone, wysłane ani zmienione. Jeśli jesteś właścicielem, możesz być w trybie Concierge — sprawdź, czy OWNER_EMAILS w Vercel zawiera Twój dokładny adres e-mail logowania.",
+    ru: "Я не могу выполнить это действие здесь — оно требует авторизованной сессии Chief of Staff владельца. Ничего не было подготовлено, зафиксировано, отправлено или изменено. Если вы владелец, возможно, вы в режиме Concierge — проверьте, что OWNER_EMAILS в Vercel содержит ваш точный адрес входа.",
+  }
+  return M[languageCode] || M.en
+}
+
+/**
+ * Returns the honest can't-do message when `reply` (from a NON-owner session)
+ * falsely claims a completed owner action that `firedTools` shows never ran;
+ * otherwise returns `reply` unchanged. Owner sessions are never rewritten.
+ */
+export function guardConfabulatedAction(
+  reply: string,
+  isOwner: boolean,
+  firedTools: Set<string>,
+  languageCode: string,
+): string {
+  if (isOwner) return reply
+  if (!reply || !OWNER_ACTION_CLAIM.test(reply)) return reply
+  let ranRealOwnerTool = false
+  for (const name of firedTools) {
+    if (OWNER_ACTION_TOOLS.has(name)) { ranRealOwnerTool = true; break }
+  }
+  if (ranRealOwnerTool) return reply
+  return honestCantDo(languageCode)
+}
+
 export async function POST(req: NextRequest) {
   // Hoisted so the outer catch can localize + tier the degraded reply.
   let errLangCode = 'en'
@@ -1533,6 +1613,10 @@ ${ev.summary}`
     let toolRounds = 0
     let timedOut   = msg === null
 
+    // Names of tools that ACTUALLY executed this turn. The post-generation guard
+    // below uses this to catch a reply that claims an owner action no tool performed.
+    const firedTools = new Set<string>()
+
     while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 10 && remainingMs() > 12_000) {
       toolRounds++
 
@@ -1543,6 +1627,7 @@ ${ev.summary}`
       const toolResults: any[] = []
       for (const block of (msg as any).content) {
         if (!block || block.type !== 'tool_use') continue
+        firedTools.add(String(block.name || ''))
         // runTool expects a JSON string; Anthropic gives input as an object.
         const result = await runTool(block.name || '', JSON.stringify(block.input ?? {}), userId, conversationId, isPrivileged, isOwner)
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
@@ -1640,6 +1725,11 @@ ${ev.summary}`
         // self-correction is best-effort — never block or break the response
       }
     }
+
+    // ── Post-generation confabulation guard: a non-owner reply that claims a
+    // completed owner action no tool performed is replaced with an honest
+    // can't-do message. Owner replies pass through untouched. ──
+    reply = guardConfabulatedAction(reply, isOwner, firedTools, languageCode)
 
     // ── Persist this exchange to conversation history (logged-in users) ───
     if (userId && conversationId && latestUserMessage) {

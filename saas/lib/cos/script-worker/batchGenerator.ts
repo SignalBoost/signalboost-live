@@ -9,20 +9,13 @@
 //
 // tsconfig non-strict: flat results; never throws to callers.
 
-import { createClient } from '@supabase/supabase-js'
 import type { BatchRequest, BatchOutput } from '@/lib/ai/batch/openaiBatch'
+import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
 import type { CosContentWorkerOutput } from './types'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
-const TABLE = 'cos_campaign_queue'
 const MODEL = 'gpt-4o-mini'
-
-function db() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false },
-  })
-}
 
 // Language autonyms — each language named in its own script, so no English label
 // stands in for another language.
@@ -171,9 +164,9 @@ export async function applyCampaignCopyOutputs(outputs: BatchOutput[], context: 
   const campaignId = String(context?.campaign_id || '')
   if (!campaignId) return
 
-  const sb = db()
-  const { data: campaign, error } = await sb.from(TABLE).select('*').eq('id', campaignId).single()
-  if (error || !campaign) return
+  const store = createSupabaseCampaignQueueStore()
+  const campaign = await store.getById(campaignId)
+  if (!campaign) return
 
   const timestamp = new Date().toISOString()
   const next: any[] = Array.isArray(campaign.work_items) ? [...campaign.work_items] : []
@@ -228,5 +221,5 @@ export async function applyCampaignCopyOutputs(outputs: BatchOutput[], context: 
     publishing_gate: 'locked_until_owner_approval',
   }
 
-  await sb.from(TABLE).update({ work_items: next, metadata }).eq('id', campaign.id)
+  await store.update(campaign.id, { work_items: next, metadata })
 }

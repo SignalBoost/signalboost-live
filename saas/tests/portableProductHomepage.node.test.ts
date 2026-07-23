@@ -1,0 +1,23 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { listPublicPortableProducts } from '../lib/portable-products/index.ts'
+
+const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+const locales = JSON.parse(readFileSync(new URL('../lib/i18n/homepageLocales.json', import.meta.url), 'utf8')) as Record<string, { portables: Record<string, { name: string; desc: string }> }>
+
+test('homepage renders public products from the registry selector without PORTABLES metadata', () => {
+  assert.match(homepage, /import \{ listPublicPortableProducts \} from '@\/lib\/portable-products'/)
+  assert.match(homepage, /listPublicPortableProducts\(\)\.map/); assert.doesNotMatch(homepage, /const PORTABLES\s*=/)
+  const ids = listPublicPortableProducts().map(product => product.productId)
+  assert.deepEqual(ids, ['campaign-studio', 'integrations-hub', 'video-maker', 'control-center', 'marketing-sales', 'press-media', 'portable-ai-chief-of-staff', 'browser-agent-ecosystem', 'agent-operations-platform', 'self-healing-supervisor'])
+  assert.ok(ids.includes('agent-operations-platform')); assert.ok(!homepage.includes('Durable Agent Runtime')); assert.ok(ids.includes('browser-agent-ecosystem'))
+})
+test('homepage status, routes, and localization remain supported', () => {
+  const products = listPublicPortableProducts()
+  assert.ok(products.filter(product => product.status === 'live').every(product => product.status === 'live'))
+  assert.ok(products.filter(product => product.status === 'preview').every(product => product.status === 'preview'))
+  assert.equal(products.find(product => product.productId === 'campaign-studio')?.route, '/agency')
+  assert.ok(products.filter(product => product.status === 'preview' && !product.route).every(product => !product.route))
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) for (const product of products) assert.ok(locales[language].portables[product.localizationKey]?.name && locales[language].portables[product.localizationKey]?.desc)
+})

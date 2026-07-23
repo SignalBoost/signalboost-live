@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { listPublicPortableProducts } from '@/lib/portable-products'
 
 const LINKS = {
   siteReview: '/dashboard/audit',
@@ -25,19 +26,6 @@ const PUBLIC_TOOLS = [
   { key: 'siteReview', icon: '◎', href: LINKS.siteReview, accent: '#f6c453', status: 'free' },
   { key: 'securityCheck', icon: '◇', href: LINKS.securityCheck, accent: '#8b8cff', status: 'free' },
   { key: 'improveYourSite', icon: '✦', href: LINKS.improveYourSite, accent: '#e7a93f', status: 'live' },
-] as const
-
-const PORTABLES = [
-  { key: 'campaign', glyph: '✦', tag: 'live', href: LINKS.agency, fallbackName: 'Campaign Studio', fallbackDesc: 'One short request becomes a finished campaign.' },
-  { key: 'integrations', glyph: '⛓', tag: 'live', href: '', fallbackName: 'Integrations Hub', fallbackDesc: 'Secure connections for websites, payments, calendars, AI systems, and APIs.' },
-  { key: 'render', glyph: '◍', tag: 'live', href: '', fallbackName: 'Video Maker', fallbackDesc: 'Voice and branded video with governed prepaid use.' },
-  { key: 'console', glyph: '◈', tag: 'live', href: '', fallbackName: 'Control Center', fallbackDesc: 'Keys, webhooks, logs, releases, and activity controls.' },
-  { key: 'marketingSales', glyph: '◎', tag: 'live', href: '', fallbackName: 'Marketing + Sales', fallbackDesc: 'Marketing and sales workflows in one portable engine.' },
-  { key: 'press', glyph: '◉', tag: 'live', href: '', fallbackName: 'Press & Media', fallbackDesc: 'Governed outreach to verified editors and paid distribution services.' },
-  { key: 'chiefOfStaff', glyph: '❖', tag: 'preview', href: '', fallbackName: 'Portable AI Chief of Staff', fallbackDesc: 'Plans and carries out only approved work through buyer-supplied ports.' },
-  { key: 'browserAgents', glyph: '◇', tag: 'preview', href: '', fallbackName: 'Browser Agent Ecosystem', fallbackDesc: 'Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks.' },
-  { key: 'agentOperations', glyph: '⌁', tag: 'preview', href: '', fallbackName: 'Agent Operations Platform', fallbackDesc: 'Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters.' },
-  { key: 'selfHealing', glyph: '⟲', tag: 'preview', href: '', fallbackName: 'Self-Healing Supervisor', fallbackDesc: 'Detects failures, diagnoses them, and proposes bounded repairs for approval.' },
 ] as const
 
 const STATS = [
@@ -142,19 +130,19 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-portables">
-            {PORTABLES.map((p) => {
-              const name = copy(`portables.${p.key}.name`, p.fallbackName)
-              const desc = copy(`portables.${p.key}.desc`, p.fallbackDesc)
+            {listPublicPortableProducts().map((p) => {
+              const name = copy(`portables.${p.localizationKey}.name`, p.fallbackName)
+              const desc = copy(`portables.${p.localizationKey}.desc`, p.fallbackDescription)
               const inner = (
                 <>
-                  <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.tag === 'live' ? 'tag-live' : 'tag-preview'}>{p.tag === 'live' ? copy('live', 'Live') : copy('preview', 'Preview')}</span></div>
+                  <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.status === 'live' ? 'tag-live' : 'tag-preview'}>{p.status === 'live' ? copy('live', 'Live') : copy('preview', 'Preview')}</span></div>
                   <h3>{name}</h3>
                   <p>{desc}</p>
                 </>
               )
-              return p.href
-                ? <Link key={p.key} href={p.href} className="qcard is-link">{inner}</Link>
-                : <div key={p.key} className="qcard">{inner}</div>
+              return p.route
+                ? <Link key={p.productId} href={p.route} className="qcard is-link">{inner}</Link>
+                : <div key={p.productId} className="qcard">{inner}</div>
             })}
           </div>
         </section>

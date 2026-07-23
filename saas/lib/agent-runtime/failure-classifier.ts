@@ -13,6 +13,6 @@ export function classifySandboxFailure(result: Pick<SandboxExecutionResult, 'exi
   const code = result.error?.code
   const category: SandboxFailureCategory = result.timedOut ? 'timeout' : code ?? (/\b(syntax|parse)error\b/i.test(result.stderr) ? 'syntax' : 'runtime')
   const stage = result.error?.stage ?? 'execution'
-  const retryable = category === 'sandbox_unavailable' || category === 'timeout' || category === 'internal'
+  const retryable = result.error?.retryable ?? (category === 'sandbox_unavailable' || category === 'timeout' || category === 'internal')
   return Object.freeze({ category, stage, retryable, safeSummary: `Sandbox ${category.replace(/_/g, ' ')}.`, diagnosticMessage: diagnostic(result.error), exitCode: result.exitCode, timedOut: result.timedOut })
 }

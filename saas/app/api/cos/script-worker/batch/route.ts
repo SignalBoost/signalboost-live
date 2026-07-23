@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { submitBatch } from '@/lib/ai/batch/openaiBatch'
 import { buildCampaignCopyRequests } from '@/lib/cos/script-worker/batchGenerator'
+import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,14 +23,11 @@ export async function POST(req: NextRequest) {
   const campaignId = String(body?.campaign_id || body?.id || '').trim()
   if (!campaignId) return NextResponse.json({ ok: false, error: 'campaign_id is required' }, { status: 400 })
 
-  const { data: campaign, error: loadError } = await ctx.admin
-    .from('cos_campaign_queue')
-    .select('*')
-    .eq('id', campaignId)
-    .single()
+  const store = createSupabaseCampaignQueueStore(ctx.admin)
+  const campaign = await store.getById(campaignId)
 
-  if (loadError || !campaign) {
-    return NextResponse.json({ ok: false, error: loadError?.message || 'Campaign not found' }, { status: 404 })
+  if (!campaign) {
+    return NextResponse.json({ ok: false, error: 'Campaign not found' }, { status: 404 })
   }
 
   if (!DRAFTABLE_STATUSES.includes(campaign.status)) {
@@ -58,7 +56,7 @@ export async function POST(req: NextRequest) {
     publishing_gate: 'locked_until_owner_approval',
   }
 
-  await ctx.admin.from('cos_campaign_queue').update({ metadata }).eq('id', campaign.id)
+  await store.update(campaign.id, { metadata })
 
   await auditAdminAction({
     admin: ctx.admin,

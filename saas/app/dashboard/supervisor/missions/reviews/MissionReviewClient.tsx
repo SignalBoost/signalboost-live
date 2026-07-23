@@ -4,40 +4,39 @@ import { useEffect, useState } from 'react'
 
 type Labels = Record<string, string>
 type Review = { reviewId: string; missionId: string; missionRevision: number; decisionId: string; status: string; title: string; summary: string; createdAt: string; routedAt: string; schemaVersion: string }
-type Detail = Review & { decisionFingerprint: string; planFingerprint: string; bindingFingerprint: string; mission: null | { missionId: string; missionType: string; revision: number; status: string; environment: string; title: string; riskLevel: string; createdAt: string; updatedAt: string; schemaVersion: string } }
+type MissionSummary = { missionId: string; missionType: string; revision: number; status: string; environment: string; title: string; riskLevel: string; createdAt: string; updatedAt: string; schemaVersion: string }
+type Detail = Review & { decisionFingerprint: string; planFingerprint: string; bindingFingerprint: string; mission: MissionSummary | null }
 type ListResponse = { items: Review[]; nextCursor?: string }
 
 const isString = (value: unknown): value is string => typeof value === 'string'
-const isNonNegativeInteger = (value: unknown): value is number => Number.isInteger(value) && value >= 0
+const isNonNegativeInteger = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
 function parseReview(value: unknown): Review | null {
-  if (!value || typeof value !== 'object') return null
-  const review = value as Record<string, unknown>
-  if (!isString(review.reviewId) || !isString(review.missionId) || !isNonNegativeInteger(review.missionRevision) || !isString(review.decisionId) || !isString(review.status) || !isString(review.title) || !isString(review.summary) || !isString(review.createdAt) || !isString(review.routedAt) || !isString(review.schemaVersion)) return null
-  return { reviewId: review.reviewId, missionId: review.missionId, missionRevision: review.missionRevision, decisionId: review.decisionId, status: review.status, title: review.title, summary: review.summary, createdAt: review.createdAt, routedAt: review.routedAt, schemaVersion: review.schemaVersion }
+  if (!isRecord(value)) return null
+  if (!isString(value.reviewId) || !isString(value.missionId) || !isNonNegativeInteger(value.missionRevision) || !isString(value.decisionId) || !isString(value.status) || !isString(value.title) || !isString(value.summary) || !isString(value.createdAt) || !isString(value.routedAt) || !isString(value.schemaVersion)) return null
+  return { reviewId: value.reviewId, missionId: value.missionId, missionRevision: value.missionRevision, decisionId: value.decisionId, status: value.status, title: value.title, summary: value.summary, createdAt: value.createdAt, routedAt: value.routedAt, schemaVersion: value.schemaVersion }
 }
+
+function parseMissionSummary(value: unknown): MissionSummary | null {
+  if (!isRecord(value)) return null
+  if (!isString(value.missionId) || !isString(value.missionType) || !isNonNegativeInteger(value.revision) || !isString(value.status) || !isString(value.environment) || !isString(value.title) || !isString(value.riskLevel) || !isString(value.createdAt) || !isString(value.updatedAt) || !isString(value.schemaVersion)) return null
+  return { missionId: value.missionId, missionType: value.missionType, revision: value.revision, status: value.status, environment: value.environment, title: value.title, riskLevel: value.riskLevel, createdAt: value.createdAt, updatedAt: value.updatedAt, schemaVersion: value.schemaVersion }
+}
+
 function parseListResponse(value: unknown): ListResponse | null {
-  if (!value || typeof value !== 'object') return null
+  if (!isRecord(value) || !Array.isArray(value.items)) return null
+  const items = value.items.map(parseReview)
+  if (items.some(item => item === null) || (value.nextCursor !== undefined && !isString(value.nextCursor))) return null
+  return { items: items as Review[], ...(isString(value.nextCursor) ? { nextCursor: value.nextCursor } : {}) }
+}
 
-  const response = value as Record<string, unknown>
-  const rawItems = response.items
-
-  if (!Array.isArray(rawItems)) return null
-
-  const items = rawItems.map(parseReview)
-
-  if (
-    items.some(item => item === null) ||
-    (response.nextCursor !== undefined && !isString(response.nextCursor))
-  ) {
-    return null
-  }
-
-  return {
-    items: items as Review[],
-    ...(isString(response.nextCursor)
-      ? { nextCursor: response.nextCursor }
-      : {}),
-  }
+function parseDetailResponse(value: unknown): Detail | null {
+  const review = parseReview(value)
+  if (!review || !isRecord(value) || !isString(value.decisionFingerprint) || !isString(value.planFingerprint) || !isString(value.bindingFingerprint)) return null
+  const mission = value.mission === null ? null : parseMissionSummary(value.mission)
+  if (value.mission !== null && !mission) return null
+  return { ...review, decisionFingerprint: value.decisionFingerprint, planFingerprint: value.planFingerprint, bindingFingerprint: value.bindingFingerprint, mission }
 }
 
 const sizes = [25, 50, 100]
@@ -85,7 +84,9 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
     try {
       const response = await fetch(`/api/internal/supervisor/missions/reviews/${encodeURIComponent(reviewId)}`, { method: 'GET', cache: 'no-store' })
       if (!response.ok) throw new Error(messageFor(response.status, labels))
-      setDetail(await response.json() as Detail)
+      const payload = parseDetailResponse(await response.json())
+      if (!payload) throw new Error(labels.error)
+      setDetail(payload)
     } catch (cause) { setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { setDetailLoading(false) }
   }
 

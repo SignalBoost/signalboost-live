@@ -1,0 +1,3 @@
+export interface RemoteSandboxTransport { request<TResponse>(input: { method: 'POST' | 'DELETE'; url: string; headers: Readonly<Record<string, string>>; body?: unknown; timeoutMs: number }): Promise<TResponse> }
+export interface RemoteCreateSessionResponse { providerId: 'remote'; sessionId: string; createdAt: string }
+export interface RemoteExecuteResponse { providerId: 'remote'; stdout: string; stderr: string; exitCode: number; signal: string | null; timedOut: boolean; durationMs: number; artifacts: readonly { path: string; sizeBytes: number; mediaType?: string; sha256?: string; truncated?: boolean; kind?: 'file' | 'directory' | 'symbolic_link' | 'device' | 'pipe' | 'socket' }[]; error?: { code: string; stage: string; message: string; retryable: boolean } }

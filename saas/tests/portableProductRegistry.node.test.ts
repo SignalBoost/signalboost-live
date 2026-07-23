@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getPortableProduct, listLicensablePortableProducts, listPortableProducts, listPublicPortableProducts, portableProductRegistry } from '../lib/portable-products/index.ts'
+import { getPortableProduct, listLicensablePortableProducts, listPortableProducts, listPublicPortableProducts, portableProductRegistry, validatePortableProductRegistry } from '../lib/portable-products/index.ts'
 
 test('registry is frozen, serializable, and has customer-facing stable IDs', () => {
   assert.ok(portableProductRegistry.length > 0)
@@ -28,4 +28,25 @@ test('product lookups, routes, and documentation metadata are safe', () => {
     assert.ok(product.route === undefined || (product.route.startsWith('/') && !product.route.startsWith('//')))
     for (const reference of [...product.documentationReferences, ...product.architectureReferences]) assert.match(reference, /^(docs|saas)\//)
   }
+})
+
+test('validation rejects implementation mismatches and undeclared metadata fields', () => {
+  const descriptor = portableProductRegistry[0]
+  const invalidStatus = Object.freeze({
+    ...descriptor,
+    implementationStatus: 'unknown',
+    documentationReferences: descriptor.documentationReferences,
+    capabilityTags: descriptor.capabilityTags,
+    architectureReferences: descriptor.architectureReferences,
+  })
+  assert.throws(() => validatePortableProductRegistry(Object.freeze([invalidStatus] as never)), /invalid implementation status/)
+
+  const undeclaredField = Object.freeze({
+    ...descriptor,
+    undocumentedMetadata: 'not allowed',
+    documentationReferences: descriptor.documentationReferences,
+    capabilityTags: descriptor.capabilityTags,
+    architectureReferences: descriptor.architectureReferences,
+  })
+  assert.throws(() => validatePortableProductRegistry(Object.freeze([undeclaredField] as never)), /not an allowed descriptor field/)
 })

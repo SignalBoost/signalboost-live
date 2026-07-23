@@ -1,4 +1,7 @@
 export { portableProductRegistry } from './product-registry.ts'
 export { getPortableProduct, listLicensablePortableProducts, listPortableProducts, listPortableProductsByCategory, listPublicPortableProducts } from './product-selectors.ts'
 export { validatePortableProductRegistry } from './product-validation.ts'
+export { portableProductManifests } from './manifests/index.ts'
+export { validatePortableProductManifests } from './manifestValidation.ts'
+export type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 export type { PortableProductCategory, PortableProductDescriptor, PortableProductImplementationClassification, PortableProductImplementationStatus, PortableProductStatus } from './product-types.ts'

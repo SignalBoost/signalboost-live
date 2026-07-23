@@ -131,18 +131,18 @@ export default function Home() {
           </div>
           <div className="grid grid-portables">
             {listPublicPortableProducts().map((p) => {
-              const name = copy(`portables.${p.localizationKey}.name`, p.fallbackName)
-              const desc = copy(`portables.${p.localizationKey}.desc`, p.fallbackDescription)
+              const name = copy(`portables.${p.localizationKey}.name`, p.manifest.displayName)
+              const desc = copy(`portables.${p.localizationKey}.desc`, p.manifest.shortDescription)
               const inner = (
                 <>
-                  <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.status === 'live' ? 'tag-live' : 'tag-preview'}>{p.status === 'live' ? copy('live', 'Live') : copy('preview', 'Preview')}</span></div>
+                  <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.manifest.status === 'live' ? 'tag-live' : 'tag-preview'}>{p.manifest.status === 'live' ? copy('live', 'Live') : copy('preview', 'Preview')}</span></div>
                   <h3>{name}</h3>
                   <p>{desc}</p>
                 </>
               )
               return p.route
-                ? <Link key={p.productId} href={p.route} className="qcard is-link">{inner}</Link>
-                : <div key={p.productId} className="qcard">{inner}</div>
+                ? <Link key={p.manifest.productId} href={p.route} className="qcard is-link">{inner}</Link>
+                : <div key={p.manifest.productId} className="qcard">{inner}</div>
             })}
           </div>
         </section>

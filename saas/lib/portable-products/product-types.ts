@@ -1,44 +1,17 @@
+import type { PortableProductManifest } from './manifestTypes.ts'
+
 export type PortableProductStatus = 'live' | 'preview' | 'internal' | 'deprecated' | 'hidden'
+export type PortableProductCategory = 'growth' | 'media' | 'operations' | 'automation' | 'infrastructure' | 'governance' | 'integrations'
+export type PortableProductImplementationStatus = 'implemented' | 'preview' | 'internal_component' | 'descriptor_only' | 'deprecated'
+export type PortableProductImplementationClassification = 'implemented_product' | 'preview_product' | 'internal_component' | 'descriptor_only_compatibility_target'
 
-export type PortableProductCategory =
-  | 'growth'
-  | 'media'
-  | 'operations'
-  | 'automation'
-  | 'infrastructure'
-  | 'governance'
-  | 'integrations'
-
-export type PortableProductImplementationStatus =
-  | 'implemented'
-  | 'preview'
-  | 'internal_component'
-  | 'descriptor_only'
-  | 'deprecated'
-
-/** Describes implementation readiness without exposing implementation details to buyers. */
-export type PortableProductImplementationClassification =
-  | 'implemented_product'
-  | 'preview_product'
-  | 'internal_component'
-  | 'descriptor_only_compatibility_target'
-
-/** Serializable, metadata-only catalog data for a portable product. */
+/** Presentation-only registry entry that references one self-describing manifest. */
 export interface PortableProductDescriptor {
-  productId: string
-  localizationKey: string
-  fallbackName: string
-  fallbackDescription: string
-  glyph: string
-  status: PortableProductStatus
-  implementationStatus: PortableProductImplementationStatus
-  implementationClassification: PortableProductImplementationClassification
-  category: PortableProductCategory
-  sortOrder: number
-  publicVisible: boolean
-  licensingAvailable: boolean
-  route?: string
-  documentationReferences: readonly string[]
-  capabilityTags: readonly string[]
-  architectureReferences: readonly string[]
+  readonly manifest: PortableProductManifest
+  readonly localizationKey: string
+  readonly glyph: string
+  readonly implementationStatus: PortableProductImplementationStatus
+  readonly implementationClassification: PortableProductImplementationClassification
+  readonly sortOrder: number
+  readonly route?: string
 }

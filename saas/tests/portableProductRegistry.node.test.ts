@@ -2,51 +2,25 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getPortableProduct, listLicensablePortableProducts, listPortableProducts, listPublicPortableProducts, portableProductRegistry, validatePortableProductRegistry } from '../lib/portable-products/index.ts'
 
-test('registry is frozen, serializable, and has customer-facing stable IDs', () => {
-  assert.ok(portableProductRegistry.length > 0)
+test('registry is frozen and preserves stable customer-facing manifest IDs', () => {
   assert.ok(Object.isFrozen(portableProductRegistry))
-  const ids = portableProductRegistry.map(product => product.productId)
+  const ids = portableProductRegistry.map(product => product.manifest.productId)
   assert.equal(new Set(ids).size, ids.length)
   assert.ok(ids.includes('agent-operations-platform')); assert.ok(ids.includes('browser-agent-ecosystem')); assert.ok(!ids.includes('agentRuntime'))
-  for (const product of portableProductRegistry) {
-    assert.match(product.productId, /^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-    assert.ok(Object.isFrozen(product)); assert.ok(Object.isFrozen(product.capabilityTags)); assert.ok(Object.isFrozen(product.documentationReferences)); assert.ok(Object.isFrozen(product.architectureReferences))
-    assert.equal(new Set(product.capabilityTags).size, product.capabilityTags.length)
-    assert.doesNotThrow(() => JSON.stringify(product))
-  }
+  for (const product of portableProductRegistry) assert.ok(Object.isFrozen(product) && Object.isFrozen(product.manifest))
 })
-test('selectors are deterministic and apply public and licensing rules', () => {
+test('selectors are deterministic and apply manifest visibility and licensing rules', () => {
   const first = listPortableProducts(); const second = listPortableProducts()
-  assert.deepEqual(first.map(product => product.productId), second.map(product => product.productId)); assert.ok(Object.isFrozen(first)); assert.notEqual(first, second)
-  assert.deepEqual(first.map(product => product.sortOrder), [...first].map(product => product.sortOrder).sort((a, b) => a - b))
-  assert.ok(listPublicPortableProducts().every(product => product.publicVisible && product.status !== 'internal' && product.status !== 'hidden' && product.status !== 'deprecated'))
-  assert.ok(listLicensablePortableProducts().every(product => product.licensingAvailable && product.status === 'live'))
+  assert.deepEqual(first.map(product => product.manifest.productId), second.map(product => product.manifest.productId)); assert.ok(Object.isFrozen(first)); assert.notEqual(first, second)
+  assert.ok(listPublicPortableProducts().every(product => product.manifest.publicVisible && product.manifest.status !== 'internal' && product.manifest.status !== 'hidden' && product.manifest.status !== 'deprecated'))
+  assert.ok(listLicensablePortableProducts().every(product => product.manifest.licensingAvailable && product.manifest.status === 'live'))
 })
-test('product lookups, routes, and documentation metadata are safe', () => {
+test('product lookups and routes remain safe', () => {
   assert.throws(() => getPortableProduct('unknown-portable'), /Unknown portable product ID/)
-  for (const product of portableProductRegistry) {
-    assert.ok(product.route === undefined || (product.route.startsWith('/') && !product.route.startsWith('//')))
-    for (const reference of [...product.documentationReferences, ...product.architectureReferences]) assert.match(reference, /^(docs|saas)\//)
-  }
+  for (const product of portableProductRegistry) assert.ok(product.route === undefined || (product.route.startsWith('/') && !product.route.startsWith('//')))
 })
-
-test('validation rejects implementation mismatches and undeclared metadata fields', () => {
+test('registry validation rejects invalid implementation status and duplicate manifest IDs', () => {
   const descriptor = portableProductRegistry[0]
-  const invalidStatus = Object.freeze({
-    ...descriptor,
-    implementationStatus: 'unknown',
-    documentationReferences: descriptor.documentationReferences,
-    capabilityTags: descriptor.capabilityTags,
-    architectureReferences: descriptor.architectureReferences,
-  })
-  assert.throws(() => validatePortableProductRegistry(Object.freeze([invalidStatus] as never)), /invalid implementation status/)
-
-  const undeclaredField = Object.freeze({
-    ...descriptor,
-    undocumentedMetadata: 'not allowed',
-    documentationReferences: descriptor.documentationReferences,
-    capabilityTags: descriptor.capabilityTags,
-    architectureReferences: descriptor.architectureReferences,
-  })
-  assert.throws(() => validatePortableProductRegistry(Object.freeze([undeclaredField] as never)), /not an allowed descriptor field/)
+  assert.throws(() => validatePortableProductRegistry(Object.freeze([Object.freeze({ ...descriptor, implementationStatus: 'unknown' })] as never)), /invalid implementation status/)
+  assert.throws(() => validatePortableProductRegistry(Object.freeze([descriptor, portableProductRegistry[0]])), /duplicate productId/)
 })

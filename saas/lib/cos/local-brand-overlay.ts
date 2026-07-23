@@ -4,20 +4,12 @@ import path from 'node:path'
 import os from 'node:os'
 import { pipeline } from 'node:stream/promises'
 import { spawn } from 'node:child_process'
-import { createClient } from '@supabase/supabase-js'
-import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from './video-storage'
+import { logCosVideoStorageFailure } from './video-storage'
+import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from './brand-schema'
 import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
 
-const RENDER_BUCKET = cosVideoRenderBucket()
 const MAX_ATTEMPTS = 5
-
-function adminDb() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase service credentials are not configured')
-  return createClient(url, key, { auth: { persistSession: false } })
-}
 
 function repoRoot() { return process.cwd().endsWith('/saas') ? process.cwd() : path.join(process.cwd(), 'saas') }
 
@@ -64,7 +56,7 @@ async function burnOnce(input: string, banner: string, output: string, aspect: '
   ])
 }
 
-export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; sourceUrl: string; aspect: '16:9' | '9:16' }) {
+export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; sourceUrl: string; aspect: '16:9' | '9:16' }, store: ObjectStorePort = createSupabaseObjectStore()) {
   const banner = await assertBannerAsset()
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'sb-brand-'))
   const input = path.join(tmp, 'source.mp4')
@@ -75,33 +67,33 @@ export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; 
     try { await burnOnce(input, banner, output, opts.aspect); last = null; break } catch (e) { last = e; console.error('local FFmpeg brand overlay attempt failed', { attempt: i, error: e instanceof Error ? e.message : String(e) }) }
   }
   if (last) throw last
-  const sb = adminDb()
-  const storage = await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: RENDER_BUCKET })
+  const storage = await store.ensureContainer({ createIfMissing: true })
   const bytes = await readFile(output)
   const objectPath = `cos-brand/${opts.campaign.id}/${opts.lang}-${Date.now()}.mp4`
-  const up = await sb.storage.from(RENDER_BUCKET).upload(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
-  if (up.error) {
-    logCosVideoStorageFailure({ stage: 'branded-final-upload', campaignId: opts.campaign.id, requestId: opts.campaign.metadata?.video?.requestId, bucket: RENDER_BUCKET, objectPath, bucketExists: storage.bucketExists, error: up.error })
-    throw new Error(`Supabase Storage upload failed for bucket "${RENDER_BUCKET}" object "${objectPath}": ${up.error.message}`)
+  const up = await store.put(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
+  if (!up.ok) {
+    logCosVideoStorageFailure({ stage: 'branded-final-upload', campaignId: opts.campaign.id, requestId: opts.campaign.metadata?.video?.requestId, bucket: store.bucket, objectPath, bucketExists: storage.bucketExists, error: up.error })
+    throw new Error(`Object storage upload failed for "${objectPath}": ${up.error}`)
   }
-  const signed = await sb.storage.from(RENDER_BUCKET).createSignedUrl(objectPath, 60 * 60 * 24 * 7)
-  if (signed.error || !signed.data?.signedUrl) {
-    logCosVideoStorageFailure({ stage: 'branded-final-sign', campaignId: opts.campaign.id, requestId: opts.campaign.metadata?.video?.requestId, bucket: RENDER_BUCKET, objectPath, bucketExists: storage.bucketExists, error: signed.error || 'missing signed URL' })
-    throw new Error(signed.error?.message || `Could not sign branded video in Supabase Storage bucket "${RENDER_BUCKET}"`)
+  const signed = await store.signedUrl(objectPath, 60 * 60 * 24 * 7)
+  if (!signed.url) {
+    logCosVideoStorageFailure({ stage: 'branded-final-sign', campaignId: opts.campaign.id, requestId: opts.campaign.metadata?.video?.requestId, bucket: store.bucket, objectPath, bucketExists: storage.bucketExists, error: signed.error || 'missing signed URL' })
+    throw new Error(signed.error || `Could not sign branded video object "${objectPath}"`)
   }
+  const brandedUrl = signed.url
   const video = opts.campaign.metadata?.video || {}
   const primary = Array.isArray(opts.campaign.languages) && opts.campaign.languages.length ? opts.campaign.languages[0] : opts.lang
   const unbrandedVoiced = { ...(video.unbrandedVoiced || {}) }; delete unbrandedVoiced[opts.lang]
   const brandedLangs = { ...(video.brandedLangs || {}), [opts.lang]: true }
-  const voiced = { ...(video.voiced || {}), [opts.lang]: signed.data.signedUrl }
-  const finalUrl = opts.lang === primary ? signed.data.signedUrl : (video.finalUrl || video.previewUrl || video.voicedUrl || signed.data.signedUrl)
+  const voiced = { ...(video.voiced || {}), [opts.lang]: brandedUrl }
+  const finalUrl = opts.lang === primary ? brandedUrl : (video.finalUrl || video.previewUrl || video.voicedUrl || brandedUrl)
   const patch = {
     ...video,
     status: 'ready',
     voiced,
     unbrandedVoiced,
     brandedLangs,
-    voicedUrl: opts.lang === primary ? signed.data.signedUrl : (video.voicedUrl || signed.data.signedUrl),
+    voicedUrl: opts.lang === primary ? brandedUrl : (video.voicedUrl || brandedUrl),
     finalUrl,
     previewUrl: finalUrl,
     previewKind: 'branded final',
@@ -115,9 +107,10 @@ export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; 
     renderError: null,
     brandDebug: { mode: 'local-ffmpeg-emergency', bannerAssetPath: banner, objectPath },
   }
-  // Queue DATA through the injected store; `sb` remains only for object storage (bucket upload/signed URL).
-  await createSupabaseCampaignQueueStore(sb).update(opts.campaign.id, { metadata: { ...(opts.campaign.metadata || {}), video: patch } })
-  return { ok: true, url: signed.data.signedUrl, objectPath, bannerAssetPath: banner }
+  // Queue DATA through the injected store; object bytes go through the object-store port above.
+  const saved = await createSupabaseCampaignQueueStore().update(opts.campaign.id, { metadata: { ...(opts.campaign.metadata || {}), video: patch } })
+  if (!saved.ok) throw new Error(saved.error || 'Failed to record branded video on the campaign')
+  return { ok: true, url: brandedUrl, objectPath, bannerAssetPath: banner }
 }
 
 export function firstBrandJob(campaign: any) {

@@ -1,7 +1,7 @@
 import { logCosVideoStorageFailure } from './video-storage'
 import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore'
+import { createPlatformImagePort, type CosImagePort } from './aiPort'
 
-const ENV_OPENAI = ['OPENAI', 'API', 'KEY'].join('_')
 
 export type CosCreativeImageResult =
   | { ok: true; imageUrl: string; objectPath: string; bucket: string; model: string }
@@ -40,31 +40,12 @@ export async function generateCosCreativeImage(opts: {
   prompt: string
   campaignKey: string
   title?: string
-}, store: ObjectStorePort = createSupabaseObjectStore()): Promise<CosCreativeImageResult> {
+}, store: ObjectStorePort = createSupabaseObjectStore(), image: CosImagePort = createPlatformImagePort()): Promise<CosCreativeImageResult> {
   try {
-    const providerKey = process.env[ENV_OPENAI]
-    if (!providerKey) return { ok: false, error: 'Creative image provider is not configured.' }
-
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${providerKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: opts.prompt,
-        size: '1024x1024',
-        n: 1,
-      }),
-    })
-
-    const data = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
-    if (!response.ok) return { ok: false, error: data.error?.message || 'Creative image generation failed.' }
-
-    const first = data.data?.[0]
-    const b64 = first?.b64_json
-    if (!b64 && first?.url) return { ok: true, imageUrl: first.url, objectPath: first.url, bucket: 'external', model: 'gpt-image-1' }
+    const img = await image.generate({ prompt: opts.prompt, size: '1024x1024' })
+    if (!img.ok) return { ok: false, error: img.error }
+    const b64 = img.b64
+    if (!b64 && img.url) return { ok: true, imageUrl: img.url, objectPath: img.url, bucket: 'external', model: 'gpt-image-1' }
     if (!b64) return { ok: false, error: 'Creative image provider returned no image data.' }
 
     const storage = await store.ensureContainer({ createIfMissing: true })

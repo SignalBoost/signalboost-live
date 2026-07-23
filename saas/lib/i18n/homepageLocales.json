@@ -52,8 +52,8 @@
         "desc": "Marketing and sales work in one tool."
       },
       "chiefOfStaff": {
-        "name": "AI Assistant",
-        "desc": "Plans and carries out approved work."
+        "name": "Portable AI Chief of Staff",
+        "desc": "Plans and carries out only approved work through buyer-supplied ports."
       },
       "browser": {
         "name": "Browser Tool",
@@ -66,6 +66,14 @@
       "selfHealing": {
         "name": "Self-Healing Supervisor",
         "desc": "Detects its own failures, diagnoses them, and repairs within limits you approve."
+      },
+      "browserAgents": {
+        "name": "Browser Agent Ecosystem",
+        "desc": "Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks."
+      },
+      "agentOperations": {
+        "name": "Agent Operations Platform",
+        "desc": "Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."
       }
     }
   },
@@ -122,8 +130,8 @@
         "desc": "Marketing y ventas en una sola herramienta."
       },
       "chiefOfStaff": {
-        "name": "Asistente de IA",
-        "desc": "Planifica y hace el trabajo aprobado."
+        "name": "Jefe de Gabinete de IA Portátil",
+        "desc": "Planifica y realiza solo el trabajo aprobado mediante puertos proporcionados por el comprador."
       },
       "browser": {
         "name": "Herramienta de Navegador",
@@ -136,6 +144,14 @@
       "selfHealing": {
         "name": "Supervisor Autorreparable",
         "desc": "Detecta sus propios fallos, los diagnostica y repara dentro de los límites que apruebes."
+      },
+      "browserAgents": {
+        "name": "Ecosistema de Agentes de Navegador",
+        "desc": "Puertos listos para usar para pilas de agentes de navegador administradas, autoalojadas y futuras."
+      },
+      "agentOperations": {
+        "name": "Plataforma de Operaciones de Agentes",
+        "desc": "Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."
       }
     }
   },
@@ -192,8 +208,8 @@
         "desc": "Marketing e vendas em uma só ferramenta."
       },
       "chiefOfStaff": {
-        "name": "Assistente de IA",
-        "desc": "Planeja e faz o trabalho aprovado."
+        "name": "Chefe de Gabinete de IA Portátil",
+        "desc": "Planeja e executa apenas o trabalho aprovado por meio de portas fornecidas pelo comprador."
       },
       "browser": {
         "name": "Ferramenta de Navegador",
@@ -206,6 +222,14 @@
       "selfHealing": {
         "name": "Supervisor Auto-Reparável",
         "desc": "Detecta as próprias falhas, diagnostica e repara dentro dos limites que você aprovar."
+      },
+      "browserAgents": {
+        "name": "Ecossistema de Agentes de Navegador",
+        "desc": "Portas prontas para uso para pilhas de agentes de navegador gerenciadas, auto-hospedadas e futuras."
+      },
+      "agentOperations": {
+        "name": "Plataforma de Operações de Agentes",
+        "desc": "Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."
       }
     }
   },
@@ -262,8 +286,8 @@
         "desc": "Marketing i sprzedaż w jednym narzędziu."
       },
       "chiefOfStaff": {
-        "name": "Asystent AI",
-        "desc": "Planuje i wykonuje zatwierdzoną pracę."
+        "name": "Przenośny Szef Sztabu AI",
+        "desc": "Planuje i wykonuje wyłącznie zatwierdzone zadania przez porty dostarczone przez nabywcę."
       },
       "browser": {
         "name": "Narzędzie Przeglądarki",
@@ -276,6 +300,14 @@
       "selfHealing": {
         "name": "Samonaprawiający się nadzorca",
         "desc": "Wykrywa własne awarie, diagnozuje je i naprawia w granicach, które zatwierdzisz."
+      },
+      "browserAgents": {
+        "name": "Ekosystem Agentów Przeglądarkowych",
+        "desc": "Gotowe do użycia porty dla zarządzanych, samodzielnie hostowanych i przyszłych stosów agentów przeglądarkowych."
+      },
+      "agentOperations": {
+        "name": "Platforma Operacji Agentów",
+        "desc": "Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."
       }
     }
   },
@@ -332,8 +364,8 @@
         "desc": "Маркетинг и продажи в одном инструменте."
       },
       "chiefOfStaff": {
-        "name": "ИИ Помощник",
-        "desc": "Планирует и выполняет одобренную работу."
+        "name": "Портативный ИИ-руководитель аппарата",
+        "desc": "Планирует и выполняет только одобренную работу через порты, предоставленные покупателем."
       },
       "browser": {
         "name": "Инструмент Браузера",
@@ -346,6 +378,14 @@
       "selfHealing": {
         "name": "Самовосстанавливающийся супервизор",
         "desc": "Обнаруживает сбои, ставит диагноз и устраняет их в пределах, которые вы одобрили."
+      },
+      "browserAgents": {
+        "name": "Экосистема браузерных агентов",
+        "desc": "Готовые к подключению порты для управляемых, самостоятельно размещаемых и будущих стеков браузерных агентов."
+      },
+      "agentOperations": {
+        "name": "Платформа операций агентов",
+        "desc": "Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."
       }
     }
   }

@@ -18,6 +18,20 @@ function assertOwned(providerId: string, items: readonly { providerId: string }[
 
 export class BrowserProviderRegistry {
   private readonly byId = new Map<string, BrowserProviderAdapter>()
+  private readonly allowProduction: boolean
+
+  // Production browser execution is OFF by default. With allowProduction=false the
+  // registry enforces the original invariant exactly — no provider may claim
+  // production and no origin may allow production, so every existing sandbox/read-
+  // only guarantee and test is preserved byte-for-byte. Passing allowProduction=true
+  // is the deliberate, owner-level act of opening the production door (it should be
+  // driven by an explicit env value such as BROWSER_PRODUCTION_ENABLED at the call
+  // site, never hard-coded true). Even with it on, a production provider must still
+  // pass every other structural check below, plus the production launch profile and
+  // the two-phase signed-approval model at execution time.
+  constructor(options: { allowProduction?: boolean } = {}) {
+    this.allowProduction = options.allowProduction === true
+  }
 
   register(raw: BrowserProviderAdapter) {
     if (this.byId.has(raw.providerId)) throw new BrowserProviderError('duplicate_provider')
@@ -38,7 +52,7 @@ export class BrowserProviderRegistry {
       capabilities.length === 0
       || !provider.supportsExecutionMode('read_only')
       || !provider.supportsReadOnlyInspection()
-      || provider.supportsProduction()
+      || (!this.allowProduction && provider.supportsProduction())
       || provider.supportsAutoFailover() !== capabilities.some(capability => capability.supportsAutoFailover)
       || provider.supportsBrowserOnDemand() !== capabilities.some(capability => capability.supportsBrowserOnDemand)
     ) {
@@ -55,8 +69,8 @@ export class BrowserProviderRegistry {
     for (const origin of originRegistry.list()) {
       if (
         !origin.readOnlyAllowed
-        || origin.productionAllowed
-        || origin.environments.includes('production')
+        || (!this.allowProduction && origin.productionAllowed)
+        || (!this.allowProduction && origin.environments.includes('production'))
         || hasDuplicates(origin.environments)
       ) {
         throw new BrowserProviderError('invalid_provider')

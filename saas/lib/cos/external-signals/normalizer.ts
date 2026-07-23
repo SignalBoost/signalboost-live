@@ -1,4 +1,6 @@
 import type { ExternalSignalIngestionResult, ExternalSignalInput, NormalizedExternalSignal } from './types'
+import { isSoldCopy } from '@/lib/portable/companyIdentity'
+import type { CompanyFacts } from '@/portable-kernel'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -82,14 +84,15 @@ export function ingestExternalSignals(inputs: ExternalSignalInput[] = []): Exter
   }
 }
 
-export function starterExternalSignals(): ExternalSignalInput[] {
+export function starterExternalSignals(facts?: CompanyFacts | null): ExternalSignalInput[] {
+  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost SaaS console')
   return [
     {
       source_type: 'manual_observation',
       source_name: 'starter_short_video_assumption',
       audience: 'small business owners and operators',
       region: 'global',
-      product: 'SignalBoost SaaS console',
+      product,
       observed_format: 'niche_short_9x16',
       observed_hero: 'faceless_dashboard_tour',
       confidence: 54,

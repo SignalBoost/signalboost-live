@@ -1,0 +1,9 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { InMemoryMissionStore, type Mission } from '../lib/supervisor/missions/index.ts'
+const at='2026-07-23T00:00:00.000Z'
+const mission=(id='m'):Mission=>({missionId:id,missionType:'ci_failure_manual_review',revision:1,status:'NEW',environment:'sandbox',title:'manual',objective:'manual',correlationId:'c',sourceEventIds:['e'],riskLevel:'low',createdAt:at,updatedAt:at,metadata:{},schemaVersion:'mission-v1'})
+const event=(id='e')=>({eventId:id,occurredAt:at,correlationId:'c',causationId:null,idempotencyKey:`key-${id}`,revision:1,schemaVersion:'mission-envelope-v1',payload:mission()})
+test('atomic mission and outbox write rejects conflicts without partial mission',async()=>{const s=new InMemoryMissionStore();await s.createWithOutbox(mission(), 'ai.missions.v1',event());await assert.rejects(s.createWithOutbox(mission('m2'),'ai.missions.v1',event()));assert.equal(await s.get('m2'),null)})
+test('outbox recovery, bounded failure, and inbox idempotency are durable contracts',async()=>{const s=new InMemoryMissionStore();await s.createWithOutbox(mission(),'ai.missions.v1',event());assert.equal((await s.listPendingOutbox(10)).length,1);await s.markOutboxFailure('e','offline',false);await s.markOutboxFailure('e','offline',true);assert.equal((await s.diagnostics()).deadLetterCount,1);assert.equal(await s.claimInbox('key-e',at),true);assert.equal(await s.claimInbox('key-e',at),false);assert.equal((await s.diagnostics()).duplicateCount,1)})
+test('optimistic concurrency rejects stale revisions and prevents duplicate updates',async()=>{const s=new InMemoryMissionStore();await s.create(mission());await s.update('m',1,'IN_PROGRESS',at);await assert.rejects(s.update('m',1,'PAUSED',at));assert.equal((await s.get('m'))?.revision,2)})

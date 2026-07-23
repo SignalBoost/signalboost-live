@@ -1,4 +1,5 @@
 import { DefaultSupervisorPolicyEngine } from '../policy-engine.ts'
+import type { RepairPlan } from '../repair-plan-schema.ts'
 import type { MissionEventBus, MissionEventEnvelope } from './event-bus.ts'
 import {
   decisionEnvelopeSchema,
@@ -10,7 +11,10 @@ import {
   type ExecutionFeedback,
   type GuardrailOutcome,
   type Mission,
+  type PolicyDecisionBinding,
+  policyDecisionBindingSchema,
 } from './models.ts'
+import { fingerprintDecision, fingerprintPolicyBinding, fingerprintRepairPlan } from './fingerprints.ts'
 import type { MissionStore } from './store.ts'
 import { missionTopics } from './topics.ts'
 
@@ -65,22 +69,48 @@ export class RuleBasedMissionReasoner {
       const mission = missionSchema.parse(event.payload)
       if (mission.missionType !== 'ci_failure_manual_review') return
       const now = this.deps.clock()
-      const decision = decisionEnvelopeSchema.parse({
+      const repairPlan: RepairPlan = {
+        planId: this.deps.id('repair-plan'),
+        incidentId: mission.missionId,
+        diagnosis: 'Route this CI failure to human review only.',
+        confidenceScore: 100,
+        requiresBrowser: false,
+        riskLevel: 'low',
+        targetProvider: 'none',
+        targetEnvironment: mission.environment,
+        steps: [{
+          stepId: 'manual-route',
+          action: 'stop',
+          description: 'Stop automation and route the CI failure to human review.',
+          protectedAction: false,
+          parameters: {},
+        }],
+        verificationSteps: [{
+          stepId: 'verify-route',
+          action: 'verify',
+          description: 'Record the manual-review route.',
+          protectedAction: false,
+          parameters: {},
+        }],
+        generatedAt: now,
+        schemaVersion: 'mission-repair-plan-v1',
+      }
+      const base = {
         decisionId: this.deps.id('decision'),
         missionId: mission.missionId,
         missionRevision: mission.revision,
-        actionType: 'route_to_manual_review',
-        riskLevel: 'low',
-        targetProvider: null,
+        actionType: 'route_to_manual_review' as const,
+        repairPlan,
+        riskLevel: 'low' as const,
         targetEnvironment: mission.environment,
-        proposedAction: 'Proposed manual-review action: route this CI failure to a human reviewer. No repair or external action will run.',
-        shellCommand: null,
-        url: null,
-        credentials: null,
-        externalSideEffect: false,
+        confidence: 100,
+        externalSideEffect: false as const,
         createdAt: now,
+        expiresAt: new Date(Date.parse(now) + 15 * 60_000).toISOString(),
         schemaVersion: 'mission-decision-v1',
-      })
+      }
+      const planFingerprint = fingerprintRepairPlan({ missionId: base.missionId, missionRevision: base.missionRevision, decisionId: base.decisionId, environment: base.targetEnvironment, actionType: base.actionType, plan: repairPlan })
+      const decision = decisionEnvelopeSchema.parse({ ...base, planFingerprint, decisionFingerprint: fingerprintDecision({ ...base, planFingerprint }) })
       await this.deps.eventBus.publish(
         missionTopics.rawDecisions,
         envelope(decision, this.deps.id('decision-event'), now, mission.correlationId),
@@ -97,12 +127,14 @@ export class MissionSafetyGateway {
       const now = this.deps.clock()
       let outcome: GuardrailOutcome
       let decision: DecisionEnvelope | undefined
+      let approvedStepIds: string[] = []
 
       try {
         decision = decisionEnvelopeSchema.parse(event.payload)
         const mission = await this.deps.missionStore.get(decision.missionId)
         if (!mission || mission.revision !== decision.missionRevision) throw new Error('stale_or_missing_mission')
-        if (decision.targetEnvironment === 'production') throw new Error('production_mutation_rejected')
+        if (Date.parse(decision.expiresAt) <= Date.parse(now)) throw new Error('decision_expired')
+        if (['COMPLETED', 'CANCELED', 'FAILED', 'BLOCKED'].includes(mission.status)) throw new Error('mission_not_eligible')
 
         const policy = new DefaultSupervisorPolicyEngine().evaluate({
           incident: {
@@ -116,35 +148,11 @@ export class MissionSafetyGateway {
             evidence: [{ evidenceId: 'mission', type: 'mission', capturedAt: now, summary: 'manual routing only' }],
             metadata: {},
           },
-          plan: {
-            planId: decision.decisionId,
-            incidentId: mission.missionId,
-            diagnosis: decision.proposedAction,
-            confidenceScore: 100,
-            requiresBrowser: false,
-            riskLevel: 'low',
-            targetProvider: 'none',
-            targetEnvironment: mission.environment,
-            steps: [{
-              stepId: 'manual-route',
-              action: 'stop',
-              description: decision.proposedAction,
-              protectedAction: false,
-              parameters: {},
-            }],
-            verificationSteps: [{
-              stepId: 'verify-route',
-              action: 'verify',
-              description: 'Record manual routing.',
-              protectedAction: false,
-              parameters: {},
-            }],
-            generatedAt: now,
-            schemaVersion: 'mission-policy-plan-v1',
-          },
+          plan: decision.repairPlan,
           mode: 'passive',
           context: {},
         })
+        approvedStepIds = policy.approvedStepIds
 
         outcome = {
           outcomeId: this.deps.id('guardrail'),
@@ -179,9 +187,23 @@ export class MissionSafetyGateway {
       )
 
       if (decision && outcome.status === 'approved') {
+        const bindingBase = {
+          decisionId: decision.decisionId,
+          missionId: decision.missionId,
+          missionRevision: decision.missionRevision,
+          decisionFingerprint: decision.decisionFingerprint,
+          planFingerprint: decision.planFingerprint,
+          policyVersion: outcome.policyVersion,
+          policyOutcome: outcome.status,
+          approvedStepIds,
+          evaluatedAt: now,
+          expiresAt: decision.expiresAt,
+          schemaVersion: 'mission-policy-binding-v1',
+        }
+        const binding = policyDecisionBindingSchema.parse({ ...bindingBase, bindingFingerprint: fingerprintPolicyBinding(bindingBase) })
         await this.deps.eventBus.publish(
           missionTopics.approvedDecisions,
-          envelope({ decision, outcome }, this.deps.id('approved-decision-event'), now, event.correlationId),
+          envelope({ decision, binding }, this.deps.id('approved-decision-event'), now, event.correlationId),
         )
       }
     })
@@ -192,25 +214,34 @@ export class NonMutatingMissionExecutor {
   constructor(private readonly deps: MissionLifecycleDeps) {}
 
   async start() {
-    return this.deps.eventBus.subscribe<{ decision: DecisionEnvelope; outcome: GuardrailOutcome }>(
+    return this.deps.eventBus.subscribe<{ decision: DecisionEnvelope; binding: PolicyDecisionBinding }>(
       missionTopics.approvedDecisions,
       async (event) => {
-        const { decision, outcome } = event.payload
-        if (outcome.status !== 'approved') return
         const now = this.deps.clock()
-        const feedback: ExecutionFeedback = executionFeedbackSchema.parse({
-          feedbackId: this.deps.id('feedback'),
-          missionId: decision.missionId,
-          decisionId: decision.decisionId,
-          missionRevision: decision.missionRevision,
-          status: 'manual_review_routed',
-          recordedAt: now,
-          schemaVersion: 'mission-execution-v1',
-        })
-        await this.deps.eventBus.publish(
-          missionTopics.executions,
-          envelope(feedback, this.deps.id('execution-event'), now, event.correlationId),
-        )
+        try {
+          const decision = decisionEnvelopeSchema.parse(event.payload.decision)
+          const binding = policyDecisionBindingSchema.parse(event.payload.binding)
+          if (binding.policyOutcome !== 'approved' || !binding.approvedStepIds.length || binding.decisionId !== decision.decisionId || binding.missionId !== decision.missionId || binding.missionRevision !== decision.missionRevision || binding.decisionFingerprint !== decision.decisionFingerprint || binding.planFingerprint !== decision.planFingerprint || Date.parse(decision.expiresAt) <= Date.parse(now)) return
+          const mission = await this.deps.missionStore.get(decision.missionId)
+          if (!mission || mission.revision !== decision.missionRevision || ['COMPLETED', 'CANCELED', 'FAILED', 'BLOCKED'].includes(mission.status) || decision.externalSideEffect !== false) return
+          const ids = new Set(decision.repairPlan.steps.map(step => step.stepId))
+          if (new Set(binding.approvedStepIds).size !== binding.approvedStepIds.length || binding.approvedStepIds.some(id => !ids.has(id))) return
+          const feedback: ExecutionFeedback = executionFeedbackSchema.parse({
+            feedbackId: this.deps.id('feedback'),
+            missionId: decision.missionId,
+            decisionId: decision.decisionId,
+            missionRevision: decision.missionRevision,
+            status: 'manual_review_routed',
+            recordedAt: now,
+            schemaVersion: 'mission-execution-v1',
+          })
+          await this.deps.eventBus.publish(
+            missionTopics.executions,
+            envelope(feedback, this.deps.id('execution-event'), now, event.correlationId),
+          )
+        } catch {
+          return
+        }
       },
     )
   }

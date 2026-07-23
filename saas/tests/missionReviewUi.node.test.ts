@@ -52,7 +52,17 @@ test('detail rendering includes fingerprints and bounded mission summary only', 
   assert.match(source, /<code>\{value\}<\/code>/)
   assert.match(source, /navigator\.clipboard/)
   assert.match(source, /detail\.mission/)
+  assert.match(source, /const missionSummary/)
+  assert.doesNotMatch(source, /Object\.entries\(detail\.mission\)/)
   assert.match(source, /labels\.feedbackUnavailable/)
+})
+
+test('review UI parses and renders only allowlisted API response fields', () => {
+  const source = client()
+  for (const parser of ['parseReview', 'parseListResponse', 'parseDetail', 'parseMission']) assert.match(source, new RegExp(`function ${parser}`))
+  assert.match(source, /const reviewFields = \['reviewId'/)
+  assert.match(source, /const missionFields = \['missionId'/)
+  assert.match(source, /const fingerprintFields = \['decisionFingerprint'/)
 })
 
 test('review UI makes GET-only Phase 6 requests and exposes no mutation controls', () => {

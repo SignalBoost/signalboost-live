@@ -10,6 +10,8 @@ The list displays the allowlisted review ID, mission ID and revision, decision I
 
 Selecting a table row fetches a read-only detail panel. It repeats the list fields and adds safe-copy, monospace decision, plan, and binding fingerprints. It renders only the bounded mission summary returned by Phase 6. The current API has no durable execution-feedback summary, so the UI explicitly states that it is unavailable rather than inventing one.
 
+The client parses both Phase 6 responses into explicit allowlists before rendering. It ignores any unexpected response properties and never renders a raw database row or arbitrary mission metadata.
+
 ## Read-only boundary and limitations
 
 The page visibly states: “Manual review only,” “No repair has been executed,” “Production execution disabled,” and “Provider mutation disabled.” It has no approval, retry, replay, repair, provider, CI, GitHub, or other mutation controls. The UI does not assert that an underlying CI failure has been fixed. Phase 6 has only one supported review status (`routed`) and does not provide execution feedback; no mutations, migrations, RPCs, workflows, workers, or production execution were added.

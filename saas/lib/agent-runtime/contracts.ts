@@ -1,6 +1,6 @@
 /** Provider-neutral, non-executing contracts for future agent sandboxes. */
 export type RuntimeLanguage = 'python' | 'typescript' | 'javascript' | 'shell'
-export type ExecutionStage = 'validation' | 'static_analysis' | 'execution' | 'artifact_collection' | 'cleanup'
+export type ExecutionStage = 'validation' | 'static_analysis' | 'tests' | 'execution' | 'artifact_collection' | 'cleanup'
 export type SandboxCapability = 'isolated_filesystem' | 'outbound_network' | 'environment_inheritance' | 'repository_write' | 'privileged_execution'
 
 export interface SandboxSessionInput {
@@ -21,6 +21,7 @@ export interface SandboxExecutionRequest {
   language: RuntimeLanguage
   stage: ExecutionStage
   source: string
+  tests?: string
   workingDirectory: string
   timeoutMs: number
 }

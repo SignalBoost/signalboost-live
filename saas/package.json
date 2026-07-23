@@ -38,7 +38,8 @@
     "test:audit-global-approval": "node --test tests/auditGlobalApproval.node.test.ts",
     "test:cyber-progress": "node --test tests/cybersecurityLiveProgress.node.test.ts",
     "test:agent-runtime-foundation": "node --test tests/agentRuntimePolicy.node.test.ts tests/agentOutputLimits.node.test.ts",
-    "test:repository-intelligence": "node --test tests/repositoryIntelligence.node.test.ts tests/repositoryIntelligenceSecurity.node.test.ts"
+    "test:repository-intelligence": "node --test tests/repositoryIntelligence.node.test.ts tests/repositoryIntelligenceSecurity.node.test.ts",
+    "test:agent-repair-controller": "node --test tests/agentRepairController.node.test.ts tests/agentRepairPrompts.node.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",

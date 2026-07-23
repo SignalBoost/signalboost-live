@@ -9,13 +9,17 @@ export type PortableProductCategory =
   | 'governance'
   | 'integrations'
 
-export type PortableProductImplementationStatus =
-  | 'implemented'
-  | 'preview'
+/** Describes implementation readiness without exposing implementation details to buyers. */
+export type PortableProductImplementationClassification =
+  | 'implemented_product'
+  | 'preview_product'
   | 'internal_component'
-  | 'descriptor_only'
-  | 'deprecated'
+  | 'descriptor_only_compatibility_target'
 
+/**
+ * Serializable catalog data for a portable product. This boundary intentionally contains
+ * metadata only: it must never gain executable behavior, credentials, runtime clients, or UI.
+ */
 export interface PortableProductDescriptor {
   productId: string
   localizationKey: string
@@ -23,7 +27,6 @@ export interface PortableProductDescriptor {
   fallbackDescription: string
   glyph: string
   status: PortableProductStatus
-  implementationStatus: PortableProductImplementationStatus
   category: PortableProductCategory
   sortOrder: number
   publicVisible: boolean
@@ -32,4 +35,5 @@ export interface PortableProductDescriptor {
   documentationReferences: readonly string[]
   capabilityTags: readonly string[]
   architectureReferences: readonly string[]
+  implementationClassification: PortableProductImplementationClassification
 }

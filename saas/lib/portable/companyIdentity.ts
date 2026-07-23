@@ -156,3 +156,32 @@ export function hostBrandName(): string {
 export function hostBrandUrl(): string {
   return String(process.env.PORTABLE_BRAND_URL || '').trim() || 'www.' + 'saas.signalboostapp.com'
 }
+
+// ── SELLABLE BLANK-COPY BRAND ────────────────────────────────────────────────
+// For a copy of the COS SOLD to a buyer. A blank copy must NEVER speak as the
+// seller. PORTABLE_SOLD_COPY=true marks a deployment as a sold copy: when it is set
+// and the buyer has not yet configured their own PORTABLE_BRAND_NAME, the brand
+// falls back to a NEUTRAL PLACEHOLDER ('[YOUR COMPANY]'), not the seller's name.
+//
+// Resolution order for a sold copy:
+//   1. PORTABLE_BRAND_NAME (the buyer's own brand, once configured) — wins.
+//   2. '[YOUR COMPANY]' placeholder — a blank copy before configuration.
+// On the seller's own deployment (PORTABLE_SOLD_COPY unset), this defers to
+// hostBrandName() and the platform brand applies exactly as before. This means the
+// SAME code ships as the seller's COS and as a blank sellable copy, switched by one
+// deploy-time flag the buyer's copy carries — the seller's deployment is untouched.
+export function isSoldCopy(): boolean {
+  return String(process.env.PORTABLE_SOLD_COPY || '').trim().toLowerCase() === 'true'
+}
+
+export function portableBrandName(): string {
+  const configured = String(process.env.PORTABLE_BRAND_NAME || '').trim()
+  if (configured) return configured
+  return isSoldCopy() ? '[YOUR COMPANY]' : hostBrandName()
+}
+
+export function portableBrandUrl(): string {
+  const configured = String(process.env.PORTABLE_BRAND_URL || '').trim()
+  if (configured) return configured
+  return isSoldCopy() ? '[YOUR COMPANY WEBSITE]' : hostBrandUrl()
+}

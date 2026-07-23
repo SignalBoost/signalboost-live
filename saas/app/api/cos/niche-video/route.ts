@@ -8,6 +8,7 @@ import {
 } from '@/lib/cos/niche-video'
 import { buildCosHeroStrategy } from '@/lib/cos/creative-strategy'
 import type { NicheVideoStrategyInput } from '@/lib/cos/niche-video'
+import { resolveCompanyFacts, isSoldCopy } from '@/lib/portable/companyIdentity'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,8 +34,9 @@ export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
+  const facts = (isSoldCopy() || String(process.env.PORTABLE_BRAND_NAME || '').trim()) ? await resolveCompanyFacts() : null
   const playbookId = req.nextUrl.searchParams.get('playbook')
-  const rawInput = playbookId ? playbookToNicheVideoInput(playbookId) : defaultSignalBoostNicheVideoInput()
+  const rawInput = playbookId ? playbookToNicheVideoInput(playbookId) : defaultSignalBoostNicheVideoInput(facts)
 
   if (!rawInput) {
     return NextResponse.json({ ok: false, error: 'Unknown playbook.', playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS }, { status: 404 })
@@ -54,8 +56,9 @@ export async function POST(req: NextRequest) {
   let body: Partial<NicheVideoStrategyInput> & { playbook?: string }
   try { body = await req.json() } catch { return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 }) }
 
+  const facts = (isSoldCopy() || String(process.env.PORTABLE_BRAND_NAME || '').trim()) ? await resolveCompanyFacts() : null
   const playbookInput = body.playbook ? playbookToNicheVideoInput(body.playbook) : null
-  const defaults = playbookInput || defaultSignalBoostNicheVideoInput()
+  const defaults = playbookInput || defaultSignalBoostNicheVideoInput(facts)
   const input: NicheVideoStrategyInput = withFiveLanguages({
     ...defaults,
     ...body,

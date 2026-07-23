@@ -1,6 +1,6 @@
 import type { CosContentWorkerInput, CosContentWorkerOutput } from './types'
 import { generateContentDraft } from './generator'
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort, type CosAiPort } from '@/lib/cos/aiPort'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import { FACTUAL_DISCIPLINE } from '@/portable-kernel'
 
@@ -22,7 +22,7 @@ function extractJson(raw: string): any | null {
   try { return JSON.parse(raw.slice(start, end + 1)) } catch { return null }
 }
 
-export async function generateContentDraftAI(input: CosContentWorkerInput): Promise<CosContentWorkerOutput> {
+export async function generateContentDraftAI(input: CosContentWorkerInput, ai: CosAiPort = createPlatformAiPort()): Promise<CosContentWorkerOutput> {
   const langName = LANG_NAMES[input.language] || 'English'
 
   const prompt = [
@@ -59,7 +59,7 @@ export async function generateContentDraftAI(input: CosContentWorkerInput): Prom
 
 ${baseSystem}` : baseSystem
 
-  const raw = await callModel({
+  const raw = await ai.generate({
     prompt,
     systemPrompt,
     maxTokens: 1800,

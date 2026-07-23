@@ -1,0 +1,1 @@
+export interface PortableBrowserWebDataPort { metadata(origin:string):Promise<Record<string,string>>; extract(origin:string, schema:Readonly<Record<string,string>>):Promise<Record<string,string>>; search(origin:string, query:string):Promise<readonly string[]>; readableContent(origin:string, maximumCharacters:number):Promise<string> }

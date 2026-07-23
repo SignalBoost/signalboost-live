@@ -48,7 +48,8 @@
     "test:agent-workflow-coordinator": "node --test tests/agentWorkflowCoordinator.node.test.ts tests/agentWorkflowAudit.node.test.ts tests/agentWorkflowSecurity.node.test.ts",
     "test:agent-workflow-supabase": "node --test tests/agentWorkflowSupabaseCodec.node.test.ts tests/agentWorkflowSupabaseStore.node.test.ts tests/agentWorkflowSupabaseConcurrency.node.test.ts tests/agentWorkflowRecoveryLock.node.test.ts tests/agentWorkflowSupabaseSecurity.node.test.ts",
     "test:agent-provider-boundary": "node --test tests/agentProviderGuard.node.test.ts tests/agentProviderAudit.node.test.ts tests/agentProviderRegistry.node.test.ts tests/agentProviderConfig.node.test.ts tests/agentRemoteProvider.node.test.ts",
-    "test:mission-manual-review": "node --test tests/missionManualReview.node.test.ts"
+    "test:mission-manual-review": "node --test tests/missionManualReview.node.test.ts",
+    "test:portable-browser-runtime": "node --test tests/portableBrowserPorts.node.test.ts tests/portableBrowserCoordinator.node.test.ts tests/portableBrowserProviderBinding.node.test.ts tests/portableBrowserManifest.node.test.ts tests/portableBrowserAdapterCatalog.node.test.ts tests/portableBrowserCompatibility.node.test.ts tests/portableBrowserPortability.node.test.ts tests/portableBrowserSecurity.node.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",

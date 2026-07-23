@@ -7,6 +7,39 @@ type Review = { reviewId: string; missionId: string; missionRevision: number; de
 type Detail = Review & { decisionFingerprint: string; planFingerprint: string; bindingFingerprint: string; mission: null | { missionId: string; missionType: string; revision: number; status: string; environment: string; title: string; riskLevel: string; createdAt: string; updatedAt: string; schemaVersion: string } }
 type ListResponse = { items: Review[]; nextCursor?: string }
 
+const isString = (value: unknown): value is string => typeof value === 'string'
+const isNonNegativeInteger = (value: unknown): value is number => Number.isInteger(value) && value >= 0
+function parseReview(value: unknown): Review | null {
+  if (!value || typeof value !== 'object') return null
+  const review = value as Record<string, unknown>
+  if (!isString(review.reviewId) || !isString(review.missionId) || !isNonNegativeInteger(review.missionRevision) || !isString(review.decisionId) || !isString(review.status) || !isString(review.title) || !isString(review.summary) || !isString(review.createdAt) || !isString(review.routedAt) || !isString(review.schemaVersion)) return null
+  return { reviewId: review.reviewId, missionId: review.missionId, missionRevision: review.missionRevision, decisionId: review.decisionId, status: review.status, title: review.title, summary: review.summary, createdAt: review.createdAt, routedAt: review.routedAt, schemaVersion: review.schemaVersion }
+}
+function parseListResponse(value: unknown): ListResponse | null {
+  if (!value || typeof value !== 'object') return null
+
+  const response = value as Record<string, unknown>
+  const rawItems = response.items
+
+  if (!Array.isArray(rawItems)) return null
+
+  const items = rawItems.map(parseReview)
+
+  if (
+    items.some(item => item === null) ||
+    (response.nextCursor !== undefined && !isString(response.nextCursor))
+  ) {
+    return null
+  }
+
+  return {
+    items: items as Review[],
+    ...(isString(response.nextCursor)
+      ? { nextCursor: response.nextCursor }
+      : {}),
+  }
+}
+
 const sizes = [25, 50, 100]
 const formatTime = (value: string) => new Date(value).toLocaleString()
 const messageFor = (status: number, labels: Labels) => status === 401 || status === 403 ? labels.accessDenied : status === 404 ? labels.notFound : labels.error
@@ -34,9 +67,10 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
     try {
       const response = await fetch(`/api/internal/supervisor/missions/reviews?${params}`, { method: 'GET', cache: 'no-store' })
       if (!response.ok) throw new Error(messageFor(response.status, labels))
-      const payload = await response.json() as ListResponse
-      setItems(Array.isArray(payload.items) ? payload.items : [])
-      setNextCursor(typeof payload.nextCursor === 'string' ? payload.nextCursor : undefined)
+      const payload = parseListResponse(await response.json())
+      if (!payload) throw new Error(labels.error)
+      setItems(payload.items)
+      setNextCursor(payload.nextCursor)
     } catch (cause) { setItems([]); setNextCursor(undefined); setError(cause instanceof Error ? cause.message : labels.error) } finally { setLoading(false) }
   }
 

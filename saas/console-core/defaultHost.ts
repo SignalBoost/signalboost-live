@@ -7,6 +7,7 @@
 
 import type { AuthAdapter, LogAdapter } from './types'
 import type { EngineHost, RegisteredExecutor } from './actionEngine'
+import { setSecretsResolver, type SecretsResolver } from './secrets'
 
 // ---- Executor registry ----
 const REGISTRY = new Map<string, RegisteredExecutor>()
@@ -34,6 +35,12 @@ export const consoleLogAdapter: LogAdapter = {
 // ---- Host assembler ----
 // The host supplies an AuthAdapter (and optionally a LogAdapter). The engine
 // never imports a specific auth/policy system — that is the portability seam.
-export function createHost(auth: AuthAdapter, log: LogAdapter = consoleLogAdapter): EngineHost {
+export function createHost(
+  auth: AuthAdapter,
+  log: LogAdapter = consoleLogAdapter,
+  secrets?: SecretsResolver,
+): EngineHost {
+  // A buyer passes their vault-backed resolver here; unset = the default process.env resolver.
+  if (secrets) setSecretsResolver(secrets)
   return { auth, log, resolveExecutor }
 }

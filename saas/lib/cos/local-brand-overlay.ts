@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
 import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from './video-storage'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from './brand-schema'
+import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
 
 const RENDER_BUCKET = cosVideoRenderBucket()
 const MAX_ATTEMPTS = 5
@@ -114,8 +115,8 @@ export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; 
     renderError: null,
     brandDebug: { mode: 'local-ffmpeg-emergency', bannerAssetPath: banner, objectPath },
   }
-  const db = await sb.from('cos_campaign_queue').update({ metadata: { ...(opts.campaign.metadata || {}), video: patch } }).eq('id', opts.campaign.id)
-  if (db.error) throw new Error(db.error.message)
+  // Queue DATA through the injected store; `sb` remains only for object storage (bucket upload/signed URL).
+  await createSupabaseCampaignQueueStore(sb).update(opts.campaign.id, { metadata: { ...(opts.campaign.metadata || {}), video: patch } })
   return { ok: true, url: signed.data.signedUrl, objectPath, bannerAssetPath: banner }
 }
 

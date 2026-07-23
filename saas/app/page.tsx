@@ -28,15 +28,16 @@ const PUBLIC_TOOLS = [
 ] as const
 
 const PORTABLES = [
-  { key: 'campaign', glyph: '✦', tag: 'live', href: LINKS.agency },
-  { key: 'integrations', glyph: '⛓', tag: 'live', href: '' },
-  { key: 'render', glyph: '◍', tag: 'live', href: '' },
-  { key: 'console', glyph: '◈', tag: 'live', href: '' },
-  { key: 'marketingSales', glyph: '◎', tag: 'live', href: '' },
-  { key: 'press', glyph: '◉', tag: 'live', href: '' },
-  { key: 'chiefOfStaff', glyph: '❖', tag: 'preview', href: '' },
-  { key: 'browser', glyph: '◇', tag: 'preview', href: '' },
-  { key: 'selfHealing', glyph: '⟲', tag: 'preview', href: '' },
+  { key: 'campaign', glyph: '✦', tag: 'live', href: LINKS.agency, fallbackName: 'Campaign Studio', fallbackDesc: 'One short request becomes a finished campaign.' },
+  { key: 'integrations', glyph: '⛓', tag: 'live', href: '', fallbackName: 'Integrations Hub', fallbackDesc: 'Secure connections for websites, payments, calendars, AI systems, and APIs.' },
+  { key: 'render', glyph: '◍', tag: 'live', href: '', fallbackName: 'Video Maker', fallbackDesc: 'Voice and branded video with governed prepaid use.' },
+  { key: 'console', glyph: '◈', tag: 'live', href: '', fallbackName: 'Control Center', fallbackDesc: 'Keys, webhooks, logs, releases, and activity controls.' },
+  { key: 'marketingSales', glyph: '◎', tag: 'live', href: '', fallbackName: 'Marketing + Sales', fallbackDesc: 'Marketing and sales workflows in one portable engine.' },
+  { key: 'press', glyph: '◉', tag: 'live', href: '', fallbackName: 'Press & Media', fallbackDesc: 'Governed outreach to verified editors and paid distribution services.' },
+  { key: 'chiefOfStaff', glyph: '❖', tag: 'preview', href: '', fallbackName: 'Portable AI Chief of Staff', fallbackDesc: 'Plans and carries out only approved work through buyer-supplied ports.' },
+  { key: 'browserAgents', glyph: '◇', tag: 'preview', href: '', fallbackName: 'Browser Agent Ecosystem', fallbackDesc: 'Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks.' },
+  { key: 'agentRuntime', glyph: '⌁', tag: 'preview', href: '', fallbackName: 'Durable Agent Runtime', fallbackDesc: 'Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters.' },
+  { key: 'selfHealing', glyph: '⟲', tag: 'preview', href: '', fallbackName: 'Self-Healing Supervisor', fallbackDesc: 'Detects failures, diagnoses them, and proposes bounded repairs for approval.' },
 ] as const
 
 const STATS = [
@@ -140,10 +141,10 @@ export default function Home() {
               <Link href={LINKS.agency} className="studio-btn">{copy('campaignStudio', 'Campaign Studio')}</Link>
             </div>
           </div>
-          <div className="grid grid-7">
+          <div className="grid grid-portables">
             {PORTABLES.map((p) => {
-              const name = copy(`portables.${p.key}.name`, p.key)
-              const desc = copy(`portables.${p.key}.desc`, '')
+              const name = copy(`portables.${p.key}.name`, p.fallbackName)
+              const desc = copy(`portables.${p.key}.desc`, p.fallbackDesc)
               const inner = (
                 <>
                   <div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={p.tag === 'live' ? 'tag-live' : 'tag-preview'}>{p.tag === 'live' ? copy('live', 'Live') : copy('preview', 'Preview')}</span></div>
@@ -185,7 +186,7 @@ export default function Home() {
         .studio-btn{color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
         .grid{display:grid;gap:12px}
         .grid-3{grid-template-columns:repeat(3,1fr)}
-        .grid-7{grid-template-columns:repeat(7,minmax(0,1fr))}
+        .grid-portables{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
         .mcard{display:flex;flex-direction:column;gap:5px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:16px;background:linear-gradient(145deg,rgba(18,23,39,.9),rgba(7,10,20,.8));backdrop-filter:blur(16px);text-decoration:none;color:#fff;transition:transform .18s,border-color .18s}
         .mcard:hover{transform:translateY(-3px)}
         .mcard-top{display:flex;align-items:center;justify-content:space-between}
@@ -204,9 +205,9 @@ export default function Home() {
         .tag-preview{font-size:8.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#aeb6c9;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:2px 6px}
         .qcard h3{margin:2px 0 0;font-size:13.5px}
         .qcard p{margin:0;color:#9aa4b9;font-size:11px;line-height:1.35}
-        @media(max-width:1180px){.home{min-height:auto;overflow:visible}.grid-7{grid-template-columns:repeat(4,1fr)}}
-        @media(max-width:820px){.grid-3{grid-template-columns:repeat(2,1fr)}.grid-7{grid-template-columns:repeat(2,1fr)}.hero{align-items:flex-start}.hero-right{align-items:flex-start}.langs{justify-content:flex-start}}
-        @media(max-width:560px){.grid-3,.grid-7{grid-template-columns:1fr}.stats{flex-wrap:wrap}}
+        @media(max-width:1180px){.home{min-height:auto;overflow:visible}}
+        @media(max-width:820px){.grid-3{grid-template-columns:repeat(2,1fr)}.hero{align-items:flex-start}.hero-right{align-items:flex-start}.langs{justify-content:flex-start}}
+        @media(max-width:560px){.grid-3,.grid-portables{grid-template-columns:1fr}.stats{flex-wrap:wrap}}
       `}</style>
     </main>
   )

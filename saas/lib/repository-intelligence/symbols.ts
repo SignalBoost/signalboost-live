@@ -12,6 +12,7 @@ const line = (sourceFile: ts.SourceFile, node: ts.Node) =>
   sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
 const exported = (node: ts.Node) =>
   Boolean(ts.getModifiers(node as ts.HasModifiers)?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword))
+const ROUTE_HANDLERS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])
 
 export function extractSymbols(relativePath: string, source: string): SymbolExtractionResult {
   if (!supported(relativePath)) return { symbols: [], imports: [], warnings: [] }
@@ -70,9 +71,11 @@ export function extractSymbols(relativePath: string, source: string): SymbolExtr
       continue
     }
 
-    const name = 'name' in statement ? statement.name : undefined
     if (ts.isFunctionDeclaration(statement) && statement.name) {
       add(statement.name.text, 'function', statement)
+      if (exported(statement) && ROUTE_HANDLERS.has(statement.name.text)) {
+        add(statement.name.text, 'route_handler', statement, true)
+      }
     } else if (ts.isClassDeclaration(statement) && statement.name) {
       add(statement.name.text, 'class', statement)
     } else if (ts.isInterfaceDeclaration(statement)) {
@@ -83,18 +86,12 @@ export function extractSymbols(relativePath: string, source: string): SymbolExtr
       add(statement.name.text, 'enum', statement)
     } else if (ts.isVariableStatement(statement) && exported(statement)) {
       for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name)) add(declaration.name.text, 'variable', statement, true)
+        if (!ts.isIdentifier(declaration.name)) continue
+        add(declaration.name.text, 'variable', statement, true)
+        if (ROUTE_HANDLERS.has(declaration.name.text)) {
+          add(declaration.name.text, 'route_handler', statement, true)
+        }
       }
-    }
-
-    if (
-      (ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement)) &&
-      name &&
-      ts.isIdentifier(name) &&
-      ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(name.text) &&
-      exported(statement)
-    ) {
-      add(name.text, 'route_handler', statement, true)
     }
   }
 

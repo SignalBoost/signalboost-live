@@ -4,10 +4,11 @@
 // overlays, SignalBoostAi branding, and www.saas.signalboostapp.com text.
 
 import { fal } from '@fal-ai/client'
+import { BRAND_TEXT } from './brand-schema'
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://www.saas.signalboostapp.com'
-const SITE_LABEL = 'www.saas.signalboostapp.com'
+const SITE_LABEL = BRAND_TEXT.url
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
 const FINAL_SECONDS = 15
 
@@ -77,14 +78,14 @@ function buildOverlayMovie(opts: { sourceUrl: string; aspect: '16:9' | '9:16'; c
         duration: FINAL_SECONDS,
         elements: [
           { type: 'video', src: opts.sourceUrl, duration: FINAL_SECONDS, resize: 'cover' },
-          textElement('SignalBoostAi', 0, 5, '#ffffff', vertical ? 520 : 300, vertical ? 72 : 58, width),
+          textElement(BRAND_TEXT.name, 0, 5, '#ffffff', vertical ? 520 : 300, vertical ? 72 : 58, width),
           textElement('Boost Your Business Growth Automatically', 5, 5, '#00ffcc', vertical ? 760 : 500, vertical ? 48 : 42, width),
           textElement(`Start today at ${SITE_LABEL}`, 10, 5, '#ffc300', vertical ? 1460 : 820, vertical ? 42 : 36, width),
         ],
       },
     ],
     elements: [
-      textElement(`SignalBoostAi • ${SITE_LABEL}`, 0, FINAL_SECONDS, '#ffffff', vertical ? 1780 : 970, vertical ? 34 : 30, width),
+      textElement(`${BRAND_TEXT.name} • ${SITE_LABEL}`, 0, FINAL_SECONDS, '#ffffff', vertical ? 1780 : 970, vertical ? 34 : 30, width),
     ],
   }
 }

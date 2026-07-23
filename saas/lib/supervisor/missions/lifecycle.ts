@@ -16,6 +16,7 @@ import {
 } from './models.ts'
 import { fingerprintDecision, fingerprintPolicyBinding, fingerprintRepairPlan } from './fingerprints.ts'
 import type { MissionStore } from './store.ts'
+import type { MissionManualReviewStore } from './manual-review.ts'
 import { missionTopics } from './topics.ts'
 
 export interface MissionLifecycleDeps {
@@ -23,6 +24,7 @@ export interface MissionLifecycleDeps {
   clock: () => string
   id: (kind: string) => string
   missionStore: MissionStore
+  manualReviewStore?: MissionManualReviewStore
 }
 
 const envelope = <T>(
@@ -211,6 +213,7 @@ export class MissionSafetyGateway {
 }
 
 export class NonMutatingMissionExecutor {
+  private readonly routedBindings = new Set<string>()
   constructor(private readonly deps: MissionLifecycleDeps) {}
 
   async start() {
@@ -221,18 +224,23 @@ export class NonMutatingMissionExecutor {
         try {
           const decision = decisionEnvelopeSchema.parse(event.payload.decision)
           const binding = policyDecisionBindingSchema.parse(event.payload.binding)
-          if (binding.policyOutcome !== 'approved' || !binding.approvedStepIds.length || binding.decisionId !== decision.decisionId || binding.missionId !== decision.missionId || binding.missionRevision !== decision.missionRevision || binding.decisionFingerprint !== decision.decisionFingerprint || binding.planFingerprint !== decision.planFingerprint || Date.parse(decision.expiresAt) <= Date.parse(now)) return
+          if (binding.policyOutcome !== 'approved' || !binding.approvedStepIds.length || binding.decisionId !== decision.decisionId || binding.missionId !== decision.missionId || binding.missionRevision !== decision.missionRevision || binding.decisionFingerprint !== decision.decisionFingerprint || binding.planFingerprint !== decision.planFingerprint || Date.parse(decision.expiresAt) <= Date.parse(now) || Date.parse(binding.expiresAt) <= Date.parse(now)) return
           const mission = await this.deps.missionStore.get(decision.missionId)
           if (!mission || mission.revision !== decision.missionRevision || ['COMPLETED', 'CANCELED', 'FAILED', 'BLOCKED'].includes(mission.status) || decision.externalSideEffect !== false) return
           const ids = new Set(decision.repairPlan.steps.map(step => step.stepId))
           if (new Set(binding.approvedStepIds).size !== binding.approvedStepIds.length || binding.approvedStepIds.some(id => !ids.has(id))) return
+          if (!this.deps.manualReviewStore) return
+          const review = await this.deps.manualReviewStore.route({
+            reviewId: this.deps.id('manual-review'), decision, binding,
+            title: mission.title, summary: mission.objective, routedAt: now,
+            schemaVersion: 'mission-manual-review-v1',
+          })
+          if (this.routedBindings.has(binding.bindingFingerprint)) return
+          this.routedBindings.add(binding.bindingFingerprint)
           const feedback: ExecutionFeedback = executionFeedbackSchema.parse({
-            feedbackId: this.deps.id('feedback'),
-            missionId: decision.missionId,
-            decisionId: decision.decisionId,
-            missionRevision: decision.missionRevision,
-            status: 'manual_review_routed',
-            recordedAt: now,
+            feedbackId: this.deps.id('feedback'), missionId: decision.missionId,
+            decisionId: decision.decisionId, missionRevision: decision.missionRevision,
+            reviewId: review.reviewId, status: 'manual_review_routed', recordedAt: now,
             schemaVersion: 'mission-execution-v1',
           })
           await this.deps.eventBus.publish(

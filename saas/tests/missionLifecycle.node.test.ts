@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { InMemoryMissionEventBus, InMemoryMissionStore, MissionOrchestrator, RuleBasedMissionReasoner, MissionSafetyGateway, NonMutatingMissionExecutor, missionTopics, transitionMission } from '../lib/supervisor/index.ts'
+import { InMemoryMissionEventBus, InMemoryMissionStore, InMemoryMissionManualReviewStore, MissionOrchestrator, RuleBasedMissionReasoner, MissionSafetyGateway, NonMutatingMissionExecutor, missionTopics, transitionMission } from '../lib/supervisor/index.ts'
 
 const time = '2026-07-23T00:00:00.000Z'
 let n = 0
-const setup = () => { n = 0; const eventBus = new InMemoryMissionEventBus(); const missionStore = new InMemoryMissionStore(); return { eventBus, missionStore, deps: { eventBus, missionStore, clock: () => time, id: (kind: string) => `${kind}-${++n}` } } }
+const setup = () => { n = 0; const eventBus = new InMemoryMissionEventBus(); const missionStore = new InMemoryMissionStore(); const manualReviewStore = new InMemoryMissionManualReviewStore(missionStore, () => time); return { eventBus, missionStore, deps: { eventBus, missionStore, manualReviewStore, clock: () => time, id: (kind: string) => `${kind}-${++n}` } } }
 const ci = () => ({ eventId: 'ci-1', eventType: 'ci.failure.detected', occurredAt: time, correlationId: 'corr-1', environment: 'sandbox', payload: { repository: 'signalboost' }, schemaVersion: 'event-v1' })
 
 test('CI failure reaches only the non-mutating manual-review executor after an approved binding', async () => {

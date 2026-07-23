@@ -1,9 +1,10 @@
 // saas/console-core/executors/anthropic.ts
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://api.anthropic.com/v1'
-function key(): string | null { return process.env.ANTHROPIC_API_KEY || null }
+function key(): string | null { return getSecret('ANTHROPIC_API_KEY') || null }
 async function getJSON(path: string) {
   const k = key(); if (!k) return { ok: false as const, error: 'ANTHROPIC_API_KEY not set' }
   const res = await fetch(`${API}${path}`, { headers: { 'x-api-key': k, 'anthropic-version': '2023-06-01' } })

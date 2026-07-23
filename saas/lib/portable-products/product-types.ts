@@ -16,6 +16,14 @@ export type PortableProductImplementationStatus =
   | 'descriptor_only'
   | 'deprecated'
 
+/** Describes implementation readiness without exposing implementation details to buyers. */
+export type PortableProductImplementationClassification =
+  | 'implemented_product'
+  | 'preview_product'
+  | 'internal_component'
+  | 'descriptor_only_compatibility_target'
+
+/** Serializable, metadata-only catalog data for a portable product. */
 export interface PortableProductDescriptor {
   productId: string
   localizationKey: string
@@ -24,6 +32,7 @@ export interface PortableProductDescriptor {
   glyph: string
   status: PortableProductStatus
   implementationStatus: PortableProductImplementationStatus
+  implementationClassification: PortableProductImplementationClassification
   category: PortableProductCategory
   sortOrder: number
   publicVisible: boolean

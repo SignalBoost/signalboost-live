@@ -8,11 +8,11 @@ export interface RepositoryIntelligencePolicy {
   maximumSelectedContextBytes: number
   maximumDirectoryDepth: number
   maximumWarningCount: number
-  followSymbolicLinks: false
-  includeHiddenFiles: false
-  readBinaryFiles: false
-  networkAccess: false
-  repositoryWrites: false
+  followSymbolicLinks: boolean
+  includeHiddenFiles: boolean
+  readBinaryFiles: boolean
+  networkAccess: boolean
+  repositoryWrites: boolean
   excludedDirectoryNames: readonly string[]
   secretPatterns: readonly string[]
 }

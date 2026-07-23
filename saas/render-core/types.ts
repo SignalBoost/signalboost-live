@@ -71,11 +71,40 @@ export interface RenderLogAdapter {
   log(event: string, data: Record<string, unknown>): void
 }
 
+/**
+ * Mints the server-side approval reference a wallet-funded paid render needs.
+ *
+ * The gate it satisfies exists so platform money cannot leave on a client's say-so.
+ * A host implements this to define what counts as server-side authorization for
+ * its own funding model — for a credits product that is normally "this authenticated
+ * user has credits and is under their cap", which the wallet reservation then proves.
+ *
+ * A host that does NOT implement this keeps the strict behaviour: every wallet-funded
+ * paid render is refused unless the caller supplies an explicit approval reference.
+ * Absent issuer means blocked, never allowed.
+ */
+export interface PaidProviderApprovalAdapter {
+  issue(request: PaidProviderApprovalRequest): Promise<PaidProviderApprovalResult>
+}
+
+export interface PaidProviderApprovalRequest {
+  actor: RenderActor
+  providerId: string
+  kind: RenderKind
+  providerCostCents: number
+}
+
+export type PaidProviderApprovalResult =
+  | { ok: true; approvalId: string }
+  | { ok: false; reason?: string }
+
 export interface RenderHost {
   wallet: WalletAdapter
   storage: StorageAdapter
   log: RenderLogAdapter
   resolvePlatformKey(providerId: string): string | null
+  /** Optional. Omit it and wallet-funded paid renders stay blocked. */
+  approvals?: PaidProviderApprovalAdapter
 }
 
 export type RenderResult = {
@@ -85,4 +114,6 @@ export type RenderResult = {
   charged?: boolean
   code?: 'no_executor' | 'approval_required' | 'insufficient_funds' | 'daily_cap' | 'no_key' | 'provider_failed' | 'error'
   message?: string
+  /** The approval reference this render was authorized under, for audit. */
+  paidProviderApprovalId?: string
 }

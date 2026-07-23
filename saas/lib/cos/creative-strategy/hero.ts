@@ -1,4 +1,6 @@
 import type { CosHeroArchetype, CosHeroStrategy, CosHeroStrategyInput } from './types'
+import { isSoldCopy } from '@/lib/portable/companyIdentity'
+import type { CompanyFacts } from '@/portable-kernel'
 
 const FIVE_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
 const DESTINATION_URL = 'www.' + 'saas.signalboostapp.com'
@@ -44,7 +46,7 @@ export function buildCosHeroStrategy(input: CosHeroStrategyInput): CosHeroStrate
     story_arc: [
       'Open with the hero overwhelmed by disconnected work.',
       'Show the viewer the exact problem in one simple sentence.',
-      'Move into the SignalBoost console and show one clear workflow.',
+      `Move into the ${input.product_or_service} and show one clear workflow.`,
       'Show the system turning data into a recommended action.',
       'End with the hero staying in control while the system prepares the next step.',
     ],
@@ -70,10 +72,12 @@ export function buildCosHeroStrategy(input: CosHeroStrategyInput): CosHeroStrate
   }
 }
 
-export function defaultCosHeroStrategyInput(): CosHeroStrategyInput {
+export function defaultCosHeroStrategyInput(facts?: CompanyFacts | null): CosHeroStrategyInput {
+  const brand = facts?.brandName?.trim() || (isSoldCopy() ? '[YOUR COMPANY]' : 'SignalBoost')
+  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost SaaS console')
   return {
-    company_name: 'SignalBoost',
-    product_or_service: 'SignalBoost SaaS console',
+    company_name: brand,
+    product_or_service: product,
     niche: 'small companies that need AI help to manage growth, provider data, reviews, and approvals',
     audience: 'busy business owners and operators',
     pain: 'they have too many dashboards, too many decisions, and no clear operating system',

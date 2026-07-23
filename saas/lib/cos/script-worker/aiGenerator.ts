@@ -1,6 +1,8 @@
 import type { CosContentWorkerInput, CosContentWorkerOutput } from './types'
 import { generateContentDraft } from './generator'
 import { callModel } from '@/lib/ai/modelRouter'
+import { isSoldCopy } from '@/lib/portable/companyIdentity'
+import { FACTUAL_DISCIPLINE } from '@/portable-kernel'
 
 // "AI" mode of the hybrid script generator. Writes a bespoke script about the
 // USER'S business through the model layer. Returns the same CosContentWorkerOutput
@@ -48,9 +50,18 @@ export async function generateContentDraftAI(input: CosContentWorkerInput): Prom
     '}',
   ].join('\n')
 
+  const buyer = isSoldCopy() || Boolean(String(process.env.PORTABLE_BRAND_NAME || '').trim())
+  const baseSystem = 'You are a marketing copywriter. Always return only valid JSON. No markdown, no commentary.'
+  // A sold copy adds fabrication discipline (never invent facts about the business; use a visible
+  // placeholder for a missing one). No company allow-list here — this content is about the user's
+  // OWN business, not the employer. Seller's own deployment keeps the original prompt exactly.
+  const systemPrompt = buyer ? `${FACTUAL_DISCIPLINE}
+
+${baseSystem}` : baseSystem
+
   const raw = await callModel({
     prompt,
-    systemPrompt: 'You are a marketing copywriter. Always return only valid JSON. No markdown, no commentary.',
+    systemPrompt,
     maxTokens: 1800,
   }).catch(() => null)
 

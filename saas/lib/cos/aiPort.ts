@@ -20,9 +20,10 @@ export function createPlatformAiPort(): CosAiPort {
 // ── Image generation — same seam, one method ──
 // A buyer swaps the image model (their DALL·E-compatible endpoint, a private diffusion service)
 // without the creative pipeline knowing the provider or holding a key.
-export type CosImageResult =
-  | { ok: true; b64?: string; url?: string }
-  | { ok: false; error: string }
+// Flat result (not a discriminated union): this repo's tsconfig is non-strict, where `!img.ok`
+// does not narrow a union — so a flat { ok; error? } shape keeps `error` safely accessible,
+// matching the store result types (DecisionResult, CampaignQueueStore.update, ObjectStorePort).
+export type CosImageResult = { ok: boolean; b64?: string; url?: string; error?: string }
 
 export interface CosImagePort {
   generate(input: { prompt: string; size?: string }): Promise<CosImageResult>

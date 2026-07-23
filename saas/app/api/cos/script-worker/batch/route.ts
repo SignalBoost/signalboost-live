@@ -8,6 +8,7 @@ import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { submitBatch } from '@/lib/ai/batch/openaiBatch'
 import { buildCampaignCopyRequests } from '@/lib/cos/script-worker/batchGenerator'
 import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
+import { resolveCompanyFacts, isSoldCopy } from '@/lib/portable/companyIdentity'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Campaign is not in a draftable state.' }, { status: 400 })
   }
 
-  const requests = buildCampaignCopyRequests(campaign)
+  const facts = (isSoldCopy() || String(process.env.PORTABLE_BRAND_NAME || '').trim()) ? await resolveCompanyFacts() : null
+  const requests = buildCampaignCopyRequests(campaign, facts)
   if (!requests.length) {
     return NextResponse.json({ ok: false, error: 'Campaign has no requested languages to generate.' }, { status: 400 })
   }

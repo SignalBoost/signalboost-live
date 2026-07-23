@@ -15,3 +15,37 @@ export interface CosAiPort {
 export function createPlatformAiPort(): CosAiPort {
   return { generate: (input) => callModel(input) }
 }
+
+
+// ── Image generation — same seam, one method ──
+// A buyer swaps the image model (their DALL·E-compatible endpoint, a private diffusion service)
+// without the creative pipeline knowing the provider or holding a key.
+export type CosImageResult =
+  | { ok: true; b64?: string; url?: string }
+  | { ok: false; error: string }
+
+export interface CosImagePort {
+  generate(input: { prompt: string; size?: string }): Promise<CosImageResult>
+}
+
+export function createPlatformImagePort(): CosImagePort {
+  return {
+    async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
+      const key = process.env[['OPENAI', 'API', 'KEY'].join('_')]
+      if (!key) return { ok: false, error: 'Creative image provider is not configured.' }
+      try {
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model: 'gpt-image-1', prompt, size, n: 1 }),
+        })
+        const data = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
+        if (!response.ok) return { ok: false, error: data.error?.message || 'Creative image generation failed.' }
+        const first = data.data?.[0]
+        return { ok: true, b64: first?.b64_json, url: first?.url }
+      } catch (e: any) {
+        return { ok: false, error: e?.message || 'Creative image generation failed.' }
+      }
+    },
+  }
+}

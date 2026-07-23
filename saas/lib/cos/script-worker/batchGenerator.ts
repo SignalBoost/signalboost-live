@@ -11,6 +11,9 @@
 
 import type { BatchRequest, BatchOutput } from '@/lib/ai/batch/openaiBatch'
 import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
+import { isSoldCopy } from '@/lib/portable/companyIdentity'
+import { buildFactualPreamble } from '@/portable-kernel'
+import type { CompanyFacts } from '@/portable-kernel'
 import type { CosContentWorkerOutput } from './types'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -71,8 +74,8 @@ function requestedLanguages(campaign: any): Lang[] {
 // Model instruction. This is the one place natural-language text lives: it is the
 // instruction we give the AI, not copy that ships. Every field the model returns
 // is written in the requested target language.
-function systemPrompt(spec: PlatformSpec, autonym: string): string {
-  return [
+function systemPrompt(spec: PlatformSpec, autonym: string, preamble: string): string {
+  const base = [
     'You are a senior multilingual marketing copywriter.',
     `Write every human-readable field entirely in this language: ${autonym}.`,
     'Do not mix languages and do not include text in any other language.',
@@ -88,13 +91,23 @@ function systemPrompt(spec: PlatformSpec, autonym: string): string {
     'scenes is an array of objects {label, narration, visual_direction}. estimated_duration_minutes is a number.',
     'No markdown, no commentary, no code fences. JSON only.',
   ].join(' ')
+  // A buyer deployment prepends the company-facts allow-list + factual-discipline rules so the
+  // model writes for the actual employer and never invents a brand, product, stat or quote. On
+  // the seller's own deployment `preamble` is empty and the prompt is unchanged.
+  return preamble ? `${preamble}
+
+${base}` : base
 }
 
 // One OpenAI chat-completions request per requested language. custom_id encodes
 // the campaign id and language so the writeback can route each result.
-export function buildCampaignCopyRequests(campaign: any): BatchRequest[] {
+export function buildCampaignCopyRequests(campaign: any, facts?: CompanyFacts | null): BatchRequest[] {
   const spec = specFor(String(campaign?.channel || ''))
   const langs = requestedLanguages(campaign)
+  // Buyer/sold copy grounds generation in the employer's facts (or visible placeholders when the
+  // record is empty); the seller's own deployment keeps the original prompt exactly.
+  const buyer = isSoldCopy() || Boolean(String(process.env.PORTABLE_BRAND_NAME || '').trim())
+  const preamble = buyer ? buildFactualPreamble(facts) : ''
   const baseBrief = String(campaign?.work_items?.[0]?.input?.brief || campaign?.objective || '')
 
   return langs.map((lang) => {
@@ -116,7 +129,7 @@ export function buildCampaignCopyRequests(campaign: any): BatchRequest[] {
         response_format: { type: 'json_object' },
         temperature: 0.7,
         messages: [
-          { role: 'system', content: systemPrompt(spec, autonym) },
+          { role: 'system', content: systemPrompt(spec, autonym, preamble) },
           { role: 'user', content: JSON.stringify(userPayload) },
         ],
       },

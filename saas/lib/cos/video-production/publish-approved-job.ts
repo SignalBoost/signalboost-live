@@ -3,6 +3,7 @@ import { sendEmail } from '@/lib/email'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost } from '@/lib/outreach/social-connectors'
 import type { getAdminSupabase } from '@/utils/supabase/server'
+import { createSupabaseObjectStore, type ObjectStorePort } from '@/lib/cos/objectStore'
 
 type AdminClient = ReturnType<typeof getAdminSupabase>
 
@@ -20,11 +21,11 @@ function wantsYouTube(job: any) {
   return Array.isArray(job?.platforms) && job.platforms.some((item: unknown) => String(item).toLowerCase().includes('youtube'))
 }
 
-async function signedVideoUrl(admin: AdminClient, bucket: string, outputUrl: string) {
+async function signedVideoUrl(store: ObjectStorePort, outputUrl: string) {
   if (outputUrl.startsWith('http')) return outputUrl
-  const { data, error } = await admin.storage.from(bucket).createSignedUrl(outputUrl, 60 * 60)
-  if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not sign rendered video URL.')
-  return data.signedUrl
+  const signed = await store.signedUrl(outputUrl, 60 * 60)
+  if (!signed.url) throw new Error(signed.error || 'Could not sign rendered video URL.')
+  return signed.url
 }
 
 export async function publishApprovedVideoProductionJob(args: {
@@ -32,15 +33,18 @@ export async function publishApprovedVideoProductionJob(args: {
   user: User
   job: any
   renderBucket: string
+  objectStore?: ObjectStorePort
 }): Promise<PublishResult> {
   const { admin, user, job, renderBucket } = args
+  // Rendered-asset access goes through the object-store port; a buyer passes their own.
+  const objectStore = args.objectStore || createSupabaseObjectStore({ client: admin, bucket: renderBucket })
   if (!wantsYouTube(job)) return { ok: true, skipped: true, error: 'YouTube was not selected for this job.' }
   if (!job?.output_url) return { ok: false, error: 'Rendered video output is missing.' }
 
   const token = await getValidSocialToken(admin, user.id, 'youtube_channels')
   if (!token.ok || !token.accessToken) return { ok: false, error: token.error || 'YouTube is not connected for this user.' }
 
-  const videoUrl = await signedVideoUrl(admin, renderBucket, String(job.output_url))
+  const videoUrl = await signedVideoUrl(objectStore, String(job.output_url))
   const destinationUrl = String(job.search_package?.destination_url || 'https://saas.signalboostapp.com')
   const title = String(job.title || 'Video campaign')
   const description = String(job.search_package?.description || job.hook || title)

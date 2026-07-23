@@ -1,7 +1,5 @@
 import type { PresenterTone, PresenterVideoDraft, PresenterVideoInput } from './types'
-import { hostBrandName } from '@/lib/portable/companyIdentity'
-
-const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
+import { portableBrandName, portableBrandUrl } from '@/lib/portable/companyIdentity'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -12,8 +10,8 @@ function toneFor(input?: PresenterTone): PresenterTone {
 }
 
 export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): PresenterVideoDraft {
-  const destination = input.destination_url || DEFAULT_URL
-  const product = input.product_or_service || `${hostBrandName()} platform`
+  const destination = input.destination_url || portableBrandUrl()
+  const product = input.product_or_service || `${portableBrandName()} platform`
   const audience = input.audience || 'your company'
   const tone = toneFor(input.tone)
   const duration = Math.max(15, Math.min(45, Number(input.duration_seconds || 25)))
@@ -21,8 +19,8 @@ export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): Prese
   const scenes = [
     {
       label: 'Presenter intro',
-      presenter_line: `Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help ${audience}.`,
-      caption: 'Meet SignalBoost AI',
+      presenter_line: `Hi, I am ${portableBrandName()} AI. I will give you a quick tour so you can see how we can help ${audience}.`,
+      caption: `Meet ${portableBrandName()} AI`,
       visual_direction: 'Show the presenter with a friendly wave and branded glow.',
       goal: 'Create attention in the first three seconds.',
     },
@@ -49,7 +47,7 @@ export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): Prese
     },
     {
       label: 'CTA',
-      presenter_line: `Visit ${destination} and see how SignalBoost can help your company turn scattered work into approved action.`,
+      presenter_line: `Visit ${destination} and see how ${portableBrandName()} can help your company turn scattered work into approved action.`,
       caption: `Visit ${destination}`,
       visual_direction: 'End with the presenter beside the branded URL, CTA button, and final product screen.',
       goal: 'Drive traffic to the SaaS platform.',
@@ -58,10 +56,10 @@ export function buildPresenterVideoDraft(input: PresenterVideoInput = {}): Prese
 
   return {
     id: id('presenter_video'),
-    presenter_name: `${hostBrandName()} AI`,
+    presenter_name: `${portableBrandName()} AI`,
     presenter_role: 'official platform guide',
     tone,
-    title: `${hostBrandName()} AI guided platform tour`,
+    title: `${portableBrandName()} AI guided platform tour`,
     duration_seconds: duration,
     opening_hook: scenes[0].presenter_line,
     scenes,

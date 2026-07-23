@@ -1,5 +1,6 @@
 import type { MarketingDecision, MarketingDecisionInput, MarketingFormatChoice, MarketingHeroChoice, MarketingSceneDesign, MarketingSignal } from './types'
-import { hostBrandName } from '@/lib/portable/companyIdentity'
+import { hostBrandName, isSoldCopy } from '@/lib/portable/companyIdentity'
+import type { CompanyFacts } from '@/portable-kernel'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -120,10 +121,14 @@ export function buildMarketingDecision(input: MarketingDecisionInput = {}): Mark
   }
 }
 
-export function defaultMarketingDecisionInput(): MarketingDecisionInput {
+export function defaultMarketingDecisionInput(facts?: CompanyFacts | null): MarketingDecisionInput {
+  // The product being marketed comes from the employer's company record when known. A blank
+  // sold copy shows a neutral placeholder; SignalBoost's own deployment keeps its literals.
+  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost SaaS console')
+  const productShort = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost console')
   return {
     campaign_goal: 'traffic',
-    product_or_service: 'SignalBoost SaaS console',
+    product_or_service: product,
     audience: 'small business owners and operators',
     region: 'global',
     signals: [
@@ -131,7 +136,7 @@ export function defaultMarketingDecisionInput(): MarketingDecisionInput {
         source: 'starter_signal',
         audience: 'small business owners',
         region: 'global',
-        product: 'SignalBoost console',
+        product: productShort,
         views: 0,
         clicks: 0,
         conversions: 0,

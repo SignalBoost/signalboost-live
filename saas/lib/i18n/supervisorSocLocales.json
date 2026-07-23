@@ -212,7 +212,15 @@
       "mission_riskLevel": "Risk level",
       "mission_createdAt": "Created time",
       "mission_updatedAt": "Updated time",
-      "mission_schemaVersion": "Schema version"
+      "mission_schemaVersion": "Schema version",
+      "diagnostics": "Review diagnostics",
+      "totalReviews": "Total reviews",
+      "routedReviews": "Routed reviews",
+      "oldestRoutedAt": "Oldest routed time",
+      "newestRoutedAt": "Newest routed time",
+      "duplicateRoutesPrevented": "Duplicate routes prevented",
+      "diagnosticsStatus": "Status",
+      "unavailable": "Unavailable"
     }
   },
   "es": {
@@ -428,7 +436,15 @@
       "mission_riskLevel": "Nivel de riesgo",
       "mission_createdAt": "Hora de creación",
       "mission_updatedAt": "Hora de actualización",
-      "mission_schemaVersion": "Versión de esquema"
+      "mission_schemaVersion": "Versión de esquema",
+      "diagnostics": "Diagnóstico de revisiones",
+      "totalReviews": "Total de revisiones",
+      "routedReviews": "Revisiones enrutadas",
+      "oldestRoutedAt": "Hora de enrutamiento más antigua",
+      "newestRoutedAt": "Hora de enrutamiento más reciente",
+      "duplicateRoutesPrevented": "Rutas duplicadas evitadas",
+      "diagnosticsStatus": "Estado",
+      "unavailable": "No disponible"
     }
   },
   "pt": {
@@ -644,7 +660,15 @@
       "mission_riskLevel": "Nível de risco",
       "mission_createdAt": "Hora de criação",
       "mission_updatedAt": "Hora de atualização",
-      "mission_schemaVersion": "Versão do esquema"
+      "mission_schemaVersion": "Versão do esquema",
+      "diagnostics": "Diagnóstico de revisões",
+      "totalReviews": "Total de revisões",
+      "routedReviews": "Revisões encaminhadas",
+      "oldestRoutedAt": "Hora mais antiga de encaminhamento",
+      "newestRoutedAt": "Hora mais recente de encaminhamento",
+      "duplicateRoutesPrevented": "Rotas duplicadas evitadas",
+      "diagnosticsStatus": "Status",
+      "unavailable": "Indisponível"
     }
   },
   "pl": {
@@ -860,7 +884,15 @@
       "mission_riskLevel": "Poziom ryzyka",
       "mission_createdAt": "Czas utworzenia",
       "mission_updatedAt": "Czas aktualizacji",
-      "mission_schemaVersion": "Wersja schematu"
+      "mission_schemaVersion": "Wersja schematu",
+      "diagnostics": "Diagnostyka przeglądów",
+      "totalReviews": "Wszystkie przeglądy",
+      "routedReviews": "Przekierowane przeglądy",
+      "oldestRoutedAt": "Najstarszy czas przekierowania",
+      "newestRoutedAt": "Najnowszy czas przekierowania",
+      "duplicateRoutesPrevented": "Zapobiegnięto zduplikowanym przekierowaniom",
+      "diagnosticsStatus": "Stan",
+      "unavailable": "Niedostępne"
     }
   },
   "ru": {
@@ -1076,7 +1108,15 @@
       "mission_riskLevel": "Уровень риска",
       "mission_createdAt": "Время создания",
       "mission_updatedAt": "Время обновления",
-      "mission_schemaVersion": "Версия схемы"
+      "mission_schemaVersion": "Версия схемы",
+      "diagnostics": "Диагностика проверок",
+      "totalReviews": "Всего проверок",
+      "routedReviews": "Перенаправленные проверки",
+      "oldestRoutedAt": "Самое раннее время перенаправления",
+      "newestRoutedAt": "Самое позднее время перенаправления",
+      "duplicateRoutesPrevented": "Предотвращено дублирование перенаправлений",
+      "diagnosticsStatus": "Статус",
+      "unavailable": "Недоступно"
     }
   }
 }

@@ -59,7 +59,7 @@ test('review UI makes GET-only Phase 6 requests and exposes no mutation controls
   const source = client()
   assert.match(source, /\/api\/internal\/supervisor\/missions\/reviews\?\$\{params\}/)
   assert.match(source, /\/api\/internal\/supervisor\/missions\/reviews\/\$\{encodeURIComponent\(reviewId\)\}/)
-  assert.equal((source.match(/method: 'GET'/g) || []).length, 2)
+  assert.equal((source.match(/method: 'GET'/g) || []).length, 3)
   assert.doesNotMatch(source, /method:\s*'(POST|PUT|PATCH|DELETE)'/)
   const controls = source.match(/<button[^>]*>[\s\S]*?<\/button>/g) || []
   assert.equal(controls.length, 4)

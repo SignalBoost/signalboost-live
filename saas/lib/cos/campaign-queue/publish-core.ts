@@ -34,6 +34,7 @@ import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { auditAdminAction } from '@/lib/outreach/security'
 import { verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
+import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
 
 // COS channels that map to a direct social post. Others (blog/email/landing_page/
 // outreach/review_campaign) are handled by their own flows.
@@ -80,12 +81,15 @@ export type PublishCoreResult = {
 
 export async function publishCampaignCore(input: PublishCoreInput): Promise<PublishCoreResult> {
   const { admin, userId } = input
+  // Campaign-queue DATA goes through the injected store; `admin` remains only for the
+  // host subsystems this engine calls (social tokens, publish mode, audit log).
+  const store = createSupabaseCampaignQueueStore(admin)
   const id = String(input.id || '').trim()
   if (!id) return { ok: false, status: 400, error: 'id is required' }
   const acceptUnbranded = input.acceptUnbranded === true
 
-  const { data: campaign, error } = await admin.from('cos_campaign_queue').select('*').eq('id', id).single()
-  if (error || !campaign) return { ok: false, status: 404, error: error?.message || 'Campaign not found' }
+  const campaign = await store.getById(id)
+  if (!campaign) return { ok: false, status: 404, error: 'Campaign not found' }
 
   // THE GATE: never publish anything the owner has not explicitly approved.
   const ownerApproved = Boolean(campaign.approved_at) && Boolean(campaign.approved_by)
@@ -124,9 +128,9 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
   const readiness = scoreCampaignReadiness(campaign)
   const readinessOk = readiness.grade === 'improved' || readiness.grade === 'marketing_grade_ready'
   if (!readinessOk) {
-    await admin.from('cos_campaign_queue').update({
+    await store.update(id, {
       metadata: { ...(campaign.metadata || {}), readiness },
-    }).eq('id', id)
+    })
     return {
       ok: false,
       status: 422,
@@ -198,10 +202,9 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
 
   // Re-read metadata just before writing so sequential multi-language publishes
   // merge into published{} instead of clobbering each other.
-  const { data: freshRow } = await admin.from('cos_campaign_queue').select('metadata').eq('id', id).single()
-  const freshMeta = (freshRow && freshRow.metadata) || campaign.metadata || {}
+  const freshMeta = (await store.getMetadata(id)) || campaign.metadata || {}
 
-  await admin.from('cos_campaign_queue').update({
+  await store.update(id, {
     status: 'running',
     metadata: {
       ...freshMeta,
@@ -219,7 +222,7 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
         },
       },
     },
-  }).eq('id', id)
+  })
 
   await auditAdminAction({
     admin,
@@ -250,9 +253,10 @@ export async function autoPublishApprovedCampaign(opts: {
   campaignId: string
 }): Promise<{ attempted: number; published: number; results: Array<{ language: string | null; ok: boolean; error?: string; liveUrl?: string }> }> {
   const { admin, userId, userEmail, campaignId } = opts
+  const store = createSupabaseCampaignQueueStore(admin)
   const summary: Array<{ language: string | null; ok: boolean; error?: string; liveUrl?: string }> = []
 
-  const { data: campaign } = await admin.from('cos_campaign_queue').select('*').eq('id', campaignId).single()
+  const campaign = await store.getById(campaignId)
   if (!campaign) return { attempted: 0, published: 0, results: [{ language: null, ok: false, error: 'Campaign not found' }] }
 
   // Non-social channels are not auto-published here — their own flows handle them.
@@ -301,9 +305,8 @@ export async function autoPublishApprovedCampaign(opts: {
   }
 
   // Record the outcome on the campaign so nothing fails silently.
-  const { data: freshRow } = await admin.from('cos_campaign_queue').select('metadata').eq('id', campaignId).single()
-  const freshMeta = (freshRow && freshRow.metadata) || {}
-  await admin.from('cos_campaign_queue').update({
+  const freshMeta = (await store.getMetadata(campaignId)) || {}
+  await store.update(campaignId, {
     metadata: {
       ...freshMeta,
       autoPublish: {
@@ -313,7 +316,7 @@ export async function autoPublishApprovedCampaign(opts: {
         results: summary,
       },
     },
-  }).eq('id', campaignId)
+  })
 
   return { attempted: targets.length, published, results: summary }
 }

@@ -159,7 +159,7 @@ The Mission 001 policy-to-executor bridge lives in `saas/lib/supervisor/executor
 
 Supported executor kinds are exactly `api`, `browser`, and `manual`. Unknown kinds and missing executor registrations fail closed. The API executor is a non-mutating stub and does not call Universal Runner or provider SDKs. The browser executor is disabled and does not import or invoke Browser Runtime, Playwright, Chromium, Stagehand, or browser-use. The manual executor only routes incidents to human review and must not claim a repair succeeded.
 
-Dispatcher at-most-once tracking is in-memory for Sprint 14: duplicate and concurrent duplicate dispatch IDs are rejected for the lifetime of a dispatcher instance, but process-restart durable tracking is deferred. All dispatch results and audit payloads must stay serializable and sanitized; never include credentials, tokens, authorization headers, raw provider responses, stack traces, or browser objects.
+Dispatcher at-most-once tracking is durable: `SupabaseDispatchStore` (`saas/lib/supervisor/executors/dispatch-store.ts`, table `supervisor_dispatch_ledger` with `dispatch_id` as primary key) rejects duplicate and concurrent-duplicate dispatch IDs across processes and restarts, and `createSupervisorDispatchStore` fails closed (`durable_dispatch_store_required`) in production without a store rather than silently using the in-memory fallback. All dispatch results and audit payloads must stay serializable and sanitized; never include credentials, tokens, authorization headers, raw provider responses, stack traces, or browser objects.
 
 ### Browser Runtime (Mission 001)
 
@@ -293,7 +293,6 @@ Typical COSA flow:
 Important: a written campaign plan in chat is not a real campaign. A real campaign must create a database row and appear in the appropriate dashboard.
 
 ---
-
 ## 6. COSA Strategy, Algorithms, Prediction, and Optimization
 
 COSA should behave like a senior marketing strategist, sales strategist, campaign analyst, and operator.
@@ -463,7 +462,7 @@ MANDATORY: any code that calls `publishSocialPost` MUST pass `accountRef` from t
 
 The publish engine is generic: `publishCampaignCore` maps `campaign.channel` to a platform (or accepts an explicit `platform` override) and attaches the finished branded video URL when the source channel is a video channel. A finished video can therefore be cross-posted to any platform via a `{ id, platform }` override; the video gate keys on the source channel, not the target.
 
-Video status: video-capable connectors are YouTube, TikTok, and Instagram. The automated video pipeline currently auto-publishes to YouTube only (crons filter `VIDEO_CHANNELS = ['youtube','short_video']`, and only `cos-auto-publish-exact` is scheduled). Cross-posting a finished video to TikTok/Instagram works through the publish-route override; a one-click UI for it is not yet built.
+Video status: video-capable connectors are YouTube, TikTok, and Instagram. The automated video pipeline currently auto-publishes to YouTube only (crons filter `VIDEO_CHANNELS = ['youtube','short_video']`, and only `cos-auto-publish-exact` is scheduled). Cross-posting a finished video to TikTok/Instagram works through the publish-route override, and the one-click UI for it is live: `/dashboard/cosa/video-pipeline` renders per-platform buttons (via `saas/app/api/cos/campaign-queue/crosspost/route.ts`, which delegates to `publishCampaignCore` with a `{ id, platform }` override) once a campaign is approved or published.
 
 Provider-token expiry (critical operational trap): a Google OAuth app left in "Testing" publishing status expires its refresh tokens after exactly 7 days (`invalid_grant`). When that happens, publishing is blocked, no live URL is produced, no email is sent, and the campaign sits at "APPROVED — PUBLISHING". This is not a code bug. Fix: reconnect the account, then publish the Google app to production (Google Cloud, OAuth consent screen, Publish app). Sensitive scopes such as `youtube.upload` may require Google verification. Note also: every publish path emails the live link ONLY after a provider-confirmed live URL exists; no live URL means no email, by design.
 
@@ -574,7 +573,7 @@ Concierge approval-path rule:
 
 Provider onboarding — adding a provider's keys, connecting an account, provisioning products/prices, or running the schema a provider needs — is a first-class, self-serve, PLUG-AND-PLAY capability for BOTH SignalBoost and every buyer of a portable. A buyer brings their OWN provider app, account, and money (BYO). The platform is AI-driven but NEVER AI-only: the buyer must be able to complete every setup task through whichever of three paths they prefer, and switch at any time.
 
-1. AI-driven (Chief of Staff / infrastructure PRs). COS drafts an infrastructure PR (Section 12); the human reviews the planned steps and merges; steps then execute against provider APIs (Vercel env, Stripe, Supabase, etc.). Nothing fires until the human merges. Requirement: multi-step PRs where a later step consumes an earlier step's output (e.g. create Stripe product → create its price) MUST resolve step-output references (`{{steps[...]}}`). Independent steps already work; dependent chaining is the known gap being fixed.
+1. AI-driven (Chief of Staff / infrastructure PRs). COS drafts an infrastructure PR (Section 12); the human reviews the planned steps and merges; steps then execute against provider APIs (Vercel env, Stripe, Supabase, etc.). Nothing fires until the human merges. Multi-step PRs where a later step consumes an earlier step's output (e.g. create Stripe product → create its price) resolve step-output references (`{{steps[N].field}}`) at merge time from the `data` the earlier step returned. References are backward-only and validated at staging, so self-, forward-, and malformed references are rejected before the owner reviews the PR; an unresolvable reference fails its step before the provider call, so a literal `{{...}}` never reaches Stripe, Vercel, or Supabase. The stored PR keeps the reference text, so the approved record and the dedup fingerprint are unchanged, and every substitution is audited with secret-shaped values masked. Resolver: `saas/lib/hub/pr-step-refs.ts`, wired into `saas/lib/hub/pr-engine.ts`, covered by `saas/tests/prStepRefs.node.test.ts`.
 
 2. Manual (human). The buyer can perform every setup task themselves — add the env var in Vercel, create the Stripe product, run the SQL — with ZERO dependence on AI. Manual is a FIRST-CLASS, ALWAYS-AVAILABLE mode chosen by preference, not merely an AI-failure fallback. It is the reliability floor and the enterprise-trust signal. Rule: no onboarding step may hard-depend on AI.
 
@@ -596,8 +595,8 @@ Per-portable documentation (compliance, security, buyer, architecture):
 - Integrations / Social Outreach Connector — `saas/docs/enterprise-social-outreach-plug-and-play.md`, `saas/docs/outreach-engine-architecture.md`, `saas/docs/outreach-unification-plan.md`, `saas/docs/provider-integration.md`, and ONBOARD Section 10A.
 - Marketing + Sales — `saas/docs/marketing-sales-module-design.md`.
 - Chief of Staff (COS) — `saas/lib/cos/README.md`, `cos-core/brain.md`, `services/cos-ai-department/README.md`, `compliance/cos-ai-department/policy.yaml`.
-- Browser Agent — `docs/browser-provider-sdk.md` (SDK only). GAP: its compliance/legal doc is NOT YET WRITTEN — the only portable missing one.
-- Render Module — no dedicated doc yet; see `saas/render-core` code.
+- Browser Agent — `docs/browser-provider-sdk.md` (SDK reference) plus `docs/portables/browser-agent-compliance.md` (compliance & security model: production execution structurally disabled, sandbox/dry-run confinement, the two-phase signed approval model, and buyer guarantees).
+- Render Module — `docs/portables/render-module.md` (architecture, the `*-core`/`*-host` split, the paid-provider approval gate and self-serve ceiling, buyer extraction) plus the `saas/render-core` code.
 - Campaign Studio (BYOK) — `saas/docs/user-guide.md`, `saas/docs/developer-guide.md`, and ONBOARD Section 12B.
 - Press & Media — `docs/portables/press-media-portable-design.md` (provider-adapter framework: `free_submission` editor submission plus the `pr_wire` paid adapter driven by `provider_registry` + `universalRunner` with a vault-encrypted BYO key). Cockpit at `/dashboard/marketing/press-providers`; see ONBOARD Sections 12, 12C, 13.
 
@@ -605,13 +604,11 @@ Cross-cutting compliance / security / governance:
 
 - Live Compliance Readiness Matrix — `/hub/audit/compliance` (`saas/lib/audit/complianceReport.ts`): 8 control families crosswalked to SOC 2 / ISO 27001 / NIST CSF / CIS, status derived from the live audit engine, CSV export.
 - `docs/command-control-charter.md`, `docs/AUDIT_MATRIX.md`, `saas/docs/AUDIT_CENTER_BACKLOG.md`, `saas/docs/cybersecurity-monitoring.md`, `docs/red-team/mission-001-red-team-review.md`, `docs/onboarding-enforcement.md`.
-- Commercial-readiness audits: `docs/portables/README.md` (code audit) and `docs/portables/compliance-checklist.md` (commercial/legal/operational audit).
+- Commercial-readiness audit: `docs/portables/README.md` (portables catalogue and code audit).
 
-The single open gap in this map is the Browser Agent compliance doc; every other portable already has its compliance/security documentation.
+Every portable in this map now has its compliance/security documentation; the Browser Agent and Render Module docs, formerly the two gaps, are written.
 
----
-
-## 13. Vault and Secret Rules
+---## 13. Vault and Secret Rules
 
 Secrets must never be hard-coded.
 
@@ -800,6 +797,8 @@ Keeping onboarding documentation current helps future developers and AI agents a
 ---
 
 ## 19. Onboarding Change Log
+
+- 2026-07-22: Closed the infra-PR step-output chaining gap (§12C). New resolver `saas/lib/hub/pr-step-refs.ts` substitutes `{{steps[N].field}}` at merge time from the `data` an earlier step returned; wired into `saas/lib/hub/pr-engine.ts` at staging (backward-only validation rejects self/forward/malformed refs before the owner reviews) and merge (fail-closed — an unresolvable ref fails its step before the provider call, never shipping a literal placeholder). Stored PR keeps the reference text so the approved record and dedup fingerprint are unchanged; substitutions are audited with secrets masked. Covered by `saas/tests/prStepRefs.node.test.ts`. Also, while verifying the five gaps this doc listed: (a) the TikTok/Instagram video cross-post UI was found ALREADY SHIPPED (`/dashboard/cosa/video-pipeline` + `crosspost/route.ts`) — §10A corrected; (b) the durable dispatcher was found ALREADY SHIPPED (`SupabaseDispatchStore` + `supervisor_dispatch_ledger`) but its file did not load under Node's strip-only TypeScript because of a constructor parameter property — fixed the non-erasable syntax so the whole test suite loads; (c) wrote the two missing portable docs `docs/portables/browser-agent-compliance.md` and `docs/portables/render-module.md` (§12D map now complete); (d) removed the §12D reference to `docs/portables/compliance-checklist.md`, which never existed. Additional defects found and fixed in transit: the manual publish route (`app/api/cos/campaign-queue/publish/route.ts`) gated on `status === 'approved'`, which blocked publishing later languages of an approved multi-language campaign and never checked `approved_at`/`approved_by` — aligned it to the `publish-core` gate and added a duplicate-publish guard; and the render credits path was unreachable (no code supplied `paidProviderApprovalId`, and `approval_required` surfaced as HTTP 502). Fixed the latter by adding an optional `PaidProviderApprovalAdapter` to the render host contract with a fail-closed engine gate and a SignalBoost issuer bounded by `RENDER_AUTO_APPROVAL_CEILING_CENTS` (default 200 = $2); VoiceStudio now offers a one-tap BYOK switch on an out-of-credits result in all five languages.
 
 - 2026-07-21: Completed the Press & Media portable's provider set. Added the remaining three paid adapters — `ad_platform` (budget is the cost, so it always hits the spend gate), `direct_io` (inherently manual: emails the insertion order and waits for a tearsheet), and `media_database` (verifies contacts against a subscription and explicitly refuses to distribute) — all registered in the host and all driven through `provider_registry` + `universalRunner` like `pr_wire`, so a new brand stays a config row. Added design-doc §7 structured columns to `press_campaigns` (`provider_id`, `provider_type`, `cost_estimate`, `cost_currency`, `spend_approved_at`, `dispatch_ref`, `dispatch_state`, `proof_type`, `proof_payload`, `scheduled_at`; migration `20260721_press_media_structured_proof.sql`) and wired the engine to persist provider identity, the estimate the spend gate ruled on, and provider-shaped proof. Localized the provider cockpit into all five platform languages (EN/ES/PT/PL/RU), provider labels and blurbs included. Created `docs/portables/README.md` — the portables catalog Section 12D references — and refreshed the Press & Media design doc so §7 documents the shipped `provider_registry` + vault reuse instead of the superseded per-portable connections table.
 

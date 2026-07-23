@@ -81,3 +81,16 @@ Adopting the COS is not a badge flip. To reach a genuine enterprise deployment, 
 are all behind injected ports as of this writing. "Enterprise-ready" for any given buyer
 still requires that buyer's own adapters, company record, host wiring, and a passing build
 plus security review in their environment — verified, not assumed.*
+
+## Portable Browser Agent Ecosystem
+
+Browser automation is optional host composition, not a COS engine dependency. A buyer selects one session provider, one agent-loop provider, one policy engine, one credential broker, one approval service, one evidence store, and one telemetry sink; web-data, human-control, and scheduler ports are optional. An integrated platform may implement several ports. Every choice is injected through the portable browser contracts; no browser vendor SDK, credential, route, or production execution ships in the portable.
+
+Buyer-supplied ports are `PortableBrowserSessionPort`, `PortableBrowserAgentLoopPort`, `PortableBrowserCredentialPort`, `PortableBrowserPolicyPort`, `PortableBrowserApprovalPort`, `PortableBrowserEvidencePort`, `PortableBrowserTelemetryPort`, `PortableBrowserWebDataPort`, `PortableBrowserHumanControlPort`, and `PortableBrowserSchedulerPort`.
+
+Browser go-live additions:
+
+- [ ] Choose and implement compatible browser adapters and validate the compatibility matrix.
+- [ ] Configure identity and credential isolation, exact origin policies, approval rules, evidence retention, human takeover, replay/incident review, and cost/concurrency limits.
+- [ ] Test provider suspension and kill switch behavior.
+- [ ] Verify no SignalBoost credentials ship with the portable.

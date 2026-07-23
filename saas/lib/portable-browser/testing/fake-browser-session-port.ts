@@ -1,0 +1,2 @@
+import type { PortableBrowserSessionPort } from '../browser-session-port.ts'
+export class FakeBrowserSessionPort implements PortableBrowserSessionPort { private n=0; async create(){return {sessionId:`fake-${++this.n}`}} async navigate(){} async observe(){return {origin:'https://example.test',allowedSelectors:['#ok']}} async perform(){} async captureEvidence(){return {referenceId:'evidence'}} async pause(){} async resume(){} async requestHumanTakeover(){return {referenceId:'takeover'}} async close(){} }

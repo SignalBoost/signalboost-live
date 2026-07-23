@@ -1,0 +1,3 @@
+import type { PortableBrowserDecision, PortableBrowserObservation } from './browser-runtime-types.ts'
+export interface PortableBrowserAgentLoopInput { objective:string; observation:PortableBrowserObservation; allowedCapabilities:readonly string[]; allowedSelectors:readonly string[]; approvedOrigins:readonly string[]; remainingActionCount:number; remainingNavigationCount:number; approvalGranted:boolean; cancellationRequested:boolean; previousOutcomes:readonly string[] }
+export interface PortableBrowserAgentLoopPort { decide(input:Readonly<PortableBrowserAgentLoopInput>):Promise<PortableBrowserDecision> }

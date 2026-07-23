@@ -1,0 +1,1 @@
+export interface PortableBrowserEvidencePort { record(input:{tenantId:string; sessionId:string; kind:string; referenceId:string}):Promise<{evidenceReference:string}>; replay(reference:string):Promise<{replayReference:string}|null> }

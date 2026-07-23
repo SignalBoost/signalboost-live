@@ -1,0 +1,2 @@
+import type { PortableBrowserEnvironment, PortableBrowserPortKind } from './browser-runtime-types.ts'
+export interface PortableBrowserHostCapabilities { ports:readonly PortableBrowserPortKind[]; capabilities:readonly string[]; environments:readonly PortableBrowserEnvironment[]; runtimeLanguages:readonly string[]; authenticationModes:readonly string[]; dataResidencies:readonly string[]; maximumConcurrentSessions:number; maximumSessionDurationMs:number; productionEnabled:boolean; configurationKeys:readonly string[]; hostRestrictions:readonly string[] }

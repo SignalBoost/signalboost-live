@@ -1,4 +1,6 @@
 import type { NicheVideoConcept, NicheVideoStrategyInput, VideoDistributionChannel, VideoDistributionVariant } from './types'
+import { isSoldCopy } from '@/lib/portable/companyIdentity'
+import type { CompanyFacts } from '@/portable-kernel'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -100,17 +102,22 @@ export function buildNicheVideoConcept(input: NicheVideoStrategyInput): NicheVid
   }
 }
 
-export function defaultSignalBoostNicheVideoInput(): NicheVideoStrategyInput {
+export function defaultSignalBoostNicheVideoInput(facts?: CompanyFacts | null): NicheVideoStrategyInput {
   const observedAt = new Date().toISOString()
+  // Buyer/sold copy: tokens from the buyer's record (or placeholder); the seller-specific
+  // COSA/SignalBoost strategy narrative is dropped. Seller deployment: original seed unchanged.
+  const buyer = isSoldCopy() || Boolean(String(process.env.PORTABLE_BRAND_NAME || '').trim())
+  const brand = facts?.brandName?.trim() || '[YOUR COMPANY]'
+  const product = facts?.products?.[0]?.trim() || '[YOUR PRODUCT]'
   return {
-    company_name: 'SignalBoost',
-    product_or_service: 'COSA Marketing and Sales Command Console',
+    company_name: buyer ? brand : 'SignalBoost',
+    product_or_service: buyer ? product : 'COSA Marketing and Sales Command Console',
     niche: 'small businesses that need marketing and sales execution without hiring a full team',
     target_audience: 'owners, solo founders, agencies, and operators who need growth capacity',
     objective: 'lead_generation',
     predicted_need: 'The audience needs a practical way to convert recommendations into approved campaigns and follow-up work.',
     primary_pain: 'too many growth tasks and not enough time or staff to coordinate them',
-    desired_action: 'visit SignalBoost and review how COSA can prepare campaigns for approval',
+    desired_action: buyer ? `visit ${brand} to learn more` : 'visit SignalBoost and review how COSA can prepare campaigns for approval',
     languages: ['en', 'es', 'pt'],
     preferred_channels: ['long_form_video', 'short_vertical_video', 'professional_feed'],
     signals: [
@@ -119,10 +126,12 @@ export function defaultSignalBoostNicheVideoInput(): NicheVideoStrategyInput {
         metric: 'niche_video_needed',
         value: 'marketing_sales_command_console',
         confidence: 78,
-        evidence: [
-          'SignalBoost needs reusable education content that explains COSA as an AI-operated marketing and sales department.',
-          'Video is appropriate because the product is easier to understand when shown as a workflow.',
-        ],
+        evidence: buyer
+          ? ['Short educational video helps explain a product when shown as a workflow.']
+          : [
+            'SignalBoost needs reusable education content that explains COSA as an AI-operated marketing and sales department.',
+            'Video is appropriate because the product is easier to understand when shown as a workflow.',
+          ],
         observed_at: observedAt,
       },
     ],

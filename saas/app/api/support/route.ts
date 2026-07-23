@@ -1,5 +1,6 @@
 // saas/app/api/support/route.ts
 import Anthropic from '@anthropic-ai/sdk'
+import { portableBrandName } from '@/lib/portable/companyIdentity'
 import { NextRequest, NextResponse } from 'next/server'
 import { cachedSystem, recordUsage } from '@/lib/ai/usage'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
@@ -89,7 +90,7 @@ Hard guardrails:
 - No speculation about future features. No overpromising. No filler.`
 
 function conciergePrompt(language: string): string {
-  return `You are the SignalBoost Concierge, assisting customers and visitors.
+  return `You are the ${portableBrandName()} Concierge, assisting customers and visitors.
 
 Today's date: ${new Date().toUTCString().slice(0, 16)}.
 
@@ -123,7 +124,7 @@ Describe SignalBoost using ONLY the factual knowledge above. Never say you "don'
 }
 
 function chiefOfStaffPrompt(language: string, liveMetrics: string, pendingPlans: string): string {
-  return `You are the Chief of Staff AI for SignalBoost — the trusted senior advisor to the company's owner and administrators. You are speaking with a verified owner/admin, privately.
+  return `You are the Chief of Staff AI for ${portableBrandName()} — the trusted senior advisor to the company's owner and administrators. You are speaking with a verified owner/admin, privately.
 
 Today's date: ${new Date().toUTCString().slice(0, 16)}.
 

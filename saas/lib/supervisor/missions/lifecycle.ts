@@ -26,7 +26,7 @@ const envelope = <T>(
   eventId: string,
   occurredAt: string,
   correlationId: string,
-): MissionEventEnvelope<T> => ({ eventId, occurredAt, correlationId, payload })
+): MissionEventEnvelope<T> => ({ eventId, occurredAt, correlationId, causationId: null, idempotencyKey: eventId, revision: 1, schemaVersion: 'mission-envelope-v1', payload })
 
 export class MissionOrchestrator {
   constructor(private readonly deps: MissionLifecycleDeps) {}
@@ -50,11 +50,9 @@ export class MissionOrchestrator {
       metadata: { eventType: input.eventType },
       schemaVersion: 'mission-v1',
     })
-    const saved = await this.deps.missionStore.create(mission)
-    await this.deps.eventBus.publish(
-      missionTopics.missions,
-      envelope(saved, this.deps.id('mission-event'), now, saved.correlationId),
-    )
+    const missionEvent = envelope(mission, this.deps.id('mission-event'), now, mission.correlationId)
+    const saved = await this.deps.missionStore.createWithOutbox(mission, missionTopics.missions, missionEvent)
+    await this.deps.eventBus.publish(missionTopics.missions, missionEvent)
     return saved
   }
 }

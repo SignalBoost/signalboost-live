@@ -1,0 +1,11 @@
+import { createAgentSandboxAuditEvent } from './provider-audit.ts'
+import type { AgentWorkflowAuditAction, AgentWorkflowAuditEvent } from './workflow-types.ts'
+import { normalizeAuditEventId, normalizeRequestId, normalizeUserId, normalizeWorkflowId } from './workflow-identifiers.ts'
+
+const clip = (value: string | undefined, length = 128) => value ? value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, length) : undefined
+export function createAgentWorkflowAuditEvent(input: Omit<AgentWorkflowAuditEvent, 'timestamp'> & { timestamp?: string }, now: () => number = Date.now): AgentWorkflowAuditEvent {
+  const timestamp = input.timestamp ?? new Date(now()).toISOString()
+  createAgentSandboxAuditEvent({ eventId: input.eventId, requestId: input.requestId, userId: input.userId, providerId: input.providerId === 'remote' ? 'remote' : 'disabled', action: input.action, outcome: input.action.includes('denied') || input.action.includes('unavailable') ? 'denied' : input.action.includes('failed') ? 'failed' : 'completed', timestamp })
+  return Object.freeze({ eventId: normalizeAuditEventId(input.eventId), action: input.action as AgentWorkflowAuditAction, requestId: normalizeRequestId(input.requestId), workflowId: normalizeWorkflowId(input.workflowId), userId: normalizeUserId(input.userId), ...(input.providerId ? { providerId: clip(input.providerId) } : {}), ...(input.language ? { language: input.language } : {}), ...(Number.isFinite(input.attemptCount) ? { attemptCount: input.attemptCount } : {}), ...(Number.isFinite(input.correctionCount) ? { correctionCount: input.correctionCount } : {}), ...(typeof input.verified === 'boolean' ? { verified: input.verified } : {}), ...(input.denialReason ? { denialReason: clip(input.denialReason) } : {}), ...(input.failureCategory ? { failureCategory: clip(input.failureCategory) } : {}), ...(input.failedStage ? { failedStage: input.failedStage } : {}), ...(Number.isFinite(input.durationMs) ? { durationMs: Math.max(0, input.durationMs!) } : {}), ...(Number.isFinite(input.quotaCostUnits) ? { quotaCostUnits: Math.max(0, input.quotaCostUnits!) } : {}), timestamp })
+}
+export const freezeWorkflowAuditEvents = (events: readonly AgentWorkflowAuditEvent[]) => Object.freeze([...events])

@@ -44,7 +44,9 @@
     "test:agent-repair-controller": "node --test tests/agentRepairController.node.test.ts tests/agentRepairPrompts.node.test.ts",
     "test:mission-durable-outbox": "node --test tests/missionDurableOutbox.node.test.ts",
     "test:mission-worker-runtime": "node --test tests/missionWorkerRuntime.node.test.ts",
-    "test:mission-phase3": "npm run test:mission-lifecycle && npm run test:mission-durable-outbox && npm run test:mission-worker-runtime"
+    "test:mission-phase3": "npm run test:mission-lifecycle && npm run test:mission-durable-outbox && npm run test:mission-worker-runtime",
+    "test:agent-workflow-coordinator": "node --test tests/agentWorkflowCoordinator.node.test.ts tests/agentWorkflowAudit.node.test.ts tests/agentWorkflowSecurity.node.test.ts",
+    "test:agent-provider-boundary": "node --test tests/agentProviderGuard.node.test.ts tests/agentProviderAudit.node.test.ts tests/agentProviderRegistry.node.test.ts tests/agentProviderConfig.node.test.ts tests/agentRemoteProvider.node.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",

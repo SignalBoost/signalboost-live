@@ -20,8 +20,9 @@ export interface CampaignQueueStore {
   getById(id: string): Promise<CampaignQueueRow | null>
   // Just the metadata jsonb for a row — the hot re-read pipeline stages do between updates.
   getMetadata(id: string): Promise<Record<string, any> | null>
-  // Apply a partial column update to one row.
-  update(id: string, patch: Partial<CampaignQueueRow>): Promise<void>
+  // Apply a partial column update to one row. Returns ok:false with the error message on
+  // failure instead of throwing, so callers choose whether a failed write is fatal.
+  update(id: string, patch: Partial<CampaignQueueRow>): Promise<{ ok: boolean; error?: string }>
 }
 
 // ── SignalBoost's own adapter (the host implementation) ──
@@ -41,8 +42,9 @@ export function createSupabaseCampaignQueueStore(client?: any): CampaignQueueSto
       const { data } = await db.from('cos_campaign_queue').select('metadata').eq('id', id).single()
       return (data?.metadata as Record<string, any>) || null
     },
-    async update(id: string, patch: Partial<CampaignQueueRow>): Promise<void> {
-      await db.from('cos_campaign_queue').update(patch).eq('id', id)
+    async update(id: string, patch: Partial<CampaignQueueRow>): Promise<{ ok: boolean; error?: string }> {
+      const { error } = await db.from('cos_campaign_queue').update(patch).eq('id', id)
+      return error ? { ok: false, error: error.message } : { ok: true }
     },
   }
 }

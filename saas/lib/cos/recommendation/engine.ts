@@ -1,5 +1,7 @@
 import { priorityFromScore, scoreRecommendation, scoreSignals } from './scoring'
 import type { CosChannel, CosDepartment, CosRecommendation, CosSignal } from './types'
+import { isSoldCopy } from '@/lib/portable/companyIdentity'
+import type { CompanyFacts } from '@/portable-kernel'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -55,7 +57,17 @@ export function buildRecommendation(args: {
   }
 }
 
-export function buildDefaultMarketingRecommendation(): CosRecommendation {
+export function buildDefaultMarketingRecommendation(facts?: CompanyFacts | null): CosRecommendation {
+  // Buyer/sold copy: the employer's product drives the summary and the seller-specific claim
+  // is dropped for a neutral one. Seller's own deployment returns the original seed unchanged.
+  const buyer = isSoldCopy() || Boolean(String(process.env.PORTABLE_BRAND_NAME || '').trim())
+  const product = facts?.products?.[0]?.trim() || '[YOUR PRODUCT]'
+  const evidence = buyer
+    ? 'Recurring feature-education campaigns build durable demand.'
+    : 'SignalBoost needs recurring feature education campaigns.'
+  const summary = buyer
+    ? `Promote a ${product} feature by teaching the customer problem first, then presenting the feature as the solution.`
+    : 'Promote a SignalBoost feature by teaching the customer problem first, then presenting the feature as the solution.'
   return buildRecommendation({
     department: 'marketing',
     signals: [{
@@ -64,10 +76,10 @@ export function buildDefaultMarketingRecommendation(): CosRecommendation {
       value: 'console_hub',
       change: 20,
       confidence: 70,
-      evidence: ['SignalBoost needs recurring feature education campaigns.'],
+      evidence: [evidence],
       observed_at: new Date().toISOString(),
     }],
-    summary: 'Promote a SignalBoost feature by teaching the customer problem first, then presenting the feature as the solution.',
+    summary,
     estimatedCostUsd: 8,
   })
 }

@@ -36,7 +36,7 @@ const PORTABLES = [
   { key: 'press', glyph: '◉', tag: 'live', href: '', fallbackName: 'Press & Media', fallbackDesc: 'Governed outreach to verified editors and paid distribution services.' },
   { key: 'chiefOfStaff', glyph: '❖', tag: 'preview', href: '', fallbackName: 'Portable AI Chief of Staff', fallbackDesc: 'Plans and carries out only approved work through buyer-supplied ports.' },
   { key: 'browserAgents', glyph: '◇', tag: 'preview', href: '', fallbackName: 'Browser Agent Ecosystem', fallbackDesc: 'Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks.' },
-  { key: 'agentRuntime', glyph: '⌁', tag: 'preview', href: '', fallbackName: 'Durable Agent Runtime', fallbackDesc: 'Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters.' },
+  { key: 'agentOperations', glyph: '⌁', tag: 'preview', href: '', fallbackName: 'Agent Operations Platform', fallbackDesc: 'Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters.' },
   { key: 'selfHealing', glyph: '⟲', tag: 'preview', href: '', fallbackName: 'Self-Healing Supervisor', fallbackDesc: 'Detects failures, diagnoses them, and proposes bounded repairs for approval.' },
 ] as const
 

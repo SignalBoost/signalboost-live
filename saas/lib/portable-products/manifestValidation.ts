@@ -5,7 +5,7 @@ const categories = new Set<PortableProductCategory>(['growth', 'media', 'operati
 const maturities = new Set<PortableProductMaturity>(['experimental', 'preview', 'beta', 'production'])
 const statuses = new Set<PortableProductStatus>(['live', 'preview', 'internal', 'deprecated', 'hidden'])
 const arrayFields: readonly (keyof PortableProductManifest)[] = ['supportedLanguages', 'targetAudience', 'requiredCapabilities', 'optionalCapabilities', 'dependencies', 'exclusions', 'architectureReferences', 'documentationReferences', 'futureFeatures']
-const SECRET_LIKE = /(api[_-]?key|secret|token|password|credential|authorization|bearer|sk-[a-z0-9])/i
+const SECRET_LIKE = /(?:api[_-]?key|secret|token|password|credential|authorization)\s*[:=]\s*\S+|bearer\s+[a-z0-9._~+/=-]{8,}|\bsk-[a-z0-9_-]{16,}\b/i
 const MAX_STRING_LENGTH = 2_000
 
 function fail(message: string): never { throw new Error(`Invalid portable product manifest: ${message}`) }

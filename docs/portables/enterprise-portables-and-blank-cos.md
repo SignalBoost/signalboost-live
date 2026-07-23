@@ -115,15 +115,17 @@ Concierge brain; **not** `cos-backup`, which is a small read-only failover COS) 
 
 ---
 
-## 5. OPEN PRODUCT QUESTION (needs Luis's decision)
+## 5. Packaging (settled)
 
-**Should the blank/no-profile COS copy be offered as its own portable (a standalone
-"blank COS" product line), or sold together (bundled with the other portables / as one
-package)?**
+The blank/no-profile COS copy is sold **both ways**: as its **own standalone portable**
+(the flagship / anchor product) **and bundled** with the other portables. Pricing tiers
+decide how much of the engine a buyer gets in either case — consistent with the
+"everything is for sale, depends on price" model.
 
-This is a packaging / go-to-market decision, **not** technical. Do not assume either
-way. Raise it with Luis. Both are supportable by the current code — the difference is
-how it's licensed and priced, not how it's built.
+This is a go-to-market / pricing decision, not a technical one. **The current code
+supports both with no change** — the same codebase ships as seller, blank copy, or
+configured buyer purely via env flags (see §4). No further engineering is required to
+enable either packaging.
 
 ---
 

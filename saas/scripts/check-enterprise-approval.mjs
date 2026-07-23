@@ -63,7 +63,9 @@ requireMatch(queueRoute, queueRoutePath, /branded\s*!==\s*true|branded\s*===\s*t
 requireMatch(queueRoute, queueRoutePath, /voicedUrl/, 'video approval must require a final preview URL')
 requireOrder(queueRoute, queueRoutePath, /computeCampaignContentHash\(/, /withApprovalBinding\(/, 'must compute the content hash before storing the approval binding')
 
-requireMatch(publishRoute, publishRoutePath, /campaign\.status\s*!==\s*['"]approved['"]/, 'manual publish route must refuse non-approved campaigns')
+requireMatch(publishRoute, publishRoutePath, /Boolean\(campaign\.approved_at\)\s*&&\s*Boolean\(campaign\.approved_by\)/, 'manual publish route must require owner approval fields')
+requireMatch(publishRoute, publishRoutePath, /\[['"]approved['"],\s*['"]queued['"],\s*['"]running['"]\]\.includes\(String\(campaign\.status\)\)/, 'manual publish route must restrict publishing to the approved lifecycle band')
+requireMatch(publishRoute, publishRoutePath, /if\s*\(\s*!ownerApproved\s*\|\|\s*!publishableStatus\s*\)/, 'manual publish route must refuse campaigns outside the owner-approved lifecycle band')
 requireMatch(publishRoute, publishRoutePath, /verifyApprovalBinding\(campaign\)/, 'manual publish route must verify approval binding before publishing')
 requireOrder(publishRoute, publishRoutePath, /verifyApprovalBinding\(campaign\)/, /publishSocialPost\(/, 'manual publish route must verify approval binding before calling social publishing')
 requireMatch(publishRoute, publishRoutePath, /branded\s*!==\s*true/, 'manual video publish must block unbranded video')

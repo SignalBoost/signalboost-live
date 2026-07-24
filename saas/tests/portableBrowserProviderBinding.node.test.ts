@@ -4,12 +4,14 @@ import { allPortableBrowserAdapterDescriptors } from '../lib/portable-browser/ca
 import { checkPortableBrowserCompatibility } from '../lib/portable-browser/browser-compatibility.ts'
 import { freezePortableBrowserManifest } from '../lib/portable-browser/browser-portable-manifest.ts'
 
+const availableAdapters = new Set(['browserbase', 'browserless'])
+
 test('portable browser descriptors are frozen, serializable, and explicitly inactive', () => {
   const ids = new Set<string>()
   for (const descriptor of allPortableBrowserAdapterDescriptors) {
     assert.ok(Object.isFrozen(descriptor)); assert.ok(!ids.has(descriptor.adapterId)); ids.add(descriptor.adapterId)
     assert.equal(descriptor.vendorDependencyInstalled, false); assert.equal(descriptor.productionEnabled, false)
-    assert.equal(descriptor.implementationStatus, descriptor.adapterId === 'browserbase' ? 'available' : 'host_adapter_required'); assert.doesNotThrow(() => JSON.stringify(descriptor))
+    assert.equal(descriptor.implementationStatus, availableAdapters.has(descriptor.adapterId) ? 'available' : 'host_adapter_required'); assert.doesNotThrow(() => JSON.stringify(descriptor))
     assert.ok(descriptor.documentationReference); assert.ok(descriptor.supportedPortKinds.length)
   }
 })

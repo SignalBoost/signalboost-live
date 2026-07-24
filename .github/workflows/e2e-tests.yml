@@ -6,7 +6,7 @@ on:
     branches: [ main, master ]
 jobs:
   test:
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -18,8 +18,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
       working-directory: saas
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
+    - name: Install Playwright Chromium
+      run: timeout 15m npx playwright install --with-deps chromium
       working-directory: saas
     - name: Run Playwright tests
       run: |

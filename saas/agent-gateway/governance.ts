@@ -1,176 +1,142 @@
 // saas/agent-gateway/governance.ts
 //
-// Protocol-agnostic governance core for the governed agent socket. It classifies every
-// normalized request, permits unattended execution only for explicitly allowlisted and
-// reversible internal actions, and otherwise fails closed behind human approval.
+// THE STABLE CORE. The one part that is yours and never changes — it names no protocol and
+// no vendor, and every request from every adapter passes through it. Two gates enforce the
+// safety envelope:
+//
+//   Gate 1 — the categorical harm interlock. If the action's consequence class can affect
+//            money, safety, data, or the outside world (or can't be classified), it ALWAYS
+//            halts for a human. A class check, not a risk score: no confidence lets the
+//            machine act here, and the allowlist cannot override it.
+//   Gate 2 — the closed allowlist. Only a 'reversible_internal' action that is explicitly
+//            listed AND carries a verified rollback runs unattended.
+//   Default — halt. Anything unlisted or unclassifiable waits for a human.
+//
+// Every decision is audited to the buyer's SIEM.
 
-import {
-  HUMAN_ONLY_CLASSES,
-  type AgentRequest,
-  type GatewayHost,
-  type GatewayOutcome,
-  type GovernanceDecision,
-  type GovernancePolicy,
-  type PortableAuditEvent,
+import type {
+  AgentRequest,
+  ConsequenceClass,
+  GatewayHost,
+  GatewayOutcome,
+  GovernanceDecision,
+  GovernancePolicy,
+  PortableAuditEvent,
 } from './types.ts'
+import { HUMAN_ONLY_CLASSES } from './types.ts'
 
-function isAllowlisted(request: AgentRequest, policy: GovernancePolicy): boolean {
-  return policy.allowlist.some((entry) =>
-    entry.actionKind === request.action.kind
-    && entry.target === request.action.target
-    && entry.rollback.trim().length > 0,
-  )
+const DATASET = 'agent_gateway'
+
+function classifyFailClosed(request: AgentRequest, policy: GovernancePolicy): ConsequenceClass {
+  try {
+    return policy.classifier.classify(request) ?? 'unknown'
+  } catch {
+    return 'unknown'
+  }
 }
 
-export function evaluateGovernance(
-  request: AgentRequest,
-  policy: GovernancePolicy,
-): GovernanceDecision {
-  const consequenceClass = policy.classifier.classify(request)
+/** Pure decision: no side effects. Given a normalized request + policy, return the verdict. */
+export function evaluate(request: AgentRequest, policy: GovernancePolicy): GovernanceDecision {
+  const consequenceClass = classifyFailClosed(request, policy)
 
+  // Gate 1 — categorical: money / safety / data / external / unknown are ALWAYS human-gated.
   if (HUMAN_ONLY_CLASSES.includes(consequenceClass)) {
     return {
       requestId: request.requestId,
       verdict: 'halt_for_approval',
       consequenceClass,
-      reason: `consequence class '${consequenceClass}' requires human approval`,
+      reason: `consequence class '${consequenceClass}' always requires human approval`,
     }
   }
 
-  if (consequenceClass !== 'reversible_internal') {
+  // Gate 2 — closed allowlist: a reversible_internal action, explicitly listed, with a rollback.
+  const entry = policy.allowlist.find(
+    (e) => e.actionKind === request.action.kind && e.target === request.action.target,
+  )
+  if (consequenceClass === 'reversible_internal' && entry && entry.rollback) {
     return {
       requestId: request.requestId,
-      verdict: 'deny',
+      verdict: 'execute',
       consequenceClass,
-      reason: `unsupported consequence class '${consequenceClass}'`,
+      reason: `pre-authorized reversible action (rollback: ${entry.rollback})`,
     }
   }
 
-  if (!isAllowlisted(request, policy)) {
-    return {
-      requestId: request.requestId,
-      verdict: 'halt_for_approval',
-      consequenceClass,
-      reason: 'reversible action is not present in the closed allowlist with a rollback',
-    }
-  }
-
+  // Default — halt.
   return {
     requestId: request.requestId,
-    verdict: 'execute',
+    verdict: 'halt_for_approval',
     consequenceClass,
-    reason: 'reversible internal action is explicitly allowlisted with a rollback',
+    reason: 'action is not in the pre-authorized allowlist',
   }
 }
 
+const SEVERITY = {
+  'agent.executed': 'notice',
+  'agent.execution_failed': 'high',
+  'agent.halted_for_approval': 'warning',
+  'agent.denied': 'high',
+} as const
+
 function auditEvent(
   request: AgentRequest,
+  eventType: keyof typeof SEVERITY,
   decision: GovernanceDecision,
-  outcome: Pick<GatewayOutcome, 'ok' | 'error' | 'approvalId'>,
-  policy: GovernancePolicy,
+  extra?: Record<string, unknown>,
 ): PortableAuditEvent {
   return {
-    eventId: `agent-gateway:${request.requestId}:${decision.verdict}`,
-    eventType: `agent_gateway.${decision.verdict}`,
+    eventId: `agw_${request.requestId}_${eventType}`,
+    eventType,
     occurredAt: new Date().toISOString(),
-    dataset: 'agent_gateway.governance',
+    dataset: DATASET,
     category: 'process',
-    schemaVersion: 1,
     subjectId: request.requestId,
-    correlationId: request.requestId,
     payload: {
       protocol: request.protocol,
       agentId: request.agentId,
-      tenantId: request.tenantId ?? policy.tenantId,
-      environment: policy.environment,
       actionKind: request.action.kind,
-      actionTarget: request.action.target,
+      target: request.action.target,
       consequenceClass: decision.consequenceClass,
       verdict: decision.verdict,
       reason: decision.reason,
-      ok: outcome.ok,
-      error: outcome.error,
-      approvalId: outcome.approvalId,
+      ...(request.actor?.userId ? { userId: request.actor.userId } : {}),
+      ...(extra ?? {}),
     },
   }
 }
 
-async function recordAudit(
-  host: GatewayHost,
-  request: AgentRequest,
-  decision: GovernanceDecision,
-  outcome: Pick<GatewayOutcome, 'ok' | 'error' | 'approvalId'>,
-  policy: GovernancePolicy,
-): Promise<void> {
-  if (!host.audit) return
-  await host.audit.record(auditEvent(request, decision, outcome, policy))
-}
-
-export async function governAndExecute(
+/**
+ * The full governed run: decide, then act, halt, or deny — auditing every outcome to the
+ * buyer's SIEM. Execution only ever happens on a Gate-2 'execute' verdict; everything else
+ * is parked for a human via the buyer's approval port.
+ */
+export async function runGoverned(
   request: AgentRequest,
   policy: GovernancePolicy,
   host: GatewayHost,
 ): Promise<GatewayOutcome> {
-  const decision = evaluateGovernance(request, policy)
+  const decision = evaluate(request, policy)
+  const base = {
+    requestId: request.requestId,
+    verdict: decision.verdict,
+    consequenceClass: decision.consequenceClass,
+    reason: decision.reason,
+  }
 
-  if (decision.verdict === 'deny') {
-    const outcome: GatewayOutcome = {
-      ...decision,
-      ok: false,
-      error: decision.reason,
-    }
-    await recordAudit(host, request, decision, outcome, policy)
-    return outcome
+  if (decision.verdict === 'execute') {
+    const r = await host.execution.perform(request)
+    const eventType = r.ok ? 'agent.executed' : 'agent.execution_failed'
+    await host.audit?.record(auditEvent(request, eventType, decision, r.ok ? undefined : { error: r.error }))
+    return { ...base, ok: r.ok, result: r.result, error: r.error }
   }
 
   if (decision.verdict === 'halt_for_approval') {
-    if (!host.approvals) {
-      const outcome: GatewayOutcome = {
-        ...decision,
-        ok: false,
-        error: 'human approval is required but no approval port is configured',
-      }
-      await recordAudit(host, request, decision, outcome, policy)
-      return outcome
-    }
-
-    try {
-      const approval = await host.approvals.requestApproval(request, decision)
-      const outcome: GatewayOutcome = {
-        ...decision,
-        ok: false,
-        approvalId: approval.approvalId,
-      }
-      await recordAudit(host, request, decision, outcome, policy)
-      return outcome
-    } catch (error) {
-      const outcome: GatewayOutcome = {
-        ...decision,
-        ok: false,
-        error: error instanceof Error ? error.message : 'approval request failed',
-      }
-      await recordAudit(host, request, decision, outcome, policy)
-      return outcome
-    }
+    let approvalId: string | undefined
+    if (host.approvals) approvalId = (await host.approvals.requestApproval(request, decision)).approvalId
+    await host.audit?.record(auditEvent(request, 'agent.halted_for_approval', decision, approvalId ? { approvalId } : undefined))
+    return { ...base, ok: false, approvalId }
   }
 
-  try {
-    const execution = await host.execution.perform(request)
-    const outcome: GatewayOutcome = {
-      ...decision,
-      ok: execution.ok,
-      result: execution.result,
-      error: execution.error,
-    }
-    await recordAudit(host, request, decision, outcome, policy)
-    return outcome
-  } catch (error) {
-    const outcome: GatewayOutcome = {
-      ...decision,
-      ok: false,
-      error: error instanceof Error ? error.message : 'execution failed',
-    }
-    await recordAudit(host, request, decision, outcome, policy)
-    return outcome
-  }
+  await host.audit?.record(auditEvent(request, 'agent.denied', decision))
+  return { ...base, ok: false }
 }

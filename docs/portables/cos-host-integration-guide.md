@@ -22,6 +22,7 @@ and the engine code never changes.
 | `CosAiPort` | `lib/cos/aiPort.ts` | The platform model router + platform keys | Text generation via **their** model provider (Azure OpenAI, Bedrock, private gateway) |
 | `CosImagePort` | `lib/cos/aiPort.ts` | Direct OpenAI image call + platform key | Image generation via their image model |
 | Company facts | `lib/portable/companyIdentity.ts` (kernel: `portable-kernel`) | The platform's organization record | Their company record, so generated content speaks for **their** business |
+| `CosBackupRuntimeConfig` (`loadBrain`/`reasoner`/`log`) | `lib/cos-backup/runtime.ts` (contract in `cos-backup-core`) | The local `cos-core/brain.md` snapshot + OpenAI + `cos_decisions` table | Their own approved continuity playbook, model provider, and audit store for Backup COS |
 
 Each engine entry point accepts its port as an argument that **defaults to SignalBoost's
 adapter**. A buyer constructs their adapters once and passes them in from their own host
@@ -94,3 +95,34 @@ Browser go-live additions:
 - [ ] Configure identity and credential isolation, exact origin policies, approval rules, evidence retention, human takeover, replay/incident review, and cost/concurrency limits.
 - [ ] Test provider suspension and kill switch behavior.
 - [ ] Verify no SignalBoost credentials ship with the portable.
+
+---
+
+## Backup COS continuity (`cos-backup-core` / `cos-backup-host`)
+
+The Concierge entry point (`app/api/concierge/route.ts`) shadows every request through a
+read-only Backup COS so a degraded Primary response never reaches the user unnoticed. That
+continuity layer now has the same port boundary as the rest of the engine:
+
+- **`cos-backup-core/ports.ts`** — host-agnostic contract: `CosReasoner` (ask a model),
+  `DecisionLogSink` (record a recovery/divergence event), and `CosBackupRuntimeConfig`
+  (bundles both plus an optional brain loader and timeout). Zero imports, zero platform
+  assumptions.
+- **`lib/cos-backup/runtime.ts`** — `runBackupCos` / `recordCosRecovery` are unchanged and
+  remain the default SignalBoost path (local `cos-core/brain.md`, OpenAI, `cos_decisions`).
+  Additive host-agnostic variants `runBackupCosWithConfig` / `recordCosRecoveryWithConfig`
+  accept a `CosBackupRuntimeConfig` — pass one in and continuity runs on a buyer's own
+  approved playbook, model provider, and audit store with no change to this file.
+- **`cos-backup-host/signalboostCosBackupHost.ts`** — the reference SignalBoost binding
+  (`createSignalBoostCosBackupConfig()`), showing exactly what a buyer's own version of this
+  one file needs to supply.
+- **`lib/cos-backup/policy.ts`** and **`lib/cos-backup/index.ts`** (divergence detection,
+  advisory-only decision comparison) were already dependency-free and needed no change —
+  they are enforced staying that way by `tests/cosBackupIntegrity.node.test.ts`.
+
+One caveat worth knowing before licensing this to a buyer: `cos-core/brain.md` (the approved
+playbook snapshot) currently states its own identity line ("COS is SignalBoost's private
+Chief of Staff…") and is under its own CODEOWNERS review process — this port change does not
+edit that file. A buyer supplying their own `loadBrain()` never inherits that line; a buyer
+who instead reuses the SignalBoost binding as-is would need that file's identity line
+addressed separately (a governance/content edit, not a code coupling issue).

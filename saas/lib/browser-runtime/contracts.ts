@@ -1,6 +1,8 @@
 // Portable Browser Runtime contracts.
 // This module must remain independent of Next.js UI, Supabase, and provider SDKs.
 
+import type { BrowserProfilePort } from './profile-portability.ts'
+
 export type BrowserTaskMode = 'observe' | 'prepare_change' | 'execute_change'
 export type BrowserTaskStatus = 'completed' | 'paused' | 'blocked' | 'failed'
 
@@ -96,6 +98,7 @@ export interface BrowserPagePort {
 
 export interface BrowserSessionPort {
   page: BrowserPagePort
+  profile?: BrowserProfilePort
   close(): Promise<void>
 }
 

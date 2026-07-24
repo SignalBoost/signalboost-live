@@ -15,7 +15,7 @@ import {
   BlendCandidate,
 } from './schema';
 import { HostContext } from './host';
-import { ProviderRegistry } from './registry';
+import { AiProviderRegistry } from './registry';
 
 export type BlendStrategy = 'ensemble' | 'voting' | 'fusion';
 
@@ -30,7 +30,7 @@ export interface BlendOptions {
 
 export class Blender {
   constructor(
-    private registry: ProviderRegistry,
+    private registry: AiProviderRegistry,
     private host: HostContext,
   ) {}
 

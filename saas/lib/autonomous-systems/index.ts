@@ -9,3 +9,4 @@ export * from './enterprise-knowledge-graph.ts';
 export * from './objective-engine.ts';
 export * from './policy-governance.ts';
 export * from './capability-registry.ts';
+export * from './decision-engine.ts';

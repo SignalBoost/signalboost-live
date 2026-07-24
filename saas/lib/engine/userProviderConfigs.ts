@@ -1,27 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
 import { vaultDecrypt, vaultEncrypt } from '../vault/crypto.ts'
-
-export type UserProviderConfig = {
-  user_id: string
-  active_provider: string
-  byok_enabled: boolean
-  encrypted_keys: Record<string, unknown>
-  created_at?: string
-  updated_at?: string
-}
+import { getProviderConfigStore } from './providerConfigStore'
+export type { UserProviderConfig } from './providerConfigStore'
 
 export type PlainProviderConfig = {
   activeProvider: string
   byokEnabled: boolean
   keys: Record<string, string>
-}
-
-function getAdminSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  )
 }
 
 type EncryptedKeyEnvelope = {
@@ -94,15 +78,7 @@ export function maskProviderKeys(encryptedKeys: Record<string, unknown> | null |
 }
 
 export async function getUserProviderConfig(userId: string): Promise<UserProviderConfig | null> {
-  const admin = getAdminSupabase()
-  const { data, error } = await admin
-    .from('user_provider_configs')
-    .select('user_id, active_provider, byok_enabled, encrypted_keys, created_at, updated_at')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-  return data as UserProviderConfig | null
+  return getProviderConfigStore().getUserProviderConfig(userId)
 }
 
 export async function saveUserProviderConfig(userId: string, input: PlainProviderConfig) {
@@ -115,19 +91,10 @@ export async function saveUserProviderConfig(userId: string, input: PlainProvide
     ...encryptProviderKeys(input.keys || {}),
   }
 
-  const admin = getAdminSupabase()
-  const { data, error } = await admin
-    .from('user_provider_configs')
-    .upsert({
-      user_id: userId,
-      active_provider: activeProvider,
-      byok_enabled: Boolean(input.byokEnabled),
-      encrypted_keys: nextKeys,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-    .select('user_id, active_provider, byok_enabled, encrypted_keys, created_at, updated_at')
-    .single()
-
-  if (error) throw new Error(error.message)
-  return data as UserProviderConfig
+  return getProviderConfigStore().upsertUserProviderConfig({
+    user_id: userId,
+    active_provider: activeProvider,
+    byok_enabled: Boolean(input.byokEnabled),
+    encrypted_keys: nextKeys,
+  })
 }

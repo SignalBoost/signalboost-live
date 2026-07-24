@@ -22,6 +22,8 @@ export interface ProviderConfigStore {
     byok_enabled: boolean
     encrypted_keys: Record<string, unknown>
   }): Promise<UserProviderConfig>
+  // Read-only provider_registry row describing how to call one provider action.
+  getProviderRegistryRow(providerId: string, actionId: string): Promise<any | null>
 }
 
 // ── SignalBoost's own adapter (the host implementation) ──
@@ -53,6 +55,17 @@ function defaultSupabaseConfigStore(): ProviderConfigStore {
         .single()
       if (error) throw new Error(error.message)
       return data as UserProviderConfig
+    },
+    async getProviderRegistryRow(providerId, actionId) {
+      const { data, error } = await db()
+        .from('provider_registry')
+        .select('*')
+        .eq('provider_id', providerId)
+        .eq('action_id', actionId)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return data || null
     },
   }
 }

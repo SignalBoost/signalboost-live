@@ -113,7 +113,10 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
     detailController.current?.abort()
     detailRequest.current += 1
     setDetail(null); setDetailError(null); setDetailLoading(false)
-    window.setTimeout(() => detailOpener.current?.focus(), 0)
+    window.setTimeout(() => {
+      const opener = detailOpener.current
+      if (opener?.isConnected && !opener.disabled) opener.focus()
+    }, 0)
   }
 
   useEffect(() => {

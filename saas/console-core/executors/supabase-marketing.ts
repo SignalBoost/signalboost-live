@@ -16,6 +16,7 @@
 // Importing this module registers the executors.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 // ─── Key inspection (never exposes the key itself) ────────────────────────────
@@ -53,8 +54,8 @@ type Creds =
   | { ok: false; error: string }
 
 function creds(): Creds {
-  const url = process.env.SECONDARY_SUPABASE_URL || process.env.MARKETING_SUPABASE_URL
-  const key = process.env.SECONDARY_SUPABASE_SERVICE_ROLE_KEY || process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
+  const url = getSecret('SECONDARY_SUPABASE_URL') || getSecret('MARKETING_SUPABASE_URL')
+  const key = getSecret('SECONDARY_SUPABASE_SERVICE_ROLE_KEY') || getSecret('MARKETING_SUPABASE_SERVICE_ROLE_KEY')
 
   // Optional provider: absent config is a clean "not connected" state, not a fault.
   if (!url || !key) return { ok: false, error: NOT_CONFIGURED }

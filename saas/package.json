@@ -60,7 +60,8 @@
     "test:portable-product-catalog": "node --test tests/portableProductCatalogApi.node.test.ts tests/portableProductCatalogPage.node.test.ts tests/portableProductCatalogSecurity.node.test.ts tests/portableProductReadiness.node.test.ts",
     "test:mission-review-diagnostics": "node --test tests/missionReviewDiagnostics.node.test.ts",
     "test:mission-review-state": "node --test tests/missionReviewState.node.test.ts",
-    "test:eae-enterprise-knowledge-graph": "node --test tests/eaeEnterpriseKnowledgeGraph.node.test.ts"
+    "test:eae-enterprise-knowledge-graph": "node --test tests/eaeEnterpriseKnowledgeGraph.node.test.ts",
+    "test:eae-risk-engine": "node --test tests/eaeRiskEngine.node.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",

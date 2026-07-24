@@ -19,3 +19,4 @@ export * from './adaptation-proposal-engine.ts';
 export * from './proposal-prioritization-engine.ts';
 export * from './human-review-queue-engine.ts';
 export * from './human-review-decision-validator.ts';
+export * from './human-review-decision-ledger.ts';

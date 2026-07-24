@@ -1,4 +1,6 @@
+// saas/lib/cos/external-signals/live-research.ts
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { ingestExternalSignals } from './normalizer'
 import type { ExternalSignalIngestionResult, ExternalSignalInput } from './types'
 
@@ -27,7 +29,7 @@ function signalFromResult(result: { title: string; url: string; snippet: string 
     source_url: result.url,
     audience: 'small business owners and operators',
     region: 'global',
-    product: 'SignalBoost SaaS platform',
+    product: `${hostBrandName()} platform`,
     observed_format: format,
     observed_hero: hero,
     confidence: confidenceFromRank(index),

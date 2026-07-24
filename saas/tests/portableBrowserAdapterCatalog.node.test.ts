@@ -4,7 +4,7 @@ import { allPortableBrowserAdapterDescriptors } from '../lib/portable-browser/ca
 import { checkPortableBrowserCompatibility } from '../lib/portable-browser/browser-compatibility.ts'
 import { freezePortableBrowserManifest } from '../lib/portable-browser/browser-portable-manifest.ts'
 
-const availableAdapters = new Set(['browserbase', 'browserless', 'steel'])
+const availableAdapters = new Set(['browserbase', 'browserless', 'steel', 'playwright'])
 
 test('portable browser descriptors are frozen, serializable, and explicitly inactive', () => {
   const ids = new Set<string>()

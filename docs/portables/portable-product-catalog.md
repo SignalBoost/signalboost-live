@@ -45,6 +45,12 @@ The catalog starts with the existing Portable Product Registry. It includes regi
 
 The page has no checkout, purchase, edit, activation, download, package, delete, or mutation controls.
 
+## Readiness dashboard
+
+`/dashboard/portable-products/readiness` and `GET /api/internal/portable-product-readiness` provide an admin-only, read-only readiness view. The dashboard derives each result from the existing registry descriptor, manifest metadata, canonical dependency graph, declared five-language support, and shared portable-product registry/manifest/dependency-graph tests. It does not scan runtime state, run tests, check deployments, or create any package, license, sale, or execution action.
+
+The deterministic dimensions are registry, manifest, documentation, architecture, dependencies, localization, testing, security, packaging specification, and licensing metadata. A `ready` result means the relevant declared metadata is complete for that dimension; `attention` means it is not declared by the source metadata. In particular, licensing readiness requires a live manifest with `licensingAvailable: true` and an implemented registry descriptor. This preserves the distinction between future planning metadata and an actual commercial or operational workflow.
+
 ## Relationship to registry, manifests, and future marketplace work
 
 The registry controls which portable products are catalog candidates and their deterministic order. The manifest remains the source for product metadata. The serializer is the only boundary that chooses which manifest fields become inspectable.

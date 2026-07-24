@@ -13,3 +13,4 @@ export * from './decision-engine.ts';
 export * from './execution-planner.ts';
 export * from './execution-authorization-gate.ts';
 export * from './risk-engine.ts';
+export * from './execution-orchestrator-simulation.ts';

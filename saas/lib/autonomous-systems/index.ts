@@ -5,5 +5,6 @@ export * from "./reasoning.ts";
 export * from './enterprise-context.ts';
 export * from './enterprise-reasoning-v2.ts';
 export * from './enterprise-memory.ts';
+export * from './enterprise-knowledge-graph.ts';
 export * from './objective-engine.ts';
 export * from './policy-governance.ts';

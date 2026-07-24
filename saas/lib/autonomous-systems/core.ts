@@ -1,7 +1,7 @@
-import {
+import { EAE_SCHEMA_VERSION } from "./types.ts";
+import type {
   CandidatePlan,
   DecisionPackage,
-  EAE_SCHEMA_VERSION,
   Observation,
   PolicyDisposition,
   TenantContext,

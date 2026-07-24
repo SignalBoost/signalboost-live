@@ -8,6 +8,7 @@
 import type { AuthAdapter, LogAdapter } from './types'
 import type { EngineHost, RegisteredExecutor } from './actionEngine'
 import { setSecretsResolver, type SecretsResolver } from './secrets'
+import { setConsoleDataStore, type ConsoleDataStore } from './dataStore'
 
 // ---- Executor registry ----
 const REGISTRY = new Map<string, RegisteredExecutor>()
@@ -39,8 +40,11 @@ export function createHost(
   auth: AuthAdapter,
   log: LogAdapter = consoleLogAdapter,
   secrets?: SecretsResolver,
+  data?: ConsoleDataStore,
 ): EngineHost {
   // A buyer passes their vault-backed resolver here; unset = the default process.env resolver.
   if (secrets) setSecretsResolver(secrets)
+  // ...and their datastore adapter here; unset = the default Supabase adapter.
+  if (data) setConsoleDataStore(data)
   return { auth, log, resolveExecutor }
 }

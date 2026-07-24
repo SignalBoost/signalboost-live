@@ -7,7 +7,7 @@
 // (see actionEngine.ts) — the most audit-critical events a Fortune-500 SOC watches.
 // A buyer passes createSiemConsoleLog(...) as the `log` argument to createHost().
 //
-// Host-agnostic: LogAdapter is a console-core type and @/portable-audit is a
+// Host-agnostic: LogAdapter is a console-core type and ../portable-audit is a
 // zero-dependency peer primitive, so this file names no platform, reads no env, and
 // holds no credentials.
 
@@ -17,7 +17,7 @@ import {
   type PortableAuditEvent,
   type SiemAuditSinkConfig,
   type SiemSeverity,
-} from '@/portable-audit'
+} from '../portable-audit/index.ts'
 
 const DATASET = 'console'
 

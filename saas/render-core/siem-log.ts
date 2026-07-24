@@ -6,7 +6,7 @@
 // render.approval_required, render.approval_issued, render.reserve_failed, render.ok,
 // render.provider_failed) — every one a money/authorization event a SOC must audit.
 //
-// Host-agnostic: RenderLogAdapter is a render-core type and @/portable-audit is a
+// Host-agnostic: RenderLogAdapter is a render-core type and ../portable-audit is a
 // zero-dependency peer primitive, so this file names no platform, reads no env, and
 // holds no credentials. A buyer's host uses createSiemRenderLog(...) as RenderHost.log.
 
@@ -16,7 +16,7 @@ import {
   type PortableAuditEvent,
   type SiemAuditSinkConfig,
   type SiemSeverity,
-} from '@/portable-audit'
+} from '../portable-audit/index.ts'
 
 const DATASET = 'render'
 

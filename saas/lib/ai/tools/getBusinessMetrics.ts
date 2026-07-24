@@ -1,8 +1,28 @@
 // saas/lib/ai/tools/getBusinessMetrics.ts
-// Live Supabase metrics for the Chief of Staff AI persona.
+// Live business metrics for the Chief of Staff AI persona.
 // Called only for owner/admin users — never exposed to the Concierge.
+//
+// PORTABLE: the datastore is INJECTED. The default adapter reads the platform's
+// own Supabase (subscriptions + outreach_queue), so this deployment is unchanged.
+// A buyer of the Chief-of-Staff portable calls setBusinessMetricsStore(...) once
+// with an adapter over THEIR datastore, and every metric below is answered from
+// their business instead — with zero change to the tool or its callers.
 
-import { createClient } from '@supabase/supabase-js'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
+
+export type SubscriptionRow = {
+plan: string | null
+video_credits: number | null
+image_credits: number | null
+ai_credits: number | null
+}
+
+export interface BusinessMetricsStore {
+// Every subscription/account row used for user, plan, MRR and credit math.
+fetchSubscriptions(): Promise<SubscriptionRow[]>
+// Count of leads in the outreach pipeline (0 if the deployment has none).
+countOutreachLeads(): Promise<number>
+}
 
 export type BusinessMetrics = {
 totalUsers: number
@@ -42,30 +62,53 @@ const PAID_PLANS = new Set([
 'command', 'enterprise', 'business',
 ])
 
-function supabaseAdmin() {
+// ── Default adapter: the platform's own Supabase (unchanged behavior) ────────
+let store: BusinessMetricsStore | null = null
+
+async function platformDb() {
+const { createClient } = await import('@supabase/supabase-js')
 return createClient(
 process.env.NEXT_PUBLIC_SUPABASE_URL!,
 process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 }
 
-export async function getBusinessMetrics(): Promise<MetricsResult> {
-try {
-const db = supabaseAdmin()
-
-// ── Subscriptions: users, plans, credits ──────────────────────────────
-const { data: subs, error: subsError } = await db
+function defaultStore(): BusinessMetricsStore {
+return {
+async fetchSubscriptions() {
+const db = await platformDb()
+const { data, error } = await db
 .from('subscriptions')
 .select('user_id, plan, status, video_credits, image_credits, ai_credits')
-
-if (subsError) {
-return { ok: false, error: `Subscriptions query failed: ${subsError.message}` }
+if (error) throw new Error(`Subscriptions query failed: ${error.message}`)
+return (data ?? []) as SubscriptionRow[]
+},
+async countOutreachLeads() {
+const db = await platformDb()
+const { count, error } = await db
+.from('outreach_queue')
+.select('id', { count: 'exact', head: true })
+if (error) {
+console.error('getBusinessMetrics: outreach_queue query failed', error.message)
+return 0
+}
+return count ?? 0
+},
+}
 }
 
-const allSubs = subs ?? []
+export function setBusinessMetricsStore(s: BusinessMetricsStore): void { store = s }
+export function getBusinessMetricsStore(): BusinessMetricsStore { return store ?? defaultStore() }
+
+export async function getBusinessMetrics(): Promise<MetricsResult> {
+try {
+const s = getBusinessMetricsStore()
+
+// ── Subscriptions: users, plans, credits ──────────────────────────────
+const allSubs = await s.fetchSubscriptions()
 const totalUsers = allSubs.length
 
-const paidSubs = allSubs.filter(s => PAID_PLANS.has((s.plan || '').toLowerCase()))
+const paidSubs = allSubs.filter(x => PAID_PLANS.has((x.plan || '').toLowerCase()))
 const paidUsers = paidSubs.length
 
 // Plan breakdown — all plans including free
@@ -76,32 +119,26 @@ planBreakdown[key] = (planBreakdown[key] ?? 0) + 1
 }
 
 // MRR from paid subscriptions
-const mrr = paidSubs.reduce((sum, s) => {
-return sum + (PLAN_MRR[(s.plan || '').toLowerCase()] ?? 0)
+const mrr = paidSubs.reduce((sum, x) => {
+return sum + (PLAN_MRR[(x.plan || '').toLowerCase()] ?? 0)
 }, 0)
 
 // Average remaining credits across all users with credit data
-const withCredits = allSubs.filter(s => s.video_credits != null)
+const withCredits = allSubs.filter(x => x.video_credits != null)
 const avg = (field: 'video_credits' | 'image_credits' | 'ai_credits') =>
 withCredits.length
-? Math.round(withCredits.reduce((s, r) => s + (r[field] ?? 0), 0) / withCredits.length)
+? Math.round(withCredits.reduce((s2, r) => s2 + (r[field] ?? 0), 0) / withCredits.length)
 : 0
 
 // ── Outreach queue: lead count ────────────────────────────────────────
-const { count: outreachLeads, error: outreachError } = await db
-.from('outreach_queue')
-.select('id', { count: 'exact', head: true })
-
-if (outreachError) {
-console.error('getBusinessMetrics: outreach_queue query failed', outreachError.message)
-}
+const outreachLeads = await s.countOutreachLeads()
 
 const metrics: BusinessMetrics = {
 totalUsers,
 paidUsers,
 mrr,
 planBreakdown,
-outreachLeads: outreachLeads ?? 0,
+outreachLeads,
 creditsSnapshot: {
 avgVideoCreditsRemaining: avg('video_credits'),
 avgImageCreditsRemaining: avg('image_credits'),
@@ -113,7 +150,7 @@ generatedAt: new Date().toISOString(),
 return {
 ok: true,
 metrics,
-source: `Supabase live — ${metrics.generatedAt}`,
+source: `live — ${metrics.generatedAt}`,
 }
 } catch (err) {
 return {
@@ -130,7 +167,7 @@ const planLines = Object.entries(metrics.planBreakdown)
 .map(([plan, count]) => ` - ${plan}: ${count} user${count !== 1 ? 's' : ''}`)
 .join('\n')
 
-return `LIVE SIGNALBOOST BUSINESS METRICS (as of ${new Date(metrics.generatedAt).toUTCString()}):
+return `LIVE ${hostBrandName().toUpperCase()} BUSINESS METRICS (as of ${new Date(metrics.generatedAt).toUTCString()}):
 
 Users
 Total accounts: ${metrics.totalUsers}
@@ -154,4 +191,3 @@ AI actions: ${metrics.creditsSnapshot.avgAiCreditsRemaining}
 
 Source: ${metrics.generatedAt}`
 }
-

@@ -220,7 +220,12 @@
       "newestRoutedAt": "Newest routed time",
       "duplicateRoutesPrevented": "Duplicate routes prevented",
       "diagnosticsStatus": "Status",
-      "unavailable": "Unavailable"
+      "unavailable": "Unavailable",
+      "closeDetail": "Close review detail",
+      "openDetail": "Open review detail",
+      "tableCaption": "Manual-review records",
+      "fingerprintCopied": "Fingerprint copied",
+      "fingerprintCopyUnavailable": "Fingerprint copy is unavailable"
     }
   },
   "es": {
@@ -444,7 +449,12 @@
       "newestRoutedAt": "Hora de enrutamiento más reciente",
       "duplicateRoutesPrevented": "Rutas duplicadas evitadas",
       "diagnosticsStatus": "Estado",
-      "unavailable": "No disponible"
+      "unavailable": "No disponible",
+      "closeDetail": "Cerrar detalles de revisión",
+      "openDetail": "Abrir detalles de revisión",
+      "tableCaption": "Registros de revisión manual",
+      "fingerprintCopied": "Huella digital copiada",
+      "fingerprintCopyUnavailable": "La copia de la huella digital no está disponible"
     }
   },
   "pt": {
@@ -668,7 +678,12 @@
       "newestRoutedAt": "Hora mais recente de encaminhamento",
       "duplicateRoutesPrevented": "Rotas duplicadas evitadas",
       "diagnosticsStatus": "Status",
-      "unavailable": "Indisponível"
+      "unavailable": "Indisponível",
+      "closeDetail": "Fechar detalhes da revisão",
+      "openDetail": "Abrir detalhes da revisão",
+      "tableCaption": "Registros de revisão manual",
+      "fingerprintCopied": "Impressão digital copiada",
+      "fingerprintCopyUnavailable": "A cópia da impressão digital não está disponível"
     }
   },
   "pl": {
@@ -892,7 +907,12 @@
       "newestRoutedAt": "Najnowszy czas przekierowania",
       "duplicateRoutesPrevented": "Zapobiegnięto zduplikowanym przekierowaniom",
       "diagnosticsStatus": "Stan",
-      "unavailable": "Niedostępne"
+      "unavailable": "Niedostępne",
+      "closeDetail": "Zamknij szczegóły przeglądu",
+      "openDetail": "Otwórz szczegóły przeglądu",
+      "tableCaption": "Rekordy ręcznego przeglądu",
+      "fingerprintCopied": "Odcisk palca skopiowany",
+      "fingerprintCopyUnavailable": "Kopiowanie odcisku palca jest niedostępne"
     }
   },
   "ru": {
@@ -1116,7 +1136,12 @@
       "newestRoutedAt": "Самое позднее время перенаправления",
       "duplicateRoutesPrevented": "Предотвращено дублирование перенаправлений",
       "diagnosticsStatus": "Статус",
-      "unavailable": "Недоступно"
+      "unavailable": "Недоступно",
+      "closeDetail": "Закрыть детали проверки",
+      "openDetail": "Открыть детали проверки",
+      "tableCaption": "Записи ручной проверки",
+      "fingerprintCopied": "Отпечаток скопирован",
+      "fingerprintCopyUnavailable": "Копирование отпечатка недоступно"
     }
   }
 }

@@ -62,7 +62,7 @@ test('review UI makes GET-only Phase 6 requests and exposes no mutation controls
   assert.equal((source.match(/method: 'GET'/g) || []).length, 3)
   assert.doesNotMatch(source, /method:\s*'(POST|PUT|PATCH|DELETE)'/)
   const controls = source.match(/<button[^>]*>[\s\S]*?<\/button>/g) || []
-  assert.equal(controls.length, 4)
+  assert.ok(controls.length >= 6)
   assert.doesNotMatch(controls.join(' '), /approve|reject|resolve|retry|replay|execute|repair|cancel|delete|edit|GitHub issue|pull request|trigger CI/i)
   assert.doesNotMatch(source, /supabase|authorization|credentials|cookies/i)
 })
@@ -71,4 +71,37 @@ test('required safety labels are visible and localized in all supported language
   const source = client(); const locales = JSON.parse(read('../lib/i18n/supervisorSocLocales.json'))
   for (const key of ['manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled']) assert.match(source, new RegExp(`labels\\.${key}`))
   for (const lang of ['en', 'pt', 'es', 'pl', 'ru']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
+})
+
+test('review UI provides accessible table controls and keyboard detail activation', () => {
+  const source = client()
+  assert.match(source, /<caption style=\{srOnly\}>\{labels\.tableCaption\}<\/caption>/)
+  assert.match(source, /<th key=\{label\} scope="col"/)
+  assert.match(source, /<button className="mission-review-focus" type="button" aria-label=\{`\$\{labels\.openDetail\}: \$\{review\.reviewId\}`\}/)
+  assert.match(source, /event\.key === ' '/)
+  assert.match(source, /event\.preventDefault\(\); void openDetail/)
+  assert.match(source, /onClick=\{event => void openDetail\(review\.reviewId, event\.currentTarget\)\}/)
+  assert.match(source, /\.mission-review-focus:focus-visible/)
+})
+
+test('review UI labels filters, pagination, and live states for assistive technology', () => {
+  const source = client()
+  for (const label of ['labels.status', 'labels.missionId', 'labels.pageSize', 'labels.applyFilters', 'labels.previous', 'labels.next']) assert.match(source, new RegExp(`aria-label=\\{${label.replace('.', '\\.')}\\}`))
+  assert.match(source, /role="status" aria-live="polite"/)
+  assert.match(source, /role="alert"/)
+  assert.match(source, /role="status" aria-live="polite">\{labels\.empty\}/)
+})
+
+test('detail close, copy feedback, and read-only safety boundary remain accessible', () => {
+  const source = client()
+  assert.match(source, /event\.key === 'Escape'/)
+  assert.match(source, /requestAnimationFrame\(\(\) => openerRef\.current\?\.focus\(\)\)/)
+  assert.match(source, /aria-label=\{labels\.closeDetail\}/)
+  assert.match(source, /aria-live="polite" aria-atomic="true"/)
+  assert.match(source, /setCopyAnnouncement\(labels\.fingerprintCopied\)/)
+  assert.match(source, /setCopyAnnouncement\(labels\.fingerprintCopyUnavailable\)/)
+  assert.match(source, /aria-label=\{`\$\{labels\.copy\} \$\{label\}`\}/)
+  assert.match(source, /<h2 id="mission-review-detail-title">\{labels\.detail\}<\/h2>/)
+  assert.match(source, /<h3>\{labels\.fingerprints\}<\/h3>/)
+  assert.match(source, /<h3>\{labels\.missionSummary\}<\/h3>/)
 })

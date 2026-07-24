@@ -4,12 +4,13 @@
 // using ELEVENLABS_API_KEY (xi-api-key header). Importing this registers them.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://api.elevenlabs.io/v1'
 
 function key(): string | null {
-  return process.env.ELEVENLABS_API_KEY || null
+  return getSecret('ELEVENLABS_API_KEY') || null
 }
 async function getJSON(path: string): Promise<{ ok: true; json: any } | { ok: false; error: string }> {
   const k = key()

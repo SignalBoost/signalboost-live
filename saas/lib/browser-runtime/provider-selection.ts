@@ -139,6 +139,7 @@ export function selectBrowserProvider(request: BrowserProviderSelectionRequest):
       continue
     }
 
+    if (candidate.health === 'unavailable') throw new Error('browser_provider_selection_state_invalid')
     const healthScore = candidate.health === 'healthy' ? 1000 : 500
     const score = healthScore + (candidate.priority ?? 0) * 10 - (candidate.costWeight ?? 0)
     ranked.push(Object.freeze({

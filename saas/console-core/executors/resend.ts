@@ -5,11 +5,12 @@
 // Every write flows through the same registerExecutor path as the reads.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
+import { getDataStore } from '../dataStore'
 import type { ActionSchema } from '../types'
-import { createClient } from '@supabase/supabase-js'
 
 const API = 'https://api.resend.com'
-function key(): string | null { return process.env.RESEND_API_KEY || null }
+function key(): string | null { return getSecret('RESEND_API_KEY') || null }
 
 async function req(method: string, path: string, body?: unknown) {
   const k = key(); if (!k) return { ok: false as const, error: 'RESEND_API_KEY not set' }
@@ -65,12 +66,6 @@ registerExecutor({
 })
 
 // ── EMAIL DELIVERY (enriched from Resend + webhook table) ────────────────────
-function adminDb() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const svc = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !svc) return null
-  return createClient(url, svc, { auth: { persistSession: false, autoRefreshToken: false } })
-}
 function deriveFromWebhook(st: any): string | null {
   if (!st) return null
   if (st.bounced_at) return 'bounced'
@@ -96,15 +91,8 @@ registerExecutor({
       if (!hasMore || !after) break
     }
     if (firstError && collected.length === 0) return { ok: false, error: firstError }
-    const db = adminDb()
-    const statusById: Record<string, any> = {}
-    if (db && collected.length) {
-      const ids = collected.map((e: any) => e.id).filter(Boolean)
-      for (let i = 0; i < ids.length; i += 100) {
-        const { data: st } = await db.from('email_delivery_status').select('*').in('resend_email_id', ids.slice(i, i + 100))
-        for (const r of (st || [])) statusById[(r as any).resend_email_id] = r
-      }
-    }
+    const ids = collected.map((e: any) => e.id).filter(Boolean)
+    const statusById: Record<string, any> = collected.length ? await getDataStore().getEmailDeliveryStatus(ids) : {}
     const emails = collected.map((e: any) => {
       const st = statusById[e.id]
       const status = e.last_event || deriveFromWebhook(st) || 'sent'
@@ -228,12 +216,13 @@ registerExecutor({
     { id: 'from_name', label: 'From name', type: 'text' },
   ]),
   async run(_ctx, input) {
-    const fromName = String(input.from_name || 'SaaSSignal Sales')
+    const fromEmail = getSecret('HUB_TEST_EMAIL_FROM') || 'saassales@signalboostapp.com'
+    const fromName = String(input.from_name || getSecret('HUB_TEST_EMAIL_FROM_NAME') || 'SaaSSignal Sales')
     const r = await req('POST', '/emails', {
-      from: `${fromName} <saassales@signalboostapp.com>`,
+      from: `${fromName} <${fromEmail}>`,
       to: [input.to],
       subject: input.subject,
-      html: `<p>This is a test email from the SignalBoost Hub Console, sent from <strong>saassales@signalboostapp.com</strong> via Resend.</p><p>If you received this, the domain is verified and email delivery is working.</p>`,
+      html: `<p>This is a test email from the Hub Console, sent from <strong>${fromEmail}</strong> via Resend.</p><p>If you received this, the domain is verified and email delivery is working.</p>`,
     })
     if (!r.ok) return r
     return { ok: true, message: `Test email sent to ${input.to}. Check the inbox — if it arrives, the domain is verified and sending is live.`, data: r.json }

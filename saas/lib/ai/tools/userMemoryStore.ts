@@ -1,86 +1,65 @@
-// saas/lib/ai/tools/userMemory.ts
-// Long-term user memory for the AI personas.
-// Stores lasting preferences, facts, and goals per logged-in user in the
-// SaaS Supabase `assistant_memories` table, and loads them into the AI's
-// context at the start of every conversation.
+// saas/lib/ai/tools/userMemoryStore.ts
+// Injected datastore seam for the AI's long-term memory of a user. Every read and write goes
+// through THIS port, never Supabase directly, so a Fortune-500 buyer's Chief of Staff remembers
+// THEIR users' facts in THEIR own database, with one adapter. On SignalBoost's own deployment
+// the default adapter uses Supabase and behavior is unchanged.
+import { createClient } from '@supabase/supabase-js'
 
-import { getUserMemoryStore, type UserMemory } from './userMemoryStore'
-export type { UserMemory }
+export type UserMemory = { id: string; kind: string; content: string; created_at: string }
 
-const MAX_MEMORIES_PER_USER = 30
-const MAX_CONTENT_LENGTH = 300
+export interface UserMemoryStore {
+  list(userId: string, limit: number): Promise<UserMemory[]>
+  findDuplicate(userId: string, content: string): Promise<boolean>
+  listAllOrdered(userId: string): Promise<{ id: string; created_at: string }[]>
+  deleteIds(ids: string[]): Promise<void>
+  insert(userId: string, kind: string, content: string): Promise<{ ok: boolean; error?: string }>
+  deleteMatching(userId: string, phrase: string): Promise<{ ok: boolean; deleted: number; error?: string }>
+}
 
-const VALID_KINDS = new Set(['preference', 'fact', 'goal'])
+// ── SignalBoost's own adapter (the host implementation) ──
+const TABLE = 'assistant_memories'
 
-// ── Load all memories for a user (newest last, for natural reading) ───────────
-export async function loadUserMemories(userId: string): Promise<UserMemory[]> {
-  try {
-    return await getUserMemoryStore().list(userId, MAX_MEMORIES_PER_USER)
-  } catch (err) {
-    console.error('userMemory: load exception', err)
-    return []
+function db() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+}
+
+function defaultSupabaseMemoryStore(): UserMemoryStore {
+  return {
+    async list(userId, limit) {
+      const { data, error } = await db().from(TABLE).select('id, kind, content, created_at')
+        .eq('user_id', userId).order('created_at', { ascending: true }).limit(limit)
+      if (error) { console.error('userMemory: load error', error.message); return [] }
+      return (data ?? []) as UserMemory[]
+    },
+    async findDuplicate(userId, content) {
+      const { data } = await db().from(TABLE).select('id').eq('user_id', userId).eq('content', content).limit(1)
+      return Boolean(data && data.length > 0)
+    },
+    async listAllOrdered(userId) {
+      const { data } = await db().from(TABLE).select('id, created_at').eq('user_id', userId).order('created_at', { ascending: true })
+      return data ?? []
+    },
+    async deleteIds(ids) {
+      if (!ids.length) return
+      await db().from(TABLE).delete().in('id', ids)
+    },
+    async insert(userId, kind, content) {
+      const { error } = await db().from(TABLE).insert({ user_id: userId, kind, content })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+    async deleteMatching(userId, phrase) {
+      const { data, error } = await db().from(TABLE).delete().eq('user_id', userId).ilike('content', `%${phrase}%`).select('id')
+      if (error) return { ok: false, deleted: 0, error: error.message }
+      return { ok: true, deleted: data?.length ?? 0 }
+    },
   }
 }
 
-// ── Format memories for injection into the system prompt ──────────────────────
-export function formatMemoriesForAI(memories: UserMemory[]): string {
-  if (!memories.length) return ''
-  const lines = memories.map(m => `- [${m.kind}] ${m.content}`)
-  return `── SAVED USER MEMORIES (lasting facts from previous conversations with this user) ──
-${lines.join('\n')}
-── END MEMORIES ──`
+let active: UserMemoryStore = defaultSupabaseMemoryStore()
+
+export function setUserMemoryStore(store: UserMemoryStore): void {
+  active = store || defaultSupabaseMemoryStore()
 }
-
-// ── Save a new memory ──────────────────────────────────────────────────────────
-export async function saveUserMemory(
-  userId: string,
-  kind: string,
-  content: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const cleanKind = String(kind || '').trim().toLowerCase()
-    const cleanContent = String(content || '').trim().slice(0, MAX_CONTENT_LENGTH)
-
-    if (!VALID_KINDS.has(cleanKind)) {
-      return { ok: false, error: `Invalid kind "${kind}" — must be preference, fact, or goal.` }
-    }
-    if (!cleanContent) {
-      return { ok: false, error: 'Memory content is empty.' }
-    }
-
-    const store = getUserMemoryStore()
-
-    // Skip exact duplicates
-    if (await store.findDuplicate(userId, cleanContent)) {
-      return { ok: true } // already remembered — treat as success
-    }
-
-    // Enforce per-user cap: delete the oldest if at the limit
-    const all = await store.listAllOrdered(userId)
-    if (all.length >= MAX_MEMORIES_PER_USER) {
-      const toDelete = all.slice(0, all.length - MAX_MEMORIES_PER_USER + 1).map(r => r.id)
-      await store.deleteIds(toDelete)
-    }
-
-    return await store.insert(userId, cleanKind, cleanContent)
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error saving memory' }
-  }
-}
-
-// ── Forget memories matching a phrase ──────────────────────────────────────────
-export async function forgetUserMemory(
-  userId: string,
-  match: string,
-): Promise<{ ok: boolean; deleted: number; error?: string }> {
-  try {
-    const phrase = String(match || '').trim()
-    if (!phrase) {
-      return { ok: false, deleted: 0, error: 'No phrase given to forget.' }
-    }
-
-    return await getUserMemoryStore().deleteMatching(userId, phrase)
-  } catch (err) {
-    return { ok: false, deleted: 0, error: err instanceof Error ? err.message : 'Unknown error forgetting memory' }
-  }
+export function getUserMemoryStore(): UserMemoryStore {
+  return active
 }

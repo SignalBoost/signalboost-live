@@ -1,4 +1,5 @@
 // saas/lib/cos-backup/runtime.ts
+// saas/lib/cos-backup/runtime.ts
 // Read-only Backup COS provider and sanitized recovery logging. This module may
 // reason and log, but it cannot call business tools or mutate provider state.
 
@@ -8,6 +9,7 @@ import path from 'node:path'
 import { callModel } from '@/lib/ai/modelRouter'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import type { BackupCosAnswer } from './policy'
+import type { CosBackupRuntimeConfig, DecisionLogSink } from '@/cos-backup-core'
 
 export type { BackupCosAnswer } from './policy'
 
@@ -29,7 +31,7 @@ function digest(value: string) {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
-function backupTimeoutMs(): number {
+export function backupTimeoutMs(): number {
   const configured = Number(process.env.COS_BACKUP_TIMEOUT_MS)
   if (!Number.isFinite(configured)) return DEFAULT_BACKUP_TIMEOUT_MS
   return Math.max(2_000, Math.min(30_000, Math.trunc(configured)))
@@ -49,7 +51,7 @@ async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
   }
 }
 
-async function loadApprovedBrain(): Promise<string> {
+export async function loadApprovedBrain(): Promise<string> {
   const candidates = [
     path.resolve(process.cwd(), '../cos-core/brain.md'),
     path.resolve(process.cwd(), 'cos-core/brain.md'),
@@ -125,4 +127,78 @@ export async function recordCosRecovery(log: CosRecoveryLog): Promise<void> {
   } catch (error) {
     console.error('COS recovery log failed', error)
   }
+}
+
+/**
+ * Host-agnostic entry points (additive — every function above this line is
+ * unchanged and remains the default SignalBoost path: env timeout, the local
+ * cos-core/brain.md snapshot, OpenAI, and the cos_decisions table). A buyer
+ * supplies loadBrain / reasoner / log via CosBackupRuntimeConfig to run
+ * Backup COS continuity on THEIR approved playbook, THEIR model provider,
+ * and THEIR audit store, with zero change to this file. See
+ * saas/cos-backup-host/signalboostCosBackupHost.ts for the reference
+ * SignalBoost binding of this same config shape.
+ */
+export async function runBackupCosWithConfig(
+  normalizedInput: string,
+  language = 'en',
+  config: CosBackupRuntimeConfig = {},
+): Promise<BackupCosAnswer> {
+  const brain = await (config.loadBrain ? config.loadBrain() : loadApprovedBrain())
+  const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
+  const ask = config.reasoner
+    ? config.reasoner.ask(prompt, { maxTokens: 1200 })
+    : callModel({ modelPreference: 'openai', prompt, maxTokens: 1200 })
+  const raw = await withDeadline(ask, config.timeoutMs ?? backupTimeoutMs())
+  const parsed = extractJson(String(raw || ''))
+  const answer = String(parsed?.answer || raw || '').trim()
+  return {
+    ok: answer.length >= 10,
+    answer: answer || 'COS continuity mode is active, but the backup reasoning provider is temporarily unavailable.',
+    intent: String(parsed?.intent || 'general_assistance').slice(0, 120),
+    requiresApproval: Boolean(parsed?.requiresApproval),
+    proposedTool: parsed?.proposedTool ? String(parsed.proposedTool).slice(0, 120) : null,
+    confidence: Math.max(0, Math.min(100, Number(parsed?.confidence) || 50)),
+    brainDigest: digest(brain),
+  }
+}
+
+export async function recordCosRecoveryWithConfig(
+  log: CosRecoveryLog,
+  sink?: DecisionLogSink,
+): Promise<void> {
+  const row = {
+    decision_id: `cos_recovery_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    user_id: null,
+    objective: log.action === 'Flagged Primary for Review'
+      ? 'Review a material Primary and Backup COS quality divergence'
+      : 'Maintain COS availability after a degraded Primary response',
+    channel: 'cos_governance',
+    state: log.action === 'Flagged Primary for Review' ? 'REVIEW' : 'FAILOVER_READ_ONLY',
+    required_source: 'cos_continuity_router',
+    must_use_tool: false,
+    proposes_action: false,
+    required_approval: false,
+    approval_reasons: ['backup_read_only', ...log.divergenceDetails],
+    confidence: log.ok ? 95 : 25,
+    output: {
+      schema: COS_CONTINUITY_SCHEMA,
+      recovery: log,
+      ownerAlertRequired: true,
+      executionAllowed: false,
+    },
+    status: 'logged',
+    created_at: new Date().toISOString(),
+  }
+
+  if (sink) {
+    try {
+      await sink.record(row)
+    } catch (error) {
+      console.error('COS recovery log failed', error)
+    }
+    return
+  }
+
+  await recordCosRecovery(log)
 }

@@ -4,12 +4,13 @@
 // work with just OPENAI_API_KEY. Importing this module registers them.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://api.openai.com/v1'
 
 function key(): string | null {
-  return process.env.OPENAI_API_KEY || null
+  return getSecret('OPENAI_API_KEY') || null
 }
 async function getJSON(path: string): Promise<{ ok: true; json: any } | { ok: false; error: string }> {
   const k = key()
@@ -170,7 +171,7 @@ registerExecutor({
 })
 
 async function githubJSON(path: string) {
-  const token = process.env.GITHUB_WRITE_TOKEN
+  const token = getSecret('GITHUB_WRITE_TOKEN')
   if (!token) return { ok: false as const, error: 'GitHub not configured — set GITHUB_WRITE_TOKEN' }
   const res = await fetch(`https://api.github.com${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, cache: 'no-store' })
   const text = await res.text()

@@ -24,3 +24,4 @@ export * from './human-review-outcome-composer.ts';
 export * from './human-review-outcome-acknowledgment.ts';
 export * from './human-review-closure-snapshot.ts';
 export * from './human-review-archive-builder.ts';
+export * from './human-review-archive-integrity-validator.ts';

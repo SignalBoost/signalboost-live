@@ -21,3 +21,4 @@ export * from './human-review-queue-engine.ts';
 export * from './human-review-decision-validator.ts';
 export * from './human-review-decision-ledger.ts';
 export * from './human-review-outcome-composer.ts';
+export * from './human-review-outcome-acknowledgment.ts';

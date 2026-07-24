@@ -3,8 +3,9 @@
 // placeholders: they read live env/token/destination state and call the same
 // provider-backed services used by /dashboard/outreach/social.
 
-import { createClient } from '@supabase/supabase-js'
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
+import { getDataStore } from '../dataStore'
 import type { ActionSchema } from '../types'
 import { buildOAuthUrl, SOCIAL_CONNECTORS, platformContentKind, platformNeedsAccountRef, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { discoverSocialDestinations } from '@/lib/outreach/social-destinations'
@@ -21,17 +22,10 @@ const PROVIDER_TO_PLATFORM: Record<ProviderId, SocialPlatform> = {
   twitter_x: 'twitter_x',
 }
 
-function db() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase service credentials are not configured')
-  return createClient(url, key, { auth: { persistSession: false } })
-}
-
 function envPrefix(platform: SocialPlatform) { return `SOCIAL_${platform.toUpperCase()}` }
 function envStatus(platform: SocialPlatform) {
   const prefix = envPrefix(platform)
-  return { clientId: Boolean(process.env[`${prefix}_CLIENT_ID`]), clientSecret: Boolean(process.env[`${prefix}_CLIENT_SECRET`]) }
+  return { clientId: Boolean(getSecret(`${prefix}_CLIENT_ID`)), clientSecret: Boolean(getSecret(`${prefix}_CLIENT_SECRET`)) }
 }
 function publicToken(row: any) {
   if (!row) return null
@@ -43,12 +37,11 @@ function publicDestination(row: any) {
   return { accountRef: row.account_ref, accountName: row.account_name || null, kind: row.kind || null, hasAccessToken: Boolean(row.access_token), discoveredAt: row.discovered_at || null }
 }
 async function platformCapability(userId: string, platform: SocialPlatform) {
-  const admin = db()
-  const tokenRes = await admin.from('outreach_social_tokens').select('platform, account_ref, account_name, scopes, expires_at').eq('user_id', userId).eq('platform', platform).maybeSingle()
-  const destRes = await admin.from('outreach_social_destinations').select('platform, account_ref, account_name, kind, access_token, discovered_at').eq('user_id', userId).eq('platform', platform)
+  const tokenRow = await getDataStore().getSocialToken(userId, platform)
+  const destRows = await getDataStore().getSocialDestinations(userId, platform)
   const env = envStatus(platform)
-  const token = publicToken(tokenRes.data)
-  const destinations = (destRes.data || []).map(publicDestination)
+  const token = publicToken(tokenRow)
+  const destinations = (destRows || []).map(publicDestination)
   const needsAccountRef = platformNeedsAccountRef(platform)
   const missing: string[] = []
   if (!env.clientId) missing.push(`${envPrefix(platform)}_CLIENT_ID`)
@@ -62,12 +55,10 @@ async function platformCapability(userId: string, platform: SocialPlatform) {
   return { platform, label: SOCIAL_CONNECTORS[platform].label, contentKind: platformContentKind(platform), needsAccountRef, env, token, destinations, configured, connected, publishReady, missing, status: publishReady ? 'publish_ready' : configured ? 'configure_connection' : 'configure_provider_app' }
 }
 async function loadDiscoveryToken(userId: string, platform: SocialPlatform) {
-  const admin = db()
-  const { data } = await admin.from('outreach_social_tokens').select('*').eq('user_id', userId).eq('platform', platform).maybeSingle()
+  const data = await getDataStore().getSocialToken(userId, platform)
   if (data) return data
   if (platform === 'instagram_business') {
-    const fb = await admin.from('outreach_social_tokens').select('*').eq('user_id', userId).eq('platform', 'facebook_pages').maybeSingle()
-    return fb.data || null
+    return (await getDataStore().getSocialToken(userId, 'facebook_pages')) || null
   }
   return null
 }
@@ -76,10 +67,9 @@ async function storeDestinations(userId: string, platform: SocialPlatform, autoS
   if (!token?.access_token) return { ok: false, error: `${platform} is not connected or has no access token.` }
   const discovered = await discoverSocialDestinations(platform, token.access_token)
   if (!discovered.ok) return { ok: false, error: discovered.error || 'destination_discovery_failed', data: discovered }
-  const admin = db()
   const stored: any[] = []
   for (const item of discovered.destinations) {
-    const { data } = await admin.from('outreach_social_destinations').upsert({
+    const data = await getDataStore().upsertSocialDestination({
       user_id: userId,
       platform: item.platform,
       account_ref: item.accountRef,
@@ -89,7 +79,7 @@ async function storeDestinations(userId: string, platform: SocialPlatform, autoS
       metadata: item.metadata || {},
       discovered_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,platform,account_ref' }).select('*').single()
+    })
     if (data) stored.push(publicDestination(data))
   }
   const selectable = discovered.destinations.filter(item => item.kind !== 'reddit_user_identity')
@@ -98,7 +88,7 @@ async function storeDestinations(userId: string, platform: SocialPlatform, autoS
     selected = selectable[0]
     const patch: Record<string, unknown> = { account_ref: selected.accountRef, account_name: selected.accountName, updated_at: new Date().toISOString() }
     if (selected.accessToken) patch.access_token = selected.accessToken
-    await admin.from('outreach_social_tokens').update(patch).eq('user_id', userId).eq('platform', platform)
+    await getDataStore().updateSocialToken(userId, platform, patch)
   }
   return { ok: true, message: `Discovered ${stored.length} destination${stored.length === 1 ? '' : 's'}`, data: { mode: discovered.mode, destinations: stored, selected } }
 }
@@ -151,9 +141,8 @@ for (const providerId of Object.keys(PROVIDER_TO_PLATFORM) as ProviderId[]) {
       if (!ctx.user?.id) return { ok: false, error: 'Not authenticated' }
       const accountRef = String(input.accountRef || '').trim()
       if (platformNeedsAccountRef(platform) && !accountRef) return { ok: false, error: `${platform} requires a destination/account reference.` }
-      const admin = db()
-      const { error } = await admin.from('outreach_social_tokens').update({ account_ref: accountRef || null, account_name: input.accountName ? String(input.accountName) : null, updated_at: new Date().toISOString() }).eq('user_id', ctx.user.id).eq('platform', platform)
-      if (error) return { ok: false, error: error.message }
+      const res = await getDataStore().updateSocialToken(ctx.user.id, platform, { account_ref: accountRef || null, account_name: input.accountName ? String(input.accountName) : null, updated_at: new Date().toISOString() })
+      if (!res.ok) return { ok: false, error: res.error }
       return { ok: true, message: `${label} destination saved.`, data: { platform, accountRef, accountName: input.accountName || null } }
     },
   })

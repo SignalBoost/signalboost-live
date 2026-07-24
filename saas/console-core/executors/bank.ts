@@ -18,8 +18,8 @@
 // Until an aggregator app is registered the executor returns a clean
 // "not configured — register <VAR>" message and never fabricates data.
 
-import { createClient } from '@supabase/supabase-js'
 import { registerExecutor } from '../defaultHost'
+import { getDataStore } from '../dataStore'
 import type { ActionField, ActionSchema } from '../types'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
 import {
@@ -49,14 +49,6 @@ const ACCOUNT: ActionField = {
 }
 const schema = (id: string, label: string, verb: string, fields: ActionField[]): ActionSchema => ({ id, label, verb, fields })
 
-// ---- admin Supabase client (service role) for vault + compliance log ----
-function admin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return null
-  return createClient(url, key)
-}
-
 function mask(ref: string): string {
   const s = String(ref || '')
   if (s.length <= 4) return '••••'
@@ -75,25 +67,18 @@ async function logCompliance(entry: {
   requestId?: string
   detail?: string
 }): Promise<void> {
-  const db = admin()
-  if (!db) return
-  try {
-    await db.from('bank_compliance_log').insert({
-      actor_id: entry.ctx.user?.id || null,
-      actor_email: entry.ctx.user?.email || null,
-      institution: entry.institution || null,
-      action: entry.action,
-      status: entry.status,
-      account_ref: entry.accountRef ? mask(entry.accountRef) : null,
-      amount_cents: typeof entry.amountCents === 'number' ? entry.amountCents : null,
-      currency: entry.currency || null,
-      request_id: entry.requestId || null,
-      detail: entry.detail ? String(entry.detail).slice(0, 500) : null,
-    })
-  } catch {
-    // compliance logging must never throw the action — but a missing row is itself
-    // a signal; the table is created by the bank_compliance_log migration.
-  }
+  await getDataStore().logBankCompliance({
+    actorId: entry.ctx.user?.id || null,
+    actorEmail: entry.ctx.user?.email || null,
+    institution: entry.institution || null,
+    action: entry.action,
+    status: entry.status,
+    accountRef: entry.accountRef ? mask(entry.accountRef) : null,
+    amountCents: typeof entry.amountCents === 'number' ? entry.amountCents : null,
+    currency: entry.currency || null,
+    requestId: entry.requestId || null,
+    detail: entry.detail ? String(entry.detail).slice(0, 500) : null,
+  })
 }
 
 // ============================================================================
@@ -114,20 +99,7 @@ function vaultProviderKey(institution: string): string {
 }
 
 async function loadTokenRow(institution: string) {
-  const db = admin()
-  if (!db) return { ok: false as const, error: 'Token vault not configured (Supabase service role missing)' }
-  const { data, error } = await db
-    .from('vault_items')
-    .select('id, value_encrypted, iv, tag, expires_at, status')
-    .eq('provider', vaultProviderKey(institution))
-    .eq('label', 'oauth_token')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) return { ok: false as const, error: error.message }
-  if (!data) return { ok: false as const, notConnected: true }
-  return { ok: true as const, row: data }
+  return getDataStore().getBankTokenRow(vaultProviderKey(institution))
 }
 
 async function readToken(institution: string): Promise<{ ok: boolean; bundle?: TokenBundle; notConnected?: boolean; error?: string }> {
@@ -143,30 +115,16 @@ async function readToken(institution: string): Promise<{ ok: boolean; bundle?: T
 }
 
 async function writeToken(institution: string, ctx: Ctx, bundle: TokenBundle): Promise<{ ok: boolean; error?: string }> {
-  const db = admin()
-  if (!db) return { ok: false, error: 'Token vault not configured' }
   const enc = vaultEncrypt(JSON.stringify(bundle))
   if (!enc.ok) return { ok: false, error: enc.error }
   const expiresIso = new Date(bundle.expires_at * 1000).toISOString()
-  // Archive any prior active token for this institution, then insert the new one.
-  await db.from('vault_items')
-    .update({ status: 'archived', archived_at: new Date().toISOString() })
-    .eq('provider', vaultProviderKey(institution))
-    .eq('label', 'oauth_token')
-    .eq('status', 'active')
-  const { error } = await db.from('vault_items').insert({
-    owner_id: ctx.user?.id || ZERO_UUID,
-    provider: vaultProviderKey(institution),
-    label: 'oauth_token',
-    value_encrypted: enc.valueEncrypted,
+  return getDataStore().saveBankTokenRow(vaultProviderKey(institution), ctx.user?.id || ZERO_UUID, {
+    valueEncrypted: enc.valueEncrypted,
     iv: enc.iv,
     tag: enc.tag,
     last4: (bundle.access_token || '').slice(-4),
-    expires_at: expiresIso,
-    status: 'active',
+    expiresIso,
   })
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
 }
 
 // ---- OAuth2 token endpoint helpers ----
@@ -547,16 +505,8 @@ registerExecutor({
     { id: 'institution', label: 'Institution', type: 'select', required: false, options: bankInstitutionOptions() },
   ]),
   async run(ctx, input) {
-    const db = admin()
-    if (!db) return { ok: false, error: 'Compliance store not configured' }
-    let q = db.from('bank_compliance_log')
-      .select('created_at, institution, action, status, account_ref, amount_cents, currency, actor_email, request_id')
-      .order('created_at', { ascending: false })
-      .limit(50)
     const institution = String(input.institution || '')
-    if (institution) q = q.eq('institution', institution)
-    const { data, error } = await q
-    if (error) return { ok: false, error: error.message }
+    const data = await getDataStore().listBankCompliance({ institution: institution || undefined, limit: 50 })
     const rows = (data || []).map(r => ({
       at: r.created_at, institution: r.institution, action: r.action, status: r.status,
       account: r.account_ref || '', amount: typeof r.amount_cents === 'number' ? (r.amount_cents / 100).toFixed(2) : '', currency: r.currency || '',

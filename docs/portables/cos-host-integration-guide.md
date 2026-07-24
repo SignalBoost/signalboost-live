@@ -30,6 +30,32 @@ wiring; nothing in the engine is edited.
 
 ---
 
+## Chief-of-Staff assistant tool ports (the chat brain)
+
+The Chief-of-Staff / Concierge **chat brain** (`app/api/support/route.ts`) answers the
+operator through a set of AI tools in `lib/ai/tools/`. Every tool that reads business data
+or calls an external service reaches it through an injected port with a default SignalBoost
+adapter, so a buyer's assistant answers from **their** data and keys. Each tool is a single
+self-contained module; a buyer calls one setter at host startup to swap it, and the public
+tool functions are unchanged — nothing else in the brain is edited.
+
+| Capability | Port | Setter | Buyer supplies |
+|---|---|---|---|
+| Long-term user memory | `UserMemoryStore` | `setUserMemoryStore` | An adapter over their datastore for the assistant's per-user memory |
+| Conversation history | `ConversationHistoryStore` + `Summarizer` | `setConversationHistoryStore` / `setConversationSummarizer` | Their store for searchable chat history, and their model for the rolling summary |
+| Business metrics | `BusinessMetricsStore` | `setBusinessMetricsStore` | An adapter returning their subscriptions/accounts and pipeline counts, so "how is my business doing" answers from **their** numbers |
+| Partner / affiliate count | `AffiliateStore` | `setAffiliateStore` | An adapter over their partner catalog |
+| Web research | `WebSearchPort` | `setWebSearchPort` | Their search provider and key (the SignalBoost default is Brave via `BRAVE_SEARCH_API_KEY`) |
+| Video search | `VideoSearchProvider` | `setVideoSearchProvider` | Their media source (the SignalBoost default is the platform's YouTube + Archive.org search) |
+
+Notes:
+
+- Defaults are unchanged SignalBoost behavior — on the seller's deployment nothing is swapped, and each default only loads its heavy client (Supabase, the search/media SDK) when actually used, so a buyer who swaps a port never bundles the one they replaced.
+- All brand text these tools emit resolves through `hostBrandName()`, so a buyer's assistant never speaks the seller's brand.
+- `getPricing` needs no port (it is static), and the press-campaign tool already runs entirely through the Press & Media portable host.
+
+---
+
 ## Configuration
 
 | Flag | Effect |
@@ -62,10 +88,11 @@ degrades gracefully without.
 
 Adopting the COS is not a badge flip. To reach a genuine enterprise deployment, a buyer:
 
-- [ ] Implements an adapter for each port above against their own stack.
+- [ ] Implements an adapter for each engine port above against their own stack.
+- [ ] Implements an adapter for each **assistant tool port** their Chief-of-Staff chat will use (memory, conversation history, business metrics, partner catalog, web search, video search), or accepts the default where a capability isn't needed.
 - [ ] Populates their company record so generation is grounded (else output carries visible placeholders).
 - [ ] Sets `PORTABLE_BRAND_NAME` / `PORTABLE_BRAND_URL` (and `PORTABLE_SOLD_COPY` for a blank copy).
-- [ ] Provides model access (`CosAiPort` / `CosImagePort`) with credentials from their own vault.
+- [ ] Provides model access (`CosAiPort` / `CosImagePort`, and the conversation `Summarizer`) with credentials from their own vault.
 - [ ] Writes their own host routes / entry points. The platform's API routes are a reference **test rig**, not part of the shipped portable.
 - [ ] Runs the build and the test suite in their environment — the real correctness gate.
 - [ ] Runs a security review of the model-access and audit adapters (the ports guarantee no engine data path leaves their infrastructure; the review confirms the adapters honor that).
@@ -75,13 +102,15 @@ Adopting the COS is not a badge flip. To reach a genuine enterprise deployment, 
 - **Host routes and dashboards.** These are SignalBoost's platform surface (the test rig). A buyer wires their own.
 - **The platform's Supabase / Next.js deployment.** That is the development environment, not the product.
 - **Batch generation.** Host-only, as above.
+- **Operator / code tools.** `repoReader`, `repoWriter`, `i18nSweep`, and `infraPRWriter` drive SignalBoost's *own* source repository and infrastructure PRs using SignalBoost credentials. Per Portable Law #6 (SignalBoost-specific adapters stay outside the portable core) they are reference adapters, **not** part of a buyer copy. A buyer who wants repo/infra autonomy for their own Chief-of-Staff supplies their own adapter behind a versioned contract, and it remains approval-controlled (Law #7 — consequential execution stays gated and audited).
 
 ---
 
-*Status: the engine's data, decision-audit, object-storage, and model-access dependencies
-are all behind injected ports as of this writing. "Enterprise-ready" for any given buyer
-still requires that buyer's own adapters, company record, host wiring, and a passing build
-plus security review in their environment — verified, not assumed.*
+*Status: the engine's data, decision-audit, object-storage, and model-access dependencies,
+and the assistant chat brain's business-data and external-service tools, are all behind
+injected ports as of this writing. "Enterprise-ready" for any given buyer still requires
+that buyer's own adapters, company record, host wiring, and a passing build plus security
+review in their environment — verified, not assumed.*
 
 ## Portable Browser Agent Ecosystem
 

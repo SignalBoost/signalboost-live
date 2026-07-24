@@ -7,3 +7,4 @@ export * from './enterprise-reasoning-v2.ts';
 export * from './enterprise-memory.ts';
 export * from './objective-engine.ts';
 export * from './policy-governance.ts';
+export * from './capability-registry.ts';

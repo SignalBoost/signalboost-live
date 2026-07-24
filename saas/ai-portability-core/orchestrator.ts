@@ -23,7 +23,7 @@ import {
   AdapterConfig,
   createAdapter,
 } from './adapters';
-import { ProviderRegistry } from './registry';
+import { AiProviderRegistry } from './registry';
 import { RoutingEngine, RoutingConfig, RoutingError } from './routing';
 import { Blender, BlendOptions } from './blending';
 import { AuditLogger, Reporter, Report } from './audit';
@@ -42,7 +42,7 @@ export interface OrchestratorConfig {
 }
 
 export class Orchestrator {
-  readonly registry = new ProviderRegistry();
+  readonly registry = new AiProviderRegistry();
   private routing: RoutingEngine;
   private blender: Blender;
   private audit: AuditLogger;
@@ -171,7 +171,7 @@ function genReqId(): string {
 export * from './schema';
 export * from './host';
 export * from './adapters';
-export { ProviderRegistry } from './registry';
+export { AiProviderRegistry, AiProviderRegistry as ProviderRegistry } from './registry';
 export { RoutingEngine, RoutingError } from './routing';
 export { Blender } from './blending';
 export type { BlendOptions, BlendStrategy } from './blending';

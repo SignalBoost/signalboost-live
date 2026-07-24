@@ -9,7 +9,7 @@ test('portable browser descriptors are frozen, serializable, and explicitly inac
   for (const descriptor of allPortableBrowserAdapterDescriptors) {
     assert.ok(Object.isFrozen(descriptor)); assert.ok(!ids.has(descriptor.adapterId)); ids.add(descriptor.adapterId)
     assert.equal(descriptor.vendorDependencyInstalled, false); assert.equal(descriptor.productionEnabled, false)
-    assert.equal(descriptor.implementationStatus, 'host_adapter_required'); assert.doesNotThrow(() => JSON.stringify(descriptor))
+    assert.equal(descriptor.implementationStatus, descriptor.adapterId === 'browserbase' ? 'available' : 'host_adapter_required'); assert.doesNotThrow(() => JSON.stringify(descriptor))
     assert.ok(descriptor.documentationReference); assert.ok(descriptor.supportedPortKinds.length)
   }
 })

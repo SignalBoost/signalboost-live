@@ -36,3 +36,4 @@ export * from './human-review-attestation-certificate-registry-attestation.ts';
 export * from './human-review-attestation-certificate-registry-attestation-integrity-validator.ts';
 export * from './human-review-attestation-certificate-registry-attestation-registry.ts';
 export * from './human-review-attestation-certificate-registry-attestation-registry-integrity-validator.ts';
+export * from './human-review-attestation-certificate-registry-attestation-registry-certificate.ts';

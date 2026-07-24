@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { EAE_CAPABILITY_SCHEMA_VERSION, buildCapabilityRegistrySnapshot, type EnterpriseCapability } from '../lib/autonomous-systems/capability-registry.ts';
+import { EAE_CAPABILITY_SCHEMA_VERSION, buildCapabilityRegistrySnapshot, type RegisteredEnterpriseCapability } from '../lib/autonomous-systems/capability-registry.ts';
 
 const tenant={tenantId:'tenant-a',environmentId:'prod',region:'us'};
 const query={tenant,action:'publish',region:'us',riskLevel:'high' as const,includeDegraded:false,maxResults:16};
-function capability(overrides:Partial<EnterpriseCapability>={}):EnterpriseCapability{return {schemaVersion:EAE_CAPABILITY_SCHEMA_VERSION,capabilityId:'content.publish',version:'1.0.0',tenant,name:'Content Publish',kind:'workflow',status:'available',supportedActions:['publish'],supportedRegions:['us'],maxRiskLevel:'high',requiresHumanApproval:true,evidenceRefs:['ev1'],metadata:{classification:'internal'},...overrides};}
+function capability(overrides:Partial<RegisteredEnterpriseCapability>={}):RegisteredEnterpriseCapability{return {schemaVersion:EAE_CAPABILITY_SCHEMA_VERSION,capabilityId:'content.publish',version:'1.0.0',tenant,name:'Content Publish',kind:'workflow',status:'available',supportedActions:['publish'],supportedRegions:['us'],maxRiskLevel:'high',requiresHumanApproval:true,evidenceRefs:['ev1'],metadata:{classification:'internal'},...overrides};}
 
 test('builds deterministic immutable snapshots',()=>{const a=buildCapabilityRegistrySnapshot([capability()],query);const b=buildCapabilityRegistrySnapshot([capability()],query);assert.equal(a.snapshotId,b.snapshotId);assert.ok(Object.isFrozen(a));assert.ok(Object.isFrozen(a.capabilities[0]));assert.deepEqual(a.capabilityIds,['content.publish@1.0.0']);});
 test('filters by action, region, status, and risk',()=>{const result=buildCapabilityRegistrySnapshot([capability(),capability({capabilityId:'eu',supportedRegions:['eu']}),capability({capabilityId:'disabled',status:'disabled'}),capability({capabilityId:'low',maxRiskLevel:'low'})],query);assert.deepEqual(result.capabilityIds,['content.publish@1.0.0']);});

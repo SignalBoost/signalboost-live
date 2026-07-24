@@ -1,3 +1,4 @@
+<!-- ONBOARD.md -->
 # ONBOARD.md — Mandatory SignalBoostAi / COSA Onboarding
 
 This document is the mandatory first read for every developer, AI coding agent, AI reviewer, infrastructure assistant, operator, contractor, and contributor working on this repository.
@@ -625,6 +626,46 @@ Rules:
 
 ---
 
+## 12E. The Governed Socket — Bring-Your-Own Agent / Protocol / Model / Tool (Product Doctrine)
+
+The product is not nine portables. The product is the **governed socket**: the layer that lets an enterprise run ANY agent, model, tool, or protocol they already trust — Microsoft Copilot, Salesforce Agentforce, OpenAI, Anthropic, Google, LangChain, CrewAI, an in-house agent — against their own infrastructure, governed uniformly. The portables are **reference apps** that prove the socket works; they are not the thing being sold. **Portability is the product.** The buyer keeps whatever platform they run and plugs it in; nothing is ripped out.
+
+Market context (why this is the category, not a feature): Gartner projects the average Fortune 500 will run 150,000+ agents by 2028, up from <15 in 2025 — the pain is agent **sprawl and governance** across many vendors, frameworks, and clouds. The two converged interoperability standards are **MCP** (Model Context Protocol — Anthropic, Linux Foundation AAIF; agent↔tool; "USB-C for agents") and **A2A** (Agent-to-Agent — Google, Linux Foundation; agent↔agent). Doctrine: support the **standards**, not N bespoke per-vendor integrations.
+
+### "Not protocol N, but protocols Ns"
+
+The platform must speak **many protocols concurrently and permanently** — one enterprise division on MCP, another on A2A, a legacy system on a webhook, a new protocol in 2028 — all live at once, all governed identically. A new protocol is a **registered adapter (a plugin), never a core rewrite**. No protocol name and no vendor name ever appears in the governance core. This is the stable-core / swappable-edge rule applied to the whole socket.
+
+### Architecture — `saas/agent-gateway/` (host-agnostic, zero platform/env/credentials)
+
+- **`types.ts`** — `AgentRequest` is the ONE normalized internal shape every adapter produces (`{ requestId, protocol, agentId, tenantId?, actor?, action:{kind,target,params} }`). The core only ever sees this; `protocol` is a provenance label for audit, never a branch. `ProtocolAdapter{ protocolId, normalize(raw)→AgentRequest, denormalize(outcome)→raw }`.
+- **`registry.ts`** — `ProtocolRegistry`: N adapters loaded **concurrently**; `register/list/get/normalize/denormalize`; fail-closed on unknown protocol and on duplicate registration. (Named `ProtocolRegistry` deliberately — must not collide with the BPAL `ProviderRegistry` guard.)
+- **`governance.ts`** — THE STABLE CORE. `evaluate(request, policy)` runs two gates; `runGoverned(request, policy, host)` decides → executes / halts / denies and audits **every** outcome to the buyer's SIEM (`dataset: 'agent_gateway'`, events `agent.executed`/`agent.execution_failed`/`agent.halted_for_approval`/`agent.denied`).
+- **`adapters/protocols.ts`** — `createMcpAdapter()` + `createA2aAdapter()`, the first two of N. Both normalize into the SAME `AgentRequest`, so the core governs them identically.
+- **`index.ts`** — barrel. Test: `saas/tests/agentGateway.node.test.ts` (proves concurrent MCP+A2A, fail-closed registry, the safety gates, and that the SAME action gets the SAME verdict via MCP and A2A). Reuses `saas/portable-audit` via a relative import; strict-tsc-clean; node-testable.
+
+### The safety envelope (non-negotiable — owner rule)
+
+- **Categorical human-approval, not a risk score.** Life-or-death, financial harm, data-destructive, external-effect, or unclassifiable actions **always** require a human. No confidence level lets the machine act on these; the allowlist cannot override this. `HUMAN_ONLY_CLASSES` in `types.ts` enforces it as Gate 1, which beats the allowlist (proven by test: a financial action explicitly placed on the allowlist still halts).
+- **Closed allowlist for unattended action.** Only a `reversible_internal` action that is explicitly listed AND carries a **verified rollback** runs without a human (Gate 2). Everything unlisted or unclassifiable **default-halts**. Fail-closed: a classifier that throws yields `unknown` → human.
+- **Approve the playbook once, not the incident.** "Autonomous" means policy-level pre-authorization of a small, reversible, rollback-verified envelope that then runs unattended — spacecraft-FDIR style. The envelope **starts near-empty** and widens only as playbooks earn trust in production. Per-incident approval is not autonomy and is not the goal; categorical harm classes are never eligible for the envelope regardless.
+
+### Where the socket sits (and does not)
+
+Govern the **consequential decision**, not the real-time control loop. The socket belongs at the supervisory / mission / command layer (dispatch, authorize, enable). It must NOT sit inside a millisecond control loop (browser render frame, drone stabilization, collision avoidance) — those stay on the agent/robot/autopilot with their own real-time and safety guarantees. Same principle as the Browser Runtime (Mission 001): govern the command, not the loop.
+
+### Physical agents (robotics) — roadmap direction
+
+Robots are just more protocols on the same socket. Drones speak **MAVLink** (ground station ↔ PX4/ArduPilot flight controllers); ground robots/arms/AVs speak **ROS 2 over DDS** (and XRCE-DDS). They ride a redundant multi-link **C2 (command-and-control)** stack that auto-switches between cellular (4G/5G), LEO satellite (Starlink/OneWeb) for beyond-line-of-sight, and encrypted mesh radio, with automatic failover. A MAVLink/ROS 2 adapter normalizes a robot command into the same `AgentRequest` and runs it through the same governance core with **zero core change** — proving the socket generalizes from software agents to commanded machines. Here the safety rule is not optional polish: a command that could cause physical harm is the `safety` class → categorical human approval, which is exactly what aviation (FAA/UTM) and automotive functional-safety regimes require. The gateway's harm-gate + SIEM audit trail is the compliance artifact a robotics operator's regulator demands. Robotics is a far more regulated, real-time, safety-critical domain — a roadmap direction, not a shipped capability — but it validates the architecture.
+
+### Cross-cutting: SIEM / audit export
+
+`saas/portable-audit/` is the shared, host-agnostic SIEM primitive (ECS-JSON + CEF; buyer implements `SiemTransport`; `createSiemAuditSink`). Wired into COS (`siemDecisionLogStore`), render (`render-core/siem-log`), console (`console-core/siem-log`), press (`PortBundle.audit`), and the agent-gateway. Three portables have CI-guarded buyer-deployment end-to-end proofs (`renderBuyerDeployment`, `cosDecisionSiem`, `consoleBuyerDeployment` in the `npm test` list) that run the real engine on buyer-supplied fakes with a mock SIEM and zero SignalBoost infrastructure. Buyer-facing SIEM wiring guide: `docs/portables/siem-audit-export.md`.
+
+### Honest status
+
+This is the **spine**, not a finished platform. Shipped: the registry + normalized request + governance core + safety envelope + MCP/A2A adapters + audit, proven by test. Remaining: more adapters (webhook/REST, ACP, MAVLink/ROS 2) to exercise the "Ns" claim; a real reference `ConsequenceClassifier` (candidate source: the Mission 002 EAE risk/policy layer); standing the gateway up as an actual MCP-server endpoint a buyer points an agent at; and wiring `ExecutionPort` to the infrastructure-PR approval machinery (§12) so halts become owner-approved PRs and allowlisted actions auto-run.
+
 ## 14. Audit, Compliance, and Cybersecurity
 
 Audit and cybersecurity are core platform capabilities, not optional add-ons.
@@ -797,6 +838,8 @@ Keeping onboarding documentation current helps future developers and AI agents a
 ---
 
 ## 19. Onboarding Change Log
+
+- 2026-07-24: Added Section 12E — The Governed Socket (bring-your-own agent/protocol/model/tool). Reframed the product from nine portables to the governance/portability layer any enterprise plugs their own agents, models, tools, and protocols into. Built `saas/agent-gateway/` (host-agnostic, strict-tsc-clean, node-tested): a `ProtocolRegistry` running N adapters concurrently, one normalized `AgentRequest` the core governs protocol-blind, MCP + A2A as the first two adapters, and a two-gate safety envelope — categorical human-approval for life/financial/data/external/unknown consequence classes (never overridable by a score or the allowlist), a closed allowlist of reversible actions with verified rollback for unattended runs, and default-halt otherwise — with every decision audited to the buyer's SIEM via `saas/portable-audit`. Documented the "protocols Ns" rule (many protocols concurrently and forever, new ones are plugins not core rewrites), the govern-the-decision-not-the-control-loop boundary, and the robotics roadmap (MAVLink / ROS 2+DDS over multi-link C2 as just more protocols; the safety class = the FAA/UTM/functional-safety human-approval requirement). Next builds: MAVLink/ROS 2 adapter, a real ConsequenceClassifier, an MCP-server endpoint, and ExecutionPort wired to infra-PRs.
 
 - 2026-07-22: Closed the infra-PR step-output chaining gap (§12C). New resolver `saas/lib/hub/pr-step-refs.ts` substitutes `{{steps[N].field}}` at merge time from the `data` an earlier step returned; wired into `saas/lib/hub/pr-engine.ts` at staging (backward-only validation rejects self/forward/malformed refs before the owner reviews) and merge (fail-closed — an unresolvable ref fails its step before the provider call, never shipping a literal placeholder). Stored PR keeps the reference text so the approved record and dedup fingerprint are unchanged; substitutions are audited with secrets masked. Covered by `saas/tests/prStepRefs.node.test.ts`. Also, while verifying the five gaps this doc listed: (a) the TikTok/Instagram video cross-post UI was found ALREADY SHIPPED (`/dashboard/cosa/video-pipeline` + `crosspost/route.ts`) — §10A corrected; (b) the durable dispatcher was found ALREADY SHIPPED (`SupabaseDispatchStore` + `supervisor_dispatch_ledger`) but its file did not load under Node's strip-only TypeScript because of a constructor parameter property — fixed the non-erasable syntax so the whole test suite loads; (c) wrote the two missing portable docs `docs/portables/browser-agent-compliance.md` and `docs/portables/render-module.md` (§12D map now complete); (d) removed the §12D reference to `docs/portables/compliance-checklist.md`, which never existed. Additional defects found and fixed in transit: the manual publish route (`app/api/cos/campaign-queue/publish/route.ts`) gated on `status === 'approved'`, which blocked publishing later languages of an approved multi-language campaign and never checked `approved_at`/`approved_by` — aligned it to the `publish-core` gate and added a duplicate-publish guard; and the render credits path was unreachable (no code supplied `paidProviderApprovalId`, and `approval_required` surfaced as HTTP 502). Fixed the latter by adding an optional `PaidProviderApprovalAdapter` to the render host contract with a fail-closed engine gate and a SignalBoost issuer bounded by `RENDER_AUTO_APPROVAL_CEILING_CENTS` (default 200 = $2); VoiceStudio now offers a one-tap BYOK switch on an out-of-credits result in all five languages.
 

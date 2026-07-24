@@ -1,4 +1,5 @@
 export { browserbaseDescriptor } from './browserbase.ts'
+export { browserlessDescriptor } from './browserless.ts'
 export { steelDescriptor } from './steel.ts'
 export { hyperbrowserDescriptor } from './hyperbrowser.ts'
 export { aws_agentcore_browserDescriptor } from './aws-agentcore-browser.ts'
@@ -24,4 +25,4 @@ export { microsoft_power_automateDescriptor } from './microsoft-power-automate.t
 export { firecrawlDescriptor } from './firecrawl.ts'
 export { private_browser_fleetDescriptor } from './private-browser-fleet.ts'
 export { custom_browser_agentDescriptor } from './custom-browser-agent.ts'
-export { allPortableBrowserAdapterDescriptors } from "./registry-data.ts"
+export { allPortableBrowserAdapterDescriptors } from './registry-data.ts'

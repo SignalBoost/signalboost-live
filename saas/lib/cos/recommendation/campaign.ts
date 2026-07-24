@@ -1,4 +1,6 @@
+// saas/lib/cos/recommendation/campaign.ts
 import type { CosCampaign, CosCampaignAsset, CosRecommendation } from './types'
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -51,7 +53,7 @@ function assetsForChannel(recommendation: CosRecommendation, primaryLanguage: Co
   if (channel === 'youtube' || channel === 'short_video') {
     const lengthGuidance = channel === 'short_video' ? '45-90 second short-form script' : '4-6 minute educational script'
     return [
-      { type: 'script', status: 'needed', language: primaryLanguage, brief: `Create a ${lengthGuidance} that starts with the customer problem and introduces SignalBoost as the solution. Campaign objective: ${objective}` },
+      { type: 'script', status: 'needed', language: primaryLanguage, brief: `Create a ${lengthGuidance} that starts with the customer problem and introduces ${hostBrandName()} as the solution. Campaign objective: ${objective}` },
       { type: 'thumbnail', status: 'needed', brief: `Create a clear thumbnail concept with one problem-driven headline. Campaign objective: ${objective}` },
       { type: 'description', status: 'needed', language: primaryLanguage, brief: `Create a video description with feature benefits, CTA, links, and compliance-safe wording. Campaign objective: ${objective}` },
       { type: 'seo', status: 'needed', brief: `Create title options, keywords, tags, and chapter suggestions. Campaign objective: ${objective}` },

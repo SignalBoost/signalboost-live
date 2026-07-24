@@ -7,6 +7,7 @@ import { sanitizeBrowserRuntimeError } from '../../browser-runtime/error-sanitiz
 
 const BROWSERBASE_ADAPTER_ID = 'browserbase'
 const BROWSERBASE_API_URL = 'https://api.browserbase.com/v1/sessions'
+const SANDBOX_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 export interface BrowserbaseCredentialBrokerPort {
   resolveBrowserbaseApiKey(scope: Readonly<{ projectId: string }>): Promise<string>
@@ -40,15 +41,26 @@ export interface BrowserbaseConnectionPort {
   connect(connectUrl: string): Promise<BrowserSessionPort>
 }
 
-function normalizeOrigin(value: string): string {
-  const origin = new URL(value).origin
-  if (origin !== value || !/^https?:$/.test(new URL(value).protocol)) throw new Error('browserbase_invalid_origin')
-  return origin
+function requireNonEmptyString(value: unknown, errorCode: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) throw new Error(errorCode)
+  return value
 }
 
-function requireNonEmptyString(value: unknown, error: string): string {
-  if (typeof value !== 'string' || value.trim().length === 0) throw new Error(error)
-  return value
+function normalizeSandboxOrigin(value: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    throw new Error('browserbase_invalid_origin')
+  }
+
+  if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol)) {
+    throw new Error('browserbase_invalid_origin')
+  }
+  if (!SANDBOX_HOSTS.has(parsed.hostname)) {
+    throw new Error('browserbase_external_origin_rejected')
+  }
+  return parsed.origin
 }
 
 function assertApprovedRequest(request: BrowserSessionLaunchRequest, approvedOrigins: ReadonlySet<string>): void {
@@ -58,7 +70,8 @@ function assertApprovedRequest(request: BrowserSessionLaunchRequest, approvedOri
   if (request.mode === 'execute_change') throw new Error('browserbase_execute_change_rejected')
   if (request.allowedOrigins.length === 0) throw new Error('browserbase_origin_required')
   for (const value of request.allowedOrigins) {
-    if (!approvedOrigins.has(normalizeOrigin(value))) throw new Error('browserbase_origin_rejected')
+    const origin = normalizeSandboxOrigin(value)
+    if (!approvedOrigins.has(origin)) throw new Error('browserbase_origin_rejected')
   }
 }
 
@@ -69,9 +82,19 @@ export class BrowserbaseSessionFactory implements BrowserSessionFactory {
   private readonly transport: BrowserbaseSessionTransport
 
   constructor(configuration: BrowserbaseAdapterConfiguration) {
-    this.projectId = requireNonEmptyString(configuration?.projectId, 'browserbase_project_id_required')
-    if (!configuration?.credentialBroker || !configuration?.transport) throw new Error('browserbase_required_port_missing')
-    this.approvedOrigins = new Set(configuration.approvedOrigins.map(normalizeOrigin))
+    if (!configuration || typeof configuration !== 'object') throw new Error('browserbase_configuration_required')
+    this.projectId = requireNonEmptyString(configuration.projectId, 'browserbase_project_id_required')
+    if (!Array.isArray(configuration.approvedOrigins)) throw new Error('browserbase_origin_required')
+    if (!configuration.credentialBroker || typeof configuration.credentialBroker.resolveBrowserbaseApiKey !== 'function') {
+      throw new Error('browserbase_credential_broker_required')
+    }
+    if (!configuration.transport
+      || typeof configuration.transport.createSession !== 'function'
+      || typeof configuration.transport.connect !== 'function') {
+      throw new Error('browserbase_transport_required')
+    }
+
+    this.approvedOrigins = new Set(configuration.approvedOrigins.map(normalizeSandboxOrigin))
     if (this.approvedOrigins.size === 0) throw new Error('browserbase_origin_required')
     this.credentialBroker = configuration.credentialBroker
     this.transport = configuration.transport
@@ -88,7 +111,14 @@ export class BrowserbaseSessionFactory implements BrowserSessionFactory {
       const session = await this.transport.createSession({ projectId: this.projectId, apiKey })
       const connectUrl = requireNonEmptyString(session?.connectUrl, 'browserbase_connect_url_missing')
       requireNonEmptyString(session?.sessionId, 'browserbase_session_id_missing')
-      if (new URL(connectUrl).protocol !== 'wss:') throw new Error('browserbase_connect_url_invalid')
+
+      let parsedConnectUrl: URL
+      try {
+        parsedConnectUrl = new URL(connectUrl)
+      } catch {
+        throw new Error('browserbase_connect_url_invalid')
+      }
+      if (parsedConnectUrl.protocol !== 'wss:') throw new Error('browserbase_connect_url_invalid')
       return await this.transport.connect(connectUrl)
     } catch (error) {
       throw new Error(sanitizeBrowserRuntimeError(error, apiKey ? [apiKey] : []))
@@ -134,6 +164,7 @@ export const browserbaseAdapterStatus = Object.freeze({
   notImplemented: false,
   requiredPorts: Object.freeze(['credential_broker', 'browserbase_transport']),
   productionEnabled: false,
+  executionBoundary: 'sandbox_loopback_only' as const,
 })
 
 export const browserbaseAdapterFactory: BrowserbaseAdapterFactory = Object.freeze({
@@ -143,11 +174,20 @@ export const browserbaseAdapterFactory: BrowserbaseAdapterFactory = Object.freez
 export function validateBrowserbaseAdapterConfiguration(value: unknown): value is BrowserbaseAdapterConfiguration {
   if (!value || typeof value !== 'object') return false
   const configuration = value as Partial<BrowserbaseAdapterConfiguration>
-  return typeof configuration.projectId === 'string'
-    && Array.isArray(configuration.approvedOrigins)
-    && !!configuration.credentialBroker
-    && typeof configuration.credentialBroker.resolveBrowserbaseApiKey === 'function'
-    && !!configuration.transport
-    && typeof configuration.transport.createSession === 'function'
-    && typeof configuration.transport.connect === 'function'
+  if (typeof configuration.projectId !== 'string'
+    || !Array.isArray(configuration.approvedOrigins)
+    || !configuration.credentialBroker
+    || typeof configuration.credentialBroker.resolveBrowserbaseApiKey !== 'function'
+    || !configuration.transport
+    || typeof configuration.transport.createSession !== 'function'
+    || typeof configuration.transport.connect !== 'function') {
+    return false
+  }
+
+  try {
+    return configuration.approvedOrigins.length > 0
+      && configuration.approvedOrigins.every(origin => typeof origin === 'string' && normalizeSandboxOrigin(origin) === origin)
+  } catch {
+    return false
+  }
 }

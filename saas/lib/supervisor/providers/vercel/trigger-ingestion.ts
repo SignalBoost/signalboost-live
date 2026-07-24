@@ -23,3 +23,65 @@ export function normalizeVercelWebhook(body:any, connections:VercelProviderConne
 export async function acceptVercelTrigger(input:{store:VercelTriggerStore; coordinationStore:CoordinationStore; connection:VercelProviderConnection; triggerSource:VercelTriggerSource; eventType?:string; deploymentId?:string; incidentType?:string; eventTime?:string; observationWindow?:string; safeMetadata?:Record<string,unknown>; now?:Date; maxAttempts?:number}){ const now=input.now??new Date(); const fp=deterministicFingerprint({tenantId:input.connection.tenantId,providerConnectionId:input.connection.providerConnectionId,projectId:input.connection.projectId,deploymentId:input.deploymentId??'',environment:input.connection.environment,eventType:input.eventType??'',incidentType:input.incidentType??'deployment_health_observation',window:input.observationWindow??''}); const key=`vercel:${fp}`; const workItemId=`vercel-health:${fp.slice(0,32)}`; const base:VercelTriggerRecord={triggerId:`trg-${fp.slice(0,32)}`,deduplicationKey:key,tenantId:input.connection.tenantId,provider:'vercel',providerConnectionId:input.connection.providerConnectionId,projectId:input.connection.projectId,deploymentId:input.deploymentId,environment:input.connection.environment,triggerSource:input.triggerSource,eventType:input.eventType,incidentType:input.incidentType??'deployment_health_observation',fingerprint:fp,eventTime:input.eventTime,receivedTime:now.toISOString(),deduplicationStatus:'created',workItemId,reasonCode:'accepted',safeMetadata:JSON.parse(JSON.stringify(input.safeMetadata??{},(_k,v)=>typeof v==='string'?safe(v,240):v)),createdAt:now.toISOString(),updatedAt:now.toISOString()}; const up=await input.store.upsertTrigger(base); if(up.outcome==='reused' && up.record.workItemId) return {outcome:'reused' as const, record:up.record, workItemId:up.record.workItemId}; const work:WorkItem={workItemId,workItemType:'vercel_deployment_health',incidentId:`vercel-trigger:${fp.slice(0,32)}`,provider:'vercel',tenantId:input.connection.tenantId,projectId:input.connection.projectId,environment:input.connection.environment,state:'queued',priority:60,createdAt:now.toISOString(),availableAt:now.toISOString(),attempt:0,maxAttempts:input.maxAttempts??1,policyVersion:'ha-policy-v1',capabilityVersion:'vercel-browser-capabilities-v1',adapterVersion:'vercel-browser-adapter-v1',schemaVersion:'supervisor-work-item-v1'}; try{ await input.coordinationStore.enqueueWorkItem(work) }catch(e:any){ if(!String(e?.code||e?.message).includes('conflict')) { await input.store.updateTrigger(up.record.triggerId,{deduplicationStatus:'deferred',reasonCode:'coordination_unavailable',updatedAt:now.toISOString()}); return {outcome:'deferred' as const, record:{...up.record,deduplicationStatus:'deferred',reasonCode:'coordination_unavailable'}, workItemId:undefined} } } await input.store.updateTrigger(up.record.triggerId,{workItemId,deduplicationStatus:'created',updatedAt:now.toISOString()}); return {outcome:'created' as const, record:{...up.record,workItemId,deduplicationStatus:'created'}, workItemId} }
 export async function runAcceptedVercelWork(input:{coordinationStore:CoordinationStore; db:any; connection:VercelProviderConnection; workItemId:string; ownerInstanceId:string; ownerRuntimeId:string; leaseMs:number; client?:VercelHealthClient; now?:Date}){ const now=input.now??new Date(); await input.coordinationStore.registerInstance({instanceId:input.ownerInstanceId,runtimeId:input.ownerRuntimeId,startedAt:now.toISOString(),heartbeatAt:now.toISOString(),softwareVersion:process.env.VERCEL_GIT_COMMIT_SHA||'local',schemaVersion:'supervisor-instance-v1',supportedProviderKinds:['vercel'],status:'healthy'}); const lease=await input.coordinationStore.acquireLease({workItemId:input.workItemId,ownerInstanceId:input.ownerInstanceId,ownerRuntimeId:input.ownerRuntimeId,leaseDurationMs:input.leaseMs,now}); const workflow=new VercelDeploymentHealthIntelligence({config:{providerConnectionId:input.connection.providerConnectionId,projectId:input.connection.projectId,teamId:input.connection.teamId,environment:input.connection.environment,lookbackWindowMs:Number(process.env.VERCEL_OBSERVATION_LOOKBACK_MS||3600000),maxDeployments:Number(process.env.VERCEL_OBSERVATION_MAX_PROJECTS||5),repeatedFailureThreshold:2,stuckDeploymentThresholdMs:3600000,maxAttempts:Number(process.env.VERCEL_OBSERVATION_RETRY_ATTEMPTS||1),clock:{now:()=>new Date()},sleeper:{sleep:async()=>{}}},secretResolver:async id=>id===process.env.VERCEL_PROVIDER_CONNECTION_ID?(process.env.VERCEL_API_TOKEN||''):'',client:input.client??new FetchVercelReadOnlyClient(),store:new SupabaseVercelHealthStore(input.db)}); return workflow.run({coordinationStore:input.coordinationStore,workItemId:input.workItemId,ownerInstanceId:input.ownerInstanceId,ownerRuntimeId:input.ownerRuntimeId,leaseId:lease.leaseId,fencingToken:lease.fencingToken,executionMode:'api_only'}) }
 export async function loadActiveVercelConnections(db:any, limit:number):Promise<VercelProviderConnection[]>{ if(process.env.VERCEL_PROJECT_ID&&process.env.VERCEL_PROVIDER_CONNECTION_ID) return [{tenantId:process.env.VERCEL_TENANT_ID||'platform',providerConnectionId:process.env.VERCEL_PROVIDER_CONNECTION_ID,projectId:process.env.VERCEL_PROJECT_ID,teamId:process.env.VERCEL_TEAM_ID,environment:(process.env.VERCEL_OBSERVATION_ENVIRONMENT as any)||'production',active:true}].slice(0,limit); const {data,error}=await db.from('provider_connections').select('tenant_id,id,project_id,team_id,environment,is_active').eq('provider','vercel').eq('is_active',true).limit(limit); if(error) throw new Error('connection_lookup_failed'); return (data??[]).map((r:any)=>({tenantId:r.tenant_id,providerConnectionId:r.id,projectId:r.project_id,teamId:r.team_id,environment:['sandbox','preview','production'].includes(r.environment)?r.environment:'production',active:!!r.is_active})) }
+
+// ============================================================================
+// PORTABLE ENTRY POINTS — a buyer calls these instead of runAcceptedVercelWork /
+// loadActiveVercelConnections. Same behavior, but every dependency (secrets, run-history
+// store, connection list) is injected instead of read from process.env or assumed
+// Supabase. The originals above are untouched and still power the platform's own
+// webhook/vercel and cron/vercel-observation routes.
+// ============================================================================
+import type { VercelObservationRuntimeConfig, VercelConnectionSource } from './portable/vercel-runtime-config.ts'
+
+export async function runAcceptedVercelWorkWithConfig(input: {
+  coordinationStore: CoordinationStore
+  connection: VercelProviderConnection
+  workItemId: string
+  ownerInstanceId: string
+  ownerRuntimeId: string
+  leaseMs: number
+  config: VercelObservationRuntimeConfig
+  now?: Date
+}) {
+  const now = input.now ?? new Date()
+  await input.coordinationStore.registerInstance({
+    instanceId: input.ownerInstanceId, runtimeId: input.ownerRuntimeId,
+    startedAt: now.toISOString(), heartbeatAt: now.toISOString(),
+    softwareVersion: input.config.softwareVersion || 'local', schemaVersion: 'supervisor-instance-v1',
+    supportedProviderKinds: ['vercel'], status: 'healthy',
+  })
+  const lease = await input.coordinationStore.acquireLease({
+    workItemId: input.workItemId, ownerInstanceId: input.ownerInstanceId,
+    ownerRuntimeId: input.ownerRuntimeId, leaseDurationMs: input.leaseMs, now,
+  })
+  const workflow = new VercelDeploymentHealthIntelligence({
+    config: {
+      providerConnectionId: input.connection.providerConnectionId,
+      projectId: input.connection.projectId,
+      teamId: input.connection.teamId,
+      environment: input.connection.environment,
+      lookbackWindowMs: input.config.lookbackWindowMs ?? 3600000,
+      maxDeployments: input.config.maxDeployments ?? 5,
+      repeatedFailureThreshold: 2,
+      stuckDeploymentThresholdMs: 3600000,
+      maxAttempts: input.config.maxAttempts ?? 1,
+      clock: { now: () => new Date() },
+      sleeper: { sleep: async () => {} },
+    },
+    secretResolver: async (id) => input.config.secretResolver(id),
+    client: input.config.client ?? new FetchVercelReadOnlyClient(),
+    store: input.config.healthStore,
+  })
+  return workflow.run({
+    coordinationStore: input.coordinationStore, workItemId: input.workItemId,
+    ownerInstanceId: input.ownerInstanceId, ownerRuntimeId: input.ownerRuntimeId,
+    leaseId: lease.leaseId, fencingToken: lease.fencingToken, executionMode: 'api_only',
+  })
+}
+
+export async function loadActiveVercelConnectionsFromSource(
+  source: VercelConnectionSource,
+  limit: number,
+): Promise<VercelProviderConnection[]> {
+  return source.list(limit)
+}

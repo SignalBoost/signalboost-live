@@ -225,7 +225,9 @@
       "closeDetail": "Close details",
       "pagination": "Review pagination",
       "fingerprintCopied": "Fingerprint copied.",
-      "fingerprintCopyFailed": "Fingerprint could not be copied."
+      "fingerprintCopyFailed": "Fingerprint could not be copied.",
+      "retryDiagnostics": "Retry diagnostics",
+      "retryDetail": "Retry details"
     }
   },
   "es": {
@@ -454,7 +456,9 @@
       "closeDetail": "Cerrar detalles",
       "pagination": "Paginación de revisiones",
       "fingerprintCopied": "Huella digital copiada.",
-      "fingerprintCopyFailed": "No se pudo copiar la huella digital."
+      "fingerprintCopyFailed": "No se pudo copiar la huella digital.",
+      "retryDiagnostics": "Reintentar diagnóstico",
+      "retryDetail": "Reintentar detalles"
     }
   },
   "pt": {
@@ -683,7 +687,9 @@
       "closeDetail": "Fechar detalhes",
       "pagination": "Paginação de revisões",
       "fingerprintCopied": "Impressão digital copiada.",
-      "fingerprintCopyFailed": "Não foi possível copiar a impressão digital."
+      "fingerprintCopyFailed": "Não foi possível copiar a impressão digital.",
+      "retryDiagnostics": "Tentar novamente o diagnóstico",
+      "retryDetail": "Tentar novamente os detalhes"
     }
   },
   "pl": {
@@ -912,7 +918,9 @@
       "closeDetail": "Zamknij szczegóły",
       "pagination": "Paginacja przeglądów",
       "fingerprintCopied": "Odcisk palca został skopiowany.",
-      "fingerprintCopyFailed": "Nie można było skopiować odcisku palca."
+      "fingerprintCopyFailed": "Nie można było skopiować odcisku palca.",
+      "retryDiagnostics": "Ponów diagnostykę",
+      "retryDetail": "Ponów szczegóły"
     }
   },
   "ru": {
@@ -1141,7 +1149,9 @@
       "closeDetail": "Закрыть сведения",
       "pagination": "Пагинация проверок",
       "fingerprintCopied": "Отпечаток скопирован.",
-      "fingerprintCopyFailed": "Не удалось скопировать отпечаток."
+      "fingerprintCopyFailed": "Не удалось скопировать отпечаток.",
+      "retryDiagnostics": "Повторить диагностику",
+      "retryDetail": "Повторить сведения"
     }
   }
 }

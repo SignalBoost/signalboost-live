@@ -27,8 +27,8 @@ test('a new detail request aborts its predecessor and binds the GET request to i
 
 test('a stale detail response cannot replace the current review or display an error', () => {
   const source = client()
-  assert.match(source, /if \(detailRequest\.current === request && !controller\.signal\.aborted\) setDetail\(payload\)/)
-  assert.match(source, /catch \(cause\) \{ if \(detailRequest\.current === request && !controller\.signal\.aborted\) setDetailError/)
+  assert.match(source, /if \(detailRequest\.current === request && !controller\.signal\.aborted && detailReviewId\.current === reviewId\) setDetail\(payload\)/)
+  assert.match(source, /catch \(cause\) \{ if \(detailRequest\.current === request && !controller\.signal\.aborted && detailReviewId\.current === reviewId\) setDetailError/)
 })
 
 test('closing the detail panel and unmounting abort active review requests', () => {
@@ -42,5 +42,5 @@ test('Mission Review remains GET-only and exposes no mutation controls', () => {
   assert.equal((source.match(/method: 'GET'/g) || []).length, 3)
   assert.doesNotMatch(source, /method:\s*'(POST|PUT|PATCH|DELETE)'/)
   const controls = source.match(/<button[^>]*>[\s\S]*?<\/button>/g) || []
-  assert.doesNotMatch(controls.join(' '), /approve|reject|resolve|retry|replay|execute|repair|cancel|delete|edit|GitHub issue|pull request|trigger CI/i)
+  assert.doesNotMatch(controls.join(' '), /approve|reject|resolve|replay|execute|repair|cancel|delete|edit|GitHub issue|pull request|trigger CI/i)
 })

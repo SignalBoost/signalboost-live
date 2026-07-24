@@ -27,12 +27,13 @@ test('diagnostics endpoint uses admin authentication, is GET-only, and does not 
   assert.doesNotMatch(route, /\.(insert|update|delete|rpc)\(/)
 })
 
-test('diagnostics UI renders the summary without mutation buttons or methods', () => {
+test('diagnostics UI renders the summary with a GET-only retry and no mutation methods', () => {
   const client = source('../app/dashboard/supervisor/missions/reviews/MissionReviewClient.tsx')
   assert.match(client, /parseManualReviewDiagnosticsResponse/)
   assert.match(client, /reviews\/diagnostics/)
   for (const field of ['diagnostics.total', 'diagnostics.routed', 'diagnostics.oldestRoutedAt', 'diagnostics.newestRoutedAt', 'diagnostics.duplicateRoutesPrevented', 'diagnostics.status']) assert.match(client, new RegExp(field.replaceAll('.', '\\.')))
   const section = client.slice(client.indexOf('<section style={diagnosticsPanel}'), client.indexOf('<form onSubmit'))
-  assert.doesNotMatch(section, /<button/)
+  assert.match(section, /labels\.retryDiagnostics/)
+  assert.match(section, /onClick=\{\(\) => void loadDiagnostics\(\)\}/)
   assert.doesNotMatch(client, /method:\s*'(POST|PUT|PATCH|DELETE)'/)
 })

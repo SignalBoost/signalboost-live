@@ -80,13 +80,13 @@ test('review UI makes GET-only Phase 6 requests and exposes no mutation controls
   assert.equal((source.match(/method: 'GET'/g) || []).length, 3)
   assert.doesNotMatch(source, /method:\s*'(POST|PUT|PATCH|DELETE)'/)
   const controls = source.match(/<button[^>]*>[\s\S]*?<\/button>/g) || []
-  assert.equal(controls.length, 6)
-  assert.doesNotMatch(controls.join(' '), /approve|reject|resolve|retry|replay|execute|repair|cancel|delete|edit|GitHub issue|pull request|trigger CI/i)
+  assert.equal(controls.length, 8)
+  assert.doesNotMatch(controls.join(' '), /approve|reject|resolve|replay|execute|repair|cancel|delete|edit|GitHub issue|pull request|trigger CI/i)
   assert.doesNotMatch(source, /supabase|authorization|credentials|cookies/i)
 })
 
 test('required safety labels are visible and localized in all supported languages', () => {
   const source = client(); const locales = JSON.parse(read('../lib/i18n/supervisorSocLocales.json'))
   for (const key of ['manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled']) assert.match(source, new RegExp(`labels\\.${key}`))
-  for (const lang of ['en', 'pt', 'es', 'pl', 'ru']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error', 'openDetail', 'closeDetail', 'pagination', 'fingerprintCopied', 'fingerprintCopyFailed']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
+  for (const lang of ['en', 'pt', 'es', 'pl', 'ru']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error', 'openDetail', 'closeDetail', 'pagination', 'fingerprintCopied', 'fingerprintCopyFailed', 'retryDiagnostics', 'retryDetail']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
 })

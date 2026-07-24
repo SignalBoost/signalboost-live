@@ -58,24 +58,38 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [diagnostics, setDiagnostics] = useState<MissionManualReviewDiagnosticsResponse | null>(null)
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(true)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState('')
   const detailOpener = useRef<HTMLButtonElement | null>(null)
   const listController = useRef<AbortController | null>(null)
   const detailController = useRef<AbortController | null>(null)
+  const diagnosticsController = useRef<AbortController | null>(null)
   const listRequest = useRef(0)
   const detailRequest = useRef(0)
+  const diagnosticsRequest = useRef(0)
+  const detailReviewId = useRef<string | null>(null)
   const copyFeedbackTimeout = useRef<number | undefined>(undefined)
 
   async function loadDiagnostics() {
+    diagnosticsController.current?.abort()
+    const controller = new AbortController()
+    diagnosticsController.current = controller
+    const request = diagnosticsRequest.current + 1
+    diagnosticsRequest.current = request
+    setDiagnosticsLoading(true)
     setDiagnosticsError(null)
     try {
-      const response = await fetch('/api/internal/supervisor/missions/reviews/diagnostics', { method: 'GET', cache: 'no-store' })
+      const response = await fetch('/api/internal/supervisor/missions/reviews/diagnostics', { method: 'GET', cache: 'no-store', signal: controller.signal })
       if (!response.ok) throw new Error(messageFor(response.status, labels))
       const payload = parseManualReviewDiagnosticsResponse(await response.json())
       if (!payload) throw new Error(labels.error)
+      if (diagnosticsRequest.current !== request || controller.signal.aborted) return
       setDiagnostics(payload)
-    } catch (cause) { setDiagnostics(null); setDiagnosticsError(cause instanceof Error ? cause.message : labels.error) }
+    } catch (cause) {
+      if (diagnosticsRequest.current !== request || controller.signal.aborted) return
+      setDiagnosticsError(cause instanceof Error ? cause.message : labels.error)
+    } finally { if (diagnosticsRequest.current === request) setDiagnosticsLoading(false) }
   }
 
   async function load(activeCursor = cursor) {
@@ -84,7 +98,7 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
     listController.current = controller
     const request = listRequest.current + 1
     listRequest.current = request
-    setLoading(true); setError(null); setDetail(null)
+    setLoading(true); setError(null)
     const params = new URLSearchParams({ limit: String(Math.min(100, pageSize)) })
     if (status) params.set('status', status)
     if (missionId.trim()) params.set('missionId', missionId.trim())
@@ -112,6 +126,7 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   function closeDetail() {
     detailController.current?.abort()
     detailRequest.current += 1
+    detailReviewId.current = null
     setDetail(null); setDetailError(null); setDetailLoading(false)
     window.setTimeout(() => {
       const opener = detailOpener.current
@@ -129,14 +144,16 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   useEffect(() => () => {
     listController.current?.abort()
     detailController.current?.abort()
+    diagnosticsController.current?.abort()
     if (copyFeedbackTimeout.current !== undefined) window.clearTimeout(copyFeedbackTimeout.current)
   }, [])
 
-  async function openDetail(reviewId: string, opener: HTMLButtonElement) {
-    detailOpener.current = opener
+  async function openDetail(reviewId: string, opener?: HTMLButtonElement | null) {
+    if (opener) detailOpener.current = opener
     detailController.current?.abort()
     const controller = new AbortController()
     detailController.current = controller
+    detailReviewId.current = reviewId
     const request = detailRequest.current + 1
     detailRequest.current = request
     setDetailLoading(true); setDetailError(null); setDetail(null)
@@ -145,8 +162,8 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
       if (!response.ok) throw new Error(messageFor(response.status, labels))
       const payload = parseDetailResponse(await response.json())
       if (!payload) throw new Error(labels.error)
-      if (detailRequest.current === request && !controller.signal.aborted) setDetail(payload)
-    } catch (cause) { if (detailRequest.current === request && !controller.signal.aborted) setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { if (detailRequest.current === request) setDetailLoading(false) }
+      if (detailRequest.current === request && !controller.signal.aborted && detailReviewId.current === reviewId) setDetail(payload)
+    } catch (cause) { if (detailRequest.current === request && !controller.signal.aborted && detailReviewId.current === reviewId) setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { if (detailRequest.current === request) setDetailLoading(false) }
   }
 
   async function copyFingerprint(value: string) {
@@ -162,7 +179,7 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
     <section style={panel}>
       <p style={kicker}>{labels.kicker}</p><h1 style={{ margin: '6px 0 12px' }}>{labels.title}</h1><p style={muted}>{labels.subtitle}</p>
       <div style={safety}><strong>{labels.manualReviewOnly}</strong><strong>{labels.noRepair}</strong><strong>{labels.productionDisabled}</strong><strong>{labels.providerDisabled}</strong></div>
-      <section style={diagnosticsPanel} aria-live="polite"><h2 style={{ marginTop: 0 }}>{labels.diagnostics}</h2>{diagnosticsError ? <p style={errorStyle} role="alert">{diagnosticsError}</p> : null}{diagnostics ? <dl style={detailGrid}><div><dt style={muted}>{labels.totalReviews}</dt><dd style={valueStyle}>{diagnostics.total}</dd></div><div><dt style={muted}>{labels.routedReviews}</dt><dd style={valueStyle}>{diagnostics.routed}</dd></div><div><dt style={muted}>{labels.oldestRoutedAt}</dt><dd style={valueStyle}>{diagnostics.oldestRoutedAt ? formatTime(diagnostics.oldestRoutedAt) : labels.unavailable}</dd></div><div><dt style={muted}>{labels.newestRoutedAt}</dt><dd style={valueStyle}>{diagnostics.newestRoutedAt ? formatTime(diagnostics.newestRoutedAt) : labels.unavailable}</dd></div>{diagnostics.duplicateRoutesPrevented !== undefined ? <div><dt style={muted}>{labels.duplicateRoutesPrevented}</dt><dd style={valueStyle}>{diagnostics.duplicateRoutesPrevented}</dd></div> : null}<div><dt style={muted}>{labels.diagnosticsStatus}</dt><dd style={valueStyle}>{diagnostics.status}</dd></div></dl> : <p style={muted} role="status">{labels.loading}</p>}</section>
+      <section style={diagnosticsPanel} aria-live="polite"><div style={detailHeader}><h2 style={{ marginTop: 0 }}>{labels.diagnostics}</h2><button type="button" onClick={() => void loadDiagnostics()} disabled={diagnosticsLoading}>{labels.retryDiagnostics}</button></div>{diagnosticsLoading ? <p style={muted} role="status">{labels.loading}</p> : null}{diagnosticsError ? <p style={errorStyle} role="alert">{diagnosticsError}</p> : null}{diagnostics ? <dl style={detailGrid}><div><dt style={muted}>{labels.totalReviews}</dt><dd style={valueStyle}>{diagnostics.total}</dd></div><div><dt style={muted}>{labels.routedReviews}</dt><dd style={valueStyle}>{diagnostics.routed}</dd></div><div><dt style={muted}>{labels.oldestRoutedAt}</dt><dd style={valueStyle}>{diagnostics.oldestRoutedAt ? formatTime(diagnostics.oldestRoutedAt) : labels.unavailable}</dd></div><div><dt style={muted}>{labels.newestRoutedAt}</dt><dd style={valueStyle}>{diagnostics.newestRoutedAt ? formatTime(diagnostics.newestRoutedAt) : labels.unavailable}</dd></div>{diagnostics.duplicateRoutesPrevented !== undefined ? <div><dt style={muted}>{labels.duplicateRoutesPrevented}</dt><dd style={valueStyle}>{diagnostics.duplicateRoutesPrevented}</dd></div> : null}<div><dt style={muted}>{labels.diagnosticsStatus}</dt><dd style={valueStyle}>{diagnostics.status}</dd></div></dl> : null}</section>
       <form onSubmit={applyFilters} style={filters} aria-label={labels.filters}>
         <label>{labels.status}<select value={status} onChange={event => setStatus(event.target.value)}><option value="">{labels.allStatuses}</option><option value="routed">{labels.routed}</option></select></label>
         <label>{labels.missionId}<input value={missionId} onChange={event => setMissionId(event.target.value)} maxLength={200} /></label>
@@ -175,7 +192,7 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
       {!loading && !error && items.length > 0 ? <div style={tableWrap}><table style={table}><thead><tr>{[labels.reviewId, labels.missionId, labels.revision, labels.decisionId, labels.status, labels.titleLabel, labels.summary, labels.createdAt, labels.routedAt, labels.openDetail].map(label => <th key={label} style={head}>{label}</th>)}</tr></thead><tbody>{items.map(review => <tr key={review.reviewId} style={row}><td style={cell}><code>{review.reviewId}</code></td><td style={cell}><code>{review.missionId}</code></td><td style={cell}>{review.missionRevision}</td><td style={cell}><code>{review.decisionId}</code></td><td style={cell}>{review.status}</td><td style={cell}>{review.title}</td><td style={cell}>{review.summary}</td><td style={cell}>{formatTime(review.createdAt)}</td><td style={cell}>{formatTime(review.routedAt)}</td><td style={cell}><button type="button" aria-label={`${labels.openDetail}: ${review.reviewId}`} onClick={event => void openDetail(review.reviewId, event.currentTarget)}>{labels.openDetail}</button></td></tr>)}</tbody></table></div> : null}
       <nav style={pagination} aria-label={labels.pagination}><button type="button" onClick={previousPage} disabled={loading || history.length === 0}>{labels.previous}</button><button type="button" onClick={nextPage} disabled={loading || !nextCursor}>{labels.next}</button></nav>
     </section>
-    {(detailLoading || detailError || detail) ? <section style={panel} aria-live="polite"><div style={detailHeader}><h2>{labels.detail}</h2><button type="button" onClick={closeDetail}>{labels.closeDetail}</button></div>{detailLoading ? <p style={muted} role="status">{labels.loading}</p> : null}{detailError ? <p style={errorStyle} role="alert">{detailError}</p> : null}{detail ? <DetailView detail={detail} labels={labels} onCopy={copyFingerprint} /> : null}<p role="status" aria-live="polite" aria-atomic="true" style={srOnly}>{copyFeedback}</p></section> : null}
+    {(detailLoading || detailError || detail) ? <section style={panel} aria-live="polite"><div style={detailHeader}><h2>{labels.detail}</h2><div style={pagination}>{detailError && detailReviewId.current ? <button type="button" onClick={() => { const reviewId = detailReviewId.current; if (reviewId) void openDetail(reviewId) }} disabled={detailLoading}>{labels.retryDetail}</button> : null}<button type="button" onClick={closeDetail}>{labels.closeDetail}</button></div></div>{detailLoading ? <p style={muted} role="status">{labels.loading}</p> : null}{detailError ? <p style={errorStyle} role="alert">{detailError}</p> : null}{detail ? <DetailView detail={detail} labels={labels} onCopy={copyFingerprint} /> : null}<p role="status" aria-live="polite" aria-atomic="true" style={srOnly}>{copyFeedback}</p></section> : null}
     <style>{focusVisibleCss}</style>
   </main>
 }

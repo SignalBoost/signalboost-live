@@ -26,3 +26,4 @@ export * from './human-review-closure-snapshot.ts';
 export * from './human-review-archive-builder.ts';
 export * from './human-review-archive-integrity-validator.ts';
 export * from './human-review-archive-attestation.ts';
+export * from './human-review-attestation-registry.ts';

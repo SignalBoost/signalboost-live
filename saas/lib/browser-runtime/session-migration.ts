@@ -3,6 +3,7 @@ import type {
   BrowserSessionLaunchRequest,
   BrowserSessionPort,
 } from './contracts.ts'
+import { assertBrowserSessionMigrationCapabilities } from './provider-capabilities.ts'
 import {
   captureBrowserSessionSnapshot,
   restoreBrowserSessionSnapshot,
@@ -63,6 +64,12 @@ export async function migrateBrowserSession(
   assertRequest(request)
   const migrationId = requireMigrationId(request.migrationId)
   const migratedAt = requireTimestamp(request.createdAt)
+
+  assertBrowserSessionMigrationCapabilities({
+    sourceSession: request.sourceSession,
+    targetFactory: request.targetFactory,
+    includeProfile: request.includeProfile,
+  })
 
   const snapshot = await captureBrowserSessionSnapshot(request.sourceSession, {
     snapshotId: migrationId,

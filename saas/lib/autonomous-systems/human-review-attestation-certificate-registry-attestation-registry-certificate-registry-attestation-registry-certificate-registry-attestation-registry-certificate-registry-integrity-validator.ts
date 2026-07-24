@@ -40,7 +40,7 @@ export function validateEnterpriseHumanReviewNestedAttestationRegistryCertificat
   const certificateIds=new Set<string>();
   const certificateSerials=new Set<string>();
   for(const entry of entries){
-    if(!entry.certificateId||!entry.certificateSerial||!entry.registryId||!entry.validationId||!entry.issuerId) errors.push('nested_attestation_registry_certificate_registry_entry_identity_required');
+    if(!entry.certificateId||!entry.certificateSerial||!entry.sourceRegistryId||!entry.validationId||!entry.issuerId) errors.push('nested_attestation_registry_certificate_registry_entry_identity_required');
     if(certificateIds.has(entry.certificateId)) errors.push('duplicate_certificate_id'); else certificateIds.add(entry.certificateId);
     if(certificateSerials.has(entry.certificateSerial)) errors.push('duplicate_certificate_serial'); else certificateSerials.add(entry.certificateSerial);
     if(entry.executable!==false||entry.readOnly!==true) errors.push('unsafe_nested_attestation_registry_certificate_registry_entry');

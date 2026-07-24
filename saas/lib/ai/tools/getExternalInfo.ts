@@ -1,23 +1,72 @@
 // saas/lib/ai/tools/getExternalInfo.ts
-// Live web search for the Chief of Staff via the Brave Search API.
+// Live web search for the Chief of Staff.
 // Returns structured top results (title, url, snippet) for market/competitor/news queries.
-// Requires BRAVE_SEARCH_API_KEY in env. Free tier: 2,000 queries/month.
+//
+// PORTABLE: the search provider is INJECTED. The default adapter uses the Brave
+// Search API (BRAVE_SEARCH_API_KEY; free tier: 2,000 queries/month) — unchanged
+// behavior for this deployment. A buyer of the Chief-of-Staff portable calls
+// setWebSearchPort(...) once to use their own search provider and key.
 
+import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
 
-type SearchResult = { title: string; url: string; snippet: string }
+export type SearchResult = { title: string; url: string; snippet: string }
+
+export interface WebSearchPort {
+  // Return up to `count` results, or throw Error(message) explaining why none.
+  search(query: string, count: number): Promise<SearchResult[]>
+}
 
 const cache = new Map<string, { at: number; results: SearchResult[] }>()
 const CACHE_MS = 5 * 60 * 1000 // 5 minutes
 const MAX_CACHE_ENTRIES = 50
 
+// ── Default adapter: Brave Search (unchanged behavior) ───────────────────────
+let searchPort: WebSearchPort | null = null
+
+function defaultSearchPort(): WebSearchPort {
+  return {
+    async search(query: string, count: number): Promise<SearchResult[]> {
+      const apiKey = process.env.BRAVE_SEARCH_API_KEY
+      if (!apiKey) throw new Error('BRAVE_SEARCH_API_KEY is not configured in environment variables.')
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 8000)
+      try {
+        const res = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: {
+            'Accept': 'application/json',
+            'X-Subscription-Token': apiKey,
+          },
+        })
+
+        if (!res.ok) throw new Error(`Search API returned ${res.status}.`)
+
+        const json = await res.json()
+        const raw = json?.web?.results
+        if (!Array.isArray(raw) || raw.length === 0) throw new Error('No results found.')
+
+        return raw.slice(0, count).map((r: any) => ({
+          title: String(r?.title || '').slice(0, 200),
+          url: String(r?.url || ''),
+          snippet: String(r?.description || '').replace(/<[^>]+>/g, '').slice(0, 400),
+        })).filter((r: SearchResult) => r.title && r.url)
+      } finally {
+        clearTimeout(timeout)
+      }
+    },
+  }
+}
+
+export function setWebSearchPort(p: WebSearchPort): void { searchPort = p }
+export function getWebSearchPort(): WebSearchPort { return searchPort ?? defaultSearchPort() }
+
 export async function getExternalInfo(query: string): Promise<{ ok: boolean; results: SearchResult[]; error?: string }> {
   const q = String(query || '').trim().slice(0, 400)
   if (!q) return { ok: false, results: [], error: 'Empty search query.' }
-
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY
-  if (!apiKey) return { ok: false, results: [], error: 'BRAVE_SEARCH_API_KEY is not configured in environment variables.' }
 
   const key = q.toLowerCase()
   const hit = cache.get(key)
@@ -26,34 +75,8 @@ export async function getExternalInfo(query: string): Promise<{ ok: boolean; res
   }
 
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
-
-    const res = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=6`, {
-      signal: controller.signal,
-      cache: 'no-store',
-      headers: {
-        'Accept': 'application/json',
-        'X-Subscription-Token': apiKey,
-      },
-    })
-    clearTimeout(timeout)
-
-    if (!res.ok) {
-      return { ok: false, results: [], error: `Search API returned ${res.status}.` }
-    }
-
-    const json = await res.json()
-    const raw = json?.web?.results
-    if (!Array.isArray(raw) || raw.length === 0) {
-      return { ok: false, results: [], error: 'No results found.' }
-    }
-
-    const results: SearchResult[] = raw.slice(0, 6).map((r: any) => ({
-      title: String(r?.title || '').slice(0, 200),
-      url: String(r?.url || ''),
-      snippet: String(r?.description || '').replace(/<[^>]+>/g, '').slice(0, 400),
-    })).filter((r: SearchResult) => r.title && r.url)
+    const results = await getWebSearchPort().search(q, 6)
+    if (!results.length) return { ok: false, results: [], error: 'No results found.' }
 
     if (cache.size >= MAX_CACHE_ENTRIES) {
       const oldest = cache.keys().next().value
@@ -77,7 +100,7 @@ function signalFromResult(query: string, result: SearchResult, index: number): E
     source_url: result.url,
     audience: 'small business owners and operators',
     region: 'global',
-    product: 'SignalBoost SaaS platform',
+    product: `${hostBrandName()} platform`,
     observed_format,
     observed_hero,
     confidence: Math.max(52, 68 - index * 3),

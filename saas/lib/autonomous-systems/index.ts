@@ -17,3 +17,4 @@ export * from './outcome-evaluator.ts';
 export * from './learning-feedback-engine.ts';
 export * from './adaptation-proposal-engine.ts';
 export * from './proposal-prioritization-engine.ts';
+export * from './human-review-queue-engine.ts';

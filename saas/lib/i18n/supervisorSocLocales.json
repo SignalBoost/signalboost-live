@@ -220,7 +220,12 @@
       "newestRoutedAt": "Newest routed time",
       "duplicateRoutesPrevented": "Duplicate routes prevented",
       "diagnosticsStatus": "Status",
-      "unavailable": "Unavailable"
+      "unavailable": "Unavailable",
+      "openDetail": "Open review details",
+      "closeDetail": "Close details",
+      "pagination": "Review pagination",
+      "fingerprintCopied": "Fingerprint copied.",
+      "fingerprintCopyFailed": "Fingerprint could not be copied."
     }
   },
   "es": {
@@ -444,7 +449,12 @@
       "newestRoutedAt": "Hora de enrutamiento más reciente",
       "duplicateRoutesPrevented": "Rutas duplicadas evitadas",
       "diagnosticsStatus": "Estado",
-      "unavailable": "No disponible"
+      "unavailable": "No disponible",
+      "openDetail": "Abrir detalles de la revisión",
+      "closeDetail": "Cerrar detalles",
+      "pagination": "Paginación de revisiones",
+      "fingerprintCopied": "Huella digital copiada.",
+      "fingerprintCopyFailed": "No se pudo copiar la huella digital."
     }
   },
   "pt": {
@@ -668,7 +678,12 @@
       "newestRoutedAt": "Hora mais recente de encaminhamento",
       "duplicateRoutesPrevented": "Rotas duplicadas evitadas",
       "diagnosticsStatus": "Status",
-      "unavailable": "Indisponível"
+      "unavailable": "Indisponível",
+      "openDetail": "Abrir detalhes da revisão",
+      "closeDetail": "Fechar detalhes",
+      "pagination": "Paginação de revisões",
+      "fingerprintCopied": "Impressão digital copiada.",
+      "fingerprintCopyFailed": "Não foi possível copiar a impressão digital."
     }
   },
   "pl": {
@@ -892,7 +907,12 @@
       "newestRoutedAt": "Najnowszy czas przekierowania",
       "duplicateRoutesPrevented": "Zapobiegnięto zduplikowanym przekierowaniom",
       "diagnosticsStatus": "Stan",
-      "unavailable": "Niedostępne"
+      "unavailable": "Niedostępne",
+      "openDetail": "Otwórz szczegóły przeglądu",
+      "closeDetail": "Zamknij szczegóły",
+      "pagination": "Paginacja przeglądów",
+      "fingerprintCopied": "Odcisk palca został skopiowany.",
+      "fingerprintCopyFailed": "Nie można było skopiować odcisku palca."
     }
   },
   "ru": {
@@ -1116,7 +1136,12 @@
       "newestRoutedAt": "Самое позднее время перенаправления",
       "duplicateRoutesPrevented": "Предотвращено дублирование перенаправлений",
       "diagnosticsStatus": "Статус",
-      "unavailable": "Недоступно"
+      "unavailable": "Недоступно",
+      "openDetail": "Открыть сведения о проверке",
+      "closeDetail": "Закрыть сведения",
+      "pagination": "Пагинация проверок",
+      "fingerprintCopied": "Отпечаток скопирован.",
+      "fingerprintCopyFailed": "Не удалось скопировать отпечаток."
     }
   }
 }

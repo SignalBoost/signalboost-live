@@ -1,9 +1,10 @@
 // saas/console-core/executors/gemini.ts
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://generativelanguage.googleapis.com/v1beta'
-function key(): string | null { return process.env.GEMINI_API_KEY || null }
+function key(): string | null { return getSecret('GEMINI_API_KEY') || null }
 async function getJSON(path: string) {
   const k = key(); if (!k) return { ok: false as const, error: 'GEMINI_API_KEY not set' }
   const res = await fetch(`${API}${path}`, { headers: { 'x-goog-api-key': k } })

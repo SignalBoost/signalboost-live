@@ -1,6 +1,6 @@
 import { vaultDecrypt, vaultEncrypt } from '../vault/crypto.ts'
-import { getProviderConfigStore } from './providerConfigStore'
-export type { UserProviderConfig } from './providerConfigStore'
+import { getProviderConfigStore, type UserProviderConfig } from './providerConfigStore'
+export type { UserProviderConfig }
 
 export type PlainProviderConfig = {
   activeProvider: string

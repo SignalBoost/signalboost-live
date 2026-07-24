@@ -6,13 +6,14 @@
 // coupons, and webhook endpoint diagnostics.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://api.stripe.com'
 const STRIPE_KEY_ENV = ['STRIPE', 'SECRET', 'KEY'].join('_')
 
 function apiKey(): string | null {
-  return process.env[STRIPE_KEY_ENV] || null
+  return getSecret(STRIPE_KEY_ENV) || null
 }
 
 function schema(id: string, label: string, verb: string, fields: ActionField[] = []): ActionSchema {

@@ -15,3 +15,4 @@ export * from './execution-authorization-gate.ts';
 export * from './execution-orchestrator-simulation.ts';
 export * from './outcome-evaluator.ts';
 export * from './learning-feedback-engine.ts';
+export * from './adaptation-proposal-engine.ts';

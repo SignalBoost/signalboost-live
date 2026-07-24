@@ -4,6 +4,7 @@ import type { BrowserSessionPort } from '../lib/browser-runtime/contracts.ts'
 import {
   BrowserbaseSessionFactory,
   FetchBrowserbaseSessionTransport,
+  validateBrowserbaseAdapterConfiguration,
   type BrowserbaseCredentialBrokerPort,
   type BrowserbaseSessionTransport,
 } from '../lib/portable-browser/adapters/browserbase-adapter.ts'
@@ -28,7 +29,7 @@ function createFactory(transport: BrowserbaseSessionTransport, broker: Browserba
   })
 }
 
-test('Browserbase factory opens a buyer project session through injected broker and transport', async () => {
+test('Browserbase factory opens a sandbox session through injected broker and transport', async () => {
   const calls: Array<{ projectId: string; apiKey: string }> = []
   const connections: string[] = []
   const opened = await createFactory({
@@ -41,14 +42,26 @@ test('Browserbase factory opens a buyer project session through injected broker 
   assert.deepEqual(connections, ['wss://connect.browserbase.test/session-1'])
 })
 
-test('Browserbase factory rejects non-approved origins and execute_change before resolving credentials', async () => {
+test('Browserbase factory rejects external, unapproved, and execute_change launches before credentials', async () => {
   let credentialReads = 0
   const factory = createFactory({ createSession: async () => { throw new Error('must not create') }, connect: async () => session }, {
     resolveBrowserbaseApiKey: async () => { credentialReads += 1; return 'test-broker-key' },
   })
-  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['https://unapproved.example'] }), /browserbase_origin_rejected/)
+  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['https://github.com'] }), /browserbase_external_origin_rejected/)
+  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['http://127.0.0.1:4173'] }), /browserbase_origin_rejected/)
   await assert.rejects(factory.open({ ...launchRequest, mode: 'execute_change' }), /browserbase_execute_change_rejected/)
   assert.equal(credentialReads, 0)
+})
+
+test('Browserbase configuration rejects external origins before a factory can be created', () => {
+  const credentialBroker = { resolveBrowserbaseApiKey: async () => 'test-broker-key' }
+  const transport = { createSession: async () => ({ sessionId: 'session', connectUrl: 'wss://example.test' }), connect: async () => session }
+  assert.equal(validateBrowserbaseAdapterConfiguration({
+    projectId: 'buyer-project', approvedOrigins: ['https://github.com'], credentialBroker, transport,
+  }), false)
+  assert.throws(() => new BrowserbaseSessionFactory({
+    projectId: 'buyer-project', approvedOrigins: ['https://github.com'], credentialBroker, transport,
+  }), /browserbase_external_origin_rejected/)
 })
 
 test('Browserbase factory sanitizes broker key material from transport errors', async () => {

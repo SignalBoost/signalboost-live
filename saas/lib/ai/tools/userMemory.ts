@@ -4,44 +4,18 @@
 // SaaS Supabase `assistant_memories` table, and loads them into the AI's
 // context at the start of every conversation.
 
-import { createClient } from '@supabase/supabase-js'
+import { getUserMemoryStore } from './userMemoryStore'
+export type { UserMemory } from './userMemoryStore'
 
-const MEMORIES_TABLE = 'assistant_memories'
 const MAX_MEMORIES_PER_USER = 30
 const MAX_CONTENT_LENGTH = 300
 
 const VALID_KINDS = new Set(['preference', 'fact', 'goal'])
 
-export type UserMemory = {
-  id: string
-  kind: string
-  content: string
-  created_at: string
-}
-
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
-
 // ── Load all memories for a user (newest last, for natural reading) ───────────
 export async function loadUserMemories(userId: string): Promise<UserMemory[]> {
   try {
-    const db = supabaseAdmin()
-    const { data, error } = await db
-      .from(MEMORIES_TABLE)
-      .select('id, kind, content, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true })
-      .limit(MAX_MEMORIES_PER_USER)
-
-    if (error) {
-      console.error('userMemory: load error', error.message)
-      return []
-    }
-    return (data ?? []) as UserMemory[]
+    return await getUserMemoryStore().list(userId, MAX_MEMORIES_PER_USER)
   } catch (err) {
     console.error('userMemory: load exception', err)
     return []
@@ -74,42 +48,21 @@ export async function saveUserMemory(
       return { ok: false, error: 'Memory content is empty.' }
     }
 
-    const db = supabaseAdmin()
+    const store = getUserMemoryStore()
 
     // Skip exact duplicates
-    const { data: existing } = await db
-      .from(MEMORIES_TABLE)
-      .select('id')
-      .eq('user_id', userId)
-      .eq('content', cleanContent)
-      .limit(1)
-
-    if (existing && existing.length > 0) {
+    if (await store.findDuplicate(userId, cleanContent)) {
       return { ok: true } // already remembered — treat as success
     }
 
     // Enforce per-user cap: delete the oldest if at the limit
-    const { data: all } = await db
-      .from(MEMORIES_TABLE)
-      .select('id, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true })
-
-    if (all && all.length >= MAX_MEMORIES_PER_USER) {
+    const all = await store.listAllOrdered(userId)
+    if (all.length >= MAX_MEMORIES_PER_USER) {
       const toDelete = all.slice(0, all.length - MAX_MEMORIES_PER_USER + 1).map(r => r.id)
-      await db.from(MEMORIES_TABLE).delete().in('id', toDelete)
+      await store.deleteIds(toDelete)
     }
 
-    const { error } = await db.from(MEMORIES_TABLE).insert({
-      user_id: userId,
-      kind: cleanKind,
-      content: cleanContent,
-    })
-
-    if (error) {
-      return { ok: false, error: error.message }
-    }
-    return { ok: true }
+    return await store.insert(userId, cleanKind, cleanContent)
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Unknown error saving memory' }
   }
@@ -126,18 +79,7 @@ export async function forgetUserMemory(
       return { ok: false, deleted: 0, error: 'No phrase given to forget.' }
     }
 
-    const db = supabaseAdmin()
-    const { data, error } = await db
-      .from(MEMORIES_TABLE)
-      .delete()
-      .eq('user_id', userId)
-      .ilike('content', `%${phrase}%`)
-      .select('id')
-
-    if (error) {
-      return { ok: false, deleted: 0, error: error.message }
-    }
-    return { ok: true, deleted: data?.length ?? 0 }
+    return await getUserMemoryStore().deleteMatching(userId, phrase)
   } catch (err) {
     return { ok: false, deleted: 0, error: err instanceof Error ? err.message : 'Unknown error forgetting memory' }
   }

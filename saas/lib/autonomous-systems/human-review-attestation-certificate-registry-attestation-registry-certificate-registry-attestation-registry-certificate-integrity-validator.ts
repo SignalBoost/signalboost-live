@@ -17,6 +17,8 @@ export interface EnterpriseHumanReviewAttestationCertificateRegistryAttestationR
   readonly tenant: TenantContext;
   readonly certificateId: string;
   readonly certificateSerial: string;
+  readonly registryId: string;
+  readonly issuerId: string;
   readonly disposition: HumanReviewAttestationCertificateRegistryAttestationRegistryCertificateRegistryAttestationRegistryCertificateIntegrityDisposition;
   readonly valid: boolean;
   readonly errors: readonly string[];
@@ -50,6 +52,6 @@ export function validateEnterpriseHumanReviewAttestationCertificateRegistryAttes
   if(request.certificate.disposition==='certified'&&request.certificate.attestationIds.length===0) errors.push('certified_certificate_missing_attestations');
   const uniqueErrors=[...new Set(errors)].sort();
   const disposition:HumanReviewAttestationCertificateRegistryAttestationRegistryCertificateRegistryAttestationRegistryCertificateIntegrityDisposition=request.certificate.disposition==='empty'&&uniqueErrors.length===0?'empty':uniqueErrors.length===0?'valid':'invalid';
-  const base={schemaVersion:EAE_HUMAN_REVIEW_ATTESTATION_CERTIFICATE_REGISTRY_ATTESTATION_REGISTRY_CERTIFICATE_REGISTRY_ATTESTATION_REGISTRY_CERTIFICATE_INTEGRITY_SCHEMA_VERSION,tenant:request.tenant,certificateId:request.certificate.certificateId,certificateSerial:request.certificate.certificateSerial,disposition,valid:uniqueErrors.length===0,errors:uniqueErrors,validatedAttestationIds:[...attestationIds].sort(),evidenceRefs:[...new Set(request.certificate.evidenceRefs)].sort(),truncated:request.certificate.attestationIds.length>request.maxAttestationIds,readOnly:true as const,executable:false as const};
+  const base={schemaVersion:EAE_HUMAN_REVIEW_ATTESTATION_CERTIFICATE_REGISTRY_ATTESTATION_REGISTRY_CERTIFICATE_REGISTRY_ATTESTATION_REGISTRY_CERTIFICATE_INTEGRITY_SCHEMA_VERSION,tenant:request.tenant,certificateId:request.certificate.certificateId,certificateSerial:request.certificate.certificateSerial,registryId:request.certificate.registryId,issuerId,disposition,valid:uniqueErrors.length===0,errors:uniqueErrors,validatedAttestationIds:[...attestationIds].sort(),evidenceRefs:[...new Set(request.certificate.evidenceRefs)].sort(),truncated:request.certificate.attestationIds.length>request.maxAttestationIds,readOnly:true as const,executable:false as const};
   return freeze({...base,validationId:`eae_human_review_attestation_certificate_registry_attestation_registry_certificate_registry_attestation_registry_certificate_integrity_${hash(base)}`});
 }

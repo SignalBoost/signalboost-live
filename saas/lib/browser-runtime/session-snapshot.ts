@@ -1,6 +1,5 @@
 import type { BrowserSessionPort } from './contracts.ts'
 import {
-  BROWSER_PROFILE_SNAPSHOT_SCHEMA_VERSION,
   normalizeBrowserProfileSnapshot,
   type BrowserProfileSnapshot,
 } from './profile-portability.ts'
@@ -75,9 +74,6 @@ export function normalizeBrowserSessionSnapshot(value: BrowserSessionSnapshot): 
   const createdAt = requireTimestamp(value.createdAt)
   const currentUrl = normalizeHttpUrl(value.currentUrl, 'browser_session_snapshot_url_invalid')
   const profile = value.profile === undefined ? undefined : normalizeBrowserProfileSnapshot(value.profile)
-  if (profile && profile.schemaVersion !== BROWSER_PROFILE_SNAPSHOT_SCHEMA_VERSION) {
-    throw new Error('browser_session_snapshot_profile_invalid')
-  }
   return deepFreeze({
     schemaVersion: BROWSER_SESSION_SNAPSHOT_SCHEMA_VERSION,
     snapshotId,
@@ -92,7 +88,8 @@ export async function captureBrowserSessionSnapshot(
   input: CaptureBrowserSessionSnapshotInput,
 ): Promise<BrowserSessionSnapshot> {
   if (!session?.page || typeof session.page.url !== 'function') throw new Error('browser_session_snapshot_session_invalid')
-  const includeProfile = input?.includeProfile !== false
+  if (!input || typeof input !== 'object') throw new Error('browser_session_snapshot_input_invalid')
+  const includeProfile = input.includeProfile !== false
   let profile: BrowserProfileSnapshot | undefined
   if (includeProfile) {
     if (!session.profile || typeof session.profile.exportProfile !== 'function') {
@@ -102,8 +99,8 @@ export async function captureBrowserSessionSnapshot(
   }
   return normalizeBrowserSessionSnapshot({
     schemaVersion: BROWSER_SESSION_SNAPSHOT_SCHEMA_VERSION,
-    snapshotId: input?.snapshotId,
-    createdAt: input?.createdAt,
+    snapshotId: input.snapshotId,
+    createdAt: input.createdAt,
     currentUrl: session.page.url(),
     ...(profile ? { profile } : {}),
   })
@@ -115,12 +112,13 @@ export async function restoreBrowserSessionSnapshot(
   options: RestoreBrowserSessionSnapshotOptions,
 ): Promise<void> {
   if (!session?.page || typeof session.page.goto !== 'function') throw new Error('browser_session_snapshot_session_invalid')
+  if (!options || typeof options !== 'object') throw new Error('browser_session_snapshot_options_invalid')
   const normalized = normalizeBrowserSessionSnapshot(snapshot)
-  const allowedOrigins = normalizeAllowedOrigins(options?.allowedOrigins)
+  const allowedOrigins = normalizeAllowedOrigins(options.allowedOrigins)
   const destinationOrigin = new URL(normalized.currentUrl).origin
   if (!allowedOrigins.has(destinationOrigin)) throw new Error('browser_session_snapshot_origin_rejected')
 
-  const restoreProfile = options?.restoreProfile !== false
+  const restoreProfile = options.restoreProfile !== false
   if (restoreProfile && normalized.profile) {
     if (!session.profile || typeof session.profile.importProfile !== 'function') {
       throw new Error('browser_session_snapshot_profile_import_unsupported')

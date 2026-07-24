@@ -58,6 +58,7 @@ export interface DispatchResult { state: DispatchState; ref: string; detail?: st
 export interface ProofResult { proofType: ProofType; payload: unknown; pending: boolean }
 
 import type { CompanyProfilePort } from '@/portable-kernel'
+import type { PortableAuditSink } from '@/portable-audit'
 
 // ── Injected host services (Ports). Adapters depend on these, never on concrete SDKs. ──
 export interface AiPort {
@@ -92,6 +93,7 @@ export interface PortBundle {
   http?: HttpPort
   runner?: RunnerPort                // config-driven execution for paid providers (universal runner)
   company?: CompanyProfilePort       // the employer whose facts the AI may state
+  audit?: PortableAuditSink          // buyer SIEM/audit export (SOC2/ISO27001); omitted = no audit
   config?: Record<string, string>    // the buyer's connected credentials for this provider
 }
 

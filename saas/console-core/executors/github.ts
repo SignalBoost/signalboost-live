@@ -8,6 +8,7 @@
 // Importing this module registers all GitHub executors as a side effect.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://api.github.com'
@@ -24,15 +25,15 @@ function ghHeaders(token: string): Record<string, string> {
 function gh(input: Record<string, unknown>):
   | { ok: true; token: string; headers: Record<string, string>; owner: string; name: string }
   | { ok: false; error: string } {
-  const token = process.env.GITHUB_WRITE_TOKEN
+  const token = getSecret('GITHUB_WRITE_TOKEN')
   if (!token) return { ok: false, error: 'GitHub not configured — set GITHUB_WRITE_TOKEN' }
   const raw = String(input.repo || '').trim()
   // Portable defaults: no hardcoded repository. A host may set
   // GITHUB_DEFAULT_OWNER / GITHUB_DEFAULT_REPO to provide a fallback; otherwise
   // owner/name come solely from the selected "owner/name" input, so the engine
   // never silently targets another tenant's repo.
-  let owner = String(process.env.GITHUB_DEFAULT_OWNER || '').trim()
-  let name = raw || String(process.env.GITHUB_DEFAULT_REPO || '').trim()
+  let owner = String(getSecret('GITHUB_DEFAULT_OWNER') || '').trim()
+  let name = raw || String(getSecret('GITHUB_DEFAULT_REPO') || '').trim()
   if (raw.includes('/')) {
     const parts = raw.split('/')
     owner = (parts[0] || '').trim() || owner
@@ -144,7 +145,7 @@ function logAutoMerge(result: AutoMergeResult): AutoMergeResult {
 }
 
 async function resolveAutoMergeContext(target: ReturnType<typeof parseAutoMergeTarget>): Promise<AutoMergeContext | { ok: false; result: AutoMergeResult }> {
-  const c = gh({ repo: target.repo || process.env.GITHUB_DEFAULT_REPO || '' })
+  const c = gh({ repo: target.repo || getSecret('GITHUB_DEFAULT_REPO') || '' })
   if (c.ok === false) return { ok: false, result: { ok: false, branch: target.branch || target.pr || '', commit: '', message: 'Merge failed', error: c.error } }
   return { ok: true, token: c.token, headers: c.headers, owner: c.owner, name: c.name, targetBranch: target.targetBranch }
 }

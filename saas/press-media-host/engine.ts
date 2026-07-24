@@ -27,6 +27,36 @@ export interface PressMediaContext {
   ports: PortBundle
 }
 
+// Emit a SIEM/audit record for a dispatch (send to a journalist / post / filed order).
+// Optional: only fires when the host installed ports.audit (a PortableAuditSink). Never
+// throws — audit export must not affect a dispatch. This is enterprise checklist #6 for press.
+async function auditDispatch(
+  ctx: PressMediaContext,
+  campaignId: string,
+  providerId: string,
+  result: { state: DispatchState; ref: string; detail?: string },
+  targetType?: string,
+): Promise<void> {
+  const failed = result.state === 'failed' || result.state === 'rejected'
+  await ctx.ports.audit
+    ?.record({
+      eventId: `press_${campaignId}_${result.ref || result.state}`,
+      eventType: failed ? 'press.dispatch_failed' : 'press.dispatched',
+      occurredAt: new Date().toISOString(),
+      dataset: 'press',
+      category: 'process',
+      subjectId: campaignId,
+      payload: {
+        providerId,
+        state: result.state,
+        ...(result.ref ? { dispatchRef: result.ref } : {}),
+        ...(targetType ? { targetType } : {}),
+        ...(result.detail ? { detail: result.detail } : {}),
+      },
+    })
+    .catch(() => {})
+}
+
 export interface RunCampaignArgs {
   providerId?: string              // default 'free_submission'
   brief: CampaignBrief
@@ -172,6 +202,7 @@ export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs)
   const result = await adapter.dispatch(campaign, ctx.ports)
   const status = stateToStatus(result.state)
   const proof = await adapter.fetchProof(result.ref, ctx.ports).catch(() => null)
+  await auditDispatch(ctx, stored.id, adapter.describe().id, result, args.target?.mediaTargetType)
 
   const update: any = {
     status,
@@ -213,6 +244,7 @@ export async function dispatchApprovedCampaign(ctx: PressMediaContext, campaignI
   const result = await adapter.dispatch(campaign, ctx.ports)
   const status = stateToStatus(result.state)
   const proof = await adapter.fetchProof(result.ref, ctx.ports).catch(() => null)
+  await auditDispatch(ctx, stored.id, providerId, result)
 
   const approvedAt = new Date().toISOString()
   const update: any = {

@@ -3,5 +3,8 @@ export { getPortableProduct, listLicensablePortableProducts, listPortableProduct
 export { validatePortableProductRegistry } from './product-validation.ts'
 export { portableProductManifests } from './manifests/index.ts'
 export { validatePortableProductManifests } from './manifestValidation.ts'
+export { createPortableProductDependencyGraph, portableProductDependencyGraph, portableProductDependencyGraphSchemaVersion } from './dependency-graph.ts'
+export { validatePortableProductDependencyGraph } from './dependency-graph-validation.ts'
 export type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 export type { PortableProductCategory, PortableProductDescriptor, PortableProductImplementationClassification, PortableProductImplementationStatus, PortableProductStatus } from './product-types.ts'
+export type { PortableGraphEdge, PortableGraphEdgeType, PortableGraphNode, PortableGraphNodeType, PortableProductDependencyGraph } from './dependency-graph.ts'

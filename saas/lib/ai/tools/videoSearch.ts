@@ -1,10 +1,15 @@
 // saas/lib/ai/tools/videoSearch.ts
-// AI tool wrapper around the existing video search (YouTube Data API v3 + Archive.org).
+// AI tool wrapper around video search (YouTube Data API v3 + Archive.org).
 // It turns VERIFIED search results into media tags that the AssistantMessage renderer
 // already understands: <VIDEO>youtube-id</VIDEO> or <VIDEO>archive-url</VIDEO>.
 // This avoids exposing raw JSON arrays in the chat UI.
+//
+// PORTABLE: the video provider is INJECTED. The default adapter uses the
+// platform's own searchVideos (YouTube + Archive.org) — unchanged behavior for
+// this deployment. A buyer of the Chief-of-Staff portable calls
+// setVideoSearchProvider(...) once to use their own media source.
 
-import { searchVideos, type VideoResult } from '@/lib/video/search'
+import type { VideoResult } from '@/lib/video/search'
 
 export type AiVideoItem = {
   title: string
@@ -21,6 +26,30 @@ export type VideoSearchResult = {
   tags: string
   error?: string
 }
+
+export interface VideoSearchProvider {
+  search(query: string): Promise<VideoResult[]>
+  // When false, the "no results" hint mentions the missing API key.
+  configured(): boolean
+}
+
+// ── Default adapter: the platform's own searchVideos (unchanged behavior) ────
+let provider: VideoSearchProvider | null = null
+
+function defaultProvider(): VideoSearchProvider {
+  return {
+    async search(query: string): Promise<VideoResult[]> {
+      const { searchVideos } = await import('@/lib/video/search')
+      return searchVideos(query)
+    },
+    configured(): boolean {
+      return Boolean(process.env.YOUTUBE_API_KEY)
+    },
+  }
+}
+
+export function setVideoSearchProvider(p: VideoSearchProvider): void { provider = p }
+export function getVideoSearchProvider(): VideoSearchProvider { return provider ?? defaultProvider() }
 
 function bareId(r: VideoResult): { type: 'video' | 'archive'; id: string } | null {
   if (r.source === 'youtube') {
@@ -49,9 +78,11 @@ export async function runVideoSearch(query: string): Promise<VideoSearchResult> 
   const q = String(query || '').trim().slice(0, 200)
   if (!q) return { ok: false, items: [], array: '', tags: '', error: 'Empty video search query.' }
 
+  const vp = getVideoSearchProvider()
+
   let results: VideoResult[] = []
   try {
-    results = await searchVideos(q)
+    results = await vp.search(q)
   } catch (err) {
     return { ok: false, items: [], array: '', tags: '', error: err instanceof Error ? err.message : 'Video search failed.' }
   }
@@ -75,7 +106,7 @@ export async function runVideoSearch(query: string): Promise<VideoSearchResult> 
       items: [],
       array: '',
       tags: '',
-      error: process.env.YOUTUBE_API_KEY
+      error: vp.configured()
         ? 'No verified, embeddable videos were found for that query.'
         : 'No videos found. YouTube results require YOUTUBE_API_KEY in the environment; without it only Archive.org public-domain results are returned.',
     }

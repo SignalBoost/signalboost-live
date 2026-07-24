@@ -3,7 +3,24 @@ import type { RenderExecutor, RenderInput, RenderProduced } from '../types'
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1'
 const DEFAULT_MODEL_ID = 'eleven_multilingual_v2'
-const CENTS_PER_1K_CHARS = Number(process.env.ELEVENLABS_CENTS_PER_1K_CHARS || '18')
+
+// render-core reads NO environment — that is the whole point of the core (see
+// types.ts header). The price per 1,000 characters is a host/deployment fact, so
+// it lives behind a setter with a neutral default. A host applies its own rate
+// from its own layer (see render-host/signalboostHost.ts); a buyer either keeps
+// the default or calls setElevenLabsRateCentsPer1k() with theirs. No env here.
+const DEFAULT_CENTS_PER_1K_CHARS = 18
+let centsPer1kChars = DEFAULT_CENTS_PER_1K_CHARS
+
+/** A host sets the ElevenLabs price per 1,000 characters, in cents. */
+export function setElevenLabsRateCentsPer1k(cents: number): void {
+  if (Number.isFinite(cents) && cents >= 0) centsPer1kChars = cents
+}
+
+/** The rate the cost estimate currently uses (for host wiring / diagnostics). */
+export function getElevenLabsRateCentsPer1k(): number {
+  return centsPer1kChars
+}
 
 function textOf(input: RenderInput): string {
   const t = input.params?.text
@@ -16,7 +33,7 @@ export const elevenLabsVoiceExecutor: RenderExecutor = {
   estimateCostCents(input: RenderInput): number {
     const chars = textOf(input).length
     if (chars <= 0) return 0
-    return Math.ceil((chars / 1000) * CENTS_PER_1K_CHARS)
+    return Math.ceil((chars / 1000) * centsPer1kChars)
   },
   async produce(input: RenderInput, apiKey: string): Promise<RenderProduced> {
     const text = textOf(input)

@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { proposeEnterpriseAdaptations } from '../lib/autonomous-systems/adaptation-proposal-engine.ts';
+import type { EnterpriseLearningFeedbackSnapshot } from '../lib/autonomous-systems/learning-feedback-engine.ts';
+
+const tenant={tenantId:'tenant-a',environmentId:'prod',region:'us'};
+const feedback:EnterpriseLearningFeedbackSnapshot={schemaVersion:'1.0.0',feedbackId:'feedback-1',tenant,evaluationId:'evaluation-1',simulationId:'simulation-1',disposition:'eligible_for_review',readOnly:true,executable:false,signals:[{signalId:'signal-adjust',kind:'adjust',subjectId:'quality',reason:'outcome_metric_missed',confidence:0.5,evidenceRefs:['b','a','a']},{signalId:'signal-reinforce',kind:'reinforce',subjectId:'speed',reason:'outcome_metric_met',confidence:1,evidenceRefs:['speed']}],suppressedSignalIds:[],evidenceRefs:['feedback'],truncated:false};
+function propose(overrides:Partial<Parameters<typeof proposeEnterpriseAdaptations>[0]>={}){return proposeEnterpriseAdaptations({tenant,feedback,acknowledgedProposalIds:[],maxProposals:16,...overrides});}
+
+test('builds deterministic immutable human-review proposals',()=>{const a=propose();const b=propose();assert.equal(a.proposalSetId,b.proposalSetId);assert.equal(a.disposition,'ready_for_human_review');assert.equal(a.executable,false);assert.equal(a.readOnly,true);assert.ok(a.proposals.every(p=>p.requiresHumanApproval&&p.executable===false));assert.ok(Object.isFrozen(a));assert.ok(Object.isFrozen(a.proposals[0]));});
+test('maps learning signals to bounded proposal targets',()=>{const result=propose();assert.deepEqual(result.proposals.map(p=>p.target).sort(),['objective','plan']);assert.ok(result.proposals.some(p=>p.action==='propose_bounded_plan_adjustment'));});
+test('preserves needs-evidence and blocked dispositions',()=>{const investigate=propose({feedback:{...feedback,disposition:'needs_evidence',signals:[{...feedback.signals[0]!,kind:'investigate'}]}});assert.equal(investigate.disposition,'needs_evidence');assert.equal(investigate.proposals[0]?.target,'evidence');const blocked=propose({feedback:{...feedback,disposition:'blocked'}});assert.equal(blocked.disposition,'blocked');});
+test('enforces tenant and safe-input boundaries',()=>{assert.throws(()=>propose({tenant:{tenantId:'other',environmentId:'prod'}}),/feedback_tenant_boundary_violation/);assert.throws(()=>propose({feedback:{...feedback,executable:true as never}}),/unsafe_feedback_rejected/);});
+test('suppresses acknowledged proposals deterministically',()=>{const initial=propose();const acknowledged=initial.proposals[0]!.proposalId;const result=propose({acknowledgedProposalIds:[acknowledged]});assert.ok(!result.proposals.some(p=>p.proposalId===acknowledged));assert.deepEqual(result.acknowledgedProposalIds,[acknowledged]);});
+test('rejects duplicate acknowledgements',()=>{assert.throws(()=>propose({acknowledgedProposalIds:['x','x']}),/duplicate_acknowledged_proposal_id/);});
+test('bounds proposals and reports truncation',()=>{const result=propose({maxProposals:1});assert.equal(result.proposals.length,1);assert.equal(result.truncated,true);assert.throws(()=>propose({maxProposals:0}),/unbounded_adaptation_proposal_rejected/);});
+test('sorts and deduplicates evidence references',()=>{const result=propose();assert.deepEqual(result.evidenceRefs,[...new Set(result.evidenceRefs)].sort());assert.deepEqual(result.proposals.find(p=>p.signalId==='signal-adjust')?.evidenceRefs,['a','b']);});

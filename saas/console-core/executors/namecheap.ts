@@ -3,6 +3,7 @@
 // Resend DNS setup. Uses Namecheap's XML API with API-user credentials from env.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionSchema } from '../types'
 
 const API = 'https://api.namecheap.com/xml.response'
@@ -20,7 +21,7 @@ type DnsHost = {
 }
 
 function env(name: string): string | null {
-  const value = process.env[name]
+  const value = getSecret(name)
   return value && value.trim() ? value.trim() : null
 }
 
@@ -29,7 +30,7 @@ function credentials() {
   const apiKey = env('NAMECHEAP_API_KEY')
   const username = env('NAMECHEAP_USERNAME') || apiUser
   const clientIp = env('NAMECHEAP_CLIENT_IP')
-  const sandbox = (process.env.NAMECHEAP_SANDBOX || '').toLowerCase() === 'true'
+  const sandbox = (getSecret('NAMECHEAP_SANDBOX') || '').toLowerCase() === 'true'
   if (!apiUser || !apiKey || !username || !clientIp) {
     return { ok: false as const, error: 'NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, and NAMECHEAP_CLIENT_IP must be set' }
   }

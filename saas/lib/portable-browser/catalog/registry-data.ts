@@ -1,4 +1,5 @@
 import { browserbaseDescriptor } from './browserbase.ts'
+import { browserlessDescriptor } from './browserless.ts'
 import { steelDescriptor } from './steel.ts'
 import { hyperbrowserDescriptor } from './hyperbrowser.ts'
 import { aws_agentcore_browserDescriptor } from './aws-agentcore-browser.ts'
@@ -24,4 +25,33 @@ import { microsoft_power_automateDescriptor } from './microsoft-power-automate.t
 import { firecrawlDescriptor } from './firecrawl.ts'
 import { private_browser_fleetDescriptor } from './private-browser-fleet.ts'
 import { custom_browser_agentDescriptor } from './custom-browser-agent.ts'
-export const allPortableBrowserAdapterDescriptors=Object.freeze([browserbaseDescriptor,steelDescriptor,hyperbrowserDescriptor,aws_agentcore_browserDescriptor,azure_playwrightDescriptor,browserstackDescriptor,sauce_labsDescriptor,lambdatestDescriptor,apifyDescriptor,bright_dataDescriptor,oxylabsDescriptor,stagehandDescriptor,browser_useDescriptor,notteDescriptor,skyvernDescriptor,playwrightDescriptor,puppeteerDescriptor,selenium_gridDescriptor,playwright_mcpDescriptor,agent_browserDescriptor,uipathDescriptor,automation_anywhereDescriptor,microsoft_power_automateDescriptor,firecrawlDescriptor,private_browser_fleetDescriptor,custom_browser_agentDescriptor])
+
+export const allPortableBrowserAdapterDescriptors = Object.freeze([
+  browserbaseDescriptor,
+  browserlessDescriptor,
+  steelDescriptor,
+  hyperbrowserDescriptor,
+  aws_agentcore_browserDescriptor,
+  azure_playwrightDescriptor,
+  browserstackDescriptor,
+  sauce_labsDescriptor,
+  lambdatestDescriptor,
+  apifyDescriptor,
+  bright_dataDescriptor,
+  oxylabsDescriptor,
+  stagehandDescriptor,
+  browser_useDescriptor,
+  notteDescriptor,
+  skyvernDescriptor,
+  playwrightDescriptor,
+  puppeteerDescriptor,
+  selenium_gridDescriptor,
+  playwright_mcpDescriptor,
+  agent_browserDescriptor,
+  uipathDescriptor,
+  automation_anywhereDescriptor,
+  microsoft_power_automateDescriptor,
+  firecrawlDescriptor,
+  private_browser_fleetDescriptor,
+  custom_browser_agentDescriptor,
+])

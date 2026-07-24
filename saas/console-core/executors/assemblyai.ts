@@ -1,9 +1,10 @@
 // saas/console-core/executors/assemblyai.ts
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionField, ActionSchema } from '../types'
 
 const API = 'https://api.assemblyai.com/v2'
-function key(): string | null { return process.env.ASSEMBLYAI_API_KEY || null }
+function key(): string | null { return getSecret('ASSEMBLYAI_API_KEY') || null }
 async function getJSON(path: string) {
   const k = key(); if (!k) return { ok: false as const, error: 'ASSEMBLYAI_API_KEY not set' }
   const res = await fetch(`${API}${path}`, { headers: { authorization: k } })

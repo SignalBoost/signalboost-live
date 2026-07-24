@@ -26,4 +26,6 @@ const orch = createOrchestrator(createSignalBoostAiPortabilityHost(), {
   },
 });
 
-export const { GET, POST } = toNextHandlers(orch, '/api/ai-portability');
+const handlers = toNextHandlers(orch, '/api/ai-portability');
+export const GET = handlers.GET;
+export const POST = handlers.POST;

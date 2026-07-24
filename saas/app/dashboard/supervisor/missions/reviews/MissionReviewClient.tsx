@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { parseManualReviewDiagnosticsResponse, type MissionManualReviewDiagnosticsResponse } from '@/lib/supervisor/missions/review-diagnostics'
+import { formatTimestamp } from './formatTimestamp'
 
 type Labels = Record<string, string>
 type Review = { reviewId: string; missionId: string; missionRevision: number; decisionId: string; status: string; title: string; summary: string; createdAt: string; routedAt: string; schemaVersion: string }
@@ -41,16 +42,6 @@ function parseDetailResponse(value: unknown): Detail | null {
 }
 
 const sizes = [25, 50, 100]
-function formatTimestamp(value: string | undefined, fallback: string): string {
-  if (!value) return fallback
-  const timestamp = new Date(value)
-  if (!Number.isFinite(timestamp.getTime())) return fallback
-  try {
-    return timestamp.toLocaleString()
-  } catch {
-    return fallback
-  }
-}
 const messageFor = (status: number, labels: Labels) => status === 401 || status === 403 ? labels.accessDenied : status === 404 ? labels.notFound : labels.error
 
 export default function MissionReviewClient({ labels }: { labels: Labels }) {

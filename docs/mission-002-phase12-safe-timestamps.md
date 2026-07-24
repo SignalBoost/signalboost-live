@@ -1,10 +1,11 @@
 # Mission 002 Phase 12 — Safe Timestamp Rendering
 
 The Mission Review operator page now sends every displayed timestamp through one
-client-side `formatTimestamp(value, fallback)` helper. The helper keeps the
-existing `Date#toLocaleString()` behavior for valid values, while returning the
-localized `unavailable` label when a timestamp is missing, malformed, non-finite,
-or cannot be formatted by the browser.
+client-side `formatTimestamp(value, fallback)` helper in
+`saas/app/dashboard/supervisor/missions/reviews/formatTimestamp.ts`. The helper
+keeps the existing `Date#toLocaleString()` behavior for valid values, while
+returning the localized `unavailable` label when a timestamp is missing,
+malformed, non-finite, or cannot be formatted by the browser.
 
 ## Affected read-only fields
 

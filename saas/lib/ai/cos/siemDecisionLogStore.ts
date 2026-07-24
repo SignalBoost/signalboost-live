@@ -24,7 +24,7 @@ import {
   type PortableAuditEvent,
   type SiemAuditSinkConfig,
   type SiemSeverity,
-} from '@/portable-audit'
+} from '../../../portable-audit/index.ts'
 
 const DATASET = 'cos.decision'
 

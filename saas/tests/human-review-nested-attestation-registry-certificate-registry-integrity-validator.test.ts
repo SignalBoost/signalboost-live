@@ -3,7 +3,7 @@ import test from 'node:test';
 import { validateEnterpriseHumanReviewNestedAttestationRegistryCertificateRegistryIntegrity } from '../lib/autonomous-systems/human-review-attestation-certificate-registry-attestation-registry-certificate-registry-attestation-registry-certificate-registry-attestation-registry-certificate-registry-integrity-validator.ts';
 
 const tenant={tenantId:'tenant-a',environmentId:'prod'};
-const entry={certificateId:'cert-1',certificateSerial:'EAE-HRARR-ABC12345',registryId:'source-registry',validationId:'validation-1',issuerId:'issuer-1',disposition:'valid' as const,valid:true,attestationIds:['att-1'],evidenceRefs:['evidence-1'],readOnly:true as const,executable:false as const};
+const entry={certificateId:'cert-1',certificateSerial:'EAE-HRARR-ABC12345',sourceRegistryId:'source-registry',validationId:'validation-1',issuerId:'issuer-1',disposition:'valid' as const,valid:true,attestationIds:['att-1'],evidenceRefs:['evidence-1'],readOnly:true as const,executable:false as const};
 const registry={schemaVersion:'1.0.0' as const,registryId:'registry-1',tenant,disposition:'complete' as const,entries:[entry],priorCertificateIds:[],rejectedCertificateIds:[],evidenceRefs:['registry-evidence'],truncated:false,readOnly:true as const,executable:false as const};
 
 test('validates a safe deterministic certificate registry snapshot',()=>{

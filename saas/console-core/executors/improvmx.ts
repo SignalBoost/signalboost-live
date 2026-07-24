@@ -2,12 +2,13 @@
 // Live ImprovMX provider integration for domains and forwarding aliases.
 
 import { registerExecutor } from '../defaultHost'
+import { getSecret } from '../secrets'
 import type { ActionSchema } from '../types'
 
-const API = process.env.IMPROVMX_API_BASE_URL || 'https://api.improvmx.com/v3'
+const API = getSecret('IMPROVMX_API_BASE_URL') || 'https://api.improvmx.com/v3'
 
 function apiKey(): string | null {
-  return process.env.IMPROVMX_API_KEY?.trim() || null
+  return getSecret('IMPROVMX_API_KEY')?.trim() || null
 }
 
 function authHeader(key: string): string {

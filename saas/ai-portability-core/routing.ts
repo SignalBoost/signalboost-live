@@ -15,7 +15,7 @@ import {
   ProviderCapability,
 } from './schema';
 import { HostContext } from './host';
-import { ProviderRegistry } from './registry';
+import { AiProviderRegistry } from './registry';
 
 export interface RoutingResult {
   response: UnifiedResponse;
@@ -35,7 +35,7 @@ export interface RoutingConfig {
 
 export class RoutingEngine {
   constructor(
-    private registry: ProviderRegistry,
+    private registry: AiProviderRegistry,
     private host: HostContext,
     private config: RoutingConfig = {},
   ) {}

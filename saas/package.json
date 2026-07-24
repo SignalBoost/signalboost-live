@@ -51,6 +51,7 @@
     "test:agent-provider-boundary": "node --test tests/agentProviderGuard.node.test.ts tests/agentProviderAudit.node.test.ts tests/agentProviderRegistry.node.test.ts tests/agentProviderConfig.node.test.ts tests/agentRemoteProvider.node.test.ts",
     "test:mission-manual-review": "node --test tests/missionManualReview.node.test.ts",
     "test:mission-review-api": "node --test tests/missionReviewApi.node.test.ts",
+    "test:mission-review-timestamps": "node --test tests/missionReviewTimestamps.node.test.ts",
     "test:portable-browser-runtime": "node --test tests/portableBrowserPorts.node.test.ts tests/portableBrowserCoordinator.node.test.ts tests/portableBrowserProviderBinding.node.test.ts tests/portableBrowserManifest.node.test.ts tests/portableBrowserAdapterCatalog.node.test.ts tests/portableBrowserCompatibility.node.test.ts tests/portableBrowserPortability.node.test.ts tests/portableBrowserSecurity.node.test.ts",
     "test:mission-review-ui": "node --test tests/missionReviewUi.node.test.ts",
     "test:mission-review-a11y": "node --test tests/missionReviewA11y.node.test.ts",

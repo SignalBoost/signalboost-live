@@ -5,7 +5,7 @@ export type CapabilityStatus = 'available' | 'degraded' | 'disabled';
 export type CapabilityKind = 'reasoning' | 'retrieval' | 'generation' | 'analysis' | 'workflow' | 'integration';
 type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
 
-export interface EnterpriseCapability {
+export interface RegisteredEnterpriseCapability {
   readonly schemaVersion: typeof EAE_CAPABILITY_SCHEMA_VERSION;
   readonly capabilityId: string;
   readonly version: string;
@@ -35,7 +35,7 @@ export interface CapabilityRegistrySnapshot {
   readonly snapshotId: string;
   readonly tenant: TenantContext;
   readonly capabilityIds: readonly string[];
-  readonly capabilities: readonly EnterpriseCapability[];
+  readonly capabilities: readonly RegisteredEnterpriseCapability[];
   readonly truncated: boolean;
 }
 
@@ -48,7 +48,7 @@ function freeze<T>(v:T):T { if(!v||typeof v!=='object'||Object.isFrozen(v)) retu
 function safe(v: unknown, p='value'): void { if(typeof v==='function'||typeof v==='symbol'||typeof v==='bigint') throw new Error(`${p}_executable_rejected`); if(typeof v==='number'&&!Number.isFinite(v)) throw new Error(`${p}_non_finite_number`); if(!v||typeof v!=='object') return; for(const [k,x] of Object.entries(v as Record<string,unknown>)){ if(secret.test(k)) throw new Error(`${p}_secret_rejected`); safe(x,`${p}.${k}`); } }
 function validVersion(v:string):boolean { return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(v); }
 
-function validateCapability(c:EnterpriseCapability, tenant:TenantContext):void {
+function validateCapability(c:RegisteredEnterpriseCapability, tenant:TenantContext):void {
   if(c.schemaVersion!==EAE_CAPABILITY_SCHEMA_VERSION) throw new Error('unsupported_schema');
   if(tenantKey(c.tenant)!==tenantKey(tenant)) throw new Error('tenant_environment_boundary_violation');
   if(!c.capabilityId||!c.name||!validVersion(c.version)) throw new Error('invalid_capability');
@@ -58,7 +58,7 @@ function validateCapability(c:EnterpriseCapability, tenant:TenantContext):void {
   safe(c.metadata,'metadata');
 }
 
-export function buildCapabilityRegistrySnapshot(capabilities:readonly EnterpriseCapability[], query:CapabilityQuery):CapabilityRegistrySnapshot {
+export function buildCapabilityRegistrySnapshot(capabilities:readonly RegisteredEnterpriseCapability[], query:CapabilityQuery):CapabilityRegistrySnapshot {
   if(!query.tenant.tenantId||!query.tenant.environmentId) throw new Error('tenant_required');
   if(!Number.isInteger(query.maxResults)||query.maxResults<1||query.maxResults>256) throw new Error('unbounded_capability_query_rejected');
   const keys=new Set<string>();

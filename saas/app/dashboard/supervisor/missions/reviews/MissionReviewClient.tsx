@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { parseManualReviewDiagnosticsResponse, type MissionManualReviewDiagnosticsResponse } from '@/lib/supervisor/missions/review-diagnostics'
 
 type Labels = Record<string, string>
@@ -59,6 +59,10 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [diagnostics, setDiagnostics] = useState<MissionManualReviewDiagnosticsResponse | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
+  const [copyFeedback, setCopyFeedback] = useState('')
+  const detailOpener = useRef<HTMLButtonElement | null>(null)
+  const detailRequest = useRef(0)
+  const copyFeedbackTimeout = useRef<number | undefined>(undefined)
 
   async function loadDiagnostics() {
     setDiagnosticsError(null)
@@ -93,18 +97,43 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   function nextPage() { if (!nextCursor) return; setHistory(previous => [...previous, cursor || '']); setCursor(nextCursor); void load(nextCursor) }
   function previousPage() { const previous = history.at(-1); if (previous === undefined) return; const nextHistory = history.slice(0, -1); setHistory(nextHistory); setCursor(previous || undefined); void load(previous || undefined) }
 
-  async function openDetail(reviewId: string) {
+  function closeDetail() {
+    detailRequest.current += 1
+    setDetail(null); setDetailError(null); setDetailLoading(false)
+    window.setTimeout(() => detailOpener.current?.focus(), 0)
+  }
+
+  useEffect(() => {
+    if (!detail && !detailLoading && !detailError) return
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); closeDetail() } }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [detail, detailLoading, detailError])
+
+  useEffect(() => () => { if (copyFeedbackTimeout.current !== undefined) window.clearTimeout(copyFeedbackTimeout.current) }, [])
+
+  async function openDetail(reviewId: string, opener: HTMLButtonElement) {
+    detailOpener.current = opener
+    const request = detailRequest.current + 1
+    detailRequest.current = request
     setDetailLoading(true); setDetailError(null); setDetail(null)
     try {
       const response = await fetch(`/api/internal/supervisor/missions/reviews/${encodeURIComponent(reviewId)}`, { method: 'GET', cache: 'no-store' })
       if (!response.ok) throw new Error(messageFor(response.status, labels))
       const payload = parseDetailResponse(await response.json())
       if (!payload) throw new Error(labels.error)
-      setDetail(payload)
-    } catch (cause) { setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { setDetailLoading(false) }
+      if (detailRequest.current === request) setDetail(payload)
+    } catch (cause) { if (detailRequest.current === request) setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { if (detailRequest.current === request) setDetailLoading(false) }
   }
 
-  async function copyFingerprint(value: string) { await navigator.clipboard?.writeText(value) }
+  async function copyFingerprint(value: string) {
+    try {
+      await navigator.clipboard?.writeText(value)
+      setCopyFeedback(labels.fingerprintCopied)
+    } catch { setCopyFeedback(labels.fingerprintCopyFailed) }
+    if (copyFeedbackTimeout.current !== undefined) window.clearTimeout(copyFeedbackTimeout.current)
+    copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(''), 3000)
+  }
 
   return <main style={page}>
     <section style={panel}>
@@ -119,11 +148,12 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
       </form>
       {loading ? <p style={muted} role="status">{labels.loading}</p> : null}
       {error ? <p style={errorStyle} role="alert">{error}</p> : null}
-      {!loading && !error && items.length === 0 ? <p style={muted}>{labels.empty}</p> : null}
-      {!loading && !error && items.length > 0 ? <div style={tableWrap}><table style={table}><thead><tr>{[labels.reviewId, labels.missionId, labels.revision, labels.decisionId, labels.status, labels.titleLabel, labels.summary, labels.createdAt, labels.routedAt].map(label => <th key={label} style={head}>{label}</th>)}</tr></thead><tbody>{items.map(review => <tr key={review.reviewId} style={row} onClick={() => void openDetail(review.reviewId)} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter') void openDetail(review.reviewId) }}><td style={cell}><code>{review.reviewId}</code></td><td style={cell}><code>{review.missionId}</code></td><td style={cell}>{review.missionRevision}</td><td style={cell}><code>{review.decisionId}</code></td><td style={cell}>{review.status}</td><td style={cell}>{review.title}</td><td style={cell}>{review.summary}</td><td style={cell}>{formatTime(review.createdAt)}</td><td style={cell}>{formatTime(review.routedAt)}</td></tr>)}</tbody></table></div> : null}
-      <div style={pagination}><button type="button" onClick={previousPage} disabled={loading || history.length === 0}>{labels.previous}</button><button type="button" onClick={nextPage} disabled={loading || !nextCursor}>{labels.next}</button></div>
+      {!loading && !error && items.length === 0 ? <p style={muted} role="status">{labels.empty}</p> : null}
+      {!loading && !error && items.length > 0 ? <div style={tableWrap}><table style={table}><thead><tr>{[labels.reviewId, labels.missionId, labels.revision, labels.decisionId, labels.status, labels.titleLabel, labels.summary, labels.createdAt, labels.routedAt, labels.openDetail].map(label => <th key={label} style={head}>{label}</th>)}</tr></thead><tbody>{items.map(review => <tr key={review.reviewId} style={row}><td style={cell}><code>{review.reviewId}</code></td><td style={cell}><code>{review.missionId}</code></td><td style={cell}>{review.missionRevision}</td><td style={cell}><code>{review.decisionId}</code></td><td style={cell}>{review.status}</td><td style={cell}>{review.title}</td><td style={cell}>{review.summary}</td><td style={cell}>{formatTime(review.createdAt)}</td><td style={cell}>{formatTime(review.routedAt)}</td><td style={cell}><button type="button" aria-label={`${labels.openDetail}: ${review.reviewId}`} onClick={event => void openDetail(review.reviewId, event.currentTarget)}>{labels.openDetail}</button></td></tr>)}</tbody></table></div> : null}
+      <nav style={pagination} aria-label={labels.pagination}><button type="button" onClick={previousPage} disabled={loading || history.length === 0}>{labels.previous}</button><button type="button" onClick={nextPage} disabled={loading || !nextCursor}>{labels.next}</button></nav>
     </section>
-    {(detailLoading || detailError || detail) ? <section style={panel} aria-live="polite"><h2>{labels.detail}</h2>{detailLoading ? <p style={muted}>{labels.loading}</p> : null}{detailError ? <p style={errorStyle} role="alert">{detailError}</p> : null}{detail ? <DetailView detail={detail} labels={labels} onCopy={copyFingerprint} /> : null}</section> : null}
+    {(detailLoading || detailError || detail) ? <section style={panel} aria-live="polite"><div style={detailHeader}><h2>{labels.detail}</h2><button type="button" onClick={closeDetail}>{labels.closeDetail}</button></div>{detailLoading ? <p style={muted} role="status">{labels.loading}</p> : null}{detailError ? <p style={errorStyle} role="alert">{detailError}</p> : null}{detail ? <DetailView detail={detail} labels={labels} onCopy={copyFingerprint} /> : null}<p role="status" aria-live="polite" aria-atomic="true" style={srOnly}>{copyFeedback}</p></section> : null}
+    <style>{focusVisibleCss}</style>
   </main>
 }
 
@@ -132,4 +162,4 @@ function DetailView({ detail, labels, onCopy }: { detail: Detail; labels: Labels
   return <><dl style={detailGrid}>{fields.map(([label, value]) => <div key={label}><dt style={muted}>{label}</dt><dd style={valueStyle}>{value}</dd></div>)}</dl><h3>{labels.fingerprints}</h3>{([[labels.decisionFingerprint, detail.decisionFingerprint], [labels.planFingerprint, detail.planFingerprint], [labels.bindingFingerprint, detail.bindingFingerprint]] as const).map(([label, value]) => <div key={label} style={fingerprint}><span>{label}: <code>{value}</code></span><button type="button" onClick={() => void onCopy(value)}>{labels.copy}</button></div>)}<h3>{labels.missionSummary}</h3>{detail.mission ? <dl style={detailGrid}>{Object.entries(detail.mission).map(([key, value]) => <div key={key}><dt style={muted}>{labels[`mission_${key}`] || key}</dt><dd style={valueStyle}>{String(value)}</dd></div>)}</dl> : <p style={muted}>{labels.missionUnavailable}</p>}<p style={muted}>{labels.feedbackUnavailable}</p></>
 }
 
-const page={minHeight:'100vh',padding:32,color:'#fff',background:'linear-gradient(135deg,#06111f,#05070c)'}; const panel={border:'1px solid rgba(255,255,255,.12)',borderRadius:24,padding:24,background:'rgba(255,255,255,.06)',marginBottom:18}; const kicker={color:'#1af0ff',fontWeight:800,textTransform:'uppercase' as const,letterSpacing:1}; const muted={color:'rgba(255,255,255,.68)'}; const safety={display:'flex',gap:10,flexWrap:'wrap' as const,color:'#b8ffdd',fontWeight:700,margin:'18px 0'}; const diagnosticsPanel={border:'1px solid rgba(26,240,255,.35)',borderRadius:14,padding:16,margin:'18px 0'}; const filters={display:'flex',gap:12,flexWrap:'wrap' as const,alignItems:'end',marginBottom:18}; const tableWrap={overflowX:'auto' as const}; const table={width:'100%',minWidth:1040,borderCollapse:'collapse' as const}; const head={textAlign:'left' as const,padding:'10px',borderBottom:'1px solid rgba(255,255,255,.16)',color:'#ffc300'}; const cell={padding:'10px',borderBottom:'1px solid rgba(255,255,255,.08)',verticalAlign:'top' as const}; const row={cursor:'pointer'}; const pagination={display:'flex',gap:10,marginTop:18}; const errorStyle={color:'#ff9cab',fontWeight:700}; const detailGrid={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}; const valueStyle={margin:0,wordBreak:'break-word' as const}; const fingerprint={display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',border:'1px solid rgba(255,255,255,.12)',borderRadius:10,padding:10,margin:'8px 0',wordBreak:'break-all' as const}
+const page={minHeight:'100vh',padding:32,color:'#fff',background:'linear-gradient(135deg,#06111f,#05070c)'}; const panel={border:'1px solid rgba(255,255,255,.12)',borderRadius:24,padding:24,background:'rgba(255,255,255,.06)',marginBottom:18}; const kicker={color:'#1af0ff',fontWeight:800,textTransform:'uppercase' as const,letterSpacing:1}; const muted={color:'rgba(255,255,255,.68)'}; const safety={display:'flex',gap:10,flexWrap:'wrap' as const,color:'#b8ffdd',fontWeight:700,margin:'18px 0'}; const diagnosticsPanel={border:'1px solid rgba(26,240,255,.35)',borderRadius:14,padding:16,margin:'18px 0'}; const filters={display:'flex',gap:12,flexWrap:'wrap' as const,alignItems:'end',marginBottom:18}; const tableWrap={overflowX:'auto' as const}; const table={width:'100%',minWidth:1120,borderCollapse:'collapse' as const}; const head={textAlign:'left' as const,padding:'10px',borderBottom:'1px solid rgba(255,255,255,.16)',color:'#ffc300'}; const cell={padding:'10px',borderBottom:'1px solid rgba(255,255,255,.08)',verticalAlign:'top' as const}; const row={}; const pagination={display:'flex',gap:10,marginTop:18}; const detailHeader={display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}; const errorStyle={color:'#ff9cab',fontWeight:700}; const detailGrid={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}; const valueStyle={margin:0,wordBreak:'break-word' as const}; const fingerprint={display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',border:'1px solid rgba(255,255,255,.12)',borderRadius:10,padding:10,margin:'8px 0',wordBreak:'break-all' as const}; const srOnly={position:'absolute' as const,width:1,height:1,padding:0,margin:-1,overflow:'hidden' as const,clip:'rect(0, 0, 0, 0)',whiteSpace:'nowrap' as const,border:0}; const focusVisibleCss='button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #1af0ff; outline-offset: 3px; }'

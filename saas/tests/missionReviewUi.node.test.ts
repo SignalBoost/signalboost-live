@@ -20,6 +20,24 @@ test('review UI has loading, empty, and bounded API error states', () => {
   assert.match(source, /role="status"/)
   assert.match(source, /role="alert"/)
   assert.match(source, /messageFor/)
+  assert.match(source, /aria-atomic="true"/)
+})
+
+test('review UI uses native detail buttons with accessible filter and pagination labels', () => {
+  const source = client()
+  assert.match(source, /<button type="button" aria-label=\{`\$\{labels\.openDetail\}: \$\{review\.reviewId\}`\}/)
+  assert.match(source, /<form onSubmit=\{applyFilters\} style=\{filters\} aria-label=\{labels\.filters\}>/)
+  assert.match(source, /<nav style=\{pagination\} aria-label=\{labels\.pagination\}>/)
+  assert.match(source, /focus-visible/)
+  assert.doesNotMatch(source, /<tr[^>]*(onClick|tabIndex|onKeyDown)/)
+})
+
+test('detail panel closes on Escape and restores focus to its opener', () => {
+  const source = client()
+  assert.match(source, /event\.key === 'Escape'/)
+  assert.match(source, /event\.preventDefault\(\); closeDetail\(\)/)
+  assert.match(source, /detailOpener\.current\?\.focus\(\)/)
+  assert.match(source, /<button type="button" onClick=\{closeDetail\}>\{labels\.closeDetail\}<\/button>/)
 })
 
 test('review UI renders only list allowlist and keeps fingerprints out of list rows', () => {
@@ -62,7 +80,7 @@ test('review UI makes GET-only Phase 6 requests and exposes no mutation controls
   assert.equal((source.match(/method: 'GET'/g) || []).length, 3)
   assert.doesNotMatch(source, /method:\s*'(POST|PUT|PATCH|DELETE)'/)
   const controls = source.match(/<button[^>]*>[\s\S]*?<\/button>/g) || []
-  assert.equal(controls.length, 4)
+  assert.equal(controls.length, 6)
   assert.doesNotMatch(controls.join(' '), /approve|reject|resolve|retry|replay|execute|repair|cancel|delete|edit|GitHub issue|pull request|trigger CI/i)
   assert.doesNotMatch(source, /supabase|authorization|credentials|cookies/i)
 })
@@ -70,5 +88,5 @@ test('review UI makes GET-only Phase 6 requests and exposes no mutation controls
 test('required safety labels are visible and localized in all supported languages', () => {
   const source = client(); const locales = JSON.parse(read('../lib/i18n/supervisorSocLocales.json'))
   for (const key of ['manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled']) assert.match(source, new RegExp(`labels\\.${key}`))
-  for (const lang of ['en', 'pt', 'es', 'pl', 'ru']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
+  for (const lang of ['en', 'pt', 'es', 'pl', 'ru']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error', 'openDetail', 'closeDetail', 'pagination', 'fingerprintCopied', 'fingerprintCopyFailed']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
 })

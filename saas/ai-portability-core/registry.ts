@@ -14,7 +14,7 @@ import {
 } from './schema';
 import { ProviderAdapter } from './adapters';
 
-export class ProviderRegistry {
+export class AiProviderRegistry {
   private adapters = new Map<string, ProviderAdapter>();
 
   register(adapter: ProviderAdapter): this {
@@ -75,7 +75,7 @@ export class ProviderRegistry {
 
 /** Convenience: estimate then rank by cost from a prompt. */
 export function costRankForPrompt(
-  registry: ProviderRegistry,
+  registry: AiProviderRegistry,
   prompt: string,
   maxTokens = 1024,
 ): ProviderAdapter[] {

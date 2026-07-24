@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { evaluateEnterpriseExecutionAuthorization } from '../lib/autonomous-systems/execution-authorization-gate.ts';
+import type { EnterpriseExecutionPlanSnapshot } from '../lib/autonomous-systems/execution-planner.ts';
+
+const tenant={tenantId:'tenant-a',environmentId:'prod',region:'us'};
+function plan(overrides:Partial<EnterpriseExecutionPlanSnapshot>={}):EnterpriseExecutionPlanSnapshot{return {schemaVersion:'1.0.0',planId:'plan-1',tenant,decisionId:'decision-1',disposition:'proceed',executable:false,steps:[],approvalStepIds:['step-1'],rollbackStepIds:[],contingencyStepIds:[],evidenceRefs:['plan-evidence'],truncated:false,...overrides};}
+function approval(overrides:Record<string,unknown>={}){return {approvalId:'approval-1',tenant,planId:'plan-1',stepId:'step-1',approverRole:'operator',approved:true,evidenceRefs:['approval-evidence'],...overrides};}
+const request={tenant,plan:plan(),approvals:[approval()],policyValid:true,capabilitiesAvailable:true,environmentReady:true,maxApprovals:16};
+
+test('produces deterministic immutable readiness evidence',()=>{const a=evaluateEnterpriseExecutionAuthorization(request);const b=evaluateEnterpriseExecutionAuthorization(request);assert.equal(a.authorizationId,b.authorizationId);assert.equal(a.status,'ready_for_authorization');assert.equal(a.externallyAuthorizable,true);assert.equal(a.executable,false);assert.ok(Object.isFrozen(a));});
+test('preserves missing approval gates',()=>{const result=evaluateEnterpriseExecutionAuthorization({...request,approvals:[]});assert.equal(result.status,'approval_required');assert.deepEqual(result.missingApprovalStepIds,['step-1']);});
+test('fails closed for policy capability and environment readiness',()=>{assert.equal(evaluateEnterpriseExecutionAuthorization({...request,policyValid:false}).status,'blocked');assert.equal(evaluateEnterpriseExecutionAuthorization({...request,capabilitiesAvailable:false}).status,'blocked');assert.equal(evaluateEnterpriseExecutionAuthorization({...request,environmentReady:false}).status,'blocked');});
+test('preserves escalation and block dispositions',()=>{assert.equal(evaluateEnterpriseExecutionAuthorization({...request,plan:plan({disposition:'escalate'})}).status,'escalation_required');assert.equal(evaluateEnterpriseExecutionAuthorization({...request,plan:plan({disposition:'block'})}).status,'blocked');});
+test('enforces tenant and plan boundaries',()=>{assert.throws(()=>evaluateEnterpriseExecutionAuthorization({...request,approvals:[approval({tenant:{tenantId:'other',environmentId:'prod'}})]}),/tenant_environment_boundary_violation/);assert.throws(()=>evaluateEnterpriseExecutionAuthorization({...request,approvals:[approval({planId:'other'})]}),/approval_plan_mismatch/);});
+test('rejects duplicates and unbounded requests',()=>{assert.throws(()=>evaluateEnterpriseExecutionAuthorization({...request,approvals:[approval(),approval()]}),/duplicate_approval_id/);assert.throws(()=>evaluateEnterpriseExecutionAuthorization({...request,maxApprovals:0}),/unbounded_authorization_request_rejected/);});
+test('reports truncation and aggregates evidence',()=>{const result=evaluateEnterpriseExecutionAuthorization({...request,approvals:[approval(),approval({approvalId:'approval-2',stepId:'other'})],maxApprovals:1});assert.equal(result.truncated,true);assert.deepEqual(result.evidenceRefs,['approval-evidence','plan-evidence']);});

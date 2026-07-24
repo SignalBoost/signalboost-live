@@ -11,3 +11,4 @@ export * from './policy-governance.ts';
 export * from './capability-registry.ts';
 export * from './decision-engine.ts';
 export * from './execution-planner.ts';
+export * from './execution-authorization-gate.ts';

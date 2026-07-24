@@ -24,6 +24,6 @@ test('Mission Review announces loading, errors, empty results, and bounded copy 
 test('Mission Review supports Escape close, focus restoration, and visible focus styling', () => {
   const source = client()
   assert.match(source, /event\.key === 'Escape'/)
-  assert.match(source, /detailOpener\.current\?\.focus\(\)/)
+  assert.match(source, /opener\?\.isConnected && !opener\.disabled\) opener\.focus\(\)/)
   assert.match(source, /:focus-visible/)
 })

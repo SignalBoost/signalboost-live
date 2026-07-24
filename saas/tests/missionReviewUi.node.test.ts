@@ -36,7 +36,7 @@ test('detail panel closes on Escape and restores focus to its opener', () => {
   const source = client()
   assert.match(source, /event\.key === 'Escape'/)
   assert.match(source, /event\.preventDefault\(\); closeDetail\(\)/)
-  assert.match(source, /detailOpener\.current\?\.focus\(\)/)
+  assert.match(source, /opener\?\.isConnected && !opener\.disabled\) opener\.focus\(\)/)
   assert.match(source, /<button type="button" onClick=\{closeDetail\}>\{labels\.closeDetail\}<\/button>/)
 })
 

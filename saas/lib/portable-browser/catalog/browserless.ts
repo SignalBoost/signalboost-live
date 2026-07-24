@@ -5,7 +5,7 @@ export const browserlessDescriptor = freezePortableBrowserAdapterDescriptor({
   displayName: 'Browserless',
   category: 'session_infrastructure',
   implementationStatus: 'available',
-  runtimeLanguages: ['typescript', 'websocket'],
+  runtimeLanguages: ['typescript'],
   deploymentModels: ['managed_cloud', 'self_hosted'],
   supportedPortKinds: ['session', 'evidence', 'telemetry', 'human_control', 'credential'],
   declaredCapabilities: ['structured_actions'],

@@ -54,6 +54,7 @@
     "test:portable-browser-runtime": "node --test tests/portableBrowserPorts.node.test.ts tests/portableBrowserCoordinator.node.test.ts tests/portableBrowserProviderBinding.node.test.ts tests/portableBrowserManifest.node.test.ts tests/portableBrowserAdapterCatalog.node.test.ts tests/portableBrowserCompatibility.node.test.ts tests/portableBrowserPortability.node.test.ts tests/portableBrowserSecurity.node.test.ts",
     "test:mission-review-ui": "node --test tests/missionReviewUi.node.test.ts",
     "test:portable-product-registry": "node --test tests/portableProductRegistry.node.test.ts tests/portableProductHomepage.node.test.ts tests/portableProductSecurity.node.test.ts tests/portableProductManifest.node.test.ts",
+    "test:portable-product-catalog": "node --test tests/portableProductCatalogApi.node.test.ts tests/portableProductCatalogPage.node.test.ts tests/portableProductCatalogSecurity.node.test.ts",
     "test:mission-review-diagnostics": "node --test tests/missionReviewDiagnostics.node.test.ts"
   },
   "dependencies": {

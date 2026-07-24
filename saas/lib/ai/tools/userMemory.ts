@@ -4,8 +4,8 @@
 // SaaS Supabase `assistant_memories` table, and loads them into the AI's
 // context at the start of every conversation.
 
-import { getUserMemoryStore } from './userMemoryStore'
-export type { UserMemory } from './userMemoryStore'
+import { getUserMemoryStore, type UserMemory } from './userMemoryStore'
+export type { UserMemory }
 
 const MAX_MEMORIES_PER_USER = 30
 const MAX_CONTENT_LENGTH = 300

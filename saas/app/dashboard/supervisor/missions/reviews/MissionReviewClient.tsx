@@ -61,6 +61,9 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [copyFeedback, setCopyFeedback] = useState('')
   const detailOpener = useRef<HTMLButtonElement | null>(null)
+  const listController = useRef<AbortController | null>(null)
+  const detailController = useRef<AbortController | null>(null)
+  const listRequest = useRef(0)
   const detailRequest = useRef(0)
   const copyFeedbackTimeout = useRef<number | undefined>(undefined)
 
@@ -76,19 +79,28 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   }
 
   async function load(activeCursor = cursor) {
+    listController.current?.abort()
+    const controller = new AbortController()
+    listController.current = controller
+    const request = listRequest.current + 1
+    listRequest.current = request
     setLoading(true); setError(null); setDetail(null)
     const params = new URLSearchParams({ limit: String(Math.min(100, pageSize)) })
     if (status) params.set('status', status)
     if (missionId.trim()) params.set('missionId', missionId.trim())
     if (activeCursor) params.set('cursor', activeCursor)
     try {
-      const response = await fetch(`/api/internal/supervisor/missions/reviews?${params}`, { method: 'GET', cache: 'no-store' })
+      const response = await fetch(`/api/internal/supervisor/missions/reviews?${params}`, { method: 'GET', cache: 'no-store', signal: controller.signal })
       if (!response.ok) throw new Error(messageFor(response.status, labels))
       const payload = parseListResponse(await response.json())
       if (!payload) throw new Error(labels.error)
+      if (listRequest.current !== request || controller.signal.aborted) return
       setItems(payload.items)
       setNextCursor(payload.nextCursor)
-    } catch (cause) { setItems([]); setNextCursor(undefined); setError(cause instanceof Error ? cause.message : labels.error) } finally { setLoading(false) }
+    } catch (cause) {
+      if (listRequest.current !== request || controller.signal.aborted) return
+      setItems([]); setNextCursor(undefined); setError(cause instanceof Error ? cause.message : labels.error)
+    } finally { if (listRequest.current === request) setLoading(false) }
   }
 
   useEffect(() => { void load(); void loadDiagnostics() }, []) // Initial inspection is GET-only.
@@ -98,6 +110,7 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
   function previousPage() { const previous = history.at(-1); if (previous === undefined) return; const nextHistory = history.slice(0, -1); setHistory(nextHistory); setCursor(previous || undefined); void load(previous || undefined) }
 
   function closeDetail() {
+    detailController.current?.abort()
     detailRequest.current += 1
     setDetail(null); setDetailError(null); setDetailLoading(false)
     window.setTimeout(() => detailOpener.current?.focus(), 0)
@@ -110,20 +123,27 @@ export default function MissionReviewClient({ labels }: { labels: Labels }) {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [detail, detailLoading, detailError])
 
-  useEffect(() => () => { if (copyFeedbackTimeout.current !== undefined) window.clearTimeout(copyFeedbackTimeout.current) }, [])
+  useEffect(() => () => {
+    listController.current?.abort()
+    detailController.current?.abort()
+    if (copyFeedbackTimeout.current !== undefined) window.clearTimeout(copyFeedbackTimeout.current)
+  }, [])
 
   async function openDetail(reviewId: string, opener: HTMLButtonElement) {
     detailOpener.current = opener
+    detailController.current?.abort()
+    const controller = new AbortController()
+    detailController.current = controller
     const request = detailRequest.current + 1
     detailRequest.current = request
     setDetailLoading(true); setDetailError(null); setDetail(null)
     try {
-      const response = await fetch(`/api/internal/supervisor/missions/reviews/${encodeURIComponent(reviewId)}`, { method: 'GET', cache: 'no-store' })
+      const response = await fetch(`/api/internal/supervisor/missions/reviews/${encodeURIComponent(reviewId)}`, { method: 'GET', cache: 'no-store', signal: controller.signal })
       if (!response.ok) throw new Error(messageFor(response.status, labels))
       const payload = parseDetailResponse(await response.json())
       if (!payload) throw new Error(labels.error)
-      if (detailRequest.current === request) setDetail(payload)
-    } catch (cause) { if (detailRequest.current === request) setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { if (detailRequest.current === request) setDetailLoading(false) }
+      if (detailRequest.current === request && !controller.signal.aborted) setDetail(payload)
+    } catch (cause) { if (detailRequest.current === request && !controller.signal.aborted) setDetailError(cause instanceof Error ? cause.message : labels.error) } finally { if (detailRequest.current === request) setDetailLoading(false) }
   }
 
   async function copyFingerprint(value: string) {

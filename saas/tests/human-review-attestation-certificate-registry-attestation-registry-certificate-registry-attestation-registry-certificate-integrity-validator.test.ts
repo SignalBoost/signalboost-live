@@ -10,6 +10,8 @@ test('validates deterministically and freezes output',()=>{
   const second=validateEnterpriseHumanReviewAttestationCertificateRegistryAttestationRegistryCertificateRegistryAttestationRegistryCertificateIntegrity({tenant,certificate,expectedIssuerId:'issuer-1',maxAttestationIds:10});
   assert.deepEqual(first,second);
   assert.equal(first.disposition,'valid');
+  assert.equal(first.registryId,'reg-1');
+  assert.equal(first.issuerId,'issuer-1');
   assert.deepEqual(first.validatedAttestationIds,['att-a','att-b']);
   assert.deepEqual(first.evidenceRefs,['a','z']);
   assert.equal(Object.isFrozen(first),true);

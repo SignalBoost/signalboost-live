@@ -51,3 +51,4 @@ export * from './human-review-attestation-certificate-registry-attestation-regis
 export * from './human-review-attestation-certificate-registry-attestation-registry-certificate-registry-attestation-registry-certificate-registry-attestation.ts';
 export * from './human-review-attestation-certificate-registry-attestation-registry-certificate-registry-attestation-registry-certificate-registry-attestation-integrity-validator.ts';
 export * from './human-review-attestation-certificate-registry-attestation-registry-certificate-registry-attestation-registry-certificate-registry-attestation-registry.ts';
+export * from './human-review-attestation-certificate-registry-attestation-registry-certificate-registry-attestation-registry-certificate-registry-attestation-registry-integrity-validator.ts';

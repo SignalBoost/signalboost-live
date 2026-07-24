@@ -42,7 +42,7 @@
     "test:agent-runtime-foundation": "node --test tests/agentRuntimePolicy.node.test.ts tests/agentOutputLimits.node.test.ts",
     "test:repository-intelligence": "node --test tests/repositoryIntelligence.node.test.ts tests/repositoryIntelligenceSecurity.node.test.ts",
     "test:agent-repair-controller": "node --test tests/agentRepairController.node.test.ts tests/agentRepairPrompts.node.test.ts",
-    "test:code-repair-approval": "node --test tests/codeRepairApproval.node.test.ts",
+    "test:code-repair-approval": "node --test tests/codeRepairApproval.node.test.ts tests/codeRepairApplication.node.test.ts",
     "test:mission-durable-outbox": "node --test tests/missionDurableOutbox.node.test.ts",
     "test:mission-worker-runtime": "node --test tests/missionWorkerRuntime.node.test.ts",
     "test:mission-phase3": "npm run test:mission-lifecycle && npm run test:mission-durable-outbox && npm run test:mission-worker-runtime",

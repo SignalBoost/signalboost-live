@@ -1,6 +1,20 @@
 import { planProviderActionSubmission, type ProviderActionSubmission } from './provider-action-submit'
 import type { ProviderExecutionMode } from './provider-execution-modes'
 
+export type ReviewedProviderCapabilitySnapshot = Readonly<{
+  mode: ProviderExecutionMode
+  available: true
+  reason?: string
+  endpoint?: string | null
+  browserAdapterId?: string | null
+  approvedOrigin?: string | null
+}>
+
+export type ProviderCapabilityReview = Readonly<{
+  reviewer: string
+  reviewedAt: string
+}>
+
 export type ProviderCapabilityResponse = Readonly<{
   ok: boolean
   error?: string
@@ -8,6 +22,8 @@ export type ProviderCapabilityResponse = Readonly<{
   availableModes?: readonly ProviderExecutionMode[]
   browserAdapterId?: string | null
   approvedOrigins?: readonly string[]
+  reviewedCapabilities?: readonly ReviewedProviderCapabilitySnapshot[]
+  review?: ProviderCapabilityReview | null
 }>
 
 export type ProviderActionClientRequest = Readonly<{

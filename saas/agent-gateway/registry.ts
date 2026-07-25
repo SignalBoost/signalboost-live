@@ -1,12 +1,7 @@
 // saas/agent-gateway/registry.ts
-//
-// The protocol registry: N protocol adapters loaded CONCURRENTLY, all live at once. The
-// enterprise's divisions can each speak a different protocol (MCP here, A2A there, a
-// webhook elsewhere, protocol-X in 2028) and every one normalizes into the same internal
-// request for the same governance core. Fail closed: an unknown protocol is refused, and
-// a protocol can't be registered twice.
+// Concurrent protocol registry. Unknown and duplicate protocols fail closed.
 
-import type { AgentRequest, ProtocolAdapter } from './types.ts'
+import type { AgentRequest, ProtocolAdapter, ProtocolCapabilityMetadata } from './types.ts'
 
 export class ProtocolRegistry {
   private readonly adapters = new Map<string, ProtocolAdapter>()
@@ -14,6 +9,9 @@ export class ProtocolRegistry {
   register(adapter: ProtocolAdapter): void {
     if (this.adapters.has(adapter.protocolId)) {
       throw new Error(`protocol '${adapter.protocolId}' is already registered`)
+    }
+    if (!adapter.capabilities.version || adapter.capabilities.operations.length === 0 || adapter.capabilities.evidence.length === 0) {
+      throw new Error(`protocol '${adapter.protocolId}' has incomplete capability metadata`)
     }
     this.adapters.set(adapter.protocolId, adapter)
   }
@@ -26,14 +24,22 @@ export class ProtocolRegistry {
     return this.adapters.get(protocolId)
   }
 
-  /** Normalize a raw request from a named protocol into the internal shape. Fail closed. */
+  capabilities(protocolId: string): ProtocolCapabilityMetadata {
+    const adapter = this.adapters.get(protocolId)
+    if (!adapter) throw new Error(`no adapter registered for protocol '${protocolId}'`)
+    return adapter.capabilities
+  }
+
+  capabilityCatalog(): Readonly<Record<string, ProtocolCapabilityMetadata>> {
+    return Object.freeze(Object.fromEntries([...this.adapters].map(([id, adapter]) => [id, adapter.capabilities])))
+  }
+
   normalize(protocolId: string, raw: unknown): AgentRequest {
     const adapter = this.adapters.get(protocolId)
     if (!adapter) throw new Error(`no adapter registered for protocol '${protocolId}'`)
     return adapter.normalize(raw)
   }
 
-  /** Format a governed outcome back into a protocol's wire format. */
   denormalize(protocolId: string, outcome: import('./types.ts').GatewayOutcome): unknown {
     const adapter = this.adapters.get(protocolId)
     if (!adapter) throw new Error(`no adapter registered for protocol '${protocolId}'`)

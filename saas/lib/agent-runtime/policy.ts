@@ -1,3 +1,4 @@
+// saas/lib/agent-runtime/policy.ts
 export interface SandboxRuntimePolicy {
   maximumCorrectionAttempts: number
   maximumCommandExecutionTimeMs: number
@@ -38,8 +39,14 @@ export const DEFAULT_SANDBOX_RUNTIME_POLICY: Readonly<SandboxRuntimePolicy> = Ob
 
 export interface PolicyValidationIssue { field: keyof SandboxRuntimePolicy; reason: string }
 export class SandboxPolicyValidationError extends Error {
-  constructor(public readonly issues: readonly PolicyValidationIssue[]) {
+  // Explicit field, not a constructor parameter property: `node --test` strips types rather
+  // than compiling them, and strip-only mode cannot emit the implicit assignment. Guarded by
+  // scripts/validate-strip-safe.mjs.
+  readonly issues: readonly PolicyValidationIssue[]
+
+  constructor(issues: readonly PolicyValidationIssue[]) {
     super(`Unsafe sandbox policy: ${issues.map(issue => issue.field).join(', ')}`)
+    this.issues = issues
     this.name = 'SandboxPolicyValidationError'
   }
 }

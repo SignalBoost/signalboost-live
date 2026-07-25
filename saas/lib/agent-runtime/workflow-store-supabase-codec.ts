@@ -1,10 +1,11 @@
+// saas/lib/agent-runtime/workflow-store-supabase-codec.ts
 import { createHash } from 'node:crypto'
 import { normalizeRequestId, normalizeUserId, normalizeWorkflowId, normalizeWorkflowIdentifier } from './workflow-identifiers.ts'
 import { AGENT_WORKFLOW_STATUSES, freezeAgentWorkflowState, isTerminalWorkflowStatus, type AgentWorkflowState, type AgentWorkflowStatus } from './workflow-state.ts'
 import type { AgentWorkflowDatabaseRow } from './workflow-store-supabase-types.ts'
 
 export type AgentWorkflowCodecErrorCode='invalid_row'|'invalid_identifier'|'invalid_status'|'invalid_version'|'invalid_timestamp'|'invalid_capabilities'|'invalid_cost'|'invalid_lease'|'invalid_terminal_state'|'unsafe_field'
-export class AgentWorkflowCodecError extends Error { constructor(readonly code:AgentWorkflowCodecErrorCode){super(code);this.name='AgentWorkflowCodecError'} }
+export class AgentWorkflowCodecError extends Error { readonly code:AgentWorkflowCodecErrorCode; constructor(code:AgentWorkflowCodecErrorCode){super(code);this.code=code;this.name='AgentWorkflowCodecError'} }
 const bad=(code:AgentWorkflowCodecErrorCode):never=>{throw new AgentWorkflowCodecError(code)}
 const safe=(value:unknown,max=128):string=>{if(typeof value!=='string')bad('invalid_identifier'); const text=value as string; try{return normalizeWorkflowIdentifier(text,max)}catch{ return bad('invalid_identifier') }}
 const timestamp=(value:unknown, nullable=false):string|null=>{if(value===null&&nullable)return null;if(typeof value!=='string')bad('invalid_timestamp'); const text=value as string;if(!Number.isFinite(Date.parse(text)))bad('invalid_timestamp');return new Date(text).toISOString()}

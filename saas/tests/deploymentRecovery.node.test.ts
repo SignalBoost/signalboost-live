@@ -17,7 +17,7 @@ import {
   RETRY_DEPLOYMENT_TARGET,
   createRetryDeploymentExecutor,
 } from '../agent-gateway-host/deployment-recovery.ts'
-import { GATEWAY_ALLOWLIST } from '../agent-gateway-host/signalboost-host.ts'
+import { GATEWAY_ALLOWLIST, GATEWAY_POLICY } from '../agent-gateway-host/gateway-policy.ts'
 import {
   PROPOSED_REPAIR_TARGET,
   resolveSupervisorRepairAction,
@@ -60,6 +60,7 @@ test('production gateway policy contains only the reviewed deployment retry acti
   assert.deepEqual(GATEWAY_ALLOWLIST[0], RETRY_DEPLOYMENT_ALLOWLIST_ENTRY)
   assert.equal(GATEWAY_ALLOWLIST[0]?.actionKind, RETRY_DEPLOYMENT_KIND)
   assert.equal(GATEWAY_ALLOWLIST[0]?.target, RETRY_DEPLOYMENT_TARGET)
+  assert.equal(GATEWAY_POLICY.allowlist, GATEWAY_ALLOWLIST)
 })
 
 test('a retry is classified reversible_internal on its own merits', () => {

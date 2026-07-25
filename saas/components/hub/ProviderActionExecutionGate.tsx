@@ -8,6 +8,7 @@ import type {
   ReviewedProviderCapabilitySnapshot,
 } from '@/lib/hub/provider-action-client'
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
+import GovernedProviderActionFetchBoundary from './GovernedProviderActionFetchBoundary'
 
 export type ReviewedProviderCapability = ReviewedProviderCapabilitySnapshot
 
@@ -121,7 +122,11 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
       {reviewedContent !== undefined ? (
         <div style={{ flex: '1 1 auto', minHeight: 0 }}>{reviewedContent}</div>
       ) : selected.mode === 'direct' ? (
-        <div style={{ flex: '1 1 auto', minHeight: 0 }}>{children}</div>
+        <div style={{ flex: '1 1 auto', minHeight: 0 }}>
+          <GovernedProviderActionFetchBoundary handoff={handoff}>
+            {children}
+          </GovernedProviderActionFetchBoundary>
+        </div>
       ) : (
         <GateNotice
           title={`${LABELS[selected.mode]} is reviewed but not enabled in this legacy form`}

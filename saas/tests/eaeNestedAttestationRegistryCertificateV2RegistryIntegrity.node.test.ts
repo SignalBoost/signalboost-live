@@ -4,6 +4,7 @@ import type { EnterpriseHumanReviewNestedAttestationRegistryCertificateV2Integri
 import { buildEnterpriseHumanReviewNestedAttestationRegistryCertificateV2Registry } from '../lib/autonomous-systems/human-review-nested-attestation-registry-certificate-v2-registry.ts';
 import { validateEnterpriseHumanReviewNestedAttestationRegistryCertificateV2RegistryIntegrity } from '../lib/autonomous-systems/human-review-nested-attestation-registry-certificate-v2-registry-integrity-validator.ts';
 
+// This suite also serves as the preview-deployment smoke contract for this bounded EAE slice.
 const tenant={tenantId:'tenant-a',environmentId:'env-a'};
 function integrity(certificateId:string, certificateSerial:string, valid=true):EnterpriseHumanReviewNestedAttestationRegistryCertificateV2IntegrityResult { return {schemaVersion:'1.0.0',validationId:`validation-${certificateId}`,tenant,certificateId,certificateSerial,registryId:`source-${certificateId}`,sourceValidationId:`source-validation-${certificateId}`,issuerId:'issuer-a',disposition:valid?'valid':'invalid',valid,errors:valid?[]:['invalid'],validatedAttestationIds:['attestation-b','attestation-a'],evidenceRefs:['z','a'],truncated:false,readOnly:true,executable:false}; }
 const registry=buildEnterpriseHumanReviewNestedAttestationRegistryCertificateV2Registry({tenant,integrityResults:[integrity('certificate-b','SERIAL-B'),integrity('certificate-a','SERIAL-A')],priorCertificateIds:[],maxEntries:10});

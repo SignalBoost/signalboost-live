@@ -46,6 +46,12 @@ const GUARDED = [
   'cos-backup-core',
   'cos-backup-host',
   'ai-portability-host',
+  'agent-operations-host',
+  // Not a portable directory, but the Agent Operations Platform's whole runtime — and the
+  // place this bug hid longest: eleven parameter properties kept ten of its own test suites
+  // from loading at all, so a portable advertising "guarded workflows with quotas, audit,
+  // idempotency, recovery" had never once had those guarantees exercised.
+  'lib/agent-runtime',
 ]
 
 /**

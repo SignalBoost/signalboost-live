@@ -18,16 +18,13 @@ import { runUniversalProvider } from '@/lib/engine/universalRunner'
 import { createInfraPr } from '@/lib/infra-pr/store'
 import { triggerProductionRedeploy } from '@/lib/infra-pr/redeploy'
 
-import type { GatewayHost, GovernancePolicy } from '../agent-gateway/index.ts'
-import { defaultConsequenceClassifier } from '../agent-gateway/index.ts'
+import type { GatewayHost } from '../agent-gateway/index.ts'
 import { createInfraPrApprovalPort } from './infra-pr-approvals.ts'
 import { createPrEngineApprovalPort } from './pr-engine-approvals.ts'
 import type { ApprovableAction } from './pr-engine-approvals.ts'
 import { SUPERVISOR_REPAIR_ACTIONS } from './supervisor-actions.ts'
-import {
-  RETRY_DEPLOYMENT_ALLOWLIST_ENTRY,
-  createRetryDeploymentExecutor,
-} from './deployment-recovery.ts'
+import { createRetryDeploymentExecutor } from './deployment-recovery.ts'
+import { GATEWAY_ALLOWLIST, GATEWAY_POLICY } from './gateway-policy.ts'
 import {
   createExecutionChain,
   createUniversalChainExecutor,
@@ -35,18 +32,7 @@ import {
 } from './execution-chain.ts'
 import type { ExecutableAction } from './universal-execution.ts'
 
-// ── The pre-authorized envelope ──────────────────────────────────────────────
-// ONE entry. Per the FDIR doctrine the envelope starts closed and widens only as a playbook
-// earns trust, so this list grows one deliberate decision at a time — it is a policy
-// statement that happens to live in code, and it is the first thing a buyer's security
-// review should read.
-//
-// The single entry retries a failed deployment. It is here because it is the safest real
-// recovery that exists: a failed build is never promoted, so production is untouched
-// whatever happens, and a retry is the whole fix for a transient build failure. See
-// deployment-recovery.ts for the full reasoning, including why no webhook path can reach
-// it — the only caller is the owner-gated retry endpoint.
-export const GATEWAY_ALLOWLIST: GovernancePolicy['allowlist'] = [RETRY_DEPLOYMENT_ALLOWLIST_ENTRY]
+export { GATEWAY_ALLOWLIST, GATEWAY_POLICY } from './gateway-policy.ts'
 
 // Actions the gateway may execute directly via the provider API, once allowlisted above.
 // A closed map: an action absent here cannot run, no matter what clears governance.
@@ -60,11 +46,6 @@ export const API_ACTIONS: readonly ExecutableAction[] = []
 // entries stage a READ-ONLY step; see supervisor-actions.ts for why nothing executable is
 // mapped yet.
 export const APPROVABLE_ACTIONS: readonly ApprovableAction[] = SUPERVISOR_REPAIR_ACTIONS
-
-export const GATEWAY_POLICY: GovernancePolicy = {
-  classifier: defaultConsequenceClassifier,
-  allowlist: GATEWAY_ALLOWLIST,
-}
 
 /**
  * Assemble the live SignalBoost gateway host.

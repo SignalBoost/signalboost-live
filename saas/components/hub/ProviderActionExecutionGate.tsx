@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
 
-type Capability = Readonly<{
+export type ReviewedProviderCapability = Readonly<{
   mode: ProviderExecutionMode
   available: boolean
   reason?: string
@@ -17,13 +17,22 @@ type CapabilityResponse = Readonly<{
   ok: boolean
   error?: string
   preferredMode?: ProviderExecutionMode
-  capabilities?: readonly Capability[]
+  capabilities?: readonly ReviewedProviderCapability[]
   review?: Readonly<{ reviewer: string; reviewedAt: string }> | null
+}>
+
+export type ProviderExecutionHandoff = Readonly<{
+  templateId: string
+  selectedMode: ProviderExecutionMode
+  selectedCapability: ReviewedProviderCapability
+  availableCapabilities: readonly ReviewedProviderCapability[]
+  review: CapabilityResponse['review']
 }>
 
 export type ProviderActionExecutionGateProps = Readonly<{
   templateId: string
   children: ReactNode
+  renderReviewedMode?: (handoff: ProviderExecutionHandoff) => ReactNode
 }>
 
 const LABELS: Record<ProviderExecutionMode, string> = {
@@ -40,14 +49,13 @@ const DETAILS: Record<ProviderExecutionMode, string> = {
   manual: 'Provides a direct-configuration path without issuing an automated provider request.',
 }
 
-export default function ProviderActionExecutionGate({ templateId, children }: ProviderActionExecutionGateProps) {
+export default function ProviderActionExecutionGate({ templateId, children, renderReviewedMode }: ProviderActionExecutionGateProps) {
   const [response, setResponse] = useState<CapabilityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedMode, setSelectedMode] = useState<ProviderExecutionMode | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
-
     async function load() {
       setLoading(true)
       setSelectedMode(null)
@@ -68,7 +76,6 @@ export default function ProviderActionExecutionGate({ templateId, children }: Pr
         if (!controller.signal.aborted) setLoading(false)
       }
     }
-
     void load()
     return () => controller.abort()
   }, [templateId])
@@ -86,19 +93,20 @@ export default function ProviderActionExecutionGate({ templateId, children }: Pr
     setSelectedMode(preferred)
   }, [available, response, selectedMode])
 
-  if (loading) {
-    return <GateNotice title="Checking reviewed execution paths…" />
-  }
-
-  if (!response?.ok) {
-    return <GateNotice title="Execution paths unavailable" detail={response?.error || 'provider_capabilities_unavailable'} danger />
-  }
-
-  if (available.length === 0) {
-    return <GateNotice title="No reviewed execution path is available" detail="This action is blocked by default." danger />
-  }
+  if (loading) return <GateNotice title="Checking reviewed execution paths…" />
+  if (!response?.ok) return <GateNotice title="Execution paths unavailable" detail={response?.error || 'provider_capabilities_unavailable'} danger />
+  if (available.length === 0) return <GateNotice title="No reviewed execution path is available" detail="This action is blocked by default." danger />
 
   const selected = available.find(capability => capability.mode === selectedMode) || available[0]
+  const handoff: ProviderExecutionHandoff = Object.freeze({
+    templateId,
+    selectedMode: selected.mode,
+    selectedCapability: selected,
+    availableCapabilities: Object.freeze([...available]),
+    review: response.review || null,
+  })
+
+  const reviewedContent = renderReviewedMode?.(handoff)
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -111,24 +119,7 @@ export default function ProviderActionExecutionGate({ templateId, children }: Pr
           {available.map(capability => {
             const active = capability.mode === selected.mode
             return (
-              <button
-                key={capability.mode}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setSelectedMode(capability.mode)}
-                style={{
-                  padding: '9px 10px',
-                  borderRadius: 9,
-                  border: active ? '1px solid rgba(26,240,255,.70)' : '1px solid rgba(255,255,255,.12)',
-                  background: active ? 'rgba(26,240,255,.11)' : 'rgba(255,255,255,.03)',
-                  color: '#fff',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  fontWeight: 750,
-                }}
-              >
+              <button key={capability.mode} type="button" role="radio" aria-checked={active} onClick={() => setSelectedMode(capability.mode)} style={{ padding: '9px 10px', borderRadius: 9, border: active ? '1px solid rgba(26,240,255,.70)' : '1px solid rgba(255,255,255,.12)', background: active ? 'rgba(26,240,255,.11)' : 'rgba(255,255,255,.03)', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: 11, fontWeight: 750 }}>
                 {LABELS[capability.mode]}
               </button>
             )
@@ -137,7 +128,9 @@ export default function ProviderActionExecutionGate({ templateId, children }: Pr
         <div style={{ fontSize: 10.5, lineHeight: 1.45, color: 'rgba(255,255,255,.58)' }}>{DETAILS[selected.mode]}</div>
       </section>
 
-      {selected.mode === 'direct' ? (
+      {reviewedContent !== undefined ? (
+        <div style={{ flex: '1 1 auto', minHeight: 0 }}>{reviewedContent}</div>
+      ) : selected.mode === 'direct' ? (
         <div style={{ flex: '1 1 auto', minHeight: 0 }}>{children}</div>
       ) : (
         <GateNotice

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { normalizeProviderCapabilityResponse } from '../lib/hub/provider-capability-client'
+import {
+  discoverReviewedProviderCapabilities,
+  normalizeProviderCapabilityResponse,
+} from '../lib/hub/provider-capability-client'
 
 test('normalizes only reviewed available execution modes', () => {
   const normalized = normalizeProviderCapabilityResponse({
@@ -69,4 +72,57 @@ test('does not copy browser metadata from an unavailable browser path', () => {
 
   assert.equal(normalized.browserAdapterId, null)
   assert.deepEqual(normalized.approvedOrigins, [])
+})
+
+test('discovers and normalizes reviewed capabilities through the authenticated route', async () => {
+  let requestBody = ''
+  const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBody = String(init?.body || '')
+    return new Response(JSON.stringify({
+      ok: true,
+      preferredMode: 'cosa_pr',
+      capabilities: [
+        { mode: 'direct', available: false },
+        { mode: 'cosa_pr', available: true },
+      ],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+
+  const discovered = await discoverReviewedProviderCapabilities(' github.create_issue ', fetcher)
+
+  assert.deepEqual(JSON.parse(requestBody), { templateId: 'github.create_issue' })
+  assert.equal(discovered.ok, true)
+  assert.equal(discovered.preferredMode, 'cosa_pr')
+  assert.deepEqual(discovered.availableModes, ['cosa_pr'])
+})
+
+test('capability discovery fails closed for invalid input, route errors, and network errors', async () => {
+  const invalid = await discoverReviewedProviderCapabilities('')
+  assert.equal(invalid.ok, false)
+  assert.equal(invalid.error, 'template_id_required')
+
+  const routeFailure = await discoverReviewedProviderCapabilities('github.create_issue', (async () => (
+    new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  )) as typeof fetch)
+  assert.equal(routeFailure.ok, false)
+  assert.equal(routeFailure.error, 'Unauthorized')
+
+  const networkFailure = await discoverReviewedProviderCapabilities('github.create_issue', (async () => {
+    throw new Error('offline')
+  }) as typeof fetch)
+  assert.equal(networkFailure.ok, false)
+  assert.equal(networkFailure.error, 'provider_capabilities_unavailable')
+})
+
+test('capability discovery preserves abort semantics', async () => {
+  const aborted = new DOMException('aborted', 'AbortError')
+  await assert.rejects(
+    discoverReviewedProviderCapabilities('github.create_issue', (async () => {
+      throw aborted
+    }) as typeof fetch),
+    (error: unknown) => error === aborted,
+  )
 })

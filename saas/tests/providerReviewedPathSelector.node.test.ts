@@ -9,10 +9,10 @@ async function source(): Promise<string> {
   return readFile(componentPath, 'utf8')
 }
 
-test('execution gate renders only reviewed available modes', async () => {
+test('execution gate renders only normalized reviewed capabilities', async () => {
   const text = await source()
 
-  assert.match(text, /capabilities \|\| \[\]\)\.filter\(capability => capability\.available\)/)
+  assert.match(text, /response\?\.reviewedCapabilities/)
   assert.match(text, /role="radiogroup"/)
   assert.match(text, /role="radio"/)
   assert.match(text, /aria-checked=\{active\}/)

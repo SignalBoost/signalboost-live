@@ -16,6 +16,7 @@
 import { stageInfrastructurePR } from '@/lib/hub/pr-engine'
 import { runUniversalProvider } from '@/lib/engine/universalRunner'
 import { createInfraPr } from '@/lib/infra-pr/store'
+import { triggerProductionRedeploy } from '@/lib/infra-pr/redeploy'
 
 import type { GatewayHost, GovernancePolicy } from '../agent-gateway/index.ts'
 import { defaultConsequenceClassifier } from '../agent-gateway/index.ts'
@@ -24,6 +25,10 @@ import { createPrEngineApprovalPort } from './pr-engine-approvals.ts'
 import type { ApprovableAction } from './pr-engine-approvals.ts'
 import { SUPERVISOR_REPAIR_ACTIONS } from './supervisor-actions.ts'
 import {
+  RETRY_DEPLOYMENT_ALLOWLIST_ENTRY,
+  createRetryDeploymentExecutor,
+} from './deployment-recovery.ts'
+import {
   createExecutionChain,
   createUniversalChainExecutor,
   createBrowserChainExecutor,
@@ -31,11 +36,17 @@ import {
 import type { ExecutableAction } from './universal-execution.ts'
 
 // ── The pre-authorized envelope ──────────────────────────────────────────────
-// Deliberately EMPTY. Per the FDIR doctrine the envelope starts near-empty and widens only
-// as playbooks earn trust in production. An empty allowlist means every action halts for a
-// human — the correct posture on day one, and the only honest one before any playbook has
-// been exercised. Adding an entry here is a policy decision, not a code change.
-export const GATEWAY_ALLOWLIST: GovernancePolicy['allowlist'] = []
+// ONE entry. Per the FDIR doctrine the envelope starts closed and widens only as a playbook
+// earns trust, so this list grows one deliberate decision at a time — it is a policy
+// statement that happens to live in code, and it is the first thing a buyer's security
+// review should read.
+//
+// The single entry retries a failed deployment. It is here because it is the safest real
+// recovery that exists: a failed build is never promoted, so production is untouched
+// whatever happens, and a retry is the whole fix for a transient build failure. See
+// deployment-recovery.ts for the full reasoning, including why no webhook path can reach
+// it — the only caller is the owner-gated retry endpoint.
+export const GATEWAY_ALLOWLIST: GovernancePolicy['allowlist'] = [RETRY_DEPLOYMENT_ALLOWLIST_ENTRY]
 
 // Actions the gateway may execute directly via the provider API, once allowlisted above.
 // A closed map: an action absent here cannot run, no matter what clears governance.
@@ -69,6 +80,8 @@ export function createSignalBoostGatewayHost(): GatewayHost {
   return {
     execution: createExecutionChain({
       executors: [
+        // First: the one action the envelope authorizes. Declines everything else.
+        createRetryDeploymentExecutor({ redeploy: triggerProductionRedeploy }),
         createUniversalChainExecutor({
           runUniversalProvider: async (input) => {
             const r = await runUniversalProvider(input)

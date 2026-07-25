@@ -2,31 +2,21 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
+import { discoverReviewedProviderCapabilities } from '@/lib/hub/provider-capability-client'
+import type {
+  ProviderCapabilityResponse,
+  ReviewedProviderCapabilitySnapshot,
+} from '@/lib/hub/provider-action-client'
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
 
-export type ReviewedProviderCapability = Readonly<{
-  mode: ProviderExecutionMode
-  available: boolean
-  reason?: string
-  endpoint?: string | null
-  browserAdapterId?: string | null
-  approvedOrigin?: string | null
-}>
-
-type CapabilityResponse = Readonly<{
-  ok: boolean
-  error?: string
-  preferredMode?: ProviderExecutionMode
-  capabilities?: readonly ReviewedProviderCapability[]
-  review?: Readonly<{ reviewer: string; reviewedAt: string }> | null
-}>
+export type ReviewedProviderCapability = ReviewedProviderCapabilitySnapshot
 
 export type ProviderExecutionHandoff = Readonly<{
   templateId: string
   selectedMode: ProviderExecutionMode
   selectedCapability: ReviewedProviderCapability
   availableCapabilities: readonly ReviewedProviderCapability[]
-  review: CapabilityResponse['review']
+  review: ProviderCapabilityResponse['review']
 }>
 
 export type ProviderActionExecutionGateProps = Readonly<{
@@ -50,7 +40,7 @@ const DETAILS: Record<ProviderExecutionMode, string> = {
 }
 
 export default function ProviderActionExecutionGate({ templateId, children, renderReviewedMode }: ProviderActionExecutionGateProps) {
-  const [response, setResponse] = useState<CapabilityResponse | null>(null)
+  const [response, setResponse] = useState<ProviderCapabilityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedMode, setSelectedMode] = useState<ProviderExecutionMode | null>(null)
 
@@ -60,17 +50,17 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
       setLoading(true)
       setSelectedMode(null)
       try {
-        const res = await fetch('/api/hub/action/capabilities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId }),
-          signal: controller.signal,
-        })
-        const data = await res.json() as CapabilityResponse
-        if (!controller.signal.aborted) setResponse(data)
+        const discovered = await discoverReviewedProviderCapabilities(templateId, fetch, controller.signal)
+        if (!controller.signal.aborted) setResponse(discovered)
       } catch (error) {
         if (!controller.signal.aborted && (error as Error).name !== 'AbortError') {
-          setResponse({ ok: false, error: 'provider_capabilities_unavailable' })
+          setResponse(Object.freeze({
+            ok: false,
+            error: 'provider_capabilities_unavailable',
+            availableModes: Object.freeze([]),
+            reviewedCapabilities: Object.freeze([]),
+            review: null,
+          }))
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false)
@@ -81,7 +71,7 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
   }, [templateId])
 
   const available = useMemo(
-    () => (response?.capabilities || []).filter(capability => capability.available),
+    () => response?.reviewedCapabilities || Object.freeze([] as ReviewedProviderCapability[]),
     [response],
   )
 
@@ -99,7 +89,7 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
 
   const selected = available.find(capability => capability.mode === selectedMode) || available[0]
   const handoff: ProviderExecutionHandoff = Object.freeze({
-    templateId,
+    templateId: String(templateId || '').trim(),
     selectedMode: selected.mode,
     selectedCapability: selected,
     availableCapabilities: Object.freeze([...available]),

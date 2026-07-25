@@ -41,16 +41,16 @@ export default function ProtocolCapabilityCatalogClient({ labels }: { labels: Pr
     return () => controller.abort()
   }, [labels.unavailable])
 
-  return <main style={page}>
-    <header style={{ display:'grid', gap:8 }}><div style={eyebrow}>Agent Gateway</div><h1 style={{ margin:0 }}>{labels.title}</h1><p style={muted}>{labels.subtitle}</p></header>
+  return <main style={page} aria-labelledby="protocol-catalog-title" aria-busy={!snapshot && !error}>
+    <header style={{ display:'grid', gap:8 }}><div style={eyebrow}>Agent Gateway</div><h1 id="protocol-catalog-title" style={{ margin:0 }}>{labels.title}</h1><p style={muted}>{labels.subtitle}</p></header>
     {error && <div role="alert" style={errorCard}>{error}</div>}
-    {!snapshot && !error && <p style={muted}>{labels.loading}</p>}
+    {!snapshot && !error && <p role="status" aria-live="polite" style={muted}>{labels.loading}</p>}
     {snapshot && <>
-      <section aria-label={labels.protocolSummary} style={summaryGrid}>
+      <section aria-label={labels.protocolSummary} style={summaryGrid} role="list">
         <Metric label={labels.protocols} value={snapshot.summary.protocols}/><Metric label={labels.mutating} value={snapshot.summary.mutatingProtocols}/><Metric label={labels.supervisoryOnly} value={snapshot.summary.supervisoryOnlyProtocols}/><Metric label={labels.safetyClassified} value={snapshot.summary.safetyClassifiedProtocols}/>
       </section>
-      <section style={{ display:'grid', gap:12 }}>{snapshot.protocols.map(protocol => <article key={protocol.protocolId} style={card}>
-        <div style={{ display:'flex', justifyContent:'space-between', gap:16, alignItems:'baseline' }}><h2 style={{ margin:0, fontSize:18 }}>{protocol.protocolId.toUpperCase()}</h2><span style={pill}>{protocol.domain} · v{protocol.version}</span></div>
+      <section style={{ display:'grid', gap:12 }} aria-label={labels.title}>{snapshot.protocols.map(protocol => <article key={protocol.protocolId} style={card} aria-labelledby={`protocol-${protocol.protocolId}`}>
+        <div style={cardHeader}><h2 id={`protocol-${protocol.protocolId}`} style={{ margin:0, fontSize:18 }}>{protocol.protocolId.toUpperCase()}</h2><span style={pill}>{protocol.domain} · v{protocol.version}</span></div>
         <Row label={labels.operations} values={protocol.operations}/><Row label={labels.safetyHints} values={protocol.safetyHints}/><Row label={labels.evidence} values={protocol.evidence}/>
         <div style={boundary}>{protocol.mutating ? labels.mutatingBoundary : labels.nonMutating} · {protocol.supervisoryOnly ? labels.supervisoryBoundary : labels.softwareBoundary}</div>
       </article>)}</section>
@@ -59,15 +59,16 @@ export default function ProtocolCapabilityCatalogClient({ labels }: { labels: Pr
   </main>
 }
 
-function Metric({ label, value }: { label: string; value: number }) { return <div style={metric}><strong style={{ fontSize:24 }}>{value}</strong><span style={muted}>{label}</span></div> }
-function Row({ label, values }: { label: string; values: string[] }) { return <div><div style={rowLabel}>{label}</div><div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>{values.map(value => <span key={value} style={tag}>{value}</span>)}</div></div> }
-const page={minHeight:'100vh',padding:32,color:'#fff',background:'linear-gradient(135deg,#06111f,#05070c)',display:'grid',gap:24}
+function Metric({ label, value }: { label: string; value: number }) { return <div style={metric} role="listitem"><strong style={{ fontSize:24 }}>{value}</strong><span style={muted}>{label}</span></div> }
+function Row({ label, values }: { label: string; values: string[] }) { return <div><div style={rowLabel}>{label}</div><div style={{ display:'flex', flexWrap:'wrap', gap:6 }} role="list">{values.map(value => <span key={value} style={tag} role="listitem">{value}</span>)}</div></div> }
+const page={minHeight:'100vh',padding:'clamp(16px,4vw,32px)',color:'#fff',background:'linear-gradient(135deg,#06111f,#05070c)',display:'grid',gap:24}
 const eyebrow={fontSize:11,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase' as const,color:'#67e8f9'}
 const muted={color:'rgba(255,255,255,.62)',margin:0}; const summaryGrid={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}
 const metric={display:'grid',gap:4,padding:16,borderRadius:12,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.035)'}
-const card={display:'grid',gap:14,padding:18,borderRadius:14,border:'1px solid rgba(255,255,255,.1)',background:'rgba(3,7,18,.56)'}
-const pill={fontSize:11,padding:'4px 8px',borderRadius:999,background:'rgba(103,232,249,.12)',color:'#a5f3fc'}
+const card={display:'grid',gap:14,padding:18,borderRadius:14,border:'1px solid rgba(255,255,255,.1)',background:'rgba(3,7,18,.56)',minWidth:0}
+const cardHeader={display:'flex',justifyContent:'space-between',gap:16,alignItems:'baseline',flexWrap:'wrap' as const}
+const pill={fontSize:11,padding:'4px 8px',borderRadius:999,background:'rgba(103,232,249,.12)',color:'#a5f3fc',overflowWrap:'anywhere' as const}
 const rowLabel={fontSize:11,fontWeight:800,textTransform:'uppercase' as const,letterSpacing:'.08em',color:'rgba(255,255,255,.55)',marginBottom:7}
-const tag={fontSize:11,padding:'4px 7px',borderRadius:7,background:'rgba(255,255,255,.07)',color:'rgba(255,255,255,.8)'}
-const boundary={fontSize:12,color:'#fde68a'}; const footer={fontSize:12,color:'rgba(255,255,255,.55)',paddingTop:4}
+const tag={fontSize:11,padding:'4px 7px',borderRadius:7,background:'rgba(255,255,255,.07)',color:'rgba(255,255,255,.8)',overflowWrap:'anywhere' as const}
+const boundary={fontSize:12,color:'#fde68a',overflowWrap:'anywhere' as const}; const footer={fontSize:12,color:'rgba(255,255,255,.55)',paddingTop:4}
 const errorCard={padding:14,borderRadius:10,border:'1px solid rgba(248,113,113,.4)',color:'#fecaca',background:'rgba(127,29,29,.25)'}

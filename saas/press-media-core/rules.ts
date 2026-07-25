@@ -3,4 +3,4 @@
 // and every future module obey one rule set instead of drifting apart. Re-exported here so
 // existing press imports keep working.
 // See: saas/portable-kernel/facts.ts
-export * from '@/portable-kernel'
+export * from '../portable-kernel/index.ts'

@@ -101,10 +101,18 @@ function validClock(clock: ContinuityClock): Date {
 }
 
 export class AgentGatewayContinuityController {
-  constructor(
-    private readonly store: ContinuityStore,
-    private readonly clock: ContinuityClock = () => new Date(),
-  ) {}
+  // Explicit fields, not constructor parameter properties: the repo's test runner is
+  // `node --test` on .ts sources, which strips types rather than compiling them, and
+  // strip-only mode cannot emit the implicit assignments a parameter property needs.
+  // Using one here loads fine in the Next build and throws ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX
+  // in every test that imports this module — including, via the barrel, all of them.
+  private readonly store: ContinuityStore
+  private readonly clock: ContinuityClock
+
+  constructor(store: ContinuityStore, clock: ContinuityClock = () => new Date()) {
+    this.store = store
+    this.clock = clock
+  }
 
   async admit(
     input: ContinuityRequestIdentityInput,

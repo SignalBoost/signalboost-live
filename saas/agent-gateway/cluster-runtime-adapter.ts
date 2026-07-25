@@ -53,7 +53,16 @@ export function translateClusterTransition(commit: ClusterTransitionCommit): rea
 }
 
 export class ClusterRuntimeAdapterContract {
-  constructor(private readonly store: ClusterRuntimeInstructionStore) {}
+  // Explicit field, not a constructor parameter property. The suites run `node --test`
+  // on .ts sources, which STRIPS types instead of compiling them, and strip-only mode
+  // cannot emit the implicit assignment. A parameter property compiles fine in the Next
+  // build and kills every suite importing the agent-gateway barrel. Guarded in prebuild
+  // by scripts/validate-strip-safe.mjs.
+  private readonly store: ClusterRuntimeInstructionStore
+
+  constructor(store: ClusterRuntimeInstructionStore) {
+    this.store = store
+  }
   async stage(commit: ClusterTransitionCommit): Promise<readonly ClusterRuntimeInstruction[]> {
     const staged: ClusterRuntimeInstruction[] = []
     for (const instruction of translateClusterTransition(commit)) {

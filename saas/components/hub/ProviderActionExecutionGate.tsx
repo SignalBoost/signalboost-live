@@ -33,15 +33,24 @@ const LABELS: Record<ProviderExecutionMode, string> = {
   manual: 'Direct configuration',
 }
 
+const DETAILS: Record<ProviderExecutionMode, string> = {
+  direct: 'Uses the reviewed provider API route. Provider mutation occurs only after the existing preview and confirmation controls.',
+  cosa_pr: 'Stages a governed infrastructure proposal for review. It does not directly mutate the provider.',
+  browser_agent: 'Creates a reviewed dry-run package only. Production browser execution remains disabled.',
+  manual: 'Provides a direct-configuration path without issuing an automated provider request.',
+}
+
 export default function ProviderActionExecutionGate({ templateId, children }: ProviderActionExecutionGateProps) {
   const [response, setResponse] = useState<CapabilityResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedMode, setSelectedMode] = useState<ProviderExecutionMode | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
 
     async function load() {
       setLoading(true)
+      setSelectedMode(null)
       try {
         const res = await fetch('/api/hub/action/capabilities', {
           method: 'POST',
@@ -68,7 +77,14 @@ export default function ProviderActionExecutionGate({ templateId, children }: Pr
     () => (response?.capabilities || []).filter(capability => capability.available),
     [response],
   )
-  const directReviewed = available.some(capability => capability.mode === 'direct')
+
+  useEffect(() => {
+    if (!response?.ok || available.length === 0 || selectedMode) return
+    const preferred = response.preferredMode && available.some(capability => capability.mode === response.preferredMode)
+      ? response.preferredMode
+      : available[0].mode
+    setSelectedMode(preferred)
+  }, [available, response, selectedMode])
 
   if (loading) {
     return <GateNotice title="Checking reviewed execution paths…" />
@@ -78,26 +94,61 @@ export default function ProviderActionExecutionGate({ templateId, children }: Pr
     return <GateNotice title="Execution paths unavailable" detail={response?.error || 'provider_capabilities_unavailable'} danger />
   }
 
-  if (!directReviewed) {
-    return (
-      <GateNotice
-        title="Direct execution is not reviewed for this action"
-        detail={available.length > 0
-          ? `Reviewed paths: ${available.map(capability => LABELS[capability.mode]).join(', ')}. The legacy provider form remains blocked until it is wired to the governed submission controller.`
-          : 'No reviewed execution path is available. This action is blocked by default.'}
-        provenance={response.review ? `Reviewed by ${response.review.reviewer} · ${response.review.reviewedAt}` : undefined}
-        danger
-      />
-    )
+  if (available.length === 0) {
+    return <GateNotice title="No reviewed execution path is available" detail="This action is blocked by default." danger />
   }
+
+  const selected = available.find(capability => capability.mode === selectedMode) || available[0]
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ padding: '8px 11px', borderRadius: 10, border: '1px solid rgba(34,197,94,.28)', background: 'rgba(34,197,94,.07)', fontSize: 11, color: 'rgba(255,255,255,.68)', flex: '0 0 auto' }}>
-        <strong style={{ color: '#86efac' }}>Reviewed path:</strong> Direct API
-        {response.review && <span> · {response.review.reviewer} · {response.review.reviewedAt}</span>}
-      </div>
-      <div style={{ flex: '1 1 auto', minHeight: 0 }}>{children}</div>
+      <section aria-label="Reviewed provider execution paths" style={{ padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,.10)', background: 'rgba(3,7,18,.38)', display: 'grid', gap: 8, flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+          <strong style={{ fontSize: 11, color: '#86efac' }}>Reviewed execution path</strong>
+          {response.review && <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,.42)' }}>{response.review.reviewer} · {response.review.reviewedAt}</span>}
+        </div>
+        <div role="radiogroup" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 7 }}>
+          {available.map(capability => {
+            const active = capability.mode === selected.mode
+            return (
+              <button
+                key={capability.mode}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setSelectedMode(capability.mode)}
+                style={{
+                  padding: '9px 10px',
+                  borderRadius: 9,
+                  border: active ? '1px solid rgba(26,240,255,.70)' : '1px solid rgba(255,255,255,.12)',
+                  background: active ? 'rgba(26,240,255,.11)' : 'rgba(255,255,255,.03)',
+                  color: '#fff',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 750,
+                }}
+              >
+                {LABELS[capability.mode]}
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ fontSize: 10.5, lineHeight: 1.45, color: 'rgba(255,255,255,.58)' }}>{DETAILS[selected.mode]}</div>
+      </section>
+
+      {selected.mode === 'direct' ? (
+        <div style={{ flex: '1 1 auto', minHeight: 0 }}>{children}</div>
+      ) : (
+        <GateNotice
+          title={`${LABELS[selected.mode]} is reviewed but not enabled in this legacy form`}
+          detail={selected.mode === 'browser_agent'
+            ? 'The reviewed adapter and approved origin remain available to the governed client controller. This screen will not launch a browser.'
+            : selected.mode === 'cosa_pr'
+              ? 'Proposal staging remains available only through the governed client controller. This screen will not submit a provider mutation.'
+              : 'No automated request will be sent. Use the provider configuration guidance for this action.'}
+        />
+      )}
     </div>
   )
 }

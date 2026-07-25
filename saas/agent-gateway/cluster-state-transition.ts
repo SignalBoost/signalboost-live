@@ -58,7 +58,16 @@ function emptyElectionState(clusterId: string): ClusterElectionState {
 }
 
 export class ClusterStateTransitionController {
-  constructor(private readonly store: ClusterElectionStore) {}
+  // Explicit field, not a constructor parameter property. The suites run `node --test`
+  // on .ts sources, which STRIPS types instead of compiling them, and strip-only mode
+  // cannot emit the implicit assignment. A parameter property compiles fine in the Next
+  // build and kills every suite importing the agent-gateway barrel. Guarded in prebuild
+  // by scripts/validate-strip-safe.mjs.
+  private readonly store: ClusterElectionStore
+
+  constructor(store: ClusterElectionStore) {
+    this.store = store
+  }
 
   async recordVote(input: { clusterId: string; voterId: string; candidateId: string; term: number }): Promise<ClusterElectionState> {
     const clusterId = required(input.clusterId, 'clusterId')

@@ -10,6 +10,7 @@ Read these after this root file when the task touches the relevant area:
 
 - Full historical and cross-cutting handbook: `docs/ONBOARD-full.md`
 - Current Mission 002, Portable Products, and Enterprise Autonomy Engine handoff: `docs/mission-002-eae-handoff.md`
+- First-class Provider Hub BYOK/BYOI portable: `docs/portables/provider-hub-byok-portable.md`
 
 The full handbook preserves detailed doctrine for COSA, Console Hub, Browser Runtime, Mission 001, provider onboarding, audit, cybersecurity, publishing, infrastructure PRs, localization, navigation, and other established subsystems.
 
@@ -165,6 +166,21 @@ Every portable should:
 - expose clear installation, configuration, security, compliance, and test documentation;
 - separate portable core logic from SignalBoost-specific host integration.
 
+### Provider Hub BYOK/BYOI
+
+Provider Hub is a first-class portable and shared provider foundation for SignalBoost products.
+
+It must support two audiences without weakening either boundary:
+
+- authenticated SignalBoost end users who connect and use their own supported provider accounts through a safe self-service experience;
+- companies that license Provider Hub as a standalone, embedded, white-label, or managed enterprise deployment.
+
+The end-user experience must remain available inside SignalBoost while the enterprise product is extracted and hardened. A preview route may reuse an existing verified BYOK surface, but it must not imply that unimplemented provider adapters or enterprise controls are production-ready.
+
+Provider Hub must preserve tenant isolation, secret redaction, buyer ownership of accounts and spend, manual setup as a reliability floor, bounded metadata, and explicit approval for consequential changes. It composes the Universal Provider Framework but must not become a second COS, orchestration engine, policy engine, browser runtime, or credential store.
+
+Read `docs/portables/provider-hub-byok-portable.md` before changing BYOK, provider settings, provider configuration stores, provider onboarding, provider capability metadata, or portable dependencies on external providers.
+
 Recent portable-product work includes:
 
 - PR #480: Enterprise Autonomy Engine foundation and portable doctrine.
@@ -279,6 +295,7 @@ For detailed cross-cutting doctrine, read:
 - `docs/ONBOARD-full.md`
 - `docs/mission-002-eae-handoff.md`
 - `docs/portables/README.md`
+- `docs/portables/provider-hub-byok-portable.md`
 - `docs/command-control-charter.md`
 - `docs/AUDIT_MATRIX.md`
 - `docs/browser-provider-sdk.md`

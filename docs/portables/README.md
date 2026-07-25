@@ -21,6 +21,7 @@ Two rules make a module portable rather than merely reusable:
 
 | Portable | Code | Documentation |
 |---|---|---|
+| **Provider Hub (BYOK/BYOI)** — self-service and enterprise provider connection, governance, and reusable capability access | Existing provider settings, provider stores, and Universal Provider Framework; target `provider-hub-core` / `provider-hub-host` extraction | `docs/portables/provider-hub-byok-portable.md`, `saas/docs/provider-integration.md` |
 | **Console Hub** — operator console, Key Vault, audit & PR cockpit | `saas/console-core`, `saas/console-host` | `saas/console-core/README.md`, `saas/docs/console/*`, `saas/lib/infra-pr/README.md` |
 | **Integrations / Social Outreach Connector** — BYO-provider publishing across seven social platforms | `saas/lib/outreach`, `saas/lib/publish-core.ts` | `saas/docs/enterprise-social-outreach-plug-and-play.md`, `saas/docs/outreach-engine-architecture.md`, `saas/docs/provider-integration.md`, ONBOARD §10A |
 | **Marketing + Sales** | `saas/marketing-sales-core`, `saas/marketing-sales-host` | `saas/docs/marketing-sales-module-design.md` |
@@ -29,6 +30,8 @@ Two rules make a module portable rather than merely reusable:
 | **Render Module** — voiceover and render pipeline | `saas/render-core`, `saas/render-host` | No dedicated doc yet; see the code |
 | **Campaign Studio (BYOK)** — one-prompt campaign generation on the user's own AI keys | `saas/lib/agency`, `saas/app/agency` | `saas/docs/user-guide.md`, `saas/docs/developer-guide.md`, ONBOARD §12B |
 | **Press & Media** — one governed press engine, every channel a plugged-in provider | `saas/press-media-core`, `saas/press-media-host` | `press-media-portable-design.md` (this folder), ONBOARD §12D |
+
+Provider Hub is intentionally available in two modes: authenticated self-service access for SignalBoost users and separately licensed enterprise/white-label deployment for organizations. The current public preview may reuse Campaign Studio's BYOK route until a dedicated self-service Provider Hub route is complete.
 
 ## Press & Media at a glance
 

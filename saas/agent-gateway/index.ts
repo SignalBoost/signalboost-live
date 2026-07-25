@@ -1,16 +1,20 @@
 // saas/agent-gateway/index.ts
 //
 // The governed socket: bring-your-own agent / protocol / model / tool, made portable and
-// safe. Register N protocol adapters (MCP + A2A + MAVLink shipped; more are plugins), normalize
-// every request into one internal shape, and run it through one governance core — the
-// safety envelope (categorical human-approval for money/safety/data, a closed allowlist
-// for reversible actions, default-halt) with every decision audited to the buyer's SIEM.
-// MAVLink remains supervisory: real-time stabilization and collision avoidance stay on the
-// robot or autopilot while COS governs authorization, approval, execution, and evidence.
+// safe. Register N protocol adapters (MCP + A2A + MAVLink + ROS 2 + OPC UA + MQTT shipped;
+// more are plugins), normalize every request into one internal shape, and run it through one
+// governance core — the safety envelope (categorical human-approval for money/safety/data,
+// a closed allowlist for reversible actions, default-halt) with every decision audited to the
+// buyer's SIEM.
+// Physical and industrial adapters remain supervisory: real-time stabilization, collision
+// avoidance, PLC scan cycles, interlocks, emergency stops, and deterministic safety stay on
+// the robot, autopilot, PLC, or certified safety controller while COS governs authorization,
+// approval, execution, and evidence.
 export * from './types.ts'
 export * from './registry.ts'
 export * from './governance.ts'
 export * from './adapters/protocols.ts'
 export * from './adapters/robotics.ts'
+export * from './adapters/industrial.ts'
 export * from './classifier.ts'
 export * from './mcp-server.ts'

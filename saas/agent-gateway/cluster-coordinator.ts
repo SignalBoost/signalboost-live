@@ -164,7 +164,6 @@ function compareCandidates(a: ClusterMember, b: ClusterMember): number {
   if (a.health.state !== b.health.state) return a.health.state === 'healthy' ? -1 : 1
   if (a.activeLeaseCount !== b.activeLeaseCount) return a.activeLeaseCount - b.activeLeaseCount
   if (a.queueDepth !== b.queueDepth) return a.queueDepth - b.queueDepth
-  if (a.restartCount !== undefined || b.restartCount !== undefined) return 0
   return a.replicaId.localeCompare(b.replicaId)
 }
 

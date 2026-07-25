@@ -28,6 +28,7 @@ export interface ProviderConnectionPersistencePort {
 }
 
 const SECRET_FIELD = /(secret|token|password|private.?key|credential|api.?key|access.?key)/i
+const SAFE_MASKED_VALUE = /^(saved|configured|••••[a-zA-Z0-9_-]{1,8})$/
 
 function required(value: unknown, name: string): string {
   const normalized = String(value ?? '').trim()
@@ -41,6 +42,7 @@ function assertSafeMaskedFields(fields: Record<string, unknown>): Readonly<Recor
     if (SECRET_FIELD.test(name)) throw new Error(`secret-shaped public field rejected: ${name}`)
     const value = String(rawValue ?? '').trim()
     if (!value) continue
+    if (!SAFE_MASKED_VALUE.test(value)) throw new Error(`unsafe masked value rejected: ${name}`)
     safe[name] = value
   }
   return Object.freeze(safe)

@@ -1,23 +1,30 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
 import { getCurrentUser } from '@/utils/supabase/server'
-import ProtocolCapabilityCatalogClient from './ProtocolCapabilityCatalogClient'
+import ProtocolCapabilityCatalogClient, { labelsForLocale } from './ProtocolCapabilityCatalogClient'
+
+const locale = (value?: string) => {
+  const candidate = (value || 'en').slice(0, 2).toLowerCase()
+  return ['en', 'es', 'pt', 'pl', 'ru'].includes(candidate) ? candidate : 'en'
+}
 
 export default async function ProtocolCapabilityCatalogPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
+  const labels = labelsForLocale(locale((await cookies()).get('sb_locale')?.value))
   const access = await getAccess()
   if (!access.isAdmin) {
     return (
       <main style={page}>
-        <h1>Protocol capability catalog</h1>
-        <p>Administrator access is required.</p>
+        <h1>{labels.title}</h1>
+        <p>{labels.adminRequired}</p>
       </main>
     )
   }
 
-  return <ProtocolCapabilityCatalogClient />
+  return <ProtocolCapabilityCatalogClient labels={labels} />
 }
 
 const page = {

@@ -10,13 +10,13 @@ async function source(path: URL): Promise<string> {
   return readFile(path, 'utf8')
 }
 
-test('execution gate discovers reviewed capabilities before rendering the legacy form', async () => {
+test('execution gate uses the fail-closed reviewed capability discovery client', async () => {
   const gate = await source(gatePath)
 
-  assert.match(gate, /\/api\/hub\/action\/capabilities/)
-  assert.match(gate, /body: JSON\.stringify\(\{ templateId \}\)/)
-  assert.match(gate, /capability\.mode === 'direct'/)
-  assert.match(gate, /Direct execution is not reviewed for this action/)
+  assert.match(gate, /import \{ discoverReviewedProviderCapabilities \}/)
+  assert.match(gate, /discoverReviewedProviderCapabilities\(templateId, fetch, controller\.signal\)/)
+  assert.doesNotMatch(gate, /fetch\('\/api\/hub\/action\/capabilities'/)
+  assert.match(gate, /reviewedCapabilities/)
 })
 
 test('execution gate fails closed when capabilities are unavailable or empty', async () => {
@@ -24,7 +24,7 @@ test('execution gate fails closed when capabilities are unavailable or empty', a
 
   assert.match(gate, /provider_capabilities_unavailable/)
   assert.match(gate, /No reviewed execution path is available/)
-  assert.match(gate, /if \(!directReviewed\)/)
+  assert.match(gate, /This action is blocked by default/)
 })
 
 test('provider action modal wraps the legacy form in the reviewed execution gate', async () => {
@@ -41,5 +41,6 @@ test('non-direct reviewed paths remain informational and do not launch execution
 
   assert.doesNotMatch(gate, /browser-agent\/execute/)
   assert.doesNotMatch(gate, /submitProviderActionClientPlan/)
-  assert.match(gate, /legacy provider form remains blocked/)
+  assert.match(gate, /This screen will not launch a browser/)
+  assert.match(gate, /This screen will not submit a provider mutation/)
 })

@@ -7,6 +7,7 @@ import {
   createProviderConnectionMetadata,
 } from '../provider-hub-core/index.ts'
 import { createSignalBoostProviderConnectionPort } from '../provider-hub-host/signalboost-provider-config-adapter.ts'
+import './providerHubHostPorts.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 

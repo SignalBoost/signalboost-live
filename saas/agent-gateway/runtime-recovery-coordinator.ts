@@ -114,7 +114,16 @@ function schedulerInstruction(
 }
 
 export class RuntimeRecoveryCoordinator {
-  constructor(private readonly store: RuntimeRecoveryStore) {}
+  // Explicit field, not a constructor parameter property. The repo's suites run
+  // `node --test` directly on .ts sources, which STRIPS types instead of compiling them,
+  // and strip-only mode cannot emit the implicit assignment a parameter property needs.
+  // A parameter property here compiles fine in the Next build and throws
+  // ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX in every suite that imports the agent-gateway barrel.
+  private readonly store: RuntimeRecoveryStore
+
+  constructor(store: RuntimeRecoveryStore) {
+    this.store = store
+  }
 
   async coordinate(input: {
     lease: ContinuityLease

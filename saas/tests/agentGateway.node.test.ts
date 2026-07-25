@@ -1,12 +1,12 @@
 // saas/tests/agentGateway.node.test.ts
 //
-// END-TO-END proof of the governed socket. A buyer registers TWO protocols (MCP + A2A)
-// concurrently, brings their own execution + approval + SIEM, and every request — whatever
-// protocol it arrived on — flows through ONE governance core. Asserts: reversible allowlisted
-// actions execute; anything touching money/data is categorically halted for a human EVEN IF
-// someone allowlisted it; unlisted actions default-halt; the SAME action gets the SAME verdict
-// via MCP and via A2A (portability across protocols); unknown protocols fail closed; and every
-// outcome is audited. No SignalBoost infrastructure.
+// END-TO-END proof of the governed socket. A buyer registers THREE protocols (MCP + A2A +
+// MAVLink) concurrently, brings their own execution + approval + SIEM, and every request —
+// whatever protocol it arrived on — flows through ONE governance core. Asserts: reversible
+// allowlisted actions execute; anything touching money/data/safety is categorically halted for
+// a human EVEN IF someone allowlisted it; unlisted actions default-halt; the SAME action gets
+// the SAME verdict across protocols (portability across software and physical agents); unknown
+// protocols fail closed; and every outcome is audited. No SignalBoost infrastructure.
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -16,6 +16,7 @@ import {
   evaluate,
   createMcpAdapter,
   createA2aAdapter,
+  createMavlinkAdapter,
   type AgentRequest,
   type ConsequenceClass,
   type GovernancePolicy,
@@ -31,6 +32,7 @@ const classifier = {
     if (/^(restart-|rollback-|clear-cache|rerun-)/.test(t)) return 'reversible_internal'
     if (/(refund|charge|payout|invoice|payment)/.test(t)) return 'financial'
     if (/(delete|drop|purge)/.test(t)) return 'data_destructive'
+    if (/(land|takeoff|waypoint|navigate|steer|brake|throttle|thrust|altitude|arm|disarm|motor|servo|actuator|payload)/i.test(t)) return 'safety'
     if (/(send|publish|email|post)/.test(t)) return 'external_effect'
     return 'unknown'
   },
@@ -63,12 +65,13 @@ function registry() {
   const r = new ProtocolRegistry()
   r.register(createMcpAdapter())
   r.register(createA2aAdapter())
+  r.register(createMavlinkAdapter())
   return r
 }
 
-test('two protocols run concurrently in one registry; unknown protocol + double-register fail closed', () => {
+test('software and physical-agent protocols run concurrently; unknown protocol + double-register fail closed', () => {
   const r = registry()
-  assert.deepEqual(r.list().sort(), ['a2a', 'mcp'])
+  assert.deepEqual(r.list().sort(), ['a2a', 'mavlink', 'mcp'])
   assert.throws(() => r.normalize('grpc-x', {}), /no adapter registered/)
   assert.throws(() => r.register(createMcpAdapter()), /already registered/)
 })
@@ -128,7 +131,35 @@ test('the SAME action gets the SAME verdict via MCP and via A2A (portability acr
   assert.equal(evaluate(a2aReq, policy).verdict, 'execute')
 })
 
-test('financial halt holds across BOTH protocols', () => {
+test('MAVLink enters the existing governed pipeline and safety commands halt for COS approval', async () => {
+  const r = registry()
+  const { host, performed, approvals, events } = buyerHost()
+  const req = r.normalize('mavlink', {
+    id: 'flight-17',
+    system_id: 42,
+    tenantId: 'acme',
+    command: 'NAV_LAND',
+    params: { latitude: 12.1364, longitude: -86.2514 },
+  })
+
+  assert.equal(req.protocol, 'mavlink')
+  assert.equal(req.action.kind, 'robot_command')
+  assert.equal(req.action.target, 'NAV_LAND')
+
+  const out = await runGoverned(req, policy, host)
+  assert.equal(out.consequenceClass, 'safety')
+  assert.equal(out.verdict, 'halt_for_approval')
+  assert.equal(performed.length, 0)
+  assert.equal(approvals.length, 1)
+  assert.ok(events.some((e) => e.eventType === 'agent.halted_for_approval'))
+
+  const ack = r.denormalize('mavlink', out) as Record<string, any>
+  assert.equal(ack.requestId, 'flight-17')
+  assert.equal(ack.result, 'MAV_RESULT_TEMPORARILY_REJECTED')
+  assert.equal(ack.governance.verdict, 'halt_for_approval')
+})
+
+test('financial halt holds across BOTH software protocols', () => {
   const r = registry()
   const viaMcp = r.normalize('mcp', { id: 'm', agent: 'b', params: { name: 'send-payout', arguments: {} } })
   const viaA2a = r.normalize('a2a', { taskId: 't', from: 'b', kind: 'tool_call', skill: 'send-payout' })

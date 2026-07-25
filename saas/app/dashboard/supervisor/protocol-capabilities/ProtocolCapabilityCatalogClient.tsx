@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 
 const STALE_AFTER_MS = 5 * 60 * 1000
 
@@ -79,8 +80,8 @@ const page={minHeight:'100vh',padding:'clamp(16px,4vw,32px)',color:'#fff',backgr
 const eyebrow={fontSize:11,fontWeight:800,letterSpacing:'.12em',textTransform:'uppercase' as const,color:'#67e8f9'}
 const muted={color:'rgba(255,255,255,.62)',margin:0}; const summaryGrid={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}
 const metric={display:'grid',gap:4,padding:16,borderRadius:12,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.035)'}
-const freshnessCard={display:'flex',flexWrap:'wrap',gap:12,padding:12,borderRadius:10,border:'1px solid rgba(56,242,164,.35)',background:'rgba(6,78,59,.2)',fontSize:12}
-const warningCard={...freshnessCard,border:'1px solid rgba(253,230,138,.45)',background:'rgba(120,53,15,.22)'}
+const freshnessCard: CSSProperties={display:'flex',flexWrap:'wrap',gap:12,padding:12,borderRadius:10,border:'1px solid rgba(56,242,164,.35)',background:'rgba(6,78,59,.2)',fontSize:12}
+const warningCard: CSSProperties={...freshnessCard,border:'1px solid rgba(253,230,138,.45)',background:'rgba(120,53,15,.22)'}
 const card={display:'grid',gap:14,padding:18,borderRadius:14,border:'1px solid rgba(255,255,255,.1)',background:'rgba(3,7,18,.56)',minWidth:0}
 const cardHeader={display:'flex',justifyContent:'space-between',gap:16,alignItems:'baseline',flexWrap:'wrap' as const}
 const pill={fontSize:11,padding:'4px 8px',borderRadius:999,background:'rgba(103,232,249,.12)',color:'#a5f3fc',overflowWrap:'anywhere' as const}

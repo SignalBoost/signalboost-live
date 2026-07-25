@@ -47,3 +47,36 @@ export function normalizeProviderCapabilityResponse(
     approvedOrigins,
   })
 }
+
+export async function discoverReviewedProviderCapabilities(
+  templateId: string,
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal,
+): Promise<ProviderCapabilityResponse> {
+  const normalizedTemplateId = String(templateId || '').trim()
+  if (!normalizedTemplateId) {
+    return normalizeProviderCapabilityResponse({ ok: false, error: 'template_id_required' })
+  }
+
+  try {
+    const response = await fetcher('/api/hub/action/capabilities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateId: normalizedTemplateId }),
+      signal,
+    })
+    const data = await response.json() as ProviderCapabilityRouteResponse
+
+    if (!response.ok) {
+      return normalizeProviderCapabilityResponse({
+        ok: false,
+        error: data?.error || 'provider_capabilities_unavailable',
+      })
+    }
+
+    return normalizeProviderCapabilityResponse(data)
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') throw error
+    return normalizeProviderCapabilityResponse({ ok: false, error: 'provider_capabilities_unavailable' })
+  }
+}

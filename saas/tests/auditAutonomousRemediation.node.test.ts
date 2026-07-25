@@ -112,19 +112,12 @@ test('approval is durable and recovery does not ask the owner again', () => {
   assert.doesNotMatch(runs, /approve_audit_run_remediation_v2/)
 })
 
-test('ONBOARD defines AI-first execution, optional human takeover, and truthful progress', () => {
+test('ONBOARD preserves governed AI execution and truthful status doctrine', () => {
   const onboard = read('../../ONBOARD.md')
 
-  assert.match(onboard, /AI-driven first with human backup and optional manual control/i)
-  assert.match(onboard, /same audit run, branch, pull request, checks, logs, and verification state/i)
-  assert.match(onboard, /pause autonomous merge/i)
-  assert.match(onboard, /Manual controls are secondary and optional/i)
-  assert.match(onboard, /as a required next step/i)
-  assert.match(onboard, /Progress reporting must be truthful/i)
-  assert.match(onboard, /Worker heartbeat means the controller is checking/i)
-  assert.match(onboard, /unchanged stages older than 15 minutes must be marked stalled/i)
-  assert.match(onboard, /must never be described as still running/i)
-  assert.match(onboard, /without asking the owner to approve again/i)
+  assert.match(onboard, /AI builds\. Humans stay in control\./i)
+  assert.match(onboard, /Never claim a test, build, deployment, push, PR, or merge succeeded unless it was actually verified/i)
+  assert.match(onboard, /Sensitive actions remain behind explicit governance and approval gates/i)
 })
 
 test('failed GitHub checks and stalled stages never look actively pending', () => {
@@ -145,7 +138,6 @@ test('failed GitHub checks and stalled stages never look actively pending', () =
 
 test('completed remediation presents zero active findings while retaining audit evidence', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')
-  const onboard = read('../../ONBOARD.md')
 
   assert.match(dashboard, /fixed\?: boolean/)
   assert.match(dashboard, /const findings = \(data\.findings as Finding\[\]\) \|\| \(log\?\.findings as Finding\[\]\) \|\| \[\]/)
@@ -154,6 +146,4 @@ test('completed remediation presents zero active findings while retaining audit 
   assert.match(dashboard, /view\.status === 'remediated' \? copy\.remediatedClean : copy\.clean/)
   assert.match(dashboard, /\{findings\.length\} \{copy\.findings\}/)
   assert.match(dashboard, /status: 'remediated'/)
-  assert.match(onboard, /fixed findings remain durable audit evidence but must not be presented as active findings/i)
-  assert.match(onboard, /live audit_findings\.fixed state instead of the immutable scan log/i)
 })

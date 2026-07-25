@@ -14,15 +14,16 @@ test('execution gate exports a bounded reviewed handoff contract', async () => {
   assert.match(text, /selectedMode: ProviderExecutionMode/)
   assert.match(text, /selectedCapability: ReviewedProviderCapability/)
   assert.match(text, /availableCapabilities: readonly ReviewedProviderCapability\[\]/)
-  assert.match(text, /review: CapabilityResponse\['review'\]/)
+  assert.match(text, /review: ProviderCapabilityResponse\['review'\]/)
 })
 
-test('handoff is created only from available reviewed capabilities', async () => {
+test('handoff is created only from normalized reviewed capabilities', async () => {
   const text = await source()
-  assert.match(text, /filter\(capability => capability\.available\)/)
+  assert.match(text, /response\?\.reviewedCapabilities/)
   assert.match(text, /const selected = available\.find/)
   assert.match(text, /Object\.freeze\(\{[\s\S]*selectedCapability: selected/)
   assert.match(text, /availableCapabilities: Object\.freeze\(\[\.\.\.available\]\)/)
+  assert.match(text, /templateId: String\(templateId \|\| ''\)\.trim\(\)/)
 })
 
 test('legacy behavior remains fail closed when no reviewed renderer is supplied', async () => {

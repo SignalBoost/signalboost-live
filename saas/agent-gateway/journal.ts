@@ -210,7 +210,13 @@ export function reconcileJournalEntry(entry: AgentGatewayJournalEntry): Reconcil
 }
 
 export class AgentGatewayRestartReconciler {
-  constructor(private readonly store: JournalStore) {}
+  // Explicit field, not a constructor parameter property — see the note in continuity.ts:
+  // strip-only type stripping (`node --test` on .ts) cannot emit the implicit assignment.
+  private readonly store: JournalStore
+
+  constructor(store: JournalStore) {
+    this.store = store
+  }
 
   async inspect(): Promise<readonly ReconciliationDecision[]> {
     const entries = await this.store.listRecoverable()

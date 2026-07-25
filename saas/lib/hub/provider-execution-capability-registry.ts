@@ -1,4 +1,5 @@
 import {
+  assertProviderExecutionMode,
   createProviderExecutionPolicy,
   type ProviderExecutionCapability,
   type ProviderExecutionPolicy,
@@ -27,6 +28,10 @@ export function registerReviewedProviderExecutionCapability(
   }
 
   const policy = createProviderExecutionPolicy({ capabilities: registration.capabilities })
+  for (const capability of policy.capabilities) {
+    if (capability.available) assertProviderExecutionMode(policy, capability.mode)
+  }
+
   REVIEWED_CAPABILITIES.set(templateId, Object.freeze({
     templateId,
     reviewer,

@@ -98,7 +98,16 @@ export function createClusterRuntimeReceipt(input: ClusterRuntimeReceiptInput): 
 }
 
 export class ClusterRuntimeReceiptController {
-  constructor(private readonly store: ClusterRuntimeReceiptStore) {}
+  // Explicit field, not a constructor parameter property. The suites run `node --test`
+  // on .ts sources, which STRIPS types instead of compiling them, and strip-only mode
+  // cannot emit the implicit assignment. A parameter property compiles fine in the Next
+  // build and kills every suite importing the agent-gateway barrel. Guarded in prebuild
+  // by scripts/validate-strip-safe.mjs.
+  private readonly store: ClusterRuntimeReceiptStore
+
+  constructor(store: ClusterRuntimeReceiptStore) {
+    this.store = store
+  }
 
   async record(input: ClusterRuntimeReceiptInput): Promise<ClusterRuntimeReceipt> {
     const receipt = createClusterRuntimeReceipt(input)

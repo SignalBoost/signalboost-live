@@ -51,6 +51,7 @@ export function validateEnterpriseHumanReviewNestedAttestationRegistryCertificat
   if(new Set(certificateSerials).size!==certificateSerials.length) errors.push('duplicate_certificate_serial');
   if(entries.some(entry=>entry.executable!==false||entry.readOnly!==true)) errors.push('unsafe_registry_entry');
   if(entries.some(entry=>!entry.validationId||!entry.sourceValidationId||!entry.sourceRegistryId||!entry.issuerId)) errors.push('registry_entry_identity_required');
+  if(entries.some(entry=>entry.valid!== (entry.disposition!=='invalid'))) errors.push('certificate_validity_disposition_mismatch');
 
   const prior=new Set(request.registry.priorCertificateIds);
   const rejected=new Set(request.registry.rejectedCertificateIds);
@@ -62,6 +63,6 @@ export function validateEnterpriseHumanReviewNestedAttestationRegistryCertificat
 
   const uniqueErrors=[...new Set(errors)].sort();
   const disposition:HumanReviewNestedAttestationRegistryCertificateV2RegistryIntegrityDisposition=request.registry.disposition==='empty'&&uniqueErrors.length===0?'empty':uniqueErrors.length===0?'valid':'invalid';
-  const base={schemaVersion:EAE_HUMAN_REVIEW_NESTED_ATTESTATION_REGISTRY_CERTIFICATE_V2_REGISTRY_INTEGRITY_SCHEMA_VERSION,tenant:request.tenant,registryId:request.registry.registryId,disposition,valid:uniqueErrors.length===0,errors:uniqueErrors,validatedCertificateIds:[...certificateIds].sort(),evidenceRefs:[...new Set(request.registry.evidenceRefs)].sort(),truncated:request.registry.entries.length>request.maxEntries,readOnly:true as const,executable:false as const};
+  const base={schemaVersion:EAE_HUMAN_REVIEW_NESTED_ATTESTATION_REGISTRY_CERTIFICATE_V2_REGISTRY_INTEGRITY_SCHEMA_VERSION,tenant:request.tenant,registryId:request.registry.registryId,disposition,valid:uniqueErrors.length===0,errors:uniqueErrors,validatedCertificateIds:[...certificateIds].sort(),evidenceRefs:[...new Set(request.registry.evidenceRefs)].sort(),truncated:request.registry.truncated||request.registry.entries.length>request.maxEntries,readOnly:true as const,executable:false as const};
   return freeze({...base,validationId:`eae_nested_attestation_registry_certificate_v2_registry_integrity_${hash(base)}`});
 }

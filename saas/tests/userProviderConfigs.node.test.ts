@@ -45,7 +45,7 @@ test('Provider Hub public metadata is versioned, immutable, and tenant scoped', 
   assert.ok(Object.isFrozen(metadata.authentication.maskedFields))
 })
 
-test('Provider Hub rejects missing scope and secret-shaped public fields', () => {
+test('Provider Hub rejects missing scope, secret-shaped fields, and unsafe mask values', () => {
   const base = {
     tenantId: 'tenant-1', environmentId: 'production', connectionId: 'connection-1',
     providerId: 'openai', state: 'configured' as const,
@@ -57,6 +57,10 @@ test('Provider Hub rejects missing scope and secret-shaped public fields', () =>
     ...base,
     authentication: { ...base.authentication, maskedFields: { apiKey: 'plaintext' } },
   }), /secret-shaped public field rejected/)
+  assert.throws(() => createProviderConnectionMetadata({
+    ...base,
+    authentication: { ...base.authentication, maskedFields: { account: 'sk-live-secret' } },
+  }), /unsafe masked value rejected/)
 })
 
 test('SignalBoost provider store satisfies the Provider Hub persistence port', async () => {
@@ -71,14 +75,23 @@ test('SignalBoost provider store satisfies the Provider Hub persistence port', a
         updated_at: '2026-07-25T23:00:00.000Z',
       }
     },
+  }, (identity) => {
+    if (identity.tenantId !== 'tenant-1' || identity.environmentId !== 'production') return null
+    if (identity.connectionId !== 'connection-1' || identity.providerId !== 'openai') return null
+    return 'user-1'
   })
 
   const connection = await port.getConnection({
-    tenantId: 'tenant-1', environmentId: 'production', connectionId: 'user-1', providerId: 'openai',
+    tenantId: 'tenant-1', environmentId: 'production', connectionId: 'connection-1', providerId: 'openai',
   })
   assert.equal(connection?.state, 'configured')
   assert.equal(connection?.authentication.configured, true)
   assert.deepEqual(connection?.authentication.maskedFields, { apiField: 'saved' })
+
+  const crossScope = await port.getConnection({
+    tenantId: 'tenant-2', environmentId: 'production', connectionId: 'connection-1', providerId: 'openai',
+  })
+  assert.equal(crossScope, null)
 })
 
 test('Provider Hub core remains Node-safe and host-neutral', async () => {

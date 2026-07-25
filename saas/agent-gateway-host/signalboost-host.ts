@@ -22,6 +22,7 @@ import { defaultConsequenceClassifier } from '../agent-gateway/index.ts'
 import { createInfraPrApprovalPort } from './infra-pr-approvals.ts'
 import { createPrEngineApprovalPort } from './pr-engine-approvals.ts'
 import type { ApprovableAction } from './pr-engine-approvals.ts'
+import { SUPERVISOR_REPAIR_ACTIONS } from './supervisor-actions.ts'
 import {
   createExecutionChain,
   createUniversalChainExecutor,
@@ -40,9 +41,14 @@ export const GATEWAY_ALLOWLIST: GovernancePolicy['allowlist'] = []
 // A closed map: an action absent here cannot run, no matter what clears governance.
 export const API_ACTIONS: readonly ExecutableAction[] = []
 
-// Actions that can become an executable cockpit PR. Each needs a REGISTERED provider
-// template id (see lib/hub/provider-templates*.ts) — pr-engine rejects unregistered ids.
-export const APPROVABLE_ACTIONS: readonly ApprovableAction[] = []
+// Actions that can become a cockpit PR. Each needs a REGISTERED provider template id
+// (see lib/hub/provider-templates*.ts) — pr-engine rejects unregistered ids.
+//
+// The supervisor's proposed repairs are here so a halted repair reaches the Infrastructure
+// PR cockpit the owner already uses, instead of the holding-pen table nothing reads. Both
+// entries stage a READ-ONLY step; see supervisor-actions.ts for why nothing executable is
+// mapped yet.
+export const APPROVABLE_ACTIONS: readonly ApprovableAction[] = SUPERVISOR_REPAIR_ACTIONS
 
 export const GATEWAY_POLICY: GovernancePolicy = {
   classifier: defaultConsequenceClassifier,

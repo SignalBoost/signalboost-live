@@ -1,3 +1,4 @@
+// saas/lib/agent-runtime/providers/remote-provider.ts
 import type {
   CodeSandboxProvider,
   SandboxExecutionRequest,
@@ -25,11 +26,20 @@ export class RemoteCodeSandboxProvider implements CodeSandboxProvider {
   readonly providerId = 'remote'
   private destroyed = new Set<string>()
 
+  // Explicit fields, not constructor parameter properties: `node --test` strips types rather
+  // than compiling them, and strip-only mode cannot emit the implicit assignments.
+  private readonly config: AgentSandboxProviderConfig
+  private readonly transport: RemoteSandboxTransport
+  private readonly policy: SandboxRuntimePolicy
+
   constructor(
-    private readonly config: AgentSandboxProviderConfig,
-    private readonly transport: RemoteSandboxTransport,
-    private readonly policy: SandboxRuntimePolicy,
+    config: AgentSandboxProviderConfig,
+    transport: RemoteSandboxTransport,
+    policy: SandboxRuntimePolicy,
   ) {
+    this.config = config
+    this.transport = transport
+    this.policy = policy
     if (!config.enabled || !config.endpoint?.startsWith('https://') || !config.authenticationToken) {
       throw new Error('Remote sandbox provider requires explicit safe configuration.')
     }

@@ -46,6 +46,16 @@ function validDate(now: Date): string {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error('invalid election clock')
   return now.toISOString()
 }
+function emptyElectionState(clusterId: string): ClusterElectionState {
+  return Object.freeze({
+    schemaVersion: 'agent-gateway-cluster-election-state-v1',
+    clusterId,
+    term: 0,
+    votes: Object.freeze({}),
+    readOnly: true,
+    executable: false,
+  })
+}
 
 export class ClusterStateTransitionController {
   constructor(private readonly store: ClusterElectionStore) {}
@@ -55,18 +65,18 @@ export class ClusterStateTransitionController {
     const voterId = required(input.voterId, 'voterId')
     const candidateId = required(input.candidateId, 'candidateId')
     if (!Number.isSafeInteger(input.term) || input.term < 0) throw new Error('invalid election term')
-    const current = (await this.store.get(clusterId)) ?? Object.freeze({ schemaVersion: 'agent-gateway-cluster-election-state-v1' as const, clusterId, term: 0, votes: Object.freeze({}), readOnly: true as const, executable: false as const })
+    const current: ClusterElectionState = (await this.store.get(clusterId)) ?? emptyElectionState(clusterId)
     if (input.term < current.term) throw new Error('stale election term rejected')
     if (input.term === current.term && current.votes[voterId] && current.votes[voterId] !== candidateId) throw new Error('double vote rejected')
     if (input.term === current.term && current.votes[voterId] === candidateId) return current
-    const next = Object.freeze({ schemaVersion: 'agent-gateway-cluster-election-state-v1' as const, clusterId, term: input.term, votes: Object.freeze({ ...(input.term === current.term ? current.votes : {}), [voterId]: candidateId }), readOnly: true as const, executable: false as const })
+    const next: ClusterElectionState = Object.freeze({ schemaVersion: 'agent-gateway-cluster-election-state-v1', clusterId, term: input.term, votes: Object.freeze({ ...(input.term === current.term ? current.votes : {}), [voterId]: candidateId }), readOnly: true, executable: false })
     if (!(await this.store.compareAndSet(clusterId, current.term, next))) throw new Error('election state changed concurrently')
     return next
   }
 
   async commit(plan: ClusterCoordinationPlan, now = new Date()): Promise<ClusterTransitionCommit> {
     const clusterId = required(plan.clusterId, 'clusterId')
-    const current = (await this.store.get(clusterId)) ?? Object.freeze({ schemaVersion: 'agent-gateway-cluster-election-state-v1' as const, clusterId, term: 0, votes: Object.freeze({}), readOnly: true as const, executable: false as const })
+    const current: ClusterElectionState = (await this.store.get(clusterId)) ?? emptyElectionState(clusterId)
     if (plan.term < current.term) throw new Error('stale cluster plan rejected')
     if (plan.disposition === 'wait-for-quorum' || plan.disposition === 'no-eligible-candidate') {
       return Object.freeze({ schemaVersion: 'agent-gateway-cluster-transition-commit-v1', clusterId, previousTerm: current.term, term: current.term, ...(current.leaderId ? { leaderId: current.leaderId } : {}), demotedReplicaIds: Object.freeze([...plan.demoteReplicaIds]), disposition: plan.disposition, committedAt: validDate(now), idempotent: true, readOnly: true, executable: false })
@@ -77,7 +87,7 @@ export class ClusterStateTransitionController {
       return Object.freeze({ schemaVersion: 'agent-gateway-cluster-transition-commit-v1', clusterId, previousTerm: current.term, term: current.term, ...(leaderId ? { leaderId } : {}), ...(plan.promoteReplicaId ? { promotedReplicaId: plan.promoteReplicaId } : {}), demotedReplicaIds: Object.freeze([...plan.demoteReplicaIds]), disposition: plan.disposition, committedAt: current.committedAt ?? validDate(now), idempotent: true, readOnly: true, executable: false })
     }
     const committedAt = validDate(now)
-    const next = Object.freeze({ schemaVersion: 'agent-gateway-cluster-election-state-v1' as const, clusterId, term: nextTerm, ...(leaderId ? { leaderId } : {}), votes: Object.freeze({}), committedAt, readOnly: true as const, executable: false as const })
+    const next: ClusterElectionState = Object.freeze({ schemaVersion: 'agent-gateway-cluster-election-state-v1', clusterId, term: nextTerm, ...(leaderId ? { leaderId } : {}), votes: Object.freeze({}), committedAt, readOnly: true, executable: false })
     if (!(await this.store.compareAndSet(clusterId, current.term, next))) throw new Error('cluster transition changed concurrently')
     return Object.freeze({ schemaVersion: 'agent-gateway-cluster-transition-commit-v1', clusterId, previousTerm: current.term, term: nextTerm, ...(leaderId ? { leaderId } : {}), ...(plan.promoteReplicaId ? { promotedReplicaId: plan.promoteReplicaId } : {}), demotedReplicaIds: Object.freeze([...plan.demoteReplicaIds]), disposition: plan.disposition, committedAt, idempotent: false, readOnly: true, executable: false })
   }

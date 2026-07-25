@@ -57,8 +57,8 @@ export interface CostEstimate { amount: number; currency: string }
 export interface DispatchResult { state: DispatchState; ref: string; detail?: string }
 export interface ProofResult { proofType: ProofType; payload: unknown; pending: boolean }
 
-import type { CompanyProfilePort } from '@/portable-kernel'
-import type { PortableAuditSink } from '@/portable-audit'
+import type { CompanyProfilePort } from '../portable-kernel/index.ts'
+import type { PortableAuditSink } from '../portable-audit/index.ts'
 
 // ── Injected host services (Ports). Adapters depend on these, never on concrete SDKs. ──
 export interface AiPort {

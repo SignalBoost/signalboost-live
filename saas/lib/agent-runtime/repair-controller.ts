@@ -1,3 +1,4 @@
+// saas/lib/agent-runtime/repair-controller.ts
 import type { CodeSandboxProvider, SandboxExecutionRequest, SandboxExecutionResult, SandboxSession } from './contracts.ts'
 import type { SandboxRuntimePolicy } from './policy.ts'
 import { classifySandboxFailure, type SandboxFailureCategory } from './failure-classifier.ts'
@@ -19,7 +20,10 @@ function diagnostic(category: SandboxFailureCategory, stage: RepairStage, messag
 /** One inert provider session is created per workflow and destroyed exactly once in finally. */
 export class RepairController {
   private readonly policy: Readonly<SandboxRuntimePolicy>; private readonly now: () => number
-  constructor(private readonly dependencies: RepairControllerDependencies) { this.policy = assertSafeSandboxRuntimePolicy({ ...DEFAULT_SANDBOX_RUNTIME_POLICY, ...dependencies.policy }); this.now = dependencies.now ?? Date.now }
+  // Explicit field, not a constructor parameter property: `node --test` strips types
+  // rather than compiling them, and strip-only mode cannot emit the implicit assignment.
+  private readonly dependencies: RepairControllerDependencies
+  constructor(dependencies: RepairControllerDependencies) { this.dependencies = dependencies; this.policy = assertSafeSandboxRuntimePolicy({ ...DEFAULT_SANDBOX_RUNTIME_POLICY, ...dependencies.policy }); this.now = dependencies.now ?? Date.now }
   async run(request: RepairWorkflowRequest): Promise<RepairControllerResult> {
     const startedAtMs = this.now(), deadlineMs = startedAtMs + this.policy.maximumWorkflowTimeMs, maxCandidates = this.policy.maximumCorrectionAttempts + 1
     const attempts: ReturnType<typeof createRepairAttempt>[] = []; let session: SandboxSession | undefined; let result: RepairControllerResult | undefined

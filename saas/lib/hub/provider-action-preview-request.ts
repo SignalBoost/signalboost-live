@@ -10,6 +10,7 @@ export type ProviderActionPreviewRequest = Readonly<{
   templateId: string
   payload: Record<string, unknown>
   mode?: ProviderExecutionMode
+  policy?: ProviderExecutionPolicy
 }>
 
 export type ProviderActionPreviewResult = Readonly<{
@@ -33,10 +34,9 @@ export function buildProviderActionPreviewFromRequest(
   const validation = validateTemplatePayload(templateId, request.payload)
   if (!validation.ok) throw new Error('provider_payload_invalid')
 
-  // Legacy templates currently expose only implemented paths: authenticated direct
-  // execution plus a non-executing direct-configuration fallback. COSA PR and
-  // Browser Agent remain hidden until a template-specific capability is reviewed.
-  const policy = createProviderExecutionPolicy()
+  // The public preview route uses the conservative legacy default. A dedicated,
+  // reviewed route may inject a narrower policy for a mode it actually implements.
+  const policy = request.policy ?? createProviderExecutionPolicy()
   const mode = request.mode ?? policy.preferredMode
   const provider = String(template.api.service || templateId.split('.')[0]).toLowerCase()
   const target = `${template.api.method} ${template.api.endpoint}`
@@ -48,10 +48,12 @@ export function buildProviderActionPreviewFromRequest(
     payload: request.payload,
     mode,
     policy,
-    approvalRequired: Boolean(template.requiresConfirm || template.previewBeforeSubmit),
+    approvalRequired: Boolean(template.requiresConfirm || template.previewBeforeSubmit || mode !== 'direct'),
     expectedVerification: mode === 'direct'
       ? `Verify the ${provider} response and the resulting provider state.`
-      : `Review and apply the redacted configuration, then verify the resulting ${provider} state.`,
+      : mode === 'cosa_pr'
+        ? `Review the staged proposal, merge only after owner approval, then verify the resulting ${provider} state.`
+        : `Review and apply the redacted configuration, then verify the resulting ${provider} state.`,
   })
 
   return Object.freeze({ preview, policy })

@@ -74,7 +74,7 @@ export function createExecutionChain(options: ExecutionChainOptions): ExecutionP
           return { ok: false, error: `${executor.id}: ${detail}` }
         }
 
-        if (!attempt.handled) {
+        if (attempt.handled === false) {
           declined.push(attempt.reason ? `${executor.id} (${attempt.reason})` : executor.id)
           continue
         }

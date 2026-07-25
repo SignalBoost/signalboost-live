@@ -1,6 +1,6 @@
 import { buildProviderActionPreview, type ProviderActionPreview } from './provider-action-preview'
+import { getProviderExecutionPolicy } from './provider-execution-capability-registry'
 import {
-  createProviderExecutionPolicy,
   type ProviderExecutionMode,
   type ProviderExecutionPolicy,
 } from './provider-execution-modes'
@@ -34,9 +34,10 @@ export function buildProviderActionPreviewFromRequest(
   const validation = validateTemplatePayload(templateId, request.payload)
   if (!validation.ok) throw new Error('provider_payload_invalid')
 
-  // The public preview route uses the conservative legacy default. A dedicated,
-  // reviewed route may inject a narrower policy for a mode it actually implements.
-  const policy = request.policy ?? createProviderExecutionPolicy()
+  // Dedicated routes may inject a narrower policy. Otherwise the shared preview
+  // resolves only capabilities that were explicitly reviewed for this template.
+  // Unregistered templates fail safely to Direct API + Direct configuration.
+  const policy = request.policy ?? getProviderExecutionPolicy(templateId)
   const mode = request.mode ?? policy.preferredMode
   const provider = String(template.api.service || templateId.split('.')[0]).toLowerCase()
   const target = `${template.api.method} ${template.api.endpoint}`

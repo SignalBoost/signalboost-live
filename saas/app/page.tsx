@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { PreviewProjects } from '@/components/home/PreviewProjects'
 import { t } from '@/lib/i18n/t'
 import { listPublicPortableProducts } from '@/lib/portable-products'
 
@@ -160,6 +161,8 @@ export default function Home() {
             })}
           </div>
         </section>
+
+        <PreviewProjects />
       </div>
 
       <style jsx>{`

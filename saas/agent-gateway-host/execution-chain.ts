@@ -122,7 +122,6 @@ export function createUniversalChainExecutor(options: UniversalChainExecutorOpti
         actionId: entry.actionId,
         variables: filterParams(request.action.params, entry.allowedParams),
       })
-
       if (!outcome.ok) {
         return { handled: true, ok: false, error: outcome.error ?? `provider returned ${outcome.status}` }
       }

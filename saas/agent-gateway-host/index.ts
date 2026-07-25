@@ -4,11 +4,14 @@
 // happens after the gate". The portable half lives in saas/agent-gateway/ and stays free of
 // this file's assumptions; everything here is SignalBoost infrastructure:
 //
-//   ApprovalPort   → a halted action becomes an OPEN Infrastructure PR in the cockpit;
-//                    approving it executes through the existing merge machinery.
-//   ExecutionPort  → an authorized action runs through the EXECUTOR CHAIN: provider API
-//                    first, browser agent where no API exists, a person only when neither
-//                    machine can act. Automation first; human as the backstop, not the default.
+//   ApprovalPort      → a halted action becomes an OPEN Infrastructure PR in the cockpit;
+//                       approving it executes through the existing merge machinery.
+//   ExecutionPort     → an authorized action runs through the EXECUTOR CHAIN: provider API
+//                       first, browser agent where no API exists, a person only when neither
+//                       machine can act. Automation first; human as the backstop.
+//   supervisor-repair → the actuation bridge that finally lets self-healing heal: the
+//                       diagnosed repair_plan is dispatched through the same two gates
+//                       instead of being discarded.
 //
 // signalboost-host.ts is the only file here that imports the real systems, and is therefore
 // the only one excluded from node tests. A buyer replaces this whole directory with their
@@ -19,3 +22,4 @@ export * from './infra-pr-approvals.ts'
 export * from './pr-engine-approvals.ts'
 export * from './universal-execution.ts'
 export * from './execution-chain.ts'
+export * from './supervisor-repair.ts'

@@ -13,6 +13,7 @@
 export * from './types.ts'
 export * from './registry.ts'
 export * from './governance.ts'
+export * from './continuity.ts'
 export * from './adapters/protocols.ts'
 export * from './adapters/robotics.ts'
 export * from './adapters/industrial.ts'

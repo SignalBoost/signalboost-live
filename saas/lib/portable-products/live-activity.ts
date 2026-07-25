@@ -14,9 +14,15 @@
 //  1. EVERY SOURCE IS A TABLE THE PORTABLE'S OWN CODE WRITES TO. The map below was built by
 //     grepping each portable's directory for its actual queries, not from the manifests.
 //     A manifest can claim a capability; a row cannot.
-//  2. NO SOURCE MEANS "NO LIVE SOURCE", NEVER A PASS. Four portables write nothing at all.
+//  2. NO SOURCE MEANS "NO LIVE SOURCE", NEVER A PASS. Some portables write nothing at all.
 //     They report `no_live_source` and are explicitly NOT ready — the whole point is to stop
 //     a portable looking healthy because nobody wired it up. Silence is the finding.
+//  3. A TABLE PLUS AN ADAPTER IS NOT A WRITER. This rule was added after two portables were
+//     given a durable table and a storage adapter, and were then reported as "connected,
+//     idle" on the homepage — which reads as *wired up, just quiet*. Nothing called either
+//     adapter, so the row count could never move off zero. A source counts ONLY when a
+//     reachable code path actually inserts rows. An adapter nobody calls is a plan, not a
+//     signal, and NO_LIVE_SOURCE_REASONS below says so out loud for each affected portable.
 //
 // Table names come only from the frozen constant below and are never taken from a request,
 // so this cannot become an arbitrary-table read.
@@ -34,15 +40,17 @@ export interface PortableActivitySource {
  * productId → the tables its own code writes to.
  *
  * Verified by grepping each portable's source directory, July 2026:
- *   press-media               app/api/agency/press-*
- *   integrations-hub          lib/engine
- *   self-healing-supervisor   lib/supervisor
- *   control-center            console-core
- *   campaign-studio           lib/cos
+ *   press-media                app/api/agency/press-*
+ *   integrations-hub           lib/engine
+ *   self-healing-supervisor    lib/supervisor
+ *   control-center             console-core
+ *   campaign-studio            lib/cos
  *   portable-ai-chief-of-staff lib/cos-backup
+ *   video-maker                video job + artifact tables
+ *   marketing-sales            its own ms_* department schema
  *
- * Absent on purpose (their code writes NO table): video-maker, marketing-sales,
- * browser-agent-ecosystem, agent-operations-platform.
+ * Absent on purpose — see NO_LIVE_SOURCE_REASONS for the reason in each case:
+ * provider-hub, browser-agent-ecosystem, agent-operations-platform.
  */
 export const PORTABLE_ACTIVITY_SOURCES: Readonly<Record<string, readonly PortableActivitySource[]>> = Object.freeze({
   'press-media': Object.freeze([
@@ -70,6 +78,34 @@ export const PORTABLE_ACTIVITY_SOURCES: Readonly<Record<string, readonly Portabl
   'portable-ai-chief-of-staff': Object.freeze([
     { table: 'cos_decisions', timestampColumn: 'created_at', meaning: 'chief-of-staff decisions logged' },
   ]),
+  'video-maker': Object.freeze([
+    { table: 'video_jobs', timestampColumn: 'created_at', meaning: 'video render and export jobs' },
+    { table: 'video_storage', timestampColumn: 'created_at', meaning: 'video artifacts stored' },
+  ]),
+  'marketing-sales': Object.freeze([
+    { table: 'ms_campaigns', timestampColumn: 'created_at', meaning: 'marketing and sales campaigns created' },
+    { table: 'ms_drafts', timestampColumn: 'created_at', meaning: 'campaign drafts created' },
+    { table: 'ms_publish_results', timestampColumn: 'at', meaning: 'publishing outcomes recorded' },
+    { table: 'ms_metrics', timestampColumn: 'captured_at', meaning: 'campaign metrics captured' },
+    { table: 'ms_audit', timestampColumn: 'at', meaning: 'department actions audited' },
+  ]),
+})
+
+/**
+ * Why a portable has no live source. Every portable absent from the map above MUST appear
+ * here, so "no signal" is always an explained finding rather than an oversight — and so a
+ * future reader can tell a portable that was never wired from one that was wired to a table
+ * nothing writes.
+ *
+ * These strings are shown to the operator. They say what is actually missing, which is also
+ * exactly what has to be built for the portable to earn a live source.
+ */
+export const NO_LIVE_SOURCE_REASONS: Readonly<Record<string, string>> = Object.freeze({
+  'provider-hub': 'Provider Hub records connections through the integrations engine rather than a table of its own, so it has no independent operational signal.',
+  'browser-agent-ecosystem':
+    'A portable_browser_activity table and a Supabase adapter both exist, but nothing anywhere calls the adapter — and no browser runtime exists to generate events in the first place, since Chromium cannot run in a serverless function. The row count cannot move until a real browser host runs work.',
+  'agent-operations-platform':
+    'An agent_operation_activity table and a Supabase adapter both exist, but nothing outside lib/agent-runtime imports the runtime at all, so no workflow is ever coordinated and no row is ever written. It needs a caller, not more machinery.',
 })
 
 export type PortableLiveStatus =
@@ -118,8 +154,12 @@ export interface PortableActivityStore {
 
 function summarize(productId: string, status: PortableLiveStatus, totalRows: number, last: string | null): string {
   switch (status) {
-    case 'no_live_source':
-      return `${productId} writes no operational table. Nothing about this portable can be verified from live data.`
+    case 'no_live_source': {
+      const reason = NO_LIVE_SOURCE_REASONS[productId]
+      return reason
+        ? `${productId} has no live operational signal. ${reason}`
+        : `${productId} writes no operational table. Nothing about this portable can be verified from live data.`
+    }
     case 'unreachable':
       return `${productId} has operational tables but at least one could not be read. Treat its status as unknown, not healthy.`
     case 'idle':
@@ -197,4 +237,17 @@ export async function loadAllPortableActivity(
 /** Portables whose code writes no operational table at all. */
 export function portablesWithoutLiveSource(productIds: readonly string[]): readonly string[] {
   return productIds.filter((id) => !PORTABLE_ACTIVITY_SOURCES[id]?.length)
+}
+
+/**
+ * Portables that have neither a live source nor a stated reason for lacking one.
+ *
+ * This should always be empty. A non-empty result means a portable is reporting "no signal"
+ * with no explanation attached — which is how an unwired portable quietly starts looking
+ * like a merely quiet one.
+ */
+export function portablesWithUnexplainedSilence(productIds: readonly string[]): readonly string[] {
+  return productIds.filter(
+    (id) => !PORTABLE_ACTIVITY_SOURCES[id]?.length && !NO_LIVE_SOURCE_REASONS[id],
+  )
 }

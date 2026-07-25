@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import ProtocolCapabilitySummary from '@/components/supervisor/ProtocolCapabilitySummary'
 
 const links = [
   { href: '/dashboard/supervisor', label: 'Operations Center' },
@@ -21,6 +22,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
         </div>
         <span style={boundary}>Read-only diagnostics</span>
       </nav>
+      <ProtocolCapabilitySummary />
       {children}
     </div>
   )

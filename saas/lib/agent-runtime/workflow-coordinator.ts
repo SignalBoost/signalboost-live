@@ -1,3 +1,4 @@
+// saas/lib/agent-runtime/workflow-coordinator.ts
 import { createAgentOperationActivityRecord } from './activity-store.ts'
 import { guardAgentSandboxProvider } from './provider-guard.ts'
 import { createAgentWorkflowAuditEvent } from './workflow-audit.ts'
@@ -10,7 +11,10 @@ const safeError = (error: unknown) => String(error instanceof Error ? error.mess
 /** Control-plane only. It has no transport, filesystem, environment, or execution dependency. */
 export class AgentWorkflowCoordinator {
   private readonly now: () => number
-  constructor(private readonly dependencies: AgentWorkflowCoordinatorDependencies) { this.now = dependencies.now ?? Date.now }
+  // Explicit field, not a constructor parameter property: `node --test` strips types
+  // rather than compiling them, and strip-only mode cannot emit the implicit assignment.
+  private readonly dependencies: AgentWorkflowCoordinatorDependencies
+  constructor(dependencies: AgentWorkflowCoordinatorDependencies) { this.dependencies = dependencies; this.now = dependencies.now ?? Date.now }
 
   async run(principal: AgentWorkflowPrincipal, request: AgentWorkflowRequest): Promise<AgentWorkflowResult> {
     const startedAtMs = this.now(); const deadlineMs = startedAtMs + this.dependencies.runtimePolicy.maximumWorkflowTimeMs

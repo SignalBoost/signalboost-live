@@ -74,7 +74,7 @@ export function createExecutionChain(options: ExecutionChainOptions): ExecutionP
           return { ok: false, error: `${executor.id}: ${detail}` }
         }
 
-        if (!attempt.handled) {
+        if (attempt.handled === false) {
           declined.push(attempt.reason ? `${executor.id} (${attempt.reason})` : executor.id)
           continue
         }
@@ -122,7 +122,6 @@ export function createUniversalChainExecutor(options: UniversalChainExecutorOpti
         actionId: entry.actionId,
         variables: filterParams(request.action.params, entry.allowedParams),
       })
-
       if (!outcome.ok) {
         return { handled: true, ok: false, error: outcome.error ?? `provider returned ${outcome.status}` }
       }

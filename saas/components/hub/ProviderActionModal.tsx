@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { getProviderTemplates } from '@/lib/hub/provider-templates'
 import { getHubProvider } from '@/lib/hub/provider-registry'
 import ProviderActionForm from './ProviderActionForm'
+import ProviderActionExecutionGate from './ProviderActionExecutionGate'
 import { Lang, cardStyle, bodyStyle } from './shared'
 
 export type ProviderActionModalProps = {
@@ -91,22 +92,24 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
   if (state === 'form' && selectedTemplateId) {
     return (
       <div style={{ width: '100%', height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
-        <ProviderActionForm
-          key={selectedTemplateId}
-          templateId={selectedTemplateId}
-          lang={lang}
-          onClose={() => {
-            setState('list')
-            setSelectedTemplateId(null)
-          }}
-          onSuccess={() => {
-            onSuccess?.()
-            onClose()
-          }}
-          onError={error => {
-            console.error('Action error:', error)
-          }}
-        />
+        <ProviderActionExecutionGate templateId={selectedTemplateId}>
+          <ProviderActionForm
+            key={selectedTemplateId}
+            templateId={selectedTemplateId}
+            lang={lang}
+            onClose={() => {
+              setState('list')
+              setSelectedTemplateId(null)
+            }}
+            onSuccess={() => {
+              onSuccess?.()
+              onClose()
+            }}
+            onError={error => {
+              console.error('Action error:', error)
+            }}
+          />
+        </ProviderActionExecutionGate>
       </div>
     )
   }

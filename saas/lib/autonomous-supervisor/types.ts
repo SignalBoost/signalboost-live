@@ -1,4 +1,6 @@
+// saas/lib/autonomous-supervisor/types.ts
 import type { SupervisorThinkerResponse } from '@/lib/cos/supervisor-thinker-prompt'
+import type { RepairDispatchSummary } from '../../agent-gateway-host/supervisor-actions.ts'
 
 export type SupervisorSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
@@ -36,5 +38,12 @@ export interface SupervisorRunResult {
     mode: 'not_required' | 'approval_review' | 'unavailable'
     message: string
   }
+  /**
+   * What happened to the DIAGNOSED REPAIR PLAN. Present whenever the diagnosis produced
+   * repair steps: they are run through the governed socket, halt, and are staged as
+   * Infrastructure PRs for the owner. Absent when the diagnosis proposed no repair, in
+   * which case approvalDispatch carries the old read-only investigation instead.
+   */
+  repairDispatch?: RepairDispatchSummary
   error?: string
 }

@@ -1,22 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-
-type Snapshot = {
-  summary: { protocols: number; mutatingProtocols: number; supervisoryOnlyProtocols: number; safetyClassifiedProtocols: number }
-  safety: { readOnly: true; executionControlsExposed: false; mutationControlsExposed: false }
-}
+import {
+  type ProtocolDiagnosticsSnapshot,
+  validateProtocolDiagnosticsSnapshot,
+} from '@/lib/supervisor/protocol-diagnostics-client'
 
 type Labels = { protocols: string; safety: string; supervisory: string; mutating: string; safe: string }
 
 export default function ProtocolCapabilitySummary({ labels }: { labels: Labels }) {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const [snapshot, setSnapshot] = useState<ProtocolDiagnosticsSnapshot | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
     fetch('/api/internal/supervisor/protocol-capabilities', { method: 'GET', cache: 'no-store', signal: controller.signal })
       .then(response => response.ok ? response.json() : null)
-      .then(data => { if (!controller.signal.aborted && data?.summary) setSnapshot(data) })
+      .then(data => {
+        const validated = validateProtocolDiagnosticsSnapshot(data)
+        if (!controller.signal.aborted && validated) setSnapshot(validated)
+      })
       .catch(() => undefined)
     return () => controller.abort()
   }, [])

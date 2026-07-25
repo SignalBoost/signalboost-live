@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { getCurrentUser } from '@/lib/auth/permission-middleware'
 import { buildProviderActionPreviewFromRequest } from '@/lib/hub/provider-action-preview-request'
+import { createProviderExecutionPolicy } from '@/lib/hub/provider-execution-modes'
 import { stageInfrastructurePR, type InfraRisk } from '@/lib/hub/pr-engine'
 
 export const runtime = 'nodejs'
@@ -14,6 +15,15 @@ type CosaPrRequestBody = {
   summary?: string
   risk?: InfraRisk
 }
+
+const COSA_PR_POLICY = createProviderExecutionPolicy({
+  preferredMode: 'cosa_pr',
+  capabilities: [{
+    mode: 'cosa_pr',
+    available: true,
+    endpoint: '/api/hub/action/cosa-pr',
+  }],
+})
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req)
@@ -35,6 +45,7 @@ export async function POST(req: NextRequest) {
       templateId,
       payload,
       mode: 'cosa_pr',
+      policy: COSA_PR_POLICY,
     })
 
     const preview = previewResult.preview

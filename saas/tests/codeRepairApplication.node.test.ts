@@ -1,3 +1,4 @@
+// saas/tests/codeRepairApplication.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
@@ -11,7 +12,8 @@ const diff = '--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-old\n+new\n'
 function artifacts() { const proposal = createCodeRepairPatchProposal(plan, 'base-1', diff); const validation: any = { proposalId: proposal.proposalId, validated: true, results: [], cleanupSucceeded: true, repositoryModified: false, networkAccessAllowed: false }; const review: any = { reviewId: 'review', proposalId: proposal.proposalId, provider: 'reviewer', model: 'model', verdict: 'approve', confidence: 1, summary: 'ok', findings: [], validationPassed: true, requiresHumanApproval: true, applicationAllowed: false, mergeAllowed: false }; return { proposal, validation, review } }
 class Workspace implements CodeRepairDisposableWorkspaceManager {
   created = 0; staged = 0; destroyed = 0; rollback = 0
-  constructor(private readonly integrity = true) {}
+  private readonly integrity: boolean
+  constructor(integrity = true) { this.integrity = integrity;}
   async create(input: any) { this.created++; return { id: input.workspaceId, root: '/tmp/isolated', baseCommitSha: input.baseCommitSha, isolation: 'disposable' as const, productionRepository: false as const } }
   async verifyIntegrity() { return this.integrity }
   async stageUnifiedDiff() { this.staged++ }

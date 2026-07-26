@@ -48,10 +48,11 @@ export class Orchestrator {
   private audit: AuditLogger;
   private reporter: Reporter;
 
+  private host: HostContext
   constructor(
-    private host: HostContext,
+    host: HostContext,
     config: OrchestratorConfig,
-  ) {
+  ) { this.host = host;
     for (const p of config.providers) {
       this.registry.register(createAdapter(p.kind, p));
     }

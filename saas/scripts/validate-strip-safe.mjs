@@ -18,11 +18,10 @@
 // So this guard runs in PREBUILD, on purpose. It fails the Vercel build — the one signal
 // everyone actually watches — instead of quietly reddening a suite nobody runs.
 //
-// SCOPE. The portable cores and their host adapters: the code that is SOLD, and the code a
-// buyer is most likely to run under their own toolchain. Two directories are deliberately
-// absent because they carry pre-existing violations; they are named in DEFERRED below and
-// reported on every run so they stay visible rather than forgotten. Move a directory from
-// DEFERRED to GUARDED once it is clean — that is the whole maintenance story.
+// SCOPE. The portable cores and their host adapters, plus supporting runtime and test code
+// that Node loads directly. The only remaining repository violations are in three
+// lib/portable-browser files owned by separate work, so they are deliberately not claimed
+// by this guard expansion.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -41,12 +40,20 @@ const GUARDED = [
   'render-core',
   'render-host',
   'console-host',
+  'console-core',
   'marketing-sales-core',
   'marketing-sales-host',
   'cos-backup-core',
   'cos-backup-host',
   'ai-portability-host',
+  'ai-portability-core',
   'agent-operations-host',
+  'lib/supervisor/missions',
+  'lib/provider-framework',
+  'lib/enterprise/operations',
+  'lib/code-repair',
+  'lib/cos',
+  'tests',
   // Not a portable directory, but the Agent Operations Platform's whole runtime — and the
   // place this bug hid longest: eleven parameter properties kept ten of its own test suites
   // from loading at all, so a portable advertising "guarded workflows with quotas, audit,
@@ -55,13 +62,11 @@ const GUARDED = [
 ]
 
 /**
- * Known-unsafe directories, not yet enforced. Reported every run so the debt is visible in
- * the build log. Clean one, then move it up into GUARDED.
+ * Known-unsafe directories, not yet enforced. This is empty: the only remaining repository
+ * violations are the three lib/portable-browser files owned elsewhere and deliberately not
+ * claimed here.
  */
-const DEFERRED = [
-  { dir: 'console-core', note: 'operator/stateMachine.ts has a constructor parameter property' },
-  { dir: 'ai-portability-core', note: 'blending / orchestrator / routing / audit have constructor parameter properties' },
-]
+const DEFERRED = []
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx']
 const PARAMETER_MODIFIER = /^(?:public|private|protected|readonly)\b/

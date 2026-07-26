@@ -1,3 +1,4 @@
+// saas/tests/codeRepairPatchProposal.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createCodeRepairPatchProposal, parseUnifiedDiff, validateCodeRepairPatch } from '../lib/code-repair/index.ts'
@@ -52,7 +53,9 @@ class Workspace implements CodeRepairValidationWorkspace {
   staged = 0
   runs: string[] = []
   destroys = 0
-  constructor(private readonly failAt?: string, private readonly destroyFails = false) {}
+  private readonly failAt?: string
+  private readonly destroyFails: boolean
+  constructor(failAt?: string, destroyFails = false) { this.failAt = failAt; this.destroyFails = destroyFails;}
   async create() { this.creates++; return { id: 'workspace-1' } }
   async stageUnifiedDiff() { this.staged++ }
   async run(_workspace: { id: string }, command: CodeRepairValidationCommand) {

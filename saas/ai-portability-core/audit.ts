@@ -11,7 +11,8 @@ import { UnifiedResponse, ProviderAttempt } from './schema';
 import { HostContext, AuditRecord } from './host';
 
 export class AuditLogger {
-  constructor(private host: HostContext) {}
+  private host: HostContext
+  constructor(host: HostContext) { this.host = host;}
 
   async record(input: {
     requestId: string;
@@ -80,7 +81,8 @@ export interface Report {
 }
 
 export class Reporter {
-  constructor(private host: HostContext) {}
+  private host: HostContext
+  constructor(host: HostContext) { this.host = host;}
 
   async generate(params: {
     from?: number;

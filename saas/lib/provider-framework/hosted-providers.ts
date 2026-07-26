@@ -1,3 +1,4 @@
+// saas/lib/provider-framework/hosted-providers.ts
 import { randomUUID } from 'node:crypto'
 import {
   UNIVERSAL_PROVIDER_SCHEMA_VERSION,
@@ -68,7 +69,8 @@ function capability(providerId: string, capabilityId: string): UniversalProvider
 export class HostedReadOnlyProviderAdapter implements UniversalProviderSdk {
   readonly metadata: UniversalProviderMetadata
 
-  constructor(readonly definition: HostedProviderDefinition) {
+  readonly definition: HostedProviderDefinition
+  constructor(definition: HostedProviderDefinition) { this.definition = definition;
     this.metadata = Object.freeze<UniversalProviderMetadata>({
       providerId: definition.providerId,
       displayNameKey: `universalProvider.${definition.providerId}.displayName`,

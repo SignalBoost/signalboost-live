@@ -1,3 +1,4 @@
+// saas/lib/enterprise/operations/operationsSnapshotProducer.ts
 import type { ClosedLoopVerificationResult } from '../memory/closedLoopVerification'
 import type { OrganizationalRepairLearning } from '../memory/organizationalLearning'
 import type { EnterprisePlaybookRegistry } from '../memory/playbookIntelligence'
@@ -24,10 +25,12 @@ export type ProduceOperationsSnapshotInput = Readonly<{
 }>
 
 export class OperationsSnapshotProducer {
+  private readonly source: OperationsSnapshotSource
+  private readonly writer: OperationsSnapshotWriter
   constructor(
-    private readonly source: OperationsSnapshotSource,
-    private readonly writer: OperationsSnapshotWriter,
-  ) {}
+    source: OperationsSnapshotSource,
+    writer: OperationsSnapshotWriter,
+  ) { this.source = source; this.writer = writer;}
 
   async produce(input: ProduceOperationsSnapshotInput): Promise<OperationsIntelligenceSnapshot> {
     const organizationId = input.organizationId.trim()

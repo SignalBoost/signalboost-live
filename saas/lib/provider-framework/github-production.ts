@@ -1,3 +1,4 @@
+// saas/lib/provider-framework/github-production.ts
 import { createHash } from 'node:crypto'
 import type { CoordinationStore, WorkItem } from '../supervisor/coordination/index.ts'
 import { ownershipIdentity } from '../supervisor/coordination/index.ts'
@@ -55,7 +56,9 @@ export function resolveGitHubCredential(ref: string): string {
 }
 
 export class SupabaseGitHubEvidenceSink implements EvidenceSink {
-  constructor(private readonly db: any, private readonly workItemId: string) {}
+  private readonly db: any
+  private readonly workItemId: string
+  constructor(db: any, workItemId: string) { this.db = db; this.workItemId = workItemId;}
   async persist(observation: NormalizedGitHubObservation): Promise<readonly string[]> {
     const rows = observation.evidenceReferences.map((evidence) => ({
       evidence_id: evidence.evidenceId,
@@ -80,7 +83,8 @@ export class SupabaseGitHubEvidenceSink implements EvidenceSink {
 }
 
 export class SupabaseGitHubAuditSink implements AuditSink {
-  constructor(private readonly db: any) {}
+  private readonly db: any
+  constructor(db: any) { this.db = db;}
   async persist(event: Readonly<{ eventType: string; workItemId: string; metadata: Readonly<Record<string, string | number | boolean | null>> }>): Promise<void> {
     const { error } = await this.db.from('github_provider_audit_events').insert({
       event_id: `gha_${digest(`${event.workItemId}:${event.eventType}:${JSON.stringify(event.metadata)}`).slice(0, 32)}`,

@@ -1,3 +1,4 @@
+// saas/lib/code-repair/provider-patch-generator.ts
 import { createHash } from 'node:crypto'
 import type { CodeRepairPatchGenerator } from './patch-contracts.ts'
 import type { CodeRepairModelProvider, CodeRepairPatchGenerationInput } from './provider-contracts.ts'
@@ -20,10 +21,12 @@ function extractUnifiedDiff(content: string): string {
 }
 
 export class ProviderBackedCodeRepairPatchGenerator implements CodeRepairPatchGenerator {
+  private readonly provider: CodeRepairModelProvider
+  private readonly maximumOutputCharacters: number
   constructor(
-    private readonly provider: CodeRepairModelProvider,
-    private readonly maximumOutputCharacters = 60_000,
-  ) {}
+    provider: CodeRepairModelProvider,
+    maximumOutputCharacters = 60_000,
+  ) { this.provider = provider; this.maximumOutputCharacters = maximumOutputCharacters;}
 
   async generate(input: CodeRepairPatchGenerationInput): Promise<string> {
     if (!input.plan.requiresHumanApproval || input.plan.patchGenerationAllowed) {

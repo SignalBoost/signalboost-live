@@ -14,10 +14,12 @@ import type {
 import { estimateTokens } from './budget-policy'
 
 export class DefaultContextAssembler implements ContextAssembler {
+  private readonly sources: ContextSourceRegistry
+  private readonly budget: BudgetPolicy
   constructor(
-    private readonly sources: ContextSourceRegistry,
-    private readonly budget: BudgetPolicy,
-  ) {}
+    sources: ContextSourceRegistry,
+    budget: BudgetPolicy,
+  ) { this.sources = sources; this.budget = budget;}
 
   async assemble(plan: ExecutionPlan, ctx: TurnContext): Promise<AssembledContext> {
     const alloc = this.budget.allocate(plan.contextDirectives, plan.contextBudgetTokens, ctx)

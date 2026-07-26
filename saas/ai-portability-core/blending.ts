@@ -29,10 +29,12 @@ export interface BlendOptions {
 }
 
 export class Blender {
+  private registry: AiProviderRegistry
+  private host: HostContext
   constructor(
-    private registry: AiProviderRegistry,
-    private host: HostContext,
-  ) {}
+    registry: AiProviderRegistry,
+    host: HostContext,
+  ) { this.registry = registry; this.host = host;}
 
   async blend(
     req: UnifiedRequest,

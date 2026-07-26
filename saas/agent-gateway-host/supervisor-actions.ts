@@ -28,7 +28,13 @@
 // deliberate step.
 
 import type { ApprovableAction } from './pr-engine-approvals.ts'
-import type { DispatchRepairPlanResult, RepairActionResolver } from './supervisor-repair.ts'
+import type {
+  DispatchRepairPlanResult,
+  RepairActionResolver,
+  RepairIncident,
+  RepairParamResolver,
+  RepairStep,
+} from './supervisor-repair.ts'
 import { UNRECOGNIZED_TARGET } from './supervisor-repair.ts'
 
 /**
@@ -57,6 +63,43 @@ export const REPAIR_REVIEW_PARAMS: readonly string[] = [
   'requiresApproval',
 ]
 
+// ── Evidence targets ─────────────────────────────────────────────────────────
+// The three provider actions below are READ-ONLY, have a real handler in the hub action
+// route, and require no fields — so merging one genuinely runs and returns something useful.
+// The diagnosis picks WHICH to gather based on what it thinks broke, instead of every
+// incident staging the same generic env listing.
+//
+// WHY THESE STAY READ-ONLY, deliberately. The most common Vercel build failure is a missing
+// or wrong environment variable, and vercel.add_env_var / vercel.edit_env both have working
+// handlers — so a mutating repair is technically within reach. It is not mapped here, and
+// the reason is a safety property rather than caution: those actions need a VALUE, and the
+// only thing that could supply one automatically is the model. A model-authored secret
+// landing in a PR payload is not a repair, it is a new class of incident. The diagnosis
+// identifies WHICH variable and WHICH environment; the value comes from the buyer's vault or
+// from a person. That boundary is the whole design.
+
+export const INSPECT_VERCEL_ENV_TARGET = 'supervisor.inspect_vercel_env'
+export const INSPECT_DATABASE_TARGET = 'supervisor.inspect_database'
+export const INSPECT_VAULT_TARGET = 'supervisor.inspect_vault'
+
+/** Facts the diagnosis identified, carried into the PR the owner reads. Never a value. */
+export const IDENTIFIED_PARAMS: readonly string[] = ['identifiedVariable', 'identifiedEnvironment']
+
+const EVIDENCE_TEMPLATES: Readonly<Record<string, { templateId: string; label: string }>> = Object.freeze({
+  [INSPECT_VERCEL_ENV_TARGET]: {
+    templateId: 'vercel.view_env',
+    label: 'Supervisor evidence — list deployment environment variable names',
+  },
+  [INSPECT_DATABASE_TARGET]: {
+    templateId: 'supabase.list_tables',
+    label: 'Supervisor evidence — list database tables',
+  },
+  [INSPECT_VAULT_TARGET]: {
+    templateId: 'vault.view_keys',
+    label: 'Supervisor evidence — inspect the vault audit trail',
+  },
+})
+
 /**
  * The closed set of supervisor actions that can become a cockpit PR.
  *
@@ -79,17 +122,64 @@ export const SUPERVISOR_REPAIR_ACTIONS: readonly ApprovableAction[] = Object.fre
     label: 'Supervisor repair requiring a person — review (read-only inspection)',
     allowedParams: REPAIR_REVIEW_PARAMS,
   }),
+  ...Object.entries(EVIDENCE_TEMPLATES).map(([target, entry]) =>
+    Object.freeze({
+      actionKind: 'supervisor_repair',
+      target,
+      templateId: entry.templateId,
+      label: entry.label,
+      allowedParams: [...REPAIR_REVIEW_PARAMS, ...IDENTIFIED_PARAMS],
+    }),
+  ),
 ]) as readonly ApprovableAction[]
 
+const ENV_TOKENS = /\b(env|environment|variable|secret|config|configuration)\b/i
+const DATABASE_TOKENS = /\b(database|supabase|postgres|table|migration|schema|query)\b/i
+const VAULT_TOKENS = /\b(vault|credential|api key|token|rotate|rotation)\b/i
+
+/** A SCREAMING_SNAKE identifier is how a diagnosis names a variable. Names only. */
+const VARIABLE_NAME = /\b([A-Z][A-Z0-9]{2,}(?:_[A-Z0-9]+){1,})\b/
+const ENVIRONMENT_NAME = /\b(production|preview|development|staging)\b/i
+
+function stepText(step: RepairStep): string {
+  return `${step.action} ${step.target} ${step.expected_result}`
+}
+
 /**
- * Maps every repair step onto PROPOSED_REPAIR_TARGET.
+ * Pick the evidence action that matches what the diagnosis says broke.
  *
- * This recognizes nothing as executable — it is not a step toward autonomy, it is a routing
- * decision. Replacing it with a resolver that returns real action ids is what would make
- * repairs executable, and that must not happen before those actions exist in the hub action
- * route and have earned an allowlist entry.
+ * Prose is still never used AS a target — it only selects among a closed set of three
+ * constants, each mapped to a vetted read-only template. Anything unrecognized falls to
+ * PROPOSED_REPAIR_TARGET, which executes nothing.
  */
-export const resolveSupervisorRepairAction: RepairActionResolver = () => PROPOSED_REPAIR_TARGET
+export const resolveSupervisorRepairAction: RepairActionResolver = (step) => {
+  const text = stepText(step)
+
+  // A named variable wins outright. A diagnosis about SUPABASE_SERVICE_ROLE_KEY is about a
+  // MISSING VARIABLE, not about the database — and listing tables would answer the wrong
+  // question. Without this the word "Supabase" in the expected result hijacks the choice.
+  if (VARIABLE_NAME.test(text) || /\benv(ironment)?\s+var(iable)?s?\b/i.test(text)) {
+    return INSPECT_VERCEL_ENV_TARGET
+  }
+  if (DATABASE_TOKENS.test(text)) return INSPECT_DATABASE_TARGET
+  if (VAULT_TOKENS.test(text)) return INSPECT_VAULT_TARGET
+  if (ENV_TOKENS.test(text)) return INSPECT_VERCEL_ENV_TARGET
+  return PROPOSED_REPAIR_TARGET
+}
+
+/** Extract the variable and environment the diagnosis named. Never a value. */
+export const resolveSupervisorRepairParams: RepairParamResolver = (
+  step: RepairStep,
+  _incident: RepairIncident,
+) => {
+  const text = stepText(step)
+  const variable = VARIABLE_NAME.exec(text)
+  const environment = ENVIRONMENT_NAME.exec(text)
+  return Object.freeze({
+    ...(variable ? { identifiedVariable: variable[1] } : {}),
+    ...(environment ? { identifiedEnvironment: environment[1].toLowerCase() } : {}),
+  })
+}
 
 export interface RepairDispatchSummary {
   /** Steps the bridge attempted before stopping. */

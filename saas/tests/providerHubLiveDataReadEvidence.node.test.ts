@@ -41,7 +41,7 @@ test('Provider Hub live-data read evidence fails closed for unsafe or malformed 
   const evidence = createProviderLiveDataReadEvidence({
     ...base,
     method: 'POST',
-    sourceOrigin: 'https://user:password@example.com/?api_key=secret',
+    sourceOrigin: 'https://user:EXAMPLE_NOTAREAL_PASSWORD@example.com/?api_key=EXAMPLE_NOTAREAL_KEY',
     observedAt: '2026-07-28T18:00:30.000Z',
     dataSha256: 'bad',
     httpStatus: 429,
@@ -59,11 +59,11 @@ test('Provider Hub live-data read evidence fails closed for unsafe or malformed 
 })
 
 test('Provider Hub live-data read evidence redacts unsafe ETags and rejects malformed rate-limit containers', () => {
-  const unsafeEtag = createProviderLiveDataReadEvidence({ ...base, etag: 'api_key=plaintext-secret' })
+  const unsafeEtag = createProviderLiveDataReadEvidence({ ...base, etag: 'api_key=EXAMPLE_NOTAREAL_PLAINTEXT_SECRET' })
   assert.equal(unsafeEtag.state, 'blocked')
   assert.ok(unsafeEtag.blockers.includes('invalid-etag'))
   assert.equal(unsafeEtag.etag, null)
-  assert.equal(JSON.stringify(unsafeEtag).includes('plaintext-secret'), false)
+  assert.equal(JSON.stringify(unsafeEtag).includes('EXAMPLE_NOTAREAL_PLAINTEXT_SECRET'), false)
 
   for (const rateLimit of ['invalid', 12, []]) {
     const malformed = createProviderLiveDataReadEvidence({ ...base, rateLimit })

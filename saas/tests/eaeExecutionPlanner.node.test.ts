@@ -1,3 +1,4 @@
+// saas/tests/eaeExecutionPlanner.node.test.ts
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EAE_DECISION_SCHEMA_VERSION, buildEnterpriseExecutionPlan, type EnterpriseDecisionSnapshot, type ExecutionStepCandidate } from '../lib/autonomous-systems/index.ts';
@@ -12,7 +13,13 @@ test('builds deterministic immutable non-executable plans',()=>{const a=buildEnt
 test('orders dependencies before dependents',()=>{const result=buildEnterpriseExecutionPlan(request([step({stepId:'step-2',action:'publish',dependsOn:['step-1']}),step()]));assert.deepEqual(result.steps.map(s=>s.stepId),['step-1','step-2']);assert.deepEqual(result.steps.map(s=>s.ordinal),[1,2]);});
 test('preserves review and escalation gates',()=>{assert.deepEqual(buildEnterpriseExecutionPlan(request([step()],decision({disposition:'require_review'}))).approvalStepIds,['step-1']);assert.equal(buildEnterpriseExecutionPlan(request([step()],decision({disposition:'escalate'}))).steps[0]?.gate,'escalation');assert.equal(buildEnterpriseExecutionPlan(request([step({requiresHumanApproval:true})])).steps[0]?.gate,'human_review');});
 test('tracks rollback, contingency, and evidence',()=>{const result=buildEnterpriseExecutionPlan(request([step()]));assert.deepEqual(result.rollbackStepIds,['step-1']);assert.deepEqual(result.contingencyStepIds,['step-1']);assert.deepEqual(result.evidenceRefs,['decision-evidence','step-evidence']);});
-test('enforces tenant isolation and selected candidate boundary',()=>{assert.throws(()=>buildEnterpriseExecutionPlan(request([step({tenant:{tenantId:'other',environmentId:'prod'}})])),/tenant_environment_boundary_violation/);assert.throws(()=>buildEnterpriseExecutionPlan(request([step({candidateId:'candidate-2',dependsOn:['step-1']}),step()])),/cross_candidate_dependency_rejected/);});
+test('enforces tenant isolation and selected candidate boundary',()=>{assert.throws(()=>buildEnterpriseExecutionPlan(request([step({tenant:{tenantId:'other',environmentId:'prod'}})])),/tenant_environment_boundary_violation/);// The previous fixture here could never reach the branch it names. `step({candidateId:'candidate-2',
+// dependsOn:['step-1']})` leaves stepId at its default 'step-1', so the step depended on ITSELF and
+// tripped invalid_execution_dependency first — and the second step() reused the same id. The planner
+// was right all along. Reaching cross_candidate_dependency_rejected needs a step in the SELECTED
+// candidate depending on a step that belongs to a different one, since ineligible steps are filtered
+// out before the dependency walk and are simply absent from the lookup.
+assert.throws(()=>buildEnterpriseExecutionPlan(request([step({dependsOn:['step-2']}),step({stepId:'step-2',candidateId:'candidate-2'})])),/cross_candidate_dependency_rejected/);});
 test('rejects missing and circular dependencies',()=>{assert.throws(()=>buildEnterpriseExecutionPlan(request([step({dependsOn:['missing']})])),/missing_execution_dependency/);assert.throws(()=>buildEnterpriseExecutionPlan(request([step({stepId:'a',dependsOn:['b']}),step({stepId:'b',dependsOn:['a']})])),/circular_execution_dependency/);});
 test('enforces bounds and reports truncation',()=>{assert.throws(()=>buildEnterpriseExecutionPlan({...request([]),maxSteps:0}),/unbounded_execution_plan_rejected/);const result=buildEnterpriseExecutionPlan({...request([step(),step({stepId:'step-2'})]),maxSteps:1});assert.equal(result.truncated,true);assert.equal(result.steps.length,1);});
 test('blocks plans when the decision is blocked or lacks a selection',()=>{const result=buildEnterpriseExecutionPlan(request([step()],decision({disposition:'block',selectedCandidateId:undefined})));assert.equal(result.steps.length,0);assert.equal(result.disposition,'block');});

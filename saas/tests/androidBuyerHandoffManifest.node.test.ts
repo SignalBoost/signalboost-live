@@ -1,3 +1,4 @@
+// saas/tests/androidBuyerHandoffManifest.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -40,18 +41,31 @@ test('rejects forged packaging evidence chain metadata', () => {
   }
 })
 
-test('rejects credential-bearing and encoded handoff references', () => {
+test('rejects credential-bearing and multiply encoded handoff references', () => {
   for (const buyerReference of [
     'https://example.com/buyer?api_key=plaintext',
     'https://example.com/buyer?apikey=plaintext',
     'https://example.com/buyer?access_token=plaintext',
     'https://example.com/buyer?%61%70%69%5f%6b%65%79=plaintext',
+    'https://example.com/buyer?%2561%2570%2569%255f%256b%2565%2579=secretvalue',
+    'https://example.com/buyer?%252561%252570%252569%25255f%25256b%252565%252579=secretvalue',
   ]) {
     const result = validateAndroidBuyerHandoffManifest({ ...safe, buyerReference })
     assert.equal(result.state, 'blocked')
     assert.ok(result.blockers.includes('references'))
     assert.equal(result.references.buyer, '')
   }
+})
+
+test('binds the manifest to the canonical Provider Hub identity', () => {
+  const result = validateAndroidBuyerHandoffManifest({
+    ...safe,
+    portableId: 'other-product',
+    evidenceChain: { ...chain, portableId: 'other-product' },
+  })
+  assert.equal(result.state, 'blocked')
+  assert.ok(result.blockers.includes('evidence-chain'))
+  assert.ok(result.blockers.includes('identity'))
 })
 
 test('fails closed for missing acknowledgments and unsafe state', () => {

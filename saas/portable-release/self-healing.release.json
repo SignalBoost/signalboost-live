@@ -34,6 +34,10 @@
     {
       "path": "lib/browser-runtime/sandbox-adapter.ts",
       "reason": "Exports SANDBOX_ADAPTER_ID 'signalboost.sandbox.v1', which reaches the buyer's SIEM. Owned by the browser-runtime lane; must be renamed before 1.0.0 final."
+    },
+    {
+      "path": "lib/supervisor/executors/owner-notifier.ts",
+      "reason": "The platform-only email fallback still reads SIGNALBOOST_OWNER_EMAIL and carries the platform dashboard URL. Enterprise deployments inject HostContext/NotificationSink instead; this fallback must be neutralized or excluded before 1.0.0 final."
     }
   ],
 
@@ -81,7 +85,7 @@
   },
 
   "knownLimitations": [
-    "Two adapter identifiers still carry the build platform's name into buyer evidence records and SIEM. Naming only, no behaviour. Tracked in knownNamingExceptions and blocking for 1.0.0 final.",
+    "Three platform identifiers or defaults still carry the build platform's name into buyer-reachable code or evidence. Naming only, no behaviour change. Tracked in knownNamingExceptions and blocking for 1.0.0 final.",
     "Deployment-platform trigger ingestion reads platform environment variables directly. It sits outside the buyer import graph and is not in this archive.",
     "The acceptance harness in this release candidate has not yet been run against a buyer's real wiring. Until it has, this is a release candidate and licensingAvailable stays false."
   ],

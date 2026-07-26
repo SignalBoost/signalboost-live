@@ -367,11 +367,13 @@ if (spec.releaseNotes) {
 let archive = null;
 if (!NO_ARCHIVE) {
   const tgz = `${spec.id}-${spec.version}.tgz`;
+  const archivePath = path.join(path.dirname(outDir), tgz);
   execFileSync(
     'tar',
-    ['--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner', '-czf', tgz, '-C', outDir, '.'],
-    { cwd: outDir },
+    ['--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner', '-czf', archivePath, '-C', outDir, '.'],
+    { cwd: ROOT },
   );
+  fs.renameSync(archivePath, path.join(outDir, tgz));
   const buf = fs.readFileSync(path.join(outDir, tgz));
   fs.writeFileSync(path.join(outDir, `${tgz}.sha256`), `${sha256(buf)}  ${tgz}\n`);
   archive = tgz;

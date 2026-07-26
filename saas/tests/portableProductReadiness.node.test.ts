@@ -55,6 +55,35 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
   }
 })
 
+test('Integrations Hub commercial evidence is bounded and honestly incomplete', () => {
+  const report = createPortableCommercialReadinessReport()
+  const integrationsHub = report.entries.find(entry => entry.productId === 'integrations-hub')
+  assert.ok(integrationsHub)
+  assert.equal(integrationsHub.readyCount, 4)
+  assert.equal(integrationsHub.totalCount, 10)
+  assert.equal(integrationsHub.completionPercent, 40)
+  assert.equal(integrationsHub.commerciallyReady, false)
+  assert.deepEqual(integrationsHub.checks.filter(check => check.status === 'ready').map(check => check.dimension), [
+    'architecture',
+    'buyer-installation',
+    'buyer-configuration',
+    'support-boundary',
+  ])
+  assert.deepEqual(integrationsHub.checks.filter(check => check.status === 'blocked').map(check => check.dimension), [
+    'distribution-package',
+    'integrity-manifest',
+    'licensing-enforcement',
+    'fulfillment-handoff',
+    'operations-recovery',
+    'deployment-acceptance',
+  ])
+  const recovery = integrationsHub.checks.find(check => check.dimension === 'operations-recovery')
+  assert.deepEqual(recovery?.blockers, ['missing-operations-recovery-evidence'])
+  for (const check of integrationsHub.checks) {
+    assert.ok(Object.isFrozen(check) && Object.isFrozen(check.evidence) && Object.isFrozen(check.blockers))
+  }
+})
+
 test('Provider Hub product evidence profile stays fail-closed for external proof', () => {
   assert.equal(providerHubCommercialEvidenceProfile.productId, 'provider-hub')
   assert.equal(providerHubCommercialEvidenceProfile.verifiedCount, 6)

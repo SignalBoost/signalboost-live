@@ -46,13 +46,26 @@ jobs:
         working-directory: saas
         run: |
           set -euo pipefail
-          node scripts/package-portable.mjs "portable-release/${{ matrix.spec }}" --no-archive
+          if ! node scripts/package-portable.mjs "portable-release/${{ matrix.spec }}" --no-archive > portable-build.log 2>&1; then
+            cat portable-build.log
+            exit 1
+          fi
+          cat portable-build.log
           release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
           archive="$(node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync(process.argv[1]+"/manifest.json","utf8")); process.stdout.write(`${m.id}-${m.version}.tgz`)' "$release_dir")"
           temp_archive="$(dirname "$release_dir")/$archive"
           tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf "$temp_archive" -C "$release_dir" .
           mv "$temp_archive" "$release_dir/$archive"
           sha256sum "$release_dir/$archive" | sed "s#  $release_dir/#  #" > "$release_dir/$archive.sha256"
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-build-log-${{ matrix.spec }}
+          path: saas/portable-build.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Verify checksums from the archive root
         working-directory: saas

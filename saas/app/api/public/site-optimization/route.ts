@@ -40,9 +40,9 @@ async function readJsonLimited(req: Request): Promise<{ ok: true; value: Body } 
 function sameOriginOk(req: Request) {
   const origin = req.headers.get('origin')
   if (!origin) return true
-  const host = req.headers.get('host')
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
   if (!host) return false
-  try { return new URL(origin).host === host } catch { return false }
+  try { return new URL(origin).host === host.split(',')[0]?.trim() } catch { return false }
 }
 
 function clientIpKey(req: Request) {
@@ -141,19 +141,25 @@ export async function POST(req: Request) {
 
   const startedAt = Date.now()
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 12_000)
+  const timer = setTimeout(() => controller.abort(), 15_000)
 
   try {
     const res = await fetch(target.toString(), {
       method: 'GET',
       redirect: 'follow',
       signal: controller.signal,
+      cache: 'no-store',
       headers: {
-        'user-agent': 'SignalBoost Website Optimization Preview/1.0',
+        'user-agent': 'Mozilla/5.0 (compatible; SignalBoostSiteOptimizer/1.0; +https://saas.signalboostapp.com/website-optimizer)',
         accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.9',
       },
     })
     clearTimeout(timer)
+
+    if (!res.ok) {
+      return NextResponse.json({ ok: false, error: `The website returned HTTP ${res.status}.` }, { status: 422 })
+    }
 
     const contentType = header(res.headers, 'content-type').toLowerCase()
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
@@ -179,7 +185,7 @@ export async function POST(req: Request) {
     const imagesWithoutAlt = countMatches(html, /<img\b(?![^>]*\balt=)/gi)
     const lazyImages = countMatches(html, /<img\b[^>]*\bloading=["']lazy["']/gi)
     const gzip = /gzip|br|zstd/i.test(header(res.headers, 'content-encoding'))
-    const cache = header(res.headers, 'cache-control')
+    const cacheHeader = header(res.headers, 'cache-control')
     const csp = header(res.headers, 'content-security-policy')
     const hsts = header(res.headers, 'strict-transport-security')
     const xcto = header(res.headers, 'x-content-type-options')
@@ -193,7 +199,7 @@ export async function POST(req: Request) {
     if (stylesheetCount > 8) add(findings, 'many_stylesheets', 'performance', 'low', stylesheetCount)
     if (imageCount > 6 && lazyImages === 0) add(findings, 'missing_lazy_images', 'performance', 'medium', imageCount)
     if (!gzip && bytes > 80_000) add(findings, 'missing_compression', 'performance', 'medium', bytes)
-    if (!cache) add(findings, 'missing_cache_header', 'performance', 'low')
+    if (!cacheHeader) add(findings, 'missing_cache_header', 'performance', 'low')
 
     if (!title) add(findings, 'missing_title', 'seo', 'high')
     else if (title.length < 25 || title.length > 70) add(findings, 'title_length', 'seo', 'medium', title.length)
@@ -242,8 +248,11 @@ export async function POST(req: Request) {
       limits: { onePageOnly: true, maxHtmlBytes: MAX_HTML_BYTES, noPrivateAccess: true, remediationLocked: true },
       upgrade: { productLine: 'optimization', offer: 'SignalBoost can review the site and prepare an owner-approved optimization plan.' },
     })
-  } catch {
+  } catch (error) {
     clearTimeout(timer)
-    return NextResponse.json({ ok: false, error: 'Could not load this public website.' }, { status: 400 })
+    const message = error instanceof Error && error.name === 'AbortError'
+      ? 'The website took too long to respond.'
+      : 'Could not load this public website.'
+    return NextResponse.json({ ok: false, error: message }, { status: 400 })
   }
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { queryClusterRuntimeHealthGovernanceEvidenceIndex } from '../agent-gateway/cluster-runtime-health-governance-evidence-index-query.ts'
-import type { ClusterRuntimeHealthGovernanceEvidenceIndex } from '../agent-gateway/cluster-runtime-health-governance-evidence-index.ts'
+import type { ClusterRuntimeHealthGovernanceEvidenceIndex, ClusterRuntimeHealthGovernanceEvidenceIndexEntry } from '../agent-gateway/cluster-runtime-health-governance-evidence-index.ts'
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
@@ -25,7 +25,7 @@ function digest(value: unknown): string {
 
 const generatedAt = '2026-07-26T06:55:00.000Z'
 const safety = Object.freeze({ readOnly: true as const, advisoryOnly: true as const, automaticRetryEnabled: false as const, automaticRepairEnabled: false as const, infrastructureMutationEnabled: false as const })
-const entries = Object.freeze([
+const entries: readonly ClusterRuntimeHealthGovernanceEvidenceIndexEntry[] = Object.freeze([
   Object.freeze({ schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-index-entry-v1' as const, artifactId: 'a-dashboard', kind: 'dashboard' as const, schema: 'dashboard-v1', generatedAt, integrityDigest: '11111111', provenance: Object.freeze(['runtime-health', 'bundle-1']), retentionClass: 'governance-evidence' as const, readOnly: true as const, executable: false as const }),
   Object.freeze({ schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-index-entry-v1' as const, artifactId: 'b-manifest', kind: 'evidence-manifest' as const, schema: 'manifest-v1', generatedAt, integrityDigest: '22222222', provenance: Object.freeze(['runtime-health', 'bundle-1']), retentionClass: 'governance-evidence' as const, readOnly: true as const, executable: false as const }),
   Object.freeze({ schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-index-entry-v1' as const, artifactId: 'c-bundle', kind: 'governance-evidence-bundle' as const, schema: 'bundle-v1', generatedAt, integrityDigest: '33333333', provenance: Object.freeze(['runtime-health']), retentionClass: 'governance-evidence' as const, readOnly: true as const, executable: false as const }),
@@ -67,14 +67,18 @@ test('supports exact artifact, kind, and schema filters', () => {
 })
 
 test('fails closed for altered indexes and malformed filters, limits, and cursors', () => {
+  const [firstEntry, secondEntry, thirdEntry] = entries
+  assert.ok(firstEntry && secondEntry && thirdEntry)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex({ ...index, safety: { ...safety, automaticRepairEnabled: true } } as unknown as ClusterRuntimeHealthGovernanceEvidenceIndex), /unsafe/)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex({ ...index, entryCount: 2 } as ClusterRuntimeHealthGovernanceEvidenceIndex), /count/)
-  assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex({ ...index, entries: Object.freeze([{ ...entries[0], schema: 'altered' }, entries[1], entries[2]]) } as unknown as ClusterRuntimeHealthGovernanceEvidenceIndex), /integrity digest/)
+  assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex({ ...index, entries: Object.freeze([{ ...firstEntry, schema: 'altered' }, secondEntry, thirdEntry]) } as unknown as ClusterRuntimeHealthGovernanceEvidenceIndex), /integrity digest/)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { artifactIds: [''] }), /artifactIds/)
+  assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { artifactId: ['a-dashboard'] }), /query key/)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { limit: 0 }), /limit/)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { limit: '1' } as unknown), /limit/)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { cursor: 'wrong:1' }), /cursor/)
   const first = queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { provenance: ['bundle-1'], limit: 1 })
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { kinds: ['dashboard'], limit: 1, cursor: first.nextCursor ?? undefined }), /cursor/)
+  assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex({ ...index, clusterId: 'forged' }, { provenance: ['bundle-1'], limit: 1, cursor: first.nextCursor ?? undefined }), /cursor/)
   assert.throws(() => queryClusterRuntimeHealthGovernanceEvidenceIndex(index, { provenance: ['bundle-1'], cursor: `${indexDigest}:00000000:99` }), /cursor/)
 })

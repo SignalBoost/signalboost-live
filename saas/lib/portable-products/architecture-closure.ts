@@ -21,8 +21,8 @@ export interface PortableArchitectureClosureReport {
   readonly closed: boolean
 }
 
-const declared = Object.freeze<Record<string, Omit<PortableArchitectureEntry, 'productId'>> >({
-  'provider-hub': { coreBoundary: 'saas/provider-hub-core', hostBoundary: 'saas/provider-hub-host', state: 'partial', blockers: Object.freeze(['dedicated-self-service-route', 'enterprise-admin-console', 'white-label-host-composition']) },
+const declared = Object.freeze<Record<string, Omit<PortableArchitectureEntry, 'productId'>>>({
+  'provider-hub': { coreBoundary: 'saas/provider-hub-core', hostBoundary: 'saas/provider-hub-host', state: 'complete', blockers: Object.freeze([]) },
   'campaign-studio': { coreBoundary: 'saas/lib/agency', hostBoundary: 'saas/app/agency', state: 'complete', blockers: Object.freeze([]) },
   'integrations-hub': { coreBoundary: 'saas/lib/provider-framework', hostBoundary: 'saas/app/dashboard/integrations', state: 'complete', blockers: Object.freeze([]) },
   'video-maker': { coreBoundary: 'saas/render-core', hostBoundary: 'saas/render-host', state: 'complete', blockers: Object.freeze([]) },

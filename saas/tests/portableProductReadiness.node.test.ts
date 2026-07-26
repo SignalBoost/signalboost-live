@@ -55,6 +55,31 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
   }
 })
 
+test('Campaign Studio commercial evidence is architecture-only and fail-closed', () => {
+  const report = createPortableCommercialReadinessReport()
+  const campaignStudio = report.entries.find(entry => entry.productId === 'campaign-studio')
+  assert.ok(campaignStudio)
+  assert.equal(campaignStudio.readyCount, 1)
+  assert.equal(campaignStudio.totalCount, 10)
+  assert.equal(campaignStudio.completionPercent, 10)
+  assert.equal(campaignStudio.commerciallyReady, false)
+  assert.deepEqual(campaignStudio.checks.filter(check => check.status === 'ready').map(check => check.dimension), ['architecture'])
+  assert.deepEqual(campaignStudio.checks.filter(check => check.status === 'blocked').map(check => check.dimension), [
+    'distribution-package',
+    'integrity-manifest',
+    'buyer-installation',
+    'licensing-enforcement',
+    'fulfillment-handoff',
+    'operations-recovery',
+    'buyer-configuration',
+    'deployment-acceptance',
+    'support-boundary',
+  ])
+  for (const check of campaignStudio.checks) {
+    assert.ok(Object.isFrozen(check) && Object.isFrozen(check.evidence) && Object.isFrozen(check.blockers))
+  }
+})
+
 test('Provider Hub product evidence profile stays fail-closed for external proof', () => {
   assert.equal(providerHubCommercialEvidenceProfile.productId, 'provider-hub')
   assert.equal(providerHubCommercialEvidenceProfile.verifiedCount, 4)

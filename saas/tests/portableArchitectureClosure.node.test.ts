@@ -66,7 +66,21 @@ test('Agent Operations is architecture-complete while runtime inputs remain buye
   assert.equal(descriptor?.manifest.licensingAvailable, false)
 })
 
-test('preview and descriptor products remain fail-closed', () => {
+test('Self-Healing Supervisor is architecture-complete while buyer go-live remains external', () => {
+  const report = createPortableArchitectureClosureReport()
+  const supervisor = report.entries.find(entry => entry.productId === 'self-healing-supervisor')
+  const descriptor = portableProductRegistry.find(entry => entry.manifest.productId === 'self-healing-supervisor')
+  assert.equal(supervisor?.state, 'complete')
+  assert.deepEqual(supervisor?.blockers, [])
+  assert.equal(supervisor?.coreBoundary, 'saas/lib/supervisor/portable')
+  assert.equal(supervisor?.hostBoundary, 'HostContext + createSupervisorDispatcher')
+  assert.equal(descriptor?.implementationStatus, 'implemented')
+  assert.equal(descriptor?.manifest.status, 'preview')
+  assert.equal(descriptor?.manifest.licensingAvailable, false)
+  assert.equal(descriptor?.route, '/dashboard/supervisor')
+})
+
+test('descriptor products remain fail-closed', () => {
   const report = createPortableArchitectureClosureReport()
   const browserAgents = report.entries.find(entry => entry.productId === 'browser-agent-ecosystem')
   assert.equal(browserAgents?.state, 'descriptor-only')

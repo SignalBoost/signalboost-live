@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  createClusterRuntimeHealthGovernanceEvidenceCatalog,
-  type ClusterRuntimeHealthGovernanceEvidenceDirectory,
-} from './cluster-runtime-health-governance-evidence-catalog.ts'
+import { createClusterRuntimeHealthGovernanceEvidenceCatalog } from './cluster-runtime-health-governance-evidence-catalog.ts'
+import type { ClusterRuntimeHealthGovernanceEvidenceDirectory } from './cluster-runtime-health-governance-evidence-directory.ts'
 
 const generatedAt = '2026-07-26T00:00:00.000Z'
 

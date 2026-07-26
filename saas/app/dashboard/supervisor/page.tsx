@@ -1,5 +1,7 @@
+// saas/app/dashboard/supervisor/page.tsx
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import aiKillSwitchLocales from '@/lib/i18n/aiKillSwitchLocales.json'
 import { createBrowserProviderDiagnosticsSnapshot } from '@/lib/browser-provider'
 import { getAccess } from '@/lib/auth/access'
 import { loadLanguage } from '@/lib/i18n/loadLanguage'
@@ -27,15 +29,19 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const matches = (value: unknown, key: string) => { const f = param(key); return !f || f === 'all' || String(value ?? '').toLowerCase() === f.toLowerCase() }
   const search = String(param('q') || '').trim().toLowerCase()
   const textHas = (...values: unknown[]) => !search || values.some(v => String(v ?? '').toLowerCase().includes(search))
-  const access = await getAccess(); const dict = await loadLanguage(safeLang((await cookies()).get('sb_locale')?.value)); const t = (dict as any).supervisorSoc as Record<string,string>
+  const access = await getAccess(); const lang = safeLang((await cookies()).get('sb_locale')?.value); const dict = await loadLanguage(lang); const t = (dict as any).supervisorSoc as Record<string,string>
+  const killSwitchCopy = ((aiKillSwitchLocales as any)[lang] || (aiKillSwitchLocales as any).en) as Record<string,string>
   if (!access.isAdmin) return <main style={page}><h1>{t.title}</h1><p>{t.adminOnly}</p></main>
   const db = getAdminSupabase(); const runs = await new SupabaseVercelHealthStore(db).listRuns({ limit: 50 }).catch(() => [])
   const [instances, workItems, leases, triggers] = await Promise.all([
     readTable(db, 'supervisor_instances').catch(() => []), readTable(db, 'supervisor_work_items').catch(() => []), readTable(db, 'supervisor_leases').catch(() => []), readTable(db, 'vercel_observation_triggers').catch(() => []),
   ])
   const health = createPlatformHealthSnapshot({ runs, instances, workItems, leases, triggers, ciState: 'unknown', localizationComplete: true })
-  const { data: systemStatus } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()
-  const aiAutonomyEnabled = systemStatus?.ai_autonomous_execution_enabled !== false
+  // FAIL CLOSED, exactly as saas/proxy.ts does. It admits traffic only on `=== true`; a missing
+  // table, a missing row or an RLS denial all mean blocked. Reading `!== false` here made an
+  // unreadable row render as "AI AUTONOMY ACTIVE" while the middleware 503'd every webhook.
+  const { data: systemStatus, error: systemStatusError } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()
+  const killSwitchState: 'active' | 'engaged' | 'unavailable' = systemStatusError || !systemStatus ? 'unavailable' : systemStatus.ai_autonomous_execution_enabled === true ? 'active' : 'engaged'
   const bpal = createBrowserProviderDiagnosticsSnapshot(); const providers = bpal.providers.filter(p => matches(p.providerId, 'provider'))
   const activeInstances = instances.filter(i => ['starting','healthy','draining'].includes(String(i.status)))
   const filteredWorkItems = workItems.filter(w => matches(w.provider, 'provider') && matches(w.environment, 'environment') && matches(w.state, 'status') && textHas(w.project_id, w.projectId, w.work_item_id, w.workItemId, w.incident_id, w.provider))
@@ -56,7 +62,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const stateLabel = platform === 'green' ? t.green : platform === 'yellow' ? t.yellow : t.red
   return <main style={page}>
     <section style={hero}><p style={kicker}>{t.kicker}</p><h1 style={{ margin:'6px 0' }}>{t.title}</h1><p style={muted}>{t.subtitle}</p><p style={notice}>{t.readOnly}</p></section>
-    <GlobalAiKillSwitch enabled={aiAutonomyEnabled} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed }} />
+    <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
     <div style={grid2}>
       <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={`${health.status} · ${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
       <Card title={t.healthMetrics}><dl style={fields}><Field k={t.totalObservations} v={runs.length}/><Field k={t.successfulObservations} v={successful.length}/><Field k={t.verificationSuccess} v={verificationSuccess}/><Field k={t.avgObservationDuration} v={avg(durations)}/><Field k={t.avgVerificationDuration} v={avg(durations)}/><Field k={t.providerAvailability} v={providers.map(p => `${p.providerId}: ${p.health.state}`).join(' · ')}/><Field k={t.queueDepth} v={activeWork.length}/></dl></Card>

@@ -1,3 +1,4 @@
+// saas/lib/autonomous-systems/risk-engine.ts
 import { createHash } from 'node:crypto';
 import type { RiskLevel, TenantContext } from './types.ts';
 
@@ -25,6 +26,12 @@ export interface EnterpriseRiskAssessmentSnapshot {
   readonly riskLevel: RiskLevel;
   readonly score: number;
   readonly signalIds: readonly string[];
+  /**
+   * Subjects of the selected signals, index-aligned with signalIds. Present because the
+   * assessment identity is a hash of this snapshot: anything the identity must distinguish
+   * has to be visible here, or the id stops being verifiable from the snapshot alone.
+   */
+  readonly subjects: readonly string[];
   readonly evidenceRefs: readonly string[];
   readonly truncated: boolean;
   readonly readOnly: true;
@@ -80,6 +87,11 @@ export function assessEnterpriseRisk(request: RiskAssessmentRequest): Enterprise
     riskLevel,
     score,
     signalIds: selected.map((signal) => signal.signalId),
+    // Subject is material to what was assessed, so it must be inside the hashed base. It was
+    // omitted, which meant two assessments of DIFFERENT subjects that happened to share a
+    // signalId produced a byte-identical assessmentId — a silent collision in an identifier
+    // the engine treats as unique evidence. Index-aligned with signalIds above.
+    subjects: selected.map((signal) => signal.subject),
     evidenceRefs: [...new Set(selected.flatMap((signal) => signal.evidenceRefs))].sort(),
     truncated: ordered.length > request.maxSignals,
     readOnly: true as const,

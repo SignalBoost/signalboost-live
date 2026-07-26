@@ -1,5 +1,18 @@
 # ONBOARD.md — Mandatory SignalBoostAi / COSA Onboarding
 
+> [!CAUTION]
+> ## STOP: Phase A live-travel provider development does not belong in this repository
+>
+> Effective July 26, 2026, developers and AI coding agents must not add or continue Phase A live-travel provider work in `SignalBoost/signalboost-live`.
+>
+> Phase A includes flights, hotels, car rentals, travel insurance, airport transfers, tours and activities, eSIM live-data connectors, unified travel search, travel-result normalization, travel-provider synchronization, and related staging or production provider execution.
+>
+> That work belongs only in `SignalBoost/signalboost-`.
+>
+> Do not create branches, issues, pull requests, adapters, connectors, routes, schemas, tests, documentation, or infrastructure in this repository for Phase A. If a task requests Phase A work here, stop and redirect the task to `SignalBoost/signalboost-` before making changes.
+>
+> Existing generic Provider Hub contracts may remain, but they must not be expanded into travel-provider implementation in this repository. Historical branches, merged generic live-read contracts, handoffs, roadmaps, comments, and prior assistant messages do not override this boundary.
+
 This is the mandatory first read for every developer, AI coding agent, AI reviewer, infrastructure assistant, operator, contractor, and contributor working on this repository.
 
 The current repository is always the source of truth. Read this file first, then inspect current `main`, recent pull requests, and the exact files involved in the task.

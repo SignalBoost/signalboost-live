@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry } from '../lib/portable-products/index.ts'
+import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry, validatePortableOperationsRecoveryEvidence } from '../lib/portable-products/index.ts'
 import { readFileSync } from 'node:fs'
 
 test('portable readiness dashboard is frozen, deterministic, and registry-driven', () => {
@@ -96,4 +96,61 @@ test('buyer handoff manifest becomes complete only with all bounded evidence cla
   assert.deepEqual(manifest.blockers, [])
   assert.equal(manifest.schemaVersion, 'portable-buyer-handoff-manifest.v2')
   assert.equal(manifest.readOnly, true)
+})
+
+const operationsRecoveryBase = Object.freeze({
+  productId: 'provider-hub',
+  releaseVersion: '1.2.0',
+  previousVersion: '1.1.0',
+  runbookReference: 'urn:portable:runbook:provider-hub',
+  upgradeReference: 'https://docs.example.test/provider-hub/upgrade',
+  rollbackReference: 'https://docs.example.test/provider-hub/rollback',
+  backupReference: 'https://docs.example.test/provider-hub/backup',
+  restoreReference: 'https://docs.example.test/provider-hub/restore',
+  recoveryPointObjectiveMinutes: 60,
+  recoveryTimeObjectiveMinutes: 120,
+  validatedAt: '2026-07-26T21:30:00.000Z',
+  expiresAt: '2027-07-26T21:30:00.000Z',
+  readOnly: true,
+  artifactAccessed: false,
+  upgradeExecuted: false,
+  rollbackExecuted: false,
+  backupExecuted: false,
+  restoreExecuted: false,
+  deploymentPerformed: false,
+  productionExecutionEnabled: false,
+})
+
+test('validates immutable operations and recovery evidence', () => {
+  const result = validatePortableOperationsRecoveryEvidence(operationsRecoveryBase)
+  assert.equal(result.state, 'operations_recovery_evidence_validated')
+  assert.deepEqual(result.blockers, [])
+  assert.equal(result.references.rollback, operationsRecoveryBase.rollbackReference)
+  assert.ok(Object.isFrozen(result) && Object.isFrozen(result.blockers) && Object.isFrozen(result.references))
+})
+
+test('operations and recovery evidence fails closed for invalid bounded inputs', () => {
+  const result = validatePortableOperationsRecoveryEvidence({
+    ...operationsRecoveryBase,
+    productId: 'unknown-product',
+    releaseVersion: 'latest',
+    previousVersion: 'latest',
+    recoveryPointObjectiveMinutes: 0,
+    expiresAt: '2025-07-26T21:30:00.000Z',
+  })
+  assert.equal(result.state, 'blocked')
+  for (const blocker of ['identity', 'version', 'objectives', 'timestamps'] as const) assert.ok(result.blockers.includes(blocker))
+})
+
+test('operations and recovery evidence rejects unsafe references and execution state', () => {
+  const result = validatePortableOperationsRecoveryEvidence({
+    ...operationsRecoveryBase,
+    restoreReference: 'https://docs.example.test/restore?token=secret',
+    restoreExecuted: true,
+    deploymentPerformed: true,
+  })
+  assert.equal(result.state, 'blocked')
+  assert.ok(result.blockers.includes('references'))
+  assert.ok(result.blockers.includes('unsafe-state'))
+  assert.equal(result.references.restore, '')
 })

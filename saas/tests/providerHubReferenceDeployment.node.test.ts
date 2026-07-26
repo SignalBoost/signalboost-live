@@ -59,7 +59,7 @@ test('Provider Hub reference deployment composes deterministic scoped host ports
 
   const projection = deployment.ports.ui.project({ actor, connection, allowedActions: ['view'] })
   assert.deepEqual(projection.allowedActions, ['view'])
-  assert.equal(projection.connection.authentication.maskedFields.credentialField, 'saved')
+  assert.equal(projection.connection.authentication.maskedFields.accountField, 'saved')
 })
 
 test('external-host example preserves buyer adapters without SignalBoost coupling', () => {

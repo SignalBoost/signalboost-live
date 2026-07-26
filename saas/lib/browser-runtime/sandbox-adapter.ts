@@ -1,6 +1,9 @@
-import type { BrowserTask, BrowserTaskStep } from './contracts.ts'
+// saas/lib/browser-runtime/sandbox-adapter.ts
 
-export const SANDBOX_ADAPTER_ID = 'signalboost.sandbox.v1'
+import type { BrowserTask, BrowserTaskStep } from './contracts.ts'
+import { SANDBOX_ADAPTER_ID } from './adapter-identifiers.ts'
+
+export { SANDBOX_ADAPTER_ID } from './adapter-identifiers.ts'
 
 export interface SandboxTaskInput {
   taskId: string

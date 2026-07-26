@@ -1,4 +1,7 @@
+// saas/lib/browser-runtime/launch-profile.ts
+
 import type { BrowserSessionLaunchRequest } from './contracts.ts'
+import { SANDBOX_ADAPTER_ID } from './adapter-identifiers.ts'
 
 export interface BrowserLaunchProfile {
   id: string
@@ -23,7 +26,6 @@ export interface SandboxLaunchProfileOptions {
   viewport?: { width: number; height: number }
 }
 
-const DEFAULT_SANDBOX_ADAPTER_ID = 'signalboost.sandbox.v1'
 const DEFAULT_SANDBOX_ORIGINS = ['http://127.0.0.1:4173', 'http://localhost:4173']
 
 function normalizeOrigin(value: string): string {
@@ -36,7 +38,7 @@ export class SandboxBrowserLaunchProfileProvider implements BrowserLaunchProfile
   private readonly profile: BrowserLaunchProfile
 
   constructor(options: SandboxLaunchProfileOptions = {}) {
-    this.adapterId = options.adapterId ?? DEFAULT_SANDBOX_ADAPTER_ID
+    this.adapterId = options.adapterId ?? SANDBOX_ADAPTER_ID
     this.allowedOrigins = new Set((options.allowedOrigins ?? DEFAULT_SANDBOX_ORIGINS).map(normalizeOrigin))
     this.profile = {
       id: 'sandbox.chromium.v1',

@@ -45,23 +45,14 @@ to set `NODE_ENV`.
 
 The same test that enforces §1 also walks the **entire import graph** reachable from the
 two entry points in §5 — currently 64 modules — and fails if host coupling appears
-anywhere new. Five touchpoints exist today and are listed in that test with their
-justification. Three are inert for you:
+anywhere new. Three touchpoints exist today and are listed in that test with their
+justification. They are inert for you:
 
 | Module | What it is | Why it cannot affect your deployment |
 | --- | --- | --- |
 | `executors/create-supervisor-dispatcher.ts` | lazy import of a platform email notifier | reached only when you supply neither a `HostContext` nor a notifier; supplying either bypasses it entirely |
 | `executors/api-executor.ts` | lazy import of the platform provider engine, used as the **default** `api_request` runner | pass your own `ApiStepRunner` and the import is never evaluated |
 | `executors/dispatch-store.ts` | reads `NODE_ENV` inside `platformSupervisorRuntime()` | a platform-only helper; you pass your own store or an explicit `runtime` |
-
-Two are **buyer-visible and not yet resolved**, so they are stated rather than buried:
-`executors/browser/browser-runtime-mapper.ts` emits an `adapterId` of
-`signalboost.browser-runtime.dry-run.v1`, and `lib/browser-runtime/sandbox-adapter.ts`
-exports `SANDBOX_ADAPTER_ID = 'signalboost.sandbox.v1'`. If you enable browser steps,
-those identifiers appear in your evidence records and your SIEM. They affect naming in
-your audit trail only — no behaviour, no network destination, no credential path — but
-they are the build platform's name inside your data, and they are tracked for removal
-before this portable is marked live.
 
 ---
 

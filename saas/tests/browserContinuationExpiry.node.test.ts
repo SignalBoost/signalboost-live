@@ -1,3 +1,5 @@
+// saas/tests/browserContinuationExpiry.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -53,7 +55,7 @@ function makeTask(): BrowserTask {
     taskId: 'TASK-EXPIRY-001',
     incidentId: 'INC-EXPIRY-001',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-15T10:00:00.000Z',
     expiresAt: '2026-07-15T11:00:00.000Z',

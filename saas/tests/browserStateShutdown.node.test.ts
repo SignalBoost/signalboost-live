@@ -1,6 +1,9 @@
+// saas/tests/browserStateShutdown.node.test.ts
+
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/adapter-identifiers.ts'
 import {
   InMemoryBrowserExecutionStore,
   InMemoryBrowserSessionRegistry,
@@ -41,7 +44,7 @@ function makeRecord(executionId: string): BrowserExecutionRecord {
     taskId: `TASK-${executionId}`,
     incidentId: `INC-${executionId}`,
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     checkpointStepId: 'approval-checkpoint',
     startedAt: retainedAt.toISOString(),

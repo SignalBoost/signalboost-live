@@ -1,3 +1,5 @@
+// saas/tests/browserRuntimeSanitization.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -18,7 +20,7 @@ function makeTask(): BrowserTask {
     taskId: 'TASK-SANITIZE-001',
     incidentId: 'INC-SANITIZE-001',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-16T10:00:00.000Z',
     expiresAt: '2026-07-16T11:00:00.000Z',

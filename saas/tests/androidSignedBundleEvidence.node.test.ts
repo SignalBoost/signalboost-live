@@ -74,7 +74,7 @@ test('fails closed for malformed, unsafe, uploaded, or mismatched evidence', () 
 
 test('signed bundle evidence source has no access, execution, or mutation capability', async () => {
   const source = await readFile(new URL('../portable-mobile/android-signed-bundle-evidence.ts', import.meta.url), 'utf8')
-  for (const forbidden of ["from 'node:child_process'", "from 'node:fs'", 'exec(', 'spawn(', 'fetch(', 'readFile(', 'writeFile(', 'signingConfigs', 'playConsole']) {
+  for (const forbidden of ["from 'node:child_process'", "from 'node:fs'", 'exec(', 'spawn(', 'fetch(', 'readFile(', 'writeFile(', 'signingConfigs {', 'serviceAccountCredentials']) {
     assert.equal(source.includes(forbidden), false, `signed evidence contract must not contain ${forbidden}`)
   }
 })

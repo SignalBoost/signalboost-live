@@ -36,6 +36,8 @@ export interface AndroidBuildEvidenceReport {
   schemaVersion: typeof ANDROID_BUILD_EVIDENCE_SCHEMA_VERSION
   portableId: string
   packageName: string
+  sourceCommitSha: string
+  unsignedAabSha256: string
   state: 'evidence_validated' | 'blocked'
   blockers: readonly AndroidBuildEvidenceBlocker[]
   readOnly: true
@@ -67,7 +69,7 @@ export function validateAndroidBuildEvidence(input: AndroidBuildEvidenceInput): 
   if (!SHA.test(input.sourceCommitSha)) blockers.push('source-commit')
   if (![input.jdkVersion, input.androidSdkVersion, input.gradleVersion].every(nonEmpty)) blockers.push('toolchain')
   if (!input.lintPassed || !input.testsPassed) blockers.push('verification-results')
-  if (!input.unsignedAabPath.endsWith('.aab') || input.unsignedAabPath.startsWith('/') || input.unsignedAabPath.includes('..')) blockers.push('artifact-path')
+  if (typeof input.unsignedAabPath !== 'string' || !input.unsignedAabPath.endsWith('.aab') || input.unsignedAabPath.startsWith('/') || input.unsignedAabPath.includes('..')) blockers.push('artifact-path')
   if (!SHA256.test(input.unsignedAabSha256)) blockers.push('artifact-digest')
 
   const started = validDate(input.buildStartedAt)
@@ -79,6 +81,8 @@ export function validateAndroidBuildEvidence(input: AndroidBuildEvidenceInput): 
     schemaVersion: ANDROID_BUILD_EVIDENCE_SCHEMA_VERSION,
     portableId: String(input.portableId ?? '').trim(),
     packageName: String(input.packageName ?? '').trim(),
+    sourceCommitSha: SHA.test(input.sourceCommitSha) ? input.sourceCommitSha : '',
+    unsignedAabSha256: SHA256.test(input.unsignedAabSha256) ? input.unsignedAabSha256 : '',
     state: blockers.length === 0 ? 'evidence_validated' : 'blocked',
     blockers: Object.freeze(blockers),
     readOnly: true,

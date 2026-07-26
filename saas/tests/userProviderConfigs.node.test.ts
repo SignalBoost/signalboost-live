@@ -20,6 +20,7 @@ import './androidBuildPlan.node.test.ts'
 import './androidBuildEvidence.node.test.ts'
 import './androidBuildEvidenceManifest.node.test.ts'
 import './androidPublicationReadiness.node.test.ts'
+import './androidSignedBundleEvidence.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 

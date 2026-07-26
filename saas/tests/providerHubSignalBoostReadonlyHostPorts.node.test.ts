@@ -6,13 +6,11 @@ import { createSignalBoostReadonlyHostPorts } from '../provider-hub-host/signalb
 
 const scope = { tenantId: 'tenant-a', environmentId: 'test' }
 
-function createPorts() {
+function createPorts(resolveActorOverride?: (input: { actorId: string; tenantId: string; environmentId: string }) => Promise<{ actorId: string; tenantId: string; environmentId: string; roles: string[] } | null>) {
   const auditEvents: unknown[] = []
   const ports = createSignalBoostReadonlyHostPorts({
     ...scope,
-    async resolveActor(input) {
-      return { ...input, roles: ['operator'] }
-    },
+    resolveActor: resolveActorOverride ?? (async input => ({ ...input, roles: ['operator'] })),
     async resolveConnectionOwner() {
       return { ownerId: 'owner-1' }
     },
@@ -49,7 +47,7 @@ test('creates immutable scoped read-only host ports', async () => {
   })
 })
 
-test('fails closed across tenant and environment boundaries', async () => {
+test('fails closed across tenant, environment, and actor identity boundaries', async () => {
   const { ports } = createPorts()
   await assert.rejects(
     ports.identity.resolveActor({ actorId: 'actor-1', tenantId: 'tenant-b', environmentId: 'test' }),
@@ -58,6 +56,12 @@ test('fails closed across tenant and environment boundaries', async () => {
   await assert.rejects(
     ports.licensing.checkEntitlement({ tenantId: 'tenant-a', environmentId: 'production', capability: 'provider.read' }),
     /scope mismatch/,
+  )
+
+  const mismatched = createPorts(async input => ({ ...input, actorId: 'actor-2', roles: ['admin'] })).ports
+  await assert.rejects(
+    mismatched.identity.resolveActor({ actorId: 'actor-1', ...scope }),
+    /actor mismatch/,
   )
 })
 
@@ -90,14 +94,24 @@ test('forwards immutable audit events and sanitizes UI projections deterministic
   assert.equal(auditEvents.length, 1)
   assert.equal(Object.isFrozen(auditEvents[0]), true)
 
+  const enrichedConnection = {
+    ...connection,
+    secretToken: 'must-not-project',
+    authentication: {
+      ...connection.authentication,
+      rawApiKey: 'must-not-project',
+    },
+  }
   const projection = ports.ui.project({
     actor: { actorId: 'actor-1', ...scope, roles: ['operator'] },
-    connection,
+    connection: enrichedConnection,
     allowedActions: ['view', 'inspect', 'view'],
     notices: ['read only', 'approval required'],
   })
   assert.deepEqual(projection.allowedActions, ['inspect', 'view'])
   assert.deepEqual(projection.notices, ['approval required', 'read only'])
+  assert.equal('secretToken' in projection.connection, false)
+  assert.equal('rawApiKey' in projection.connection.authentication, false)
   assert.equal(Object.isFrozen(projection), true)
   assert.equal(Object.isFrozen(projection.connection.authentication.maskedFields), true)
 })

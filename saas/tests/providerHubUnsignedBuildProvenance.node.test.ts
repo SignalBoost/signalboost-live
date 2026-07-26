@@ -1,0 +1,61 @@
+// saas/tests/providerHubUnsignedBuildProvenance.node.test.ts
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import test from 'node:test'
+
+import { createProviderHubUnsignedBuildProvenance } from '../portable-mobile/provider-hub-unsigned-build-provenance.ts'
+
+const digest = 'a'.repeat(64)
+const valid = {
+  sourceCommitSha: 'b'.repeat(40),
+  packageName: 'com.signalboost.providerhub' as const,
+  scaffoldSchemaVersion: 'signalboost-android-scaffold-v1' as const,
+  buildPlanSchemaVersion: 'signalboost-android-build-plan-v1' as const,
+  assetDigests: {
+    manifest: digest,
+    serviceWorker: digest,
+    offlinePage: digest,
+    icon: digest,
+    maskableIcon: digest,
+    assetLinksTemplate: digest,
+  },
+  toolchain: { jdk: '17.0.12', androidSdk: '35', gradle: '8.10.2', androidGradlePlugin: '8.7.3' },
+  unsignedAabPath: 'app/build/outputs/bundle/release/app-release.aab',
+  unsignedAabSha256: 'c'.repeat(64),
+  artifactSigned: false as const,
+  artifactUploaded: false as const,
+  playConsolePublished: false as const,
+  productionExecutionEnabled: false as const,
+}
+
+test('creates deterministic immutable Provider Hub unsigned build provenance', () => {
+  const first = createProviderHubUnsignedBuildProvenance(valid)
+  const second = createProviderHubUnsignedBuildProvenance(valid)
+  assert.deepEqual(first, second)
+  assert.equal(first.state, 'validated')
+  assert.deepEqual(first.blockers, [])
+  assert.match(first.provenanceId, /^provider-hub:unsigned-build:[0-9a-f]{8}$/)
+  assert.equal(first.buildExecuted, false)
+  assert.equal(first.signingEnabled, false)
+  assert.ok(Object.isFrozen(first))
+  assert.ok(Object.isFrozen(first.blockers))
+})
+
+test('fails closed for malformed, mismatched, or unsafe evidence', () => {
+  const report = createProviderHubUnsignedBuildProvenance({
+    ...valid,
+    sourceCommitSha: 'bad',
+    assetDigests: { ...valid.assetDigests, manifest: 'bad' },
+    unsignedAabSha256: 'bad',
+    artifactSigned: true,
+  } as unknown as Parameters<typeof createProviderHubUnsignedBuildProvenance>[0])
+  assert.equal(report.state, 'blocked')
+  assert.deepEqual(report.blockers, ['source-commit', 'asset-digests', 'artifact-digest', 'unsafe-state'])
+})
+
+test('provenance contract has no build, artifact, signing, network, or store capability', async () => {
+  const source = await readFile(new URL('../portable-mobile/provider-hub-unsigned-build-provenance.ts', import.meta.url), 'utf8')
+  for (const forbidden of ["from 'node:fs'", "from 'node:child_process'", 'readFile(', 'writeFile(', 'exec(', 'spawn(', 'fetch(', 'gradlew', 'signingConfigs', 'play.googleapis.com']) {
+    assert.equal(source.includes(forbidden), false, `provenance contract must not contain ${forbidden}`)
+  }
+})

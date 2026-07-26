@@ -50,6 +50,8 @@ type LocalizedCopy = {
   noticeLabels: Readonly<Record<string, string>>
 }
 
+const LOCALIZED_LOAD_ERROR = '__localized_provider_hub_load_error__'
+
 const copy: Readonly<Record<Locale, LocalizedCopy>> = {
   en: { title: 'Your provider connections', notice: 'This dashboard is read-only. It never reveals, copies, decrypts, or returns provider credentials.', unavailable: 'Status unavailable', loadError: 'Unable to load Provider Hub status.', loading: 'Loading connection status…', section: 'Provider connection status', none: 'No provider configured', state: 'Connection state', auth: 'Authentication', configured: 'Credentials configured', yes: 'Yes', no: 'No', tenant: 'Tenant', environment: 'Environment', id: 'Connection ID', updated: 'Updated', noMetadata: 'No connection metadata is available for this authenticated scope.', fields: 'Configured fields', actions: 'Available actions', notices: 'Notices', actionLabels: { view: 'View', manual_setup: 'Manual setup' }, noticeLabels: { 'No provider connection is configured.': 'No provider connection is configured.' } },
   es: { title: 'Tus conexiones de proveedores', notice: 'Este panel es de solo lectura. Nunca revela, copia, descifra ni devuelve credenciales de proveedores.', unavailable: 'Estado no disponible', loadError: 'No se pudo cargar el estado de Provider Hub.', loading: 'Cargando el estado de la conexión…', section: 'Estado de conexión del proveedor', none: 'Ningún proveedor configurado', state: 'Estado de la conexión', auth: 'Autenticación', configured: 'Credenciales configuradas', yes: 'Sí', no: 'No', tenant: 'Inquilino', environment: 'Entorno', id: 'ID de conexión', updated: 'Actualizado', noMetadata: 'No hay metadatos de conexión disponibles para este ámbito autenticado.', fields: 'Campos configurados', actions: 'Acciones disponibles', notices: 'Avisos', actionLabels: { view: 'Ver', manual_setup: 'Configuración manual' }, noticeLabels: { 'No provider connection is configured.': 'No hay ninguna conexión de proveedor configurada.' } },
@@ -80,20 +82,21 @@ export default function ProviderHubStatusDashboard({ endpoint, title }: { endpoi
     fetch(endpoint, { method: 'GET', cache: 'no-store' })
       .then(async response => {
         const body = await response.json() as StatusSurface & { error?: string }
-        if (!response.ok) throw new Error(body.error || text.loadError)
+        if (!response.ok) throw new Error(body.error || LOCALIZED_LOAD_ERROR)
         if (active) setSurface(body)
       })
-      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : text.loadError) })
+      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : LOCALIZED_LOAD_ERROR) })
     return () => { active = false }
-  }, [endpoint, text.loadError])
+  }, [endpoint])
 
   const actionLabel = (action: string) => text.actionLabels[action] || humanize(action)
   const noticeLabel = (notice: string) => text.noticeLabels[notice] || notice
+  const errorLabel = error === LOCALIZED_LOAD_ERROR ? text.loadError : error
 
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: '32px 20px' }}>
       <header style={{ marginBottom: 24 }}><p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Provider Hub</p><h1 style={{ margin: '8px 0' }}>{title || text.title}</h1><p>{text.notice}</p></header>
-      {error ? <section role="alert"><h2>{text.unavailable}</h2><p>{error}</p></section> : null}
+      {error ? <section role="alert"><h2>{text.unavailable}</h2><p>{errorLabel}</p></section> : null}
       {!error && !surface ? <p>{text.loading}</p> : null}
       {surface ? <section aria-label={text.section} style={{ display: 'grid', gap: 16 }}>
         <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 20 }}>

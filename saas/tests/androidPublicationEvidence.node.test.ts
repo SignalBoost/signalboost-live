@@ -59,6 +59,22 @@ test('blocks malformed prerequisite and input values without throwing', () => {
   assert.deepEqual(report.blockers, ['publication-readiness', 'signed-bundle-evidence', 'identity', 'release-version', 'release-track', 'digest-linkage', 'console-references', 'rollout', 'review-status', 'country-scope', 'timestamps', 'unsafe-state'])
 })
 
+test('rejects prerequisite reports with contradictory safety fields', () => {
+  const unsafeReadiness = { ...readiness, artifactAccessed: true }
+  const unsafeSigned = { ...signed, rawSigningMaterialAccepted: true }
+  const report = validateAndroidPublicationEvidence(unsafeReadiness, unsafeSigned, input)
+  assert.deepEqual(report.blockers, ['publication-readiness', 'signed-bundle-evidence'])
+})
+
+test('rejects coerced release numbers from untyped callers', () => {
+  const booleanVersion = validateAndroidPublicationEvidence(readiness, signed, { ...input, versionCode: true })
+  assert.ok(booleanVersion.blockers.includes('release-version'))
+  assert.equal(booleanVersion.versionCode, 0)
+
+  const stringRollout = validateAndroidPublicationEvidence(readiness, signed, { ...input, rolloutPercentage: '100' })
+  assert.ok(stringRollout.blockers.includes('rollout'))
+})
+
 test('publication evidence source has no store execution or mutation capability', async () => {
   const source = await readFile(new URL('../portable-mobile/android-publication-evidence.ts', import.meta.url), 'utf8')
   for (const forbidden of ["from 'node:child_process'", "from 'node:fs'", 'exec(', 'spawn(', 'fetch(', 'readFile(', 'writeFile(', 'androidpublisher', 'serviceAccountCredentials', 'insertEdit(', 'commitEdit(', 'uploadBundle(']) {

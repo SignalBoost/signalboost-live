@@ -1,10 +1,9 @@
+// saas/agent-gateway/cluster-runtime-health-governance-evidence-registry.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  createClusterRuntimeHealthGovernanceEvidenceRegistry,
-  type ClusterRuntimeHealthGovernanceEvidenceCatalog,
-} from './cluster-runtime-health-governance-evidence-registry.ts'
+import { createClusterRuntimeHealthGovernanceEvidenceRegistry } from './cluster-runtime-health-governance-evidence-registry.ts'
+import type { ClusterRuntimeHealthGovernanceEvidenceCatalog } from './cluster-runtime-health-governance-evidence-catalog.ts'
 
 const generatedAt = '2026-07-26T00:00:00.000Z'
 

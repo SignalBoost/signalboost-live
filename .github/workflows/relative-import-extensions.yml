@@ -1,0 +1,42 @@
+name: Relative Import Extensions
+
+on:
+  pull_request:
+    paths:
+      - 'saas/**/*.ts'
+      - 'saas/**/*.tsx'
+      - 'saas/scripts/validate-relative-import-extensions.mjs'
+      - '.github/workflows/relative-import-extensions.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/**/*.ts'
+      - 'saas/**/*.tsx'
+      - 'saas/scripts/validate-relative-import-extensions.mjs'
+      - '.github/workflows/relative-import-extensions.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: relative-import-extensions-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate relative TypeScript imports
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate relative TypeScript import extensions
+        working-directory: saas
+        run: node scripts/validate-relative-import-extensions.mjs

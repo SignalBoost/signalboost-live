@@ -8,6 +8,13 @@ export { canonicalize, encodeToken, signingInput, verifyLicense, TOKEN_PREFIX } 
 export { createEntitlementGate, createUnlicensedDevelopmentGate, type EntitlementGate } from './enforce.ts';
 export { issueLicense, generateIssuerKeyPair } from './issue.ts';
 export {
+  guardWithEntitlement,
+  unmatchedGuards,
+  type GuardOptions,
+  type GuardedMethod,
+  type EntitlementRefusal,
+} from './guard.ts';
+export {
   createStaticRevocationList,
   createCachingRevocationSource,
   mergeRevocationSources,

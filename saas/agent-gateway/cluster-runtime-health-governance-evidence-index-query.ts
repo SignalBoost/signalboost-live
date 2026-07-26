@@ -65,15 +65,27 @@ function uniqueStrings(value: unknown, field: string): readonly string[] {
 
 function validateIndex(index: ClusterRuntimeHealthGovernanceEvidenceIndex): void {
   if (!index || index.schemaVersion !== 'agent-gateway-cluster-runtime-health-governance-evidence-index-v1') throw new Error('invalid cluster runtime health governance evidence query index')
-  if (!index.indexId || !index.clusterId || !index.bundleId || !Number.isFinite(Date.parse(index.generatedAt))) throw new Error('invalid cluster runtime health governance evidence query identity')
+  if (!index.indexId || !index.clusterId || !index.bundleId || !index.manifestId || !index.registryId || !index.catalogId || !index.archiveId || !index.snapshotId || !Number.isFinite(Date.parse(index.generatedAt))) throw new Error('invalid cluster runtime health governance evidence query identity')
   if (index.entryCount !== index.entries.length) throw new Error('invalid cluster runtime health governance evidence query count')
   if (index.integrity.algorithm !== 'fnv1a-32' || index.integrity.canonical !== true || index.integrity.appendOnlyCompatible !== true || !/^[0-9a-f]{8}$/.test(index.integrity.digest)) throw new Error('invalid cluster runtime health governance evidence query integrity')
   if (index.executable !== false || index.safety.readOnly !== true || index.safety.advisoryOnly !== true || index.safety.automaticRetryEnabled !== false || index.safety.automaticRepairEnabled !== false || index.safety.infrastructureMutationEnabled !== false) throw new Error('unsafe cluster runtime health governance evidence query index')
   for (const entry of index.entries) {
-    if (entry.schemaVersion !== 'agent-gateway-cluster-runtime-health-governance-evidence-index-entry-v1' || !entry.artifactId || !entry.schema || !Number.isFinite(Date.parse(entry.generatedAt)) || !/^[0-9a-f]{8}$/.test(entry.integrityDigest) || entry.retentionClass !== 'governance-evidence' || entry.readOnly !== true || entry.executable !== false || !Array.isArray(entry.provenance)) {
+    if (entry.schemaVersion !== 'agent-gateway-cluster-runtime-health-governance-evidence-index-entry-v1' || !entry.artifactId || !entry.schema || entry.generatedAt !== index.generatedAt || !/^[0-9a-f]{8}$/.test(entry.integrityDigest) || entry.retentionClass !== 'governance-evidence' || entry.readOnly !== true || entry.executable !== false || !Array.isArray(entry.provenance) || entry.provenance.some(value => typeof value !== 'string' || value.length === 0)) {
       throw new Error('invalid cluster runtime health governance evidence query entry')
     }
   }
+  const expectedDigest = digest({
+    bundleId: index.bundleId,
+    manifestId: index.manifestId,
+    registryId: index.registryId,
+    catalogId: index.catalogId,
+    archiveId: index.archiveId,
+    snapshotId: index.snapshotId,
+    entries: index.entries,
+    statistics: index.statistics,
+    schemaInventory: index.schemaInventory,
+  })
+  if (expectedDigest !== index.integrity.digest) throw new Error('invalid cluster runtime health governance evidence query integrity digest')
 }
 
 export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
@@ -90,10 +102,11 @@ export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
   const limit = query.limit === undefined ? 50 : query.limit
   if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error('invalid cluster runtime health governance evidence index query limit')
 
+  const filterIdentity = digest({ artifactIds, kinds, schemas, provenance })
   let offset = 0
   if (query.cursor !== undefined) {
     if (typeof query.cursor !== 'string') throw new Error('invalid cluster runtime health governance evidence index query cursor')
-    const match = new RegExp(`^${index.integrity.digest}:(\\d+)$`).exec(query.cursor)
+    const match = new RegExp(`^${index.integrity.digest}:${filterIdentity}:(\\d+)$`).exec(query.cursor)
     if (!match) throw new Error('invalid cluster runtime health governance evidence index query cursor')
     offset = Number(match[1])
     if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('invalid cluster runtime health governance evidence index query cursor')
@@ -109,8 +122,8 @@ export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
   if (offset > matches.length) throw new Error('invalid cluster runtime health governance evidence index query cursor range')
   const entries = Object.freeze(matches.slice(offset, offset + limit))
   const nextOffset = offset + entries.length
-  const nextCursor = nextOffset < matches.length ? `${index.integrity.digest}:${nextOffset}` : null
-  const integrity = Object.freeze({ algorithm: 'fnv1a-32' as const, digest: digest({ indexId: index.indexId, normalized, offset, entries, nextCursor }), canonical: true as const })
+  const nextCursor = nextOffset < matches.length ? `${index.integrity.digest}:${filterIdentity}:${nextOffset}` : null
+  const integrity = Object.freeze({ algorithm: 'fnv1a-32' as const, digest: digest({ indexId: index.indexId, normalized, filterIdentity, offset, entries, nextCursor }), canonical: true as const })
 
   return Object.freeze({
     schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-index-query-result-v1',

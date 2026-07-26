@@ -7,3 +7,9 @@ export * from './types.ts';
 export { canonicalize, encodeToken, signingInput, verifyLicense, TOKEN_PREFIX } from './verify.ts';
 export { createEntitlementGate, createUnlicensedDevelopmentGate, type EntitlementGate } from './enforce.ts';
 export { issueLicense, generateIssuerKeyPair } from './issue.ts';
+export {
+  createStaticRevocationList,
+  createCachingRevocationSource,
+  mergeRevocationSources,
+  type CachingRevocationOptions,
+} from './revocation.ts';

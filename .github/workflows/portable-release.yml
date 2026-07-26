@@ -12,6 +12,9 @@ on:
       - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
       - 'saas/provider-hub-core/**'
+      - 'saas/press-media-core/**'
+      - 'saas/portable-kernel/**'
+      - 'saas/portable-audit/**'
       - 'saas/portable-license/**'
       - 'saas/portable-release/**'
       - 'saas/scripts/package-portable.mjs'
@@ -22,6 +25,9 @@ on:
       - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
       - 'saas/provider-hub-core/**'
+      - 'saas/press-media-core/**'
+      - 'saas/portable-kernel/**'
+      - 'saas/portable-audit/**'
       - 'saas/portable-license/**'
       - 'saas/portable-release/**'
       - 'saas/scripts/package-portable.mjs'
@@ -37,6 +43,7 @@ jobs:
       matrix:
         spec:
           - self-healing.release.json
+          - press-media.release.json
           - provider-hub.release.json
     steps:
       - uses: actions/checkout@v4

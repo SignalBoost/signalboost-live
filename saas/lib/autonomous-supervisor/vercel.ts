@@ -1,3 +1,4 @@
+// saas/lib/autonomous-supervisor/vercel.ts
 import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
 import { stageInfrastructurePR } from '@/lib/hub/pr-engine'
@@ -47,7 +48,12 @@ export async function normalizeVercelIncident(input: any): Promise<NormalizedInc
   }
 
   return {
-    incident_id: String(input?.incident_id || `INC-SB-${new Date(timestamp).getUTCFullYear()}-${shortHash(`${project}:${timestamp}:${summary}`)}`),
+    // STABLE BY ROOT CAUSE, not by moment. The timestamp used to be part of this hash, so
+    // one broken commit produced a NEW incident id for every failed build — nine approval
+    // PRs for a single unterminated string. Hashing project + error summary means repeated
+    // failures of the same cause collapse onto one incident, which is what makes the
+    // downstream PR fingerprint dedupe work at all.
+    incident_id: String(input?.incident_id || `INC-SB-${new Date(timestamp).getUTCFullYear()}-${shortHash(`${project}:${summary}`)}`),
     timestamp,
     provider: 'Vercel',
     project,

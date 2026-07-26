@@ -61,6 +61,11 @@ export const PORTABLE_ACTIVITY_SOURCES: Readonly<Record<string, readonly Portabl
     { table: 'user_provider_configs', timestampColumn: 'created_at', meaning: 'connected user provider credentials' },
   ]),
   'self-healing-supervisor': Object.freeze([
+    // The webhook path — detect, diagnose, dispatch, stage — writes HERE and nowhere else.
+    // The three tables below belong to the executor and health-observation paths, which this
+    // pipeline does not touch. Leaving them as the only sources meant a supervisor that had
+    // just staged nine real repairs still reported "Not connected".
+    { table: 'infrastructure_prs', timestampColumn: 'created_at', meaning: 'infrastructure changes staged for approval, including supervisor-diagnosed repairs' },
     { table: 'supervisor_dispatch_ledger', timestampColumn: 'claimed_at', meaning: 'repair dispatches claimed' },
     { table: 'supervisor_executions', timestampColumn: 'created_at', meaning: 'supervisor executions recorded' },
     { table: 'vercel_deployment_health_runs', timestampColumn: 'created_at', meaning: 'deployment health observations' },

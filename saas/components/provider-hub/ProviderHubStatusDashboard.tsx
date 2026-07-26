@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Connection = {
   schemaVersion: string
@@ -31,21 +32,21 @@ const copy = {
   ru: { title: 'Ваши подключения к провайдерам', notice: 'Эта панель доступна только для чтения. Она никогда не раскрывает, не копирует, не расшифровывает и не возвращает учетные данные провайдера.', unavailable: 'Статус недоступен', loadError: 'Не удалось загрузить статус Provider Hub.', loading: 'Загрузка статуса подключения…', section: 'Статус подключения провайдера', none: 'Провайдер не настроен', state: 'Состояние подключения', auth: 'Аутентификация', configured: 'Учетные данные настроены', yes: 'Да', no: 'Нет', tenant: 'Арендатор', environment: 'Среда', id: 'Идентификатор подключения', updated: 'Обновлено', noMetadata: 'Для этой аутентифицированной области нет метаданных подключения.', fields: 'Настроенные поля', actions: 'Доступные действия', notices: 'Уведомления' },
 } as const
 
-function resolveLocale(): Locale {
-  if (typeof document === 'undefined') return 'en'
-  const candidate = (document.documentElement.lang || navigator.language || 'en').toLowerCase().split('-')[0]
+function normalizeLocale(value: string): Locale {
+  const candidate = value.toLowerCase().split('-')[0]
   return candidate === 'es' || candidate === 'pt' || candidate === 'pl' || candidate === 'ru' ? candidate : 'en'
 }
 
 export default function ProviderHubStatusDashboard({ endpoint, title }: { endpoint: string; title?: string }) {
+  const { lang } = useI18n()
+  const locale = normalizeLocale(lang)
   const [surface, setSurface] = useState<StatusSurface | null>(null)
   const [error, setError] = useState('')
-  const [locale, setLocale] = useState<Locale>('en')
   const text = useMemo(() => copy[locale], [locale])
 
-  useEffect(() => { setLocale(resolveLocale()) }, [])
   useEffect(() => {
     let active = true
+    setError('')
     fetch(endpoint, { method: 'GET', cache: 'no-store' })
       .then(async response => {
         const body = await response.json() as StatusSurface & { error?: string }

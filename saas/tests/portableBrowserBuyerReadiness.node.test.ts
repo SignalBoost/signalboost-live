@@ -17,15 +17,12 @@ import {
   summarizeCatalogBuyerReadiness,
 } from '../lib/portable-browser/browser-buyer-readiness.ts'
 
-/** Vendors whose buyer contract is declared. Move an id here only when its entry states its fields. */
-const CONTRACTED = [
-  'aws-agentcore-browser',
-  'azure-playwright',
-  'browserstack',
-  'lambdatest',
-  'sauce-labs',
-  'selenium-grid',
-]
+/**
+ * Every vendor in the catalog now states what a buyer must supply. This list is the whole
+ * catalog on purpose — if a vendor is added without a contract, these tests fail rather than
+ * letting it ship as a brochure entry.
+ */
+const CONTRACTED = allPortableBrowserAdapterDescriptors.map((d) => d.adapterId)
 
 const byId = (id: string) => {
   const found = allPortableBrowserAdapterDescriptors.find((d) => d.adapterId === id)
@@ -112,22 +109,33 @@ test('an optional field may be omitted — selenium grid inside a buyer network 
 })
 
 test('a vendor that declares NO contract is never reported ready, even with a full configuration', () => {
-  const undeclared = allPortableBrowserAdapterDescriptors.find(
-    (d) => !CONTRACTED.includes(d.adapterId) && d.configurationFieldDefinitions.length === 0,
-  )
-  assert.ok(undeclared, 'expected at least one vendor still without a contract')
-  const readiness = describeBrowserAdapterBuyerReadiness(undeclared!, { anything: 'at all' })
+  // Synthetic on purpose: no catalog vendor is in this state any more, and the rule still
+  // has to hold for the next vendor someone adds.
+  const undeclared = {
+    ...allPortableBrowserAdapterDescriptors[0],
+    adapterId: 'unwired-vendor',
+    displayName: 'Unwired Vendor',
+    configurationFieldDefinitions: [],
+  }
+  const readiness = describeBrowserAdapterBuyerReadiness(undeclared as any, { anything: 'at all' })
   assert.equal(readiness.declaresConfigurationContract, false)
   assert.equal(readiness.ready, false)
   assert.match(readiness.summary, /cannot tell what to supply/i)
 })
 
-test('the catalog-wide gap is a number someone can watch shrink', () => {
+test('EVERY vendor in the catalog states what a buyer must supply — the gap is closed', () => {
   const summary = summarizeCatalogBuyerReadiness(allPortableBrowserAdapterDescriptors)
   assert.equal(summary.total, allPortableBrowserAdapterDescriptors.length)
   assert.deepEqual(summary.withContract, [...CONTRACTED].sort())
-  assert.equal(summary.withContract.length + summary.withoutContract.length, summary.total)
-  assert.ok(summary.withoutContract.length > 0, 'when this hits zero, every vendor is buyer-ready')
+  assert.deepEqual(summary.withoutContract, [], 'a vendor was added without a buyer contract')
+})
+
+test('every vendor requires approved origins — a session may never roam', () => {
+  for (const descriptor of allPortableBrowserAdapterDescriptors) {
+    const origins = descriptor.configurationFieldDefinitions.find((f) => f.key === 'approvedOrigins')
+    assert.ok(origins, `${descriptor.adapterId} does not require approvedOrigins`)
+    assert.equal(origins!.required, true, `${descriptor.adapterId} treats approvedOrigins as optional`)
+  }
 })
 
 test('a typo in a supplied key is surfaced rather than silently ignored', () => {

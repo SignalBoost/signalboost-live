@@ -1,5 +1,5 @@
 // saas/lib/portable-products/support-boundary-evidence.ts
-import { getPortableProduct } from './product-selectors.ts'
+import { portableProductRegistry } from './product-registry.ts'
 
 export const portableSupportBoundaryEvidenceSchemaVersion = 'portable-support-boundary-evidence.v1' as const
 
@@ -53,7 +53,8 @@ function uniqueNonEmpty(values: readonly string[]): boolean {
 export function validatePortableSupportBoundaryEvidence(input: PortableSupportBoundaryEvidenceInput): PortableSupportBoundaryEvidence {
   const blockers = new Set<PortableSupportBoundaryEvidenceBlocker>()
 
-  if (!getPortableProduct(input.productId)) blockers.add('identity')
+  const registered = portableProductRegistry.some(entry => entry.manifest.productId === input.productId)
+  if (!registered) blockers.add('identity')
   if (!safeId.test(input.tenantId) || !safeId.test(input.environmentId)) blockers.add('scope')
   if (!input.supportOwner.trim() || !input.serviceWindow.trim() || !uniqueNonEmpty(input.responseTargets) || !uniqueNonEmpty(input.exclusions)) blockers.add('coverage')
   if (!safeReference.test(input.escalationPathReference) || !safeReference.test(input.maintenancePolicyReference)) blockers.add('references')

@@ -45,11 +45,30 @@ export interface PortableCommercialReadinessReport {
 }
 
 /**
- * Explicit commercial evidence only. Empty declarations are intentional: architecture,
- * manifest metadata, preview routes, and documentation references do not prove packaging,
- * licensing, fulfillment, deployment acceptance, or support readiness.
+ * Explicit commercial evidence only. Architecture and documentation references are counted only
+ * when they directly establish the named delivery boundary. Missing package, integrity, licensing,
+ * fulfillment, or clean-environment acceptance evidence remains intentionally fail-closed.
  */
-const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCommercialReadinessDimension, readonly string[]>>>>({})
+const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCommercialReadinessDimension, readonly string[]>>>>({
+  'provider-hub': Object.freeze({
+    'buyer-installation': Object.freeze([
+      'docs/portables/provider-hub-security-operations-acceptance.md#5-installation-and-configuration',
+    ]),
+    'operations-recovery': Object.freeze([
+      'docs/portables/provider-hub-security-operations-acceptance.md#6-upgrade-migration-and-rollback',
+      'docs/portables/provider-hub-security-operations-acceptance.md#7-backup-and-recovery',
+    ]),
+    'buyer-configuration': Object.freeze([
+      'docs/portables/provider-hub-byok-portable.md#dual-audience-contract',
+      'docs/portables/provider-hub-security-operations-acceptance.md#53-required-production-configuration-record',
+    ]),
+    'support-boundary': Object.freeze([
+      'docs/portables/provider-hub-security-operations-acceptance.md#1-scope-and-verified-implementation-state',
+      'docs/portables/provider-hub-security-operations-acceptance.md#4-compliance-and-evidence-responsibility-matrix',
+      'docs/portables/provider-hub-security-operations-acceptance.md#10-permanent-safety-notices',
+    ]),
+  }),
+})
 
 function freezeCheck(
   dimension: PortableCommercialReadinessDimension,

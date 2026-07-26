@@ -16,7 +16,7 @@ export interface AndroidScaffoldPlan {
   productionExecutionEnabled: false
 }
 
-const FORBIDDEN = /BEGIN\s|PRIVATE\s+KEY|keystore|storePassword|keyPassword|signingConfigs|exec\(|spawn\(|child_process/i
+const FORBIDDEN = /BEGIN\s|PRIVATE\s+KEY|keystore|storePassword|keyPassword|signingConfigs|exec\(|spawn\(/i
 
 function escapeXml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')

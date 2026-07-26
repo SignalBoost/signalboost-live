@@ -28,10 +28,15 @@ export const dynamic = 'force-dynamic'
 /** Presence only. The value is never read into the response. */
 const present = (name: string): boolean => Boolean(process.env[name] && String(process.env[name]).trim())
 
-const SUPERVISOR_TABLES: readonly { table: string; timestampColumn: string; meaning: string }[] = Object.freeze([
-  { table: 'supervisor_dispatch_ledger', timestampColumn: 'claimed_at', meaning: 'repair dispatches claimed' },
-  { table: 'supervisor_executions', timestampColumn: 'created_at', meaning: 'supervisor executions recorded' },
-  { table: 'vercel_deployment_health_runs', timestampColumn: 'created_at', meaning: 'deployment health observations' },
+// infrastructure_prs FIRST, because it is the only one this pipeline writes. The original
+// list held the other three alone, so a supervisor that had just staged nine real repairs
+// still reported NEVER EXERCISED — a checklist that reports failure on a working system is
+// worse than no checklist.
+const SUPERVISOR_TABLES: readonly { table: string; timestampColumn: string; meaning: string; provesTheWebhookPath: boolean }[] = Object.freeze([
+  { table: 'infrastructure_prs', timestampColumn: 'created_at', meaning: 'repairs staged for approval — what THIS pipeline writes', provesTheWebhookPath: true },
+  { table: 'supervisor_dispatch_ledger', timestampColumn: 'claimed_at', meaning: 'repair dispatches claimed (executor path, not this one)', provesTheWebhookPath: false },
+  { table: 'supervisor_executions', timestampColumn: 'created_at', meaning: 'supervisor executions recorded (executor path, not this one)', provesTheWebhookPath: false },
+  { table: 'vercel_deployment_health_runs', timestampColumn: 'created_at', meaning: 'deployment health observations (observer path, not this one)', provesTheWebhookPath: false },
 ])
 
 export async function GET(req: NextRequest) {
@@ -105,14 +110,18 @@ export async function GET(req: NextRequest) {
     blockers.push(`These supervisor tables could not be read, so nothing can be recorded: ${unreadable.join(', ')}.`)
   }
 
-  const totalRows = tables.reduce((sum, t) => sum + (t.rowCount ?? 0), 0)
+  // Only the webhook path's own table counts as proof that THIS pipeline ran.
+  const provingTables = new Set(SUPERVISOR_TABLES.filter((t) => t.provesTheWebhookPath).map((t) => t.table))
+  const totalRows = tables
+    .filter((t) => provingTables.has(t.table))
+    .reduce((sum, t) => sum + (t.rowCount ?? 0), 0)
   const configured = blockers.length === 0
 
   const verdict = !configured
     ? 'NOT READY — the pipeline cannot complete a run until the blockers below are cleared.'
     : totalRows === 0
       ? 'CONFIGURED, NEVER EXERCISED — everything the pipeline needs is present, but no incident has ever run through it. Trigger a failing PREVIEW deployment: production is untouched by a failed build, and the run will be real.'
-      : `EXERCISED — ${totalRows} recorded row${totalRows === 1 ? '' : 's'} across the supervisor tables.`
+      : `EXERCISED — ${totalRows} staged approval${totalRows === 1 ? '' : 's'} in infrastructure_prs. Detection, diagnosis and staging have all run.`
 
   return NextResponse.json({
     ok: true,

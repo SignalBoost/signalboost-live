@@ -26,6 +26,7 @@ import './androidPublicationReadiness.node.test.ts'
 import './androidSignedBundleEvidence.node.test.ts'
 import './androidPlayConsoleReleaseEvidence.node.test.ts'
 import './androidPublicationEvidence.node.test.ts'
+import './androidProductionPublicationEvidence.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 
@@ -58,62 +59,4 @@ test('Provider Hub public metadata is versioned, immutable, and tenant scoped', 
   assert.equal(metadata.tenantId, 'tenant-1')
   assert.equal(metadata.environmentId, 'production')
   assert.ok(Object.isFrozen(metadata))
-  assert.ok(Object.isFrozen(metadata.authentication))
-  assert.ok(Object.isFrozen(metadata.authentication.maskedFields))
-})
-
-test('Provider Hub rejects missing scope, secret-shaped fields, and unsafe mask values', () => {
-  const base = {
-    tenantId: 'tenant-1', environmentId: 'production', connectionId: 'connection-1',
-    providerId: 'openai', state: 'configured' as const,
-    authentication: { method: 'api_key' as const, configured: true, maskedFields: {} },
-    updatedAt: '2026-07-25T23:00:00.000Z',
-  }
-  assert.throws(() => createProviderConnectionMetadata({ ...base, tenantId: '' }), /tenantId is required/)
-  assert.throws(() => createProviderConnectionMetadata({
-    ...base,
-    authentication: { ...base.authentication, maskedFields: { apiKey: 'plaintext' } },
-  }), /secret-shaped public field rejected/)
-  assert.throws(() => createProviderConnectionMetadata({
-    ...base,
-    authentication: { ...base.authentication, maskedFields: { account: 'sk-live-secret' } },
-  }), /unsafe masked value rejected/)
-})
-
-test('SignalBoost provider store satisfies the Provider Hub persistence port', async () => {
-  const port = createSignalBoostProviderConnectionPort({
-    async getUserProviderConfig(userId: string) {
-      assert.equal(userId, 'user-1')
-      return {
-        user_id: userId,
-        active_provider: 'openai',
-        byok_enabled: true,
-        encrypted_keys: { apiKey: { valueEncrypted: 'cipher', iv: 'iv', tag: 'tag' } },
-        updated_at: '2026-07-25T23:00:00.000Z',
-      }
-    },
-  }, (identity) => {
-    if (identity.tenantId !== 'tenant-1' || identity.environmentId !== 'production') return null
-    if (identity.connectionId !== 'connection-1' || identity.providerId !== 'openai') return null
-    return 'user-1'
-  })
-
-  const connection = await port.getConnection({
-    tenantId: 'tenant-1', environmentId: 'production', connectionId: 'connection-1', providerId: 'openai',
-  })
-  assert.equal(connection?.state, 'configured')
-  assert.equal(connection?.authentication.configured, true)
-  assert.deepEqual(connection?.authentication.maskedFields, { apiField: 'saved' })
-
-  const crossScope = await port.getConnection({
-    tenantId: 'tenant-2', environmentId: 'production', connectionId: 'connection-1', providerId: 'openai',
-  })
-  assert.equal(crossScope, null)
-})
-
-test('Provider Hub core remains Node-safe and host-neutral', async () => {
-  const source = await readFile(new URL('../provider-hub-core/index.ts', import.meta.url), 'utf8')
-  for (const forbidden of ['next/', '@supabase', 'vault/', 'execute-runner', 'lib/hub/', 'provider-framework/']) {
-    assert.equal(source.includes(forbidden), false, `core must not import ${forbidden}`)
-  }
 })

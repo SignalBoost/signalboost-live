@@ -1,3 +1,4 @@
+// saas/tests/androidPackagingReadiness.node.test.ts
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
@@ -12,10 +13,13 @@ test('Provider Hub Android packaging metadata is deterministic and non-productio
   assert.equal(providerHubAndroidPackaging.schemaVersion, ANDROID_PACKAGING_SCHEMA_VERSION)
   assert.equal(providerHubAndroidPackaging.portableId, 'provider-hub')
   assert.equal(providerHubAndroidPackaging.shell, 'twa')
-  assert.equal(providerHubAndroidPackaging.state, 'metadata_ready')
+  assert.equal(providerHubAndroidPackaging.state, 'build_ready')
   assert.equal(providerHubAndroidPackaging.signing.productionKeyConfigured, false)
+  assert.equal(providerHubAndroidPackaging.distribution.playConsoleAppCreated, false)
+  assert.equal(providerHubAndroidPackaging.distribution.internalTestingPublished, false)
   assert.equal(providerHubAndroidPackaging.distribution.productionPublished, false)
   assert.ok(providerHubAndroidPackaging.icons.some((icon) => icon.purpose.includes('maskable')))
+  assert.deepEqual(providerHubAndroidPackaging.icons.map(icon => icon.src).sort(), ['/icons/provider-hub-192.svg', '/icons/provider-hub-512-maskable.svg'])
   assert.ok(Object.isFrozen(providerHubAndroidPackaging))
 })
 

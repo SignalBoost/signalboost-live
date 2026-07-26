@@ -1,177 +1,99 @@
-// saas/agent-gateway/cluster-runtime-health-governance-evidence-catalog.ts
-// Deterministic immutable catalog for runtime health governance evidence.
+// saas/agent-gateway/cluster-runtime-health-governance-evidence-catalog.test.ts
+import assert from 'node:assert/strict'
+import test from 'node:test'
 
-import type {
-  ClusterRuntimeHealthGovernanceEvidenceDirectory,
-  ClusterRuntimeHealthGovernanceEvidenceDirectoryEntry,
-} from './cluster-runtime-health-governance-evidence-directory.ts'
+import { createClusterRuntimeHealthGovernanceEvidenceCatalog } from './cluster-runtime-health-governance-evidence-catalog.ts'
+import type { ClusterRuntimeHealthGovernanceEvidenceDirectory } from './cluster-runtime-health-governance-evidence-directory.ts'
 
-export interface ClusterRuntimeHealthGovernanceEvidenceCatalogEntry {
-  schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-catalog-entry-v1'
-  artifactId: string
-  kind: ClusterRuntimeHealthGovernanceEvidenceDirectoryEntry['kind'] | 'governance-evidence-directory'
-  schema: string
-  generatedAt: string
-  integrityDigest: string
-  provenance: readonly string[]
-  retentionClass: 'governance-evidence'
-  readOnly: true
-  executable: false
-}
+const generatedAt = '2026-07-26T00:00:00.000Z'
 
-export interface ClusterRuntimeHealthGovernanceEvidenceCatalog {
-  schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-catalog-v1'
-  evidenceCatalogId: string
-  clusterId: string
-  generatedAt: string
-  directoryId: string
-  indexId: string
-  bundleId: string
-  manifestId: string
-  registryId: string
-  catalogId: string
-  archiveId: string
-  snapshotId: string
-  entryCount: number
-  entries: readonly ClusterRuntimeHealthGovernanceEvidenceCatalogEntry[]
-  statistics: Readonly<Record<string, number>>
-  schemaInventory: Readonly<Record<string, number>>
-  integrity: Readonly<{ algorithm: 'fnv1a-32'; digest: string; canonical: true; appendOnlyCompatible: true }>
-  retentionClass: 'governance-evidence'
-  safety: Readonly<{
-    readOnly: true
-    advisoryOnly: true
-    automaticRetryEnabled: false
-    automaticRepairEnabled: false
-    infrastructureMutationEnabled: false
-  }>
-  executable: false
-}
-
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
-function digest(value: unknown): string {
-  const input = canonical(value)
-  let hash = 0x811c9dc5
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193) >>> 0
-  }
-  return hash.toString(16).padStart(8, '0')
-}
-
-function sortedCounts(values: readonly string[]): Readonly<Record<string, number>> {
-  const counts = values.reduce<Record<string, number>>((result, value) => {
-    result[value] = (result[value] ?? 0) + 1
-    return result
-  }, {})
-  return Object.freeze(Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right))))
-}
-
-export function createClusterRuntimeHealthGovernanceEvidenceCatalog(
-  directory: ClusterRuntimeHealthGovernanceEvidenceDirectory,
-): ClusterRuntimeHealthGovernanceEvidenceCatalog {
-  if (!directory || directory.schemaVersion !== 'agent-gateway-cluster-runtime-health-governance-evidence-directory-v1') {
-    throw new Error('invalid cluster runtime health governance evidence catalog directory')
-  }
-  if (
-    directory.executable !== false || directory.safety.readOnly !== true || directory.safety.advisoryOnly !== true ||
-    directory.safety.automaticRetryEnabled !== false || directory.safety.automaticRepairEnabled !== false ||
-    directory.safety.infrastructureMutationEnabled !== false
-  ) {
-    throw new Error('unsafe cluster runtime health governance evidence catalog directory')
-  }
-  if (
-    !directory.directoryId || !directory.indexId || !directory.bundleId || !directory.manifestId ||
-    !directory.registryId || !directory.catalogId || !directory.archiveId || !directory.snapshotId ||
-    !directory.clusterId || !Number.isFinite(Date.parse(directory.generatedAt))
-  ) {
-    throw new Error('invalid cluster runtime health governance evidence catalog identity')
-  }
-  if (
-    directory.integrity.algorithm !== 'fnv1a-32' || directory.integrity.canonical !== true ||
-    directory.integrity.appendOnlyCompatible !== true || !/^[0-9a-f]{8}$/.test(directory.integrity.digest)
-  ) {
-    throw new Error('invalid cluster runtime health governance evidence catalog integrity')
-  }
-  if (directory.entryCount !== directory.entries.length) {
-    throw new Error('invalid cluster runtime health governance evidence catalog count')
-  }
-
-  const rawEntries: ClusterRuntimeHealthGovernanceEvidenceCatalogEntry[] = directory.entries.map(entry => {
-    if (
-      entry.schemaVersion !== 'agent-gateway-cluster-runtime-health-governance-evidence-directory-entry-v1' ||
-      entry.generatedAt !== directory.generatedAt || entry.readOnly !== true || entry.executable !== false ||
-      entry.retentionClass !== 'governance-evidence' || !entry.artifactId || !entry.schema ||
-      !/^[0-9a-f]{8}$/.test(entry.integrityDigest)
-    ) {
-      throw new Error('invalid cluster runtime health governance evidence catalog entry')
-    }
-    return Object.freeze({
-      schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-catalog-entry-v1' as const,
-      artifactId: entry.artifactId,
-      kind: entry.kind,
-      schema: entry.schema,
-      generatedAt: entry.generatedAt,
-      integrityDigest: entry.integrityDigest,
-      provenance: Object.freeze([...entry.provenance, directory.directoryId]),
-      retentionClass: entry.retentionClass,
-      readOnly: true as const,
-      executable: false as const,
-    })
-  })
-
-  rawEntries.push(Object.freeze({
-    schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-catalog-entry-v1',
-    artifactId: directory.directoryId,
-    kind: 'governance-evidence-directory',
-    schema: directory.schemaVersion,
-    generatedAt: directory.generatedAt,
-    integrityDigest: directory.integrity.digest,
-    provenance: Object.freeze(['agent-gateway-runtime-health']),
-    retentionClass: directory.retentionClass,
-    readOnly: true,
-    executable: false,
-  }))
-
-  const entries = [...new Map(rawEntries.map(entry => [entry.artifactId, entry])).values()]
-    .sort((left, right) => left.kind.localeCompare(right.kind) || left.artifactId.localeCompare(right.artifactId))
-  const statistics = sortedCounts(entries.map(entry => entry.kind))
-  const schemaInventory = sortedCounts(entries.map(entry => entry.schema))
-  const integrity = Object.freeze({
-    algorithm: 'fnv1a-32' as const,
-    digest: digest({ directoryId: directory.directoryId, indexId: directory.indexId, bundleId: directory.bundleId, manifestId: directory.manifestId, registryId: directory.registryId, catalogId: directory.catalogId, archiveId: directory.archiveId, snapshotId: directory.snapshotId, entries, statistics, schemaInventory }),
-    canonical: true as const,
-    appendOnlyCompatible: true as const,
-  })
-
-  return Object.freeze({
-    schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-catalog-v1',
-    evidenceCatalogId: `${directory.clusterId}:${directory.generatedAt}:${directory.integrity.digest}:${integrity.digest}`,
-    clusterId: directory.clusterId,
-    generatedAt: directory.generatedAt,
-    directoryId: directory.directoryId,
-    indexId: directory.indexId,
-    bundleId: directory.bundleId,
-    manifestId: directory.manifestId,
-    registryId: directory.registryId,
-    catalogId: directory.catalogId,
-    archiveId: directory.archiveId,
-    snapshotId: directory.snapshotId,
-    entryCount: entries.length,
-    entries: Object.freeze(entries),
-    statistics,
-    schemaInventory,
-    integrity,
-    retentionClass: directory.retentionClass,
+function directory(): ClusterRuntimeHealthGovernanceEvidenceDirectory {
+  return {
+    schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-directory-v1',
+    directoryId: 'cluster-a:directory',
+    clusterId: 'cluster-a',
+    generatedAt,
+    indexId: 'cluster-a:index',
+    bundleId: 'cluster-a:bundle',
+    manifestId: 'cluster-a:manifest',
+    registryId: 'cluster-a:registry',
+    catalogId: 'cluster-a:catalog',
+    archiveId: 'cluster-a:archive',
+    snapshotId: 'cluster-a:snapshot',
+    entryCount: 2,
+    entries: [
+      {
+        schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-directory-entry-v1',
+        artifactId: 'artifact-b',
+        kind: 'governance-registry-manifest',
+        schema: 'schema-b',
+        generatedAt,
+        integrityDigest: '22222222',
+        provenance: ['root'],
+        retentionClass: 'governance-evidence',
+        readOnly: true,
+        executable: false,
+      },
+      {
+        schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-directory-entry-v1',
+        artifactId: 'artifact-a',
+        kind: 'governance-registry',
+        schema: 'schema-a',
+        generatedAt,
+        integrityDigest: '11111111',
+        provenance: ['root'],
+        retentionClass: 'governance-evidence',
+        readOnly: true,
+        executable: false,
+      },
+    ],
+    statistics: Object.freeze({}),
+    schemaInventory: Object.freeze({}),
+    integrity: Object.freeze({ algorithm: 'fnv1a-32', digest: '1234abcd', canonical: true, appendOnlyCompatible: true }),
+    retentionClass: 'governance-evidence',
     safety: Object.freeze({ readOnly: true, advisoryOnly: true, automaticRetryEnabled: false, automaticRepairEnabled: false, infrastructureMutationEnabled: false }),
     executable: false,
-  })
+  }
 }
+
+test('creates deterministic immutable evidence catalog', () => {
+  const first = createClusterRuntimeHealthGovernanceEvidenceCatalog(directory())
+  const second = createClusterRuntimeHealthGovernanceEvidenceCatalog(directory())
+
+  assert.deepEqual(first, second)
+  assert.equal(first.entryCount, 3)
+  assert.deepEqual(first.entries.map(entry => entry.kind), [
+    'governance-evidence-directory',
+    'governance-registry',
+    'governance-registry-manifest',
+  ])
+  assert.equal(first.statistics['governance-evidence-directory'], 1)
+  assert.equal(first.schemaInventory['schema-a'], 1)
+  assert.equal(first.integrity.algorithm, 'fnv1a-32')
+  assert.match(first.integrity.digest, /^[0-9a-f]{8}$/)
+  assert.ok(Object.isFrozen(first))
+  assert.ok(Object.isFrozen(first.entries))
+  assert.ok(Object.isFrozen(first.entries[0]))
+})
+
+test('suppresses duplicate artifact identifiers', () => {
+  const source = directory()
+  source.entries = Object.freeze([source.entries[0], source.entries[0]])
+  source.entryCount = 2
+  const catalog = createClusterRuntimeHealthGovernanceEvidenceCatalog(source)
+  assert.equal(catalog.entryCount, 2)
+})
+
+test('fails closed for unsafe or malformed evidence directories', () => {
+  const unsafe = directory()
+  unsafe.safety = { ...unsafe.safety, infrastructureMutationEnabled: true } as never
+  assert.throws(() => createClusterRuntimeHealthGovernanceEvidenceCatalog(unsafe), /unsafe/)
+
+  const invalidCount = directory()
+  invalidCount.entryCount = 99
+  assert.throws(() => createClusterRuntimeHealthGovernanceEvidenceCatalog(invalidCount), /count/)
+
+  const invalidEntry = directory()
+  invalidEntry.entries = [{ ...invalidEntry.entries[0], generatedAt: '2026-07-25T00:00:00.000Z' }, invalidEntry.entries[1]]
+  assert.throws(() => createClusterRuntimeHealthGovernanceEvidenceCatalog(invalidEntry), /entry/)
+})

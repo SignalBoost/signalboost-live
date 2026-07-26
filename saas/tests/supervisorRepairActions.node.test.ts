@@ -18,10 +18,14 @@ import {
 } from '../agent-gateway-host/supervisor-repair.ts'
 import type { RepairStep } from '../agent-gateway-host/supervisor-repair.ts'
 import {
+  INSPECT_DATABASE_TARGET,
+  INSPECT_VAULT_TARGET,
+  INSPECT_VERCEL_ENV_TARGET,
   PROPOSED_REPAIR_TARGET,
   REPAIR_REVIEW_TEMPLATE,
   SUPERVISOR_REPAIR_ACTIONS,
   resolveSupervisorRepairAction,
+  resolveSupervisorRepairParams,
   summarizeRepairDispatch,
 } from '../agent-gateway-host/supervisor-actions.ts'
 
@@ -59,11 +63,47 @@ function hostWithCapturedStaging() {
 const POLICY: GovernancePolicy = { classifier: defaultConsequenceClassifier, allowlist: [] }
 
 test('the resolver never turns model prose into an executable target', () => {
-  const step = planStep({ action: 'delete the production database', target: 'drop everything' })
-  assert.equal(resolveSupervisorRepairAction(step, INCIDENT), PROPOSED_REPAIR_TARGET)
-  const request = repairStepToRequest(INCIDENT, step, PROPOSED_REPAIR_TARGET, 'autonomous-supervisor')
-  assert.equal(request.action.target, PROPOSED_REPAIR_TARGET)
-  assert.equal(request.action.params?.describedAction, 'delete the production database')
+  // Prose only ever SELECTS among a closed set of constants; it is never used as a target.
+  const step = planStep({ action: 'rm -rf everything and wire $50,000', target: 'anything at all' })
+  const resolved = resolveSupervisorRepairAction(step, INCIDENT)
+  assert.ok(
+    [PROPOSED_REPAIR_TARGET, INSPECT_VERCEL_ENV_TARGET, INSPECT_DATABASE_TARGET, INSPECT_VAULT_TARGET].includes(resolved!),
+    'resolver returned something outside the closed set',
+  )
+  const request = repairStepToRequest(INCIDENT, step, resolved, 'autonomous-supervisor')
+  assert.notEqual(request.action.target, step.action)
+  assert.equal(request.action.params?.describedAction, step.action)
+})
+
+test('the diagnosis picks the evidence action that matches what it says broke', () => {
+  const db = planStep({ action: 'inspect the migration that failed', target: 'database schema', expected_result: 'the schema is consistent' })
+  assert.equal(resolveSupervisorRepairAction(db, INCIDENT), INSPECT_DATABASE_TARGET)
+  const vault = planStep({ action: 'rotate the credential', target: 'vault', expected_result: 'the rotation completes' })
+  assert.equal(resolveSupervisorRepairAction(vault, INCIDENT), INSPECT_VAULT_TARGET)
+  const env = planStep({ action: 'the SUPABASE_SERVICE_ROLE_KEY environment variable is missing', target: 'env' })
+  assert.equal(resolveSupervisorRepairAction(env, INCIDENT), INSPECT_VERCEL_ENV_TARGET)
+})
+
+test('the diagnosis names the VARIABLE and ENVIRONMENT — and never a value', () => {
+  const step = planStep({
+    action: 'Restore the missing SUPABASE_SERVICE_ROLE_KEY in production; set it to sk-do-not-copy-this',
+    target: 'vercel environment variables',
+  })
+  const params = resolveSupervisorRepairParams(step, INCIDENT)
+  assert.equal(params.identifiedVariable, 'SUPABASE_SERVICE_ROLE_KEY')
+  assert.equal(params.identifiedEnvironment, 'production')
+  // Nothing resembling the value is carried, and no extra keys appear.
+  assert.deepEqual(Object.keys(params).sort(), ['identifiedEnvironment', 'identifiedVariable'])
+  assert.ok(!JSON.stringify(params).includes('sk-do-not-copy-this'))
+})
+
+test('NO MUTATING PROVIDER ACTION IS MAPPED — a model can never author a secret into a PR', () => {
+  const mutating = ['vercel.add_env_var', 'vercel.edit_env', 'vercel.delete_env', 'supabase.run_migration', 'vercel.rotate_token']
+  for (const action of SUPERVISOR_REPAIR_ACTIONS) {
+    assert.ok(!mutating.includes(action.templateId), `${action.target} maps to a mutating template`)
+    assert.ok(!(action.allowedParams ?? []).includes('value'), `${action.target} would carry a value`)
+    assert.ok(!(action.allowedParams ?? []).some((p) => /secret|token|password|key$/i.test(p)), `${action.target} would carry a credential`)
+  }
 })
 
 test('a proposed repair halts and is staged as a read-only cockpit PR', async () => {
@@ -74,6 +114,7 @@ test('a proposed repair halts and is staged as a read-only cockpit PR', async ()
     policy: POLICY,
     host,
     resolveAction: resolveSupervisorRepairAction,
+    resolveParams: resolveSupervisorRepairParams,
   })
 
   assert.equal(result.completed, false)
@@ -83,8 +124,11 @@ test('a proposed repair halts and is staged as a read-only cockpit PR', async ()
 
   assert.equal(staged.length, 1)
   assert.equal(staged[0].steps.length, 1)
-  assert.equal(staged[0].steps[0].templateId, REPAIR_REVIEW_TEMPLATE)
+  // A named variable routes to the environment evidence action, not the generic review.
+  assert.equal(staged[0].steps[0].templateId, 'vercel.view_env')
   assert.equal(staged[0].steps[0].provider, 'vercel')
+  // The diagnosis identified the variable, and it reaches the person reading the PR.
+  assert.equal(staged[0].steps[0].payload.identifiedVariable, 'SUPABASE_SERVICE_ROLE_KEY')
   // The diagnosis's own words reach the person reviewing the PR.
   assert.equal(
     staged[0].steps[0].payload.describedAction,
@@ -120,12 +164,17 @@ test('a human-assigned step is never machine-dispatched but is still staged', as
   assert.equal(staged.length, 1)
 })
 
-test('both mapped targets exist and both stage a read-only template', () => {
+test('every mapped target stages a template that is read-only AND has a real handler', () => {
   const targets = SUPERVISOR_REPAIR_ACTIONS.map((a) => a.target).sort()
-  assert.deepEqual(targets, [PROPOSED_REPAIR_TARGET, UNRECOGNIZED_TARGET].sort())
+  assert.deepEqual(targets, [
+    PROPOSED_REPAIR_TARGET, UNRECOGNIZED_TARGET, INSPECT_VERCEL_ENV_TARGET, INSPECT_DATABASE_TARGET, INSPECT_VAULT_TARGET,
+  ].sort())
+  // Each of these is implemented in the hub action route and requires no fields, so merging
+  // one genuinely runs instead of dying.
+  const executable = new Set(['vercel.view_env', 'supabase.list_tables', 'vault.view_keys'])
   for (const action of SUPERVISOR_REPAIR_ACTIONS) {
     assert.equal(action.actionKind, 'supervisor_repair')
-    assert.equal(action.templateId, REPAIR_REVIEW_TEMPLATE)
+    assert.ok(executable.has(action.templateId), `${action.target} maps to ${action.templateId}`)
   }
 })
 

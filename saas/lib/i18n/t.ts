@@ -1,5 +1,5 @@
 import type { Dict } from '@/lib/i18n/loadLanguage'
-import en from '@/locales/en.json'
+import en from '@/locales/en.json' with { type: 'json' }
 import { DASHBOARD_COPY } from '@/lib/i18n/dashboardCopy'
 import { STUDIO_HUB_COPY } from '@/lib/i18n/studioHubCopy'
 import { PLATFORM_COPY } from '@/lib/i18n/platformCopy'

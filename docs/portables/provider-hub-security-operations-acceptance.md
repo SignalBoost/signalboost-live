@@ -25,6 +25,10 @@ Example-only or buyer-supplied:
 
 Not claimed:
 
+The acceptance evidence in this guide verifies the implemented surfaces listed above, in the host
+where they were tested. It does not verify a universally production-ready enterprise deployment.
+Specifically not claimed:
+
 - independent security certification;
 - SOC 2, ISO 27001, FedRAMP, PCI DSS, HIPAA, GDPR, or other regulatory compliance by documentation alone;
 - production load, availability, recovery-time, or recovery-point guarantees;

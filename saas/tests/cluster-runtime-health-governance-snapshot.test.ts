@@ -6,7 +6,7 @@ import type { ClusterRuntimeHealthGovernanceChain } from '../agent-gateway/clust
 
 const generatedAt = '2026-07-26T01:20:00.000Z'
 const safety = Object.freeze({ readOnly: true as const, advisoryOnly: true as const, automaticRetryEnabled: false as const, automaticRepairEnabled: false as const, infrastructureMutationEnabled: false as const })
-const link = Object.freeze({
+const firstLink = Object.freeze({
   schemaVersion: 'agent-gateway-cluster-runtime-health-governance-chain-link-v1' as const,
   position: 0,
   artifactId: 'gateway-east:artifact',
@@ -21,14 +21,15 @@ const link = Object.freeze({
   readOnly: true as const,
   executable: false as const,
 })
+const duplicateLink = Object.freeze({ ...firstLink, position: 1, previousLinkDigest: firstLink.cumulativeDigest, cumulativeDigest: '76543210' })
 const chain = Object.freeze({
   schemaVersion: 'agent-gateway-cluster-runtime-health-governance-chain-v1' as const,
   chainId: 'gateway-east:chain',
   clusterId: 'gateway-east',
   generatedAt,
-  artifactCount: 1,
-  links: Object.freeze([link, link]),
-  headDigest: '89abcdef',
+  artifactCount: 2,
+  links: Object.freeze([firstLink, duplicateLink]),
+  headDigest: '76543210',
   integrity: Object.freeze({ algorithm: 'fnv1a-32' as const, digest: 'fedcba98', canonical: true as const, appendOnly: true as const }),
   retentionClass: 'governance-evidence' as const,
   safety,
@@ -36,12 +37,11 @@ const chain = Object.freeze({
 }) satisfies ClusterRuntimeHealthGovernanceChain
 
 test('creates identical immutable governance snapshots with duplicate suppression', () => {
-  const valid = { ...chain, artifactCount: 2 } as ClusterRuntimeHealthGovernanceChain
-  const first = createClusterRuntimeHealthGovernanceSnapshot(valid)
-  const second = createClusterRuntimeHealthGovernanceSnapshot(valid)
+  const first = createClusterRuntimeHealthGovernanceSnapshot(chain)
+  const second = createClusterRuntimeHealthGovernanceSnapshot(chain)
   assert.deepEqual(first, second)
   assert.equal(first.artifactCount, 2)
-  assert.equal(first.chainHeadDigest, '89abcdef')
+  assert.equal(first.chainHeadDigest, '76543210')
   assert.match(first.cumulativeIntegrityDigest, /^[0-9a-f]{8}$/)
   assert.equal(Object.isFrozen(first), true)
   assert.equal(first.executable, false)
@@ -51,6 +51,6 @@ test('fails closed for malformed, unsafe, mismatched, and broken chain inputs', 
   assert.throws(() => createClusterRuntimeHealthGovernanceSnapshot({ ...chain, schemaVersion: 'bad' } as unknown as ClusterRuntimeHealthGovernanceChain), /invalid/)
   assert.throws(() => createClusterRuntimeHealthGovernanceSnapshot({ ...chain, safety: { ...safety, infrastructureMutationEnabled: true } } as unknown as ClusterRuntimeHealthGovernanceChain), /unsafe/)
   assert.throws(() => createClusterRuntimeHealthGovernanceSnapshot({ ...chain, artifactCount: 1 } as ClusterRuntimeHealthGovernanceChain), /count/)
-  const badLink = { ...link, position: 1 }
-  assert.throws(() => createClusterRuntimeHealthGovernanceSnapshot({ ...chain, artifactCount: 2, links: [badLink, link] } as unknown as ClusterRuntimeHealthGovernanceChain), /link/)
+  const badLink = { ...firstLink, position: 1 }
+  assert.throws(() => createClusterRuntimeHealthGovernanceSnapshot({ ...chain, links: [badLink, duplicateLink] } as unknown as ClusterRuntimeHealthGovernanceChain), /link/)
 })

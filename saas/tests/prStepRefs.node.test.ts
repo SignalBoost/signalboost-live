@@ -162,9 +162,9 @@ test('records each substitution so the merge is auditable', () => {
 })
 
 test('masks a secret-shaped value in the audit trail but still delivers it', () => {
-  const out = resolveStepRefs({ api_key: '{{steps[0].secret}}' }, [{ secret: 'sk_live_123456789' }])
-  assert.equal((out.payload as any).api_key, 'sk_live_123456789', 'provider must receive the real value')
-  assert.ok(!String(out.resolved?.[0].value).includes('123456789'), 'audit trail must not carry the secret')
+  const out = resolveStepRefs({ api_key: '{{steps[0].secret}}' }, [{ secret: 'EXAMPLE_SECRET_PLACEHOLDER_NOT_REAL' }])
+  assert.equal((out.payload as any).api_key, 'EXAMPLE_SECRET_PLACEHOLDER_NOT_REAL', 'provider must receive the real value')
+  assert.ok(!String(out.resolved?.[0].value).includes('PLACEHOLDER_NOT_REAL'), 'audit trail must not carry the secret')
   assert.match(String(out.resolved?.[0].value), /••••/)
 })
 

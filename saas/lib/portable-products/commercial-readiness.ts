@@ -51,6 +51,16 @@ export interface PortableCommercialReadinessReport {
  */
 const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCommercialReadinessDimension, readonly string[]>>>>({
   'provider-hub': Object.freeze({
+    'distribution-package': Object.freeze([
+      'saas/portable-release/provider-hub.release.json',
+      '.github/workflows/portable-release.yml#package-provider-hub-release-json',
+    ]),
+    'integrity-manifest': Object.freeze([
+      'saas/scripts/verify-release.mjs',
+      '.github/workflows/portable-release.yml#verify-the-artifact-independently',
+      '.github/workflows/portable-release.yml#verify-checksums-the-way-a-buyer-would',
+      '.github/workflows/portable-release.yml#prove-the-archive-extracts-and-still-verifies',
+    ]),
     'buyer-installation': Object.freeze([
       'docs/portables/provider-hub-security-operations-acceptance.md#5-installation-and-configuration',
     ]),

@@ -1,3 +1,4 @@
+// saas/lib/portable-products/buyer-handoff-manifest.ts
 import { portableProductRegistry } from './product-registry.ts'
 
 export const portableBuyerHandoffManifestSchemaVersion = 'portable-buyer-handoff-manifest.v2' as const

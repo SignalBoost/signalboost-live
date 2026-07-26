@@ -11,403 +11,54 @@
     "live": "Live",
     "preview": "Preview",
     "open": "Open",
-    "stats": {
-      "workflows": "workflows",
-      "actions": "actions",
-      "markets": "markets",
-      "uptime": "uptime"
-    },
+    "stats": {"workflows":"workflows","actions":"actions","markets":"markets","uptime":"uptime"},
     "modules": {
-      "audit": {
-        "title": "Site Review",
-        "desc": "Check public websites, find problems, and get a clear action list."
-      },
-      "security": {
-        "title": "Security Check",
-        "desc": "Check links, headers, cookies, and HTTPS without entering private systems."
-      },
-      "optimization": {
-        "title": "Improve Your Site",
-        "desc": "Create local content, improve pages, review changes, and launch when ready."
-      }
+      "audit":{"title":"Site Review","desc":"Check public websites, find problems, and get a clear action list."},
+      "security":{"title":"Security Check","desc":"Check links, headers, cookies, and HTTPS without entering private systems."},
+      "optimization":{"title":"Improve Your Site","desc":"Create local content, improve pages, review changes, and launch when ready."}
     },
     "portables": {
-      "providerHub": {
-        "name": "Provider Hub",
-        "desc": "Bring your own AI and business accounts, connected through one governed workspace."
-      },
-      "campaign": {
-        "name": "Campaign Studio",
-        "desc": "One short request becomes a finished campaign."
-      },
-      "integrations": {
-        "name": "Integrations Hub",
-        "desc": "Safe links for sales tools, websites, payments, calendars, AI tools, and APIs."
-      },
-      "render": {
-        "name": "Video Maker",
-        "desc": "Voice and branded video with safe prepaid use."
-      },
-      "console": {
-        "name": "Control Center",
-        "desc": "Keys, webhooks, logs, releases, and activity checks."
-      },
-      "marketingSales": {
-        "name": "Marketing + Sales",
-        "desc": "Marketing and sales work in one tool."
-      },
-      "chiefOfStaff": {
-        "name": "Portable AI Chief of Staff",
-        "desc": "Plans and carries out only approved work through buyer-supplied ports."
-      },
-      "browser": {
-        "name": "Browser Tool",
-        "desc": "Safe browser work with clear limits and checks."
-      },
-      "press": {
-        "name": "Press & Media",
-        "desc": "Reach verified editors and paid wires from one governed engine."
-      },
-      "selfHealing": {
-        "name": "Self-Healing Supervisor",
-        "desc": "Detects its own failures, diagnoses them, and repairs within limits you approve."
-      },
-      "browserAgents": {
-        "name": "Browser Agent Ecosystem",
-        "desc": "Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks."
-      },
-      "agentOperations": {
-        "name": "Agent Operations Platform",
-        "desc": "Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."
-      }
-    }
+      "providerHub":{"name":"Provider Hub","desc":"Bring your own AI and business accounts, connected through one governed workspace."},
+      "campaign":{"name":"Campaign Studio","desc":"One short request becomes a finished campaign."},
+      "integrations":{"name":"Integrations Hub","desc":"Safe links for sales tools, websites, payments, calendars, AI tools, and APIs."},
+      "render":{"name":"Video Maker","desc":"Voice and branded video with safe prepaid use."},
+      "console":{"name":"Control Center","desc":"Keys, webhooks, logs, releases, and activity checks."},
+      "marketingSales":{"name":"Marketing + Sales","desc":"Marketing and sales work in one tool."},
+      "chiefOfStaff":{"name":"Portable AI Chief of Staff","desc":"Plans and carries out only approved work through buyer-supplied ports."},
+      "browser":{"name":"Browser Tool","desc":"Safe browser work with clear limits and checks."},
+      "press":{"name":"Press & Media","desc":"Reach verified editors and paid wires from one governed engine."},
+      "selfHealing":{"name":"Self-Healing Supervisor","desc":"Detects its own failures, diagnoses them, and repairs within limits you approve."},
+      "browserAgents":{"name":"Browser Agent Ecosystem","desc":"Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks."},
+      "agentOperations":{"name":"Agent Operations Platform","desc":"Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."}
+    },
+    "portableMaturity":{"preview":"Preview","deprecated":"Deprecated"}
   },
   "es": {
-    "kicker": "Con IA · Personas al control",
-    "title": "Un solo lugar para cada tarea de crecimiento.",
-    "languagesAria": "Disponible en cinco idiomas",
-    "publicModules": "Herramientas públicas",
-    "portableEngines": "Herramientas portátiles — usa las herramientas de SignalBoost con licencia",
-    "license": "Licencia",
-    "campaignStudio": "Estudio de Campañas",
-    "live": "Activo",
-    "preview": "Vista previa",
-    "open": "Abrir",
-    "stats": {
-      "workflows": "flujos",
-      "actions": "acciones",
-      "markets": "mercados",
-      "uptime": "disponibilidad"
-    },
-    "modules": {
-      "audit": {
-        "title": "Revisión del Sitio",
-        "desc": "Revisa sitios públicos, encuentra problemas y recibe una lista clara de acciones."
-      },
-      "security": {
-        "title": "Control de Seguridad",
-        "desc": "Revisa enlaces, cabeceras, cookies y HTTPS sin entrar en sistemas privados."
-      },
-      "optimization": {
-        "title": "Mejora tu Sitio",
-        "desc": "Crea contenido local, mejora páginas, revisa cambios y publica cuando esté listo."
-      }
-    },
-    "portables": {
-      "providerHub": {
-        "name": "Centro de Proveedores",
-        "desc": "Usa tus propias cuentas de IA y de negocio, conectadas en un espacio de trabajo con gobernanza."
-      },
-      "campaign": {
-        "name": "Estudio de Campañas",
-        "desc": "Una solicitud corta se convierte en una campaña terminada."
-      },
-      "integrations": {
-        "name": "Centro de Integraciones",
-        "desc": "Conexiones seguras para ventas, sitios web, pagos, calendarios, IA y APIs."
-      },
-      "render": {
-        "name": "Creador de Video",
-        "desc": "Voz y video con marca y uso prepago seguro."
-      },
-      "console": {
-        "name": "Centro de Control",
-        "desc": "Claves, webhooks, registros, versiones y controles de actividad."
-      },
-      "marketingSales": {
-        "name": "Marketing + Ventas",
-        "desc": "Marketing y ventas en una sola herramienta."
-      },
-      "chiefOfStaff": {
-        "name": "Jefe de Gabinete de IA Portátil",
-        "desc": "Planifica y realiza solo el trabajo aprobado mediante puertos proporcionados por el comprador."
-      },
-      "browser": {
-        "name": "Herramienta de Navegador",
-        "desc": "Trabajo seguro en el navegador con límites y controles claros."
-      },
-      "press": {
-        "name": "Prensa y Medios",
-        "desc": "Llega a editores verificados y cables de pago desde un solo motor supervisado."
-      },
-      "selfHealing": {
-        "name": "Supervisor Autorreparable",
-        "desc": "Detecta sus propios fallos, los diagnostica y repara dentro de los límites que apruebes."
-      },
-      "browserAgents": {
-        "name": "Ecosistema de Agentes de Navegador",
-        "desc": "Puertos listos para usar para pilas de agentes de navegador administradas, autoalojadas y futuras."
-      },
-      "agentOperations": {
-        "name": "Plataforma de Operaciones de Agentes",
-        "desc": "Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."
-      }
-    }
+    "kicker":"Con IA · Personas al control","title":"Un solo lugar para cada tarea de crecimiento.","languagesAria":"Disponible en cinco idiomas","publicModules":"Herramientas públicas","portableEngines":"Herramientas portátiles — usa las herramientas de SignalBoost con licencia","license":"Licencia","campaignStudio":"Estudio de Campañas","live":"Activo","preview":"Vista previa","open":"Abrir",
+    "stats":{"workflows":"flujos","actions":"acciones","markets":"mercados","uptime":"disponibilidad"},
+    "modules":{"audit":{"title":"Revisión del Sitio","desc":"Revisa sitios públicos, encuentra problemas y recibe una lista clara de acciones."},"security":{"title":"Control de Seguridad","desc":"Revisa enlaces, cabeceras, cookies y HTTPS sin entrar en sistemas privados."},"optimization":{"title":"Mejora tu Sitio","desc":"Crea contenido local, mejora páginas, revisa cambios y publica cuando esté listo."}},
+    "portables":{"providerHub":{"name":"Centro de Proveedores","desc":"Usa tus propias cuentas de IA y de negocio, conectadas en un espacio de trabajo con gobernanza."},"campaign":{"name":"Estudio de Campañas","desc":"Una solicitud corta se convierte en una campaña terminada."},"integrations":{"name":"Centro de Integraciones","desc":"Conexiones seguras para ventas, sitios web, pagos, calendarios, IA y APIs."},"render":{"name":"Creador de Video","desc":"Voz y video con marca y uso prepago seguro."},"console":{"name":"Centro de Control","desc":"Claves, webhooks, registros, versiones y controles de actividad."},"marketingSales":{"name":"Marketing + Ventas","desc":"Marketing y ventas en una sola herramienta."},"chiefOfStaff":{"name":"Jefe de Gabinete de IA Portátil","desc":"Planifica y realiza solo el trabajo aprobado mediante puertos proporcionados por el comprador."},"browser":{"name":"Herramienta de Navegador","desc":"Trabajo seguro en el navegador con límites y controles claros."},"press":{"name":"Prensa y Medios","desc":"Llega a editores verificados y cables de pago desde un solo motor supervisado."},"selfHealing":{"name":"Supervisor Autorreparable","desc":"Detecta sus propios fallos, los diagnostica y repara dentro de los límites que apruebes."},"browserAgents":{"name":"Ecosistema de Agentes de Navegador","desc":"Puertos listos para usar para pilas de agentes de navegador administradas, autoalojadas y futuras."},"agentOperations":{"name":"Plataforma de Operaciones de Agentes","desc":"Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."}},
+    "portableMaturity":{"preview":"Vista previa","deprecated":"Obsoleto"}
   },
   "pt": {
-    "kicker": "Com IA · Pessoas no controle",
-    "title": "Um só lugar para cada tarefa de crescimento.",
-    "languagesAria": "Disponível em cinco idiomas",
-    "publicModules": "Ferramentas públicas",
-    "portableEngines": "Ferramentas portáteis — licencie as ferramentas da SignalBoost",
-    "license": "Licença",
-    "campaignStudio": "Estúdio de Campanhas",
-    "live": "Ativo",
-    "preview": "Prévia",
-    "open": "Abrir",
-    "stats": {
-      "workflows": "fluxos",
-      "actions": "ações",
-      "markets": "mercados",
-      "uptime": "disponibilidade"
-    },
-    "modules": {
-      "audit": {
-        "title": "Revisão do Site",
-        "desc": "Verifique sites públicos, encontre problemas e receba uma lista clara de ações."
-      },
-      "security": {
-        "title": "Verificação de Segurança",
-        "desc": "Verifique links, cabeçalhos, cookies e HTTPS sem entrar em sistemas privados."
-      },
-      "optimization": {
-        "title": "Melhore seu Site",
-        "desc": "Crie conteúdo local, melhore páginas, revise mudanças e publique quando estiver pronto."
-      }
-    },
-    "portables": {
-      "providerHub": {
-        "name": "Central de Fornecedores",
-        "desc": "Use as suas próprias contas de IA e de negócio, ligadas num espaço de trabalho com governação."
-      },
-      "campaign": {
-        "name": "Estúdio de Campanhas",
-        "desc": "Um pedido curto vira uma campanha pronta."
-      },
-      "integrations": {
-        "name": "Central de Integrações",
-        "desc": "Conexões seguras para vendas, sites, pagamentos, calendários, IA e APIs."
-      },
-      "render": {
-        "name": "Criador de Vídeo",
-        "desc": "Voz e vídeo com marca e uso pré-pago seguro."
-      },
-      "console": {
-        "name": "Central de Controle",
-        "desc": "Chaves, webhooks, registros, versões e controles de atividade."
-      },
-      "marketingSales": {
-        "name": "Marketing + Vendas",
-        "desc": "Marketing e vendas em uma só ferramenta."
-      },
-      "chiefOfStaff": {
-        "name": "Chefe de Gabinete de IA Portátil",
-        "desc": "Planeja e executa apenas o trabalho aprovado por meio de portas fornecidas pelo comprador."
-      },
-      "browser": {
-        "name": "Ferramenta de Navegador",
-        "desc": "Trabalho seguro no navegador com limites e controles claros."
-      },
-      "press": {
-        "name": "Imprensa e Mídia",
-        "desc": "Alcance editores verificados e wires pagos a partir de um único motor governado."
-      },
-      "selfHealing": {
-        "name": "Supervisor Auto-Reparável",
-        "desc": "Detecta as próprias falhas, diagnostica e repara dentro dos limites que você aprovar."
-      },
-      "browserAgents": {
-        "name": "Ecossistema de Agentes de Navegador",
-        "desc": "Portas prontas para uso para pilhas de agentes de navegador gerenciadas, auto-hospedadas e futuras."
-      },
-      "agentOperations": {
-        "name": "Plataforma de Operações de Agentes",
-        "desc": "Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."
-      }
-    }
+    "kicker":"Com IA · Pessoas no controle","title":"Um só lugar para cada tarefa de crescimento.","languagesAria":"Disponível em cinco idiomas","publicModules":"Ferramentas públicas","portableEngines":"Ferramentas portáteis — licencie as ferramentas da SignalBoost","license":"Licença","campaignStudio":"Estúdio de Campanhas","live":"Ativo","preview":"Prévia","open":"Abrir",
+    "stats":{"workflows":"fluxos","actions":"ações","markets":"mercados","uptime":"disponibilidade"},
+    "modules":{"audit":{"title":"Revisão do Site","desc":"Verifique sites públicos, encontre problemas e receba uma lista clara de ações."},"security":{"title":"Verificação de Segurança","desc":"Verifique links, cabeçalhos, cookies e HTTPS sem entrar em sistemas privados."},"optimization":{"title":"Melhore seu Site","desc":"Crie conteúdo local, melhore páginas, revise mudanças e publique quando estiver pronto."}},
+    "portables":{"providerHub":{"name":"Central de Fornecedores","desc":"Use as suas próprias contas de IA e de negócio, ligadas num espaço de trabalho com governação."},"campaign":{"name":"Estúdio de Campanhas","desc":"Um pedido curto vira uma campanha pronta."},"integrations":{"name":"Central de Integrações","desc":"Conexões seguras para vendas, sites, pagamentos, calendários, IA e APIs."},"render":{"name":"Criador de Vídeo","desc":"Voz e vídeo com marca e uso pré-pago seguro."},"console":{"name":"Central de Controle","desc":"Chaves, webhooks, registros, versões e controles de atividade."},"marketingSales":{"name":"Marketing + Vendas","desc":"Marketing e vendas em uma só ferramenta."},"chiefOfStaff":{"name":"Chefe de Gabinete de IA Portátil","desc":"Planeja e executa apenas o trabalho aprovado por meio de portas fornecidas pelo comprador."},"browser":{"name":"Ferramenta de Navegador","desc":"Trabalho seguro no navegador com limites e controles claros."},"press":{"name":"Imprensa e Mídia","desc":"Alcance editores verificados e wires pagos a partir de um único motor governado."},"selfHealing":{"name":"Supervisor Auto-Reparável","desc":"Detecta as próprias falhas, diagnostica e repara dentro dos limites que você aprovar."},"browserAgents":{"name":"Ecossistema de Agentes de Navegador","desc":"Portas prontas para uso para pilhas de agentes de navegador gerenciadas, auto-hospedadas e futuras."},"agentOperations":{"name":"Plataforma de Operações de Agentes","desc":"Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."}},
+    "portableMaturity":{"preview":"Pré-visualização","deprecated":"Descontinuado"}
   },
   "pl": {
-    "kicker": "Z pomocą AI · Człowiek decyduje",
-    "title": "Jedno miejsce do każdej pracy nad rozwojem.",
-    "languagesAria": "Dostępne w pięciu językach",
-    "publicModules": "Narzędzia publiczne",
-    "portableEngines": "Narzędzia przenośne — licencjonuj narzędzia SignalBoost",
-    "license": "Licencja",
-    "campaignStudio": "Studio Kampanii",
-    "live": "Działa",
-    "preview": "Podgląd",
-    "open": "Otwórz",
-    "stats": {
-      "workflows": "procesy",
-      "actions": "działania",
-      "markets": "rynki",
-      "uptime": "dostępność"
-    },
-    "modules": {
-      "audit": {
-        "title": "Sprawdź Stronę",
-        "desc": "Sprawdź publiczne strony, znajdź problemy i otrzymaj jasną listę działań."
-      },
-      "security": {
-        "title": "Sprawdź Bezpieczeństwo",
-        "desc": "Sprawdź linki, nagłówki, pliki cookie i HTTPS bez wejścia do prywatnych systemów."
-      },
-      "optimization": {
-        "title": "Ulepsz Stronę",
-        "desc": "Twórz lokalne treści, ulepszaj strony, sprawdzaj zmiany i publikuj, gdy wszystko jest gotowe."
-      }
-    },
-    "portables": {
-      "providerHub": {
-        "name": "Centrum Dostawców",
-        "desc": "Podłącz własne konta AI i biznesowe w jednym nadzorowanym środowisku pracy."
-      },
-      "campaign": {
-        "name": "Studio Kampanii",
-        "desc": "Krótka prośba staje się gotową kampanią."
-      },
-      "integrations": {
-        "name": "Centrum Integracji",
-        "desc": "Bezpieczne połączenia dla sprzedaży, stron, płatności, kalendarzy, AI i API."
-      },
-      "render": {
-        "name": "Twórca Wideo",
-        "desc": "Głos i film z marką oraz bezpiecznym limitem przedpłaty."
-      },
-      "console": {
-        "name": "Centrum Sterowania",
-        "desc": "Klucze, webhooki, logi, wydania i kontrola działań."
-      },
-      "marketingSales": {
-        "name": "Marketing + Sprzedaż",
-        "desc": "Marketing i sprzedaż w jednym narzędziu."
-      },
-      "chiefOfStaff": {
-        "name": "Przenośny Szef Sztabu AI",
-        "desc": "Planuje i wykonuje wyłącznie zatwierdzone zadania przez porty dostarczone przez nabywcę."
-      },
-      "browser": {
-        "name": "Narzędzie Przeglądarki",
-        "desc": "Bezpieczna praca w przeglądarce z jasnymi limitami i kontrolą."
-      },
-      "press": {
-        "name": "Prasa i Media",
-        "desc": "Docieraj do zweryfikowanych redaktorów i płatnych wire'ów z jednego nadzorowanego silnika."
-      },
-      "selfHealing": {
-        "name": "Samonaprawiający się nadzorca",
-        "desc": "Wykrywa własne awarie, diagnozuje je i naprawia w granicach, które zatwierdzisz."
-      },
-      "browserAgents": {
-        "name": "Ekosystem Agentów Przeglądarkowych",
-        "desc": "Gotowe do użycia porty dla zarządzanych, samodzielnie hostowanych i przyszłych stosów agentów przeglądarkowych."
-      },
-      "agentOperations": {
-        "name": "Platforma Operacji Agentów",
-        "desc": "Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."
-      }
-    }
+    "kicker":"Z pomocą AI · Człowiek decyduje","title":"Jedno miejsce do każdej pracy nad rozwojem.","languagesAria":"Dostępne w pięciu językach","publicModules":"Narzędzia publiczne","portableEngines":"Narzędzia przenośne — licencjonuj narzędzia SignalBoost","license":"Licencja","campaignStudio":"Studio Kampanii","live":"Działa","preview":"Podgląd","open":"Otwórz",
+    "stats":{"workflows":"procesy","actions":"działania","markets":"rynki","uptime":"dostępność"},
+    "modules":{"audit":{"title":"Sprawdź Stronę","desc":"Sprawdź publiczne strony, znajdź problemy i otrzymaj jasną listę działań."},"security":{"title":"Sprawdź Bezpieczeństwo","desc":"Sprawdź linki, nagłówki, pliki cookie i HTTPS bez wejścia do prywatnych systemów."},"optimization":{"title":"Ulepsz Stronę","desc":"Twórz lokalne treści, ulepszaj strony, sprawdzaj zmiany i publikuj, gdy wszystko jest gotowe."}},
+    "portables":{"providerHub":{"name":"Centrum Dostawców","desc":"Podłącz własne konta AI i biznesowe w jednym nadzorowanym środowisku pracy."},"campaign":{"name":"Studio Kampanii","desc":"Krótka prośba staje się gotową kampanią."},"integrations":{"name":"Centrum Integracji","desc":"Bezpieczne połączenia dla sprzedaży, stron, płatności, kalendarzy, AI i API."},"render":{"name":"Twórca Wideo","desc":"Głos i film z marką oraz bezpiecznym limitem przedpłaty."},"console":{"name":"Centrum Sterowania","desc":"Klucze, webhooki, logi, wydania i kontrola działań."},"marketingSales":{"name":"Marketing + Sprzedaż","desc":"Marketing i sprzedaż w jednym narzędziu."},"chiefOfStaff":{"name":"Przenośny Szef Sztabu AI","desc":"Planuje i wykonuje wyłącznie zatwierdzone zadania przez porty dostarczone przez nabywcę."},"browser":{"name":"Narzędzie Przeglądarki","desc":"Bezpieczna praca w przeglądarce z jasnymi limitami i kontrolą."},"press":{"name":"Prasa i Media","desc":"Docieraj do zweryfikowanych redaktorów i płatnych wire'ów z jednego nadzorowanego silnika."},"selfHealing":{"name":"Samonaprawiający się nadzorca","desc":"Wykrywa własne awarie, diagnozuje je i naprawia w granicach, które zatwierdzisz."},"browserAgents":{"name":"Ekosystem Agentów Przeglądarkowych","desc":"Gotowe do użycia porty dla zarządzanych, samodzielnie hostowanych i przyszłych stosów agentów przeglądarkowych."},"agentOperations":{"name":"Platforma Operacji Agentów","desc":"Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."}},
+    "portableMaturity":{"preview":"Podgląd","deprecated":"Wycofane"}
   },
   "ru": {
-    "kicker": "С ИИ · Решение за человеком",
-    "title": "Одно место для всех задач роста.",
-    "languagesAria": "Доступно на пяти языках",
-    "publicModules": "Открытые инструменты",
-    "portableEngines": "Переносимые инструменты — лицензируйте инструменты SignalBoost",
-    "license": "Лицензия",
-    "campaignStudio": "Студия Кампаний",
-    "live": "Работает",
-    "preview": "Предпросмотр",
-    "open": "Открыть",
-    "stats": {
-      "workflows": "процессы",
-      "actions": "действия",
-      "markets": "рынки",
-      "uptime": "доступность"
-    },
-    "modules": {
-      "audit": {
-        "title": "Проверка Сайта",
-        "desc": "Проверьте открытые сайты, найдите проблемы и получите понятный план действий."
-      },
-      "security": {
-        "title": "Проверка Безопасности",
-        "desc": "Проверьте ссылки, заголовки, cookie и HTTPS без входа в закрытые системы."
-      },
-      "optimization": {
-        "title": "Улучшить Сайт",
-        "desc": "Создавайте местный контент, улучшайте страницы, проверяйте изменения и публикуйте после проверки."
-      }
-    },
-    "portables": {
-      "providerHub": {
-        "name": "Центр провайдеров",
-        "desc": "Подключите собственные аккаунты ИИ и бизнес-сервисов в одном управляемом рабочем пространстве."
-      },
-      "campaign": {
-        "name": "Студия Кампаний",
-        "desc": "Короткий запрос становится готовой кампанией."
-      },
-      "integrations": {
-        "name": "Центр Интеграций",
-        "desc": "Безопасные связи для продаж, сайтов, платежей, календарей, ИИ и API."
-      },
-      "render": {
-        "name": "Создание Видео",
-        "desc": "Голос и фирменное видео с безопасной предоплатой."
-      },
-      "console": {
-        "name": "Центр Управления",
-        "desc": "Ключи, вебхуки, журналы, выпуски и проверка действий."
-      },
-      "marketingSales": {
-        "name": "Маркетинг + Продажи",
-        "desc": "Маркетинг и продажи в одном инструменте."
-      },
-      "chiefOfStaff": {
-        "name": "Портативный ИИ-руководитель аппарата",
-        "desc": "Планирует и выполняет только одобренную работу через порты, предоставленные покупателем."
-      },
-      "browser": {
-        "name": "Инструмент Браузера",
-        "desc": "Безопасная работа в браузере с ясными пределами и проверками."
-      },
-      "press": {
-        "name": "Пресса и медиа",
-        "desc": "Выход на проверенных редакторов и платные ленты из одного управляемого движка."
-      },
-      "selfHealing": {
-        "name": "Самовосстанавливающийся супервизор",
-        "desc": "Обнаруживает сбои, ставит диагноз и устраняет их в пределах, которые вы одобрили."
-      },
-      "browserAgents": {
-        "name": "Экосистема браузерных агентов",
-        "desc": "Готовые к подключению порты для управляемых, самостоятельно размещаемых и будущих стеков браузерных агентов."
-      },
-      "agentOperations": {
-        "name": "Платформа операций агентов",
-        "desc": "Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."
-      }
-    }
+    "kicker":"С ИИ · Решение за человеком","title":"Одно место для всех задач роста.","languagesAria":"Доступно на пяти языках","publicModules":"Открытые инструменты","portableEngines":"Переносимые инструменты — лицензируйте инструменты SignalBoost","license":"Лицензия","campaignStudio":"Студия Кампаний","live":"Работает","preview":"Предпросмотр","open":"Открыть",
+    "stats":{"workflows":"процессы","actions":"действия","markets":"рынки","uptime":"доступность"},
+    "modules":{"audit":{"title":"Проверка Сайта","desc":"Проверьте открытые сайты, найдите проблемы и получите понятный план действий."},"security":{"title":"Проверка Безопасности","desc":"Проверьте ссылки, заголовки, cookie и HTTPS без входа в закрытые системы."},"optimization":{"title":"Улучшить Сайт","desc":"Создавайте местный контент, улучшайте страницы, проверяйте изменения и публикуйте после проверки."}},
+    "portables":{"providerHub":{"name":"Центр провайдеров","desc":"Подключите собственные аккаунты ИИ и бизнес-сервисов в одном управляемом рабочем пространстве."},"campaign":{"name":"Студия Кампаний","desc":"Короткий запрос становится готовой кампанией."},"integrations":{"name":"Центр Интеграций","desc":"Безопасные связи для продаж, сайтов, платежей, календарей, ИИ и API."},"render":{"name":"Создание Видео","desc":"Голос и фирменное видео с безопасной предоплатой."},"console":{"name":"Центр Управления","desc":"Ключи, вебхуки, журналы, выпуски и проверка действий."},"marketingSales":{"name":"Маркетинг + Продажи","desc":"Маркетинг и продажи в одном инструменте."},"chiefOfStaff":{"name":"Портативный ИИ-руководитель аппарата","desc":"Планирует и выполняет только одобренную работу через порты, предоставленные покупателем."},"browser":{"name":"Инструмент Браузера","desc":"Безопасная работа в браузере с ясными пределами и проверками."},"press":{"name":"Пресса и медиа","desc":"Выход на проверенных редакторов и платные ленты из одного управляемого движка."},"selfHealing":{"name":"Самовосстанавливающийся супервизор","desc":"Обнаруживает сбои, ставит диагноз и устраняет их в пределах, которые вы одобрили."},"browserAgents":{"name":"Экосистема браузерных агентов","desc":"Готовые к подключению порты для управляемых, самостоятельно размещаемых и будущих стеков браузерных агентов."},"agentOperations":{"name":"Платформа операций агентов","desc":"Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."}},
+    "portableMaturity":{"preview":"Предпросмотр","deprecated":"Устарело"}
   }
 }

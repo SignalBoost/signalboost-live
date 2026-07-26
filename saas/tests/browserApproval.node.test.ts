@@ -1,3 +1,5 @@
+// saas/tests/browserApproval.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -16,7 +18,7 @@ function makeTask(overrides: Partial<BrowserTask> = {}): BrowserTask {
     taskId: 'TASK-APPROVAL-TIME',
     incidentId: 'INC-APPROVAL-TIME',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-16T05:00:00.000Z',
     expiresAt: '2026-07-16T06:00:00.000Z',

@@ -1,3 +1,5 @@
+// saas/tests/browserApprovalEnvelope.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
@@ -20,7 +22,7 @@ function makeTask(): BrowserTask {
     taskId: 'TASK-APPROVAL-ENVELOPE',
     incidentId: 'INC-APPROVAL-ENVELOPE',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-16T12:00:00.000Z',
     expiresAt: '2026-07-16T13:00:00.000Z',

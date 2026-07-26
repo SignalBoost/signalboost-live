@@ -1,3 +1,5 @@
+// saas/tests/browserSessionCapacity.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -41,7 +43,7 @@ function makeTask(suffix: string): BrowserTask {
     taskId: `TASK-CAPACITY-${suffix}`,
     incidentId: `INC-CAPACITY-${suffix}`,
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-16T03:00:00.000Z',
     expiresAt,

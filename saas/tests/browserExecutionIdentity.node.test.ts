@@ -1,3 +1,5 @@
+// saas/tests/browserExecutionIdentity.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -27,7 +29,7 @@ function makeTask(): BrowserTask {
     taskId: 'TASK-EXECUTION-IDENTITY-001',
     incidentId: 'INC-EXECUTION-IDENTITY-001',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-16T10:00:00.000Z',
     expiresAt: '2026-07-16T11:00:00.000Z',

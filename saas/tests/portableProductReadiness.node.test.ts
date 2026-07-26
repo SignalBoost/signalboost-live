@@ -33,10 +33,34 @@ test('buyer handoff manifest is immutable and fails closed when delivery evidenc
     exclusions: ['checkout', 'entitlement-activation', 'provider-execution'],
   })
   assert.equal(manifest.complete, false)
-  assert.ok(manifest.blockers.includes('missing-artifact:package'))
-  assert.ok(manifest.blockers.includes('missing-artifact:acceptance'))
+  assert.ok(manifest.blockers.includes('missing-required-artifact:package'))
+  assert.ok(manifest.blockers.includes('missing-required-artifact:acceptance'))
   assert.ok(manifest.blockers.includes('missing-buyer-responsibilities'))
   assert.ok(Object.isFrozen(manifest) && Object.isFrozen(manifest.artifacts) && Object.isFrozen(manifest.blockers))
+})
+
+test('buyer handoff manifest rejects optional required classes and blank responsibility boundaries', () => {
+  const digest = 'a'.repeat(64)
+  const artifacts = ['package', 'integrity', 'installation', 'configuration', 'operations', 'acceptance', 'support'].map(kind => ({
+    kind: kind as 'package' | 'integrity' | 'installation' | 'configuration' | 'operations' | 'acceptance' | 'support',
+    path: `handoff/${kind}.json`,
+    sha256: digest,
+    required: false,
+  }))
+  const manifest = createPortableBuyerHandoffManifest({
+    productId: 'provider-hub',
+    releaseVersion: '1.0.0',
+    packageFormat: 'tar.gz',
+    artifacts,
+    buyerResponsibilities: ['   '],
+    supplierResponsibilities: [''],
+    exclusions: [],
+  })
+  assert.equal(manifest.complete, false)
+  assert.ok(manifest.blockers.includes('missing-required-artifact:package'))
+  assert.ok(manifest.blockers.includes('missing-required-artifact:support'))
+  assert.ok(manifest.blockers.includes('missing-buyer-responsibilities'))
+  assert.ok(manifest.blockers.includes('missing-supplier-responsibilities'))
 })
 
 test('buyer handoff manifest becomes complete only with all bounded evidence classes', () => {

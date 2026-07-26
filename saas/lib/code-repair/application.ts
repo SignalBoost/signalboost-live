@@ -1,3 +1,4 @@
+// saas/lib/code-repair/application.ts
 import { createHash } from 'node:crypto'
 import {
   CodeRepairApprovalService,
@@ -94,7 +95,16 @@ function validPatch(p: CodeRepairPatchProposal): boolean {
  * No Git commands, commits, pushes, merge operations, or production filesystem writes exist here.
  */
 export class CodeRepairApplicationOrchestrator {
-  constructor(private readonly approvals: CodeRepairApprovalService, private readonly workspaces: CodeRepairDisposableWorkspaceManager, private readonly audit: CodeRepairExecutionAuditSink = new InMemoryCodeRepairExecutionAuditSink(), private readonly metrics = new CodeRepairExecutionMetricsCollector()) {}
+  private readonly approvals: CodeRepairApprovalService
+  private readonly workspaces: CodeRepairDisposableWorkspaceManager
+  private readonly audit: CodeRepairExecutionAuditSink
+  private readonly metrics: CodeRepairExecutionMetricsCollector
+  constructor(approvals: CodeRepairApprovalService,workspaces: CodeRepairDisposableWorkspaceManager,audit: CodeRepairExecutionAuditSink = new InMemoryCodeRepairExecutionAuditSink(),metrics = new CodeRepairExecutionMetricsCollector()) {
+    this.approvals = approvals
+    this.workspaces = workspaces
+    this.audit = audit
+    this.metrics = metrics
+  }
 
   async dryRun(request: CodeRepairDryRunRequest): Promise<CodeRepairExecutionReport> {
     this.metrics.record('attempted')

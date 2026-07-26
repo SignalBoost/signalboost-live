@@ -34,11 +34,19 @@ export interface RoutingConfig {
 }
 
 export class RoutingEngine {
+  private registry: AiProviderRegistry
+  private host: HostContext
+  private config: RoutingConfig
+
   constructor(
-    private registry: AiProviderRegistry,
-    private host: HostContext,
-    private config: RoutingConfig = {},
-  ) {}
+    registry: AiProviderRegistry,
+    host: HostContext,
+    config: RoutingConfig = {},
+  ) {
+    this.registry = registry
+    this.host = host
+    this.config = config
+  }
 
   /** Resolve the ordered provider chain for a request. */
   plan(req: UnifiedRequest): { policy: RoutingPolicy; chain: string[] } {
@@ -146,12 +154,17 @@ export class RoutingEngine {
 }
 
 export class RoutingError extends Error {
+  public attempts: ProviderAttempt[]
+  public policy: RoutingPolicy
+
   constructor(
     message: string,
-    public attempts: ProviderAttempt[],
-    public policy: RoutingPolicy,
+    attempts: ProviderAttempt[],
+    policy: RoutingPolicy,
   ) {
     super(message);
+    this.attempts = attempts
+    this.policy = policy
     this.name = 'RoutingError';
   }
 }

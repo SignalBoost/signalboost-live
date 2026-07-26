@@ -156,7 +156,6 @@ second trail in the same call.
 
 ```ts
 import {
-  createEnterpriseNotifier,
   createEnterpriseDispatchStore,
   createSiemAuditSink,
   type HostContext,
@@ -172,13 +171,13 @@ const host: HostContext = {
 }
 
 // 2. Durable ledger on your database.
-const store = createEnterpriseDispatchStore({ sql: myExecutor })
+const dispatchStore = createEnterpriseDispatchStore({ sql: myExecutor })
 
 // 3. Audit to your SIEM.
-const auditSink = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
+const audit = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
 
 // 4. Wire the dispatcher in enterprise mode (host-driven, not platform email).
-const dispatcher = createSupervisorDispatcher({ host, store, auditSink })
+const dispatcher = createSupervisorDispatcher({ host, dispatchStore, audit })
 ```
 
 On the SignalBoost test rig the same factory is called with no `host` and falls back
@@ -207,7 +206,8 @@ approver with no routable address, or a duplicate id throws when you wire the de
 That is deliberate: `createEnterpriseNotifier` swallows every error by design, because the
 step has already halted and a delivery failure must not become a second incident — which
 means a directory that breaks at runtime breaks *silently*. Validating up front is what
-keeps that trade-off safe.
+keeps that trade-off safe. After construction `approversFor` is total: it cannot throw and
+cannot return empty, so delivery has no failure mode of its own.
 
 Use it to run the §6 acceptance incident. Replace it with your IdP adapter before
 production, so leavers and rota changes are reflected without a redeploy — the contract is
@@ -228,8 +228,52 @@ This portable is enterprise-ready when, on your stack:
    A reference implementation ships so this is not a blocker on day one — see §5.1.
 7. ⬜ You have run an end-to-end incident in staging: detect → safe step auto-runs →
    dangerous step pauses → approver notified → approval → execution → SIEM shows the
-   full trail.
+   full trail. A runnable harness performs this against your wiring — see §7.
 
 Items 1–5 are code the portable provides and you configure. Items 6–7 are your
 integration and acceptance test. When 6–7 pass in your environment, the portable is
 genuinely live for you.
+
+---
+
+## 7. Running the acceptance test
+
+Item 7 above is the one thing this guide cannot do for you: it has to run against *your*
+vault, *your* channel, *your* directory. So the portable ships the scenario as code, and you
+supply the `HostContext` you intend to deploy with.
+
+```ts
+import { runAcceptanceScenario } from 'lib/supervisor/portable'
+
+const result = await runAcceptanceScenario({ host: myProductionHostContext })
+console.log(result.summary)
+if (!result.passed) process.exit(1)
+```
+
+It checks five guarantees and reports each one independently:
+
+| Check | What a failure means |
+| --- | --- |
+| `safe_step_executed` | the supervisor cannot act at all — wiring or policy is wrong |
+| `dangerous_step_paused` | **approval gating is not in effect. Do not deploy.** |
+| `approver_notified` | your `ApproverDirectory` or `NotificationSink` is not delivering |
+| `buyer_branding_used` | your people would receive notifications branded as someone else |
+| `audit_trail_emitted` | your SIEM would have no record of the run |
+
+Run it once per danger category to prove each routes to the right people:
+
+```ts
+for (const dangerousCategory of ['financial', 'destructive', 'credential_security'] as const) {
+  const result = await runAcceptanceScenario({ host, dangerousCategory })
+  if (!result.passed) throw new Error(`${dangerousCategory}: ${result.summary}`)
+}
+```
+
+**It is safe to run repeatedly, including against production wiring.** No network call, no
+provider call, no real repair: the consequential step is *required* to pause, so nothing
+consequential can execute by design, and the safe step goes through a runner you inject. The
+notification, however, is real — your channel receives it, because a harness that stubbed
+that out would not be testing the thing you need tested.
+
+The returned object is frozen and JSON-serializable, including every notification and audit
+event produced. File it as your acceptance record.

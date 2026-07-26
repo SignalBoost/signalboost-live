@@ -40,3 +40,9 @@ export {
   APPROVER_CATEGORIES,
   type StaticApproverDirectoryConfig,
 } from './static-approver-directory.ts'
+export {
+  runAcceptanceScenario,
+  type AcceptanceOptions,
+  type AcceptanceResult,
+  type AcceptanceCheck,
+} from './acceptance-harness.ts'

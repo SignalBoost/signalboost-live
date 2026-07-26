@@ -11,6 +11,7 @@ import './providerHubHostPorts.node.test.ts'
 import './providerHubContractIsolation.node.test.ts'
 import './providerHubStatusSurface.node.test.ts'
 import './providerHubStatusDashboard.node.test.ts'
+import './providerHubReferenceDeployment.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 

@@ -20,7 +20,7 @@ export interface ProviderHubCommercialEvidenceProfile {
 }
 
 // Repository references prove contract and documentation coverage only. Buyer-specific
-// deployment, artifact, licensing, recovery, and acceptance evidence remains fail-closed.
+// licensing, fulfillment, recovery, and deployment acceptance evidence remains fail-closed.
 const dimensions = Object.freeze<readonly ProviderHubCommercialEvidenceDimension[]>([
   Object.freeze({
     dimension: 'architecture',
@@ -30,15 +30,24 @@ const dimensions = Object.freeze<readonly ProviderHubCommercialEvidenceDimension
   }),
   Object.freeze({
     dimension: 'distribution-package',
-    status: 'external-evidence-required',
-    evidence: Object.freeze(['saas/examples/provider-hub-reference/']),
-    blockers: Object.freeze(['missing-versioned-release-artifact']),
+    status: 'verified',
+    evidence: Object.freeze([
+      'saas/portable-release/provider-hub.release.json',
+      'saas/portable-release/provider-hub.RELEASE-NOTES.md',
+      '.github/workflows/portable-release.yml#package-provider-hub-release-json',
+    ]),
+    blockers: Object.freeze([]),
   }),
   Object.freeze({
     dimension: 'integrity-manifest',
-    status: 'external-evidence-required',
-    evidence: Object.freeze([]),
-    blockers: Object.freeze(['missing-release-artifact-sha256-and-size']),
+    status: 'verified',
+    evidence: Object.freeze([
+      'saas/scripts/verify-release.mjs',
+      '.github/workflows/portable-release.yml#verify-the-artifact-independently',
+      '.github/workflows/portable-release.yml#verify-checksums-the-way-a-buyer-would',
+      '.github/workflows/portable-release.yml#prove-the-archive-extracts-and-still-verifies',
+    ]),
+    blockers: Object.freeze([]),
   }),
   Object.freeze({
     dimension: 'buyer-installation',

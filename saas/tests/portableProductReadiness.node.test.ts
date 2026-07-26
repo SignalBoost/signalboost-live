@@ -30,19 +30,19 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
   assert.notEqual(first, second)
   assert.ok(Object.isFrozen(first) && Object.isFrozen(first.entries))
   assert.ok(providerHub)
-  assert.equal(providerHub.readyCount, 4)
+  assert.equal(providerHub.readyCount, 6)
   assert.equal(providerHub.totalCount, 10)
-  assert.equal(providerHub.completionPercent, 40)
+  assert.equal(providerHub.completionPercent, 60)
   assert.equal(providerHub.commerciallyReady, false)
   assert.deepEqual(providerHub.checks.filter(check => check.status === 'ready').map(check => check.dimension), [
     'architecture',
+    'distribution-package',
+    'integrity-manifest',
     'buyer-installation',
     'buyer-configuration',
     'support-boundary',
   ])
   assert.deepEqual(providerHub.checks.filter(check => check.status === 'blocked').map(check => check.dimension), [
-    'distribution-package',
-    'integrity-manifest',
     'licensing-enforcement',
     'fulfillment-handoff',
     'operations-recovery',
@@ -57,20 +57,23 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
 
 test('Provider Hub product evidence profile stays fail-closed for external proof', () => {
   assert.equal(providerHubCommercialEvidenceProfile.productId, 'provider-hub')
-  assert.equal(providerHubCommercialEvidenceProfile.verifiedCount, 4)
+  assert.equal(providerHubCommercialEvidenceProfile.verifiedCount, 6)
   assert.equal(providerHubCommercialEvidenceProfile.totalCount, 10)
-  assert.equal(providerHubCommercialEvidenceProfile.completionPercent, 40)
+  assert.equal(providerHubCommercialEvidenceProfile.completionPercent, 60)
   assert.equal(providerHubCommercialEvidenceProfile.commerciallyReady, false)
   assert.deepEqual(providerHubCommercialEvidenceProfile.dimensions.filter(dimension => dimension.status === 'verified').map(dimension => dimension.dimension), [
     'architecture',
+    'distribution-package',
+    'integrity-manifest',
     'buyer-installation',
     'buyer-configuration',
     'support-boundary',
   ])
   const blocked = providerHubCommercialEvidenceProfile.dimensions.filter(dimension => dimension.status === 'external-evidence-required')
-  assert.ok(blocked.find(dimension => dimension.dimension === 'distribution-package')?.blockers.includes('missing-versioned-release-artifact'))
-  assert.ok(blocked.find(dimension => dimension.dimension === 'integrity-manifest')?.blockers.includes('missing-release-artifact-sha256-and-size'))
+  assert.ok(blocked.find(dimension => dimension.dimension === 'licensing-enforcement')?.blockers.includes('missing-buyer-entitlement-enforcement-evidence'))
+  assert.ok(blocked.find(dimension => dimension.dimension === 'fulfillment-handoff')?.blockers.includes('missing-complete-versioned-buyer-handoff-bundle'))
   assert.ok(blocked.find(dimension => dimension.dimension === 'operations-recovery')?.blockers.includes('missing-buyer-backup-infrastructure-and-recovery-rehearsal'))
+  assert.ok(blocked.find(dimension => dimension.dimension === 'deployment-acceptance')?.blockers.includes('missing-clean-environment-install-and-buyer-signoff'))
   assert.ok(Object.isFrozen(providerHubCommercialEvidenceProfile))
   assert.ok(Object.isFrozen(providerHubCommercialEvidenceProfile.dimensions))
   assert.ok(providerHubCommercialEvidenceProfile.dimensions.every(dimension => Object.isFrozen(dimension)))

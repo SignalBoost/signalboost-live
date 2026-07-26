@@ -60,4 +60,4 @@ test('Provider Hub public metadata is versioned, immutable, and tenant scoped', 
   assert.equal(metadata.tenantId, 'tenant-1')
   assert.equal(metadata.environmentId, 'production')
   assert.ok(Object.isFrozen(metadata))
-}
+})

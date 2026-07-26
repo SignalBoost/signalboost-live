@@ -11,7 +11,7 @@ function product(manifest: PortableProductManifest, descriptor: Omit<PortablePro
 validatePortableProductManifests(portableProductManifests)
 /** Canonical presentation catalog. Product metadata lives only in the referenced manifests. */
 export const portableProductRegistry = Object.freeze([
-  product(providerHubManifest, { localizationKey: 'providerHub', glyph: '⌘', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 5, route: '/agency' }),
+  product(providerHubManifest, { localizationKey: 'providerHub', glyph: '⌘', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 5, route: '/dashboard/provider-hub' }),
   product(campaignStudioManifest, { localizationKey: 'campaign', glyph: '✦', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 10, route: '/agency' }),
   product(integrationsHubManifest, { localizationKey: 'integrations', glyph: '⛓', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 20 }),
   product(videoMakerManifest, { localizationKey: 'render', glyph: '◍', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 30 }),

@@ -156,7 +156,6 @@ second trail in the same call.
 
 ```ts
 import {
-  createEnterpriseNotifier,
   createEnterpriseDispatchStore,
   createSiemAuditSink,
   type HostContext,
@@ -172,13 +171,13 @@ const host: HostContext = {
 }
 
 // 2. Durable ledger on your database.
-const store = createEnterpriseDispatchStore({ sql: myExecutor })
+const dispatchStore = createEnterpriseDispatchStore({ sql: myExecutor })
 
 // 3. Audit to your SIEM.
-const auditSink = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
+const audit = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
 
 // 4. Wire the dispatcher in enterprise mode (host-driven, not platform email).
-const dispatcher = createSupervisorDispatcher({ host, store, auditSink })
+const dispatcher = createSupervisorDispatcher({ host, dispatchStore, audit })
 ```
 
 On the SignalBoost test rig the same factory is called with no `host` and falls back

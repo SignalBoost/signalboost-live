@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getPortableProduct, listLicensablePortableProducts, listPortableProducts, listPublicPortableProducts, portableProductRegistry, validatePortableProductRegistry } from '../lib/portable-products/index.ts'
 import './portableArchitectureClosure.node.test.ts'
+import './supervisorIntegrationGuideWiring.node.test.ts'
 
 test('registry is frozen and preserves stable customer-facing manifest IDs', () => {
   assert.ok(Object.isFrozen(portableProductRegistry))

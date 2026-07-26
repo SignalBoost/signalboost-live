@@ -19,6 +19,8 @@ export interface ProviderHubCommercialEvidenceProfile {
   readonly dimensions: readonly ProviderHubCommercialEvidenceDimension[]
 }
 
+// Repository references prove contract and documentation coverage only. Buyer-specific
+// deployment, artifact, licensing, recovery, and acceptance evidence remains fail-closed.
 const dimensions = Object.freeze<readonly ProviderHubCommercialEvidenceDimension[]>([
   Object.freeze({
     dimension: 'architecture',

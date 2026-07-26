@@ -64,6 +64,9 @@ const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCom
       'docs/portables/provider-hub-security-operations-acceptance.md#10-permanent-safety-notices',
     ]),
   }),
+  // Campaign Studio is intentionally declared with no commercial delivery evidence. Its manifest
+  // proves the architecture/product boundary, while licensing-packaging remains future work.
+  'campaign-studio': Object.freeze({}),
 })
 
 function freezeCheck(

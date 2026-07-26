@@ -62,6 +62,20 @@ export interface RepairIncident {
  */
 export type RepairActionResolver = (step: RepairStep, incident: RepairIncident) => string | null
 
+/**
+ * Optional companion to the resolver: extra parameters carried into the request, and from
+ * there into the approval PR the owner reads.
+ *
+ * THESE ARE FACTS THE DIAGNOSIS IDENTIFIED, NEVER VALUES IT INVENTED. A diagnosis can say
+ * WHICH environment variable is missing and WHICH environment it belongs to — that is
+ * diagnosis. Supplying the secret itself is not, and must come from the buyer's vault or
+ * from a person. Nothing returned here should ever be a credential.
+ */
+export type RepairParamResolver = (
+  step: RepairStep,
+  incident: RepairIncident,
+) => Readonly<Record<string, unknown>>
+
 /** Recognizes nothing. The correct starting point: every step halts for a human. */
 export const resolveNothing: RepairActionResolver = () => null
 
@@ -78,6 +92,8 @@ export interface DispatchRepairPlanOptions {
   host: GatewayHost
   /** Defaults to resolveNothing — nothing is executable until the host teaches it something. */
   resolveAction?: RepairActionResolver
+  /** Optional extra params for the staged approval. Identified facts only, never secrets. */
+  resolveParams?: RepairParamResolver
   /** Identifies the supervisor as the calling agent in the audit trail. */
   agentId?: string
 }
@@ -104,6 +120,7 @@ export function repairStepToRequest(
   step: RepairStep,
   resolvedTarget: string | null,
   agentId: string,
+  extraParams: Readonly<Record<string, unknown>> = {},
 ): AgentRequest {
   return {
     requestId: `${incident.incident_id}:repair:${step.step}`,
@@ -122,6 +139,8 @@ export function repairStepToRequest(
         expectedResult: step.expected_result,
         executor: step.executor,
         requiresApproval: step.requires_approval,
+        // Host-identified facts. Never a credential — see RepairParamResolver.
+        ...extraParams,
       },
     },
   }
@@ -148,7 +167,8 @@ export async function dispatchRepairPlan(
     const forcedHuman = step.requires_approval || step.executor === 'human'
     const resolvedTarget = forcedHuman ? null : resolve(step, options.incident)
 
-    const request = repairStepToRequest(options.incident, step, resolvedTarget, agentId)
+    const extraParams = options.resolveParams ? options.resolveParams(step, options.incident) : {}
+    const request = repairStepToRequest(options.incident, step, resolvedTarget, agentId, extraParams)
     const outcome = await runGoverned(request, options.policy, options.host)
 
     results.push({ step: step.step, action: step.action, resolvedTarget, outcome })

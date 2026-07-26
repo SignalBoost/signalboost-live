@@ -83,27 +83,54 @@ export function validateAndroidPublicationEvidence(
   const input = inputValue as Partial<AndroidPublicationEvidenceInput> | null
   const blockers: AndroidPublicationEvidenceBlocker[] = []
 
-  const validReadiness = Boolean(readiness && readiness.schemaVersion === 'signalboost-android-publication-readiness-v1' && readiness.state === 'publication_ready' && Array.isArray(readiness.blockers) && readiness.blockers.length === 0 && readiness.storeSubmissionExecuted === false && readiness.productionPublished === false && readiness.productionExecutionEnabled === false)
+  const validReadiness = Boolean(
+    readiness &&
+    readiness.schemaVersion === 'signalboost-android-publication-readiness-v1' &&
+    readiness.state === 'publication_ready' &&
+    Array.isArray(readiness.blockers) &&
+    readiness.blockers.length === 0 &&
+    readiness.readOnly === true &&
+    readiness.artifactAccessed === false &&
+    readiness.signingExecuted === false &&
+    readiness.storeSubmissionExecuted === false &&
+    readiness.productionPublished === false &&
+    readiness.productionExecutionEnabled === false,
+  )
   if (!validReadiness) blockers.push('publication-readiness')
 
-  const validSignedEvidence = Boolean(signedEvidence && signedEvidence.schemaVersion === 'signalboost-android-signed-bundle-evidence-v1' && signedEvidence.state === 'signed_bundle_evidence_validated' && Array.isArray(signedEvidence.blockers) && signedEvidence.blockers.length === 0 && SHA256.test(String(signedEvidence.signedAabSha256 ?? '')) && signedEvidence.storeSubmissionEnabled === false && signedEvidence.productionExecutionEnabled === false)
+  const validSignedEvidence = Boolean(
+    signedEvidence &&
+    signedEvidence.schemaVersion === 'signalboost-android-signed-bundle-evidence-v1' &&
+    signedEvidence.state === 'signed_bundle_evidence_validated' &&
+    Array.isArray(signedEvidence.blockers) &&
+    signedEvidence.blockers.length === 0 &&
+    SHA256.test(String(signedEvidence.signedAabSha256 ?? '')) &&
+    signedEvidence.readOnly === true &&
+    signedEvidence.artifactAccessed === false &&
+    signedEvidence.signingPerformed === false &&
+    signedEvidence.rawSigningMaterialAccepted === false &&
+    signedEvidence.storeSubmissionEnabled === false &&
+    signedEvidence.productionExecutionEnabled === false,
+  )
   if (!validSignedEvidence) blockers.push('signed-bundle-evidence')
 
   const portableId = typeof input?.portableId === 'string' ? input.portableId.trim() : ''
   const packageName = typeof input?.packageName === 'string' ? input.packageName.trim() : ''
   if (!portableId || !PACKAGE_NAME.test(packageName) || portableId !== readiness?.portableId || portableId !== signedEvidence?.portableId || packageName !== readiness?.packageName || packageName !== signedEvidence?.packageName) blockers.push('identity')
 
-  const versionCode = Number(input?.versionCode)
+  const versionCodeValue = input?.versionCode
+  const validVersionCode = typeof versionCodeValue === 'number' && Number.isSafeInteger(versionCodeValue) && versionCodeValue > 0
   const versionName = typeof input?.versionName === 'string' ? input.versionName.trim() : ''
-  if (!Number.isSafeInteger(versionCode) || versionCode <= 0 || !VERSION_NAME.test(versionName)) blockers.push('release-version')
+  if (!validVersionCode || !VERSION_NAME.test(versionName)) blockers.push('release-version')
 
   const releaseTrack = input?.releaseTrack
   if (!['internal', 'closed', 'open', 'production'].includes(String(releaseTrack ?? ''))) blockers.push('release-track')
   if (!SHA256.test(String(input?.signedAabSha256 ?? '')) || input?.signedAabSha256 !== signedEvidence?.signedAabSha256) blockers.push('digest-linkage')
   if (!validReference(input?.playEditReference) || !validReference(input?.playReleaseReference)) blockers.push('console-references')
 
-  const rollout = Number(input?.rolloutPercentage)
-  if (!Number.isFinite(rollout) || rollout < 0 || rollout > 100 || (releaseTrack !== 'production' && rollout !== 100)) blockers.push('rollout')
+  const rolloutValue = input?.rolloutPercentage
+  const validRollout = typeof rolloutValue === 'number' && Number.isFinite(rolloutValue) && rolloutValue >= 0 && rolloutValue <= 100
+  if (!validRollout || (releaseTrack !== 'production' && rolloutValue !== 100)) blockers.push('rollout')
   if (!['draft', 'in_review', 'approved'].includes(String(input?.reviewStatus ?? ''))) blockers.push('review-status')
 
   const countries = input?.countryCodes
@@ -119,7 +146,7 @@ export function validateAndroidPublicationEvidence(
     schemaVersion: ANDROID_PUBLICATION_EVIDENCE_SCHEMA_VERSION,
     portableId,
     packageName,
-    versionCode: Number.isSafeInteger(versionCode) && versionCode > 0 ? versionCode : 0,
+    versionCode: validVersionCode ? versionCodeValue : 0,
     versionName: VERSION_NAME.test(versionName) ? versionName : '',
     releaseTrack: typeof releaseTrack === 'string' ? releaseTrack : '',
     state: blockers.length === 0 ? 'publication_evidence_validated' : 'blocked',

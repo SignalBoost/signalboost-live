@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPortableBuyerHandoffManifest, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry } from '../lib/portable-products/index.ts'
+import { createPortableBuyerHandoffManifest, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry, providerHubCommercialEvidenceProfile } from '../lib/portable-products/index.ts'
 import { readFileSync } from 'node:fs'
 
 test('portable readiness dashboard is frozen, deterministic, and registry-driven', () => {
@@ -49,4 +49,36 @@ test('buyer handoff manifest becomes complete only with all bounded evidence cla
   assert.equal(manifest.complete, true)
   assert.deepEqual(manifest.blockers, [])
   assert.equal(manifest.schemaVersion, 'portable-buyer-handoff-manifest.v1')
+})
+
+test('Provider Hub commercial evidence remains immutable and fails closed', () => {
+  const profile = providerHubCommercialEvidenceProfile
+  assert.equal(profile.productId, 'provider-hub')
+  assert.equal(profile.commerciallyReady, false)
+  assert.ok(profile.blockers.includes('missing-production-artifact-identity'))
+  assert.ok(profile.blockers.includes('missing-end-to-end-buyer-acceptance-evidence'))
+  assert.ok(profile.blockers.includes('missing-provider-hub-license-issuance-evidence'))
+  assert.equal(profile.checkoutEnabled, false)
+  assert.equal(profile.entitlementMutationEnabled, false)
+  assert.equal(profile.fulfillmentMutationEnabled, false)
+  assert.equal(profile.providerExecutionEnabled, false)
+  assert.equal(profile.productionExecutionEnabled, false)
+  assert.ok(Object.isFrozen(profile) && Object.isFrozen(profile.dimensions) && Object.isFrozen(profile.blockers))
+  for (const dimension of profile.dimensions) {
+    assert.ok(Object.isFrozen(dimension) && Object.isFrozen(dimension.references) && Object.isFrozen(dimension.blockers))
+  }
+})
+
+test('Provider Hub commercial evidence covers bounded dimensions exactly once', () => {
+  const dimensions = providerHubCommercialEvidenceProfile.dimensions.map(item => item.dimension)
+  assert.deepEqual(dimensions, [
+    'packaging-specification',
+    'installation-configuration',
+    'operations-security',
+    'licensing-entitlement',
+    'distribution-artifact',
+    'buyer-acceptance',
+    'support-recovery',
+  ])
+  assert.equal(new Set(dimensions).size, dimensions.length)
 })

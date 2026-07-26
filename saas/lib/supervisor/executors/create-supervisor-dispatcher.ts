@@ -13,7 +13,7 @@
 //     No platform is named, no env var is read, no host singleton is imported.
 //
 //   • PLATFORM (the test rig only): pass nothing for notifications. As a convenience
-//     for developing the portable on the SignalBoost platform, the factory falls back
+//     for developing the portable on the build platform, the factory falls back
 //     to the platform email notifier. This path is NOT part of the sellable portable —
 //     an enterprise buyer always supplies a HostContext.
 //
@@ -36,32 +36,20 @@ export interface CreateSupervisorDispatcherOptions {
   dispatchStore?: DispatchStore
   /** Override the API step runner (defaults to the universal-provider runner). */
   apiRunner?: ApiStepRunner
-  /**
-   * ENTERPRISE integration: the buyer's infrastructure boundary. When provided, the
-   * dispatcher wires the host-agnostic enterprise notifier so paused steps route
-   * through the buyer's approvers/channel/branding. This is the sellable path.
-   */
+  /** Enterprise integration: the buyer's infrastructure boundary. */
   host?: HostContext
-  /** Directly override the pause notifier (takes precedence over `host`). Used by tests. */
+  /** Directly override the pause notifier (takes precedence over `host`). */
   notifyOwner?: OwnerNotifier
-  /**
-   * PLATFORM-ONLY fallback: dashboard URL for the platform email notifier used when
-   * developing on the SignalBoost test rig (no `host`, no `notifyOwner`). Ignored in
-   * enterprise mode.
-   */
+  /** Platform-only fallback dashboard URL. Ignored in enterprise mode. */
   dashboardUrl?: string
 }
 
-// Platform test-rig fallback: the platform email notifier, imported lazily so this
-// factory carries no host/email dependency unless this fallback is actually used.
-// This is intentionally the ONLY place the portable can reach the platform, and only
-// when no enterprise HostContext and no explicit notifier were supplied.
 function platformFallbackNotifier(dashboardUrl?: string): OwnerNotifier {
   return async (input) => {
     try {
       const [{ sendEmail }, { createOwnerEmailNotifier }] = await Promise.all([
         import('@/lib/email'),
-        import('./owner-notifier.ts'),
+        import('@/lib/supervisor/executors/owner-notifier'),
       ])
       await createOwnerEmailNotifier({ send: opts => sendEmail(opts), dashboardUrl })(input)
     } catch {

@@ -1,3 +1,4 @@
+// saas/lib/portable-products/deployment-acceptance-evidence.ts
 import { portableProductRegistry } from './product-registry.ts'
 
 export const portableDeploymentAcceptanceEvidenceSchemaVersion = 'portable-deployment-acceptance-evidence.v1' as const

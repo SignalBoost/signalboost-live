@@ -28,12 +28,20 @@ test('implemented products require explicit core and host boundaries before arch
   }
 })
 
-test('preview and descriptor products remain fail-closed', () => {
+test('Provider Hub is architecture-complete while commercial maturity remains preview', () => {
   const report = createPortableArchitectureClosureReport()
   const providerHub = report.entries.find(entry => entry.productId === 'provider-hub')
+  const descriptor = portableProductRegistry.find(entry => entry.manifest.productId === 'provider-hub')
+  assert.equal(providerHub?.state, 'complete')
+  assert.deepEqual(providerHub?.blockers, [])
+  assert.equal(descriptor?.implementationStatus, 'implemented')
+  assert.equal(descriptor?.manifest.status, 'preview')
+  assert.equal(descriptor?.route, '/dashboard/provider-hub')
+})
+
+test('preview and descriptor products remain fail-closed', () => {
+  const report = createPortableArchitectureClosureReport()
   const browserAgents = report.entries.find(entry => entry.productId === 'browser-agent-ecosystem')
-  assert.equal(providerHub?.state, 'partial')
-  assert.ok((providerHub?.blockers.length ?? 0) > 0)
   assert.equal(browserAgents?.state, 'descriptor-only')
   assert.ok((browserAgents?.blockers.length ?? 0) > 0)
   assert.equal(report.closed, false)

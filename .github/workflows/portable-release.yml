@@ -1,0 +1,110 @@
+# .github/workflows/portable-release.yml
+#
+# Runs the release gates for each portable that has a spec, and publishes the
+# archive as a build artifact. A pull request that breaks the buyer import
+# graph, leaks the platform name into a payload file, or shortens the graph
+# fails here instead of at a buyer's site.
+
+name: Portable release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/supervisor/**'
+      - 'saas/lib/browser-runtime/**'
+      - 'saas/portable-release/**'
+      - 'saas/scripts/package-portable.mjs'
+      - '.github/workflows/portable-release.yml'
+  pull_request:
+    paths:
+      - 'saas/lib/supervisor/**'
+      - 'saas/lib/browser-runtime/**'
+      - 'saas/portable-release/**'
+      - 'saas/scripts/package-portable.mjs'
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        spec:
+          - self-healing.release.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          show-progress: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build release
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          node scripts/package-portable.mjs "portable-release/${{ matrix.spec }}" --no-archive
+          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
+          archive="$(node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync(process.argv[1]+"/manifest.json","utf8")); process.stdout.write(`${m.id}-${m.version}.tgz`)' "$release_dir")"
+          temp_archive="$(dirname "$release_dir")/$archive"
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf "$temp_archive" -C "$release_dir" .
+          mv "$temp_archive" "$release_dir/$archive"
+          sha256sum "$release_dir/$archive" | sed "s#  $release_dir/#  #" > "$release_dir/$archive.sha256"
+
+      - name: Verify checksums from the archive root
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
+          echo "verifying $release_dir"
+          cd "$release_dir"
+          sha256sum -c SHA256SUMS
+          for f in *.tgz.sha256; do sha256sum -c "$f"; done
+
+      - name: Confirm no credential material is in the payload
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
+          if grep -rInE '(BEGIN [A-Z ]*PRIVATE KEY|sk-[A-Za-z0-9]{20,}|xox[baprs]-)' "$release_dir/payload"; then
+            echo "::error::credential-shaped material found in the payload"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: Report
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1] + "/manifest.json", "utf8"));
+            const out = [];
+            out.push("### " + m.name + "  `" + m.version + "`");
+            out.push("");
+            out.push("| | |");
+            out.push("| --- | --- |");
+            out.push("| commit | `" + m.sourceCommit.slice(0, 12) + "` |");
+            out.push("| modules | " + m.moduleCount + " |");
+            out.push("| payload files | " + m.files.length + " |");
+            out.push("| host fallbacks | " + m.runtime.externalDependencies.filter(d => d.hostFallback).length + " |");
+            out.push("| tracked naming exceptions | " + m.namingExceptions.length + " |");
+            if (m.namingExceptions.length) {
+              out.push("");
+              out.push("**Naming exceptions still shipping:**");
+              for (const e of m.namingExceptions) out.push("- `" + e.path + "` — " + e.reason);
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
+          ' "$release_dir"
+
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-${{ matrix.spec }}
+          path: saas/dist/portables/**
+          if-no-files-found: error
+          retention-days: 90

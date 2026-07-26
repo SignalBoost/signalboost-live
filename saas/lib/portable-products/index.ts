@@ -15,6 +15,7 @@ export { createPortableLicensingFulfillmentEvidence, portableLicensingFulfillmen
 export { portableOperationsRecoveryEvidenceSchemaVersion, validatePortableOperationsRecoveryEvidence } from './operations-recovery-evidence.ts'
 export { portableBuyerConfigurationEvidenceSchemaVersion, validatePortableBuyerConfigurationEvidence } from './buyer-configuration-evidence.ts'
 export { portableDeploymentAcceptanceEvidenceSchemaVersion, validatePortableDeploymentAcceptanceEvidence } from './deployment-acceptance-evidence.ts'
+export { portableSupportBoundaryEvidenceSchemaVersion, validatePortableSupportBoundaryEvidence } from './support-boundary-evidence.ts'
 export type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 export type { PortableProductCategory, PortableProductDescriptor, PortableProductImplementationClassification, PortableProductImplementationStatus, PortableProductStatus } from './product-types.ts'
 export type { PortableGraphEdge, PortableGraphEdgeType, PortableGraphNode, PortableGraphNodeType, PortableProductDependencyGraph } from './dependency-graph.ts'
@@ -28,3 +29,4 @@ export type { PortableCommercialEvidenceInput, PortableCommercialEvidenceStatus,
 export type { PortableOperationsRecoveryEvidenceBlocker } from './operations-recovery-evidence.ts'
 export type { PortableBuyerConfigurationEvidenceBlocker } from './buyer-configuration-evidence.ts'
 export type { PortableDeploymentAcceptanceEvidenceBlocker } from './deployment-acceptance-evidence.ts'
+export type { PortableSupportBoundaryEvidenceBlocker } from './support-boundary-evidence.ts'

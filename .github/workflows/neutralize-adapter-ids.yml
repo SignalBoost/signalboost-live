@@ -1,16 +1,17 @@
 name: Neutralize adapter identifiers
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/neutral-buyer-evidence-adapter-ids
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   codemod-and-verify:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'feat/neutral-buyer-evidence-adapter-ids' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

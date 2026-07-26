@@ -13,6 +13,17 @@ export {
 } from './enforce.ts';
 export { issueLicense, generateIssuerKeyPair } from './issue.ts';
 export {
+  SELF_HEALING_CATALOG,
+  assertIssuableFeatures,
+  catalogFor,
+  editionNames,
+  featuresForEdition,
+  knownFeatureIds,
+  unknownFeatures,
+  type CatalogFeature,
+  type ProductCatalog,
+} from './catalog.ts';
+export {
   guardWithEntitlement,
   unmatchedGuards,
   type GuardOptions,

@@ -44,15 +44,17 @@ to set `NODE_ENV`.
 ### 2.1 Where the build platform is still reachable, and why
 
 The same test that enforces §1 also walks the **entire import graph** reachable from the
-two entry points in §5 — currently 64 modules — and fails if host coupling appears
-anywhere new. Three touchpoints exist today and are listed in that test with their
-justification. They are inert for you:
+two entry points in §5 and fails if host coupling appears anywhere new. Two aliased lazy
+host fallbacks are declared and excluded from the buyer release payload:
 
 | Module | What it is | Why it cannot affect your deployment |
 | --- | --- | --- |
-| `executors/create-supervisor-dispatcher.ts` | lazy import of a platform email notifier | reached only when you supply neither a `HostContext` nor a notifier; supplying either bypasses it entirely |
-| `executors/api-executor.ts` | lazy import of the platform provider engine, used as the **default** `api_request` runner | pass your own `ApiStepRunner` and the import is never evaluated |
-| `executors/dispatch-store.ts` | reads `NODE_ENV` inside `platformSupervisorRuntime()` | a platform-only helper; you pass your own store or an explicit `runtime` |
+| `executors/create-supervisor-dispatcher.ts` | aliased lazy import of the platform email notifier | excluded from the archive; supplying a `HostContext` or notifier bypasses it |
+| `executors/api-executor.ts` | aliased lazy import of the platform provider engine used as the default `api_request` runner | excluded from the archive; pass your own `ApiStepRunner` |
+
+The dispatch store no longer reads `NODE_ENV`; callers pass a durable store or an explicit
+runtime. The buyer payload therefore carries no environment-reading helper and no platform
+notifier implementation.
 
 ---
 
@@ -171,9 +173,9 @@ const audit = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json
 const dispatcher = createSupervisorDispatcher({ host, dispatchStore, audit })
 ```
 
-On the SignalBoost test rig the same factory is called with no `host` and falls back
-to a platform email notifier — that fallback is the only place the platform's own
-email is touched, and it does not run on your deployment.
+On the platform test rig the same factory can be called without a `host` and use an
+aliased development fallback. That fallback is excluded from the buyer archive and does
+not run in your deployment.
 
 ### 5.1 Approvers before you have an IdP adapter
 
@@ -232,6 +234,19 @@ genuinely live for you.
 Item 7 above is the one thing this guide cannot do for you: it has to run against *your*
 vault, *your* channel, *your* directory. So the portable ships the scenario as code, and you
 supply the `HostContext` you intend to deploy with.
+
+Write one file that exports the `HostContext` you intend to deploy with, then run every risk
+category in one command:
+
+```bash
+node scripts/run-self-healing-acceptance.mjs ./my-host.mjs --out acceptance-record.json
+```
+
+It exits non-zero unless every category passes every check, so it belongs in your deployment
+pipeline: a regression in approval gating then fails the deploy rather than reaching
+production. `--category destructive` narrows it to one route while you are wiring up.
+
+Or call the scenario directly:
 
 ```ts
 import { runAcceptanceScenario } from 'lib/supervisor/portable'

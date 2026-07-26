@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPortableBuyerHandoffManifest, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry } from '../lib/portable-products/index.ts'
+import { createPortableBuyerHandoffManifest, createPortableLicensingFulfillmentEvidence, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry } from '../lib/portable-products/index.ts'
 import { readFileSync } from 'node:fs'
 
 test('portable readiness dashboard is frozen, deterministic, and registry-driven', () => {
@@ -49,4 +49,30 @@ test('buyer handoff manifest becomes complete only with all bounded evidence cla
   assert.equal(manifest.complete, true)
   assert.deepEqual(manifest.blockers, [])
   assert.equal(manifest.schemaVersion, 'portable-buyer-handoff-manifest.v1')
+})
+
+test('licensing and fulfillment evidence fails closed when proof is absent', () => {
+  const evidence = createPortableLicensingFulfillmentEvidence({ productId: 'provider-hub', licensing: { status: 'absent', references: [] }, fulfillment: { status: 'absent', references: [] }, checkoutEnabled: false, billingMutationEnabled: false, entitlementMutationEnabled: false, fulfillmentMutationEnabled: false })
+  assert.equal(evidence.complete, false)
+  assert.equal(evidence.licensingReady, false)
+  assert.equal(evidence.fulfillmentReady, false)
+  assert.deepEqual(evidence.blockers, ['missing-licensing-evidence', 'missing-fulfillment-evidence'])
+  assert.ok(Object.isFrozen(evidence) && Object.isFrozen(evidence.licensing) && Object.isFrozen(evidence.fulfillment) && Object.isFrozen(evidence.blockers))
+})
+
+test('documented evidence requires references and rejects mutation claims', () => {
+  const evidence = createPortableLicensingFulfillmentEvidence({ productId: 'provider-hub', licensing: { status: 'documented', references: ['   '] }, fulfillment: { status: 'verified', references: ['docs/handoff/provider-hub.md'] }, checkoutEnabled: true, billingMutationEnabled: false, entitlementMutationEnabled: true, fulfillmentMutationEnabled: false })
+  assert.equal(evidence.complete, false)
+  assert.ok(evidence.blockers.includes('missing-licensing-references'))
+  assert.ok(evidence.blockers.includes('checkout-enabled'))
+  assert.ok(evidence.blockers.includes('entitlement-mutation-enabled'))
+})
+
+test('licensing and fulfillment evidence completes only as read-only proof', () => {
+  const evidence = createPortableLicensingFulfillmentEvidence({ productId: 'provider-hub', licensing: { status: 'verified', references: ['contracts/provider-hub-license-boundary.v1.json'] }, fulfillment: { status: 'verified', references: ['handoff/provider-hub-release.v1.json'] }, checkoutEnabled: false, billingMutationEnabled: false, entitlementMutationEnabled: false, fulfillmentMutationEnabled: false })
+  assert.equal(evidence.complete, true)
+  assert.equal(evidence.licensingReady, true)
+  assert.equal(evidence.fulfillmentReady, true)
+  assert.deepEqual(evidence.blockers, [])
+  assert.equal(evidence.schemaVersion, 'portable-licensing-fulfillment-evidence.v1')
 })

@@ -58,6 +58,20 @@ test('Provider Hub live-data read evidence fails closed for unsafe or malformed 
   ]) assert.ok(evidence.blockers.includes(blocker), `missing blocker ${blocker}`)
 })
 
+test('Provider Hub live-data read evidence redacts unsafe ETags and rejects malformed rate-limit containers', () => {
+  const unsafeEtag = createProviderLiveDataReadEvidence({ ...base, etag: 'api_key=plaintext-secret' })
+  assert.equal(unsafeEtag.state, 'blocked')
+  assert.ok(unsafeEtag.blockers.includes('invalid-etag'))
+  assert.equal(unsafeEtag.etag, null)
+  assert.equal(JSON.stringify(unsafeEtag).includes('plaintext-secret'), false)
+
+  for (const rateLimit of ['invalid', 12, []]) {
+    const malformed = createProviderLiveDataReadEvidence({ ...base, rateLimit })
+    assert.equal(malformed.state, 'blocked')
+    assert.ok(malformed.blockers.includes('invalid-rate-limit-container'))
+  }
+})
+
 test('Provider Hub live-data read evidence requires coherent success and failure states', () => {
   const successWithFailure = createProviderLiveDataReadEvidence({ ...base, failureCode: 'quota_exceeded' })
   assert.ok(successWithFailure.blockers.includes('success-cannot-have-failure-code'))

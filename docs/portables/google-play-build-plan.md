@@ -21,6 +21,8 @@ The plan records buyer prerequisites, an ordered build sequence, expected unsign
 
 All task descriptions are declarative. `commandsExecuted`, `filesystemMutated`, `appBundleGenerated`, `signingEnabled`, `storeSubmissionEnabled`, and `productionExecutionEnabled` remain `false`.
 
+A build plan is not build evidence. Only buyer-controlled execution and independently retained results can establish `build_ready` status.
+
 ## Buyer responsibilities
 
 The buyer must supply and approve the isolated Android build environment, JDK, Android SDK, dependency access, release signing process, Digital Asset Links fingerprint, security review, store assets, privacy disclosures, Data Safety answers, and Play Console actions.

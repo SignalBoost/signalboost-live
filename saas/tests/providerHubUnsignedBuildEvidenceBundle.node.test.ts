@@ -77,7 +77,7 @@ test('fails closed for identity, schema, digest, traversal, and unsafe claims', 
     signingEnabled: true,
   })
   assert.equal(result.state, 'blocked')
-  assert.deepEqual(result.blockers, ['artifact-path', 'digests', 'package-identity', 'schema-identity', 'unsafe-state'])
+  assert.deepEqual(result.blockers, ['artifact-path', 'dependency-review', 'digests', 'package-identity', 'schema-identity', 'unsafe-state'])
 })
 
 test('rejects unknown keys, dynamic toolchains, repositories, credentials, and malformed evidence', () => {

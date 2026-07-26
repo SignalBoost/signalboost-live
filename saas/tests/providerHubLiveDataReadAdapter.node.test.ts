@@ -22,7 +22,7 @@ const digest = {
 
 test('Provider Hub live-data adapter performs injected GET reads in staging and emits immutable evidence', async () => {
   const calls: unknown[] = []
-  const evidence = await executeProviderLiveDataRead(request, {
+  const result = await executeProviderLiveDataRead(request, {
     executionMode: 'staging',
     now: () => '2026-07-26T19:00:00.000Z',
     digest,
@@ -45,16 +45,16 @@ test('Provider Hub live-data adapter performs injected GET reads in staging and 
   })
 
   assert.equal(calls.length, 1)
-  assert.deepEqual(calls[0], {
-    url: request.sourceUrl,
-    timeoutMs: 5_000,
-  })
-  assert.equal(evidence.state, 'validated')
-  assert.equal(evidence.httpStatus, 200)
-  assert.equal(evidence.resultCount, 1)
-  assert.equal(evidence.dataSha256, 'a'.repeat(64))
-  assert.equal(evidence.networkAccessPerformed, false)
-  assert.ok(Object.isFrozen(evidence))
+  assert.deepEqual(calls[0], { url: request.sourceUrl, timeoutMs: 5_000 })
+  assert.equal(result.executionMode, 'staging')
+  assert.equal(result.transportInvoked, true)
+  assert.equal(result.method, 'GET')
+  assert.equal(result.evidence.state, 'validated')
+  assert.equal(result.evidence.httpStatus, 200)
+  assert.equal(result.evidence.resultCount, 1)
+  assert.equal(result.evidence.dataSha256, 'a'.repeat(64))
+  assert.ok(Object.isFrozen(result))
+  assert.ok(Object.isFrozen(result.evidence))
 })
 
 test('Provider Hub live-data adapter fails closed for production execution and credential-shaped URLs', async () => {
@@ -80,18 +80,19 @@ test('Provider Hub live-data adapter fails closed for production execution and c
 })
 
 test('Provider Hub live-data adapter converts transport failures into deterministic read evidence', async () => {
-  const evidence = await executeProviderLiveDataRead(request, {
+  const result = await executeProviderLiveDataRead(request, {
     executionMode: 'test',
     now: () => '2026-07-26T19:00:00.000Z',
     digest,
     transport: { async get() { throw new Error('offline') } },
   })
 
-  assert.equal(evidence.state, 'validated')
-  assert.equal(evidence.httpStatus, 503)
-  assert.equal(evidence.resultCount, 0)
-  assert.equal(evidence.failureCode, 'transport_failure')
-  assert.equal(evidence.dataSha256, '0'.repeat(64))
+  assert.equal(result.transportInvoked, true)
+  assert.equal(result.evidence.state, 'validated')
+  assert.equal(result.evidence.httpStatus, 503)
+  assert.equal(result.evidence.resultCount, 0)
+  assert.equal(result.evidence.failureCode, 'transport_failure')
+  assert.equal(result.evidence.dataSha256, '0'.repeat(64))
 })
 
 test('Provider Hub live-data adapter bounds timeout and rejects unsafe URL authority', async () => {

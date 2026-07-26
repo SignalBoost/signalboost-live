@@ -1,3 +1,4 @@
+// saas/lib/portable-products/buyer-configuration-evidence.ts
 import { portableProductRegistry } from './product-registry.ts'
 
 export const portableBuyerConfigurationEvidenceSchemaVersion = 'portable-buyer-configuration-evidence.v1' as const

@@ -9,6 +9,7 @@ const SAFE_VALUE = /^(?!.*(?:password|secret|token|credential|private[_ -]?key|b
 const EXPECTED_KEYS = ['assetDigests', 'buildLogDigest', 'buildPlanSchemaVersion', 'dependencyLockDigest', 'dependencyReview', 'evidence', 'lintPassed', 'packageName', 'productionExecutionEnabled', 'provenanceSchemaVersion', 'repositories', 'scaffoldSchemaVersion', 'signingEnabled', 'sourceCommitSha', 'testsPassed', 'toolchain', 'unsignedAabPath', 'unsignedAabSha256', 'uploadEnabled', 'publicationEnabled'] as const
 const ASSET_KEYS = ['assetLinksTemplate', 'icon', 'manifest', 'maskableIcon', 'offlinePage', 'serviceWorker'] as const
 const APPROVED_REPOSITORIES = ['google', 'mavenCentral'] as const
+const PACKAGE_NAME = 'com.signalboost.providerhub' as const
 
 export interface ProviderHubUnsignedBuildEvidenceBundleInput {
   sourceCommitSha: string
@@ -57,11 +58,11 @@ export function createProviderHubUnsignedBuildEvidenceBundle(inputValue: unknown
   const keys = Object.keys(input).sort()
   if (keys.length !== EXPECTED_KEYS.length || keys.some((key, index) => key !== [...EXPECTED_KEYS].sort()[index])) blockers.push('evidence-keys')
   if (!SHA40.test(String(input.sourceCommitSha ?? ''))) blockers.push('source-commit')
-  if (input.packageName !== 'com.signalboost.providerhub') blockers.push('package-identity')
+  if (input.packageName !== PACKAGE_NAME) blockers.push('package-identity')
   if (input.scaffoldSchemaVersion !== 'signalboost-android-scaffold-v1' || input.buildPlanSchemaVersion !== 'signalboost-android-build-plan-v1' || input.provenanceSchemaVersion !== 'signalboost-provider-hub-unsigned-build-provenance-v1') blockers.push('schema-identity')
 
   const review = input.dependencyReview && typeof input.dependencyReview === 'object' ? input.dependencyReview as Record<string, unknown> : {}
-  if (review.schemaVersion !== 'signalboost-provider-hub-dependency-review-v1' || review.state !== 'review_ready' || review.packageName !== input.packageName || review.portableId !== 'provider-hub' || !Array.isArray(review.blockers) || review.blockers.length !== 0 || typeof review.reviewId !== 'string' || !SAFE_VALUE.test(review.reviewId)) blockers.push('dependency-review')
+  if (review.schemaVersion !== 'signalboost-provider-hub-dependency-review-v1' || review.state !== 'review_ready' || review.packageName !== PACKAGE_NAME || review.portableId !== 'provider-hub' || !Array.isArray(review.blockers) || review.blockers.length !== 0 || typeof review.reviewId !== 'string' || !SAFE_VALUE.test(review.reviewId)) blockers.push('dependency-review')
 
   const assets = input.assetDigests && typeof input.assetDigests === 'object' ? input.assetDigests as Record<string, unknown> : {}
   const assetKeys = Object.keys(assets).sort()
@@ -79,7 +80,7 @@ export function createProviderHubUnsignedBuildEvidenceBundle(inputValue: unknown
   const evidence = input.evidence && typeof input.evidence === 'object' ? input.evidence as Record<string, unknown> : {}
   const evidenceKeys = Object.keys(evidence)
   if (evidenceKeys.length === 0 || new Set(evidenceKeys).size !== evidenceKeys.length || evidenceKeys.some(key => !SAFE_VALUE.test(key) || typeof evidence[key] !== 'string' || !SHA256.test(evidence[key] as string))) blockers.push('evidence-index')
-  if (canonical(input).match(/password|secret|credential|private[_ -]?key|bearer\s/i)) blockers.push('credential-shaped-value')
+  if (/password|secret|token|credential|private[_ -]?key|bearer\s/i.test(canonical(input))) blockers.push('credential-shaped-value')
   if (input.signingEnabled !== false || input.uploadEnabled !== false || input.publicationEnabled !== false || input.productionExecutionEnabled !== false) blockers.push('unsafe-state')
 
   const sorted = Object.freeze([...new Set(blockers)].sort())
@@ -91,7 +92,7 @@ export function createProviderHubUnsignedBuildEvidenceBundle(inputValue: unknown
     state: sorted.length === 0 ? 'evidence_ready' : 'blocked',
     blockers: sorted,
     sourceCommitSha: SHA40.test(String(input.sourceCommitSha ?? '')) ? input.sourceCommitSha : '',
-    packageName: 'com.signalboost.providerhub',
+    packageName: PACKAGE_NAME,
     evidence: normalizedEvidence,
     readOnly: true,
     filesystemAccessed: false,

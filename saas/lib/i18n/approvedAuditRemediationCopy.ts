@@ -48,6 +48,7 @@ const COPY: Record<string, Record<string, string>> = {
     'Execution path': 'Ruta de ejecución',
     'Only reviewed and implemented paths are shown.': 'Solo se muestran las rutas revisadas e implementadas.',
     'Architecture references': 'Referencias de arquitectura',
+    'Documentation references': 'Referencias de documentación',
     'Provider Hub': 'Centro de proveedores',
   },
   pt: {
@@ -97,6 +98,7 @@ const COPY: Record<string, Record<string, string>> = {
     'Execution path': 'Caminho de execução',
     'Only reviewed and implemented paths are shown.': 'Somente caminhos revisados e implementados são exibidos.',
     'Architecture references': 'Referências de arquitetura',
+    'Documentation references': 'Referências de documentação',
     'Provider Hub': 'Central de provedores',
   },
   pl: {
@@ -146,6 +148,7 @@ const COPY: Record<string, Record<string, string>> = {
     'Execution path': 'Ścieżka wykonania',
     'Only reviewed and implemented paths are shown.': 'Wyświetlane są tylko zweryfikowane i zaimplementowane ścieżki.',
     'Architecture references': 'Odwołania do architektury',
+    'Documentation references': 'Odwołania do dokumentacji',
     'Provider Hub': 'Centrum dostawców',
   },
   ru: {
@@ -195,6 +198,7 @@ const COPY: Record<string, Record<string, string>> = {
     'Execution path': 'Путь выполнения',
     'Only reviewed and implemented paths are shown.': 'Отображаются только проверенные и реализованные пути.',
     'Architecture references': 'Архитектурные ссылки',
+    'Documentation references': 'Ссылки на документацию',
     'Provider Hub': 'Центр провайдеров',
   },
 }

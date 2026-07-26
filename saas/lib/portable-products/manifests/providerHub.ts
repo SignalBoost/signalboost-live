@@ -15,8 +15,14 @@ export const providerHubManifest: PortableProductManifest = Object.freeze({
   optionalCapabilities: Object.freeze(['vault-integration', 'oauth', 'service-accounts', 'health-monitoring', 'quota-monitoring']),
   dependencies: Object.freeze(['buyer-supplied-provider-account', 'buyer-supplied-credentials', 'approved-vault-host']),
   exclusions: Object.freeze(['secret-exposure', 'automatic-approval', 'unbounded-spend', 'provider-mutation-without-approval']),
-  architectureReferences: Object.freeze(['universal-provider-framework', 'portable-product-doctrine', 'console-hub']),
-  documentationReferences: Object.freeze(['docs/portables/provider-hub-byok-portable.md', 'saas/docs/provider-integration.md']),
-  futureFeatures: Object.freeze(['provider-hub-core-host-extraction', 'dedicated-self-service-provider-hub', 'enterprise-admin-console', 'white-label-packaging', 'licensing-enforcement']),
+  architectureReferences: Object.freeze(['provider-hub-core', 'provider-hub-host', 'universal-provider-framework', 'portable-product-doctrine', 'console-hub']),
+  documentationReferences: Object.freeze([
+    'docs/portables/provider-hub-byok-portable.md',
+    'docs/portables/provider-hub-existing-assets-inventory.md',
+    'saas/provider-hub-core/index.ts',
+    'saas/provider-hub-host/contracts.ts',
+    'saas/docs/provider-integration.md',
+  ]),
+  futureFeatures: Object.freeze(['dedicated-self-service-provider-hub', 'enterprise-admin-console', 'white-label-packaging', 'licensing-enforcement']),
   supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
 })

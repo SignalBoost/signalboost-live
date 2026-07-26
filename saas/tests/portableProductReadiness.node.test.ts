@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry, validatePortableOperationsRecoveryEvidence } from '../lib/portable-products/index.ts'
+import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry, validatePortableDeploymentAcceptanceEvidence, validatePortableOperationsRecoveryEvidence } from '../lib/portable-products/index.ts'
 import { readFileSync } from 'node:fs'
 
 test('portable readiness dashboard is frozen, deterministic, and registry-driven', () => {
@@ -99,26 +99,11 @@ test('buyer handoff manifest becomes complete only with all bounded evidence cla
 })
 
 const operationsRecoveryBase = Object.freeze({
-  productId: 'provider-hub',
-  releaseVersion: '1.2.0',
-  previousVersion: '1.1.0',
-  runbookReference: 'urn:portable:runbook:provider-hub',
-  upgradeReference: 'https://docs.example.test/provider-hub/upgrade',
-  rollbackReference: 'https://docs.example.test/provider-hub/rollback',
-  backupReference: 'https://docs.example.test/provider-hub/backup',
-  restoreReference: 'https://docs.example.test/provider-hub/restore',
-  recoveryPointObjectiveMinutes: 60,
-  recoveryTimeObjectiveMinutes: 120,
-  validatedAt: '2026-07-26T21:30:00.000Z',
-  expiresAt: '2027-07-26T21:30:00.000Z',
-  readOnly: true,
-  artifactAccessed: false,
-  upgradeExecuted: false,
-  rollbackExecuted: false,
-  backupExecuted: false,
-  restoreExecuted: false,
-  deploymentPerformed: false,
-  productionExecutionEnabled: false,
+  productId: 'provider-hub', releaseVersion: '1.2.0', previousVersion: '1.1.0',
+  runbookReference: 'urn:portable:runbook:provider-hub', upgradeReference: 'https://docs.example.test/provider-hub/upgrade', rollbackReference: 'https://docs.example.test/provider-hub/rollback', backupReference: 'https://docs.example.test/provider-hub/backup', restoreReference: 'https://docs.example.test/provider-hub/restore',
+  recoveryPointObjectiveMinutes: 60, recoveryTimeObjectiveMinutes: 120,
+  validatedAt: '2026-07-26T21:30:00.000Z', expiresAt: '2027-07-26T21:30:00.000Z',
+  readOnly: true, artifactAccessed: false, upgradeExecuted: false, rollbackExecuted: false, backupExecuted: false, restoreExecuted: false, deploymentPerformed: false, productionExecutionEnabled: false,
 })
 
 test('validates immutable operations and recovery evidence', () => {
@@ -130,27 +115,48 @@ test('validates immutable operations and recovery evidence', () => {
 })
 
 test('operations and recovery evidence fails closed for invalid bounded inputs', () => {
-  const result = validatePortableOperationsRecoveryEvidence({
-    ...operationsRecoveryBase,
-    productId: 'unknown-product',
-    releaseVersion: 'latest',
-    previousVersion: 'latest',
-    recoveryPointObjectiveMinutes: 0,
-    expiresAt: '2025-07-26T21:30:00.000Z',
-  })
+  const result = validatePortableOperationsRecoveryEvidence({ ...operationsRecoveryBase, productId: 'unknown-product', releaseVersion: 'latest', previousVersion: 'latest', recoveryPointObjectiveMinutes: 0, expiresAt: '2025-07-26T21:30:00.000Z' })
   assert.equal(result.state, 'blocked')
   for (const blocker of ['identity', 'version', 'objectives', 'timestamps'] as const) assert.ok(result.blockers.includes(blocker))
 })
 
 test('operations and recovery evidence rejects unsafe references and execution state', () => {
-  const result = validatePortableOperationsRecoveryEvidence({
-    ...operationsRecoveryBase,
-    restoreReference: 'https://docs.example.test/restore?token=secret',
-    restoreExecuted: true,
-    deploymentPerformed: true,
-  })
+  const result = validatePortableOperationsRecoveryEvidence({ ...operationsRecoveryBase, restoreReference: 'https://docs.example.test/restore?token=secret', restoreExecuted: true, deploymentPerformed: true })
   assert.equal(result.state, 'blocked')
   assert.ok(result.blockers.includes('references'))
   assert.ok(result.blockers.includes('unsafe-state'))
   assert.equal(result.references.restore, '')
+})
+
+const deploymentAcceptanceChecks = ['clean-install', 'configuration-validation', 'health-check', 'rollback-readiness', 'buyer-signoff'].map(kind => ({ kind, status: 'passed', evidenceReference: `urn:portable:acceptance:${kind}` }))
+const deploymentAcceptanceBase = Object.freeze({
+  productId: 'provider-hub', tenantId: 'tenant-1', environmentId: 'production-us', releaseVersion: '1.0.0', checks: deploymentAcceptanceChecks,
+  evaluatedAt: '2026-07-26T21:30:00.000Z', acknowledgedAt: '2026-07-26T21:31:00.000Z', buyerAccepted: true, buyerSignoffReference: 'urn:portable:acceptance:buyer-signoff',
+  readOnly: true, deploymentPerformed: false, infrastructureMutationPerformed: false, credentialTransferred: false, providerExecutionPerformed: false, productionExecutionEnabled: false,
+})
+
+test('validates immutable deployment acceptance evidence', () => {
+  const result = validatePortableDeploymentAcceptanceEvidence(deploymentAcceptanceBase)
+  assert.equal(result.state, 'deployment_acceptance_evidence_validated')
+  assert.deepEqual(result.blockers, [])
+  assert.equal(result.checks.length, 5)
+  assert.ok(Object.isFrozen(result) && Object.isFrozen(result.checks))
+})
+
+test('deployment acceptance evidence fails closed for malformed checks and references', () => {
+  const result = validatePortableDeploymentAcceptanceEvidence({
+    ...deploymentAcceptanceBase,
+    checks: [...deploymentAcceptanceChecks.slice(0, 4), { ...deploymentAcceptanceChecks[0], evidenceReference: 'https://example.test/?token=secret' }],
+    acknowledgedAt: '2026-07-26T21:29:00.000Z',
+  })
+  assert.equal(result.state, 'blocked')
+  assert.ok(result.blockers.includes('checks'))
+  assert.ok(result.blockers.includes('references'))
+  assert.ok(result.blockers.includes('timestamps'))
+})
+
+test('deployment acceptance evidence rejects missing signoff and unsafe execution state', () => {
+  const result = validatePortableDeploymentAcceptanceEvidence({ ...deploymentAcceptanceBase, productId: 'unknown-product', tenantId: '', environmentId: 'bad environment', buyerAccepted: false, buyerSignoffReference: '', deploymentPerformed: true })
+  for (const blocker of ['identity', 'scope', 'acknowledgment', 'unsafe-state'] as const) assert.ok(result.blockers.includes(blocker))
+  assert.equal(result.deploymentPerformed, false)
 })

@@ -20,7 +20,7 @@ export interface ReferenceDeploymentInput {
 
 export interface ProviderHubReferenceDeployment {
   ports: ProviderHubHostPorts
-  auditEvents: readonly ProviderHubAuditEvent[]
+  readonly auditEvents: readonly ProviderHubAuditEvent[]
 }
 
 function sameScope(actor: ProviderHubActorIdentity, identity: ProviderConnectionIdentity): boolean {
@@ -34,22 +34,22 @@ export function createProviderHubReferenceDeployment(
   const entitled = new Set(input.entitledCapabilities ?? ['provider-hub.view'])
   let vaultVersion = 0
 
-  const ports = {
+  const ports: ProviderHubHostPorts = {
     identity: {
-      async resolveActor(candidate: { actorId: string; tenantId: string; environmentId: string }) {
+      async resolveActor(candidate) {
         if (candidate.actorId !== input.actor.actorId) return null
         if (candidate.tenantId !== input.actor.tenantId) return null
         if (candidate.environmentId !== input.actor.environmentId) return null
         return input.actor
       },
-      async resolveConnectionOwner(identity: ProviderConnectionIdentity) {
+      async resolveConnectionOwner(identity) {
         if (!sameScope(input.actor, identity)) return null
         if (identity.connectionId !== input.connection.connectionId) return null
         return { ownerId: input.actor.actorId }
       },
     },
     vault: {
-      async storeSecret({ identity }: { identity: ProviderConnectionIdentity; secretEnvelope: unknown }) {
+      async storeSecret({ identity }) {
         if (!sameScope(input.actor, identity)) throw new Error('scope mismatch')
         vaultVersion += 1
         return Object.freeze({
@@ -60,12 +60,12 @@ export function createProviderHubReferenceDeployment(
           version: vaultVersion,
         }) satisfies ProviderHubVaultReference
       },
-      async deleteSecret(reference: ProviderHubVaultReference) {
+      async deleteSecret(reference) {
         if (reference.tenantId !== input.actor.tenantId) throw new Error('scope mismatch')
       },
     },
     persistence: {
-      async getConnection(identity: ProviderConnectionIdentity) {
+      async getConnection(identity) {
         if (!sameScope(input.actor, identity)) return null
         if (identity.connectionId !== input.connection.connectionId) return null
         if (identity.providerId !== input.connection.providerId) return null
@@ -73,18 +73,18 @@ export function createProviderHubReferenceDeployment(
       },
     },
     audit: {
-      async append(event: Readonly<ProviderHubAuditEvent>) {
+      async append(event) {
         if (event.tenantId !== input.actor.tenantId) throw new Error('scope mismatch')
         auditEvents.push(Object.freeze({ ...event }))
       },
     },
     approvals: {
       async request() {
-        return { approvalId: 'reference-approval-pending', decision: 'pending' as const }
+        return { approvalId: 'reference-approval-pending', decision: 'pending' }
       },
     },
     licensing: {
-      async checkEntitlement({ tenantId, environmentId, capability }: { tenantId: string; environmentId: string; capability: string }) {
+      async checkEntitlement({ tenantId, environmentId, capability }) {
         const scoped = tenantId === input.actor.tenantId && environmentId === input.actor.environmentId
         return scoped && entitled.has(capability)
           ? { entitled: true, entitlementRef: `reference-license://${tenantId}/${capability}` }
@@ -92,12 +92,7 @@ export function createProviderHubReferenceDeployment(
       },
     },
     ui: {
-      project({ actor, connection, allowedActions, notices = [] }: {
-        actor: ProviderHubActorIdentity
-        connection: ProviderConnectionMetadata
-        allowedActions: readonly string[]
-        notices?: readonly string[]
-      }): ProviderHubUiProjection {
+      project({ actor, connection, allowedActions, notices = [] }): ProviderHubUiProjection {
         if (!sameScope(actor, connection)) throw new Error('scope mismatch')
         return Object.freeze({
           schemaVersion: PROVIDER_HUB_HOST_PORTS_VERSION,
@@ -107,7 +102,7 @@ export function createProviderHubReferenceDeployment(
         })
       },
     },
-  } satisfies ProviderHubHostPorts
+  }
 
   return Object.freeze({
     ports,
@@ -125,7 +120,7 @@ export function createReferenceConnection(): ProviderConnectionMetadata {
     authentication: {
       method: 'api_key',
       configured: true,
-      maskedFields: { credentialField: 'saved' },
+      maskedFields: { accountField: 'saved' },
     },
     updatedAt: '2026-07-26T00:00:00.000Z',
   })

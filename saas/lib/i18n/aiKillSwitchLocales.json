@@ -1,0 +1,28 @@
+{
+  "_path": "saas/lib/i18n/aiKillSwitchLocales.json",
+  "en": {
+    "unavailable": "AI AUTONOMY BLOCKED — GLOBAL STATUS UNREADABLE",
+    "unavailableDescription": "The global AI status row could not be read. Supervisor ingress, automated webhooks and background cron jobs all fail closed on exactly this condition, so autonomous execution is being rejected right now even though nobody engaged the kill switch. Human traffic continues normally.",
+    "unavailableAction": "Run supabase/migrations/20260726_ensure_global_ai_kill_switch.sql, then reload this page. The switch cannot be operated until the global status row is readable."
+  },
+  "es": {
+    "unavailable": "AUTONOMÍA DE IA BLOQUEADA — ESTADO GLOBAL ILEGIBLE",
+    "unavailableDescription": "No se pudo leer la fila de estado global de la IA. La entrada del Supervisor, los webhooks automáticos y las tareas cron en segundo plano fallan en modo cerrado ante exactamente esta condición, por lo que la ejecución autónoma se está rechazando ahora mismo aunque nadie haya activado el interruptor de emergencia. El tráfico humano continúa con normalidad.",
+    "unavailableAction": "Ejecuta supabase/migrations/20260726_ensure_global_ai_kill_switch.sql y vuelve a cargar esta página. El interruptor no se puede operar hasta que la fila de estado global sea legible."
+  },
+  "pt": {
+    "unavailable": "AUTONOMIA DE IA BLOQUEADA — ESTADO GLOBAL ILEGÍVEL",
+    "unavailableDescription": "Não foi possível ler a linha de estado global da IA. A entrada do Supervisor, os webhooks automáticos e as tarefas cron em segundo plano falham de forma fechada exatamente nesta condição, por isso a execução autónoma está a ser rejeitada neste momento, mesmo sem ninguém ter acionado o interruptor de emergência. O tráfego humano continua normalmente.",
+    "unavailableAction": "Execute supabase/migrations/20260726_ensure_global_ai_kill_switch.sql e recarregue esta página. O interruptor não pode ser operado enquanto a linha de estado global não for legível."
+  },
+  "pl": {
+    "unavailable": "AUTONOMIA AI ZABLOKOWANA — GLOBALNY STATUS NIE DO ODCZYTU",
+    "unavailableDescription": "Nie udało się odczytać globalnego wiersza statusu AI. Ruch przychodzący Supervisora, automatyczne webhooki i zadania cron w tle domyślnie blokują się dokładnie w tej sytuacji, więc autonomiczne wykonanie jest w tej chwili odrzucane, mimo że nikt nie uruchomił wyłącznika awaryjnego. Ruch użytkowników działa normalnie.",
+    "unavailableAction": "Uruchom supabase/migrations/20260726_ensure_global_ai_kill_switch.sql, a następnie odśwież tę stronę. Wyłącznika nie można obsługiwać, dopóki globalny wiersz statusu nie będzie czytelny."
+  },
+  "ru": {
+    "unavailable": "АВТОНОМИЯ ИИ ЗАБЛОКИРОВАНА — ГЛОБАЛЬНЫЙ СТАТУС НЕ ЧИТАЕТСЯ",
+    "unavailableDescription": "Не удалось прочитать строку глобального статуса ИИ. Входящий трафик Supervisor, автоматические вебхуки и фоновые cron-задачи по умолчанию блокируются именно в этом случае, поэтому автономное выполнение сейчас отклоняется, хотя аварийный выключатель никто не активировал. Пользовательский трафик работает как обычно.",
+    "unavailableAction": "Выполните supabase/migrations/20260726_ensure_global_ai_kill_switch.sql и перезагрузите эту страницу. Переключателем нельзя управлять, пока строка глобального статуса не станет читаемой."
+  }
+}

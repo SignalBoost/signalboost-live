@@ -12,8 +12,13 @@
 //     --product self-healing-supervisor \
 //     --licensee "Buyer GmbH" \
 //     --edition enterprise \
-//     --features repair.dispatch,siem.export \
 //     --seats 25 --days 365 --grace 14
+//
+// Features come from the edition's entry in the catalogue unless --features
+// overrides them, and either way they are checked against the catalogue before
+// anything is signed. A feature name no code checks produces a licence that
+// silently unlocks nothing: the buyer pays, the gate refuses, and nobody finds
+// out until an incident.
 //
 // The private key is read from a file you point at, never from this repository
 // and never from an environment variable, so it does not end up in a shell
@@ -22,6 +27,12 @@
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { generateIssuerKeyPair, issueLicense } from '../portable-license/index.ts';
+import {
+  assertIssuableFeatures,
+  catalogFor,
+  editionNames,
+  featuresForEdition,
+} from '../portable-license/catalog.ts';
 import type { PortableLicenseClaims } from '../portable-license/index.ts';
 
 function arg(name: string): string | undefined {
@@ -33,12 +44,14 @@ function has(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
+function die(message: string): never {
+  console.error(`\n  ${message}\n`);
+  process.exit(1);
+}
+
 function required(name: string): string {
   const v = arg(name);
-  if (!v) {
-    console.error(`  missing --${name}`);
-    process.exit(1);
-  }
+  if (!v) die(`missing --${name}`);
   return v;
 }
 
@@ -54,24 +67,59 @@ if (has('genkey')) {
 }
 
 const keyFile = required('key-file');
-if (!fs.existsSync(keyFile)) {
-  console.error(`  key file not found: ${keyFile}`);
-  process.exit(1);
-}
+if (!fs.existsSync(keyFile)) die(`key file not found: ${keyFile}`);
 const privateKeyPem = fs.readFileSync(keyFile, 'utf8');
+
+const productId = required('product');
+const edition = arg('edition') ?? 'standard';
+const skipCatalog = has('no-catalog-check');
+
+let features: string[];
+const explicit = arg('features');
+
+if (explicit) {
+  features = explicit
+    .split(',')
+    .map((f) => f.trim())
+    .filter(Boolean);
+} else {
+  const fromEdition = featuresForEdition(productId, edition);
+  if (!fromEdition) {
+    die(
+      catalogFor(productId)
+        ? `"${edition}" is not an edition of ${productId}. Known editions: ${editionNames(productId).join(', ')}.`
+        : `No feature catalogue for "${productId}", so --features cannot be inferred. Pass --features explicitly.`,
+    );
+  }
+  features = fromEdition;
+}
+
+if (skipCatalog) {
+  console.warn('\n  WARNING: --no-catalog-check is set. Feature names are NOT being verified');
+  console.warn('  against any capability in the code. A typo here becomes a licence that');
+  console.warn('  unlocks nothing.\n');
+  if (features.length === 0) die('a licence with no features unlocks nothing');
+} else {
+  try {
+    assertIssuableFeatures(productId, features);
+  } catch (err) {
+    die(`${(err as Error).message}\n\n  Pass --no-catalog-check to override, but read that message first.`);
+  }
+}
 
 const days = Number(arg('days') ?? '365');
 const grace = Number(arg('grace') ?? '14');
 const seatsRaw = arg('seats');
 const executionsRaw = arg('max-executions');
 
-if (!Number.isFinite(days) || days <= 0) {
-  console.error('  --days must be a positive number, or use --perpetual');
-  process.exit(1);
+if (!has('perpetual') && (!Number.isFinite(days) || days <= 0)) {
+  die('--days must be a positive number, or use --perpetual');
 }
 
 const now = new Date();
 const notBefore = arg('not-before') ? new Date(required('not-before')) : now;
+if (Number.isNaN(notBefore.getTime())) die('--not-before must be a parseable date');
+
 const expiresAt = has('perpetual') ? null : new Date(notBefore.getTime() + days * 86_400_000);
 
 const claims: PortableLicenseClaims = {
@@ -79,12 +127,9 @@ const claims: PortableLicenseClaims = {
   licenseId: arg('license-id') ?? randomUUID(),
   issuer: required('issuer'),
   licensee: required('licensee'),
-  productId: required('product'),
-  edition: arg('edition') ?? 'standard',
-  features: (arg('features') ?? '')
-    .split(',')
-    .map((f) => f.trim())
-    .filter(Boolean),
+  productId,
+  edition,
+  features,
   seats: seatsRaw ? Number(seatsRaw) : null,
   maxExecutions: executionsRaw ? Number(executionsRaw) : null,
   issuedAt: now.toISOString(),
@@ -94,11 +139,6 @@ const claims: PortableLicenseClaims = {
 };
 
 if (arg('note')) claims.note = required('note');
-
-if (claims.features.length === 0) {
-  console.error('  --features is empty, so this licence would unlock nothing. Pass at least one.');
-  process.exit(1);
-}
 
 const token = issueLicense(claims, privateKeyPem);
 
@@ -115,4 +155,7 @@ console.log(`  grace        ${claims.graceDays} days`);
 console.log('\n  Token — the buyer puts this in their own configuration or vault:\n');
 console.log(token);
 console.log('\n  Record the licence id. Revocation is by id, and you cannot revoke what');
-console.log('  you did not write down.\n');
+console.log('  you did not write down.');
+console.log('\n  Seats and execution limits are recorded here but are NOT enforced by the');
+console.log('  product. They are contract terms. Say so to the buyer rather than letting');
+console.log('  them assume a control exists.\n');

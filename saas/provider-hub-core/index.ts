@@ -1,3 +1,12 @@
+export { executeProviderLiveDataRead } from './live-data-read-adapter.ts'
+export type {
+  ProviderLiveDataDigestPort,
+  ProviderLiveDataExecutionMode,
+  ProviderLiveDataReadAdapterOptions,
+  ProviderLiveDataReadRequest,
+  ProviderLiveDataReadTransport,
+  ProviderLiveDataTransportResponse,
+} from './live-data-read-adapter.ts'
 export { PROVIDER_LIVE_DATA_READ_EVIDENCE_SCHEMA_VERSION, createProviderLiveDataReadEvidence } from './live-data-read-evidence.ts'
 export type { ProviderLiveDataReadEvidence, ProviderLiveDataReadState } from './live-data-read-evidence.ts'
 

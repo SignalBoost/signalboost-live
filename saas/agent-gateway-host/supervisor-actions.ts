@@ -56,12 +56,14 @@ export const REPAIR_REVIEW_PARAMS: readonly string[] = [
   'incidentId',
   'project',
   'stepNumber',
-  'describedAction',
-  'describedTarget',
-  'expectedResult',
   'executor',
   'requiresApproval',
 ]
+
+// The model's prose (describedAction / describedTarget / expectedResult) is DELIBERATELY
+// absent. pr-engine fingerprints a PR by templateId + canonical payload, and prose varies on
+// every run — which is how one broken commit became nine approval PRs. The proposal is not
+// lost: pr-engine-approvals puts it in the PR SUMMARY, where a person reads it anyway.
 
 // ── Evidence targets ─────────────────────────────────────────────────────────
 // The three provider actions below are READ-ONLY, have a real handler in the hub action

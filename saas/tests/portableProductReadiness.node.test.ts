@@ -53,6 +53,31 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
   }
 })
 
+test('Campaign Studio commercial evidence is explicit and remains fail-closed', () => {
+  const report = createPortableCommercialReadinessReport()
+  const campaignStudio = report.entries.find(entry => entry.productId === 'campaign-studio')
+  assert.ok(campaignStudio)
+  assert.equal(campaignStudio.readyCount, 5)
+  assert.equal(campaignStudio.totalCount, 10)
+  assert.equal(campaignStudio.completionPercent, 50)
+  assert.equal(campaignStudio.commerciallyReady, false)
+  assert.deepEqual(campaignStudio.checks.filter(check => check.status === 'ready').map(check => check.dimension), [
+    'architecture',
+    'buyer-installation',
+    'operations-recovery',
+    'buyer-configuration',
+    'support-boundary',
+  ])
+  assert.deepEqual(campaignStudio.checks.filter(check => check.status === 'blocked').map(check => check.dimension), [
+    'distribution-package',
+    'integrity-manifest',
+    'licensing-enforcement',
+    'fulfillment-handoff',
+    'deployment-acceptance',
+  ])
+  assert.ok(campaignStudio.checks.every(check => Object.isFrozen(check) && Object.isFrozen(check.evidence) && Object.isFrozen(check.blockers)))
+})
+
 test('buyer handoff manifest is immutable and fails closed when delivery evidence is incomplete', () => {
   const manifest = createPortableBuyerHandoffManifest({ productId: 'provider-hub', releaseVersion: '1.0.0', packageFormat: 'tar.gz', artifacts: [], buyerResponsibilities: [], supplierResponsibilities: [], exclusions: ['checkout', 'entitlement-activation', 'provider-execution'] })
   assert.equal(manifest.complete, false)

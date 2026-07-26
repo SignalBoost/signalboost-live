@@ -50,6 +50,20 @@ export interface PortableCommercialReadinessReport {
  * fulfillment, recovery rehearsal, or clean-environment acceptance evidence remains fail-closed.
  */
 const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCommercialReadinessDimension, readonly string[]>>>>({
+  'integrations-hub': Object.freeze({
+    'buyer-installation': Object.freeze([
+      'docs/portables/integrations-hub-commercial-operations.md#2-buyer-installation',
+    ]),
+    'buyer-configuration': Object.freeze([
+      'docs/portables/integrations-hub-commercial-operations.md#3-buyer-configuration-record',
+      'saas/docs/provider-integration.md#how-credentials-are-supplied',
+    ]),
+    'support-boundary': Object.freeze([
+      'docs/portables/integrations-hub-commercial-operations.md#1-supported-product-boundary',
+      'docs/portables/integrations-hub-commercial-operations.md#5-support-and-responsibility-boundary',
+      'saas/docs/provider-integration.md#coming-soon-present-in-ui-not-yet-executable',
+    ]),
+  }),
   'campaign-studio': Object.freeze({
     'buyer-installation': Object.freeze([
       'docs/portables/campaign-studio-commercial-operations.md#2-buyer-installation',

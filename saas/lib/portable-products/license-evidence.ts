@@ -1,3 +1,4 @@
+// saas/lib/portable-products/license-evidence.ts
 import { portableProductRegistry } from './product-registry.ts'
 
 export const portableLicenseEvidenceSchemaVersion = 'portable-license-evidence.v1' as const
@@ -11,7 +12,8 @@ export type PortableLicenseEvidenceBlocker =
   | 'unsafe-state'
 
 type RecordValue = Record<string, unknown>
-const REFERENCE = /^[a-z][a-z0-9+.-]*:\/\/[A-Za-z0-9._~!$&'()*+,;=:@%\/?#\[\]-]+$/
+const URL_REFERENCE = /^[a-z][a-z0-9+.-]*:\/\/[A-Za-z0-9._~!$&'()*+,;=:@%\/?#\[\]-]+$/
+const URN_REFERENCE = /^urn:[a-z0-9][a-z0-9-]{0,31}(?::[A-Za-z0-9._~!$&'()*+,;=:@%-]+)+$/
 const UNSAFE = /BEGIN\s|PRIVATE\s+KEY|password|secret=|token=|bearer\s|client_email|private_key/i
 const CAPABILITY = /^[a-z][a-z0-9.-]{1,79}$/
 const SCOPE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
@@ -21,7 +23,7 @@ function record(value: unknown): RecordValue | null {
 }
 
 function validReference(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= 512 && REFERENCE.test(value) && !UNSAFE.test(value)
+  return typeof value === 'string' && value.length <= 512 && (URL_REFERENCE.test(value) || URN_REFERENCE.test(value)) && !UNSAFE.test(value)
 }
 
 function validTimestamp(value: unknown): number | null {

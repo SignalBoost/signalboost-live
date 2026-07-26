@@ -94,7 +94,10 @@ export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
 ): ClusterRuntimeHealthGovernanceEvidenceIndexQueryResult {
   validateIndex(index)
   if (!queryValue || typeof queryValue !== 'object' || Array.isArray(queryValue)) throw new Error('invalid cluster runtime health governance evidence index query')
-  const query = queryValue as Partial<ClusterRuntimeHealthGovernanceEvidenceIndexQuery>
+  const rawQuery = queryValue as Record<string, unknown>
+  const allowedKeys = new Set(['artifactIds', 'kinds', 'schemas', 'provenance', 'limit', 'cursor'])
+  if (Object.keys(rawQuery).some(key => !allowedKeys.has(key))) throw new Error('invalid cluster runtime health governance evidence index query key')
+  const query = rawQuery as Partial<ClusterRuntimeHealthGovernanceEvidenceIndexQuery>
   const artifactIds = uniqueStrings(query.artifactIds, 'artifactIds')
   const kinds = uniqueStrings(query.kinds, 'kinds')
   const schemas = uniqueStrings(query.schemas, 'schemas')
@@ -102,7 +105,7 @@ export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
   const limit = query.limit === undefined ? 50 : query.limit
   if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error('invalid cluster runtime health governance evidence index query limit')
 
-  const filterIdentity = digest({ artifactIds, kinds, schemas, provenance })
+  const filterIdentity = digest({ indexId: index.indexId, clusterId: index.clusterId, artifactIds, kinds, schemas, provenance })
   let offset = 0
   if (query.cursor !== undefined) {
     if (typeof query.cursor !== 'string') throw new Error('invalid cluster runtime health governance evidence index query cursor')
@@ -123,7 +126,7 @@ export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
   const entries = Object.freeze(matches.slice(offset, offset + limit))
   const nextOffset = offset + entries.length
   const nextCursor = nextOffset < matches.length ? `${index.integrity.digest}:${filterIdentity}:${nextOffset}` : null
-  const integrity = Object.freeze({ algorithm: 'fnv1a-32' as const, digest: digest({ indexId: index.indexId, normalized, filterIdentity, offset, entries, nextCursor }), canonical: true as const })
+  const integrity = Object.freeze({ algorithm: 'fnv1a-32' as const, digest: digest({ indexId: index.indexId, clusterId: index.clusterId, normalized, filterIdentity, offset, entries, nextCursor }), canonical: true as const })
 
   return Object.freeze({
     schemaVersion: 'agent-gateway-cluster-runtime-health-governance-evidence-index-query-result-v1',

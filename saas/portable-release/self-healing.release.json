@@ -39,7 +39,7 @@
 
   "includeFiles": [
     {
-      "from": "docs/portables/self-healing-integration-guide.md",
+      "from": "../docs/portables/self-healing-integration-guide.md",
       "to": "docs/integration-guide.md"
     }
   ],

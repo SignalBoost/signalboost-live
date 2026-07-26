@@ -79,7 +79,11 @@
   ],
 
   "acceptance": {
-    "_note": "No acceptance harness exists for this portable yet. Unlike the Self-Healing Supervisor, whose safety property demands one, this portable's risk is commercial rather than operational — but a buyer still needs proof it works against their own ports before they trust it with a journalist. Build one before dropping -rc.",
-    "status": "not yet implemented"
+    "entry": "payload/press-media-core/acceptance-harness.ts",
+    "export": "runPressAcceptance",
+    "how": "Call runPressAcceptance({ ports, selfAddress }) with your own ports and an address YOU control. Eleven checks are reported independently: the provider is registered, your company record was used, an unverified contact was refused, a malformed address was refused, your AiPort produced the copy, no forbidden claim appeared, no quote was invented, your transport accepted a real message, your owner notification fired, no proof URL was fabricated, and your audit sink accepted an event.",
+    "guarantee": "One real message is sent, to the address you supply. The harness refuses to run without one and never reads a target from a media database, so it cannot mail an editor. Delivery is recorded only after your transport accepts it.",
+    "cli": "node scripts/run-press-acceptance.mjs <your-ports-module> --self <your-address> --out record.json — exits non-zero unless every check passes, so it belongs in a deployment pipeline.",
+    "evidence": "The returned record is frozen and JSON-serializable. Keep it. It is the buyer acceptance record for this deployment."
   }
 }

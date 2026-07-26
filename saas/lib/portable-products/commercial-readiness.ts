@@ -62,6 +62,18 @@ const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCom
       'docs/portables/campaign-studio-commercial-operations.md#5-support-and-responsibility-boundary',
     ]),
   }),
+  'integrations-hub': Object.freeze({
+    'buyer-installation': Object.freeze([
+      'docs/portables/integrations-hub-commercial-operations.md#2-buyer-installation',
+    ]),
+    'buyer-configuration': Object.freeze([
+      'docs/portables/integrations-hub-commercial-operations.md#3-buyer-configuration-record',
+    ]),
+    'support-boundary': Object.freeze([
+      'docs/portables/integrations-hub-commercial-operations.md#1-supported-product-boundary',
+      'docs/portables/integrations-hub-commercial-operations.md#5-support-and-responsibility-boundary',
+    ]),
+  }),
   'provider-hub': Object.freeze({
     'distribution-package': Object.freeze([
       'saas/portable-release/provider-hub.release.json',

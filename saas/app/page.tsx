@@ -1,3 +1,4 @@
+// saas/app/page.tsx
 'use client'
 
 import Link from 'next/link'
@@ -82,14 +83,22 @@ function relativeTime(value: string | null): string {
 }
 
 function runtimeLabel(status: PortableRuntimeStatus): string {
+  // RUNTIME, NOT MATURITY. 'active' here means the portable's tables currently hold rows —
+  // nothing more. It says the thing is running; it does not say the thing is finished, and a
+  // visitor reading a card that says only "Active" will reasonably assume it is for sale.
   if (status === 'active') return 'Active'
   if (status === 'idle') return 'Connected · idle'
   if (status === 'unreachable') return 'Data unavailable'
   return 'Not connected'
 }
 
+// The card needs the OTHER axis as well. A portable's manifest `status` is its commercial
+// maturity, and until now the public home page rendered only the runtime tag — so
+// self-healing-supervisor, provider-hub and three others showed a green "Active" with no
+// indication anywhere that they are still preview and deliberately not licensable. Two
+// different questions, and only one of them was being answered on screen.
 function maturityLabel(status: string): string | null {
-  if (status === 'live') return null
+  if (status === 'live') return null            // live needs no qualifier
   if (status === 'preview') return 'Preview'
   if (status === 'deprecated') return 'Deprecated'
   return status

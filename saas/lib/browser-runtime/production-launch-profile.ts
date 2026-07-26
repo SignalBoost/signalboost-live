@@ -22,7 +22,7 @@ import type { BrowserSessionLaunchRequest } from './contracts.ts'
 import type { BrowserLaunchProfile, BrowserLaunchProfileProvider } from './launch-profile.ts'
 
 export interface ProductionLaunchProfileOptions {
-  /** The adapter id this profile serves, e.g. 'signalboost.<provider>.production.v1'. */
+  /** The adapter id this profile serves, e.g. 'portable.<provider>.production.v1'. */
   adapterId: string
   /** The provider this profile serves (e.g. the provider id). Matched case-insensitively. */
   provider: string

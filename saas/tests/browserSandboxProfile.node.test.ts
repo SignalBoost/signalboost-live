@@ -1,3 +1,5 @@
+// saas/tests/browserSandboxProfile.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -10,7 +12,7 @@ function request(
 ): BrowserSessionLaunchRequest {
   return {
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'observe',
     allowedOrigins: ['http://127.0.0.1:4173'],
     ...overrides,

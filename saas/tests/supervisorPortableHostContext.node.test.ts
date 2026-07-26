@@ -81,10 +81,6 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
       'lazy import of the platform provider engine as the DEFAULT api step runner; a buyer passes their own runner'],
     ['lib/supervisor/executors/dispatch-store.ts',
       'process.env is confined to platformSupervisorRuntime(), a platform-only helper the buyer never calls'],
-    ['lib/supervisor/executors/browser/browser-runtime-mapper.ts',
-      'BUYER-VISIBLE: emits adapterId "signalboost.browser-runtime.dry-run.v1" into evidence records'],
-    ['lib/browser-runtime/sandbox-adapter.ts',
-      'BUYER-VISIBLE: SANDBOX_ADAPTER_ID is "signalboost.sandbox.v1"'],
   ])
 
   const seen = new Set()

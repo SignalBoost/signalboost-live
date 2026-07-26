@@ -1,3 +1,5 @@
+// saas/tests/supervisorApprovalQueue.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
@@ -46,7 +48,7 @@ function task(): BrowserTask {
     taskId: 'task-1',
     incidentId: 'incident-1',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt,
     expiresAt,

@@ -1,3 +1,4 @@
+// saas/lib/supervisor/executors/browser/sandbox-package-promoter.ts
 import type { BrowserTask, BrowserTaskStep } from '../../../browser-runtime/contracts.ts'
 import { verifyBrowserRuntimeDryRunPackage } from './browser-runtime-adapter.ts'
 import type { BrowserRuntimeDryRunPackage } from './browser-runtime-dry-run-schema.ts'

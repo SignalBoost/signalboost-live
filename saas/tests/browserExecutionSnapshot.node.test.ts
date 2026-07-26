@@ -1,3 +1,5 @@
+// saas/tests/browserExecutionSnapshot.node.test.ts
+import { SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -58,7 +60,7 @@ function makeSinglePhaseTask(): BrowserTask {
     taskId: 'TASK-SNAPSHOT-001',
     incidentId: 'INC-SNAPSHOT-001',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-15T10:00:00.000Z',
     expiresAt: '2026-07-15T11:00:00.000Z',
@@ -85,7 +87,7 @@ function makeResumableTask(): BrowserTask {
     taskId: 'TASK-SNAPSHOT-RESUME-001',
     incidentId: 'INC-SNAPSHOT-RESUME-001',
     provider: 'sandbox',
-    adapterId: 'signalboost.sandbox.v1',
+    adapterId: SANDBOX_ADAPTER_ID,
     mode: 'prepare_change',
     issuedAt: '2026-07-15T10:00:00.000Z',
     expiresAt: '2026-07-15T11:00:00.000Z',

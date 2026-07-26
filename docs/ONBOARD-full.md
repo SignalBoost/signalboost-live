@@ -179,7 +179,7 @@ Known limitation: Browser Runtime live execution remains disconnected. The next 
 
 The portable Browser Runtime lives in `saas/lib/browser-runtime` and must remain independent of Next.js UI, Supabase, and provider SDKs. Mission 001 advances the runtime only through bounded, testable slices.
 
-The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the isolated `/browser-sandbox/login` route. Sandbox tasks must:
+The executable sandbox adapter uses the neutral adapter ID `portable.browser-sandbox.v1` and the isolated `/browser-sandbox/login` route. Sandbox tasks must:
 
 - use only `http` or `https` origins explicitly listed in `allowedOrigins`;
 - re-check the live page origin after navigation and before and after click, fill, wait, and screenshot steps;

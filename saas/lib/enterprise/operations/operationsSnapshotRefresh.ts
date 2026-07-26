@@ -1,3 +1,4 @@
+// saas/lib/enterprise/operations/operationsSnapshotRefresh.ts
 import type { OperationsIntelligenceSnapshot } from './operationsIntelligence'
 import type { OperationsSnapshotProducer } from './operationsSnapshotProducer'
 
@@ -27,10 +28,15 @@ function parseTimestamp(value: string, label: string): number {
 }
 
 export class OperationsSnapshotRefresh {
+  private readonly registry: OperationsRefreshRegistry
+  private readonly producer: Pick<OperationsSnapshotProducer, 'produce'>
   constructor(
-    private readonly registry: OperationsRefreshRegistry,
-    private readonly producer: Pick<OperationsSnapshotProducer, 'produce'>,
-  ) {}
+    registry: OperationsRefreshRegistry,
+    producer: Pick<OperationsSnapshotProducer, 'produce'>,
+  ) {
+    this.registry = registry
+    this.producer = producer
+  }
 
   async run(input: Readonly<{ intervalStartedAt: string }>): Promise<OperationsRefreshResult> {
     const intervalStartedAtMs = parseTimestamp(input.intervalStartedAt, 'operations refresh intervalStartedAt')

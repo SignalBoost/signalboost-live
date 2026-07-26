@@ -122,7 +122,10 @@ export function recommendedNext(from: OperatorState, ctx: TransitionContext): Op
 // ── Optional stateful wrapper ─────────────────────────────────────────────────
 export class OperatorMachine {
   private _state: OperatorState = 'PLANNING'
-  constructor(private rb: Runbook) {}
+  private rb: Runbook
+  constructor(rb: Runbook) {
+    this.rb = rb
+  }
   get state(): OperatorState { return this._state }
   context(): TransitionContext { return deriveContext(this.rb) }
   to(target: OperatorState): TransitionResult {

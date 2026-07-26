@@ -1,3 +1,4 @@
+// saas/lib/enterprise/operations/operationsSnapshotStore.ts
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { OperationsIntelligenceSnapshot } from './operationsIntelligence'
 
@@ -18,7 +19,10 @@ export function parseOperationsIntelligenceSnapshot(value: unknown): OperationsI
 }
 
 export class SupabaseOperationsSnapshotStore {
-  constructor(private readonly client: SupabaseClient) {}
+  private readonly client: SupabaseClient
+  constructor(client: SupabaseClient) {
+    this.client = client
+  }
 
   async save(snapshot: OperationsIntelligenceSnapshot): Promise<OperationsIntelligenceSnapshot> {
     const validated = parseOperationsIntelligenceSnapshot(snapshot)

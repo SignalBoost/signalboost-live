@@ -76,14 +76,27 @@ export async function runEngineLoop(args: {
 }
 
 export class DefaultCosGateway implements CosGateway {
+  private readonly router: IntentRouter
+  private readonly resolver: PlanResolver
+  private readonly assembler: ContextAssembler
+  private readonly engines: EngineRegistry
+  private readonly tools: ToolRegistry
+  private readonly prompts: PromptStrategyRegistry
   constructor(
-    private readonly router: IntentRouter,
-    private readonly resolver: PlanResolver,
-    private readonly assembler: ContextAssembler,
-    private readonly engines: EngineRegistry,
-    private readonly tools: ToolRegistry,
-    private readonly prompts: PromptStrategyRegistry,
-  ) {}
+    router: IntentRouter,
+    resolver: PlanResolver,
+    assembler: ContextAssembler,
+    engines: EngineRegistry,
+    tools: ToolRegistry,
+    prompts: PromptStrategyRegistry,
+  ) {
+    this.router = router
+    this.resolver = resolver
+    this.assembler = assembler
+    this.engines = engines
+    this.tools = tools
+    this.prompts = prompts
+  }
 
   async handle(ctx: TurnContext): Promise<CosReply> {
     const intent = await this.router.classify(ctx)

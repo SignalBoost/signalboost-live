@@ -1,5 +1,5 @@
 // saas/lib/portable-products/support-boundary-evidence.ts
-import { portableProductRegistry } from './product-registry.ts'
+import { getPortableProduct } from './product-selectors.ts'
 
 export const portableSupportBoundaryEvidenceSchemaVersion = 'portable-support-boundary-evidence.v1' as const
 
@@ -53,8 +53,13 @@ function uniqueNonEmpty(values: readonly string[]): boolean {
 export function validatePortableSupportBoundaryEvidence(input: PortableSupportBoundaryEvidenceInput): PortableSupportBoundaryEvidence {
   const blockers = new Set<PortableSupportBoundaryEvidenceBlocker>()
 
-  const registered = portableProductRegistry.some(entry => entry.manifest.productId === input.productId)
-  if (!registered) blockers.add('identity')
+  // getPortableProduct THROWS on an unknown id; it does not return undefined. Calling it bare
+  // meant this validator — whose entire contract is to FAIL CLOSED and return a blocker list —
+  // threw instead for the one input it most needs to reject. A validator that throws where it
+  // promised to report is worse than no validator: the caller's error path never runs.
+  let productExists = false
+  try { productExists = !!getPortableProduct(input.productId) } catch { productExists = false }
+  if (!productExists) blockers.add('identity')
   if (!safeId.test(input.tenantId) || !safeId.test(input.environmentId)) blockers.add('scope')
   if (!input.supportOwner.trim() || !input.serviceWindow.trim() || !uniqueNonEmpty(input.responseTargets) || !uniqueNonEmpty(input.exclusions)) blockers.add('coverage')
   if (!safeReference.test(input.escalationPathReference) || !safeReference.test(input.maintenancePolicyReference)) blockers.add('references')

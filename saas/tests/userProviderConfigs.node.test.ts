@@ -17,6 +17,7 @@ import './androidPackagingReadiness.node.test.ts'
 import './providerHubAndroidBuildReadiness.node.test.ts'
 import './providerHubUnsignedBuildProvenance.node.test.ts'
 import './providerHubDependencyReview.node.test.ts'
+import './providerHubUnsignedBuildEvidenceBundle.node.test.ts'
 import './androidUnsignedScaffold.node.test.ts'
 import './androidScaffoldReviewBundle.node.test.ts'
 import './androidBuildPlan.node.test.ts'
@@ -59,4 +60,4 @@ test('Provider Hub public metadata is versioned, immutable, and tenant scoped', 
   assert.equal(metadata.tenantId, 'tenant-1')
   assert.equal(metadata.environmentId, 'production')
   assert.ok(Object.isFrozen(metadata))
-})
+}

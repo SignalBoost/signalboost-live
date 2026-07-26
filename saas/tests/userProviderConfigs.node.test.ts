@@ -15,6 +15,7 @@ import './providerHubReferenceDeployment.node.test.ts'
 import './providerHubDocumentation.node.test.ts'
 import './androidPackagingReadiness.node.test.ts'
 import './androidUnsignedScaffold.node.test.ts'
+import './androidBuildPlan.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 

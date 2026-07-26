@@ -1,3 +1,4 @@
+// saas/lib/enterprise/intelligence/service.ts
 import { analyzePublicUrl } from '@/lib/enterprise/url-intelligence'
 import {
   acquireRefreshLock,
@@ -8,7 +9,7 @@ import {
 } from '@/lib/enterprise/memory/service'
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { determineEnterpriseMemoryRefreshRequirements } from '@/lib/enterprise/memory/refreshPolicy'
-import type { EnterpriseApprovalPackage, EnterpriseIntelligenceRequest, EnterpriseWorkspace } from './types'
+import type { EnterpriseApprovalPackage, EnterpriseIntelligenceRequest, EnterpriseWorkspace } from './types.ts'
 
 function schemaLanguage(value?: string) {
   const code = (value || '').toLowerCase().split(/[-_]/)[0]

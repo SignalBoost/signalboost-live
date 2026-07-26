@@ -1,7 +1,8 @@
+// saas/components/integration-builder/SearchableDropdown.tsx
 'use client'
 
 import { useId, useMemo, useState } from 'react'
-import type { Option } from './mockApi'
+import type { Option } from './mockApi.ts'
 
 export default function SearchableDropdown({ label, options, value, onChange, placeholder = 'Select an option', multiple = false }: { label: string; options: Option[]; value: string | string[]; onChange: (value: string | string[]) => void; placeholder?: string; multiple?: boolean }) {
   const id = useId(); const [open, setOpen] = useState(false); const [query, setQuery] = useState('')

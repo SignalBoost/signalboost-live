@@ -1,7 +1,7 @@
 // saas/lib/integrations/catalog.ts
 // Aggregates every provider catalog (sales + security) and registers them once.
-import { registerSalesCatalog, SALES_CATALOG } from './catalog-sales'
-import { registerSecurityCatalog, SECURITY_CATALOG } from './catalog-security'
+import { registerSalesCatalog, SALES_CATALOG } from './catalog-sales.ts'
+import { registerSecurityCatalog, SECURITY_CATALOG } from './catalog-security.ts'
 
 export const CATALOG = [...SALES_CATALOG, ...SECURITY_CATALOG]
 

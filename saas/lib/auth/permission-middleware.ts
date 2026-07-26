@@ -2,9 +2,9 @@
 // Owner-only permission checking middleware for protected Hub API routes.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { HubUser, Permission } from './rbac-types'
-import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service'
-import { getAccess } from './access'
+import { HubUser, Permission } from './rbac-types.ts'
+import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service.ts'
+import { getAccess } from './access.ts'
 import { recordAuditEvent } from '@/lib/hub/audit'
 
 export async function getCurrentUser(_req: NextRequest): Promise<HubUser | null> {

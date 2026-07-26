@@ -1,3 +1,4 @@
+// saas/components/hub/ProviderActionModal.tsx
 'use client'
 
 // saas/components/hub/ProviderActionModal.tsx
@@ -11,9 +12,9 @@ import { useTranslation } from '@/components/i18n/useTranslation'
 import { useState } from 'react'
 import { getProviderTemplates } from '@/lib/hub/provider-templates'
 import { getHubProvider } from '@/lib/hub/provider-registry'
-import ProviderActionForm from './ProviderActionForm'
-import ProviderActionExecutionGate from './ProviderActionExecutionGate'
-import { Lang, cardStyle, bodyStyle } from './shared'
+import ProviderActionForm from './ProviderActionForm.tsx'
+import ProviderActionExecutionGate from './ProviderActionExecutionGate.tsx'
+import { Lang, cardStyle, bodyStyle } from './shared.tsx'
 
 export type ProviderActionModalProps = {
   providerId: string

@@ -1,8 +1,9 @@
+// saas/lib/cos/ui/VideoPreviewRenderer.tsx
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop'
-import { SignalBoostGuide } from './SignalBoostGuide'
+import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop.tsx'
+import { SignalBoostGuide } from './SignalBoostGuide.tsx'
 
 const GOLD = '#ffc300'
 const SIGNALBOOST_URL = 'www.saas.signalboostapp.com'

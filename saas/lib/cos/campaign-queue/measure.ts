@@ -5,8 +5,8 @@
 // construction, matching the rest of this codebase: a platform with no
 // readonly-capable token reports "not supported yet," never a fake number.
 
-import { getValidSocialToken } from '../../outreach/social-token'
-import type { SocialPlatform } from '../../outreach/social-connectors'
+import { getValidSocialToken } from '../../outreach/social-token.ts'
+import type { SocialPlatform } from '../../outreach/social-connectors.ts'
 
 export type CampaignPerformanceMetrics = {
   platform: SocialPlatform

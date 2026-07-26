@@ -7,7 +7,7 @@
 // Cockpit palette: navy gradients, gold #ffc300, cyan #1af0ff, monospaced readouts.
 
 import { useEffect, useState } from 'react'
-import { cardStyle, labelStyle, bodyStyle, rowStyle, monoStyle } from '../shared'
+import { cardStyle, labelStyle, bodyStyle, rowStyle, monoStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 type EnvTarget = 'production' | 'preview' | 'development'

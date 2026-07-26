@@ -4,7 +4,7 @@
 // feed validateTarget so the other providers only ever send to real, verified outlets. It
 // therefore verifies targets through the universal runner ('verify_contact') and REFUSES to
 // dispatch — an honest 'rejected' beats pretending a subscription can publish a release.
-import type { MediaProviderAdapter, PortBundle, MediaTarget, RunnerProviderConfig } from '../types'
+import type { MediaProviderAdapter, PortBundle, MediaTarget, RunnerProviderConfig } from '../types.ts'
 
 const PROVIDER_ID = 'media_database'
 

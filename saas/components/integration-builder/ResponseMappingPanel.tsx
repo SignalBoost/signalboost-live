@@ -1,9 +1,10 @@
+// saas/components/integration-builder/ResponseMappingPanel.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useState } from 'react'
-import TreeView from './TreeView'
-import Modal from './Modal'
+import TreeView from './TreeView.tsx'
+import Modal from './Modal.tsx'
 const outputs = ['integration.output.userId', 'integration.output.email']
 export default function ResponseMappingPanel({ schema, mappings, onMappings }: { schema: Record<string, unknown>; mappings: Record<string, string>; onMappings: (v: Record<string, string>) => void }) {
   const [path, setPath] = useState(''); const [output, setOutput] = useState(outputs[0])

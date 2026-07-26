@@ -5,7 +5,7 @@
 // generator had no company context and filled the gap. The same shape of bug lives anywhere a
 // missing fact gets a silent default. Context alone is not the cure — a better-informed model
 // invents less often but more convincingly. The cure is an explicit rule plus a visible gap.
-import type { CompanyFacts } from './types'
+import type { CompanyFacts } from './types.ts'
 
 export const FACTUAL_DISCIPLINE = [
   'FACTUAL DISCIPLINE — these rules override every other instruction:',

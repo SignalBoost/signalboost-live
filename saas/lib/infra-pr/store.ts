@@ -1,9 +1,10 @@
+// saas/lib/infra-pr/store.ts
 // lib/infra-pr/store.ts
 // CRUD + cryptographically-chained audit ledger. All DB access funnels
 // through ./client. Signing uses Node's native crypto (zero deps).
 import { createHmac } from 'crypto';
-import { infraAdminClient } from './client';
-import { InfraPr, InfraPrDraft, InfraPrStatus, Result, AuditRow, ChainVerification } from './types';
+import { infraAdminClient } from './client.ts';
+import { InfraPr, InfraPrDraft, InfraPrStatus, Result, AuditRow, ChainVerification } from './types.ts';
 
 const TABLE = 'pending_infrastructure_prs';
 const AUDIT = 'infrastructure_pr_audit';

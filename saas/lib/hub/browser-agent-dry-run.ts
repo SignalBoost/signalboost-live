@@ -1,7 +1,8 @@
+// saas/lib/hub/browser-agent-dry-run.ts
 import { createHash } from 'crypto'
 
-import { buildProviderActionPreviewFromRequest } from './provider-action-preview-request'
-import { createProviderExecutionPolicy, type ProviderExecutionPolicy } from './provider-execution-modes'
+import { buildProviderActionPreviewFromRequest } from './provider-action-preview-request.ts'
+import { createProviderExecutionPolicy, type ProviderExecutionPolicy } from './provider-execution-modes.ts'
 
 export type BrowserAgentDryRunPackage = Readonly<{
   packageId: string

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { Webhook, WebhookEvent } from '@/lib/hub/webhooks-service'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 

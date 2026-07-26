@@ -1,3 +1,4 @@
+// saas/components/hub/console/ProviderConsoleCard.tsx
 'use client'
 
 // Hub Command Console — Child layout representations.
@@ -15,7 +16,7 @@ import { type ConsoleProvider, isDestructiveTemplate, isProviderLive, isActionLi
 import { getTemplate } from '@/lib/hub/provider-templates'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
-import { type Lang } from '../shared'
+import { type Lang } from '../shared.tsx'
 
 // Derive the effective live/credential state for a provider.
 function deriveState(providerId: string, status: ProviderLiveStatus | undefined, statusLoaded: boolean) {

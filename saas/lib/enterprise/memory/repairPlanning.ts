@@ -1,7 +1,8 @@
+// saas/lib/enterprise/memory/repairPlanning.ts
 // Grounded repair-plan proposals derived from Enterprise root-cause analysis.
 // Plans never execute actions and never bypass approval boundaries.
 
-import type { RootCauseAnalysis, RootCauseHypothesis } from './rootCauseAnalysis'
+import type { RootCauseAnalysis, RootCauseHypothesis } from './rootCauseAnalysis.ts'
 
 export type RepairRisk = 'low' | 'medium' | 'high'
 

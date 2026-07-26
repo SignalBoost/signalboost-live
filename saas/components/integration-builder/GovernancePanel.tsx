@@ -1,10 +1,11 @@
+// saas/components/integration-builder/GovernancePanel.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useState } from 'react'
-import ToggleSwitch from './ToggleSwitch'
-import Modal from './Modal'
-import { mockApi } from './mockApi'
+import ToggleSwitch from './ToggleSwitch.tsx'
+import Modal from './Modal.tsx'
+import { mockApi } from './mockApi.ts'
 export default function GovernancePanel({ governance, onGovernance }: { governance: { requires_approval: boolean; secrets_backend_only: boolean; supervisor_monitoring: boolean }; onGovernance: (v: typeof governance) => void }) {
   const [logs, setLogs] = useState<string[]>([]); const [status, setStatus] = useState(''); const [open, setOpen] = useState(false)
   async function test() { setStatus('Testing…'); const result = await mockApi.testIntegration(); setLogs(result.logs); setStatus(result.ok ? 'Success: mock integration test passed.' : 'Failed: review generated logs.') }

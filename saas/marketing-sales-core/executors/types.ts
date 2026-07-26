@@ -2,7 +2,7 @@
 // Publisher contract. A publisher (YouTube, TikTok, LinkedIn, …) self-registers.
 // Honest by construction: a campaign reaches 'published' only when run() returns
 // a real liveUrl; gated platforms declare publish:false and are refused.
-import type { Draft, MarketingHost } from '../types'
+import type { Draft, MarketingHost } from '../types.ts'
 
 export interface PublishResult {
   ok: boolean

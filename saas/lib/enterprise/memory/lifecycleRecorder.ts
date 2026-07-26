@@ -1,14 +1,15 @@
+// saas/lib/enterprise/memory/lifecycleRecorder.ts
 // Server-only persistence for automatic campaign lifecycle learning.
 // This module is part of the Enterprise Memory boundary; routes never touch enterprise tables.
 
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { averageConfidence, calibrateConfidence } from './confidenceCalibration'
+import { averageConfidence, calibrateConfidence } from './confidenceCalibration.ts'
 import {
   buildApprovedLifecyclePayload,
   buildMeasuredLifecyclePayload,
   buildPublishedLifecyclePayload,
   resolveCampaignLifecycleIdentity,
-} from './lifecycleLearning'
+} from './lifecycleLearning.ts'
 
 async function upsert(campaign: any, payload: Record<string, any>) {
   const identity = resolveCampaignLifecycleIdentity(campaign)

@@ -1,8 +1,9 @@
+// saas/lib/enterprise/memory/rootCauseAnalysis.ts
 // Grounded root-cause hypothesis ranking from correlated Enterprise Evidence timelines.
 // This module ranks observed candidate causes; it never invents events, claims certainty, or executes repairs.
 
-import type { EvidenceCorrelationLink } from './evidenceCorrelation'
-import type { EvidenceTimeline, EvidenceTimelineEntry } from './evidenceTimeline'
+import type { EvidenceCorrelationLink } from './evidenceCorrelation.ts'
+import type { EvidenceTimeline, EvidenceTimelineEntry } from './evidenceTimeline.ts'
 
 export type RootCauseHypothesis = Readonly<{
   eventId: string

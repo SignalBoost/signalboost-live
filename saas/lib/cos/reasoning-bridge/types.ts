@@ -1,5 +1,6 @@
-import type { ExternalSignalInput, ExternalSignalIngestionResult } from '../external-signals'
-import type { MarketingDecision, MarketingDecisionInput } from '../marketing-decision'
+// saas/lib/cos/reasoning-bridge/types.ts
+import type { ExternalSignalInput, ExternalSignalIngestionResult } from '../external-signals/index.ts'
+import type { MarketingDecision, MarketingDecisionInput } from '../marketing-decision/index.ts'
 
 export type CosReasoningBridgeInput = {
   user_text?: string

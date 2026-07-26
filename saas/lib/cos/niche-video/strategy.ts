@@ -1,4 +1,5 @@
-import type { NicheVideoConcept, NicheVideoStrategyInput, VideoDistributionChannel, VideoDistributionVariant } from './types'
+// saas/lib/cos/niche-video/strategy.ts
+import type { NicheVideoConcept, NicheVideoStrategyInput, VideoDistributionChannel, VideoDistributionVariant } from './types.ts'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
 

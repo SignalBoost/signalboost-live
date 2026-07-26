@@ -15,7 +15,7 @@
 // stay in lockstep. State labels expose i18n keys (English fallback) for the
 // PREVIEW/status UI; no foreign translations are invented here.
 
-import { approvalsSatisfied, preflightPassed, type Runbook } from './runbook'
+import { approvalsSatisfied, preflightPassed, type Runbook } from './runbook.ts'
 
 export type OperatorState =
   | 'PLANNING' | 'PREVIEW' | 'WAITING_FOR_APPROVAL' | 'EXECUTING'

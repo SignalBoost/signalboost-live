@@ -1,6 +1,7 @@
-import { campaignFromRecommendation } from '../recommendation/campaign'
-import type { CosCampaign, CosRecommendation } from '../recommendation/types'
-import type { CosCampaignQueueItem, CosCampaignRiskLevel, CosCampaignWorkItem } from './types'
+// saas/lib/cos/campaign-queue/builder.ts
+import { campaignFromRecommendation } from '../recommendation/campaign.ts'
+import type { CosCampaign, CosRecommendation } from '../recommendation/types.ts'
+import type { CosCampaignQueueItem, CosCampaignRiskLevel, CosCampaignWorkItem } from './types.ts'
 
 // CFO duty folded into COS: no CEO lets meaningful spend go out ungoverned.
 // Any recommendation whose estimated cost crosses this line gets escalated to

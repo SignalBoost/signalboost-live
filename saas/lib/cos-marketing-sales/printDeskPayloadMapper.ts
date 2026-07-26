@@ -3,7 +3,7 @@
 // Local papers and magazines often use email-based ad desks instead of APIs;
 // this class compiles a unified submission payload for owner approval.
 
-import type { CosLocale, PrintAssetMetadata, PrintDeskContact, PrintDeskPayload, PrintDimensions } from './types'
+import type { CosLocale, PrintAssetMetadata, PrintDeskContact, PrintDeskPayload, PrintDimensions } from './types.ts'
 
 const DEFAULT_DIMENSIONS: PrintDimensions = {
   widthInches: 8.5,

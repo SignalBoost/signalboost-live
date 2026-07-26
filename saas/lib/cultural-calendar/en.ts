@@ -1,7 +1,7 @@
 // saas/lib/cultural-calendar/en.ts
 // English greetings + US federal holidays + day-of-week flavor.
 
-import { GreetingContext, Greeting, pick, fill, inRange, nthWeekdayOfMonth, lastWeekdayOfMonth, timeOfDay } from './helpers'
+import { GreetingContext, Greeting, pick, fill, inRange, nthWeekdayOfMonth, lastWeekdayOfMonth, timeOfDay } from './helpers.ts'
 
 export function englishGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx

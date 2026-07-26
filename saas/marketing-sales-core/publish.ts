@@ -4,14 +4,14 @@
 // connector, runs it, records a real result row, and only marks 'published' when
 // the connector returns a real liveUrl. Unconnected or unfinished connectors are
 // refused with a localizable error code — never a faked publish.
-import type { MarketingHost, Campaign, Draft, Lang, Result } from './types'
-import { canTransition } from './lifecycle'
-import { resolveExecutor } from './executors/registry'
+import type { MarketingHost, Campaign, Draft, Lang, Result } from './types.ts'
+import { canTransition } from './lifecycle.ts'
+import { resolveExecutor } from './executors/registry.ts'
 // Ensure publishers are registered regardless of who imports this module.
-import './executors/youtube'
-import './executors/tiktok'
-import './executors/linkedin'
-import './executors/site'
+import './executors/youtube.ts'
+import './executors/tiktok.ts'
+import './executors/linkedin.ts'
+import './executors/site.ts'
 
 export async function publishCampaign(
   host: MarketingHost,

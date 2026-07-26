@@ -4,8 +4,8 @@
 // Uses the existing Vercel project/token resolver — same credentials as the
 // other Vercel actions.
 
-import { registerExecutor } from '../defaultHost'
-import type { ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import type { ActionSchema } from '../types.ts'
 import { resolveVercelProject } from '@/lib/hub/vercel-project'
 
 const VERCEL_API = 'https://api.vercel.com'

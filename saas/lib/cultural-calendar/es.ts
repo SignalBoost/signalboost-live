@@ -2,7 +2,7 @@
 // Spanish greetings + Latin American / Iberian holidays + day-of-week.
 // Phrasing kept standard / neutral Latin American Spanish.
 
-import { GreetingContext, Greeting, pick, fill, inRange, easterSunday, timeOfDay } from './helpers'
+import { GreetingContext, Greeting, pick, fill, inRange, easterSunday, timeOfDay } from './helpers.ts'
 
 export function spanishGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx

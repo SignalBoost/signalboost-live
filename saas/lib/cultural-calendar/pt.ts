@@ -1,7 +1,7 @@
 // saas/lib/cultural-calendar/pt.ts
 // Portuguese greetings - Brazilian Portuguese leaning, with PT-PT acceptable phrasing.
 
-import { GreetingContext, Greeting, pick, fill, inRange, carnavalRange, timeOfDay } from './helpers'
+import { GreetingContext, Greeting, pick, fill, inRange, carnavalRange, timeOfDay } from './helpers.ts'
 
 export function portugueseGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx

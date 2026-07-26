@@ -1,3 +1,4 @@
+// saas/tests/reviews.jest.test.ts
 import {
   REVIEW_LOCALES,
   analyzeReviewSentiment,
@@ -5,7 +6,7 @@ import {
   buildTestimonialCampaign,
   formatReviewCurrency,
   formatReviewDate,
-} from '../lib/reviews'
+} from '../lib/reviews.ts'
 
 describe('Reviews SaaS module', () => {
   test('supports review submission metadata in all 5 languages', () => {

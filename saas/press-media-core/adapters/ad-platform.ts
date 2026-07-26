@@ -4,7 +4,7 @@
 // Host-agnostic: no SDKs, no hand-rolled HTTP, no key handling — it names registered actions
 // ('create_campaign', 'fetch_report') that the host executes through the canonical universal
 // runner (provider_registry config + vault-resolved credentials). A new ad network = a row.
-import type { MediaProviderAdapter, PortBundle, RunnerProviderConfig } from '../types'
+import type { MediaProviderAdapter, PortBundle, RunnerProviderConfig } from '../types.ts'
 
 const PROVIDER_ID = 'ad_platform'
 

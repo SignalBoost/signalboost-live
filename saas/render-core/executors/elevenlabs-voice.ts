@@ -1,5 +1,6 @@
-import { registerRenderer } from '../engine'
-import type { RenderExecutor, RenderInput, RenderProduced } from '../types'
+// saas/render-core/executors/elevenlabs-voice.ts
+import { registerRenderer } from '../engine.ts'
+import type { RenderExecutor, RenderInput, RenderProduced } from '../types.ts'
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1'
 const DEFAULT_MODEL_ID = 'eleven_multilingual_v2'

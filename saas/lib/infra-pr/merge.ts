@@ -1,12 +1,13 @@
+// saas/lib/infra-pr/merge.ts
 // lib/infra-pr/merge.ts
 // Merge / approve execution with RBAC enforcement at the gate. The host app
 // injects the merging user's role; the module rejects merges below the
 // required clearance for the action's risk tier.
-import { getInfraPr, updateInfraPr, auditInfraPr } from './store';
-import { executeViaEngine } from './execute';
-import { triggerProductionRedeploy } from './redeploy';
-import { canMerge } from './action-policy';
-import { InfraPr } from './types';
+import { getInfraPr, updateInfraPr, auditInfraPr } from './store.ts';
+import { executeViaEngine } from './execute.ts';
+import { triggerProductionRedeploy } from './redeploy.ts';
+import { canMerge } from './action-policy.ts';
+import { InfraPr } from './types.ts';
 
 interface MergeOpts {
   id: string;

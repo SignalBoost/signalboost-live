@@ -17,8 +17,8 @@ import type {
   DecisionListResult,
   DecisionLogStore,
   DecisionResult,
-} from './decisionStore'
-import type { CosReasoningOutput } from './reasoningTypes'
+} from './decisionStore.ts'
+import type { CosReasoningOutput } from './reasoningTypes.ts'
 import {
   createSiemAuditSink,
   type PortableAuditEvent,

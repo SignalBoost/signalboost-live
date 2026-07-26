@@ -1,4 +1,5 @@
-import type { ProviderTemplate } from './provider-templates'
+// saas/lib/hub/provider-templates-social.ts
+import type { ProviderTemplate } from './provider-templates.ts'
 
 function socialTemplates(provider: string, label: string, icon: string, accountHelp: string): Record<string, ProviderTemplate> {
   return {

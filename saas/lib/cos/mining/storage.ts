@@ -7,7 +7,7 @@
 // come from env / Key Vault — never hard-coded, never persisted by this module.
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { RawEvent, FeatureRecord, SegmentRecord, AssociationRule } from './types'
+import { RawEvent, FeatureRecord, SegmentRecord, AssociationRule } from './types.ts'
 
 export interface MiningRunRow {
   id: string

@@ -5,7 +5,7 @@
 // On SignalBoost's own deployment createSupabaseDecisionLogStore() is the adapter and behaviour
 // is identical to the previous direct cos_decisions calls.
 import { getAdminSupabase } from '@/utils/supabase/server'
-import type { CosReasoningOutput } from './reasoningTypes'
+import type { CosReasoningOutput } from './reasoningTypes.ts'
 
 export type CosDecisionStatus =
   | 'logged'    // COS produced the decision

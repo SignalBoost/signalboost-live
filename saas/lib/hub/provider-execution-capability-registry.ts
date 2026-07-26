@@ -1,9 +1,10 @@
+// saas/lib/hub/provider-execution-capability-registry.ts
 import {
   assertProviderExecutionMode,
   createProviderExecutionPolicy,
   type ProviderExecutionCapability,
   type ProviderExecutionPolicy,
-} from './provider-execution-modes'
+} from './provider-execution-modes.ts'
 
 export type ReviewedProviderExecutionCapability = Readonly<{
   templateId: string

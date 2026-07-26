@@ -2,9 +2,9 @@
 // Namecheap DNS executor — list/add/delete DNS host records and one-click
 // Resend DNS setup. Uses Namecheap's XML API with API-user credentials from env.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionSchema } from '../types.ts'
 
 const API = 'https://api.namecheap.com/xml.response'
 

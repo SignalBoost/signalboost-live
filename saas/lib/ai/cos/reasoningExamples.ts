@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/reasoningExamples.ts
 // Run with `npx tsx saas/lib/ai/cos/reasoningExamples.ts` to verify v1 behavior.
-import { runCosReasoning } from './reasoningCore';
+import { runCosReasoning } from './reasoningCore.ts';
 
 const objectives = [
   'make a video about our audit features',

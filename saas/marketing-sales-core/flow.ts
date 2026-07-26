@@ -4,8 +4,8 @@
 // contracts and the lifecycle guard — never a host implementation. The same
 // honesty discipline as the rest of the platform: a status only advances through
 // a legal transition, and the human decision is the only path past needs_approval.
-import type { MarketingHost, Campaign, Lang, DecisionOutcome, Actor, Result } from './types'
-import { canTransition } from './lifecycle'
+import type { MarketingHost, Campaign, Lang, DecisionOutcome, Actor, Result } from './types.ts'
+import { canTransition } from './lifecycle.ts'
 
 export async function createCampaign(
   host: MarketingHost,

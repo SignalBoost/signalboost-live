@@ -1,6 +1,7 @@
-import { dispatchToCloudRenderer, getSystemCpuLoad } from './dependencies'
-import { createCosQueues, type VideoRenderJobPayload } from './queues'
-import { verifyOrProvisionBucket } from './storage'
+// saas/lib/cos/pipeline/routing.ts
+import { dispatchToCloudRenderer, getSystemCpuLoad } from './dependencies.ts'
+import { createCosQueues, type VideoRenderJobPayload } from './queues.ts'
+import { verifyOrProvisionBucket } from './storage.ts'
 
 export type RenderRouteResult =
   | { ok: true; route: 'local'; jobId?: string; bucketName: string }

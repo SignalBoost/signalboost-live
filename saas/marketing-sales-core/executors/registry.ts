@@ -1,6 +1,6 @@
 // saas/marketing-sales-core/executors/registry.ts
 // Self-registration registry, same pattern as console-core/defaultHost.
-import type { PublishExecutor } from './types'
+import type { PublishExecutor } from './types.ts'
 
 const REGISTRY = new Map<string, PublishExecutor>()
 

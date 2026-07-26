@@ -14,8 +14,8 @@
 // console.sec.*. Native strings for en/es/pt/pl/ru live in lib/i18n/bankCopy.ts
 // (consulted by lib/i18n/t.ts), so nothing renders English-only for a buyer.
 
-import type { ProviderTemplate } from './provider-templates'
-import { bankInstitutionOptions } from './bank-registry'
+import type { ProviderTemplate } from './provider-templates.ts'
+import { bankInstitutionOptions } from './bank-registry.ts'
 
 const INSTITUTION = {
   id: 'institution', label: 'Institution', type: 'select' as const, required: true,

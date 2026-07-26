@@ -1,12 +1,12 @@
 // saas/lib/enterprise/operations/operationsSnapshotProducer.ts
-import type { ClosedLoopVerificationResult } from '../memory/closedLoopVerification'
-import type { OrganizationalRepairLearning } from '../memory/organizationalLearning'
-import type { EnterprisePlaybookRegistry } from '../memory/playbookIntelligence'
+import type { ClosedLoopVerificationResult } from '../memory/closedLoopVerification.ts'
+import type { OrganizationalRepairLearning } from '../memory/organizationalLearning.ts'
+import type { EnterprisePlaybookRegistry } from '../memory/playbookIntelligence.ts'
 import {
   buildOperationsIntelligenceSnapshot,
   type OperationsIncident,
   type OperationsIntelligenceSnapshot,
-} from './operationsIntelligence'
+} from './operationsIntelligence.ts'
 
 export type OperationsSnapshotSource = Readonly<{
   loadIncidents(organizationId: string): Promise<readonly OperationsIncident[]>

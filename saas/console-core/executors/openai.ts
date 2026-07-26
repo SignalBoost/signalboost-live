@@ -3,9 +3,9 @@
 // OpenAI provider on the portable engine. Read-only observability actions that
 // work with just OPENAI_API_KEY. Importing this module registers them.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionField, ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionField, ActionSchema } from '../types.ts'
 
 const API = 'https://api.openai.com/v1'
 

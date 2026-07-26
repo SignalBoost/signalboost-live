@@ -1,6 +1,7 @@
-import { logCosVideoStorageFailure } from './video-storage'
-import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore'
-import { createPlatformImagePort, type CosImagePort } from './aiPort'
+// saas/lib/cos/creative-image.ts
+import { logCosVideoStorageFailure } from './video-storage.ts'
+import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore.ts'
+import { createPlatformImagePort, type CosImagePort } from './aiPort.ts'
 
 
 export type CosCreativeImageResult =

@@ -1,7 +1,8 @@
+// saas/tests/browserAgentDryRun.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildBrowserAgentDryRunPackage } from '../lib/hub/browser-agent-dry-run'
+import { buildBrowserAgentDryRunPackage } from '../lib/hub/browser-agent-dry-run.ts'
 
 const payload = { name: 'example', apiKey: 'secret-value' }
 

@@ -18,9 +18,9 @@
 // Until an aggregator app is registered the executor returns a clean
 // "not configured — register <VAR>" message and never fabricates data.
 
-import { registerExecutor } from '../defaultHost'
-import { getDataStore } from '../dataStore'
-import type { ActionField, ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getDataStore } from '../dataStore.ts'
+import type { ActionField, ActionSchema } from '../types.ts'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
 import {
   getBankConnector,

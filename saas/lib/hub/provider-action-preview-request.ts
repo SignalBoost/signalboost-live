@@ -1,10 +1,11 @@
-import { buildProviderActionPreview, type ProviderActionPreview } from './provider-action-preview'
-import { getProviderExecutionPolicy } from './provider-execution-capability-registry'
+// saas/lib/hub/provider-action-preview-request.ts
+import { buildProviderActionPreview, type ProviderActionPreview } from './provider-action-preview.ts'
+import { getProviderExecutionPolicy } from './provider-execution-capability-registry.ts'
 import {
   type ProviderExecutionMode,
   type ProviderExecutionPolicy,
-} from './provider-execution-modes'
-import { getTemplate, validateTemplatePayload } from './provider-templates'
+} from './provider-execution-modes.ts'
+import { getTemplate, validateTemplatePayload } from './provider-templates.ts'
 
 export type ProviderActionPreviewRequest = Readonly<{
   templateId: string

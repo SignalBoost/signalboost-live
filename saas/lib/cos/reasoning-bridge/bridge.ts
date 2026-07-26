@@ -1,6 +1,7 @@
-import { ingestExternalSignals, starterExternalSignals } from '../external-signals'
-import { buildMarketingDecision } from '../marketing-decision'
-import type { CosReasoningBridgeInput, CosReasoningBridgeOutput } from './types'
+// saas/lib/cos/reasoning-bridge/bridge.ts
+import { ingestExternalSignals, starterExternalSignals } from '../external-signals/index.ts'
+import { buildMarketingDecision } from '../marketing-decision/index.ts'
+import type { CosReasoningBridgeInput, CosReasoningBridgeOutput } from './types.ts'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`

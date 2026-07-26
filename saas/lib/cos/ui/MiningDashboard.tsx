@@ -1,3 +1,4 @@
+// saas/lib/cos/ui/MiningDashboard.tsx
 'use client'
 
 // saas/lib/cos/ui/MiningDashboard.tsx
@@ -7,10 +8,10 @@
 // modules are imported as TYPES only, so no DB code is bundled into the client.
 
 import { useCallback, useEffect, useState } from 'react'
-import { cosT, localizeFeatureName } from '../i18n'
-import type { MiningOverview } from '../overview'
-import type { Prediction, PropensityScores } from '../predictive'
-import type { FeatureRecord } from '../mining/types'
+import { cosT, localizeFeatureName } from '../i18n.ts'
+import type { MiningOverview } from '../overview.ts'
+import type { Prediction, PropensityScores } from '../predictive.ts'
+import type { FeatureRecord } from '../mining/types.ts'
 
 export interface MiningDashboardProps {
   lang: string

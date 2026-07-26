@@ -8,10 +8,10 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { callModel } from '@/lib/ai/modelRouter'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import type { BackupCosAnswer } from './policy'
+import type { BackupCosAnswer } from './policy.ts'
 import type { CosBackupRuntimeConfig, DecisionLogSink } from '@/cos-backup-core'
 
-export type { BackupCosAnswer } from './policy'
+export type { BackupCosAnswer } from './policy.ts'
 
 export const COS_CONTINUITY_SCHEMA = 'signalboost-cos-continuity-v1' as const
 

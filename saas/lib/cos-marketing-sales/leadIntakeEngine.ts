@@ -2,8 +2,8 @@
 // Shared public lead intake builder for SignalBoost lead magnets.
 // It prepares a tagged lead package and owner-review plan only.
 
-import type { CosLocale, LeadCapture, LeadIntakePayload, LeadIntakeResult, LeadIntakeSource, OutreachPlan } from './types'
-import { salesOutreachManager } from './salesOutreachManager'
+import type { CosLocale, LeadCapture, LeadIntakePayload, LeadIntakeResult, LeadIntakeSource, OutreachPlan } from './types.ts'
+import { salesOutreachManager } from './salesOutreachManager.ts'
 
 const SOURCE_TAGS: Record<LeadIntakeSource, string[]> = {
   website_optimizer: ['website', 'optimization', 'seo', 'conversion'],

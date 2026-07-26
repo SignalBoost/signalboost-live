@@ -1,3 +1,4 @@
+// saas/components/hub/ProviderActionLauncher.tsx
 'use client'
 
 // saas/components/hub/ProviderActionLauncher.tsx
@@ -13,8 +14,8 @@
 // needing to refactor it.
 
 import { useEffect, useState } from 'react'
-import ProviderActionModal from './ProviderActionModal'
-import { Lang } from './shared'
+import ProviderActionModal from './ProviderActionModal.tsx'
+import { Lang } from './shared.tsx'
 
 export type ProviderActionLauncherProps = {
   providerId: string

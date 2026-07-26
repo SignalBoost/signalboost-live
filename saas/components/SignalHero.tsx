@@ -1,7 +1,8 @@
+// saas/components/SignalHero.tsx
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import SignalCanvas from './SignalCanvas'
+import SignalCanvas from './SignalCanvas.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 const LANGS = [

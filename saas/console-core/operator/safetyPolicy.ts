@@ -11,21 +11,21 @@
 // capability/destructive checks, M4 preflight. No secrets are ever read or
 // returned here — secret injection is the Executor's job, behind this gate.
 
-import { OPERATOR_INVARIANTS, OPERATOR_POLICY_VERSION, resolvePrecedence } from './principles'
+import { OPERATOR_INVARIANTS, OPERATOR_POLICY_VERSION, resolvePrecedence } from './principles.ts'
 import {
   requiredApproval,
   permits,
   type GovernedTemplate,
   type ApprovalRequirement,
   type PermissionPolicy,
-} from './templates'
-import { preExecutionCheck } from './capabilityMatrix'
+} from './templates.ts'
+import { preExecutionCheck } from './capabilityMatrix.ts'
 import {
   preflightPassed,
   failedPreflightChecks,
   type PreflightChecks,
   type ExecutionMode,
-} from './runbook'
+} from './runbook.ts'
 
 // ── Deadman / timeout budgets (Module 6 §15) ──────────────────────────────────
 export const STEP_TIMEOUT_MS = 60_000        // a single step may not exceed this

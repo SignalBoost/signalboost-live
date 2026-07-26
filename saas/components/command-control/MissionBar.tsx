@@ -1,7 +1,8 @@
+// saas/components/command-control/MissionBar.tsx
 'use client'
 
-import { Dot, LANGS, c, labelStyle, type HubData, type Lang } from '../hub/shared'
-import type { CommandPage } from './types'
+import { Dot, LANGS, c, labelStyle, type HubData, type Lang } from '../hub/shared.tsx'
+import type { CommandPage } from './types.ts'
 
 type MissionBarProps = {
   activePage: CommandPage

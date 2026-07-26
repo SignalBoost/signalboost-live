@@ -1,6 +1,6 @@
 // saas/marketing-sales-core/i18n.ts
-import type { Lang } from './types'
-import { DICTIONARIES, type MsDict } from './i18n/dictionaries'
+import type { Lang } from './types.ts'
+import { DICTIONARIES, type MsDict } from './i18n/dictionaries.ts'
 
 export function msT(lang: Lang | string, key: keyof MsDict): string {
   const dict = DICTIONARIES[(lang as Lang)] || DICTIONARIES.en

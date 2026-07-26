@@ -13,9 +13,9 @@ import {
   UnifiedRequest,
   UnifiedResponse,
   BlendCandidate,
-} from './schema';
-import { HostContext } from './host';
-import { AiProviderRegistry } from './registry';
+} from './schema.ts';
+import { HostContext } from './host.ts';
+import { AiProviderRegistry } from './registry.ts';
 
 export type BlendStrategy = 'ensemble' | 'voting' | 'fusion';
 

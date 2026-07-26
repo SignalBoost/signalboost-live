@@ -1,9 +1,9 @@
 // saas/lib/ai/modes.ts
 // Four AI modes — each builds a structured prompt and returns typed JSON.
 
-import { callModel } from './modelRouter'
-import { safeParseJSON, validateLocalItems, validateBusinessSite, validateCreativeWorld, validateGlobalKnowledge } from './validation'
-import type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge } from './validation'
+import { callModel } from './modelRouter.ts'
+import { safeParseJSON, validateLocalItems, validateBusinessSite, validateCreativeWorld, validateGlobalKnowledge } from './validation.ts'
+import type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge } from './validation.ts'
 
 export type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge }
 

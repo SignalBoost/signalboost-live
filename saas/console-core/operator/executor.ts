@@ -15,10 +15,10 @@
 // logged or returned. On any failed stage it emits a FailureRecord for the
 // Module 5 card and STOPS — never auto-retries, never auto-skips.
 
-import { lintTemplate, validatePayload, type GovernedTemplate } from './templates'
-import { preExecutionCheck } from './capabilityMatrix'
-import { evaluateSafety, postStatePassed } from './safetyPolicy'
-import type { ExecutionMode, FailureRecord, AuditEntry } from './runbook'
+import { lintTemplate, validatePayload, type GovernedTemplate } from './templates.ts'
+import { preExecutionCheck } from './capabilityMatrix.ts'
+import { evaluateSafety, postStatePassed } from './safetyPolicy.ts'
+import type { ExecutionMode, FailureRecord, AuditEntry } from './runbook.ts'
 
 export type PipelineStage =
   | 'template_load' | 'schema_validation' | 'safety_gate' | 'secret_injection'
@@ -43,7 +43,7 @@ export interface ExecuteRequest {
   executionMode: ExecutionMode
   approvalGranted: boolean
   approverRole?: string
-  preflight?: import('./runbook').PreflightChecks
+  preflight?: import('./runbook.ts').PreflightChecks
   rollbackNotes?: string
 }
 

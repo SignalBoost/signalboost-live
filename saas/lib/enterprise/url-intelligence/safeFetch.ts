@@ -1,6 +1,7 @@
+// saas/lib/enterprise/url-intelligence/safeFetch.ts
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
-import type { SafeFetchResult } from './types'
+import type { SafeFetchResult } from './types.ts'
 
 const MAX_REDIRECTS = 4
 const MAX_BYTES = 1_500_000

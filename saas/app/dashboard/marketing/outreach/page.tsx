@@ -1,5 +1,6 @@
+// saas/app/dashboard/marketing/outreach/page.tsx
 import { redirect } from 'next/navigation'
-import OutreachHubPage from '../../outreach/page'
+import OutreachHubPage from '../../outreach/page.tsx'
 
 const OLD_PRESS_CHANNELS = new Set(['online-newspapers', 'print-newspapers', 'trade-press'])
 

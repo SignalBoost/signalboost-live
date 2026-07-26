@@ -11,8 +11,8 @@
 //   - No hardcoded prose. All display text lives in i18n keys; this module only
 //     computes structured data (rows, findings, summary, score).
 
-import type { AuditSnapshot } from './findingsEngine'
-import { runFindings } from './findingsEngine'
+import type { AuditSnapshot } from './findingsEngine.ts'
+import { runFindings } from './findingsEngine.ts'
 import {
   type Finding,
   type IdentityRow,
@@ -23,7 +23,7 @@ import {
   daysSince,
   summarizeIdentities,
   scoreFromFindings,
-} from './reportModel'
+} from './reportModel.ts'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Identity & Access report shape

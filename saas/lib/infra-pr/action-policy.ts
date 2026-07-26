@@ -1,3 +1,4 @@
+// saas/lib/infra-pr/action-policy.ts
 // lib/infra-pr/action-policy.ts
 // SELF-CONTAINED, PROVIDER-AGNOSTIC policy + multi-level RBAC. Zero external
 // imports beyond this module's own types. Provider is NEVER inspected.
@@ -6,7 +7,7 @@
 // critical/destructive action IDs flagged strict high-risk.
 //
 // RBAC: tiered clearance. Roles are INJECTED by the host app (auth-agnostic).
-import { ActionVerb, RiskTier, ApprovalTier, Role } from './types';
+import { ActionVerb, RiskTier, ApprovalTier, Role } from './types.ts';
 
 const HIGH_RISK_ACTION_IDS: Record<string, true> = {
   drop_table: true, drop_schema: true, truncate_table: true, delete_row: true,

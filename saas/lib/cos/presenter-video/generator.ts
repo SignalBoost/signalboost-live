@@ -1,4 +1,5 @@
-import type { PresenterTone, PresenterVideoDraft, PresenterVideoInput } from './types'
+// saas/lib/cos/presenter-video/generator.ts
+import type { PresenterTone, PresenterVideoDraft, PresenterVideoInput } from './types.ts'
 import { portableBrandName, portableBrandUrl } from '@/lib/portable/companyIdentity'
 
 function id(prefix: string) {

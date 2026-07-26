@@ -8,14 +8,14 @@
 //   const host = createPressMediaHost((r) => { r.register(createPrWireAdapter()) })
 // The engine, spend gate, approval queue and proof handling never change.
 import { createDefaultMediaRegistry, createPrWireAdapter, createAdPlatformAdapter, createDirectIoAdapter, createMediaDatabaseAdapter, type MediaProviderRegistry } from '@/press-media-core'
-import { createHostPorts } from './ports'
+import { createHostPorts } from './ports.ts'
 import {
   runCampaign, dispatchApprovedCampaign, recordPublishedUrl, updateCampaignCopy,
   type PressMediaContext, type RunCampaignArgs, type RunCampaignResult,
-} from './engine'
+} from './engine.ts'
 
-export * from './ports'
-export * from './engine'
+export * from './ports.ts'
+export * from './engine.ts'
 
 export interface PressMediaHost {
   registry: MediaProviderRegistry

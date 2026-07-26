@@ -4,8 +4,8 @@
 // the substrate end to end across categories and auth types. Every other provider is
 // cataloged with its connect metadata + declared capabilities and lights up the moment
 // its method is implemented — same pattern, no caller changes.
-import type { IntegrationProvider, IntegrationContext, IntegrationResult } from './types'
-import { registerProvider } from './registry'
+import type { IntegrationProvider, IntegrationContext, IntegrationResult } from './types.ts'
+import { registerProvider } from './registry.ts'
 
 const ok = (data: any, mode: string): IntegrationResult => ({ ok: true, data, mode })
 const bad = (mode: string, error?: string): IntegrationResult => ({ ok: false, mode, error })

@@ -6,8 +6,8 @@
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { getOwnerEntitlements } from '@/lib/auth/ownerEntitlements'
 
-export { RENDER_MARKUP, DAILY_PROVIDER_CAP_CENTS, creditsForProviderCost } from './renderPricing'
-import { DAILY_PROVIDER_CAP_CENTS, creditsForProviderCost } from './renderPricing'
+export { RENDER_MARKUP, DAILY_PROVIDER_CAP_CENTS, creditsForProviderCost } from './renderPricing.ts'
+import { DAILY_PROVIDER_CAP_CENTS, creditsForProviderCost } from './renderPricing.ts'
 
 export async function getRenderBalance(userId: string): Promise<number> {
   const admin = getAdminSupabase()

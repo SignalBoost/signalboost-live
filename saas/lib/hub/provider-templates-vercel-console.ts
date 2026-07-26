@@ -9,7 +9,7 @@
 // That mismatch made Vercel env inspection/write actions look available in the
 // UI but route through the wrong generic fallback. Keep the IDs below aligned.
 
-import type { ProviderTemplate } from './provider-templates'
+import type { ProviderTemplate } from './provider-templates.ts'
 
 export const VERCEL_CONSOLE_TEMPLATES: Record<string, ProviderTemplate> = {
   'vercel.overview': { id: 'vercel.overview', label: 'Overview', description: 'Open the project overview/status panel.', icon: '▲', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },

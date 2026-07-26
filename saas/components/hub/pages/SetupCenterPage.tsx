@@ -1,6 +1,7 @@
+// saas/components/hub/pages/SetupCenterPage.tsx
 'use client'
 
-import { PageProps, cardStyle, labelStyle, rowStyle } from '../shared'
+import { PageProps, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 

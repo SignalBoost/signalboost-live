@@ -1,8 +1,9 @@
+// saas/lib/enterprise/memory/playbookIntelligence.ts
 // Versioned operational playbooks derived only from verified organizational repair learning.
 // This module ranks proven strategies; it never executes repairs or promotes unverified plans.
 
-import type { OrganizationalRepairLearning, RepairStrategyLearning } from './organizationalLearning'
-import type { RepairPlanStep } from './repairPlanning'
+import type { OrganizationalRepairLearning, RepairStrategyLearning } from './organizationalLearning.ts'
+import type { RepairPlanStep } from './repairPlanning.ts'
 
 export type PlaybookStatus = 'candidate' | 'recommended' | 'trusted' | 'deprecated'
 

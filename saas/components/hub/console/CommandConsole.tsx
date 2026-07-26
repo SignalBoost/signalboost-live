@@ -1,3 +1,4 @@
+// saas/components/hub/console/CommandConsole.tsx
 'use client'
 
 // saas/components/hub/console/CommandConsole.tsx
@@ -6,10 +7,10 @@
 import { useEffect, useState } from 'react'
 import { type ConsoleTierId } from '@/lib/hub/console-catalog'
 import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
-import { Lang } from '../shared'
-import ProviderActionForm from '../ProviderActionForm'
+import { Lang } from '../shared.tsx'
+import ProviderActionForm from '../ProviderActionForm.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
+import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard.tsx'
 import { signalboostConsoleUI } from '@/console-host/consoleHostConfig'
 
 const PER_PAGE = 2

@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "prebuild": "npm run validate:next-routes && npm run validate:strip-safe",
+    "prebuild": "npm run validate:next-routes && npm run validate:strip-safe && npm run validate:relative-import-extensions",
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
@@ -34,6 +34,7 @@
     "test:cos-continuity": "node --test tests/cosBackupIntegrity.node.test.ts",
     "validate:bpal": "node scripts/validate-bpal-guard.mjs",
     "validate:strip-safe": "node scripts/validate-strip-safe.mjs",
+    "validate:relative-import-extensions": "node scripts/validate-relative-import-extensions.mjs",
     "test:provider-framework": "node --test tests/universalProviderFramework.node.test.ts tests/providerRegistryBootstrap.node.test.ts tests/githubProviderRuntime.node.test.ts tests/githubProductionPipeline.node.test.ts",
     "test:audit-remediation": "node --test tests/auditAutonomousRemediation.node.test.ts tests/auditExecutiveFindingState.node.test.ts tests/repoWriterWorkspaceAliases.node.test.ts",
     "test:dashboard": "node --test tests/supervisorOperationsCenter.node.test.ts tests/enterpriseOperationsIntelligence.node.test.ts tests/enterpriseOperationsDashboard.node.test.ts tests/enterpriseOperationsDashboardAccess.node.test.ts tests/cybersecurityLiveProgress.node.test.ts tests/auditAutonomousRemediation.node.test.ts tests/auditExecutiveFindingState.node.test.ts tests/repoWriterWorkspaceAliases.node.test.ts",

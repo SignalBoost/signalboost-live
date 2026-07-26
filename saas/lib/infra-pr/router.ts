@@ -1,12 +1,13 @@
+// saas/lib/infra-pr/router.ts
 // lib/infra-pr/router.ts
 // The single, provider-agnostic entry the Chief of Staff calls for ANY
 // write. Packages into a generic PR, computes the dry-run diff, persists.
 // Never executes — merge does that. RBAC is enforced at MERGE, not here
 // (drafting stays open so the AI can queue proposals).
-import { createInfraPr } from './store';
-import { classifyAction, requiredRoleForRisk } from './action-policy';
-import { buildSimulationDiff } from './execute';
-import { ActionVerb, ApprovalTier, RiskTier, Role } from './types';
+import { createInfraPr } from './store.ts';
+import { classifyAction, requiredRoleForRisk } from './action-policy.ts';
+import { buildSimulationDiff } from './execute.ts';
+import { ActionVerb, ApprovalTier, RiskTier, Role } from './types.ts';
 
 export interface RouteInput {
   provider: string;

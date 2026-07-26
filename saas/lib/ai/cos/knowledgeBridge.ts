@@ -8,7 +8,7 @@
 //
 // tsconfig is non-strict: flat results; never throws to the caller.
 
-import type { CosSourceType, CosReasoningOutput } from './reasoningTypes'
+import type { CosSourceType, CosReasoningOutput } from './reasoningTypes.ts'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics'
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'

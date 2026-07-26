@@ -1,3 +1,4 @@
+// saas/components/hub/ProviderActionForm.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
@@ -11,7 +12,7 @@ import {
   validateTemplatePayload,
   type ProviderFormField,
 } from '@/lib/hub/provider-templates'
-import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
+import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared.tsx'
 import { SearchableSelect } from '@/components/enterprise/SearchableSelect'
 import { useTranslation } from '@/components/i18n/useTranslation'
 

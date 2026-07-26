@@ -16,7 +16,7 @@
 // if it alone exceeds budget that is a RESOLVER bug — we surface it (ok:false) so
 // the assembler can fail loud rather than silently truncate load-bearing context.
 // ─────────────────────────────────────────────────────────────────────────────
-import type { BudgetPolicy, BudgetAllocation, ContextDirective, TurnContext } from './contracts'
+import type { BudgetPolicy, BudgetAllocation, ContextDirective, TurnContext } from './contracts.ts'
 
 export const SAFETY = 0.85           // budget to 85% of the ceiling
 export const MIN_USEFUL_TOKENS = 64  // below this, an allowance is not worth the slot

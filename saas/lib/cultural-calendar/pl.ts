@@ -1,8 +1,8 @@
 // saas/lib/cultural-calendar/pl.ts
 // Polish greetings - includes imieniny (name days), holidays, day-of-week flavor.
 
-import { GreetingContext, Greeting, pick, fill, inRange, easterSunday, timeOfDay } from './helpers'
-import { getNamedaysForDate } from './pl-namedays'
+import { GreetingContext, Greeting, pick, fill, inRange, easterSunday, timeOfDay } from './helpers.ts'
+import { getNamedaysForDate } from './pl-namedays.ts'
 
 export function polishGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx

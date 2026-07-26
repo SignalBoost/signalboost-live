@@ -1,4 +1,5 @@
-import { OperatorPlan, WikiContentItem, newId } from './store'
+// saas/lib/operator/planner.ts
+import { OperatorPlan, WikiContentItem, newId } from './store.ts'
 
 const WEBSITE_HINTS = ['website', 'homepage', 'landing', 'restaurant', 'real estate', 'colors', 'button', 'reservation', 'polish', 'portuguese']
 

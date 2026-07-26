@@ -1,7 +1,7 @@
 // saas/console-core/executors/gemini.ts
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionField, ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionField, ActionSchema } from '../types.ts'
 
 const API = 'https://generativelanguage.googleapis.com/v1beta'
 function key(): string | null { return getSecret('GEMINI_API_KEY') || null }

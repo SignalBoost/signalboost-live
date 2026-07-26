@@ -2,7 +2,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
 import { stageInfrastructurePR } from '@/lib/hub/pr-engine'
-import type { DiagnosticResult, NormalizedIncidentPayload } from './types'
+import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 8).toUpperCase()

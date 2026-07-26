@@ -7,8 +7,8 @@ import {
   DeviceType,
   DEVICE_CODE,
   FEATURE_NAMES as F,
-} from './types'
-import { linearRegression } from './algorithms'
+} from './types.ts'
+import { linearRegression } from './algorithms.ts'
 
 const DAY_MS = 86_400_000
 

@@ -3,8 +3,8 @@
 // they ask the registry to run a capability and get an honest result — real when the
 // adapter implements it, "not wired yet" when it only declares it, "refuse" when the
 // tenant hasn't connected. No fake success, ever.
-import type { IntegrationProvider, IntegrationCategory, IntegrationContext, IntegrationResult, Capability } from './types'
-import { CAPABILITY_METHOD } from './types'
+import type { IntegrationProvider, IntegrationCategory, IntegrationContext, IntegrationResult, Capability } from './types.ts'
+import { CAPABILITY_METHOD } from './types.ts'
 
 const REGISTRY = new Map<string, IntegrationProvider>()
 
@@ -56,8 +56,8 @@ export async function runCapability(
   }
 }
 
-import type { TaskTemplate } from './types'
-import { TASK_TEMPLATES } from './types'
+import type { TaskTemplate } from './types.ts'
+import { TASK_TEMPLATES } from './types.ts'
 
 // Expand a provider's declared capabilities into runnable console task templates.
 export function tasksFor(p: IntegrationProvider): TaskTemplate[] {

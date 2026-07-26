@@ -1,9 +1,9 @@
 // saas/console-core/executors/improvmx.ts
 // Live ImprovMX provider integration for domains and forwarding aliases.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionSchema } from '../types.ts'
 
 const API = getSecret('IMPROVMX_API_BASE_URL') || 'https://api.improvmx.com/v3'
 

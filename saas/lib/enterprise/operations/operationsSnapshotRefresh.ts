@@ -1,6 +1,6 @@
 // saas/lib/enterprise/operations/operationsSnapshotRefresh.ts
-import type { OperationsIntelligenceSnapshot } from './operationsIntelligence'
-import type { OperationsSnapshotProducer } from './operationsSnapshotProducer'
+import type { OperationsIntelligenceSnapshot } from './operationsIntelligence.ts'
+import type { OperationsSnapshotProducer } from './operationsSnapshotProducer.ts'
 
 export type OperationsRefreshOrganization = Readonly<{
   organizationId: string

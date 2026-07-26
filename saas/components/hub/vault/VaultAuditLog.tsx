@@ -1,10 +1,11 @@
+// saas/components/hub/vault/VaultAuditLog.tsx
 'use client'
 
 // saas/components/hub/vault/VaultAuditLog.tsx
 // Read-only audit trail of all vault access and actions.
 
 import { VaultAuditLog as VaultAuditLogType } from '@/lib/hub/vault-types'
-import { labelStyle } from '../shared'
+import { labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type VaultAuditLogProps = {

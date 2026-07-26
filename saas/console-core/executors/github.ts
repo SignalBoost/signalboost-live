@@ -7,9 +7,9 @@
 //
 // Importing this module registers all GitHub executors as a side effect.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionField, ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionField, ActionSchema } from '../types.ts'
 
 const API = 'https://api.github.com'
 

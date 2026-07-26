@@ -1,7 +1,8 @@
+// saas/lib/enterprise/memory/evidenceGraph.ts
 // Pure, deterministic evidence graph for explainable Enterprise Memory decisions.
 // This layer does not execute actions or bypass approval; it only connects sanitized evidence.
 
-import type { EnterpriseMemoryCandidate, EnterpriseMemoryKind } from './retrievalRanking'
+import type { EnterpriseMemoryCandidate, EnterpriseMemoryKind } from './retrievalRanking.ts'
 
 export type EvidenceNodeKind = EnterpriseMemoryKind
 

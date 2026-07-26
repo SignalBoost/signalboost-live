@@ -1,12 +1,13 @@
+// saas/lib/cos/local-brand-overlay.ts
 import { createWriteStream } from 'node:fs'
 import { mkdtemp, stat, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { pipeline } from 'node:stream/promises'
 import { spawn } from 'node:child_process'
-import { logCosVideoStorageFailure } from './video-storage'
-import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore'
-import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from './brand-schema'
+import { logCosVideoStorageFailure } from './video-storage.ts'
+import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore.ts'
+import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from './brand-schema.ts'
 import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store'
 
 const MAX_ATTEMPTS = 5

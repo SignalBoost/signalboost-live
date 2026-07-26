@@ -20,14 +20,14 @@ import type {
   CosReasoningOutput,
   CosChannel,
   CosDecisionState,
-} from './reasoningTypes';
+} from './reasoningTypes.ts';
 import {
   CHANNEL_BELIEFS,
   SENSITIVE_CATEGORIES,
   SAFE_INTERNAL_ACTIONS,
   ACTION_VERBS,
-} from './cosBeliefs';
-import { routeCosSource } from './sourceRouter';
+} from './cosBeliefs.ts';
+import { routeCosSource } from './sourceRouter.ts';
 
 function decisionId(): string {
   return `cos_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

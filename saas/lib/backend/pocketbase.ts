@@ -1,4 +1,5 @@
-import { requirePocketBaseUrl, pocketBaseAdminCredentials } from "./config";
+// saas/lib/backend/pocketbase.ts
+import { requirePocketBaseUrl, pocketBaseAdminCredentials } from "./config.ts";
 
 type PocketBaseRecord = Record<string, unknown> & { id: string };
 

@@ -1,8 +1,9 @@
+// saas/lib/hub/provider-action-preview.ts
 import {
   assertProviderExecutionMode,
   type ProviderExecutionMode,
   type ProviderExecutionPolicy,
-} from './provider-execution-modes'
+} from './provider-execution-modes.ts'
 
 export type ProviderActionPreview = Readonly<{
   templateId: string

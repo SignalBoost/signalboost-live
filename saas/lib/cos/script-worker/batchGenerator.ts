@@ -14,7 +14,7 @@ import { createSupabaseCampaignQueueStore } from '@/lib/cos/campaign-queue/store
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import { buildFactualPreamble } from '@/portable-kernel'
 import type { CompanyFacts } from '@/portable-kernel'
-import type { CosContentWorkerOutput } from './types'
+import type { CosContentWorkerOutput } from './types.ts'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 

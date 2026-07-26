@@ -2,7 +2,7 @@
 // Role-based access control service
 
 import { createClient } from '@supabase/supabase-js'
-import { HubUser, Permission, Role, DEFAULT_ROLES } from './rbac-types'
+import { HubUser, Permission, Role, DEFAULT_ROLES } from './rbac-types.ts'
 
 /**
  * Check if user has permission

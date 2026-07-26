@@ -9,10 +9,10 @@
 // default) and the COS trail lands in their datastore/SIEM with no change to this module.
 //
 // tsconfig is non-strict: flat { ok, error? } results; never throws.
-import type { CosReasoningOutput } from './reasoningTypes'
-import { createSupabaseDecisionLogStore, type CosDecisionStatus, type DecisionLogStore } from './decisionStore'
+import type { CosReasoningOutput } from './reasoningTypes.ts'
+import { createSupabaseDecisionLogStore, type CosDecisionStatus, type DecisionLogStore } from './decisionStore.ts'
 
-export type { CosDecisionStatus } from './decisionStore'
+export type { CosDecisionStatus } from './decisionStore.ts'
 
 const defaultStore = createSupabaseDecisionLogStore()
 

@@ -1,7 +1,8 @@
+// saas/components/command-control/CommandRail.tsx
 'use client'
 
 import type { CSSProperties } from 'react'
-import type { CommandPageKey, CommandRailSection } from './types'
+import type { CommandPageKey, CommandRailSection } from './types.ts'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 

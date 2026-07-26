@@ -1,3 +1,4 @@
+// saas/components/hub/ProviderActionExecutionGate.tsx
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -8,7 +9,7 @@ import type {
   ReviewedProviderCapabilitySnapshot,
 } from '@/lib/hub/provider-action-client'
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
-import GovernedProviderActionFetchBoundary from './GovernedProviderActionFetchBoundary'
+import GovernedProviderActionFetchBoundary from './GovernedProviderActionFetchBoundary.tsx'
 
 export type ReviewedProviderCapability = ReviewedProviderCapabilitySnapshot
 

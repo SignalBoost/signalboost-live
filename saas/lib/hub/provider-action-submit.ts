@@ -1,4 +1,5 @@
-import type { ProviderExecutionMode } from './provider-execution-modes'
+// saas/lib/hub/provider-action-submit.ts
+import type { ProviderExecutionMode } from './provider-execution-modes.ts'
 
 const ENGINE_PROVIDERS = new Set([
   'github',

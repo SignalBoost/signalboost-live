@@ -1,3 +1,4 @@
+// saas/tests/providerActionClient.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -5,7 +6,7 @@ import {
   buildProviderActionClientPlan,
   chooseReviewedProviderMode,
   submitProviderActionClientPlan,
-} from '../lib/hub/provider-action-client'
+} from '../lib/hub/provider-action-client.ts'
 
 const baseCapabilities = {
   ok: true,

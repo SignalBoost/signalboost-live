@@ -1,9 +1,10 @@
+// saas/lib/enterprise/memory/campaignLearningStore.ts
 import { getAdminSupabase } from '@/utils/supabase/server'
 import {
   normalizeCampaignLearning,
   type CampaignLearningInput,
   type CampaignLearningRecord,
-} from './campaignLearning'
+} from './campaignLearning.ts'
 
 export async function recordCampaignLearning(args: {
   organizationId: string

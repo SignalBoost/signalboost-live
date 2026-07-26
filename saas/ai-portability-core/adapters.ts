@@ -14,8 +14,8 @@ import {
   UnifiedResponse,
   ProviderMetadata,
   computeCost,
-} from './schema';
-import { HostContext } from './host';
+} from './schema.ts';
+import { HostContext } from './host.ts';
 
 export interface AdapterConfig {
   /** Vault ref name for this provider's API key. */

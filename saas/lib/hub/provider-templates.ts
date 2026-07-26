@@ -1,12 +1,12 @@
 // saas/lib/hub/provider-templates.ts
 // Hub Console — Complete universal action form templates synchronized with backend policy dictionaries.
 
-import { EXTRA_TEMPLATES } from './provider-templates-extra'
-import { COMPLETE_TEMPLATES } from './provider-templates-complete'
-import { VERCEL_DNS_TEMPLATES } from './provider-templates-vercel-dns'
-import { BANK_TEMPLATES } from './provider-templates-bank'
-import { RESEND_CONSOLE_TEMPLATES } from './provider-templates-resend'
-import { SOCIAL_PROVIDER_TEMPLATES } from './provider-templates-social'
+import { EXTRA_TEMPLATES } from './provider-templates-extra.ts'
+import { COMPLETE_TEMPLATES } from './provider-templates-complete.ts'
+import { VERCEL_DNS_TEMPLATES } from './provider-templates-vercel-dns.ts'
+import { BANK_TEMPLATES } from './provider-templates-bank.ts'
+import { RESEND_CONSOLE_TEMPLATES } from './provider-templates-resend.ts'
+import { SOCIAL_PROVIDER_TEMPLATES } from './provider-templates-social.ts'
 
 export interface ProviderFormField {
   id: string

@@ -8,7 +8,7 @@
 // v1 matches objectives to beliefs by `signals` (term matching).
 // v2 will replace signal-matching with LLM semantic matching against `describes`.
 
-import type { CosChannel, CosSourceType } from './reasoningTypes';
+import type { CosChannel, CosSourceType } from './reasoningTypes.ts';
 
 export interface SourceBelief {
   id: CosSourceType;

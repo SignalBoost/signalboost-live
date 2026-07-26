@@ -3,9 +3,9 @@
 // ElevenLabs provider on the portable engine. Read-only observability actions
 // using ELEVENLABS_API_KEY (xi-api-key header). Importing this registers them.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionField, ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionField, ActionSchema } from '../types.ts'
 
 const API = 'https://api.elevenlabs.io/v1'
 

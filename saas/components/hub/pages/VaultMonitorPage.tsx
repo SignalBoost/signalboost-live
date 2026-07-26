@@ -1,11 +1,12 @@
+// saas/components/hub/pages/VaultMonitorPage.tsx
 'use client'
 
 // saas/components/hub/pages/VaultMonitorPage.tsx
 // Monitor 2 — Key Vault in the horizontal Hub flow.
 // The Vault is intentionally tall/vertical and hides the platform mirror.
 
-import { PageProps } from '../shared'
-import KeyVaultV2Page from './KeyVaultV2Page'
+import { PageProps } from '../shared.tsx'
+import KeyVaultV2Page from './KeyVaultV2Page.tsx'
 
 export default function VaultMonitorPage(props: PageProps) {
   return (

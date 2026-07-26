@@ -15,18 +15,18 @@ import {
   UnifiedResponse,
   validateUnifiedRequest,
   RoutingPolicy,
-} from './schema';
-import { HostContext } from './host';
+} from './schema.ts';
+import { HostContext } from './host.ts';
 import {
   ProviderAdapter,
   ProviderKind,
   AdapterConfig,
   createAdapter,
-} from './adapters';
-import { AiProviderRegistry } from './registry';
-import { RoutingEngine, RoutingConfig, RoutingError } from './routing';
-import { Blender, BlendOptions } from './blending';
-import { AuditLogger, Reporter, Report } from './audit';
+} from './adapters.ts';
+import { AiProviderRegistry } from './registry.ts';
+import { RoutingEngine, RoutingConfig, RoutingError } from './routing.ts';
+import { Blender, BlendOptions } from './blending.ts';
+import { AuditLogger, Reporter, Report } from './audit.ts';
 
 export interface ProviderConfigEntry extends AdapterConfig {
   kind: ProviderKind;
@@ -170,12 +170,12 @@ function genReqId(): string {
 }
 
 /* Re-export the public surface so buyers import from one place. */
-export * from './schema';
-export * from './host';
-export * from './adapters';
-export { AiProviderRegistry, AiProviderRegistry as ProviderRegistry } from './registry';
-export { RoutingEngine, RoutingError } from './routing';
-export { Blender } from './blending';
-export type { BlendOptions, BlendStrategy } from './blending';
-export { AuditLogger, Reporter } from './audit';
-export type { Report, ReportRow } from './audit';
+export * from './schema.ts';
+export * from './host.ts';
+export * from './adapters.ts';
+export { AiProviderRegistry, AiProviderRegistry as ProviderRegistry } from './registry.ts';
+export { RoutingEngine, RoutingError } from './routing.ts';
+export { Blender } from './blending.ts';
+export type { BlendOptions, BlendStrategy } from './blending.ts';
+export { AuditLogger, Reporter } from './audit.ts';
+export type { Report, ReportRow } from './audit.ts';

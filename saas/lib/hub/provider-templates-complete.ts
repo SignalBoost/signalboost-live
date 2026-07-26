@@ -3,7 +3,7 @@
 // in the June 2026 audit. Covers setup, maintenance, and operational tasks for
 // every Tier 1-3 provider. All write actions are policy-gated.
 
-import type { ProviderTemplate } from './provider-templates'
+import type { ProviderTemplate } from './provider-templates.ts'
 
 export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
 

@@ -11,8 +11,8 @@ import {
   ProviderMetadata,
   estimateTokens,
   computeCost,
-} from './schema';
-import { ProviderAdapter } from './adapters';
+} from './schema.ts';
+import { ProviderAdapter } from './adapters.ts';
 
 export class AiProviderRegistry {
   private adapters = new Map<string, ProviderAdapter>();

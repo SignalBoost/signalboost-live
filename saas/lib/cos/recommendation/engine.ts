@@ -1,5 +1,6 @@
-import { priorityFromScore, scoreRecommendation, scoreSignals } from './scoring'
-import type { CosChannel, CosDepartment, CosRecommendation, CosSignal } from './types'
+// saas/lib/cos/recommendation/engine.ts
+import { priorityFromScore, scoreRecommendation, scoreSignals } from './scoring.ts'
+import type { CosChannel, CosDepartment, CosRecommendation, CosSignal } from './types.ts'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
 

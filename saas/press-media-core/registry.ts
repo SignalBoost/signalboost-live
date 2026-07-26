@@ -1,7 +1,7 @@
 // saas/press-media-core/registry.ts
 // Plug-and-play provider registry. A buyer's connected provider = one registered adapter.
 // Adding a new provider never touches the engine — you register an adapter, done.
-import type { MediaProviderAdapter, ProviderType, ProviderDescriptor } from './types'
+import type { MediaProviderAdapter, ProviderType, ProviderDescriptor } from './types.ts'
 
 export class MediaProviderRegistry {
   private adapters = new Map<string, MediaProviderAdapter>()

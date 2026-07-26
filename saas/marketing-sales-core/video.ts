@@ -4,7 +4,7 @@
 // and the storage all arrive INJECTED from the host. The core only sequences the
 // lifecycle over ms_drafts and is honest by construction — asset_url is filled
 // ONLY when a real finished video URL comes back. Swap the host, keep this file.
-import type { MarketingStore } from './types'
+import type { MarketingStore } from './types.ts'
 
 // A render provider the host injects (real one wraps fal.queue.submit/status/result).
 export type VideoSubmit = (

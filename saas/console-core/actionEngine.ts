@@ -8,7 +8,7 @@
 // The existing /api/hub/action route is untouched. Providers are migrated to run
 // through this engine one at a time (Phase 3); until then both coexist.
 
-import type { ActionSchema, AuthAdapter, LogAdapter } from './types'
+import type { ActionSchema, AuthAdapter, LogAdapter } from './types.ts'
 
 /** A provider action wired for the engine: its schema, policy id, and runtime. */
 export interface RegisteredExecutor {

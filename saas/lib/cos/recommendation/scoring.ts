@@ -1,4 +1,5 @@
-import type { CosPriority, CosSignal } from './types'
+// saas/lib/cos/recommendation/scoring.ts
+import type { CosPriority, CosSignal } from './types.ts'
 
 export type RecommendationScoreInput = {
   impact?: number

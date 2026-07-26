@@ -1,9 +1,10 @@
+// saas/lib/cos/pipeline/workers.ts
 import type { Job } from 'bullmq'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 import { renderBrandOverlayVideo } from '@/lib/cos/video-compose'
 import { createSupabaseCampaignQueueStore, type CampaignQueueStore } from '@/lib/cos/campaign-queue/store'
-import { runFFmpegRender } from './dependencies'
-import { createCosWorker, queueNames, type BrandOverlayJobPayload, type VideoRenderJobPayload, type VoiceOverJobPayload } from './queues'
+import { runFFmpegRender } from './dependencies.ts'
+import { createCosWorker, queueNames, type BrandOverlayJobPayload, type VideoRenderJobPayload, type VoiceOverJobPayload } from './queues.ts'
 
 const VIDEO_WORKER_CONCURRENCY = Number(process.env.COS_VIDEO_WORKER_CONCURRENCY || 3)
 const VOICE_WORKER_CONCURRENCY = Number(process.env.COS_VOICE_WORKER_CONCURRENCY || 5)

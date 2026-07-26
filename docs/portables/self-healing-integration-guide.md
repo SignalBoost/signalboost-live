@@ -1,3 +1,4 @@
+<!-- docs/portables/self-healing-integration-guide.md -->
 # Self-Healing Supervisor — Enterprise Integration Guide
 
 **Audience:** the buyer's engineering team installing the Self-Healing portable into
@@ -25,21 +26,42 @@ You implement these interfaces against your own systems. Import them from
 | `SqlExecutor` | your database driver | the durable at-most-once dispatch ledger (§3) |
 | `SiemTransport` | your SIEM collector (HTTPS/HEC, syslog, Kafka) | receive the audit stream (§4) |
 
-All are plain interfaces — no base class, no platform import. The portable core names
-no platform, reads no `process.env`, and imports no host singleton.
+All are plain interfaces — no base class, no platform import. Everything under
+`lib/supervisor/portable/` names no platform, reads no `process.env`, and imports no host
+singleton — enforced, not asserted: `tests/supervisorPortableHostContext.node.test.ts`
+fails the build if any of those files acquires a host reference.
 
 ---
 
 ## 2. Configuration (no environment variables required)
 
-The portable does **not** read environment variables in its core. You pass everything
-explicitly. The only env-reading code in the repo is the clearly-labeled
-`platform-env-adapter.ts` files, which exist for the SignalBoost test rig and which you
-do **not** use.
+You pass everything explicitly. You supply, per deployment: your `HostContext`
+implementation, your `SqlExecutor` for the ledger, and your `SiemAuditSinkConfig`
+(transport + format). That is the whole surface — nothing is read from the environment on
+your behalf, so nothing silently changes behaviour based on how your build system happens
+to set `NODE_ENV`.
 
-You supply, per deployment: your `HostContext` implementation, your `SqlExecutor` for
-the ledger, and your `SiemAuditSinkConfig` (transport + format). That's the whole
-surface.
+### 2.1 Where the build platform is still reachable, and why
+
+The same test that enforces §1 also walks the **entire import graph** reachable from the
+two entry points in §5 — currently 64 modules — and fails if host coupling appears
+anywhere new. Five touchpoints exist today and are listed in that test with their
+justification. Three are inert for you:
+
+| Module | What it is | Why it cannot affect your deployment |
+| --- | --- | --- |
+| `executors/create-supervisor-dispatcher.ts` | lazy import of a platform email notifier | reached only when you supply neither a `HostContext` nor a notifier; supplying either bypasses it entirely |
+| `executors/api-executor.ts` | lazy import of the platform provider engine, used as the **default** `api_request` runner | pass your own `ApiStepRunner` and the import is never evaluated |
+| `executors/dispatch-store.ts` | reads `NODE_ENV` inside `platformSupervisorRuntime()` | a platform-only helper; you pass your own store or an explicit `runtime` |
+
+Two are **buyer-visible and not yet resolved**, so they are stated rather than buried:
+`executors/browser/browser-runtime-mapper.ts` emits an `adapterId` of
+`signalboost.browser-runtime.dry-run.v1`, and `lib/browser-runtime/sandbox-adapter.ts`
+exports `SANDBOX_ADAPTER_ID = 'signalboost.sandbox.v1'`. If you enable browser steps,
+those identifiers appear in your evidence records and your SIEM. They affect naming in
+your audit trail only — no behaviour, no network destination, no credential path — but
+they are the build platform's name inside your data, and they are tracked for removal
+before this portable is marked live.
 
 ---
 

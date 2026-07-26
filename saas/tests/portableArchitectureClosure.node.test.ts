@@ -92,6 +92,7 @@ test('Browser Agent Ecosystem is architecture-complete while production executio
   assert.equal(descriptor?.manifest.status, 'preview')
   assert.equal(descriptor?.manifest.licensingAvailable, false)
   assert.ok(descriptor?.manifest.exclusions.includes('production-browser-execution'))
+  assert.equal(descriptor?.route, undefined)
 })
 
 test('all registered portable architecture boundaries are closed', () => {

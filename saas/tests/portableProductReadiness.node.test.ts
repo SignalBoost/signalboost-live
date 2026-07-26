@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPortableBuyerHandoffManifest, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry } from '../lib/portable-products/index.ts'
+import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry } from '../lib/portable-products/index.ts'
 import { readFileSync } from 'node:fs'
 
 test('portable readiness dashboard is frozen, deterministic, and registry-driven', () => {
@@ -20,6 +20,37 @@ test('readiness surfaces remain internal, guarded, and read-only', () => {
   const page = readFileSync(new URL('../app/dashboard/portable-products/readiness/page.tsx', import.meta.url), 'utf8')
   assert.match(route, /requireAdmin/); assert.match(page, /getCurrentUser/); assert.match(page, /access\.isAdmin/)
   for (const source of [route, page]) for (const forbidden of [/export async function (POST|PUT|PATCH|DELETE)/, /checkout/i, /purchase/i, /activate/i, /download/i, /<form/i, /worker/i, /cos tool/i]) assert.doesNotMatch(source, forbidden)
+})
+
+test('Provider Hub commercial evidence is explicit, immutable, and honestly incomplete', () => {
+  const first = createPortableCommercialReadinessReport()
+  const second = createPortableCommercialReadinessReport()
+  const providerHub = first.entries.find(entry => entry.productId === 'provider-hub')
+  assert.deepEqual(first, second)
+  assert.notEqual(first, second)
+  assert.ok(Object.isFrozen(first) && Object.isFrozen(first.entries))
+  assert.ok(providerHub)
+  assert.equal(providerHub.readyCount, 5)
+  assert.equal(providerHub.totalCount, 10)
+  assert.equal(providerHub.completionPercent, 50)
+  assert.equal(providerHub.commerciallyReady, false)
+  assert.deepEqual(providerHub.checks.filter(check => check.status === 'ready').map(check => check.dimension), [
+    'architecture',
+    'buyer-installation',
+    'operations-recovery',
+    'buyer-configuration',
+    'support-boundary',
+  ])
+  assert.deepEqual(providerHub.checks.filter(check => check.status === 'blocked').map(check => check.dimension), [
+    'distribution-package',
+    'integrity-manifest',
+    'licensing-enforcement',
+    'fulfillment-handoff',
+    'deployment-acceptance',
+  ])
+  for (const check of providerHub.checks) {
+    assert.ok(Object.isFrozen(check) && Object.isFrozen(check.evidence) && Object.isFrozen(check.blockers))
+  }
 })
 
 test('buyer handoff manifest is immutable and fails closed when delivery evidence is incomplete', () => {

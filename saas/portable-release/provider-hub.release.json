@@ -6,12 +6,12 @@
   "version": "1.0.0-rc.1",
   "license": "SEE LICENSE IN LICENSE",
   "description": "Provider-neutral connection metadata and bounded live-data read behavior. The buyer supplies provider transport, digest, persistence, credentials, authorization, deployment, and operational controls.",
-  "payloadRoot": ".",
+  "payloadRoot": "provider-hub-core",
   "entryPoints": [
     "provider-hub-core/index.ts"
   ],
   "buyerEntryPoints": {
-    ".": "payload/provider-hub-core/index.ts"
+    ".": "payload/index.ts"
   },
   "_minModules": "The Provider Hub buyer graph starts at the bounded core index and must include its local read adapter and evidence modules. A shorter graph means the portable boundary is incomplete.",
   "minModules": 3,
@@ -62,7 +62,7 @@
     "Provider writes, credential transfer, automatic rollout, and production execution remain disabled."
   ],
   "acceptance": {
-    "entry": "payload/provider-hub-core/index.ts",
+    "entry": "payload/index.ts",
     "export": "createProviderConnectionMetadata",
     "how": "Import the entry point in a clean buyer environment, create redacted connection metadata, and exercise live-data reads only through buyer-supplied test doubles before production wiring.",
     "guarantee": "The payload contains no credentials and performs no provider mutation, deployment, or automatic production action.",

@@ -1,6 +1,6 @@
-import type {
-  ProviderConnectionIdentity,
-  ProviderConnectionMetadata,
+import {
+  createProviderConnectionMetadata,
+  type ProviderConnectionIdentity,
 } from '../provider-hub-core/index.ts'
 import {
   PROVIDER_HUB_HOST_PORTS_VERSION,
@@ -48,7 +48,13 @@ function createIdentityPort(dependencies: SignalBoostReadonlyHostPortDependencie
       const actor = await dependencies.resolveActor(input)
       if (!actor) return null
       assertScope(actor, scope)
-      return Object.freeze({ ...actor, roles: Object.freeze([...actor.roles]) })
+      if (actor.actorId !== input.actorId) throw new Error('SignalBoost provider hub actor mismatch')
+      return Object.freeze({
+        actorId: required(actor.actorId, 'actorId'),
+        tenantId: scope.tenantId,
+        environmentId: scope.environmentId,
+        roles: Object.freeze([...actor.roles].map(role => required(role, 'role')).sort()),
+      })
     },
     async resolveConnectionOwner(identity: ProviderConnectionIdentity) {
       assertScope(identity, scope)
@@ -75,7 +81,16 @@ function createAuditPort(dependencies: SignalBoostReadonlyHostPortDependencies, 
   const port: ProviderHubAuditPort = {
     async append(event: Readonly<ProviderHubAuditEvent>) {
       assertScope(event, scope)
-      await dependencies.appendAudit(Object.freeze({ ...event }))
+      await dependencies.appendAudit(Object.freeze({
+        eventId: required(event.eventId, 'eventId'),
+        eventType: required(event.eventType, 'eventType'),
+        actorId: required(event.actorId, 'actorId'),
+        tenantId: scope.tenantId,
+        environmentId: scope.environmentId,
+        connectionId: required(event.connectionId, 'connectionId'),
+        occurredAt: required(event.occurredAt, 'occurredAt'),
+        ...(event.evidenceRef ? { evidenceRef: required(event.evidenceRef, 'evidenceRef') } : {}),
+      }))
     },
   }
   return Object.freeze(port)
@@ -100,7 +115,10 @@ function createLicensingPort(dependencies: SignalBoostReadonlyHostPortDependenci
       assertScope(input, scope)
       const capability = required(input.capability, 'capability')
       const result = await dependencies.checkEntitlement({ ...input, capability })
-      return Object.freeze({ ...result })
+      return Object.freeze({
+        entitled: Boolean(result.entitled),
+        ...(result.entitlementRef ? { entitlementRef: required(result.entitlementRef, 'entitlementRef') } : {}),
+      })
     },
   }
   return Object.freeze(port)
@@ -113,12 +131,18 @@ function createUiPort(scope: SignalBoostScope): ProviderHubUiPort {
       assertScope(input.connection, scope)
       const allowedActions = Object.freeze([...new Set(input.allowedActions.map(action => required(action, 'allowed action')))].sort())
       const notices = Object.freeze([...(input.notices ?? [])].map(notice => required(notice, 'notice')).sort())
-      const connection: ProviderConnectionMetadata = Object.freeze({
-        ...input.connection,
-        authentication: Object.freeze({
-          ...input.connection.authentication,
-          maskedFields: Object.freeze({ ...input.connection.authentication.maskedFields }),
-        }),
+      const connection = createProviderConnectionMetadata({
+        tenantId: input.connection.tenantId,
+        environmentId: input.connection.environmentId,
+        connectionId: input.connection.connectionId,
+        providerId: input.connection.providerId,
+        state: input.connection.state,
+        authentication: {
+          method: input.connection.authentication.method,
+          configured: input.connection.authentication.configured,
+          maskedFields: { ...input.connection.authentication.maskedFields },
+        },
+        updatedAt: input.connection.updatedAt,
       })
       return Object.freeze({
         schemaVersion: PROVIDER_HUB_HOST_PORTS_VERSION,

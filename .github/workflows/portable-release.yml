@@ -11,6 +11,7 @@ on:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
+      - 'saas/provider-hub-core/**'
       - 'saas/portable-license/**'
       - 'saas/portable-release/**'
       - 'saas/scripts/package-portable.mjs'
@@ -20,6 +21,7 @@ on:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
+      - 'saas/provider-hub-core/**'
       - 'saas/portable-license/**'
       - 'saas/portable-release/**'
       - 'saas/scripts/package-portable.mjs'
@@ -35,6 +37,7 @@ jobs:
       matrix:
         spec:
           - self-healing.release.json
+          - provider-hub.release.json
     steps:
       - uses: actions/checkout@v4
         with:

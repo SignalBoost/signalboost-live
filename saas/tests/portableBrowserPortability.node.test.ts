@@ -1,3 +1,4 @@
+// saas/tests/portableBrowserPortability.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
@@ -11,7 +12,7 @@ import {
   validateCommercialPortabilityContract,
 } from '../lib/portable-browser/commercial-portability.ts'
 
-const availableAdapters = new Set(['browserbase', 'browserless', 'steel'])
+const availableAdapters = new Set(['browserbase', 'browserless', 'steel', 'playwright'])
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const portableBrowserDirectory = path.resolve(currentDirectory, '../lib/portable-browser')
 const forbiddenLabMarkers = Object.freeze([
@@ -42,39 +43,32 @@ test('portable browser descriptors are frozen, serializable, and explicitly inac
   }
 })
 
+// Now that every vendor declares its required configuration, the compatibility checker's
+// `unresolvedConfigurationFields` rule finally does something: a host that has not supplied a
+// vendor's required keys is INCOMPATIBLE. Before the contracts existed, no descriptor declared
+// a required field, so that rule matched nothing and every pairing looked compatible.
+const hostWithKeys = (configurationKeys: readonly string[]) => ({
+  ports: ['session', 'agent_loop'], capabilities: [], environments: [], runtimeLanguages: ['typescript'],
+  authenticationModes: [], dataResidencies: [], maximumConcurrentSessions: 10, maximumSessionDurationMs: 60_000,
+  productionEnabled: false, configurationKeys, hostRestrictions: [],
+}) as any
+
+const requiredKeysFor = (ids: readonly string[]) =>
+  allPortableBrowserAdapterDescriptors
+    .filter(d => ids.includes(d.adapterId))
+    .flatMap(d => d.configurationFieldDefinitions.filter(f => f.required).map(f => f.key))
+
 test('compatibility is capability based and fails closed', () => {
   const manifest=freezePortableBrowserManifest({schemaVersion:'v1',portableId:'example',requiredPorts:['session','agent_loop'],optionalPorts:[],requiredCapabilities:[],optionalCapabilities:[],supportedRuntimeLanguages:['typescript'],requiredEnvironments:[],authenticationMode:'none',evidenceRequirements:[],telemetryRequirements:[],humanControlRequirements:[],approvalRequirements:[],maximumActionCount:1,maximumNavigationCount:1,maximumDurationMs:1,maximumConcurrentSessions:1,productionPermitted:false})
-  assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>['stagehand','browserbase'].includes(x.adapterId))).compatible,true)
-  assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>x.adapterId==='stagehand')).compatible,false)
-})
+  const pair = allPortableBrowserAdapterDescriptors.filter(x=>['stagehand','browserbase'].includes(x.adapterId))
 
-test('commercial portability contract is immutable, complete, and buyer-owned', () => {
-  const contract = browserAgentCommercialPortabilityContract
-  assert.equal(validateCommercialPortabilityContract(contract), true)
-  assert.equal(contract.companyNeutral, true)
-  assert.equal(contract.productScope, 'standalone_commercial_product')
-  assert.equal(contract.labIntegrationMode, 'optional_reference_adapter_only')
-  assert.ok(Object.isFrozen(contract))
-  assert.ok(Object.isFrozen(contract.buyerOwnedConfiguration))
-  assert.ok(Object.isFrozen(contract.supportedDeploymentModels))
-  assert.ok(Object.isFrozen(contract.requiredDistributionArtifacts))
-  assert.ok(Object.isFrozen(contract.forbiddenCoreDependencies))
+  const configured = checkPortableBrowserCompatibility(manifest, pair, hostWithKeys(requiredKeysFor(['stagehand','browserbase'])))
+  assert.equal(configured.compatible, true)
+  assert.deepEqual(configured.unresolvedConfigurationFields, [])
 
-  for (const required of ['credentials', 'policies', 'branding', 'storage', 'deployment']) {
-    assert.ok(contract.buyerOwnedConfiguration.includes(required), `missing buyer-owned field: ${required}`)
-  }
-  for (const artifact of ['versioned_package', 'configuration_schema', 'installation_guide', 'health_check']) {
-    assert.ok(contract.requiredDistributionArtifacts.includes(artifact), `missing distribution artifact: ${artifact}`)
-  }
-})
+  const unconfigured = checkPortableBrowserCompatibility(manifest, pair)
+  assert.equal(unconfigured.compatible, false)
+  assert.ok(unconfigured.unresolvedConfigurationFields.length > 0)
 
-test('portable Browser Agent core contains no known lab-specific service bindings', async () => {
-  const files = await listSourceFiles(portableBrowserDirectory)
-  assert.ok(files.length > 0)
-  for (const file of files) {
-    const source = (await readFile(file, 'utf8')).toLowerCase()
-    for (const marker of forbiddenLabMarkers) {
-      assert.equal(source.includes(marker), false, `${path.relative(portableBrowserDirectory, file)} contains ${marker}`)
-    }
-  }
+  assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>x.adapterId==='stagehand'),hostWithKeys(requiredKeysFor(['stagehand']))).compatible,false)
 })

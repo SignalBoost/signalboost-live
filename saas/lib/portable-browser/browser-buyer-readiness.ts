@@ -5,9 +5,10 @@
 // The catalog already describes 27 browser vendors richly: category, deployment models,
 // authentication modes, evidence and observability capabilities, compliance metadata keys.
 // What almost none of them stated was the one thing a Fortune-500 integration team actually
-// needs on day one — WHICH FIELDS DO WE FILL IN. Twenty-four of the twenty-seven shipped
+// needs on day one — WHICH FIELDS DO WE FILL IN. Every one of the twenty-seven shipped
 // `configurationFieldDefinitions: []`, so a buyer could read the whole catalog and still not
-// know whether their stack needed a hub URL, a region, a project id, or a credential.
+// know whether their stack needed a hub URL, a region, a project id, or a credential. All
+// twenty-seven now declare one, and a test fails if a new vendor arrives without.
 //
 // A vendor entry that cannot tell a buyer what to provide is a brochure, not an integration
 // surface. This module makes the contract explicit, checkable, and honest in both

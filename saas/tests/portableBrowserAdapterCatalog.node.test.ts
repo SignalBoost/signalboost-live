@@ -1,3 +1,4 @@
+// saas/tests/portableBrowserAdapterCatalog.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { allPortableBrowserAdapterDescriptors } from '../lib/portable-browser/catalog/index.ts'
@@ -15,8 +16,37 @@ test('portable browser descriptors are frozen, serializable, and explicitly inac
     assert.ok(descriptor.documentationReference); assert.ok(descriptor.supportedPortKinds.length)
   }
 })
+// Now that every vendor declares its required configuration, the compatibility checker's
+// `unresolvedConfigurationFields` rule finally does something: a host that has not supplied a
+// vendor's required keys is INCOMPATIBLE. Before the contracts existed, no descriptor
+// declared a required field, so that rule matched nothing and every pairing looked
+// compatible. These cases pin the real behaviour in both directions.
+const hostWithKeys = (configurationKeys: readonly string[]) => ({
+  ports: ['session', 'agent_loop'] as const, capabilities: [], environments: [], runtimeLanguages: ['typescript'],
+  authenticationModes: [], dataResidencies: [], maximumConcurrentSessions: 10, maximumSessionDurationMs: 60_000,
+  productionEnabled: false, configurationKeys, hostRestrictions: [],
+}) as any
+
+const requiredKeysFor = (ids: readonly string[]) =>
+  allPortableBrowserAdapterDescriptors
+    .filter(d => ids.includes(d.adapterId))
+    .flatMap(d => d.configurationFieldDefinitions.filter(f => f.required).map(f => f.key))
+
 test('compatibility is capability based and fails closed', () => {
   const manifest=freezePortableBrowserManifest({schemaVersion:'v1',portableId:'example',requiredPorts:['session','agent_loop'],optionalPorts:[],requiredCapabilities:[],optionalCapabilities:[],supportedRuntimeLanguages:['typescript'],requiredEnvironments:[],authenticationMode:'none',evidenceRequirements:[],telemetryRequirements:[],humanControlRequirements:[],approvalRequirements:[],maximumActionCount:1,maximumNavigationCount:1,maximumDurationMs:1,maximumConcurrentSessions:1,productionPermitted:false})
-  assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>['stagehand','browserbase'].includes(x.adapterId))).compatible,true)
-  assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>x.adapterId==='stagehand')).compatible,false)
+  const pair = allPortableBrowserAdapterDescriptors.filter(x=>['stagehand','browserbase'].includes(x.adapterId))
+
+  // A host that supplies every required configuration key for both vendors is compatible.
+  const configured = checkPortableBrowserCompatibility(manifest, pair, hostWithKeys(requiredKeysFor(['stagehand','browserbase'])))
+  assert.equal(configured.compatible, true)
+  assert.deepEqual(configured.unresolvedConfigurationFields, [])
+
+  // The same pairing with NO configuration supplied is refused, and says which fields are missing.
+  const unconfigured = checkPortableBrowserCompatibility(manifest, pair)
+  assert.equal(unconfigured.compatible, false)
+  assert.ok(unconfigured.unresolvedConfigurationFields.length > 0)
+  assert.ok(unconfigured.unresolvedConfigurationFields.every(entry => entry.includes(':')))
+
+  // A missing PORT still fails closed regardless of configuration.
+  assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>x.adapterId==='stagehand'),hostWithKeys(requiredKeysFor(['stagehand']))).compatible,false)
 })

@@ -11,7 +11,7 @@ export type VaultSecret = {
   provider_name: string
   secret_type: VaultSecretType
   secret_name: string
-  masked_value: string // e.g., "sk_live_4J3...Xx2" (first 8 + last 4 chars visible)
+  masked_value: string // first 8 + last 4 characters visible, e.g. "prefix12...Xx2"
   created_at: string
   updated_at: string
   expires_at?: string

@@ -5,7 +5,12 @@
 
 export * from './types.ts';
 export { canonicalize, encodeToken, signingInput, verifyLicense, TOKEN_PREFIX } from './verify.ts';
-export { createEntitlementGate, createUnlicensedDevelopmentGate, type EntitlementGate } from './enforce.ts';
+export {
+  createEntitlementGate,
+  createUnlicensedDevelopmentGate,
+  type EntitlementGate,
+  type EntitlementCheck,
+} from './enforce.ts';
 export { issueLicense, generateIssuerKeyPair } from './issue.ts';
 export {
   guardWithEntitlement,

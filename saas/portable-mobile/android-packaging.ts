@@ -41,6 +41,7 @@ export interface AndroidPackagingDescriptor {
 
 const PACKAGE_NAME = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/
 const ICON_SIZE = /^(\d+)x\1$/
+const SIGNING_MATERIAL_PATTERN = /BEGIN\s|PRIVATE\s+KEY|keystore|password/i
 
 function required(value: unknown, name: string): string {
   const normalized = String(value ?? '').trim()
@@ -87,7 +88,7 @@ export function createAndroidPackagingDescriptor(input: Omit<AndroidPackagingDes
   if (input.signing.productionKeyConfigured && !input.signing.keyReference) {
     throw new Error('production signing requires an opaque keyReference')
   }
-  if (input.signing.keyReference && /BEGIN |PRIVATE KEY|keystore|password/i.test(input.signing.keyReference)) {
+  if (input.signing.keyReference && SIGNING_MATERIAL_PATTERN.test(input.signing.keyReference)) {
     throw new Error('keyReference must be opaque and must not contain signing material')
   }
   if (input.state === 'play_console_published' && !input.distribution.productionPublished) {

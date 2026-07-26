@@ -27,6 +27,13 @@ const DEFAULT_ALWAYS_ALLOWED: PortableActionClass[] = ['read', 'observe'];
 /** Milliseconds a verdict is reused before the token is re-verified. */
 const VERDICT_TTL_MS = 60_000;
 
+export interface EntitlementCheck {
+  allowed: boolean;
+  verdict: EntitlementVerdict;
+  /** Why it was refused. Empty string when allowed. */
+  reason: string;
+}
+
 export interface EntitlementGate {
   /** Current verdict. Cached briefly so a hot path is not re-verifying constantly. */
   status(): Promise<EntitlementVerdict>;
@@ -35,10 +42,15 @@ export interface EntitlementGate {
    * immediately before the side effect, not at the edge of the process.
    */
   assertEntitled(action: string, actionClass: PortableActionClass, feature?: string): Promise<void>;
-  /** Non-throwing form for call sites that need to branch rather than fail. */
-  check(action: string, actionClass: PortableActionClass, feature?: string): Promise<
-    { allowed: true; verdict: EntitlementVerdict } | { allowed: false; verdict: EntitlementVerdict; reason: string }
-  >;
+  /**
+   * Non-throwing form for call sites that need to branch rather than fail.
+   *
+   * The result is a FLAT shape, not a discriminated union, and `reason` is
+   * always present — empty when the call is allowed. This repository compiles
+   * with strictNullChecks off, where narrowing a union on a boolean discriminant
+   * does not work, so a union here type-errors at every consumer.
+   */
+  check(action: string, actionClass: PortableActionClass, feature?: string): Promise<EntitlementCheck>;
   /** True if the licence names this feature. False when unlicensed. */
   hasFeature(feature: string): Promise<boolean>;
   /** A short, safe line for logs, banners and audit records. Never contains the token. */
@@ -82,23 +94,27 @@ export function createEntitlementGate(config: EntitlementGateConfig): Entitlemen
     return inFlight;
   }
 
-  async function check(action: string, actionClass: PortableActionClass, feature?: string) {
+  async function check(
+    action: string,
+    actionClass: PortableActionClass,
+    feature?: string,
+  ): Promise<EntitlementCheck> {
     const verdict = await status();
 
     if (alwaysAllowed.has(actionClass)) {
-      return { allowed: true as const, verdict };
+      return { allowed: true, verdict, reason: '' };
     }
     if (!verdict.entitled) {
-      return { allowed: false as const, verdict, reason: verdict.reason };
+      return { allowed: false, verdict, reason: verdict.reason };
     }
     if (feature && !(verdict.claims?.features ?? []).includes(feature)) {
       return {
-        allowed: false as const,
+        allowed: false,
         verdict,
         reason: `This deployment's ${verdict.claims?.edition ?? 'current'} licence does not include "${feature}".`,
       };
     }
-    return { allowed: true as const, verdict };
+    return { allowed: true, verdict, reason: '' };
   }
 
   async function assertEntitled(action: string, actionClass: PortableActionClass, feature?: string) {
@@ -152,7 +168,7 @@ export function createUnlicensedDevelopmentGate(productId: string): EntitlementG
       return verdict;
     },
     async check() {
-      return { allowed: true as const, verdict };
+      return { allowed: true, verdict, reason: '' };
     },
     async assertEntitled() {},
     async hasFeature() {

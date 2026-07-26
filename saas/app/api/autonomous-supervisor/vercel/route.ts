@@ -33,6 +33,7 @@ import { dispatchRepairPlan } from '@/agent-gateway-host/supervisor-repair.ts'
 import type { RepairStep } from '@/agent-gateway-host/supervisor-repair.ts'
 import {
   resolveSupervisorRepairAction,
+  resolveSupervisorRepairParams,
   summarizeRepairDispatch,
 } from '@/agent-gateway-host/supervisor-actions.ts'
 import type { RepairDispatchSummary } from '@/agent-gateway-host/supervisor-actions.ts'
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
         policy: GATEWAY_POLICY,
         host: createSignalBoostGatewayHost(),
         resolveAction: resolveSupervisorRepairAction,
+        resolveParams: resolveSupervisorRepairParams,
       })
       repairDispatch = summarizeRepairDispatch(dispatched, repairPlan.length)
     } catch (error: any) {

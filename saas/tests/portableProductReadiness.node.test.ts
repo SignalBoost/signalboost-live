@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry, validatePortableDeploymentAcceptanceEvidence, validatePortableOperationsRecoveryEvidence } from '../lib/portable-products/index.ts'
+import { createPortableBuyerHandoffManifest, createPortableCommercialReadinessReport, createPortableProductReadinessDashboard, portableProductReadinessDashboard, portableProductRegistry, providerHubCommercialEvidenceProfile, validatePortableDeploymentAcceptanceEvidence, validatePortableOperationsRecoveryEvidence } from '../lib/portable-products/index.ts'
 import { readFileSync } from 'node:fs'
 
 test('portable readiness dashboard is frozen, deterministic, and registry-driven', () => {
@@ -30,14 +30,13 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
   assert.notEqual(first, second)
   assert.ok(Object.isFrozen(first) && Object.isFrozen(first.entries))
   assert.ok(providerHub)
-  assert.equal(providerHub.readyCount, 5)
+  assert.equal(providerHub.readyCount, 4)
   assert.equal(providerHub.totalCount, 10)
-  assert.equal(providerHub.completionPercent, 50)
+  assert.equal(providerHub.completionPercent, 40)
   assert.equal(providerHub.commerciallyReady, false)
   assert.deepEqual(providerHub.checks.filter(check => check.status === 'ready').map(check => check.dimension), [
     'architecture',
     'buyer-installation',
-    'operations-recovery',
     'buyer-configuration',
     'support-boundary',
   ])
@@ -46,11 +45,35 @@ test('Provider Hub commercial evidence is explicit, immutable, and honestly inco
     'integrity-manifest',
     'licensing-enforcement',
     'fulfillment-handoff',
+    'operations-recovery',
     'deployment-acceptance',
   ])
+  const recovery = providerHub.checks.find(check => check.dimension === 'operations-recovery')
+  assert.deepEqual(recovery?.blockers, ['missing-operations-recovery-evidence'])
   for (const check of providerHub.checks) {
     assert.ok(Object.isFrozen(check) && Object.isFrozen(check.evidence) && Object.isFrozen(check.blockers))
   }
+})
+
+test('Provider Hub product evidence profile stays fail-closed for external proof', () => {
+  assert.equal(providerHubCommercialEvidenceProfile.productId, 'provider-hub')
+  assert.equal(providerHubCommercialEvidenceProfile.verifiedCount, 4)
+  assert.equal(providerHubCommercialEvidenceProfile.totalCount, 10)
+  assert.equal(providerHubCommercialEvidenceProfile.completionPercent, 40)
+  assert.equal(providerHubCommercialEvidenceProfile.commerciallyReady, false)
+  assert.deepEqual(providerHubCommercialEvidenceProfile.dimensions.filter(dimension => dimension.status === 'verified').map(dimension => dimension.dimension), [
+    'architecture',
+    'buyer-installation',
+    'buyer-configuration',
+    'support-boundary',
+  ])
+  const blocked = providerHubCommercialEvidenceProfile.dimensions.filter(dimension => dimension.status === 'external-evidence-required')
+  assert.ok(blocked.find(dimension => dimension.dimension === 'distribution-package')?.blockers.includes('missing-versioned-release-artifact'))
+  assert.ok(blocked.find(dimension => dimension.dimension === 'integrity-manifest')?.blockers.includes('missing-release-artifact-sha256-and-size'))
+  assert.ok(blocked.find(dimension => dimension.dimension === 'operations-recovery')?.blockers.includes('missing-buyer-backup-infrastructure-and-recovery-rehearsal'))
+  assert.ok(Object.isFrozen(providerHubCommercialEvidenceProfile))
+  assert.ok(Object.isFrozen(providerHubCommercialEvidenceProfile.dimensions))
+  assert.ok(providerHubCommercialEvidenceProfile.dimensions.every(dimension => Object.isFrozen(dimension)))
 })
 
 test('buyer handoff manifest is immutable and fails closed when delivery evidence is incomplete', () => {

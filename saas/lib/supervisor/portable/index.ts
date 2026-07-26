@@ -34,3 +34,9 @@ export {
   type SiemSeverity,
   type SiemAuditSinkConfig,
 } from './siem-audit-sink.ts'
+export {
+  createStaticApproverDirectory,
+  ApproverDirectoryConfigError,
+  APPROVER_CATEGORIES,
+  type StaticApproverDirectoryConfig,
+} from './static-approver-directory.ts'

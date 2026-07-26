@@ -1,0 +1,105 @@
+# .github/workflows/self-healing-acceptance.yml
+#
+# Runs the Self-Healing Supervisor acceptance harness against the platform's own
+# host adapter and produces the evidence record that gates the manifest going
+# live.
+#
+# HOW TO RUN IT: GitHub → Actions → "Self-Healing acceptance" → Run workflow.
+#
+# BEFORE THE FIRST RUN, add two repository secrets under
+# Settings → Secrets and variables → Actions → New repository secret:
+#
+#   OWNER_EMAILS      the address(es) that receive approval requests
+#   RESEND_API_KEY    the same key the platform uses to send mail
+#
+# THIS SENDS REAL EMAIL to the addresses in OWNER_EMAILS. That is deliberate and
+# it is the point of the check: an approval request that nobody receives is the
+# failure mode the harness exists to catch, so stubbing the send would defeat
+# it. Nothing consequential executes — the dangerous step is required to pause.
+#
+# Manual trigger only. This is not something to run on every push.
+
+name: Self-Healing acceptance
+
+on:
+  workflow_dispatch:
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Check the required secrets are present
+        env:
+          OWNER_EMAILS: ${{ secrets.OWNER_EMAILS }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          test -n "${OWNER_EMAILS:-}" || missing="$missing OWNER_EMAILS"
+          test -n "${RESEND_API_KEY:-}" || missing="$missing RESEND_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Add them under Settings → Secrets and variables → Actions." >&2
+            echo "Without them the host adapter cannot be constructed and the run" >&2
+            echo "would fail with an unexplained check failure rather than this message." >&2
+            exit 1
+          fi
+          echo "secrets present"
+
+      - name: Install dependencies
+        working-directory: saas
+        run: npm install --no-audit --no-fund
+
+      - name: Run acceptance against the platform host adapter
+        id: run
+        working-directory: saas
+        env:
+          OWNER_EMAILS: ${{ secrets.OWNER_EMAILS }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          set -euo pipefail
+          # All three risk categories, always. Approver routing is per-category,
+          # so a single-category pass proves exactly one route works.
+          node --experimental-strip-types scripts/run-self-healing-acceptance.mjs \
+            ./self-healing-host/acceptance-entry.ts \
+            --out self-healing-acceptance-record.json
+
+      - name: Put the record in the job summary
+        if: always()
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          {
+            echo "### Self-Healing acceptance"
+            echo ""
+            if [ -f self-healing-acceptance-record.json ]; then
+              echo '```json'
+              cat self-healing-acceptance-record.json
+              echo '```'
+            else
+              echo "No record was written. The run failed before acceptance completed —"
+              echo "read the step log above for the reason."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the acceptance record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-healing-acceptance-record
+          path: saas/self-healing-acceptance-record.json
+          if-no-files-found: warn
+          retention-days: 365
+
+      - name: What a pass means
+        if: success()
+        run: |
+          echo "All categories passed every check against the real host adapter."
+          echo "The record above is the buyer-acceptance evidence for this deployment."
+          echo "Keep it: it is what justifies moving the manifest off preview."

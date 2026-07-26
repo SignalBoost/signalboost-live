@@ -95,6 +95,27 @@ function pickParams(
   return out
 }
 
+/**
+ * The agent's own words, for the person reading the PR.
+ *
+ * These live in the SUMMARY rather than the step payload on purpose. pr-engine fingerprints
+ * a PR by its steps — templateId plus canonical payload — so anything that varies between
+ * runs produces a second PR for the same problem. Model prose varies every time. Keeping it
+ * here means the reader still sees exactly what was proposed, while the payload stays stable
+ * enough to deduplicate.
+ */
+function describedProposal(request: AgentRequest): string[] {
+  const params = request.action.params ?? {}
+  const described = typeof params.describedAction === 'string' ? params.describedAction.trim() : ''
+  const target = typeof params.describedTarget === 'string' ? params.describedTarget.trim() : ''
+  const expected = typeof params.expectedResult === 'string' ? params.expectedResult.trim() : ''
+  const out: string[] = []
+  if (described) out.push(`Proposed: ${described.slice(0, 400)}`)
+  if (target) out.push(`Against: ${target.slice(0, 200)}`)
+  if (expected) out.push(`Expected: ${expected.slice(0, 200)}`)
+  return out
+}
+
 /** Build the cockpit PR for a halted, template-mapped action. Exported for inspection and tests. */
 export function stagedPrFor(
   request: AgentRequest,
@@ -110,6 +131,7 @@ export function stagedPrFor(
       `Governance classified it ${decision.consequenceClass} and HALTED it.`,
       'It has NOT been performed. Approving this PR executes it; closing this PR leaves it undone.',
       `Reason: ${decision.reason}`,
+      ...describedProposal(request),
       `Gateway request id: ${request.requestId}`,
     ].join(' '),
     steps: [{

@@ -1,40 +1,25 @@
 'use client'
 
+import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-
 type LocalizedText = Readonly<Record<SupportedLanguage, string>>
-
 type PreviewProject = Readonly<{
   id: string
   glyph: string
   name: LocalizedText
   description: LocalizedText
   foundation: LocalizedText
+  href?: string
 }>
 
 const TEXT = {
-  heading: {
-    en: 'Strategic projects — preview',
-    es: 'Proyectos estratégicos — vista previa',
-    pt: 'Projetos estratégicos — prévia',
-    pl: 'Projekty strategiczne — podgląd',
-    ru: 'Стратегические проекты — предварительный обзор',
-  },
-  intro: {
-    en: 'Visible roadmap initiatives. Preview only: not a claim of commercial readiness, production execution, or availability for licensing.',
-    es: 'Iniciativas visibles de la hoja de ruta. Solo vista previa: no implica preparación comercial, ejecución en producción ni disponibilidad de licencia.',
-    pt: 'Iniciativas visíveis do roteiro. Apenas prévia: não indica prontidão comercial, execução em produção nem disponibilidade para licenciamento.',
-    pl: 'Widoczne inicjatywy z mapy rozwoju. Tylko podgląd: nie oznacza gotowości handlowej, wykonania produkcyjnego ani dostępności licencji.',
-    ru: 'Видимые инициативы дорожной карты. Только предварительный обзор: это не означает коммерческую готовность, работу в продакшене или доступность лицензирования.',
-  },
-  badge: {
-    en: 'Preview', es: 'Vista previa', pt: 'Prévia', pl: 'Podgląd', ru: 'Предпросмотр',
-  },
-  foundation: {
-    en: 'Foundation', es: 'Base', pt: 'Base', pl: 'Podstawa', ru: 'Основа',
-  },
+  heading: { en: 'Strategic projects — preview', es: 'Proyectos estratégicos — vista previa', pt: 'Projetos estratégicos — prévia', pl: 'Projekty strategiczne — podgląd', ru: 'Стратегические проекты — предварительный обзор' },
+  intro: { en: 'Visible roadmap initiatives. Preview only: not a claim of commercial readiness, production execution, or availability for licensing.', es: 'Iniciativas visibles de la hoja de ruta. Solo vista previa: no implica preparación comercial, ejecución en producción ni disponibilidad de licencia.', pt: 'Iniciativas visíveis do roteiro. Apenas prévia: não indica prontidão comercial, execução em produção nem disponibilidade para licenciamento.', pl: 'Widoczne inicjatywy z mapy rozwoju. Tylko podgląd: nie oznacza gotowości handlowej, wykonania produkcyjnego ani dostępności licencji.', ru: 'Видимые инициативы дорожной карты. Только предварительный обзор: это не означает коммерческую готовность, работу в продакшене или доступность лицензирования.' },
+  badge: { en: 'Preview', es: 'Vista previa', pt: 'Prévia', pl: 'Podgląd', ru: 'Предпросмотр' },
+  foundation: { en: 'Foundation', es: 'Base', pt: 'Base', pl: 'Podstawa', ru: 'Основа' },
+  details: { en: 'Explore real implementation →', es: 'Explorar implementación real →', pt: 'Explorar implementação real →', pl: 'Zobacz rzeczywistą implementację →', ru: 'Открыть реальную реализацию →' },
 } satisfies Record<string, LocalizedText>
 
 const PROJECTS: readonly PreviewProject[] = Object.freeze([
@@ -51,10 +36,10 @@ const PROJECTS: readonly PreviewProject[] = Object.freeze([
     foundation: { en: 'Mission 002 provider framework', es: 'Framework de proveedores de la Misión 002', pt: 'Framework de provedores da Missão 002', pl: 'Framework dostawców Misji 002', ru: 'Фреймворк провайдеров Mission 002' },
   },
   {
-    id: 'governed-socket', glyph: '⌁',
+    id: 'governed-socket', glyph: '⌁', href: '/products/agent-gateway',
     name: { en: 'Governed Socket / Agent Gateway', es: 'Socket Gobernado / Puerta de Agentes', pt: 'Socket Governado / Gateway de Agentes', pl: 'Zarządzane Gniazdo / Brama Agentów', ru: 'Управляемый шлюз агентов' },
-    description: { en: 'Normalizes many agent and tool protocols into one governed request with consistent policy, approval, execution, and audit.', es: 'Normaliza múltiples protocolos en una solicitud gobernada con política, aprobación, ejecución y auditoría coherentes.', pt: 'Normaliza vários protocolos em uma solicitação governada com política, aprovação, execução e auditoria consistentes.', pl: 'Normalizuje wiele protokołów do jednego zarządzanego żądania ze spójną polityką, akceptacją i audytem.', ru: 'Нормализует разные протоколы в единый управляемый запрос с общей политикой, одобрением и аудитом.' },
-    foundation: { en: 'MCP, A2A, MAVLink, ROS 2 and protocol adapter registry', es: 'MCP, A2A, MAVLink, ROS 2 y registro de adaptadores', pt: 'MCP, A2A, MAVLink, ROS 2 e registro de adaptadores', pl: 'MCP, A2A, MAVLink, ROS 2 i rejestr adapterów', ru: 'MCP, A2A, MAVLink, ROS 2 и реестр адаптеров' },
+    description: { en: 'Connect agents, enterprise applications, APIs, automation, robots, and industrial systems through one governed gateway with policy, approvals, runtime coordination, Provider Hub diagnostics, and immutable evidence.', es: 'Conecta agentes, aplicaciones, APIs, automatización, robots y sistemas industriales mediante un gateway gobernado con políticas, aprobaciones, runtime, diagnósticos y evidencia inmutable.', pt: 'Conecte agentes, aplicações, APIs, automação, robôs e sistemas industriais por um gateway governado com políticas, aprovações, runtime, diagnósticos e evidências imutáveis.', pl: 'Łącz agentów, aplikacje, API, automatyzację, roboty i systemy przemysłowe przez jedną zarządzaną bramę z politykami, akceptacją, runtime, diagnostyką i niezmiennymi dowodami.', ru: 'Подключайте агентов, приложения, API, автоматизацию, роботов и промышленные системы через единый управляемый шлюз с политиками, одобрениями, runtime, диагностикой и неизменяемыми доказательствами.' },
+    foundation: { en: 'MCP, A2A, REST/OpenAPI, MQTT, MAVLink, ROS 2, OPC UA, cluster runtime, Provider Hub, runtime health, and governance evidence', es: 'MCP, A2A, REST/OpenAPI, MQTT, MAVLink, ROS 2, OPC UA, runtime de clúster, Provider Hub, salud y evidencia', pt: 'MCP, A2A, REST/OpenAPI, MQTT, MAVLink, ROS 2, OPC UA, runtime de cluster, Provider Hub, saúde e evidências', pl: 'MCP, A2A, REST/OpenAPI, MQTT, MAVLink, ROS 2, OPC UA, runtime klastra, Provider Hub, zdrowie i dowody', ru: 'MCP, A2A, REST/OpenAPI, MQTT, MAVLink, ROS 2, OPC UA, кластерный runtime, Provider Hub, здоровье и доказательства' },
   },
   {
     id: 'enterprise-autonomy-engine', glyph: '◇',
@@ -71,8 +56,8 @@ const PROJECTS: readonly PreviewProject[] = Object.freeze([
   {
     id: 'multi-provider-onboarding', glyph: '＋',
     name: { en: 'Multi-Provider Onboarding', es: 'Incorporación de Múltiples Proveedores', pt: 'Integração de Múltiplos Provedores', pl: 'Wdrażanie Wielu Dostawców', ru: 'Подключение множества провайдеров' },
-    description: { en: 'Four governed paths for every provider: Direct API, COSA PR, Browser Agent, and Manual.', es: 'Cuatro rutas gobernadas para cada proveedor: API directa, PR de COSA, Browser Agent y Manual.', pt: 'Quatro caminhos governados para cada provedor: API direta, PR do COSA, Browser Agent e Manual.', pl: 'Cztery zarządzane ścieżki dla każdego dostawcy: Direct API, COSA PR, Browser Agent i Manual.', ru: 'Четыре управляемых пути для каждого провайдера: Direct API, COSA PR, Browser Agent и Manual.' },
-    foundation: { en: 'Provider-specific templates using the shared Direct API → COSA PR → Browser Agent → Manual philosophy.', es: 'Plantillas específicas por proveedor con la filosofía común API directa → PR de COSA → Browser Agent → Manual.', pt: 'Templates específicos por provedor com a filosofia comum API direta → PR do COSA → Browser Agent → Manual.', pl: 'Szablony specyficzne dla dostawcy oparte na wspólnej filozofii Direct API → COSA PR → Browser Agent → Manual.', ru: 'Шаблоны для конкретных провайдеров с общей моделью Direct API → COSA PR → Browser Agent → Manual.' },
+    description: { en: 'Four governed paths for every provider: Direct configuration, Governed AI infrastructure PR, Browser Agent assistance, and provider-guided configuration.', es: 'Cuatro rutas gobernadas: configuración directa, PR de infraestructura de IA gobernada, asistencia de Browser Agent y configuración guiada por el proveedor.', pt: 'Quatro caminhos governados: configuração direta, PR de infraestrutura de IA governada, assistência do Browser Agent e configuração guiada pelo provedor.', pl: 'Cztery zarządzane ścieżki: konfiguracja bezpośrednia, zarządzany PR infrastruktury AI, pomoc Browser Agent i konfiguracja prowadzona przez dostawcę.', ru: 'Четыре управляемых пути: прямая настройка, управляемый AI infrastructure PR, помощь Browser Agent и настройка по инструкциям провайдера.' },
+    foundation: { en: 'Provider-specific templates using the shared Direct configuration → Governed AI infrastructure PR → Browser Agent assistance → provider-guided configuration model.', es: 'Plantillas específicas con el modelo configuración directa → PR gobernado → Browser Agent → configuración guiada.', pt: 'Templates específicos com o modelo configuração direta → PR governado → Browser Agent → configuração guiada.', pl: 'Szablony oparte na modelu konfiguracja bezpośrednia → zarządzany PR → Browser Agent → konfiguracja prowadzona.', ru: 'Шаблоны по модели прямая настройка → управляемый PR → Browser Agent → настройка по инструкции.' },
   },
   {
     id: 'robotics-protocol-adapters', glyph: '⌖',
@@ -82,9 +67,7 @@ const PROJECTS: readonly PreviewProject[] = Object.freeze([
   },
 ])
 
-function safeLanguage(value: string): SupportedLanguage {
-  return value === 'es' || value === 'pt' || value === 'pl' || value === 'ru' ? value : 'en'
-}
+function safeLanguage(value: string): SupportedLanguage { return value === 'es' || value === 'pt' || value === 'pl' || value === 'ru' ? value : 'en' }
 
 export function PreviewProjects() {
   const { lang } = useI18n()
@@ -92,28 +75,15 @@ export function PreviewProjects() {
 
   return (
     <section className="preview-zone" aria-labelledby="preview-projects-heading">
-      <div className="preview-head">
-        <div>
-          <span className="preview-label" id="preview-projects-heading">{TEXT.heading[language]}</span>
-          <p>{TEXT.intro[language]}</p>
-        </div>
-        <span className="preview-count">{PROJECTS.length} {TEXT.badge[language].toLowerCase()}</span>
-      </div>
+      <div className="preview-head"><div><span className="preview-label" id="preview-projects-heading">{TEXT.heading[language]}</span><p>{TEXT.intro[language]}</p></div><span className="preview-count">{PROJECTS.length} {TEXT.badge[language].toLowerCase()}</span></div>
       <div className="preview-grid">
-        {PROJECTS.map((project) => (
-          <article className="preview-card" key={project.id}>
-            <div className="preview-card-top">
-              <span className="preview-icon" aria-hidden="true">{project.glyph}</span>
-              <span className="preview-badge">{TEXT.badge[language]}</span>
-            </div>
-            <h3>{project.name[language]}</h3>
-            <p>{project.description[language]}</p>
-            <small><b>{TEXT.foundation[language]}:</b> {project.foundation[language]}</small>
-          </article>
-        ))}
+        {PROJECTS.map((project) => {
+          const card = <article className={`preview-card${project.href ? ' preview-card-live' : ''}`}><div className="preview-card-top"><span className="preview-icon" aria-hidden="true">{project.glyph}</span><span className="preview-badge">{TEXT.badge[language]}</span></div><h3>{project.name[language]}</h3><p>{project.description[language]}</p><small><b>{TEXT.foundation[language]}:</b> {project.foundation[language]}</small>{project.href ? <strong className="preview-action">{TEXT.details[language]}</strong> : null}</article>
+          return project.href ? <Link className="preview-link" href={project.href} key={project.id}>{card}</Link> : <div key={project.id}>{card}</div>
+        })}
       </div>
       <style jsx>{`
-        .preview-zone{display:flex;flex-direction:column;gap:10px;padding-top:2px}.preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.preview-head>div{max-width:820px}.preview-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#aeb6ff}.preview-head p{margin:5px 0 0;color:#8f9bb0;font-size:11px;line-height:1.45}.preview-count{display:inline-flex;align-items:center;border:1px solid rgba(139,140,255,.35);background:rgba(98,96,210,.12);color:#c8c9ff;border-radius:999px;padding:5px 10px;font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.preview-card{display:flex;flex-direction:column;gap:6px;min-width:0;padding:14px;border-radius:16px;border:1px dashed rgba(139,140,255,.35);background:linear-gradient(145deg,rgba(24,25,52,.72),rgba(8,10,24,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}.preview-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.preview-icon{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;border:1px solid rgba(139,140,255,.55);color:#b8b9ff;font-size:14px}.preview-badge{border:1px solid currentColor;color:#b7b8ff;border-radius:999px;padding:3px 7px;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.preview-card h3{margin:2px 0 0;color:#f4f4ff;font-size:13.5px}.preview-card p{margin:0;color:#a0a8bc;font-size:11px;line-height:1.4}.preview-card small{margin-top:auto;padding-top:8px;border-top:1px solid rgba(255,255,255,.07);color:#8994aa;font-size:9.5px;line-height:1.4}.preview-card small b{color:#b7b8d6}@media(max-width:560px){.preview-grid{grid-template-columns:1fr}}
+        .preview-zone{display:flex;flex-direction:column;gap:10px;padding-top:2px}.preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.preview-head>div{max-width:820px}.preview-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#aeb6ff}.preview-head p{margin:5px 0 0;color:#8f9bb0;font-size:11px;line-height:1.45}.preview-count{display:inline-flex;align-items:center;border:1px solid rgba(139,140,255,.35);background:rgba(98,96,210,.12);color:#c8c9ff;border-radius:999px;padding:5px 10px;font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.preview-link{display:block;color:inherit;text-decoration:none}.preview-card{display:flex;flex-direction:column;gap:6px;min-width:0;height:100%;padding:14px;border-radius:16px;border:1px dashed rgba(139,140,255,.35);background:linear-gradient(145deg,rgba(24,25,52,.72),rgba(8,10,24,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}.preview-card-live{border-style:solid;border-color:rgba(34,211,238,.42);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.preview-card-live:hover{transform:translateY(-2px);border-color:rgba(34,211,238,.85);box-shadow:0 14px 38px rgba(8,145,178,.16),inset 0 1px 0 rgba(255,255,255,.05)}.preview-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.preview-icon{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;border:1px solid rgba(139,140,255,.55);color:#b8b9ff;font-size:14px}.preview-badge{border:1px solid currentColor;color:#b7b8ff;border-radius:999px;padding:3px 7px;font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.preview-card h3{margin:2px 0 0;color:#f4f4ff;font-size:13.5px}.preview-card p{margin:0;color:#a0a8bc;font-size:11px;line-height:1.4}.preview-card small{margin-top:auto;padding-top:8px;border-top:1px solid rgba(255,255,255,.07);color:#8994aa;font-size:9.5px;line-height:1.4}.preview-card small b{color:#b7b8d6}.preview-action{padding-top:3px;color:#8be9f6;font-size:10px;letter-spacing:.02em}@media(max-width:560px){.preview-grid{grid-template-columns:1fr}}
       `}</style>
     </section>
   )

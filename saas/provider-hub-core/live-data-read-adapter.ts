@@ -35,6 +35,13 @@ export interface ProviderLiveDataReadAdapterOptions {
   readonly now: () => string
 }
 
+export interface ProviderLiveDataReadExecution {
+  readonly executionMode: Exclude<ProviderLiveDataExecutionMode, 'production'>
+  readonly transportInvoked: true
+  readonly method: 'GET'
+  readonly evidence: ProviderLiveDataReadEvidence
+}
+
 const CREDENTIAL_SHAPE = /(api[_-]?key|access[_-]?token|password|secret|bearer|private[_-]?key)/i
 const SAFE_PATH = /^\/[a-zA-Z0-9._~!$&'()*+,;=:@%/-]*$/
 
@@ -57,10 +64,17 @@ function normalizeOriginAndUrl(raw: string): { origin: string; url: string } {
   return { origin: url.origin, url: url.toString() }
 }
 
+function execution(
+  mode: Exclude<ProviderLiveDataExecutionMode, 'production'>,
+  evidence: ProviderLiveDataReadEvidence,
+): ProviderLiveDataReadExecution {
+  return Object.freeze({ executionMode: mode, transportInvoked: true, method: 'GET', evidence })
+}
+
 export async function executeProviderLiveDataRead(
   request: ProviderLiveDataReadRequest,
   options: ProviderLiveDataReadAdapterOptions,
-): Promise<ProviderLiveDataReadEvidence> {
+): Promise<ProviderLiveDataReadExecution> {
   if (options.executionMode === 'production') throw new Error('production-live-data-read-disabled')
 
   const timeoutMs = positiveInteger(request.timeoutMs)
@@ -77,7 +91,7 @@ export async function executeProviderLiveDataRead(
   try {
     response = await options.transport.get(Object.freeze({ url: source.url, timeoutMs }))
   } catch {
-    return createProviderLiveDataReadEvidence({
+    return execution(options.executionMode, createProviderLiveDataReadEvidence({
       ...request,
       method: 'GET',
       sourceOrigin: source.origin,
@@ -89,7 +103,7 @@ export async function executeProviderLiveDataRead(
       etag: null,
       rateLimit: null,
       failureCode: 'transport_failure',
-    })
+    }))
   }
 
   const body = String(response.body ?? '')
@@ -103,7 +117,7 @@ export async function executeProviderLiveDataRead(
   }
   const successful = response.status >= 200 && response.status < 300
 
-  return createProviderLiveDataReadEvidence({
+  return execution(options.executionMode, createProviderLiveDataReadEvidence({
     tenantId: request.tenantId,
     environmentId: request.environmentId,
     connectionId: request.connectionId,
@@ -119,5 +133,5 @@ export async function executeProviderLiveDataRead(
     etag: headers.etag ?? null,
     rateLimit,
     failureCode: successful ? null : 'provider_read_failed',
-  })
+  }))
 }

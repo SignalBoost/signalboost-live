@@ -9,6 +9,7 @@ export { createPortableProductReadinessDashboard, portableProductReadinessDashbo
 export { createPortableArchitectureClosureReport, portableArchitectureClosureReport, portableArchitectureClosureSchemaVersion } from './architecture-closure.ts'
 export { commercialReadinessDimensions, createPortableCommercialReadinessReport, portableCommercialReadinessReport, portableCommercialReadinessSchemaVersion } from './commercial-readiness.ts'
 export { portablePackageManifestSchemaVersion, validatePortablePackageManifest } from './package-manifest.ts'
+export { createPortableBuyerHandoffManifest, portableBuyerHandoffManifestSchemaVersion } from './buyer-handoff-manifest.ts'
 export type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 export type { PortableProductCategory, PortableProductDescriptor, PortableProductImplementationClassification, PortableProductImplementationStatus, PortableProductStatus } from './product-types.ts'
 export type { PortableGraphEdge, PortableGraphEdgeType, PortableGraphNode, PortableGraphNodeType, PortableProductDependencyGraph } from './dependency-graph.ts'
@@ -16,3 +17,4 @@ export type { PortableProductReadiness, PortableProductReadinessDashboard, Porta
 export type { PortableArchitectureClosureReport, PortableArchitectureEntry, PortableArchitectureState } from './architecture-closure.ts'
 export type { PortableCommercialReadinessCheck, PortableCommercialReadinessDimension, PortableCommercialReadinessEntry, PortableCommercialReadinessReport, PortableCommercialReadinessStatus } from './commercial-readiness.ts'
 export type { PortablePackageManifestBlocker } from './package-manifest.ts'
+export type { PortableBuyerHandoffArtifact, PortableBuyerHandoffArtifactKind, PortableBuyerHandoffManifest, PortableBuyerHandoffManifestInput } from './buyer-handoff-manifest.ts'

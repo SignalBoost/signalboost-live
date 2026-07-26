@@ -1,5 +1,8 @@
 'use client'
 
+
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 
@@ -54,7 +57,7 @@ export default function ProtocolCapabilityCatalogClient({ labels }: { labels: Pr
   const freshnessLabel = freshness === 'fresh' ? labels.freshSnapshot : freshness === 'stale' ? labels.staleSnapshot : labels.invalidSnapshot
 
   return <main style={page} aria-labelledby="protocol-catalog-title" aria-busy={!snapshot && !error}>
-    <header style={{ display:'grid', gap:8 }}><div style={eyebrow}>Agent Gateway</div><h1 id="protocol-catalog-title" style={{ margin:0 }}>{labels.title}</h1><p style={muted}>{labels.subtitle}</p></header>
+    <header style={{ display:'grid', gap:8 }}><div style={eyebrow}><LocalizedText fallback={"Agent Gateway"} /></div><h1 id="protocol-catalog-title" style={{ margin:0 }}>{labels.title}</h1><p style={muted}>{labels.subtitle}</p></header>
     {error && <div role="alert" style={errorCard}>{error}</div>}
     {!snapshot && !error && <p role="status" aria-live="polite" style={muted}>{labels.loading}</p>}
     {snapshot && <>

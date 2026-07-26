@@ -24,9 +24,7 @@ export interface ProviderLiveDataReadTransport {
   get(input: Readonly<{ url: string; timeoutMs: number }>): Promise<ProviderLiveDataTransportResponse>
 }
 
-export interface ProviderLiveDataDigestPort {
-  sha256(value: string): Promise<string>
-}
+export interface ProviderLiveDataDigestPort { sha256(value: string): Promise<string> }
 
 export interface ProviderLiveDataReadAdapterOptions {
   readonly executionMode: ProviderLiveDataExecutionMode
@@ -50,8 +48,7 @@ function positiveInteger(value: unknown): number | null {
 }
 
 function parseNonNegativeInteger(value: string | undefined): number | null {
-  if (value == null || value.trim() === '') return null
-  if (!/^\d+$/.test(value.trim())) return null
+  if (value == null || value.trim() === '' || !/^\d+$/.test(value.trim())) return null
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) ? parsed : null
 }
@@ -64,10 +61,7 @@ function normalizeOriginAndUrl(raw: string): { origin: string; url: string } {
   return { origin: url.origin, url: url.toString() }
 }
 
-function execution(
-  mode: Exclude<ProviderLiveDataExecutionMode, 'production'>,
-  evidence: ProviderLiveDataReadEvidence,
-): ProviderLiveDataReadExecution {
+function execution(mode: Exclude<ProviderLiveDataExecutionMode, 'production'>, evidence: ProviderLiveDataReadEvidence): ProviderLiveDataReadExecution {
   return Object.freeze({ executionMode: mode, transportInvoked: true, method: 'GET', evidence })
 }
 
@@ -76,13 +70,10 @@ export async function executeProviderLiveDataRead(
   options: ProviderLiveDataReadAdapterOptions,
 ): Promise<ProviderLiveDataReadExecution> {
   if (options.executionMode === 'production') throw new Error('production-live-data-read-disabled')
-
   const timeoutMs = positiveInteger(request.timeoutMs)
   if (timeoutMs === null || timeoutMs > 30_000) throw new Error('invalid-timeout')
-
   const observedAt = new Date(request.observedAt)
   if (!Number.isFinite(observedAt.getTime())) throw new Error('invalid-observed-at')
-
   const source = normalizeOriginAndUrl(request.sourceUrl)
   const fetchedAt = new Date(options.now())
   if (!Number.isFinite(fetchedAt.getTime())) throw new Error('invalid-clock')
@@ -92,7 +83,11 @@ export async function executeProviderLiveDataRead(
     response = await options.transport.get(Object.freeze({ url: source.url, timeoutMs }))
   } catch {
     return execution(options.executionMode, createProviderLiveDataReadEvidence({
-      ...request,
+      tenantId: request.tenantId,
+      environmentId: request.environmentId,
+      connectionId: request.connectionId,
+      providerId: request.providerId,
+      capability: request.capability,
       method: 'GET',
       sourceOrigin: source.origin,
       fetchedAt: fetchedAt.toISOString(),
@@ -107,16 +102,8 @@ export async function executeProviderLiveDataRead(
   }
 
   const body = String(response.body ?? '')
-  const digest = await options.digest.sha256(body)
   const headers = response.headers ?? {}
-  const resultCount = parseNonNegativeInteger(headers['x-result-count']) ?? (response.status >= 200 && response.status < 300 ? 1 : 0)
-  const rateLimit = {
-    limit: parseNonNegativeInteger(headers['x-ratelimit-limit']),
-    remaining: parseNonNegativeInteger(headers['x-ratelimit-remaining']),
-    resetAt: headers['x-ratelimit-reset-at'] ?? null,
-  }
   const successful = response.status >= 200 && response.status < 300
-
   return execution(options.executionMode, createProviderLiveDataReadEvidence({
     tenantId: request.tenantId,
     environmentId: request.environmentId,
@@ -128,10 +115,14 @@ export async function executeProviderLiveDataRead(
     fetchedAt: fetchedAt.toISOString(),
     observedAt: observedAt.toISOString(),
     httpStatus: response.status,
-    resultCount,
-    dataSha256: digest,
+    resultCount: parseNonNegativeInteger(headers['x-result-count']) ?? (successful ? 1 : 0),
+    dataSha256: await options.digest.sha256(body),
     etag: headers.etag ?? null,
-    rateLimit,
+    rateLimit: {
+      limit: parseNonNegativeInteger(headers['x-ratelimit-limit']),
+      remaining: parseNonNegativeInteger(headers['x-ratelimit-remaining']),
+      resetAt: headers['x-ratelimit-reset-at'] ?? null,
+    },
     failureCode: successful ? null : 'provider_read_failed',
   }))
 }

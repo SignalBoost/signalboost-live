@@ -63,7 +63,6 @@ function hostWithCapturedStaging() {
 const POLICY: GovernancePolicy = { classifier: defaultConsequenceClassifier, allowlist: [] }
 
 test('the resolver never turns model prose into an executable target', () => {
-  // Prose only ever SELECTS among a closed set of constants; it is never used as a target.
   const step = planStep({ action: 'rm -rf everything and wire $50,000', target: 'anything at all' })
   const resolved = resolveSupervisorRepairAction(step, INCIDENT)
   assert.ok(
@@ -92,7 +91,6 @@ test('the diagnosis names the VARIABLE and ENVIRONMENT — and never a value', (
   const params = resolveSupervisorRepairParams(step, INCIDENT)
   assert.equal(params.identifiedVariable, 'SUPABASE_SERVICE_ROLE_KEY')
   assert.equal(params.identifiedEnvironment, 'production')
-  // Nothing resembling the value is carried, and no extra keys appear.
   assert.deepEqual(Object.keys(params).sort(), ['identifiedEnvironment', 'identifiedVariable'])
   assert.ok(!JSON.stringify(params).includes('sk-do-not-copy-this'))
 })
@@ -121,20 +119,14 @@ test('a proposed repair halts and is staged as a read-only cockpit PR', async ()
   assert.equal(result.results[0].outcome.verdict, 'halt_for_approval')
   assert.equal(result.results[0].outcome.ok, false)
   assert.equal(result.results[0].outcome.approvalId, 'pr_1')
-
   assert.equal(staged.length, 1)
   assert.equal(staged[0].steps.length, 1)
-  // A named variable routes to the environment evidence action, not the generic review.
   assert.equal(staged[0].steps[0].templateId, 'vercel.view_env')
   assert.equal(staged[0].steps[0].provider, 'vercel')
-  // The diagnosis identified the variable, and it reaches the person reading the PR.
   assert.equal(staged[0].steps[0].payload.identifiedVariable, 'SUPABASE_SERVICE_ROLE_KEY')
-  // The diagnosis's own words reach the person reviewing the PR.
-  assert.equal(
-    staged[0].steps[0].payload.describedAction,
-    'Restore the missing SUPABASE_SERVICE_ROLE_KEY value in production.',
-  )
+  assert.match(staged[0].summary, /Restore the missing SUPABASE_SERVICE_ROLE_KEY value in production/)
   assert.equal(staged[0].steps[0].payload.incidentId, INCIDENT.incident_id)
+  assert.equal(staged[0].steps[0].payload.describedAction, undefined, 'prose must stay out of the fingerprinted payload')
 })
 
 test('a step the diagnosis marked as needing approval still reaches the cockpit', async () => {
@@ -169,8 +161,6 @@ test('every mapped target stages a template that is read-only AND has a real han
   assert.deepEqual(targets, [
     PROPOSED_REPAIR_TARGET, UNRECOGNIZED_TARGET, INSPECT_VERCEL_ENV_TARGET, INSPECT_DATABASE_TARGET, INSPECT_VAULT_TARGET,
   ].sort())
-  // Each of these is implemented in the hub action route and requires no fields, so merging
-  // one genuinely runs instead of dying.
   const executable = new Set(['vercel.view_env', 'supabase.list_tables', 'vault.view_keys'])
   for (const action of SUPERVISOR_REPAIR_ACTIONS) {
     assert.equal(action.actionKind, 'supervisor_repair')
@@ -179,7 +169,6 @@ test('every mapped target stages a template that is read-only AND has a real han
 })
 
 test('the proposed-repair target can never execute: it is not classified reversible', async () => {
-  // Even if someone were to add it to an allowlist, Gate 1 halts an unknown class first.
   const request = repairStepToRequest(INCIDENT, planStep(), PROPOSED_REPAIR_TARGET, 'autonomous-supervisor')
   const outcome = await runGoverned(
     request,
@@ -241,4 +230,33 @@ test('an empty repair plan is reported honestly, not as a repair', () => {
   const summary = summarizeRepairDispatch({ completed: true, results: [] }, 0)
   assert.equal(summary.mode, 'not_required')
   assert.equal(summary.prIds.length, 0)
+})
+
+
+test('DEDUPE: the same root cause twice produces an IDENTICAL staged payload', async () => {
+  const runOnce = async (prose: string) => {
+    const { staged } = hostWithCapturedStaging()
+    const host = hostWithCapturedStaging()
+    const result = await dispatchRepairPlan({
+      incident: INCIDENT,
+      repairPlan: [planStep({ action: prose, expected_result: `${prose} — attempt` })],
+      policy: POLICY,
+      host: host.host,
+      resolveAction: resolveSupervisorRepairAction,
+      resolveParams: resolveSupervisorRepairParams,
+    })
+    assert.equal(result.completed, false)
+    return host.staged[0]
+  }
+
+  const first = await runOnce('Restore the missing SUPABASE_SERVICE_ROLE_KEY value in production.')
+  const second = await runOnce('Set SUPABASE_SERVICE_ROLE_KEY in the production environment.')
+
+  assert.deepEqual(
+    first.steps[0].payload,
+    second.steps[0].payload,
+    'payloads differ, so pr-engine would stage two PRs for one root cause',
+  )
+  assert.equal(first.steps[0].templateId, second.steps[0].templateId)
+  assert.notEqual(first.summary, second.summary)
 })

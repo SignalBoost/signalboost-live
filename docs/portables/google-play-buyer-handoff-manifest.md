@@ -4,7 +4,7 @@ SignalBoost validates metadata for a human-controlled buyer handoff after the An
 
 ## Required prerequisite
 
-The supplied packaging report must use `signalboost-android-packaging-evidence-chain-v1`, have state `packaging_evidence_chain_validated`, contain no blockers, and preserve read-only safety flags.
+The supplied packaging report must use `signalboost-android-packaging-evidence-chain-v1`, have state `packaging_evidence_chain_validated`, contain no blockers, include the canonical six packaging phases, preserve valid commit, digest, and release identities, and retain read-only safety flags.
 
 ## External responsibilities
 

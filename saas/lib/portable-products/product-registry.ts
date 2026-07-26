@@ -18,7 +18,7 @@ export const portableProductRegistry = Object.freeze([
   product(controlCenterManifest, { localizationKey: 'console', glyph: '◈', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 40 }),
   product(marketingSalesManifest, { localizationKey: 'marketingSales', glyph: '◎', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 50 }),
   product(pressMediaManifest, { localizationKey: 'press', glyph: '◉', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 60 }),
-  product(portableChiefOfStaffManifest, { localizationKey: 'chiefOfStaff', glyph: '❖', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 70 }),
+  product(portableChiefOfStaffManifest, { localizationKey: 'chiefOfStaff', glyph: '❖', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 70, route: '/dashboard/cos-mining' }),
   product(browserAgentEcosystemManifest, { localizationKey: 'browserAgents', glyph: '◇', implementationStatus: 'descriptor_only', implementationClassification: 'descriptor_only_compatibility_target', sortOrder: 80 }),
   product(agentOperationsPlatformManifest, { localizationKey: 'agentOperations', glyph: '⌁', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 90 }),
   product(selfHealingSupervisorManifest, { localizationKey: 'selfHealing', glyph: '⟲', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 100 }),

@@ -39,6 +39,20 @@ test('Provider Hub is architecture-complete while commercial maturity remains pr
   assert.equal(descriptor?.route, '/dashboard/provider-hub')
 })
 
+test('Portable COS is architecture-complete while licensing remains disabled', () => {
+  const report = createPortableArchitectureClosureReport()
+  const cos = report.entries.find(entry => entry.productId === 'portable-ai-chief-of-staff')
+  const descriptor = portableProductRegistry.find(entry => entry.manifest.productId === 'portable-ai-chief-of-staff')
+  assert.equal(cos?.state, 'complete')
+  assert.deepEqual(cos?.blockers, [])
+  assert.equal(cos?.coreBoundary, 'saas/lib/cos')
+  assert.equal(cos?.hostBoundary, 'saas/lib/cos/host.ts')
+  assert.equal(descriptor?.implementationStatus, 'implemented')
+  assert.equal(descriptor?.manifest.status, 'preview')
+  assert.equal(descriptor?.manifest.licensingAvailable, false)
+  assert.equal(descriptor?.route, '/dashboard/cos-mining')
+})
+
 test('preview and descriptor products remain fail-closed', () => {
   const report = createPortableArchitectureClosureReport()
   const browserAgents = report.entries.find(entry => entry.productId === 'browser-agent-ecosystem')

@@ -29,6 +29,7 @@ import './androidPlayConsoleReleaseEvidence.node.test.ts'
 import './androidPublicationEvidence.node.test.ts'
 import './androidProductionPublicationEvidence.node.test.ts'
 import './androidPackagingEvidenceChain.node.test.ts'
+import './androidBuyerHandoffManifest.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 

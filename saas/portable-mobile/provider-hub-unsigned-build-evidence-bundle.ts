@@ -4,7 +4,7 @@ export const PROVIDER_HUB_UNSIGNED_BUILD_EVIDENCE_BUNDLE_SCHEMA_VERSION = 'signa
 
 const SHA40 = /^[0-9a-f]{40}$/
 const SHA256 = /^[0-9a-f]{64}$/
-const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+\.aab$/
+const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._\/-]+\.aab$/
 const SAFE_VALUE = /^(?!.*(?:password|secret|token|credential|private[_ -]?key|bearer\s|@|\.\.))[A-Za-z0-9._:/+-]+$/i
 const EXPECTED_KEYS = ['assetDigests', 'buildLogDigest', 'buildPlanSchemaVersion', 'dependencyLockDigest', 'dependencyReview', 'evidence', 'lintPassed', 'packageName', 'productionExecutionEnabled', 'provenanceSchemaVersion', 'repositories', 'scaffoldSchemaVersion', 'signingEnabled', 'sourceCommitSha', 'testsPassed', 'toolchain', 'unsignedAabPath', 'unsignedAabSha256', 'uploadEnabled', 'publicationEnabled'] as const
 const ASSET_KEYS = ['assetLinksTemplate', 'icon', 'manifest', 'maskableIcon', 'offlinePage', 'serviceWorker'] as const
@@ -79,7 +79,7 @@ export function createProviderHubUnsignedBuildEvidenceBundle(inputValue: unknown
   const evidence = input.evidence && typeof input.evidence === 'object' ? input.evidence as Record<string, unknown> : {}
   const evidenceKeys = Object.keys(evidence)
   if (evidenceKeys.length === 0 || new Set(evidenceKeys).size !== evidenceKeys.length || evidenceKeys.some(key => !SAFE_VALUE.test(key) || typeof evidence[key] !== 'string' || !SHA256.test(evidence[key] as string))) blockers.push('evidence-index')
-  if (canonical(input).match(/password|secret|credential|private[_ -]?key|bearer\s/i)) blockers.push('credential-shaped-value')
+  if (canonical(input).match(/password|secret|token|credential|private[_ -]?key|bearer\s/i)) blockers.push('credential-shaped-value')
   if (input.signingEnabled !== false || input.uploadEnabled !== false || input.publicationEnabled !== false || input.productionExecutionEnabled !== false) blockers.push('unsafe-state')
 
   const sorted = Object.freeze([...new Set(blockers)].sort())

@@ -1,3 +1,4 @@
+// saas/tests/browserlessAdapter.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { BrowserSessionPort } from '../lib/browser-runtime/contracts.ts'
@@ -71,7 +72,7 @@ test('Browserless factory rejects external targets and execute_change before cre
 
   await assert.rejects(
     factory.open({ ...launchRequest, allowedOrigins: ['https://github.com'] }),
-    /browserless_external_origin_rejected/,
+    /browserless_origin_rejected/,
   )
   await assert.rejects(
     factory.open({ ...launchRequest, mode: 'execute_change' }),
@@ -122,5 +123,9 @@ test('Browserless configuration rejects credential-bearing, non-wss, and unsuppo
   assert.equal(validateBrowserlessAdapterConfiguration({ ...base, endpoint: 'wss://production-sfo.browserless.io/chromium?token=literal' }), false)
   assert.equal(validateBrowserlessAdapterConfiguration({ ...base, endpoint: 'wss://user:pass@production-sfo.browserless.io/chromium' }), false)
   assert.equal(validateBrowserlessAdapterConfiguration({ ...base, endpoint: 'wss://production-sfo.browserless.io/unsupported' }), false)
-  assert.equal(validateBrowserlessAdapterConfiguration({ ...base, endpoint: 'wss://production-sfo.browserless.io/chromium', approvedOrigins: ['https://example.com'] }), false)
+  // A buyer production origin is VALID now — the allowlist is the cage, not localhost.
+  // What must still fail closed is a downgraded or malformed origin.
+  assert.equal(validateBrowserlessAdapterConfiguration({ ...base, endpoint: 'wss://production-sfo.browserless.io/chromium', approvedOrigins: ['https://example.com'] }), true)
+  assert.equal(validateBrowserlessAdapterConfiguration({ ...base, approvedOrigins: ['http://app.acme.com'] }), false)
+  assert.equal(validateBrowserlessAdapterConfiguration({ ...base, approvedOrigins: ['https://acme.com/app'] }), false)
 })

@@ -1,3 +1,4 @@
+// saas/portable-mobile/provider-hub.android.ts
 import { createAndroidPackagingDescriptor } from './android-packaging.ts'
 
 export const providerHubAndroidPackaging = createAndroidPackagingDescriptor({
@@ -9,10 +10,10 @@ export const providerHubAndroidPackaging = createAndroidPackagingDescriptor({
   displayMode: 'standalone',
   orientation: 'any',
   icons: [
-    { src: '/icons/provider-hub-192.png', sizes: '192x192', purpose: 'any' },
-    { src: '/icons/provider-hub-512-maskable.png', sizes: '512x512', purpose: 'maskable' },
+    { src: '/icons/provider-hub-192.svg', sizes: '192x192', purpose: 'any' },
+    { src: '/icons/provider-hub-512-maskable.svg', sizes: '512x512', purpose: 'maskable' },
   ],
-  state: 'metadata_ready',
+  state: 'build_ready',
   signing: { productionKeyConfigured: false },
   distribution: {
     playConsoleAppCreated: false,
@@ -20,7 +21,8 @@ export const providerHubAndroidPackaging = createAndroidPackagingDescriptor({
     productionPublished: false,
   },
   notices: [
-    'Packaging metadata only',
+    'Build-readiness assets and validation only',
+    'Digital Asset Links fingerprint remains a release-owner substitution',
     'No Android bundle has been generated or signed',
     'No Play Console publication has occurred',
     'Authenticated web functionality remains the source of truth',

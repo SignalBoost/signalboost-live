@@ -80,14 +80,19 @@ export function createProviderLiveDataReadEvidence(input: Record<string, unknown
   const dataSha256 = text(input.dataSha256).toLowerCase()
   if (!SHA256.test(dataSha256)) blockers.add('invalid-data-sha256')
 
-  const etag = input.etag == null ? null : text(input.etag)
-  if (etag && (etag.length > 256 || CREDENTIAL_SHAPE.test(etag))) blockers.add('invalid-etag')
+  const rawEtag = input.etag == null ? null : text(input.etag)
+  const etagUnsafe = Boolean(rawEtag && (rawEtag.length > 256 || CREDENTIAL_SHAPE.test(rawEtag)))
+  if (etagUnsafe) blockers.add('invalid-etag')
+  const etag = etagUnsafe ? null : rawEtag
   const failureCode = input.failureCode == null ? null : text(input.failureCode)
   if (failureCode && !SAFE_FAILURE.test(failureCode)) blockers.add('invalid-failure-code')
   if (httpStatus !== null && httpStatus >= 200 && httpStatus < 300 && failureCode) blockers.add('success-cannot-have-failure-code')
   if (httpStatus !== null && (httpStatus < 200 || httpStatus >= 300) && !failureCode) blockers.add('failure-code-required')
 
-  const rawRate = input.rateLimit && typeof input.rateLimit === 'object' ? input.rateLimit as Record<string, unknown> : {}
+  const rateLimitPresent = Object.prototype.hasOwnProperty.call(input, 'rateLimit') && input.rateLimit != null
+  const rateLimitValidContainer = !rateLimitPresent || (typeof input.rateLimit === 'object' && !Array.isArray(input.rateLimit))
+  if (!rateLimitValidContainer) blockers.add('invalid-rate-limit-container')
+  const rawRate = rateLimitValidContainer && input.rateLimit ? input.rateLimit as Record<string, unknown> : {}
   for (const key of Object.keys(rawRate)) if (!['limit','remaining','resetAt'].includes(key)) blockers.add(`unknown-rate-limit-key:${key}`)
   const limit = rawRate.limit == null ? null : integer(rawRate.limit)
   const remaining = rawRate.remaining == null ? null : integer(rawRate.remaining)

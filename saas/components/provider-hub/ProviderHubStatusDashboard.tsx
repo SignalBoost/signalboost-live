@@ -1,5 +1,8 @@
 'use client'
 
+
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react'
 
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -95,7 +98,7 @@ export default function ProviderHubStatusDashboard({ endpoint, title }: { endpoi
 
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: '32px 20px' }}>
-      <header style={{ marginBottom: 24 }}><p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Provider Hub</p><h1 style={{ margin: '8px 0' }}>{title || text.title}</h1><p>{text.notice}</p></header>
+      <header style={{ marginBottom: 24 }}><p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}><LocalizedText fallback={"Provider Hub"} /></p><h1 style={{ margin: '8px 0' }}>{title || text.title}</h1><p>{text.notice}</p></header>
       {error ? <section role="alert"><h2>{text.unavailable}</h2><p>{errorLabel}</p></section> : null}
       {!error && !surface ? <p>{text.loading}</p> : null}
       {surface ? <section aria-label={text.section} style={{ display: 'grid', gap: 16 }}>

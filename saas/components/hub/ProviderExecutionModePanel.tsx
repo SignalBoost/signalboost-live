@@ -1,5 +1,8 @@
 'use client'
 
+
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
@@ -142,12 +145,8 @@ export default function ProviderExecutionModePanel({
   return (
     <section aria-label="Provider execution mode" style={{ display: 'grid', gap: 10 }}>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}>
-          Execution path
-        </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}>
-          Only reviewed and implemented paths are shown.
-        </div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}><LocalizedText fallback={"Execution path"} /></div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}><LocalizedText fallback={"Only reviewed and implemented paths are shown."} /></div>
       </div>
 
       {capabilityLoading && (

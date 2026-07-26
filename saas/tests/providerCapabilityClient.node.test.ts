@@ -1,10 +1,11 @@
+// saas/tests/providerCapabilityClient.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
   discoverReviewedProviderCapabilities,
   normalizeProviderCapabilityResponse,
-} from '../lib/hub/provider-capability-client'
+} from '../lib/hub/provider-capability-client.ts'
 
 test('normalizes only reviewed available execution modes', () => {
   const normalized = normalizeProviderCapabilityResponse({

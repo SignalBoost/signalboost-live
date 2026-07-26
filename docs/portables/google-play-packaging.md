@@ -2,7 +2,7 @@
 
 ## Current status
 
-This repository currently provides versioned Android packaging-readiness metadata and validation only. It does not contain a generated APK or Android App Bundle, a production signing key, a Play Console application, or evidence of store publication.
+This repository provides versioned Android packaging metadata, build-readiness assets, and validation for the Provider Hub portable. It does not contain a generated APK or Android App Bundle, a production signing key, a Play Console application, or evidence of store publication.
 
 ## Supported shell choices
 
@@ -14,7 +14,7 @@ The descriptor records the intended shell but does not invoke Bubblewrap, Gradle
 ## Readiness states
 
 1. `metadata_ready` — deterministic packaging metadata exists and passes repository validation.
-2. `build_ready` — required web assets, verified launch behavior, Android project configuration, and repeatable build instructions have been validated.
+2. `build_ready` — required web assets and bounded launch/failure behavior have been validated in the repository.
 3. `signed_bundle_ready` — an AAB has been produced with an approved production signing process and the evidence has been retained outside source control.
 4. `play_console_published` — Play Console publication has been completed and verified.
 
@@ -33,11 +33,20 @@ Each portable descriptor must include:
 - explicit signing and distribution evidence flags;
 - visible notices describing what has not been built, signed, or published.
 
-## Provider Hub reference descriptor
+## Provider Hub build-ready evidence
 
-`saas/portable-mobile/provider-hub.android.ts` describes a future TWA package for the authenticated Provider Hub dashboard at `/dashboard/provider-hub`. It is intentionally marked `metadata_ready`.
+`saas/portable-mobile/provider-hub.android.ts` describes the TWA package for the authenticated Provider Hub dashboard at `/dashboard/provider-hub` and is marked `build_ready`.
 
-The referenced icon paths are packaging requirements, not evidence that final store assets have been designed or approved. A later phase must add verified icon files, a web manifest, service-worker behavior, Digital Asset Links, offline/failure behavior, privacy disclosures, and authenticated-launch testing before moving to `build_ready`.
+The bounded repository evidence includes:
+
+- `saas/public/provider-hub.webmanifest`;
+- repository-owned standard and maskable SVG icons;
+- `saas/public/provider-hub-sw.js` with navigation-only failure handling;
+- `saas/public/provider-hub-offline.html` with an explicit no-action failure message;
+- a credential-free Digital Asset Links template at `saas/public/.well-known/assetlinks.template.json`;
+- deterministic tests for authenticated launch, unauthenticated redirect, network failure, offline failure, Android back navigation, asset presence, and non-production boundaries.
+
+The Digital Asset Links file remains a template. The release owner must replace the placeholder with the approved Play App Signing SHA-256 certificate fingerprint during a controlled release process. No fingerprint, signing material, or credential is committed.
 
 ## Production responsibilities
 
@@ -45,11 +54,11 @@ The release owner must provide and verify:
 
 - Play Console developer account and organization ownership;
 - unique package-name availability;
-- final app name, icons, screenshots, feature graphic, descriptions, category, contact details, and privacy-policy URL;
+- final screenshots, feature graphic, descriptions, category, contact details, and privacy-policy URL;
 - content rating, Data Safety form, target audience, advertising declarations, and account-deletion requirements;
 - approved production keystore custody or Play App Signing enrollment;
 - repeatable build provenance and dependency review;
-- internal, closed, or open testing evidence;
+- internal, closed, or open testing evidence on representative Android devices;
 - authentication, deep-link, network-loss, back-button, accessibility, and device compatibility testing;
 - store-review responses and final publication evidence.
 
@@ -57,4 +66,4 @@ No signing material, passwords, service-account credentials, or Play Console tok
 
 ## Next bounded phase
 
-The next implementation slice should add build-readiness assets and validation for one portable only: web manifest, final icon files, Digital Asset Links template, installability checks, and authenticated launch/failure tests. It must still stop before production signing or store mutation.
+The next slice may validate a repeatable unsigned TWA project build from these assets and retain build provenance. It must still stop before production signing, Play Console upload, rollout, or publication.

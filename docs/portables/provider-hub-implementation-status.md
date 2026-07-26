@@ -17,9 +17,9 @@ Verified against the repository after completion of the initial eight-phase impl
 
 ## Verified maturity
 
-The repository verifies an implemented and tested portable foundation with bounded read-only status surfaces and reference packaging.
+The repository verifies an implemented and tested portable foundation with bounded read-only status surfaces and reference packaging. The canonical portable registry therefore classifies Provider Hub as `implemented`, and the architecture-closure report classifies its explicit `provider-hub-core` and `provider-hub-host` boundaries as complete.
 
-It does not verify a universally production-ready enterprise deployment. Production identity, SSO, RBAC, vault, persistence, audit retention, approval policy, licensing enforcement, backup infrastructure, high availability, observability, provider-specific operations, load testing, recovery rehearsal, compliance assessment, and independent certification remain deployment-specific responsibilities unless separately implemented and evidenced.
+The product manifest intentionally remains `preview`. Architecture completion does not mean universally production-ready enterprise deployment or commercial fulfillment. Production identity, SSO, RBAC, vault, persistence, audit retention, approval policy, licensing enforcement, backup infrastructure, high availability, observability, provider-specific operations, load testing, recovery rehearsal, compliance assessment, and independent certification remain deployment-specific responsibilities unless separately implemented and evidenced.
 
 ## Canonical evidence
 

@@ -66,7 +66,7 @@ requires it.
 
 ```sql
 CREATE TABLE supervisor_dispatch_ledger (
-  dispatch_id     TEXT        NOT NULL PRIMARY KEY,
+  dispatch_id     TEXT        NOT NULL PRIMARY KEY,   -- the at-most-once key
   incident_id     TEXT        NOT NULL,
   executor_kind   TEXT        NOT NULL,
   work_item_id    TEXT        NOT NULL,
@@ -96,7 +96,7 @@ Postgres SQLSTATE `23505` (the default the store already recognizes, along with
 createEnterpriseDispatchStore({
   sql: myExecutor,
   tableName: 'supervisor_dispatch_ledger',
-  isUniqueViolation: (e) => (e as any)?.code === 'ER_DUP_ENTRY',
+  isUniqueViolation: (e) => (e as any)?.code === 'ER_DUP_ENTRY', // e.g. MySQL
 })
 ```
 
@@ -113,7 +113,8 @@ essentially every SIEM:
 - `cef` — ArcSight Common Event Format over syslog. For ArcSight, QRadar, legacy SOC
   pipelines.
 
-Events are severity-tagged for triage. You implement `SiemTransport.send`:
+Events are severity-tagged for triage (e.g. a dangerous step pausing for approval →
+`warning`; a failed execution → `high`). You implement `SiemTransport.send`:
 
 ```ts
 import { createSiemAuditSink, teeAuditSinks } from 'lib/supervisor/portable'
@@ -121,6 +122,7 @@ import { createSiemAuditSink, teeAuditSinks } from 'lib/supervisor/portable'
 const siem = createSiemAuditSink({
   transport: {
     async send(record, meta) {
+      // ship `record` to your collector; `meta` gives eventType/occurredAt/severity
       await fetch(MY_HEC_URL, { method: 'POST', headers: { Authorization: MY_TOKEN }, body: record })
     },
   },
@@ -134,9 +136,10 @@ const siem = createSiemAuditSink({
 ```
 
 Transport failures are **swallowed by default** so audit export can never break
-self-healing — your transport owns durability. Set `swallowTransportErrors: false` if
-your compliance posture requires failures to propagate. Use `teeAuditSinks` to send to
-your SIEM and keep a second trail in the same call.
+self-healing — your transport owns durability (queue/retry/dead-letter). Set
+`swallowTransportErrors: false` if your compliance posture requires failures to
+propagate. Use `teeAuditSinks(siem, myOtherSink)` to send to your SIEM **and** keep a
+second trail in the same call.
 
 ---
 
@@ -150,19 +153,33 @@ import {
 } from 'lib/supervisor/portable'
 import { createSupervisorDispatcher } from 'lib/supervisor/executors/create-supervisor-dispatcher'
 
+// 1. Implement the boundary against your systems.
 const host: HostContext = {
-  secrets: mySecretsProvider,
-  notifications: mySlackSink,
-  approvers: myOktaApproverDirectory,
+  secrets: mySecretsProvider,          // your vault
+  notifications: mySlackSink,          // your channel
+  approvers: myOktaApproverDirectory,  // your SSO
   branding: { productName: 'Acme Ops', consoleBaseUrl: 'https://ops.acme.com' },
 }
 
+// 2. Durable ledger on your database.
 const dispatchStore = createEnterpriseDispatchStore({ sql: myExecutor })
+
+// 3. Audit to your SIEM.
 const audit = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
+
+// 4. Wire the dispatcher in enterprise mode (host-driven, not platform email).
 const dispatcher = createSupervisorDispatcher({ host, dispatchStore, audit })
 ```
 
+On the SignalBoost test rig the same factory is called with no `host` and falls back
+to a platform email notifier — that fallback is the only place the platform's own
+email is touched, and it does not run on your deployment.
+
 ### 5.1 Approvers before you have an IdP adapter
+
+`ApproverDirectory` is one method, but writing it against Okta or Entra is a project, and
+until it exists the supervisor cannot pause a dangerous step and address the request to
+anyone. So the portable ships a reference you configure instead of implement:
 
 ```ts
 import { createStaticApproverDirectory } from 'lib/supervisor/portable'
@@ -171,27 +188,50 @@ const approvers = createStaticApproverDirectory({
   financial: [{ id: 'finance', address: 'finance@acme.com' }],
   destructive: [{ id: 'sre-oncall', address: '#sre-oncall' }],
   credential_security: [{ id: 'sec-oncall', address: 'sec@acme.com' }],
+  // or: fallback: [{ id: 'ops', address: '#ops' }]  — one group approves everything
 })
 ```
 
-It fails at construction, not during an incident. Replace it with your IdP adapter before
-production.
+It **fails at construction**, not during an incident. A category with no approver, an
+approver with no routable address, or a duplicate id throws when you wire the deployment.
+That is deliberate: `createEnterpriseNotifier` swallows every error by design, because the
+step has already halted and a delivery failure must not become a second incident — which
+means a directory that breaks at runtime breaks *silently*. Validating up front is what
+keeps that trade-off safe. After construction `approversFor` is total: it cannot throw and
+cannot return empty, so delivery has no failure mode of its own.
+
+Use it to run the §6 acceptance incident. Replace it with your IdP adapter before
+production, so leavers and rota changes are reflected without a redeploy — the contract is
+one method, so that is a one-line swap.
 
 ---
 
 ## 6. What "LIVE" requires (honest checklist)
 
-1. ✅ Core reads no env, names no platform.
+This portable is enterprise-ready when, on your stack:
+
+1. ✅ Core reads no env, names no platform (already true).
 2. ✅ Secrets come from your vault via `SecretsProvider`.
 3. ✅ Notifications go to your channel via `NotificationSink`.
-4. ✅ The dispatch ledger runs on your database via `SqlExecutor`.
-5. ✅ Audit lands in your SIEM via `SiemTransport`.
-6. ⬜ Approvers resolve through your SSO.
-7. ⬜ You have run an end-to-end incident in staging. A runnable harness performs this against your wiring — see §7.
+4. ✅ The dispatch ledger runs on your database via `SqlExecutor` (§3 DDL applied).
+5. ✅ Audit lands in your SIEM via `SiemTransport` (§4).
+6. ⬜ Approvers resolve through your SSO (`ApproverDirectory` implemented against your IdP).
+   A reference implementation ships so this is not a blocker on day one — see §5.1.
+7. ⬜ You have run an end-to-end incident in staging: detect → safe step auto-runs →
+   dangerous step pauses → approver notified → approval → execution → SIEM shows the
+   full trail. A runnable harness performs this against your wiring — see §7.
+
+Items 1–5 are code the portable provides and you configure. Items 6–7 are your
+integration and acceptance test. When 6–7 pass in your environment, the portable is
+genuinely live for you.
 
 ---
 
 ## 7. Running the acceptance test
+
+Item 7 above is the one thing this guide cannot do for you: it has to run against *your*
+vault, *your* channel, *your* directory. So the portable ships the scenario as code, and you
+supply the `HostContext` you intend to deploy with.
 
 ```ts
 import { runAcceptanceScenario } from 'lib/supervisor/portable'
@@ -201,6 +241,30 @@ console.log(result.summary)
 if (!result.passed) process.exit(1)
 ```
 
-It checks safe execution, dangerous-step pausing, approver delivery, buyer branding, and
-audit output. Run it once per danger category. The returned object is frozen and
-JSON-serializable so it can be filed as acceptance evidence.
+It checks five guarantees and reports each one independently:
+
+| Check | What a failure means |
+| --- | --- |
+| `safe_step_executed` | the supervisor cannot act at all — wiring or policy is wrong |
+| `dangerous_step_paused` | **approval gating is not in effect. Do not deploy.** |
+| `approver_notified` | your `ApproverDirectory` or `NotificationSink` is not delivering |
+| `buyer_branding_used` | your people would receive notifications branded as someone else |
+| `audit_trail_emitted` | your SIEM would have no record of the run |
+
+Run it once per danger category to prove each routes to the right people:
+
+```ts
+for (const dangerousCategory of ['financial', 'destructive', 'credential_security'] as const) {
+  const result = await runAcceptanceScenario({ host, dangerousCategory })
+  if (!result.passed) throw new Error(`${dangerousCategory}: ${result.summary}`)
+}
+```
+
+**It is safe to run repeatedly, including against production wiring.** No network call, no
+provider call, no real repair: the consequential step is *required* to pause, so nothing
+consequential can execute by design, and the safe step goes through a runner you inject. The
+notification, however, is real — your channel receives it, because a harness that stubbed
+that out would not be testing the thing you need tested.
+
+The returned object is frozen and JSON-serializable, including every notification and audit
+event produced. File it as your acceptance record.

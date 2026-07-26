@@ -32,6 +32,11 @@ export interface ClusterRuntimeHealthGovernanceLedger {
   executable: false
 }
 
+type GovernanceLedgerRawRecord = Pick<
+  ClusterRuntimeHealthGovernanceLedgerEntry,
+  'artifactId' | 'kind' | 'schema' | 'generatedAt' | 'integrityDigest' | 'provenance' | 'retentionClass'
+>
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value && typeof value === 'object') {
@@ -57,7 +62,7 @@ export function createClusterRuntimeHealthGovernanceLedger(index: ClusterRuntime
   if (!index.clusterId || !Number.isFinite(Date.parse(index.generatedAt))) throw new Error('invalid cluster runtime health governance ledger identity')
   if (index.integrity.algorithm !== 'fnv1a-32' || index.integrity.canonical !== true || !/^[0-9a-f]{8}$/.test(index.integrity.digest)) throw new Error('invalid cluster runtime health governance ledger integrity')
 
-  const raw = index.records.map(record => {
+  const raw: GovernanceLedgerRawRecord[] = index.records.map(record => {
     if (record.schemaVersion !== 'agent-gateway-cluster-runtime-health-audit-record-v1' || record.generatedAt !== index.generatedAt || record.readOnly !== true || record.executable !== false || !/^[0-9a-f]{8}$/.test(record.integrityDigest)) throw new Error('invalid cluster runtime health governance ledger record')
     return {
       artifactId: record.artifactId,

@@ -21,7 +21,7 @@ export const portableProductRegistry = Object.freeze([
   product(portableChiefOfStaffManifest, { localizationKey: 'chiefOfStaff', glyph: '❖', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 70, route: '/dashboard/cos-mining' }),
   product(browserAgentEcosystemManifest, { localizationKey: 'browserAgents', glyph: '◇', implementationStatus: 'descriptor_only', implementationClassification: 'descriptor_only_compatibility_target', sortOrder: 80 }),
   product(agentOperationsPlatformManifest, { localizationKey: 'agentOperations', glyph: '⌁', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 90, route: '/dashboard/portable-products' }),
-  product(selfHealingSupervisorManifest, { localizationKey: 'selfHealing', glyph: '⟲', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 100 }),
+  product(selfHealingSupervisorManifest, { localizationKey: 'selfHealing', glyph: '⟲', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 100, route: '/dashboard/supervisor' }),
 ])
 
 validatePortableProductRegistry(portableProductRegistry)

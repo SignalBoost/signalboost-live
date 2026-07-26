@@ -1,0 +1,60 @@
+name: Provider Hub source release
+
+on:
+  pull_request:
+    paths:
+      - 'saas/provider-hub-core/**'
+      - 'saas/provider-hub-host/**'
+      - 'saas/examples/provider-hub-reference/**'
+      - 'saas/scripts/package-provider-hub-release.mjs'
+      - 'saas/tests/providerHubSourceReleasePackager.node.test.ts'
+      - 'docs/portables/provider-hub-*.md'
+      - '.github/workflows/provider-hub-source-release.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic release version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - name: Test deterministic packager
+        run: node --test tests/providerHubSourceReleasePackager.node.test.ts
+      - name: Resolve release identity
+        id: release
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="0.1.0-pr.${{ github.event.pull_request.number }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Build unsigned source release
+        run: node scripts/package-provider-hub-release.mjs "${{ steps.release.outputs.version }}" "${{ steps.release.outputs.sha }}"
+      - name: Upload internal release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-hub-source-release-${{ steps.release.outputs.version }}
+          path: |
+            saas/dist/provider-hub/*.tar.gz
+            saas/dist/provider-hub/*.manifest.json
+          if-no-files-found: error
+          retention-days: 14

@@ -64,6 +64,21 @@ const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCom
       'docs/portables/provider-hub-security-operations-acceptance.md#10-permanent-safety-notices',
     ]),
   }),
+  'campaign-studio': Object.freeze({
+    'buyer-installation': Object.freeze([
+      'docs/portables/campaign-studio-commercial-operations.md#2-buyer-installation',
+    ]),
+    'operations-recovery': Object.freeze([
+      'docs/portables/campaign-studio-commercial-operations.md#4-upgrade-rollback-backup-and-recovery',
+    ]),
+    'buyer-configuration': Object.freeze([
+      'docs/portables/campaign-studio-commercial-operations.md#3-buyer-configuration-record',
+    ]),
+    'support-boundary': Object.freeze([
+      'docs/portables/campaign-studio-commercial-operations.md#1-supported-product-boundary',
+      'docs/portables/campaign-studio-commercial-operations.md#5-support-and-responsibility-boundary',
+    ]),
+  }),
 })
 
 function freezeCheck(

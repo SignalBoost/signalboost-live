@@ -1,4 +1,5 @@
 {
+  "_path": "saas/lib/i18n/homepageLocales.json",
   "en": {
     "kicker": "AI powered · People in control",
     "title": "One place for every growth task.",
@@ -31,6 +32,10 @@
       }
     },
     "portables": {
+      "providerHub": {
+        "name": "Provider Hub",
+        "desc": "Bring your own AI and business accounts, connected through one governed workspace."
+      },
       "campaign": {
         "name": "Campaign Studio",
         "desc": "One short request becomes a finished campaign."
@@ -109,6 +114,10 @@
       }
     },
     "portables": {
+      "providerHub": {
+        "name": "Centro de Proveedores",
+        "desc": "Usa tus propias cuentas de IA y de negocio, conectadas en un espacio de trabajo con gobernanza."
+      },
       "campaign": {
         "name": "Estudio de Campañas",
         "desc": "Una solicitud corta se convierte en una campaña terminada."
@@ -187,6 +196,10 @@
       }
     },
     "portables": {
+      "providerHub": {
+        "name": "Central de Fornecedores",
+        "desc": "Use as suas próprias contas de IA e de negócio, ligadas num espaço de trabalho com governação."
+      },
       "campaign": {
         "name": "Estúdio de Campanhas",
         "desc": "Um pedido curto vira uma campanha pronta."
@@ -265,6 +278,10 @@
       }
     },
     "portables": {
+      "providerHub": {
+        "name": "Centrum Dostawców",
+        "desc": "Podłącz własne konta AI i biznesowe w jednym nadzorowanym środowisku pracy."
+      },
       "campaign": {
         "name": "Studio Kampanii",
         "desc": "Krótka prośba staje się gotową kampanią."
@@ -343,6 +360,10 @@
       }
     },
     "portables": {
+      "providerHub": {
+        "name": "Центр провайдеров",
+        "desc": "Подключите собственные аккаунты ИИ и бизнес-сервисов в одном управляемом рабочем пространстве."
+      },
       "campaign": {
         "name": "Студия Кампаний",
         "desc": "Короткий запрос становится готовой кампанией."

@@ -1,6 +1,9 @@
+// saas/tests/supervisorPortableHostContext.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createEnterpriseNotifier } from '../lib/supervisor/portable/enterprise-notifier.ts'
 import type { HostContext, PortableNotification } from '../lib/supervisor/portable/host-context.ts'
 
@@ -56,15 +59,73 @@ test('a sink failure never throws back into the executor', async () => {
   await createEnterpriseNotifier(host)({ dispatchId: 'D', incidentId: 'I', step: step('x'), verdict: { dangerous: true, category: 'destructive', reason: 'r' } as never })
 })
 
-test('portable boundary source has zero host coupling (code, not comments)', () => {
-  const files = ['../lib/supervisor/portable/enterprise-notifier.ts', '../lib/supervisor/portable/host-context.ts']
-  for (const rel of files) {
-    const raw = readFileSync(new URL(rel, import.meta.url), 'utf8')
-    // strip line comments and block comments before checking for coupling
+test('the whole buyer import graph has zero host coupling, except touchpoints named here', () => {
+  // The integration guide promises the buyer that the portable "names no platform, reads no
+  // process.env, and imports no host singleton". That promise covers everything their import
+  // reaches — not the two files this test used to check by hand. A buyer's security architect
+  // greps the whole graph, so this test walks the whole graph.
+  //
+  // Entry points are exactly what §5 of the guide tells them to import.
+  const entries = [
+    '../lib/supervisor/portable/index.ts',
+    '../lib/supervisor/executors/create-supervisor-dispatcher.ts',
+  ]
+
+  // Touchpoints that exist on purpose. Each one is listed with the reason it is acceptable,
+  // so this test states the exceptions instead of hiding them. The assertion at the end is
+  // that this set does not GROW: any new coupling anywhere in the graph fails the suite.
+  const known = new Map([
+    ['lib/supervisor/executors/create-supervisor-dispatcher.ts',
+      'lazy import of the platform email notifier, reached only when the buyer supplies neither a HostContext nor a notifier'],
+    ['lib/supervisor/executors/api-executor.ts',
+      'lazy import of the platform provider engine as the DEFAULT api step runner; a buyer passes their own runner'],
+    ['lib/supervisor/executors/dispatch-store.ts',
+      'process.env is confined to platformSupervisorRuntime(), a platform-only helper the buyer never calls'],
+    ['lib/supervisor/executors/browser/browser-runtime-mapper.ts',
+      'BUYER-VISIBLE: emits adapterId "signalboost.browser-runtime.dry-run.v1" into evidence records'],
+    ['lib/browser-runtime/sandbox-adapter.ts',
+      'BUYER-VISIBLE: SANDBOX_ADAPTER_ID is "signalboost.sandbox.v1"'],
+  ])
+
+  const seen = new Set()
+  const found = new Map()
+  const root = fileURLToPath(new URL('..', import.meta.url))
+
+  const walk = (file) => {
+    if (seen.has(file) || !existsSync(file)) return
+    seen.add(file)
+    const raw = readFileSync(file, 'utf8')
+    // Strip comments first: a file may legitimately DISCUSS process.env in prose.
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
-    assert.ok(!/signalboost/i.test(code), `${rel} names the build platform`)
-    assert.ok(!/process\.env/.test(code), `${rel} reads process.env`)
-    assert.ok(!/@\/lib\//.test(code), `${rel} imports a host singleton`)
+    const hits = []
+    if (/process\.env/.test(code)) hits.push('process.env')
+    if (/signalboost/i.test(code)) hits.push('names the build platform')
+    if (/@\/lib\//.test(code)) hits.push('imports a host singleton')
+    if (hits.length) found.set(relative(root, file), hits.join(' + '))
+    for (const match of code.matchAll(/from\s+'(\.[^']+)'/g)) {
+      const base = resolve(dirname(file), match[1])
+      for (const candidate of [base, `${base}.ts`, resolve(base, 'index.ts')]) {
+        if (existsSync(candidate) && candidate.endsWith('.ts')) { walk(candidate); break }
+      }
+    }
+  }
+  for (const entry of entries) walk(fileURLToPath(new URL(entry, import.meta.url)))
+
+  assert.ok(seen.size > 40, `expected to walk the real graph, only reached ${seen.size} modules`)
+  const unexpected = [...found.keys()].filter(f => !known.has(f))
+  assert.deepEqual(unexpected, [], `new host coupling in the buyer import graph: ${unexpected.map(f => `${f} (${found.get(f)})`).join('; ')}`)
+})
+
+test('the portable boundary modules themselves are unconditionally clean', () => {
+  // No exceptions permitted in lib/supervisor/portable/** — this is the surface the buyer
+  // implements against, and it must be readable as host-neutral without caveats.
+  for (const name of ['host-context.ts', 'enterprise-notifier.ts', 'enterprise-dispatch-store.ts', 'siem-audit-sink.ts', 'index.ts']) {
+    const file = fileURLToPath(new URL(`../lib/supervisor/portable/${name}`, import.meta.url))
+    const raw = readFileSync(file, 'utf8')
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+    assert.ok(!/signalboost/i.test(code), `${name} names the build platform`)
+    assert.ok(!/process\.env/.test(code), `${name} reads process.env`)
+    assert.ok(!/@\/lib\//.test(code), `${name} imports a host singleton`)
   }
 })
 

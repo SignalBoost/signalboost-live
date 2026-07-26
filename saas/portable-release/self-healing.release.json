@@ -22,7 +22,7 @@
   "minModules": 55,
 
   "_hostFallbacks": "Bare or aliased specifiers the payload may reach but does not ship. Leave empty on the first run: the packer will BLOCK and print the exact specifier strings it found, and only the ones it actually prints belong here — each with a note in buyerMustSupply saying what the buyer provides instead.",
-  "hostFallbacks": ["@/lib/email"],
+  "hostFallbacks": ["@/lib/email", "@/lib/engine/universalRunner"],
 
   "namingPattern": "signalboost",
   "_knownNamingExceptions": "Files where the build platform's name still appears in code. Tracked, not accepted. A file not on this list blocks the release.",
@@ -53,7 +53,8 @@
     "HostBranding — the buyer's own name and URL. The payload carries no default brand.",
     "SiemTransport — receives audit events as ECS-JSON or CEF for Splunk, Elastic, Datadog, Sentinel, Chronicle, ArcSight or QRadar.",
     "ApiStepRunner — optional. Supply one to control how api_request repair steps execute.",
-    "@/lib/email host fallback — used only by the platform development fallback when no buyer HostContext or explicit notifier is supplied; enterprise deployments provide NotificationSink instead."
+    "@/lib/email host fallback — used only by the platform development fallback when no buyer HostContext or explicit notifier is supplied; enterprise deployments provide NotificationSink instead.",
+    "@/lib/engine/universalRunner host fallback — used only by the default platform provider runner; enterprise deployments inject ApiStepRunner instead."
   ],
 
   "notIncluded": [

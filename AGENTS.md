@@ -1,3 +1,4 @@
+<!-- AGENTS.md -->
 # AGENTS.md — Mandatory entry point for every AI agent
 
 STOP. Before scanning, diagnosing, or changing ANYTHING in this repository, you MUST fully read `ONBOARD.md` at the repository root. That document is the mandatory onboarding for all developers and AI agents. This file is only the pointer plus a condensed capability card — it does not replace `ONBOARD.md`, and neither file replaces inspecting the actual code.
@@ -37,9 +38,25 @@ Required order (from ONBOARD.md, non-negotiable):
 
 **Adapter/driver model:** new media providers (ElevenLabs, Runway, Kling, …) are added as one catalog entry + one small adapter in `saas/lib/agency/userProviders.ts` implementing the shared contract. The engine, UI, and approval flows never change per provider. Only advertise a provider as "live" once its adapter exists — a user key unlocks billing, not capability.
 
+**Strip-safety rule (non-negotiable — this has broken the test suite three times):**
+- The test suites run `node --test` directly on `.ts` sources. Node STRIPS types there; it does not compile them. Any TypeScript feature that emits runtime code cannot be stripped and throws `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` at module load.
+- NEVER write these in `saas/agent-gateway/**`, `saas/agent-gateway-host/**`, `saas/lib/agent-runtime/**`, or any other guarded directory (the full list is in `saas/scripts/validate-strip-safe.mjs`):
+  - constructor parameter properties — `constructor(private readonly store: X) {}`
+  - `enum` (including `const enum`)
+  - `namespace`
+  - `export =` and `import x = require()`
+- Write instead: declare the field on the class and assign it in the constructor body; a `const` object plus a union type in place of `enum`; plain module exports in place of `namespace`; standard ESM imports.
+- WHY THIS IS EASY TO MISS: all of it is legal TypeScript and `next build` compiles it happily, so the deploy goes green while the suites die. One bad file in a barrel takes down EVERY suite that imports that barrel — a single parameter property in `agent-gateway` has repeatedly killed all thirteen gateway suites at once, and eleven of them in `lib/agent-runtime` meant the Agent Operations Platform's own guarantees had never once been exercised.
+- `npm run validate:strip-safe` enforces this and runs in `prebuild`, so a violation FAILS THE VERCEL BUILD. Run it locally before pushing.
+
+**Test fixtures that look like credentials:**
+- A fake secret in a test must carry an `EXAMPLE` / `NOTAREAL` marker IN THE VALUE. Never use a realistic vendor prefix (`sk_live_…`, `AKIA…`, `ghp_…`).
+- GitHub push protection blocks the commit, and anyone auditing the repo — including a buyer's security review — has to stop and prove it is fake.
+
 **Owner workflow constraints (critical):**
 - The owner is a non-coder working exclusively through the GitHub web UI, pasting complete file replacements; Vercel auto-deploys from `main`.
 - Deliver complete files, never diffs. Split oversized files into parts and merge only at the end — never ask the owner to merge mid-task.
+- Commit a NEW module in its own commit BEFORE any file that imports it. A batch that lands the importer without the module breaks the build, and partial landings are common — after any interruption, re-check which files actually landed instead of assuming the batch did.
 - Type-check against the repo tsconfig (strict: false) before delivering. Never claim builds/tests/deploys succeeded without verification.
 - State out-of-band steps explicitly (Vercel env vars, Supabase SQL, provider dashboards).
 

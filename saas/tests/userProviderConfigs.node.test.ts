@@ -17,6 +17,7 @@ import './androidPackagingReadiness.node.test.ts'
 import './androidUnsignedScaffold.node.test.ts'
 import './androidScaffoldReviewBundle.node.test.ts'
 import './androidBuildPlan.node.test.ts'
+import './androidBuildEvidence.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 
@@ -25,7 +26,6 @@ test('encrypts, masks, and decrypts provider keys without exposing plaintext in 
   const { decryptProviderKeys, encryptProviderKeys, maskProviderKeys } = await import('../lib/engine/userProviderConfigs.ts')
 
   const encrypted = encryptProviderKeys({ apiKey: 'sk-test-12345' })
-
   assert.equal(typeof encrypted.apiKey.valueEncrypted, 'string')
   assert.notEqual(encrypted.apiKey.valueEncrypted, 'sk-test-12345')
   assert.equal(encrypted.apiKey.last4, '2345')
@@ -46,7 +46,6 @@ test('Provider Hub public metadata is versioned, immutable, and tenant scoped', 
     authentication: { method: 'api_key', configured: true, maskedFields: { account: '••••2345' } },
     updatedAt: '2026-07-25T23:00:00.000Z',
   })
-
   assert.equal(metadata.schemaVersion, PROVIDER_HUB_CONNECTION_SCHEMA_VERSION)
   assert.equal(metadata.tenantId, 'tenant-1')
   assert.equal(metadata.environmentId, 'production')

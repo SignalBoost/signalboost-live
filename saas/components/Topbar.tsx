@@ -1,6 +1,7 @@
+// saas/components/Topbar.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient.ts";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { t } from "@/lib/i18n/t";
 

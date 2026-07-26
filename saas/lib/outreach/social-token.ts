@@ -4,7 +4,7 @@
 // connection or no way to refresh, it says so — it never returns a stale token
 // and never fakes a publish-ready connection.
 
-import { refreshSocialToken, type SocialPlatform } from './social-connectors'
+import { refreshSocialToken, type SocialPlatform } from './social-connectors.ts'
 
 export type ValidSocialToken = {
   ok: boolean

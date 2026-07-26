@@ -2,8 +2,8 @@
 // Mock-safe outreach planning router. It prepares an owner-reviewable cadence;
 // it does not send, publish, or contact anyone directly.
 
-import type { CosLocale, FollowUpMilestone, LeadCapture, OutreachDispatchRecord, OutreachPlan, OutreachStep } from './types'
-import { checkDomainContactLimit } from './contactLimiter'
+import type { CosLocale, FollowUpMilestone, LeadCapture, OutreachDispatchRecord, OutreachPlan, OutreachStep } from './types.ts'
+import { checkDomainContactLimit } from './contactLimiter.ts'
 
 const SUBJECTS: Record<CosLocale, string[]> = {
   en: ['Your quick website/data signal', 'A short multilingual brief for your team', 'Interactive demo proposal'],

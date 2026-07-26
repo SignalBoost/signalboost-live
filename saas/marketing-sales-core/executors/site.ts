@@ -3,9 +3,9 @@
 // dependency. An approved campaign's drafts already live in ms_drafts; publishing
 // makes them public at a real URL on the host's own site. No OAuth, no asset
 // upload: it returns the canonical campaign URL that the public page renders from.
-import { registerExecutor } from './registry'
-import type { PublishResult } from './types'
-import type { Draft, MarketingHost } from '../types'
+import { registerExecutor } from './registry.ts'
+import type { PublishResult } from './types.ts'
+import type { Draft, MarketingHost } from '../types.ts'
 
 registerExecutor({
   id: 'site',

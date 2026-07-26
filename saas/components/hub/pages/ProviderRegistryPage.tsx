@@ -1,3 +1,4 @@
+// saas/components/hub/pages/ProviderRegistryPage.tsx
 'use client'
 
 // saas/components/hub/pages/ProviderRegistryPage.tsx
@@ -5,7 +6,7 @@
 // Read-only planning monitor powered by the Hub provider registry.
 
 import { useMemo, useState } from 'react'
-import { PageProps, TONES, cardStyle, bodyStyle, labelStyle } from '../shared'
+import { PageProps, TONES, cardStyle, bodyStyle, labelStyle } from '../shared.tsx'
 import { HUB_PROVIDER_TIERS, getHubProvidersByTier, HubProviderStatus } from '@/lib/hub/provider-registry'
 
 // Native per-language copy for this console page. `lang` arrives via PageProps.

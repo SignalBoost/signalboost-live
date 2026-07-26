@@ -1,3 +1,4 @@
+// saas/app/dashboard/marketing/press-providers/page.tsx
 'use client'
 
 // saas/app/dashboard/marketing/press-providers/page.tsx
@@ -9,8 +10,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import PressProviderConnectForm from './PressProviderConnectForm'
-import PressCompanyProfileForm from './PressCompanyProfileForm'
+import PressProviderConnectForm from './PressProviderConnectForm.tsx'
+import PressCompanyProfileForm from './PressCompanyProfileForm.tsx'
 
 type Provider = { id: string; label: string; type: string; cost: string; proof: string; needs: string[]; blurb: string; live: boolean; registered?: boolean }
 type Campaign = {

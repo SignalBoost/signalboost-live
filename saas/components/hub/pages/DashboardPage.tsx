@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import { Deployment } from '@/lib/hub/deployments-service'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 

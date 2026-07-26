@@ -1,7 +1,8 @@
-import { buildDefaultMarketingRecommendation } from '../recommendation/engine'
-import type { CosRecommendation } from '../recommendation/types'
-import { getSignalBoostGoals } from './goals'
-import type { CosLocale, ExecutiveBriefing, ExecutiveBriefingItem, ExecutiveMetric } from './types'
+// saas/lib/cos/executive-core/briefing.ts
+import { buildDefaultMarketingRecommendation } from '../recommendation/engine.ts'
+import type { CosRecommendation } from '../recommendation/types.ts'
+import { getSignalBoostGoals } from './goals.ts'
+import type { CosLocale, ExecutiveBriefing, ExecutiveBriefingItem, ExecutiveMetric } from './types.ts'
 
 function normalizeLocale(locale?: string): CosLocale {
   const value = (locale || 'en').slice(0, 2).toLowerCase()

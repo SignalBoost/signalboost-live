@@ -17,8 +17,8 @@
 // Localization: this file carries i18n KEYS with English fallbacks only. It never
 // invents es/pt/pl/ru text — those values live in /locales/{lang}.json.
 
-import { preExecutionCheck } from './capabilityMatrix'
-import type { FailureRecord } from './runbook'
+import { preExecutionCheck } from './capabilityMatrix.ts'
+import type { FailureRecord } from './runbook.ts'
 
 export type FailureAction = 'retry' | 'edit_inputs' | 'skip_step' | 'abort_runbook' | 'open_logs'
 export type OverrideAction = 'force_run_step' | 'bypass_template_validation' | 'continue_runbook'

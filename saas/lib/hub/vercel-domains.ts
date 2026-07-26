@@ -6,7 +6,7 @@
 // `?teamId=` and Vercel rejected it — the Domains/DNS panel came back empty.
 // teamUrl() now omits the teamId param entirely when it's blank.
 
-import { VercelDomain, DNSRecord, Domain, DNSCheckResult, SSLCertificate } from './domains-types'
+import { VercelDomain, DNSRecord, Domain, DNSCheckResult, SSLCertificate } from './domains-types.ts'
 
 const VERCEL_API = 'https://api.vercel.com'
 

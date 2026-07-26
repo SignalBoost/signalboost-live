@@ -1,4 +1,5 @@
-import { type SocialPlatform } from './social-connectors'
+// saas/lib/outreach/social-destinations.ts
+import { type SocialPlatform } from './social-connectors.ts'
 
 export type SocialDestination = {
   platform: SocialPlatform

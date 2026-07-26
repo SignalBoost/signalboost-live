@@ -4,7 +4,7 @@
 // a maybe-URL: the editor decides if/when to run it, so dispatch returns 'submitted' and
 // fetchProof stays pending until an owner records the published link. It NEVER invents a
 // publication and NEVER fabricates a published URL.
-import type { MediaProviderAdapter } from '../types'
+import type { MediaProviderAdapter } from '../types.ts'
 
 function escapeHtml(value: string): string {
   return String(value).replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'))

@@ -2,7 +2,7 @@
 // Supabase memory layer — save and reuse generated AI content.
 
 import { createClient } from '@supabase/supabase-js'
-import type { ValidLocalItem, ValidBusinessSite } from './validation'
+import type { ValidLocalItem, ValidBusinessSite } from './validation.ts'
 
 function supabaseAdmin() {
   return createClient(

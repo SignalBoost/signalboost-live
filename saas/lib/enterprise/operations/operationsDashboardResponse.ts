@@ -1,5 +1,6 @@
-import { parseOperationsIntelligenceSnapshot } from './operationsSnapshotStore'
-import type { OperationsIntelligenceSnapshot } from './operationsIntelligence'
+// saas/lib/enterprise/operations/operationsDashboardResponse.ts
+import { parseOperationsIntelligenceSnapshot } from './operationsSnapshotStore.ts'
+import type { OperationsIntelligenceSnapshot } from './operationsIntelligence.ts'
 
 export const OPERATIONS_RESPONSE_SCHEMA_VERSION = 'operations-intelligence-response-v1' as const
 

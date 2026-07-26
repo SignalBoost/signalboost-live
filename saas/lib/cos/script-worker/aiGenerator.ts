@@ -1,5 +1,6 @@
-import type { CosContentWorkerInput, CosContentWorkerOutput } from './types'
-import { generateContentDraft } from './generator'
+// saas/lib/cos/script-worker/aiGenerator.ts
+import type { CosContentWorkerInput, CosContentWorkerOutput } from './types.ts'
+import { generateContentDraft } from './generator.ts'
 import { createPlatformAiPort, type CosAiPort } from '@/lib/cos/aiPort'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import { FACTUAL_DISCIPLINE } from '@/portable-kernel'

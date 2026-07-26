@@ -5,7 +5,7 @@
 // On SignalBoost's own deployment createSupabaseObjectStore() is the adapter and behaviour is
 // identical to the previous direct storage.from(bucket).upload / createSignedUrl calls.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { cosVideoRenderBucket, ensureCosVideoRenderBucket } from './video-storage'
+import { cosVideoRenderBucket, ensureCosVideoRenderBucket } from './video-storage.ts'
 
 export type ObjectStoreCheck = { bucket: string; bucketExists: boolean }
 

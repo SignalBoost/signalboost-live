@@ -1,4 +1,5 @@
-import type { EnterpriseVideoStrategy, EnterpriseVideoStrategyInput, EnterpriseVideoTier } from './types'
+// saas/lib/cos/enterprise-video/strategy.ts
+import type { EnterpriseVideoStrategy, EnterpriseVideoStrategyInput, EnterpriseVideoTier } from './types.ts'
 import { hostBrandName, hostBrandUrl } from '@/lib/portable/companyIdentity'
 
 // Brand/URL come from the HOST, not a hardcoded constant. On this deployment the host resolves

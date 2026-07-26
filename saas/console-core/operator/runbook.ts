@@ -13,9 +13,9 @@
 // and summaries can be rendered through t() in the active language (en/es/pt/pl/
 // ru, English fallback). Defaults to 'en'.
 
-import { OPERATOR_POLICY_VERSION, OPERATOR_IDENTITY } from './principles'
-import type { RiskLevel, ApprovalRequirement, PermissionPolicy } from './templates'
-import { preExecutionCheck } from './capabilityMatrix'
+import { OPERATOR_POLICY_VERSION, OPERATOR_IDENTITY } from './principles.ts'
+import type { RiskLevel, ApprovalRequirement, PermissionPolicy } from './templates.ts'
+import { preExecutionCheck } from './capabilityMatrix.ts'
 
 export type ExecutionMode = 'simulation' | 'execution'
 export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'

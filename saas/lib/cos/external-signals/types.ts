@@ -1,4 +1,5 @@
-import type { MarketingFormatChoice, MarketingHeroChoice, MarketingSignal } from '../marketing-decision'
+// saas/lib/cos/external-signals/types.ts
+import type { MarketingFormatChoice, MarketingHeroChoice, MarketingSignal } from '../marketing-decision/index.ts'
 
 export type ExternalSignalSourceType =
   | 'web_research'

@@ -2,7 +2,7 @@
 // The MarketingStore interface lives in types.ts. The live Supabase adapter is
 // supplied by the host (marketing-sales-host). This in-memory adapter exists so
 // the core can be exercised with zero host — proving portability, used in tests.
-import type { MarketingStore, StoreRow } from './types'
+import type { MarketingStore, StoreRow } from './types.ts'
 
 export function createMemoryStore(): MarketingStore {
   const tables = new Map<string, Map<string, StoreRow>>()

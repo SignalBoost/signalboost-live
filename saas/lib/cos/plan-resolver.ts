@@ -15,7 +15,7 @@
 // non-privileged principal is still forced onto the advisory-safe tool policy —
 // which is exactly what makes advisory mode sellable to non-owner tiers.
 // ─────────────────────────────────────────────────────────────────────────────
-import type { PlanResolver, Intent, TurnContext, ExecutionPlan } from './contracts'
+import type { PlanResolver, Intent, TurnContext, ExecutionPlan } from './contracts.ts'
 
 // Stable identifiers the registries resolve to concrete impls.
 const ENGINE_FAST = 'fast'                  // e.g. gpt-4o-mini — quick execution turns

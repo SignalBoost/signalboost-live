@@ -1,6 +1,6 @@
 // saas/lib/enterprise/operations/operationsSnapshotStore.ts
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { OperationsIntelligenceSnapshot } from './operationsIntelligence'
+import type { OperationsIntelligenceSnapshot } from './operationsIntelligence.ts'
 
 const TABLE = 'enterprise_operations_snapshots'
 

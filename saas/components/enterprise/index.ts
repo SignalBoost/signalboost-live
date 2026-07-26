@@ -1,6 +1,7 @@
-export { SearchableSelect } from './SearchableSelect'
-export { SearchableMultiSelect } from './SearchableMultiSelect'
-export { SuggestionCardGrid } from './SuggestionCardGrid'
-export type { SuggestionCard } from './SuggestionCardGrid'
-export { SourceUrlField, normalizeSourceUrl, validateSourceUrl } from './SourceUrlField'
-export { CosaCampaignConfigurator } from './CosaCampaignConfigurator'
+// saas/components/enterprise/index.ts
+export { SearchableSelect } from './SearchableSelect.tsx'
+export { SearchableMultiSelect } from './SearchableMultiSelect.tsx'
+export { SuggestionCardGrid } from './SuggestionCardGrid.tsx'
+export type { SuggestionCard } from './SuggestionCardGrid.tsx'
+export { SourceUrlField, normalizeSourceUrl, validateSourceUrl } from './SourceUrlField.tsx'
+export { CosaCampaignConfigurator } from './CosaCampaignConfigurator.tsx'

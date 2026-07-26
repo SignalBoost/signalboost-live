@@ -2,7 +2,7 @@
 // Planning guard for the portable COS Marketing + Sales Engine.
 // It limits planned contact touches by corporate domain before any owner-approved action.
 
-import type { DomainThrottleDecision, OutreachDispatchRecord } from './types'
+import type { DomainThrottleDecision, OutreachDispatchRecord } from './types.ts'
 
 export const CONTACT_WINDOW_HOURS = 48
 export const CONTACT_MAX_PER_DOMAIN = 2

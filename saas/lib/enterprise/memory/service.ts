@@ -7,7 +7,7 @@
 // tenant, so isolation = trusted server-side writes (matches repo convention).
 
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { canonicalDomainOf, createUrlFingerprint, normalizeUrl } from './urlCanonical'
+import { canonicalDomainOf, createUrlFingerprint, normalizeUrl } from './urlCanonical.ts'
 
 type Admin = ReturnType<typeof getAdminSupabase>
 

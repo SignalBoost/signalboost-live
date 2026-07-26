@@ -1,3 +1,4 @@
+// saas/components/hub/GovernedProviderActionFetchBoundary.tsx
 'use client'
 
 import { useEffect, type ReactNode } from 'react'
@@ -6,7 +7,7 @@ import {
   buildProviderActionClientPlan,
   type ProviderCapabilityResponse,
 } from '@/lib/hub/provider-action-client'
-import type { ProviderExecutionHandoff } from './ProviderActionExecutionGate'
+import type { ProviderExecutionHandoff } from './ProviderActionExecutionGate.tsx'
 
 const LEGACY_ACTION_ENDPOINTS = new Set([
   '/api/hub/action',

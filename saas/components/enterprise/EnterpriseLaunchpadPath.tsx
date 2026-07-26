@@ -1,10 +1,11 @@
+// saas/components/enterprise/EnterpriseLaunchpadPath.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { EnterpriseLaunchpadConfigurator, type LaunchpadApprovalPackage, type LaunchpadWorkspace } from './EnterpriseLaunchpadConfigurator'
+import { EnterpriseLaunchpadConfigurator, type LaunchpadApprovalPackage, type LaunchpadWorkspace } from './EnterpriseLaunchpadConfigurator.tsx'
 
 type Step = { label: string; description: string; href: string }
 type Props = { workspace: LaunchpadWorkspace; badge: string; title: string; subtitle: string; steps: Step[] }

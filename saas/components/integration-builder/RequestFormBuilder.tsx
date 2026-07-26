@@ -1,7 +1,8 @@
+// saas/components/integration-builder/RequestFormBuilder.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
-import type { SchemaField } from './mockApi'
+import type { SchemaField } from './mockApi.ts'
 const variables = ['input.customerId', 'input.email', 'context.projectId']
 export default function RequestFormBuilder({ fields, values, onChange }: { fields: SchemaField[]; values: Record<string, unknown>; onChange: (values: Record<string, unknown>) => void }) {
   if (!fields.length) return <p style={{ color: 'rgba(255,255,255,.55)', margin: 0 }}><LocalizedText fallback={"Select an endpoint to compile a visual request form."} /></p>

@@ -2,8 +2,8 @@
 // Assembles the admin dashboard payload from a MiningStore. Kept in the portable module
 // (not in the route handler) so the same intelligence view ships to any host.
 
-import { MiningStore, MiningRunRow, SegmentCount } from './mining/storage'
-import { AssociationRule } from './mining/types'
+import { MiningStore, MiningRunRow, SegmentCount } from './mining/storage.ts'
+import { AssociationRule } from './mining/types.ts'
 
 export interface MiningOverview {
   latestRun: MiningRunRow | null

@@ -4,10 +4,10 @@
 // create/delete audience, add/delete contact, send test email).
 // Every write flows through the same registerExecutor path as the reads.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import { getDataStore } from '../dataStore'
-import type { ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import { getDataStore } from '../dataStore.ts'
+import type { ActionSchema } from '../types.ts'
 
 const API = 'https://api.resend.com'
 function key(): string | null { return getSecret('RESEND_API_KEY') || null }

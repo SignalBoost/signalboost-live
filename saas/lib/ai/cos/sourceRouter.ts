@@ -5,8 +5,8 @@
 // knowledge lives in the beliefs; this file only iterates and scores them, so
 // adding a source never changes this logic. v2 swaps the matcher for the model.
 
-import type { CosSourceRouting } from './reasoningTypes';
-import { SOURCE_BELIEFS, CURRENT_FACT_SIGNALS } from './cosBeliefs';
+import type { CosSourceRouting } from './reasoningTypes.ts';
+import { SOURCE_BELIEFS, CURRENT_FACT_SIGNALS } from './cosBeliefs.ts';
 
 export function routeCosSource(objective: string): CosSourceRouting {
   const text = ` ${(objective || '').toLowerCase().trim()} `;

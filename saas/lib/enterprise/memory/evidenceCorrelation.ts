@@ -1,7 +1,8 @@
+// saas/lib/enterprise/memory/evidenceCorrelation.ts
 // Deterministic correlation for normalized cross-agent evidence events.
 // Correlation expresses related evidence only; it never claims causation or authorizes execution.
 
-import type { EnterpriseEvidenceEvent } from './evidenceBus'
+import type { EnterpriseEvidenceEvent } from './evidenceBus.ts'
 
 export type EvidenceCorrelationReason =
   | 'correlation_id'

@@ -1,3 +1,4 @@
+// saas/components/hub/pages/ProviderExpansionPage.tsx
 'use client'
 
 // saas/components/hub/pages/ProviderExpansionPage.tsx
@@ -5,8 +6,8 @@
 // Four tall cards per page. Status + actions. Operations first, monitoring second.
 
 import { useEffect, useMemo, useState } from 'react'
-import { PageProps, TONES, cardStyle, labelStyle } from '../shared'
-import ProviderActionLauncher from '../ProviderActionLauncher'
+import { PageProps, TONES, cardStyle, labelStyle } from '../shared.tsx'
+import ProviderActionLauncher from '../ProviderActionLauncher.tsx'
 
 // Native per-language copy for this console page. `lang` arrives via PageProps.
 const COPY: Record<string, Record<string, string>> = {

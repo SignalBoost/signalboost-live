@@ -1,6 +1,7 @@
+// saas/lib/enterprise/url-intelligence/analyze.ts
 import schema from '@/config/master_config_schema.json'
-import { safeFetchPublicSource } from './safeFetch'
-import type { ConfidenceValue, UrlIntelligenceResult } from './types'
+import { safeFetchPublicSource } from './safeFetch.ts'
+import type { ConfidenceValue, UrlIntelligenceResult } from './types.ts'
 
 const config = schema.enterprise_config
 const CONFIRM_BELOW = 70

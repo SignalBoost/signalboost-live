@@ -2,12 +2,12 @@
 // Public API for the cultural calendar module.
 // The dashboard imports getGreetingForUser() from here.
 
-import { englishGreeting } from './en'
-import { spanishGreeting } from './es'
-import { portugueseGreeting } from './pt'
-import { polishGreeting } from './pl'
-import { russianGreeting } from './ru'
-import type { GreetingContext, Greeting } from './helpers'
+import { englishGreeting } from './en.ts'
+import { spanishGreeting } from './es.ts'
+import { portugueseGreeting } from './pt.ts'
+import { polishGreeting } from './pl.ts'
+import { russianGreeting } from './ru.ts'
+import type { GreetingContext, Greeting } from './helpers.ts'
 
 export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 export type { GreetingContext, Greeting }

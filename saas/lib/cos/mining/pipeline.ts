@@ -2,10 +2,10 @@
 // Modular ETL: Extract (load raw events) -> Transform (features, K-means, Apriori)
 // -> Load (feature store, segments, rules). One audited run per invocation.
 
-import { getMiningStore } from './storage'
-import { extractFeatures } from './features'
-import { kmeans, apriori } from './algorithms'
-import { SegmentRecord, AssociationRule, MiningRunSummary } from './types'
+import { getMiningStore } from './storage.ts'
+import { extractFeatures } from './features.ts'
+import { kmeans, apriori } from './algorithms.ts'
+import { SegmentRecord, AssociationRule, MiningRunSummary } from './types.ts'
 
 export interface PipelineOptions {
   job: 'daily' | 'weekly' | 'manual'

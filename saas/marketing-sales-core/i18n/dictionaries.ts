@@ -4,7 +4,7 @@
 // validates the same JSON. No inline copy can drift, and the data travels inside
 // the module (self-contained / portable). No English default leaks: every key
 // must exist in every language (enforced by verify-marketing-sales-locale-parity).
-import type { Lang } from '../types'
+import type { Lang } from '../types.ts'
 import en from './data/en.json'
 import es from './data/es.json'
 import pt from './data/pt.json'

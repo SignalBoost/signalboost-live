@@ -1,7 +1,8 @@
+// saas/lib/infra-pr/tool.ts
 // lib/infra-pr/tool.ts
 // Chief of Staff tool. ONE generic tool for ANY provider write. Routes
 // through the policy + simulation and drafts a pending PR. Never executes.
-import { routeInfrastructureWrite } from './router';
+import { routeInfrastructureWrite } from './router.ts';
 
 export const proposeInfrastructurePrTool = {
   type: 'function' as const,

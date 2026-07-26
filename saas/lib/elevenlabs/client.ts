@@ -2,7 +2,7 @@
 // SERVER-SIDE ONLY. Never import this in a 'use client' component.
 // Primary provider: ElevenLabs. Fallback provider: OpenAI speech, when OPENAI_API_KEY is set.
 
-import { DEFAULT_MODEL_ID, findVoice } from "./voices";
+import { DEFAULT_MODEL_ID, findVoice } from "./voices.ts";
 
 const ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1";
 const OPENAI_BASE_URL = "https://api.openai.com/v1";

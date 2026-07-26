@@ -1,4 +1,5 @@
-import type { CosHeroArchetype, CosHeroStrategy, CosHeroStrategyInput } from './types'
+// saas/lib/cos/creative-strategy/hero.ts
+import type { CosHeroArchetype, CosHeroStrategy, CosHeroStrategyInput } from './types.ts'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
 

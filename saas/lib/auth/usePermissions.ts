@@ -4,8 +4,8 @@
 'use client'
 
 import React, { useContext, createContext, ReactNode } from 'react'
-import { HubUser, Permission } from './rbac-types'
-import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service'
+import { HubUser, Permission } from './rbac-types.ts'
+import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service.ts'
 
 // User context - in production, populated by auth provider
 export const UserContext = createContext<HubUser | null>(null)

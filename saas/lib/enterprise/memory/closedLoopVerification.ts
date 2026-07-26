@@ -1,7 +1,8 @@
+// saas/lib/enterprise/memory/closedLoopVerification.ts
 // Deterministic closed-loop verification for approved Enterprise repair plans.
 // This module evaluates fresh observations; it never executes repairs or closes incidents directly.
 
-import type { EnterpriseRepairPlan, RepairPlanStep } from './repairPlanning'
+import type { EnterpriseRepairPlan, RepairPlanStep } from './repairPlanning.ts'
 
 export type VerificationObservation = Readonly<{
   observationId: string

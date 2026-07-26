@@ -1,10 +1,11 @@
+// saas/components/hub/vault/UnlockScreen.tsx
 'use client'
 
 // saas/components/hub/vault/UnlockScreen.tsx
 // Vault access control — password + real TOTP verification before showing secrets.
 
 import { useState } from 'react'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type UnlockScreenProps = {

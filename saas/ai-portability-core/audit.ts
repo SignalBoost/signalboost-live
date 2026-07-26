@@ -7,8 +7,8 @@
  * enterprise-billing summaries.
  */
 
-import { UnifiedResponse, ProviderAttempt } from './schema';
-import { HostContext, AuditRecord } from './host';
+import { UnifiedResponse, ProviderAttempt } from './schema.ts';
+import { HostContext, AuditRecord } from './host.ts';
 
 export class AuditLogger {
   private host: HostContext

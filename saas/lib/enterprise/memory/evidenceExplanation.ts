@@ -1,7 +1,8 @@
+// saas/lib/enterprise/memory/evidenceExplanation.ts
 // Deterministic, bounded explanations derived only from supplied Enterprise Memory evidence.
 
-import type { RankedEnterpriseMemory } from './retrievalRanking'
-import type { EnterpriseEvidenceGraph, EvidenceNode } from './evidenceGraph'
+import type { RankedEnterpriseMemory } from './retrievalRanking.ts'
+import type { EnterpriseEvidenceGraph, EvidenceNode } from './evidenceGraph.ts'
 
 export type EvidenceExplanationItem = {
   nodeId: string

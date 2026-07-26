@@ -1,4 +1,5 @@
-import { ADMIN_SIDEBAR, CRM_STAGES, FORECASTS, getConciergeAnswer } from '../lib/platform/unifiedPlatform'
+// saas/tests/unifiedPlatform.jest.test.ts
+import { ADMIN_SIDEBAR, CRM_STAGES, FORECASTS, getConciergeAnswer } from '../lib/platform/unifiedPlatform.ts'
 
 describe('Unified NASA-style SignalBoost platform', () => {
   test('Concierge handles Marketplace and SaaS queries', () => {

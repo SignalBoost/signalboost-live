@@ -4,7 +4,7 @@
 // (no dependency on the host's /locales folder). Structure parity across the five
 // languages is enforced in CI by scripts/verify-cos-locale-parity.mjs.
 
-import { COS_DICTS, COS_LANGS, CosLang } from './i18n/dictionaries'
+import { COS_DICTS, COS_LANGS, CosLang } from './i18n/dictionaries.ts'
 
 export type { CosLang }
 export { COS_LANGS }

@@ -1,13 +1,14 @@
+// saas/components/hub/pages/VaultV2Page.tsx
 'use client'
 
 // saas/components/hub/pages/KeyVaultV2Page.tsx
 // Vault v2 Wave 1 (W1) — Read-only unlocked view with secrets grid and audit log.
 
 import { useState, useMemo } from 'react'
-import { UnlockScreen, VaultSecretsGrid, VaultAuditLog, ProviderSelect } from '../vault'
+import { UnlockScreen, VaultSecretsGrid, VaultAuditLog, ProviderSelect } from '../vault/index.ts'
 import { VaultSecret, VaultExpirationAlert, VaultAuditLog as VaultAuditLogType, VaultStats } from '@/lib/hub/vault-types'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
-import { PageProps, cardStyle, labelStyle } from '../shared'
+import { PageProps, cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 // Mock data for W1 (read-only demo)

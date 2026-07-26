@@ -1,10 +1,11 @@
+// saas/components/command-control/CommandShell.tsx
 'use client'
 
 import type { ReactNode } from 'react'
-import CommandRail from './CommandRail'
-import MissionBar from './MissionBar'
-import type { CommandPage, CommandPageKey, CommandRailSection } from './types'
-import type { HubData, Lang } from '../hub/shared'
+import CommandRail from './CommandRail.tsx'
+import MissionBar from './MissionBar.tsx'
+import type { CommandPage, CommandPageKey, CommandRailSection } from './types.ts'
+import type { HubData, Lang } from '../hub/shared.tsx'
 
 type CommandShellProps = {
   sections: CommandRailSection[]

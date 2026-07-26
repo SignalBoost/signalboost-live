@@ -4,7 +4,7 @@
 // overlays, SignalBoostAi branding, and www.saas.signalboostapp.com text.
 
 import { fal } from '@fal-ai/client'
-import { BRAND_TEXT } from './brand-schema'
+import { BRAND_TEXT } from './brand-schema.ts'
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://www.saas.signalboostapp.com'

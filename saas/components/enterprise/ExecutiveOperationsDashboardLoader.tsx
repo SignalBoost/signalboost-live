@@ -1,8 +1,9 @@
+// saas/components/enterprise/ExecutiveOperationsDashboardLoader.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import ExecutiveOperationsDashboard from './ExecutiveOperationsDashboard'
+import ExecutiveOperationsDashboard from './ExecutiveOperationsDashboard.tsx'
 import type { OperationsIntelligenceSnapshot } from '@/lib/enterprise/operations/operationsIntelligence'
 import { parseOperationsDashboardApiResponse } from '@/lib/enterprise/operations/operationsDashboardResponse'
 import { getOperationsDashboardStateCopy } from '@/lib/i18n/operationsDashboardStateCopy'

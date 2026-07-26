@@ -5,7 +5,7 @@
 // alive between approval and publish. Swap THIS file to run elsewhere.
 import { fal } from '@fal-ai/client'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { createSignalBoostMarketingHost } from './signalboostHost'
+import { createSignalBoostMarketingHost } from './signalboostHost.ts'
 import type { Actor, MarketingHost } from '@/marketing-sales-core/types'
 import {
   requestVideoForDraft,

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { ConsoleSettings, ApprovalPolicy } from '@/lib/hub/settings-service'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 export function SettingsPage() {

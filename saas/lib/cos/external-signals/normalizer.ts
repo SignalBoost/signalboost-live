@@ -1,4 +1,5 @@
-import type { ExternalSignalIngestionResult, ExternalSignalInput, NormalizedExternalSignal } from './types'
+// saas/lib/cos/external-signals/normalizer.ts
+import type { ExternalSignalIngestionResult, ExternalSignalInput, NormalizedExternalSignal } from './types.ts'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
 

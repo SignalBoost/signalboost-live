@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { VercelDomain, SSLCertificate, Domain } from '@/lib/hub/domains-types'
-import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared'
+import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 export function DomainsPage() {

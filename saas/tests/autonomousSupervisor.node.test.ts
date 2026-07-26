@@ -1,11 +1,12 @@
+// saas/tests/autonomousSupervisor.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import {
   verifySignalBoostSupervisorSignature,
   verifyVercelWebhookSignature,
-} from '../lib/autonomous-supervisor/vercel'
-import { validateDiagnostic } from '../lib/autonomous-supervisor/diagnostic'
+} from '../lib/autonomous-supervisor/vercel.ts'
+import { validateDiagnostic } from '../lib/autonomous-supervisor/diagnostic.ts'
 
 const previousSecret = process.env.COS_SUPERVISOR_WEBHOOK_SECRET
 process.env.COS_SUPERVISOR_WEBHOOK_SECRET = 'test-secret'

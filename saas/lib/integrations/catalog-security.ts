@@ -3,8 +3,8 @@
 // adapters as the sales stack. GitHub Advanced Security and Snyk are wired REAL (both
 // directly API-callable) to prove the audit path end to end; the rest are cataloged with
 // their task templates and light up the moment a method is implemented. Honest throughout.
-import type { IntegrationProvider, IntegrationContext, IntegrationResult } from './types'
-import { registerProvider } from './registry'
+import type { IntegrationProvider, IntegrationContext, IntegrationResult } from './types.ts'
+import { registerProvider } from './registry.ts'
 
 const ok = (data: any, mode: string): IntegrationResult => ({ ok: true, data, mode })
 const bad = (mode: string, error?: string): IntegrationResult => ({ ok: false, mode, error })

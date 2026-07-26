@@ -1,8 +1,8 @@
 // saas/lib/cos/external-signals/live-research.ts
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
-import { ingestExternalSignals } from './normalizer'
-import type { ExternalSignalIngestionResult, ExternalSignalInput } from './types'
+import { ingestExternalSignals } from './normalizer.ts'
+import type { ExternalSignalIngestionResult, ExternalSignalInput } from './types.ts'
 
 function confidenceFromRank(index: number) {
   return Math.max(52, 68 - index * 3)

@@ -2,7 +2,7 @@
 // Per-tenant credential resolution for the integration framework. Each org connects
 // its own provider accounts; this is the single seam that turns a registry adapter
 // into a live, tenant-scoped integration. Service-role reads; RLS protects the rest.
-import type { IntegrationContext } from './types'
+import type { IntegrationContext } from './types.ts'
 
 export interface ConnRow {
   org_id: string

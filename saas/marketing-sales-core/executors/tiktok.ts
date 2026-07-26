@@ -2,9 +2,9 @@
 // tiktok publisher — registered but gated. Requires platform approval before any
 // code can post. Declares publish:false so it is hidden in UI and refused
 // server-side; it can never fabricate a publish.
-import { registerExecutor } from './registry'
-import type { PublishResult } from './types'
-import type { Draft, MarketingHost } from '../types'
+import { registerExecutor } from './registry.ts'
+import type { PublishResult } from './types.ts'
+import type { Draft, MarketingHost } from '../types.ts'
 
 registerExecutor({
   id: 'tiktok',

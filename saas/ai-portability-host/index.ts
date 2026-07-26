@@ -2,6 +2,6 @@
 /**
  * AI Portability — host public surface.
  */
-export { createSignalBoostAiPortabilityHost } from './signalboostHost';
-export { createHttpHandler, toNextHandlers } from './http-handler';
-export type { HttpRequest, HttpResponse } from './http-handler';
+export { createSignalBoostAiPortabilityHost } from './signalboostHost.ts';
+export { createHttpHandler, toNextHandlers } from './http-handler.ts';
+export type { HttpRequest, HttpResponse } from './http-handler.ts';

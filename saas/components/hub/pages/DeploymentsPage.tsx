@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import { Deployment } from '@/lib/hub/deployments-service'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 type DeployMode = 'view' | 'rollback' | 'cancel'

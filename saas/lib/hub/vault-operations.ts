@@ -2,7 +2,7 @@
 // Fetch vault data from Supabase hub_vault_* tables.
 
 import { createClient } from '@supabase/supabase-js'
-import { VaultSecret, VaultAuditLog, VaultStats } from './vault-types'
+import { VaultSecret, VaultAuditLog, VaultStats } from './vault-types.ts'
 
 // Lazy init: read env at request time, not module load, so `next build`
 // page-data collection never fails when build-time env is absent.

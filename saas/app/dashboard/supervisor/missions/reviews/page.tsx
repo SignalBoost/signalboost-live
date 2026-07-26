@@ -1,9 +1,10 @@
+// saas/app/dashboard/supervisor/missions/reviews/page.tsx
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
 import { loadLanguage } from '@/lib/i18n/loadLanguage'
 import { getCurrentUser } from '@/utils/supabase/server'
-import MissionReviewClient from './MissionReviewClient'
+import MissionReviewClient from './MissionReviewClient.tsx'
 
 const locale = (value?: string) => {
   const candidate = (value || 'en').slice(0, 2).toLowerCase()

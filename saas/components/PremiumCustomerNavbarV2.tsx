@@ -1,10 +1,11 @@
+// saas/components/PremiumCustomerNavbarV2.tsx
 'use client'
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import AuthModal from './AuthModal'
+import AuthModal from './AuthModal.tsx'
 import { supabase } from '@/utils/supabase/client'
 
 type NavItem = {

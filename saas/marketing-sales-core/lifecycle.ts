@@ -1,7 +1,7 @@
 // saas/marketing-sales-core/lifecycle.ts
 // Pure state machine. Defines legal transitions and which require a human
 // (management) decision per the Command Control Charter.
-import type { CampaignStatus } from './types'
+import type { CampaignStatus } from './types.ts'
 
 const TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   intake: ['drafting', 'archived'],

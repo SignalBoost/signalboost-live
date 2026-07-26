@@ -7,7 +7,7 @@
 // module portable and auditable. Swap in a trained model later by implementing the same
 // Prediction contract — consumers won't change.
 
-import { FeatureRecord, AssociationRule, FEATURE_NAMES as F } from './mining/types'
+import { FeatureRecord, AssociationRule, FEATURE_NAMES as F } from './mining/types.ts'
 
 export interface Prediction {
   action: string // the predicted next behavioral token, e.g. "transfer@fri"

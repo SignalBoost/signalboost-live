@@ -1,3 +1,4 @@
+// saas/components/hub/vault/RotationModal.tsx
 'use client'
 
 // saas/components/hub/vault/RotationModal.tsx
@@ -6,8 +7,8 @@
 import { useState } from 'react'
 import { VaultSecret } from '@/lib/hub/vault-types'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
-import { MFAVerification } from './index'
-import { cardStyle, labelStyle } from '../shared'
+import { MFAVerification } from './index.ts'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type RotationModalProps = {

@@ -3,10 +3,10 @@
 // placeholders: they read live env/token/destination state and call the same
 // provider-backed services used by /dashboard/outreach/social.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import { getDataStore } from '../dataStore'
-import type { ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import { getDataStore } from '../dataStore.ts'
+import type { ActionSchema } from '../types.ts'
 import { buildOAuthUrl, SOCIAL_CONNECTORS, platformContentKind, platformNeedsAccountRef, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { discoverSocialDestinations } from '@/lib/outreach/social-destinations'
 

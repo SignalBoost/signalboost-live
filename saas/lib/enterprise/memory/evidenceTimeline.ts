@@ -1,8 +1,9 @@
+// saas/lib/enterprise/memory/evidenceTimeline.ts
 // Deterministic timeline reconstruction from normalized, correlated evidence.
 // Timelines preserve observed order and durations; they never invent missing events or claim causation.
 
-import type { EnterpriseEvidenceEvent } from './evidenceBus'
-import type { EvidenceCorrelationLink, EvidenceCorrelationResult } from './evidenceCorrelation'
+import type { EnterpriseEvidenceEvent } from './evidenceBus.ts'
+import type { EvidenceCorrelationLink, EvidenceCorrelationResult } from './evidenceCorrelation.ts'
 
 export type EvidenceTimelineEntry = Readonly<{
   sequence: number

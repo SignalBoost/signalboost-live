@@ -1,4 +1,5 @@
-import type { FundingMode, RenderExecutor, RenderHost, RenderInput, RenderResult } from './types'
+// saas/render-core/engine.ts
+import type { FundingMode, RenderExecutor, RenderHost, RenderInput, RenderResult } from './types.ts'
 
 const REGISTRY = new Map<string, RenderExecutor>()
 

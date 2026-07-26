@@ -1,8 +1,9 @@
+// saas/app/dashboard/supervisor/protocol-capabilities/page.tsx
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
 import { getCurrentUser } from '@/utils/supabase/server'
-import ProtocolCapabilityCatalogClient, { labelsForLocale } from './ProtocolCapabilityCatalogClient'
+import ProtocolCapabilityCatalogClient, { labelsForLocale } from './ProtocolCapabilityCatalogClient.tsx'
 
 const locale = (value?: string) => {
   const candidate = (value || 'en').slice(0, 2).toLowerCase()

@@ -22,7 +22,7 @@ import marketingSalesLocales from './marketingSalesLocales.json'
 import auditCenterLocales from './auditCenterLocales.json'
 import supervisorSocLocales from './supervisorSocLocales.json'
 import homepageLocales from './homepageLocales.json'
-import { mergeDict, mergePageLocales } from './pageLocales'
+import { mergeDict, mergePageLocales } from './pageLocales.ts'
 
 export type DictValue = string | string[] | Dict
 export type Dict = { [key: string]: DictValue }

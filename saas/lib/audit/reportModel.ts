@@ -16,7 +16,7 @@
 //   3. i18n-NATIVE. Customer-facing text is `messageKey` + `params`; the
 //      renderer resolves `t(messageKey + '.title', fallback)` and interpolates.
 
-import type { Severity } from './runner' // 'critical' | 'high' | 'medium' | 'low' | 'info'
+import type { Severity } from './runner.ts' // 'critical' | 'high' | 'medium' | 'low' | 'info'
 
 export type { Severity }
 

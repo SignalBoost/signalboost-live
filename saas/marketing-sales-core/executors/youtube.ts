@@ -2,9 +2,9 @@
 // YouTube publisher — the one real connector. The upload (OAuth + Data API) is
 // implemented in build step 4; this registers the executor and the seam so the
 // shell compiles and the registry is honest about capability today.
-import { registerExecutor } from './registry'
-import type { PublishResult } from './types'
-import type { Draft, MarketingHost } from '../types'
+import { registerExecutor } from './registry.ts'
+import type { PublishResult } from './types.ts'
+import type { Draft, MarketingHost } from '../types.ts'
 
 registerExecutor({
   id: 'youtube',

@@ -5,7 +5,7 @@
 // (credentials resolved through the secrets seam), so the platform is unchanged. The store only
 // ever sees ENCRYPTED token blobs — bank executors encrypt/decrypt before/after calling it.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { getSecret } from './secrets'
+import { getSecret } from './secrets.ts'
 
 export interface BankTokenRow {
   id?: string

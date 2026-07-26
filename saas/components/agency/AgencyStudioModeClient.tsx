@@ -1,7 +1,8 @@
+// saas/components/agency/AgencyStudioModeClient.tsx
 'use client'
 
 import { useState } from 'react'
-import PublicAgencyClient from './PublicAgencyClient'
+import PublicAgencyClient from './PublicAgencyClient.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
 

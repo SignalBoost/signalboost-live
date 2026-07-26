@@ -5,9 +5,9 @@
 // for products, prices, customers, charges, subscriptions, payments, disputes,
 // coupons, and webhook endpoint diagnostics.
 
-import { registerExecutor } from '../defaultHost'
-import { getSecret } from '../secrets'
-import type { ActionField, ActionSchema } from '../types'
+import { registerExecutor } from '../defaultHost.ts'
+import { getSecret } from '../secrets.ts'
+import type { ActionField, ActionSchema } from '../types.ts'
 
 const API = 'https://api.stripe.com'
 const STRIPE_KEY_ENV = ['STRIPE', 'SECRET', 'KEY'].join('_')

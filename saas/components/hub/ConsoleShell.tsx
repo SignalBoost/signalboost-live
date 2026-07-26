@@ -6,9 +6,9 @@
 // expanding into a dedicated workspace, plus utility + system pages. All
 // provider actions run through /api/hub/action (auth + policy + audit).
 
-import CommandConsole from './console/CommandConsole'
+import CommandConsole from './console/CommandConsole.tsx'
 import type { ConsoleTierId } from '@/lib/hub/console-catalog'
-import type { Lang } from './shared'
+import type { Lang } from './shared.tsx'
 
 export default function ConsoleShell({
   lang = 'en',

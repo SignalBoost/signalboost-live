@@ -10,8 +10,8 @@
 import type {
   ContextAssembler, AssembledContext, ExecutionPlan, TurnContext,
   ContextSourceRegistry, BudgetPolicy, ContextBlock, DroppedRecord,
-} from './contracts'
-import { estimateTokens } from './budget-policy'
+} from './contracts.ts'
+import { estimateTokens } from './budget-policy.ts'
 
 export class DefaultContextAssembler implements ContextAssembler {
   private readonly sources: ContextSourceRegistry

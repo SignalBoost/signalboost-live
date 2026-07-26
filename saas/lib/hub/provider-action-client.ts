@@ -1,5 +1,6 @@
-import { planProviderActionSubmission, type ProviderActionSubmission } from './provider-action-submit'
-import type { ProviderExecutionMode } from './provider-execution-modes'
+// saas/lib/hub/provider-action-client.ts
+import { planProviderActionSubmission, type ProviderActionSubmission } from './provider-action-submit.ts'
+import type { ProviderExecutionMode } from './provider-execution-modes.ts'
 
 export type ReviewedProviderCapabilitySnapshot = Readonly<{
   mode: ProviderExecutionMode

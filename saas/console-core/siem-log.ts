@@ -11,7 +11,7 @@
 // zero-dependency peer primitive, so this file names no platform, reads no env, and
 // holds no credentials.
 
-import type { LogAdapter } from './types'
+import type { LogAdapter } from './types.ts'
 import {
   createSiemAuditSink,
   type PortableAuditEvent,

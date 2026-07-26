@@ -1,2 +1,3 @@
-export { buildVideoQualityComparison, scoreVideoCandidate } from './scoring'
-export type { VideoQualityCandidate, VideoQualityComparison, VideoQualityFeature, VideoQualityScore } from './types'
+// saas/lib/cos/video-quality/index.ts
+export { buildVideoQualityComparison, scoreVideoCandidate } from './scoring.ts'
+export type { VideoQualityCandidate, VideoQualityComparison, VideoQualityFeature, VideoQualityScore } from './types.ts'

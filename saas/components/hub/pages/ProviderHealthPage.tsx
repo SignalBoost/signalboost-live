@@ -1,10 +1,11 @@
+// saas/components/hub/pages/ProviderHealthPage.tsx
 'use client'
 
 // saas/components/hub/pages/ProviderHealthPage.tsx
 // Provider Health — split into smaller health monitor pages so providers are not cramped.
 
 import { useMemo, useState } from 'react'
-import { PageProps, TONES, cardStyle, labelStyle, rowStyle } from '../shared'
+import { PageProps, TONES, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 

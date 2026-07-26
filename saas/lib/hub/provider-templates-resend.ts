@@ -3,7 +3,7 @@
 // contacts (add/delete), audiences (create/delete), send test email.
 // Every write action is policy-gated (admin or owner_with_audit).
 
-import type { ProviderTemplate } from './provider-templates'
+import type { ProviderTemplate } from './provider-templates.ts'
 
 export const RESEND_CONSOLE_TEMPLATES: Record<string, ProviderTemplate> = {
   // ── Supabase setup helper ─────────────────────────────────────────────────

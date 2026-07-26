@@ -1,3 +1,4 @@
-export { generateContentDraft } from './generator'
-export type { CosContentWorkerInput, CosContentWorkerOutput } from './types'
-export { generateContentDraftAI } from './aiGenerator'
+// saas/lib/cos/script-worker/index.ts
+export { generateContentDraft } from './generator.ts'
+export type { CosContentWorkerInput, CosContentWorkerOutput } from './types.ts'
+export { generateContentDraftAI } from './aiGenerator.ts'

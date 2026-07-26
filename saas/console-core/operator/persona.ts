@@ -15,7 +15,7 @@ import {
   PRECEDENCE,
   OPERATOR_INVARIANTS,
   OPERATOR_POLICY_VERSION,
-} from './principles'
+} from './principles.ts'
 
 // ── Forbidden behaviors (Module 9 §3) ─────────────────────────────────────────
 export const FORBIDDEN_BEHAVIORS = [

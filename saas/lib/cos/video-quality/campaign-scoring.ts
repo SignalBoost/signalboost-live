@@ -4,9 +4,9 @@
 // "did COSA actually think about everything before publishing" check — it runs
 // automatically on every publish attempt, so no human has to manually review
 // hero/format/CTA/monetization/traffic-plan/branding before something goes live.
-import { buildMarketingDecision } from '../marketing-decision'
-import { scoreVideoCandidate } from './scoring'
-import type { VideoQualityCandidate, VideoQualityScore } from './types'
+import { buildMarketingDecision } from '../marketing-decision/index.ts'
+import { scoreVideoCandidate } from './scoring.ts'
+import type { VideoQualityCandidate, VideoQualityScore } from './types.ts'
 
 const SIGNALBOOST_URL_PATTERN = /saas\.signalboostapp\.com/i
 

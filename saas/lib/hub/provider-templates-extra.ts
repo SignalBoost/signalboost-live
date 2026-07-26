@@ -15,7 +15,7 @@
 //
 // Flat field model mirrors provider-templates.ts. tsconfig strict:false.
 
-import type { ProviderTemplate } from './provider-templates'
+import type { ProviderTemplate } from './provider-templates.ts'
 
 // Buyer-portable default for the GitHub "Repository" picker. Set
 // NEXT_PUBLIC_CONSOLE_DEFAULT_REPO (e.g. "acme/widgets") to pre-select a repo

@@ -1,4 +1,5 @@
-import type { VideoProductionInput, VideoProductionJob, VideoProductionTier } from './types'
+// saas/lib/cos/video-production/planner.ts
+import type { VideoProductionInput, VideoProductionJob, VideoProductionTier } from './types.ts'
 
 const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
 

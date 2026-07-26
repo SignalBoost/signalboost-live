@@ -1,10 +1,11 @@
+// saas/components/hub/vault/MFAVerification.tsx
 'use client'
 
 // saas/components/hub/vault/MFAVerification.tsx
 // Multi-factor authentication for sensitive vault operations (rotation, revocation).
 
 import { useState } from 'react'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 

@@ -1,6 +1,7 @@
-import type { ExternalSignalInput } from '../external-signals'
-import type { MarketingDecision } from '../marketing-decision'
-import type { PresenterVideoDraft } from '../presenter-video'
+// saas/lib/cos/chat-intelligence/types.ts
+import type { ExternalSignalInput } from '../external-signals/index.ts'
+import type { MarketingDecision } from '../marketing-decision/index.ts'
+import type { PresenterVideoDraft } from '../presenter-video/index.ts'
 
 export type CosChatIntelligenceInput = {
   user_text?: string

@@ -3,4 +3,4 @@
 // core (registers site + gated stubs) FIRST, then the real host connectors, which
 // overwrite the matching stub ids. Import THIS from any publish entry point.
 import '@/marketing-sales-core'
-import './executors/social'
+import './executors/social.ts'

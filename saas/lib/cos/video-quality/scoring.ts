@@ -1,5 +1,6 @@
-import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision'
-import type { VideoQualityCandidate, VideoQualityComparison, VideoQualityFeature, VideoQualityScore } from './types'
+// saas/lib/cos/video-quality/scoring.ts
+import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision/index.ts'
+import type { VideoQualityCandidate, VideoQualityComparison, VideoQualityFeature, VideoQualityScore } from './types.ts'
 
 const FEATURES: VideoQualityFeature[] = [
   'hero_selected',

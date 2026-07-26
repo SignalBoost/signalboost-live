@@ -1,4 +1,5 @@
-import type { VideoQuota } from './types'
+// saas/lib/video/subscription.ts
+import type { VideoQuota } from './types.ts'
 /**
  * Calculate video quota, overage, and export eligibility based on tier and duration.
  * Export is enabled for ALL tiers. Tiers only differ in included minutes and overage rate.

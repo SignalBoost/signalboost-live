@@ -10,7 +10,7 @@
 // zero-dependency peer primitive, so this file names no platform, reads no env, and
 // holds no credentials. A buyer's host uses createSiemRenderLog(...) as RenderHost.log.
 
-import type { RenderLogAdapter } from './types'
+import type { RenderLogAdapter } from './types.ts'
 import {
   createSiemAuditSink,
   type PortableAuditEvent,

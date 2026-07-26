@@ -1,9 +1,10 @@
+// saas/lib/enterprise/operations/operationsIntelligence.ts
 // Read-only aggregation contract for the Enterprise Operations Intelligence dashboard.
 // This module summarizes existing evidence-driven outputs; it never mutates incidents, executes repairs, or changes approvals.
 
-import type { ClosedLoopVerificationResult } from '../memory/closedLoopVerification'
-import type { EnterprisePlaybookRegistry, PlaybookStatus } from '../memory/playbookIntelligence'
-import type { OrganizationalRepairLearning } from '../memory/organizationalLearning'
+import type { ClosedLoopVerificationResult } from '../memory/closedLoopVerification.ts'
+import type { EnterprisePlaybookRegistry, PlaybookStatus } from '../memory/playbookIntelligence.ts'
+import type { OrganizationalRepairLearning } from '../memory/organizationalLearning.ts'
 
 export type OperationsIncident = Readonly<{
   incidentId: string

@@ -14,18 +14,18 @@
 
 // Portable contracts: ActionSchema, ActionField, AuthAdapter, LogAdapter,
 // ActionExecutor, ConsoleHost, ProviderMeta, etc.
-export * from './types'
+export * from './types.ts'
 
 // The engine pipeline: runAction(), validateInput(), and the Engine* types.
-export * from './actionEngine'
+export * from './actionEngine.ts'
 
 // The portable registry + host assembler: registerExecutor(), resolveExecutor(),
 // listRegistered(), consoleLogAdapter, createHost(auth, log?).
-export * from './defaultHost'
+export * from './defaultHost.ts'
 
 // The operator subsystem (state machine, safety policy, runbook, persona, …),
 // namespaced to keep the top-level surface clean and collision-free.
-export * as operator from './operator'
+export * as operator from './operator/index.ts'
 
 // NOTE: the bundled provider executors are intentionally NOT re-exported here.
 // They register themselves as a side effect, so wire them explicitly with

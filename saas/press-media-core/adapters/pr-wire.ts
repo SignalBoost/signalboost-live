@@ -6,7 +6,7 @@
 // platform's canonical universal runner (provider_registry config + vault/env secret
 // resolution). Adding a wire brand = a provider_registry row, not code. Host-agnostic:
 // imports only the contract.
-import type { MediaProviderAdapter, PortBundle, RunnerProviderConfig } from '../types'
+import type { MediaProviderAdapter, PortBundle, RunnerProviderConfig } from '../types.ts'
 
 const PROVIDER_ID = 'pr_wire'
 

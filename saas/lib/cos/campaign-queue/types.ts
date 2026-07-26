@@ -1,4 +1,5 @@
-import type { CosCampaign, CosRecommendation } from '../recommendation/types'
+// saas/lib/cos/campaign-queue/types.ts
+import type { CosCampaign, CosRecommendation } from '../recommendation/types.ts'
 
 export type CosCampaignQueueStatus = 'draft' | 'waiting_approval' | 'approved' | 'queued' | 'running' | 'completed' | 'measured' | 'learned' | 'rejected'
 

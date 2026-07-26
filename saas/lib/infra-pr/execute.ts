@@ -1,3 +1,4 @@
+// saas/lib/infra-pr/execute.ts
 // lib/infra-pr/execute.ts
 // Two responsibilities:
 //  1) executeViaEngine — live merge: replays the payload through the host
@@ -8,8 +9,8 @@
 // The dry-run is a *declarative* prediction derived from the action verb +
 // payload shape (a true provider plan needs provider-side dry-run support);
 // it is provider-aware for the 4 core toolkits and falls back generically.
-import type { InfraPr, SimDiff, SimChange, ActionVerb } from './types';
-import { deriveVerb } from './action-policy';
+import type { InfraPr, SimDiff, SimChange, ActionVerb } from './types.ts';
+import { deriveVerb } from './action-policy.ts';
 
 const ENGINE_PATH = process.env.INFRA_PR_ENGINE_PATH || '/api/hub/action';
 

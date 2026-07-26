@@ -1,13 +1,14 @@
+// saas/components/integration-builder/EnterpriseIntegrationBuilder.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useEffect, useMemo, useState } from 'react'
-import IntegrationMetadataPanel from './IntegrationMetadataPanel'
-import ProviderEndpointPanel from './ProviderEndpointPanel'
-import ResponseMappingPanel from './ResponseMappingPanel'
-import GovernancePanel from './GovernancePanel'
-import JsonBlueprintPanel from './JsonBlueprintPanel'
-import { mockApi, type Endpoint, type Option, type Provider, type ProviderSchema } from './mockApi'
+import IntegrationMetadataPanel from './IntegrationMetadataPanel.tsx'
+import ProviderEndpointPanel from './ProviderEndpointPanel.tsx'
+import ResponseMappingPanel from './ResponseMappingPanel.tsx'
+import GovernancePanel from './GovernancePanel.tsx'
+import JsonBlueprintPanel from './JsonBlueprintPanel.tsx'
+import { mockApi, type Endpoint, type Option, type Provider, type ProviderSchema } from './mockApi.ts'
 
 export default function EnterpriseIntegrationBuilder() {
   const [name, setName] = useState(''); const [description, setDescription] = useState(''); const [tags, setTags] = useState<string[]>([])

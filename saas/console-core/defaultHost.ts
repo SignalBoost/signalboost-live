@@ -5,10 +5,10 @@
 // policy live in the host layer (see ../console-host/) and are injected via
 // createHost(). console-core stays provider- and company-agnostic.
 
-import type { AuthAdapter, LogAdapter } from './types'
-import type { EngineHost, RegisteredExecutor } from './actionEngine'
-import { setSecretsResolver, type SecretsResolver } from './secrets'
-import { setConsoleDataStore, type ConsoleDataStore } from './dataStore'
+import type { AuthAdapter, LogAdapter } from './types.ts'
+import type { EngineHost, RegisteredExecutor } from './actionEngine.ts'
+import { setSecretsResolver, type SecretsResolver } from './secrets.ts'
+import { setConsoleDataStore, type ConsoleDataStore } from './dataStore.ts'
 
 // ---- Executor registry ----
 const REGISTRY = new Map<string, RegisteredExecutor>()

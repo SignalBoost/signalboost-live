@@ -1,9 +1,10 @@
+// saas/lib/hub/provider-capability-client.ts
 import type {
   ProviderCapabilityResponse,
   ProviderCapabilityReview,
   ReviewedProviderCapabilitySnapshot,
-} from './provider-action-client'
-import type { ProviderExecutionMode } from './provider-execution-modes'
+} from './provider-action-client.ts'
+import type { ProviderExecutionMode } from './provider-execution-modes.ts'
 
 export type ProviderCapabilityRouteItem = Readonly<{
   mode: ProviderExecutionMode

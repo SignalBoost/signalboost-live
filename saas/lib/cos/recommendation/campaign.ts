@@ -1,5 +1,5 @@
 // saas/lib/cos/recommendation/campaign.ts
-import type { CosCampaign, CosCampaignAsset, CosRecommendation } from './types'
+import type { CosCampaign, CosCampaignAsset, CosRecommendation } from './types.ts'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 function id(prefix: string) {

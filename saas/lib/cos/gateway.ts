@@ -15,7 +15,7 @@ import type {
   IntentRouter, PlanResolver, ContextAssembler,
   EngineRegistry, ToolRegistry, PromptStrategyRegistry,
   ReasoningEngine, EngineInput, LoopPolicy, ChatMessage, ExecutionPlan,
-} from './contracts'
+} from './contracts.ts'
 
 interface LoopOutcome {
   text: string

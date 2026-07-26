@@ -1,5 +1,6 @@
+// saas/components/command-control/types.ts
 import type { ComponentType } from 'react'
-import type { PageProps } from '../hub/shared'
+import type { PageProps } from '../hub/shared.tsx'
 
 export type CommandPageKey =
   | 'dashboard'

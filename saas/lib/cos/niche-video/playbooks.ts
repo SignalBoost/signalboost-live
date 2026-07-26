@@ -1,5 +1,6 @@
-import type { CosSignal } from '../recommendation/types'
-import type { NicheVideoStrategyInput, VideoDistributionChannel } from './types'
+// saas/lib/cos/niche-video/playbooks.ts
+import type { CosSignal } from '../recommendation/types.ts'
+import type { NicheVideoStrategyInput, VideoDistributionChannel } from './types.ts'
 
 export type ProductWalkthroughVideoPlaybook = {
   id: string

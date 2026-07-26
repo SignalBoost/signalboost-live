@@ -6,7 +6,7 @@
 // the theme whose past campaigns drew the most real views, while still exploring.
 import Anthropic from '@anthropic-ai/sdk'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { createSignalBoostMarketingHost } from './signalboostHost'
+import { createSignalBoostMarketingHost } from './signalboostHost.ts'
 import { runDirector, type GeneratedCampaign } from '@/marketing-sales-core/director'
 import { LANGS, type Lang, type Actor, type MarketingHost } from '@/marketing-sales-core/types'
 import { buildFactualPreamble } from '@/portable-kernel'

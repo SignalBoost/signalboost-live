@@ -1,8 +1,9 @@
+// saas/lib/enterprise/memory/organizationalLearning.ts
 // Organizational learning derived only from completed closed-loop verification outcomes.
 // Inconclusive outcomes never change repair effectiveness or confidence.
 
-import type { ClosedLoopVerificationResult } from './closedLoopVerification'
-import type { EnterpriseRepairPlan, RepairPlanStep } from './repairPlanning'
+import type { ClosedLoopVerificationResult } from './closedLoopVerification.ts'
+import type { EnterpriseRepairPlan, RepairPlanStep } from './repairPlanning.ts'
 
 export type RepairLearningSample = Readonly<{
   sampleId: string

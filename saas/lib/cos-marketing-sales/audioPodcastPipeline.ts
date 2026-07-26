@@ -3,7 +3,7 @@
 // Produces structured JSON for a two-host casual tech dialogue before any
 // external audio provider is called.
 
-import type { CosLocale, PodcastInput, PodcastSequence, PodcastSegment } from './types'
+import type { CosLocale, PodcastInput, PodcastSequence, PodcastSegment } from './types.ts'
 
 const HOST_NAMES: Record<CosLocale, { hostA: string; hostB: string; announcer: string }> = {
   en: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },

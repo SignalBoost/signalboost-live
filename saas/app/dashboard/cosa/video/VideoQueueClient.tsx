@@ -1,10 +1,11 @@
+// saas/app/dashboard/cosa/video/VideoQueueClient.tsx
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { getVideoQueueCopy, type VideoQueueItemCopy } from '@/lib/cos/i18n/videoQueueCopy'
 import { getVideoWorkflowCopy } from '@/lib/cos/i18n/videoWorkflowCopy'
-import { ProductionJobsPanel } from './ProductionJobsPanel'
+import { ProductionJobsPanel } from './ProductionJobsPanel.tsx'
 
 const GOLD = '#ffc300'
 

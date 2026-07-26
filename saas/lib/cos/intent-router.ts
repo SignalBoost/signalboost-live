@@ -7,7 +7,7 @@
 //   • the client hint is advisory, never binding.
 // The interface leaves room for an LLM classifier later with zero caller changes.
 // ─────────────────────────────────────────────────────────────────────────────
-import type { IntentRouter, Intent, TurnContext } from './contracts'
+import type { IntentRouter, Intent, TurnContext } from './contracts.ts'
 
 // Tunable knobs, kept explicit so they are testable and auditable.
 const CONFIDENCE_THRESHOLD = 0.6   // below this ⇒ mixed (fail open)

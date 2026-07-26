@@ -4,7 +4,7 @@
 // the adapter models the real workflow (send the insertion-order request to the sales contact,
 // then wait for a tearsheet/affidavit) rather than pretending to automate it. It dispatches via
 // the injected EmailPort — no HTTP, no key. Proof arrives weeks later and the owner records it.
-import type { MediaProviderAdapter, PortBundle, RunnerProviderConfig } from '../types'
+import type { MediaProviderAdapter, PortBundle, RunnerProviderConfig } from '../types.ts'
 
 const PROVIDER_ID = 'direct_io'
 

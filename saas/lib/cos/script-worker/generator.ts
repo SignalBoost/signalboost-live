@@ -1,4 +1,5 @@
-import type { CosContentWorkerInput, CosContentWorkerOutput } from './types'
+// saas/lib/cos/script-worker/generator.ts
+import type { CosContentWorkerInput, CosContentWorkerOutput } from './types.ts'
 
 // Human-prepared (non-AI) outreach generator. Free, deterministic, never fails,
 // no API key. Upgraded July 2026 to be DYNAMIC: each generation picks different

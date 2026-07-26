@@ -1,3 +1,4 @@
+// saas/components/hub/vault/VaultSecretsGrid.tsx
 'use client'
 
 // saas/components/hub/vault/VaultSecretsGrid.tsx
@@ -5,7 +6,7 @@
 
 import { useMemo } from 'react'
 import { VaultSecret, VaultExpirationAlert } from '@/lib/hub/vault-types'
-import { cardStyle, labelStyle } from '../shared'
+import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type VaultSecretsGridProps = {

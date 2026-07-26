@@ -1,10 +1,11 @@
+// saas/lib/autonomous-supervisor/diagnostic.ts
 import {
   SUPERVISOR_THINKER_RESPONSE_SCHEMA,
   SUPERVISOR_THINKER_SYSTEM_PROMPT,
   assertIncidentIdMatches,
   type SupervisorThinkerResponse,
 } from '@/lib/cos/supervisor-thinker-prompt'
-import type { DiagnosticResult, NormalizedIncidentPayload } from './types'
+import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 const METHODS = new Set(['api', 'code_change', 'cli', 'ui_agent', 'human_action', 'no_action'])
 const RISKS = new Set(['low', 'medium', 'high', 'critical'])

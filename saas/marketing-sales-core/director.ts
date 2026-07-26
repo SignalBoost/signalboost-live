@@ -5,8 +5,8 @@
 // core stays portable (an adopter plugs in their own copy engine). Honesty by
 // construction: it only queues a real, non-empty generation, and it caps itself so
 // it can never flood the queue.
-import type { MarketingHost, Lang, Result } from './types'
-import { createCampaign, addDraftsAndQueue } from './flow'
+import type { MarketingHost, Lang, Result } from './types.ts'
+import { createCampaign, addDraftsAndQueue } from './flow.ts'
 
 export type GeneratedCampaign =
   | { objective: string; drafts: Array<{ lang: Lang; title: string; body: string }>; channel?: string }

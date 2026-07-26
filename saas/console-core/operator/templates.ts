@@ -11,7 +11,7 @@
 // ProviderTemplate; an adapter (later) maps existing templates + action-policy
 // entries onto this contract. Portable: imports only Module 1 doctrine.
 
-import { precedenceRank } from './principles'
+import { precedenceRank } from './principles.ts'
 
 void precedenceRank // doctrine reference kept available to enforcement callers
 

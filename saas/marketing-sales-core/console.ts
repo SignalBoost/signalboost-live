@@ -3,7 +3,7 @@
 // org with its current status, language count, and — when published — the real
 // live URL and channel. One read surface for the whole pipeline ("one monitor,
 // one job"). Read-only: it reports state, it never changes it.
-import type { MarketingHost, Campaign, Result } from './types'
+import type { MarketingHost, Campaign, Result } from './types.ts'
 
 export interface ConsoleRow {
   campaign: Campaign

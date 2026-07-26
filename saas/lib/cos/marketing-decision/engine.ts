@@ -1,4 +1,5 @@
-import type { MarketingDecision, MarketingDecisionInput, MarketingFormatChoice, MarketingHeroChoice, MarketingSceneDesign, MarketingSignal } from './types'
+// saas/lib/cos/marketing-decision/engine.ts
+import type { MarketingDecision, MarketingDecisionInput, MarketingFormatChoice, MarketingHeroChoice, MarketingSceneDesign, MarketingSignal } from './types.ts'
 import { hostBrandName, isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
 

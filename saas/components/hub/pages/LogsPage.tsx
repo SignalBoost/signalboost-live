@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { AuditLog } from '@/lib/hub/logs-service'
-import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared'
+import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 interface LogStats {

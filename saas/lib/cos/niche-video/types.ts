@@ -1,4 +1,5 @@
-import type { CosSignal } from '../recommendation/types'
+// saas/lib/cos/niche-video/types.ts
+import type { CosSignal } from '../recommendation/types.ts'
 
 export type NicheVideoObjective = 'awareness' | 'education' | 'lead_generation' | 'conversion' | 'trust_building'
 

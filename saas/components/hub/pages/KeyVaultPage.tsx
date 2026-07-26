@@ -1,3 +1,4 @@
+// saas/components/hub/pages/KeyVaultPage.tsx
 'use client'
 
 // saas/components/hub/pages/KeyVaultPage.tsx
@@ -6,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { PageProps, Lang, c, TONES, Tone, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Band, Status } from '../shared'
+import { PageProps, Lang, c, TONES, Tone, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Band, Status } from '../shared.tsx'
 
 const V: Record<string, Record<Lang, string>> = {
   mySafe:      { en: 'My Safe', es: 'Mi Caja Fuerte', pt: 'Meu Cofre', pl: 'Mój Sejf', ru: 'Мой сейф' },

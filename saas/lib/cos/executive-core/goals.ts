@@ -1,4 +1,5 @@
-import type { CompanyGoal } from './types'
+// saas/lib/cos/executive-core/goals.ts
+import type { CompanyGoal } from './types.ts'
 
 const now = () => new Date().toISOString()
 

@@ -1,8 +1,8 @@
 // saas/lib/cultural-calendar/ru.ts
 // Russian greetings - includes именины (name days), Russian holidays, day-of-week.
 
-import { GreetingContext, Greeting, pick, fill, inRange, timeOfDay } from './helpers'
-import { getRussianNamedaysForDate } from './ru-namedays'
+import { GreetingContext, Greeting, pick, fill, inRange, timeOfDay } from './helpers.ts'
+import { getRussianNamedaysForDate } from './ru-namedays.ts'
 
 export function russianGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx

@@ -1,6 +1,7 @@
-import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision'
-import { buildPresenterVideoDraft } from '../presenter-video'
-import type { CosChatIntelligence, CosChatIntelligenceInput } from './types'
+// saas/lib/cos/chat-intelligence/build.ts
+import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision/index.ts'
+import { buildPresenterVideoDraft } from '../presenter-video/index.ts'
+import type { CosChatIntelligence, CosChatIntelligenceInput } from './types.ts'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 
 const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'

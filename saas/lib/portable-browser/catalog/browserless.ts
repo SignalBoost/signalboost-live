@@ -1,3 +1,4 @@
+// saas/lib/portable-browser/catalog/browserless.ts
 import { freezePortableBrowserAdapterDescriptor } from '../browser-adapter-descriptor.ts'
 
 export const browserlessDescriptor = freezePortableBrowserAdapterDescriptor({
@@ -14,7 +15,7 @@ export const browserlessDescriptor = freezePortableBrowserAdapterDescriptor({
   humanControlCapabilities: ['exclusive_takeover'],
   evidenceCapabilities: ['replay_reference'],
   complianceMetadataKeys: ['tenant_isolation', 'approved_origins'],
-  configurationFieldDefinitions: [],
+  configurationFieldDefinitions:[{key:'endpoint',type:'url',required:true,description:'Browserless websocket endpoint the session connects to (wss). The shipped adapter accepts /, /chromium, /chrome or /chromium/playwright.'},{key:'credentialReference',type:'opaque_reference',required:true,description:'Vault reference resolving to the Browserless token. Supply a reference, never the secret itself.'},{key:'approvedOrigins',type:'string',required:true,description:'Comma-separated origins the session is permitted to visit. Anything else is refused.'}],
   documentationReference: 'docs/portables/browser-agent-adapter-catalog.md',
   vendorDependencyInstalled: false,
   productionEnabled: false,

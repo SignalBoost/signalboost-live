@@ -11,6 +11,7 @@ export { commercialReadinessDimensions, createPortableCommercialReadinessReport,
 export { portablePackageManifestSchemaVersion, validatePortablePackageManifest } from './package-manifest.ts'
 export { createPortableBuyerHandoffManifest, portableBuyerHandoffManifestSchemaVersion } from './buyer-handoff-manifest.ts'
 export { portableLicenseEvidenceSchemaVersion, validatePortableLicenseEvidence } from './license-evidence.ts'
+export { createPortableLicensingFulfillmentEvidence, portableLicensingFulfillmentEvidenceSchemaVersion } from './licensing-fulfillment-evidence.ts'
 export type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 export type { PortableProductCategory, PortableProductDescriptor, PortableProductImplementationClassification, PortableProductImplementationStatus, PortableProductStatus } from './product-types.ts'
 export type { PortableGraphEdge, PortableGraphEdgeType, PortableGraphNode, PortableGraphNodeType, PortableProductDependencyGraph } from './dependency-graph.ts'
@@ -20,3 +21,4 @@ export type { PortableCommercialReadinessCheck, PortableCommercialReadinessDimen
 export type { PortablePackageManifestBlocker } from './package-manifest.ts'
 export type { PortableBuyerHandoffArtifact, PortableBuyerHandoffArtifactKind, PortableBuyerHandoffManifest, PortableBuyerHandoffManifestInput } from './buyer-handoff-manifest.ts'
 export type { PortableLicenseEvidenceBlocker } from './license-evidence.ts'
+export type { PortableCommercialEvidenceInput, PortableCommercialEvidenceStatus, PortableLicensingFulfillmentEvidence, PortableLicensingFulfillmentEvidenceInput } from './licensing-fulfillment-evidence.ts'

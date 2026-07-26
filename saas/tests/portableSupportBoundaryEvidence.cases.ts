@@ -1,3 +1,4 @@
+// saas/tests/portableSupportBoundaryEvidence.cases.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -7,7 +8,7 @@ const base = Object.freeze({
   productId: 'provider-hub',
   tenantId: 'tenant-1',
   environmentId: 'production-us',
-  supportOwner: 'SignalBoost Portable Support',
+  supportOwner: 'Portable Support Team',
   serviceWindow: 'business-hours-us-eastern',
   responseTargets: ['severity-1:4h', 'severity-2:1-business-day'],
   escalationPathReference: 'urn:portable:support:escalation:provider-hub',

@@ -1,3 +1,4 @@
+// saas/lib/portable-products/support-boundary-evidence.ts
 import { getPortableProduct } from './product-selectors.ts'
 
 export const portableSupportBoundaryEvidenceSchemaVersion = 'portable-support-boundary-evidence.v1' as const

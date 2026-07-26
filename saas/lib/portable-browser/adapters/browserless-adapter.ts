@@ -1,3 +1,4 @@
+// saas/lib/portable-browser/adapters/browserless-adapter.ts
 import type {
   BrowserSessionFactory,
   BrowserSessionLaunchRequest,
@@ -6,7 +7,7 @@ import type {
 import { sanitizeBrowserRuntimeError } from '../../browser-runtime/error-sanitizer.ts'
 
 const BROWSERLESS_ADAPTER_ID = 'browserless'
-const SANDBOX_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 const SUPPORTED_PATHS = new Set(['/', '/chromium', '/chrome', '/chromium/playwright'])
 
 export interface BrowserlessCredentialBrokerPort {
@@ -33,15 +34,27 @@ function requireNonEmptyString(value: unknown, errorCode: string): string {
   return value
 }
 
-function normalizeSandboxOrigin(value: string): string {
+// ORIGIN POLICY. The buyer declares the origins this session may visit and NOTHING else is
+// reachable. The allowlist must be non-empty, each entry must be an exact origin, and every
+// origin on a launch request must already be in it. Plaintext http is confined to loopback.
+// This adapter is meant to drive a buyer's real application, so the allowlist is the cage —
+// not an artificial restriction to localhost.
+function normalizeApprovedOrigin(value: string): string {
   let parsed: URL
   try {
     parsed = new URL(value)
   } catch {
     throw new Error('browserless_invalid_origin')
   }
-  if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol)) throw new Error('browserless_invalid_origin')
-  if (!SANDBOX_HOSTS.has(parsed.hostname)) throw new Error('browserless_external_origin_rejected')
+  // An exact origin only: no path, query, fragment, or embedded credentials.
+  if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
+    throw new Error('browserless_invalid_origin')
+  }
+  // Plaintext http is permitted ONLY for loopback, so a buyer can run locally without
+  // weakening what a production origin has to be.
+  if (parsed.protocol === 'http:' && !LOOPBACK_HOSTS.has(parsed.hostname)) {
+    throw new Error('browserless_insecure_origin_rejected')
+  }
   return parsed.origin
 }
 
@@ -66,7 +79,7 @@ function assertApprovedRequest(request: BrowserSessionLaunchRequest, approvedOri
   if (request.mode === 'execute_change') throw new Error('browserless_execute_change_rejected')
   if (request.allowedOrigins.length === 0) throw new Error('browserless_origin_required')
   for (const value of request.allowedOrigins) {
-    const origin = normalizeSandboxOrigin(value)
+    const origin = normalizeApprovedOrigin(value)
     if (!approvedOrigins.has(origin)) throw new Error('browserless_origin_rejected')
   }
 }
@@ -93,7 +106,7 @@ export class BrowserlessSessionFactory implements BrowserSessionFactory {
     if (!configuration.connection || typeof configuration.connection.connect !== 'function') {
       throw new Error('browserless_connection_required')
     }
-    this.approvedOrigins = new Set(configuration.approvedOrigins.map(normalizeSandboxOrigin))
+    this.approvedOrigins = new Set(configuration.approvedOrigins.map(normalizeApprovedOrigin))
     if (this.approvedOrigins.size === 0) throw new Error('browserless_origin_required')
     this.credentialBroker = configuration.credentialBroker
     this.connection = configuration.connection
@@ -138,7 +151,7 @@ export function validateBrowserlessAdapterConfiguration(value: unknown): value i
   try {
     normalizeEndpoint(configuration.endpoint)
     return configuration.approvedOrigins.length > 0
-      && configuration.approvedOrigins.every(origin => typeof origin === 'string' && normalizeSandboxOrigin(origin) === origin)
+      && configuration.approvedOrigins.every(origin => typeof origin === 'string' && normalizeApprovedOrigin(origin) === origin)
   } catch {
     return false
   }

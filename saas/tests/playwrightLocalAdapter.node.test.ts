@@ -1,3 +1,4 @@
+// saas/tests/playwrightLocalAdapter.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { BrowserSessionPort } from '../lib/browser-runtime/contracts.ts'
@@ -58,7 +59,7 @@ test('rejects execute_change and unapproved origins before launching a browser',
   })
 
   await assert.rejects(factory.open(request({ mode: 'execute_change' })), /playwright_execute_change_rejected/)
-  await assert.rejects(factory.open(request({ allowedOrigins: ['https://example.com'] })), /playwright_external_origin_rejected/)
+  await assert.rejects(factory.open(request({ allowedOrigins: ['https://example.com'] })), /playwright_origin_rejected/)
   await assert.rejects(factory.open(request({ allowedOrigins: ['http://localhost:3000'] })), /playwright_origin_rejected/)
   assert.equal(launches, 0)
 })
@@ -71,7 +72,11 @@ test('validates engines, configuration shape, and launcher failures', async () =
   }
   assert.equal(validatePlaywrightLocalAdapterConfiguration(valid), true)
   assert.equal(validatePlaywrightLocalAdapterConfiguration({ ...valid, engine: 'chrome' }), false)
-  assert.equal(validatePlaywrightLocalAdapterConfiguration({ ...valid, approvedOrigins: ['https://example.com'] }), false)
+  // A buyer production origin is VALID now — the allowlist is the cage, not localhost.
+  // What must still fail closed is a downgraded or malformed origin.
+  assert.equal(validatePlaywrightLocalAdapterConfiguration({ ...valid, approvedOrigins: ['https://example.com'] }), true)
+  assert.equal(validatePlaywrightLocalAdapterConfiguration({ ...valid, approvedOrigins: ['http://app.acme.com'] }), false)
+  assert.equal(validatePlaywrightLocalAdapterConfiguration({ ...valid, approvedOrigins: ['https://acme.com/app'] }), false)
 
   const factory = new PlaywrightLocalSessionFactory({
     ...valid,

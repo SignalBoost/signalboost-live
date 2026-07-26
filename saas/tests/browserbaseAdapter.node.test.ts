@@ -1,3 +1,4 @@
+// saas/tests/browserbaseAdapter.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { BrowserSessionPort } from '../lib/browser-runtime/contracts.ts'
@@ -47,21 +48,30 @@ test('Browserbase factory rejects external, unapproved, and execute_change launc
   const factory = createFactory({ createSession: async () => { throw new Error('must not create') }, connect: async () => session }, {
     resolveBrowserbaseApiKey: async () => { credentialReads += 1; return 'test-broker-key' },
   })
-  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['https://github.com'] }), /browserbase_external_origin_rejected/)
+  // A production origin is legitimate now; what makes it safe is that it must be in the
+  // buyer's declared allowlist. An origin the buyer never named is still refused.
+  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['https://github.com'] }), /browserbase_origin_rejected/)
   await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['http://127.0.0.1:4173'] }), /browserbase_origin_rejected/)
   await assert.rejects(factory.open({ ...launchRequest, mode: 'execute_change' }), /browserbase_execute_change_rejected/)
   assert.equal(credentialReads, 0)
 })
 
-test('Browserbase configuration rejects external origins before a factory can be created', () => {
+test('Browserbase accepts a buyer production origin and still fails closed on a bad one', () => {
   const credentialBroker = { resolveBrowserbaseApiKey: async () => 'test-broker-key' }
   const transport = { createSession: async () => ({ sessionId: 'session', connectUrl: 'wss://example.test' }), connect: async () => session }
+
+  // A real buyer origin is the point of the adapter — the allowlist is the cage, not localhost.
   assert.equal(validateBrowserbaseAdapterConfiguration({
-    projectId: 'buyer-project', approvedOrigins: ['https://github.com'], credentialBroker, transport,
-  }), false)
+    projectId: 'buyer-project', approvedOrigins: ['https://app.acme.com'], credentialBroker, transport,
+  }), true)
+
+  // Downgraded transport and malformed origins still fail closed.
   assert.throws(() => new BrowserbaseSessionFactory({
-    projectId: 'buyer-project', approvedOrigins: ['https://github.com'], credentialBroker, transport,
-  }), /browserbase_external_origin_rejected/)
+    projectId: 'buyer-project', approvedOrigins: ['http://app.acme.com'], credentialBroker, transport,
+  }), /browserbase_insecure_origin_rejected/)
+  assert.throws(() => new BrowserbaseSessionFactory({
+    projectId: 'buyer-project', approvedOrigins: ['https://acme.com/app'], credentialBroker, transport,
+  }), /browserbase_invalid_origin/)
 })
 
 test('Browserbase factory sanitizes broker key material from transport errors', async () => {

@@ -92,9 +92,36 @@ test('an origin outside the allowlist is refused — a session cannot roam', asy
   }
 })
 
-test('an external origin is refused before it ever reaches the allowlist check', () => {
+test('a buyer PRODUCTION origin is accepted — these adapters drive real applications', async () => {
   for (const id of Object.keys(FACTORIES)) {
-    assert.throws(() => build(id, { approvedOrigins: ['https://app.example.com'] }), new RegExp(`${id}_external_origin_rejected`))
+    const production = 'https://app.acme.com'
+    const factory = build(id, { approvedOrigins: [production] })
+    const opened = await factory.open(launch(id, { allowedOrigins: [production] }))
+    assert.ok(opened, `${id} refused a legitimate buyer origin`)
+  }
+})
+
+test('the allowlist is the cage: an origin the buyer never declared is refused', async () => {
+  for (const id of Object.keys(FACTORIES)) {
+    const factory = build(id, { approvedOrigins: ['https://app.acme.com'] })
+    await assert.rejects(
+      () => factory.open(launch(id, { allowedOrigins: ['https://evil.example.com'] })),
+      new RegExp(`${id}_origin_rejected`),
+    )
+  }
+})
+
+test('plaintext http is refused outside loopback, so a production origin cannot be downgraded', () => {
+  for (const id of Object.keys(FACTORIES)) {
+    assert.throws(() => build(id, { approvedOrigins: ['http://app.acme.com'] }), new RegExp(`${id}_insecure_origin_rejected`))
+  }
+})
+
+test('a wildcard, a path, or embedded credentials are refused as origins', () => {
+  for (const id of Object.keys(FACTORIES)) {
+    for (const bad of ['https://acme.com/*', 'https://acme.com/app', 'https://user:pw@acme.com']) {
+      assert.throws(() => build(id, { approvedOrigins: [bad] }), new RegExp(`${id}_invalid_origin`), `${id} accepted ${bad}`)
+    }
   }
 })
 

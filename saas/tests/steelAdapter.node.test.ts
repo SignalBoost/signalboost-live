@@ -1,3 +1,4 @@
+// saas/tests/steelAdapter.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { BrowserSessionPort } from '../lib/browser-runtime/contracts.ts'
@@ -75,7 +76,7 @@ test('Steel factory rejects external origins and execute_change before credentia
     },
   })
 
-  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['https://example.com'] }), /steel_external_origin_rejected/)
+  await assert.rejects(factory.open({ ...launchRequest, allowedOrigins: ['https://example.com'] }), /steel_origin_rejected/)
   await assert.rejects(factory.open({ ...launchRequest, mode: 'execute_change' }), /steel_execute_change_rejected/)
   assert.equal(credentialReads, 0)
 })
@@ -142,5 +143,9 @@ test('Steel configuration validation fails closed', () => {
   assert.equal(validateSteelAdapterConfiguration(valid), true)
   assert.equal(validateSteelAdapterConfiguration({ ...valid, apiBaseUrl: 'http://api.steel.dev' }), false)
   assert.equal(validateSteelAdapterConfiguration({ ...valid, connectOrigin: 'wss://connect.steel.dev?apiKey=embedded' }), false)
-  assert.equal(validateSteelAdapterConfiguration({ ...valid, approvedOrigins: ['https://github.com'] }), false)
+  // A buyer production origin is VALID now — the allowlist is the cage, not localhost.
+  // What must still fail closed is a downgraded or malformed origin.
+  assert.equal(validateSteelAdapterConfiguration({ ...valid, approvedOrigins: ['https://github.com'] }), true)
+  assert.equal(validateSteelAdapterConfiguration({ ...valid, approvedOrigins: ['http://app.acme.com'] }), false)
+  assert.equal(validateSteelAdapterConfiguration({ ...valid, approvedOrigins: ['https://acme.com/app'] }), false)
 })

@@ -1,3 +1,4 @@
+// saas/tests/portableLicenseEvidence.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -9,7 +10,7 @@ const base = Object.freeze({
   environmentId: 'production-us',
   capability: 'provider-connections',
   decision: 'entitled',
-  entitlementReference: 'urn:signalboost:entitlement:example',
+  entitlementReference: 'urn:portable:entitlement:example',
   evaluatedAt: '2026-07-26T21:00:00.000Z',
   expiresAt: '2027-07-26T21:00:00.000Z',
   readOnly: true,
@@ -28,6 +29,14 @@ test('validates immutable read-only entitlement evidence', () => {
   assert.equal(result.entitlementReference, base.entitlementReference)
   assert.ok(Object.isFrozen(result))
   assert.ok(Object.isFrozen(result.blockers))
+})
+
+test('accepts safe URL and opaque URN entitlement references', () => {
+  for (const entitlementReference of ['urn:portable:entitlement:example', 'https://license.example.test/evidence/123']) {
+    const result = validatePortableLicenseEvidence({ ...base, entitlementReference })
+    assert.equal(result.state, 'license_evidence_validated')
+    assert.equal(result.entitlementReference, entitlementReference)
+  }
 })
 
 test('permits pending and not-entitled decisions without entitlement references', () => {

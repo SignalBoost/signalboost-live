@@ -246,6 +246,21 @@ It exits non-zero unless every category passes every check, so it belongs in you
 pipeline: a regression in approval gating then fails the deploy rather than reaching
 production. `--category destructive` narrows it to one route while you are wiring up.
 
+On the build platform's own deployment the same scenario also runs behind an owner-only
+endpoint, because that is the only place its mailer key and owner addresses resolve:
+
+```
+POST /api/autonomous-supervisor/acceptance
+```
+
+It answers 200 only when every check passes and 409 when any fails, so a green response is
+unambiguous. It sends real notifications to the configured approvers — that is the point, not
+a side effect. `?category=destructive` narrows it the same way the CLI flag does.
+
+A buyer does not need that endpoint; the command above is the portable path. It exists because
+the vendor has to produce its own acceptance evidence, and the record it emits is the same
+artifact a buyer will produce.
+
 Or call the scenario directly:
 
 ```ts

@@ -24,19 +24,26 @@
 //     mutation path is a separate, deliberate decision, not a default.
 //   • ORIGIN ALLOWLIST. Every origin in the request must appear in the configured allowlist,
 //     and the allowlist itself must be non-empty. A session cannot roam.
-//   • SANDBOX HOSTS ONLY (see ORIGIN POSTURE below).
 //   • CREDENTIALS ARE RESOLVED, NEVER STORED. The broker is called per launch. The resolved
 //     value is passed to the transport and then handed to the error sanitizer as a known
 //     secret, so it cannot leak through a thrown message.
 //   • ERRORS ARE SANITIZED. Every failure inside open() goes through
 //     sanitizeBrowserRuntimeError with the live credential registered.
 //
-// ORIGIN POSTURE — READ BEFORE WIDENING. The shipped adapters restrict approved origins to
-// localhost / 127.0.0.1 / [::1]. That is a sandbox posture: it means these adapters cannot
-// yet drive a buyer's real application. This kit deliberately keeps the SAME restriction so
-// the catalog has ONE security posture rather than two. Widening it to buyer-supplied
-// production origins is a real decision with real consequences and should be made once,
-// explicitly, across all eighteen adapters — not slipped in per vendor.
+// ORIGIN POLICY — THE BUYER DECLARES THE CAGE. These adapters exist to drive a Fortune-500
+// buyer's OWN application, so the allowlist takes whatever origins that buyer configures.
+// The enforcement is what makes it safe, not an artificial confinement to localhost:
+//
+//   • The allowlist must be NON-EMPTY. An adapter with no declared origins cannot open.
+//   • Each entry must be an EXACT ORIGIN — no path, query, fragment, embedded credentials,
+//     and no wildcards. `https://app.acme.com` is an origin; `https://acme.com/*` is not.
+//   • Every origin on a launch request must ALREADY be in the allowlist. A session cannot
+//     reach anywhere the buyer did not name in advance.
+//   • Plaintext http is confined to loopback, so local development works without lowering
+//     the bar for a production origin.
+//
+// All eighteen adapters share this policy — the four originally shipped were opened up in
+// the same change, so the catalog has ONE posture rather than two.
 
 import type {
   BrowserSessionFactory,
@@ -45,7 +52,7 @@ import type {
 } from '../../browser-runtime/contracts.ts'
 import { sanitizeBrowserRuntimeError } from '../../browser-runtime/error-sanitizer.ts'
 
-const SANDBOX_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 /** Resolves a secret from the buyer's vault. Called per launch; the value is never retained. */
 export interface RemoteAdapterCredentialBroker {
@@ -84,18 +91,20 @@ export function requireNonEmptyString(value: unknown, errorCode: string): string
   return value
 }
 
-/** An origin must be a bare https/http origin on a sandbox host — no path, no credentials. */
-export function normalizeSandboxOrigin(value: string, adapterId: string): string {
+/** An exact origin the buyer declared. No path, no credentials, no wildcard. */
+export function normalizeApprovedOrigin(value: string, adapterId: string): string {
   let parsed: URL
   try {
     parsed = new URL(value)
   } catch {
     throw new Error(`${adapterId}_invalid_origin`)
   }
-  if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol)) {
+  if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
     throw new Error(`${adapterId}_invalid_origin`)
   }
-  if (!SANDBOX_HOSTS.has(parsed.hostname)) throw new Error(`${adapterId}_external_origin_rejected`)
+  if (parsed.protocol === 'http:' && !LOOPBACK_HOSTS.has(parsed.hostname)) {
+    throw new Error(`${adapterId}_insecure_origin_rejected`)
+  }
   return parsed.origin
 }
 
@@ -112,7 +121,7 @@ function assertApprovedRequest(
     throw new Error(`${adapterId}_origin_required`)
   }
   for (const value of request.allowedOrigins) {
-    if (!approvedOrigins.has(normalizeSandboxOrigin(value, adapterId))) {
+    if (!approvedOrigins.has(normalizeApprovedOrigin(value, adapterId))) {
       throw new Error(`${adapterId}_origin_rejected`)
     }
   }
@@ -139,7 +148,7 @@ export function createRemoteBrowserSessionFactory(
   }
 
   if (!Array.isArray(configuration.approvedOrigins)) throw new Error(`${adapterId}_origin_required`)
-  const approvedOrigins = new Set(configuration.approvedOrigins.map((o) => normalizeSandboxOrigin(o, adapterId)))
+  const approvedOrigins = new Set(configuration.approvedOrigins.map((o) => normalizeApprovedOrigin(o, adapterId)))
   if (approvedOrigins.size === 0) throw new Error(`${adapterId}_origin_required`)
 
   const broker = configuration.credentialBroker

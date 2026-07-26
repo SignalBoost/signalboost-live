@@ -60,20 +60,11 @@ test('a sink failure never throws back into the executor', async () => {
 })
 
 test('the whole buyer import graph has zero host coupling, except touchpoints named here', () => {
-  // The integration guide promises the buyer that the portable "names no platform, reads no
-  // process.env, and imports no host singleton". That promise covers everything their import
-  // reaches — not the two files this test used to check by hand. A buyer's security architect
-  // greps the whole graph, so this test walks the whole graph.
-  //
-  // Entry points are exactly what §5 of the guide tells them to import.
   const entries = [
     '../lib/supervisor/portable/index.ts',
     '../lib/supervisor/executors/create-supervisor-dispatcher.ts',
   ]
 
-  // Touchpoints that exist on purpose. Each one is listed with the reason it is acceptable,
-  // so this test states the exceptions instead of hiding them. The assertion at the end is
-  // that this set does not GROW: any new coupling anywhere in the graph fails the suite.
   const known = new Map([
     ['lib/supervisor/executors/create-supervisor-dispatcher.ts',
       'lazy import of the platform email notifier, reached only when the buyer supplies neither a HostContext nor a notifier'],
@@ -81,10 +72,6 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
       'lazy import of the platform provider engine as the DEFAULT api step runner; a buyer passes their own runner'],
     ['lib/supervisor/executors/dispatch-store.ts',
       'process.env is confined to platformSupervisorRuntime(), a platform-only helper the buyer never calls'],
-    ['lib/supervisor/executors/browser/browser-runtime-mapper.ts',
-      'BUYER-VISIBLE: emits adapterId "signalboost.browser-runtime.dry-run.v1" into evidence records'],
-    ['lib/browser-runtime/sandbox-adapter.ts',
-      'BUYER-VISIBLE: SANDBOX_ADAPTER_ID is "signalboost.sandbox.v1"'],
   ])
 
   const seen = new Set()
@@ -95,7 +82,6 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
     if (seen.has(file) || !existsSync(file)) return
     seen.add(file)
     const raw = readFileSync(file, 'utf8')
-    // Strip comments first: a file may legitimately DISCUSS process.env in prose.
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
     const hits = []
     if (/process\.env/.test(code)) hits.push('process.env')
@@ -117,8 +103,6 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
 })
 
 test('the portable boundary modules themselves are unconditionally clean', () => {
-  // No exceptions permitted in lib/supervisor/portable/** — this is the surface the buyer
-  // implements against, and it must be readable as host-neutral without caveats.
   for (const name of ['host-context.ts', 'enterprise-notifier.ts', 'enterprise-dispatch-store.ts', 'siem-audit-sink.ts', 'index.ts']) {
     const file = fileURLToPath(new URL(`../lib/supervisor/portable/${name}`, import.meta.url))
     const raw = readFileSync(file, 'utf8')

@@ -80,11 +80,23 @@ test('Self-Healing Supervisor is architecture-complete while buyer go-live remai
   assert.equal(descriptor?.route, '/dashboard/supervisor')
 })
 
-test('descriptor products remain fail-closed', () => {
+test('Browser Agent Ecosystem is architecture-complete while production execution remains excluded', () => {
   const report = createPortableArchitectureClosureReport()
   const browserAgents = report.entries.find(entry => entry.productId === 'browser-agent-ecosystem')
-  assert.equal(browserAgents?.state, 'descriptor-only')
-  assert.ok((browserAgents?.blockers.length ?? 0) > 0)
-  assert.equal(report.closed, false)
-  assert.equal(report.completionPercent, Math.round((report.completeCount / report.totalCount) * 100))
+  const descriptor = portableProductRegistry.find(entry => entry.manifest.productId === 'browser-agent-ecosystem')
+  assert.equal(browserAgents?.state, 'complete')
+  assert.deepEqual(browserAgents?.blockers, [])
+  assert.equal(browserAgents?.coreBoundary, 'saas/lib/portable-browser')
+  assert.equal(browserAgents?.hostBoundary, 'PortableBrowserRuntimeCoordinator + buyer-injected ports')
+  assert.equal(descriptor?.implementationStatus, 'implemented')
+  assert.equal(descriptor?.manifest.status, 'preview')
+  assert.equal(descriptor?.manifest.licensingAvailable, false)
+  assert.ok(descriptor?.manifest.exclusions.includes('production-browser-execution'))
+})
+
+test('all registered portable architecture boundaries are closed', () => {
+  const report = createPortableArchitectureClosureReport()
+  assert.equal(report.completeCount, report.totalCount)
+  assert.equal(report.completionPercent, 100)
+  assert.equal(report.closed, true)
 })

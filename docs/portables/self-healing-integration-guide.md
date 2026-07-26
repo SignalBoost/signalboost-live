@@ -156,6 +156,7 @@ second trail in the same call.
 
 ```ts
 import {
+  createEnterpriseNotifier,
   createEnterpriseDispatchStore,
   createSiemAuditSink,
   type HostContext,
@@ -171,18 +172,46 @@ const host: HostContext = {
 }
 
 // 2. Durable ledger on your database.
-const dispatchStore = createEnterpriseDispatchStore({ sql: myExecutor })
+const store = createEnterpriseDispatchStore({ sql: myExecutor })
 
 // 3. Audit to your SIEM.
-const audit = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
+const auditSink = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
 
 // 4. Wire the dispatcher in enterprise mode (host-driven, not platform email).
-const dispatcher = createSupervisorDispatcher({ host, dispatchStore, audit })
+const dispatcher = createSupervisorDispatcher({ host, store, auditSink })
 ```
 
 On the SignalBoost test rig the same factory is called with no `host` and falls back
 to a platform email notifier — that fallback is the only place the platform's own
 email is touched, and it does not run on your deployment.
+
+### 5.1 Approvers before you have an IdP adapter
+
+`ApproverDirectory` is one method, but writing it against Okta or Entra is a project, and
+until it exists the supervisor cannot pause a dangerous step and address the request to
+anyone. So the portable ships a reference you configure instead of implement:
+
+```ts
+import { createStaticApproverDirectory } from 'lib/supervisor/portable'
+
+const approvers = createStaticApproverDirectory({
+  financial: [{ id: 'finance', address: 'finance@acme.com' }],
+  destructive: [{ id: 'sre-oncall', address: '#sre-oncall' }],
+  credential_security: [{ id: 'sec-oncall', address: 'sec@acme.com' }],
+  // or: fallback: [{ id: 'ops', address: '#ops' }]  — one group approves everything
+})
+```
+
+It **fails at construction**, not during an incident. A category with no approver, an
+approver with no routable address, or a duplicate id throws when you wire the deployment.
+That is deliberate: `createEnterpriseNotifier` swallows every error by design, because the
+step has already halted and a delivery failure must not become a second incident — which
+means a directory that breaks at runtime breaks *silently*. Validating up front is what
+keeps that trade-off safe.
+
+Use it to run the §6 acceptance incident. Replace it with your IdP adapter before
+production, so leavers and rota changes are reflected without a redeploy — the contract is
+one method, so that is a one-line swap.
 
 ---
 
@@ -196,6 +225,7 @@ This portable is enterprise-ready when, on your stack:
 4. ✅ The dispatch ledger runs on your database via `SqlExecutor` (§3 DDL applied).
 5. ✅ Audit lands in your SIEM via `SiemTransport` (§4).
 6. ⬜ Approvers resolve through your SSO (`ApproverDirectory` implemented against your IdP).
+   A reference implementation ships so this is not a blocker on day one — see §5.1.
 7. ⬜ You have run an end-to-end incident in staging: detect → safe step auto-runs →
    dangerous step pauses → approver notified → approval → execution → SIEM shows the
    full trail.

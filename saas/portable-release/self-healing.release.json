@@ -1,0 +1,94 @@
+{
+  "_path": "saas/portable-release/self-healing.release.json",
+
+  "id": "self-healing-supervisor",
+  "name": "Self-Healing Supervisor",
+  "packageName": "@portable/self-healing-supervisor",
+  "version": "1.0.0-rc.1",
+  "license": "SEE LICENSE IN LICENSE",
+  "description": "Infrastructure that detects incidents, drafts a repair plan, and halts every consequential step for a named human approver. Ships as behaviour only: the buyer supplies secrets, datastore, notifications, approver identity, branding and SIEM transport.",
+
+  "payloadRoot": "lib",
+  "entryPoints": [
+    "lib/supervisor/portable/index.ts",
+    "lib/supervisor/executors/create-supervisor-dispatcher.ts"
+  ],
+  "buyerEntryPoints": {
+    ".": "payload/supervisor/portable/index.ts",
+    "./dispatcher": "payload/supervisor/executors/create-supervisor-dispatcher.ts"
+  },
+
+  "_minModules": "The buyer import graph measured 64 modules on 2026-07-26. A materially shorter walk means an entry point moved or an import style changed, and a partial payload must never ship silently.",
+  "minModules": 55,
+
+  "_hostFallbacks": "Bare or aliased specifiers the payload may reach but does not ship. Leave empty on the first run: the packer will BLOCK and print the exact specifier strings it found, and only the ones it actually prints belong here — each with a note in buyerMustSupply saying what the buyer provides instead.",
+  "hostFallbacks": [],
+
+  "namingPattern": "signalboost",
+  "_knownNamingExceptions": "Files where the build platform's name still appears in code. Tracked, not accepted. A file not on this list blocks the release.",
+  "knownNamingExceptions": [
+    {
+      "path": "lib/supervisor/executors/browser/browser-runtime-mapper.ts",
+      "reason": "Emits adapterId 'signalboost.browser-runtime.dry-run.v1' into evidence records. Owned by the browser-runtime lane; must be renamed to a neutral identifier before 1.0.0 final."
+    },
+    {
+      "path": "lib/browser-runtime/sandbox-adapter.ts",
+      "reason": "Exports SANDBOX_ADAPTER_ID 'signalboost.sandbox.v1', which reaches the buyer's SIEM. Owned by the browser-runtime lane; must be renamed before 1.0.0 final."
+    }
+  ],
+
+  "includeFiles": [
+    {
+      "from": "docs/portables/self-healing-integration-guide.md",
+      "to": "docs/integration-guide.md"
+    }
+  ],
+  "releaseNotes": "portable-release/self-healing.RELEASE-NOTES.md",
+
+  "buyerMustSupply": [
+    "SecretsProvider — reads credentials from the buyer's own vault. No environment variables are read by the payload.",
+    "SqlExecutor — executes against the buyer's own SQL datastore. DDL for supervisor_dispatch_ledger is in the integration guide.",
+    "NotificationSink — delivers approval requests to the buyer's channel (email, Slack, ServiceNow, PagerDuty).",
+    "ApproverDirectory — maps each risk category to a real named human. A reference implementation, createStaticApproverDirectory, ships in the payload and validates at construction time.",
+    "HostBranding — the buyer's own name and URL. The payload carries no default brand.",
+    "SiemTransport — receives audit events as ECS-JSON or CEF for Splunk, Elastic, Datadog, Sentinel, Chronicle, ArcSight or QRadar.",
+    "ApiStepRunner — optional. Supply one to control how api_request repair steps execute."
+  ],
+
+  "notIncluded": [
+    "A browser sandbox. Browser-backed repair steps require a Chromium runtime the buyer or a provider must operate.",
+    "Email or chat delivery. The payload formats notifications; the buyer's NotificationSink delivers them.",
+    "Any incident source. Deployment-platform ingestion is host-side and is not part of this release.",
+    "Identity or SSO. ApproverDirectory receives identities the buyer's directory already holds.",
+    "Any credential. Nothing in the archive contains or requires a build-platform account."
+  ],
+
+  "supportedPlatforms": [
+    "Node.js 20 LTS and 22 LTS",
+    "TypeScript 5.x, non-strict and strict both compile",
+    "Any SQL datastore reachable through the buyer's SqlExecutor",
+    "Any SIEM accepting ECS-JSON or CEF over the buyer's SiemTransport",
+    "Linux and macOS build hosts; no native modules"
+  ],
+
+  "upgradeCompatibility": {
+    "previousVersions": [],
+    "policy": "Within 1.x the buyer-facing interfaces are additive only. A new required member on SecretsProvider, SqlExecutor, NotificationSink, ApproverDirectory, HostBranding or SiemTransport is a major version. New optional members and new exports are minor.",
+    "ledgerSchema": "Rows in supervisor_dispatch_ledger carry schema_version. A migration that changes an existing column is a major version; an added nullable column is a minor version.",
+    "rollback": "The payload holds no state of its own. Rolling back to an earlier version means restoring the earlier archive; ledger rows written by a newer version remain readable because schema_version is present on every row."
+  },
+
+  "knownLimitations": [
+    "Two adapter identifiers still carry the build platform's name into buyer evidence records and SIEM. Naming only, no behaviour. Tracked in knownNamingExceptions and blocking for 1.0.0 final.",
+    "Deployment-platform trigger ingestion reads platform environment variables directly. It sits outside the buyer import graph and is not in this archive.",
+    "The acceptance harness in this release candidate has not yet been run against a buyer's real wiring. Until it has, this is a release candidate and licensingAvailable stays false."
+  ],
+
+  "acceptance": {
+    "entry": "payload/supervisor/portable/acceptance-harness.ts",
+    "export": "runAcceptanceScenario",
+    "how": "Call runAcceptanceScenario({ host }) with your own HostContext, once per risk category. It reports five independent checks: safe_step_executed, dangerous_step_paused, approver_notified, buyer_branding_used, audit_trail_emitted.",
+    "guarantee": "The consequential step is required to pause, so nothing consequential can execute during acceptance. The approver notification is real: it is delivered through your own sink, and it is only recorded as passed after your sink accepts it.",
+    "evidence": "The returned result is frozen and JSON-serializable. Keep it. It is the buyer acceptance record for this deployment."
+  }
+}

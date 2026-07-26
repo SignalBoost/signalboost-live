@@ -1,0 +1,71 @@
+{
+  "_path": "saas/portable-release/provider-hub.release.json",
+  "id": "provider-hub",
+  "name": "Provider Hub",
+  "packageName": "@portable/provider-hub",
+  "version": "1.0.0-rc.1",
+  "license": "SEE LICENSE IN LICENSE",
+  "description": "Provider-neutral connection metadata and bounded live-data read behavior. The buyer supplies provider transport, digest, persistence, credentials, authorization, deployment, and operational controls.",
+  "payloadRoot": ".",
+  "entryPoints": [
+    "provider-hub-core/index.ts"
+  ],
+  "buyerEntryPoints": {
+    ".": "payload/provider-hub-core/index.ts"
+  },
+  "_minModules": "The Provider Hub buyer graph starts at the bounded core index and must include its local read adapter and evidence modules. A shorter graph means the portable boundary is incomplete.",
+  "minModules": 3,
+  "_hostFallbacks": "Bare or aliased specifiers reached by the buyer graph but supplied by the buyer. Keep empty unless the release gate reports a concrete dependency.",
+  "hostFallbacks": [],
+  "namingPattern": "signalboost",
+  "knownNamingExceptions": [],
+  "includeFiles": [
+    {
+      "from": "../docs/portables/provider-hub-byok-portable.md",
+      "to": "docs/provider-hub-byok-portable.md"
+    },
+    {
+      "from": "../docs/portables/provider-hub-security-operations-acceptance.md",
+      "to": "docs/security-operations-acceptance.md"
+    }
+  ],
+  "releaseNotes": "portable-release/provider-hub.RELEASE-NOTES.md",
+  "buyerMustSupply": [
+    "ProviderLiveDataReadTransport — performs buyer-authorized provider reads using buyer-owned credentials and network policy.",
+    "ProviderLiveDataDigestPort — produces any required digest without exposing source payloads or credentials.",
+    "ProviderConnectionPersistencePort — reads connection metadata from the buyer's own persistence layer.",
+    "Credential and vault integration — all provider credentials remain buyer-owned and outside the payload.",
+    "Authorization, approval, quota, spend, audit, and deployment controls — the payload does not supply production policy or infrastructure."
+  ],
+  "notIncluded": [
+    "Provider credentials or tokens.",
+    "OAuth clients or service-account material.",
+    "Provider mutation or write execution.",
+    "Automatic approval, rollout, deployment, or production publication.",
+    "A hosted database, vault, network transport, or provider account."
+  ],
+  "supportedPlatforms": [
+    "Node.js 20 LTS and 22 LTS",
+    "TypeScript 5.x",
+    "Buyer-selected persistence, vault, and network implementations",
+    "Linux and macOS build hosts; no native modules"
+  ],
+  "upgradeCompatibility": {
+    "previousVersions": [],
+    "policy": "Within 1.x the buyer-facing interfaces are additive only.",
+    "ledgerSchema": "The payload owns no datastore schema.",
+    "rollback": "The payload holds no state and can be replaced by restoring the previous verified archive."
+  },
+  "knownLimitations": [
+    "The release candidate validates packaging and integrity only; it is not evidence of buyer deployment acceptance.",
+    "Live data requires a buyer-supplied transport and buyer-owned provider authorization.",
+    "Provider writes, credential transfer, automatic rollout, and production execution remain disabled."
+  ],
+  "acceptance": {
+    "entry": "payload/provider-hub-core/index.ts",
+    "export": "createProviderConnectionMetadata",
+    "how": "Import the entry point in a clean buyer environment, create redacted connection metadata, and exercise live-data reads only through buyer-supplied test doubles before production wiring.",
+    "guarantee": "The payload contains no credentials and performs no provider mutation, deployment, or automatic production action.",
+    "evidence": "Keep the independently verified manifest, SHA-256 results, clean extraction result, and buyer test record."
+  }
+}

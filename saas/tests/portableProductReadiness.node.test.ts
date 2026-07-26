@@ -33,7 +33,7 @@ test('buyer handoff manifest is immutable and fails closed when delivery evidenc
 
 test('buyer handoff manifest rejects optional required classes and blank responsibility boundaries', () => {
   const digest = 'a'.repeat(64)
-  const artifacts = ['package', 'integrity', 'installation', 'configuration', 'operations', 'acceptance', 'support'].map(kind => ({ kind: kind as 'package' | 'integrity' | 'installation' | 'configuration' | 'operations' | 'acceptance' | 'support', path: `handoff/${kind}.json`, sha256: digest, required: false }))
+  const artifacts = ['package', 'integrity', 'installation', 'configuration', 'operations', 'acceptance', 'support'].map(kind => ({ kind: kind as 'package' | 'integrity' | 'installation' | 'configuration' | 'operations' | 'acceptance' | 'support', path: `docs/handoff/${kind}.json`, sha256: digest, required: false }))
   const manifest = createPortableBuyerHandoffManifest({ productId: 'provider-hub', releaseVersion: '1.0.0', packageFormat: 'tar.gz', artifacts, buyerResponsibilities: ['   '], supplierResponsibilities: [''], exclusions: [] })
   assert.equal(manifest.complete, false)
   assert.ok(manifest.blockers.includes('missing-required-artifact:package'))
@@ -44,9 +44,25 @@ test('buyer handoff manifest rejects optional required classes and blank respons
 
 test('buyer handoff manifest becomes complete only with all bounded evidence classes', () => {
   const digest = 'a'.repeat(64)
-  const artifacts = ['package', 'integrity', 'installation', 'configuration', 'operations', 'acceptance', 'support'].map(kind => ({ kind: kind as 'package' | 'integrity' | 'installation' | 'configuration' | 'operations' | 'acceptance' | 'support', path: `handoff/${kind}.json`, sha256: digest, required: true }))
-  const manifest = createPortableBuyerHandoffManifest({ productId: 'provider-hub', releaseVersion: '1.0.0', packageFormat: 'tar.gz', artifacts, buyerResponsibilities: ['Supply provider credentials through the buyer-owned secret boundary.'], supplierResponsibilities: ['Deliver the verified package and documented support boundary.'], exclusions: ['checkout', 'entitlement-activation', 'provider-execution'] })
+  const artifacts = ['package', 'integrity', 'installation', 'configuration', 'operations', 'acceptance', 'support'].map(kind => ({ kind: kind as 'package' | 'integrity' | 'installation' | 'configuration' | 'operations' | 'acceptance' | 'support', path: `docs/handoff/${kind}.json`, sha256: digest, required: true }))
+  const manifest = createPortableBuyerHandoffManifest({
+    productId: 'provider-hub',
+    releaseVersion: '1.0.0',
+    packageFormat: 'tar.gz',
+    artifacts,
+    buyerResponsibilities: ['Supply provider credentials through the buyer-owned secret boundary.'],
+    supplierResponsibilities: ['Deliver the verified package and documented support boundary.'],
+    exclusions: ['checkout', 'entitlement-activation', 'provider-execution'],
+    preparedAt: '2026-07-26T20:00:00.000Z',
+    acknowledgedAt: '2026-07-26T20:05:00.000Z',
+    artifactTransferred: false,
+    credentialsTransferred: false,
+    entitlementMutated: false,
+    deploymentPerformed: false,
+    productionExecutionEnabled: false,
+  })
   assert.equal(manifest.complete, true)
   assert.deepEqual(manifest.blockers, [])
-  assert.equal(manifest.schemaVersion, 'portable-buyer-handoff-manifest.v1')
+  assert.equal(manifest.schemaVersion, 'portable-buyer-handoff-manifest.v2')
+  assert.equal(manifest.readOnly, true)
 })

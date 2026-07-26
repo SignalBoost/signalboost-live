@@ -53,6 +53,19 @@ test('Portable COS is architecture-complete while licensing remains disabled', (
   assert.equal(descriptor?.route, '/dashboard/cos-mining')
 })
 
+test('Agent Operations is architecture-complete while runtime inputs remain buyer-supplied', () => {
+  const report = createPortableArchitectureClosureReport()
+  const agentOperations = report.entries.find(entry => entry.productId === 'agent-operations-platform')
+  const descriptor = portableProductRegistry.find(entry => entry.manifest.productId === 'agent-operations-platform')
+  assert.equal(agentOperations?.state, 'complete')
+  assert.deepEqual(agentOperations?.blockers, [])
+  assert.equal(agentOperations?.coreBoundary, 'saas/lib/agent-runtime')
+  assert.equal(agentOperations?.hostBoundary, 'saas/agent-operations-host')
+  assert.equal(descriptor?.implementationStatus, 'implemented')
+  assert.equal(descriptor?.manifest.status, 'preview')
+  assert.equal(descriptor?.manifest.licensingAvailable, false)
+})
+
 test('preview and descriptor products remain fail-closed', () => {
   const report = createPortableArchitectureClosureReport()
   const browserAgents = report.entries.find(entry => entry.productId === 'browser-agent-ecosystem')

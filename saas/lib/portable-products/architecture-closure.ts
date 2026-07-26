@@ -31,7 +31,7 @@ const declared = Object.freeze<Record<string, Omit<PortableArchitectureEntry, 'p
   'press-media': { coreBoundary: 'saas/press-media-core', hostBoundary: 'saas/press-media-host', state: 'complete', blockers: Object.freeze([]) },
   'portable-ai-chief-of-staff': { coreBoundary: 'saas/lib/cos', hostBoundary: 'saas/lib/cos/host.ts', state: 'complete', blockers: Object.freeze([]) },
   'browser-agent-ecosystem': { coreBoundary: 'docs/browser-provider-sdk.md', hostBoundary: '', state: 'descriptor-only', blockers: Object.freeze(['portable-runtime-core', 'host-adapter-boundary', 'compliance-package']) },
-  'agent-operations-platform': { coreBoundary: 'saas/lib/agent-runtime', hostBoundary: 'saas/app/dashboard', state: 'partial', blockers: Object.freeze(['standalone-host-boundary', 'buyer-deployment-composition']) },
+  'agent-operations-platform': { coreBoundary: 'saas/lib/agent-runtime', hostBoundary: 'saas/agent-operations-host', state: 'complete', blockers: Object.freeze([]) },
   'self-healing-supervisor': { coreBoundary: 'saas/lib/supervisor', hostBoundary: 'saas/app/dashboard/supervisor', state: 'partial', blockers: Object.freeze(['standalone-host-boundary', 'buyer-policy-composition']) },
 })
 

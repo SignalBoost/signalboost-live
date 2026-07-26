@@ -1,3 +1,5 @@
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+
 // saas/components/hub/ProviderActionExecutionGate.tsx
 'use client'
 
@@ -104,7 +106,7 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
     <div style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <section aria-label="Reviewed provider execution paths" style={{ padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,.10)', background: 'rgba(3,7,18,.38)', display: 'grid', gap: 8, flex: '0 0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-          <strong style={{ fontSize: 11, color: '#86efac' }}>Reviewed execution path</strong>
+          <strong style={{ fontSize: 11, color: '#86efac' }}><LocalizedText fallback={"Reviewed execution path"} /></strong>
           {response.review && <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,.42)' }}>{response.review.reviewer} · {response.review.reviewedAt}</span>}
         </div>
         <div role="radiogroup" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 7 }}>

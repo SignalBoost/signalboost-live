@@ -35,7 +35,7 @@ const envelope = <T>(
 ): MissionEventEnvelope<T> => ({ eventId, occurredAt, correlationId, causationId: null, idempotencyKey: eventId, revision: 1, schemaVersion: 'mission-envelope-v1', payload })
 
 export class MissionOrchestrator {
-  constructor(private readonly deps: MissionLifecycleDeps) {}
+  private readonly deps: MissionLifecycleDeps; constructor(deps: MissionLifecycleDeps) { this.deps = deps }
 
   async accept(event: unknown): Promise<Mission> {
     const input = missionEventSchema.parse(event)
@@ -64,7 +64,7 @@ export class MissionOrchestrator {
 }
 
 export class RuleBasedMissionReasoner {
-  constructor(private readonly deps: MissionLifecycleDeps) {}
+  private readonly deps: MissionLifecycleDeps; constructor(deps: MissionLifecycleDeps) { this.deps = deps }
 
   async start() {
     return this.deps.eventBus.subscribe<Mission>(missionTopics.missions, async (event) => {
@@ -122,7 +122,7 @@ export class RuleBasedMissionReasoner {
 }
 
 export class MissionSafetyGateway {
-  constructor(private readonly deps: MissionLifecycleDeps) {}
+  private readonly deps: MissionLifecycleDeps; constructor(deps: MissionLifecycleDeps) { this.deps = deps }
 
   async start() {
     return this.deps.eventBus.subscribe<DecisionEnvelope>(missionTopics.rawDecisions, async (event) => {
@@ -214,7 +214,7 @@ export class MissionSafetyGateway {
 
 export class NonMutatingMissionExecutor {
   private readonly routedBindings = new Set<string>()
-  constructor(private readonly deps: MissionLifecycleDeps) {}
+  private readonly deps: MissionLifecycleDeps; constructor(deps: MissionLifecycleDeps) { this.deps = deps }
 
   async start() {
     return this.deps.eventBus.subscribe<{ decision: DecisionEnvelope; binding: PolicyDecisionBinding }>(

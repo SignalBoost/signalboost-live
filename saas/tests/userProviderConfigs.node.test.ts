@@ -13,6 +13,7 @@ import './providerHubStatusSurface.node.test.ts'
 import './providerHubStatusDashboard.node.test.ts'
 import './providerHubReferenceDeployment.node.test.ts'
 import './providerHubDocumentation.node.test.ts'
+import './androidPackagingReadiness.node.test.ts'
 
 const originalVaultMasterKey = process.env.VAULT_MASTER_KEY
 

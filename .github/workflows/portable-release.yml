@@ -1,9 +1,7 @@
 # .github/workflows/portable-release.yml
 #
-# Runs the release gates for each portable that has a spec, and publishes the
-# archive as a build artifact. A pull request that breaks the buyer import
-# graph, leaks the platform name into a payload file, or shortens the graph
-# fails here instead of at a buyer's site.
+# Builds each portable that has a release spec, then verifies the artifact with
+# a second script that shares no logic with the one that produced it.
 
 name: Portable release
 
@@ -13,15 +11,20 @@ on:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
+      - 'saas/portable-license/**'
       - 'saas/portable-release/**'
       - 'saas/scripts/package-portable.mjs'
+      - 'saas/scripts/verify-release.mjs'
       - '.github/workflows/portable-release.yml'
   pull_request:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
+      - 'saas/portable-license/**'
       - 'saas/portable-release/**'
       - 'saas/scripts/package-portable.mjs'
+      - 'saas/scripts/verify-release.mjs'
+      - '.github/workflows/portable-release.yml'
   workflow_dispatch:
 
 jobs:
@@ -35,8 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
-          show-progress: false
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -46,17 +48,7 @@ jobs:
         working-directory: saas
         run: |
           set -euo pipefail
-          if ! node scripts/package-portable.mjs "portable-release/${{ matrix.spec }}" --no-archive > portable-build.log 2>&1; then
-            cat portable-build.log
-            exit 1
-          fi
-          cat portable-build.log
-          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
-          archive="$(node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync(process.argv[1]+"/manifest.json","utf8")); process.stdout.write(`${m.id}-${m.version}.tgz`)' "$release_dir")"
-          temp_archive="$(dirname "$release_dir")/$archive"
-          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf "$temp_archive" -C "$release_dir" .
-          mv "$temp_archive" "$release_dir/$archive"
-          sha256sum "$release_dir/$archive" | sed "s#  $release_dir/#  #" > "$release_dir/$archive.sha256"
+          node scripts/package-portable.mjs "portable-release/${{ matrix.spec }}" 2>&1 | tee portable-build.log
 
       - name: Upload build diagnostics
         if: always()
@@ -67,52 +59,69 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Verify checksums from the archive root
+      - name: Locate the release directory
+        id: release
         working-directory: saas
         run: |
           set -euo pipefail
-          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
-          echo "verifying $release_dir"
-          cd "$release_dir"
+          dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
+          test -n "$dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the artifact independently
+        working-directory: saas
+        run: node scripts/verify-release.mjs "${{ steps.release.outputs.dir }}"
+
+      - name: Verify checksums the way a buyer would
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          cd "${{ steps.release.outputs.dir }}"
           sha256sum -c SHA256SUMS
           for f in *.tgz.sha256; do sha256sum -c "$f"; done
+
+      - name: Prove the archive extracts and still verifies
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          src="$PWD/${{ steps.release.outputs.dir }}"
+          work="$(mktemp -d)"
+          tar xzf "$src"/*.tgz -C "$work"
+          node scripts/verify-release.mjs "$work"
+          cd "$work"
+          sha256sum -c SHA256SUMS
+          test -f manifest.json
+          test -f RELEASE-NOTES.md
 
       - name: Confirm no credential material is in the payload
         working-directory: saas
         run: |
           set -euo pipefail
-          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
+          release_dir="${{ steps.release.outputs.dir }}"
           if grep -rInE '(BEGIN [A-Z ]*PRIVATE KEY|sk-[A-Za-z0-9]{20,}|xox[baprs]-)' "$release_dir/payload"; then
             echo "::error::credential-shaped material found in the payload"
             exit 1
           fi
-          echo "clean"
 
       - name: Report
         working-directory: saas
         run: |
           set -euo pipefail
-          release_dir="$(find dist/portables -mindepth 2 -maxdepth 2 -type d | head -1)"
           node -e '
             const fs = require("fs");
             const m = JSON.parse(fs.readFileSync(process.argv[1] + "/manifest.json", "utf8"));
             const out = [];
-            out.push("### " + m.name + "  `" + m.version + "`");
+            out.push("### " + (m.name || m.id) + "  `" + m.version + "`");
             out.push("");
             out.push("| | |");
             out.push("| --- | --- |");
-            out.push("| commit | `" + m.sourceCommit.slice(0, 12) + "` |");
+            out.push("| commit | `" + String(m.sourceCommit).slice(0, 12) + "` |");
             out.push("| modules | " + m.moduleCount + " |");
             out.push("| payload files | " + m.files.length + " |");
-            out.push("| host fallbacks | " + m.runtime.externalDependencies.filter(d => d.hostFallback).length + " |");
-            out.push("| tracked naming exceptions | " + m.namingExceptions.length + " |");
-            if (m.namingExceptions.length) {
-              out.push("");
-              out.push("**Naming exceptions still shipping:**");
-              for (const e of m.namingExceptions) out.push("- `" + e.path + "` — " + e.reason);
-            }
+            out.push("| host fallbacks | " + (m.runtime.externalDependencies || []).filter(d => d.hostFallback).length + " |");
+            out.push("| naming exceptions | " + (m.namingExceptions || []).length + " |");
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
-          ' "$release_dir"
+          ' "${{ steps.release.outputs.dir }}"
 
       - name: Upload release
         uses: actions/upload-artifact@v4

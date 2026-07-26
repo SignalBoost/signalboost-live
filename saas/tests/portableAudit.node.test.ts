@@ -1,4 +1,5 @@
 // saas/tests/portableAudit.node.test.ts
+import './portableSupportBoundaryEvidence.cases.ts'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
@@ -57,7 +58,7 @@ test('transport receives the formatted record + severity meta', async () => {
 
 test('swallowTransportErrors defaults to true (audit never breaks the portable); false propagates', async () => {
   const boom = { send() { throw new Error('collector down') } }
-  await createSiemAuditSink({ transport: boom, format: 'cef' }).record(evt) // must not throw
+  await createSiemAuditSink({ transport: boom, format: 'cef' }).record(evt)
   await assert.rejects(() => createSiemAuditSink({ transport: boom, format: 'cef', swallowTransportErrors: false }).record(evt))
 })
 
@@ -68,7 +69,7 @@ test('teeAuditSinks fans out and isolates a failing sink', async () => {
   const other = { record: async () => { b++ } }
   await teeAuditSinks(good, bad, other).record(evt)
   assert.equal(a, 1)
-  assert.equal(b, 1) // the failing middle sink did not block the third
+  assert.equal(b, 1)
 })
 
 test('default severity is info when no mapper supplied', () => {

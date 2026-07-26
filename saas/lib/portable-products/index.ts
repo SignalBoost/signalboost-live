@@ -13,6 +13,7 @@ export { createPortableBuyerHandoffManifest, portableBuyerHandoffManifestSchemaV
 export { portableLicenseEvidenceSchemaVersion, validatePortableLicenseEvidence } from './license-evidence.ts'
 export { createPortableLicensingFulfillmentEvidence, portableLicensingFulfillmentEvidenceSchemaVersion } from './licensing-fulfillment-evidence.ts'
 export { portableOperationsRecoveryEvidenceSchemaVersion, validatePortableOperationsRecoveryEvidence } from './operations-recovery-evidence.ts'
+export { portableBuyerConfigurationEvidenceSchemaVersion, validatePortableBuyerConfigurationEvidence } from './buyer-configuration-evidence.ts'
 export type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 export type { PortableProductCategory, PortableProductDescriptor, PortableProductImplementationClassification, PortableProductImplementationStatus, PortableProductStatus } from './product-types.ts'
 export type { PortableGraphEdge, PortableGraphEdgeType, PortableGraphNode, PortableGraphNodeType, PortableProductDependencyGraph } from './dependency-graph.ts'
@@ -24,3 +25,4 @@ export type { PortableBuyerHandoffArtifact, PortableBuyerHandoffArtifactKind, Po
 export type { PortableLicenseEvidenceBlocker } from './license-evidence.ts'
 export type { PortableCommercialEvidenceInput, PortableCommercialEvidenceStatus, PortableLicensingFulfillmentEvidence, PortableLicensingFulfillmentEvidenceInput } from './licensing-fulfillment-evidence.ts'
 export type { PortableOperationsRecoveryEvidenceBlocker } from './operations-recovery-evidence.ts'
+export type { PortableBuyerConfigurationEvidenceBlocker } from './buyer-configuration-evidence.ts'

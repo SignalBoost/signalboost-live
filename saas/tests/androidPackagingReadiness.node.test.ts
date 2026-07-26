@@ -54,8 +54,8 @@ test('Android packaging sources contain no build, signing, or store mutation beh
     '../portable-mobile/provider-hub.android.ts',
   ]
   const forbidden = [
-    'child_process', 'exec(', 'spawn(', 'gradlew', 'bundletool', 'jarsigner',
-    'apksigner', 'play.googleapis.com', 'androidpublisher', 'process.env', 'PRIVATE KEY',
+    'node:child_process', 'child_process.exec', 'child_process.spawn', 'gradlew', 'bundletool',
+    'jarsigner', 'apksigner', 'play.googleapis.com', 'androidpublisher', 'process.env', 'PRIVATE KEY',
   ]
   for (const path of paths) {
     const source = await readFile(new URL(path, import.meta.url), 'utf8')

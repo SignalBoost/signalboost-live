@@ -123,7 +123,10 @@ export function queryClusterRuntimeHealthGovernanceEvidenceIndex(
     (provenance.length === 0 || provenance.every(value => entry.provenance.includes(value))),
   )
   if (offset > matches.length) throw new Error('invalid cluster runtime health governance evidence index query cursor range')
-  const entries = Object.freeze(matches.slice(offset, offset + limit))
+  const entries = Object.freeze(matches.slice(offset, offset + limit).map(entry => Object.freeze({
+    ...entry,
+    provenance: Object.freeze([...entry.provenance]),
+  })))
   const nextOffset = offset + entries.length
   const nextCursor = nextOffset < matches.length ? `${index.integrity.digest}:${filterIdentity}:${nextOffset}` : null
   const integrity = Object.freeze({ algorithm: 'fnv1a-32' as const, digest: digest({ indexId: index.indexId, clusterId: index.clusterId, normalized, filterIdentity, offset, entries, nextCursor }), canonical: true as const })

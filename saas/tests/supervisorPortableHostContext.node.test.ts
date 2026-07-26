@@ -67,28 +67,26 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
 
   const known = new Map([
     ['lib/supervisor/executors/create-supervisor-dispatcher.ts',
-      'lazy import of the platform email notifier, reached only when the buyer supplies neither a HostContext nor a notifier'],
+      'aliased lazy imports of the platform email notifier, reached only when the buyer supplies neither a HostContext nor a notifier; both are declared host fallbacks and are absent from the release payload'],
     ['lib/supervisor/executors/api-executor.ts',
-      'lazy import of the platform provider engine as the DEFAULT api step runner; a buyer passes their own runner'],
-    ['lib/supervisor/executors/dispatch-store.ts',
-      'process.env is confined to platformSupervisorRuntime(), a platform-only helper the buyer never calls'],
+      'aliased lazy import of the platform provider engine as the DEFAULT api step runner; a buyer passes their own ApiStepRunner'],
   ])
 
-  const seen = new Set()
-  const found = new Map()
+  const seen = new Set<string>()
+  const found = new Map<string, string>()
   const root = fileURLToPath(new URL('..', import.meta.url))
 
-  const walk = (file) => {
+  const walk = (file: string) => {
     if (seen.has(file) || !existsSync(file)) return
     seen.add(file)
     const raw = readFileSync(file, 'utf8')
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
-    const hits = []
+    const hits: string[] = []
     if (/process\.env/.test(code)) hits.push('process.env')
     if (/signalboost/i.test(code)) hits.push('names the build platform')
     if (/@\/lib\//.test(code)) hits.push('imports a host singleton')
     if (hits.length) found.set(relative(root, file), hits.join(' + '))
-    for (const match of code.matchAll(/from\s+'(\.[^']+)'/g)) {
+    for (const match of code.matchAll(/(?:from\s+|import\s*\(\s*)'(\.[^']+)'/g)) {
       const base = resolve(dirname(file), match[1])
       for (const candidate of [base, `${base}.ts`, resolve(base, 'index.ts')]) {
         if (existsSync(candidate) && candidate.endsWith('.ts')) { walk(candidate); break }

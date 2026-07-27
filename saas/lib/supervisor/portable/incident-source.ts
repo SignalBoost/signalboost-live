@@ -136,10 +136,21 @@ export class IncidentSourceConfigError extends Error {
 // Every vendor spells severity and environment differently. The canonical schema
 // accepts three of each, so an unmapped value must land somewhere defined rather
 // than throw — an alert with an odd severity is still an alert.
+// The high/medium/low scale is the most common severity vocabulary there is —
+// PagerDuty urgency, Grafana labels, Google Cloud, Splunk, ServiceNow — and none of
+// it was here. `high` fell through to the fallback, so the most urgent thing most
+// vendors can send arrived as a warning.
+//
+// It belongs HERE and not in any one adapter. Patching a single adapter fixes that
+// vendor and leaves the other seven silently downgrading, with a green test suite
+// because only the patched vendor is covered. One vocabulary, one place.
+//
+// `high` maps to critical because in every scale that uses it, high is the level that
+// wakes someone — including PagerDuty urgency, where high and low are the only values.
 const severityWords: Array<[RegExp, SupervisorIncident['severity']]> = [
-  [/^(crit|critical|fatal|emergency|sev-?[01]|p[01]|error|alert|down|firing)$/i, 'critical'],
-  [/^(warn|warning|minor|degraded|sev-?[23]|p[23]|elevated)$/i, 'warning'],
-  [/^(info|informational|notice|ok|low|sev-?[45]|p[45])$/i, 'info'],
+  [/^(crit|critical|fatal|emergency|sev-?[01]|p[01]|error|alert|down|firing|high|urgent|major|re-?triggered|triggered|alarm)$/i, 'critical'],
+  [/^(warn|warning|minor|degraded|sev-?[23]|p[23]|elevated|medium|moderate|no ?data|insufficient_?data)$/i, 'warning'],
+  [/^(info|informational|notice|ok|low|none|debug|sev-?[45]|p[45])$/i, 'info'],
 ]
 
 export function normalizeSeverity(value: unknown, fallback: SupervisorIncident['severity'] = 'warning'): SupervisorIncident['severity'] {
@@ -220,7 +231,14 @@ function sanitizeValue(value: unknown, depth: number, removed: string[], path: s
 // problem this is; detectedAt is deliberately excluded so the same failure recurring
 // a minute later fingerprints identically and deduplicates.
 export function fingerprintIncident(input: { provider: string; environment: string; dedupeKey?: string; errorCode?: string; errorMessage: string; affectedResource?: string }): string {
-  const base = [input.provider, input.environment, input.dedupeKey ?? '', input.errorCode ?? '', input.dedupeKey ? '' : input.errorMessage, input.affectedResource ?? ''].join('\u0000')
+  // When the vendor supplies a dedupe key it IS the identity of the alert, and
+  // nothing beside it may split it. Previously errorCode and affectedResource were
+  // mixed in regardless, so an adapter that put a per-delivery value in errorCode —
+  // an event id, a run id — produced a fresh fingerprint every time and deduplication
+  // silently never engaged, even though the stable key was right there.
+  const base = input.dedupeKey
+    ? [input.provider, input.environment, input.dedupeKey].join('\u0000')
+    : [input.provider, input.environment, '', input.errorCode ?? '', input.errorMessage, input.affectedResource ?? ''].join('\u0000')
   return `sha256:${sha256Hex(base)}`
 }
 

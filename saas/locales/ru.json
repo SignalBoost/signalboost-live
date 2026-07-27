@@ -479,35 +479,35 @@
       "displayName": "Vercel",
       "capabilities": {
         "read_deployment_status": {
-          "name": "Read Deployment Status",
+          "name": "Прочитать статус развёртывания",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "inspect_deployment_failure": {
-          "name": "Inspect Deployment Failure",
+          "name": "Изучить сбой развёртывания",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "inspect_deployment_logs": {
-          "name": "Inspect Deployment Logs",
+          "name": "Изучить журналы развёртывания",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "inspect_domain_status": {
-          "name": "Inspect Domain Status",
+          "name": "Изучить статус домена",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "inspect_project_metadata": {
-          "name": "Inspect Project Metadata",
+          "name": "Изучить метаданные проекта",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "inspect_environment_variable_metadata": {
-          "name": "Inspect Environment Variable Metadata",
+          "name": "Изучить метаданные переменных среды",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "capture_dashboard_evidence": {
-          "name": "Capture Dashboard Evidence",
+          "name": "Собрать доказательства с панели",
           "description": "Метаданные браузера Vercel только для чтения"
         },
         "compare_dashboard_with_api": {
-          "name": "Compare Dashboard With Api",
+          "name": "Сравнить панель с API",
           "description": "Метаданные браузера Vercel только для чтения"
         }
       },
@@ -538,7 +538,7 @@
       "forbidden": "Запрещено"
     },
     "maturity": {
-      "experimental": "Экспериментально",
+      "experimental": "Экспериментальный",
       "sandbox_verified": "Проверено в песочнице",
       "human_approved": "Одобрено человеком",
       "auto_failover_ready": "Готово к автоматическому переключению",
@@ -564,40 +564,40 @@
     "productionBrowserDisabled": "Выполнение браузера в production отключено.",
     "providerMutationDisabled": "Изменения у провайдера отключены.",
     "labels": {
-      "provider": "Provider",
-      "project": "Project",
-      "deployment": "Deployment",
-      "environment": "Environment",
-      "workItem": "Work item",
-      "owner": "Owner",
-      "lease": "Lease",
-      "fence": "Fencing generation",
-      "incident": "Incident type",
-      "severity": "Severity",
-      "plan": "Plan",
-      "channel": "Selected channel",
-      "apiFailure": "API failure category",
-      "comparison": "Comparison status",
-      "verification": "Verification status",
-      "approvedSteps": "Approved steps",
-      "bpal": "BPAL capability",
-      "capability": "Capability",
-      "risk": "Risk",
-      "maturity": "Maturity",
-      "origins": "Approved origins",
-      "evidenceProfile": "Evidence profile",
-      "verificationProfile": "Verification profile",
-      "auditTimeline": "Audit timeline",
-      "triggerSource": "Trigger source",
-      "triggerTime": "Trigger time",
-      "fingerprint": "Fingerprint",
-      "deduplication": "Deduplication",
-      "lastHeartbeat": "Last heartbeat",
-      "reconciliation": "Reconciliation",
-      "readOnly": "Read-only execution"
+      "provider": "Поставщик",
+      "project": "Проект",
+      "deployment": "Развёртывание",
+      "environment": "Среда",
+      "workItem": "Рабочий элемент",
+      "owner": "Владелец",
+      "lease": "Аренда",
+      "fence": "Поколение изоляции",
+      "incident": "Тип инцидента",
+      "severity": "Серьёзность",
+      "plan": "План",
+      "channel": "Выбранный канал",
+      "apiFailure": "Категория сбоя API",
+      "comparison": "Статус сравнения",
+      "verification": "Статус проверки",
+      "approvedSteps": "Утверждённые шаги",
+      "bpal": "Возможность BPAL",
+      "capability": "Возможность",
+      "risk": "Риск",
+      "maturity": "Зрелость",
+      "origins": "Утверждённые источники",
+      "evidenceProfile": "Профиль доказательств",
+      "verificationProfile": "Профиль проверки",
+      "auditTimeline": "Хронология аудита",
+      "triggerSource": "Источник триггера",
+      "triggerTime": "Время триггера",
+      "fingerprint": "Отпечаток",
+      "deduplication": "Дедупликация",
+      "lastHeartbeat": "Последний сигнал",
+      "reconciliation": "Сверка",
+      "readOnly": "Выполнение только для чтения"
     },
-    "triggerVisibility": "Automatic triggers are durably deduplicated before a Supervisor lease can run read-only health intelligence.",
-    "readOnlyNotice": "Execution is read-only; Vercel mutations, repairs, and production Browser execution are disabled."
+    "triggerVisibility": "Автоматические триггеры надёжно дедуплицируются, прежде чем аренда Supervisor сможет выполнить анализ состояния только для чтения.",
+    "readOnlyNotice": "Выполнение только для чтения; изменения в Vercel, восстановления и выполнение Browser в продакшене отключены."
   },
   "universalProvider": {
     "operator": {

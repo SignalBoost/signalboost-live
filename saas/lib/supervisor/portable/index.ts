@@ -73,3 +73,13 @@ export type {
   IncidentStore,
   RawIncidentDelivery,
 } from './incident-source.ts'
+
+export {
+  createMonitoringIncidentSourceDefinition,
+  monitoringAdapterIds,
+  stagedMonitoringAdapters,
+  type MonitoringAdapterContext,
+  type MonitoringAdapterDescriptor,
+  type MonitoringAdapterId,
+  type MonitoringAdapterMaturity,
+} from './monitoring-adapters.ts'

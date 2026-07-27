@@ -645,6 +645,72 @@
       "siteReview": "Przegląd strony",
       "securityCheck": "Kontrola bezpieczeństwa",
       "improveYourSite": "Ulepsz swoją stronę"
+    },
+    "credits": {
+      "label": "kredyty",
+      "unlimited": "Bez limitu"
+    }
+  },
+  "credits": {
+    "usage": {
+      "title": "Zużycie kredytów",
+      "used": "zużytych kredytów",
+      "warning": "Zużyto ponad 80%. Rozważ wyższy plan.",
+      "limitReached": "Osiągnięto limit kredytów.",
+      "autoTopup": "Automatyczne doładowanie doda więcej kredytów."
+    }
+  },
+  "reset": "Resetuj",
+  "trust": {
+    "trustedBy": "Zaufali nam"
+  },
+  "video": {
+    "kicker": "Studio wideo",
+    "title": "Edytor wideo z napisami AI",
+    "subtitle": "Prześlij wideo, wygeneruj zsynchronizowane napisy AI, przeciągnij stylizowane nakładki na kanwę i wyeksportuj wideo z napisami."
+  },
+  "sales": {
+    "eyebrow": "Sprzedaż",
+    "title": "Agent sprzedaży AI",
+    "prospect": "Potencjalny klient",
+    "company": "Nazwa firmy",
+    "contact": "Imię i nazwisko kontaktu",
+    "email": "E-mail",
+    "website": "Strona internetowa",
+    "industry": "Branża",
+    "notes": "Notatki o tym kliencie",
+    "subject": "Temat",
+    "generate": "Wygeneruj e-mail sprzedażowy",
+    "drafting": "Tworzenie...",
+    "aiDraft": "Szkic AI",
+    "emptyDraft": "E-mail sprzedażowy pojawi się tutaj.",
+    "openEmail": "Otwórz w kliencie poczty"
+  },
+  "operator": {
+    "approve": "Zatwierdź aktualizację",
+    "rollback": "Przywróć poprzednią wersję",
+    "status": {
+      "title": "Status publikacji",
+      "state": "Stan:"
+    },
+    "plan": {
+      "previewTitle": "Podejrzyj swoją stronę",
+      "previewSubtitle": "To jest wygenerowana treść. Zatwierdź ją, aby opublikować stronę."
+    }
+  },
+  "studioPreview": {
+    "kicker": "Przegląd podglądu Studio",
+    "title": "Sprawdź tutaj ten podgląd wideo COS",
+    "description": "Decyzje o podglądzie pozostają w przepływie Studio, blisko wygenerowanego zasobu.",
+    "ariaLabel": "Przegląd podglądu wideo Studio",
+    "actions": {
+      "approve": "Zatwierdź podgląd",
+      "revision": "Wstrzymaj do poprawek"
+    },
+    "status": {
+      "pending": "Oczekiwanie na lokalny przegląd w Studio.",
+      "approved": "Zatwierdzono do następnego kroku Studio.",
+      "revision": "Wstrzymano do poprawek w Studio."
     }
   }
 }

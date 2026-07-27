@@ -14,7 +14,8 @@ export type MonitoringAdapterMaturity = 'staged' | 'certified' | 'deprecated'
 export interface MonitoringAdapterDescriptor { readonly adapterId:MonitoringAdapterId; readonly displayName:string; readonly maturity:MonitoringAdapterMaturity; readonly transport:'webhook'; readonly authentication:readonly string[]; readonly schemaVersion:'monitoring-adapter-v1' }
 export interface MonitoringAdapterContext { readonly sourceId:string; readonly defaultEnvironment?:string }
 export interface MonitoringAdapterAuthenticationContext { readonly adapterId:MonitoringAdapterId; readonly vendor:string }
-export interface MonitoringAdapterAuthenticator { (delivery:RawIncidentDelivery,context:MonitoringAdapterAuthenticationContext):{ok:boolean;reason?:string} }
+export type MonitoringAdapterAuthenticationResult = { ok:boolean; reason?:string }
+export type MonitoringAdapterAuthenticator = (delivery:RawIncidentDelivery,context:MonitoringAdapterAuthenticationContext)=>MonitoringAdapterAuthenticationResult
 export interface AuthenticatedMonitoringAdapterContext extends MonitoringAdapterContext { readonly authenticate:MonitoringAdapterAuthenticator }
 
 const rows:Record<MonitoringAdapterId,MonitoringAdapterDescriptor>={
@@ -44,5 +45,6 @@ export function createMonitoringIncidentSourceDefinition(adapterId:MonitoringAda
 export function createAuthenticatedMonitoringIncidentSourceDefinition(adapterId:MonitoringAdapterId,context:AuthenticatedMonitoringAdapterContext):IncidentSourceDefinition{
   if(typeof context.authenticate!=='function')throw new Error('monitoring_adapter_authenticator_required')
   const definition=createMonitoringIncidentSourceDefinition(adapterId,context)
-  return Object.freeze({...definition,authenticate(delivery:RawIncidentDelivery){return context.authenticate(delivery,{adapterId,vendor:definition.vendor})}})
+  const authenticate=(delivery:RawIncidentDelivery):MonitoringAdapterAuthenticationResult=>context.authenticate(delivery,{adapterId,vendor:definition.vendor})
+  return {...definition,authenticate}
 }

@@ -14,7 +14,7 @@ const fixtures: Record<(typeof monitoringAdapterIds)[number], unknown> = {
   'grafana-alerting': { status: 'firing', alerts: [{ startsAt: receivedAt, fingerprint: 'grafana-1', labels: { alertname: 'DatabaseLatency', severity: 'warning', service: 'postgres' }, annotations: { description: 'p95 latency is high' } }] },
   'google-cloud-operations': { incident: { incident_id: 'gcp-1', timestamp: receivedAt, severity: 'critical', title: 'Cloud Run errors', summary: 'Error rate exceeded threshold', resource: 'checkout-service' } },
 }
-const runtime = { dedupe: createInMemoryDedupeStore(), store: createInMemoryIncidentStore(), now: () => new Date(receivedAt) }
+const createRuntime = () => ({ dedupe: createInMemoryDedupeStore(), store: createInMemoryIncidentStore(), now: () => new Date(receivedAt) })
 const deliveryFor = (adapterId:(typeof monitoringAdapterIds)[number],headers:Record<string,string>={}) => ({headers,rawBody:JSON.stringify(fixtures[adapterId]),receivedAt})
 
 test('popular monitoring adapters are staged and immutable', () => {
@@ -23,20 +23,20 @@ test('popular monitoring adapters are staged and immutable', () => {
   assert.ok(Object.isFrozen(stagedMonitoringAdapters))
 })
 for (const adapterId of monitoringAdapterIds) test(`${adapterId} plugs into the universal incident source`, async () => {
-  const source=createIncidentSource(createMonitoringIncidentSourceDefinition(adapterId,{sourceId:`source-${adapterId}`}),runtime)
+  const source=createIncidentSource(createMonitoringIncidentSourceDefinition(adapterId,{sourceId:`source-${adapterId}`}),createRuntime())
   const result=await source.receive(deliveryFor(adapterId)); assert.equal(result.status,'accepted')
   if(result.status!=='accepted')return
   assert.equal(result.incident.source,'webhook'); assert.equal(result.incident.metadata.adapterId,adapterId); assert.equal(result.incident.metadata.adapterMaturity,'staged'); assert.ok(result.incident.evidence.length>0)
 })
 test('the universal source deduplicates repeated provider delivery', async () => {
-  const source=createIncidentSource(createMonitoringIncidentSourceDefinition('datadog',{sourceId:'datadog-main'}),runtime); const delivery=deliveryFor('datadog')
+  const source=createIncidentSource(createMonitoringIncidentSourceDefinition('datadog',{sourceId:'datadog-main'}),createRuntime()); const delivery=deliveryFor('datadog')
   assert.equal((await source.receive(delivery)).status,'accepted'); assert.equal((await source.receive(delivery)).status,'duplicate')
 })
 test('missing source identity fails closed',()=>assert.throws(()=>createMonitoringIncidentSourceDefinition('datadog',{sourceId:''}),/source_id_required/))
 test('authenticated factory rejects missing authenticator at wiring time',()=>assert.throws(()=>createAuthenticatedMonitoringIncidentSourceDefinition('datadog',{sourceId:'datadog-secure',authenticate:undefined as never}),/authenticator_required/))
 test('native adapter authentication runs before provider payload mapping', async () => {
   let calls=0
-  const source=createIncidentSource(createAuthenticatedMonitoringIncidentSourceDefinition('datadog',{sourceId:'datadog-secure',authenticate(delivery,context){calls+=1;assert.equal(context.adapterId,'datadog');assert.equal(context.vendor,'Datadog');return delivery.headers.authorization==='Bearer accepted'?{ok:true}:{ok:false,reason:'datadog_auth_failed'}}}),runtime)
+  const source=createIncidentSource(createAuthenticatedMonitoringIncidentSourceDefinition('datadog',{sourceId:'datadog-secure',authenticate(delivery,context){calls+=1;assert.equal(context.adapterId,'datadog');assert.equal(context.vendor,'Datadog');return delivery.headers.authorization==='Bearer accepted'?{ok:true}:{ok:false,reason:'datadog_auth_failed'}}}),createRuntime())
   const denied=await source.receive(deliveryFor('datadog',{authorization:'Bearer rejected'})); assert.equal(denied.status==='rejected'&&denied.reason,'datadog_auth_failed')
   assert.equal((await source.receive(deliveryFor('datadog',{authorization:'Bearer accepted'}))).status,'accepted'); assert.equal(calls,2)
 })

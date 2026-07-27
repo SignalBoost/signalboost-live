@@ -31,6 +31,9 @@ export const INTAKE_LIMITS = Object.freeze({
   maxEvidenceItems: 20,
   maxMetadataEntries: 100,
   maxMetadataDepth: 6,
+  // A vendor may legitimately batch many alerts into one delivery. Bounded so a
+  // single request cannot turn into unbounded work.
+  maxBatchSize: 50,
 })
 
 // ── What arrives ─────────────────────────────────────────────────────────────
@@ -62,11 +65,15 @@ export interface IncidentMapping {
 
 export type IncidentSourceStatus = 'live' | 'staged' | 'disabled'
 
-export type IncidentSourceOutcome =
+export type IncidentSourceSingleOutcome =
   | { status: 'accepted'; incident: SupervisorIncident; fingerprint: string }
   | { status: 'duplicate'; fingerprint: string; duplicateOf: string }
   | { status: 'ignored'; reason: string }
   | { status: 'rejected'; reason: string }
+
+// A delivery carrying several alerts produces one outcome PER ALERT. Declared as a
+// separate variant rather than nesting, so a batch can never contain a batch.
+export type IncidentSourceOutcome = IncidentSourceSingleOutcome | { status: 'batch'; outcomes: IncidentSourceSingleOutcome[] }
 
 export interface IncidentSourceHealth {
   sourceId: string
@@ -117,7 +124,12 @@ export interface IncidentSourceDefinition {
   authenticate?(delivery: RawIncidentDelivery): { ok: boolean; reason?: string }
   // Return null to IGNORE a delivery that is legitimately not an incident — a
   // resolution notice, a heartbeat, a test ping. Ignoring is not rejecting.
-  map(body: unknown, delivery: RawIncidentDelivery): IncidentMapping | null
+  //
+  // Return an ARRAY when one delivery carries several alerts. Alertmanager and
+  // Grafana batch by default, and mapping only the first silently discards the rest —
+  // real alert loss that looks like a working integration. Each element becomes its
+  // own incident, validated and deduplicated independently.
+  map(body: unknown, delivery: RawIncidentDelivery): IncidentMapping | IncidentMapping[] | null
 }
 
 export interface IncidentSourceRuntime {
@@ -325,7 +337,98 @@ export function createIncidentSource(definition: IncidentSourceDefinition, runti
   let lastAcceptedAt: string | null = null
   let lastRejectionReason: string | null = null
 
-  const reject = (reason: string): IncidentSourceOutcome => { counters.rejected += 1; lastRejectionReason = reason; return { status: 'rejected', reason } }
+  const reject = (reason: string): IncidentSourceSingleOutcome => { counters.rejected += 1; lastRejectionReason = reason; return { status: 'rejected', reason } }
+
+  // Everything that turns ONE mapping into ONE incident. Lifted out of receive() so a
+  // batched delivery runs the identical path per alert — validation, normalization,
+  // sanitization, fingerprinting and deduplication cannot be skipped by arriving in a
+  // batch rather than alone.
+  const processMapping = async (mapping: IncidentMapping, receivedAt: string): Promise<IncidentSourceSingleOutcome> => {
+    if (!mapping.provider?.trim()) return reject('mapping_missing_provider')
+    if (!mapping.errorMessage?.trim()) return reject('mapping_missing_error_message')
+
+    const environment = normalizeEnvironment(mapping.environment)
+    const severity = normalizeSeverity(mapping.severity)
+    const detectedAt = mapping.detectedAt && !Number.isNaN(Date.parse(mapping.detectedAt)) ? mapping.detectedAt : receivedAt
+
+    const fingerprint = fingerprintIncident({
+      provider: mapping.provider,
+      environment,
+      dedupeKey: mapping.dedupeKey,
+      errorCode: mapping.errorCode,
+      errorMessage: mapping.errorMessage,
+      affectedResource: mapping.affectedResource,
+    })
+
+    if (runtime.dedupe) {
+      let existing: string | null = null
+      // A dedupe store that is down must not silently let every duplicate through
+      // as a fresh incident, nor take intake down. It fails OPEN and is reported.
+      try { existing = await runtime.dedupe.seen(fingerprint) } catch { existing = null }
+      if (existing) { counters.duplicates += 1; return { status: 'duplicate', fingerprint, duplicateOf: existing } }
+    }
+
+    const incidentId = idFactory(fingerprint)
+    const evidenceInput = (mapping.evidence ?? []).slice(0, INTAKE_LIMITS.maxEvidenceItems)
+    const evidence = evidenceInput.length > 0
+      ? evidenceInput.map((item, index) => ({
+          evidenceId: item.evidenceId?.trim() || `${incidentId}-evidence-${index + 1}`,
+          type: item.type?.trim() || 'vendor_payload',
+          capturedAt: item.capturedAt && !Number.isNaN(Date.parse(item.capturedAt)) ? item.capturedAt : detectedAt,
+          summary: clampString(item.summary),
+          ...(item.reference ? { reference: clampString(item.reference) } : {}),
+          ...(item.digest ? { digest: clampString(item.digest) } : {}),
+        }))
+      // The schema requires non-empty evidence, and rightly so — an incident with
+      // no evidence cannot be diagnosed. A vendor that supplies none still leaves a
+      // record of what arrived and from where.
+      : [{ evidenceId: `${incidentId}-evidence-1`, type: 'vendor_alert', capturedAt: detectedAt, summary: clampString(mapping.errorMessage) }]
+
+    const removedKeys: string[] = []
+    const metadata = sanitizeMetadata({
+      ...(mapping.metadata ?? {}),
+      intakeSourceId: definition.sourceId,
+      intakeVendor: definition.vendor,
+      intakeStatus: definition.status,
+      intakeFingerprint: fingerprint,
+      ...(mapping.dedupeKey ? { intakeDedupeKey: mapping.dedupeKey } : {}),
+    }, 0, removedKeys)
+    if (removedKeys.length > 0) metadata[REDACTED_KEYS_FIELD] = removedKeys.slice(0, INTAKE_LIMITS.maxMetadataEntries)
+    if (!isPlainSerializable(metadata)) return reject('metadata_not_serializable')
+
+    let incident: SupervisorIncident
+    try {
+      incident = incidentSchema.parse({
+        incidentId,
+        provider: mapping.provider.trim(),
+        environment,
+        severity,
+        detectedAt,
+        source: 'webhook',
+        ...(mapping.errorCode ? { errorCode: clampString(mapping.errorCode) } : {}),
+        errorMessage: clampString(mapping.errorMessage),
+        evidence,
+        ...(mapping.affectedResource ? { affectedResource: clampString(mapping.affectedResource) } : {}),
+        metadata,
+      })
+    } catch (error) {
+      return reject(`schema_rejected: ${error instanceof Error ? error.message : 'unknown'}`)
+    }
+
+    // Persist and remember AFTER the incident is valid. Recording a fingerprint for
+    // an incident that never existed would suppress the next real one.
+    if (runtime.store) {
+      try { await runtime.store.persist(incident, { sourceId: definition.sourceId, vendor: definition.vendor, fingerprint }) }
+      catch (error) { return reject(`persist_failed: ${error instanceof Error ? error.message : 'unknown'}`) }
+    }
+    if (runtime.dedupe) {
+      try { await runtime.dedupe.remember(fingerprint, incidentId, new Date(now().getTime() + windowMs).toISOString()) } catch {}
+    }
+
+    counters.accepted += 1
+    lastAcceptedAt = receivedAt
+    return { status: 'accepted', incident, fingerprint }
+  }
 
   return {
     sourceId: definition.sourceId,
@@ -350,95 +453,26 @@ export function createIncidentSource(definition: IncidentSourceDefinition, runti
       let body: unknown
       try { body = JSON.parse(delivery.rawBody) } catch { return reject('invalid_json') }
 
-      let mapping: IncidentMapping | null
+      let mapping: IncidentMapping | IncidentMapping[] | null
       // An adapter that throws is a bug in the adapter, never an outage of intake.
       try { mapping = definition.map(body, delivery) } catch (error) { return reject(`mapping_error: ${error instanceof Error ? error.message : 'unknown'}`) }
 
       if (mapping === null) { counters.ignored += 1; return { status: 'ignored', reason: 'not_an_incident' } }
-      if (!mapping.provider?.trim()) return reject('mapping_missing_provider')
-      if (!mapping.errorMessage?.trim()) return reject('mapping_missing_error_message')
-
-      const environment = normalizeEnvironment(mapping.environment)
-      const severity = normalizeSeverity(mapping.severity)
-      const detectedAt = mapping.detectedAt && !Number.isNaN(Date.parse(mapping.detectedAt)) ? mapping.detectedAt : receivedAt
-
-      const fingerprint = fingerprintIncident({
-        provider: mapping.provider,
-        environment,
-        dedupeKey: mapping.dedupeKey,
-        errorCode: mapping.errorCode,
-        errorMessage: mapping.errorMessage,
-        affectedResource: mapping.affectedResource,
-      })
-
-      if (runtime.dedupe) {
-        let existing: string | null = null
-        // A dedupe store that is down must not silently let every duplicate through
-        // as a fresh incident, nor take intake down. It fails OPEN and is reported.
-        try { existing = await runtime.dedupe.seen(fingerprint) } catch { existing = null }
-        if (existing) { counters.duplicates += 1; return { status: 'duplicate', fingerprint, duplicateOf: existing } }
+      if (Array.isArray(mapping)) {
+        if (mapping.length === 0) { counters.ignored += 1; return { status: 'ignored', reason: 'empty_batch' } }
+        const outcomes: IncidentSourceSingleOutcome[] = []
+        for (const item of mapping.slice(0, INTAKE_LIMITS.maxBatchSize)) outcomes.push(await processMapping(item, receivedAt))
+        // Truncation is REPORTED, never silent — a dropped alert that nobody is told
+        // about is the exact failure this whole change exists to remove.
+        if (mapping.length > INTAKE_LIMITS.maxBatchSize) outcomes.push(reject(`batch_truncated: ${mapping.length} alerts exceeded the ${INTAKE_LIMITS.maxBatchSize} limit`))
+        // A batch of one is not a batch. Unwrapping keeps every existing caller —
+        // and every existing test — working unchanged when a vendor that CAN batch
+        // happens to send a single alert, which is the common case. Only a genuinely
+        // multi-alert delivery makes a caller deal with the batch shape.
+        return outcomes.length === 1 ? outcomes[0] : { status: 'batch', outcomes }
       }
 
-      const incidentId = idFactory(fingerprint)
-      const evidenceInput = (mapping.evidence ?? []).slice(0, INTAKE_LIMITS.maxEvidenceItems)
-      const evidence = evidenceInput.length > 0
-        ? evidenceInput.map((item, index) => ({
-            evidenceId: item.evidenceId?.trim() || `${incidentId}-evidence-${index + 1}`,
-            type: item.type?.trim() || 'vendor_payload',
-            capturedAt: item.capturedAt && !Number.isNaN(Date.parse(item.capturedAt)) ? item.capturedAt : detectedAt,
-            summary: clampString(item.summary),
-            ...(item.reference ? { reference: clampString(item.reference) } : {}),
-            ...(item.digest ? { digest: clampString(item.digest) } : {}),
-          }))
-        // The schema requires non-empty evidence, and rightly so — an incident with
-        // no evidence cannot be diagnosed. A vendor that supplies none still leaves a
-        // record of what arrived and from where.
-        : [{ evidenceId: `${incidentId}-evidence-1`, type: 'vendor_alert', capturedAt: detectedAt, summary: clampString(mapping.errorMessage) }]
-
-      const removedKeys: string[] = []
-      const metadata = sanitizeMetadata({
-        ...(mapping.metadata ?? {}),
-        intakeSourceId: definition.sourceId,
-        intakeVendor: definition.vendor,
-        intakeStatus: definition.status,
-        intakeFingerprint: fingerprint,
-        ...(mapping.dedupeKey ? { intakeDedupeKey: mapping.dedupeKey } : {}),
-      }, 0, removedKeys)
-      if (removedKeys.length > 0) metadata[REDACTED_KEYS_FIELD] = removedKeys.slice(0, INTAKE_LIMITS.maxMetadataEntries)
-      if (!isPlainSerializable(metadata)) return reject('metadata_not_serializable')
-
-      let incident: SupervisorIncident
-      try {
-        incident = incidentSchema.parse({
-          incidentId,
-          provider: mapping.provider.trim(),
-          environment,
-          severity,
-          detectedAt,
-          source: 'webhook',
-          ...(mapping.errorCode ? { errorCode: clampString(mapping.errorCode) } : {}),
-          errorMessage: clampString(mapping.errorMessage),
-          evidence,
-          ...(mapping.affectedResource ? { affectedResource: clampString(mapping.affectedResource) } : {}),
-          metadata,
-        })
-      } catch (error) {
-        return reject(`schema_rejected: ${error instanceof Error ? error.message : 'unknown'}`)
-      }
-
-      // Persist and remember AFTER the incident is valid. Recording a fingerprint for
-      // an incident that never existed would suppress the next real one.
-      if (runtime.store) {
-        try { await runtime.store.persist(incident, { sourceId: definition.sourceId, vendor: definition.vendor, fingerprint }) }
-        catch (error) { return reject(`persist_failed: ${error instanceof Error ? error.message : 'unknown'}`) }
-      }
-      if (runtime.dedupe) {
-        try { await runtime.dedupe.remember(fingerprint, incidentId, new Date(now().getTime() + windowMs).toISOString()) } catch {}
-      }
-
-      counters.accepted += 1
-      lastAcceptedAt = receivedAt
-      return { status: 'accepted', incident, fingerprint }
+      return processMapping(mapping, receivedAt)
     },
 
     health() {

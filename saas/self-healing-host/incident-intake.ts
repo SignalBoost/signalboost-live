@@ -1,131 +1,134 @@
-CODEX TASK — ELIMINATE HARDCODED ENGLISH ACROSS THE SAAS UI
-Repository: SignalBoost/signalboost-live
-Working directory: saas/
-Branch: ai/i18n-hardcoded-sweep-2 (create from current main)
+import {
+  createIncidentRuntime,
+  createInMemoryDedupeStore,
+  createInMemoryIncidentRecordStore,
+  createIncidentSource,
+  createSignedWebhookSource,
+  type IncidentSource,
+} from '@/lib/supervisor/portable/index'
+import { createMonitoringIncidentSourceDefinition, monitoringAdapterIds, type MonitoringAdapterId } from '@/lib/supervisor/portable/monitoring-adapters'
+import { createSharedSecretAuthenticator } from '@/lib/supervisor/portable/monitoring-authenticators'
+import { createTriageThinker } from '@/lib/supervisor/portable/triage-thinker'
+import { createReferenceVerifier } from '@/lib/supervisor/portable/reference-verifier'
+import { SupervisorOrchestrator } from '@/lib/supervisor/orchestrator'
+import { DefaultSupervisorPolicyEngine } from '@/lib/supervisor/policy-engine'
+import type { AuditEvent } from '@/lib/supervisor/execution-contracts'
 
-=====================================================================
-CONTEXT YOU MUST VERIFY BEFORE CHANGING ANYTHING
-=====================================================================
-The app supports five languages: en, es, pt, pl, ru.
+export const GENERIC_SOURCE_ID = 'generic'
+export const VENDOR_SECRET_HEADER = 'x-supervisor-secret'
 
-Translations live in saas/locales/ as several dictionary files per
-language: <lang>.json, cos.<lang>.json, pages.<lang>.json.
+const VENDOR_SECRET_ENV: Record<MonitoringAdapterId, string> = {
+  datadog: 'SUPERVISOR_INTAKE_SECRET_DATADOG',
+  pagerduty: 'SUPERVISOR_INTAKE_SECRET_PAGERDUTY',
+  'aws-cloudwatch-eventbridge': 'SUPERVISOR_INTAKE_SECRET_AWS',
+  'prometheus-alertmanager': 'SUPERVISOR_INTAKE_SECRET_ALERTMANAGER',
+  splunk: 'SUPERVISOR_INTAKE_SECRET_SPLUNK',
+  'azure-monitor': 'SUPERVISOR_INTAKE_SECRET_AZURE',
+  'grafana-alerting': 'SUPERVISOR_INTAKE_SECRET_GRAFANA',
+  'google-cloud-operations': 'SUPERVISOR_INTAKE_SECRET_GCP',
+}
 
-Components translate via the useI18n() hook from
-saas/components/i18n/I18nProvider.tsx, called as:
+export interface IntakeWiringNote {
+  sourceId: string
+  mounted: boolean
+  reason: string
+}
 
-    t('some.key', 'English fallback')
+const secretOf = (name: string): string => String(process.env[name] ?? '').trim()
 
-The second argument renders whenever the key is absent from the active
-language's dictionary. That fallback is the bug's hiding place: a
-missing key does not throw, does not warn, and does not show a broken
-string — it silently renders English. Every language therefore looks
-"mostly working" while being mostly untranslated.
+let cached: { runtime: ReturnType<typeof createIncidentRuntime>; notes: IntakeWiringNote[] } | null = null
 
-A measurement taken on current main, which you should REPRODUCE rather
-than trust:
-  - 639 distinct t() keys are referenced across app/ and components/
-  - 631 of them exist in NO dictionary for ANY language
-  - dictionary sizes are out of sync: en 535, pt 535, es 519, pl 519,
-    ru 519
-  - pages.*.json exists only for en and pt; es, pl and ru are absent
-  - 169 of 324 .tsx files use the i18n hook at all; the remaining 155
-    are either non-visual or contain untranslated literals
+// Bounded on purpose. This is a convenience view for an operator, NOT the audit of
+// record — a buyer tees the real audit to their SIEM through the portable's audit
+// sink. An unbounded in-process array would be a memory leak pretending to be
+// compliance.
+const AUDIT_BUFFER_LIMIT = 200
+let auditBuffer: Array<Readonly<AuditEvent>> = []
+function recordAudit(event: Readonly<AuditEvent>): void {
+  auditBuffer.push(event)
+  if (auditBuffer.length > AUDIT_BUFFER_LIMIT) auditBuffer = auditBuffer.slice(-AUDIT_BUFFER_LIMIT)
+}
+export function recentIntakeAudit(limit = 50): Array<Readonly<AuditEvent>> {
+  return auditBuffer.slice(-Math.max(1, Math.min(limit, AUDIT_BUFFER_LIMIT)))
+}
 
-Reproduce these numbers first and report them. If your count differs
-from the above, investigate why before proceeding — a discrepancy means
-one of us is scanning the wrong set of files, and acting on the wrong
-inventory would produce hundreds of misplaced keys.
+export function getIncidentIntake(): { runtime: ReturnType<typeof createIncidentRuntime>; notes: IntakeWiringNote[] } {
+  if (cached) return cached
 
-=====================================================================
-DELIVERABLE 1 — THE AUDIT (do this alone, in one PR, before any fix)
-=====================================================================
-Produce saas/locales/i18n-audit.json containing, per key:
-  - the key
-  - the English fallback string found at the call site
-  - every file:line that references it
-  - which language dictionaries currently contain it
+  const dedupe = createInMemoryDedupeStore()
+  const records = createInMemoryIncidentRecordStore()
+  const sources: IncidentSource[] = []
+  const notes: IntakeWiringNote[] = []
 
-Also list separately:
-  a) visible string literals in .tsx that are NOT wrapped in t() at all
-     — button labels, headings, placeholders, aria-labels, alt text,
-     option labels, toast and error messages shown to a user
-  b) files with no i18n hook wiring that render visible text
-  c) keys present in a dictionary but referenced nowhere (dead keys)
-  d) values in es/pt/pl/ru that are byte-identical to the English value
-     (these are untranslated placeholders, not translations)
+  const genericSecret = secretOf('SUPERVISOR_INTAKE_SECRET')
+  if (genericSecret) {
+    try {
+      sources.push(createSignedWebhookSource({ secret: genericSecret, sourceId: GENERIC_SOURCE_ID, vendor: 'generic', status: 'live' }, { dedupe }))
+      notes.push({ sourceId: GENERIC_SOURCE_ID, mounted: true, reason: 'signed webhook configured' })
+    } catch (error) {
+      notes.push({ sourceId: GENERIC_SOURCE_ID, mounted: false, reason: error instanceof Error ? error.message : 'invalid configuration' })
+    }
+  } else {
+    notes.push({ sourceId: GENERIC_SOURCE_ID, mounted: false, reason: 'SUPERVISOR_INTAKE_SECRET is not set' })
+  }
 
-Do NOT fix anything in this PR. The audit is the artifact; a fix
-without an inventory cannot be reviewed or resumed.
+  for (const adapterId of monitoringAdapterIds) {
+    const envName = VENDOR_SECRET_ENV[adapterId]
+    const secret = secretOf(envName)
+    if (!secret) {
+      notes.push({ sourceId: adapterId, mounted: false, reason: `${envName} is not set` })
+      continue
+    }
+    try {
+      const definition = createMonitoringIncidentSourceDefinition(adapterId, { sourceId: adapterId })
+      const authenticate = createSharedSecretAuthenticator({ secret, headerName: VENDOR_SECRET_HEADER })
+      sources.push(createIncidentSource({ ...definition, authenticate }, { dedupe }))
+      notes.push({ sourceId: adapterId, mounted: true, reason: `shared secret via ${VENDOR_SECRET_HEADER}` })
+    } catch (error) {
+      notes.push({ sourceId: adapterId, mounted: false, reason: error instanceof Error ? error.message : 'invalid configuration' })
+    }
+  }
 
-=====================================================================
-DELIVERABLE 2 — THE FIX, IN BATCHES OF ONE AREA PER PR
-=====================================================================
-Suggested batch order, highest user visibility first:
-  1. navigation (components/PremiumCustomerNavbarV2.tsx) and shared
-     layout/chrome
-  2. public marketing pages (home, pricing, faq, support, login)
-  3. dashboard shell and the ten most-visited dashboard pages
-  4. admin and operator pages
-  5. everything remaining
+  if (sources.length === 0) {
+    sources.push(createIncidentSource({ sourceId: '__unconfigured__', vendor: 'none', status: 'disabled', map: () => null }))
+  }
 
-For each batch:
-  - add the missing keys to ALL FIVE dictionaries in the same commit
-  - keep the English fallback argument in the t() call, unchanged
-  - wrap any bare visible literal in t() with a new key
-  - never change the key of an existing working translation
+  cached = {
+    runtime: createIncidentRuntime({
+      sources,
+      // An accepted alert is now DIAGNOSED and evaluated by the shipped policy engine,
+      // not merely filed. What it still is not is EXECUTED: running even a read-only
+      // observation needs a step runner with access to the buyer's systems and this
+      // platform has no generic one, so the executor below reports that plainly and
+      // the orchestration honestly ends `unresolved`. Returning a fabricated success
+      // would put a lie in the audit trail, which is the one thing an operator must
+      // never find there.
+      handler: async (incident) => {
+        let verdict = 'unknown'
+        let risk = 'low'
+        const orchestrator = new SupervisorOrchestrator({
+          thinker: createTriageThinker(),
+          policyEngine: new DefaultSupervisorPolicyEngine(),
+          executor: { execute: () => ({ status: 'failed', executedStepIds: [], startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), summary: 'no execution step runner is configured in this deployment' }) },
+          verifier: createReferenceVerifier(),
+          audit: { write: (event: Readonly<AuditEvent>) => {
+            if (event.eventType === 'plan_generated' && typeof event.payload.riskLevel === 'string') risk = event.payload.riskLevel
+            if (event.eventType === 'policy_evaluated' && typeof event.payload.outcome === 'string') verdict = event.payload.outcome
+            recordAudit(event)
+          } },
+          // Passive, not autopilot. An inbound alert from an unproven integration must
+          // not widen what is allowed to run unattended.
+          mode: 'passive',
+          executionContext: { executionId: `intake-${incident.incidentId}` },
+        })
+        const outcome = await orchestrator.run(incident)
+        return { status: outcome.status, reason: `diagnosed (risk ${risk}); policy ${verdict}; ${outcome.reason}` }
+      },
+      records,
+    }),
+    notes,
+  }
+  return cached
+}
 
-=====================================================================
-TRANSLATION RULES
-=====================================================================
-- Translate into real es / pt / pl / ru. Copying the English string
-  into another language file is what created the current problem and
-  is worse than leaving the key absent, because it looks translated in
-  every audit that only counts keys.
-- DO NOT translate: product names, portable names, brand terms, code
-  identifiers, HTTP verbs, header names, environment variable names,
-  log/audit event types, or anything a user types verbatim.
-- Keep interpolation placeholders exactly as they appear.
-- Keep translations short enough for their UI slot; German-style
-  overflow in a nav item is a visual regression.
-- If a term is genuinely ambiguous out of context, leave the key absent
-  and list it in an "needs-human-decision" section rather than guessing.
-  A confident wrong translation is harder to find than a missing one.
-
-=====================================================================
-HARD CONSTRAINTS
-=====================================================================
-- No behaviour changes. This sweep only moves strings; it must not
-  alter logic, routing, auth, or data flow.
-- Do not touch anything under saas/lib/supervisor/portable/,
-  saas/portable-license/, saas/portable-kernel/,
-  saas/press-media-core/ or any other portable payload directory.
-  Those ship to buyers and must contain no platform coupling; a
-  translation import there breaks the boundary guard.
-- Do not modify tests to make them pass.
-- Every relative import must keep its .ts / .tsx extension — the repo
-  enforces this and omitting it fails at runtime, not at compile time.
-
-=====================================================================
-VERIFY BEFORE EVERY PR
-=====================================================================
-From saas/:
-    npx tsc --noEmit                                  # must be 0 errors
-    node scripts/validate-next-route-config.mjs
-    node scripts/validate-strip-safe.mjs
-    node scripts/validate-relative-import-extensions.mjs
-    npx next build                                    # must compile
-    node --import ./scripts/test-alias-loader.mjs --test tests/*.node.test.ts
-
-Also confirm, for each batch, that every JSON dictionary still parses
-and that all five language files gained the SAME set of keys. A batch
-that adds a key to en.json only has reintroduced the original bug.
-
-=====================================================================
-WHAT DONE LOOKS LIKE
-=====================================================================
-Switching the language selector to es, pt, pl or ru changes every
-visible string on the page. No English remains except brand and
-product names. The audit file's "missing from all dictionaries" count
-is zero, and the "identical to English" count is zero for every
-language.
+export function resetIncidentIntakeForTests(): void { cached = null; auditBuffer = [] }

@@ -113,7 +113,7 @@
     "merge_method": "Método de Fusión",
     "region": "Región",
     "domain": "Dominio",
-    "bucket": "Bucket",
+    "bucket": "Depósito",
     "product": "Producto",
     "price": "Precio",
     "query": "Consulta",
@@ -479,35 +479,35 @@
       "displayName": "Vercel",
       "capabilities": {
         "read_deployment_status": {
-          "name": "Read Deployment Status",
+          "name": "Leer el estado del despliegue",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "inspect_deployment_failure": {
-          "name": "Inspect Deployment Failure",
+          "name": "Inspeccionar el fallo del despliegue",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "inspect_deployment_logs": {
-          "name": "Inspect Deployment Logs",
+          "name": "Inspeccionar los registros del despliegue",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "inspect_domain_status": {
-          "name": "Inspect Domain Status",
+          "name": "Inspeccionar el estado del dominio",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "inspect_project_metadata": {
-          "name": "Inspect Project Metadata",
+          "name": "Inspeccionar los metadatos del proyecto",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "inspect_environment_variable_metadata": {
-          "name": "Inspect Environment Variable Metadata",
+          "name": "Inspeccionar los metadatos de las variables de entorno",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "capture_dashboard_evidence": {
-          "name": "Capture Dashboard Evidence",
+          "name": "Capturar evidencia del panel",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         },
         "compare_dashboard_with_api": {
-          "name": "Compare Dashboard With Api",
+          "name": "Comparar el panel con la API",
           "description": "Metadatos de navegador de Vercel de solo lectura"
         }
       },
@@ -564,40 +564,40 @@
     "productionBrowserDisabled": "La ejecución de navegador en producción está deshabilitada.",
     "providerMutationDisabled": "La mutación del proveedor está deshabilitada.",
     "labels": {
-      "provider": "Provider",
-      "project": "Project",
-      "deployment": "Deployment",
-      "environment": "Environment",
-      "workItem": "Work item",
-      "owner": "Owner",
-      "lease": "Lease",
-      "fence": "Fencing generation",
-      "incident": "Incident type",
-      "severity": "Severity",
+      "provider": "Proveedor",
+      "project": "Proyecto",
+      "deployment": "Despliegue",
+      "environment": "Entorno",
+      "workItem": "Elemento de trabajo",
+      "owner": "Propietario",
+      "lease": "Concesión",
+      "fence": "Generación de aislamiento",
+      "incident": "Tipo de incidente",
+      "severity": "Gravedad",
       "plan": "Plan",
-      "channel": "Selected channel",
-      "apiFailure": "API failure category",
-      "comparison": "Comparison status",
-      "verification": "Verification status",
-      "approvedSteps": "Approved steps",
-      "bpal": "BPAL capability",
-      "capability": "Capability",
-      "risk": "Risk",
-      "maturity": "Maturity",
-      "origins": "Approved origins",
-      "evidenceProfile": "Evidence profile",
-      "verificationProfile": "Verification profile",
-      "auditTimeline": "Audit timeline",
-      "triggerSource": "Trigger source",
-      "triggerTime": "Trigger time",
-      "fingerprint": "Fingerprint",
-      "deduplication": "Deduplication",
-      "lastHeartbeat": "Last heartbeat",
-      "reconciliation": "Reconciliation",
-      "readOnly": "Read-only execution"
+      "channel": "Canal seleccionado",
+      "apiFailure": "Categoría de fallo de API",
+      "comparison": "Estado de comparación",
+      "verification": "Estado de verificación",
+      "approvedSteps": "Pasos aprobados",
+      "bpal": "Capacidad BPAL",
+      "capability": "Capacidad",
+      "risk": "Riesgo",
+      "maturity": "Madurez",
+      "origins": "Orígenes aprobados",
+      "evidenceProfile": "Perfil de evidencia",
+      "verificationProfile": "Perfil de verificación",
+      "auditTimeline": "Cronología de auditoría",
+      "triggerSource": "Origen del disparador",
+      "triggerTime": "Hora del disparador",
+      "fingerprint": "Huella",
+      "deduplication": "Deduplicación",
+      "lastHeartbeat": "Último latido",
+      "reconciliation": "Reconciliación",
+      "readOnly": "Ejecución de solo lectura"
     },
-    "triggerVisibility": "Automatic triggers are durably deduplicated before a Supervisor lease can run read-only health intelligence.",
-    "readOnlyNotice": "Execution is read-only; Vercel mutations, repairs, and production Browser execution are disabled."
+    "triggerVisibility": "Los disparadores automáticos se deduplican de forma duradera antes de que una concesión del Supervisor pueda ejecutar inteligencia de salud de solo lectura.",
+    "readOnlyNotice": "La ejecución es de solo lectura; las mutaciones en Vercel, las reparaciones y la ejecución de Browser en producción están desactivadas."
   },
   "universalProvider": {
     "operator": {

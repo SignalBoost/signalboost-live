@@ -82,6 +82,7 @@
       }
     },
     "portableMaturity": {
+      "live": "Live",
       "preview": "Preview",
       "deprecated": "Deprecated"
     }
@@ -168,6 +169,7 @@
       }
     },
     "portableMaturity": {
+      "live": "Activo",
       "preview": "Vista previa",
       "deprecated": "Obsoleto"
     }
@@ -254,6 +256,7 @@
       }
     },
     "portableMaturity": {
+      "live": "Ativo",
       "preview": "Pré-visualização",
       "deprecated": "Descontinuado"
     }
@@ -340,6 +343,7 @@
       }
     },
     "portableMaturity": {
+      "live": "Dostępne",
       "preview": "Podgląd",
       "deprecated": "Wycofane"
     }
@@ -426,6 +430,7 @@
       }
     },
     "portableMaturity": {
+      "live": "Доступно",
       "preview": "Предпросмотр",
       "deprecated": "Устарело"
     }

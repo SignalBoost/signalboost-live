@@ -84,3 +84,13 @@ export {
   WebhookIntakeConfigError,
 } from './webhook-intake.ts'
 export type { IntakeEnvelope, SignedWebhookOptions } from './webhook-intake.ts'
+
+export {
+  createMonitoringIncidentSourceDefinition,
+  monitoringAdapterIds,
+  stagedMonitoringAdapters,
+  type MonitoringAdapterContext,
+  type MonitoringAdapterDescriptor,
+  type MonitoringAdapterId,
+  type MonitoringAdapterMaturity,
+} from './monitoring-adapters.ts'

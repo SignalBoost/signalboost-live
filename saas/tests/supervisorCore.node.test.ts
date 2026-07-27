@@ -122,9 +122,9 @@ test('reference verifier runs every read-only verification step and reports veri
   const seen: string[] = []
   const verifier = createReferenceVerifier({
     now: () => new Date('2026-07-16T00:04:00.000Z'),
-    runner: async ({ step }) => {
-      seen.push(step.stepId)
-      return { ok: true, summary: `${step.stepId} healthy`, data: { state: 'healthy' } }
+    runner: async (verificationStep) => {
+      seen.push(verificationStep.stepId)
+      return { ok: true, summary: `${verificationStep.stepId} healthy`, data: { state: 'healthy' } }
     },
   })
   const result = await verifier.verify({
@@ -134,7 +134,9 @@ test('reference verifier runs every read-only verification step and reports veri
   })
   assert.equal(result.status, 'verified')
   assert.deepEqual(seen, ['verify-1', 'read-2'])
-  assert.deepEqual(result.metadata?.executedVerificationStepIds, ['verify-1', 'read-2'])
+  assert.equal(result.metadata?.stepsTotal, 2)
+  assert.equal(result.metadata?.stepsPassed, 2)
+  assert.equal(result.metadata?.stepsUncheckable, 0)
 })
 
 test('reference verifier refuses mutation-shaped verification without calling the runner', async () => {
@@ -145,27 +147,27 @@ test('reference verifier refuses mutation-shaped verification without calling th
     plan: parsedPlan({ verificationSteps: [step({ stepId: 'mutate-verify', action: 'api_request' })] }),
     execution: completedExecution(),
   })
-  assert.equal(result.status, 'failed')
+  assert.equal(result.status, 'unresolved')
   assert.equal(calls, 0)
-  assert.match(result.errors[0], /not read-only/)
+  assert.match(result.errors[0], /step_not_read_only/)
 })
 
-test('reference verifier fails closed on a protected verification step', async () => {
-  const verifier = createReferenceVerifier({ runner: async () => ({ ok: true, summary: 'unexpected' }) })
+test('reference verifier permits protected read-only verification because it cannot mutate', async () => {
+  const verifier = createReferenceVerifier({ runner: async (verificationStep) => ({ ok: true, summary: `${verificationStep.stepId} healthy` }) })
   const result = await verifier.verify({
     incident: parsedIncident(),
     plan: parsedPlan({ verificationSteps: [step({ stepId: 'protected-verify', action: 'verify', protectedAction: true })] }),
     execution: completedExecution(),
   })
-  assert.equal(result.status, 'failed')
-  assert.match(result.errors[0], /protected/)
+  assert.equal(result.status, 'verified')
+  assert.equal(result.metadata?.stepsPassed, 1)
 })
 
-test('reference verifier stops on the first failed observation', async () => {
+test('reference verifier records failed observations and evaluates the full read-only plan', async () => {
   const seen: string[] = []
-  const verifier = createReferenceVerifier({ runner: async ({ step }) => {
-    seen.push(step.stepId)
-    return { ok: step.stepId !== 'verify-1', summary: step.stepId === 'verify-1' ? 'still unhealthy' : 'healthy' }
+  const verifier = createReferenceVerifier({ runner: async (verificationStep) => {
+    seen.push(verificationStep.stepId)
+    return { ok: verificationStep.stepId !== 'verify-1', summary: verificationStep.stepId === 'verify-1' ? 'still unhealthy' : 'healthy' }
   } })
   const result = await verifier.verify({
     incident: parsedIncident(),
@@ -173,8 +175,11 @@ test('reference verifier stops on the first failed observation', async () => {
     execution: completedExecution(),
   })
   assert.equal(result.status, 'failed')
-  assert.deepEqual(seen, ['verify-1'])
-  assert.deepEqual(result.metadata?.failedVerificationStepIds, ['verify-1'])
+  assert.deepEqual(seen, ['verify-1', 'read-2'])
+  assert.match(result.errors[0], /check_failed:verify-1/)
+  assert.equal(result.metadata?.stepsTotal, 2)
+  assert.equal(result.metadata?.stepsPassed, 1)
+  assert.equal(result.metadata?.stepsUncheckable, 0)
 })
 
 test('reference verifier does not verify incomplete execution', async () => {

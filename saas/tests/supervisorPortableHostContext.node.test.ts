@@ -101,7 +101,7 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
 })
 
 test('the portable boundary modules themselves are unconditionally clean', () => {
-  for (const name of ['host-context.ts', 'enterprise-notifier.ts', 'enterprise-dispatch-store.ts', 'siem-audit-sink.ts', 'incident-source.ts', 'webhook-intake.ts', 'incident-runtime.ts', 'index.ts']) {
+  for (const name of ['host-context.ts', 'enterprise-notifier.ts', 'enterprise-dispatch-store.ts', 'siem-audit-sink.ts', 'incident-source.ts', 'webhook-intake.ts', 'incident-runtime.ts', 'reference-verifier.ts', 'index.ts']) {
     const file = fileURLToPath(new URL(`../lib/supervisor/portable/${name}`, import.meta.url))
     const raw = readFileSync(file, 'utf8')
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')

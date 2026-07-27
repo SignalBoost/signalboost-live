@@ -1,4 +1,4 @@
-import type { IncidentSourceDefinition } from './incident-source.ts'
+import type { IncidentSourceDefinition, RawIncidentDelivery } from './incident-source.ts'
 import { createDatadogDefinition } from './monitoring-adapters/datadog.ts'
 import { createPagerDutyDefinition } from './monitoring-adapters/pagerduty.ts'
 import { createAwsDefinition } from './monitoring-adapters/aws-cloudwatch-eventbridge.ts'
@@ -13,6 +13,9 @@ export type MonitoringAdapterId = (typeof monitoringAdapterIds)[number]
 export type MonitoringAdapterMaturity = 'staged' | 'certified' | 'deprecated'
 export interface MonitoringAdapterDescriptor { readonly adapterId:MonitoringAdapterId; readonly displayName:string; readonly maturity:MonitoringAdapterMaturity; readonly transport:'webhook'; readonly authentication:readonly string[]; readonly schemaVersion:'monitoring-adapter-v1' }
 export interface MonitoringAdapterContext { readonly sourceId:string; readonly defaultEnvironment?:string }
+export interface MonitoringAdapterAuthenticationContext { readonly adapterId:MonitoringAdapterId; readonly vendor:string }
+export interface MonitoringAdapterAuthenticator { (delivery:RawIncidentDelivery,context:MonitoringAdapterAuthenticationContext):{ok:boolean;reason?:string} }
+export interface AuthenticatedMonitoringAdapterContext extends MonitoringAdapterContext { readonly authenticate:MonitoringAdapterAuthenticator }
 
 const rows:Record<MonitoringAdapterId,MonitoringAdapterDescriptor>={
   datadog:d('datadog','Datadog',['shared-secret','source-ip-policy']), pagerduty:d('pagerduty','PagerDuty',['webhook-signature']),
@@ -36,4 +39,10 @@ export function createMonitoringIncidentSourceDefinition(adapterId:MonitoringAda
     case'grafana-alerting':return createGrafanaDefinition(context.sourceId)
     case'google-cloud-operations':return createGoogleCloudDefinition(context.sourceId)
   }
+}
+
+export function createAuthenticatedMonitoringIncidentSourceDefinition(adapterId:MonitoringAdapterId,context:AuthenticatedMonitoringAdapterContext):IncidentSourceDefinition{
+  if(typeof context.authenticate!=='function')throw new Error('monitoring_adapter_authenticator_required')
+  const definition=createMonitoringIncidentSourceDefinition(adapterId,context)
+  return Object.freeze({...definition,authenticate(delivery:RawIncidentDelivery){return context.authenticate(delivery,{adapterId,vendor:definition.vendor})}})
 }

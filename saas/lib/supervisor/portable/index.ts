@@ -68,6 +68,7 @@ export type {
   IncidentSourceDefinition,
   IncidentSourceHealth,
   IncidentSourceOutcome,
+  IncidentSourceSingleOutcome,
   IncidentSourceRuntime,
   IncidentSourceStatus,
   IncidentStore,
@@ -106,6 +107,7 @@ export {
 } from './incident-runtime.ts'
 export type {
   DeliveryResult,
+  DeliverySingleResult,
   IncidentHandler,
   IncidentRecord,
   IncidentRecordStatus,
@@ -125,3 +127,12 @@ export type {
   VerificationCheckResult,
   VerificationStepRunner,
 } from './reference-verifier.ts'
+
+export {
+  createSharedSecretAuthenticator,
+  createHmacSignatureAuthenticator,
+  createTrustedNetworkAuthenticator,
+  AuthenticatorConfigError,
+  AUTHENTICATOR_DEFAULTS,
+} from './monitoring-authenticators.ts'
+export type { AuthenticationOutcome, DeliveryAuthenticator, HmacSignatureOptions } from './monitoring-authenticators.ts'

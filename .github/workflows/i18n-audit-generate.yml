@@ -1,0 +1,43 @@
+name: Generate i18n audit
+
+on:
+  push:
+    branches:
+      - ai/i18n-hardcoded-sweep-2
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ai/i18n-hardcoded-sweep-2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - run: node scripts/generate-i18n-audit.mjs
+      - name: Validate audit JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('locales/i18n-audit.json','utf8'))"
+      - name: Commit audit artifact and remove temporary generator
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add saas/locales/i18n-audit.json
+          git rm saas/scripts/generate-i18n-audit.mjs .github/workflows/i18n-audit-generate.yml
+          git commit -m "audit(i18n): inventory hardcoded SaaS UI strings"
+          git push origin HEAD:ai/i18n-hardcoded-sweep-2

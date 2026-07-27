@@ -75,6 +75,17 @@ export type {
 } from './incident-source.ts'
 
 export {
+  createSignedWebhookSource,
+  signIntakeRequest,
+  INTAKE_ENVELOPE_VERSION,
+  SIGNATURE_HEADER,
+  TIMESTAMP_HEADER,
+  WEBHOOK_DEFAULTS,
+  WebhookIntakeConfigError,
+} from './webhook-intake.ts'
+export type { IntakeEnvelope, SignedWebhookOptions } from './webhook-intake.ts'
+
+export {
   createMonitoringIncidentSourceDefinition,
   monitoringAdapterIds,
   stagedMonitoringAdapters,

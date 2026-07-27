@@ -12,8 +12,35 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { generateKeyPairSync } from 'node:crypto'
+
+import { issueLicense } from '../portable-license/issue.ts'
+import { featuresForEdition } from '../portable-license/catalog.ts'
 
 const SECRET = 'a-sufficiently-long-datadog-secret'
+
+// Diagnosis is a licensed capability, so these tests install a REAL licence rather
+// than bypassing the gate. Testing the intake path with the gate disabled would prove
+// only that an unlicensed deployment behaves the same as a licensed one, which is the
+// opposite of what the licence is for.
+const ISSUER = 'signalboost-test'
+const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+const LICENSE_PUBLIC_KEY = publicKey.export({ type: 'spki', format: 'pem' }).toString()
+const LICENSE_TOKEN = issueLicense({
+  schema: 'portable-license/1',
+  licenseId: 'lic-intake-test',
+  issuer: ISSUER,
+  licensee: 'Intake Test',
+  productId: 'self-healing-supervisor',
+  edition: 'enterprise',
+  features: featuresForEdition('self-healing-supervisor', 'enterprise') ?? ['repair.plan'],
+  seats: null,
+  maxExecutions: null,
+  issuedAt: new Date(Date.now() - 1000).toISOString(),
+  notBefore: new Date(Date.now() - 1000).toISOString(),
+  expiresAt: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString(),
+  graceDays: 0,
+}, privateKey.export({ type: 'pkcs8', format: 'pem' }).toString())
 
 const datadogAlert = (overrides: Record<string, unknown> = {}) => JSON.stringify({
   id: `evt-${Math.random().toString(36).slice(2, 10)}`,
@@ -31,12 +58,18 @@ async function withDatadogSource<T>(run: (mod: typeof import('../self-healing-ho
   const saved = { ...process.env }
   for (const key of Object.keys(process.env)) if (key.startsWith('SUPERVISOR_INTAKE_SECRET')) delete process.env[key]
   process.env.SUPERVISOR_INTAKE_SECRET_DATADOG = SECRET
+  process.env.SUPERVISOR_LICENSE_TOKEN = LICENSE_TOKEN
+  process.env.SUPERVISOR_LICENSE_ISSUER = ISSUER
+  process.env.SUPERVISOR_LICENSE_PUBLIC_KEYS = LICENSE_PUBLIC_KEY
+  const entitlement = await import('../self-healing-host/supervisor-entitlement.ts')
+  entitlement.resetSupervisorEntitlementForTests()
   mod.resetIncidentIntakeForTests()
   try {
     return await run(mod)
   } finally {
     mod.resetIncidentIntakeForTests()
-    for (const key of Object.keys(process.env)) if (key.startsWith('SUPERVISOR_INTAKE_SECRET')) delete process.env[key]
+    entitlement.resetSupervisorEntitlementForTests()
+    for (const key of Object.keys(process.env)) if (key.startsWith('SUPERVISOR_')) delete process.env[key]
     Object.assign(process.env, saved)
   }
 }
@@ -116,4 +149,32 @@ test('a repeated alert is deduplicated and is not diagnosed twice', async () => 
     assert.equal(first.status, 'handled')
     assert.equal(second.status, 'duplicate', 'the second firing costs no diagnosis at all')
   })
+})
+
+test('WITHOUT a licence the alert is still received, but not diagnosed', async () => {
+  // The commercial boundary, seen from the intake endpoint. An unlicensed deployment
+  // must not quietly behave like a licensed one — but it must also not lose the
+  // alert, because dropping a buyer's incident is a hostage tactic, not enforcement.
+  const mod = await import('../self-healing-host/incident-intake.ts')
+  const entitlement = await import('../self-healing-host/supervisor-entitlement.ts')
+  const saved = { ...process.env }
+  for (const key of Object.keys(process.env)) if (key.startsWith('SUPERVISOR_')) delete process.env[key]
+  process.env.SUPERVISOR_INTAKE_SECRET_DATADOG = SECRET
+  entitlement.resetSupervisorEntitlementForTests()
+  mod.resetIncidentIntakeForTests()
+
+  try {
+    const { runtime } = mod.getIncidentIntake()
+    const result = await runtime.deliver('datadog', { headers: { [mod.VENDOR_SECRET_HEADER]: SECRET }, rawBody: datadogAlert() })
+
+    assert.equal(result.status, 'handled', 'the alert is still accepted and recorded')
+    if (result.status !== 'handled') return
+    assert.notEqual(result.record.status, 'completed')
+    assert.ok(/licence|license/i.test(result.record.reason), `the record must say a licence is required: ${result.record.reason}`)
+  } finally {
+    mod.resetIncidentIntakeForTests()
+    entitlement.resetSupervisorEntitlementForTests()
+    for (const key of Object.keys(process.env)) if (key.startsWith('SUPERVISOR_')) delete process.env[key]
+    Object.assign(process.env, saved)
+  }
 })

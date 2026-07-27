@@ -66,7 +66,13 @@ test('Agent Operations is architecture-complete while runtime inputs remain buye
   assert.equal(descriptor?.manifest.licensingAvailable, false)
 })
 
-test('Self-Healing Supervisor is architecture-complete while buyer go-live remains external', () => {
+// Flipped off preview Jul 27 2026 on evidence, not on a badge change: the acceptance
+// scenario was run against the platform's real host adapter and passed all five checks
+// across all three risk categories — safe step executed, dangerous step paused,
+// approver notified, buyer branding used, audit trail emitted. The assertions below
+// deliberately still pin status and licensing BY NAME, so a future change to either is
+// a decision someone makes rather than a side effect.
+test('Self-Healing Supervisor is architecture-complete and cleared for licensing', () => {
   const report = createPortableArchitectureClosureReport()
   const supervisor = report.entries.find(entry => entry.productId === 'self-healing-supervisor')
   const descriptor = portableProductRegistry.find(entry => entry.manifest.productId === 'self-healing-supervisor')
@@ -75,8 +81,8 @@ test('Self-Healing Supervisor is architecture-complete while buyer go-live remai
   assert.equal(supervisor?.coreBoundary, 'saas/lib/supervisor/portable')
   assert.equal(supervisor?.hostBoundary, 'HostContext + createSupervisorDispatcher')
   assert.equal(descriptor?.implementationStatus, 'implemented')
-  assert.equal(descriptor?.manifest.status, 'preview')
-  assert.equal(descriptor?.manifest.licensingAvailable, false)
+  assert.equal(descriptor?.manifest.status, 'live')
+  assert.equal(descriptor?.manifest.licensingAvailable, true)
   assert.equal(descriptor?.route, '/dashboard/supervisor')
 })
 

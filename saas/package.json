@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "prebuild": "npm run validate:next-routes && npm run validate:strip-safe",
+    "prebuild": "npm run validate:next-routes && npm run validate:strip-safe && npm run validate:i18n-copy",
     "build": "next build",
     "start": "next start",
     "dev": "next dev",

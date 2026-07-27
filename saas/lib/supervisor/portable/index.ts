@@ -94,3 +94,19 @@ export {
   type MonitoringAdapterId,
   type MonitoringAdapterMaturity,
 } from './monitoring-adapters.ts'
+
+export {
+  createIncidentRuntime,
+  createInMemoryIncidentRecordStore,
+  IncidentRuntimeConfigError,
+} from './incident-runtime.ts'
+export type {
+  DeliveryResult,
+  IncidentHandler,
+  IncidentRecord,
+  IncidentRecordStatus,
+  IncidentRecordStore,
+  IncidentRunOutcome,
+  IncidentRuntimeHealth,
+  IncidentRuntimeOptions,
+} from './incident-runtime.ts'

@@ -113,7 +113,7 @@
     "merge_method": "Metoda Scalania",
     "region": "Region",
     "domain": "Domena",
-    "bucket": "Bucket",
+    "bucket": "Zasobnik",
     "product": "Produkt",
     "price": "Cena",
     "query": "Zapytanie",
@@ -479,35 +479,35 @@
       "displayName": "Vercel",
       "capabilities": {
         "read_deployment_status": {
-          "name": "Read Deployment Status",
+          "name": "Odczytaj status wdrożenia",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "inspect_deployment_failure": {
-          "name": "Inspect Deployment Failure",
+          "name": "Zbadaj awarię wdrożenia",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "inspect_deployment_logs": {
-          "name": "Inspect Deployment Logs",
+          "name": "Zbadaj logi wdrożenia",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "inspect_domain_status": {
-          "name": "Inspect Domain Status",
+          "name": "Zbadaj status domeny",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "inspect_project_metadata": {
-          "name": "Inspect Project Metadata",
+          "name": "Zbadaj metadane projektu",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "inspect_environment_variable_metadata": {
-          "name": "Inspect Environment Variable Metadata",
+          "name": "Zbadaj metadane zmiennych środowiskowych",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "capture_dashboard_evidence": {
-          "name": "Capture Dashboard Evidence",
+          "name": "Przechwyć dowody z panelu",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         },
         "compare_dashboard_with_api": {
-          "name": "Compare Dashboard With Api",
+          "name": "Porównaj panel z API",
           "description": "Metadane przeglądarki Vercel tylko do odczytu"
         }
       },
@@ -538,7 +538,7 @@
       "forbidden": "Zabronione"
     },
     "maturity": {
-      "experimental": "Eksperymentalne",
+      "experimental": "Eksperymentalny",
       "sandbox_verified": "Zweryfikowane w sandboxie",
       "human_approved": "Zatwierdzone przez człowieka",
       "auto_failover_ready": "Gotowe do automatycznego przełączenia",
@@ -547,7 +547,7 @@
     "channel": {
       "api": "API",
       "browser": "Przeglądarka",
-      "manual": "Ręcznie"
+      "manual": "Ręczny"
     },
     "boolean": {
       "true": "Tak",
@@ -564,40 +564,40 @@
     "productionBrowserDisabled": "Wykonywanie przeglądarki w produkcji jest wyłączone.",
     "providerMutationDisabled": "Mutacje dostawcy są wyłączone.",
     "labels": {
-      "provider": "Provider",
-      "project": "Project",
-      "deployment": "Deployment",
-      "environment": "Environment",
-      "workItem": "Work item",
-      "owner": "Owner",
-      "lease": "Lease",
-      "fence": "Fencing generation",
-      "incident": "Incident type",
-      "severity": "Severity",
+      "provider": "Dostawca",
+      "project": "Projekt",
+      "deployment": "Wdrożenie",
+      "environment": "Środowisko",
+      "workItem": "Element pracy",
+      "owner": "Właściciel",
+      "lease": "Dzierżawa",
+      "fence": "Generacja odgrodzenia",
+      "incident": "Typ incydentu",
+      "severity": "Waga",
       "plan": "Plan",
-      "channel": "Selected channel",
-      "apiFailure": "API failure category",
-      "comparison": "Comparison status",
-      "verification": "Verification status",
-      "approvedSteps": "Approved steps",
-      "bpal": "BPAL capability",
-      "capability": "Capability",
-      "risk": "Risk",
-      "maturity": "Maturity",
-      "origins": "Approved origins",
-      "evidenceProfile": "Evidence profile",
-      "verificationProfile": "Verification profile",
-      "auditTimeline": "Audit timeline",
-      "triggerSource": "Trigger source",
-      "triggerTime": "Trigger time",
-      "fingerprint": "Fingerprint",
-      "deduplication": "Deduplication",
-      "lastHeartbeat": "Last heartbeat",
-      "reconciliation": "Reconciliation",
-      "readOnly": "Read-only execution"
+      "channel": "Wybrany kanał",
+      "apiFailure": "Kategoria awarii API",
+      "comparison": "Status porównania",
+      "verification": "Status weryfikacji",
+      "approvedSteps": "Zatwierdzone kroki",
+      "bpal": "Możliwość BPAL",
+      "capability": "Możliwość",
+      "risk": "Ryzyko",
+      "maturity": "Dojrzałość",
+      "origins": "Zatwierdzone źródła",
+      "evidenceProfile": "Profil dowodów",
+      "verificationProfile": "Profil weryfikacji",
+      "auditTimeline": "Oś czasu audytu",
+      "triggerSource": "Źródło wyzwalacza",
+      "triggerTime": "Czas wyzwolenia",
+      "fingerprint": "Odcisk",
+      "deduplication": "Deduplikacja",
+      "lastHeartbeat": "Ostatni sygnał życia",
+      "reconciliation": "Uzgadnianie",
+      "readOnly": "Wykonanie tylko do odczytu"
     },
-    "triggerVisibility": "Automatic triggers are durably deduplicated before a Supervisor lease can run read-only health intelligence.",
-    "readOnlyNotice": "Execution is read-only; Vercel mutations, repairs, and production Browser execution are disabled."
+    "triggerVisibility": "Automatyczne wyzwalacze są trwale deduplikowane, zanim dzierżawa Supervisora będzie mogła uruchomić analizę stanu tylko do odczytu.",
+    "readOnlyNotice": "Wykonanie jest tylko do odczytu; zmiany w Vercel, naprawy i wykonanie Browser na produkcji są wyłączone."
   },
   "universalProvider": {
     "operator": {

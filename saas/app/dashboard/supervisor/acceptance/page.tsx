@@ -19,6 +19,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
+import { LocalizedText } from '@/components/i18n/LocalizedText'
+import { auditUiText } from '@/lib/i18n/auditUiCopy'
 
 type Check = { id: string; title: string; passed: boolean; detail: string }
 type Run = { category: string; passed: boolean; checks: Check[]; auditEventTypes: string[]; summary: string }
@@ -28,6 +31,7 @@ const panel: React.CSSProperties = { border: '1px solid rgba(255,255,255,.14)', 
 const muted: React.CSSProperties = { color: '#9aa4b9', fontSize: 13, lineHeight: 1.5 }
 
 export default function SupervisorAcceptancePage() {
+  const { lang } = useTranslation()
   const [state, setState] = useState<'idle' | 'running' | 'done'>('idle')
   const [record, setRecord] = useState<Record | null>(null)
   const [error, setError] = useState('')
@@ -41,9 +45,9 @@ export default function SupervisorAcceptancePage() {
       setRecord(payload)
       // 409 is a real answer, not a transport failure: it means a check failed, or the host
       // context could not be built. Only a non-JSON or network error is an error here.
-      if (!response.ok && !payload) setError(`Request failed (${response.status})`)
+      if (!response.ok && !payload) setError(`${auditUiText(lang, 'Request failed')} (${response.status})`)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The request did not complete')
+      setError(cause instanceof Error ? cause.message : auditUiText(lang, 'The request did not complete'))
     } finally {
       setState('done')
     }
@@ -52,12 +56,9 @@ export default function SupervisorAcceptancePage() {
   const passed = record?.passed === true
 
   return <main style={{ padding: 24, maxWidth: 900 }}>
-    <h1 style={{ marginTop: 0 }}>Self-Healing Supervisor — acceptance</h1>
+    <h1 style={{ marginTop: 0 }}><LocalizedText fallback="Self-Healing Supervisor — acceptance" /></h1>
     <p style={muted}>
-      Runs one rehearsal incident per risk category against this deployment&rsquo;s real wiring: a safe
-      step executes, a consequential step must pause, the approver is notified through the real
-      channel, and an audit trail is produced. Nothing consequential can execute — the dangerous
-      step is required to pause. Approvers receive real email.
+      <LocalizedText fallback={"Runs one rehearsal incident per risk category against this deployment’s real wiring: a safe step executes, a consequential step must pause, the approver is notified through the real channel, and an audit trail is produced. Nothing consequential can execute — the dangerous step is required to pause. Approvers receive real email."} />
     </p>
 
     <section style={panel}>
@@ -67,21 +68,21 @@ export default function SupervisorAcceptancePage() {
         disabled={state === 'running'}
         style={{ border: 0, borderRadius: 12, padding: '14px 20px', fontWeight: 900, fontSize: 15, cursor: state === 'running' ? 'wait' : 'pointer', color: '#07111f', background: '#f5c451' }}
       >
-        {state === 'running' ? 'Running all three categories…' : 'Run acceptance'}
+        {state === 'running' ? <LocalizedText fallback="Running all three categories…" /> : <LocalizedText fallback="Run acceptance" />}
       </button>
-      {state === 'running' ? <p style={muted}>Sending real notifications. This takes a few seconds.</p> : null}
+      {state === 'running' ? <p style={muted}><LocalizedText fallback="Sending real notifications. This takes a few seconds." /></p> : null}
       {error ? <p role="alert" style={{ color: '#ffb3c1', fontWeight: 700 }}>{error}</p> : null}
     </section>
 
     {record?.error ? <section style={{ ...panel, borderColor: '#ffb020' }}>
-      <h2 style={{ marginTop: 0, color: '#ffcf7a' }}>Not run</h2>
+      <h2 style={{ marginTop: 0, color: '#ffcf7a' }}><LocalizedText fallback="Not run" /></h2>
       <p>{record.error}</p>
       {record.remedy ? <p style={muted}>{record.remedy}</p> : null}
     </section> : null}
 
     {record?.runs?.length ? <>
       <section style={{ ...panel, borderColor: passed ? '#38f2a4' : '#ff5c7a' }}>
-        <h2 style={{ marginTop: 0, color: passed ? '#71ffc1' : '#ff8ca2' }}>{passed ? 'PASSED' : 'FAILED'}</h2>
+        <h2 style={{ marginTop: 0, color: passed ? '#71ffc1' : '#ff8ca2' }}>{passed ? <LocalizedText fallback="PASSED" /> : <LocalizedText fallback="FAILED" />}</h2>
         <p>{record.meaning}</p>
         {record.blocking?.length ? <ul>{record.blocking.map(item => <li key={item}>{item}</li>)}</ul> : null}
         <p style={muted}>{record.productName} · {record.ranAt}</p>
@@ -91,7 +92,7 @@ export default function SupervisorAcceptancePage() {
         <h3 style={{ marginTop: 0 }}>{item.category}</h3>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
           {item.checks.map(check => <li key={check.id}>
-            <strong style={{ color: check.passed ? '#71ffc1' : '#ff8ca2' }}>{check.passed ? 'PASS' : 'FAIL'}</strong>{' '}
+            <strong style={{ color: check.passed ? '#71ffc1' : '#ff8ca2' }}>{check.passed ? <LocalizedText fallback="PASS" /> : <LocalizedText fallback="FAIL" />}</strong>{' '}
             {check.title}
             <div style={muted}>{check.detail}</div>
           </li>)}
@@ -99,8 +100,8 @@ export default function SupervisorAcceptancePage() {
       </section>)}
 
       <section style={panel}>
-        <h3 style={{ marginTop: 0 }}>Evidence record</h3>
-        <p style={muted}>This is the artifact that closes item 7 of the integration guide. Keep it.</p>
+        <h3 style={{ marginTop: 0 }}><LocalizedText fallback="Evidence record" /></h3>
+        <p style={muted}><LocalizedText fallback="This is the artifact that closes item 7 of the integration guide. Keep it." /></p>
         <textarea readOnly value={JSON.stringify(record, null, 2)} style={{ width: '100%', minHeight: 220, background: '#07111f', color: '#c3ccdf', border: '1px solid rgba(255,255,255,.14)', borderRadius: 10, padding: 12, fontFamily: 'ui-monospace, monospace', fontSize: 12 }} />
       </section>
     </> : null}

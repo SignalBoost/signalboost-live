@@ -18,8 +18,10 @@ export function requiredString(value: unknown, fallback: string): string {
   return optionalString(value) ?? fallback
 }
 
+// Acknowledged PagerDuty incidents and Datadog no-data alerts remain active incidents.
+// Only terminal/recovery states and non-alert probes are ignored.
 export function isNonIncidentState(...values: unknown[]): boolean {
-  return values.some(value => /^(resolved|closed|ok|healthy|recovered|acknowledged|acknowledged_by_user|no_data|test|ping|heartbeat)$/i.test(optionalString(value) ?? ''))
+  return values.some(value => /^(resolved|closed|ok|healthy|recovered|cleared|test|ping|heartbeat)$/i.test(optionalString(value) ?? ''))
 }
 
 export function mapping(input: {

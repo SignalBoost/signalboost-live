@@ -136,3 +136,10 @@ export {
   AUTHENTICATOR_DEFAULTS,
 } from './monitoring-authenticators.ts'
 export type { AuthenticationOutcome, DeliveryAuthenticator, HmacSignatureOptions } from './monitoring-authenticators.ts'
+
+export {
+  createTriageThinker,
+  classifyIncidentShape,
+  TRIAGE_PLAN_SCHEMA_VERSION,
+} from './triage-thinker.ts'
+export type { TriageThinkerOptions } from './triage-thinker.ts'

@@ -1,300 +1,211 @@
-<!-- docs/portables/self-healing-integration-guide.md -->
-# Self-Healing Supervisor — Enterprise Integration Guide
+<!-- docs/portables/self-healing-incident-intake-guide.md -->
 
-**Audience:** the buyer's engineering team installing the Self-Healing portable into
-their own stack. Nothing here depends on SignalBoost infrastructure.
+# Incident intake — buyer and adapter guide
 
-**What the portable does:** it watches deployment/provider health, and when it detects
-an incident it prepares a repair. Safe steps run automatically; **dangerous steps
-(financial, destructive, credential/security) pause for a human approver** and are
-never auto-executed. Every action is emitted to your SIEM. The portable brings the
-behavior; **you bring the infrastructure** through the interfaces below.
+The Self-Healing Supervisor diagnoses, gates, executes and verifies repairs. It does
+not watch your systems, and that is deliberate: you already run Datadog, CloudWatch,
+Alertmanager, PagerDuty or Splunk, and replacing them is not on offer. This document
+covers the socket those tools plug into.
 
----
+Two ways in:
 
-## 1. What you provide (the HostContext boundary)
+1. **The generic signed webhook.** Point any system at it today. No adapter required.
+2. **A native vendor adapter.** A thin translation of one vendor's payload shape.
+   Written once, against the contract in this document.
 
-You implement these interfaces against your own systems. Import them from
-`lib/supervisor/portable`.
-
-| Interface | You back it with | Purpose |
-| --- | --- | --- |
-| `SecretsProvider` | your vault (Vault, AWS/GCP Secrets Manager, etc.) | resolve provider API tokens at runtime — no secrets in env or code |
-| `NotificationSink` | your channel (email, Slack, ServiceNow, PagerDuty, Teams) | deliver a paused-step approval request to approvers |
-| `ApproverDirectory` | your SSO/IdP (Okta, Entra, etc.) | resolve who may approve a dangerous step |
-| `HostBranding` | your product name + console URL | branding on the notifications your people receive |
-| `SqlExecutor` | your database driver | the durable at-most-once dispatch ledger (§3) |
-| `SiemTransport` | your SIEM collector (HTTPS/HEC, syslog, Kafka) | receive the audit stream (§4) |
-
-All are plain interfaces — no base class, no platform import. Everything under
-`lib/supervisor/portable/` names no platform, reads no `process.env`, and imports no host
-singleton — enforced, not asserted: `tests/supervisorPortableHostContext.node.test.ts`
-fails the build if any of those files acquires a host reference.
+Both produce the identical canonical incident. Everything downstream — diagnosis,
+policy, approval gating, verification, audit — is unaware of which one was used.
 
 ---
 
-## 2. Configuration (no environment variables required)
+## 1. The generic signed webhook
 
-You pass everything explicitly. You supply, per deployment: your `HostContext`
-implementation, your `SqlExecutor` for the ledger, and your `SiemAuditSinkConfig`
-(transport + format). That is the whole surface — nothing is read from the environment on
-your behalf, so nothing silently changes behaviour based on how your build system happens
-to set `NODE_ENV`.
+### The payload
 
-### 2.1 Where the build platform is still reachable, and why
+Only `provider` and `errorMessage` are required.
 
-The same test that enforces §1 also walks the **entire import graph** reachable from the
-two entry points in §5 and fails if host coupling appears anywhere new. Two aliased lazy
-host fallbacks are declared and excluded from the buyer release payload:
-
-| Module | What it is | Why it cannot affect your deployment |
-| --- | --- | --- |
-| `executors/create-supervisor-dispatcher.ts` | aliased lazy import of the platform email notifier | excluded from the archive; supplying a `HostContext` or notifier bypasses it |
-| `executors/api-executor.ts` | aliased lazy import of the platform provider engine used as the default `api_request` runner | excluded from the archive; pass your own `ApiStepRunner` |
-
-The dispatch store no longer reads `NODE_ENV`; callers pass a durable store or an explicit
-runtime. The buyer payload therefore carries no environment-reading helper and no platform
-notifier implementation.
-
----
-
-## 3. The dispatch ledger (DDL)
-
-The portable guarantees **at-most-once** execution of a repair dispatch. That
-guarantee rests on a `UNIQUE`/`PRIMARY KEY` on `dispatch_id`: a duplicate insert is
-caught and treated as "already dispatched." Create this table (Postgres shown; adapt
-types for your engine). Override the table name via `tableName` if your schema
-requires it.
-
-```sql
-CREATE TABLE supervisor_dispatch_ledger (
-  dispatch_id     TEXT        NOT NULL PRIMARY KEY,   -- the at-most-once key
-  incident_id     TEXT        NOT NULL,
-  executor_kind   TEXT        NOT NULL,
-  work_item_id    TEXT        NOT NULL,
-  execution_id    TEXT        NOT NULL,
-  claimed_at      TIMESTAMPTZ NOT NULL,
-  status          TEXT        NOT NULL,
-  schema_version  TEXT        NOT NULL
-);
-
-CREATE INDEX idx_supervisor_dispatch_ledger_incident
-  ON supervisor_dispatch_ledger (incident_id);
-```
-
-Your `SqlExecutor` is tiny — one method, parameterized (`$1..$n`):
-
-```ts
-interface SqlExecutor {
-  execute(sql: string, params: readonly unknown[]): Promise<void>
+```json
+{
+  "schemaVersion": "supervisor-incident-intake-v1",
+  "provider": "acme-internal-monitor",
+  "errorMessage": "payment worker queue is not draining",
+  "environment": "production",
+  "severity": "critical",
+  "detectedAt": "2026-07-27T12:00:00.000Z",
+  "errorCode": "QUEUE_STALLED",
+  "affectedResource": "worker/payments",
+  "dedupeKey": "monitor-alert-8891",
+  "resolved": false,
+  "evidence": [
+    { "type": "query_result", "summary": "queue depth 41000 and rising", "reference": "https://monitor.internal/q/1" }
+  ],
+  "metadata": { "team": "payments", "runbook": "RB-114" }
 }
 ```
 
-If your driver signals a unique-constraint violation with something other than
-Postgres SQLSTATE `23505` (the default the store already recognizes, along with
-"duplicate"/"unique" in the message), teach it yours:
+`schemaVersion` may be omitted — a shell script with `curl` is a supported sender.
+If present it must match exactly; an unrecognised version is reported, not silently
+accepted.
 
-```ts
-createEnterpriseDispatchStore({
-  sql: myExecutor,
-  tableName: 'supervisor_dispatch_ledger',
-  isUniqueViolation: (e) => (e as any)?.code === 'ER_DUP_ENTRY', // e.g. MySQL
-})
+Send `"resolved": true` when the condition clears. That is **ignored**, not rejected:
+recovery notices do not count as intake failures.
+
+### Signing
+
+Two headers. The signature is HMAC-SHA256 over `` `${timestamp}.${rawBody}` ``, hex
+encoded, prefixed `v1=` (a bare hex digest is also accepted).
+
 ```
+x-supervisor-timestamp: 1785499200
+x-supervisor-signature: v1=<hex>
+```
+
+The timestamp is inside the signed material, so a captured request cannot be replayed
+with a fresh timestamp — changing it invalidates the signature. Requests older than
+the replay window (default 300s) are refused; so are timestamps more than 60s in the
+future.
+
+Use `signIntakeRequest(secret, timestamp, rawBody)` from the portable if you are
+generating signatures in JavaScript. Any language works — it is plain HMAC-SHA256.
+
+### Limits and rotation
+
+| Setting | Default | Notes |
+|---|---|---|
+| `replayWindowSeconds` | 300 | How long a signed request stays valid |
+| `clockSkewSeconds` | 60 | Tolerance for a sender running fast |
+| `maxBodyBytes` | 131072 | Measured in bytes, checked before parsing |
+| `minSecretLength` | 16 | Enforced when the deployment is wired, not at alert time |
+
+`secret` accepts an array. Publish the new secret, keep the old one listed until every
+sender has moved, then drop it — no window where alerts are dropped.
 
 ---
 
-## 4. Audit → your SIEM
+## 2. Writing a vendor adapter
 
-Every supervisor action flows through a `DispatchAuditSink`. `createSiemAuditSink`
-formats each event and ships it through your transport. Two built-in formats cover
-essentially every SIEM:
-
-- `ecs-json` — Elastic Common Schema JSON. Native for Elastic, Splunk (HEC), Datadog,
-  Microsoft Sentinel, Sumo Logic, Chronicle. The modern default.
-- `cef` — ArcSight Common Event Format over syslog. For ArcSight, QRadar, legacy SOC
-  pipelines.
-
-Events are severity-tagged for triage (e.g. a dangerous step pausing for approval →
-`warning`; a failed execution → `high`). You implement `SiemTransport.send`:
+An adapter is a `map` function and nothing else.
 
 ```ts
-import { createSiemAuditSink, teeAuditSinks } from 'lib/supervisor/portable'
+import { createIncidentSource } from './incident-source.ts'
 
-const siem = createSiemAuditSink({
-  transport: {
-    async send(record, meta) {
-      // ship `record` to your collector; `meta` gives eventType/occurredAt/severity
-      await fetch(MY_HEC_URL, { method: 'POST', headers: { Authorization: MY_TOKEN }, body: record })
-    },
+export const acmeSource = createIncidentSource({
+  sourceId: 'acme',
+  vendor: 'Acme Monitoring',
+  status: 'staged',
+
+  authenticate(delivery) {
+    return delivery.headers['x-acme-token'] === expected
+      ? { ok: true }
+      : { ok: false, reason: 'bad_token' }
   },
-  format: 'ecs-json',
-  vendor: 'AcmeCorp',
-  product: 'SelfHealingSupervisor',
-  productVersion: '1.0.0',
-  tenantId: 'acme',
-  environment: 'production',
+
+  map(body) {
+    const alert = body as AcmeAlert
+    if (alert.type === 'recovery') return null
+    return {
+      provider: 'acme',
+      errorMessage: alert.title,
+      severity: alert.priority,
+      environment: alert.tags?.env,
+      affectedResource: alert.scope,
+      dedupeKey: alert.aggregation_key,
+      detectedAt: alert.fired_at,
+      evidence: [{ type: 'vendor_alert', summary: alert.body, reference: alert.url }],
+      metadata: { tags: alert.tags },
+    }
+  },
 })
 ```
 
-Transport failures are **swallowed by default** so audit export can never break
-self-healing — your transport owns durability (queue/retry/dead-letter). Set
-`swallowTransportErrors: false` if your compliance posture requires failures to
-propagate. Use `teeAuditSinks(siem, myOtherSink)` to send to your SIEM **and** keep a
-second trail in the same call.
+### Rules
+
+**Pass raw vendor values through.** Do not normalise severity or environment. The core
+maps `SEV-1`, `P0`, `firing`, `critical`, `fatal` and the rest to the three canonical
+severities; an adapter that pre-maps will fight that table and diverge from every
+other vendor.
+
+**Do not sanitize, validate, fingerprint or deduplicate.** All of it happens after
+`map` returns, identically for every source. An adapter doing its own is redundant and
+becomes the one place a vendor behaves differently.
+
+**Always set `dedupeKey` when the vendor has one.** Datadog's aggregation key,
+PagerDuty's `dedup_key`, Alertmanager's fingerprint. It overrides message-text
+comparison, so a reworded alert collapses into the existing incident instead of
+opening a second one.
+
+**Return `null` for anything that is not an incident.** Recovery notices, heartbeats,
+test pings, acknowledgements. `null` means ignored; it is not a failure.
+
+**Let bad input reject itself.** Missing required fields, malformed JSON and failed
+authentication are all handled by the core with a named reason. Throwing from `map`
+is contained too — it becomes `mapping_error` and the next delivery still works.
+
+### What the core does for you
+
+Validation against the canonical schema · severity and environment normalization ·
+secret-shaped key removal · size and depth bounds · deterministic fingerprinting ·
+deduplication · health counters · four outcomes (`accepted`, `duplicate`, `ignored`,
+`rejected`) each with a named reason.
+
+Two behaviours worth knowing because they are deliberate:
+
+- **An unlabelled environment defaults to `production`**, not `sandbox`. Production is
+  the stricter policy path; assuming sandbox would quietly widen what may run
+  unattended.
+- **Secret-shaped metadata keys are removed, not blanked.** The canonical schema
+  rejects on the key alone, so blanking the value would still fail the whole alert.
+  Removed paths are listed under `intakeRedactedKeys` so a reviewer can see what was
+  dropped and from where; no plaintext secret reaches the incident, the audit trail or
+  your SIEM.
 
 ---
 
-## 5. Reference wiring
+## 3. Status: staged vs live
 
-```ts
-import {
-  createEnterpriseDispatchStore,
-  createSiemAuditSink,
-  type HostContext,
-} from 'lib/supervisor/portable'
-import { createSupervisorDispatcher } from 'lib/supervisor/executors/create-supervisor-dispatcher'
+Every adapter carries `status`:
 
-// 1. Implement the boundary against your systems.
-const host: HostContext = {
-  secrets: mySecretsProvider,          // your vault
-  notifications: mySlackSink,          // your channel
-  approvers: myOktaApproverDirectory,  // your SSO
-  branding: { productName: 'Acme Ops', consoleBaseUrl: 'https://ops.acme.com' },
-}
+| Status | Meaning |
+|---|---|
+| `staged` | Mapping is proven against fixtures. Never run against real provider traffic. |
+| `live` | Validated against the real provider in a real deployment. |
+| `disabled` | Refuses every delivery, before authentication. |
 
-// 2. Durable ledger on your database.
-const dispatchStore = createEnterpriseDispatchStore({ sql: myExecutor })
+An adapter ships `staged` and stays there until **all** of the following exist:
 
-// 3. Audit to your SIEM.
-const audit = createSiemAuditSink({ transport: myHecTransport, format: 'ecs-json' })
+- validation against real provider traffic;
+- documented configuration for that vendor;
+- successful staging ingestion;
+- durable incident creation;
+- end-to-end runtime evidence.
 
-// 4. Wire the dispatcher in enterprise mode (host-driven, not platform email).
-const dispatcher = createSupervisorDispatcher({ host, dispatchStore, audit })
-```
-
-On the platform test rig the same factory can be called without a `host` and use an
-aliased development fallback. That fallback is excluded from the buyer archive and does
-not run in your deployment.
-
-### 5.1 Approvers before you have an IdP adapter
-
-`ApproverDirectory` is one method, but writing it against Okta or Entra is a project, and
-until it exists the supervisor cannot pause a dangerous step and address the request to
-anyone. So the portable ships a reference you configure instead of implement:
-
-```ts
-import { createStaticApproverDirectory } from 'lib/supervisor/portable'
-
-const approvers = createStaticApproverDirectory({
-  financial: [{ id: 'finance', address: 'finance@acme.com' }],
-  destructive: [{ id: 'sre-oncall', address: '#sre-oncall' }],
-  credential_security: [{ id: 'sec-oncall', address: 'sec@acme.com' }],
-  // or: fallback: [{ id: 'ops', address: '#ops' }]  — one group approves everything
-})
-```
-
-It **fails at construction**, not during an incident. A category with no approver, an
-approver with no routable address, or a duplicate id throws when you wire the deployment.
-That is deliberate: `createEnterpriseNotifier` swallows every error by design, because the
-step has already halted and a delivery failure must not become a second incident — which
-means a directory that breaks at runtime breaks *silently*. Validating up front is what
-keeps that trade-off safe. After construction `approversFor` is total: it cannot throw and
-cannot return empty, so delivery has no failure mode of its own.
-
-Use it to run the §6 acceptance incident. Replace it with your IdP adapter before
-production, so leavers and rota changes are reflected without a redeploy — the contract is
-one method, so that is a one-line swap.
+`status` is reported by `health()` and by the registry, never hidden. A staged adapter
+must not be presented anywhere in the product as a live integration. Nothing flips to
+`live` because the code looks finished.
 
 ---
 
-## 6. What "LIVE" requires (honest checklist)
+## 4. Testing an adapter
 
-This portable is enterprise-ready when, on your stack:
+Every adapter ships with fixtures — real captured payloads from that vendor, secrets
+scrubbed — and a suite covering at minimum:
 
-1. ✅ Core reads no env, names no platform (already true).
-2. ✅ Secrets come from your vault via `SecretsProvider`.
-3. ✅ Notifications go to your channel via `NotificationSink`.
-4. ✅ The dispatch ledger runs on your database via `SqlExecutor` (§3 DDL applied).
-5. ✅ Audit lands in your SIEM via `SiemTransport` (§4).
-6. ⬜ Approvers resolve through your SSO (`ApproverDirectory` implemented against your IdP).
-   A reference implementation ships so this is not a blocker on day one — see §5.1.
-7. ⬜ You have run an end-to-end incident in staging: detect → safe step auto-runs →
-   dangerous step pauses → approver notified → approval → execution → SIEM shows the
-   full trail. A runnable harness performs this against your wiring — see §7.
+- a firing alert maps to the expected canonical incident;
+- a recovery notice returns `null`;
+- severity mapping across that vendor's full vocabulary;
+- the vendor's dedupe key is carried through and collapses a repeat;
+- authentication rejects a forged request;
+- a malformed payload rejects with a named reason rather than throwing.
 
-Items 1–5 are code the portable provides and you configure. Items 6–7 are your
-integration and acceptance test. When 6–7 pass in your environment, the portable is
-genuinely live for you.
+Write the negative cases first. An intake path that stays green while dropping real
+alerts is worse than no intake path, because it looks like it is working.
 
 ---
 
-## 7. Running the acceptance test
+## 5. What is not included
 
-Item 7 above is the one thing this guide cannot do for you: it has to run against *your*
-vault, *your* channel, *your* directory. So the portable ships the scenario as code, and you
-supply the `HostContext` you intend to deploy with.
-
-Write one file that exports the `HostContext` you intend to deploy with, then run every risk
-category in one command:
-
-```bash
-node scripts/run-self-healing-acceptance.mjs ./my-host.mjs --out acceptance-record.json
-```
-
-It exits non-zero unless every category passes every check, so it belongs in your deployment
-pipeline: a regression in approval gating then fails the deploy rather than reaching
-production. `--category destructive` narrows it to one route while you are wiring up.
-
-On the build platform's own deployment the same scenario also runs behind an owner-only
-endpoint, because that is the only place its mailer key and owner addresses resolve:
-
-```
-POST /api/autonomous-supervisor/acceptance
-```
-
-It answers 200 only when every check passes and 409 when any fails, so a green response is
-unambiguous. It sends real notifications to the configured approvers — that is the point, not
-a side effect. `?category=destructive` narrows it the same way the CLI flag does.
-
-A buyer does not need that endpoint; the command above is the portable path. It exists because
-the vendor has to produce its own acceptance evidence, and the record it emits is the same
-artifact a buyer will produce.
-
-Or call the scenario directly:
-
-```ts
-import { runAcceptanceScenario } from 'lib/supervisor/portable'
-
-const result = await runAcceptanceScenario({ host: myProductionHostContext })
-console.log(result.summary)
-if (!result.passed) process.exit(1)
-```
-
-It checks five guarantees and reports each one independently:
-
-| Check | What a failure means |
-| --- | --- |
-| `safe_step_executed` | the supervisor cannot act at all — wiring or policy is wrong |
-| `dangerous_step_paused` | **approval gating is not in effect. Do not deploy.** |
-| `approver_notified` | your `ApproverDirectory` or `NotificationSink` is not delivering |
-| `buyer_branding_used` | your people would receive notifications branded as someone else |
-| `audit_trail_emitted` | your SIEM would have no record of the run |
-
-Run it once per danger category to prove each routes to the right people:
-
-```ts
-for (const dangerousCategory of ['financial', 'destructive', 'credential_security'] as const) {
-  const result = await runAcceptanceScenario({ host, dangerousCategory })
-  if (!result.passed) throw new Error(`${dangerousCategory}: ${result.summary}`)
-}
-```
-
-**It is safe to run repeatedly, including against production wiring.** No network call, no
-provider call, no real repair: the consequential step is *required* to pause, so nothing
-consequential can execute by design, and the safe step goes through a runner you inject. The
-notification, however, is real — your channel receives it, because a harness that stubbed
-that out would not be testing the thing you need tested.
-
-The returned object is frozen and JSON-serializable, including every notification and audit
-event produced. File it as your acceptance record.
+The portable does not ship monitoring, does not store your incidents (you bind a
+`DedupeStore` and an `IncidentStore` against your own datastore — in-memory reference
+implementations are included for tests and single-process deployments), and does not
+execute production changes without the approval path described in the integration
+guide.

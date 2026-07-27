@@ -84,6 +84,35 @@ test('Integrations Hub commercial evidence is bounded and honestly incomplete', 
   }
 })
 
+test('Video Maker commercial evidence is bounded and honestly incomplete', () => {
+  const report = createPortableCommercialReadinessReport()
+  const videoMaker = report.entries.find(entry => entry.productId === 'video-maker')
+  assert.ok(videoMaker)
+  assert.equal(videoMaker.readyCount, 4)
+  assert.equal(videoMaker.totalCount, 10)
+  assert.equal(videoMaker.completionPercent, 40)
+  assert.equal(videoMaker.commerciallyReady, false)
+  assert.deepEqual(videoMaker.checks.filter(check => check.status === 'ready').map(check => check.dimension), [
+    'architecture',
+    'buyer-installation',
+    'buyer-configuration',
+    'support-boundary',
+  ])
+  assert.deepEqual(videoMaker.checks.filter(check => check.status === 'blocked').map(check => check.dimension), [
+    'distribution-package',
+    'integrity-manifest',
+    'licensing-enforcement',
+    'fulfillment-handoff',
+    'operations-recovery',
+    'deployment-acceptance',
+  ])
+  const recovery = videoMaker.checks.find(check => check.dimension === 'operations-recovery')
+  assert.deepEqual(recovery?.blockers, ['missing-operations-recovery-evidence'])
+  for (const check of videoMaker.checks) {
+    assert.ok(Object.isFrozen(check) && Object.isFrozen(check.evidence) && Object.isFrozen(check.blockers))
+  }
+})
+
 test('Provider Hub product evidence profile stays fail-closed for external proof', () => {
   assert.equal(providerHubCommercialEvidenceProfile.productId, 'provider-hub')
   assert.equal(providerHubCommercialEvidenceProfile.verifiedCount, 6)

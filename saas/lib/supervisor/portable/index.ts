@@ -113,12 +113,11 @@ export type {
 
 export {
   createReferenceVerifier,
-  readOnlyVerificationActions,
-  referenceVerifierSchemaVersion,
-  ReferenceVerifierConfigError,
+  READ_ONLY_VERIFICATION_ACTIONS,
+  VERIFIER_DEFAULTS,
 } from './reference-verifier.ts'
 export type {
   ReferenceVerifierOptions,
-  VerificationStepObservation,
+  VerificationCheckResult,
   VerificationStepRunner,
 } from './reference-verifier.ts'

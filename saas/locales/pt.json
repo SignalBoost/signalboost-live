@@ -1,650 +1,76 @@
-{
-  "tier": {
-    "core": "Essencial",
-    "tier2": "Escala",
-    "tier3": "Empresarial",
-    "tier4": "Interno",
-    "sidebar": {
-      "core": "Provedores Nível 1",
-      "tier2": "Provedores Nível 2",
-      "tier3": "Provedores Nível 3",
-      "tier4": "Ferramentas Nível 4"
-    },
-    "blurb": {
-      "core": "Infraestrutura principal: nuvem, pagamentos, dados, hospedagem e controle de código.",
-      "tier2": "Mensagens, e-mail, rede edge e integrações de computação.",
-      "tier3": "Plataforma de apps, observabilidade, rastreamento de erros e resposta a incidentes.",
-      "tier4": "Cofre de segredos criptografado e governança de equipe."
+INSERT BLOCK for saas/locales/pt.json
+
+STEP 1 — paste this immediately AFTER the opening { on line 1,
+         keeping everything already in the file below it:
+
+
+  "credits": {
+    "usage": {
+      "title": "Uso de créditos",
+      "used": "créditos usados",
+      "warning": "Mais de 80% usado. Considere fazer upgrade.",
+      "limitReached": "Limite de créditos atingido.",
+      "autoTopup": "A recarga automática adicionará mais créditos."
     }
   },
-  "util": {
-    "domains": "Domínios/DNS",
-    "deployments": "Implantações",
-    "logs": "Registros",
-    "settings": "Configurações"
+  "reset": "Repor",
+  "trust": {
+    "trustedBy": "Com a confiança de"
   },
-  "sub": {
-    "ai_and_models": "IA E MODELOS",
-    "email": "E-MAIL",
-    "transcription": "TRANSCRIÇÃO",
-    "cloud_infrastructure": "INFRAESTRUTURA CLOUD",
-    "cloud_platform": "PLATAFORMA CLOUD",
-    "microsoft_cloud": "NUVEM MICROSOFT",
-    "payments_and_billing": "PAGAMENTOS E COBRANÇA",
-    "database_and_authentication": "BANCO DE DADOS E AUTENTICAÇÃO",
-    "deployments_and_networking": "IMPLANTAÇÕES E REDE",
-    "source_control": "CONTROLE DE CÓDIGO",
-    "messaging_and_sms": "MENSAGENS E SMS",
-    "transactional_email": "E-MAIL TRANSACIONAL",
-    "dns_cdn_and_edge": "DNS, CDN E EDGE",
-    "cloud_compute": "COMPUTAÇÃO CLOUD",
-    "app_platform": "PLATAFORMA DE APPS",
-    "observability": "OBSERVABILIDADE",
-    "error_monitoring": "MONITORAMENTO DE ERROS",
-    "incident_response": "RESPOSTA A INCIDENTES",
-    "encrypted_secret_vault": "COFRE DE SEGREDOS CRIPTOGRAFADO",
-    "team_access_and_compliance": "ACESSO DA EQUIPE E CONFORMIDADE",
-    "voice_and_audio": "VOZ E ÁUDIO"
+  "video": {
+    "kicker": "Estúdio de vídeo",
+    "title": "Editor de vídeo com legendas por IA",
+    "subtitle": "Carregue um vídeo, gere legendas sincronizadas com IA, arraste sobreposições estilizadas na tela e exporte o vídeo legendado."
   },
-  "sec": {
-    "repositories": "Repositórios",
-    "pull_requests": "Pull Requests",
-    "branches": "Ramificações",
-    "issues": "Issues",
-    "activity": "Atividade",
-    "secrets_and_tokens": "Segredos e Tokens",
-    "models": "Modelos",
-    "files": "Arquivos",
-    "jobs": "Trabalhos",
-    "voices": "Vozes",
-    "account": "Conta",
-    "history": "Histórico",
-    "domains": "Domínios",
-    "audiences": "Públicos",
-    "broadcasts": "Transmissões",
-    "api_keys": "Chaves de API",
-    "transcripts": "Transcrições",
-    "data": "Dados",
-    "auth": "Autenticação",
-    "storage": "Armazenamento",
-    "customers": "Clientes",
-    "prices_and_tiers": "Preços e Planos",
-    "catalog": "Catálogo",
-    "table_crud": "CRUD de Tabelas",
-    "sql_engine": "Motor SQL",
-    "users_and_access": "Usuários e Acesso",
-    "credentials": "Credenciais",
-    "environment_variables": "Variáveis de Ambiente",
-    "deployments": "Implantações",
-    "networking_and_logs": "Rede e Registros",
+  "sales": {
+    "eyebrow": "Vendas",
+    "title": "Agente de vendas com IA",
+    "prospect": "Prospeto",
+    "company": "Nome da empresa",
+    "contact": "Nome do contacto",
     "email": "E-mail",
-    "messaging": "Mensagens",
-    "dns": "DNS",
-    "cache": "Cache",
-    "compute": "Computação",
-    "iam": "IAM",
-    "security": "Segurança",
-    "security_rules": "Regras de Segurança",
-    "secrets_storage": "Armazém de Segredos",
-    "monitoring": "Monitoramento",
-    "incidents": "Incidentes",
-    "team_access": "Acesso da Equipe",
-    "compliance_and_audit": "Conformidade e Auditoria",
-    "audit": "Auditoria"
+    "website": "Site",
+    "industry": "Setor",
+    "notes": "Notas sobre este prospeto",
+    "subject": "Assunto",
+    "generate": "Gerar e-mail de vendas",
+    "drafting": "A redigir...",
+    "aiDraft": "Rascunho de IA",
+    "emptyDraft": "O e-mail de vendas aparecerá aqui.",
+    "openEmail": "Abrir no e-mail"
   },
-  "fld": {
-    "repository": "Repositório",
-    "pull_request": "Pull Request",
-    "issue": "Issue",
-    "branch": "Ramificação",
-    "model": "Modelo",
-    "voice": "Voz",
-    "table": "Tabela",
-    "transcript": "Transcrição",
-    "title": "Título",
-    "new_title": "Novo Título",
-    "description": "Descrição",
-    "body": "Corpo",
-    "content": "Conteúdo",
-    "name": "Nome",
-    "message": "Mensagem",
-    "email": "E-mail",
-    "new_email": "Novo E-mail",
-    "merge_method": "Método de Merge",
-    "region": "Região",
-    "domain": "Domínio",
-    "bucket": "Bucket",
-    "product": "Produto",
-    "price": "Preço",
-    "query": "Consulta",
-    "operation": "Operação",
-    "phone_number": "Número de Telefone"
-  },
-  "opt": {
-    "open": "Aberto",
-    "closed": "Fechado",
-    "merge_commit": "Commit de merge",
-    "squash": "Squash",
-    "rebase": "Rebase",
-    "production": "Produção",
-    "preview": "Pré-visualização",
-    "development": "Desenvolvimento"
-  },
-  "ui": {
-    "execute": "Executar",
-    "confirm": "Confirmar",
-    "cancel": "Cancelar",
-    "preview": "Pré-visualizar",
-    "close": "Fechar",
-    "error": "Erro",
-    "success": "Sucesso",
-    "running": "Executando…",
-    "no_inputs": "Esta ação não requer dados.",
-    "workspace": "Espaço de trabalho",
-    "hub_home": "Início do Hub",
-    "back": "Voltar",
-    "tier": "Nível",
-    "providers": "Provedores",
-    "utility_views": "Vistas Utilitárias",
-    "review_action": "Revise a ação que será enviada para",
-    "cannot_undo": "Após confirmar, não pode ser desfeito.",
-    "about_to_execute": "Você está prestes a executar",
-    "on": "em"
-  },
-  "tpl": {
-    "github": {
-      "list_repos": {
-        "label": "Ver Repositórios",
-        "desc": "Lista os repositórios visíveis para o token de acesso configurado."
-      },
-      "list_prs": {
-        "label": "Listar Pull Requests",
-        "desc": "Mostra os pull requests abertos (mais recentes primeiro) de um repositório."
-      },
-      "view_pr_files": {
-        "label": "Ver Arquivos do PR",
-        "desc": "Lista os arquivos alterados em um pull request."
-      },
-      "merge_pr": {
-        "label": "Fazer Merge do PR",
-        "desc": "Faz o merge de um pull request na sua ramificação base."
-      },
-      "close_pr": {
-        "label": "Fechar PR",
-        "desc": "Fecha um pull request sem fazer merge."
-      },
-      "list_branches": {
-        "label": "Listar Ramificações",
-        "desc": "Lista as ramificações de um repositório (útil para limpeza de ai/*)."
-      },
-      "delete_branch": {
-        "label": "Excluir Ramificação",
-        "desc": "Exclui uma ramificação por nome (main é protegida)."
-      },
-      "list_commits": {
-        "label": "Commits Recentes",
-        "desc": "Mostra os commits mais recentes de um repositório."
-      },
-      "list_issues": {
-        "label": "Listar Issues",
-        "desc": "Mostra as issues abertas de um repositório."
-      },
-      "open_issue": {
-        "label": "Abrir Issue",
-        "desc": "Cria uma nova issue em um repositório."
-      },
-      "edit_issue": {
-        "label": "Editar Issue",
-        "desc": "Atualiza o título ou o estado (aberto/fechado) de uma issue."
-      },
-      "close_issue": {
-        "label": "Fechar Issue",
-        "desc": "Fecha uma issue aberta."
-      },
-      "rotate_token": {
-        "label": "Rotacionar Token",
-        "desc": "Rotaciona o token de acesso do GitHub armazenado (revogar + reemitir)."
-      },
-      "manage_secrets": {
-        "label": "Gerenciar Segredos",
-        "desc": "Cria ou atualiza um segredo do Actions em um repositório."
-      }
+  "operator": {
+    "approve": "Aprovar atualização",
+    "rollback": "Restaurar a versão anterior",
+    "status": {
+      "title": "Estado de publicação",
+      "state": "Estado:"
     },
-    "openai": {
-      "list_models": {
-        "label": "Ver Modelos",
-        "desc": "Lista os modelos disponíveis para a chave de API configurada."
-      },
-      "retrieve_model": {
-        "label": "Detalhes do Modelo",
-        "desc": "Mostra os detalhes de um modelo específico."
-      },
-      "list_files": {
-        "label": "Listar Arquivos",
-        "desc": "Arquivos enviados para a conta da OpenAI."
-      },
-      "list_fine_tunes": {
-        "label": "Trabalhos de Fine-tuning",
-        "desc": "Trabalhos de fine-tuning recentes e seu status."
-      },
-      "list_batches": {
-        "label": "Trabalhos em Lote",
-        "desc": "Trabalhos em lote recentes e seu status."
-      }
-    },
-    "elevenlabs": {
-      "list_voices": {
-        "label": "Listar Vozes",
-        "desc": "Vozes disponíveis para a conta."
-      },
-      "voice_details": {
-        "label": "Detalhes da Voz",
-        "desc": "Inspeciona uma voz específica."
-      },
-      "list_models": {
-        "label": "Listar Modelos",
-        "desc": "Modelos de fala disponíveis para a conta."
-      },
-      "subscription": {
-        "label": "Assinatura e Uso",
-        "desc": "Nível do plano e uso da cota de caracteres."
-      },
-      "list_history": {
-        "label": "Histórico de Geração",
-        "desc": "Gerações recentes de texto para fala."
-      }
-    },
-    "anthropic": {
-      "list_models": {
-        "label": "Ver Modelos",
-        "desc": "Modelos disponíveis para a chave de API."
-      },
-      "retrieve_model": {
-        "label": "Detalhes do Modelo",
-        "desc": "Detalhes de um modelo específico."
-      }
-    },
-    "gemini": {
-      "list_models": {
-        "label": "Ver Modelos",
-        "desc": "Modelos disponíveis para a chave do Gemini."
-      },
-      "model_details": {
-        "label": "Detalhes do Modelo",
-        "desc": "Detalhes de um modelo específico."
-      }
-    },
-    "resend": {
-      "list_domains": {
-        "label": "Listar Domínios",
-        "desc": "Domínios de envio e status de verificação."
-      },
-      "list_audiences": {
-        "label": "Listar Públicos",
-        "desc": "Públicos de contatos."
-      },
-      "list_broadcasts": {
-        "label": "Listar Transmissões",
-        "desc": "Transmissões recentes."
-      },
-      "list_api_keys": {
-        "label": "Listar Chaves de API",
-        "desc": "Chaves de API da conta."
-      }
-    },
-    "assemblyai": {
-      "list_transcripts": {
-        "label": "Transcrições Recentes",
-        "desc": "Trabalhos de transcrição mais recentes."
-      },
-      "transcript_details": {
-        "label": "Detalhes da Transcrição",
-        "desc": "Inspeciona um trabalho de transcrição."
-      }
-    },
-    "supabase_mkt": {
-      "list_tables": {
-        "label": "Listar Tabelas",
-        "desc": "Tabelas públicas do projeto de marketing."
-      },
-      "list_rows": {
-        "label": "Listar Linhas",
-        "desc": "Linhas de uma tabela escolhida."
-      },
-      "list_users": {
-        "label": "Listar Usuários",
-        "desc": "Usuários de autenticação do projeto de marketing."
-      },
-      "list_buckets": {
-        "label": "Listar Buckets",
-        "desc": "Buckets de armazenamento do projeto de marketing."
-      }
+    "plan": {
+      "previewTitle": "Pré-visualize o seu site",
+      "previewSubtitle": "Este é o conteúdo gerado. Aprove-o para publicar o seu site."
     }
   },
-  "home": {
-    "hero": {
-      "marquee": "Auditar · Criar · Avaliar · Transmitir",
-      "title": "Proteja seu código com auditorias automáticas de repositórios, crie sites de alto desempenho, colete avaliações de clientes e transmita conteúdo nativo de áudio e vídeo",
-      "subtitle": "— no seu idioma, não uma tradução. Monitoramento premium da postura de cibersegurança aliado a um motor global de localização."
-    },
-    "features": {
-      "audit": "Auditoria e segurança de código",
-      "site": "Criador de sites",
-      "reviews": "Coletor de avaliações",
-      "audio": "Áudio nativo",
-      "video": "Editor de vídeo"
-    },
-    "publicTools": {
-      "label": "Ferramentas públicas",
-      "status": {
-        "free": "Grátis",
-        "live": "Ativo"
-      },
-      "siteReview": {
-        "title": "Revisão do site",
-        "description": "Verifique sites públicos, encontre problemas e receba uma lista clara de ações."
-      },
-      "securityCheck": {
-        "title": "Verificação de segurança",
-        "description": "Verifique links, cabeçalhos, cookies e HTTPS sem entrar em sistemas privados."
-      },
-      "improveYourSite": {
-        "title": "Melhore seu site",
-        "description": "Crie conteúdo local, melhore páginas, revise mudanças e publique quando estiver pronto."
-      }
-    }
-  },
-  "enterprise": {
-    "labels": {
-      "goal": "Objetivo",
-      "audience": "Público",
-      "tone": "Tom",
-      "region": "Região",
-      "platform": "Plataforma",
-      "format": "Formato",
-      "offerType": "Tipo de oferta",
-      "ctaStrategy": "Estratégia de CTA",
-      "creativeDirection": "Direção criativa",
-      "sourceField": "Site ou fonte do GitHub"
-    },
-    "helper": {
-      "cosaSource": "O COSA analisa esta fonte pública e propõe um brief de campanha estruturado."
-    },
-    "buttons": {
-      "analyzeAndPrefill": "Analisar e preencher",
-      "analyzingSource": "Analisando fonte…",
-      "analyzeSource": "Analisar fonte",
-      "analyzing": "Analisando…",
-      "approveBuild": "Aprovar brief e criar campanha",
-      "buildingCampaign": "Criando campanha…",
-      "generateNewOptions": "Gerar novas opções",
-      "done": "Concluído"
+  "studioPreview": {
+    "kicker": "Revisão da pré-visualização do Studio",
+    "title": "Reveja aqui esta pré-visualização de vídeo COS",
+    "description": "As decisões sobre a pré-visualização permanecem no fluxo do Studio, junto ao recurso gerado.",
+    "ariaLabel": "Revisão da pré-visualização de vídeo do Studio",
+    "actions": {
+      "approve": "Aprovar a pré-visualização",
+      "revision": "Reter para revisão"
     },
     "status": {
-      "sourceIntelReady": "Inteligência da fonte pronta",
-      "analyzedSource": "Fonte analisada"
-    },
-    "placeholders": {
-      "sourceUrl": "https://exemplo.com ou https://github.com/org/repo",
-      "searchOptions": "Buscar opções",
-      "selectOption": "Selecione uma opção",
-      "selectMany": "Selecione uma ou mais opções"
-    },
-    "concepts": {
-      "authorityTitle": "Autoridade empresarial",
-      "authorityDesc": "Lidere com credibilidade, controle operacional e valor de negócio mensurável.",
-      "demoTitle": "Demonstração de produto",
-      "demoDesc": "Mostre o fluxo do produto e leve o público a um próximo passo concreto.",
-      "educationTitle": "Campanha educacional",
-      "educationDesc": "Ensine o problema e a solução com clareza antes de apresentar a oferta."
+      "pending": "A aguardar a revisão local no Studio.",
+      "approved": "Aprovado para o próximo passo do Studio.",
+      "revision": "Retido para revisão no Studio."
     }
   },
-  "supervisorApprovals": {
-    "approvalQueue": "Fila de aprovações",
-    "pendingApproval": "Aprovação pendente",
-    "sandboxExecution": "Execução de sandbox",
-    "approve": "Aprovar",
-    "reject": "Rejeitar",
-    "executionId": "ID da execução",
-    "provider": "Provedor",
-    "targetOrigin": "Origem de destino",
-    "remainingSteps": "Etapas restantes",
-    "evidence": "Evidências",
-    "verificationRequirements": "Requisitos de verificação",
-    "expires": "Expira",
-    "approved": "Aprovado",
-    "rejected": "Rejeitado",
-    "expired": "Expirado",
-    "sessionNoLongerAvailable": "Sessão não está mais disponível",
-    "newExecutionRequired": "Uma nova execução é necessária",
-    "approvalFailed": "Falha na aprovação",
-    "rejectionReason": "Motivo da rejeição",
-    "noPendingApprovals": "Nenhuma aprovação pendente",
-    "incidentSummary": "Resumo do incidente",
-    "diagnosisSummary": "Resumo do diagnóstico",
-    "riskLevel": "Nível de risco",
-    "checkpointReached": "Checkpoint alcançado",
-    "expectedResult": "Resultado esperado",
-    "approvalStatus": "Status da aprovação"
-  },
-  "supervisorHa": {
-    "supervisorInstances": "Instâncias do Supervisor",
-    "healthy": "Saudável",
-    "draining": "Em drenagem",
-    "unavailable": "Indisponível",
-    "providerWorker": "Worker do provedor",
-    "workOwner": "Dono do trabalho",
-    "leaseExpires": "Lease expira",
-    "reassigned": "Reatribuído",
-    "executionMethod": "Método de execução",
-    "apiOnly": "Somente API",
-    "smartFailover": "Failover inteligente",
-    "browserOnDemand": "Navegador sob demanda",
-    "automaticBrowserFailover": "Failover automático para navegador",
-    "humanApprovalRequired": "Aprovação humana obrigatória",
-    "apiRetry": "Nova tentativa de API",
-    "browserReason": "Motivo do navegador",
-    "capabilityMaturity": "Maturidade da capacidade",
-    "policyVersion": "Versão da política",
-    "staleOwnerRejected": "Dono obsoleto rejeitado",
-    "manualOperatorRequired": "Operador manual obrigatório",
-    "productionBrowserExecutionDisabled": "Execução de navegador em produção desativada",
-    "noActiveWork": "Nenhum trabalho ativo",
-    "durableCoordination": "Coordenação durável",
-    "coordinationStore": "Armazenamento de coordenação",
-    "connected": "Conectado",
-    "supervisorInstance": "Instância do Supervisor",
-    "runtimeId": "ID de runtime",
-    "lastHeartbeat": "Último heartbeat",
-    "activeLease": "Lease ativo",
-    "leaseExpired": "Lease expirado",
-    "leaseOwner": "Proprietário do lease",
-    "fencingGeneration": "Geração de cerca",
-    "workItem": "Item de trabalho",
-    "queued": "Na fila",
-    "leased": "Com lease",
-    "processing": "Processando",
-    "abandoned": "Abandonado",
-    "staleOwner": "Proprietário obsoleto",
-    "coordinationConflict": "Conflito de coordenação",
-    "browserSessionLost": "Sessão do navegador perdida",
-    "newExecutionRequired": "Nova execução necessária",
-    "reconciliation": "Reconciliação",
-    "noActiveLease": "Sem lease ativo",
-    "coordinationStoreHealth": "Saúde do armazenamento de coordenação",
-    "abandonedBrowserExecutions": "Execuções de navegador abandonadas"
-  },
-  "browserProvider": {
-    "vercel": {
-      "displayName": "Vercel",
-      "capabilities": {
-        "read_deployment_status": {
-          "name": "Read Deployment Status",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "inspect_deployment_failure": {
-          "name": "Inspect Deployment Failure",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "inspect_deployment_logs": {
-          "name": "Inspect Deployment Logs",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "inspect_domain_status": {
-          "name": "Inspect Domain Status",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "inspect_project_metadata": {
-          "name": "Inspect Project Metadata",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "inspect_environment_variable_metadata": {
-          "name": "Inspect Environment Variable Metadata",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "capture_dashboard_evidence": {
-          "name": "Capture Dashboard Evidence",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        },
-        "compare_dashboard_with_api": {
-          "name": "Compare Dashboard With Api",
-          "description": "Metadados de navegador da Vercel somente leitura"
-        }
-      },
-      "origins": {
-        "dashboard": "Painel da Vercel"
-      },
-      "navigation": {
-        "deployments": "Visualização do painel da Vercel",
-        "deploymentDetails": "Visualização do painel da Vercel",
-        "logs": "Visualização do painel da Vercel",
-        "domains": "Visualização do painel da Vercel",
-        "projectSettings": "Visualização do painel da Vercel",
-        "environmentVariables": "Visualização do painel da Vercel"
-      }
+
+STEP 2 — the file already has a "nav" section. Inside it, add this
+         "credits" entry alongside whatever nav keys are already there:
+
+    "credits": {
+      "label": "créditos",
+      "unlimited": "Ilimitado"
     },
-    "health": {
-      "healthy": "Saudável",
-      "degraded": "Degradado",
-      "outage": "Indisponível",
-      "unknown": "Desconhecido",
-      "suspended": "Suspenso"
-    },
-    "risk": {
-      "read_only": "Somente leitura",
-      "low_risk_reversible": "Reversível de baixo risco",
-      "medium": "Médio",
-      "high": "Alto",
-      "forbidden": "Proibido"
-    },
-    "maturity": {
-      "experimental": "Experimental",
-      "sandbox_verified": "Verificado em sandbox",
-      "human_approved": "Aprovado por humano",
-      "auto_failover_ready": "Pronto para failover automático",
-      "suspended": "Suspenso"
-    },
-    "channel": {
-      "api": "API",
-      "browser": "Navegador",
-      "manual": "Manual"
-    },
-    "boolean": {
-      "true": "Sim",
-      "false": "Não"
-    }
-  },
-  "vercelHealth": {
-    "kicker": "Fluxo Vercel somente leitura",
-    "title": "Inteligência de saúde de implantações Vercel",
-    "subtitle": "Implantações observadas, evidências, verificação e histórico persistido para operadores. Não há redeploys, salvamentos, mudanças de ambiente nem automação de navegador aqui.",
-    "empty": "Ainda não há execuções de saúde registradas.",
-    "evidence": "Evidências",
-    "adminOnly": "Acesso de administrador obrigatório.",
-    "productionBrowserDisabled": "A execução de navegador em produção está desativada.",
-    "providerMutationDisabled": "A mutação do provedor está desativada.",
-    "labels": {
-      "provider": "Provider",
-      "project": "Project",
-      "deployment": "Deployment",
-      "environment": "Environment",
-      "workItem": "Work item",
-      "owner": "Owner",
-      "lease": "Lease",
-      "fence": "Fencing generation",
-      "incident": "Incident type",
-      "severity": "Severity",
-      "plan": "Plan",
-      "channel": "Selected channel",
-      "apiFailure": "API failure category",
-      "comparison": "Comparison status",
-      "verification": "Verification status",
-      "approvedSteps": "Approved steps",
-      "bpal": "BPAL capability",
-      "capability": "Capability",
-      "risk": "Risk",
-      "maturity": "Maturity",
-      "origins": "Approved origins",
-      "evidenceProfile": "Evidence profile",
-      "verificationProfile": "Verification profile",
-      "auditTimeline": "Audit timeline",
-      "triggerSource": "Trigger source",
-      "triggerTime": "Trigger time",
-      "fingerprint": "Fingerprint",
-      "deduplication": "Deduplication",
-      "lastHeartbeat": "Last heartbeat",
-      "reconciliation": "Reconciliation",
-      "readOnly": "Read-only execution"
-    },
-    "triggerVisibility": "Automatic triggers are durably deduplicated before a Supervisor lease can run read-only health intelligence.",
-    "readOnlyNotice": "Execution is read-only; Vercel mutations, repairs, and production Browser execution are disabled."
-  },
-  "universalProvider": {
-    "operator": {
-      "ownerTeam": "Operações do Supervisor",
-      "documentation": "Documentação da estrutura de provedores"
-    },
-    "vercel": {
-      "description": "Metadados do provedor Vercel somente leitura adaptados à estrutura universal de provedores."
-    }
-  },
-  "nav": {
-    "home": "Início",
-    "campaigns": "Campanhas",
-    "campaignStudio": "Estúdio de Campanhas",
-    "marketingSales": "Marketing + Vendas",
-    "studio": "Estúdio",
-    "operations": "Operações",
-    "supervisorSOC": "SOC do Supervisor (Interruptor de Emergência)",
-    "consoleHub": "Central de Controle",
-    "saasStation": "Estação SaaS",
-    "auditCockpit": "Cockpit de Auditoria",
-    "security": "Segurança",
-    "cybersecurity": "Cibersegurança",
-    "website": "Site",
-    "admin": "Administração",
-    "ownerAdmin": "Proprietário/Admin",
-    "coreHelp": "Ajuda Central",
-    "pricing": "Preços",
-    "logOut": "Sair",
-    "searchPlaceholder": "Pesquisar seções",
-    "searchLabel": "Pesquisar navegação",
-    "noSearchResults": "Nenhuma seção correspondente",
-    "languageLabel": "Idioma",
-    "menu": "Menu",
-    "getStarted": "Começar",
-    "languages": {
-      "en": "English",
-      "pt": "Português",
-      "es": "Español",
-      "pl": "Polski",
-      "ru": "Русский"
-    },
-    "publicTools": {
-      "label": "Ferramentas públicas",
-      "siteReview": "Revisão do site",
-      "securityCheck": "Verificação de segurança",
-      "improveYourSite": "Melhore seu site"
-    }
-  }
-}

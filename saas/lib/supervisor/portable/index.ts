@@ -110,3 +110,15 @@ export type {
   IncidentRuntimeHealth,
   IncidentRuntimeOptions,
 } from './incident-runtime.ts'
+
+export {
+  createReferenceVerifier,
+  readOnlyVerificationActions,
+  referenceVerifierSchemaVersion,
+  ReferenceVerifierConfigError,
+} from './reference-verifier.ts'
+export type {
+  ReferenceVerifierOptions,
+  VerificationStepObservation,
+  VerificationStepRunner,
+} from './reference-verifier.ts'

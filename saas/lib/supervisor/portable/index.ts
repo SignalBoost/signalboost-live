@@ -46,3 +46,30 @@ export {
   type AcceptanceResult,
   type AcceptanceCheck,
 } from './acceptance-harness.ts'
+
+export {
+  createIncidentSource,
+  createIncidentSourceRegistry,
+  createInMemoryDedupeStore,
+  createInMemoryIncidentStore,
+  fingerprintIncident,
+  normalizeEnvironment,
+  normalizeSeverity,
+  sanitizeMetadata,
+  IncidentSourceConfigError,
+  INTAKE_LIMITS,
+  REDACTED,
+  REDACTED_KEYS_FIELD,
+} from './incident-source.ts'
+export type {
+  DedupeStore,
+  IncidentMapping,
+  IncidentSource,
+  IncidentSourceDefinition,
+  IncidentSourceHealth,
+  IncidentSourceOutcome,
+  IncidentSourceRuntime,
+  IncidentSourceStatus,
+  IncidentStore,
+  RawIncidentDelivery,
+} from './incident-source.ts'

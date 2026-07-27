@@ -143,3 +143,20 @@ export {
   TRIAGE_PLAN_SCHEMA_VERSION,
 } from './triage-thinker.ts'
 export type { TriageThinkerOptions } from './triage-thinker.ts'
+
+export {
+  createResourceCheckRunner,
+  createHttpResourceCheck,
+  createReadOnlyExecutor,
+  ResourceCheckConfigError,
+  READ_ONLY_ACTIONS,
+  CHECK_DEFAULTS,
+} from './resource-check-runner.ts'
+export type {
+  CheckOutcome,
+  ResourceCheck,
+  ResourceCheckContext,
+  ResourceCheckRunnerOptions,
+  HttpResourceCheckOptions,
+  ReadOnlyExecutorOptions,
+} from './resource-check-runner.ts'

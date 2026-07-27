@@ -50,6 +50,20 @@ export interface PortableCommercialReadinessReport {
  * fulfillment, recovery rehearsal, or clean-environment acceptance evidence remains fail-closed.
  */
 const declaredEvidence = Object.freeze<Record<string, Partial<Record<PortableCommercialReadinessDimension, readonly string[]>>>>({
+  'video-maker': Object.freeze({
+    'buyer-installation': Object.freeze([
+      'docs/portables/video-maker-commercial-operations.md#2-buyer-installation',
+      'docs/portables/render-module.md#the-split',
+    ]),
+    'buyer-configuration': Object.freeze([
+      'docs/portables/video-maker-commercial-operations.md#3-buyer-configuration-record',
+    ]),
+    'support-boundary': Object.freeze([
+      'docs/portables/video-maker-commercial-operations.md#1-supported-product-boundary',
+      'docs/portables/video-maker-commercial-operations.md#5-support-and-responsibility-boundary',
+      'docs/portables/render-module.md#the-split',
+    ]),
+  }),
   'integrations-hub': Object.freeze({
     'buyer-installation': Object.freeze([
       'docs/portables/integrations-hub-commercial-operations.md#2-buyer-installation',

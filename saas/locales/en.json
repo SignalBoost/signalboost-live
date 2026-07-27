@@ -645,6 +645,72 @@
       "siteReview": "Site Review",
       "securityCheck": "Security Check",
       "improveYourSite": "Improve Your Site"
+    },
+    "credits": {
+      "label": "credits",
+      "unlimited": "Unlimited"
+    }
+  },
+  "credits": {
+    "usage": {
+      "title": "Credit Usage",
+      "used": "credits used",
+      "warning": "Over 80% used. Consider upgrading.",
+      "limitReached": "Credit limit reached.",
+      "autoTopup": "Auto top-up will add more credits."
+    }
+  },
+  "reset": "Reset",
+  "trust": {
+    "trustedBy": "Trusted by"
+  },
+  "video": {
+    "kicker": "Video Studio",
+    "title": "AI caption video editor",
+    "subtitle": "Upload a video, generate synced AI captions, drag styled overlays on canvas, and export a captioned video file."
+  },
+  "sales": {
+    "eyebrow": "Sales",
+    "title": "AI Sales Agent",
+    "prospect": "Prospect",
+    "company": "Company name",
+    "contact": "Contact name",
+    "email": "Email",
+    "website": "Website",
+    "industry": "Industry",
+    "notes": "Notes about this prospect",
+    "subject": "Subject",
+    "generate": "Generate Sales Email",
+    "drafting": "Drafting...",
+    "aiDraft": "AI Draft",
+    "emptyDraft": "The sales email will appear here.",
+    "openEmail": "Open in Email"
+  },
+  "operator": {
+    "approve": "Approve update",
+    "rollback": "Restore previous version",
+    "status": {
+      "title": "Publish status",
+      "state": "State:"
+    },
+    "plan": {
+      "previewTitle": "Preview your website",
+      "previewSubtitle": "This is the content I generated. Approve it to publish your site live."
+    }
+  },
+  "studioPreview": {
+    "kicker": "Studio preview review",
+    "title": "Review this COS video preview here",
+    "description": "Video preview decisions stay inside the Studio workflow, close to the generated asset.",
+    "ariaLabel": "Studio video preview review",
+    "actions": {
+      "approve": "Approve preview",
+      "revision": "Hold for revision"
+    },
+    "status": {
+      "pending": "Waiting for local Studio review.",
+      "approved": "Approved for the next Studio step.",
+      "revision": "Held for revision in Studio."
     }
   }
 }

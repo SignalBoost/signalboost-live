@@ -1,0 +1,28 @@
+import type { IncidentMapping, RawIncidentDelivery } from '../incident-source.ts'
+
+export function object(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+export function first(...values: unknown[]): unknown {
+  return values.find(value => value !== undefined && value !== null && String(value).trim() !== '')
+}
+export function optionalString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined
+  const result = String(value).trim()
+  return result || undefined
+}
+export function isNonIncidentState(...values: unknown[]): boolean {
+  return values.some(value => /^(resolved|closed|ok|healthy|recovered|acknowledged|no_data|test|ping|heartbeat)$/i.test(optionalString(value) ?? ''))
+}
+export function mapping(input: { provider:string; delivery:RawIncidentDelivery; message:unknown; severity?:unknown; environment?:unknown; detectedAt?:unknown; errorCode?:unknown; affectedResource?:unknown; dedupeKey?:unknown; metadata?:Record<string,unknown> }): IncidentMapping {
+  const errorMessage = optionalString(input.message) ?? `${input.provider} monitoring alert`
+  const result: IncidentMapping = { provider:input.provider, errorMessage, evidence:[{ type:'monitoring-alert', summary:errorMessage, capturedAt:optionalString(input.detectedAt) ?? input.delivery.receivedAt }], metadata:input.metadata ?? {} }
+  const severity=optionalString(input.severity), environment=optionalString(input.environment), detectedAt=optionalString(input.detectedAt), errorCode=optionalString(input.errorCode), affectedResource=optionalString(input.affectedResource), dedupeKey=optionalString(input.dedupeKey)
+  if(severity)result.severity=severity
+  if(environment)result.environment=environment
+  if(detectedAt)result.detectedAt=detectedAt
+  if(errorCode)result.errorCode=errorCode
+  if(affectedResource)result.affectedResource=affectedResource
+  if(dedupeKey)result.dedupeKey=dedupeKey
+  return result
+}

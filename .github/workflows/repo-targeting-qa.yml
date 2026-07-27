@@ -53,9 +53,9 @@ jobs:
       - name: Typecheck root app
         run: npm run typecheck
 
-      - name: Build root app
-        run: npm run build
-
+      # Production build coverage is owned by QA Scan and SaaS CI. Keeping this
+      # workflow focused prevents a duplicate root build from obscuring the
+      # repository-targeting, route, locale, and conflict-cleanup contracts.
       - name: Install SaaS dependencies
         working-directory: saas
         run: npm install --no-package-lock

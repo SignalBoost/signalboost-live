@@ -86,9 +86,13 @@ export {
 export type { IntakeEnvelope, SignedWebhookOptions } from './webhook-intake.ts'
 
 export {
+  createAuthenticatedMonitoringIncidentSourceDefinition,
   createMonitoringIncidentSourceDefinition,
   monitoringAdapterIds,
   stagedMonitoringAdapters,
+  type AuthenticatedMonitoringAdapterContext,
+  type MonitoringAdapterAuthenticationContext,
+  type MonitoringAdapterAuthenticator,
   type MonitoringAdapterContext,
   type MonitoringAdapterDescriptor,
   type MonitoringAdapterId,

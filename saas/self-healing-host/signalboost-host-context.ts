@@ -124,7 +124,16 @@ export function createSignalBoostHostContext(overrides: Partial<HostContext> = {
     approvers: createStaticApproverDirectory({ fallback: approvers }),
     branding: {
       productName: 'SignalBoost Supervisor',
-      consoleBaseUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://saas.signalboostapp.com/dashboard',
+      // The approval link in every paused-step email is built from this. It must point
+      // at the DASHBOARD section, not the site root — and NEXT_PUBLIC_APP_URL is the
+      // site root, used everywhere else in the app. Reading it directly dropped the
+      // /dashboard segment and sent every approver to a 404, which is the worst
+      // possible failure for a control whose entire job is to get a human's attention.
+      // So the segment is appended here rather than assumed to be present, and
+      // SUPERVISOR_CONSOLE_URL exists for a deployment that mounts the console
+      // somewhere else entirely.
+      consoleBaseUrl: (process.env.SUPERVISOR_CONSOLE_URL
+        || `${(process.env.NEXT_PUBLIC_APP_URL || 'https://saas.signalboostapp.com').replace(/\/+$/, '')}/dashboard`).replace(/\/+$/, ''),
     },
     ...overrides,
   }

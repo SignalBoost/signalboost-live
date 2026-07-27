@@ -84,12 +84,139 @@ export const SELF_HEALING_CATALOG: ProductCatalog = {
   },
 };
 
+export const PRESS_MEDIA_CATALOG: ProductCatalog = {
+  productId: 'press-media',
+  features: [
+    {
+      id: 'press.observe',
+      summary: 'Read campaign history, dispatch state and proof records.',
+      note: 'Never gated. See rule 1.',
+    },
+    {
+      id: 'press.factual-discipline',
+      summary:
+        'The anti-fabrication kernel: generated copy states only supplied facts and leaves a visible [PLACEHOLDER] for anything it was not given.',
+      note:
+        'Never gated, and this one is not negotiable at any price. Selling a cheaper edition that may invent a product name means selling the buyer a reputational incident.',
+    },
+    {
+      id: 'press.owner-approval',
+      summary: 'The approval queue and the spend gate: nothing dispatches, and no money is committed, without a human.',
+      note: 'Never gated. See rule 2.',
+    },
+    {
+      id: 'press.audit-export',
+      summary: "Emit press events to the buyer's SIEM as ECS-JSON or CEF.",
+      note: 'Never gated.',
+    },
+    {
+      id: 'press.compose',
+      summary: "Generate campaign copy through the buyer's own AiPort.",
+    },
+    {
+      id: 'press.free-submission',
+      summary: 'Submit a release to a verified editor contact by email.',
+    },
+    {
+      id: 'press.wire',
+      summary: 'PR wire distribution with a distribution report as proof.',
+      note: "Separable: billed per release on the buyer's own wire account.",
+    },
+    {
+      id: 'press.media-database',
+      summary: 'Verify journalist contacts against a media database before dispatch.',
+      note: "Separable: needs the buyer's own Cision/Muck Rack style subscription.",
+    },
+    {
+      id: 'press.ad-platform',
+      summary: 'Budgeted paid distribution through an ad platform, with a real-time report.',
+      note: "Separable: spend runs on the buyer's own ad account and always hits the spend gate.",
+    },
+    {
+      id: 'press.direct-io',
+      summary: 'Insertion-order workflow for print, TV and radio, with a tearsheet as proof.',
+      note: 'Separable, and inherently manual — there is no API behind it.',
+    },
+  ],
+
+  alwaysIncluded: ['press.observe', 'press.factual-discipline', 'press.owner-approval', 'press.audit-export'],
+
+  editions: {
+    standard: ['press.compose', 'press.free-submission'],
+    enterprise: [
+      'press.compose',
+      'press.free-submission',
+      'press.wire',
+      'press.media-database',
+      'press.ad-platform',
+      'press.direct-io',
+    ],
+  },
+};
+
+export const PROVIDER_HUB_CATALOG: ProductCatalog = {
+  productId: 'provider-hub',
+  features: [
+    {
+      id: 'hub.observe',
+      summary: 'Read connection metadata and the evidence record of every live-data read.',
+      note: 'Never gated. See rule 1.',
+    },
+    {
+      id: 'hub.read-evidence',
+      summary: 'Produce a schema-versioned evidence record for each read, without exposing payloads or credentials.',
+      note: 'Never gated: it is the artifact a buyer shows their auditor.',
+    },
+    {
+      id: 'hub.approval',
+      summary: 'Route provider actions through the approval port before they execute.',
+      note: 'Never gated. See rule 2.',
+    },
+    {
+      id: 'hub.audit',
+      summary: "Emit provider events to the buyer's audit sink.",
+      note: 'Never gated.',
+    },
+    {
+      id: 'hub.connection-metadata',
+      summary: 'Create and persist provider connection metadata against the buyer\'s own store.',
+    },
+    {
+      id: 'hub.live-data-read',
+      summary: "Perform a bounded, authorized provider read through the buyer's transport and credentials.",
+      note: 'The core paid capability: metadata without reads is a directory, reads are the product doing work.',
+    },
+  ],
+
+  alwaysIncluded: ['hub.observe', 'hub.read-evidence', 'hub.approval', 'hub.audit'],
+
+  editions: {
+    standard: ['hub.connection-metadata'],
+    enterprise: ['hub.connection-metadata', 'hub.live-data-read'],
+  },
+};
+
 const CATALOGS: Record<string, ProductCatalog> = {
   [SELF_HEALING_CATALOG.productId]: SELF_HEALING_CATALOG,
+  [PRESS_MEDIA_CATALOG.productId]: PRESS_MEDIA_CATALOG,
+  [PROVIDER_HUB_CATALOG.productId]: PROVIDER_HUB_CATALOG,
 };
 
 export function catalogFor(productId: string): ProductCatalog | null {
   return CATALOGS[productId] ?? null;
+}
+
+/**
+ * Every catalogue. Exported so the invariant tests run against ALL products
+ * rather than a hand-picked one — a new catalogue inherits the two rules
+ * automatically instead of being trusted to remember them.
+ */
+export function allCatalogs(): ProductCatalog[] {
+  return Object.values(CATALOGS);
+}
+
+export function catalogedProductIds(): string[] {
+  return Object.keys(CATALOGS);
 }
 
 export function knownFeatureIds(productId: string): string[] {

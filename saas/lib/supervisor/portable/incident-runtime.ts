@@ -63,11 +63,16 @@ export interface IncidentRecordStore {
   save(record: IncidentRecord): Promise<void>
 }
 
-export type DeliveryResult =
+export type DeliverySingleResult =
   | { status: 'handled'; record: IncidentRecord; replayed: boolean }
   | { status: 'duplicate'; fingerprint: string; duplicateOf: string }
   | { status: 'ignored'; reason: string }
   | { status: 'rejected'; reason: string }
+
+// One delivery can carry several alerts (Alertmanager and Grafana batch by default),
+// so it can produce several results. Each is handled independently: one alert being
+// a duplicate or failing must not stop the others in the same request being run.
+export type DeliveryResult = DeliverySingleResult | { status: 'batch'; results: DeliverySingleResult[] }
 
 export interface IncidentRuntimeHealth {
   deliveries: number
@@ -141,59 +146,75 @@ export function createIncidentRuntime(options: IncidentRuntimeOptions) {
       if (intake.status === 'ignored') { counters.ignored += 1; return { status: 'ignored', reason: intake.reason } }
       if (intake.status === 'duplicate') { counters.duplicates += 1; return { status: 'duplicate', fingerprint: intake.fingerprint, duplicateOf: intake.duplicateOf } }
 
-      const { incident, fingerprint } = intake
+      // Run the accepted-incident path once per alert. Declared here rather than at
+      // module scope so it keeps the delivery's own receivedAt and source.
+      const handleAccepted = async (incident: SupervisorIncident, fingerprint: string): Promise<DeliverySingleResult> => {
+        // IDEMPOTENCY. Checked before the handler runs, so a vendor retry of an alert
+        // already diagnosed cannot cause a second diagnosis or a second execution.
+        if (options.records) {
+          let existing: IncidentRecord | null = null
+          // A record store that is down must not block incident handling — it degrades
+          // to at-least-once, which is the correct trade when the alternative is
+          // dropping a live incident. Reported through health, never silent.
+          try { existing = await options.records.find(incident.incidentId) } catch { existing = null }
+          if (existing) { counters.replayed += 1; return { status: 'handled', record: existing, replayed: true } }
+        }
 
-      // IDEMPOTENCY. Checked before the handler runs, so a vendor retry of an alert
-      // already diagnosed cannot cause a second diagnosis or a second execution.
-      if (options.records) {
-        let existing: IncidentRecord | null = null
-        // A record store that is down must not block incident handling — it degrades
-        // to at-least-once, which is the correct trade when the alternative is
-        // dropping a live incident. Reported through health, never silent.
-        try { existing = await options.records.find(incident.incidentId) } catch { existing = null }
-        if (existing) { counters.replayed += 1; return { status: 'handled', record: existing, replayed: true } }
+        let status: IncidentRecordStatus
+        let reason: string
+        try {
+          const outcome = await options.handler(incident)
+          status = outcome?.status ?? 'failed'
+          reason = outcome?.reason ?? 'handler returned no reason'
+        } catch (error) {
+          // A throwing handler is recorded as a real terminal state rather than
+          // disappearing. An operator must be able to see that an alert arrived and
+          // that handling it failed — an unrecorded crash looks identical to an alert
+          // that was never sent.
+          counters.handlerErrors += 1
+          status = 'handler_error'
+          reason = error instanceof Error ? error.message : 'handler threw a non-error value'
+          lastHandlerError = reason
+        }
+
+        const record: IncidentRecord = Object.freeze({
+          incidentId: incident.incidentId,
+          fingerprint,
+          sourceId: source.sourceId,
+          vendor: source.vendor,
+          provider: incident.provider,
+          environment: incident.environment,
+          severity: incident.severity,
+          receivedAt,
+          completedAt: now().toISOString(),
+          status,
+          reason,
+        })
+
+        if (options.records) {
+          try { await options.records.save(record) } catch { /* the incident was still handled; losing the record must not undo that */ }
+        }
+        if (options.onRecord) { try { options.onRecord(record) } catch {} }
+
+        counters.handled += 1
+        lastHandledAt = record.completedAt
+        bump(status)
+        return { status: 'handled', record, replayed: false }
       }
 
-      let status: IncidentRecordStatus
-      let reason: string
-      try {
-        const outcome = await options.handler(incident)
-        status = outcome?.status ?? 'failed'
-        reason = outcome?.reason ?? 'handler returned no reason'
-      } catch (error) {
-        // A throwing handler is recorded as a real terminal state rather than
-        // disappearing. An operator must be able to see that an alert arrived and
-        // that handling it failed — an unrecorded crash looks identical to an alert
-        // that was never sent.
-        counters.handlerErrors += 1
-        status = 'handler_error'
-        reason = error instanceof Error ? error.message : 'handler threw a non-error value'
-        lastHandlerError = reason
+      if (intake.status === 'batch') {
+        const results: DeliverySingleResult[] = []
+        for (const outcome of intake.outcomes) {
+          if (outcome.status === 'accepted') { results.push(await handleAccepted(outcome.incident, outcome.fingerprint)); continue }
+          if (outcome.status === 'duplicate') { counters.duplicates += 1; results.push({ status: 'duplicate', fingerprint: outcome.fingerprint, duplicateOf: outcome.duplicateOf }); continue }
+          if (outcome.status === 'ignored') { counters.ignored += 1; results.push({ status: 'ignored', reason: outcome.reason }); continue }
+          counters.rejected += 1
+          results.push({ status: 'rejected', reason: outcome.reason })
+        }
+        return { status: 'batch', results }
       }
 
-      const record: IncidentRecord = Object.freeze({
-        incidentId: incident.incidentId,
-        fingerprint,
-        sourceId: source.sourceId,
-        vendor: source.vendor,
-        provider: incident.provider,
-        environment: incident.environment,
-        severity: incident.severity,
-        receivedAt,
-        completedAt: now().toISOString(),
-        status,
-        reason,
-      })
-
-      if (options.records) {
-        try { await options.records.save(record) } catch { /* the incident was still handled; losing the record must not undo that */ }
-      }
-      if (options.onRecord) { try { options.onRecord(record) } catch {} }
-
-      counters.handled += 1
-      lastHandledAt = record.completedAt
-      bump(status)
-      return { status: 'handled', record, replayed: false }
+      return handleAccepted(intake.incident, intake.fingerprint)
     },
 
     health(): IncidentRuntimeHealth {

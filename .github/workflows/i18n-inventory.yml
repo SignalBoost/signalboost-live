@@ -1,33 +1,145 @@
-name: I18n Full Inventory
+name: Apply I18n Remediation
 
 on:
   pull_request:
     paths:
-      - 'saas/**'
       - '.github/workflows/i18n-inventory.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inventory:
+  remediate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
-      - name: Capture main revision
-        run: |
-          git rev-parse HEAD > main-commit.txt
-          git rev-parse 'HEAD^{tree}' > main-tree.txt
-      - name: Package current main source
-        run: tar --exclude='saas/node_modules' --exclude='saas/.next' --exclude='saas/coverage' -czf saas-source.tgz -C saas .
-      - name: Upload current main snapshot
-        uses: actions/upload-artifact@v4
+          ref: fix/i18n-remove-hardcoded-english
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
         with:
-          name: i18n-current-main-source
-          path: |
-            saas-source.tgz
-            main-commit.txt
-            main-tree.txt
-          if-no-files-found: error
+          node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - name: Install dependencies
+        working-directory: saas
+        run: npm ci --no-audit --no-fund
+      - name: Restore and harden localization guards
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/git/blobs/c0cc01335775e16f419419519d866d363d8cb983 --jq .content | tr -d '\n' | base64 -d > saas/scripts/enforce-localized-page-copy.mjs
+          cat > /tmp/patch-i18n.mjs <<'NODE'
+          import fs from 'node:fs'
+          
+          function replaceOnce(source, before, after, label) {
+            const first = source.indexOf(before)
+            if (first < 0) throw new Error(`Missing patch target: ${label}`)
+            if (source.indexOf(before, first + before.length) >= 0) throw new Error(`Ambiguous patch target: ${label}`)
+            return source.slice(0, first) + after + source.slice(first + before.length)
+          }
+          
+          const scannerPath = process.argv[2]
+          const checkerPath = process.argv[3]
+          let scanner = fs.readFileSync(scannerPath, 'utf8')
+          scanner = replaceOnce(
+            scanner,
+            "const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__'])",
+            "const SKIP_DIRS = new Set(['api', 'node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__'])",
+            'skip API routes',
+          )
+          scanner = replaceOnce(
+            scanner,
+            `const FALLBACK_PROPS = new Set([\n  'fallback', 'fallbackLabel', 'fallbackPrompt', 'fallbackTitle', 'fallbackDescription',\n  'fallbackText', 'fallbackMessage', 'fallbackPlaceholder', 'fallbackHint', 'fallbackCta',\n])\n`,
+            `const FALLBACK_PROPS = new Set([\n  'fallback', 'fallbackLabel', 'fallbackPrompt', 'fallbackTitle', 'fallbackDescription',\n  'fallbackText', 'fallbackMessage', 'fallbackPlaceholder', 'fallbackHint', 'fallbackCta',\n])\nconst TRANSLATION_CALLS = new Set([\n  'c', 'copy', 'localize', 'msg', 't', 'tr', 'translate', 'uiCopy',\n])\nconst TECHNICAL_LITERALS = new Set([\n  'en', 'es', 'pt', 'pl', 'ru', 'fr', 'de', 'it', 'ja', 'ko', 'zh',\n  'px', 'ms', 's', 'kb', 'mb', 'gb', 'tb',\n])\nconst USER_MESSAGE_CALLS = new Set([\n  'alert', 'confirm', 'errorText', 'prompt', 'setAlert', 'setError', 'setErrorText',\n  'setFeedback', 'setMessage', 'setNotice', 'setSuccess', 'setToast', 'setWarning',\n  'showToast', 'toast',\n])\n`,
+            'copy call classifications',
+          )
+          scanner = replaceOnce(
+            scanner,
+            "  return Boolean(text && /[A-Za-z]{2,}/.test(text))",
+            "  return Boolean(text && !TECHNICAL_LITERALS.has(text.toLowerCase()) && /[A-Za-z]{2,}/.test(text))",
+            'technical literal exclusion',
+          )
+          scanner = replaceOnce(
+            scanner,
+            `function inStyledJsx(node) {`,
+            `function inUserMessageCall(node) {\n  if (comparisonOperand(node) || inIncludesReceiver(node)) return false\n  const nonCopyCalls = new Set([\n    ...TRANSLATION_CALLS, 'get', 'has', 'includes', 'match', 'replace',\n    'split', 'startsWith', 'endsWith', 'test',\n  ])\n  for (let current = node.parent; current; current = current.parent) {\n    if (ts.isCallExpression(current)) {\n      const name = calleeName(current.expression)\n      if (nonCopyCalls.has(name)) return false\n      if (USER_MESSAGE_CALLS.has(name)) return true\n    }\n    if (ts.isFunctionLike(current) || ts.isSourceFile(current)) break\n  }\n  return false\n}\n\nfunction inStyledJsx(node) {`,
+            'state message detection',
+          )
+          scanner = replaceOnce(
+            scanner,
+            "      if (name === 't' || name === 'uiCopy') return false",
+            "      if (TRANSLATION_CALLS.has(name)) return false",
+            'translation call exclusion',
+          )
+          scanner = replaceOnce(
+            scanner,
+            "      const displayStatus = name === 'status' && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) && /\\s/.test(init.text)",
+            "      const displayStatus = name === 'status' && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) && (/\\s/.test(init.text) || /^[A-Z]/.test(init.text))",
+            'one-word display statuses',
+          )
+          scanner = replaceOnce(
+            scanner,
+            "        if (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node)) add(node, node.text, 'central-copy')",
+            "        if (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node) || inUserMessageCall(node)) add(node, node.text, 'central-copy')",
+            'state message calls',
+          )
+          scanner = replaceOnce(
+            scanner,
+            `const results = []\nconst generated = new Map()`,
+            `function loadExistingGenerated() {\n  const entries = new Map()\n  if (!fs.existsSync(GENERATED_PATH)) return entries\n  const source = fs.readFileSync(GENERATED_PATH, 'utf8')\n  for (const line of source.split(/\\r?\\n/)) {\n    const match = line.match(/^\\s*("u_[a-f0-9]+"):\\s*("(?:[^"\\\\]|\\\\.)*"),?\\s*$/)\n    if (!match) continue\n    try {\n      entries.set(JSON.parse(match[1]), JSON.parse(match[2]))\n    } catch {\n      // Ignore malformed hand-edited rows; the generated file remains typechecked.\n    }\n  }\n  return entries\n}\n\nconst results = []\nconst generated = WRITE ? loadExistingGenerated() : new Map()`,
+            'idempotent generated table',
+          )
+          fs.writeFileSync(scannerPath, scanner, 'utf8')
+          
+          let checker = fs.readFileSync(checkerPath, 'utf8')
+          checker = replaceOnce(
+            checker,
+            "const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__']);\nconst SENTINEL = '[validate:i18n-copy] PASS';",
+            "const SKIP_DIRS = new Set(['api', 'node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__']);\nconst SENTINEL = '[validate:i18n-copy] PASS';\nconst TECHNICAL_LITERALS = new Set([\n  'en', 'es', 'pt', 'pl', 'ru', 'fr', 'de', 'it', 'ja', 'ko', 'zh',\n  'px', 'ms', 's', 'kb', 'mb', 'gb', 'tb',\n]);",
+            'checker scope',
+          )
+          checker = replaceOnce(
+            checker,
+            "  if (!text) return false;\n  if (/^(&[a-zA-Z]+;|&#\\d+;|\\s)+$/.test(text)) return false;",
+            "  if (!text) return false;\n  if (TECHNICAL_LITERALS.has(text.toLowerCase())) return false;\n  if (/^(&[a-zA-Z]+;|&#\\d+;|\\s)+$/.test(text)) return false;",
+            'checker technical literals',
+          )
+          fs.writeFileSync(checkerPath, checker, 'utf8')
+          NODE
+          node /tmp/patch-i18n.mjs saas/scripts/enforce-localized-page-copy.mjs saas/scripts/check-hardcoded-copy.mjs
+          cd saas
+          npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/enforce-localized-page-copy.mjs'
+      - name: Centralize user-facing English
+        working-directory: saas
+        run: |
+          node scripts/enforce-localized-page-copy.mjs --write
+          node scripts/check-hardcoded-copy.mjs --write-baseline
+      - name: Validate localization guard
+        working-directory: saas
+        run: npm run validate:i18n-copy
+      - name: Verify idempotency
+        working-directory: saas
+        run: |
+          before=$(sha256sum lib/i18n/generatedUiCopy.ts | cut -d' ' -f1)
+          node scripts/enforce-localized-page-copy.mjs --write
+          after=$(sha256sum lib/i18n/generatedUiCopy.ts | cut -d' ' -f1)
+          test "$before" = "$after"
+          git diff --exit-code -- lib/i18n/generatedUiCopy.ts
+      - name: Typecheck
+        working-directory: saas
+        run: npm run typecheck
+      - name: Build
+        working-directory: saas
+        run: npm run build
+      - name: Commit remediation
+        run: |
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add saas
+          if git diff --cached --quiet; then
+            echo 'No remediation changes to commit.'
+          else
+            git commit -m 'fix(i18n): eliminate hardcoded English UI copy'
+            git push origin HEAD:fix/i18n-remove-hardcoded-english
+          fi

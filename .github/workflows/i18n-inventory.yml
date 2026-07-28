@@ -15,12 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: fix/i18n-remove-hardcoded-english
-      - name: Package remediation branch source
+          ref: main
+      - name: Capture main revision
+        run: |
+          git rev-parse HEAD > main-commit.txt
+          git rev-parse 'HEAD^{tree}' > main-tree.txt
+      - name: Package current main source
         run: tar --exclude='saas/node_modules' --exclude='saas/.next' --exclude='saas/coverage' -czf saas-source.tgz -C saas .
-      - name: Upload remediation source snapshot
+      - name: Upload current main snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: i18n-remediation-source
-          path: saas-source.tgz
+          name: i18n-current-main-source
+          path: |
+            saas-source.tgz
+            main-commit.txt
+            main-tree.txt
           if-no-files-found: error

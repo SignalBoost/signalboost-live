@@ -46,9 +46,13 @@ jobs:
       - name: Validate locale-key source
         run: npm run validate:i18n-copy
       - name: Typecheck
-        run: npm run typecheck
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee ../typecheck.log
       - name: Production build
-        run: npm run build
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee ../build.log
       - name: Unit and contract tests
         run: |
           set -o pipefail
@@ -64,6 +68,8 @@ jobs:
         with:
           name: i18n-real-locale-key-evidence
           path: |
+            typecheck.log
+            build.log
             npm-test.log
             locale-key-report.txt
             locale-key-stat.txt

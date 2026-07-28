@@ -13,7 +13,7 @@ on:
       - 'saas/locales/**'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: complete-all-locale-catalogs-${{ github.event.pull_request.number }}
@@ -63,6 +63,8 @@ jobs:
     needs: complete-locale
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
 
     steps:
       - name: Check out triggering PR revision
@@ -100,18 +102,15 @@ jobs:
       - name: Verify complete locale structure
         run: node scripts/verify-repo-targeting.mjs --base origin/main --head HEAD --report qa/completed-locale-report.md
 
-      - name: Stage verified bundle
+      - name: Commit verified complete catalogs
         run: |
-          mkdir -p completed-bundle
-          cp saas/locales/es.json completed-bundle/es.json
-          cp saas/locales/pt.json completed-bundle/pt.json
-          cp saas/locales/pl.json completed-bundle/pl.json
-          cp saas/locales/ru.json completed-bundle/ru.json
-
-      - name: Upload verified locale bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: complete-locale-bundle
-          path: completed-bundle
-          if-no-files-found: error
-          retention-days: 1
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add \
+            saas/locales/es.json \
+            saas/locales/pt.json \
+            saas/locales/pl.json \
+            saas/locales/ru.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(i18n): complete every five-language locale key'
+          git push origin "HEAD:${HEAD_BRANCH}"

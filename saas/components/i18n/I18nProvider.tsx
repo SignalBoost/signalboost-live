@@ -57,6 +57,8 @@ function persistLanguage(lang: string) {
   localStorage.setItem('site-language', safe)
   document.documentElement.lang = safe
   document.cookie = `signalboost_language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
+  document.cookie = `site-language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
+  document.cookie = `sb_locale=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
   return safe
 }
 
@@ -222,6 +224,8 @@ export function I18nProvider({
 
   const [dict, setDict] =
     useState<Dict>(englishCopy as Dict)
+  const [englishDict, setEnglishDict] =
+    useState<Dict>(englishCopy as Dict)
   const [isReady, setIsReady] =
     useState(false)
 
@@ -243,11 +247,14 @@ export function I18nProvider({
       setDict(englishCopy as Dict)
       const safeLang = persistLanguage(lang)
 
-      const loaded =
-        await loadLanguage(safeLang)
+      const [loaded, mergedEnglish] = await Promise.all([
+        loadLanguage(safeLang),
+        loadLanguage('en'),
+      ])
 
       if (cancelled) return
 
+      setEnglishDict(mergedEnglish)
       setDict(loaded)
       setIsReady(true)
     }
@@ -261,9 +268,9 @@ export function I18nProvider({
   useEffect(() => {
     if (!isReady) return
     const map = new Map<string, string>()
-    if (lang !== 'en') collectCopyPairs(englishCopy as Dict, dict, map)
+    if (lang !== 'en') collectCopyPairs(englishDict, dict, map)
     return applyLocaleSafetyNet(map, lang)
-  }, [dict, isReady, lang])
+  }, [dict, englishDict, isReady, lang])
 
   const setLang = async (
     newLang: string

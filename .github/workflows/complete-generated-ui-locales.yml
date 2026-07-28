@@ -9,10 +9,6 @@ permissions:
   contents: write
   models: read
 
-concurrency:
-  group: complete-generated-ui-locales-${{ github.event.pull_request.number }}-${{ github.actor == 'github-actions[bot]' && github.run_id || 'operator' }}
-  cancel-in-progress: true
-
 jobs:
   generate-and-validate:
     if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.repo.full_name == github.repository

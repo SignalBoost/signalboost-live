@@ -11,11 +11,11 @@ on:
       - 'saas/scripts/check-generated-ui-locale-completeness.mjs'
       - 'saas/scripts/generated-ui-locale-utils.mjs'
       - 'saas/scripts/translate-generated-ui-locales.mjs'
+      - 'saas/scripts/translate-generated-ui-locales-public.mjs'
       - 'saas/package.json'
 
 permissions:
   contents: write
-  models: read
 
 concurrency:
   group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
@@ -44,23 +44,12 @@ jobs:
         with:
           node-version: 24
 
-      - name: Require OpenAI translation credential
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          test -n "$OPENAI_API_KEY" || {
-            echo 'OPENAI_API_KEY is required for the one-time full catalog generation.' >&2
-            exit 1
-          }
-
       - name: Generate ${{ matrix.locale }} catalog
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_TRANSLATION_MODEL: gpt-4o-mini
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODELS_MODEL: openai/gpt-4o-mini
-          TRANSLATION_REQUEST_TIMEOUT_MS: '120000'
-        run: node saas/scripts/translate-generated-ui-locales.mjs --write --locale=${{ matrix.locale }}
+          TRANSLATION_REQUEST_TIMEOUT_MS: '30000'
+          TRANSLATION_BATCH_MAX_ITEMS: '40'
+          TRANSLATION_BATCH_MAX_CHARS: '5000'
+        run: node saas/scripts/translate-generated-ui-locales-public.mjs --write --locale=${{ matrix.locale }}
 
       - name: Stage generated catalog artifact
         run: |
@@ -103,6 +92,7 @@ jobs:
         run: |
           npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/migrate-page-copy-to-locales.mjs && node scripts/check-generated-ui-locale-completeness.mjs'
           npm pkg set 'scripts.translate:i18n-generated-ui=node scripts/translate-generated-ui-locales.mjs --write'
+          npm pkg set 'scripts.translate:i18n-generated-ui-public=node scripts/translate-generated-ui-locales-public.mjs --write'
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

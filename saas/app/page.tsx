@@ -7,31 +7,32 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { PreviewProjects } from '@/components/home/PreviewProjects'
 import { t } from '@/lib/i18n/t'
 import { listPublicPortableProducts } from '@/lib/portable-products'
-import { uiText } from '@/lib/i18n/uiText'
 
 const LINKS = {
   siteReview: '/dashboard/audit',
   securityCheck: '/cybersecurity-check',
   improveYourSite: '/dashboard/improve',
   agency: '/agency',
-  license: 'mailto:partners@signalboostapp.com?subject=Licensing%20SignalBoost%20modules',
+  licenseEmail: 'partners@signalboostapp.com',
 }
 
 const LANGUAGES = [
-  ['🇺🇸', 'English'],
-  ['🇲🇽', 'Español'],
-  ['🇧🇷', 'Português'],
-  ['🇵🇱', 'Polski'],
-  ['🇷🇺', 'Русский'],
+  ['🇺🇸', 'en'],
+  ['🇲🇽', 'es'],
+  ['🇧🇷', 'pt'],
+  ['🇵🇱', 'pl'],
+  ['🇷🇺', 'ru'],
 ] as const
 
 const PUBLIC_TOOLS = [
-  { key: 'siteReview', icon: '◎', href: LINKS.siteReview, accent: '#f6c453', status: 'free' },
-  { key: 'securityCheck', icon: '◇', href: LINKS.securityCheck, accent: '#8b8cff', status: 'free' },
-  { key: 'improveYourSite', icon: '✦', href: LINKS.improveYourSite, accent: '#e7a93f', status: 'live' },
+  { key: 'audit', icon: '◎', href: LINKS.siteReview, accent: '#f6c453', status: 'free' },
+  { key: 'security', icon: '◇', href: LINKS.securityCheck, accent: '#8b8cff', status: 'free' },
+  { key: 'optimization', icon: '✦', href: LINKS.improveYourSite, accent: '#e7a93f', status: 'live' },
 ] as const
 
 type PortableRuntimeStatus = 'active' | 'idle' | 'unreachable' | 'no_live_source'
+type SystemStatus = 'active' | 'idle' | 'degraded' | 'unreachable'
+type Copy = (path: string) => string
 
 type PortableRuntime = {
   productId: string
@@ -42,7 +43,7 @@ type PortableRuntime = {
 
 type LiveActivityResponse = {
   generatedAt: string
-  status: 'active' | 'idle' | 'degraded' | 'unreachable'
+  status: SystemStatus
   totalRows: number
   activePortables: number
   portables: PortableRuntime[]
@@ -65,49 +66,32 @@ function useCountUp(target: number, decimals = 0, duration = 900) {
   return value
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({ value, label, locale }: { value: number; label: string; locale: string }) {
   const count = useCountUp(value)
-  return <div className="stat"><strong>{count.toLocaleString()}</strong><span>{label}</span></div>
+  return <div className="stat"><strong>{count.toLocaleString(locale)}</strong><span>{label}</span></div>
 }
 
-function relativeTime(value: string | null): string {
-  if (!value) return 'No activity recorded'
+function relativeTime(value: string | null, locale: string, copy: Copy): string {
+  if (!value) return copy('activity.none')
   const time = new Date(value).getTime()
-  if (!Number.isFinite(time)) return 'Activity time unavailable'
+  if (!Number.isFinite(time)) return copy('activity.unavailable')
+
   const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000))
-  if (seconds < 60) return `${seconds}s ago`
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'always' })
+  if (seconds < 60) return formatter.format(-seconds, 'second')
+
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return formatter.format(-minutes, 'minute')
+
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
+  if (hours < 24) return formatter.format(-hours, 'hour')
 
-function runtimeLabel(status: PortableRuntimeStatus): string {
-  // RUNTIME, NOT MATURITY. 'active' here means the portable's tables currently hold rows —
-  // nothing more. It says the thing is running; it does not say the thing is finished, and a
-  // visitor reading a card that says only "Active" will reasonably assume it is for sale.
-  if (status === 'active') return 'Active'
-  if (status === 'idle') return 'Connected · idle'
-  if (status === 'unreachable') return 'Data unavailable'
-  return 'Not connected'
-}
-
-// The card needs the OTHER axis as well. A portable's manifest `status` is its commercial
-// maturity, and until now the public home page rendered only the runtime tag — so
-// self-healing-supervisor, provider-hub and three others showed a green "Active" with no
-// indication anywhere that they are still preview and deliberately not licensable. Two
-// different questions, and only one of them was being answered on screen.
-function maturityLabel(status: string): string {
-  if (status === 'live') return 'Live'
-  if (status === 'preview') return 'Preview'
-  if (status === 'deprecated') return 'Deprecated'
-  return status
+  return formatter.format(-Math.floor(hours / 24), 'day')
 }
 
 export default function Home() {
-  const { dict } = useI18n()
-  const copy = (path: string, fallback: string) => t(dict, `homepage.${path}`, fallback)
+  const { dict, lang } = useI18n()
+  const copy: Copy = (path) => t(dict, `homepage.${path}`)
   const [live, setLive] = useState<LiveActivityResponse | null>(null)
 
   useEffect(() => {
@@ -131,6 +115,8 @@ export default function Home() {
     () => new Map((live?.portables ?? []).map((item) => [item.productId, item])),
     [live],
   )
+  const licenseHref = `mailto:${LINKS.licenseEmail}?subject=${encodeURIComponent(copy('licenseEmailSubject'))}`
+  const systemStatus = live ? copy(`system.${live.status}`) : copy('system.loading')
 
   return (
     <main className="home">
@@ -142,39 +128,38 @@ export default function Home() {
 
       <div className="content">
         <header className="hero">
-          <div className="hero-left"><span className="kicker">{copy('kicker', 'AI powered · People in control')}</span><h1>{copy('title', 'One place for every growth task.')}</h1></div>
+          <div className="hero-left"><span className="kicker">{copy('kicker')}</span><h1>{copy('title')}</h1></div>
           <div className="hero-right">
-            <div className="langs" aria-label={copy('languagesAria', 'Available in five languages')}>{LANGUAGES.map(([flag, name]) => <span key={name} className="lang"><b>{flag}</b>{name}</span>)}</div>
-            <div className="stats" aria-label={uiText('generatedUi.u_633d984a2fcf8210')}>
-              <Stat value={live?.activePortables ?? 0} label={uiText('generatedUi.u_13bb3181236f67ea')} />
-              <Stat value={live?.totalRows ?? 0} label={uiText('generatedUi.u_723ab78939beea0e')} />
-              <div className="stat"><strong className={`system-${live?.status ?? 'unreachable'}`}>{live ? live.status : uiText('generatedUi.u_3d6df245178e6076')}</strong><span>{uiText('generatedUi.u_4a37197beef860dd')}</span></div>
+            <div className="langs" aria-label={copy('languagesAria')}>{LANGUAGES.map(([flag, code]) => <span key={code} className="lang"><b>{flag}</b>{copy(`languages.${code}`)}</span>)}</div>
+            <div className="stats" aria-label={copy('stats.aria')}>
+              <Stat value={live?.activePortables ?? 0} label={copy('stats.activePortables')} locale={lang} />
+              <Stat value={live?.totalRows ?? 0} label={copy('stats.verifiedRows')} locale={lang} />
+              <div className="stat"><strong className={`system-${live?.status ?? 'unreachable'}`}>{systemStatus}</strong><span>{copy('stats.systemStatus')}</span></div>
             </div>
           </div>
         </header>
 
         <section className="zone">
-          <span className="zone-label">{t(dict, 'home.publicTools.label')}</span>
+          <span className="zone-label">{copy('publicModules')}</span>
           <div className="grid grid-3">
             {PUBLIC_TOOLS.map((tool) => {
-              const title = t(dict, `home.publicTools.${tool.key}.title`, tool.key)
-              const desc = t(dict, `home.publicTools.${tool.key}.description`, '')
-              const status = t(dict, `home.publicTools.status.${tool.status}`, tool.status)
-              return <Link key={tool.key} href={tool.href} className="mcard" style={{ ['--accent' as string]: tool.accent }}><div className="mcard-top"><span className="mcard-icon">{tool.icon}</span><span className={tool.status === 'free' ? 'free-pill' : 'live-pill'}>{tool.status === 'live' ? <i /> : null} {status}</span></div><h2>{title}</h2><p>{desc}</p><span className="mcard-open">{copy('open', 'Open')} ↗</span></Link>
+              const title = copy(`modules.${tool.key}.title`)
+              const desc = copy(`modules.${tool.key}.desc`)
+              const status = copy(`toolStatus.${tool.status}`)
+              return <Link key={tool.key} href={tool.href} className="mcard" style={{ ['--accent' as string]: tool.accent }}><div className="mcard-top"><span className="mcard-icon">{tool.icon}</span><span className={tool.status === 'free' ? 'free-pill' : 'live-pill'}>{tool.status === 'live' ? <i /> : null} {status}</span></div><h2>{title}</h2><p>{desc}</p><span className="mcard-open">{copy('open')} ↗</span></Link>
             })}
           </div>
         </section>
 
         <section className="zone">
-          <div className="zone-head"><span className="zone-label">{copy('portableEngines', 'Portable tools — live operational activity')}</span><div className="zone-cta"><a className="license-btn" href={LINKS.license}>{copy('license', 'License')} →</a><Link href={LINKS.agency} className="studio-btn">{copy('campaignStudio', 'Campaign Studio')}</Link></div></div>
+          <div className="zone-head"><span className="zone-label">{copy('portableEngines')}</span><div className="zone-cta"><a className="license-btn" href={licenseHref}>{copy('license')} →</a><Link href={LINKS.agency} className="studio-btn">{copy('campaignStudio')}</Link></div></div>
           <div className="grid grid-portables">
             {listPublicPortableProducts().map((p) => {
-              const name = copy(`portables.${p.localizationKey}.name`, p.manifest.displayName)
-              const desc = copy(`portables.${p.localizationKey}.desc`, p.manifest.shortDescription)
+              const name = copy(`portables.${p.localizationKey}.name`)
+              const desc = copy(`portables.${p.localizationKey}.desc`)
               const runtime = activityByProduct.get(p.manifest.productId)
               const status = runtime?.status ?? 'unreachable'
-              const maturity = maturityLabel(p.manifest.status)
-              const inner = <><div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={`maturity-tag maturity-${p.manifest.status}`}>{copy(`portableMaturity.${p.manifest.status}`, maturity)}</span></div><h3>{name}</h3><p>{desc}</p><div className="runtime-metrics"><strong>{runtime ? runtime.totalRows.toLocaleString() : '—'}</strong><span>{uiText('generatedUi.u_87d2dba86d5ac60e')}</span><small><span className={`runtime-dot runtime-${status}`}><i /></span>{runtimeLabel(status)}{runtime ? ` · ${relativeTime(runtime.lastActivityAt)}` : ''}</small></div></>
+              const inner = <><div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={`maturity-tag maturity-${p.manifest.status}`}>{copy(`portableMaturity.${p.manifest.status}`)}</span></div><h3>{name}</h3><p>{desc}</p><div className="runtime-metrics"><strong>{runtime ? runtime.totalRows.toLocaleString(lang) : '—'}</strong><span>{copy('stats.verifiedRows')}</span><small><span className={`runtime-dot runtime-${status}`}><i /></span>{copy(`runtime.${status}`)}{runtime ? ` · ${relativeTime(runtime.lastActivityAt, lang, copy)}` : ''}</small></div></>
               return p.route ? <Link key={p.manifest.productId} href={p.route} className="qcard is-link">{inner}</Link> : <div key={p.manifest.productId} className="qcard">{inner}</div>
             })}
           </div>

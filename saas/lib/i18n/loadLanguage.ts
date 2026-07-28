@@ -22,6 +22,7 @@ import marketingSalesLocales from './marketingSalesLocales.json'
 import auditCenterLocales from './auditCenterLocales.json'
 import supervisorSocLocales from './supervisorSocLocales.json'
 import homepageLocales from './homepageLocales.json'
+import { HOMEPAGE_UI_LOCALES } from './homepageUiLocales.ts'
 import { mergeDict, mergePageLocales } from './pageLocales.ts'
 
 export type DictValue = string | string[] | Dict
@@ -67,7 +68,9 @@ function loadSupervisorSoc(lang: string): Dict {
 
 function loadHomepage(lang: string): Dict {
   const table = homepageLocales as unknown as Record<string, Dict>
-  return table[lang] || table.en || {}
+  const base = table[lang] || table.en || {}
+  const ui = HOMEPAGE_UI_LOCALES[lang] || HOMEPAGE_UI_LOCALES.en || {}
+  return mergeDict(base, ui)
 }
 
 function isDict(value: DictValue | undefined): value is Dict {

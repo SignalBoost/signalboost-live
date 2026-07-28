@@ -10,20 +10,23 @@ permissions:
   models: read
 
 concurrency:
-  group: complete-generated-ui-locales
-  cancel-in-progress: true
+  group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 jobs:
   generate-and-validate:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
+    env:
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
 
     steps:
-      - name: Check out localization branch
+      - name: Check out triggering PR branch
         uses: actions/checkout@v4
         with:
-          ref: fix/i18n-five-language-catalog
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -38,7 +41,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MODELS_MODEL: openai/gpt-4o-mini
-          REMOVE_TRIGGER_WORKFLOW: '1'
         run: node saas/scripts/translate-generated-ui-locales.mjs --write
 
       - name: Make five-language parity blocking
@@ -46,15 +48,6 @@ jobs:
         run: |
           npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/migrate-page-copy-to-locales.mjs && node scripts/check-generated-ui-locale-completeness.mjs'
           npm pkg set 'scripts.translate:i18n-generated-ui=node scripts/translate-generated-ui-locales.mjs --write'
-
-      - name: Publish generated locale candidates
-        run: |
-          git config user.name 'SignalBoost Automation'
-          git config user.email 'actions@users.noreply.github.com'
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -m 'fix(i18n): complete all five generated UI dictionaries'
-          git push origin HEAD:fix/i18n-five-language-catalog
 
       - name: Install dependencies
         working-directory: saas
@@ -73,3 +66,13 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
         run: npm run build
+
+      - name: Publish validated locale catalogs
+        run: |
+          rm .github/workflows/complete-generated-ui-locales.yml
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(i18n): complete all five generated UI dictionaries'
+          git push origin "HEAD:${HEAD_BRANCH}"

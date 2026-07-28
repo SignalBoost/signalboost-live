@@ -112,8 +112,8 @@ function modelConfig() {
       maxTokens: 8000,
       maxChars: 6000,
       maxItems: 60,
-      requestConcurrency: 1,
-      requestSpacingMs: 10000,
+      requestConcurrency: 3,
+      requestSpacingMs: 5000,
       rateLimitCooldownMs: 65000,
     }
     return cachedModelConfig
@@ -122,7 +122,7 @@ function modelConfig() {
   throw new Error('OPENAI_API_KEY or GITHUB_TOKEN is required to generate missing locale copy.')
 }
 
-function usesSerializedRequests() {
+function usesGitHubModels() {
   return modelConfig().provider === 'GitHub Models'
 }
 
@@ -286,7 +286,7 @@ async function translateBatch(locale, batch) {
   } catch (error) {
     if (batch.length === 1 || !shouldSplitBatch(error)) throw error
     const middle = Math.ceil(batch.length / 2)
-    if (usesSerializedRequests()) {
+    if (usesGitHubModels()) {
       const left = await translateBatch(locale, batch.slice(0, middle))
       await sleep(modelConfig().requestSpacingMs)
       const right = await translateBatch(locale, batch.slice(middle))
@@ -363,16 +363,26 @@ async function buildLocale(locale, englishData, localizedData) {
   const batches = createBatches(missing)
   console.log(`[i18n] ${locale}: ${Object.keys(english).length} keys, ${missing.length} unique translations, ${batches.length} batches.`)
 
-  if (usesSerializedRequests()) {
-    for (let index = 0; index < batches.length; index += 1) {
-      const batch = batches[index]
-      console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
-      const translated = await translateBatch(locale, batch)
-      for (const [source, value] of translated) resolvedBySource.set(source, value)
-      writeLocale(locale, materializeLocale(english, localizedData, resolvedBySource))
-      publishCheckpoint(locale, index + 1, batches.length)
-      console.log(`[i18n] ${locale}: checkpoint ${index + 1}/${batches.length} published.`)
-      if (index < batches.length - 1) await sleep(modelConfig().requestSpacingMs)
+  if (usesGitHubModels()) {
+    const windowSize = modelConfig().requestConcurrency
+    for (let start = 0; start < batches.length; start += windowSize) {
+      const window = batches.slice(start, start + windowSize)
+      const results = await Promise.all(window.map((batch, offset) => {
+        const index = start + offset
+        console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
+        return translateBatch(locale, batch)
+      }))
+
+      for (let offset = 0; offset < results.length; offset += 1) {
+        const translated = results[offset]
+        for (const [source, value] of translated) resolvedBySource.set(source, value)
+        const index = start + offset
+        writeLocale(locale, materializeLocale(english, localizedData, resolvedBySource))
+        publishCheckpoint(locale, index + 1, batches.length)
+        console.log(`[i18n] ${locale}: checkpoint ${index + 1}/${batches.length} published.`)
+      }
+
+      if (start + windowSize < batches.length) await sleep(modelConfig().requestSpacingMs)
     }
   } else {
     const batchResults = await Promise.all(batches.map(async (batch, index) => {

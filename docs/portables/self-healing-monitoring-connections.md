@@ -239,10 +239,29 @@ policy as a well-mapped one.
 4. Check the incident: is the message readable, the severity right, the affected
    resource populated, the environment correct?
 5. Trigger the same alert again. Expect **200 duplicate** — if you get a second 202,
-   the dedupe key is not being sent.
+   either the dedupe key is not being sent, or your host is starting a fresh process
+   per request. Read the caveat below before treating it as a misconfiguration.
 
 A **401** means the header or secret is wrong. A **404** means the environment variable
 is not set in the running deployment. A **400** names which field was missing.
+
+### Step 5 on a serverless host
+
+Deduplication and the incident record store are supplied to the runtime by the host
+adapter, and the default implementations hold their state in the memory of the process
+that handles the request.
+
+On a long-running host — a container, a VM, a pod — that is one process, and step 5
+behaves exactly as written. On a platform that may start a fresh process per request
+(serverless functions, or an autoscaler that has scaled to zero), the second request can
+land on a process that never saw the first, and you get a second **202** even though your
+dedupe key is correct. That is a property of where you are running it, not a fault in
+your configuration.
+
+If you need deduplication that holds across processes, either run the portable on a
+long-running host, or have your host adapter supply implementations of `DedupeStore` and
+`IncidentRecordStore` backed by your own datastore. Both are exported interfaces; the
+in-memory versions are a default, not a constraint.
 
 ---
 

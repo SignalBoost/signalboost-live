@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - fix/i18n-zero-hardcoded-copy-current
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'saas/**'
+      - '.github/workflows/i18n-zero-copy-migration.yml'
 
 permissions:
   contents: write
@@ -47,5 +53,9 @@ jobs:
           git config user.name 'SignalBoost Automation'
           git config user.email 'actions@users.noreply.github.com'
           git add saas
-          git commit -m 'fix(i18n): eliminate hardcoded English UI copy'
-          git push origin HEAD:fix/i18n-zero-hardcoded-copy-current
+          if git diff --cached --quiet; then
+            echo 'No migration changes remain.'
+          else
+            git commit -m 'fix(i18n): eliminate hardcoded English UI copy'
+            git push origin HEAD:fix/i18n-zero-hardcoded-copy-current
+          fi

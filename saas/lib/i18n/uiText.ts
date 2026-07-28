@@ -19,12 +19,12 @@ export function setRuntimeDictionary(dict: Dict | null | undefined): void {
   activeDictionary = dict ?? ENGLISH
 }
 
-export function uiText(path: string): string {
+export function uiText<T extends string = string>(path: string): T {
   const active = lookup(activeDictionary, path)
-  if (typeof active === 'string') return active
+  if (typeof active === 'string') return active as T
 
   const english = lookup(ENGLISH, path)
-  if (typeof english === 'string') return english
+  if (typeof english === 'string') return english as T
 
-  return path
+  return path as T
 }

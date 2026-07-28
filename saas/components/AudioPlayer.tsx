@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from '@/components/i18n/useTranslation';
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -9,7 +10,18 @@ interface AudioPlayerProps {
   voiceModel: string;
 }
 
+const PROVIDER_NAME = 'OpenAI';
+const COPY = {
+  en: { pause: 'Pause track', play: 'Play track', download: 'Download MP3' },
+  es: { pause: 'Pausar pista', play: 'Reproducir pista', download: 'Descargar MP3' },
+  pt: { pause: 'Pausar faixa', play: 'Reproduzir faixa', download: 'Baixar MP3' },
+  pl: { pause: 'Wstrzymaj utwór', play: 'Odtwórz utwór', download: 'Pobierz MP3' },
+  ru: { pause: 'Приостановить трек', play: 'Воспроизвести трек', download: 'Скачать MP3' },
+} as const;
+
 export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayerProps) {
+  const { lang } = useTranslation();
+  const copy = COPY[lang as keyof typeof COPY] ?? COPY.en;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -23,7 +35,6 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
     const setAudioTime = () => setCurrentTime(audio.currentTime);
     const handleAudioEnd = () => setIsPlaying(false);
 
-    // Track audio loading and playing states natively
     audio.addEventListener('loadedmetadata', setAudioData);
     audio.addEventListener('timeupdate', setAudioTime);
     audio.addEventListener('ended', handleAudioEnd);
@@ -62,14 +73,12 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
 
   return (
     <div className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 shadow-md flex flex-col md:flex-row items-center gap-4 w-full max-w-2xl">
-      {/* Native Hidden Audio Node */}
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
-      {/* Play/Pause Primary Control Button */}
       <button
         onClick={togglePlay}
         className="w-12 h-12 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full flex items-center justify-center font-bold text-lg shadow transition-all shrink-0"
-        aria-label={isPlaying ? 'Pause Track' : 'Play Track'}
+        aria-label={isPlaying ? copy.pause : copy.play}
       >
         {isPlaying ? (
           <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -82,19 +91,17 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
         )}
       </button>
 
-      {/* Metadata Labels */}
       <div className="flex-1 min-w-0 w-full">
         <h4 className="text-sm font-semibold truncate text-slate-100">{title}</h4>
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
-            OpenAI {voiceModel}
+            {PROVIDER_NAME} {voiceModel}
           </span>
           <span className="text-xs text-slate-400 font-mono">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
         </div>
 
-        {/* Dynamic Custom Progress Timeline Bar */}
         <div className="mt-2 flex items-center w-full">
           <input
             type="range"
@@ -112,7 +119,6 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
         </div>
       </div>
 
-      {/* Action Utilities Option Group */}
       <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end border-t border-slate-800 md:border-t-0 pt-3 md:pt-0">
         <a
           href={audioUrl}
@@ -124,7 +130,7 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
           <svg className="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Download MP3
+          {copy.download}
         </a>
       </div>
     </div>

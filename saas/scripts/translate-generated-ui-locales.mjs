@@ -15,7 +15,7 @@ const LOCALE_DIR = path.join(ROOT, 'locales')
 const TEMP_WORKFLOW_PATH = path.join(REPO_ROOT, '.github', 'workflows', 'complete-generated-ui-locales.yml')
 const WRITE = process.argv.includes('--write')
 const localeArgument = process.argv.find(argument => argument.startsWith('--locale='))
-const REQUEST_TIMEOUT_MS = Number(process.env.TRANSLATION_REQUEST_TIMEOUT_MS || 120000)
+const REQUEST_TIMEOUT_MS = Number(process.env.TRANSLATION_REQUEST_TIMEOUT_MS || 90000)
 
 const LANGUAGE_NAMES = {
   es: 'natural, neutral Latin American Spanish',
@@ -109,11 +109,11 @@ function modelConfig() {
       endpoint: 'https://models.github.ai/inference/chat/completions',
       token: process.env.GITHUB_TOKEN,
       model: process.env.GITHUB_MODELS_MODEL || 'openai/gpt-4o-mini',
-      maxTokens: 12000,
-      maxChars: 18000,
-      maxItems: 200,
+      maxTokens: 8000,
+      maxChars: 6000,
+      maxItems: 60,
       requestConcurrency: 1,
-      requestSpacingMs: 7000,
+      requestSpacingMs: 10000,
       rateLimitCooldownMs: 65000,
     }
     return cachedModelConfig

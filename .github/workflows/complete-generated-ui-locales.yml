@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   generate-and-validate:

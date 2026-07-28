@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useMemo } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 type Props = {
   label: string
@@ -13,28 +14,61 @@ type Props = {
   required?: boolean
 }
 
+type ValidationCopy = {
+  required: string
+  protocol: string
+  publicUrl: string
+  invalid: string
+}
+
+const COPY = {
+  en: {
+    validation: { required: 'Enter a website or GitHub URL.', protocol: 'Only HTTP and HTTPS URLs are supported.', publicUrl: 'Use a publicly accessible URL.', invalid: 'Enter a valid URL.' },
+    placeholder: 'https://example.com or https://github.com/org/repo', analyzing: 'Analyzing…', analyze: 'Analyze source', helper: 'The server will validate and extract metadata before using this source.',
+  },
+  es: {
+    validation: { required: 'Ingresa la URL de un sitio web o de GitHub.', protocol: 'Solo se admiten URL HTTP y HTTPS.', publicUrl: 'Usa una URL de acceso público.', invalid: 'Ingresa una URL válida.' },
+    placeholder: 'https://ejemplo.com o https://github.com/org/repo', analyzing: 'Analizando…', analyze: 'Analizar fuente', helper: 'El servidor validará y extraerá los metadatos antes de usar esta fuente.',
+  },
+  pt: {
+    validation: { required: 'Insira a URL de um site ou do GitHub.', protocol: 'Somente URLs HTTP e HTTPS são compatíveis.', publicUrl: 'Use uma URL acessível publicamente.', invalid: 'Insira uma URL válida.' },
+    placeholder: 'https://exemplo.com ou https://github.com/org/repo', analyzing: 'Analisando…', analyze: 'Analisar fonte', helper: 'O servidor validará e extrairá os metadados antes de usar esta fonte.',
+  },
+  pl: {
+    validation: { required: 'Wprowadź adres witryny lub repozytorium GitHub.', protocol: 'Obsługiwane są tylko adresy HTTP i HTTPS.', publicUrl: 'Użyj publicznie dostępnego adresu URL.', invalid: 'Wprowadź prawidłowy adres URL.' },
+    placeholder: 'https://przyklad.com lub https://github.com/org/repo', analyzing: 'Analizowanie…', analyze: 'Analizuj źródło', helper: 'Serwer zweryfikuje i pobierze metadane przed użyciem tego źródła.',
+  },
+  ru: {
+    validation: { required: 'Введите адрес сайта или репозитория GitHub.', protocol: 'Поддерживаются только URL-адреса HTTP и HTTPS.', publicUrl: 'Используйте общедоступный URL-адрес.', invalid: 'Введите корректный URL-адрес.' },
+    placeholder: 'https://example.com или https://github.com/org/repo', analyzing: 'Анализ…', analyze: 'Анализировать источник', helper: 'Сервер проверит и извлечет метаданные перед использованием этого источника.',
+  },
+} as const
+
 export function normalizeSourceUrl(value: string): string {
   const trimmed = value.trim()
   if (!trimmed) return ''
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 }
 
-export function validateSourceUrl(value: string): string | null {
-  if (!value.trim()) return 'Enter a website or GitHub URL.'
+export function validateSourceUrl(value: string, copy: ValidationCopy = COPY.en.validation): string | null {
+  if (!value.trim()) return copy.required
   try {
     const parsed = new URL(normalizeSourceUrl(value))
-    if (!['http:', 'https:'].includes(parsed.protocol)) return 'Only HTTP and HTTPS URLs are supported.'
-    if (!parsed.hostname || parsed.hostname === 'localhost' || parsed.hostname.endsWith('.local')) return 'Use a publicly accessible URL.'
+    if (!['http:', 'https:'].includes(parsed.protocol)) return copy.protocol
+    if (!parsed.hostname || parsed.hostname === 'localhost' || parsed.hostname.endsWith('.local')) return copy.publicUrl
     return null
   } catch {
-    return 'Enter a valid URL.'
+    return copy.invalid
   }
 }
 
 export function SourceUrlField({ label, value, onChange, onSubmit, loading, error, helperText, required }: Props) {
+  const { lang } = useTranslation()
+  const copy = COPY[lang as keyof typeof COPY] ?? COPY.en
   const id = useId()
-  const localError = useMemo(() => value ? validateSourceUrl(value) : null, [value])
+  const localError = useMemo(() => value ? validateSourceUrl(value, copy.validation) : null, [copy.validation, value])
   const displayedError = error || localError
+  const invalid = Boolean(validateSourceUrl(value, copy.validation))
 
   return <div style={{ display: 'grid', gap: 7 }}>
     <label htmlFor={id} style={{ color: '#fff', fontWeight: 850, fontSize: 13 }}>{label}{required ? ' *' : ''}</label>
@@ -49,13 +83,13 @@ export function SourceUrlField({ label, value, onChange, onSubmit, loading, erro
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onBlur={() => value && onChange(normalizeSourceUrl(value))}
-        placeholder="https://example.com or https://github.com/org/repo"
+        placeholder={copy.placeholder}
         aria-invalid={Boolean(displayedError)}
         aria-describedby={`${id}-help`}
         style={{ minWidth: 260, flex: 1, border: displayedError ? '1px solid #fca5a5' : '1px solid rgba(255,255,255,.14)', background: 'rgba(2,6,23,.78)', color: '#fff', borderRadius: 12, padding: '11px 12px' }}
       />
-      {onSubmit && <button type="button" disabled={loading || Boolean(validateSourceUrl(value))} onClick={onSubmit} style={{ border: 'none', borderRadius: 12, background: '#ffc300', color: '#000', padding: '10px 14px', fontWeight: 900, cursor: loading ? 'wait' : 'pointer', opacity: loading || Boolean(validateSourceUrl(value)) ? .55 : 1 }}>{loading ? 'Analyzing…' : 'Analyze source'}</button>}
+      {onSubmit && <button type="button" disabled={loading || invalid} onClick={onSubmit} style={{ border: 'none', borderRadius: 12, background: '#ffc300', color: '#000', padding: '10px 14px', fontWeight: 900, cursor: loading ? 'wait' : 'pointer', opacity: loading || invalid ? .55 : 1 }}>{loading ? copy.analyzing : copy.analyze}</button>}
     </div>
-    <p id={`${id}-help`} style={{ margin: 0, color: displayedError ? '#fca5a5' : 'rgba(255,255,255,.55)', fontSize: 11 }}>{displayedError || helperText || 'The server will validate and extract metadata before using this source.'}</p>
+    <p id={`${id}-help`} style={{ margin: 0, color: displayedError ? '#fca5a5' : 'rgba(255,255,255,.55)', fontSize: 11 }}>{displayedError || helperText || copy.helper}</p>
   </div>
 }

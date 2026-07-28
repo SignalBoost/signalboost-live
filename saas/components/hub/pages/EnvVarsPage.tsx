@@ -34,6 +34,104 @@ const inputStyle: React.CSSProperties = {
   outline: 'none', boxSizing: 'border-box',
 }
 
+// A searchable picker for the key name.
+//
+// WHY THIS IS NOT A PLAIN TEXT INPUT. The key is the one field where a typo is silent and
+// expensive: "SUPERVISOR_LICENCE_TOKEN" creates a second, useless variable instead of
+// touching the one the build reads, and nothing complains until something fails to start.
+// Every key that already exists in the project is offered here, so the ordinary case
+// requires no typing at all. A genuinely new name is still possible — it just has to be
+// chosen deliberately rather than arrived at by mistyping an existing one.
+
+function KeyPicker({
+  value, onChange, options, existing, placeholder, newLabel, searchLabel, emptyLabel, duplicateWarning,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  existing: boolean
+  placeholder: string
+  newLabel: string
+  searchLabel: string
+  emptyLabel: string
+  duplicateWarning: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const needle = query.trim().toLowerCase()
+  const filtered = needle ? options.filter((k) => k.toLowerCase().includes(needle)) : options
+  const typed = query.trim()
+  const canCreate = typed.length > 0 && !options.some((k) => k.toLowerCase() === typed.toLowerCase())
+
+  function pick(next: string) {
+    onChange(next)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        style={{ ...inputStyle, textAlign: 'left', cursor: 'pointer', color: value ? '#fff' : 'rgba(255,255,255,.45)' }}
+      >
+        {value || placeholder}
+      </button>
+
+      {existing && value ? (
+        <div style={{ marginTop: 6, fontSize: 12, color: GOLD }}>{duplicateWarning}</div>
+      ) : null}
+
+      {open ? (
+        <div style={{ position: 'absolute', zIndex: 40, left: 0, right: 0, top: '100%', marginTop: 6, padding: 8, borderRadius: 12, border: '1px solid rgba(255,255,255,.15)', background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)', maxHeight: 320, overflowY: 'auto' }}>
+          <input
+            type="search"
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setOpen(false); setQuery('') }
+              if (e.key === 'Enter' && canCreate) { e.preventDefault(); pick(typed) }
+            }}
+            placeholder={searchLabel}
+            style={{ ...inputStyle, marginBottom: 8 }}
+          />
+          <div role="listbox" style={{ display: 'grid', gap: 4 }}>
+            {filtered.map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="option"
+                aria-selected={k === value}
+                onClick={() => pick(k)}
+                style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid transparent', background: k === value ? 'rgba(26,240,255,.12)' : 'transparent', color: '#fff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, cursor: 'pointer' }}
+              >
+                {k}
+              </button>
+            ))}
+            {filtered.length === 0 && !canCreate ? (
+              <div style={{ padding: '8px 10px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{emptyLabel}</div>
+            ) : null}
+            {canCreate ? (
+              <button
+                type="button"
+                onClick={() => pick(typed)}
+                style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.4)', background: 'rgba(255,195,0,.1)', color: GOLD, fontSize: 12.5, cursor: 'pointer' }}
+              >
+                {newLabel.replace('{key}', typed)}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function btn(tone: 'cyan' | 'gold' | 'ghost' | 'danger'): React.CSSProperties {
   const map: Record<string, React.CSSProperties> = {
     cyan: { border: '1px solid rgba(26,240,255,.45)', background: 'rgba(26,240,255,.12)', color: CYAN },
@@ -205,6 +303,10 @@ export default function EnvVarsPage() {
     }
   }
 
+  // Every key already in the project, so the common case needs no typing.
+  const keyOptions = [...new Set(vars.map((v) => v.key))].sort((a, b) => a.localeCompare(b))
+  const keyExists = keyOptions.some((k) => k.toLowerCase() === newKey.trim().toLowerCase())
+
   function toggle(list: EnvTarget[], setList: (v: EnvTarget[]) => void, t: EnvTarget) {
     setList(list.includes(t) ? list.filter((x) => x !== t) : [...list, t])
   }
@@ -232,7 +334,17 @@ export default function EnvVarsPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.4fr)', gap: 10 }}>
-            <input style={inputStyle} placeholder="KEY_NAME" value={newKey} onChange={(e) => setNewKey(e.target.value)} />
+            <KeyPicker
+              value={newKey}
+              onChange={setNewKey}
+              options={keyOptions}
+              existing={keyExists}
+              placeholder={t('console.env.ph_key', 'Choose a variable name')}
+              searchLabel={t('console.env.ph_key_search', 'Search existing variables')}
+              newLabel={t('console.env.key_new', 'Create new variable "{key}"')}
+              emptyLabel={t('console.env.key_none', 'No matching variable')}
+              duplicateWarning={t('console.env.key_duplicate', 'This variable already exists. Adding it again will be rejected \u2014 edit it in the list below instead.')}
+            />
             <input style={inputStyle} placeholder={t('console.env.ph_value', 'value')} value={newValue} onChange={(e) => setNewValue(e.target.value)} />
           </div>
 

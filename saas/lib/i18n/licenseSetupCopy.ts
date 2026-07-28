@@ -13,7 +13,7 @@ import type {
   LicenseMintFeatureId,
   LicenseMintRemedyCode,
   LicenseMintWarningCode,
-} from '../supervisor/licenseMintContract'
+} from '../supervisor/licenseMintContract.ts'
 
 export type LicenseSetupLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 

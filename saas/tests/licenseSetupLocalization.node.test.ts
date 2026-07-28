@@ -7,8 +7,8 @@ import {
   LICENSE_MINT_FEATURE_IDS,
   LICENSE_MINT_REMEDY_CODES,
   LICENSE_MINT_WARNING_CODES,
-} from '../lib/supervisor/licenseMintContract'
-import { LICENSE_SETUP_COPY } from '../lib/i18n/licenseSetupCopy'
+} from '../lib/supervisor/licenseMintContract.ts'
+import { LICENSE_SETUP_COPY } from '../lib/i18n/licenseSetupCopy.ts'
 
 const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru'] as const
 

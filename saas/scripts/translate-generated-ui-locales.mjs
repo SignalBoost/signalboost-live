@@ -13,6 +13,8 @@ const REPO_ROOT = path.resolve(ROOT, '..')
 const LOCALE_DIR = path.join(ROOT, 'locales')
 const TEMP_WORKFLOW_PATH = path.join(REPO_ROOT, '.github', 'workflows', 'complete-generated-ui-locales.yml')
 const WRITE = process.argv.includes('--write')
+const localeArgument = process.argv.find(argument => argument.startsWith('--locale='))
+const REQUEST_TIMEOUT_MS = Number(process.env.TRANSLATION_REQUEST_TIMEOUT_MS || 120000)
 
 const LANGUAGE_NAMES = {
   es: 'natural, neutral Latin American Spanish',
@@ -22,6 +24,10 @@ const LANGUAGE_NAMES = {
 }
 
 const TOKEN_PATTERN = /\{\{[^{}]+\}\}|\$\{[^{}]+\}|\{[^{}]+\}|%(?:\d+\$)?[sdif]|https?:\/\/[^\s)\]}]+|\b[^\s@]+@[^\s@]+\.[^\s@]+\b|`[^`]+`/g
+
+let cachedModelConfig
+let activeRequests = 0
+const requestWaiters = []
 
 function readLocale(locale) {
   return JSON.parse(fs.readFileSync(path.join(LOCALE_DIR, `${locale}.json`), 'utf8'))
@@ -78,60 +84,108 @@ function sleep(ms) {
 }
 
 function modelConfig() {
+  if (cachedModelConfig) return cachedModelConfig
+
   if (process.env.OPENAI_API_KEY) {
-    return {
+    cachedModelConfig = {
+      provider: 'OpenAI',
       endpoint: 'https://api.openai.com/v1/chat/completions',
       token: process.env.OPENAI_API_KEY,
       model: process.env.OPENAI_TRANSLATION_MODEL || 'gpt-4o-mini',
       maxTokens: 16384,
-      maxChars: 48000,
-      maxItems: 600,
+      maxChars: 32000,
+      maxItems: 400,
+      requestConcurrency: 4,
     }
+    return cachedModelConfig
   }
 
   if (process.env.GITHUB_TOKEN) {
-    return {
+    cachedModelConfig = {
+      provider: 'GitHub Models',
       endpoint: 'https://models.github.ai/inference/chat/completions',
       token: process.env.GITHUB_TOKEN,
       model: process.env.GITHUB_MODELS_MODEL || 'openai/gpt-4o-mini',
-      maxTokens: 4000,
-      maxChars: 12000,
-      maxItems: 180,
+      maxTokens: 12000,
+      maxChars: 9000,
+      maxItems: 100,
+      requestConcurrency: 2,
     }
+    return cachedModelConfig
   }
 
   throw new Error('OPENAI_API_KEY or GITHUB_TOKEN is required to generate missing locale copy.')
 }
 
+async function withRequestSlot(task) {
+  const { requestConcurrency } = modelConfig()
+  if (activeRequests >= requestConcurrency) {
+    await new Promise(resolve => requestWaiters.push(resolve))
+  }
+
+  activeRequests += 1
+  try {
+    return await task()
+  } finally {
+    activeRequests -= 1
+    requestWaiters.shift()?.()
+  }
+}
+
+function retryDelay(response, attempt) {
+  const retryAfter = Number(response?.headers?.get('retry-after') || 0)
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(retryAfter * 1000, 120000)
+  return Math.min(2000 * (2 ** attempt), 60000)
+}
+
 async function requestTranslation(locale, payload, attempt = 0) {
   const config = modelConfig()
-  const response = await fetch(config.endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0,
-      max_tokens: config.maxTokens,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `You are a professional SaaS product localization editor. Translate every JSON string value into ${LANGUAGE_NAMES[locale]}. Keep every JSON key exactly unchanged. Preserve placeholders such as __SB_TOKEN_0__, URLs, code, acronyms, provider names, product names, and technical identifiers exactly. Translate visible interface wording naturally and concisely. Return one valid JSON object only, containing every input key and no commentary.`,
-        },
-        { role: 'user', content: JSON.stringify(payload) },
-      ],
-    }),
-  })
+  let response
+
+  try {
+    response = await withRequestSlot(async () => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+      try {
+        return await fetch(config.endpoint, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            model: config.model,
+            temperature: 0,
+            max_tokens: config.maxTokens,
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'system',
+                content: `You are a professional SaaS product localization editor. Translate every JSON string value into ${LANGUAGE_NAMES[locale]}. Keep every JSON key exactly unchanged. Preserve placeholders such as __SB_TOKEN_0__, URLs, code, acronyms, provider names, product names, and technical identifiers exactly. Translate visible interface wording naturally and concisely. Return one valid JSON object only, containing every input key and no commentary.`,
+              },
+              { role: 'user', content: JSON.stringify(payload) },
+            ],
+          }),
+        })
+      } finally {
+        clearTimeout(timeout)
+      }
+    })
+  } catch (error) {
+    if (attempt < 7) {
+      await sleep(Math.min(2000 * (2 ** attempt), 60000))
+      return requestTranslation(locale, payload, attempt + 1)
+    }
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(`Translation request failed for ${locale}: ${reason}`)
+  }
 
   if (!response.ok) {
     const body = await response.text()
     if ((response.status === 429 || response.status >= 500) && attempt < 7) {
-      const retryAfter = Number(response.headers.get('retry-after') || 0)
-      await sleep(Math.max(retryAfter * 1000, 2000 * (2 ** attempt)))
+      await sleep(retryDelay(response, attempt))
       return requestTranslation(locale, payload, attempt + 1)
     }
     throw new Error(`Translation request failed for ${locale} (${response.status}): ${body.slice(0, 1200)}`)
@@ -168,6 +222,11 @@ function createBatches(items) {
   return batches
 }
 
+function shouldSplitBatch(error) {
+  const message = error instanceof Error ? error.message : String(error)
+  return !message.startsWith('Translation request failed for')
+}
+
 async function translateBatch(locale, batch) {
   try {
     const payload = Object.fromEntries(batch.map(item => [item.id, item.masked]))
@@ -186,10 +245,12 @@ async function translateBatch(locale, batch) {
 
     return translated
   } catch (error) {
-    if (batch.length === 1) throw error
+    if (batch.length === 1 || !shouldSplitBatch(error)) throw error
     const middle = Math.ceil(batch.length / 2)
-    const left = await translateBatch(locale, batch.slice(0, middle))
-    const right = await translateBatch(locale, batch.slice(middle))
+    const [left, right] = await Promise.all([
+      translateBatch(locale, batch.slice(0, middle)),
+      translateBatch(locale, batch.slice(middle)),
+    ])
     return new Map([...left, ...right])
   }
 }
@@ -253,22 +314,35 @@ async function buildLocale(locale, englishData, localizedData) {
   return { ...localizedData, generatedUi }
 }
 
+function selectedLocales() {
+  if (!localeArgument) return TARGET_UI_LOCALES
+  const locales = localeArgument.slice('--locale='.length).split(',').map(locale => locale.trim()).filter(Boolean)
+  if (!locales.length) throw new Error('--locale must name at least one target locale.')
+  const invalid = locales.filter(locale => !TARGET_UI_LOCALES.includes(locale))
+  if (invalid.length) throw new Error(`Unsupported target locale(s): ${invalid.join(', ')}`)
+  return [...new Set(locales)]
+}
+
 async function main() {
   if (!WRITE) throw new Error('Run with --write to update locale files.')
 
-  const englishData = readLocale('en')
-  const localizedData = Object.fromEntries(TARGET_UI_LOCALES.map(locale => [locale, readLocale(locale)]))
-  const completed = await Promise.all(
-    TARGET_UI_LOCALES.map(async locale => [locale, await buildLocale(locale, englishData, localizedData[locale])])
-  )
+  const config = modelConfig()
+  const locales = selectedLocales()
+  console.log(`[i18n] Provider: ${config.provider}; model: ${config.model}; request concurrency: ${config.requestConcurrency}.`)
 
-  for (const [locale, data] of completed) writeLocale(locale, data)
+  const englishData = readLocale('en')
+  const localizedData = Object.fromEntries(locales.map(locale => [locale, readLocale(locale)]))
+
+  await Promise.all(locales.map(async locale => {
+    const data = await buildLocale(locale, englishData, localizedData[locale])
+    writeLocale(locale, data)
+  }))
 
   if (process.env.REMOVE_TRIGGER_WORKFLOW === '1' && fs.existsSync(TEMP_WORKFLOW_PATH)) {
     fs.rmSync(TEMP_WORKFLOW_PATH)
   }
 
-  console.log(`[i18n] Completed ${Object.keys(englishData.generatedUi).length} generated UI keys across en/es/pt/pl/ru.`)
+  console.log(`[i18n] Completed ${Object.keys(englishData.generatedUi).length} generated UI keys for ${locales.join('/')}.`)
 }
 
 main().catch(error => {

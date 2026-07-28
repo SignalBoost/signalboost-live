@@ -1,3 +1,4 @@
+// saas/app/dashboard/future-projects/page.tsx
 'use client'
 
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -9,6 +10,7 @@ type ProjectCopy = {
   title: string
   subtitle: string
   status: string
+  badge: string
   projectTitle: string
   projectSummary: string
   goalTitle: string
@@ -31,6 +33,7 @@ const COPY: Record<Language, ProjectCopy> = {
     title: 'Future Projects',
     subtitle: 'Concepts being considered for future SignalBoost development. These projects are not active production features yet.',
     status: 'Concept — future build',
+    badge: 'FUTURE',
     projectTitle: 'AI Platform Connection Gateway',
     projectSummary: 'A guided gateway, browser copilot, OAuth agent, and platform automation system that helps users connect services such as Facebook, Instagram, Reddit, TikTok, LinkedIn, YouTube, Telegram, and WeChat.',
     goalTitle: 'Goal',
@@ -56,6 +59,7 @@ const COPY: Record<Language, ProjectCopy> = {
     title: 'Proyectos futuros',
     subtitle: 'Conceptos considerados para el desarrollo futuro de SignalBoost. Estos proyectos todavía no son funciones activas de producción.',
     status: 'Concepto — desarrollo futuro',
+    badge: 'FUTURO',
     projectTitle: 'Gateway de conexión de plataformas con IA',
     projectSummary: 'Un sistema con gateway guiado, copiloto de navegador, agente OAuth y automatización de plataformas para ayudar a conectar servicios como Facebook, Instagram, Reddit, TikTok, LinkedIn, YouTube, Telegram y WeChat.',
     goalTitle: 'Objetivo',
@@ -81,6 +85,7 @@ const COPY: Record<Language, ProjectCopy> = {
     title: 'Projetos futuros',
     subtitle: 'Conceitos considerados para o desenvolvimento futuro do SignalBoost. Estes projetos ainda não são recursos ativos de produção.',
     status: 'Conceito — desenvolvimento futuro',
+    badge: 'FUTURO',
     projectTitle: 'Gateway de conexão de plataformas com IA',
     projectSummary: 'Um sistema com gateway guiado, copiloto de navegador, agente OAuth e automação de plataformas para ajudar usuários a conectar Facebook, Instagram, Reddit, TikTok, LinkedIn, YouTube, Telegram e WeChat.',
     goalTitle: 'Objetivo',
@@ -106,6 +111,7 @@ const COPY: Record<Language, ProjectCopy> = {
     title: 'Przyszłe projekty',
     subtitle: 'Koncepcje rozważane do przyszłego rozwoju SignalBoost. Nie są to jeszcze aktywne funkcje produkcyjne.',
     status: 'Koncepcja — przyszła realizacja',
+    badge: 'PRZYSZŁOŚĆ',
     projectTitle: 'Bramka połączeń platformowych AI',
     projectSummary: 'System obejmujący prowadzoną bramkę, asystenta przeglądarki, agenta OAuth i automatyzację platform, pomagający łączyć Facebook, Instagram, Reddit, TikTok, LinkedIn, YouTube, Telegram i WeChat.',
     goalTitle: 'Cel',
@@ -131,6 +137,7 @@ const COPY: Record<Language, ProjectCopy> = {
     title: 'Будущие проекты',
     subtitle: 'Концепции для будущего развития SignalBoost. Эти проекты пока не являются активными производственными функциями.',
     status: 'Концепция — будущая разработка',
+    badge: 'БУДУЩЕЕ',
     projectTitle: 'Шлюз подключения платформ с ИИ',
     projectSummary: 'Система из управляемого шлюза, браузерного помощника, OAuth-агента и агента автоматизации для подключения Facebook, Instagram, Reddit, TikTok, LinkedIn, YouTube, Telegram и WeChat.',
     goalTitle: 'Цель',
@@ -171,7 +178,7 @@ export default function FutureProjectsPage() {
             <div className="sb-eyebrow">{copy.status}</div>
             <h2 style={{ margin: '8px 0 0', fontSize: 'clamp(1.5rem, 3vw, 2.25rem)' }}>{copy.projectTitle}</h2>
           </div>
-          <span style={{ border: '1px solid rgba(167,139,250,.5)', borderRadius: 999, padding: '7px 12px', color: '#c4b5fd', fontSize: 12, fontWeight: 800 }}>FUTURE</span>
+          <span style={{ border: '1px solid rgba(167,139,250,.5)', borderRadius: 999, padding: '7px 12px', color: '#c4b5fd', fontSize: 12, fontWeight: 800 }}>{copy.badge}</span>
         </div>
 
         <p className="sb-body" style={{ maxWidth: 900, marginTop: 18 }}>{copy.projectSummary}</p>

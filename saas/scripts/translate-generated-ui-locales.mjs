@@ -303,9 +303,12 @@ async function buildLocale(locale, englishData, localizedData) {
   const batches = createBatches(missing)
   console.log(`[i18n] ${locale}: ${Object.keys(english).length} keys, ${missing.length} unique translations, ${batches.length} batches.`)
 
-  for (let index = 0; index < batches.length; index += 1) {
-    console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batches[index].length} values)`)
-    const translated = await translateBatch(locale, batches[index])
+  const batchResults = await Promise.all(batches.map(async (batch, index) => {
+    console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
+    return translateBatch(locale, batch)
+  }))
+
+  for (const translated of batchResults) {
     for (const [source, value] of translated) resolvedBySource.set(source, value)
   }
 

@@ -28,7 +28,9 @@ jobs:
         run: node scripts/list-i18n-fallbacks.mjs > ../i18n-fallback-inventory.txt 2>&1
       - name: Capture missing locale keys
         run: node scripts/list-missing-i18n-keys.mjs > ../missing-i18n-keys.txt 2>&1
-      - name: Upload inventory
+      - name: Package source snapshot
+        run: tar --exclude=node_modules --exclude=.next --exclude=coverage -czf ../saas-source.tgz .
+      - name: Upload inventory and source snapshot
         uses: actions/upload-artifact@v4
         with:
           name: hardcoded-ui-inventory
@@ -36,4 +38,5 @@ jobs:
             hardcoded-ui-inventory.txt
             i18n-fallback-inventory.txt
             missing-i18n-keys.txt
+            saas-source.tgz
           if-no-files-found: error

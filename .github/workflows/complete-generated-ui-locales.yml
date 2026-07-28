@@ -41,22 +41,6 @@ jobs:
           git config user.name 'SignalBoost Automation'
           git config user.email 'actions@users.noreply.github.com'
 
-      - name: Throttle GitHub Models translation requests
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs')
-          const file = 'saas/scripts/translate-generated-ui-locales.mjs'
-          const original = fs.readFileSync(file, 'utf8')
-          let source = original
-            .replace('maxTokens: 8000,\n      maxChars: 6000,\n      maxItems: 60,\n      requestConcurrency: 4,', 'maxTokens: 12000,\n      maxChars: 9000,\n      maxItems: 100,\n      requestConcurrency: 1,')
-            .replace(
-              `  const batchResults = await Promise.all(batches.map(async (batch, index) => {\n    console.log(\`[i18n] \${locale}: batch \${index + 1}/\${batches.length} (\${batch.length} values)\`)\n    return translateBatch(locale, batch)\n  }))`,
-              `  const batchResults = []\n  for (let index = 0; index < batches.length; index += 1) {\n    const batch = batches[index]\n    console.log(\`[i18n] \${locale}: batch \${index + 1}/\${batches.length} (\${batch.length} values)\`)\n    batchResults.push(await translateBatch(locale, batch))\n    if (index + 1 < batches.length) await sleep(6000)\n  }`,
-            )
-          if (source === original) throw new Error('Translation throttling patch did not match the generator source.')
-          fs.writeFileSync(file, source)
-          NODE
-
       - name: Generate and publish each locale
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -66,13 +50,13 @@ jobs:
           set -euo pipefail
           for locale in es pt pl ru; do
             node saas/scripts/translate-generated-ui-locales.mjs --write --locale="$locale"
+            git pull --rebase --autostash origin "$HEAD_BRANCH"
             git add "saas/locales/$locale.json"
             if ! git diff --cached --quiet; then
               git commit -m "fix(i18n): complete $locale generated UI dictionary"
               git push origin "HEAD:${HEAD_BRANCH}"
             fi
           done
-          git checkout -- saas/scripts/translate-generated-ui-locales.mjs
 
       - name: Make five-language parity blocking
         working-directory: saas
@@ -101,6 +85,7 @@ jobs:
       - name: Publish validated catalog guard
         run: |
           rm .github/workflows/complete-generated-ui-locales.yml
+          git pull --rebase --autostash origin "$HEAD_BRANCH"
           git add -A
           git diff --cached --quiet && exit 0
           git commit -m 'fix(i18n): enforce complete five-language UI catalogs'

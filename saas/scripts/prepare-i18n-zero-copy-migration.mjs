@@ -45,7 +45,7 @@ const TEST_FILES = [
   'tests/providerReviewedPathSelector.node.test.ts',
   'tests/supervisorSectionNavigation.node.test.ts',
 ]
-const helperImport = "import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource'"
+const helperImport = "import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'"
 const readPattern = /(?<!hydrateLocalizedSource\()readFileSync\(([^;\n]*?),\s*(['"])(utf-?8)\2\)/g
 
 for (const relativePath of TEST_FILES) {

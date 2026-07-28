@@ -17,7 +17,7 @@ jobs:
   generate-and-validate:
     if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     env:
       HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
 
@@ -36,12 +36,26 @@ jobs:
           cache: npm
           cache-dependency-path: saas/package-lock.json
 
-      - name: Generate missing translations
+      - name: Configure publication identity
+        run: |
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+
+      - name: Generate and publish each locale
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MODELS_MODEL: openai/gpt-4o-mini
-        run: node saas/scripts/translate-generated-ui-locales.mjs --write
+        run: |
+          set -euo pipefail
+          for locale in es pt pl ru; do
+            node saas/scripts/translate-generated-ui-locales.mjs --write --locale="$locale"
+            git add "saas/locales/$locale.json"
+            if ! git diff --cached --quiet; then
+              git commit -m "fix(i18n): complete $locale generated UI dictionary"
+              git push origin "HEAD:${HEAD_BRANCH}"
+            fi
+          done
 
       - name: Make five-language parity blocking
         working-directory: saas
@@ -67,12 +81,10 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
         run: npm run build
 
-      - name: Publish validated locale catalogs
+      - name: Publish validated catalog guard
         run: |
           rm .github/workflows/complete-generated-ui-locales.yml
-          git config user.name 'SignalBoost Automation'
-          git config user.email 'actions@users.noreply.github.com'
           git add -A
           git diff --cached --quiet && exit 0
-          git commit -m 'fix(i18n): complete all five generated UI dictionaries'
+          git commit -m 'fix(i18n): enforce complete five-language UI catalogs'
           git push origin "HEAD:${HEAD_BRANCH}"

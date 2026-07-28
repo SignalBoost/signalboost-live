@@ -30,6 +30,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Prepare page-only migration
+        run: node scripts/prepare-i18n-zero-copy-migration.mjs
       - name: Centralize user-facing English
         run: node scripts/enforce-localized-page-copy.mjs --write
       - name: Clear resolved baseline

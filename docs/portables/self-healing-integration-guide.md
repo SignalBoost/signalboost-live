@@ -19,6 +19,8 @@ The buyer supplies infrastructure through the portable interfaces below.
 | `SqlExecutor` | Durable dispatch ledger database |
 | `SiemTransport` | SIEM collector transport |
 | `IncidentSource` | Generic signed webhook or staged vendor adapter |
+| `SupervisorExecutor` | The runner that performs approved repair steps |
+| `ApiStepRunner` | Individual API calls against the target provider |
 | `VerificationStepRunner` | Read-only post-repair observations |
 
 ## 2. Durable dispatch ledger
@@ -64,14 +66,35 @@ The Supervisor orchestrator receives the verifier separately as part of its depe
 configuration. Verification never widens execution authority and may only run the plan's
 read-only `read`, `verify`, or `screenshot` steps.
 
-## 4. Incident intake
+## 4. Execution runners — nothing repairs without one
+
+The orchestrator plans, applies policy, routes approvals, verifies and audits on its own.
+**It does not execute.** Performing a repair step means touching your systems, and the
+portable has no way to do that except through a runner you supply.
+
+- `SupervisorExecutor` — the interface a dispatched repair is handed to. It declares its
+  `kind` and returns a structured result: which steps ran, which were skipped, the
+  evidence produced, and a status.
+- `ApiStepRunner` — the function `APIExecutor` calls to perform an individual API step
+  against the target provider.
+
+If no executor is registered for the kind a plan requests, the dispatcher records an
+`executor_missing` audit event and the run ends without execution.
+
+**A deployment with no execution runner is still useful, and still honest.** Incidents are
+received, diagnosed, gated for approval, verified where read-only steps allow, and
+audited. What it will not do is claim a repair happened: the orchestration ends
+`unresolved` and records why. That is intended behaviour rather than a defect. A
+fabricated success is the one thing an operator must never find in an audit trail.
+
+## 5. Incident intake
 
 Companies can use the generic signed webhook immediately or one of the staged vendor
 adapters. Vendor adapters only map fields into `IncidentMapping`; the universal core
 handles normalization, sanitation, validation, fingerprinting, deduplication, storage,
 and source health.
 
-## 5. What “live” requires
+## 6. What “live” requires
 
 A buyer deployment is genuinely live only after all of these are proven in its own
 environment:
@@ -86,7 +109,7 @@ environment:
 7. Audit evidence reaches the configured SIEM.
 8. A staging incident completes the full workflow without unsupported production claims.
 
-## 6. Acceptance rehearsal
+## 7. Acceptance rehearsal
 
 ```bash
 node scripts/run-self-healing-acceptance.mjs ./my-host.mjs --out acceptance-record.json

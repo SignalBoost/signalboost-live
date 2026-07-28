@@ -658,7 +658,8 @@
       "warning": "Zużyto ponad 80%. Rozważ wyższy plan.",
       "limitReached": "Osiągnięto limit kredytów.",
       "autoTopup": "Automatyczne doładowanie doda więcej kredytów."
-    }
+    },
+    "packs": "Pakiet startowy: 50 kredytów = 15 USD · Pakiet Pro: 200 kredytów = 50 USD."
   },
   "reset": "Resetuj",
   "trust": {
@@ -3375,61 +3376,669 @@
     "u_1f6fa6f69d185e60": " min"
   },
   "lab": {
-    "somethingWrong": "Coś poszło nie tak"
+    "somethingWrong": "Coś poszło nie tak",
+    "license": {
+      "restricted": "Rights-restricted",
+      "public": "Domena publiczna",
+      "embeddable": "Dowolnie osadzany"
+    },
+    "videoSynthesis": "VIDEO_SYNTHESIS_UNIT",
+    "motionPrompt": "MOTION_PROMPT",
+    "videoPrompt": "VIDEO_PROMPT",
+    "aspectRatio": "ASPECT_RATIO",
+    "videoCredits": "VIDEO_CREDITS",
+    "runPrompt": "RUN_PROMPT",
+    "agentReasoning": "AGENT_REASONING",
+    "warnConstraints": "WARN_CONSTRAINTS",
+    "generatedMatrix": "GENERATED_MATRIX",
+    "nodesDetected": "NODES_DETECTED",
+    "restrictedNode": "RESTRICTED_NODE",
+    "synthesisCore": "SYNTHESIS_CONTAINMENT_CORE",
+    "coreScope": "CORE_SCOPE",
+    "targetProjectId": "TARGET_PROJECT_ID",
+    "recipeTemplates": "RECIPE_TEMPLATES",
+    "pipelineStaging": "PIPELINE_STAGING",
+    "purgeAll": "PURGE_ALL",
+    "captionInfo": {
+      "title": "LAB_DIAGNOSTICS: CAPTION_AUTOMATION",
+      "description": "Sztuczna inteligencja dokona transkrypcji oryginalnego dźwięku (automatycznie wykrywając język mówiony), następnie przetłumaczy transkrypcję na wybrane języki i wygeneruje pliki z napisami (SRT, VTT, ASS), które można pobrać i używać w dowolnym miejscu."
+    },
+    "generateSubtitles": "Wygeneruj napisy w 5 językach",
+    "openOriginal": "Otwórz oryginał na",
+    "genFailed": "Generacja nie powiodła się. Twój kredyt został zwrócony.",
+    "needImage": "Najpierw załącz zdjęcie (użyj przycisku 📎 lub wklej je).",
+    "textToVideo": "TEKST → WIDEO",
+    "imageToVideo": "OBRAZ → WIDEO",
+    "usingImage": "Korzystając z załączonego obrazu",
+    "attachImagePrompt": "Dołącz obrazek powyżej (📎 lub wklej), aby go animować.",
+    "motionPlaceholder": "Opisz ruch, np. „powolne kinowe przybliżanie, delikatne przesuwanie kamery”",
+    "promptPlaceholder": "Opisz film, który chcesz wygenerować...",
+    "renderingNote": "Renderowanie wideo — zwykle zajmuje to 2–4 minuty. Możesz dalej pracować; pojawi się tutaj, gdy będzie gotowy.",
+    "downloadVideo": "POBIERZ WIDEO",
+    "submitting": "PRZESYŁANIE...",
+    "rendering": "REMENDOWANIE...",
+    "generateAnother": "WYGENERUJ KOLEJNY",
+    "generateVideo": "GENERUJ WIDEO",
+    "credit": "kredyt",
+    "defaultProject": "Mój projekt",
+    "evaluating": "Ocena ograniczeń neuronowych...",
+    "searchFailed": "Wyszukiwanie nie powiodło się",
+    "suggestion1": "Ostatni gol Pelé",
+    "suggestion2": "Lądowanie na Księżycu 1969",
+    "suggestion3": "Przemówienie Churchilla podczas II wojny światowej",
+    "suggestion4": "Utwórz reklamę podcastu w języku hiszpańskim",
+    "suggestion5": "Upadek muru berlińskiego 1989",
+    "suggestion6": "Utwórz promocję TikTok",
+    "status": "SIGNALBOOST_FOUNDRY // STATUS",
+    "online": "ONLINE",
+    "compute": "OBLICZ",
+    "active": "AKTYWNY",
+    "title": "CORE_ENGINE // Laboratorium",
+    "subtitle": "Parametry syntezy: analiza materiału filmowego, generatywne przesyłanie strumieniowe awatarów, orkiestracja audio dub.",
+    "placeholder": "Zapytanie wstrzykujące… np. „utwórz reklamę z lat 30. po hiszpańsku” lub „pokaż mi ostatniego gola Pelé”",
+    "attach": "DOŁĄCZ",
+    "abort": "PRZERWIJ",
+    "compiling": "KOMPILACJA...",
+    "pipeline": "RUROCIĄG",
+    "inject": "WSTRZYKNIJ",
+    "awaitingDirectives": "Oczekiwanie na podpowiedzi algorytmiczne. W tym miejscu zostaną skonsolidowane przesyłane strumieniowo materiały wejściowe z węzłów archiwalnych i węzłów awatarów wektorowych.",
+    "run": "BIEGAJ"
   },
   "dash": {
     "preview": {
-      "close": "Zamknij"
+      "close": "Zamknij",
+      "updated": "Zaktualizowano",
+      "thinking": "Myślenie…",
+      "label": "Podgląd na żywo",
+      "quickActions": "Szybkie działania",
+      "yourProjects": "Twoje projekty",
+      "createProject": "+ Utwórz projekt",
+      "openProject": "Otwórz projekt",
+      "execute": "Wykonaj zapytanie",
+      "thinkingMsg": "SignalBoost myśli…",
+      "openInBuilder": "Otwórz w kreatorze →"
+    },
+    "actions": {
+      "website": {
+        "label": "Zbuduj witrynę internetową",
+        "subline": "Utwórz lub edytuj swoją obecność online"
+      },
+      "review": {
+        "label": "Zbieraj recenzje",
+        "subline": "Uzyskaj informacje zwrotne i referencje"
+      },
+      "podcast": {
+        "label": "Generuj natywny dźwięk",
+        "subline": "Twórz treści głosowe w wielu językach"
+      },
+      "video": {
+        "label": "Twórz filmy",
+        "subline": "Zamień treść w zasoby wizualne"
+      }
+    },
+    "time": {
+      "ago": "temu",
+      "justNow": "Właśnie teraz"
+    },
+    "team": "Zespół",
+    "concierge": {
+      "title": "Konsjerż SignalBoost",
+      "loading": "Ładuję obszar roboczy i sprawdzam, co wymaga uwagi.",
+      "welcome": "Witamy. Zacznij od stworzenia swojego pierwszego projektu lub zapytaj SignalBoost, co zbudować jako pierwsze.",
+      "drafts": {
+        "many": "Masz {count} wersji roboczych projektów. Otwórz jeden i opublikuj, gdy będzie gotowy.",
+        "one": "Masz 1 wersję roboczą projektu. Otwórz jeden i opublikuj, gdy będzie gotowy."
+      },
+      "live": {
+        "many": "Masz {count} aktywnych projektów. Następny krok: promuj, zbieraj recenzje lub twórz treści.",
+        "one": "Masz 1 aktywny projekt. Następny krok: promuj, zbieraj recenzje lub twórz treści."
+      },
+      "help": "Potrzebujesz pomocy w wyborze kolejnego ruchu? Zapytaj SignalBoost poniżej.",
+      "askNext": "Zapytaj dalej"
+    },
+    "prompts": {
+      "new": {
+        "p1": "Jaki plan będzie dla mnie odpowiedni?",
+        "p2": "Jak zbudować swoją pierwszą stronę internetową?",
+        "p3": "Jakie języki obsługujecie?",
+        "p4": "Jak działa darmowy plan?"
+      },
+      "returning": {
+        "p1": "Jak dodać nowy język?",
+        "p2": "Jak przesłać odcinek podcastu?",
+        "p3": "Jak zbierać recenzje?",
+        "p4": "Jak uaktualnić swój plan?"
+      }
+    },
+    "connectionError": "Problem z połączeniem. Spróbuj ponownie.",
+    "projectsTitleNamed": "Projekty {name}",
+    "projectsTitle": "Twoje projekty",
+    "upgrade": "Uaktualnij",
+    "loadingTeam": "Ładowanie zespołu…",
+    "noProjects": "Nie ma jeszcze żadnych projektów",
+    "noProjectsSub": "Utwórz swój pierwszy projekt powyżej",
+    "feedback": "Podziel się opinią — każda wiadomość pomaga ulepszyć SignalBoost",
+    "sketch": {
+      "headlineFallback": "Twój nagłówek tutaj"
+    },
+    "prompt": {
+      "nextAction": "Co powinienem zrobić dalej?"
+    },
+    "askPlaceholder": "Zapytaj SignalBoost o wszystko…",
+    "stats": {
+      "activeSites": "Aktywne witryny",
+      "projects": "Projekty",
+      "audioGenerated": "Wygenerowano dźwięk",
+      "min": "min",
+      "videosCreated": "Utworzono filmy"
     }
   },
   "onboarding": {
     "confirm": {
-      "tone": "Ton"
+      "tone": "Ton",
+      "role": "Rola",
+      "saving": "Zapisuję…",
+      "heading": "Potwierdź swoją spersonalizowaną konfigurację.",
+      "intro": "Przed otwarciem pulpitu nawigacyjnego przejrzyj podsumowanie wprowadzenia. Twoje wybory są przechowywane w ustawieniach profilu i wykorzystywane przez Apprentice Workshop.",
+      "itLevel": "Poziom informatyczny",
+      "notSelected": "Nie wybrano",
+      "consent": "Zgoda na szkolenie AI",
+      "granted": "Zgoda",
+      "notGranted": "Nie przyznano",
+      "previewLabel": "Zapowiedź warsztatu praktykanta",
+      "previewAdvanced": "Zobaczysz szybsze ścieżki techniczne, diagnostykę i kontrolę wdrożenia.",
+      "previewIntermediate": "Zobaczysz zrównoważone wskazówki z konfigurowalnymi skrótami.",
+      "previewBeginner": "Zobaczysz przyjazne dla początkujących lekcje, definicje i bezpieczne ustawienia domyślne.",
+      "editTone": "← Edytuj ton",
+      "complete": "Zakończ wdrożenie →"
+    },
+    "common": {
+      "continue": "Kontynuuj →",
+      "back": "← Wróć"
+    },
+    "roles": {
+      "developer": {
+        "title": "Deweloper"
+      },
+      "non_developer": {
+        "title": "Non-developer"
+      }
+    },
+    "loading": "Ładowanie wprowadzenia…",
+    "skip": "Przejdź do panelu →",
+    "progressComplete": "{pct}% ukończono",
+    "welcome": {
+      "title": "Witamy, {name}. Twórz szybciej dzięki inteligentniejszej konfiguracji.",
+      "intro": "SignalBoost dostosuje wskazówki dotyczące warsztatu praktykanta, ton sztucznej inteligencji i ustawienia domyślne produktu na podstawie czterech szybkich preferencji. Każdy wybór można później zmienić w ustawieniach.",
+      "storyboardLabel": "Storyboard",
+      "storyboardBody": "Witamy → sprofiluj swój poziom umiejętności → wybierz zgodę na prywatność → wybierz dźwięk asystenta → potwierdź konfigurację.",
+      "start": "Rozpocznij wdrażanie →"
+    },
+    "profiling": {
+      "heading": "Pomóż nam dostosować Warsztat Praktykanta.",
+      "intro": "Wybierz ścieżkę, która najlepiej pasuje do sposobu, w jaki SignalBoost ma wyjaśniać konfigurację, pulpity nawigacyjne i decyzje techniczne.",
+      "itComfort": "Poziom komfortu informatycznego"
+    },
+    "consent": {
+      "heading": "Wybierz preferencje dotyczące treningu AI.",
+      "intro": "Zgoda jest opcjonalna i domyślnie odznaczona. SignalBoost może nadal personalizować Twoje konto bez wykorzystywania Twoich danych do szkolenia AI.",
+      "checkboxLabel": "Wyrażam zgodę na wykorzystanie przez SignalBoost moich preferencji dotyczących wdrożenia w celu ulepszenia szkoleń AI.",
+      "checkboxBody": "Przechowujemy te preferencje ze znacznikiem czasu, zapewniamy możliwość późniejszej rezygnacji i unikamy sprzedaży danych osobowych.",
+      "save": "Zapisz zgodę →",
+      "continueWithout": "Kontynuuj bez zgody →"
+    },
+    "tone": {
+      "heading": "Wybierz dźwięk asystenta.",
+      "intro": "Ta preferencja towarzyszy Ci przy generowaniu treści, kopiach pomocniczych i objaśnieniach Warsztatów Praktykantów."
     }
   },
   "podcasters_page": {
     "plans": {
       "indie": {
-        "cta": "Rozpocznij"
+        "cta": "Rozpocznij",
+        "name": "Niezależne",
+        "description": "Idealny dla niezależnych podcasterów rozpoczynających działalność na całym świecie.",
+        "f1": "1 przedstawienie",
+        "f2": "4 odcinki miesięcznie",
+        "f3": "2 języki",
+        "f4": "Natywny głos AI",
+        "f5": "Napisy w 2 językach",
+        "f6": "Podstawowe generowanie klipów",
+        "f7": "Strona z podcastami",
+        "f8": "Recenzje słuchaczy"
       },
       "pro": {
-        "cta": "Rozpocznij"
+        "cta": "Rozpocznij",
+        "name": "Profesjonalista",
+        "description": "Dla poważnych podcasterów, którzy chcą globalnego zasięgu.",
+        "f1": "3 przedstawienia",
+        "f2": "Nieograniczona liczba odcinków",
+        "f3": "Wszystkie 5 języków",
+        "f4": "Natywny głos AI",
+        "f5": "Napisy we wszystkich 5 językach",
+        "f6": "Fabryka klipsów",
+        "f7": "Wielojęzyczna witryna z podcastami",
+        "f8": "Analityka"
+      },
+      "network": {
+        "name": "Sieć",
+        "description": "Dla sieci podcastów zarządzających wieloma programami.",
+        "f1": "Nielimitowane pokazy",
+        "f2": "Nieograniczona liczba odcinków",
+        "f3": "Wszystkie języki oraz niestandardowe",
+        "f4": "Dedykowane przetwarzanie",
+        "f5": "Niestandardowe formaty napisów",
+        "f6": "Witryna internetowa białej etykiety",
+        "f7": "Dostęp do API",
+        "f8": "Dedykowany menadżer konta",
+        "cta": "Skontaktuj się z nami"
       }
-    }
+    },
+    "mostPopular": "Najpopularniejszy",
+    "perMonth": "/mo",
+    "howTitle": "Jak to działa",
+    "plansTitle": "Plany podcastów",
+    "plansSubtitle": "Naszkicuj swój pomysł za darmo, korzystając z naszego poziomu podglądu, a następnie wybierz plan podcastu, gdy będziesz gotowy do publikacji."
   },
   "pricing_page": {
-    "loading": "Ładowanie..."
+    "loading": "Ładowanie...",
+    "errorGeneric": "Coś poszło nie tak."
   },
   "concierge": {
-    "send": "Wyślij"
+    "send": "Wyślij",
+    "thinking": "Myśląc...",
+    "attach": "Dołącz pliki",
+    "utilityOffer": "Zidentyfikowałem możliwości optymalizacji Twojego adresu URL. Czy chcesz, aby nasze studio medialne (COS Core v1) automatycznie utworzyło kampanię wideo, aby zwiększyć Twoją konwersję za jedyne 10 kredytów?",
+    "greeting": "Witam, jestem konsjerżem SignalBoost. Zapytaj mnie o swój obszar roboczy lub otwórz poniższe odpowiedzi na często zadawane pytania, pomoc techniczną i dokumenty.",
+    "assetReady": "Twój zasób COS Core v1 jest gotowy. Przejrzyj to na karcie zgody finansowej Studio przed publikacją:",
+    "assetReadyCta": "Otwórz kartę zatwierdzenia",
+    "fallback": "Nie udało mi się utworzyć odpowiedzi.",
+    "connectionError": "Problem z połączeniem. Spróbuj ponownie.",
+    "button": "✨ Konsjerż",
+    "title": "✨ Konsjerż",
+    "dropHere": "Upuść pliki, które chcesz załączyć",
+    "dropHint": "Obrazy, pliki PDF lub tekst — do 10 MB każdy",
+    "close": "Zwiń dok Concierge",
+    "removeFile": "Usuń plik",
+    "placeholder": "Zapytaj o cokolwiek..."
   },
   "topbar": {
     "credits": "kredyty",
-    "account": "Konto"
+    "account": "Konto",
+    "credit": "kredyt"
   },
   "console": {
     "deploy": {
       "heading": "Wdrożenia",
-      "deployment": "Wdrożenie"
+      "deployment": "Wdrożenie",
+      "refresh": "↻ Odśwież",
+      "created": "Utworzono",
+      "err": {
+        "load": "Nie udało się wczytać wdrożeń",
+        "loading": "Błąd podczas ładowania wdrożeń"
+      },
+      "rollbackVerb": "Wróć do",
+      "cancelVerb": "Anuluj kompilację",
+      "rollbackTail": "To promuje go z powrotem do produkcji.",
+      "cancelTail": "Spowoduje to przerwanie działającej kompilacji.",
+      "rollbackDone": "Wycofywanie zakończone",
+      "cancelDone": "Budowa anulowana",
+      "failedAction": "Nie udało się",
+      "errorDuring": "Błąd podczas",
+      "headingRollback": "Wdrożenie wycofania",
+      "headingCancel": "Anuluj kompilację",
+      "subRollback": "Wybierz poprzednie wdrożenie GOTOWE, aby powrócić do wersji produkcyjnej.",
+      "subCancel": "Przerwij trwającą kompilację (BUDOWANIE, W KOLEJCE lub INICJALIZACJA).",
+      "sub": "Najnowsza historia i status wdrożenia Vercel.",
+      "loading": "Ładowanie wdrożeń...",
+      "empty": "Nie znaleziono wdrożeń",
+      "current": "AKTUALNE",
+      "by": "przez",
+      "promoting": "Promowanie…",
+      "rollbackThis": "↩️ Wróć do tego",
+      "currentTarget": "🔒aktualny cel produkcyjny",
+      "onlyReady": "Promowane mogą być tylko wdrożenia GOTOWE",
+      "canceling": "Anuluję…",
+      "cancelBuild": "🛑 Anuluj kompilację",
+      "notInProgress": "Nie w toku — nic do anulowania",
+      "liveUrl": "Aktywny adres URL",
+      "gitCommit": "Git Zatwierdź",
+      "deploymentId": "Identyfikator wdrożenia",
+      "aliases": "Aliasy",
+      "inspector": "📊 Wyświetl szczegóły wdrożenia w Inspektorze →",
+      "justNow": "właśnie teraz",
+      "minAgo": "temu",
+      "hourAgo": "godz. temu",
+      "dayAgo": "d temu"
     },
     "providerHealth": {
       "open": "Otwarte",
       "environment": "Środowisko",
       "provider": "Dostawca",
-      "severity": "Waga"
+      "severity": "Waga",
+      "monitor": "Monitoruj 3",
+      "critical": "Krytyczny",
+      "lastChecked": "Ostatnio sprawdzane:",
+      "title": "Zdrowie dostawcy",
+      "subtitle": "Zdrowie dostawcy jest teraz podzielone na mniejsze monitory stanu, dzięki czemu karty pozostają widoczne i spokojne.",
+      "statusCards": "Karty Statusu Dostawcy",
+      "issues": "Problemy i alerty",
+      "issuesDesc": "Tylko alerty dla tej mniejszej strony monitora.",
+      "noAlerts": "Brak istotnych alertów dla tego monitora stanu.",
+      "alertDetail": "Szczegóły alertu",
+      "impact": "Wpływ",
+      "fix": "Zalecana poprawka",
+      "selectAlert": "Wybierz alert, aby sprawdzić szczegóły."
     },
     "webhooks": {
-      "delete": "Usuń"
+      "delete": "Usuń",
+      "title": "Webhooks",
+      "urlLabel": "Webhook URL",
+      "eventPlural": "wydarzenia",
+      "created": "Utworzono",
+      "err": {
+        "load": "Nie udało się załadować webhooków",
+        "loading": "Błąd ładowania webhooków",
+        "required": "Wymagany adres URL i co najmniej jedno zdarzenie",
+        "create": "Nie udało się utworzyć webhooka",
+        "creating": "Błąd podczas tworzenia webhooka",
+        "delete": "Nie udało się usunąć webhooka",
+        "deleting": "Błąd podczas usuwania webhooka",
+        "testing": "Błąd podczas testowania webhooka"
+      },
+      "confirmDelete": "Usunąć tego webhooka?",
+      "testSuccess": "Test udany",
+      "testFailed": "Test nie powiódł się",
+      "subtitle": "Kieruj zdarzenia skarbca do systemów zewnętrznych za pośrednictwem elementów webhook HTTP",
+      "newWebhook": "Nowy webhook",
+      "eventsLabel": "Wydarzenia do subskrypcji",
+      "create": "Utwórz webhooka",
+      "add": "+ Dodaj webhooka",
+      "loading": "Ładowanie webhooków...",
+      "empty": "Nie skonfigurowano żadnych webhooków",
+      "eventSingular": "wydarzenie",
+      "failures": "Awarie:",
+      "subscribedEvents": "Subskrybowane wydarzenia",
+      "lastFired": "Ostatni zwolniony",
+      "never": "Nigdy",
+      "test": "Testuj"
+    },
+    "users": {
+      "roleLabel": "Rola",
+      "err": {
+        "load": "Nie udało się załadować użytkowników",
+        "loading": "Błąd ładowania użytkowników",
+        "emailRequired": "Wymagany e-mail",
+        "invite": "Nie udało się zaprosić użytkownika",
+        "inviting": "Błąd zapraszania użytkownika",
+        "role": "Nie udało się zaktualizować roli",
+        "updatingRole": "Błąd podczas aktualizowania roli",
+        "remove": "Nie udało się usunąć użytkownika",
+        "removing": "Błąd podczas usuwania użytkownika"
+      },
+      "confirmRemove": "Usunąć tego użytkownika z obszaru roboczego?",
+      "title": "Członkowie zespołu",
+      "subtitle": "Zarządzaj dostępem do obszaru roboczego i rolami użytkowników",
+      "inviteTitle": "Zaproś członka zespołu",
+      "emailLabel": "Adres e-mail",
+      "sendInvite": "Wyślij zaproszenie",
+      "inviteMember": "+ Zaproś członka",
+      "loading": "Ładowanie członków zespołu...",
+      "empty": "Nie ma jeszcze członków zespołu",
+      "ownerLocked": "Nie można zmienić roli właściciela",
+      "permissions": "Uprawnienia",
+      "joined": "Dołączył",
+      "lastLogin": "Ostatnie logowanie",
+      "never": "Nigdy",
+      "removeUser": "Usuń użytkownika"
+    },
+    "rail": {
+      "tagline": "Kontrola poleceń",
+      "subtitle": "Wiedz, co jest zepsute. Wiedz, co dalej naprawić.",
+      "planned": "Planowane miejsce pracy"
+    },
+    "aiOps": {
+      "title": "Centrum operacyjne AI",
+      "subtitle": "Jedno zadanie: powiedz właścicielowi, co ma najpierw naprawić w zakresie zdrowia, bezpieczeństwa, kosztów i konfiguracji.",
+      "recommended": "Zalecane działania"
+    },
+    "auditLog": {
+      "title": "Dziennik audytu",
+      "subtitle": "Jedno zadanie: pokazać, co się zmieniło, kto i kiedy to zmienił.",
+      "recent": "Ostatnia aktywność"
+    },
+    "securityAlerts": {
+      "title": "Alerty bezpieczeństwa",
+      "subtitle": "Jedno zadanie: pokazać, co jest niebezpieczne i co należy naprawić w pierwszej kolejności.",
+      "findings": "Otwórz wyniki dotyczące bezpieczeństwa"
+    },
+    "setup": {
+      "title": "Centrum konfiguracji",
+      "subtitle": "Jedno zadanie: poprowadzić użytkowników nietechnicznych przez proces łączenia się z dostawcą i konfiguracji.",
+      "checklist": "Lista kontrolna konfiguracji"
+    },
+    "team": {
+      "title": "Zespół i dostęp",
+      "subtitle": "Jedno zadanie: pokazać, kto może zobaczyć lub zmienić centrum dowodzenia.",
+      "roles": "Role dostępu"
+    },
+    "usageCost": {
+      "title": "Użycie i koszt",
+      "subtitle": "Jedno zadanie: pokazać wydatki, wzrost wykorzystania i ryzyko kosztów, zanim faktury zaskoczą właściciela.",
+      "signals": "Sygnały użycia dostawcy"
     }
   },
   "common": {
-    "cancel": "Anuluj"
+    "cancel": "Anuluj",
+    "enabled": "Włączone",
+    "ready": "Gotowy"
   },
   "vault": {
     "mfa": {
       "method": {
-        "email": "E-mail"
-      }
+        "email": "E-mail",
+        "sms": "SMS",
+        "totp": "Aplikacja uwierzytelniająca",
+        "totpDesc": "Użyj aplikacji uwierzytelniającej",
+        "emailDesc": "Kod wysłany na Twój e-mail",
+        "smsDesc": "Kod wysłany na Twój telefon"
+      },
+      "op": {
+        "rotation": "Obróć to poświadczenie",
+        "revocation": "Unieważnij to poświadczenie",
+        "export": "Wyeksportuj to poświadczenie"
+      },
+      "invalidLength": "Wpisz ważny kod",
+      "invalid": "Nieprawidłowy kod. Spróbuj ponownie.",
+      "failed": "Weryfikacja nie powiodła się",
+      "eyebrow": "Weryfikacja bezpieczeństwa",
+      "title": "Zweryfikuj swoją tożsamość",
+      "enterCode": "Wprowadź 6-cyfrowy kod",
+      "verifying": "Weryfikuję...",
+      "verify": "Zweryfikuj",
+      "success": "Zweryfikowano pomyślnie",
+      "proceeding": "Kontynuacja operacji..."
     }
+  },
+  "promote_page": {
+    "preview": {
+      "title": "Podgląd kampanii"
+    },
+    "badge": "Promuj moją firmę",
+    "title": "Utwórz pełną kampanię",
+    "subtitle": "Przeanalizuj źródło, przejrzyj ustrukturyzowany brief i zatwierdź go, aby utworzyć kampanię."
+  },
+  "wireframes": {
+    "viewPricing": "Zobacz ceny",
+    "unifiedAria": "Podgląd szkieletu pulpitu nawigacyjnego ujednoliconego SaaS",
+    "sidebarAria": "Nawigacja w module SaaS",
+    "i18nStatus": "i18n online: EN · ES · PT · PL · RU",
+    "kicker": "Modele szkieletowe kokpitu SaaS",
+    "title": "Konsola kokpitu do obsługi narzędzi biurowych i przepływu pracy asystentów",
+    "subtitle": "Responsywny system dashboardów z kartami telemetrycznymi, nawigacją przyjazną klawiaturze, szklanymi panelami i podglądami modułów gotowymi do zatwierdzenia przed kodowaniem produkcyjnym.",
+    "jumpPricing": "Przejdź do podglądu cen",
+    "telemetryAria": "Ujednolicone karty telemetryczne",
+    "modulesAria": "Podgląd szkieletu modułu",
+    "openDashboard": "Otwórz pulpit nawigacyjny",
+    "previewKicker": "Podgląd obrazów",
+    "previewTitle": "Eksport obrazu szkieletowego",
+    "previewAlt": "Podgląd szkieletowy",
+    "pricing": {
+      "kicker": "Integracja cenowa",
+      "title": "Panele planu SignalBoost",
+      "description": "Karty cenowe wykorzystują ten sam styl konsoli i kierują użytkowników bezpośrednio do każdego modułu obszaru roboczego."
+    }
+  },
+  "faq": {
+    "categories": {
+      "all": "Wszystko"
+    },
+    "kicker": "Centrum pomocy",
+    "title": "Często zadawane pytania",
+    "search": "Wyszukaj pytania...",
+    "empty": "Żadna odpowiedź nie pasowała do Twojego wyszukiwania."
+  },
+  "support": {
+    "contact": "Skontaktuj się z pomocą techniczną",
+    "documentation": "Dokumentacja",
+    "faq": "Często zadawane pytania",
+    "details": "Szczegóły",
+    "help": "Pomoc",
+    "defaultSubject": "Prośba o pomoc techniczną SignalBoost",
+    "kicker": "Wsparcie przepływu pracy",
+    "title": "Jak możemy pomóc?",
+    "subtitle": "Zacznij od często zadawanych pytań lub dokumentacji, a następnie wyślij zlokalizowaną prośbę o wsparcie z potrzebnym kontekstem.",
+    "faqDesc": "Najpierw wyszukaj odpowiedzi.",
+    "docsDesc": "Przeczytaj przewodniki po produktach.",
+    "email": "Wsparcie e-mailowe",
+    "topic": "Temat",
+    "topicPlaceholder": "Rozliczenia, publikowanie stron internetowych, recenzje, audio...",
+    "detailsPlaceholder": "Opowiedz nam, co się stało, czego się spodziewałeś i o stronie, na której pracowałeś.",
+    "send": "Otwórz prośbę e-mailową"
+  },
+  "auth": {
+    "errorNoName": "Proszę wpisać swoje imię i nazwisko.",
+    "passwordPlaceholder": "Hasło",
+    "errorEmailExists": "Konto z tym adresem e-mail już istnieje. Zamiast tego zaloguj się.",
+    "checkEmail": "Sprawdź swoją pocztę e-mail, aby potwierdzić swoje konto!",
+    "welcomeBack": "Witamy z powrotem",
+    "createAccount": "Utwórz darmowe konto",
+    "continueGoogle": "Kontynuuj z Google",
+    "continueGitHub": "Kontynuuj korzystanie z GitHuba",
+    "or": "lub",
+    "namePlaceholder": "Twoje pełne imię i nazwisko",
+    "emailPlaceholder": "Adres e-mail",
+    "freePlanNote": "Zaczniesz od planu Free — naszkicuj jedną stronę internetową w jednym języku ze znakiem wodnym. Uaktualnij w dowolnym momencie, aby publikować naprawdę.",
+    "pleaseWait": "Proszę czekać...",
+    "logIn": "Zaloguj się",
+    "createFreeAccount": "Utwórz darmowe konto",
+    "noAccount": "Nie masz konta?",
+    "signUpFree": "Zarejestruj się bezpłatnie",
+    "haveAccount": "Masz już konto?",
+    "logInLink": "Zaloguj się"
+  },
+  "dashboard": "Pulpit nawigacyjny",
+  "marketingSalesCosa": "Marketingu i Sprzedaży COSA",
+  "buildWebsite": "Zbuduj witrynę internetową",
+  "collectReviews": "Zbieraj recenzje",
+  "createVideos": "Twórz filmy",
+  "team": {
+    "remove": "Usuń",
+    "inviteSent": "Zaproszenie wysłane!",
+    "teamSeats": "Fotele drużynowe",
+    "used": "używany",
+    "planSuffix": "planuj",
+    "seatLimitReached": "Osiągnięto limit miejsc. Uaktualnij, aby dodać więcej członków zespołu.",
+    "upgrade": "Uaktualnij",
+    "emailPlaceholder": "teammate@email.com",
+    "sending": "Wysyłanie...",
+    "invite": "Zaproś",
+    "noMembers": "Nie ma jeszcze członków zespołu. Zaproś kogoś powyżej."
+  },
+  "orchestration": {
+    "confidence": "Zaufanie",
+    "kicker": "Orkiestracja sztucznej inteligencji",
+    "title": "Automatycznie kieruj następną akcję",
+    "subtitle": "SignalBoost łączy kolejny najlepszy krok w każdym obszarze roboczym.",
+    "openRoute": "Otwórz moduł routowany",
+    "inputLabel": "Opisz wynik",
+    "placeholder": "Przykład: popraw SEO mojej witryny i utwórz zasoby kampanii uzupełniającej",
+    "run": "Uruchom orkiestrację",
+    "intentRouter": "Intencja routera",
+    "memory": "Warstwa pamięci",
+    "operatorFallback": "Ścieżka przeglądu ręcznego",
+    "telemetry": "Telemetria"
+  },
+  "featuresFlow": {
+    "eyebrow": "Przepływ kierowany",
+    "heading": "Od niechlujnego pomysłu do zatwierdzonej kampanii."
+  },
+  "podcastSection": {
+    "f1": {
+      "title": "Brzmi jak lokalny",
+      "desc": "Przekonwertujemy Twój odcinek na natywnie brzmiący dźwięk w języku portugalskim, hiszpańskim, polskim i rosyjskim. Nie napisy — prawdziwe głosy."
+    },
+    "f2": {
+      "title": "Bądź wirusowy w 5 językach",
+      "desc": "Automatycznie generuj krótkie klipy dla TikTok, Reels i YouTube Shorts z każdego odcinka – we wszystkich Twoich językach."
+    },
+    "f3": {
+      "title": "Napisy w każdym języku",
+      "desc": "Automatycznie generuj napisy i podpisy do swoich filmów — wypalone lub jako osobne pliki. Idealny dla cichych scrollerów."
+    },
+    "f4": {
+      "title": "Twój program, Twoja strona",
+      "desc": "Markowa witryna podcastów z odtwarzaczem odcinków, wielojęzycznymi notatkami z programów i recenzjami słuchaczy."
+    },
+    "f5": {
+      "title": "Zbuduj swoją społeczność",
+      "desc": "Zbieraj recenzje i referencje słuchaczy w ich ojczystym języku. Pokaż światu, że Twoi odbiorcy Cię kochają."
+    },
+    "podcaster1": {
+      "reach": "190 milionów słuchaczy"
+    },
+    "podcaster2": {
+      "reach": "Numer 1 w Brazylii"
+    },
+    "podcaster3": {
+      "reach": "Najlepszy LATAM"
+    },
+    "badge": "Dla podcasterów",
+    "headlineLine1": "Nagrywasz to.",
+    "headlineLine2Pre": "Bierzemy to",
+    "headlineLine2Highlight": "globalny.",
+    "intro": "Po nagraniu odcinka SignalBoost zajmie się całą resztą — natywnym lektorem w 5 językach, napisami, klipami społecznościowymi, stroną internetową programu i recenzjami słuchaczy.",
+    "note": "Nie zajmujemy się edycją sprzętową ani surowego dźwięku — po prostu przynieś nam ukończony odcinek.",
+    "ctaPlans": "Zobacz plany podcastów",
+    "ctaHow": "Jak to działa"
+  },
+  "promoteBusiness": "Promuj biznes",
+  "generateAudio": "Generuj dźwięk",
+  "testimonials": {
+    "eyebrow": "Referencje",
+    "heading": "Klienci czują mniej bałaganu i większą kontrolę."
+  },
+  "studio": {
+    "catalog": {
+      "aria": "Katalog usług Universal Media Hub",
+      "eyebrow": "Uniwersalne centrum multimedialne",
+      "title": "Wybierz dokładnie taki wynik, jaki chcesz.",
+      "subtitle": "Studio odzwierciedla teraz taksonomię strony głównej: dziewięć usług i bezpłatnych narzędzi pogrupowanych według rzeczywistych celów, a COS Core v1 po cichu przygotowuje wersje robocze do czasu zatwierdzenia kolejnego kroku finansowego."
+    }
+  },
+  "services": {
+    "kicker": "Usługa SignalBoost",
+    "comparePricing": "Porównaj ceny",
+    "workflow": "Przebieg pracy z przewodnikiem",
+    "inputs": "Wejścia",
+    "urlInput": "Wprowadzanie adresu URL",
+    "uploadInput": "Prześlij dane wejściowe",
+    "briefInput": "Krótkie",
+    "briefPlaceholder": "Opisz cel, odbiorców, ofertę i preferowany ton.",
+    "aiSuggestions": "Sugestie AI",
+    "resultsPanel": "Panel wyników",
+    "resultsTitle": "Co przygotowuje SignalBoost",
+    "generateResults": "Generuj wyniki",
+    "viewLanding": "Zobacz stronę docelową"
   }
 }

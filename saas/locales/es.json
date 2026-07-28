@@ -658,7 +658,8 @@
       "warning": "Más del 80 % usado. Considera mejorar tu plan.",
       "limitReached": "Se alcanzó el límite de créditos.",
       "autoTopup": "La recarga automática añadirá más créditos."
-    }
+    },
+    "packs": "Paquete de inicio: 50 créditos = $15 · Paquete profesional: 200 créditos = $50."
   },
   "reset": "Restablecer",
   "trust": {
@@ -3375,61 +3376,669 @@
     "u_1f6fa6f69d185e60": " mín."
   },
   "lab": {
-    "somethingWrong": "Algo salió mal"
+    "somethingWrong": "Algo salió mal",
+    "license": {
+      "restricted": "Rights-restricted",
+      "public": "Dominio público",
+      "embeddable": "Integrable libremente"
+    },
+    "videoSynthesis": "VIDEO_SYNTHESIS_UNIT",
+    "motionPrompt": "MOTION_PROMPT",
+    "videoPrompt": "VIDEO_PROMPT",
+    "aspectRatio": "ASPECT_RATIO",
+    "videoCredits": "VIDEO_CREDITS",
+    "runPrompt": "RUN_PROMPT",
+    "agentReasoning": "AGENT_REASONING",
+    "warnConstraints": "WARN_CONSTRAINTS",
+    "generatedMatrix": "GENERATED_MATRIX",
+    "nodesDetected": "NODES_DETECTED",
+    "restrictedNode": "RESTRICTED_NODE",
+    "synthesisCore": "SYNTHESIS_CONTAINMENT_CORE",
+    "coreScope": "CORE_SCOPE",
+    "targetProjectId": "TARGET_PROJECT_ID",
+    "recipeTemplates": "RECIPE_TEMPLATES",
+    "pipelineStaging": "PIPELINE_STAGING",
+    "purgeAll": "PURGE_ALL",
+    "captionInfo": {
+      "title": "LAB_DIAGNOSTICS: CAPTION_AUTOMATION",
+      "description": "La IA transcribirá el audio original (detectando el idioma hablado automáticamente), luego traducirá la transcripción a los idiomas elegidos y generará archivos de subtítulos (SRT, VTT, ASS) que puede descargar y usar en cualquier lugar."
+    },
+    "generateSubtitles": "Genera subtítulos en 5 idiomas",
+    "openOriginal": "Abrir original en",
+    "genFailed": "La generación fracasó. Su crédito fue reembolsado.",
+    "needImage": "Primero adjunte una imagen (use el botón 📎 o pegue una).",
+    "textToVideo": "TEXTO → VÍDEO",
+    "imageToVideo": "IMAGEN → VÍDEO",
+    "usingImage": "Usando imagen adjunta",
+    "attachImagePrompt": "Adjunte una imagen arriba (📎 o péguela) para animarla.",
+    "motionPlaceholder": "Describe el movimiento, p.e. \"Acercamiento cinematográfico lento, movimiento suave de la cámara\"",
+    "promptPlaceholder": "Describe el vídeo que deseas generar...",
+    "renderingNote": "Renderizar su vídeo: esto suele tardar entre 2 y 4 minutos. Puedes seguir trabajando; Aparecerá aquí cuando esté listo.",
+    "downloadVideo": "DESCARGAR VÍDEO",
+    "submitting": "ENVIANDO...",
+    "rendering": "RENDERIZANDO...",
+    "generateAnother": "GENERAR OTRO",
+    "generateVideo": "GENERAR VÍDEO",
+    "credit": "credito",
+    "defaultProject": "mi proyecto",
+    "evaluating": "Evaluando restricciones neuronales...",
+    "searchFailed": "La búsqueda falló",
+    "suggestion1": "Último gol de Pelé",
+    "suggestion2": "Alunizaje 1969",
+    "suggestion3": "Discurso de Churchill sobre la Segunda Guerra Mundial",
+    "suggestion4": "Crear anuncio de podcast en español",
+    "suggestion5": "Caída del Muro de Berlín 1989",
+    "suggestion6": "Crear promoción de TikTok",
+    "status": "SIGNALBOOST_FOUNDRY // ESTADO",
+    "online": "EN LÍNEA",
+    "compute": "COMPUTAR",
+    "active": "ACTIVO",
+    "title": "CORE_ENGINE // El laboratorio",
+    "subtitle": "Parámetros de síntesis: análisis de metraje, transmisión de avatar generativo, orquestación de doblaje de audio.",
+    "placeholder": "Consulta de inyección... por ejemplo, \"crea un anuncio de los años 30 en español\" o \"muéstrame el último gol de Pelé\"",
+    "attach": "ADJUNTAR",
+    "abort": "ABORTAR",
+    "compiling": "COMPILANDO...",
+    "pipeline": "TUBO",
+    "inject": "INYECTAR",
+    "awaitingDirectives": "A la espera de directivas rápidas algorítmicas. Las entradas de metraje transmitido desde nodos de archivo y nodos de avatar vectoriales se consolidarán aquí.",
+    "run": "CORRER"
   },
   "dash": {
     "preview": {
-      "close": "Cerrar"
-    }
+      "close": "Cerrar",
+      "updated": "Actualizado",
+      "thinking": "Pensando…",
+      "label": "Vista previa en vivo",
+      "quickActions": "Acciones rápidas",
+      "yourProjects": "Tus proyectos",
+      "createProject": "+ Crear proyecto",
+      "openProject": "Abrir proyecto",
+      "execute": "Ejecutar consulta",
+      "thinkingMsg": "SignalBoost está pensando...",
+      "openInBuilder": "Abrir en constructor →"
+    },
+    "actions": {
+      "website": {
+        "label": "construir un sitio web",
+        "subline": "Crea o edita tu presencia en línea"
+      },
+      "review": {
+        "label": "Recopilar reseñas",
+        "subline": "Obtenga comentarios y testimonios"
+      },
+      "podcast": {
+        "label": "Generar audio nativo",
+        "subline": "Crea contenido de voz en varios idiomas."
+      },
+      "video": {
+        "label": "Crear vídeos",
+        "subline": "Convierta el contenido en activos visuales"
+      }
+    },
+    "time": {
+      "ago": "hace",
+      "justNow": "Justo ahora"
+    },
+    "team": "equipo",
+    "stats": {
+      "min": "mín.",
+      "activeSites": "Sitios activos",
+      "projects": "Proyectos",
+      "audioGenerated": "Audio generado",
+      "videosCreated": "Vídeos creados"
+    },
+    "concierge": {
+      "title": "Conserjería SignalBoost",
+      "loading": "Cargando su espacio de trabajo y comprobando qué necesita atención.",
+      "welcome": "Bienvenido. Comience creando su primer proyecto o pregúntele a SignalBoost qué construir primero.",
+      "drafts": {
+        "many": "Tienes {count} borradores de proyectos. Abra uno y publíquelo cuando esté listo.",
+        "one": "Tienes 1 borrador de proyecto. Abra uno y publíquelo cuando esté listo."
+      },
+      "live": {
+        "many": "Tienes {count} proyectos activos. Siguiente paso: promocionar, recopilar reseñas o crear contenido.",
+        "one": "Tienes 1 proyecto en vivo. Siguiente paso: promocionar, recopilar reseñas o crear contenido."
+      },
+      "help": "¿Necesita ayuda para elegir el siguiente paso? Pregúntele a SignalBoost a continuación.",
+      "askNext": "Preguntar a continuación"
+    },
+    "prompts": {
+      "new": {
+        "p1": "¿Qué plan es el adecuado para mí?",
+        "p2": "¿Cómo construyo mi primer sitio web?",
+        "p3": "¿Qué idiomas admite?",
+        "p4": "¿Cómo funciona el plan gratuito?"
+      },
+      "returning": {
+        "p1": "¿Cómo agrego un nuevo idioma?",
+        "p2": "¿Cómo subo un episodio de podcast?",
+        "p3": "¿Cómo recopilo reseñas?",
+        "p4": "¿Cómo actualizo mi plan?"
+      }
+    },
+    "connectionError": "Tener problemas para conectarse. Por favor inténtalo de nuevo.",
+    "projectsTitleNamed": "Proyectos de {name}",
+    "projectsTitle": "Tus proyectos",
+    "upgrade": "Actualizar",
+    "loadingTeam": "Cargando equipo…",
+    "noProjects": "Aún no hay proyectos",
+    "noProjectsSub": "Crea tu primer proyecto arriba",
+    "feedback": "Comparta comentarios: cada mensaje ayuda a mejorar SignalBoost",
+    "sketch": {
+      "headlineFallback": "Tu titular aquí"
+    },
+    "prompt": {
+      "nextAction": "¿Qué debo hacer a continuación?"
+    },
+    "askPlaceholder": "Pregúntale a SignalBoost cualquier cosa..."
   },
   "onboarding": {
     "confirm": {
-      "tone": "Tono"
+      "tone": "Tono",
+      "role": "Rol",
+      "saving": "Guardando…",
+      "heading": "Confirma tu configuración personalizada.",
+      "intro": "Revise el resumen de incorporación antes de abrir su panel. Sus elecciones se almacenan en la configuración del perfil y Apprentice Workshop las utiliza.",
+      "itLevel": "nivel de TI",
+      "notSelected": "No seleccionado",
+      "consent": "Consentimiento de entrenamiento de IA",
+      "granted": "Concedido",
+      "notGranted": "No concedido",
+      "previewLabel": "Vista previa del taller de aprendices",
+      "previewAdvanced": "Verá rutas técnicas, diagnósticos y comprobaciones de implementación más rápidos.",
+      "previewIntermediate": "Verá una guía equilibrada con atajos configurables.",
+      "previewBeginner": "Verá lecciones, definiciones y valores predeterminados seguros para principiantes.",
+      "editTone": "← Editar tono",
+      "complete": "Incorporación completa →"
+    },
+    "common": {
+      "continue": "Continuar →",
+      "back": "← Volver"
+    },
+    "roles": {
+      "developer": {
+        "title": "Desarrollador"
+      },
+      "non_developer": {
+        "title": "Non-developer"
+      }
+    },
+    "loading": "Cargando incorporación…",
+    "skip": "Saltar al panel →",
+    "progressComplete": "{pct}% completado",
+    "welcome": {
+      "title": "Bienvenido, {name}. Construya más rápido con una configuración más inteligente.",
+      "intro": "SignalBoost adaptará la guía de Apprentice Workshop, el tono de IA y los valores predeterminados del producto a partir de cuatro preferencias rápidas. Cada elección se puede cambiar más adelante en la configuración.",
+      "storyboardLabel": "Guión gráfico",
+      "storyboardBody": "Bienvenido → perfila tu nivel de habilidad → elige consentimiento de privacidad → elige el tono del asistente → confirma tu configuración.",
+      "start": "Empezar a incorporarse →"
+    },
+    "profiling": {
+      "heading": "Ayúdanos a adaptar el Taller de Aprendices.",
+      "intro": "Elija la ruta que mejor se adapte a cómo desea que SignalBoost explique la configuración, los paneles y las decisiones técnicas.",
+      "itComfort": "Nivel de comodidad de TI"
+    },
+    "consent": {
+      "heading": "Elija su preferencia de entrenamiento de IA.",
+      "intro": "El consentimiento es opcional y no está marcado de forma predeterminada. SignalBoost aún puede personalizar su cuenta sin utilizar sus datos para el entrenamiento de IA.",
+      "checkboxLabel": "Doy mi consentimiento para que SignalBoost utilice mis preferencias de incorporación para mejorar la capacitación en IA.",
+      "checkboxBody": "Almacenamos esta preferencia con una marca de tiempo, proporcionamos controles de exclusión voluntaria más adelante y evitamos vender datos personales.",
+      "save": "Guardar consentimiento →",
+      "continueWithout": "Continuar sin consentimiento →"
+    },
+    "tone": {
+      "heading": "Elige el tono de tu asistente.",
+      "intro": "Esta preferencia lo acompaña en la generación de contenido, la copia de soporte y las explicaciones del Apprentice Workshop."
     }
   },
   "podcasters_page": {
     "plans": {
       "indie": {
-        "cta": "Comenzar"
+        "cta": "Comenzar",
+        "name": "Independiente",
+        "description": "Perfecto para podcasters independientes que se inician a nivel mundial.",
+        "f1": "1 espectáculo",
+        "f2": "4 episodios por mes",
+        "f3": "2 idiomas",
+        "f4": "Voz en off nativa de IA",
+        "f5": "Subtítulos en 2 idiomas",
+        "f6": "Generación de clips básica",
+        "f7": "sitio web de podcasts",
+        "f8": "Reseñas de oyentes"
       },
       "pro": {
-        "cta": "Comenzar"
+        "cta": "Comenzar",
+        "name": "profesional",
+        "description": "Para podcasters serios que desean un alcance global.",
+        "f1": "3 espectáculos",
+        "f2": "Episodios ilimitados",
+        "f3": "Los 5 idiomas",
+        "f4": "Voz en off nativa de IA",
+        "f5": "Subtítulos en los 5 idiomas",
+        "f6": "Fábrica de clips",
+        "f7": "Sitio web de podcasts en varios idiomas",
+        "f8": "Analítica"
+      },
+      "network": {
+        "name": "Red",
+        "description": "Para redes de podcasts que gestionan múltiples programas.",
+        "f1": "Espectáculos ilimitados",
+        "f2": "Episodios ilimitados",
+        "f3": "Todos los idiomas más personalizados",
+        "f4": "Procesamiento dedicado",
+        "f5": "Formatos de subtítulos personalizados",
+        "f6": "Sitio web de marca blanca",
+        "f7": "Acceso API",
+        "f8": "Gerente de cuenta dedicado",
+        "cta": "Contáctenos"
       }
-    }
+    },
+    "mostPopular": "mas popular",
+    "perMonth": "/mo",
+    "howTitle": "como funciona",
+    "plansTitle": "Planes de podcasts",
+    "plansSubtitle": "Bosqueja tu idea de forma gratuita con nuestro nivel de vista previa y luego elige un plan de podcast cuando estés listo para publicar."
   },
   "pricing_page": {
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "errorGeneric": "Algo salió mal."
   },
   "concierge": {
-    "send": "Enviar"
+    "send": "Enviar",
+    "thinking": "Pensando...",
+    "attach": "Adjuntar archivos",
+    "utilityOffer": "Identifiqué oportunidades de optimización en su URL. ¿Le gustaría que nuestro estudio de medios (COS Core v1) creara automáticamente una campaña de video para impulsar su conversión por solo 10 créditos?",
+    "greeting": "Hola, soy el conserje de SignalBoost. Pregúntame sobre tu espacio de trabajo o abre Preguntas frecuentes, soporte y documentos a continuación.",
+    "assetReady": "Su activo COS Core v1 está listo. Revíselo en la tarjeta de aprobación financiera de Studio antes del lanzamiento:",
+    "assetReadyCta": "Abrir tarjeta de aprobación",
+    "fallback": "No pude crear una respuesta.",
+    "connectionError": "Problema de conexión. Por favor inténtalo de nuevo.",
+    "button": "✨ Conserje",
+    "title": "✨ Conserje",
+    "dropHere": "Soltar archivos para adjuntar",
+    "dropHint": "Imágenes, archivos PDF o texto: hasta 10 MB cada uno",
+    "close": "Contraer muelle de conserjería",
+    "removeFile": "Eliminar archivo",
+    "placeholder": "Pregunta cualquier cosa..."
   },
   "topbar": {
     "credits": "créditos",
-    "account": "Cuenta"
+    "account": "Cuenta",
+    "credit": "credito"
   },
   "console": {
     "deploy": {
       "heading": "Despliegues",
-      "deployment": "Despliegue"
+      "deployment": "Despliegue",
+      "refresh": "↻ Actualizar",
+      "created": "Creado",
+      "err": {
+        "load": "No se pudieron cargar las implementaciones",
+        "loading": "Error al cargar implementaciones"
+      },
+      "rollbackVerb": "Retroceder a",
+      "cancelVerb": "Cancelar compilación",
+      "rollbackTail": "Esto lo promueve nuevamente a producción.",
+      "cancelTail": "Esto aborta la compilación en ejecución.",
+      "rollbackDone": "Reversión completa",
+      "cancelDone": "Construcción cancelada",
+      "failedAction": "No se pudo",
+      "errorDuring": "Error durante",
+      "headingRollback": "Implementación de reversión",
+      "headingCancel": "Cancelar compilación",
+      "subRollback": "Elija una implementación LISTO anterior para promover el regreso a producción.",
+      "subCancel": "Cancelar una compilación en curso (CONSTRUYENDO, EN COLA o INICIALIZANDO).",
+      "sub": "Historial y estado de implementación reciente de Vercel.",
+      "loading": "Cargando implementaciones...",
+      "empty": "No se encontraron implementaciones",
+      "current": "ACTUAL",
+      "by": "por",
+      "promoting": "Promoviendo…",
+      "rollbackThis": "↩️ Volver a esto",
+      "currentTarget": "🔒 objetivo de producción actual",
+      "onlyReady": "Solo se pueden promocionar implementaciones READY",
+      "canceling": "Cancelando…",
+      "cancelBuild": "🛑 Cancelar compilación",
+      "notInProgress": "No en progreso, no hay nada que cancelar",
+      "liveUrl": "URL activa",
+      "gitCommit": "Confirmación de Git",
+      "deploymentId": "ID de implementación",
+      "aliases": "Alias",
+      "inspector": "📊 Ver detalles de implementación en Inspector →",
+      "justNow": "justo ahora",
+      "minAgo": "hace m",
+      "hourAgo": "hace h",
+      "dayAgo": "hace d"
     },
     "providerHealth": {
       "open": "Abierto",
       "environment": "Entorno",
       "provider": "Proveedor",
-      "severity": "Gravedad"
+      "severity": "Gravedad",
+      "monitor": "monitor 3",
+      "critical": "Crítico",
+      "lastChecked": "Última comprobación:",
+      "title": "Salud del proveedor",
+      "subtitle": "Provider Health ahora está dividido en monitores de salud más pequeños para que las tarjetas permanezcan visibles y tranquilas.",
+      "statusCards": "Tarjetas de estado de proveedor",
+      "issues": "Problemas y alertas",
+      "issuesDesc": "Solo alertas para esta página de monitor más pequeña.",
+      "noAlerts": "No hay alertas esenciales para este monitor de salud.",
+      "alertDetail": "Detalle de alerta",
+      "impact": "Impacto",
+      "fix": "Solución recomendada",
+      "selectAlert": "Seleccione una alerta para inspeccionar los detalles."
     },
     "webhooks": {
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "title": "Webhooks",
+      "urlLabel": "Webhook URL",
+      "eventPlural": "eventos",
+      "created": "Creado",
+      "err": {
+        "load": "No se pudieron cargar los webhooks",
+        "loading": "Error al cargar webhooks",
+        "required": "Se requiere URL y al menos un evento",
+        "create": "No se pudo crear el webhook",
+        "creating": "Error al crear webhook",
+        "delete": "No se pudo eliminar el webhook",
+        "deleting": "Error al eliminar el webhook",
+        "testing": "Error al probar el webhook"
+      },
+      "confirmDelete": "¿Eliminar este webhook?",
+      "testSuccess": "Prueba exitosa",
+      "testFailed": "Prueba fallida",
+      "subtitle": "Enrutar eventos de bóveda a sistemas externos a través de webhooks HTTP",
+      "newWebhook": "Nuevo webhook",
+      "eventsLabel": "Eventos para suscribirse",
+      "create": "Crear webhook",
+      "add": "+ Agregar webhook",
+      "loading": "Cargando webhooks...",
+      "empty": "No hay webhooks configurados",
+      "eventSingular": "evento",
+      "failures": "Fallos:",
+      "subscribedEvents": "Eventos suscritos",
+      "lastFired": "último despedido",
+      "never": "nunca",
+      "test": "prueba"
+    },
+    "users": {
+      "roleLabel": "Rol",
+      "err": {
+        "load": "No se pudieron cargar los usuarios",
+        "loading": "Error al cargar usuarios",
+        "emailRequired": "Correo electrónico requerido",
+        "invite": "No se pudo invitar al usuario",
+        "inviting": "Error al invitar al usuario",
+        "role": "No se pudo actualizar el rol",
+        "updatingRole": "Error al actualizar el rol",
+        "remove": "No se pudo eliminar el usuario",
+        "removing": "Error al eliminar usuario"
+      },
+      "confirmRemove": "¿Eliminar a este usuario del espacio de trabajo?",
+      "title": "Miembros del equipo",
+      "subtitle": "Administrar el acceso al espacio de trabajo y los roles de usuario",
+      "inviteTitle": "Invitar a miembro del equipo",
+      "emailLabel": "Dirección de correo electrónico",
+      "sendInvite": "Enviar invitación",
+      "inviteMember": "+ Invitar miembro",
+      "loading": "Cargando miembros del equipo...",
+      "empty": "Aún no hay miembros del equipo",
+      "ownerLocked": "El rol de propietario no se puede cambiar",
+      "permissions": "Permisos",
+      "joined": "Se unió",
+      "lastLogin": "Último inicio de sesión",
+      "never": "nunca",
+      "removeUser": "Eliminar usuario"
+    },
+    "rail": {
+      "tagline": "Control de comando",
+      "subtitle": "Sepa lo que está roto. Sepa qué arreglar a continuación.",
+      "planned": "Espacio de trabajo planificado"
+    },
+    "aiOps": {
+      "title": "Centro de operaciones de IA",
+      "subtitle": "Un trabajo: decirle al propietario qué arreglar primero en términos de estado, seguridad, costo y configuración.",
+      "recommended": "Acciones recomendadas"
+    },
+    "auditLog": {
+      "title": "Registro de auditoría",
+      "subtitle": "Un trabajo: mostrar qué cambió, quién lo cambió y cuándo.",
+      "recent": "Actividad reciente"
+    },
+    "securityAlerts": {
+      "title": "Alertas de seguridad",
+      "subtitle": "Un trabajo: mostrar qué es peligroso y qué se debe solucionar primero.",
+      "findings": "Abrir hallazgos de seguridad"
+    },
+    "setup": {
+      "title": "Centro de configuración",
+      "subtitle": "Un trabajo: guiar a los usuarios no técnicos a través de la conexión y configuración del proveedor.",
+      "checklist": "Lista de verificación de configuración"
+    },
+    "team": {
+      "title": "Equipo y acceso",
+      "subtitle": "Un trabajo: mostrar quién puede ver o cambiar el centro de mando.",
+      "roles": "Funciones de acceso"
+    },
+    "usageCost": {
+      "title": "Uso y costo",
+      "subtitle": "Un trabajo: mostrar los gastos, los aumentos de uso y los riesgos de costos antes de que las facturas sorprendan al propietario.",
+      "signals": "Señales de uso del proveedor"
     }
   },
   "common": {
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "enabled": "Habilitado",
+    "ready": "Listo"
   },
   "vault": {
     "mfa": {
       "method": {
-        "email": "Correo"
-      }
+        "email": "Correo",
+        "sms": "SMS",
+        "totp": "Aplicación de autenticación",
+        "totpDesc": "Utilice su aplicación de autenticación",
+        "emailDesc": "Código enviado a tu correo electrónico.",
+        "smsDesc": "Código enviado a tu teléfono"
+      },
+      "op": {
+        "rotation": "Rotar esta credencial",
+        "revocation": "Revocar esta credencial",
+        "export": "Exportar esta credencial"
+      },
+      "invalidLength": "Introduce un código válido",
+      "invalid": "Código no válido. Por favor inténtalo de nuevo.",
+      "failed": "La verificación falló",
+      "eyebrow": "Verificación de seguridad",
+      "title": "Verifique su identidad",
+      "enterCode": "Ingrese el código de 6 dígitos",
+      "verifying": "Verificando...",
+      "verify": "verificar",
+      "success": "Verificado con éxito",
+      "proceeding": "Continuando con la operación..."
     }
+  },
+  "promote_page": {
+    "preview": {
+      "title": "Vista previa de la campaña"
+    },
+    "badge": "Promocionar mi negocio",
+    "title": "Crear una campaña completa",
+    "subtitle": "Analiza una fuente, revisa el resumen estructurado y aprobalo para crear la campaña."
+  },
+  "wireframes": {
+    "viewPricing": "Ver precios",
+    "unifiedAria": "Vista previa de estructura alámbrica del panel de SaaS unificado",
+    "sidebarAria": "Navegación del módulo SaaS",
+    "i18nStatus": "i18n en línea: EN · ES · PT · PL · RU",
+    "kicker": "Estructuras alámbricas de cabina SaaS",
+    "title": "Consola de cabina para servicios de oficina y flujos de trabajo de asistente",
+    "subtitle": "Un sistema de tablero responsivo con tarjetas de telemetría, navegación fácil de usar con teclado, paneles de vidrio y vistas previas de módulos listos para su aprobación antes de la codificación de producción.",
+    "jumpPricing": "Saltar a vista previa de precios",
+    "telemetryAria": "Tarjetas de telemetría unificadas",
+    "modulesAria": "Vistas previas de la estructura alámbrica del módulo",
+    "openDashboard": "Abrir panel",
+    "previewKicker": "Vista previa de imágenes",
+    "previewTitle": "Exportaciones de imágenes de estructura alámbrica",
+    "previewAlt": "Vista previa de estructura alámbrica",
+    "pricing": {
+      "kicker": "Integración de precios",
+      "title": "Paneles del plan SignalBoost",
+      "description": "Las tarjetas de precios utilizan el mismo estilo de consola y dirigen a los usuarios directamente a cada módulo del espacio de trabajo."
+    }
+  },
+  "faq": {
+    "categories": {
+      "all": "Todos"
+    },
+    "kicker": "Centro de ayuda",
+    "title": "Preguntas frecuentes",
+    "search": "Preguntas de búsqueda...",
+    "empty": "Ninguna respuesta coincidió con su búsqueda."
+  },
+  "support": {
+    "contact": "Contactar con soporte",
+    "documentation": "Documentación",
+    "faq": "Preguntas frecuentes",
+    "details": "Detalles",
+    "help": "Ayuda",
+    "defaultSubject": "Solicitud de soporte de SignalBoost",
+    "kicker": "Flujo de trabajo de soporte",
+    "title": "¿Cómo podemos ayudar?",
+    "subtitle": "Comience con preguntas frecuentes o documentación, luego envíe una solicitud de soporte localizada con el contexto que necesitamos.",
+    "faqDesc": "Busque respuestas primero.",
+    "docsDesc": "Leer guías de productos.",
+    "email": "Soporte por correo electrónico",
+    "topic": "Tema",
+    "topicPlaceholder": "Facturación, publicación web, reseñas, audio...",
+    "detailsPlaceholder": "Cuéntanos qué pasó, qué esperabas y la página donde estabas trabajando.",
+    "send": "Abrir solicitud de correo electrónico"
+  },
+  "auth": {
+    "errorNoName": "Por favor ingrese su nombre.",
+    "passwordPlaceholder": "Contraseña",
+    "errorEmailExists": "Ya existe una cuenta con este correo electrónico. En su lugar, inicie sesión.",
+    "checkEmail": "¡Revisa tu correo electrónico para confirmar tu cuenta!",
+    "welcomeBack": "Bienvenido de nuevo",
+    "createAccount": "Crea tu cuenta gratuita",
+    "continueGoogle": "Continuar con Google",
+    "continueGitHub": "Continuar con GitHub",
+    "or": "o",
+    "namePlaceholder": "Tu nombre completo",
+    "emailPlaceholder": "Dirección de correo electrónico",
+    "freePlanNote": "Comenzará con el plan gratuito: dibuje un sitio web en un idioma con una marca de agua. Actualice en cualquier momento para publicar de verdad.",
+    "pleaseWait": "Por favor espera...",
+    "logIn": "Iniciar sesión",
+    "createFreeAccount": "Crear cuenta gratis",
+    "noAccount": "¿No tienes una cuenta?",
+    "signUpFree": "Regístrate gratis",
+    "haveAccount": "¿Ya tienes una cuenta?",
+    "logInLink": "Iniciar sesión"
+  },
+  "dashboard": "Panel de control",
+  "marketingSalesCosa": "Marketing y Ventas COSA",
+  "buildWebsite": "construir un sitio web",
+  "collectReviews": "Recopilar reseñas",
+  "createVideos": "Crear vídeos",
+  "team": {
+    "remove": "Quitar",
+    "inviteSent": "¡Invitación enviada!",
+    "teamSeats": "Asientos de equipo",
+    "used": "usado",
+    "planSuffix": "planear",
+    "seatLimitReached": "Se alcanzó el límite de asientos. Actualice para agregar más miembros al equipo.",
+    "upgrade": "Actualizar",
+    "emailPlaceholder": "teammate@email.com",
+    "sending": "Enviando...",
+    "invite": "invitar",
+    "noMembers": "Aún no hay miembros del equipo. Invita a alguien arriba."
+  },
+  "orchestration": {
+    "confidence": "confianza",
+    "kicker": "Orquestación de IA",
+    "title": "Enrutar la siguiente acción automáticamente",
+    "subtitle": "SignalBoost conecta el siguiente mejor paso en cada espacio de trabajo.",
+    "openRoute": "Módulo enrutado abierto",
+    "inputLabel": "Describe el resultado",
+    "placeholder": "Ejemplo: mejorar el SEO de mi sitio web y crear activos de campaña de seguimiento",
+    "run": "Ejecutar orquestación",
+    "intentRouter": "Enrutador de intención",
+    "memory": "Capa de memoria",
+    "operatorFallback": "Ruta de revisión humana",
+    "telemetry": "Telemetria"
+  },
+  "featuresFlow": {
+    "eyebrow": "Flujo guiado",
+    "heading": "De idea desordenada a campaña aprobada."
+  },
+  "podcastSection": {
+    "f1": {
+      "title": "Suena como un local",
+      "desc": "Convertimos su episodio a audio nativo en portugués, español, polaco y ruso. No subtítulos, voces reales."
+    },
+    "f2": {
+      "title": "Hazte viral en 5 idiomas",
+      "desc": "Genera automáticamente clips cortos para TikTok, Reels y YouTube Shorts de cada episodio, en todos tus idiomas."
+    },
+    "f3": {
+      "title": "Subtítulos en todos los idiomas",
+      "desc": "Genere automáticamente subtítulos y subtítulos para sus videos, grabados en archivos separados o en ellos. Perfecto para desplazadores silenciosos."
+    },
+    "f4": {
+      "title": "Tu programa, tu sitio",
+      "desc": "Un sitio web de podcasts personalizado con reproductor de episodios, notas de programas multilingües y reseñas de oyentes."
+    },
+    "f5": {
+      "title": "Construye tu comunidad",
+      "desc": "Recopile reseñas y testimonios de oyentes en su idioma nativo. Muéstrale al mundo que tu audiencia te ama."
+    },
+    "podcaster1": {
+      "reach": "190 millones de oyentes"
+    },
+    "podcaster2": {
+      "reach": "#1 en Brasil"
+    },
+    "podcaster3": {
+      "reach": "Arriba LATAM"
+    },
+    "badge": "Para podcasters",
+    "headlineLine1": "Lo grabas.",
+    "headlineLine2Pre": "lo tomamos",
+    "headlineLine2Highlight": "globales.",
+    "intro": "Una vez que se graba su episodio, SignalBoost se encarga de todo lo demás: voz en off nativa en 5 idiomas, subtítulos, clips sociales, el sitio web de su programa y reseñas de los oyentes.",
+    "note": "No realizamos edición de hardware ni de audio sin procesar, solo tráiganos su episodio terminado.",
+    "ctaPlans": "Ver planes de podcasts",
+    "ctaHow": "como funciona"
+  },
+  "promoteBusiness": "promover negocios",
+  "generateAudio": "generar audio",
+  "testimonials": {
+    "eyebrow": "Testimonios",
+    "heading": "Los clientes sienten menos desorden y más control."
+  },
+  "studio": {
+    "catalog": {
+      "aria": "Catálogo de servicios de Universal Media Hub",
+      "eyebrow": "Centro de medios universal",
+      "title": "Elija el resultado exacto que desea.",
+      "subtitle": "Studio ahora refleja la taxonomía de la página de inicio: nueve servicios y utilidades gratuitas agrupados por intención real, con COS Core v1 preparando borradores en silencio hasta que usted apruebe el siguiente paso financiero."
+    }
+  },
+  "services": {
+    "kicker": "Servicio SignalBoost",
+    "comparePricing": "Comparar precios",
+    "workflow": "Flujo de trabajo guiado",
+    "inputs": "Entradas",
+    "urlInput": "entrada de URL",
+    "uploadInput": "Cargar entrada",
+    "briefInput": "Breve",
+    "briefPlaceholder": "Describe el objetivo, la audiencia, la oferta y el tono preferido.",
+    "aiSuggestions": "sugerencias de IA",
+    "resultsPanel": "Panel de resultados",
+    "resultsTitle": "Lo que prepara SignalBoost",
+    "generateResults": "Generar resultados",
+    "viewLanding": "Ver página de destino"
   }
 }

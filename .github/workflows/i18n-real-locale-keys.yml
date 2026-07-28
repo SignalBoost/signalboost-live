@@ -75,13 +75,29 @@ jobs:
             locale-key-stat.txt
           if-no-files-found: warn
       - name: Commit validated migration
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          set -o pipefail
           git config user.name 'SignalBoost Automation'
           git config user.email 'actions@users.noreply.github.com'
           git add saas
           if git diff --cached --quiet; then
-            echo 'No migration changes remain.'
+            echo 'No migration changes remain.' | tee ../push.log
           else
             git commit -m 'fix(i18n): move page copy into real locale keys'
-            git push origin HEAD:fix/i18n-real-locale-keys
+            git format-patch --stdout "${EXPECTED_HEAD}..HEAD" > ../validated-i18n.patch
+            git bundle create ../validated-i18n.bundle HEAD "^${EXPECTED_HEAD}"
+            git fetch origin fix/i18n-real-locale-keys
+            git push --verbose --force-with-lease="refs/heads/fix/i18n-real-locale-keys:${EXPECTED_HEAD}" origin HEAD:refs/heads/fix/i18n-real-locale-keys 2>&1 | tee ../push.log
           fi
+      - name: Upload validated commit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-validated-commit
+          path: |
+            push.log
+            validated-i18n.patch
+            validated-i18n.bundle
+          if-no-files-found: warn

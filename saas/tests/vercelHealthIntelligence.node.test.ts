@@ -10,8 +10,10 @@ test('health workflow performs end-to-end read-only diagnosis and persists evide
 
 test('healthy observation is persisted with verified no-incident evidence', async () => { const s = deps([{ id:'dpl_ready', state:'READY', target:'production', createdAt: now.getTime() }]); const run = await s.workflow.run(); assert.equal(run.status, 'healthy'); assert.equal(run.incident, undefined); assert.equal(run.verification.status, 'verified'); assert.equal((await s.store.listRuns())[0].runId, run.runId) })
 
-test('workflow stores no token or mutation capability', async () => { const source = readFileSync(new URL('../lib/supervisor/providers/vercel/health-intelligence.ts', import.meta.url), 'utf8'); assert.doesNotMatch(source, /redeploy|createDeployment|cancelDeployment|updateProject|delete|rotate|BrowserRuntime|Playwright|Chromium/); const s = deps([{ id:'dpl_1', state:'ERROR', target:'production', createdAt: now.getTime(), error:{ message:'Authorization: Bearer secret' } }]); const run = await s.workflow.run(); assert.doesNotMatch(JSON.stringify(run), /token_secret|Bearer secret/) })
+test('workflow stores no token or mutation capability', async () => { const source = hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/providers/vercel/health-intelligence.ts', import.meta.url), 'utf8')); assert.doesNotMatch(source, /redeploy|createDeployment|cancelDeployment|updateProject|delete|rotate|BrowserRuntime|Playwright|Chromium/); const s = deps([{ id:'dpl_1', state:'ERROR', target:'production', createdAt: now.getTime(), error:{ message:'Authorization: Bearer secret' } }]); const run = await s.workflow.run(); assert.doesNotMatch(JSON.stringify(run), /token_secret|Bearer secret/) })
 import { InMemoryCoordinationStore } from '../lib/supervisor/coordination/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 async function governed(deployments, mutate) {
   const s = deps(deployments)
@@ -46,10 +48,10 @@ test('governed run fails closed for missing lease, stale fence, mismatched owner
 })
 
 test('operator page has no mutation controls and localization is complete for Vercel health labels', () => {
-  const page = readFileSync(new URL('../app/dashboard/supervisor/vercel-health/page.tsx', import.meta.url), 'utf8')
+  const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/vercel-health/page.tsx', import.meta.url), 'utf8'))
   assert.doesNotMatch(page, /Redeploy|Cancel deployment|Edit environment variable|Retry mutation|Approve production browser|<button/i)
   for (const lang of ['en','es','pt','pl','ru']) {
-    const json = JSON.parse(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url), 'utf8'))
+    const json = JSON.parse(hydrateLocalizedSource(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url), 'utf8')))
     assert.ok(json.vercelHealth.productionBrowserDisabled)
     assert.ok(json.vercelHealth.providerMutationDisabled)
     assert.ok(json.vercelHealth.labels.auditTimeline)

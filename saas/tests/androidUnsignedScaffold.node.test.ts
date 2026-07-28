@@ -5,6 +5,8 @@ import test from 'node:test'
 import { createUnsignedAndroidScaffold } from '../portable-mobile/android-scaffold.ts'
 import { createAndroidPackagingDescriptor } from '../portable-mobile/android-packaging.ts'
 import { providerHubAndroidPackaging } from '../portable-mobile/provider-hub.android.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('creates a deterministic unsigned Provider Hub TWA scaffold', () => {
   const first = createUnsignedAndroidScaffold(providerHubAndroidPackaging)
@@ -40,7 +42,7 @@ test('fails closed for Capacitor, signing, publication, and signed states', () =
 })
 
 test('scaffold planner has no filesystem, shell, network, signing, or submission capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/android-scaffold.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/android-scaffold.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ['node:fs', 'child_process', 'fetch(', 'exec(', 'spawn(', 'gradlew', 'bundleRelease', 'play console api']) {
     assert.equal(source.toLowerCase().includes(forbidden.toLowerCase()), false, `source must not contain ${forbidden}`)
   }

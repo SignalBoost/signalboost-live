@@ -5,6 +5,8 @@ import test from 'node:test'
 import { createAndroidBuildPlan } from '../portable-mobile/android-build-plan.ts'
 import { createUnsignedAndroidScaffold } from '../portable-mobile/android-scaffold.ts'
 import { providerHubAndroidPackaging } from '../portable-mobile/provider-hub.android.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('creates a deterministic non-executing Provider Hub Android build plan', () => {
   const scaffold = createUnsignedAndroidScaffold(providerHubAndroidPackaging)
@@ -37,7 +39,7 @@ test('fails closed for incomplete or unsafe scaffold state', () => {
 })
 
 test('build-plan source has no execution or mutation capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/android-build-plan.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/android-build-plan.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ["from 'node:child_process'", "from 'node:fs'", 'exec(', 'spawn(', 'fetch(', 'writeFile(', 'signingConfigs', 'playConsole']) {
     assert.equal(source.includes(forbidden), false, `build plan must not contain ${forbidden}`)
   }

@@ -712,5 +712,186 @@
       "approved": "Aprobado para el siguiente paso de Studio.",
       "revision": "Retenido para revisión en Studio."
     }
+  },
+  "generatedUi": {
+    "u_1dc83f605edf0ae2": "Monitoreo",
+    "u_920e413c7d411b61": "Estado",
+    "u_d31de1a5c5c8ba2a": "Navegador",
+    "u_ba3bbbe10d8bef66": "Cargando…",
+    "u_30e9a089397b25b0": "Campañas",
+    "u_c1c224b03cd9bc7b": "Administración",
+    "u_4b1b8aa3608a26da": "Propietario",
+    "u_969ccbd3cf6300ec": "Correo",
+    "u_19766ed6ccb2f4a3": "Cancelar",
+    "u_eebdd24a77d9ad32": "Confirmar",
+    "u_c4ebc6d4a5832cd9": "Alto",
+    "u_47bd29075f8b8019": "Contenido",
+    "u_8e588cd187741f1c": "Medio",
+    "u_c2c8b72e302ec730": "Tono",
+    "u_f6f4688ff23d50c6": "Enviar",
+    "u_0e76960093379060": "Historial",
+    "u_7d9eb7acb13e2462": "Cerrar",
+    "u_0e91610117029a62": "Actualizar",
+    "u_87b42e40c2a290e0": "Aprobado",
+    "u_47d2a515ef2f05b8": "Cargando...",
+    "u_2f343666aaa88c44": "Formato",
+    "u_268286d2ef7573e0": "Campaña",
+    "u_ab604a360777735f": "Rechazar",
+    "u_50ab62def34755ef": "Centro de ciberseguridad",
+    "u_369d154c24f90563": "Centro de auditoría",
+    "u_13d6ff07b8a5d792": "Repositorio",
+    "u_5e9f98120dbe5682": "Gravedad",
+    "u_e3bee02722edac7c": "Aprobado por humanos",
+    "u_aea4a04a80426ed8": "Rechazado",
+    "u_ed077f3d8125d60d": "Abierto",
+    "u_cec3a9b89b2e3913": "Datos",
+    "u_11a6767d5674c7e4": "Listo",
+    "u_cdbf6975e8a35b0d": "Objetivo",
+    "u_89b633adede66a05": "Analizando…",
+    "u_ce4683e7013a18cd": "Canal",
+    "u_dcba31525bd63b56": "Marketing + Ventas",
+    "u_6007acbe30b2cd98": "Aprobar",
+    "u_b5a229ac8becc603": "Sitio web",
+    "u_22965568d22a14ee": "Conectado",
+    "u_324b134f57c70c72": "Vista previa",
+    "u_c21ead0614e7e1b7": "Cerrado",
+    "u_d92c603b66e19cf6": "Se requiere acceso de administrador.",
+    "u_7e8cd2056da73a7f": "Título",
+    "u_6ccaa6415b5ee449": "Cuerpo",
+    "u_4637016c5e82d0d1": "Recolector de reseñas",
+    "u_e2d0a54968ead24e": "Eliminar",
+    "u_8de4e0ea7370e4e6": "Ventas",
+    "u_bddd837f1a0ce8ce": "Aún no hay datos.",
+    "u_dcd1d5223f73b3a9": "Nombre",
+    "u_526e0087cc3f254d": "Descripción",
+    "u_9859597853197476": "Proyecto",
+    "u_9e471951a1b4106e": "Entorno",
+    "u_870a8ffd98f4f2bd": "Despliegue",
+    "u_b753fe0c7acec513": "Pasos aprobados",
+    "u_03867aea70acaf4c": "Evidencia",
+    "u_7e1b0d5641f2640c": "Cuenta",
+    "u_1509f561f2416598": "Guardar",
+    "u_dfe95783edfef791": "Precios",
+    "u_0711a8d636e4c068": "Riesgo",
+    "u_b764cdc0eab71374": "Desconocido",
+    "u_8f6fb4eb7f42c0e2": "Seguridad",
+    "u_74a883a037bc227f": "Ajustes",
+    "u_fb9ef894175c3274": "Producto",
+    "u_3a78695388b38b5c": "Inicio",
+    "u_61e8d44ad423a4a0": "Comenzar",
+    "u_9296483909d17d1a": "Herramientas públicas",
+    "u_5976c17e6bbdd35e": "Revisión del sitio",
+    "u_5b5353420d2d5a74": "Control de seguridad",
+    "u_9df13ac00553006c": "Mejora tu sitio",
+    "u_068bb1a34377680c": "Estudio de campañas",
+    "u_358cc201f87d9dc9": "Operaciones",
+    "u_0aa91af2ec4c1fd7": "Estudio",
+    "u_095321ec675b9643": "Estudio de vídeo",
+    "u_23b2d5dae0a87cf9": "Ciberseguridad",
+    "u_c0c52c1e72197d6d": "Centro de auditoría",
+    "u_49616145514e9abf": "Cerrar sesión",
+    "u_4943e64e40762052": "Propietario/Admin",
+    "u_3cbf6d117f4dc1b5": "Centro de consola",
+    "u_f411a1fb62758b4c": "Gratis",
+    "u_ea2100dc89ae9fe2": "Registros",
+    "u_c1a070e0a89b1d41": "Cola de aprobaciones",
+    "u_be379a30f1aa05d1": "créditos",
+    "u_11dde17d6c3e2098": "Ilimitado",
+    "u_87bf2bc08589f0bd": "Voz",
+    "u_472590ae974d4c1f": "Proveedor",
+    "u_13a7c655a7d4213c": "Producción",
+    "u_51e716c2a48a766b": "Autoridad empresarial",
+    "u_7457215bf1064734": "Lidera con credibilidad, control operativo y valor de negocio medible.",
+    "u_75c419ef704f82fe": "Demostración de producto",
+    "u_988324fef9d35ba1": "Muestra el flujo del producto y lleva a la audiencia hacia un siguiente paso concreto.",
+    "u_19b761b533fb818c": "Campaña educativa",
+    "u_d93a8bc97280279f": "Enseña el problema y la solución con claridad antes de presentar la oferta.",
+    "u_3024d9fd1e6be7fd": "Sitio web o fuente de GitHub",
+    "u_3a59c0df4f617b9a": "COSA analiza esta fuente pública y propone un brief de campaña estructurado.",
+    "u_2bfac71b180af5fa": "Analizando fuente…",
+    "u_8db4b7da61625c04": "Analizar y rellenar",
+    "u_b15d4e7cbfbc6316": "Fuente analizada",
+    "u_d3a008ef1335692d": "Región",
+    "u_545c02357695a6ff": "Audiencia",
+    "u_c78ffe19571018fb": "Plataforma",
+    "u_2a8e278e97755982": "Tipo de oferta",
+    "u_0b28778c262112ff": "Estrategia de CTA",
+    "u_955fe28d6fc25bcd": "Dirección creativa",
+    "u_5968f960f77a58a8": "Creando campaña…",
+    "u_4189932d0b20e615": "Aprobar brief y crear campaña",
+    "u_b44484a0fa28c471": "Sector",
+    "u_a4fe65264ef7dbb3": "Idioma",
+    "u_daee7606b339f3c3": "Restablecer",
+    "u_27dd1507cc7aff4f": "Selecciona una o más opciones",
+    "u_fb1cbc38fb4060f4": "Selecciona una opción",
+    "u_a231ac201ef7c2ec": "https://ejemplo.com o https://github.com/org/repo",
+    "u_0d4f89f98ca0d154": "Analizar fuente",
+    "u_bf4768405082a5b7": "Generar nuevas opciones",
+    "u_8b925b14879ff054": "Listar Dominios",
+    "u_7f1e323b6272c620": "Saludable",
+    "u_b64ac05f17e64d03": "Activo",
+    "u_424a2551d356754c": "Caducado",
+    "u_85a39ab345d672ff": "Sí",
+    "u_8e16312c846c8068": "Editor de vídeo con subtítulos por IA",
+    "u_3a81e923b13cfadb": "Sube un vídeo, genera subtítulos sincronizados con IA, arrastra superposiciones con estilo en el lienzo y exporta el vídeo subtitulado.",
+    "u_cb9e8664edea8cf5": "Nivel"
+  },
+  "lab": {
+    "somethingWrong": "Algo salió mal"
+  },
+  "dash": {
+    "preview": {
+      "close": "Cerrar"
+    }
+  },
+  "onboarding": {
+    "confirm": {
+      "tone": "Tono"
+    }
+  },
+  "podcasters_page": {
+    "plans": {
+      "indie": {
+        "cta": "Comenzar"
+      },
+      "pro": {
+        "cta": "Comenzar"
+      }
+    }
+  },
+  "pricing_page": {
+    "loading": "Cargando..."
+  },
+  "concierge": {
+    "send": "Enviar"
+  },
+  "topbar": {
+    "credits": "créditos",
+    "account": "Cuenta"
+  },
+  "console": {
+    "deploy": {
+      "heading": "Despliegues",
+      "deployment": "Despliegue"
+    },
+    "providerHealth": {
+      "open": "Abierto",
+      "environment": "Entorno",
+      "provider": "Proveedor",
+      "severity": "Gravedad"
+    },
+    "webhooks": {
+      "delete": "Eliminar"
+    }
+  },
+  "common": {
+    "cancel": "Cancelar"
+  },
+  "vault": {
+    "mfa": {
+      "method": {
+        "email": "Correo"
+      }
+    }
   }
 }

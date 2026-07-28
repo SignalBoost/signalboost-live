@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 const BRAND = 'SignalBoost'
@@ -38,7 +37,7 @@ type FooterCopy = {
 
 const COPY: Record<Language, FooterCopy> = {
   en: {
-    product: uiCopy('u_f6c2a37d5674a049'), home: uiCopy('u_2742b68cb5e3034c'), pricing: uiCopy('u_c38bc5a996802a03'), repoCheck: uiCopy('u_3739e2a269f1a5da'), websiteOptimizer: uiCopy('u_fd3fc3d3742daa36'), dashboard: uiCopy('u_2419d769a0e4163d'), documentation: uiCopy('u_dafcf754def0fcf4'), faq: uiCopy('u_327ddb725f37432c'), podcasters: uiCopy('u_e69d9f4c10880709'), build: uiCopy('u_b1e7ecd0f0736d68'), buildWebsite: uiCopy('u_16546e3882337db2'), collectReviews: uiCopy('u_5505ded130cfe875'), generateNativeAudio: uiCopy('u_1f56f9863432a198'), createVideos: uiCopy('u_cae9c0a6ecb95397'), company: uiCopy('u_c549f87d7cbd312c'), about: uiCopy('u_46f2b33a8b5e778b'), partners: uiCopy('u_00d0874f2e403ad3'), privacy: uiCopy('u_9456f608b52bec8b'), contact: uiCopy('u_5d7961c2350d98b7'), nativeExperiences: uiCopy('u_065e388536138856'), poweredBy: uiCopy('u_1be3d77adb95e486'),
+    product: uiText('generatedUi.u_fb9ef894175c3274'), home: uiText('generatedUi.u_3a78695388b38b5c'), pricing: uiText('generatedUi.u_dfe95783edfef791'), repoCheck: uiText('generatedUi.u_8651dc793a5300ac'), websiteOptimizer: uiText('generatedUi.u_34c6e246583a97cc'), dashboard: uiText('generatedUi.u_67b696468610b879'), documentation: uiText('generatedUi.u_c205924de0fe636c'), faq: uiText('generatedUi.u_dbc468a14b601d5d'), podcasters: uiText('generatedUi.u_0d74ad5328bfdd35'), build: uiText('generatedUi.u_bdd254b65baac169'), buildWebsite: uiText('generatedUi.u_2572dc4557068313'), collectReviews: uiText('generatedUi.u_acb928c5ad0b574b'), generateNativeAudio: uiText('generatedUi.u_e6b4b7d5c4fa2d5b'), createVideos: uiText('generatedUi.u_e03e4252b1e8da4d'), company: uiText('generatedUi.u_de4743c879734dc3'), about: uiText('generatedUi.u_4efca0d10c5feb8e'), partners: uiText('generatedUi.u_5dab502bfba3c3df'), privacy: uiText('generatedUi.u_54a57c3147c49f33'), contact: uiText('generatedUi.u_2b5c3d26721ae9c3'), nativeExperiences: uiText('generatedUi.u_99b26c23af00f998'), poweredBy: uiText('generatedUi.u_fdc5d2e9410c2d88'),
   },
   es: {
     product: 'Producto', home: 'Inicio', pricing: 'Precios', repoCheck: 'Revisión gratuita del repositorio', websiteOptimizer: 'Optimizador web gratuito', dashboard: 'Panel', documentation: 'Documentación', faq: 'Preguntas frecuentes', podcasters: 'Podcasters', build: 'Crear', buildWebsite: 'Crear un sitio web', collectReviews: 'Recopilar reseñas', generateNativeAudio: 'Generar audio nativo', createVideos: 'Crear videos', company: 'Empresa', about: 'Acerca de', partners: 'Socios', privacy: 'Privacidad', contact: 'Contacto', nativeExperiences: 'Experiencias nativas disponibles en', poweredBy: 'Desarrollado por',

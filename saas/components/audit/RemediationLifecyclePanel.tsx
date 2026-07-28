@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // Truthful live status for the audit remediation lifecycle. The stage bar is
 // determinate; the moving light appears only while the dashboard is receiving
@@ -68,11 +67,11 @@ type Copy = {
 
 const COPY: Record<string, Copy> = {
   en: {
-    preparing: uiCopy('u_9c0f74ba82e27565'), checksPending: uiCopy('u_c517298669baaeb3'), autoMergeQueued: uiCopy('u_bf796793e2536db0'), partial: uiCopy('u_fd275fed1c256a61'), merged: uiCopy('u_07e373bd5b805f6b'), failed: uiCopy('u_b991a6576e84f5c4'),
-    detailPreparing: uiCopy('u_b6536978c5348555'), detailChecks: uiCopy('u_7ca7329421117176'), detailQueued: uiCopy('u_a6b754f7c79f12bd'), detailPartial: uiCopy('u_e3ff2d9438c41d08'), detailMerged: uiCopy('u_04ae66b8e404ddb2'), detailFailed: uiCopy('u_d34431efbb70eb01'),
-    fixed: uiCopy('u_568de3173d0c55bd'), approved: uiCopy('u_1495deb35d4882c7'), skipped: uiCopy('u_8a06f5ac5259619b'), pipelineLabel: uiCopy('u_4ca354b28c198f43'),
-    stepApproval: uiCopy('u_6b20bc6b0b5d3f79'), stepPrepare: uiCopy('u_39a49f0bc2c9a031'), stepChecks: uiCopy('u_29ed2ad9a4663123'), stepMerge: uiCopy('u_f569e728cc9578d8'), stepVerified: uiCopy('u_5628643b1fe89b5c'),
-    workerActive: uiCopy('u_0889415bf63ac85f'), checksMonitored: uiCopy('u_179612f589a4e92c'), mergeMonitored: uiCopy('u_a4c54ce179a3c4a7'), checkingActivity: uiCopy('u_82004c107482fd71'), heartbeatDelayed: uiCopy('u_1b8c174481dc9e70'), heartbeatStale: uiCopy('u_e0d778c31a3e431f'), checksFailedActivity: uiCopy('u_909265ff5a6e1a3e'), repairingActivity: uiCopy('u_ca9cca8c32f64b6f'), stalledActivity: uiCopy('u_84579d640dfbc6e3'), failedChecksLabel: uiCopy('u_95f91a28dd4ea66f'), activityComplete: uiCopy('u_7f77497da96a3247'), activityStopped: uiCopy('u_fbfd4baa6a014236'), lastChecked: uiCopy('u_34b3281c4ddc5e20'), lastChanged: uiCopy('u_8e98aed160fe78e3'), stage: uiCopy('u_b7265dc161639149'), of: uiCopy('u_56b2064447d546a7'),
+    preparing: uiText('generatedUi.u_2ed94e5ba42659ee'), checksPending: uiText('generatedUi.u_18a0fd66254faf5b'), autoMergeQueued: uiText('generatedUi.u_3b4889d2c7815563'), partial: uiText('generatedUi.u_83715ff4e7dcac7f'), merged: uiText('generatedUi.u_12d003b86816980c'), failed: uiText('generatedUi.u_8f2caad23589128c'),
+    detailPreparing: uiText('generatedUi.u_c49e5607703adc7d'), detailChecks: uiText('generatedUi.u_cd234988bacc9ddc'), detailQueued: uiText('generatedUi.u_0c9dcd7bfb6080a0'), detailPartial: uiText('generatedUi.u_24491dd6d33c557d'), detailMerged: uiText('generatedUi.u_265e3cf5bbc5a5fc'), detailFailed: uiText('generatedUi.u_cffb663044c85f71'),
+    fixed: uiText('generatedUi.u_992a93455c71fedd'), approved: uiText('generatedUi.u_2687f86ed6784b8a'), skipped: uiText('generatedUi.u_389595a44dc9dce7'), pipelineLabel: uiText('generatedUi.u_5f654862462b7c9e'),
+    stepApproval: uiText('generatedUi.u_bc2c78de6779c98d'), stepPrepare: uiText('generatedUi.u_71bd69df55c097cc'), stepChecks: uiText('generatedUi.u_3e459f5e689f28f2'), stepMerge: uiText('generatedUi.u_4c8d9d40cf77f084'), stepVerified: uiText('generatedUi.u_dac2f420d94b9312'),
+    workerActive: uiText('generatedUi.u_003a0c2aaaf36548'), checksMonitored: uiText('generatedUi.u_19f233e28914eac1'), mergeMonitored: uiText('generatedUi.u_cc69044374ed7e41'), checkingActivity: uiText('generatedUi.u_99fc45858f5c82f9'), heartbeatDelayed: uiText('generatedUi.u_c72468acc5be3bd1'), heartbeatStale: uiText('generatedUi.u_ab782f28380bbd69'), checksFailedActivity: uiText('generatedUi.u_40034702265ce504'), repairingActivity: uiText('generatedUi.u_b0c78a2953d417f4'), stalledActivity: uiText('generatedUi.u_2dc61b48e02bdf3e'), failedChecksLabel: uiText('generatedUi.u_c23d5373de793d74'), activityComplete: uiText('generatedUi.u_a5b357ae8ff562f0'), activityStopped: uiText('generatedUi.u_2d840bf37c4773d7'), lastChecked: uiText('generatedUi.u_0c0c351a971353b5'), lastChanged: uiText('generatedUi.u_8c3a9d5718aa4208'), stage: "Stage", of: uiText('generatedUi.u_28391d3bc64ec15c'),
   },
   es: {
     preparing: 'SignalBoost AI está preparando las correcciones aprobadas', checksPending: 'SignalBoost AI está validando las correcciones', autoMergeQueued: 'La fusión automática está en cola', partial: 'Correcciones seguras completadas con excepciones', merged: 'Correcciones aprobadas completadas', failed: 'La corrección automática necesita atención',
@@ -281,7 +280,7 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
         })}
       </ol>
 
-      <style>{uiCopy('u_7b3d28401d5e1493')}</style>
+      <style>{"\n        @keyframes sbAuditProgressFlow {\n          0% { transform: translateX(-120%); }\n          100% { transform: translateX(320%); }\n        }\n        @keyframes sbAuditHeartbeat {\n          0%, 100% { transform: scale(1); opacity: .65; }\n          50% { transform: scale(1.55); opacity: 1; }\n        }\n        .sb-audit-progress-flow {\n          width: 34%;\n          background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);\n          animation: sbAuditProgressFlow 1.45s linear infinite;\n        }\n        .sb-audit-heartbeat {\n          animation: sbAuditHeartbeat 1.4s ease-in-out infinite;\n        }\n        @media (prefers-reduced-motion: reduce) {\n          .sb-audit-progress-flow, .sb-audit-heartbeat { animation: none; }\n        }\n      "}</style>
     </div>
   )
 }

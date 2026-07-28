@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const boundaryPath = new URL('../components/hub/GovernedProviderActionFetchBoundary.tsx', import.meta.url)
 const gatePath = new URL('../components/hub/ProviderActionExecutionGate.tsx', import.meta.url)
 
 async function source(path: URL): Promise<string> {
-  return readFile(path, 'utf8')
+  return readFile(path, 'utf8').then(hydrateLocalizedSource)
 }
 
 test('legacy provider action requests are rebuilt through the governed client planner', async () => {

@@ -1,16 +1,15 @@
 import AdminDrilldownPage from '@/components/admin/AdminDrilldownPage'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export default function Page() {
   return (
     <AdminDrilldownPage
-      title={uiCopy('u_2a28ae00b98b6e00')}
-      status={uiCopy('u_47a34d07b6a37703')}
-      action={uiCopy('u_361d09db72383464')}
+      title={uiText('generatedUi.u_b6504b7a28195aa4')}
+      status={uiText('generatedUi.u_1dc83f605edf0ae2')}
+      action={uiText('generatedUi.u_cc62e0cc8d539370')}
       externalUrl={process.env.NEXT_PUBLIC_SUPABASE_DASHBOARD_URL}
-      externalLabel={uiCopy('u_11773554c0d7ef9b')}
-      events={[{ label: uiCopy('u_11d9ed55b2f147dd'), status: uiCopy('u_4c4d9a8087424afc'), detail: uiCopy('u_25b23b22bf6b7f41') }]}
+      externalLabel={uiText('generatedUi.u_a44774b2e9865de2')}
+      events={[{ label: uiText('generatedUi.u_b6504b7a28195aa4'), status: "Monitoring", detail: uiText('generatedUi.u_fd56004d04368898') }]}
     />
   )
 }

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const gatePath = new URL('../components/hub/ProviderActionExecutionGate.tsx', import.meta.url)
 
 async function source(): Promise<string> {
-  return readFile(gatePath, 'utf8')
+  return readFile(gatePath, 'utf8').then(hydrateLocalizedSource)
 }
 
 test('execution gate exports a bounded reviewed handoff contract', async () => {

@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import CompanyIdentityPrompt from '@/components/company/CompanyIdentityPrompt'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export const FREE_ORGANIC_MODE = true
 export const ENTERPRISE_READY = true
@@ -100,52 +99,52 @@ const ORGANIC_COPY: Record<string, {
   }
 }> = {
   en: {
-    formTitle: uiCopy('u_02c3fd8e6ccdf284'),
-    companyLabel: uiCopy('u_1d71e0efe48a2963'),
-    companyPlaceholder: uiCopy('u_a981877661a9d2c9'),
-    announcementLabel: uiCopy('u_61616c730d7fd4e2'),
-    announcementPlaceholder: uiCopy('u_be52ea54845d1dff'),
-    audienceLabel: uiCopy('u_9b343917affbeca0'),
-    audiencePlaceholder: uiCopy('u_f6cbae8fbf3fbb27'),
-    websiteLabel: uiCopy('u_7a9a4ed4bc9619d2'),
-    generate: uiCopy('u_7b0e248cdc83450b'),
-    generating: uiCopy('u_f2a1832f4ba7d267'),
-    resultsTitle: uiCopy('u_06ec671b45b7ac24'),
-    copyBtn: uiCopy('u_6c342e152d4943fd'),
-    copied: uiCopy('u_093262e3caafb313'),
-    regenerate: uiCopy('u_5ee98cdcf833218b'),
-    genError: uiCopy('u_92e543e9a9a5b232'),
-    requiredError: uiCopy('u_4f97b8ad706f3124'),
-    dispatchTitle: uiCopy('u_be334365cfcce3af'),
-    dispatchBody: uiCopy('u_d9bd662413a78696'),
-    publicationLabel: uiCopy('u_7d8c9dffda4b8ec9'),
-    publicationPlaceholder: uiCopy('u_82216d36a3e66320'),
-    editorEmailLabel: uiCopy('u_c18d625e718aaa0f'),
-    dispatchBtn: uiCopy('u_9df5135138046744'),
-    dispatching: uiCopy('u_58ddf7eeaf63cbb9'),
-    dispatchQueued: uiCopy('u_8f780558cf83a760'),
-    dispatchError: uiCopy('u_a3c4cddb80f1f184'),
-    emailInvalid: uiCopy('u_801edbd336f08b01'),
-    byokTitle: uiCopy('u_acfbc607edebc065'),
-    byokBody: uiCopy('u_e0a34f791f19cd5e'),
-    byokProviderLabel: uiCopy('u_6a3aeed260416e95'),
-    byokKeyLabel: uiCopy('u_05dbd782a360b598'),
-    byokKeyRequired: uiCopy('u_2a20a9e2edabc263'),
-    byokKeyInvalid: uiCopy('u_02bb8c1a636f423a'),
-    byokLiveLabel: uiCopy('u_8b63b7892bfc2a41'),
-    byokComingLabel: uiCopy('u_f8aa484704277912'),
-    byokConnected: uiCopy('u_a96e22ef2fd69102'),
-    byokSaveKey: uiCopy('u_4d503880fe72c315'),
-    byokDisconnect: uiCopy('u_3a9d6370caff2ddb'),
-    sections: { youtube: uiCopy('u_442bf6796820214c'), linkedin: uiCopy('u_f38d822b123931d6'), press: uiCopy('u_f6024adb3e7f64a8') },
+    formTitle: uiText('generatedUi.u_4dc5c48933a9cea3'),
+    companyLabel: uiText('generatedUi.u_f4ec6be1af66f9da'),
+    companyPlaceholder: uiText('generatedUi.u_d6adad647ee2ba13'),
+    announcementLabel: uiText('generatedUi.u_b9c8b8f3f9d54270'),
+    announcementPlaceholder: uiText('generatedUi.u_dd29121bbaecf782'),
+    audienceLabel: uiText('generatedUi.u_1161c6dae2ffb26c'),
+    audiencePlaceholder: uiText('generatedUi.u_abeec4af74cc25d0'),
+    websiteLabel: uiText('generatedUi.u_a1c8f67f62accec5'),
+    generate: uiText('generatedUi.u_eb922c5869900d18'),
+    generating: uiText('generatedUi.u_1015a71c930680e9'),
+    resultsTitle: uiText('generatedUi.u_fd9e745546ea094e'),
+    copyBtn: uiText('generatedUi.u_e21f935f11d7e966'),
+    copied: uiText('generatedUi.u_8d525e5f158b9afe'),
+    regenerate: uiText('generatedUi.u_1651031bf58d8eea'),
+    genError: uiText('generatedUi.u_d1d007a52a5d557e'),
+    requiredError: uiText('generatedUi.u_2ff59d0f8a6bbc10'),
+    dispatchTitle: uiText('generatedUi.u_62186625402c2436'),
+    dispatchBody: uiText('generatedUi.u_b1c9b3e510649d8e'),
+    publicationLabel: uiText('generatedUi.u_eab011ad9ff060aa'),
+    publicationPlaceholder: uiText('generatedUi.u_48df7099049b4bf1'),
+    editorEmailLabel: uiText('generatedUi.u_66d92747c9801c50'),
+    dispatchBtn: uiText('generatedUi.u_4c4767736de175c5'),
+    dispatching: uiText('generatedUi.u_e043ca8743f13e14'),
+    dispatchQueued: uiText('generatedUi.u_fff5b0bc57011f59'),
+    dispatchError: uiText('generatedUi.u_cd30cf65853c01c3'),
+    emailInvalid: uiText('generatedUi.u_7db048b948a929d9'),
+    byokTitle: uiText('generatedUi.u_761278e2d1c93816'),
+    byokBody: uiText('generatedUi.u_a128cfc58b3b17a3'),
+    byokProviderLabel: uiText('generatedUi.u_8791254537f430ca'),
+    byokKeyLabel: uiText('generatedUi.u_ae563693e9639134'),
+    byokKeyRequired: uiText('generatedUi.u_1ef52a8443e3d618'),
+    byokKeyInvalid: uiText('generatedUi.u_4a682edd82b691ea'),
+    byokLiveLabel: uiText('generatedUi.u_2a4729fa7647b090'),
+    byokComingLabel: uiText('generatedUi.u_4f7d64017689437e'),
+    byokConnected: uiText('generatedUi.u_22965568d22a14ee'),
+    byokSaveKey: uiText('generatedUi.u_2a54c26197a2644c'),
+    byokDisconnect: uiText('generatedUi.u_acfc5be785a9bb3d'),
+    sections: { youtube: uiText('generatedUi.u_bd8b194062a0cffb'), linkedin: uiText('generatedUi.u_c9ab28bdd9945720'), press: uiText('generatedUi.u_8ce3b2b64f4b2302') },
     labels: {
-      youtubeTitle: uiCopy('u_de458df7bb015815'),
-      youtubeDescription: uiCopy('u_82cfdcaa3bd04509'),
-      youtubeCommunityPost: uiCopy('u_af30a9cafad89c02'),
-      linkedinCompanyPost: uiCopy('u_29cc4c6bb7716954'),
-      linkedinFounderPost: uiCopy('u_c6a23c38099e1385'),
-      pressReleaseSubject: uiCopy('u_885d14b574935284'),
-      pressReleaseBody: uiCopy('u_7d358249cea72ae7'),
+      youtubeTitle: uiText('generatedUi.u_ff9a9985951b07b6'),
+      youtubeDescription: uiText('generatedUi.u_9d23a14b9a2ae811'),
+      youtubeCommunityPost: uiText('generatedUi.u_ed1705c8817c8b49'),
+      linkedinCompanyPost: uiText('generatedUi.u_8b841c7ff24acd03'),
+      linkedinFounderPost: uiText('generatedUi.u_6eec798c9467f769'),
+      pressReleaseSubject: uiText('generatedUi.u_848f0ca2c125e4dc'),
+      pressReleaseBody: uiText('generatedUi.u_f69ea3f5d4240cb7'),
     },
   },
   es: {
@@ -660,8 +659,8 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                 <label style={{ display: 'grid', gap: 6 }}>
                   <span className="sb-caption">{oc.byokProviderLabel}</span>
                   <select value={apiProvider} onChange={(e) => setApiProvider(e.target.value === 'openai' ? 'openai' : 'anthropic')} style={fieldStyle}>
-                    <option value="anthropic">{uiCopy('u_9e7c5b7a6b2fb064')}</option>
-                    <option value="openai">{uiCopy('u_b31ef3b03639831b')}</option>
+                    <option value="anthropic">{uiText('generatedUi.u_962bc5fcdd2dbbd4')}</option>
+                    <option value="openai">{uiText('generatedUi.u_8b7d1a3187ab355d')}</option>
                   </select>
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
@@ -692,7 +691,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
               </label>
               <label style={{ display: 'grid', gap: 6 }}>
                 <span className="sb-caption">{oc.websiteLabel}</span>
-                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder={uiCopy('u_984b8dbb8960eb18')} maxLength={200} style={fieldStyle} />
+                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder={uiText('generatedUi.u_66dfeeedabf1f022')} maxLength={200} style={fieldStyle} />
               </label>
             </div>
             <div className="sb-cta-row">
@@ -740,7 +739,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                       </label>
                       <label style={{ display: 'grid', gap: 6 }}>
                         <span className="sb-caption">{oc.editorEmailLabel}</span>
-                        <input value={editorEmail} onChange={(e) => setEditorEmail(e.target.value)} placeholder={uiCopy('u_daf14eaf9ccfa07f')} maxLength={200} style={fieldStyle} />
+                        <input value={editorEmail} onChange={(e) => setEditorEmail(e.target.value)} placeholder={uiText('generatedUi.u_af340ed4537c667e')} maxLength={200} style={fieldStyle} />
                       </label>
                     </div>
                     <div className="sb-cta-row">

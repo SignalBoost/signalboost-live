@@ -3,8 +3,7 @@
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -40,7 +39,7 @@ export default function CosaVideoQualityPage() {
       if (!json.ok) throw new Error(json.error || 'Unable to run quality test')
       setComparison(json.comparison)
     } catch (err: any) {
-      setError(err?.message || uiCopy('u_5e2cc7b1d4f0538a'))
+      setError(err?.message || "Unable to run quality test")
     } finally {
       setLoading(false)
     }
@@ -51,10 +50,10 @@ export default function CosaVideoQualityPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_4977eb691fe28cac')} /></p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={uiCopy('u_5c6611d1ea2593a5')} /></h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}><LocalizedText fallback={uiCopy('u_12d2510c1f7a29d5')} /></p>
-        <button onClick={runTest} disabled={loading} style={primaryButton}>{loading ? uiCopy('u_1b1fc238fa747d59') : uiCopy('u_b11a595c3da47c57')}</button>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_918b2f285eb9be36')} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={uiText('generatedUi.u_8b5d1b0df7664cf1')} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}><LocalizedText fallback={uiText('generatedUi.u_efea11cc22f35529')} /></p>
+        <button onClick={runTest} disabled={loading} style={primaryButton}>{loading ? uiText('generatedUi.u_4977a7e5bb3675c4') : uiText('generatedUi.u_35f72b9593ed693b')}</button>
       </section>
 
       {error && <div style={errorCard}>{error}</div>}
@@ -67,13 +66,13 @@ export default function CosaVideoQualityPage() {
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}>{uiCopy('u_f285f6e445468144')}</p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>{uiText('generatedUi.u_4a36f89dafb0a101')}</p>
             <h2 style={{ color: comparison.improvement_points > 0 ? GOLD : '#fecaca', margin: '8px 0 0', fontSize: 26 }}>{comparison.verdict}</h2>
-            <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}>{uiCopy('u_a583a32492421f3f')}{comparison.improvement_points}{uiCopy('u_82a37cf068d25075')}</p>
+            <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}>{uiText('generatedUi.u_a5e5037ee3a8373d')}{comparison.improvement_points}{uiText('generatedUi.u_c5efe1f2b33b01d1')}</p>
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_348989eb04505965')} /></p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_f6eb77625278a7ac')} /></p>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               {comparison.next_actions.map((action, index) => <div key={index} style={listItem}>{action}</div>)}
             </div>
@@ -91,8 +90,8 @@ function ScoreCard({ score }: { score: Score }) {
       <h2 style={{ color: GOLD, fontSize: 32, margin: '8px 0 0' }}>{score.score}/{score.max_score}</h2>
       <p style={{ color: '#fff', fontWeight: 900, textTransform: 'capitalize', margin: '4px 0 0' }}>{score.grade.replaceAll('_', ' ')}</p>
       <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-        <FeatureList title={uiCopy('u_cc41528d4182d3e0')} items={score.passed_features} good />
-        <FeatureList title={uiCopy('u_a9ba7effd32cfcae')} items={score.failed_features} />
+        <FeatureList title={uiText('generatedUi.u_436fe71bb9561f05')} items={score.passed_features} good />
+        <FeatureList title={uiText('generatedUi.u_6be36ca49ee85210')} items={score.failed_features} />
       </div>
     </section>
   )
@@ -103,7 +102,7 @@ function FeatureList({ title, items, good = false }: { title: string; items: str
     <div>
       <p style={{ color: good ? '#86efac' : '#fca5a5', fontSize: 12, fontWeight: 950, margin: 0, textTransform: 'uppercase' }}>{title}</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-        {items.length ? items.map((item) => <span key={item} style={pill}>{item.replaceAll('_', ' ')}</span>) : <span style={pill}>{uiCopy('u_0f88108db6692c51')}</span>}
+        {items.length ? items.map((item) => <span key={item} style={pill}>{item.replaceAll('_', ' ')}</span>) : <span style={pill}>{uiText('generatedUi.u_dc937b59892604f5')}</span>}
       </div>
     </div>
   )

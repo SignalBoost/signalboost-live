@@ -23,6 +23,8 @@ import {
 import {
   executionRecordSchemaVersion,
 } from '../lib/supervisor/persistence/execution-record-schema.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 function browserDecision(overrides: Partial<ExecutionDecision> = {}): ExecutionDecision {
   return {
@@ -332,8 +334,8 @@ test('BPAL selection audit fails closed on mismatched or forbidden Browser decis
 })
 
 test('BPAL selection audit remains metadata-only and non-executing', async () => {
-  const source = await readFile(new URL('../lib/supervisor/browser-provider-selection-audit.ts', import.meta.url), 'utf8')
-  const selectorSource = await readFile(new URL('../lib/supervisor/browser-provider-audited-selector.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../lib/supervisor/browser-provider-selection-audit.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
+  const selectorSource = await readFile(new URL('../lib/supervisor/browser-provider-audited-selector.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   assert.doesNotMatch(source, /playwright|chromium|browserSession|secretResolver|credentialRef|authorization|fetch\(|provider sdk/i)
   assert.doesNotMatch(selectorSource, /playwright|chromium|browserSession|secretResolver|credentialRef|authorization|fetch\(|provider sdk/i)
   assert.match(source, /productionExecutionEnabled: false/)

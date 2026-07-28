@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createPlatformHealthSnapshot } from '../lib/supervisor/platform-health.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const now = new Date('2026-07-17T12:00:00.000Z')
 const run = (overrides = {}) => ({ runId:'run-1', projectId:'p', providerConnectionId:'c', environment:'production', status:'healthy', startedAt:'2026-07-17T11:59:00.000Z', completedAt:'2026-07-17T12:00:00.000Z', completedStepIds:['verify-healthy-observation'], approvedStepIds:['verify-healthy-observation'], selectedChannel:'api', comparisonStatus:'unavailable', bpalSelections:[], auditEvents:[{eventId:'e',eventType:'workflow_completed',occurredAt:'2026-07-17T12:00:00.000Z',payload:{},schemaVersion:'x'}], evidence:[], verification:{status:'verified',checkedAt:'2026-07-17T12:00:00.000Z',summary:'ok',reasons:[]}, schemaVersion:'vercel-deployment-health-intelligence-v2', ...overrides }) as any
@@ -22,7 +24,7 @@ test('Mission 001 platform health monitor raises deterministic self-diagnostic a
 })
 
 test('Supervisor Operations Center exposes platform self-diagnostics without controls', () => {
-  const page = readFileSync(new URL('../app/dashboard/supervisor/page.tsx', import.meta.url), 'utf8')
+  const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/page.tsx', import.meta.url), 'utf8'))
   assert.match(page, /createPlatformHealthSnapshot/)
   for (const label of ['subsystemHealth','trendGraphs','recentAlerts','recentRecoveries','currentWarnings','healthHistory']) assert.match(page, new RegExp(label))
   assert.doesNotMatch(page, /<form|<button|repair|redeploy|BrowserRuntime|Playwright/i)

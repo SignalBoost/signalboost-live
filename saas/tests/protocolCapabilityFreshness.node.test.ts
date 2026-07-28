@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const source = readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/ProtocolCapabilityCatalogClient.tsx', import.meta.url), 'utf8')
+
+const source = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/ProtocolCapabilityCatalogClient.tsx', import.meta.url), 'utf8'))
 
 test('protocol catalog exposes generated timestamp and schema contract', () => {
   assert.match(source, /snapshot\.generatedAt/)

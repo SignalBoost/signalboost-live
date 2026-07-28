@@ -7,7 +7,7 @@ import { SUITE_COPY } from '@/lib/i18n/suiteCopy'
 import { WORKSPACE_COPY } from '@/lib/i18n/workspaceCopy'
 import { BANK_COPY } from '@/lib/i18n/bankCopy'
 
-export function t(dict: Dict | null | undefined, path: string, fallback: string): string {
+export function t(dict: Dict | null | undefined, path: string, fallback = ''): string {
   const value = lookup(dict, path)
   if (typeof value === 'string') return value
 

@@ -6,6 +6,8 @@ import {
   parseOperationsIntelligenceSnapshot,
   SupabaseOperationsSnapshotStore,
 } from '../lib/enterprise/operations/operationsSnapshotStore.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const validSnapshot = {
   organizationId: 'org-1',
@@ -71,7 +73,7 @@ test('Supabase snapshot store rejects blank scope and sanitizes storage failures
 })
 
 test('operations snapshot migration keeps browser roles fully blocked', async () => {
-  const sql = await readFile(new URL('../supabase/migrations/20260719_enterprise_operations_snapshots.sql', import.meta.url), 'utf8')
+  const sql = await readFile(new URL('../supabase/migrations/20260719_enterprise_operations_snapshots.sql', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   assert.match(sql, /enable row level security/i)
   assert.match(sql, /revoke all on table public\.enterprise_operations_snapshots from anon, authenticated/i)
   assert.match(sql, /grant select, insert on table public\.enterprise_operations_snapshots to service_role/i)

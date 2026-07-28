@@ -7,9 +7,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 const GREEN = '#86efac'
@@ -31,9 +28,9 @@ export type UsageDashboardView = {
 }
 
 const FEATURE_LABEL: Record<string, string> = {
-  'support.chief-of-staff': uiCopy('u_65fca8be6276e364'),
-  'support.concierge': uiCopy('u_cf8b0d3b7a8b2b3c'),
-  'audit.executive-summary': uiCopy('u_4fee8a2ec1c5aa96'),
+  'support.chief-of-staff': "Chief of Staff",
+  'support.concierge': "Concierge (external)",
+  'audit.executive-summary': "Audit · Executive Summary",
 }
 
 function fmtInt(n: number): string { return (n || 0).toLocaleString('en-US') }
@@ -50,36 +47,36 @@ export default function UsageDashboard({ data }: { data: UsageDashboardView }) {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.usage.title', uiCopy('u_03a70c9237ccaf94'))} <span style={{ color: GOLD }}>·</span>
+          {t('audit.usage.title', "AI Usage & Cost")} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 680, lineHeight: 1.5 }}>
-          {tt(uiCopy('u_3f628cf89df1b14f'), uiCopy('u_9c0c24082520d16b'), { n: data.windowDays })}
+          {tt("audit.usage.subtitle", "Token consumption and estimated cost across AI features over the last {n} days. Cost is an estimate; token counts are exact.", { n: data.windowDays })}
         </p>
       </div>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.usage.totalCost', uiCopy('u_e33b6e2774a26bb2'))} value={fmtUsd(tot.costUsd)} color={GOLD} />
-        <Stat label={t('audit.usage.calls', uiCopy('u_7123656abb868937'))} value={fmtInt(tot.calls)} />
-        <Stat label={t('audit.usage.totalTokens', uiCopy('u_3d4108678e82cec1'))} value={fmtInt(totalTokens)} />
-        <Stat label={t('audit.usage.cacheHit', uiCopy('u_888fd5af7b311481'))} value={data.cacheReadPct + '%'} color={data.cacheReadPct > 0 ? GREEN : undefined} />
+        <Stat label={t('audit.usage.totalCost', "Est. cost")} value={fmtUsd(tot.costUsd)} color={GOLD} />
+        <Stat label={t('audit.usage.calls', "Calls")} value={fmtInt(tot.calls)} />
+        <Stat label={t('audit.usage.totalTokens', "Total tokens")} value={fmtInt(totalTokens)} />
+        <Stat label={t('audit.usage.cacheHit', "Input from cache")} value={data.cacheReadPct + '%'} color={data.cacheReadPct > 0 ? GREEN : undefined} />
       </section>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
-        <SectionTitle>{t('audit.usage.byFeature', uiCopy('u_f6e94d88e6c7d9e1'))}</SectionTitle>
+        <SectionTitle>{t('audit.usage.byFeature', "By Feature")}</SectionTitle>
         {data.byFeature.length === 0 ? <Empty t={t} /> : (
           <Table
-            cols={[t('audit.usage.col.feature', uiCopy('u_b627b13cc1d46b1f')), t('audit.usage.col.calls', uiCopy('u_67c0223dc5c1666c')), t('audit.usage.col.tokens', uiCopy('u_0cc898c8c3f2a6c4')), t('audit.usage.col.cost', uiCopy('u_ffea3af596653a9e'))]}
+            cols={[t('audit.usage.col.feature', "Feature"), t('audit.usage.col.calls', "Calls"), t('audit.usage.col.tokens', "Tokens"), t('audit.usage.col.cost', "Est. cost")]}
             rows={data.byFeature.map(g => [FEATURE_LABEL[g.key] || g.key, fmtInt(g.calls), fmtInt(g.tokens), fmtUsd(g.costUsd)])}
           />
         )}
       </section>
 
       <section style={{ ...glass, padding: 20 }}>
-        <SectionTitle>{t('audit.usage.byUser', uiCopy('u_adcb87aaf30feb9b'))}</SectionTitle>
-        <p style={{ margin: '0 0 12px', fontSize: 11.5, color: GREY }}>{t('audit.usage.byUserHint', uiCopy('u_4187804c05aea003'))}</p>
+        <SectionTitle>{t('audit.usage.byUser', "Top Consumers")}</SectionTitle>
+        <p style={{ margin: '0 0 12px', fontSize: 11.5, color: GREY }}>{t('audit.usage.byUserHint', "Highest estimated cost first — the basis for per-user billing or throttling.")}</p>
         {data.byUser.length === 0 ? <Empty t={t} /> : (
           <Table
-            cols={[t('audit.usage.col.user', uiCopy('u_97a214e9264c53a6')), t('audit.usage.col.calls', uiCopy('u_e939486110f590bd')), t('audit.usage.col.tokens', uiCopy('u_35e60c75042ef28b')), t('audit.usage.col.cost', uiCopy('u_5e2a021786d6477b'))]}
+            cols={[t('audit.usage.col.user', "User"), t('audit.usage.col.calls', "Calls"), t('audit.usage.col.tokens', "Tokens"), t('audit.usage.col.cost', "Est. cost")]}
             rows={data.byUser.map(g => [shortId(g.key), fmtInt(g.calls), fmtInt(g.tokens), fmtUsd(g.costUsd)])}
             mono0
           />
@@ -101,7 +98,7 @@ function SectionTitle({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>{children}</div>
 }
 function Empty({ t }: { t: (k: string, f: string) => string }) {
-  return <div style={{ fontSize: 13, color: GREY }}>{t('audit.usage.empty', uiCopy('u_f14013165f5969ca'))}</div>
+  return <div style={{ fontSize: 13, color: GREY }}>{t('audit.usage.empty', "No usage recorded yet.")}</div>
 }
 function Table({ cols, rows, mono0 }: { cols: string[]; rows: string[][]; mono0?: boolean }) {
   return (

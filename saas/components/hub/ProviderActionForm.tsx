@@ -15,8 +15,7 @@ import {
 import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared.tsx'
 import { SearchableSelect } from '@/components/enterprise/SearchableSelect'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // Providers migrated to the portable action engine. Their actions + pickers
 // target /api/hub/action/engine; everything else stays on the legacy route.
@@ -98,7 +97,7 @@ export default function ProviderActionForm({
   }, [templateId, values])
 
   if (!template) {
-    return <div style={{ ...cardStyle, ...bodyStyle }}>{uiCopy('u_9cf46c44cb227dd9')}{templateId}</div>
+    return <div style={{ ...cardStyle, ...bodyStyle }}>{uiText('generatedUi.u_705068d16cda0b87')}{templateId}</div>
   }
 
   const handleFieldChange = (fieldId: string, value: unknown) => {
@@ -202,7 +201,7 @@ export default function ProviderActionForm({
         <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
           <span style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, background: 'rgba(26,240,255,.10)', border: '1px solid rgba(26,240,255,.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)' }}>{template.icon}</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(26,240,255,.75)', marginBottom: 3 }}>{uiCopy('u_50d29e786d627d53')}{String(template.api?.service || '').toUpperCase()}
+            <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(26,240,255,.75)', marginBottom: 3 }}>{uiText('generatedUi.u_752017472f13a789')}{String(template.api?.service || '').toUpperCase()}
             </div>
             <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.15 }}>{template.label}</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', marginTop: 2 }}>{template.description}</div>
@@ -215,7 +214,7 @@ export default function ProviderActionForm({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
             {template.fields.length === 0 ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 13 }}>
-                {t('console.actionForm.noExtraInfo', uiCopy('u_a794ee41823141b0'))}
+                {t('console.actionForm.noExtraInfo', "This action requires no additional information.")}
               </div>
             ) : (
               <>
@@ -234,8 +233,8 @@ export default function ProviderActionForm({
                 {advancedFields.length > 0 && (
                   <div style={{ border: '1px solid rgba(255,255,255,.10)', borderRadius: 12, background: 'rgba(255,255,255,.03)', overflow: 'hidden' }}>
                     <button type="button" onClick={() => setShowAdvanced(v => !v)} className="hub-chip" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 13px', border: 0, borderRadius: 0, background: 'rgba(26,240,255,.06)', color: '#fff', cursor: 'pointer' }}>
-                      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(26,240,255,.82)' }}><LocalizedText fallback={uiCopy('u_5ad05975e0db8185')} /></span>
-                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{showAdvanced ? uiCopy('u_033541b59c168188') : uiCopy('u_9ccf953134fa3b6d')}</span>
+                      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(26,240,255,.82)' }}><LocalizedText fallback={uiText('generatedUi.u_9443ff69463ef46b')} /></span>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{showAdvanced ? uiText('generatedUi.u_ac20a57bfde0bbc4') : uiText('generatedUi.u_c1fef5f3cc9edacc')}</span>
                     </button>
                     {showAdvanced && (
                       <div style={{ padding: '13px 13px 0' }}>
@@ -262,7 +261,7 @@ export default function ProviderActionForm({
             {templateId === 'vercel.add_env_var' && (
               <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-                  {t('console.actionForm.activeEnvMap', uiCopy('u_a19a15da992629f2'))}
+                  {t('console.actionForm.activeEnvMap', "Active Environment Variables Map")}
                 </div>
                 <EmbeddedVercelEnvList />
               </div>
@@ -273,7 +272,7 @@ export default function ProviderActionForm({
         {state === 'preview' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, overflow: 'hidden' }}>
             <div style={noticeStyle}>
-              {t('console.ui.review_action', uiCopy('u_679c5ff420c02e0d'))} {template.api.service}. {t('console.ui.cannot_undo', uiCopy('u_d50edd1af2476631'))}
+              {t('console.ui.review_action', "Review the action that will be sent to")} {template.api.service}. {t('console.ui.cannot_undo', "Once confirmed, this cannot be undone.")}
             </div>
             <div style={jsonBoxStyle}>
               {JSON.stringify({ template: templateId, api: `${template.api.method} ${template.api.endpoint}`, payload: values }, null, 2)}
@@ -282,12 +281,12 @@ export default function ProviderActionForm({
         )}
 
         {state === 'confirm' && (
-          <CenteredState icon="⚠️" title={t('console.cui.confirm_action', uiCopy('u_a2b975186992363b'))}>
-            {t('console.ui.about_to_execute', uiCopy('u_2826eea7ed439c40'))} <strong>{template.label}</strong> {t('console.ui.on', uiCopy('u_7c9a014bb1357409'))} {template.api.service}.
+          <CenteredState icon="⚠️" title={t('console.cui.confirm_action', "Confirm action")}>
+            {t('console.ui.about_to_execute', "You are about to execute")} <strong>{template.label}</strong> {t('console.ui.on', "on")} {template.api.service}.
           </CenteredState>
         )}
 
-        {state === 'submitting' && <CenteredState icon="⏳" title={t('console.cui.executing_action', uiCopy('u_fc8647fc60991e1c'))} spin />}
+        {state === 'submitting' && <CenteredState icon="⏳" title={t('console.cui.executing_action', "Executing action…")} spin />}
 
         {state === 'success' && result?.ok && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden' }}>
@@ -300,7 +299,7 @@ export default function ProviderActionForm({
         )}
 
         {state === 'error' && result?.error && (
-          <CenteredState icon="❌" title={t("console.ui.error", uiCopy('u_b16cbc9bd0862e12'))} titleColor="#ef4444">
+          <CenteredState icon="❌" title={t("console.ui.error", "Error")} titleColor="#ef4444">
             <span style={{ fontFamily: monoStyle.fontFamily }}>{result.error}</span>
           </CenteredState>
         )}
@@ -309,35 +308,35 @@ export default function ProviderActionForm({
       <div style={footerStyle}>
         {state === 'idle' && (
           <>
-            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', uiCopy('u_b8b90b3b841e0925'))}</button>}
+            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', "Cancel")}</button>}
             <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>
-              {templateId === 'openai.codex_open_cloud' || templateId === 'openai.codex_generate_prompt' ? uiCopy('u_cd9a431de19423f9') : template.previewBeforeSubmit ? t('console.ui.preview', uiCopy('u_8bf4d26e24b418df')) : template.requiresConfirm ? t('console.ui.confirm', uiCopy('u_157d441dad1dbcf1')) : t('console.ui.execute', uiCopy('u_2a2503d06cbdaf2f'))}
+              {templateId === 'openai.codex_open_cloud' || templateId === 'openai.codex_generate_prompt' ? uiText('generatedUi.u_b70f0a1fc693f3d5') : template.previewBeforeSubmit ? t('console.ui.preview', "Preview") : template.requiresConfirm ? t('console.ui.confirm', "Confirm") : t('console.ui.execute', "Execute")}
             </button>
           </>
         )}
 
         {state === 'preview' && (
           <>
-            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.cui.back', uiCopy('u_c573d9716ddf7ac3'))}</button>
+            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.cui.back', "Back")}</button>
             <button onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())} className="hub-btn" style={warningButtonStyle}>
-              {template.requiresConfirm ? t('console.ui.confirm', uiCopy('u_c32150548a3adcb1')) : t('console.ui.execute', uiCopy('u_92958b67417d3411'))}
+              {template.requiresConfirm ? t('console.ui.confirm', "Confirm") : t('console.ui.execute', "Execute")}
             </button>
           </>
         )}
 
         {state === 'confirm' && (
           <>
-            <button onClick={() => setState(template.previewBeforeSubmit ? 'preview' : 'idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', uiCopy('u_c2b4e34dca04149e'))}</button>
-            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>{t('console.cui.execute_now', uiCopy('u_83fb539fc361c113'))}</button>
+            <button onClick={() => setState(template.previewBeforeSubmit ? 'preview' : 'idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', "Cancel")}</button>
+            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>{t('console.cui.execute_now', "Execute Now")}</button>
           </>
         )}
 
         {(state === 'submitting' || state === 'success' || state === 'error') && onClose && (
-          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>{t('console.ui.close', uiCopy('u_27990de259af2409'))}</button>
+          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>{t('console.ui.close', "Close")}</button>
         )}
       </div>
 
-      <style>{uiCopy('u_91256ef5af4dec66')}</style>
+      <style>{"@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
     </div>
   )
 }
@@ -478,7 +477,7 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
       {field.type !== 'toggle' && field.type !== 'select' && (
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', color: 'rgba(255,255,255,.62)' }}>
           <span aria-hidden="true" style={{ width: 4, height: 4, borderRadius: 999, background: '#1af0ff', flexShrink: 0 }} />
-          {useVercelEnvPicker ? uiCopy('u_458209a17ba9c290') : useStripeProductPicker ? uiCopy('u_9fb223bb892d1a82') : field.label}
+          {useVercelEnvPicker ? uiText('generatedUi.u_ccbb4a76e2370f1c') : useStripeProductPicker ? uiText('generatedUi.u_fb9ef894175c3274') : field.label}
           {field.required && <span style={{ color: '#ffc300' }}>*</span>}
         </label>
       )}
@@ -487,11 +486,11 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
 
       {useVercelEnvPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          {t('console.actionForm.envHelp', uiCopy('u_11e456139fbec8eb'))}
+          {t('console.actionForm.envHelp', "Select from live environment configurations. The console maps core variable IDs directly.")}
         </div>
       ) : useStripeProductPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          {t('console.actionForm.stripeHelp', uiCopy('u_1ac5e3411b4d84e9'))}
+          {t('console.actionForm.stripeHelp', "Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.")}
         </div>
       ) : (
         field.help && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>{field.help}</div>
@@ -572,7 +571,7 @@ function StripeProductPicker({
 
   if (loading) {
     return (
-      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>{uiCopy('u_506f8174a6232e92')}</div>
+      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>{uiText('generatedUi.u_839da34712cd864b')}</div>
     )
   }
 
@@ -581,7 +580,7 @@ function StripeProductPicker({
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder={uiCopy('u_c16dd16b4b4609c0')}
+        placeholder={uiText('generatedUi.u_f0289230bc26a440')}
         style={{
           ...pickerInputStyle,
           border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
@@ -600,7 +599,7 @@ function StripeProductPicker({
       }}
     >
       <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-        {t('console.actionForm.selectStripeProduct', uiCopy('u_69cd6010ea1b7a3a'))}
+        {t('console.actionForm.selectStripeProduct', "Select a Stripe product")}
       </option>
 
       {products.map(product => (
@@ -671,7 +670,7 @@ function VercelEnvVarPicker({
 
   if (loading) {
     return (
-      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>{uiCopy('u_2000925c60cfe9e0')}</div>
+      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>{uiText('generatedUi.u_be83a46769c70349')}</div>
     )
   }
 
@@ -680,7 +679,7 @@ function VercelEnvVarPicker({
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder={t('console.cui.select_key_id', uiCopy('u_c14876c9bc1e9792'))}
+        placeholder={t('console.cui.select_key_id', "Select key ID...")}
         style={{
           ...pickerInputStyle,
           border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
@@ -699,7 +698,7 @@ function VercelEnvVarPicker({
       }}
     >
       <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-        {t('console.actionForm.selectEnvToDelete', uiCopy('u_38d707bd958adcb3'))}
+        {t('console.actionForm.selectEnvToDelete', "Select an environment variable to delete")}
       </option>
 
       {envs.map(env => (
@@ -732,7 +731,7 @@ function EmbeddedVercelEnvList() {
         const items = data.data?.vars || data.data?.envs || (Array.isArray(data.data) ? data.data : [])
         if (!cancelled) setEnvs(items)
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : uiCopy('u_2ad9212eee0a4ae8'))
+        if (!cancelled) setError(err instanceof Error ? err.message : "Inventory lookup failed")
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -741,9 +740,9 @@ function EmbeddedVercelEnvList() {
     return () => { cancelled = true }
   }, [])
 
-  if (loading) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{t('console.cui.querying_vars', uiCopy('u_c0f25fb9d6ae0514'))}</div>
-  if (error) return <div style={{ fontSize: 11, color: '#ef4444' }}>{uiCopy('u_40defa9e8c22e4ed')}{error}</div>
-  if (envs.length === 0) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '4px 0' }}>{t('console.cui.no_config_keys', uiCopy('u_83bc069f80f54d1e'))}</div>
+  if (loading) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{t('console.cui.querying_vars', "Querying cluster variables ledger...")}</div>
+  if (error) return <div style={{ fontSize: 11, color: '#ef4444' }}>{uiText('generatedUi.u_6f3f68c12f33be54')}{error}</div>
+  if (envs.length === 0) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '4px 0' }}>{t('console.cui.no_config_keys', "No active configuration keys found.")}</div>
 
   return (
     <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.2)', padding: '6px 10px' }}>
@@ -751,7 +750,7 @@ function EmbeddedVercelEnvList() {
         <div key={env.id || env.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12.5 }}>
           <span style={{ fontFamily: monoStyle.fontFamily, color: 'rgba(26,240,255,0.9)', fontWeight: 600 }}>{env.key}</span>
           <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase' }}>
-            {env.target ? (Array.isArray(env.target) ? env.target.join(', ') : env.target) : uiCopy('u_e768a769e18b6944')}
+            {env.target ? (Array.isArray(env.target) ? env.target.join(', ') : env.target) : uiText('generatedUi.u_5ef5ef0364b6939c')}
           </span>
         </div>
       ))}
@@ -862,7 +861,7 @@ function RemoteSelect({
     fontFamily: 'inherit', outline: 'none',
   }
 
-  if (!depsReady) return <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)' }}>{source.emptyHint || uiCopy('u_9236e0260b6860fd')}</div>
+  if (!depsReady) return <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)' }}>{source.emptyHint || uiText('generatedUi.u_b8686dbf1b1118be')}</div>
 
   const current = String(value ?? '')
   return (
@@ -876,15 +875,15 @@ function RemoteSelect({
         disabled={loading || Boolean(loadError) || options.length === 0}
         required={field.required}
       />
-      {loading && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', marginTop: 4 }}>{uiCopy('u_d9d3d6f4b7f636f2')}</div>}
+      {loading && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', marginTop: 4 }}>{uiText('generatedUi.u_ae3e259e266db5c3')}</div>}
       {loadError && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 6 }}>
           <span style={{ fontSize: 11, color: 'rgba(239,68,68,.85)' }}>⚠️ {loadError}</span>
-          <button type="button" className="hub-chip" onClick={() => setReloadToken(token => token + 1)} style={{ ...secondaryButtonStyle, padding: '5px 9px', fontSize: 11 }}>{uiCopy('u_02e7e9b5aa8e831c')}</button>
+          <button type="button" className="hub-chip" onClick={() => setReloadToken(token => token + 1)} style={{ ...secondaryButtonStyle, padding: '5px 9px', fontSize: 11 }}>{uiText('generatedUi.u_942087cc2d41e013')}</button>
         </div>
       )}
-      {!loading && !loadError && options.length > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{source.action.startsWith(uiCopy('u_b34056aee747aca7')) ? uiCopy('u_6bf9b2e995ddd176') : uiCopy('u_48c3229c9883b695')}</div>}
-      {!loading && !loadError && options.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', uiCopy('u_4541dfe17d1224b8'))}</div>}
+      {!loading && !loadError && options.length > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{source.action.startsWith("github.") ? uiText('generatedUi.u_29d8e2694c4f55b8') : uiText('generatedUi.u_754496cf32b4535f')}</div>}
+      {!loading && !loadError && options.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', "Nothing to select here yet. No manual fallback is available for live controlled fields.")}</div>}
     </div>
   )
 }
@@ -977,23 +976,23 @@ function CodexHandoffResult({ data }: { data: any }) {
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
       <div style={noticeStyle}>
-        <strong style={{ color: '#ffc300' }}>{uiCopy('u_e11f37ef071de014')}</strong><LocalizedText fallback={uiCopy('u_d5a2114c5d13e603')} /></div>
+        <strong style={{ color: '#ffc300' }}>{uiText('generatedUi.u_015c607dd0af0168')}</strong><LocalizedText fallback={uiText('generatedUi.u_ecc8c048fa19044e')} /></div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flex: '0 0 auto' }}>
         <button type="button" onClick={copyPrompt} className="hub-btn" style={primaryButtonStyle}>
-          {copied ? uiCopy('u_b65ef5712df9fe60') : uiCopy('u_529567b4e0eb8f2b')}
+          {copied ? uiText('generatedUi.u_8d525e5f158b9afe') : uiText('generatedUi.u_80e0d17325ca6fd4')}
         </button>
-        <a href={codexCloudUrl} target="_blank" rel="noreferrer" className="hub-chip" style={{ ...secondaryButtonStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}><LocalizedText fallback={uiCopy('u_e22719c8d6163d29')} /></a>
+        <a href={codexCloudUrl} target="_blank" rel="noreferrer" className="hub-chip" style={{ ...secondaryButtonStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}><LocalizedText fallback={uiText('generatedUi.u_48174cd95559ec63')} /></a>
       </div>
 
       {copied && (
-        <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 800, flex: '0 0 auto' }}>{uiCopy('u_c1db7768f1e1eae6')}</div>
+        <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 800, flex: '0 0 auto' }}>{uiText('generatedUi.u_332c7ff7b3d9f3ea')}</div>
       )}
 
-      <label style={{ ...labelStyle, fontSize: 10.5, color: 'rgba(255,255,255,.62)' }}><LocalizedText fallback={uiCopy('u_e1e5c68374ab97c7')} /></label>
+      <label style={{ ...labelStyle, fontSize: 10.5, color: 'rgba(255,255,255,.62)' }}><LocalizedText fallback={uiText('generatedUi.u_10467d31701675bc')} /></label>
       <textarea readOnly value={prompt} style={{ ...jsonBoxStyle, width: '100%', resize: 'vertical', color: 'rgba(255,255,255,.86)', minHeight: 260 }} />
 
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.52)', flex: '0 0 auto' }}>{uiCopy('u_4210199a41aa6dc7')}{data.directExecution ? uiCopy('u_8be3f1b6929aa4ef') : uiCopy('u_486e92b30ab6f7b6')}{uiCopy('u_0b0e40638b171f12')}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.52)', flex: '0 0 auto' }}>{uiText('generatedUi.u_7e15dd58a04c72f8')}{data.directExecution ? uiText('generatedUi.u_8a798890fe938171') : uiText('generatedUi.u_9390298f3fb0c5b1')}{uiText('generatedUi.u_06611b3de2cf9904')}</div>
     </div>
   )
 }

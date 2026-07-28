@@ -1,15 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const baseSql = readFileSync(
+
+const baseSql = hydrateLocalizedSource(readFileSync(
   new URL('../supabase/migrations/20260716_supervisor_federated_coordination.sql', import.meta.url),
   'utf8',
-)
-const hardeningSql = readFileSync(
+))
+const hardeningSql = hydrateLocalizedSource(readFileSync(
   new URL('../supabase/migrations/20260718_supervisor_coordination_security_hardening.sql', import.meta.url),
   'utf8',
-)
+))
 
 const tables = [
   'supervisor_instances',

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const header = readFileSync(new URL('../components/Header.tsx', import.meta.url), 'utf8')
-const footer = readFileSync(new URL('../components/Footer.tsx', import.meta.url), 'utf8')
-const baseline = JSON.parse(readFileSync(new URL('../scripts/i18n-hardcoded-baseline.json', import.meta.url), 'utf8')) as { files: string[] }
+
+const header = hydrateLocalizedSource(readFileSync(new URL('../components/Header.tsx', import.meta.url), 'utf8'))
+const footer = hydrateLocalizedSource(readFileSync(new URL('../components/Footer.tsx', import.meta.url), 'utf8'))
+const baseline = JSON.parse(hydrateLocalizedSource(readFileSync(new URL('../scripts/i18n-hardcoded-baseline.json', import.meta.url), 'utf8'))) as { files: string[] }
 
 for (const [name, source] of [['Header', header], ['Footer', footer]] as const) {
   test(`${name} has complete five-language component copy`, () => {

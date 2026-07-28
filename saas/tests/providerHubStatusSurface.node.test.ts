@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { createProviderHubStatusSurface, PROVIDER_HUB_STATUS_SURFACE_VERSION } from '../provider-hub-host/status-surface.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('Provider Hub status surface returns only allowlisted public metadata', () => {
   const surface = createProviderHubStatusSurface({
@@ -25,8 +27,8 @@ test('Provider Hub status surface returns only allowlisted public metadata', () 
 })
 
 test('Provider Hub status endpoints are GET-only and enforce authentication boundaries', async () => {
-  const selfService = await readFile(new URL('../app/api/provider-hub/status/route.ts', import.meta.url), 'utf8')
-  const admin = await readFile(new URL('../app/api/admin/provider-hub/status/route.ts', import.meta.url), 'utf8')
+  const selfService = await readFile(new URL('../app/api/provider-hub/status/route.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
+  const admin = await readFile(new URL('../app/api/admin/provider-hub/status/route.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   assert.match(selfService, /getAccess\(\)/)
   assert.match(selfService, /status:\s*401/)
   assert.match(admin, /requireOwner\(\)/)

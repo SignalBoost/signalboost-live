@@ -18,6 +18,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { buildConsoleUrl } from '../lib/supervisor/portable/host-context.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const SITE_ROOT = 'https://saas.signalboostapp.com'
 
@@ -75,7 +77,7 @@ test('the path the notifier asks for matches a real page in this app', async () 
   const { readFileSync, existsSync } = await import('node:fs')
   const { fileURLToPath } = await import('node:url')
 
-  const notifier = readFileSync(fileURLToPath(new URL('../lib/supervisor/portable/enterprise-notifier.ts', import.meta.url)), 'utf8')
+  const notifier = hydrateLocalizedSource(readFileSync(fileURLToPath(new URL('../lib/supervisor/portable/enterprise-notifier.ts', import.meta.url)), 'utf8'))
   const requested = notifier.match(/buildConsoleUrl\([^,]+,\s*'([^']+)'\)/)?.[1]
   assert.ok(requested, 'the notifier must build its console link from a literal path')
 

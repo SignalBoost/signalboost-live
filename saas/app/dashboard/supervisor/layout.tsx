@@ -2,11 +2,10 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 import ProtocolCapabilitySummary from '@/components/supervisor/ProtocolCapabilitySummary'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const copy = {
-  en: { brand: uiCopy('u_95745057f79500bb'), operations: uiCopy('u_99c236fe8d134c0f'), capabilities: uiCopy('u_23c3827d5f49d062'), reviews: uiCopy('u_f24fbad9d666b17b'), boundary: uiCopy('u_250b8ab053560a6e'), protocols: uiCopy('u_71d9151411e5a229'), safety: uiCopy('u_93aa6fb592998d62'), supervisory: uiCopy('u_c83c5f5dd49301a7'), mutating: uiCopy('u_e16874d19dec336b'), safe: uiCopy('u_f79f2be2de7733be') },
+  en: { brand: uiText('generatedUi.u_9de790933254b865'), operations: uiText('generatedUi.u_ec35c69829f91b4f'), capabilities: uiText('generatedUi.u_c38c6df0902b4c66'), reviews: uiText('generatedUi.u_b500898ae38ccf02'), boundary: uiText('generatedUi.u_cf950ecbaf74ad5c'), protocols: uiText('generatedUi.u_89986171158d633a'), safety: uiText('generatedUi.u_2d43d6ebae3b25f5'), supervisory: uiText('generatedUi.u_3e974237cfaa5b54'), mutating: uiText('generatedUi.u_93e58cb273f198c0'), safe: uiText('generatedUi.u_bb4d97acaa80cd66') },
   es: { brand: 'Supervisor', operations: 'Centro de operaciones', capabilities: 'Capacidades de protocolo', reviews: 'Revisiones de misiones', boundary: 'Diagnóstico de solo lectura', protocols: 'protocolos', safety: 'clasificados por seguridad', supervisory: 'solo supervisión', mutating: 'declaran capacidad de modificación', safe: 'Solo lectura · sin controles de ejecución' },
   pt: { brand: 'Supervisor', operations: 'Centro de operações', capabilities: 'Capacidades de protocolo', reviews: 'Revisões de missões', boundary: 'Diagnóstico somente leitura', protocols: 'protocolos', safety: 'classificados por segurança', supervisory: 'somente supervisão', mutating: 'declaram capacidade de alteração', safe: 'Somente leitura · sem controles de execução' },
   pl: { brand: 'Nadzorca', operations: 'Centrum operacyjne', capabilities: 'Możliwości protokołów', reviews: 'Przeglądy misji', boundary: 'Diagnostyka tylko do odczytu', protocols: 'protokołów', safety: 'sklasyfikowanych pod kątem bezpieczeństwa', supervisory: 'tylko nadzorczych', mutating: 'deklaruje możliwość modyfikacji', safe: 'Tylko odczyt · bez kontroli wykonania' },
@@ -26,7 +25,7 @@ export default async function SupervisorLayout({ children }: { children: ReactNo
   ] as const
 
   return <div>
-    <nav aria-label={uiCopy('u_6bb079952a4fd53e')} style={nav}>
+    <nav aria-label={uiText('generatedUi.u_240166ab617c5bc9')} style={nav}>
       <strong style={brand}>{t.brand}</strong>
       <div style={linksStyle}>{links.map(link => <Link key={link.href} href={link.href} style={item}>{link.label}</Link>)}</div>
       <span style={boundary}>{t.boundary}</span>

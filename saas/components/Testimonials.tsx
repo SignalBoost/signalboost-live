@@ -2,9 +2,6 @@
 
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const testimonials = [
   { name: 'Sarah K.', key: 't1' },
   { name: 'Marcus T.', key: 't2' },
@@ -14,9 +11,9 @@ const testimonials = [
 export default function Testimonials() {
   const { dict } = useI18n()
   return (
-    <section className="sb-page-shell sb-section" aria-label={t(dict, 'testimonials.eyebrow', uiCopy('u_d715bd79a9995678'))}>
-      <span className="sb-eyebrow">{t(dict, 'testimonials.eyebrow', uiCopy('u_46c9885a98bc496c'))}</span>
-      <h2 className="sb-h2" style={{ marginTop: 10, marginBottom: 24 }}>{t(dict, 'testimonials.heading', uiCopy('u_213dbc342b241801'))}</h2>
+    <section className="sb-page-shell sb-section" aria-label={t(dict, 'testimonials.eyebrow')}>
+      <span className="sb-eyebrow">{t(dict, 'testimonials.eyebrow')}</span>
+      <h2 className="sb-h2" style={{ marginTop: 10, marginBottom: 24 }}>{t(dict, 'testimonials.heading')}</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         {testimonials.map(item => (
           <article key={item.name} className="sb-card" style={{ padding: 24 }}>

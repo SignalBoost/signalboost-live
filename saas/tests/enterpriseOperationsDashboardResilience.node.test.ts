@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { parseOperationsDashboardApiResponse } from '../lib/enterprise/operations/operationsDashboardResponse.ts'
 import { getOperationsDashboardStateCopy, operationsDashboardStateCopy } from '../lib/i18n/operationsDashboardStateCopy.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const snapshot = {
   organizationId: 'org-1',
@@ -34,7 +36,7 @@ test('dashboard state copy is complete and localized across all five required la
 })
 
 test('dashboard loader parses responses before rendering and rejects cross-organization snapshots', async () => {
-  const source = await readFile(new URL('../components/enterprise/ExecutiveOperationsDashboardLoader.tsx', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../components/enterprise/ExecutiveOperationsDashboardLoader.tsx', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /parseOperationsDashboardApiResponse\(await response\.json\(\)\)/)
   assert.match(source, /body\.snapshot\.organizationId !== organizationId/)
   assert.match(source, /setSnapshot\(null\)/)

@@ -6,8 +6,7 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type CapabilityResponse = {
   ok: boolean
@@ -36,10 +35,10 @@ type PreviewResponse = {
 }
 
 const LABELS: Record<ProviderExecutionMode, string> = {
-  direct: uiCopy('u_7c61c36a8a4e8f94'),
-  cosa_pr: uiCopy('u_8fdfb6ad7cc267fb'),
-  browser_agent: uiCopy('u_f20e46951457fda9'),
-  manual: uiCopy('u_ed7a1f19a41da460'),
+  direct: "Direct API",
+  cosa_pr: "Governed AI infrastructure PR",
+  browser_agent: "Browser Agent assistance",
+  manual: "Direct configuration",
 }
 
 export type ProviderExecutionModePanelProps = {
@@ -145,14 +144,14 @@ export default function ProviderExecutionModePanel({
   const availableModes = capabilityResponse?.availableModes ?? []
 
   return (
-    <section aria-label={uiCopy('u_997f30e573833d7b')} style={{ display: 'grid', gap: 10 }}>
+    <section aria-label={uiText('generatedUi.u_dfd407e598bdb1a9')} style={{ display: 'grid', gap: 10 }}>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}><LocalizedText fallback={uiCopy('u_f3f55093762bfecd')} /></div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}><LocalizedText fallback={uiCopy('u_3508c106d23a9ca6')} /></div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}><LocalizedText fallback={uiText('generatedUi.u_24dbd0e1e35a7a41')} /></div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}><LocalizedText fallback={uiText('generatedUi.u_c4c61d6000a811ab')} /></div>
       </div>
 
       {capabilityLoading && (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_b89173e3e563080e')}</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{uiText('generatedUi.u_3c796c1059311507')}</div>
       )}
 
       {!capabilityLoading && capabilityResponse?.ok && (
@@ -186,18 +185,18 @@ export default function ProviderExecutionModePanel({
           </div>
 
           {capabilityResponse.reviewed && (
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.42)' }}>{uiCopy('u_30fb5cf1bb804ce3')}{capabilityResponse.reviewed.reviewer} · {capabilityResponse.reviewed.reviewedAt}
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.42)' }}>{uiText('generatedUi.u_031cc20288b8fb16')}{capabilityResponse.reviewed.reviewer} · {capabilityResponse.reviewed.reviewedAt}
             </div>
           )}
         </>
       )}
 
       {!capabilityLoading && capabilityResponse && !capabilityResponse.ok && (
-        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{capabilityResponse.error || uiCopy('u_0b50a8e0ebabc880')}</div>
+        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{capabilityResponse.error || uiText('generatedUi.u_84ecf5bd99e57872')}</div>
       )}
 
       {previewEnabled && previewLoading && (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_863094e9e7907780')}</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{uiText('generatedUi.u_7b62b3c39f807deb')}</div>
       )}
 
       {previewEnabled && !previewLoading && previewResponse?.ok && previewResponse.preview && (
@@ -206,13 +205,13 @@ export default function ProviderExecutionModePanel({
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.62)' }}>{previewResponse.preview.target}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.62)' }}>{previewResponse.preview.expectedVerification}</div>
           <div style={{ fontSize: 11, color: previewResponse.preview.executesProviderMutation ? '#fbbf24' : '#22c55e' }}>
-            {previewResponse.preview.executesProviderMutation ? uiCopy('u_cb31f7112763c6e7') : uiCopy('u_7bf76f842e57a1e9')}
+            {previewResponse.preview.executesProviderMutation ? uiText('generatedUi.u_1d1679b9155c46fe') : uiText('generatedUi.u_17181036a40a9b75')}
           </div>
         </div>
       )}
 
       {previewEnabled && !previewLoading && previewResponse && !previewResponse.ok && (
-        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{previewResponse.error || uiCopy('u_fc8544fc1bbfc66a')}</div>
+        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{previewResponse.error || uiText('generatedUi.u_b99fa6c061504f00')}</div>
       )}
     </section>
   )

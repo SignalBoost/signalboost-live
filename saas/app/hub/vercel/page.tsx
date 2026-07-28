@@ -5,8 +5,7 @@
 // Reachable at /hub/vercel. Gated to admins by app/hub/layout.tsx.
 
 import EnvVarsPage from '@/components/hub/pages/EnvVarsPage'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export default function HubVercelEnvPage() {
   return (
@@ -21,7 +20,7 @@ export default function HubVercelEnvPage() {
         overflowX: 'hidden',
       }}
     >
-      <style>{uiCopy('u_c5a0ea44c2be6dab')}</style>
+      <style>{"\n        .hub-chip{transition:background .15s ease,color .15s ease,border-color .15s ease;cursor:pointer;}\n        .hub-chip:hover{border-color:rgba(255,195,0,.6);}\n      "}</style>
 
       <header
         style={{
@@ -40,12 +39,12 @@ export default function HubVercelEnvPage() {
               background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)',
               WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
             }}
-          >{uiCopy('u_2a6272e366672170')}</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'rgba(255,255,255,.58)' }}>{uiCopy('u_3384e9ab5ee077e0')}</p>
+          >{uiText('generatedUi.u_b7ecb858127d5816')}</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'rgba(255,255,255,.58)' }}>{uiText('generatedUi.u_fe6a0825c7a8e5d7')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <a href="/hub" className="hub-chip" style={{ padding: '8px 13px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.72)', textDecoration: 'none', fontSize: 12.5, fontWeight: 800 }}>{uiCopy('u_f095591f2a17e244')}</a>
-          <a href="/hub/providers" className="hub-chip" style={{ padding: '8px 13px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.72)', textDecoration: 'none', fontSize: 12.5, fontWeight: 800 }}>{uiCopy('u_84bc905ca3e8d03c')}</a>
+          <a href="/hub" className="hub-chip" style={{ padding: '8px 13px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.72)', textDecoration: 'none', fontSize: 12.5, fontWeight: 800 }}>{uiText('generatedUi.u_1641d242a6af76cc')}</a>
+          <a href="/hub/providers" className="hub-chip" style={{ padding: '8px 13px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.72)', textDecoration: 'none', fontSize: 12.5, fontWeight: 800 }}>{uiText('generatedUi.u_2cdda41fd070970a')}</a>
         </div>
       </header>
 

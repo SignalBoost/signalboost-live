@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const BRAND = '⚡ SignalBoost'
 
@@ -19,7 +18,7 @@ type HeaderCopy = {
 }
 
 const COPY: Record<Language, HeaderCopy> = {
-  en: { podcasters: uiCopy('u_4f5a7bdcfbae0d94'), pricing: uiCopy('u_1025bf0d04a64bdb'), docs: uiCopy('u_bbc23cdefbbe5573'), dashboard: uiCopy('u_848d2ba7607ab0c3'), faq: uiCopy('u_37d1629c42b08690'), getStarted: uiCopy('u_2f35985ca6a0f226') },
+  en: { podcasters: uiText('generatedUi.u_0d74ad5328bfdd35'), pricing: uiText('generatedUi.u_dfe95783edfef791'), docs: uiText('generatedUi.u_7af023c43013b9a5'), dashboard: uiText('generatedUi.u_67b696468610b879'), faq: uiText('generatedUi.u_dbc468a14b601d5d'), getStarted: uiText('generatedUi.u_61e8d44ad423a4a0') },
   es: { podcasters: 'Podcasters', pricing: 'Precios', docs: 'Documentación', dashboard: 'Panel', faq: 'Preguntas frecuentes', getStarted: 'Comenzar' },
   pt: { podcasters: 'Podcasters', pricing: 'Preços', docs: 'Documentação', dashboard: 'Painel', faq: 'Perguntas frequentes', getStarted: 'Começar' },
   pl: { podcasters: 'Podcasterzy', pricing: 'Cennik', docs: 'Dokumentacja', dashboard: 'Panel', faq: 'Najczęstsze pytania', getStarted: 'Rozpocznij' },

@@ -3,16 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
 const LANGUAGES = [
-  { code: 'en', label: uiCopy('u_12574742f98e4bc8') },
-  { code: 'es', label: uiCopy('u_f1eb57ebff8fcc74') },
-  { code: 'pt', label: uiCopy('u_3b763413357c629d') },
-  { code: 'pl', label: uiCopy('u_2f3801d6d9429a1f') },
+  { code: 'en', label: uiText('generatedUi.u_ba118bf7fc9c1aed') },
+  { code: 'es', label: uiText('generatedUi.u_94b382b61b9dde0f') },
+  { code: 'pt', label: uiText('generatedUi.u_d4ada8ec276411a1') },
+  { code: 'pl', label: uiText('generatedUi.u_a5989ca14f3485cc') },
   { code: 'ru', label: 'Русский' },
 ]
 
@@ -44,7 +43,7 @@ export default function SettingsPage() {
         const res = await fetch('/api/settings', { cache: 'no-store' })
         const data = await res.json()
         if (!active) return
-        if (!res.ok) { setError(data?.error || uiCopy('u_d8d2f7153e6f87bd')); return }
+        if (!res.ok) { setError(data?.error || "Could not load your settings."); return }
         if (data.settings) {
           setSettings({
             display_name: data.settings.display_name ?? '',
@@ -56,7 +55,7 @@ export default function SettingsPage() {
         }
         setEmail(data.email || '')
       } catch {
-        if (active) setError(uiCopy('u_001993ffdea9db46'))
+        if (active) setError("Something went wrong loading your settings.")
       } finally {
         if (active) setLoading(false)
       }
@@ -79,12 +78,12 @@ export default function SettingsPage() {
         body: JSON.stringify(settings),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data?.error || uiCopy('u_75ea6b9600ba8161')); return }
+      if (!res.ok) { setError(data?.error || "Could not save your settings."); return }
       setSaved(true)
       // Apply the chosen language to the UI immediately.
       if (settings.locale && settings.locale !== lang) setLang(settings.locale)
     } catch {
-      setError(uiCopy('u_db640eff4e29604e'))
+      setError("Could not save your settings.")
     } finally {
       setSaving(false)
     }
@@ -105,7 +104,7 @@ export default function SettingsPage() {
             <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
               <div style={{ paddingTop: 0 }}><b className="gold" style={{ fontSize: 14 }}>{email || '—'}</b><span>{tr('settings.email', 'Account email')}</span></div>
               <div style={{ paddingTop: 0 }}><b style={{ fontSize: 14 }}>{langLabel}</b><span>{tr('settings.language', 'Language')}</span></div>
-              <div style={{ paddingTop: 0 }}><b className={settings.email_notifications ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{settings.email_notifications ? uiCopy('u_8a97b698efbd0150') : uiCopy('u_9e9522543f6a8b60')}</b><span>{tr('settings.notifications', 'Notifications')}</span></div>
+              <div style={{ paddingTop: 0 }}><b className={settings.email_notifications ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{settings.email_notifications ? uiText('generatedUi.u_e8a01133b1351e5f') : uiText('generatedUi.u_38cca6bea010af8a')}</b><span>{tr('settings.notifications', 'Notifications')}</span></div>
             </div>
           ) : null}
         </div>

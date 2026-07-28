@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -62,46 +61,46 @@ type FeedbackCopy = {
 
 const COPY: Record<string, FeedbackCopy> = {
   en: {
-    title: uiCopy('u_fea40eb7b13e9636'),
-    subtitle: uiCopy('u_912fb3f58f8b843b'),
-    submitTab: uiCopy('u_8fa622edb8348441'),
-    boardTab: uiCopy('u_2e8fcbb8c7a3eb34'),
-    thankYou: uiCopy('u_673eaf28d199901c'),
-    thankYouMessage: uiCopy('u_9fc9e5eb1da9e35e'),
-    submitMore: uiCopy('u_f14ee8de1de118bf'),
-    viewBoard: uiCopy('u_986945ce090e0fd3'),
-    ratingLabel: uiCopy('u_c62c5a8ebb7578bd'),
-    categoryLabel: uiCopy('u_341333097c272a93'),
-    messageLabel: uiCopy('u_bd80828b8c22788e'),
+    title: uiText('generatedUi.u_aac77df347205252'),
+    subtitle: uiText('generatedUi.u_fae6a5db7a1b9283'),
+    submitTab: uiText('generatedUi.u_8962a6170c69391b'),
+    boardTab: uiText('generatedUi.u_9f4e3b92825e7441'),
+    thankYou: uiText('generatedUi.u_268bc1833e83306f'),
+    thankYouMessage: uiText('generatedUi.u_1fb1c3075c61de42'),
+    submitMore: uiText('generatedUi.u_a8cbc7b907eddc7c'),
+    viewBoard: uiText('generatedUi.u_5730d14535a91791'),
+    ratingLabel: uiText('generatedUi.u_47fd32e33dde3eec'),
+    categoryLabel: uiText('generatedUi.u_e53b8ffde6ebf331'),
+    messageLabel: uiText('generatedUi.u_ed0adc55f2bd07e9'),
     placeholders: {
-      bug: uiCopy('u_b02e3ecc6c2f5f0d'),
-      feature: uiCopy('u_b0326a7dcecfbd28'),
-      praise: uiCopy('u_4bc06b64015e0c76'),
-      general: uiCopy('u_53ed905062b32822'),
+      bug: uiText('generatedUi.u_e01f6b27387d47eb'),
+      feature: uiText('generatedUi.u_3d4675041d69e9b4'),
+      praise: uiText('generatedUi.u_91afafffdf840203'),
+      general: uiText('generatedUi.u_8ebcc11fe101846f'),
     },
-    characters: uiCopy('u_616ffd10d827cdfd'),
-    notice: uiCopy('u_7a87edce26a05175'),
-    submitting: uiCopy('u_691f260fd7593218'),
-    submit: uiCopy('u_2f2fe7b1befc4f5f'),
-    communityFeedback: uiCopy('u_40226571d55bebd3'),
-    all: uiCopy('u_03fb965bd5526063'),
-    loading: uiCopy('u_98de8abb072466e3'),
-    emptyTitle: uiCopy('u_fcf3d145c26d6b36'),
-    emptyText: uiCopy('u_4196635fc8542152'),
-    you: uiCopy('u_1450b97dc8c1585b'),
-    time: { days: 'd', hours: 'h', mins: 'm', ago: uiCopy('u_07565f1600326806'), now: uiCopy('u_c19475397076b502') },
-    ratings: ['', uiCopy('u_10d78e7cf147f8bc'), uiCopy('u_24a6a75053a5a84c'), uiCopy('u_bc65273d40e5f1a5'), uiCopy('u_48c6718088cd1e24'), uiCopy('u_89d7db142509d208')],
+    characters: uiText('generatedUi.u_25d939ffd0d79b73'),
+    notice: uiText('generatedUi.u_ee307eda893a2f47'),
+    submitting: uiText('generatedUi.u_64115d5b9c794c92'),
+    submit: uiText('generatedUi.u_4a101ec79a35b0a2'),
+    communityFeedback: uiText('generatedUi.u_9af058b7a53bac6f'),
+    all: uiText('generatedUi.u_a52ace420f2175d0'),
+    loading: uiText('generatedUi.u_94ec56d35dc6b595'),
+    emptyTitle: uiText('generatedUi.u_725e906827e67868'),
+    emptyText: uiText('generatedUi.u_903508a31e9f2ea8'),
+    you: uiText('generatedUi.u_08b041935798fbf6'),
+    time: { days: 'd', hours: 'h', mins: 'm', ago: uiText('generatedUi.u_1d8e08fd63268284'), now: uiText('generatedUi.u_66f53417d3b7797a') },
+    ratings: ['', uiText('generatedUi.u_94dfd46d9dae63e6'), uiText('generatedUi.u_f7b19afcde965ea4'), uiText('generatedUi.u_c939327ca16dcf97'), uiText('generatedUi.u_c8cc1c7bb662fcb4'), uiText('generatedUi.u_1e5b9c4d7c7853fa')],
     categories: [
-      { id: uiCopy('u_d440cf82e08685d8'), icon: '🎉', label: uiCopy('u_3c6ba3bb48da8f86'), desc: uiCopy('u_4138fd4f0ecf67c1') },
-      { id: uiCopy('u_95f410beaefd9b65'), icon: '💡', label: uiCopy('u_0e2985dc23c80f39'), desc: uiCopy('u_e8199202083429b9') },
-      { id: uiCopy('u_2997ad0e4626d39e'), icon: '🐛', label: uiCopy('u_f32a0160d55c47b3'), desc: uiCopy('u_99a8f54c5feebed3') },
-      { id: uiCopy('u_45189849031cb670'), icon: '💬', label: uiCopy('u_08afe29d087cb337'), desc: uiCopy('u_f886fe134d56a749') },
+      { id: "praise", icon: '🎉', label: uiText('generatedUi.u_2a9c05a07ef497af'), desc: uiText('generatedUi.u_61c27afa86663280') },
+      { id: "feature", icon: '💡', label: uiText('generatedUi.u_89ee3fcc460b5443'), desc: uiText('generatedUi.u_9edc836f3d294331') },
+      { id: "bug", icon: '🐛', label: uiText('generatedUi.u_a79b02e8595f17a8'), desc: uiText('generatedUi.u_6fb8f3971ce8b229') },
+      { id: "general", icon: '💬', label: uiText('generatedUi.u_c910d474dcd724bf'), desc: uiText('generatedUi.u_5e48ed88e62d8d0d') },
     ],
     statuses: {
-      new: uiCopy('u_cde519f6512d9d98'),
-      reviewing: uiCopy('u_5a05c192553973ca'),
-      planned: uiCopy('u_00f1f6df430b9496'),
-      done: uiCopy('u_b8de5f1577781f20'),
+      new: uiText('generatedUi.u_18fdd549b2ed367a'),
+      reviewing: uiText('generatedUi.u_9e8a3b648cf75788'),
+      planned: uiText('generatedUi.u_fb6f7c93e6bf3dfa'),
+      done: uiText('generatedUi.u_11a6767d5674c7e4'),
     },
   },
 
@@ -411,8 +410,8 @@ export default function FeedbackPage() {
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
         {[
-          { id: uiCopy('u_55a9ae0be7a5d1a5'), label: copy.submitTab },
-          { id: uiCopy('u_2599261290753fd9'), label: `${copy.boardTab} ${allFeedback.length > 0 ? `(${allFeedback.length})` : ''}` },
+          { id: "submit", label: copy.submitTab },
+          { id: "board", label: `${copy.boardTab} ${allFeedback.length > 0 ? `(${allFeedback.length})` : ''}` },
         ].map((item) => (
           <button
             key={item.id}
@@ -603,7 +602,7 @@ export default function FeedbackPage() {
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{copy.communityFeedback}</h2>
 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {[{ id: uiCopy('u_14b9a86b88d738f3'), label: copy.all }, ...copy.categories.map((cat) => ({ id: cat.id, label: `${cat.icon} ${cat.label}` }))].map((filter) => (
+              {[{ id: "all", label: copy.all }, ...copy.categories.map((cat) => ({ id: cat.id, label: `${cat.icon} ${cat.label}` }))].map((filter) => (
                 <button
                   key={filter.id}
                   onClick={() => setFilterCategory(filter.id)}

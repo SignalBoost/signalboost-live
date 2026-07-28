@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -51,43 +50,43 @@ type TeamCopy = {
 
 const COPY: Record<string, TeamCopy> = {
   en: {
-    account: uiCopy('u_8bff7468404bdae9'),
-    title: uiCopy('u_f540879461ae532a'),
-    subtitle: uiCopy('u_c590588513fca12a'),
-    notAllowedTitle: uiCopy('u_dedfcf27be97f899'),
-    notAllowedBody: uiCopy('u_6dc53865d8188cc2'),
-    addTitle: uiCopy('u_3d6d26a6e095295a'),
-    emailPlaceholder: uiCopy('u_2a621b14e48bac7b'),
-    add: uiCopy('u_ad1ef30820c0a914'),
-    adding: uiCopy('u_cbae817149a7144a'),
-    loading: uiCopy('u_ac6eae0852beef74'),
-    empty: uiCopy('u_0f9d6a0b8fc24627'),
-    thatsYou: uiCopy('u_7e192dcfe526f7dd'),
-    remove: uiCopy('u_79f94ce4c52008b2'),
-    removeTitle: uiCopy('u_88ce2cd5bbcb4ff4'),
-    edit: uiCopy('u_eccc6489aa5c1e6b'),
-    save: uiCopy('u_fff942f05434005a'),
-    cancel: uiCopy('u_0a040afc3fb1c1fc'),
-    deleteConfirm: uiCopy('u_ffdd609a060e0911'),
-    confirmDelete: uiCopy('u_c573d79ef2b46989'),
-    loadError: uiCopy('u_22d1ebe89b619fd3'),
-    genericLoadError: uiCopy('u_fa94ef71d5c7de46'),
-    addError: uiCopy('u_d2a14bad65067420'),
-    addGenericError: uiCopy('u_7aaacd733d0ee4df'),
-    howRolesWork: uiCopy('u_95f5e5d712f15770'),
-    ownerRule: uiCopy('u_70d874870b4f3f45'),
-    adminRule: uiCopy('u_02ab5bb96ea9dc3e'),
-    memberRule: uiCopy('u_95966b836485a967'),
-    pendingNote: uiCopy('u_2bce251d1279b63b'),
+    account: uiText('generatedUi.u_7e1b0d5641f2640c'),
+    title: uiText('generatedUi.u_459ef18a152b8ba1'),
+    subtitle: uiText('generatedUi.u_0a700c292d374813'),
+    notAllowedTitle: uiText('generatedUi.u_23a99517ff6f9d1f'),
+    notAllowedBody: uiText('generatedUi.u_7a8a65c0a09ea176'),
+    addTitle: uiText('generatedUi.u_5dd78053d511b1d4'),
+    emailPlaceholder: uiText('generatedUi.u_7039f319f9811cec'),
+    add: uiText('generatedUi.u_9fd728c66c9a256b'),
+    adding: uiText('generatedUi.u_c6de6f45c827f464'),
+    loading: uiText('generatedUi.u_3de47cef246bee33'),
+    empty: uiText('generatedUi.u_fbb64e2d2bda2618'),
+    thatsYou: uiText('generatedUi.u_0d34bc547e773fed'),
+    remove: uiText('generatedUi.u_c3812fc4acb861d5'),
+    removeTitle: uiText('generatedUi.u_c3812fc4acb861d5'),
+    edit: uiText('generatedUi.u_464c4ffd019e1e96'),
+    save: uiText('generatedUi.u_1509f561f2416598'),
+    cancel: uiText('generatedUi.u_19766ed6ccb2f4a3'),
+    deleteConfirm: uiText('generatedUi.u_c1b15a3712482b37'),
+    confirmDelete: uiText('generatedUi.u_eebdd24a77d9ad32'),
+    loadError: uiText('generatedUi.u_b57b19d6b0700604'),
+    genericLoadError: uiText('generatedUi.u_30a12799f76e147f'),
+    addError: uiText('generatedUi.u_221884effddc6568'),
+    addGenericError: uiText('generatedUi.u_8278ffd3286a5580'),
+    howRolesWork: uiText('generatedUi.u_0b45c92e37513eb1'),
+    ownerRule: uiText('generatedUi.u_a164fdac4065a697'),
+    adminRule: uiText('generatedUi.u_596eeed11fa8f516'),
+    memberRule: uiText('generatedUi.u_0cd2c53462d490c7'),
+    pendingNote: uiText('generatedUi.u_380d4f77d0c06c90'),
     roles: {
-      owner: { label: uiCopy('u_b320386798c030a8'), desc: uiCopy('u_98c3aca725942357') },
-      admin: { label: uiCopy('u_ca595b91deec1139'), desc: uiCopy('u_edfe8414acd8624e') },
-      member: { label: uiCopy('u_51b02cc3f85f7abb'), desc: uiCopy('u_44d68e54b556c43a') },
+      owner: { label: uiText('generatedUi.u_4b1b8aa3608a26da'), desc: uiText('generatedUi.u_666865dcc0bcd654') },
+      admin: { label: uiText('generatedUi.u_8df5ca22998a696a'), desc: uiText('generatedUi.u_6f2a319d32b4683b') },
+      member: { label: uiText('generatedUi.u_7c968fb71f50e335'), desc: uiText('generatedUi.u_729370552a262bea') },
     },
     statuses: {
-      pending: uiCopy('u_4d541d83a24e0425'),
-      active: uiCopy('u_567a1f5f4ec4606b'),
-      removed: uiCopy('u_be3338696a22497e'),
+      pending: uiText('generatedUi.u_a05a295b1cc5d206'),
+      active: uiText('generatedUi.u_92340695899bd2d8'),
+      removed: uiText('generatedUi.u_4118fb4fed0ecec9'),
     },
   },
 

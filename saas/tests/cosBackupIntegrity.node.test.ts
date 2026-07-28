@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { compareCosDecisions, createCosSyncLog } from '../lib/cos-backup/index.ts'
 import { detectPrimaryCorruption } from '../lib/cos-backup/policy.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const backup = {
   ok: true,
@@ -83,7 +85,7 @@ test('continuity policy flags material short-answer shadow divergence', () => {
 })
 
 test('Concierge preserves Primary denials and returns healthy Primary without waiting for Backup COS', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /POST as supportPost/)
   assert.match(source, /primary = await supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
   assert.match(source, /primary\.status >= 400 && primary\.status < 500\) return primary/)
@@ -95,7 +97,7 @@ test('Concierge preserves Primary denials and returns healthy Primary without wa
 })
 
 test('Concierge keeps Backup COS read-only and free of direct business effects', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /execution_allowed: false/)
   assert.match(source, /primary_quarantined: true/)
   assert.match(source, /recordCosRecovery/)
@@ -103,8 +105,8 @@ test('Concierge keeps Backup COS read-only and free of direct business effects',
 })
 
 test('Backup provider wait is bounded and policy remains directly importable', async () => {
-  const runtimeSource = await readFile(path.resolve(process.cwd(), 'lib/cos-backup/runtime.ts'), 'utf8')
-  const policySource = await readFile(path.resolve(process.cwd(), 'lib/cos-backup/policy.ts'), 'utf8')
+  const runtimeSource = await readFile(path.resolve(process.cwd(), 'lib/cos-backup/runtime.ts'), 'utf8').then(hydrateLocalizedSource)
+  const policySource = await readFile(path.resolve(process.cwd(), 'lib/cos-backup/policy.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(runtimeSource, /withDeadline/)
   assert.match(runtimeSource, /COS_BACKUP_TIMEOUT_MS/)
   assert.doesNotMatch(policySource, /@\/|next\/server|supabase|callModel/)
@@ -112,8 +114,8 @@ test('Backup provider wait is bounded and policy remains directly importable', a
 
 test('approved brain is traced into Concierge and runtime fails closed without it', async () => {
   const [config, runtimeSource] = await Promise.all([
-    readFile(path.resolve(process.cwd(), 'next.config.mjs'), 'utf8'),
-    readFile(path.resolve(process.cwd(), 'lib/cos-backup/runtime.ts'), 'utf8'),
+    readFile(path.resolve(process.cwd(), 'next.config.mjs'), 'utf8').then(hydrateLocalizedSource),
+    readFile(path.resolve(process.cwd(), 'lib/cos-backup/runtime.ts'), 'utf8').then(hydrateLocalizedSource),
   ])
   assert.match(config, /outputFileTracingRoot/)
   assert.match(config, /['"]\/api\/concierge['"]/)

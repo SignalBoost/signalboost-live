@@ -3,8 +3,7 @@
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -40,19 +39,19 @@ function deriveState(campaign: any): { state: CardState; step: number; note: str
   const hasBase = Boolean(video?.hasKlingUrl)
   const voiced = voiceVerified || (Array.isArray(video?.voicedLangs) && video.voicedLangs.length > 0)
 
-  if (campaign?.approved_at && PUBLISHED_STATUSES.has(status)) return { state: 'published', step: 3, note: uiCopy('u_99a248688a8af728') }
-  if (campaign?.approved_at) return { state: 'approved', step: 3, note: uiCopy('u_11a479c85a3ceb52') }
-  if (silentFallback) return { state: 'working', step: 2, note: uiCopy('u_4b9b9c2d6ff16215') }
-  if (finalReady) return { state: 'ready', step: 3, note: uiCopy('u_b9d22a00b60fa38c') }
-  if (eligibility.startsWith('STUCK') || stage === 'failed') return { state: 'problem', step: hasBase ? 2 : 1, note: uiCopy('u_6c931ef9b685e1cd') }
-  if (!hasBase) return { state: 'working', step: 1, note: uiCopy('u_f0b5663c63dd129a') }
-  if (!voiced) return { state: 'working', step: 2, note: uiCopy('u_5839e3eb1af86a1a') }
-  return { state: 'working', step: 3, note: uiCopy('u_cd6744e3f7b3d307') }
+  if (campaign?.approved_at && PUBLISHED_STATUSES.has(status)) return { state: 'published', step: 3, note: uiText('generatedUi.u_081c2bedad4e180d') }
+  if (campaign?.approved_at) return { state: 'approved', step: 3, note: uiText('generatedUi.u_7a4003bb3ab68de0') }
+  if (silentFallback) return { state: 'working', step: 2, note: uiText('generatedUi.u_68021493edfb374c') }
+  if (finalReady) return { state: 'ready', step: 3, note: uiText('generatedUi.u_2d87483cc595f92d') }
+  if (eligibility.startsWith('STUCK') || stage === 'failed') return { state: 'problem', step: hasBase ? 2 : 1, note: uiText('generatedUi.u_a32db953e6d2aada') }
+  if (!hasBase) return { state: 'working', step: 1, note: uiText('generatedUi.u_d85912e1f96c4389') }
+  if (!voiced) return { state: 'working', step: 2, note: uiText('generatedUi.u_e19d252808b7f7c4') }
+  return { state: 'working', step: 3, note: uiText('generatedUi.u_886433533f778062') }
 }
 
 function Steps({ step, state }: { step: number; state: CardState }) {
   return <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-    {[uiCopy('u_47216c7d60710e0e'), uiCopy('u_7912bbe2dd9e37e5'), uiCopy('u_db775228a7544f12')].map((label, index) => {
+    {["Create video", "Voice & captions", "Brand banner"].map((label, index) => {
       const n = index + 1
       const done = state === 'ready' || state === 'approved' || state === 'published' || n < step
       const active = state === 'working' && n === step
@@ -60,7 +59,7 @@ function Steps({ step, state }: { step: number; state: CardState }) {
       return <div key={label} style={{ display: 'flex', gap: 7, alignItems: 'center', padding: '6px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(0,0,0,.25)' }}>
         <b style={{ color: done ? GREEN : failed ? RED : active ? CYAN : 'rgba(255,255,255,.35)' }}>{done ? '✓' : failed ? '!' : n}</b>
         <span style={{ color: done || active || failed ? '#fff' : 'rgba(255,255,255,.45)', fontSize: 13, fontWeight: 700 }}>{label}</span>
-        {active && <small style={{ color: CYAN, fontWeight: 900 }}>{uiCopy('u_fccf59e431f9a269')}</small>}
+        {active && <small style={{ color: CYAN, fontWeight: 900 }}>{uiText('generatedUi.u_6a9e3a722d19c6e6')}</small>}
       </div>
     })}
   </div>
@@ -108,7 +107,7 @@ export default function CosaVideoPipelinePage() {
         credentials: 'include',
       }).catch(() => null)
     } catch (e: any) {
-      if (!quiet) setMessage(e?.message || uiCopy('u_2e79309763078f71'))
+      if (!quiet) setMessage(e?.message || "Could not load videos.")
     } finally {
       if (!quiet) setLoading(false)
     }
@@ -131,16 +130,16 @@ export default function CosaVideoPipelinePage() {
       if (Number(result?.published || 0) > 0) {
         const liveResult = Array.isArray(result?.results) ? result.results.find((item: any) => item?.ok && item?.liveUrl) : null
         setMessage(liveResult?.liveUrl
-          ? uiCopy('u_c1131ffada336295')
-          : uiCopy('u_8d41ed8259dbc124'))
+          ? "Approved and published. The live-link email is being sent."
+          : "Approved and published. Refresh to confirm the live platform link.")
       } else if (Number(result?.attempted || 0) > 0) {
         const failed = Array.isArray(result?.results) ? result.results.find((item: any) => !item?.ok) : null
-        setMessage(`Approved, but publishing needs attention: ${failed?.error || uiCopy('u_0fddb809a2a4c02a')}`)
+        setMessage(`Approved, but publishing needs attention: ${failed?.error || "The platform did not accept the publish request."}`)
       } else {
-        setMessage(uiCopy('u_8d10b9c08dee6c6b'))
+        setMessage("Approved. Publishing continues automatically. The live link will be emailed when it is live.")
       }
       await load(true)
-    } catch (e: any) { setMessage(e?.message || uiCopy('u_c407b0752eb73e8c')) } finally { setBusyId('') }
+    } catch (e: any) { setMessage(e?.message || "Approval failed.") } finally { setBusyId('') }
   }
 
   async function redo(id: string) {
@@ -150,8 +149,8 @@ export default function CosaVideoPipelinePage() {
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error(json?.error || 'Could not restart video.')
       setData(json)
-      setMessage(uiCopy('u_658b4f408cb51924'))
-    } catch (e: any) { setMessage(e?.message || uiCopy('u_f76519c758fc1775')) } finally { setBusyId('') }
+      setMessage("Video restarted automatically.")
+    } catch (e: any) { setMessage(e?.message || "Could not restart video.") } finally { setBusyId('') }
   }
 
   async function crosspost(id: string, platform: string) {
@@ -160,8 +159,8 @@ export default function CosaVideoPipelinePage() {
       const res = await fetch('/api/cos/campaign-queue/crosspost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, platform }) })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.ok) throw new Error(json.error || 'Cross-post failed.')
-      setMessage(json.liveUrl ? `Posted. Live link: ${json.liveUrl}` : uiCopy('u_dfa14137c99b360f'))
-    } catch (e: any) { setMessage(e?.message || uiCopy('u_038b456c8df94daf')) } finally { setBusyId('') }
+      setMessage(json.liveUrl ? `Posted. Live link: ${json.liveUrl}` : "Posted. The live link will be emailed shortly.")
+    } catch (e: any) { setMessage(e?.message || "Cross-post failed.") } finally { setBusyId('') }
   }
 
   async function republish(id: string) {
@@ -170,9 +169,9 @@ export default function CosaVideoPipelinePage() {
       const res = await fetch('/api/cos/campaign-queue/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.ok) throw new Error(json.error || 'Retry failed.')
-      setMessage(json.liveUrl ? `Published. Live link: ${json.liveUrl}` : uiCopy('u_23a1d4f667741e66'))
+      setMessage(json.liveUrl ? `Published. Live link: ${json.liveUrl}` : "Re-queued. The live link will be emailed when it goes live.")
       await load(true)
-    } catch (e: any) { setMessage(e?.message || uiCopy('u_816fb2e334d79937')) } finally { setBusyId('') }
+    } catch (e: any) { setMessage(e?.message || "Retry failed.") } finally { setBusyId('') }
   }
 
   async function archiveAction(id: string, action: 'archive' | 'restore') {
@@ -181,9 +180,9 @@ export default function CosaVideoPipelinePage() {
       const res = await fetch('/api/cos/video-archive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, action }) })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error(json?.error || 'Archive action failed.')
-      setMessage(action === 'archive' ? uiCopy('u_b8cf2bccb78ef87a') : uiCopy('u_74d3a4d4d2762128'))
+      setMessage(action === 'archive' ? "Video archived." : "Video restored.")
       await load(true)
-    } catch (e: any) { setMessage(e?.message || uiCopy('u_5c5d28dcaf071f0a')) } finally { setBusyId('') }
+    } catch (e: any) { setMessage(e?.message || "Archive action failed.") } finally { setBusyId('') }
   }
 
   const all = Array.isArray(data?.campaigns) ? data.campaigns : []
@@ -198,54 +197,54 @@ export default function CosaVideoPipelinePage() {
 
   return <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
-      <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em' }}><LocalizedText fallback={uiCopy('u_494965182f71b3f4')} /></p>
-      <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}><LocalizedText fallback={uiCopy('u_6d3522346151d1c3')} /></h1>
-      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65 }}><LocalizedText fallback={uiCopy('u_33b7dc558824d800')} /></p>
+      <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em' }}><LocalizedText fallback={uiText('generatedUi.u_eec3ef3754166d8b')} /></p>
+      <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}><LocalizedText fallback={uiText('generatedUi.u_5fb1494345ed5c5b')} /></h1>
+      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65 }}><LocalizedText fallback={uiText('generatedUi.u_76b43c8466dccf77')} /></p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-        {([uiCopy('u_b0a3d7b387b09a68'), uiCopy('u_beb922fa92e81874'), uiCopy('u_db367d7f58a4ca67')] as Tab[]).map((name) => <button key={name} onClick={() => setTab(name)} style={{ ...ghost, background: tab === name ? 'rgba(255,195,0,.18)' : ghost.background, borderColor: tab === name ? GOLD : 'rgba(255,255,255,.18)' }}>{name[0].toUpperCase() + name.slice(1)} ({counts[name]})</button>)}
-        <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? uiCopy('u_2329b345c6150334') : uiCopy('u_9ee567d8de2dbe7f')}</button>
-        <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}><LocalizedText fallback={uiCopy('u_55ee240775f97a03')} /></a>
+        {(["active", "published", "archived"] as Tab[]).map((name) => <button key={name} onClick={() => setTab(name)} style={{ ...ghost, background: tab === name ? 'rgba(255,195,0,.18)' : ghost.background, borderColor: tab === name ? GOLD : 'rgba(255,255,255,.18)' }}>{name[0].toUpperCase() + name.slice(1)} ({counts[name]})</button>)}
+        <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? uiText('generatedUi.u_47d2a515ef2f05b8') : uiText('generatedUi.u_1486770684670d95')}</button>
+        <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}><LocalizedText fallback={uiText('generatedUi.u_48ab8dfb77e6dd03')} /></a>
       </div>
       {message && <p style={{ color: messageIsError ? RED : GREEN, fontWeight: 800 }}>{message}</p>}
     </section>
 
     <section style={panel}>
-      <h2 style={{ color: '#fff', margin: 0, fontSize: 20 }}>{tab === 'active' ? uiCopy('u_bbc7b97f5d7fb2eb') : tab === 'published' ? uiCopy('u_8979d1966334b11f') : uiCopy('u_448647c0bf349c7c')}</h2>
+      <h2 style={{ color: '#fff', margin: 0, fontSize: 20 }}>{tab === 'active' ? uiText('generatedUi.u_7e1b223b4740292c') : tab === 'published' ? uiText('generatedUi.u_19d3d2a4dd693a0a') : uiText('generatedUi.u_be09b3cb97b73e04')}</h2>
       <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
-        {!campaigns.length && <p style={{ color: 'rgba(255,255,255,.62)' }}>{loading ? uiCopy('u_b16bdcf9a4981906') : `No ${tab} videos.`}</p>}
+        {!campaigns.length && <p style={{ color: 'rgba(255,255,255,.62)' }}>{loading ? uiText('generatedUi.u_47d2a515ef2f05b8') : `No ${tab} videos.`}</p>}
         {campaigns.map((campaign: any) => {
           const video = campaign.video || {}
           const { state, step, note } = deriveState(campaign)
           const previewUrl = state === 'ready' || state === 'approved' || state === 'published' ? String(video?.previewUrl || video?.finalUrl || '') : ''
           const badge = archived[campaign.id]
-            ? { text: uiCopy('u_2c66da85b528a2e7'), color: GOLD }
+            ? { text: uiText('generatedUi.u_24e1323307842b00'), color: GOLD }
             : state === 'ready'
-              ? { text: uiCopy('u_88833d40ed210eb2'), color: GREEN }
+              ? { text: uiText('generatedUi.u_fba4be9e284fe342'), color: GREEN }
               : state === 'published'
-                ? { text: uiCopy('u_491bd1928d34a0c4'), color: GREEN }
+                ? { text: uiText('generatedUi.u_9466f57050053c59'), color: GREEN }
                 : state === 'approved'
-                  ? { text: uiCopy('u_35ade4d4b151f72b'), color: CYAN }
+                  ? { text: uiText('generatedUi.u_0e294286b34226e4'), color: CYAN }
                   : state === 'problem'
-                    ? { text: uiCopy('u_98212d819b2a047d'), color: RED }
-                    : { text: uiCopy('u_3358d34c2ffa4744'), color: CYAN }
+                    ? { text: uiText('generatedUi.u_08e99b36e4164d6d'), color: RED }
+                    : { text: uiText('generatedUi.u_6a506b74c4f6bc45'), color: CYAN }
           return <article key={campaign.id} style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14, background: 'rgba(2,6,23,.45)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <div><strong style={{ color: '#fff' }}>{campaign.title || campaign.id}</strong><p style={{ color: 'rgba(255,255,255,.5)', margin: '4px 0 0', fontSize: 12 }}>{uiCopy('u_eec4282585c63806')}{fmt(campaign.created_at)}{campaign.approved_at ? ` · Approved ${fmt(campaign.approved_at)}` : ''}{archived[campaign.id] ? ` · Archived ${fmt(archived[campaign.id])}` : ''}</p></div>
+              <div><strong style={{ color: '#fff' }}>{campaign.title || campaign.id}</strong><p style={{ color: 'rgba(255,255,255,.5)', margin: '4px 0 0', fontSize: 12 }}>{uiText('generatedUi.u_d70b9e24bca26b40')}{fmt(campaign.created_at)}{campaign.approved_at ? ` · Approved ${fmt(campaign.approved_at)}` : ''}{archived[campaign.id] ? ` · Archived ${fmt(archived[campaign.id])}` : ''}</p></div>
               <span style={{ color: badge.color, fontSize: 12, fontWeight: 950 }}>{badge.text}</span>
             </div>
             <Steps step={step} state={state} />
             <p style={{ color: state === 'problem' ? RED : 'rgba(255,255,255,.75)', lineHeight: 1.6 }}>{note}</p>
             {previewUrl && <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-              {state === 'ready' && !archived[campaign.id] && <button onClick={() => approve(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={uiCopy('u_fb1be944c054bbd7')} /></button>}
-              {state === 'problem' && !archived[campaign.id] && <button onClick={() => redo(campaign.id)} disabled={busyId === campaign.id} style={warning}><LocalizedText fallback={uiCopy('u_b4fc7201fcad8f0f')} /></button>}
-              {state === 'approved' && !archived[campaign.id] && <button onClick={() => republish(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={uiCopy('u_8cdcd2740ba65242')} /></button>}
-              {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'tiktok')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={uiCopy('u_4d25cb5e3e00b765')} /></button>}
-              {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'instagram_business')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={uiCopy('u_31981264d9893f96')} /></button>}
-              {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>{uiCopy('u_de0e0bb34ffc3498')}</button>}
-              {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>{uiCopy('u_74a7b7090b212f45')}</button>}
+              {state === 'ready' && !archived[campaign.id] && <button onClick={() => approve(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={uiText('generatedUi.u_12e2352c79f6a630')} /></button>}
+              {state === 'problem' && !archived[campaign.id] && <button onClick={() => redo(campaign.id)} disabled={busyId === campaign.id} style={warning}><LocalizedText fallback={uiText('generatedUi.u_4f31226d9ffc3e34')} /></button>}
+              {state === 'approved' && !archived[campaign.id] && <button onClick={() => republish(campaign.id)} disabled={busyId === campaign.id} style={primary}><LocalizedText fallback={uiText('generatedUi.u_bf74ddc5486eb7ba')} /></button>}
+              {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'tiktok')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={uiText('generatedUi.u_867244414e5b5990')} /></button>}
+              {(state === 'approved' || state === 'published') && !archived[campaign.id] && <button onClick={() => crosspost(campaign.id, 'instagram_business')} disabled={busyId === campaign.id} style={ghost}><LocalizedText fallback={uiText('generatedUi.u_ec57ca47359a9cd8')} /></button>}
+              {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>{uiText('generatedUi.u_66f4804ee23ddc09')}</button>}
+              {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>{uiText('generatedUi.u_a76e13b9839270eb')}</button>}
             </div>
-            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={uiCopy('u_ff10a80b36bb39d4')} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, campaignStatus: campaign.status, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
+            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={uiText('generatedUi.u_890ab358a55d7fce')} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, campaignStatus: campaign.status, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
           </article>
         })}
       </div>

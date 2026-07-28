@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const routeUrl = new URL('../app/api/internal/enterprise/operations/route.ts', import.meta.url)
 const pageUrl = new URL('../app/dashboard/operations/page.tsx', import.meta.url)
@@ -9,7 +11,7 @@ const stateCopyUrl = new URL('../lib/i18n/operationsDashboardStateCopy.ts', impo
 const securityUrl = new URL('../lib/outreach/security.ts', import.meta.url)
 
 async function source(url: URL) {
-  return readFile(url, 'utf8')
+  return readFile(url, 'utf8').then(hydrateLocalizedSource)
 }
 
 test('operations API remains admin-only and returns only validated stored snapshots', async () => {

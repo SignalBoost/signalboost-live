@@ -10,9 +10,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 const RED = '#fca5a5'
@@ -56,34 +53,34 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.github.title', uiCopy('u_e75330ef26a910da'))} <span style={{ color: GOLD }}>·</span>
+          {t('audit.github.title', "GitHub & Code Change Report")} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>
-          {t('audit.github.subtitle', uiCopy('u_95203055971301bd'))}
+          {t('audit.github.subtitle', "Branch protection, collaborators, stale branches, and open changes.")}
         </p>
       </div>
 
       {!data.configured && (
         <section style={{ ...glass, padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: GOLD }}>
-            {t('audit.github.notConfigured', uiCopy('u_850e01ec53d070b1'))}
+            {t('audit.github.notConfigured', "GitHub is not connected, or its data could not be collected.")}
           </div>
         </section>
       )}
 
       {/* Summary stats */}
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.common.overallScore', uiCopy('u_29cc406d29ab2fb8'))} value={data.score.score} color={data.score.score >= 80 ? GREEN : data.score.score >= 60 ? GOLD : RED} />
-        <Stat label={t('audit.github.summary.collaborators', uiCopy('u_d8c6ef2a03b50a76'))} value={s.collaborators} />
-        <Stat label={t('audit.github.summary.admins', uiCopy('u_e7d210fcf9d8cf48'))} value={s.admins} color={s.admins ? GOLD : undefined} />
-        <Stat label={t('audit.github.summary.stale', uiCopy('u_7c399002a6ad7251'))} value={s.staleBranches} color={s.staleBranches ? ORANGE : undefined} />
-        <Stat label={t('audit.github.summary.openPRs', uiCopy('u_fa474eb90acbc3f5'))} value={s.openPRs} />
+        <Stat label={t('audit.common.overallScore', "Overall Readiness Score")} value={data.score.score} color={data.score.score >= 80 ? GREEN : data.score.score >= 60 ? GOLD : RED} />
+        <Stat label={t('audit.github.summary.collaborators', "Collaborators")} value={s.collaborators} />
+        <Stat label={t('audit.github.summary.admins', "Admins")} value={s.admins} color={s.admins ? GOLD : undefined} />
+        <Stat label={t('audit.github.summary.stale', "Stale branches")} value={s.staleBranches} color={s.staleBranches ? ORANGE : undefined} />
+        <Stat label={t('audit.github.summary.openPRs', "Open PRs")} value={s.openPRs} />
       </section>
 
       {/* Branch protection */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-          {t('audit.github.protection.title', uiCopy('u_b760cea372ce7d93'))}
+          {t('audit.github.protection.title', "Default branch protection")}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, color: '#fff' }}>{data.defaultBranch}</span>
@@ -96,18 +93,18 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
       {/* Collaborators */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-          {t('audit.github.collab.title', uiCopy('u_4990655afc7e613d'))}
+          {t('audit.github.collab.title', "Collaborators")}
         </div>
         {data.collaborators.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREY }}>{t('audit.github.collab.empty', uiCopy('u_e22977ba2f55d579'))}</div>
+          <div style={{ fontSize: 13, color: GREY }}>{t('audit.github.collab.empty', "No collaborators collected.")}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.github.col.login', uiCopy('u_3b57ffb738cd5ab6'))}</Th>
-                  <Th>{t('audit.github.col.role', uiCopy('u_e8f582ce8f619643'))}</Th>
-                  <Th>{t('audit.github.col.access', uiCopy('u_ac80393aad2cfde3'))}</Th>
+                  <Th>{t('audit.github.col.login', "User")}</Th>
+                  <Th>{t('audit.github.col.role', "Role")}</Th>
+                  <Th>{t('audit.github.col.access', "Access")}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -118,10 +115,10 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
                     <Td>
                       {c.isAdmin ? (
                         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#0a0e17', background: GOLD, borderRadius: 999, padding: '2px 9px' }}>
-                          {t('audit.github.admin', uiCopy('u_4d688b8288479f10'))}
+                          {t('audit.github.admin', "Admin")}
                         </span>
                       ) : (
-                        <span style={{ color: GREY }}>{t('audit.github.member', uiCopy('u_2ec5cf53afd98529'))}</span>
+                        <span style={{ color: GREY }}>{t('audit.github.member', "Member")}</span>
                       )}
                     </Td>
                   </tr>
@@ -135,17 +132,17 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
       {/* Stale branches */}
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-          {t('audit.github.stale.title', uiCopy('u_d4918805caa0fa6c'))}
+          {t('audit.github.stale.title', "Stale branches")}
         </div>
         {data.staleBranches.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.github.stale.empty', uiCopy('u_d6fe60ed13e2262e'))}</div>
+          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.github.stale.empty', "No stale branches — clean.")}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.github.col.branch', uiCopy('u_dbc493889d6b4735'))}</Th>
-                  <Th>{t('audit.github.col.age', uiCopy('u_4d7c84f019c1bc78'))}</Th>
+                  <Th>{t('audit.github.col.branch', "Branch")}</Th>
+                  <Th>{t('audit.github.col.age', "Age (days)")}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -164,10 +161,10 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
       {/* Findings */}
       <section style={{ ...glass, padding: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-          {tt(uiCopy('u_dfd38eb552d8cf03'), uiCopy('u_54e372362fa82e3a'), { n: data.findings.length })}
+          {tt("audit.github.findings.title", "Findings ({n})", { n: data.findings.length })}
         </div>
         {data.findings.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.github.findings.empty', uiCopy('u_8bd8b083f206b6be'))}</div>
+          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.github.findings.empty', "No GitHub findings — nothing flagged.")}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {data.findings.map((f, i) => (
@@ -194,7 +191,7 @@ function FindingCard({ finding }: { finding: Finding }) {
       </div>
       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{text.detail}</div>
       <div style={{ fontSize: 12, marginTop: 4 }}>
-        <strong>{t('audit.common.recommendation', uiCopy('u_c68b7b004c5337a3'))}:</strong>{' '}
+        <strong>{t('audit.common.recommendation', "Recommendation")}:</strong>{' '}
         <span style={{ color: 'rgba(255,255,255,.78)' }}>{text.recommendation}</span>
       </div>
     </div>

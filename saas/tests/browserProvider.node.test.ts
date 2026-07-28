@@ -18,6 +18,8 @@ import {
   mapBrowserProviderCapabilityToSupervisorCapability,
   createBrowserProviderWorkerDescriptor,
 } from '../lib/browser-provider/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('canonical public entry point exports expected symbols and compatibility aliases', () => {
   assert.equal(typeof BrowserProviderRegistry, 'function')
@@ -174,20 +176,20 @@ test('BPAL source has one canonical implementation and forbidden imports are abs
     return files
   }
   const files = await walk(root)
-  const texts = await Promise.all(files.map(async file => [file.pathname, await readFile(file, 'utf8')]))
+  const texts = await Promise.all(files.map(async file => [file.pathname, await readFile(file, 'utf8').then(hydrateLocalizedSource)]))
   assert.equal(texts.filter(([, text]) => /class\s+BrowserProviderRegistry\b/.test(text)).length, 1)
   assert.equal(texts.filter(([, text]) => /interface\s+BrowserProviderAdapter\b/.test(text)).length, 1)
   assert.equal(texts.filter(([, text]) => /\bVercelBrowserAdapter\b\s*[:=]/.test(text)).length, 1)
   for (const [, text] of texts) assert.doesNotMatch(text, /playwright|browser-runtime|credential resolver|provider mutation|fetch\(|XMLHttpRequest/i)
   const runtimeFiles = await readdir(new URL('../lib/browser-runtime/', import.meta.url))
-  for (const file of runtimeFiles.filter(name => name.endsWith('.ts'))) assert.doesNotMatch(await readFile(join(new URL('../lib/browser-runtime/', import.meta.url).pathname, file), 'utf8'), /vercel/i)
+  for (const file of runtimeFiles.filter(name => name.endsWith('.ts'))) assert.doesNotMatch(await readFile(join(new URL('../lib/browser-runtime/', import.meta.url).pathname, file), 'utf8').then(hydrateLocalizedSource), /vercel/i)
 })
 
 test('browser provider localization keys exist for all five languages', async () => {
   const locales = ['en','es','pt','pl','ru']
   const keys = [VercelBrowserAdapter.displayNameKey, ...VercelBrowserAdapter.capabilities.flatMap(c => [c.displayNameKey, c.descriptionKey]), ...VercelBrowserAdapter.origins.map(o => o.labelKey), ...VercelBrowserAdapter.navigationProfiles.map(n => n.labelKey)].filter(Boolean)
   for (const locale of locales) {
-    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8'))
+    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8').then(hydrateLocalizedSource))
     for (const key of keys) assert.ok(key.split('.').reduce((value, part) => value?.[part], dict), `${locale}:${key}`)
   }
 })

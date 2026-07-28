@@ -2,8 +2,7 @@
 
 import { useId, useMemo } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Props = {
   label: string
@@ -25,8 +24,8 @@ type ValidationCopy = {
 
 const COPY = {
   en: {
-    validation: { required: uiCopy('u_20971c0ba4e2b646'), protocol: uiCopy('u_9a3da5d5c6ddbef0'), publicUrl: uiCopy('u_89ed741c22d77682'), invalid: uiCopy('u_65f043d25385285b') },
-    placeholder: uiCopy('u_ac0d42c49b4c57bb'), analyzing: uiCopy('u_ae5057940dbd1edb'), analyze: uiCopy('u_857d5834713134e0'), helper: uiCopy('u_fb30e43cc9019f49'),
+    validation: { required: uiText('generatedUi.u_0a5050acd722b067'), protocol: uiText('generatedUi.u_ed4d1d773874d2f1'), publicUrl: uiText('generatedUi.u_ae162547ad259e30'), invalid: uiText('generatedUi.u_cabf6d7c0fe283fb') },
+    placeholder: uiText('generatedUi.u_a231ac201ef7c2ec'), analyzing: uiText('generatedUi.u_89b633adede66a05'), analyze: uiText('generatedUi.u_0d4f89f98ca0d154'), helper: uiText('generatedUi.u_33df4d6aa4b94224'),
   },
   es: {
     validation: { required: 'Ingresa la URL de un sitio web o de GitHub.', protocol: 'Solo se admiten URL HTTP y HTTPS.', publicUrl: 'Usa una URL de acceso público.', invalid: 'Ingresa una URL válida.' },

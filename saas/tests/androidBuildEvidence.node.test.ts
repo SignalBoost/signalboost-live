@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { validateAndroidBuildEvidence } from '../portable-mobile/android-build-evidence.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const validEvidence = {
   portableId: 'provider-hub',
@@ -49,7 +51,7 @@ test('returns blockers in deterministic order and rejects unsafe claims', () => 
 })
 
 test('build-evidence source has no artifact, execution, network, signing, or store capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/android-build-evidence.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/android-build-evidence.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ["from 'node:fs'", "from 'node:child_process'", 'readFile(', 'writeFile(', 'exec(', 'spawn(', 'fetch(', 'signingConfigs', 'playConsoleApi']) {
     assert.equal(source.includes(forbidden), false, `build evidence must not contain ${forbidden}`)
   }

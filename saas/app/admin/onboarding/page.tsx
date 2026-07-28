@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type AnalyticsEvent = {
   event_id: string
@@ -41,57 +40,57 @@ type Feedback = {
 
 const COPY = {
   en: {
-    pill: uiCopy('u_6332e49d5fab708e'),
-    title: uiCopy('u_5c7e5e748eef6e87'),
-    subtitle: uiCopy('u_2e6dd41395393a11'),
-    loading: uiCopy('u_eebfd7706acfab0c'),
+    pill: uiText('generatedUi.u_aee2735a5fb9e042'),
+    title: uiText('generatedUi.u_1fcedd455c25bdb0'),
+    subtitle: uiText('generatedUi.u_88aa774e26be1cfb'),
+    loading: uiText('generatedUi.u_d43f06e54f2af517'),
     eventsAnalyzed: (n: number) => `${n} events analyzed`,
-    completionRate: uiCopy('u_01898fb46b162deb'),
+    completionRate: uiText('generatedUi.u_85a9d6f416b2416e'),
     completionSub: (done: number, total: number) => `${done} completed / ${total} profiled`,
-    consentOptIn: uiCopy('u_6c6c04190a9c4e40'),
+    consentOptIn: uiText('generatedUi.u_172e200a8b12c5ce'),
     consentSub: (n: number) => `${n} training consents captured`,
-    skips: uiCopy('u_9b865c6ef2913603'),
-    skipsSub: uiCopy('u_5726fbd871080c8b'),
-    errors: uiCopy('u_70c0ac905f601d02'),
-    errorsSub: uiCopy('u_8ec2f3ad5d9f29de'),
-    funnelTitle: uiCopy('u_e99e0653ba6e3aa3'),
-    views: uiCopy('u_aee9bc9b20c01086'),
-    toneTitle: uiCopy('u_6c7fa35e5e0ecc8f'),
-    monitoringTitle: uiCopy('u_6ff7fd175144e798'),
+    skips: uiText('generatedUi.u_4a78e64f224e2f5c'),
+    skipsSub: uiText('generatedUi.u_41b3228ef20bad46'),
+    errors: uiText('generatedUi.u_cb702378f31507ef'),
+    errorsSub: uiText('generatedUi.u_6a6d43af52a60240'),
+    funnelTitle: uiText('generatedUi.u_ec87355207afcece'),
+    views: uiText('generatedUi.u_74883614c4c79e12'),
+    toneTitle: uiText('generatedUi.u_ebd41a176354b132'),
+    monitoringTitle: uiText('generatedUi.u_cd947c60b57fc517'),
     monitoringItems: [
-      uiCopy('u_6affe4796769ce92'),
-      uiCopy('u_b5e91bc0aa062393'),
-      uiCopy('u_4b0e6e2ed4d016f3'),
-      uiCopy('u_80e7a58a013b2c09'),
-      uiCopy('u_0a119ab1a437753f'),
+      uiText('generatedUi.u_2e234fda6b2a6761'),
+      uiText('generatedUi.u_4775b33d8dd0405c'),
+      uiText('generatedUi.u_e8311c2a15437912'),
+      uiText('generatedUi.u_629d9124062d0108'),
+      uiText('generatedUi.u_fceacc7f93149d3d'),
     ],
-    deviceTitle: uiCopy('u_a93748e48712ebec'),
-    feedbackTitle: uiCopy('u_2a98eb2eae746356'),
-    qaTitle: uiCopy('u_f2967b85feeb57bf'),
+    deviceTitle: uiText('generatedUi.u_2a47cc0324d5b983'),
+    feedbackTitle: uiText('generatedUi.u_aac77df347205252'),
+    qaTitle: uiText('generatedUi.u_d393bc5672d356b4'),
     qaItems: [
-      uiCopy('u_e102a2e0da357eaa'),
-      uiCopy('u_98e0dd453081b673'),
-      uiCopy('u_fe74f5ee2496c2e0'),
-      uiCopy('u_6ffa9f0286db8e39'),
-      uiCopy('u_27e2007896f5627d'),
-      uiCopy('u_80d59b0762725663'),
+      uiText('generatedUi.u_e20c448325ae09b8'),
+      uiText('generatedUi.u_ee34be625e041e44'),
+      uiText('generatedUi.u_0c29f166d9870274'),
+      uiText('generatedUi.u_d561e5f96067ff6f'),
+      uiText('generatedUi.u_90d4567ec7c57ddc'),
+      uiText('generatedUi.u_79b36d80ffc019d5'),
     ],
-    devTitle: uiCopy('u_62bfb9c32dbde2cd'),
+    devTitle: uiText('generatedUi.u_e7154582ae3bde81'),
     devItems: [
-      uiCopy('u_8eec1b192768c8c4'),
-      uiCopy('u_8e33ef47c4b0991f'),
-      uiCopy('u_285f9a622d2b5f05'),
-      uiCopy('u_14a48920f82d1286'),
-      uiCopy('u_d1ff5bf25e1a8786'),
+      uiText('generatedUi.u_0f9a56700f74f955'),
+      uiText('generatedUi.u_6fa9fdd809ea48e6'),
+      uiText('generatedUi.u_e94aef9712ef962e'),
+      uiText('generatedUi.u_52ad1f0ec3b197a5'),
+      uiText('generatedUi.u_c19de7257527b6c8'),
     ],
-    recentTitle: uiCopy('u_444fe86a1cb24ae0'),
-    colStep: uiCopy('u_0e5afc7e8c7542e5'),
-    colAction: uiCopy('u_481ea8b25a1240fa'),
-    colDevice: uiCopy('u_053ee3f798480a34'),
-    colBrowser: uiCopy('u_738511273250d9e1'),
-    colTimestamp: uiCopy('u_011e533d920ecf7a'),
-    noEvents: uiCopy('u_1d6474d6b360fc97'),
-    abTitle: uiCopy('u_81ec5b6500caa491'),
+    recentTitle: uiText('generatedUi.u_d034d55e1f5f11f7'),
+    colStep: uiText('generatedUi.u_8e6a6cca7aae1d1e'),
+    colAction: uiText('generatedUi.u_64cff1319d2fd2cb'),
+    colDevice: uiText('generatedUi.u_6ba0bdeccb426d7b'),
+    colBrowser: uiText('generatedUi.u_d31de1a5c5c8ba2a'),
+    colTimestamp: uiText('generatedUi.u_115a2cc92c1097ac'),
+    noEvents: uiText('generatedUi.u_b0518cd9481c9277'),
+    abTitle: uiText('generatedUi.u_95f234501608e44b'),
     abDesc: (n: number) => `Use variant tags in onboarding_analytics.action values such as viewed_variant_a or viewed_variant_b, then compare completion, consent opt-in, and feedback response rates in this dashboard. Confirmation completions tracked: ${n}`,
   },
   es: {
@@ -381,7 +380,7 @@ export default function OnboardingAnalyticsDashboardPage() {
 
   return (
     <main className="dashboardShell">
-      <style>{uiCopy('u_2312443420a697e4')}</style>
+      <style>{"\n        .dashboardShell { color: #fff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }\n        .dashboardShell .hero { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-end; border-bottom: 1px solid rgba(255,255,255,.09); padding-bottom: .8rem; margin-bottom: 1.1rem; }\n        .dashboardShell h1 { font-size: 22px; font-weight: 950; line-height: 1.1; letter-spacing: -.045em; margin: 4px 0 4px; color: #fff; }\n        .dashboardShell p, .dashboardShell span { color: rgba(255,255,255,.66); }\n        .dashboardShell .grid { display: grid; gap: 1rem; }\n        .dashboardShell .kpiGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }\n        .dashboardShell .panelGrid { grid-template-columns: 1.2fr .8fr; align-items: start; }\n        .dashboardShell .card { border: 0; border-top: 1px solid rgba(255,255,255,.08); border-radius: 0; background: transparent; box-shadow: none; padding: .9rem 0 0; }\n        .dashboardShell .kpi { border-top: 0; border-left: 2px solid rgba(26,240,255,.4); padding: 0 0 0 .85rem; }\n        .dashboardShell .kpi strong { display: block; font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -.03em; color: #9ff7ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }\n        .barRow { display: grid; grid-template-columns: 8rem 1fr 4rem; gap: .75rem; align-items: center; margin: .9rem 0; }\n        .barTrack { height: .8rem; border-radius: 999px; background: rgba(255,255,255,.09); overflow: hidden; }\n        .barFill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, #ffc300); }\n        .donutList { display: grid; gap: .8rem; }\n        .legend { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,.09); padding-bottom: .6rem; }\n        .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 999px; margin-right: .4rem; }\n        .taskList { display: grid; gap: .65rem; padding: 0; margin: .5rem 0 0; list-style: none; }\n        .dashboardShell .taskList li { border: 0; border-top: 1px solid rgba(255,255,255,.07); border-left: 2px solid rgba(56,189,248,.4); padding: .7rem 0 .7rem .8rem; }\n        .statusPill { display: inline-flex; border-radius: 999px; padding: .35rem .65rem; background: rgba(34,197,94,.12); color: #86efac; font-size: .82rem; font-weight: 800; }\n        .table { width: 100%; border-collapse: collapse; font-size: .9rem; }\n        .table th, .table td { text-align: left; border-bottom: 1px solid rgba(255,255,255,.08); padding: .75rem .5rem; }\n        .table th { color: rgba(255,255,255,.48); font-size: .75rem; text-transform: uppercase; letter-spacing: .12em; }\n        @media (max-width: 980px) { .kpiGrid, .panelGrid { grid-template-columns: 1fr 1fr; } .hero { align-items: flex-start; flex-direction: column; } }\n        @media (max-width: 680px) { .kpiGrid, .panelGrid { grid-template-columns: 1fr; } .barRow { grid-template-columns: 1fr; gap: .35rem; } }\n      "}</style>
 
       <section className="hero">
         <div>
@@ -392,7 +391,7 @@ export default function OnboardingAnalyticsDashboardPage() {
         <p>{loading ? c.loading : c.eventsAnalyzed(events.length)}</p>
       </section>
 
-      <section className="grid kpiGrid" aria-label={uiCopy('u_572631b0979b36ed')}>
+      <section className="grid kpiGrid" aria-label={uiText('generatedUi.u_9808060006dfff73')}>
         <div className="card kpi">
           <span>{c.completionRate}</span>
           <strong>{percent(completedProfiles.length, profiles.length)}</strong>

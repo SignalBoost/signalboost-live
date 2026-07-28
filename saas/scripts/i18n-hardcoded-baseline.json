@@ -1,7 +1,7 @@
 {
   "_path": "saas/scripts/i18n-hardcoded-baseline.json",
   "_note": "Known hardcoded-copy debt, captured by scripts/check-hardcoded-copy.mjs. Files listed here are reported but do not fail the build. Regenerate ONLY when the detection rule itself gets stricter — never to clear violations someone just added.",
-  "generatedAt": "2026-07-28T04:41:07.299Z",
+  "generatedAt": "2026-07-28T05:47:53.840Z",
   "fileCount": 0,
   "files": {}
 }

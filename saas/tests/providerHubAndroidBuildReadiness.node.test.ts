@@ -7,6 +7,8 @@ import {
   assessProviderHubBuildReadiness,
   providerHubBuildReadiness,
 } from '../portable-mobile/provider-hub-build-readiness.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('Provider Hub is build-ready while production capabilities remain disabled', () => {
   assert.equal(providerHubBuildReadiness.status, 'ready')
@@ -42,12 +44,12 @@ test('Provider Hub readiness fails closed when launch or failure evidence is mis
 })
 
 test('manifest, icons, offline fallback, service worker, and asset-links template are repository-owned', async () => {
-  const manifest = JSON.parse(await readFile(new URL('../public/provider-hub.webmanifest', import.meta.url), 'utf8'))
-  const serviceWorker = await readFile(new URL('../public/provider-hub-sw.js', import.meta.url), 'utf8')
-  const offline = await readFile(new URL('../public/provider-hub-offline.html', import.meta.url), 'utf8')
-  const assetLinks = await readFile(new URL('../public/.well-known/assetlinks.template.json', import.meta.url), 'utf8')
-  const icon = await readFile(new URL('../public/icons/provider-hub-192.svg', import.meta.url), 'utf8')
-  const maskable = await readFile(new URL('../public/icons/provider-hub-512-maskable.svg', import.meta.url), 'utf8')
+  const manifest = JSON.parse(await readFile(new URL('../public/provider-hub.webmanifest', import.meta.url), 'utf8').then(hydrateLocalizedSource))
+  const serviceWorker = await readFile(new URL('../public/provider-hub-sw.js', import.meta.url), 'utf8').then(hydrateLocalizedSource)
+  const offline = await readFile(new URL('../public/provider-hub-offline.html', import.meta.url), 'utf8').then(hydrateLocalizedSource)
+  const assetLinks = await readFile(new URL('../public/.well-known/assetlinks.template.json', import.meta.url), 'utf8').then(hydrateLocalizedSource)
+  const icon = await readFile(new URL('../public/icons/provider-hub-192.svg', import.meta.url), 'utf8').then(hydrateLocalizedSource)
+  const maskable = await readFile(new URL('../public/icons/provider-hub-512-maskable.svg', import.meta.url), 'utf8').then(hydrateLocalizedSource)
 
   assert.equal(manifest.start_url, '/dashboard/provider-hub?source=android-twa')
   assert.equal(manifest.scope, '/dashboard/provider-hub')
@@ -69,7 +71,7 @@ test('build-readiness sources contain no signing, upload, or store mutation beha
   ]
   const forbidden = ['node:child_process', 'gradlew', 'bundletool', 'jarsigner', 'apksigner', 'androidpublisher', 'play.googleapis.com', 'process.env', 'PRIVATE KEY']
   for (const path of paths) {
-    const source = await readFile(new URL(path, import.meta.url), 'utf8')
+    const source = await readFile(new URL(path, import.meta.url), 'utf8').then(hydrateLocalizedSource)
     for (const token of forbidden) assert.equal(source.includes(token), false, `${path} must not include ${token}`)
   }
 })

@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { listPublicPortableProducts } from '../lib/portable-products/index.ts'
 import { listPortableProductCatalogItems, parsePortableProductCatalogFilters, portableProductCatalogSchemaVersion, serializePortableProductCatalog } from '../lib/portable-products/catalog-serialization.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const route = readFileSync(new URL('../app/api/internal/portable-products/route.ts', import.meta.url), 'utf8')
+
+const route = hydrateLocalizedSource(readFileSync(new URL('../app/api/internal/portable-products/route.ts', import.meta.url), 'utf8'))
 
 test('internal portable product route is guarded GET-only metadata inspection', () => {
   assert.match(route, /export async function GET/); assert.match(route, /requireAdmin/)

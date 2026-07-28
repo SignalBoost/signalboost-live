@@ -6,8 +6,7 @@ import Link from 'next/link'
 import { Suspense, useEffect, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lead = {
   id: string
@@ -41,8 +40,8 @@ const STATUS_COLOR: Record<string, string> = {
 const CHANNELS: Record<string, ChannelConfig> = {
   'online-newspapers': {
     eyebrow: 'Digital news outreach',
-    title: uiCopy('u_27894fe891cae803'),
-    body: uiCopy('u_b07d5057540832fa'),
+    title: uiText('generatedUi.u_4200854c4b73b2e1'),
+    body: uiText('generatedUi.u_afeb1260671e7efa'),
     targets: ['Local online newspapers', 'Regional digital newsrooms', 'Business news websites', 'Technology news portals', 'Industry newsletter editors'],
     workflow: ['Prepare pitch angle and proof points', 'Build editor/reporter contact list', 'Draft message and follow-up cadence', 'Review locally before sending', 'Track responses in the outreach pipeline'],
     ctaHref: '/dashboard/outreach/discovery?channel=online-newspapers',
@@ -50,8 +49,8 @@ const CHANNELS: Record<string, ChannelConfig> = {
   },
   'print-newspapers': {
     eyebrow: 'Print newspaper outreach',
-    title: uiCopy('u_aeb70a4c51ebf8a4'),
-    body: uiCopy('u_3e1c59bfb6fa14be'),
+    title: uiText('generatedUi.u_4b152577f36cb01d'),
+    body: uiText('generatedUi.u_cef0e6a46ef9caed'),
     targets: ['Local print newspapers', 'Community newspapers', 'Regional print business sections', 'Sunday feature editors', 'Print advertising desks'],
     workflow: ['Confirm print region and publication schedule', 'Prepare print-ready pitch or placement brief', 'Collect editorial or advertising contacts', 'Review local campaign message before outreach', 'Track print follow-up and placement status'],
     ctaHref: '/dashboard/outreach/discovery?channel=print-newspapers',
@@ -59,8 +58,8 @@ const CHANNELS: Record<string, ChannelConfig> = {
   },
   'trade-press': {
     eyebrow: 'Magazine / trade press outreach',
-    title: uiCopy('u_a24865bbd799359a'),
-    body: uiCopy('u_1f9eda93782261db'),
+    title: uiText('generatedUi.u_c94378b5d4a3d184'),
+    body: uiText('generatedUi.u_f3510e834f4525f5'),
     targets: ['IT trade magazines', 'SaaS and cloud publications', 'Cybersecurity magazines', 'MSP and channel publications', 'Startup and business technology magazines'],
     workflow: ['Define the technical audience and publication fit', 'Prepare founder/product angle and credibility proof', 'Build editor, contributor, and media-kit contacts', 'Review pitch and supporting assets inside Marketing + Sales', 'Track magazine outreach and follow-up dates'],
     ctaHref: '/dashboard/outreach/discovery?channel=trade-press',
@@ -70,31 +69,31 @@ const CHANNELS: Record<string, ChannelConfig> = {
 
 const COPY: Record<string, any> = {
   en: {
-    eyebrow: uiCopy('u_f10f079e102eda9d'),
-    title: uiCopy('u_fa925f8bea50ca46'),
-    subtitle: uiCopy('u_8f709f7300e734d6'),
-    loadError: uiCopy('u_1da0984d51d7d2b0'),
-    genericLoadError: uiCopy('u_8bfdde82d66dbd47'),
-    loading: uiCopy('u_f9038c08ca53efc4'),
-    sendsLeft: uiCopy('u_663f8002b0110049'),
-    totalLeads: uiCopy('u_814faadd34aef50e'),
-    pending: uiCopy('u_270a64ad1b5f5e1a'),
-    approved: uiCopy('u_4188eb0c225bb839'),
-    rejected: uiCopy('u_a8bc080d12ed8a73'),
-    recentLeads: uiCopy('u_700cf3d23f7962c6'),
-    channelLeads: uiCopy('u_ba08195e280aa3bd'),
-    viewAll: uiCopy('u_1a8af66bdb88ccdc'),
-    noLeadsStart: uiCopy('u_8344db22d39842c2'),
-    noChannelLeads: uiCopy('u_29447b497a5af3b9'),
-    discoveryLink: uiCopy('u_95481b16e95adaae'),
-    unnamedBusiness: uiCopy('u_9f2b5cd7382f6dfd'),
+    eyebrow: uiText('generatedUi.u_fb03f7ab12994d23'),
+    title: uiText('generatedUi.u_fa71896028ef1ce7'),
+    subtitle: uiText('generatedUi.u_64512354001f3cd3'),
+    loadError: uiText('generatedUi.u_a9d7cfaf09f16d9e'),
+    genericLoadError: uiText('generatedUi.u_ce99d53db27af017'),
+    loading: uiText('generatedUi.u_ba3bbbe10d8bef66'),
+    sendsLeft: uiText('generatedUi.u_37a94d88c760122d'),
+    totalLeads: uiText('generatedUi.u_695e6ffcabe33d3b'),
+    pending: uiText('generatedUi.u_331551b0de4157c9'),
+    approved: uiText('generatedUi.u_87b42e40c2a290e0'),
+    rejected: uiText('generatedUi.u_aea4a04a80426ed8'),
+    recentLeads: uiText('generatedUi.u_e1ea62d4ee3bf37b'),
+    channelLeads: uiText('generatedUi.u_067e02faca1c1daa'),
+    viewAll: uiText('generatedUi.u_9a780508debbfbcd'),
+    noLeadsStart: uiText('generatedUi.u_22dfdb419a0c8609'),
+    noChannelLeads: uiText('generatedUi.u_587777deedcb303d'),
+    discoveryLink: uiText('generatedUi.u_80fc402133201fbe'),
+    unnamedBusiness: uiText('generatedUi.u_7ce58cbf9a0b335b'),
     tools: [
-      { icon: '🔎', title: uiCopy('u_7ef7b3984b5c7dac'), desc: uiCopy('u_1e899c84209e1c62'), href: uiCopy('u_8d39912e12f57b0b') },
-      { icon: '📇', title: uiCopy('u_4bcef8e27ab0f266'), desc: uiCopy('u_7dc388566f9860ea'), href: uiCopy('u_70e6fd6ecf33873f') },
-      { icon: '📊', title: uiCopy('u_118252938098cbd9'), desc: uiCopy('u_2b89cafe8c606178'), href: uiCopy('u_c1b6431361329063') },
-      { icon: '⚙️', title: uiCopy('u_ef22b4e05ce76ee6'), desc: uiCopy('u_1375703d8bb82f11'), href: uiCopy('u_7ed0ec56b716bb8a') },
+      { icon: '🔎', title: uiText('generatedUi.u_d3121f52072997f3'), desc: uiText('generatedUi.u_f637c2cb4f275395'), href: uiText('generatedUi.u_6beec517d3c367ca') },
+      { icon: '📇', title: uiText('generatedUi.u_7ae8b550d6d56b2e'), desc: uiText('generatedUi.u_4596a470ff2d855f'), href: uiText('generatedUi.u_7fe275943d3aba3a') },
+      { icon: '📊', title: uiText('generatedUi.u_c1bce6ac24bdd1f5'), desc: uiText('generatedUi.u_b3d73e22ae2ad116'), href: uiText('generatedUi.u_c4ac0fc6ef9ce312') },
+      { icon: '⚙️', title: uiText('generatedUi.u_03f652da02dd35a2'), desc: uiText('generatedUi.u_327de4e9fa15f596'), href: uiText('generatedUi.u_0cef07364a886698') },
     ],
-    statuses: { pending: uiCopy('u_4004019cb2a6d95f'), approved: uiCopy('u_9affa539fbe59730'), rejected: uiCopy('u_e98c4a7e7cf2472d') },
+    statuses: { pending: uiText('generatedUi.u_62a2fed3d6e08c44'), approved: uiText('generatedUi.u_2687f86ed6784b8a'), rejected: uiText('generatedUi.u_20cd938a2ea64f61') },
   },
   pt: {
     eyebrow: 'Email Outreach', title: 'Seu centro de comando de email outreach.', subtitle: 'Analise negócios, revise leads de email preparados por IA e mova prospects pelo pipeline de email — tudo em um só lugar.', loadError: 'Não foi possível carregar os dados de email outreach.', genericLoadError: 'Algo deu errado ao carregar o email outreach.', loading: 'Carregando…', sendsLeft: 'envios de email restantes hoje', totalLeads: 'Total de leads de email', pending: 'Pendentes', approved: 'Aprovados', rejected: 'Rejeitados', recentLeads: 'Leads de email recentes', channelLeads: 'Registros do canal', viewAll: 'Ver todos →', noLeadsStart: 'Ainda não há leads de email. Comece com', noChannelLeads: 'Ainda não existem registros para este canal. Inicie a lista do canal para criar os primeiros registros de campanha.', discoveryLink: 'Descoberta', unnamedBusiness: 'Negócio sem nome',
@@ -118,7 +117,7 @@ function leadChannel(lead: Lead) {
 
 export default function OutreachHubPage() {
   return (
-    <Suspense fallback={<main style={{ color: 'var(--text-primary)' }}><p className="sb-body">{uiCopy('u_b07bc57b27863299')}</p></main>}>
+    <Suspense fallback={<main style={{ color: 'var(--text-primary)' }}><p className="sb-body">{uiText('generatedUi.u_ba3bbbe10d8bef66')}</p></main>}>
       <OutreachHubContent />
     </Suspense>
   )
@@ -215,8 +214,8 @@ function OutreachHubContent() {
 function ChannelWorkspace({ channel, noRecords }: { channel: ChannelConfig; noRecords: string }) {
   return (
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14, margin: '18px 0 24px' }}>
-      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={uiCopy('u_d6e8dc8a1bc5f775')} /></h2><ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.targets.map((item) => <li key={item}>{item}</li>)}</ul></article>
-      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={uiCopy('u_4590f2ad0d7ab7b8')} /></h2><ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.workflow.map((item) => <li key={item}>{item}</li>)}</ol>{noRecords ? <p className="sb-caption" style={{ color: '#fde68a', marginTop: 12 }}>{noRecords}</p> : null}<Link href={channel.ctaHref} className="sb-button-primary" style={{ display: 'inline-flex', marginTop: 14, textDecoration: 'none' }}>{channel.cta}</Link></article>
+      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={uiText('generatedUi.u_0e0154e35983d31a')} /></h2><ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.targets.map((item) => <li key={item}>{item}</li>)}</ul></article>
+      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={uiText('generatedUi.u_2a033dda9bd803f5')} /></h2><ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.workflow.map((item) => <li key={item}>{item}</li>)}</ol>{noRecords ? <p className="sb-caption" style={{ color: '#fde68a', marginTop: 12 }}>{noRecords}</p> : null}<Link href={channel.ctaHref} className="sb-button-primary" style={{ display: 'inline-flex', marginTop: 14, textDecoration: 'none' }}>{channel.cta}</Link></article>
     </section>
   )
 }

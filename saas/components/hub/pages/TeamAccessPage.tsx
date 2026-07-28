@@ -4,8 +4,7 @@
 import { PageProps, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const roles = [
   ['Owner', 'Full command authority', '1 user'],
@@ -19,12 +18,12 @@ export default function TeamAccessPage(_props: PageProps) {
   return (
     <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingRight: 8 }}>
       <section style={{ marginBottom: 14 }}>
-        <div style={labelStyle}>{uiCopy('u_526475533056961b')}</div>
-        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.team.title', uiCopy('u_4cd1ad97cbce176b'))}</h2>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.team.subtitle', uiCopy('u_37bb9ed942f25bb9'))}</p>
+        <div style={labelStyle}>{uiText('generatedUi.u_19c88fa9bfd67c50')}</div>
+        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.team.title')}</h2>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.team.subtitle')}</p>
       </section>
       <section style={{ ...cardStyle, padding: 16 }}>
-        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.team.roles', uiCopy('u_6d508291e474f4b2'))}</h3>
+        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.team.roles')}</h3>
         <div style={{ display: 'grid', gap: 10 }}>
           {roles.map(([role, permission, count]) => <div key={role} style={rowStyle}><strong>{role}</strong><span>{permission}</span><span style={{ color: '#1af0ff' }}>{count}</span></div>)}
         </div>

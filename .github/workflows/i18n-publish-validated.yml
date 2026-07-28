@@ -1,0 +1,76 @@
+name: Publish Validated I18n Migration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'saas/**'
+      - '.github/workflows/i18n-publish-validated.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: i18n-publish-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/i18n-real-locale-keys
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Recreate validated locale migration
+        run: |
+          node scripts/restore-generated-ui-copy.mjs
+          node scripts/prepare-real-locale-migration.mjs
+          node scripts/migrate-page-copy-to-locales.mjs --write
+          node scripts/check-hardcoded-copy.mjs --write-baseline
+          npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/migrate-page-copy-to-locales.mjs'
+      - name: Validate locale migration
+        run: |
+          test ! -e lib/i18n/generatedUiCopy.ts
+          npm run validate:i18n-copy
+          npm run typecheck
+      - name: Commit and publish
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          : > ../push.log
+          set +e
+          {
+            set -x
+            git config user.name 'SignalBoost Automation'
+            git config user.email 'actions@users.noreply.github.com'
+            git add .
+            git status --short
+            if git diff --cached --quiet; then
+              echo 'No migration changes remain.'
+            else
+              git commit -m 'fix(i18n): move page copy into real locale keys'
+              git fetch origin fix/i18n-real-locale-keys
+              git push --verbose --force-with-lease="refs/heads/fix/i18n-real-locale-keys:${EXPECTED_HEAD}" origin HEAD:refs/heads/fix/i18n-real-locale-keys
+            fi
+          } >> ../push.log 2>&1
+          status=$?
+          set -e
+          cat ../push.log
+          exit "$status"
+      - name: Upload publication diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-publication-diagnostics
+          path: push.log
+          if-no-files-found: error

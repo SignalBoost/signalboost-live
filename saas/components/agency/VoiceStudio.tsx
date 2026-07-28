@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -83,26 +82,26 @@ const COPY: Record<Lang, {
   walletNote: string
 }> = {
   en: {
-    eyebrow: uiCopy('u_de31066ecf797530'),
-    title: uiCopy('u_8413a34983b1311c'),
-    body: uiCopy('u_a3f5e84c837a7dfe'),
-    scriptLabel: uiCopy('u_884fefec9c95f634'),
-    scriptPlaceholder: uiCopy('u_288fe94d771dcf6e'),
-    voiceLabel: uiCopy('u_60b74ee20fb0d6b8'),
-    fundingLabel: uiCopy('u_cd917ec826355343'),
-    creditsMode: uiCopy('u_92b7dec629c404cb'),
-    byokMode: uiCopy('u_a72092cc1110a1d2'),
-    estimateLabel: uiCopy('u_0491d864725a6219'),
-    estimatedCredits: uiCopy('u_90de34db4a2869ee'),
-    generate: uiCopy('u_5be1798e9b08d92a'),
-    generating: uiCopy('u_42be882f9d4f6f29'),
-    previewTitle: uiCopy('u_12a8eb2aa8eb0ea8'),
-    download: uiCopy('u_363e4c25faea7dab'),
-    emptyError: uiCopy('u_d89be013bef60ead'),
-    requestError: uiCopy('u_f0da28c17105ba07'),
-    characterLimit: uiCopy('u_064935640f4c9a4b'),
-    byokNote: uiCopy('u_729a81017b1ac208'),
-    walletNote: uiCopy('u_af8d7d5e8f2074ba'),
+    eyebrow: uiText('generatedUi.u_8fc577da2e513eaa'),
+    title: uiText('generatedUi.u_8a03dd141fd6e46d'),
+    body: uiText('generatedUi.u_fb4f3d83f3618ad9'),
+    scriptLabel: uiText('generatedUi.u_2092c74626323756'),
+    scriptPlaceholder: uiText('generatedUi.u_31f003a29811f859'),
+    voiceLabel: uiText('generatedUi.u_87bf2bc08589f0bd'),
+    fundingLabel: uiText('generatedUi.u_7a740873aeadd46f'),
+    creditsMode: uiText('generatedUi.u_a14f0d63afc66254'),
+    byokMode: uiText('generatedUi.u_faaa80ce68f34d0f'),
+    estimateLabel: uiText('generatedUi.u_441d5bb37f6f4d55'),
+    estimatedCredits: uiText('generatedUi.u_9de03b671cb4b4b0'),
+    generate: uiText('generatedUi.u_30d9f13213c7c061'),
+    generating: uiText('generatedUi.u_5f1baf3681e07f17'),
+    previewTitle: uiText('generatedUi.u_864416c0cb3d2366'),
+    download: uiText('generatedUi.u_861c0c1e022f2149'),
+    emptyError: uiText('generatedUi.u_9a029984a12dae4d'),
+    requestError: uiText('generatedUi.u_d7ba5f74b913d1c5'),
+    characterLimit: uiText('generatedUi.u_cf362b3636810f22'),
+    byokNote: uiText('generatedUi.u_eef131102e30725b'),
+    walletNote: uiText('generatedUi.u_847eea078a734d2f'),
   },
   es: {
     eyebrow: 'Estudio de voz',

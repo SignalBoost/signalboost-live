@@ -11,6 +11,7 @@ import {
 import englishCopy from '@/locales/en.json'
 import { loadLanguage, type Dict, type DictValue } from '@/lib/i18n/loadLanguage'
 import { applyHardcodedUiCopy } from '@/lib/i18n/hardcoded-ui-copy'
+import { setRuntimeDictionary } from '@/lib/i18n/uiText'
 
 type I18nContextType = {
   lang: string
@@ -241,6 +242,7 @@ export function I18nProvider({
     async function init() {
       setIsReady(false)
       setDict(englishCopy as Dict)
+      setRuntimeDictionary(englishCopy as Dict)
       const safeLang = persistLanguage(lang)
 
       const loaded =
@@ -248,6 +250,7 @@ export function I18nProvider({
 
       if (cancelled) return
 
+      setRuntimeDictionary(loaded)
       setDict(loaded)
       setIsReady(true)
     }

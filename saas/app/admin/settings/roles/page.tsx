@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Role = 'user' | 'admin' | 'owner'
 
@@ -14,7 +13,7 @@ type TeamUser = {
 }
 
 const COPY = {
-  en: { eyebrow: uiCopy('u_37f1563f46162b0b'), title: uiCopy('u_cb5e528211c78126'), ownerLabel: uiCopy('u_1e05391dc9ddc4fd'), adminsLabel: uiCopy('u_ed1000f1fd643881'), totalLabel: uiCopy('u_89569027c0288701'), oneOwner: uiCopy('u_f84be26dbecfd632'), noAccess: uiCopy('u_0e771fa945023f0b'), loading: uiCopy('u_0b46e26fb29307be'), colEmail: uiCopy('u_cba253082951cbe1'), colRole: uiCopy('u_8341d0de5f83523b'), colActions: uiCopy('u_9f8ae458b53a98ea'), transferBtn: uiCopy('u_d4d613560fb12071'), confirmTitle: uiCopy('u_a8bef1279313a30d'), confirmBody: (email: string) => `Are you sure you want to transfer ownership to ${email}?`, confirmWarning: uiCopy('u_9f52daabd602de82'), cancel: uiCopy('u_d3278bdfea3b545f'), confirm: uiCopy('u_698791ac3ab192ab'), confirming: uiCopy('u_8d88fa46d16f47ff'), transferred: uiCopy('u_85c1f3f9bce782f1'), transferFailed: uiCopy('u_8ffff0c27317e6f3'), loadFailed: uiCopy('u_e8d44bfba5709c29') },
+  en: { eyebrow: uiText('generatedUi.u_069d67567834c4d9'), title: uiText('generatedUi.u_a5b449f8e7b1f4be'), ownerLabel: uiText('generatedUi.u_4b1b8aa3608a26da'), adminsLabel: uiText('generatedUi.u_8273a67b55a7d7da'), totalLabel: uiText('generatedUi.u_c9b3c38247f744e1'), oneOwner: uiText('generatedUi.u_77fe9d53045748e1'), noAccess: uiText('generatedUi.u_94d93016f397a0a4'), loading: uiText('generatedUi.u_3c550bded4315d69'), colEmail: uiText('generatedUi.u_969ccbd3cf6300ec'), colRole: uiText('generatedUi.u_14736a2eb9f4159f'), colActions: uiText('generatedUi.u_ff8059dc6752afdd'), transferBtn: uiText('generatedUi.u_f49cda3a003c5272'), confirmTitle: uiText('generatedUi.u_e66469fffd8471b8'), confirmBody: (email: string) => `Are you sure you want to transfer ownership to ${email}?`, confirmWarning: uiText('generatedUi.u_bcb7ba30438e33b5'), cancel: uiText('generatedUi.u_19766ed6ccb2f4a3'), confirm: uiText('generatedUi.u_eebdd24a77d9ad32'), confirming: uiText('generatedUi.u_f802fc22aed3ab95'), transferred: uiText('generatedUi.u_6ab930808007e75b'), transferFailed: uiText('generatedUi.u_efa06c28c406307e'), loadFailed: uiText('generatedUi.u_5d910115628b77fb') },
   es: { eyebrow: '🛡️ Admin · Roles', title: 'Gestión de roles', ownerLabel: 'Propietario', adminsLabel: 'Admins', totalLabel: 'Total', oneOwner: 'Solo se permite un propietario a la vez.', noAccess: 'No tiene acceso a la gestión de roles.', loading: 'Cargando registros de roles en vivo…', colEmail: 'Correo', colRole: 'Rol', colActions: 'Acciones', transferBtn: 'Transferir propiedad', confirmTitle: 'Confirmar transferencia de propiedad', confirmBody: (email: string) => `¿Está seguro de que desea transferir la propiedad a ${email}?`, confirmWarning: 'Perderá los privilegios de propietario.', cancel: 'Cancelar', confirm: 'Confirmar', confirming: 'Confirmando...', transferred: 'Propiedad transferida', transferFailed: 'Transferencia fallida', loadFailed: 'No se pudieron cargar los roles.' },
   pt: { eyebrow: '🛡️ Admin · Funções', title: 'Gestão de funções', ownerLabel: 'Proprietário', adminsLabel: 'Admins', totalLabel: 'Total', oneOwner: 'Apenas um proprietário é permitido por vez.', noAccess: 'Você não tem acesso à gestão de funções.', loading: 'Carregando registros de funções ao vivo…', colEmail: 'E-mail', colRole: 'Função', colActions: 'Ações', transferBtn: 'Transferir propriedade', confirmTitle: 'Confirmar transferência de propriedade', confirmBody: (email: string) => `Tem certeza de que deseja transferir a propriedade para ${email}?`, confirmWarning: 'Você perderá os privilégios de proprietário.', cancel: 'Cancelar', confirm: 'Confirmar', confirming: 'Confirmando...', transferred: 'Propriedade transferida', transferFailed: 'Transferência falhou', loadFailed: 'Não foi possível carregar as funções.' },
   pl: { eyebrow: '🛡️ Admin · Role', title: 'Zarządzanie rolami', ownerLabel: 'Właściciel', adminsLabel: 'Admini', totalLabel: 'Łącznie', oneOwner: 'Dozwolony jest tylko jeden właściciel na raz.', noAccess: 'Nie masz dostępu do zarządzania rolami.', loading: 'Ładowanie rekordów ról live…', colEmail: 'E-mail', colRole: 'Rola', colActions: 'Akcje', transferBtn: 'Przenieś własność', confirmTitle: 'Potwierdź przeniesienie własności', confirmBody: (email: string) => `Czy na pewno chcesz przenieść własność do ${email}?`, confirmWarning: 'Utracisz uprawnienia właściciela.', cancel: 'Anuluj', confirm: 'Potwierdź', confirming: 'Potwierdzanie...', transferred: 'Własność przeniesiona', transferFailed: 'Przeniesienie nie powiodło się', loadFailed: 'Nie udało się załadować ról.' },
@@ -121,8 +120,8 @@ export default function RolesManagementPage() {
             <h1 style={{ fontSize: 22, margin: '4px 0' }}>{c.title}</h1>
           </div>
           <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
-            <div style={{ paddingTop: 0 }}><b className="gold">{roleCount(uiCopy('u_81392eeb67adba73'))}</b><span>{c.ownerLabel}</span></div>
-            <div style={{ paddingTop: 0 }}><b>{roleCount(uiCopy('u_203468806a90a8f5'))}</b><span>{c.adminsLabel}</span></div>
+            <div style={{ paddingTop: 0 }}><b className="gold">{roleCount("owner")}</b><span>{c.ownerLabel}</span></div>
+            <div style={{ paddingTop: 0 }}><b>{roleCount("admin")}</b><span>{c.adminsLabel}</span></div>
             <div style={{ paddingTop: 0 }}><b>{sortedUsers.length}</b><span>{c.totalLabel}</span></div>
           </div>
         </div>

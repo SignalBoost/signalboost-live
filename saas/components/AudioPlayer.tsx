@@ -3,8 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from '@/components/i18n/useTranslation';
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -14,7 +13,7 @@ interface AudioPlayerProps {
 
 const PROVIDER_NAME = 'OpenAI';
 const COPY = {
-  en: { pause: uiCopy('u_99d7152a3e72c76e'), play: uiCopy('u_efe656d081e016fc'), download: uiCopy('u_1352ecd468dc5611') },
+  en: { pause: uiText('generatedUi.u_b49c7f7c43313f5e'), play: uiText('generatedUi.u_b789c9c2bf6255fc'), download: uiText('generatedUi.u_2c714fbd055e8b55') },
   es: { pause: 'Pausar pista', play: 'Reproducir pista', download: 'Descargar MP3' },
   pt: { pause: 'Pausar faixa', play: 'Reproduzir faixa', download: 'Baixar MP3' },
   pl: { pause: 'Wstrzymaj utwór', play: 'Odtwórz utwór', download: 'Pobierz MP3' },

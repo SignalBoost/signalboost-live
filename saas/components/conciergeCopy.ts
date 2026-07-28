@@ -1,14 +1,14 @@
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+import { uiText } from '@/lib/i18n/uiText'
 export const conciergeCopy = {
   en: {
-    label: uiCopy('u_76309d44b52bc496'),
-    title: uiCopy('u_8d6836cbbba2cafe'),
-    default: uiCopy('u_b7ff7e3a98f5301e'),
-    thinking: uiCopy('u_63246de5ab15b633'),
-    videosBtn: uiCopy('u_1fee4a28506c8c44'),
-    creditsBtn: uiCopy('u_4d629c8a0df9a388'),
-    growthBtn: uiCopy('u_979dab3e66335ab4'),
-    supportBtn: uiCopy('u_bf098b9e1b8d93fc'),
+    label: uiText('generatedUi.u_ad74fd828a4b258a'),
+    title: uiText('generatedUi.u_ad74fd828a4b258a'),
+    default: uiText('generatedUi.u_7a5580627692ea75'),
+    thinking: uiText('generatedUi.u_b4739a4f08650db2'),
+    videosBtn: uiText('generatedUi.u_88005532d4ace6bf'),
+    creditsBtn: uiText('generatedUi.u_f0de13091ddcb354'),
+    growthBtn: uiText('generatedUi.u_5b7024313fda2781'),
+    supportBtn: uiText('generatedUi.u_1d5fbdb3d68c99e8'),
   },
 }
 

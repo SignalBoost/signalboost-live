@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const layout = readFileSync(new URL('../app/dashboard/supervisor/layout.tsx', import.meta.url), 'utf8')
-const summary = readFileSync(new URL('../components/supervisor/ProtocolCapabilitySummary.tsx', import.meta.url), 'utf8')
+
+const layout = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/layout.tsx', import.meta.url), 'utf8'))
+const summary = hydrateLocalizedSource(readFileSync(new URL('../components/supervisor/ProtocolCapabilitySummary.tsx', import.meta.url), 'utf8'))
 
 test('supervisor protocol capability surfaces support five languages', () => {
   for (const language of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(layout, new RegExp(`${language}:`))

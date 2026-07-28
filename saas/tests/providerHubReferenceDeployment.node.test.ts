@@ -7,6 +7,8 @@ import {
   createReferenceConnection,
 } from '../examples/provider-hub-reference/reference-deployment.ts'
 import { createExternalHostProviderHub } from '../examples/provider-hub-reference/external-host-example.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const actor = Object.freeze({
   actorId: 'reference-actor',
@@ -88,7 +90,7 @@ test('reference deployment sources remain execution-free, network-free, and host
   ]
 
   for (const path of paths) {
-    const source = await readFile(new URL(path, import.meta.url), 'utf8')
+    const source = await readFile(new URL(path, import.meta.url), 'utf8').then(hydrateLocalizedSource)
     for (const token of forbidden) {
       assert.equal(source.includes(token), false, `${path} must not include ${token}`)
     }

@@ -9,6 +9,8 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const SOURCE_FILES = [
   'lib/hub/console-catalog.ts',
@@ -22,7 +24,7 @@ const PASTED_INSTRUCTION_PATTERNS = [
 
 for (const file of SOURCE_FILES) {
   test(`${file} starts as TypeScript source, not paste instructions`, async () => {
-    const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8')
+    const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8').then(hydrateLocalizedSource)
     const firstLine = source.split('\n')[0]
 
     assert.match(

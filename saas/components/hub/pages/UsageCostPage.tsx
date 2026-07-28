@@ -4,8 +4,7 @@
 import { PageProps, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const rows = [
   ['OpenAI', 'AI tokens', '+18%', 'Watch usage and model mix.'],
@@ -19,15 +18,15 @@ export default function UsageCostPage(_props: PageProps) {
   return (
     <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingRight: 8 }}>
       <section style={{ marginBottom: 14 }}>
-        <div style={labelStyle}>{uiCopy('u_bcd34e26e1e352dd')}</div>
-        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.usageCost.title', uiCopy('u_fc3229874e082776'))}</h2>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.usageCost.subtitle', uiCopy('u_019533e76a3eae7d'))}</p>
+        <div style={labelStyle}>{uiText('generatedUi.u_79480913f3e63c40')}</div>
+        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.usageCost.title')}</h2>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.usageCost.subtitle')}</p>
       </section>
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginBottom: 14 }}>
-        {[uiCopy('u_c50fb3652fc488f1'), uiCopy('u_f2de157c2baea52a'), uiCopy('u_7822d7dbe9a4d299'), uiCopy('u_403e8195ec706db5')].map((item, index) => <div key={item} style={{ ...cardStyle, padding: 16 }}><div style={labelStyle}>{item}</div><div style={{ fontSize: 24, fontWeight: 950, color: index === 3 ? '#ffc300' : '#1af0ff' }}>{index === 3 ? '2' : uiCopy('u_f1dfe7be5147cafb')}</div></div>)}
+        {["Today", "This Week", "This Month", "Threshold Alerts"].map((item, index) => <div key={item} style={{ ...cardStyle, padding: 16 }}><div style={labelStyle}>{item}</div><div style={{ fontSize: 24, fontWeight: 950, color: index === 3 ? '#ffc300' : '#1af0ff' }}>{index === 3 ? '2' : uiText('generatedUi.u_5fa7aac5375c5815')}</div></div>)}
       </section>
       <section style={{ ...cardStyle, padding: 16 }}>
-        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.usageCost.signals', uiCopy('u_7b1101a2556f933a'))}</h3>
+        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.usageCost.signals')}</h3>
         <div style={{ display: 'grid', gap: 10 }}>
           {rows.map(([provider, metric, change, note]) => <div key={provider} style={rowStyle}><strong>{provider}</strong><span>{metric}</span><span style={{ color: '#ffc300' }}>{change}</span><span style={{ color: 'rgba(255,255,255,.56)' }}>{note}</span></div>)}
         </div>

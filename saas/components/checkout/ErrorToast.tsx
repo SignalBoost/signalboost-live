@@ -4,9 +4,6 @@
 // Dismissible error notification for checkout flows.
 
 import { useEffect, useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 export type ErrorToastProps = {
   message: string
   isVisible: boolean
@@ -54,7 +51,7 @@ export default function ErrorToast({
         animation: 'slideIn 0.3s ease-out',
       }}
     >
-      <style>{uiCopy('u_f8c16f82521a62dc')}</style>
+      <style>{"\n        @keyframes slideIn {\n          from { transform: translateX(450px); opacity: 0; }\n          to { transform: translateX(0); opacity: 1; }\n        }\n        @media (max-width: 640px) {\n          [data-error-toast] {\n            left: 12px !important;\n            right: 12px !important;\n            max-width: none !important;\n          }\n        }\n      "}</style>
 
       <div style={{ color: '#fca5a5', fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚠️</div>
 

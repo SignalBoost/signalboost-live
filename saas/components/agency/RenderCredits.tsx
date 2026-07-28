@@ -6,8 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const PACKS: { id: 'small' | 'medium' | 'large'; credits: number; popular?: boolean }[] = [
   { id: 'small', credits: 1500 },
@@ -30,7 +29,7 @@ const COPY: Record<Lang, {
   popular: string
   signedOut: string
 }> = {
-  en: { title: uiCopy('u_78f13953cfc40731'), subtitle: uiCopy('u_25da74e6235512f4'), balanceLabel: uiCopy('u_fd4ca5d9ba88806b'), creditsWord: uiCopy('u_8c80dcb7082d3cb1'), unlimited: uiCopy('u_cad63be2d3a69a52'), ownerSubtitle: uiCopy('u_ee82ee36e30f4cfb'), buyCta: uiCopy('u_d59b3a627130cb46'), redirecting: uiCopy('u_8e6d0d5e3400270b'), buyError: uiCopy('u_266a73b383b21871'), popular: uiCopy('u_d78c524d5cd29aeb'), signedOut: uiCopy('u_b8ac9e17e05744c1') },
+  en: { title: uiText('generatedUi.u_a75e56e517cd282a'), subtitle: uiText('generatedUi.u_210d4a3f4832fbf2'), balanceLabel: uiText('generatedUi.u_dc808959338579e0'), creditsWord: uiText('generatedUi.u_be379a30f1aa05d1'), unlimited: uiText('generatedUi.u_11dde17d6c3e2098'), ownerSubtitle: uiText('generatedUi.u_69ae03e155a02858'), buyCta: uiText('generatedUi.u_64e3cb0e4960ba69'), redirecting: uiText('generatedUi.u_0d83b98bebfb5add'), buyError: uiText('generatedUi.u_827beb6ec9dcac23'), popular: uiText('generatedUi.u_76327dec9ae3a06a'), signedOut: uiText('generatedUi.u_3599fd816d4ea769') },
   es: { title: 'Créditos de render', subtitle: 'Los créditos prepagos impulsan la producción cinematográfica. Recarga una vez y paga solo lo que usa cada render.', balanceLabel: 'Tu saldo', creditsWord: 'créditos', unlimited: 'Ilimitados', ownerSubtitle: 'El acceso del propietario incluye créditos ilimitados y todas las herramientas internas aprobadas.', buyCta: 'Comprar', redirecting: 'Redirigiendo…', buyError: 'No se pudo iniciar el pago.', popular: 'Popular', signedOut: 'Inicia sesión para ver tu saldo y recargar créditos de render.' },
   pt: { title: 'Créditos de render', subtitle: 'Créditos pré-pagos alimentam a produção cinematográfica. Recarregue uma vez e pague apenas pelo uso.', balanceLabel: 'Seu saldo', creditsWord: 'créditos', unlimited: 'Ilimitados', ownerSubtitle: 'O acesso do proprietário inclui créditos ilimitados e todas as ferramentas internas aprovadas.', buyCta: 'Comprar', redirecting: 'Redirecionando…', buyError: 'Não foi possível iniciar o pagamento.', popular: 'Popular', signedOut: 'Faça login para ver seu saldo e recarregar créditos de render.' },
   pl: { title: 'Kredyty renderowania', subtitle: 'Przedpłacone kredyty napędzają produkcję. Doładuj konto i płać tylko za użycie.', balanceLabel: 'Twoje saldo', creditsWord: 'kredytów', unlimited: 'Bez limitu', ownerSubtitle: 'Dostęp właściciela obejmuje nielimitowane kredyty i wszystkie zatwierdzone narzędzia wewnętrzne.', buyCta: 'Kup', redirecting: 'Przekierowanie…', buyError: 'Nie udało się rozpocząć płatności.', popular: 'Popularne', signedOut: 'Zaloguj się, aby zobaczyć saldo i doładować kredyty.' },

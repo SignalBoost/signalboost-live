@@ -11,9 +11,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const source = readFileSync(new URL('../components/supervisor/ProtocolCapabilitySummary.tsx', import.meta.url), 'utf8')
-const layout = readFileSync(new URL('../app/dashboard/supervisor/layout.tsx', import.meta.url), 'utf8')
+
+const source = hydrateLocalizedSource(readFileSync(new URL('../components/supervisor/ProtocolCapabilitySummary.tsx', import.meta.url), 'utf8'))
+const layout = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/layout.tsx', import.meta.url), 'utf8'))
 
 test('supervisor layout surfaces the protocol capability summary', () => {
   assert.match(layout, /import ProtocolCapabilitySummary from/)

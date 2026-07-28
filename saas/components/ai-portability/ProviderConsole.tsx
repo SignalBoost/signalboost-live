@@ -9,8 +9,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 interface ProviderMeta {
   id: string;
@@ -96,32 +95,31 @@ export function ProviderConsole({
             checked={auto}
             onChange={(e) => setAuto(e.target.checked)}
           />
-          <span>{uiCopy('u_b27dbd67fdaa52d1')}</span>
+          <span>{uiText('generatedUi.u_5e8d38c5655a285f')}</span>
         </label>
 
         {auto ? (
           <select
-            aria-label={uiCopy('u_b85866845b4a23c9')}
+            aria-label={uiText('generatedUi.u_a9f96a7a54d821a6')}
             value={policy}
             onChange={(e) => setPolicy(e.target.value as Policy)}
             style={S.select}
           >
-            <option value="auto">{uiCopy('u_68a38bb4b6c04325')}</option>
-            <option value="cost">{uiCopy('u_ebfba834bfec6f5c')}</option>
-            <option value="latency">{uiCopy('u_a2755c58f6ad87de')}</option>
-            <option value="capability">{uiCopy('u_556bcae20df5b687')}</option>
+            <option value="auto">{uiText('generatedUi.u_ca5f6a4acf0e31d5')}</option>
+            <option value="cost">{uiText('generatedUi.u_d46b1b8f5c7aef79')}</option>
+            <option value="latency">{uiText('generatedUi.u_7ef7a92e55a79eba')}</option>
+            <option value="capability">{uiText('generatedUi.u_87897aae99503d48')}</option>
           </select>
         ) : (
           <select
-            aria-label={uiCopy('u_510e0df61bd0a569')}
+            aria-label={uiText('generatedUi.u_472590ae974d4c1f')}
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
             style={S.select}
           >
             {providers.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.label} — ${p.cost_per_1k_output}{uiCopy('u_7a9f30b56f8480ef')}{p.avg_latency_ms}ms
-              </option>
+                {p.label} — ${p.cost_per_1k_output}{uiText('generatedUi.u_6340eae9981b4620')}{p.avg_latency_ms}{uiText('generatedUi.u_f785c3ce1d580c8f')} </option>
             ))}
           </select>
         )}
@@ -130,13 +128,13 @@ export function ProviderConsole({
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder={uiCopy('u_78237926d497fdcb')}
+        placeholder={uiText('generatedUi.u_0f3bb0f12ebe5f5d')}
         rows={4}
         style={S.textarea}
       />
 
       <button onClick={run} disabled={loading || !prompt} style={S.button}>
-        {loading ? uiCopy('u_8b7ebf6bcdb54d4c') : auto ? uiCopy('u_fb600bb56ef8ff55') : `Run on ${provider}`}
+        {loading ? uiText('generatedUi.u_effe03a8da48932b') : auto ? uiText('generatedUi.u_a9a472f75d2be5bc') : `Run on ${provider}`}
       </button>
 
       {error && <div style={S.error}>{error}</div>}
@@ -145,10 +143,10 @@ export function ProviderConsole({
         <div style={S.result}>
           <div style={S.output}>{result.output}</div>
           <div style={S.meta}>
-            <span>{uiCopy('u_0308afd33897e9b0')}<b>{result.provider}</b></span>
-            <span>{uiCopy('u_e2e7dea8e81d6d41')}{result.tokens_used.total}</span>
-            <span>{uiCopy('u_5079d8b4eb9eec39')}{result.latency_ms}ms</span>
-            <span>{uiCopy('u_3f6d4e8c2b932c9e')}{result.cost_usd.toFixed(6)}</span>
+            <span>{uiText('generatedUi.u_672f1efd8b87117f')}<b>{result.provider}</b></span>
+            <span>{uiText('generatedUi.u_e1c97fd10751a864')}{result.tokens_used.total}</span>
+            <span>{uiText('generatedUi.u_7839136b0629d888')}{result.latency_ms}{uiText('generatedUi.u_f785c3ce1d580c8f')}</span>
+            <span>{uiText('generatedUi.u_564970ae3734b7c1')}{result.cost_usd.toFixed(6)}</span>
           </div>
         </div>
       )}

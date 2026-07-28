@@ -5,8 +5,7 @@ import type { PointerEvent } from 'react'
 import { defaultCaptionStyle, type CaptionCue, type CaptionStyle, type SupportedVideoLocale, type VideoQuota } from '@/lib/video/types'
 import { calculateVideoQuota } from '@/lib/video/subscription'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type ExportState = { status: 'idle' | 'recording' | 'ready' | 'failed'; message: string; url?: string }
@@ -18,65 +17,65 @@ type CanvasEditorHandle = { startExport: () => Promise<string> }
 type CanvasEditorProps = { videoUrl: string | null; cues: CaptionCue[]; style: CaptionStyle; aspectRatio: AspectRatio; seekTime: number; durationSec: number; lang: string; onStyleChange: (s: CaptionStyle) => void; onTime: (t: number) => void; onDuration: (s: number) => void }
 
 const COPY = {
-  eyebrow:         { en: uiCopy('u_b98a117266a3f419'), es: 'Video Studio', pt: 'Video Studio', pl: 'Video Studio', ru: 'Видео студия' },
-  heroTitle:       { en: uiCopy('u_d425aefbbb9fd8e7'), es: 'Editor de video con subtitulos IA', pt: 'Editor de video com legendas IA', pl: 'Edytor wideo z napisami AI', ru: 'Редактор видео с субтитрами AI' },
-  heroSubtitle:    { en: uiCopy('u_36da4a392af64a69'), es: 'Sube un video, genera subtitulos IA sincronizados, arrastra overlays en el canvas y exporta el video.', pt: 'Faca upload, gere legendas IA sincronizadas, arraste overlays no canvas e exporte o video.', pl: 'Przeslij wideo, generuj napisy AI, przeciagnij overlaye na canvas i eksportuj.', ru: 'Загрузите видео, создайте субтитры, перетащите оверлеи и экспортируйте.' },
-  quotaLabel:      { en: uiCopy('u_752b902ed7abfdb5'), es: 'Uso de video', pt: 'Uso de video', pl: 'Uzycie wideo', ru: 'Использование видео' },
-  quotaNote:       { en: uiCopy('u_3e1b70ecbd91720f'), es: 'Las exportaciones se graban en tu navegador.', pt: 'As exportacoes sao gravadas no seu navegador.', pl: 'Eksporty nagrywane sa w przegladarce.', ru: 'Экспорты записываются в браузере.' },
-  demoOnly:        { en: uiCopy('u_ea7343558fa5992a'), es: 'Usuarios gratuitos solo pueden previsualizar. Actualiza para exportar.', pt: 'Usuarios gratuitos apenas visualizam. Atualize para exportar.', pl: 'Bezplatni uzytkownicy tylko podgladaja. Ulepsz aby eksportowac.', ru: 'Бесплатные пользователи только просматривают. Обновитесь для экспорта.' },
-  overage:         { en: uiCopy('u_7f46e5a72862caa4'), es: 'Exceso:', pt: 'Excesso:', pl: 'Przekroczenie:', ru: 'Превышение:' },
-  overageAt:       { en: uiCopy('u_929d0e0f6eaac0c6'), es: 'minuto(s) adicional(es) a', pt: 'minuto(s) extra a', pl: 'dodatkowych min po', ru: 'доп. минут по' },
-  overageEnd:      { en: uiCopy('u_b03660d3b306c8c9'), es: '/min. SignalBoost abrira una sesion de facturacion.', pt: '/min. SignalBoost abrira uma sessao de faturamento.', pl: '/min. SignalBoost otworzy sesje rozliczeniowa.', ru: '/мин. SignalBoost откроет сеанс оплаты.' },
-  templates:       { en: uiCopy('u_8cb2b50bb6ec8783'), es: 'Plantillas', pt: 'Templates', pl: 'Szablony', ru: 'Шаблоны' },
-  templatesHint:   { en: uiCopy('u_375fb9f1c5133818'), es: 'Puntos de partida estilo Canva', pt: 'Pontos de partida estilo Canva', pl: 'Punkty startowe w stylu Canva', ru: 'Стартовые точки в стиле Canva' },
-  descSignal:      { en: uiCopy('u_d65e401d2d693659'), es: 'Subtitulos dorados para negocios.', pt: 'Legendas douradas para negocios.', pl: 'Zlote napisy dla biznesu.', ru: 'Золотые бизнес-субтитры.' },
-  descTiktok:      { en: uiCopy('u_08f45f0dc3791cf6'), es: 'Subtitulos pop grandes y blancos.', pt: 'Legendas pop grandes e brancas.', pl: 'Duze biale napisy pop.', ru: 'Большие белые поп-субтитры.' },
-  descHormozi:     { en: uiCopy('u_7a86e2315c7b2121'), es: 'Subtitulos amarillos de alto contraste.', pt: 'Legendas amarelas de alto contraste.', pl: 'Zolte napisy o wysokim kontrascie.', ru: 'Желтые субтитры с высоким контрастом.' },
-  descMinimal:     { en: uiCopy('u_8d9b623579fb10a9'), es: 'Subtitulos de tercio inferior limpio.', pt: 'Legendas de tercio inferior limpo.', pl: 'Czyste napisy w dolnej trzeciej.', ru: 'Чистые субтитры в нижней трети.' },
-  captionTimeline: { en: uiCopy('u_2b456716ad614555'), es: 'Linea de tiempo', pt: 'Linha do tempo', pl: 'Os czasu napisow', ru: 'Временная шкала' },
-  cues:            { en: uiCopy('u_d5af5b98b5b031e1'), es: 'senales', pt: 'indicacoes', pl: 'wskazowki', ru: 'реплик' },
-  editCaption:     { en: uiCopy('u_c49cbe4521ec4826'), es: 'Editar subtitulo', pt: 'Editar legenda', pl: 'Edytuj napis', ru: 'Редактировать субтитр' },
-  noCaptions:      { en: uiCopy('u_835cc5367f4679e1'), es: 'Genera subtitulos IA o sube SRT/VTT para poblar la linea de tiempo.', pt: 'Gere legendas IA ou faca upload de SRT/VTT.', pl: 'Wygeneruj napisy AI lub przeslij SRT/VTT.', ru: 'Создайте AI-субтитры или загрузите SRT/VTT.' },
-  captionStyle:    { en: uiCopy('u_e91e63bc2b76ced9'), es: 'Estilo de subtitulos', pt: 'Estilo de legendas', pl: 'Styl napisow', ru: 'Стиль субтитров' },
-  format:          { en: uiCopy('u_c4bf309811b2f7a3'), es: 'Formato', pt: 'Formato', pl: 'Format', ru: 'Формат' },
-  fontFamily:      { en: uiCopy('u_e4b734329ddc202d'), es: 'Familia tipografica', pt: 'Familia de fonte', pl: 'Rodzina czcionek', ru: 'Семейство шрифтов' },
-  fontSize:        { en: uiCopy('u_842f72eb8ad37e9e'), es: 'Tamano', pt: 'Tamanho', pl: 'Rozmiar', ru: 'Размер' },
-  textColor:       { en: uiCopy('u_4e2be3e6d851e5df'), es: 'Color del texto', pt: 'Cor do texto', pl: 'Kolor tekstu', ru: 'Цвет текста' },
-  animation:       { en: uiCopy('u_5664cd03a5425027'), es: 'Animacion', pt: 'Animacao', pl: 'Animacja', ru: 'Анимация' },
-  background:      { en: uiCopy('u_960116441e6ac978'), es: 'Fondo', pt: 'Fundo', pl: 'Tlo', ru: 'Фон' },
-  animNone:        { en: uiCopy('u_8a9fb294db08e095'), es: 'Ninguna', pt: 'Nenhuma', pl: 'Brak', ru: 'Нет' },
-  animFade:        { en: uiCopy('u_23edc71e2e9b5815'), es: 'Desvanecimiento', pt: 'Fade', pl: 'Zanikanie', ru: 'Затухание' },
-  animSlide:       { en: uiCopy('u_28b946a18c69b125'), es: 'Deslizamiento', pt: 'Deslizamiento', pl: 'Przesuniecie', ru: 'Слайд' },
-  animPop:         { en: uiCopy('u_e32b0433d3c72eac'), es: 'Pop', pt: 'Pop', pl: 'Pop', ru: 'Поп' },
-  canvasEditor:    { en: uiCopy('u_20d2b758eb00fcef'), es: 'Editor de lienzo', pt: 'Editor de canvas', pl: 'Edytor canvas', ru: 'Редактор холста' },
-  uploadPrompt:    { en: uiCopy('u_028e6af969579e6a'), es: 'Sube un video para empezar', pt: 'Faca upload para comecar', pl: 'Przeslij wideo aby edytowac', ru: 'Загрузите видео для редактирования' },
-  playing:         { en: uiCopy('u_9cef7a8ee83209bf'), es: 'Reproduciendo', pt: 'Reproduzindo', pl: 'Odtwarzanie', ru: 'Воспроизведение' },
-  play:            { en: uiCopy('u_e3ba222e5bded763'), es: 'Reproducir', pt: 'Reproduzir', pl: 'Odtwórz', ru: 'Играть' },
-  pause:           { en: uiCopy('u_65e9668b5f920465'), es: 'Pausar', pt: 'Pausar', pl: 'Pauza', ru: 'Пауза' },
-  prevFrame:       { en: uiCopy('u_49c78382e24c12f5'), es: '- fotograma', pt: '- quadro', pl: '- klatka', ru: '- кадр' },
-  nextFrame:       { en: uiCopy('u_586ffec909c5cd51'), es: '+ fotograma', pt: '+ quadro', pl: '+ klatka', ru: '+ кадр' },
-  restart:         { en: uiCopy('u_d2b457ebddece00e'), es: 'Reiniciar', pt: 'Reiniciar', pl: 'Uruchom ponownie', ru: 'Перезапуск' },
-  reset:           { en: uiCopy('u_a44e0f1abe9a9eea'), es: 'Restablecer', pt: 'Redefinir', pl: 'Resetuj', ru: 'Сбросить' },
-  exportPanel:     { en: uiCopy('u_a7ade5b7189f8443'), es: 'Panel de exportacion', pt: 'Painel de exportacao', pl: 'Panel eksportu', ru: 'Панель экспорта' },
-  exportNote:      { en: uiCopy('u_577ee686c1825920'), es: 'Haz clic en exportar y deja que el video se reproduzca. Tu navegador graba el canvas y produce un .webm.', pt: 'Clique em exportar e deixe o video reproduzir. Seu navegador grava o canvas e produz um .webm.', pl: 'Kliknij eksport i pozwol wideo sie odtworzyc. Przegladarka nagra canvas i stworzy plik .webm.', ru: 'Нажмите экспорт и дайте видео воспроизвестись. Браузер запишет холст и создаст .webm.' },
-  exportBtn:       { en: uiCopy('u_9e45c2dd9ec0f70d'), es: 'Exportar video con subtitulos', pt: 'Exportar video com legendas', pl: 'Eksportuj wideo z napisami', ru: 'Экспорт видео с субтитрами' },
-  recording:       { en: uiCopy('u_f260e1db63cd72a2'), es: 'Grabando - deja que el video se reproduzca...', pt: 'Gravando - deixe o video reproduzir...', pl: 'Nagrywanie - pozwol odtworzyc wideo...', ru: 'Запись - дайте видео воспроизвестись...' },
-  downloadBtn:     { en: uiCopy('u_0b1bfe57989e96da'), es: 'Descargar video con subtitulos (.webm)', pt: 'Baixar video com legendas (.webm)', pl: 'Pobierz wideo z napisami (.webm)', ru: 'Скачать видео с субтитрами (.webm)' },
-  webmNote:        { en: uiCopy('u_89930a6f7ebd4536'), es: '.webm funciona en Chrome, Edge y Firefox. Convierte a MP4 con HandBrake o cloudconvert.com.', pt: '.webm funciona no Chrome, Edge e Firefox. Converta para MP4 com HandBrake ou cloudconvert.com.', pl: '.webm dziala w Chrome, Edge i Firefox. Konwertuj do MP4 za pomoca HandBrake lub cloudconvert.com.', ru: '.webm работает в Chrome, Edge, Firefox. Конвертируйте в MP4 через HandBrake или cloudconvert.com.' },
-  videoInput:      { en: uiCopy('u_6b1eae5a06c4ceff'), es: 'Video', pt: 'Video', pl: 'Wideo', ru: 'Видео' },
-  aiCaptions:      { en: uiCopy('u_458fb45f2e310dc5'), es: 'Subtitulos IA', pt: 'Legendas IA', pl: 'Napisy AI', ru: 'AI-субтитры' },
-  srtVtt:          { en: uiCopy('u_4180f1f074dee9ac'), es: 'SRT/VTT opcional', pt: 'SRT/VTT opcional', pl: 'Opcjonalny SRT/VTT', ru: 'Необязательный SRT/VTT' },
-  tierLabel:       { en: uiCopy('u_c09c80d32dd3c9b9'), es: 'Plan', pt: 'Plano', pl: 'Plan', ru: 'Тариф' },
-  localeLabel:     { en: uiCopy('u_7f19fe7c5fb79b7d'), es: 'Idioma', pt: 'Idioma', pl: 'Jezyk', ru: 'Язык' },
-  genCaptions:     { en: uiCopy('u_77a83f9af54a7fbe'), es: 'Generar subtitulos', pt: 'Gerar legendas', pl: 'Generuj napisy', ru: 'Создать субтитры' },
-  transcribing:    { en: uiCopy('u_c3ec4b521e398fb1'), es: 'Transcribiendo...', pt: 'Transcrevendo...', pl: 'Transkrybowanie...', ru: 'Транскрибирование...' },
-  tierFree:        { en: uiCopy('u_518ebca26141209f'), es: 'Gratuito/demo', pt: 'Gratuito/demo', pl: 'Bezplatny/demo', ru: 'Бесплатный/демо' },
-  storageLabel:    { en: uiCopy('u_baca32ed9f910643'), es: 'Almacenamiento:', pt: 'Armazenamento:', pl: 'Przechowywanie:', ru: 'Хранилище:' },
-  captionsLabel:   { en: uiCopy('u_c84210c285a5522b'), es: 'Subtitulos:', pt: 'Legendas:', pl: 'Napisy:', ru: 'Субтитры:' },
-  footerTime:      { en: uiCopy('u_7392ea07940f09b5'), es: 'Tiempo canvas', pt: 'Tempo canvas', pl: 'Czas canvas', ru: 'Время холста' },
-  footerDuration:  { en: uiCopy('u_50f4339a84cf97c7'), es: 'duracion', pt: 'duracao', pl: 'czas trwania', ru: 'длительность' },
-  footerCaptions:  { en: uiCopy('u_d1de494eb808b05d'), es: 'subtitulos', pt: 'legendas', pl: 'napisy', ru: 'субтитров' },
-  footerNote:      { en: uiCopy('u_fc04d3d2e9f04e68'), es: 'las exportaciones se graban en tiempo real.', pt: 'exportacoes gravam em tempo real.', pl: 'eksporty nagrywane sa w czasie rzeczywistym.', ru: 'экспорты записываются в реальном времени.' },
+  eyebrow:         { en: uiText('generatedUi.u_095321ec675b9643'), es: 'Video Studio', pt: 'Video Studio', pl: 'Video Studio', ru: 'Видео студия' },
+  heroTitle:       { en: uiText('generatedUi.u_8e16312c846c8068'), es: 'Editor de video con subtitulos IA', pt: 'Editor de video com legendas IA', pl: 'Edytor wideo z napisami AI', ru: 'Редактор видео с субтитрами AI' },
+  heroSubtitle:    { en: uiText('generatedUi.u_3a81e923b13cfadb'), es: 'Sube un video, genera subtitulos IA sincronizados, arrastra overlays en el canvas y exporta el video.', pt: 'Faca upload, gere legendas IA sincronizadas, arraste overlays no canvas e exporte o video.', pl: 'Przeslij wideo, generuj napisy AI, przeciagnij overlaye na canvas i eksportuj.', ru: 'Загрузите видео, создайте субтитры, перетащите оверлеи и экспортируйте.' },
+  quotaLabel:      { en: uiText('generatedUi.u_bc16317b2cfab39e'), es: 'Uso de video', pt: 'Uso de video', pl: 'Uzycie wideo', ru: 'Использование видео' },
+  quotaNote:       { en: uiText('generatedUi.u_ad0655872b4a34bc'), es: 'Las exportaciones se graban en tu navegador.', pt: 'As exportacoes sao gravadas no seu navegador.', pl: 'Eksporty nagrywane sa w przegladarce.', ru: 'Экспорты записываются в браузере.' },
+  demoOnly:        { en: uiText('generatedUi.u_f45198e459f8516b'), es: 'Usuarios gratuitos solo pueden previsualizar. Actualiza para exportar.', pt: 'Usuarios gratuitos apenas visualizam. Atualize para exportar.', pl: 'Bezplatni uzytkownicy tylko podgladaja. Ulepsz aby eksportowac.', ru: 'Бесплатные пользователи только просматривают. Обновитесь для экспорта.' },
+  overage:         { en: uiText('generatedUi.u_5fa206e85ecfbf38'), es: 'Exceso:', pt: 'Excesso:', pl: 'Przekroczenie:', ru: 'Превышение:' },
+  overageAt:       { en: uiText('generatedUi.u_f1c65341b8172c5f'), es: 'minuto(s) adicional(es) a', pt: 'minuto(s) extra a', pl: 'dodatkowych min po', ru: 'доп. минут по' },
+  overageEnd:      { en: uiText('generatedUi.u_d1eae51ccd25a84d'), es: '/min. SignalBoost abrira una sesion de facturacion.', pt: '/min. SignalBoost abrira uma sessao de faturamento.', pl: '/min. SignalBoost otworzy sesje rozliczeniowa.', ru: '/мин. SignalBoost откроет сеанс оплаты.' },
+  templates:       { en: uiText('generatedUi.u_56b564b75c7fdb48'), es: 'Plantillas', pt: 'Templates', pl: 'Szablony', ru: 'Шаблоны' },
+  templatesHint:   { en: uiText('generatedUi.u_02a92943466e7958'), es: 'Puntos de partida estilo Canva', pt: 'Pontos de partida estilo Canva', pl: 'Punkty startowe w stylu Canva', ru: 'Стартовые точки в стиле Canva' },
+  descSignal:      { en: uiText('generatedUi.u_ac374b17cd9f6da6'), es: 'Subtitulos dorados para negocios.', pt: 'Legendas douradas para negocios.', pl: 'Zlote napisy dla biznesu.', ru: 'Золотые бизнес-субтитры.' },
+  descTiktok:      { en: uiText('generatedUi.u_8383d64c2861e51e'), es: 'Subtitulos pop grandes y blancos.', pt: 'Legendas pop grandes e brancas.', pl: 'Duze biale napisy pop.', ru: 'Большие белые поп-субтитры.' },
+  descHormozi:     { en: uiText('generatedUi.u_1dd3dfc5045e0c3f'), es: 'Subtitulos amarillos de alto contraste.', pt: 'Legendas amarelas de alto contraste.', pl: 'Zolte napisy o wysokim kontrascie.', ru: 'Желтые субтитры с высоким контрастом.' },
+  descMinimal:     { en: uiText('generatedUi.u_6e761c8fe00d53f0'), es: 'Subtitulos de tercio inferior limpio.', pt: 'Legendas de tercio inferior limpo.', pl: 'Czyste napisy w dolnej trzeciej.', ru: 'Чистые субтитры в нижней трети.' },
+  captionTimeline: { en: uiText('generatedUi.u_6da87f3748b4df1e'), es: 'Linea de tiempo', pt: 'Linha do tempo', pl: 'Os czasu napisow', ru: 'Временная шкала' },
+  cues:            { en: uiText('generatedUi.u_b15c8e6478b825db'), es: 'senales', pt: 'indicacoes', pl: 'wskazowki', ru: 'реплик' },
+  editCaption:     { en: uiText('generatedUi.u_a1e2913c5c993dc1'), es: 'Editar subtitulo', pt: 'Editar legenda', pl: 'Edytuj napis', ru: 'Редактировать субтитр' },
+  noCaptions:      { en: uiText('generatedUi.u_2feddd5281b9ab53'), es: 'Genera subtitulos IA o sube SRT/VTT para poblar la linea de tiempo.', pt: 'Gere legendas IA ou faca upload de SRT/VTT.', pl: 'Wygeneruj napisy AI lub przeslij SRT/VTT.', ru: 'Создайте AI-субтитры или загрузите SRT/VTT.' },
+  captionStyle:    { en: uiText('generatedUi.u_49a34615c56eaa07'), es: 'Estilo de subtitulos', pt: 'Estilo de legendas', pl: 'Styl napisow', ru: 'Стиль субтитров' },
+  format:          { en: "Format", es: 'Formato', pt: 'Formato', pl: 'Format', ru: 'Формат' },
+  fontFamily:      { en: uiText('generatedUi.u_119ef3fa607e7c05'), es: 'Familia tipografica', pt: 'Familia de fonte', pl: 'Rodzina czcionek', ru: 'Семейство шрифтов' },
+  fontSize:        { en: uiText('generatedUi.u_1af851907331c0ed'), es: 'Tamano', pt: 'Tamanho', pl: 'Rozmiar', ru: 'Размер' },
+  textColor:       { en: uiText('generatedUi.u_4a69d01660468781'), es: 'Color del texto', pt: 'Cor do texto', pl: 'Kolor tekstu', ru: 'Цвет текста' },
+  animation:       { en: "Animation", es: 'Animacion', pt: 'Animacao', pl: 'Animacja', ru: 'Анимация' },
+  background:      { en: uiText('generatedUi.u_ea2b8a878841df59'), es: 'Fondo', pt: 'Fundo', pl: 'Tlo', ru: 'Фон' },
+  animNone:        { en: uiText('generatedUi.u_dc937b59892604f5'), es: 'Ninguna', pt: 'Nenhuma', pl: 'Brak', ru: 'Нет' },
+  animFade:        { en: uiText('generatedUi.u_9efb597c915414fd'), es: 'Desvanecimiento', pt: 'Fade', pl: 'Zanikanie', ru: 'Затухание' },
+  animSlide:       { en: uiText('generatedUi.u_6bb4c1177681ec4e'), es: 'Deslizamiento', pt: 'Deslizamiento', pl: 'Przesuniecie', ru: 'Слайд' },
+  animPop:         { en: uiText('generatedUi.u_4d616d53988e27e9'), es: 'Pop', pt: 'Pop', pl: 'Pop', ru: 'Поп' },
+  canvasEditor:    { en: uiText('generatedUi.u_f59c0cd757b25d3b'), es: 'Editor de lienzo', pt: 'Editor de canvas', pl: 'Edytor canvas', ru: 'Редактор холста' },
+  uploadPrompt:    { en: uiText('generatedUi.u_a4b4740bf981ca5d'), es: 'Sube un video para empezar', pt: 'Faca upload para comecar', pl: 'Przeslij wideo aby edytowac', ru: 'Загрузите видео для редактирования' },
+  playing:         { en: uiText('generatedUi.u_deaf6f9d23bc24d4'), es: 'Reproduciendo', pt: 'Reproduzindo', pl: 'Odtwarzanie', ru: 'Воспроизведение' },
+  play:            { en: uiText('generatedUi.u_436e61016e26fcb7'), es: 'Reproducir', pt: 'Reproduzir', pl: 'Odtwórz', ru: 'Играть' },
+  pause:           { en: uiText('generatedUi.u_858e4ba7a29fd38b'), es: 'Pausar', pt: 'Pausar', pl: 'Pauza', ru: 'Пауза' },
+  prevFrame:       { en: uiText('generatedUi.u_1e5c8d7a72748ab8'), es: '- fotograma', pt: '- quadro', pl: '- klatka', ru: '- кадр' },
+  nextFrame:       { en: uiText('generatedUi.u_660a84a3c32904c2'), es: '+ fotograma', pt: '+ quadro', pl: '+ klatka', ru: '+ кадр' },
+  restart:         { en: uiText('generatedUi.u_6b983a81e5e8099e'), es: 'Reiniciar', pt: 'Reiniciar', pl: 'Uruchom ponownie', ru: 'Перезапуск' },
+  reset:           { en: uiText('generatedUi.u_daee7606b339f3c3'), es: 'Restablecer', pt: 'Redefinir', pl: 'Resetuj', ru: 'Сбросить' },
+  exportPanel:     { en: uiText('generatedUi.u_c5433550964ecdf2'), es: 'Panel de exportacion', pt: 'Painel de exportacao', pl: 'Panel eksportu', ru: 'Панель экспорта' },
+  exportNote:      { en: uiText('generatedUi.u_21f9d87f9acfbc63'), es: 'Haz clic en exportar y deja que el video se reproduzca. Tu navegador graba el canvas y produce un .webm.', pt: 'Clique em exportar e deixe o video reproduzir. Seu navegador grava o canvas e produz um .webm.', pl: 'Kliknij eksport i pozwol wideo sie odtworzyc. Przegladarka nagra canvas i stworzy plik .webm.', ru: 'Нажмите экспорт и дайте видео воспроизвестись. Браузер запишет холст и создаст .webm.' },
+  exportBtn:       { en: uiText('generatedUi.u_3fb09409520e1761'), es: 'Exportar video con subtitulos', pt: 'Exportar video com legendas', pl: 'Eksportuj wideo z napisami', ru: 'Экспорт видео с субтитрами' },
+  recording:       { en: uiText('generatedUi.u_0ed0852553e670f9'), es: 'Grabando - deja que el video se reproduzca...', pt: 'Gravando - deixe o video reproduzir...', pl: 'Nagrywanie - pozwol odtworzyc wideo...', ru: 'Запись - дайте видео воспроизвестись...' },
+  downloadBtn:     { en: uiText('generatedUi.u_da6991914261c0a2'), es: 'Descargar video con subtitulos (.webm)', pt: 'Baixar video com legendas (.webm)', pl: 'Pobierz wideo z napisami (.webm)', ru: 'Скачать видео с субтитрами (.webm)' },
+  webmNote:        { en: uiText('generatedUi.u_4ca36a245e0222a3'), es: '.webm funciona en Chrome, Edge y Firefox. Convierte a MP4 con HandBrake o cloudconvert.com.', pt: '.webm funciona no Chrome, Edge e Firefox. Converta para MP4 com HandBrake ou cloudconvert.com.', pl: '.webm dziala w Chrome, Edge i Firefox. Konwertuj do MP4 za pomoca HandBrake lub cloudconvert.com.', ru: '.webm работает в Chrome, Edge, Firefox. Конвертируйте в MP4 через HandBrake или cloudconvert.com.' },
+  videoInput:      { en: uiText('generatedUi.u_d534be829e32196b'), es: 'Video', pt: 'Video', pl: 'Wideo', ru: 'Видео' },
+  aiCaptions:      { en: uiText('generatedUi.u_c7e7ccb5919bf9bc'), es: 'Subtitulos IA', pt: 'Legendas IA', pl: 'Napisy AI', ru: 'AI-субтитры' },
+  srtVtt:          { en: uiText('generatedUi.u_c85692ed56cd2e97'), es: 'SRT/VTT opcional', pt: 'SRT/VTT opcional', pl: 'Opcjonalny SRT/VTT', ru: 'Необязательный SRT/VTT' },
+  tierLabel:       { en: uiText('generatedUi.u_cb9e8664edea8cf5'), es: 'Plan', pt: 'Plano', pl: 'Plan', ru: 'Тариф' },
+  localeLabel:     { en: uiText('generatedUi.u_ca3dc612f47e3913'), es: 'Idioma', pt: 'Idioma', pl: 'Jezyk', ru: 'Язык' },
+  genCaptions:     { en: uiText('generatedUi.u_d95072fb11cc2c21'), es: 'Generar subtitulos', pt: 'Gerar legendas', pl: 'Generuj napisy', ru: 'Создать субтитры' },
+  transcribing:    { en: uiText('generatedUi.u_4e9a93669648eeac'), es: 'Transcribiendo...', pt: 'Transcrevendo...', pl: 'Transkrybowanie...', ru: 'Транскрибирование...' },
+  tierFree:        { en: uiText('generatedUi.u_ce2b317a0397b81c'), es: 'Gratuito/demo', pt: 'Gratuito/demo', pl: 'Bezplatny/demo', ru: 'Бесплатный/демо' },
+  storageLabel:    { en: uiText('generatedUi.u_b352f1eaae4d4d6d'), es: 'Almacenamiento:', pt: 'Armazenamento:', pl: 'Przechowywanie:', ru: 'Хранилище:' },
+  captionsLabel:   { en: uiText('generatedUi.u_8e7581a1878c9e40'), es: 'Subtitulos:', pt: 'Legendas:', pl: 'Napisy:', ru: 'Субтитры:' },
+  footerTime:      { en: uiText('generatedUi.u_d1884790bfffb47b'), es: 'Tiempo canvas', pt: 'Tempo canvas', pl: 'Czas canvas', ru: 'Время холста' },
+  footerDuration:  { en: uiText('generatedUi.u_caa79af4db67695c'), es: 'duracion', pt: 'duracao', pl: 'czas trwania', ru: 'длительность' },
+  footerCaptions:  { en: uiText('generatedUi.u_dcb3eeed0f2b911b'), es: 'subtitulos', pt: 'legendas', pl: 'napisy', ru: 'субтитров' },
+  footerNote:      { en: uiText('generatedUi.u_dffa16af9340e30f'), es: 'las exportaciones se graban en tiempo real.', pt: 'exportacoes gravam em tempo real.', pl: 'eksporty nagrywane sa w czasie rzeczywistym.', ru: 'экспорты записываются в реальном времени.' },
 }
 
 function c(key: string, lang: string): string {
@@ -84,15 +83,15 @@ function c(key: string, lang: string): string {
 }
 
 const starterCaptions: CaptionCue[] = [
-  { id: uiCopy('u_a4ae57a8d323b3d0'), start: 0, end: 2.8, text: uiCopy('u_4b5824ff40c01ca9') },
-  { id: uiCopy('u_02adbf5575921038'), start: 3, end: 6, text: uiCopy('u_1158a19df40a00b2') },
+  { id: "cue-1", start: 0, end: 2.8, text: uiText('generatedUi.u_397abc5f35051c66') },
+  { id: "cue-2", start: 3, end: 6, text: uiText('generatedUi.u_3374240e31c70e08') },
 ]
 
 const captionPresets: CaptionPreset[] = [
-  { id: uiCopy('u_d3c464a4f1c61f80'),  label: uiCopy('u_e9ae797dd8fafa17'), descKey: uiCopy('u_99a4c78276ef941c'),  style: defaultCaptionStyle },
-  { id: uiCopy('u_85b8983e01477dbd'),  label: uiCopy('u_a0e540643a183c1a'), descKey: uiCopy('u_269f53da09ef443c'),  style: { ...defaultCaptionStyle, fontFamily: uiCopy('u_cfe87466714ace14'), fontSize: 48, color: uiCopy('u_59cd87c47ddd85dd'), backgroundColor: uiCopy('u_26fa2451203fc980'), animation: uiCopy('u_aa3cb7c92067f472'), x: 50, y: 76 } },
-  { id: uiCopy('u_29217000f0b80633'), label: uiCopy('u_1e3ddf320ca19e69'),      descKey: uiCopy('u_c332c15823306c0a'), style: { ...defaultCaptionStyle, fontFamily: uiCopy('u_62fe4e92ae14e0c1'), fontSize: 52, color: uiCopy('u_15532b714c8bba2f'), backgroundColor: uiCopy('u_37aa9917d072e3d0'), animation: uiCopy('u_f5b1ab9c3babcbd3'), x: 50, y: 70 } },
-  { id: uiCopy('u_345b0b9921489986'), label: uiCopy('u_a0d71288600db59f'),      descKey: uiCopy('u_4fc1df2f99e0ac36'), style: { ...defaultCaptionStyle, fontFamily: uiCopy('u_dd9ac090836ee634'), fontSize: 32, color: uiCopy('u_239fc31be35645aa'), backgroundColor: uiCopy('u_4e250cea4f5e3a80'), animation: uiCopy('u_457c5fdbb5727499'), x: 50, y: 84 } },
+  { id: "signal",  label: uiText('generatedUi.u_85647deec9865df5'), descKey: "descSignal",  style: defaultCaptionStyle },
+  { id: "tiktok",  label: uiText('generatedUi.u_1637a20d79daaf83'), descKey: "descTiktok",  style: { ...defaultCaptionStyle, fontFamily: "Arial Black, Inter, sans-serif", fontSize: 48, color: "#ffffff", backgroundColor: "rgba(0,0,0,0.72)", animation: "pop", x: 50, y: 76 } },
+  { id: "hormozi", label: uiText('generatedUi.u_1a90986d0f221dc9'),      descKey: "descHormozi", style: { ...defaultCaptionStyle, fontFamily: "Impact, Inter, sans-serif", fontSize: 52, color: "#FFD700", backgroundColor: "rgba(0,0,0,0.86)", animation: "pop", x: 50, y: 70 } },
+  { id: "minimal", label: uiText('generatedUi.u_057b5de48d7b90f1'),      descKey: "descMinimal", style: { ...defaultCaptionStyle, fontFamily: "Inter, Arial, sans-serif", fontSize: 32, color: "#ffffff", backgroundColor: "rgba(15,23,42,0.52)", animation: "fade", x: 50, y: 84 } },
 ]
 
 const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16]', '1:1': 'aspect-square', '16:9': 'aspect-video' }
@@ -134,7 +133,7 @@ function QuotaStatusBar({ quota, lang }: { quota: VideoQuota; lang: string }) {
   const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
   return (
     <div title={c('quotaNote', lang)}>
-      <div className="flex items-center justify-between text-xs text-white/60"><span>{c('quotaLabel', lang)}</span><span className="font-mono">{quota.usedMinutes}/{quota.includedMinutes}{uiCopy('u_390f46be9a254c7f')}</span></div>
+      <div className="flex items-center justify-between text-xs text-white/60"><span>{c('quotaLabel', lang)}</span><span className="font-mono">{quota.usedMinutes}/{quota.includedMinutes}{uiText('generatedUi.u_1f6fa6f69d185e60')}</span></div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
     </div>
   )
@@ -192,9 +191,9 @@ function StyleControls({ style, aspectRatio, onChange, onAspectRatio, lang }: { 
     <section className="border-t border-white/10 pt-5">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('captionStyle', lang)}</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm">{c('format', lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">{uiCopy('u_2998116e9015619d')}</option><option value="1:1">{uiCopy('u_fc9599edb93a5cf1')}</option><option value="16:9">{uiCopy('u_1805dacc1d1e206b')}</option></select></label>
+        <label className="text-sm">{c('format', lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">{uiText('generatedUi.u_288da45c8292d920')}</option><option value="1:1">{uiText('generatedUi.u_fdbf5fd5f1c5a49c')}</option><option value="16:9">{uiText('generatedUi.u_d3f9447affc0ace4')}</option></select></label>
         <label className="text-sm">{c('fontFamily', lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.fontFamily} onChange={(e) => onChange({ ...style, fontFamily: e.target.value })} /></label>
-        <label className="text-sm">{c('fontSize', lang)}: {style.fontSize}px<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
+        <label className="text-sm">{c('fontSize', lang)}: {style.fontSize}{uiText('generatedUi.u_6ee2cc105a677431')}<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
         <label className="text-sm">{c('textColor', lang)}<input type="color" value={style.color} onChange={(e) => onChange({ ...style, color: e.target.value })} className="mt-1 block h-10 w-full rounded-xl" /></label>
         <label className="text-sm">{c('animation', lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={style.animation} onChange={(e) => onChange({ ...style, animation: e.target.value as CaptionStyle['animation'] })}><option value="none">{c('animNone', lang)}</option><option value="fade">{c('animFade', lang)}</option><option value="slide">{c('animSlide', lang)}</option><option value="pop">{c('animPop', lang)}</option></select></label>
         <label className="text-sm">{c('background', lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.backgroundColor} onChange={(e) => onChange({ ...style, backgroundColor: e.target.value })} /></label>
@@ -317,7 +316,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
         <div className={`relative mx-auto h-[calc(100vh-470px)] min-h-[240px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
           <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[11px] text-white/70 ring-1 ring-white/15">{formatTime(time)} · {aspectRatio}</span>
           {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
-          <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label={uiCopy('u_1454b5ed81fb79b9')} />
+          <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label={uiText('generatedUi.u_c407ce3132ddb126')} />
         </div>
         <div className="mt-4 space-y-3">
           <input type="range" min="0" max={Math.max(1, durationSec)} step="0.05" value={Math.min(time, Math.max(1, durationSec))} disabled={!videoUrl} onChange={(e) => seek(Number(e.target.value))} className="w-full" />
@@ -369,8 +368,8 @@ export default function VideoEditor() {
   const [activePreset, setActivePreset]   = useState('signal')
   const [selectedCueId, setSelectedCueId] = useState<string | null>(starterCaptions[0]?.id || null)
   const [currentTime, setCurrentTime]     = useState(0)
-  const [uploadState, setUploadState]     = useState<UploadState>({ status: 'idle', message: String(uiCopy('u_09281615c003cc0e')) })
-  const [captionState, setCaptionState]   = useState<CaptionGenerationState>({ status: 'idle', message: String(uiCopy('u_7ee2aa6a193f4d19')) })
+  const [uploadState, setUploadState]     = useState<UploadState>({ status: 'idle', message: String("Upload a source video to begin.") })
+  const [captionState, setCaptionState]   = useState<CaptionGenerationState>({ status: 'idle', message: String("Generate AI captions after uploading a video, or upload SRT/VTT manually.") })
   const [exportState, setExportState]     = useState<ExportState>({ status: 'idle', message: '' })
 
   const quota = useMemo(() => calculateVideoQuota(tier, Math.ceil(Math.max(1, durationSec) / 60)), [tier, durationSec])
@@ -412,15 +411,15 @@ export default function VideoEditor() {
     setSelectedCueId(starterCaptions[0]?.id || null)
     setCurrentTime(0)
     setDurationSec(0)
-    setUploadState({ status: 'idle', message: String(uiCopy('u_8156c4ef66cc12d4')) })
-    setCaptionState({ status: 'idle', message: String(uiCopy('u_74e3c775233ce1da')) })
+    setUploadState({ status: 'idle', message: String("Upload a source video to begin.") })
+    setCaptionState({ status: 'idle', message: String("Generate AI captions after uploading a video, or upload SRT/VTT manually.") })
     setExportState({ status: 'idle', message: '' })
   }
 
   async function uploadVideo(file: File) {
     setVideoUrl(URL.createObjectURL(file))
     setUploadState({ status: 'uploading', message: `Uploading ${file.name} to secure storage...` })
-    setCaptionState({ status: 'idle', message: String(uiCopy('u_1ce7857c5811c4c7')) })
+    setCaptionState({ status: 'idle', message: String("Video selected. Click Generate Captions after upload completes.") })
     try {
       const urlRes = await fetch('/api/video/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name }) })
       const urlJson = await urlRes.json()
@@ -435,32 +434,32 @@ export default function VideoEditor() {
   }
 
   async function generateCaptions() {
-    if (!storagePath) { setCaptionState({ status: 'failed', message: String(uiCopy('u_750c99b5bbf35301')) }); return }
-    setCaptionState({ status: 'generating', message: String(uiCopy('u_d946c2ee9ca1cec5')) })
+    if (!storagePath) { setCaptionState({ status: 'failed', message: String("Wait for the video upload to finish before generating captions.") }); return }
+    setCaptionState({ status: 'generating', message: String("Submitting to AI transcription (30-90 seconds)...") })
     try {
       const res = await fetch('/api/video/transcribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: storagePath }) })
       const json = await res.json()
       if (!json.ok) { setCaptionState({ status: 'failed', message: json.error || 'Caption generation failed.' }); return }
       setTranscriptId(json.data.transcriptId)
-      setCaptionState({ status: 'generating', message: String(uiCopy('u_c3099586b3a9be4f')) })
+      setCaptionState({ status: 'generating', message: String("Transcribing... checking every 3 seconds.") })
     } catch (e) { setCaptionState({ status: 'failed', message: e instanceof Error ? e.message : 'Caption generation failed.' }) }
   }
 
   async function uploadCaptions(file: File) {
     try {
       const newCues = parseCaptionFile(await file.text())
-      if (!newCues.length) { setCaptionState({ status: 'failed', message: String(uiCopy('u_1ea08d7732fe90af')) }); return }
+      if (!newCues.length) { setCaptionState({ status: 'failed', message: String("Could not parse captions - verify the file is valid SRT or VTT.") }); return }
       setCues(newCues); setSelectedCueId(newCues[0]?.id || null); setCurrentTime(newCues[0]?.start || 0)
       setCaptionState({ status: 'ready', message: `${newCues.length} captions imported from ${file.name}.` })
-    } catch { setCaptionState({ status: 'failed', message: String(uiCopy('u_64697364b775606e')) }) }
+    } catch { setCaptionState({ status: 'failed', message: String("Could not read captions file.") }) }
   }
 
   async function exportVideo() {
     if (!canvasEditorRef.current) return
-    setExportState({ status: 'recording', message: String(uiCopy('u_a7f4f0840ecca6e2')) })
+    setExportState({ status: 'recording', message: String("Recording - let the video play all the way through. Do not close this tab.") })
     try {
       const url = await canvasEditorRef.current.startExport()
-      setExportState({ status: 'ready', message: String(uiCopy('u_4199255ae1e981e3')), url })
+      setExportState({ status: 'ready', message: String("Done! Captions are burned in. Download your video below."), url })
     } catch (e) { setExportState({ status: 'failed', message: e instanceof Error ? e.message : 'Export failed.' }) }
   }
 
@@ -482,8 +481,8 @@ export default function VideoEditor() {
         <label className="text-sm">{c('videoInput', lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
         <div className="text-sm"><span>{c('aiCaptions', lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? c('transcribing', lang) : c('genCaptions', lang)}</button></div>
         <label className="text-sm">{c('srtVtt', lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
-        <label className="text-sm">{c('tierLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">{c('tierFree', lang)}</option><option value="launch">{uiCopy('u_3a1ca96dd6f1e379')}</option><option value="growth">{uiCopy('u_9c88271c5790fbf4')}</option><option value="command">{uiCopy('u_34a47269e4ad1d93')}</option></select></label>
-        <label className="text-sm">{c('localeLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
+        <label className="text-sm">{c('tierLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">{c('tierFree', lang)}</option><option value="launch">{uiText('generatedUi.u_ccf56ef5db0b82a5')}</option><option value="growth">{uiText('generatedUi.u_66b06e996553a4e7')}</option><option value="command">{uiText('generatedUi.u_713166971d730f81')}</option></select></label>
+        <label className="text-sm">{c('localeLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>{uiText('generatedUi.u_dbd3a49d0d906b4e')}</option><option>{uiText('generatedUi.u_c0bc1e08f9743b2d')}</option><option>{uiText('generatedUi.u_e75b11da693d7bb5')}</option><option>{uiText('generatedUi.u_3485639faf1591f3')}</option><option>{uiText('generatedUi.u_ed5ad332c1060437')}</option></select></label>
         <p className="text-xs text-white/55 md:col-span-4">{c('storageLabel', lang)} {uploadState.message} · {c('captionsLabel', lang)} {captionState.message}</p>
         <div className="flex items-end md:col-span-1">
           <button type="button" onClick={resetAll} className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm text-white/60 hover:border-white/40 hover:text-white/80 transition">↺ {c('reset', lang)}</button>

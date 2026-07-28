@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DeterministicVercelThinker, repairPlanSchema } from '../lib/supervisor/index.ts'
 import type { SupervisorIncident } from '../lib/supervisor/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const incident = (metadata = {}, overrides = {}): SupervisorIncident => ({
   incidentId: 'INC-VCL-001',
@@ -72,6 +74,6 @@ test('unsupported Vercel cases fail closed with stop plan', () => {
 })
 
 test('Vercel Thinker has no Executor or Browser Runtime dependency', () => {
-  const source = readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-thinker.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-thinker.ts', import.meta.url), 'utf8'))
   assert.doesNotMatch(source, /Executor|execute\(|BrowserRuntime|Playwright|Chromium|browser-runtime/)
 })

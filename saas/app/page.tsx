@@ -7,8 +7,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { PreviewProjects } from '@/components/home/PreviewProjects'
 import { t } from '@/lib/i18n/t'
 import { listPublicPortableProducts } from '@/lib/portable-products'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const LINKS = {
   siteReview: '/dashboard/audit',
@@ -146,16 +145,16 @@ export default function Home() {
           <div className="hero-left"><span className="kicker">{copy('kicker', 'AI powered · People in control')}</span><h1>{copy('title', 'One place for every growth task.')}</h1></div>
           <div className="hero-right">
             <div className="langs" aria-label={copy('languagesAria', 'Available in five languages')}>{LANGUAGES.map(([flag, name]) => <span key={name} className="lang"><b>{flag}</b>{name}</span>)}</div>
-            <div className="stats" aria-label={uiCopy('u_e32fff5f2d88f5a6')}>
-              <Stat value={live?.activePortables ?? 0} label={uiCopy('u_0dcaaf284956a305')} />
-              <Stat value={live?.totalRows ?? 0} label={uiCopy('u_0e7252a337b6ea43')} />
-              <div className="stat"><strong className={`system-${live?.status ?? 'unreachable'}`}>{live ? live.status : uiCopy('u_fb291682a2a92eed')}</strong><span>{uiCopy('u_1660fe0fe156d3ef')}</span></div>
+            <div className="stats" aria-label={uiText('generatedUi.u_633d984a2fcf8210')}>
+              <Stat value={live?.activePortables ?? 0} label={uiText('generatedUi.u_13bb3181236f67ea')} />
+              <Stat value={live?.totalRows ?? 0} label={uiText('generatedUi.u_723ab78939beea0e')} />
+              <div className="stat"><strong className={`system-${live?.status ?? 'unreachable'}`}>{live ? live.status : uiText('generatedUi.u_3d6df245178e6076')}</strong><span>{uiText('generatedUi.u_4a37197beef860dd')}</span></div>
             </div>
           </div>
         </header>
 
         <section className="zone">
-          <span className="zone-label">{t(dict, 'home.publicTools.label', uiCopy('u_486a6e56cdbf1d89'))}</span>
+          <span className="zone-label">{t(dict, 'home.publicTools.label')}</span>
           <div className="grid grid-3">
             {PUBLIC_TOOLS.map((tool) => {
               const title = t(dict, `home.publicTools.${tool.key}.title`, tool.key)
@@ -175,7 +174,7 @@ export default function Home() {
               const runtime = activityByProduct.get(p.manifest.productId)
               const status = runtime?.status ?? 'unreachable'
               const maturity = maturityLabel(p.manifest.status)
-              const inner = <><div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={`maturity-tag maturity-${p.manifest.status}`}>{copy(`portableMaturity.${p.manifest.status}`, maturity)}</span></div><h3>{name}</h3><p>{desc}</p><div className="runtime-metrics"><strong>{runtime ? runtime.totalRows.toLocaleString() : '—'}</strong><span>{uiCopy('u_47c06bf29a58921f')}</span><small><span className={`runtime-dot runtime-${status}`}><i /></span>{runtimeLabel(status)}{runtime ? ` · ${relativeTime(runtime.lastActivityAt)}` : ''}</small></div></>
+              const inner = <><div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={`maturity-tag maturity-${p.manifest.status}`}>{copy(`portableMaturity.${p.manifest.status}`, maturity)}</span></div><h3>{name}</h3><p>{desc}</p><div className="runtime-metrics"><strong>{runtime ? runtime.totalRows.toLocaleString() : '—'}</strong><span>{uiText('generatedUi.u_87d2dba86d5ac60e')}</span><small><span className={`runtime-dot runtime-${status}`}><i /></span>{runtimeLabel(status)}{runtime ? ` · ${relativeTime(runtime.lastActivityAt)}` : ''}</small></div></>
               return p.route ? <Link key={p.manifest.productId} href={p.route} className="qcard is-link">{inner}</Link> : <div key={p.manifest.productId} className="qcard">{inner}</div>
             })}
           </div>

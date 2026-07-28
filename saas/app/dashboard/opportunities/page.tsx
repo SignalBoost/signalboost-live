@@ -2,35 +2,34 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY = {
-  eyebrow:    { en: uiCopy('u_b7d30b78610e4492'), es: 'Estratega', pt: 'Estrategista', pl: 'Strateg', ru: 'Стратег' },
-  title:      { en: uiCopy('u_acde16988de7791d'), es: 'Radar de oportunidades', pt: 'Radar de oportunidades', pl: 'Radar okazji', ru: 'Радар возможностей' },
-  subtitle:   { en: uiCopy('u_0c3e45b5b9cd918a'), es: 'Tu estratega IA escanea el mercado a diario en busca de movimientos de competidores, brechas y oportunidades.', pt: 'Seu estrategista IA varre o mercado diariamente em busca de movimentos de concorrentes, lacunas e oportunidades.', pl: 'Twój strateg AI codziennie skanuje rynek w poszukiwaniu ruchów konkurencji, luk i okazji.', ru: 'Ваш ИИ-стратег ежедневно сканирует рынок: действия конкурентов, ниши и партнёрства.' },
-  scanNow:    { en: uiCopy('u_f79465ae4fbbe003'), es: 'Escanear ahora', pt: 'Escanear agora', pl: 'Skanuj teraz', ru: 'Сканировать сейчас' },
-  scanning:   { en: uiCopy('u_6a544486ce16fde4'), es: 'Escaneando el mercado…', pt: 'Varrendo o mercado…', pl: 'Skanowanie rynku…', ru: 'Сканирование рынка…' },
-  empty:      { en: uiCopy('u_4bd5d6632662bbfa'), es: 'Sin alertas aún. Ejecuta un escaneo para llenar el radar.', pt: 'Sem alertas ainda. Execute uma varredura para popular o radar.', pl: 'Brak alertów. Uruchom skan, aby zapełnić radar.', ru: 'Пока нет оповещений. Запустите сканирование.' },
-  what:       { en: uiCopy('u_57314469f4f3d580'), es: 'Qué pasó', pt: 'O que aconteceu', pl: 'Co się stało', ru: 'Что произошло' },
-  why:        { en: uiCopy('u_6df70e23aad8a379'), es: 'Por qué importa', pt: 'Por que importa', pl: 'Dlaczego to ważne', ru: 'Почему это важно' },
-  action:     { en: uiCopy('u_ada39e72be0b61b8'), es: 'Acción recomendada', pt: 'Ação recomendada', pl: 'Zalecane działanie', ru: 'Рекомендуемое действие' },
-  sources:    { en: uiCopy('u_348b352cb6bbfa31'), es: 'Fuentes', pt: 'Fontes', pl: 'Źródła', ru: 'Источники' },
-  reviewed:   { en: uiCopy('u_e9fc4a981d84821e'), es: 'Marcar revisado', pt: 'Marcar revisado', pl: 'Oznacz jako przejrzane', ru: 'Просмотрено' },
-  dismiss:    { en: uiCopy('u_339635e21636dc85'), es: 'Descartar', pt: 'Dispensar', pl: 'Odrzuć', ru: 'Скрыть' },
-  unauthorized:{ en: uiCopy('u_48c24b417bef68f8'), es: 'Se requiere acceso de propietario/administrador.', pt: 'Acesso de proprietário/administrador necessário.', pl: 'Wymagany dostęp właściciela/administratora.', ru: 'Требуется доступ владельца/администратора.' },
-  loadError:  { en: uiCopy('u_18d9925f83c6dece'), es: 'No se pudieron cargar las alertas.', pt: 'Não foi possível carregar os alertas.', pl: 'Nie udało się załadować alertów.', ru: 'Не удалось загрузить оповещения.' },
-  scanned:    { en: uiCopy('u_9c47c0ee4b38a32f'), es: 'Escaneo completo — nuevas alertas:', pt: 'Varredura concluída — novos alertas:', pl: 'Skan zakończony — nowe alerty:', ru: 'Сканирование завершено — новых оповещений:' },
+  eyebrow:    { en: uiText('generatedUi.u_9c39bd2b9a170601'), es: 'Estratega', pt: 'Estrategista', pl: 'Strateg', ru: 'Стратег' },
+  title:      { en: uiText('generatedUi.u_5bfacdc176a5afa9'), es: 'Radar de oportunidades', pt: 'Radar de oportunidades', pl: 'Radar okazji', ru: 'Радар возможностей' },
+  subtitle:   { en: uiText('generatedUi.u_a2f665a2d38fc420'), es: 'Tu estratega IA escanea el mercado a diario en busca de movimientos de competidores, brechas y oportunidades.', pt: 'Seu estrategista IA varre o mercado diariamente em busca de movimentos de concorrentes, lacunas e oportunidades.', pl: 'Twój strateg AI codziennie skanuje rynek w poszukiwaniu ruchów konkurencji, luk i okazji.', ru: 'Ваш ИИ-стратег ежедневно сканирует рынок: действия конкурентов, ниши и партнёрства.' },
+  scanNow:    { en: uiText('generatedUi.u_cda8fe3b54175035'), es: 'Escanear ahora', pt: 'Escanear agora', pl: 'Skanuj teraz', ru: 'Сканировать сейчас' },
+  scanning:   { en: uiText('generatedUi.u_2a46b197ff653cb9'), es: 'Escaneando el mercado…', pt: 'Varrendo o mercado…', pl: 'Skanowanie rynku…', ru: 'Сканирование рынка…' },
+  empty:      { en: uiText('generatedUi.u_d2ca83465869e3c6'), es: 'Sin alertas aún. Ejecuta un escaneo para llenar el radar.', pt: 'Sem alertas ainda. Execute uma varredura para popular o radar.', pl: 'Brak alertów. Uruchom skan, aby zapełnić radar.', ru: 'Пока нет оповещений. Запустите сканирование.' },
+  what:       { en: uiText('generatedUi.u_483bd49023ae2bfb'), es: 'Qué pasó', pt: 'O que aconteceu', pl: 'Co się stało', ru: 'Что произошло' },
+  why:        { en: uiText('generatedUi.u_b8bda68d85740402'), es: 'Por qué importa', pt: 'Por que importa', pl: 'Dlaczego to ważne', ru: 'Почему это важно' },
+  action:     { en: uiText('generatedUi.u_0cdf19eece16f608'), es: 'Acción recomendada', pt: 'Ação recomendada', pl: 'Zalecane działanie', ru: 'Рекомендуемое действие' },
+  sources:    { en: uiText('generatedUi.u_caf85b0888d78f1f'), es: 'Fuentes', pt: 'Fontes', pl: 'Źródła', ru: 'Источники' },
+  reviewed:   { en: uiText('generatedUi.u_f73cf2143127e953'), es: 'Marcar revisado', pt: 'Marcar revisado', pl: 'Oznacz jako przejrzane', ru: 'Просмотрено' },
+  dismiss:    { en: uiText('generatedUi.u_48845bff334a50a5'), es: 'Descartar', pt: 'Dispensar', pl: 'Odrzuć', ru: 'Скрыть' },
+  unauthorized:{ en: uiText('generatedUi.u_9696797799f58af7'), es: 'Se requiere acceso de propietario/administrador.', pt: 'Acesso de proprietário/administrador necessário.', pl: 'Wymagany dostęp właściciela/administratora.', ru: 'Требуется доступ владельца/администратора.' },
+  loadError:  { en: uiText('generatedUi.u_e8272230a6f3b64b'), es: 'No se pudieron cargar las alertas.', pt: 'Não foi possível carregar os alertas.', pl: 'Nie udało się załadować alertów.', ru: 'Не удалось загрузить оповещения.' },
+  scanned:    { en: uiText('generatedUi.u_b62f78df03f4339c'), es: 'Escaneo completo — nuevas alertas:', pt: 'Varredura concluída — novos alertas:', pl: 'Skan zakończony — nowe alerty:', ru: 'Сканирование завершено — новых оповещений:' },
 }
 
 const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
-  competitor:  { label: uiCopy('u_7c233702a84de317'),  color: 'rgba(255,99,99,.85)' },
-  market_gap:  { label: uiCopy('u_23889f12484a4e8b'),  color: 'rgba(26,240,255,.85)' },
-  partnership: { label: uiCopy('u_96728829a1667d20'), color: 'rgba(118,255,140,.85)' },
-  pricing:     { label: uiCopy('u_5cff079a488d47e3'),     color: 'rgba(255,195,0,.9)' },
-  trend:       { label: uiCopy('u_d6646bec43b43e92'),       color: 'rgba(190,140,255,.9)' },
+  competitor:  { label: uiText('generatedUi.u_620e0a4142db9518'),  color: 'rgba(255,99,99,.85)' },
+  market_gap:  { label: uiText('generatedUi.u_8b05d06ab8c1de75'),  color: 'rgba(26,240,255,.85)' },
+  partnership: { label: uiText('generatedUi.u_e5e902bdd0ba8844'), color: 'rgba(118,255,140,.85)' },
+  pricing:     { label: uiText('generatedUi.u_06a436b9f3fc9305'),     color: 'rgba(255,195,0,.9)' },
+  trend:       { label: uiText('generatedUi.u_6911807a8185aa70'),       color: 'rgba(190,140,255,.9)' },
 }
 
 function c(obj: any, lang: string): string {

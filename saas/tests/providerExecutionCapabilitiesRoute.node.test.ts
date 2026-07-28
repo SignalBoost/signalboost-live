@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { readFile } from 'node:fs/promises'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const routePath = new URL('../app/api/hub/action/capabilities/route.ts', import.meta.url)
 
 async function routeSource(): Promise<string> {
-  return readFile(routePath, 'utf8')
+  return readFile(routePath, 'utf8').then(hydrateLocalizedSource)
 }
 
 test('provider capability route is authenticated and validates the template', async () => {

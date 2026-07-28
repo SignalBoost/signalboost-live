@@ -2,74 +2,73 @@
 
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY = {
-  eyebrow:   { en: uiCopy('u_ad115f095d80c460'), es: 'Documentación', pt: 'Documentação', pl: 'Dokumentacja', ru: 'Документация' },
-  title:     { en: uiCopy('u_33b560fe105a2462'), es: 'Un mapa claro para construir con SignalBoost.', pt: 'Um mapa claro para construir com SignalBoost.', pl: 'Przejrzysta mapa do budowania z SignalBoost.', ru: 'Чёткая карта для создания с SignalBoost.' },
-  subtitle:  { en: uiCopy('u_b78d4fb1a672d6a5'), es: 'Los docs están organizados por cómo una persona piensa el trabajo: elige una intención, sigue la guía IA, revisa el resultado y aprueba la acción final.', pt: 'Os docs estão organizados por como uma pessoa pensa o trabalho: escolha uma intenção, siga a orientação IA, revise o resultado e aprove a ação final.', pl: 'Dokumenty są zorganizowane według sposobu myślenia człowieka: wybierz intencję, śledź wskazówki AI, sprawdź wynik i zatwierdź końcowe działanie.', ru: 'Документы организованы так, как человек думает о работе: выберите намерение, следуйте руководству ИИ, проверьте результат и одобрите финальное действие.' },
-  scanPath:  { en: uiCopy('u_cec06ad16542634e'), es: 'Ruta de escaneo', pt: 'Caminho de leitura', pl: 'Ścieżka skanowania', ru: 'Путь обзора' },
-  step:      { en: uiCopy('u_b5a32b18226320bb'), es: 'Paso', pt: 'Passo', pl: 'Krok', ru: 'Шаг' },
+  eyebrow:   { en: uiText('generatedUi.u_c205924de0fe636c'), es: 'Documentación', pt: 'Documentação', pl: 'Dokumentacja', ru: 'Документация' },
+  title:     { en: uiText('generatedUi.u_0780e63f1bf7055e'), es: 'Un mapa claro para construir con SignalBoost.', pt: 'Um mapa claro para construir com SignalBoost.', pl: 'Przejrzysta mapa do budowania z SignalBoost.', ru: 'Чёткая карта для создания с SignalBoost.' },
+  subtitle:  { en: uiText('generatedUi.u_e24329b6d3d67d3b'), es: 'Los docs están organizados por cómo una persona piensa el trabajo: elige una intención, sigue la guía IA, revisa el resultado y aprueba la acción final.', pt: 'Os docs estão organizados por como uma pessoa pensa o trabalho: escolha uma intenção, siga a orientação IA, revise o resultado e aprove a ação final.', pl: 'Dokumenty są zorganizowane według sposobu myślenia człowieka: wybierz intencję, śledź wskazówki AI, sprawdź wynik i zatwierdź końcowe działanie.', ru: 'Документы организованы так, как человек думает о работе: выберите намерение, следуйте руководству ИИ, проверьте результат и одобрите финальное действие.' },
+  scanPath:  { en: uiText('generatedUi.u_afa0e4fd44228456'), es: 'Ruta de escaneo', pt: 'Caminho de leitura', pl: 'Ścieżka skanowania', ru: 'Путь обзора' },
+  step:      { en: uiText('generatedUi.u_8e6a6cca7aae1d1e'), es: 'Paso', pt: 'Passo', pl: 'Krok', ru: 'Шаг' },
   publicTools: {
-    title: { en: uiCopy('u_c65ce50d3c8ba106'), es: 'Herramientas públicas gratis / páginas para anuncios', pt: 'Ferramentas públicas gratuitas / páginas para anúncios', pl: 'Darmowe narzędzia publiczne / strony do reklam', ru: 'Бесплатные публичные инструменты / страницы для рекламы' },
-    body: { en: uiCopy('u_74304fba9217afed'), es: 'Usa estos enlaces al preparar anuncios para periódicos digitales, clasificados comunitarios o directorios locales. Los dos primeros son públicos y mejores para anuncios fríos.', pt: 'Use estes links ao preparar anúncios para jornais digitais, classificados comunitários ou diretórios locais. Os dois primeiros são públicos e melhores para anúncios frios.', pl: 'Używaj tych linków przy przygotowywaniu reklam do gazet cyfrowych, ogłoszeń społecznościowych lub katalogów lokalnych. Pierwsze dwa są publiczne i najlepsze do reklam.', ru: 'Используйте эти ссылки для цифровых газет, объявлений и локальных каталогов. Первые две страницы публичные и лучше подходят для рекламы.' },
-    bestForAds: { en: uiCopy('u_afc95e3add1c9f3f'), es: 'Mejor para anuncios', pt: 'Melhor para anúncios', pl: 'Najlepsze do reklam', ru: 'Лучше для рекламы' },
-    internal: { en: uiCopy('u_a59b6800f39603fb'), es: 'Referencia interna / con sesión', pt: 'Referência interna / com login', pl: 'Wewnętrzne / po zalogowaniu', ru: 'Внутренняя ссылка / вход' },
+    title: { en: uiText('generatedUi.u_1d2636194869cd3e'), es: 'Herramientas públicas gratis / páginas para anuncios', pt: 'Ferramentas públicas gratuitas / páginas para anúncios', pl: 'Darmowe narzędzia publiczne / strony do reklam', ru: 'Бесплатные публичные инструменты / страницы для рекламы' },
+    body: { en: uiText('generatedUi.u_ffbe5fdd1274dcf7'), es: 'Usa estos enlaces al preparar anuncios para periódicos digitales, clasificados comunitarios o directorios locales. Los dos primeros son públicos y mejores para anuncios fríos.', pt: 'Use estes links ao preparar anúncios para jornais digitais, classificados comunitários ou diretórios locais. Os dois primeiros são públicos e melhores para anúncios frios.', pl: 'Używaj tych linków przy przygotowywaniu reklam do gazet cyfrowych, ogłoszeń społecznościowych lub katalogów lokalnych. Pierwsze dwa są publiczne i najlepsze do reklam.', ru: 'Используйте эти ссылки для цифровых газет, объявлений и локальных каталогов. Первые две страницы публичные и лучше подходят для рекламы.' },
+    bestForAds: { en: uiText('generatedUi.u_62a9d03cb2e245c8'), es: 'Mejor para anuncios', pt: 'Melhor para anúncios', pl: 'Najlepsze do reklam', ru: 'Лучше для рекламы' },
+    internal: { en: uiText('generatedUi.u_4807513a2c62c69c'), es: 'Referencia interna / con sesión', pt: 'Referência interna / com login', pl: 'Wewnętrzne / po zalogowaniu', ru: 'Внутренняя ссылка / вход' },
   },
   quickLinks: {
-    dashboard: { en: uiCopy('u_d155fd8934991647'), es: 'Panel', pt: 'Painel', pl: 'Panel', ru: 'Панель' },
-    outreach:  { en: uiCopy('u_fb61a7122a0e558e'), es: 'Motor de prospección', pt: 'Motor de prospecção', pl: 'Silnik outreach', ru: 'Движок аутрича' },
-    pricing:   { en: uiCopy('u_43ded76ca067c634'), es: 'Precios', pt: 'Preços', pl: 'Cennik', ru: 'Цены' },
-    support:   { en: uiCopy('u_f2b40ee3d21b3c47'), es: 'Soporte', pt: 'Suporte', pl: 'Wsparcie', ru: 'Поддержка' },
+    dashboard: { en: uiText('generatedUi.u_67b696468610b879'), es: 'Panel', pt: 'Painel', pl: 'Panel', ru: 'Панель' },
+    outreach:  { en: uiText('generatedUi.u_7b855b0f8767d64d'), es: 'Motor de prospección', pt: 'Motor de prospecção', pl: 'Silnik outreach', ru: 'Движок аутрича' },
+    pricing:   { en: uiText('generatedUi.u_dfe95783edfef791'), es: 'Precios', pt: 'Preços', pl: 'Cennik', ru: 'Цены' },
+    support:   { en: uiText('generatedUi.u_be91940b79f46910'), es: 'Soporte', pt: 'Suporte', pl: 'Wsparcie', ru: 'Поддержка' },
   },
   sections: [
     {
       step: '1',
-      title: { en: uiCopy('u_9464586ccc81ad26'), es: 'Elige una intención', pt: 'Escolha uma intenção', pl: 'Wybierz intencję', ru: 'Выберите намерение' },
-      body:  { en: uiCopy('u_ace33378bf8c4973'), es: 'Comienza con Promocionar, Constructor, Reseñas, Audio, Video o Prospección para que cada flujo tenga un objetivo claro.', pt: 'Comece com Promover, Construtor, Avaliações, Áudio, Vídeo ou Prospecção para que cada fluxo tenha um objetivo claro.', pl: 'Zacznij od Promocji, Kreatora, Opinii, Audio, Wideo lub Outreachu, aby każdy przepływ miał jeden jasny cel.', ru: 'Начните с Продвижения, Конструктора, Отзывов, Аудио, Видео или Аутрича, чтобы каждый процесс имел одну чёткую цель.' },
+      title: { en: uiText('generatedUi.u_430539f52f4f1660'), es: 'Elige una intención', pt: 'Escolha uma intenção', pl: 'Wybierz intencję', ru: 'Выберите намерение' },
+      body:  { en: uiText('generatedUi.u_154f68c6ba5be876'), es: 'Comienza con Promocionar, Constructor, Reseñas, Audio, Video o Prospección para que cada flujo tenga un objetivo claro.', pt: 'Comece com Promover, Construtor, Avaliações, Áudio, Vídeo ou Prospecção para que cada fluxo tenha um objetivo claro.', pl: 'Zacznij od Promocji, Kreatora, Opinii, Audio, Wideo lub Outreachu, aby każdy przepływ miał jeden jasny cel.', ru: 'Начните с Продвижения, Конструктора, Отзывов, Аудио, Видео или Аутрича, чтобы каждый процесс имел одну чёткую цель.' },
     },
     {
       step: '2',
-      title: { en: uiCopy('u_db3c15cbf77ae499'), es: 'Deja que la IA sugiera primero', pt: 'Deixe a IA sugerir primeiro', pl: 'Najpierw pozwól AI zasugerować', ru: 'Сначала пусть ИИ предложит' },
-      body:  { en: uiCopy('u_356b1a65d629fcfb'), es: 'Lee el prompt sugerido, el tono y el feedback antes de escribir tus propias instrucciones.', pt: 'Leia o prompt sugerido, o tom e o feedback antes de digitar suas próprias instruções.', pl: 'Przeczytaj sugerowany prompt, ton i informacje zwrotne przed wpisaniem własnych instrukcji.', ru: 'Прочитайте предложенный промпт, тон и обратную связь перед вводом собственных инструкций.' },
+      title: { en: uiText('generatedUi.u_e4bf4dffb3e56b97'), es: 'Deja que la IA sugiera primero', pt: 'Deixe a IA sugerir primeiro', pl: 'Najpierw pozwól AI zasugerować', ru: 'Сначала пусть ИИ предложит' },
+      body:  { en: uiText('generatedUi.u_3cac59a88b978d17'), es: 'Lee el prompt sugerido, el tono y el feedback antes de escribir tus propias instrucciones.', pt: 'Leia o prompt sugerido, o tom e o feedback antes de digitar suas próprias instruções.', pl: 'Przeczytaj sugerowany prompt, ton i informacje zwrotne przed wpisaniem własnych instrukcji.', ru: 'Прочитайте предложенный промпт, тон и обратную связь перед вводом собственных инструкций.' },
     },
     {
       step: '3',
-      title: { en: uiCopy('u_d5868430b31979e0'), es: 'Revisa los activos generados', pt: 'Revise os ativos gerados', pl: 'Przejrzyj wygenerowane zasoby', ru: 'Проверьте созданные материалы' },
-      body:  { en: uiCopy('u_45b53c1abdf3192f'), es: 'Escanea tarjetas agrupadas: resumen, audiencia, copy, prueba y riesgos. Evita saltar entre paneles no relacionados.', pt: 'Escaneie cartões agrupados: resumo, público, copy, prova e riscos. Evite pular entre painéis não relacionados.', pl: 'Skanuj zgrupowane karty: podsumowanie, odbiorcy, treść, dowód i ryzyka. Unikaj przeskakiwania między niezwiązanymi panelami.', ru: 'Просматривайте сгруппированные карточки: резюме, аудитория, текст, доказательства и риски. Избегайте прыжков между несвязанными панелями.' },
+      title: { en: uiText('generatedUi.u_cbc6271c8f8a3814'), es: 'Revisa los activos generados', pt: 'Revise os ativos gerados', pl: 'Przejrzyj wygenerowane zasoby', ru: 'Проверьте созданные материалы' },
+      body:  { en: uiText('generatedUi.u_d3265c3960ec34b1'), es: 'Escanea tarjetas agrupadas: resumen, audiencia, copy, prueba y riesgos. Evita saltar entre paneles no relacionados.', pt: 'Escaneie cartões agrupados: resumo, público, copy, prova e riscos. Evite pular entre painéis não relacionados.', pl: 'Skanuj zgrupowane karty: podsumowanie, odbiorcy, treść, dowód i ryzyka. Unikaj przeskakiwania między niezwiązanymi panelami.', ru: 'Просматривайте сгруппированные карточки: резюме, аудитория, текст, доказательства и риски. Избегайте прыжков между несвязанными панелями.' },
     },
     {
       step: '4',
-      title: { en: uiCopy('u_47e553e9a4f11584'), es: 'Aprueba y publica', pt: 'Aprove e publique', pl: 'Zatwierdź i opublikuj', ru: 'Одобрите и опубликуйте' },
-      body:  { en: uiCopy('u_9cc2120781e15807'), es: 'Usa la cola de aprobación para el juicio humano final antes de que el outreach o el contenido público se publique.', pt: 'Use a fila de aprovação para o julgamento humano final antes que o outreach ou conteúdo público seja publicado.', pl: 'Użyj kolejki zatwierdzania do ostatecznej oceny ludzkiej przed uruchomieniem outreachu lub treści publicznych.', ru: 'Используйте очередь одобрения для финального человеческого решения перед публикацией аутрича или публичного контента.' },
+      title: { en: uiText('generatedUi.u_12e2352c79f6a630'), es: 'Aprueba y publica', pt: 'Aprove e publique', pl: 'Zatwierdź i opublikuj', ru: 'Одобрите и опубликуйте' },
+      body:  { en: uiText('generatedUi.u_630295474c2bc325'), es: 'Usa la cola de aprobación para el juicio humano final antes de que el outreach o el contenido público se publique.', pt: 'Use a fila de aprovação para o julgamento humano final antes que o outreach ou conteúdo público seja publicado.', pl: 'Użyj kolejki zatwierdzania do ostatecznej oceny ludzkiej przed uruchomieniem outreachu lub treści publicznych.', ru: 'Используйте очередь одобрения для финального человеческого решения перед публикацией аутрича или публичного контента.' },
     },
   ],
 }
 
 const AD_LANDING_LINKS = [
   {
-    title: uiCopy('u_97571e758203697a'),
+    title: uiText('generatedUi.u_9b08bb7787a20df3'),
     href: '/website-optimizer',
     url: 'https://www.saas.signalboostapp.com/website-optimizer',
-    badge: uiCopy('u_07be5d3c6b7ece63'),
-    description: uiCopy('u_61e404b59c3de7fe'),
+    badge: uiText('generatedUi.u_62a9d03cb2e245c8'),
+    description: uiText('generatedUi.u_b20c20c5ab9377af'),
   },
   {
-    title: uiCopy('u_0c0bc591487174dc'),
+    title: uiText('generatedUi.u_d87843ad1d95baec'),
     href: '/cybersecurity-check',
     url: 'https://www.saas.signalboostapp.com/cybersecurity-check',
-    badge: uiCopy('u_26f39ecace65fe4f'),
-    description: uiCopy('u_c8ec6cd56cacbd7f'),
+    badge: uiText('generatedUi.u_62a9d03cb2e245c8'),
+    description: uiText('generatedUi.u_3f2358c4b00716ce'),
   },
   {
-    title: uiCopy('u_c330a2176bee03c0'),
+    title: uiText('generatedUi.u_281ad82f2d803589'),
     href: '/dashboard/audit',
     url: 'https://www.saas.signalboostapp.com/dashboard/audit',
-    badge: uiCopy('u_0e35648b1cc22c41'),
-    description: uiCopy('u_c474565c10661546'),
+    badge: uiText('generatedUi.u_4807513a2c62c69c'),
+    description: uiText('generatedUi.u_205886a4abbf9551'),
   },
 ]
 
@@ -114,7 +113,7 @@ export default function DocsPage() {
           <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c(COPY.scanPath, l)}</p>
           <nav style={{ display: 'grid', gap: 10 }}>
             <a href="#ad-landing-pages" style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: 13, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <span style={{ color: '#1af0ff', fontWeight: 900, fontSize: 11, marginTop: 2, flexShrink: 0 }}>{uiCopy('u_6fbb869bb762ef0d')}</span>
+              <span style={{ color: '#1af0ff', fontWeight: 900, fontSize: 11, marginTop: 2, flexShrink: 0 }}>{uiText('generatedUi.u_0d1c315edb9b395c')}</span>
               {c(COPY.publicTools.title, l)}
             </a>
             {COPY.sections.map(s => (
@@ -129,7 +128,7 @@ export default function DocsPage() {
         {/* Steps */}
         <div style={{ display: 'grid', gap: 14 }}>
           <article id="ad-landing-pages" style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '18px 0 8px', scrollMarginTop: 90 }}>
-            <p className="sb-eyebrow" style={{ marginBottom: 8 }}>{uiCopy('u_1064cba4abc4191d')}</p>
+            <p className="sb-eyebrow" style={{ marginBottom: 8 }}>{uiText('generatedUi.u_05142b6381c80017')}</p>
             <h2 style={{ fontSize: 'clamp(16px,2.5vw,22px)', fontWeight: 900, letterSpacing: '-.03em', margin: '0 0 10px' }}>{c(COPY.publicTools.title, l)}</h2>
             <p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.7, fontSize: 14, margin: 0 }}>{c(COPY.publicTools.body, l)}</p>
             <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>

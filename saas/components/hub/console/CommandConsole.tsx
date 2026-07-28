@@ -12,8 +12,7 @@ import ProviderActionForm from '../ProviderActionForm.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard.tsx'
 import { signalboostConsoleUI } from '@/console-host/consoleHostConfig'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const PER_PAGE = 2
 
@@ -127,14 +126,14 @@ export default function CommandConsole({
           {utilityId ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ {t('console.ui.hub_home', uiCopy('u_5a1f5f45d2178c58'))}</button> / {t('console.ui.utility_views', uiCopy('u_4edd51cbdb3266ed'))}
+                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ {t('console.ui.hub_home', "Hub Home")}</button> / {t('console.ui.utility_views', "Utility Views")}
               </div>
               <UtilityFrame id={utilityId} lang={lang} />
             </div>
           ) : focusProvider ? (
             <ProviderWorkspace
               provider={focusProvider}
-              tierLabel={tier?.label ? `${t('console.ui.tier', uiCopy('u_878bef4517b8167c'))} ${tier.index} · ${tier.label}` : t('console.ui.tier', uiCopy('u_ee2719063171706e'))}
+              tierLabel={tier?.label ? `${t('console.ui.tier', "Tier")} ${tier.index} · ${tier.label}` : t('console.ui.tier', "Tier")}
               lang={lang}
               onBack={() => setFocusProviderId(null)}
               onHome={resetToHome}
@@ -146,13 +145,13 @@ export default function CommandConsole({
             <>
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{t('console.ui.tier', uiCopy('u_cb73e1748c0f3924'))} {tier?.index} · {tier?.label} {t('console.ui.providers', uiCopy('u_c575a0926de35058'))}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{t('console.ui.tier', "Tier")} {tier?.index} · {tier?.label} {t('console.ui.providers', "Providers")}</div>
                   <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4, maxWidth: 560 }}>{tier?.blurb}</div>
                 </div>
                 {pageCount > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <PagerButton label="←" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0} />
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700, minWidth: 86, textAlign: 'center' }}>{uiCopy('u_e82a65af693497c5')}{safePage + 1}{uiCopy('u_cf99da84226686a8')}{pageCount}</span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700, minWidth: 86, textAlign: 'center' }}>{uiText('generatedUi.u_0a30a815d67d7dd2')}{safePage + 1}{uiText('generatedUi.u_28391d3bc64ec15c')}{pageCount}</span>
                     <PagerButton label="→" onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1} />
                   </div>
                 )}
@@ -169,8 +168,8 @@ export default function CommandConsole({
 
         {/* Audit footer */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 24px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
-          <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('console.cui.audit_log', uiCopy('u_0c0e53d054399bce'))}</strong> {t('console.cui.audit_note', uiCopy('u_07af7b3690026728'))}{' '}
-          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{t('console.cui.view_log', uiCopy('u_4d0e2442254ab3a5'))}</button>
+          <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('console.cui.audit_log', "Audit Log:")}</strong> {t('console.cui.audit_note', "All actions are recorded for compliance.")}{' '}
+          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{t('console.cui.view_log', "View log →")}</button>
         </div>
       </main>
 
@@ -188,7 +187,7 @@ export default function CommandConsole({
                       <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{panel.title}</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>{panel.subtitle}</div>
                     </div>
-                    <button onClick={() => setActiveTemplateId(null)} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 800, cursor: 'pointer', padding: '7px 12px' }}>{uiCopy('u_98dcf0f34432e368')}</button>
+                    <button onClick={() => setActiveTemplateId(null)} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 800, cursor: 'pointer', padding: '7px 12px' }}>{uiText('generatedUi.u_e61997c6997c5afa')}</button>
                   </div>
                   {panel.render()}
                 </div>
@@ -215,5 +214,5 @@ function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
   const { t } = useTranslation()
   const renderPage = signalboostConsoleUI.utilityPages[id]
   if (renderPage) return <>{renderPage()}</>
-  return <div style={{ color: 'rgba(255,255,255,.6)' }}>{t('console.cui.unknown_page', uiCopy('u_260b924b4a5c67c1'))}</div>
+  return <div style={{ color: 'rgba(255,255,255,.6)' }}>{t('console.cui.unknown_page', "Unknown page.")}</div>
 }

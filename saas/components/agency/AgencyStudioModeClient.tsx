@@ -5,8 +5,7 @@ import { useState } from 'react'
 import PublicAgencyClient from './PublicAgencyClient.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Props = { copy: AgencyCopy['client'] }
 type StudioMode = 'manual' | 'ai'
@@ -50,20 +49,20 @@ const TEXT: Record<string, {
   fields: Record<keyof ManualDraft, string>
 }> = {
   en: {
-    title: uiCopy('u_670504c6bd5b7611'),
-    body: uiCopy('u_563dec4d20f74d9c'),
-    manual: uiCopy('u_61128407fed4b639'), ai: uiCopy('u_c743db52264f0bb5'),
-    manualTitle: uiCopy('u_eacd6dd403f84056'),
-    manualBody: uiCopy('u_80ddcc0aa62352f5'),
-    youtube: uiCopy('u_d0b68efb847f14f8'), linkedin: uiCopy('u_a399f75c02ead764'), press: uiCopy('u_0dadce0f737ec068'),
-    publication: uiCopy('u_e206973874cbd6e5'), email: uiCopy('u_9f9f94a4b5335eb8'),
-    queue: uiCopy('u_f9c09912c8649696'), queuing: uiCopy('u_68b35027e1ba8248'),
-    queued: uiCopy('u_441b81d416418705'),
-    error: uiCopy('u_94bca82bc3ec1158'),
+    title: uiText('generatedUi.u_b2758e8dbbef8702'),
+    body: uiText('generatedUi.u_ec3b66dba6e69798'),
+    manual: uiText('generatedUi.u_5bd9eee19d90aeb4'), ai: uiText('generatedUi.u_3b461b0a317ffb2d'),
+    manualTitle: uiText('generatedUi.u_83da2ba6bd13bed7'),
+    manualBody: uiText('generatedUi.u_850416cb30e5c25e'),
+    youtube: uiText('generatedUi.u_fb7accfff8c6f8ea'), linkedin: uiText('generatedUi.u_dd84425b72da12c6'), press: uiText('generatedUi.u_f5a1f30c9a371afd'),
+    publication: uiText('generatedUi.u_eab011ad9ff060aa'), email: uiText('generatedUi.u_baf395782fc066e2'),
+    queue: uiText('generatedUi.u_a3f160e4036b511a'), queuing: uiText('generatedUi.u_37255b74c579d359'),
+    queued: uiText('generatedUi.u_ddcab6e146df4543'),
+    error: uiText('generatedUi.u_d9d688e37d6ff483'),
     fields: {
-      youtubeTitle: uiCopy('u_5684a141de248a94'), youtubeDescription: uiCopy('u_77a1d55d8ff4426d'), youtubeCommunityPost: uiCopy('u_8fccbf7da7711aeb'),
-      linkedinCompanyPost: uiCopy('u_50719bf30239932c'), linkedinFounderPost: uiCopy('u_234213d37b689738'),
-      pressReleaseSubject: uiCopy('u_99d8b52dbcab495e'), pressReleaseBody: uiCopy('u_4cb3335979a47e4d'),
+      youtubeTitle: uiText('generatedUi.u_ff9a9985951b07b6'), youtubeDescription: uiText('generatedUi.u_9d23a14b9a2ae811'), youtubeCommunityPost: uiText('generatedUi.u_ed1705c8817c8b49'),
+      linkedinCompanyPost: uiText('generatedUi.u_8b841c7ff24acd03'), linkedinFounderPost: uiText('generatedUi.u_6eec798c9467f769'),
+      pressReleaseSubject: uiText('generatedUi.u_848f0ca2c125e4dc'), pressReleaseBody: uiText('generatedUi.u_f69ea3f5d4240cb7'),
     },
   },
   es: {
@@ -174,9 +173,9 @@ export default function AgencyStudioModeClient({ copy }: Props) {
           <div className="sb-glass" style={{ padding: 28, display: 'grid', gap: 18 }}>
             <div><span className="sb-eyebrow">{t.manual}</span><h2 className="sb-h2">{t.manualTitle}</h2><p className="sb-body">{t.manualBody}</p></div>
             {([
-              [t.youtube, [uiCopy('u_99856f596077bb7c'), uiCopy('u_f02666fb64eb0f56'), uiCopy('u_f13f66b287fdb697')]],
-              [t.linkedin, [uiCopy('u_f753b12cb6f7fc2e'), uiCopy('u_7483bb29d2161904')]],
-              [t.press, [uiCopy('u_b88c75ac72db65a4'), uiCopy('u_0a2ca8c4563ac99a')]],
+              [t.youtube, ["youtubeTitle", "youtubeDescription", "youtubeCommunityPost"]],
+              [t.linkedin, ["linkedinCompanyPost", "linkedinFounderPost"]],
+              [t.press, ["pressReleaseSubject", "pressReleaseBody"]],
             ] as const).map(([section, fields]) => (
               <section className="sb-card" style={{ padding: 18, display: 'grid', gap: 12 }} key={section}>
                 <h3 className="sb-h3" style={{ margin: 0 }}>{section}</h3>

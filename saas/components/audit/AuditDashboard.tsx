@@ -12,8 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -55,13 +54,13 @@ type AuditCopy = {
 
 const COPY: Record<string, AuditCopy> = {
   en: {
-    title: uiCopy('u_f436769ebf5066f2'), subtitle: uiCopy('u_9aa5d1c678b6f56d'),
-    creditUsage: uiCopy('u_28f5a1d988fbd251'), currentPlan: uiCopy('u_9a85b9456ec1b58e'), unlimited: uiCopy('u_1e39feb4d7d0e76f'),
-    meterVideo: uiCopy('u_5676c61e9df3eeae'), meterImage: uiCopy('u_5db3f4e18d589ea3'), meterAi: uiCopy('u_b4a9ab6dacbdb9b8'), usedOf: uiCopy('u_15fcf00e58db0994'),
-    upgradeTitle: uiCopy('u_dcfcced41b076886'), upgradeSubtitle: uiCopy('u_96448d916058018b'), upgrade: uiCopy('u_46790ae902b8b25f'), redirecting: uiCopy('u_ca0fe31468cf4b2d'), upgradeError: uiCopy('u_e89c7350dfa31ca6'),
-    buyTitle: uiCopy('u_aef02a111528cb37'), buySubtitle: uiCopy('u_06714569722856c3'), buyCta: uiCopy('u_9ad509d194b06824'), creditsWord: uiCopy('u_4eebd90b0d365c24'), buyError: uiCopy('u_23a85a15d2e2a80c'),
-    loading: uiCopy('u_a42f933b2d338c36'), loadError: uiCopy('u_76a7e7197901b53a'), popular: uiCopy('u_42ae6d018e2e79c9'),
-    plan: { free: uiCopy('u_ecff7c27a3ab815c'), launch: uiCopy('u_5d73c804538dc8c8'), growth: uiCopy('u_55d1790c34856d0d'), command: uiCopy('u_4302b78c6bd92475') },
+    title: uiText('generatedUi.u_3860e3310db1189d'), subtitle: uiText('generatedUi.u_787b2be0d14d0f19'),
+    creditUsage: uiText('generatedUi.u_54027c196ffbd756'), currentPlan: uiText('generatedUi.u_37ca715f53b6bb83'), unlimited: uiText('generatedUi.u_11dde17d6c3e2098'),
+    meterVideo: uiText('generatedUi.u_d534be829e32196b'), meterImage: uiText('generatedUi.u_1aa4cb0bcca76e92'), meterAi: uiText('generatedUi.u_11fb682be0a0233d'), usedOf: uiText('generatedUi.u_07b985c5caec07eb'),
+    upgradeTitle: uiText('generatedUi.u_95bcb469ae41da9f'), upgradeSubtitle: uiText('generatedUi.u_16a54a76ea9f8609'), upgrade: uiText('generatedUi.u_2ecdd4372603ee45'), redirecting: uiText('generatedUi.u_0d83b98bebfb5add'), upgradeError: uiText('generatedUi.u_827beb6ec9dcac23'),
+    buyTitle: uiText('generatedUi.u_0ead99f64ab7272b'), buySubtitle: uiText('generatedUi.u_bfb39862ae181dbf'), buyCta: uiText('generatedUi.u_64e3cb0e4960ba69'), creditsWord: uiText('generatedUi.u_be379a30f1aa05d1'), buyError: uiText('generatedUi.u_827beb6ec9dcac23'),
+    loading: uiText('generatedUi.u_0134e99d31350d7d'), loadError: uiText('generatedUi.u_97cbc43c27dd76ab'), popular: uiText('generatedUi.u_ad2ea9485094c702'),
+    plan: { free: uiText('generatedUi.u_aeba7134f71be292'), launch: uiText('generatedUi.u_ccf56ef5db0b82a5'), growth: uiText('generatedUi.u_66b06e996553a4e7'), command: uiText('generatedUi.u_713166971d730f81') },
   },
   es: {
     title: 'Espacio de Auditoría', subtitle: 'Ejecuta auditorías profundas, controla el uso y amplía tu plan.',

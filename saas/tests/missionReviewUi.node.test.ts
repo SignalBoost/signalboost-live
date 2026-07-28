@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
+
+const read = (file: string) => hydrateLocalizedSource(readFileSync(new URL(file, import.meta.url), 'utf8'))
 const page = () => read('../app/dashboard/supervisor/missions/reviews/page.tsx')
 const client = () => read('../app/dashboard/supervisor/missions/reviews/MissionReviewClient.tsx')
 

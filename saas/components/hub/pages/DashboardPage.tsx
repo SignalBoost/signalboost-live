@@ -12,8 +12,7 @@ import { Deployment } from '@/lib/hub/deployments-service'
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type DeployMode = 'view' | 'rollback' | 'cancel'
 
@@ -48,20 +47,20 @@ export function DeploymentsPage({ mode = 'view' }: { mode?: DeployMode }) {
       if (data.ok) {
         setDeployments(data.deployments || [])
       } else {
-        setError(data.error || t(dict, 'console.deploy.err.load', uiCopy('u_48c79923e0996e84')))
+        setError(data.error || t(dict, 'console.deploy.err.load'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.deploy.err.loading', uiCopy('u_a2055ceffd206d70')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.deploy.err.loading'))
     } finally {
       setLoading(false)
     }
   }
 
   async function runAction(action: 'rollback' | 'cancel', d: Deployment) {
-    const verb = action === 'rollback' ? t(dict, 'console.deploy.rollbackVerb', uiCopy('u_a069b2b757e48a9f')) : t(dict, 'console.deploy.cancelVerb', uiCopy('u_caef209bf6f610e7'))
+    const verb = action === 'rollback' ? t(dict, 'console.deploy.rollbackVerb') : t(dict, 'console.deploy.cancelVerb')
     const tail = action === 'rollback'
-      ? `${d.url || d.id}? ${t(dict, 'console.deploy.rollbackTail', uiCopy('u_5bf76eada9bb8011'))}`
-      : `${d.url || d.id}? ${t(dict, 'console.deploy.cancelTail', uiCopy('u_fdfada1629b1a6f8'))}`
+      ? `${d.url || d.id}? ${t(dict, 'console.deploy.rollbackTail')}`
+      : `${d.url || d.id}? ${t(dict, 'console.deploy.cancelTail')}`
     if (!window.confirm(`${verb} ${tail}`)) return
 
     setBusyId(d.id)
@@ -74,13 +73,13 @@ export function DeploymentsPage({ mode = 'view' }: { mode?: DeployMode }) {
       })
       const data = await res.json()
       if (data.ok) {
-        flash(data.message || (action === 'rollback' ? t(dict, 'console.deploy.rollbackDone', uiCopy('u_dca554da4c52f1a6')) : t(dict, 'console.deploy.cancelDone', uiCopy('u_f654c0c04c322900'))))
+        flash(data.message || (action === 'rollback' ? t(dict, 'console.deploy.rollbackDone') : t(dict, 'console.deploy.cancelDone')))
         await fetchDeployments()
       } else {
-        setError(data.error || `${t(dict, 'console.deploy.failedAction', uiCopy('u_3462bcf90c9ecb30'))} ${action}`)
+        setError(data.error || `${t(dict, 'console.deploy.failedAction')} ${action}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${t(dict, 'console.deploy.errorDuring', uiCopy('u_b9331d43ee910306'))} ${action}`)
+      setError(err instanceof Error ? err.message : `${t(dict, 'console.deploy.errorDuring')} ${action}`)
     } finally {
       setBusyId(null)
     }
@@ -96,14 +95,14 @@ export function DeploymentsPage({ mode = 'view' }: { mode?: DeployMode }) {
   }
 
   const heading =
-    mode === 'rollback' ? t(dict, 'console.deploy.headingRollback', uiCopy('u_8844873dfbfcb1f2'))
-    : mode === 'cancel' ? t(dict, 'console.deploy.headingCancel', uiCopy('u_5beda7e9fd3d00a9'))
-    : t(dict, 'console.deploy.heading', uiCopy('u_1ca166f234591723'))
+    mode === 'rollback' ? t(dict, 'console.deploy.headingRollback')
+    : mode === 'cancel' ? t(dict, 'console.deploy.headingCancel')
+    : t(dict, 'console.deploy.heading')
 
   const subtitle =
-    mode === 'rollback' ? t(dict, 'console.deploy.subRollback', uiCopy('u_3a994b09b836dadc'))
-    : mode === 'cancel' ? t(dict, 'console.deploy.subCancel', uiCopy('u_901d3ddd5e43aa55'))
-    : t(dict, 'console.deploy.sub', uiCopy('u_2ecf7fa21b4f3d80'))
+    mode === 'rollback' ? t(dict, 'console.deploy.subRollback')
+    : mode === 'cancel' ? t(dict, 'console.deploy.subCancel')
+    : t(dict, 'console.deploy.sub')
 
   return (
     <div style={{ padding: '0.5rem 0.25rem', maxWidth: '1200px' }}>
@@ -118,7 +117,7 @@ export function DeploymentsPage({ mode = 'view' }: { mode?: DeployMode }) {
           onClick={fetchDeployments}
           style={{ padding: '7px 13px', borderRadius: 9, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.72)' }}
         >
-          {loading ? '…' : t(dict, 'console.deploy.refresh', uiCopy('u_e529753d43b60864'))}
+          {loading ? '…' : t(dict, 'console.deploy.refresh')}
         </button>
       </div>
 
@@ -135,11 +134,11 @@ export function DeploymentsPage({ mode = 'view' }: { mode?: DeployMode }) {
 
       {loading ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          {t(dict, 'console.deploy.loading', uiCopy('u_753f5f323882ae50'))}
+          {t(dict, 'console.deploy.loading')}
         </div>
       ) : deployments.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          {t(dict, 'console.deploy.empty', uiCopy('u_20ac9dd144ea079a'))}
+          {t(dict, 'console.deploy.empty')}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
@@ -229,11 +228,11 @@ function DeploymentCard({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.45rem' }}>
             <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: stateColor, flexShrink: 0 }} />
             <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {deployment.url || t(dict, 'console.deploy.deployment', uiCopy('u_6176687ee5b4f065'))}
+              {deployment.url || t(dict, 'console.deploy.deployment')}
             </div>
             {isCurrent && (
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.06em', color: '#22c55e', border: '1px solid rgba(34,197,94,.4)', borderRadius: 6, padding: '2px 6px', flexShrink: 0 }}>
-                {t(dict, 'console.deploy.current', uiCopy('u_4f9ddbd309bad9d8'))}
+                {t(dict, 'console.deploy.current')}
               </span>
             )}
           </div>
@@ -241,7 +240,7 @@ function DeploymentCard({
           <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: '#888', flexWrap: 'wrap' }}>
             <span style={{ color: stateColor, fontWeight: 'bold' }}>{deployment.state}</span>
             <span>{timeAgo}</span>
-            {deployment.createdBy && <span>{t(dict, 'console.deploy.by', uiCopy('u_e47157da82340202'))} {deployment.createdBy}</span>}
+            {deployment.createdBy && <span>{t(dict, 'console.deploy.by')} {deployment.createdBy}</span>}
           </div>
         </div>
 
@@ -255,22 +254,22 @@ function DeploymentCard({
           {mode === 'rollback' && (
             canRollback ? (
               <button onClick={(e) => { e.stopPropagation(); onRollback() }} disabled={busy} style={actionBtn('gold', busy)}>
-                {busy ? t(dict, 'console.deploy.promoting', uiCopy('u_4df8c37277f3a5c9')) : t(dict, 'console.deploy.rollbackThis', uiCopy('u_c14144262d06cb5c'))}
+                {busy ? t(dict, 'console.deploy.promoting') : t(dict, 'console.deploy.rollbackThis')}
               </button>
             ) : (
               <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)', alignSelf: 'center' }}>
-                {isCurrent ? t(dict, 'console.deploy.currentTarget', uiCopy('u_9dcc8b20c0eaed5c')) : t(dict, 'console.deploy.onlyReady', uiCopy('u_537d990c915a9792'))}
+                {isCurrent ? t(dict, 'console.deploy.currentTarget') : t(dict, 'console.deploy.onlyReady')}
               </span>
             )
           )}
           {mode === 'cancel' && (
             canCancel ? (
               <button onClick={(e) => { e.stopPropagation(); onCancel() }} disabled={busy} style={actionBtn('danger', busy)}>
-                {busy ? t(dict, 'console.deploy.canceling', uiCopy('u_db09b8d6d3b7d102')) : t(dict, 'console.deploy.cancelBuild', uiCopy('u_9c430d3b67a4a92a'))}
+                {busy ? t(dict, 'console.deploy.canceling') : t(dict, 'console.deploy.cancelBuild')}
               </button>
             ) : (
               <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)', alignSelf: 'center' }}>
-                {t(dict, 'console.deploy.notInProgress', uiCopy('u_0226141f4ab052d0'))}
+                {t(dict, 'console.deploy.notInProgress')}
               </span>
             )
           )}
@@ -280,20 +279,20 @@ function DeploymentCard({
       {expanded && (
         <div style={{ paddingTop: '1rem', display: 'grid', gap: '1rem' }}>
           <div>
-            <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.liveUrl', uiCopy('u_0f5f631880117115'))}</div>
+            <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.liveUrl')}</div>
             <a href={`https://${deployment.url}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#1af0ff', textDecoration: 'none', wordBreak: 'break-all', fontSize: '0.9rem' }}
-            >{uiCopy('u_c9add1aeea04dd5a')}{deployment.url} →
+            >{uiText('generatedUi.u_66dfeeedabf1f022')}{deployment.url} →
             </a>
           </div>
 
           {deployment.meta?.githubCommitSha && (
             <div>
-              <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.gitCommit', uiCopy('u_00b39fa9efaf24a3'))}</div>
+              <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.gitCommit')}</div>
               <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                <div style={{ color: '#888', marginBottom: '0.25rem' }}>{deployment.meta.githubCommitRef || uiCopy('u_0655986064226ab3')}</div>
+                <div style={{ color: '#888', marginBottom: '0.25rem' }}>{deployment.meta.githubCommitRef || uiText('generatedUi.u_0d6e4079e36703eb')}</div>
                 <div style={{ color: '#1af0ff', marginBottom: '0.25rem' }}>{deployment.meta.githubCommitSha.substring(0, 7)}</div>
                 {deployment.meta.githubCommitMessage && (
                   <div style={{ color: '#aaa', fontSize: '0.75rem', marginTop: '0.5rem' }}>{deployment.meta.githubCommitMessage}</div>
@@ -307,20 +306,20 @@ function DeploymentCard({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
-              <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{t(dict, 'console.deploy.deploymentId', uiCopy('u_72c422a49befff77'))}</div>
+              <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{t(dict, 'console.deploy.deploymentId')}</div>
               <div style={{ color: '#1af0ff', fontFamily: 'monospace', fontSize: '0.75rem', wordBreak: 'break-all' }}>
                 {deployment.id.substring(0, 12)}...
               </div>
             </div>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
-              <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{t(dict, 'console.deploy.created', uiCopy('u_c0ee723c0407c3ba'))}</div>
+              <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{t(dict, 'console.deploy.created')}</div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>{date.toLocaleString()}</div>
             </div>
           </div>
 
           {deployment.alias && deployment.alias.length > 0 && (
             <div>
-              <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.aliases', uiCopy('u_381a7cf915f4bef7'))}</div>
+              <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.aliases')}</div>
               <div style={{ display: 'grid', gap: '0.25rem' }}>
                 {deployment.alias.map((alias, i) => (
                   <div key={i} style={{ color: '#1af0ff', fontSize: '0.85rem' }}>{alias}</div>
@@ -335,7 +334,7 @@ function DeploymentCard({
               rel="noopener noreferrer"
               style={{ padding: '0.75rem', background: '#1a1a2e', color: '#1af0ff', textDecoration: 'none', borderRadius: '4px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold' }}
             >
-              {t(dict, 'console.deploy.inspector', uiCopy('u_0ae321be099f206d'))}
+              {t(dict, 'console.deploy.inspector')}
             </a>
           )}
         </div>
@@ -346,9 +345,9 @@ function DeploymentCard({
 
 function getTimeAgo(date: Date, dict: any): string {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-  if (seconds < 60) return t(dict, 'console.deploy.justNow', uiCopy('u_ef397ee65bd61210'))
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}${t(dict, 'console.deploy.minAgo', uiCopy('u_a67f9d220e02523a'))}`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}${t(dict, 'console.deploy.hourAgo', uiCopy('u_68bdf6884d0e1291'))}`
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}${t(dict, 'console.deploy.dayAgo', uiCopy('u_4947d2b7a82e450c'))}`
+  if (seconds < 60) return t(dict, 'console.deploy.justNow')
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}${t(dict, 'console.deploy.minAgo')}`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}${t(dict, 'console.deploy.hourAgo')}`
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}${t(dict, 'console.deploy.dayAgo')}`
   return date.toLocaleDateString()
 }

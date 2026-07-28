@@ -5,20 +5,19 @@ import { useTranslation } from "@/components/i18n/useTranslation";
 import { useTTS } from "@/hooks/useTTS";
 import { CURATED_VOICES, type VoiceLocale } from "@/lib/elevenlabs/voices";
 import ResetButton from "@/components/ResetButton";
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const MAX_CHARS = 5000;
 const GOLD = "#ffc300";
 const BLUE = "#3b82f6";
 
 const LOCALE_LABELS: Record<string, { flag: string; label: string }> = {
-  "all": { flag: uiCopy('u_1cb74e7c5e6a5f55'), label: uiCopy('u_20e4602d2af4ba0a') },
-  "en": { flag: "EN", label: uiCopy('u_5a068871ef8fc7f8') },
-  "pt-BR": { flag: uiCopy('u_b9dc5449a70ac04c'), label: uiCopy('u_8373ad9f3cda1999') },
-  "pt-PT": { flag: "PT", label: uiCopy('u_ed6b7b469e107a54') },
-  "es-LATAM": { flag: uiCopy('u_539c78be90021d58'), label: uiCopy('u_23ac841473f42557') },
-  "es-ES": { flag: "ES", label: uiCopy('u_b72f25cc78c0e014') },
+  "all": { flag: "ALL", label: uiText('generatedUi.u_acce3d0e30f951f6') },
+  "en": { flag: uiText('generatedUi.u_69374b09b1681162'), label: uiText('generatedUi.u_ba118bf7fc9c1aed') },
+  "pt-BR": { flag: "BR", label: uiText('generatedUi.u_7d22b88c5d34c18e') },
+  "pt-PT": { flag: "PT", label: uiText('generatedUi.u_6a920121ad09c325') },
+  "es-LATAM": { flag: "MX", label: uiText('generatedUi.u_068281ad9d7a496b') },
+  "es-ES": { flag: "ES", label: uiText('generatedUi.u_d6f90417a46c1ed7') },
   "pl": { flag: "PL", label: "Polski" },
   "ru": { flag: "RU", label: "Russkiy" },
 };
@@ -112,10 +111,10 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", margin: "0 0 6px" }}>
-            {t("audio.title", uiCopy('u_badb5cee3e9c53c3'))}
+            {t("audio.title", "Audio")}
           </h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
-            {t("audio.subtitle", uiCopy('u_45438b9b186e40e5'))}
+            {t("audio.subtitle", "Turn any text into native-sounding audio.")}
           </p>
         </div>
 
@@ -197,10 +196,10 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
           <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
-            {t("audio.pickVoice", uiCopy('u_8631bd03adfd44ae'))}
+            {t("audio.pickVoice", "Pick a voice")}
           </h2>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
-            {visibleVoices.length} {t("audio.voicesAvailable", uiCopy('u_53d1a62e5146b457'))}
+            {visibleVoices.length} {t("audio.voicesAvailable", "available")}
           </span>
         </div>
 
@@ -216,7 +215,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
               fontSize: 13,
             }}
           >
-            {t("audio.noVoices", uiCopy('u_5a861f41253e570d'))}
+            {t("audio.noVoices", "No voices available for this language.")}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
@@ -259,7 +258,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
-            {t("audio.yourText", uiCopy('u_8aeab9ac365e08aa'))}
+            {t("audio.yourText", "Your text")}
           </h2>
           {(text.length > 0 || error || result || loading) ? (
             <ResetButton onReset={handleFullReset} className="sb-button-ghost" />
@@ -278,14 +277,14 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                 cursor: "pointer",
               }}
             >
-              {t("audio.clear", uiCopy('u_e67c262e7180a1db'))}
+              {t("audio.clear", "Clear")}
             </button>
           ) : null}
         </div>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={t("audio.textPlaceholder", uiCopy('u_a50baf774ad6304d'))}
+          placeholder={t("audio.textPlaceholder", "Type or paste what you want to say...")}
           rows={5}
           style={{
             width: "100%",
@@ -304,11 +303,11 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         />
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11 }}>
           <span style={{ color: overLimit ? "#f87171" : "rgba(255,255,255,0.4)" }}>
-            {text.length} / {MAX_CHARS} {t("audio.characters", uiCopy('u_d39bc753c121477c'))}
+            {text.length} / {MAX_CHARS} {t("audio.characters", "characters")}
           </span>
           {overLimit ? (
             <span style={{ color: "#f87171", fontWeight: 600 }}>
-              {t("audio.overLimit", uiCopy('u_4ad8946bc8e06287'))}
+              {t("audio.overLimit", "Over the character limit")}
             </span>
           ) : null}
         </div>
@@ -329,7 +328,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                {result.cached ? t("audio.servedFromCache", uiCopy('u_188496acf9305202')) : t("audio.justGenerated", uiCopy('u_546a4be29489be28'))}
+                {result.cached ? t("audio.servedFromCache", "Served from cache") : t("audio.justGenerated", "Just generated")}
               </div>
               {selectedVoice ? (
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
@@ -350,7 +349,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                 cursor: "pointer",
               }}
             >
-              {t("audio.download", uiCopy('u_250ed6709c2b9e4f'))}
+              {t("audio.download", "Download")}
             </button>
           </div>
           <audio
@@ -373,7 +372,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>
-            {t("audio.error", uiCopy('u_1831bec02844b515'))}
+            {t("audio.error", "Generation failed")}
           </div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
             {error.message}
@@ -399,10 +398,10 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           }}
         >
           {loading
-            ? t("audio.generating", uiCopy('u_9cc191a96c836c49'))
+            ? t("audio.generating", "Generating...")
             : result
-            ? t("audio.generateAgain", uiCopy('u_b0f797ae72a8d7d1'))
-            : t("audio.generate", uiCopy('u_17e4ad13278c5381'))}
+            ? t("audio.generateAgain", "Generate again")
+            : t("audio.generate", "Generate audio")}
         </button>
       </div>
     </div>

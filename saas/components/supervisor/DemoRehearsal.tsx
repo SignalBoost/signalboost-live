@@ -27,8 +27,7 @@
 'use client'
 
 import { useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -93,36 +92,36 @@ type RehearsalCopy = {
 
 const COPY: Record<Language, RehearsalCopy> = {
   en: {
-    heading: uiCopy('u_bb07d566260bcb17'),
-    intro: uiCopy('u_b23a58fb916b1047'),
-    rehearsalBadge: uiCopy('u_f9d8d51b54340c3b'),
-    rehearsalNote: uiCopy('u_347d18eefc7f8ebd'),
-    runButton: uiCopy('u_9bebff717f4b7778'),
-    runningButton: uiCopy('u_21804330ce0790d0'),
-    runningNote: uiCopy('u_c7faf2225bc74063'),
-    requestFailed: uiCopy('u_4c248dbbcce6820c'),
-    didNotComplete: uiCopy('u_8273597f461af231'),
-    notRun: uiCopy('u_4eba3b8ffdf4a070'),
-    passed: uiCopy('u_8c1591c1336f31d0'),
-    failed: uiCopy('u_5d49b0d8bc2875f7'),
-    pass: uiCopy('u_ad4a66b104ff2749'),
-    fail: uiCopy('u_a3dcb129584fc1b3'),
-    auditEvents: uiCopy('u_fe40f007e932f58b'),
-    notifications: uiCopy('u_6c73a32f83f1d80b'),
-    ranAtLabel: uiCopy('u_b9e730c8085868d5'),
-    drillHeading: uiCopy('u_0d60afe4cf76f993'),
-    drillIntro: uiCopy('u_7a2ace833ee5492b'),
-    drillBadge: uiCopy('u_f17ada4190a6f4ef'),
-    drillNote: uiCopy('u_26ff948a4bbac4ce'),
-    drillButton: uiCopy('u_9db3ab84c27be19b'),
-    drillRunningButton: uiCopy('u_b8567e9a6d7be041'),
-    drillRunningNote: uiCopy('u_a320ce39d54f365e'),
-    deliveryLabel: uiCopy('u_b477fbccf1d21dcb'),
-    incidentLabel: uiCopy('u_f5ea61655f124b2d'),
-    outcomeLabel: uiCopy('u_3a250956f641baec'),
-    licenceLabel: uiCopy('u_e8e82bbbabc5c4c2'),
-    licenceOk: uiCopy('u_b96677a9b14eaa2b'),
-    licenceMissing: uiCopy('u_4d1f35d1707faf98'),
+    heading: uiText('generatedUi.u_77525ef1bd4ad8a2'),
+    intro: uiText('generatedUi.u_23693ad03ec29c90'),
+    rehearsalBadge: uiText('generatedUi.u_28100fcd551b3b32'),
+    rehearsalNote: uiText('generatedUi.u_cb34e90b5739f252'),
+    runButton: uiText('generatedUi.u_5b0015fd075f755a'),
+    runningButton: uiText('generatedUi.u_5dd3a0fdd5b2f4f8'),
+    runningNote: uiText('generatedUi.u_44499e90e51f39da'),
+    requestFailed: uiText('generatedUi.u_cfce761befa84073'),
+    didNotComplete: uiText('generatedUi.u_eb76c07d7a0d2231'),
+    notRun: uiText('generatedUi.u_25f0c23a0878a1de'),
+    passed: uiText('generatedUi.u_436fe71bb9561f05'),
+    failed: uiText('generatedUi.u_031a8f0f659df890'),
+    pass: uiText('generatedUi.u_2f9acb02faa121bb'),
+    fail: uiText('generatedUi.u_425305e25df9df10'),
+    auditEvents: uiText('generatedUi.u_cc672a8a17a0ef3f'),
+    notifications: uiText('generatedUi.u_3b301f5885682323'),
+    ranAtLabel: uiText('generatedUi.u_4b4c31294fb5b71b'),
+    drillHeading: uiText('generatedUi.u_abf4903ad7669248'),
+    drillIntro: uiText('generatedUi.u_3ba49267395e4e68'),
+    drillBadge: uiText('generatedUi.u_0e2113782a3d0373'),
+    drillNote: uiText('generatedUi.u_c03ac3d56b3ba559'),
+    drillButton: uiText('generatedUi.u_694c2e9870bbe98b'),
+    drillRunningButton: uiText('generatedUi.u_f0112a0a0e57c590'),
+    drillRunningNote: uiText('generatedUi.u_de701adeff836886'),
+    deliveryLabel: uiText('generatedUi.u_52bfe584a5fc4505'),
+    incidentLabel: uiText('generatedUi.u_36a606d4886552e8'),
+    outcomeLabel: uiText('generatedUi.u_4e80abb5b14656d4'),
+    licenceLabel: uiText('generatedUi.u_f3ec8e880a46c8a6'),
+    licenceOk: uiText('generatedUi.u_a51a6c19a1ffc741'),
+    licenceMissing: uiText('generatedUi.u_39b70849d4ed7a0f'),
   },
   es: {
     heading: 'Ejecutar un ensayo ahora',

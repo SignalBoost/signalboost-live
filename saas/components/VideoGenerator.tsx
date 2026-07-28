@@ -3,9 +3,6 @@
 import { useState } from "react";
 import { useTranslation } from "@/components/i18n/useTranslation";
 import ResetButton from "@/components/ResetButton";
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 export default function VideoGenerator() {
   const { t } = useTranslation();
   const [prompt, setPrompt] = useState("");
@@ -65,7 +62,7 @@ export default function VideoGenerator() {
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder={t("video.promptPlaceholder", uiCopy('u_c62d555d6b2eb60e'))}
+        placeholder={t("video.promptPlaceholder", "Describe your video...")}
         className="w-full min-h-[160px] rounded-xl border border-gray-700 bg-black p-4 text-white"
       />
 
@@ -74,7 +71,7 @@ export default function VideoGenerator() {
         disabled={loading || !prompt}
         className="rounded-xl bg-yellow-400 px-6 py-3 font-bold text-black disabled:opacity-50"
       >
-        {loading ? t("video.generating", uiCopy('u_2eb551e97cb462c4')) : t("video.generate", uiCopy('u_ec9388aab3f59146'))}
+        {loading ? t("video.generating", "Generating Video...") : t("video.generate", "Generate Video")}
       </button>
       {(videoUrl || error) && <ResetButton onReset={reset} />}
 

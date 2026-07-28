@@ -6,6 +6,8 @@ import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { RENDER_MARKUP, creditsForProviderCost } from '../lib/credits/renderPricing.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('markup is 3x', () => {
   assert.equal(RENDER_MARKUP, 3)
@@ -30,7 +32,7 @@ test('a typical $4 render costs a customer 1200 credits', () => {
 })
 
 test('verified owner bypasses deductions only after usage is durably accounted', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'lib/credits/renderCredits.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'lib/credits/renderCredits.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /entitlements\.unlimitedCredits/)
   assert.match(source, /credits_charged:\s*0/)
   assert.match(source, /provider_cost_cents:\s*Math\.ceil/)
@@ -42,7 +44,7 @@ test('verified owner bypasses deductions only after usage is durably accounted',
 })
 
 test('owner entitlement is granted only through OWNER_EMAILS', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/ownerEntitlements.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/ownerEntitlements.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /OWNER_EMAILS/)
   assert.match(source, /auth\.admin\.getUserById/)
   assert.doesNotMatch(source, /team_members/)
@@ -50,7 +52,7 @@ test('owner entitlement is granted only through OWNER_EMAILS', async () => {
 })
 
 test('canonical protected access treats only owner as admin', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/access.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/access.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /isAdmin:\s*isOwner/)
   assert.match(source, /if \(!ctx\.isOwner\)/)
   assert.doesNotMatch(source, /ADMIN_EMAILS/)
@@ -58,13 +60,13 @@ test('canonical protected access treats only owner as admin', async () => {
 })
 
 test('admin layout is owner-only', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'app/admin/layout.tsx'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'app/admin/layout.tsx'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /if \(!access\.isOwner\) redirect\('\/dashboard'\)/)
   assert.doesNotMatch(source, /access\.isAdmin/)
 })
 
 test('Hub permission middleware rejects workspace admins and synthesizes only owner', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/permission-middleware.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'lib/auth/permission-middleware.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /if \(!access\.isOwner/)
   assert.match(source, /role:\s*'owner'/)
   assert.doesNotMatch(source, /hub_workspace_users/)
@@ -72,7 +74,7 @@ test('Hub permission middleware rejects workspace admins and synthesizes only ow
 })
 
 test('root marketing admin gate uses only owner allowlist', async () => {
-  const source = await readFile(path.resolve(process.cwd(), '../lib/auth/marketingAdmin.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), '../lib/auth/marketingAdmin.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /OWNER_EMAILS/)
   assert.match(source, /OWNER_EMAIL/)
   assert.doesNotMatch(source, /ADMIN_EMAILS/)
@@ -80,7 +82,7 @@ test('root marketing admin gate uses only owner allowlist', async () => {
 })
 
 test('render-credit API exposes unlimited owner state', async () => {
-  const source = await readFile(path.resolve(process.cwd(), 'app/api/agency/render-credits/route.ts'), 'utf8')
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/agency/render-credits/route.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /access\.isOwner/)
   assert.match(source, /unlimited:\s*true/)
   assert.match(source, /balance:\s*null/)

@@ -9,9 +9,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 const RED = '#fca5a5'
@@ -57,26 +54,26 @@ export default function ActivityReport({ data }: { data: ActivityReportView }) {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.activity.title', uiCopy('u_de96f165204fff63'))} <span style={{ color: GOLD }}>·</span>
+          {t('audit.activity.title', "Audit Log & Activity Timeline")} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>
-          {t('audit.activity.subtitle', uiCopy('u_e446c21e063ee27d'))}
+          {t('audit.activity.subtitle', "Recorded actions, actors, and results from the Hub audit log.")}
         </p>
       </div>
 
       {/* Summary stats */}
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.activity.summary.total', uiCopy('u_ee24cafee11e442b'))} value={s.total} />
-        <Stat label={t('audit.activity.summary.success', uiCopy('u_e172025aba9425bf'))} value={s.success} color={s.success ? GREEN : undefined} />
-        <Stat label={t('audit.activity.summary.failures', uiCopy('u_ff803688bf0b7910'))} value={failures} color={failures ? RED : undefined} />
-        <Stat label={t('audit.activity.summary.denials', uiCopy('u_5baee64ba104bc41'))} value={denials} color={denials ? ORANGE : undefined} />
-        <Stat label={t('audit.activity.summary.actors', uiCopy('u_d8a44386fa638efa'))} value={s.actors} />
+        <Stat label={t('audit.activity.summary.total', "Events")} value={s.total} />
+        <Stat label={t('audit.activity.summary.success', "Succeeded")} value={s.success} color={s.success ? GREEN : undefined} />
+        <Stat label={t('audit.activity.summary.failures', "Failures")} value={failures} color={failures ? RED : undefined} />
+        <Stat label={t('audit.activity.summary.denials', "Blocked / denied")} value={denials} color={denials ? ORANGE : undefined} />
+        <Stat label={t('audit.activity.summary.actors', "Actors")} value={s.actors} />
       </section>
 
       {/* Window */}
       <section style={{ ...glass, padding: 16, marginBottom: 16 }}>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
-          {tt(uiCopy('u_4c1e4f159ac7d03c'), uiCopy('u_e9e2fc3bd1efd234'), {
+          {tt("audit.activity.window", "Showing {n} most recent events · {since} → {until}", {
             n: s.total, since: fmt(s.since), until: fmt(s.until),
           })}
         </span>
@@ -85,18 +82,18 @@ export default function ActivityReport({ data }: { data: ActivityReportView }) {
       {/* Timeline table */}
       <section style={{ ...glass, padding: 20 }}>
         {data.events.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREY }}>{t('audit.activity.empty', uiCopy('u_73f23cb7d0adffd7'))}</div>
+          <div style={{ fontSize: 13, color: GREY }}>{t('audit.activity.empty', "No audit events recorded yet.")}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.activity.col.time', uiCopy('u_2e26e00befe3e63b'))}</Th>
-                  <Th>{t('audit.activity.col.actor', uiCopy('u_a37a1075455ddc5b'))}</Th>
-                  <Th>{t('audit.activity.col.action', uiCopy('u_d2f2b99cbefb7cf1'))}</Th>
-                  <Th>{t('audit.activity.col.target', uiCopy('u_bd02bc466c41c4ca'))}</Th>
-                  <Th>{t('audit.activity.col.status', uiCopy('u_db1de718dcf1145c'))}</Th>
-                  <Th>{t('audit.activity.col.message', uiCopy('u_4627d1ac98099851'))}</Th>
+                  <Th>{t('audit.activity.col.time', "Time (UTC)")}</Th>
+                  <Th>{t('audit.activity.col.actor', "Actor")}</Th>
+                  <Th>{t('audit.activity.col.action', "Action")}</Th>
+                  <Th>{t('audit.activity.col.target', "Target")}</Th>
+                  <Th>{t('audit.activity.col.status', "Status")}</Th>
+                  <Th>{t('audit.activity.col.message', "Message")}</Th>
                 </tr>
               </thead>
               <tbody>

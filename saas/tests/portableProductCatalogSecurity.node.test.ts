@@ -2,9 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { serializePortableProductCatalog } from '../lib/portable-products/catalog-serialization.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const serializer = readFileSync(new URL('../lib/portable-products/catalog-serialization.ts', import.meta.url), 'utf8')
-const route = readFileSync(new URL('../app/api/internal/portable-products/route.ts', import.meta.url), 'utf8')
+
+const serializer = hydrateLocalizedSource(readFileSync(new URL('../lib/portable-products/catalog-serialization.ts', import.meta.url), 'utf8'))
+const route = hydrateLocalizedSource(readFileSync(new URL('../app/api/internal/portable-products/route.ts', import.meta.url), 'utf8'))
 
 test('serializer is a detached metadata allowlist with no runtime, secret, or execution boundary', () => {
   for (const forbidden of [/process\.env/, /\bfetch\s*\(/, /supabase/i, /node:fs|readFile|writeFile/, /child_process|\bexec\s*\(/, /playwright|puppeteer|browser-provider|browser-runtime/i, /credential|api[_-]?key|password|bearer\s|secret[_-]?key/i, /checkout/i, /license activation/i, /package generation/i, /worker/i, /cos tool/i]) assert.doesNotMatch(serializer, forbidden)

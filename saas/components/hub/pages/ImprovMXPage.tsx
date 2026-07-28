@@ -3,8 +3,7 @@
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type DomainRow = {
   domain: string
@@ -59,7 +58,7 @@ export default function ImprovMXPage() {
     } catch (err) {
       setDomains([])
       setDomain('')
-      setError(err instanceof Error ? err.message : uiCopy('u_e195f5a8783c0abf'))
+      setError(err instanceof Error ? err.message : "Unable to load ImprovMX domains")
     } finally {
       setLoadingDomains(false)
     }
@@ -90,7 +89,7 @@ export default function ImprovMXPage() {
       setAliases(rows)
     } catch (err) {
       setAliases([])
-      setError(err instanceof Error ? err.message : uiCopy('u_93302de8001f84d1'))
+      setError(err instanceof Error ? err.message : "Unable to load ImprovMX aliases")
     } finally {
       setLoadingAliases(false)
     }
@@ -133,7 +132,7 @@ export default function ImprovMXPage() {
       setForward('')
       await loadAliases(domain)
     } catch (err) {
-      setError(err instanceof Error ? err.message : uiCopy('u_8f6856d8e0626090'))
+      setError(err instanceof Error ? err.message : "Unable to create alias")
     } finally {
       setSaving(false)
     }
@@ -155,7 +154,7 @@ export default function ImprovMXPage() {
 
       await loadAliases(domain)
     } catch (err) {
-      setError(err instanceof Error ? err.message : uiCopy('u_6ad3cf58260d88eb'))
+      setError(err instanceof Error ? err.message : "Unable to delete alias")
     }
   }
 
@@ -173,24 +172,24 @@ export default function ImprovMXPage() {
     <div style={{ padding: 18, color: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_0ffce93022be7b1a')} /></h2>
-          <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 4 }}><LocalizedText fallback={uiCopy('u_5aea9f9d9db3c662')} /></div>
+          <h2 style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_f46ea1bb1a754547')} /></h2>
+          <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 4 }}><LocalizedText fallback={uiText('generatedUi.u_b163d4c837c52d5e')} /></div>
         </div>
-        <button onClick={() => void loadDomains()} style={{ padding: '9px 13px', borderRadius: 9, cursor: 'pointer' }}><LocalizedText fallback={uiCopy('u_346a26f37b62a803')} /></button>
+        <button onClick={() => void loadDomains()} style={{ padding: '9px 13px', borderRadius: 9, cursor: 'pointer' }}><LocalizedText fallback={uiText('generatedUi.u_984d47a1e0dd0c2c')} /></button>
       </div>
 
       {error && (
-        <div style={{ padding: 12, border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, color: '#fca5a5', marginBottom: 14 }}>{uiCopy('u_59cb6172a015118a')}{error}
+        <div style={{ padding: 12, border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, color: '#fca5a5', marginBottom: 14 }}>{uiText('generatedUi.u_dc3f767f95774dce')}{error}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14, marginBottom: 18 }}>
         <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,.10)', padding: 16, borderRadius: 12 }}>
-          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={uiCopy('u_6e47564b86f0609f')} /></div>
+          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={uiText('generatedUi.u_8b925b14879ff054')} /></div>
           {loadingDomains ? (
-            <div style={{ color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_db26b02ace00b47b')}</div>
+            <div style={{ color: 'rgba(255,255,255,.55)' }}>{uiText('generatedUi.u_620c6e0c06bffcd9')}</div>
           ) : domains.length === 0 ? (
-            <div style={{ color: 'rgba(255,255,255,.55)' }}><LocalizedText fallback={uiCopy('u_52ef1cd9eebabc32')} /></div>
+            <div style={{ color: 'rgba(255,255,255,.55)' }}><LocalizedText fallback={uiText('generatedUi.u_e59418996b904e06')} /></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
               {domains.map(item => {
@@ -216,7 +215,7 @@ export default function ImprovMXPage() {
                   >
                     <span style={{ fontFamily: 'monospace' }}>{item.domain}</span>
                     <span style={{ fontSize: 11, color: active ? '#34d399' : '#f87171' }}>
-                      {active ? uiCopy('u_1dc5f5050156aaf5') : uiCopy('u_5b6cc1c05879ba19')}
+                      {active ? uiText('generatedUi.u_92340695899bd2d8') : uiText('generatedUi.u_d0c82eb89b8d659d')}
                     </span>
                   </button>
                 )
@@ -226,46 +225,46 @@ export default function ImprovMXPage() {
         </div>
 
         <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,.10)', padding: 16, borderRadius: 12 }}>
-          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={uiCopy('u_f952a9681c9ff30d')} /></div>
+          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={uiText('generatedUi.u_48abf90399b2265b')} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ background: '#070b14', padding: 16, borderRadius: 9, textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800 }}>{domains.length}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={uiCopy('u_ba4f038acc09b571')} /></div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={uiText('generatedUi.u_3d00b55f774ad2d7')} /></div>
             </div>
             <div style={{ background: '#070b14', padding: 16, borderRadius: 9, textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#34d399' }}>{activeDomains}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={uiCopy('u_ddf3ee07272914e1')} /></div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={uiText('generatedUi.u_ca5afc3eee09008b')} /></div>
             </div>
           </div>
         </div>
       </div>
 
-      <label style={{ display: 'block', marginBottom: 6 }}><LocalizedText fallback={uiCopy('u_4b88483b191ab83e')} /></label>
+      <label style={{ display: 'block', marginBottom: 6 }}><LocalizedText fallback={uiText('generatedUi.u_e53431804aeefa87')} /></label>
       <select value={domain} onChange={event => setDomain(event.target.value)} style={{ ...inputStyle, marginBottom: 18 }}>
-        <option value=""><LocalizedText fallback={uiCopy('u_2b4de4db3bfd411f')} /></option>
+        <option value=""><LocalizedText fallback={uiText('generatedUi.u_0d07cde42a48510f')} /></option>
         {domainOptions.map(name => <option key={name} value={name}>{name}</option>)}
       </select>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, marginBottom: 18 }}>
-        <input value={alias} onChange={event => setAlias(event.target.value)} placeholder={uiCopy('u_8a2e3e7bde8f0798')} style={inputStyle} />
-        <input value={forward} onChange={event => setForward(event.target.value)} placeholder={uiCopy('u_e2a996872e379ca9')} type="email" style={inputStyle} />
+        <input value={alias} onChange={event => setAlias(event.target.value)} placeholder={uiText('generatedUi.u_e79b7ffadc886d8f')} style={inputStyle} />
+        <input value={forward} onChange={event => setForward(event.target.value)} placeholder={uiText('generatedUi.u_def701389eb26689')} type="email" style={inputStyle} />
         <button disabled={saving || !domain} onClick={() => void createAlias()} style={{ padding: '9px 14px', borderRadius: 9, cursor: 'pointer' }}>
-          {saving ? uiCopy('u_67310c543a7dec8f') : uiCopy('u_2bb28e9b2487f9a1')}
+          {saving ? uiText('generatedUi.u_c79ed9492e3c1719') : uiText('generatedUi.u_93f3598b8ab1a000')}
         </button>
       </div>
 
       <div style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, overflow: 'hidden' }}>
         {loadingAliases ? (
-          <div style={{ padding: 16, color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_272e2743163c767f')}</div>
+          <div style={{ padding: 16, color: 'rgba(255,255,255,.55)' }}>{uiText('generatedUi.u_2ce3a568505251cb')}</div>
         ) : aliases.length === 0 ? (
           <div style={{ padding: 16, color: 'rgba(255,255,255,.55)' }}>
-            {domain ? uiCopy('u_0b5b6eccc6144d35') : uiCopy('u_0d7b7a17992487fb')}
+            {domain ? uiText('generatedUi.u_62569df7ad826427') : uiText('generatedUi.u_9f2c3f57c2935398')}
           </div>
         ) : aliases.map(row => (
           <div key={row.alias} style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr auto', gap: 12, padding: 12, borderBottom: '1px solid rgba(255,255,255,.08)', alignItems: 'center' }}>
             <strong>{row.alias}@{domain}</strong>
             <span>{row.forward}</span>
-            <button onClick={() => void deleteAlias(row.alias)} style={{ padding: '7px 10px', borderRadius: 8, cursor: 'pointer' }}>{uiCopy('u_d56fde6470453832')}</button>
+            <button onClick={() => void deleteAlias(row.alias)} style={{ padding: '7px 10px', borderRadius: 8, cursor: 'pointer' }}>{uiText('generatedUi.u_e2d0a54968ead24e')}</button>
           </div>
         ))}
       </div>

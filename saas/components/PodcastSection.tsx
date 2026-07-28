@@ -2,44 +2,41 @@
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 export default function PodcastSection() {
   const { dict } = useI18n()
 
   const FEATURES = [
     {
       icon: '🎙️',
-      title: t(dict, 'podcastSection.f1.title', uiCopy('u_88c25c28fd056ad6')),
-      desc: t(dict, 'podcastSection.f1.desc', uiCopy('u_2aa3b367b91f5ebc')),
+      title: t(dict, 'podcastSection.f1.title'),
+      desc: t(dict, 'podcastSection.f1.desc'),
     },
     {
       icon: '✂️',
-      title: t(dict, 'podcastSection.f2.title', uiCopy('u_a6851607474e9528')),
-      desc: t(dict, 'podcastSection.f2.desc', uiCopy('u_834961795e696221')),
+      title: t(dict, 'podcastSection.f2.title'),
+      desc: t(dict, 'podcastSection.f2.desc'),
     },
     {
       icon: '💬',
-      title: t(dict, 'podcastSection.f3.title', uiCopy('u_ca2e38895ba558a6')),
-      desc: t(dict, 'podcastSection.f3.desc', uiCopy('u_6676f72a5c360580')),
+      title: t(dict, 'podcastSection.f3.title'),
+      desc: t(dict, 'podcastSection.f3.desc'),
     },
     {
       icon: '🌐',
-      title: t(dict, 'podcastSection.f4.title', uiCopy('u_21a00a040b131bb5')),
-      desc: t(dict, 'podcastSection.f4.desc', uiCopy('u_87011cc8e5213c5b')),
+      title: t(dict, 'podcastSection.f4.title'),
+      desc: t(dict, 'podcastSection.f4.desc'),
     },
     {
       icon: '⭐',
-      title: t(dict, 'podcastSection.f5.title', uiCopy('u_cb54809571f7d5fc')),
-      desc: t(dict, 'podcastSection.f5.desc', uiCopy('u_edee7b8505ef5d81')),
+      title: t(dict, 'podcastSection.f5.title'),
+      desc: t(dict, 'podcastSection.f5.desc'),
     },
   ]
 
   const PODCASTERS = [
-    { name: 'Joe Rogan', flag: '🇺🇸', reach: t(dict, 'podcastSection.podcaster1.reach', uiCopy('u_d4ac3e03b54a5e40')) },
-    { name: 'Flow Podcast', flag: '🇧🇷', reach: t(dict, 'podcastSection.podcaster2.reach', uiCopy('u_0ed1c090bec585f1')) },
-    { name: 'Máxima FM', flag: '🇪🇸', reach: t(dict, 'podcastSection.podcaster3.reach', uiCopy('u_0fbce73610c7d7aa')) },
+    { name: 'Joe Rogan', flag: '🇺🇸', reach: t(dict, 'podcastSection.podcaster1.reach') },
+    { name: 'Flow Podcast', flag: '🇧🇷', reach: t(dict, 'podcastSection.podcaster2.reach') },
+    { name: 'Máxima FM', flag: '🇪🇸', reach: t(dict, 'podcastSection.podcaster3.reach') },
   ]
 
   return (
@@ -49,7 +46,7 @@ export default function PodcastSection() {
       margin: '0 auto',
       fontFamily: 'system-ui',
     }}>
-      <style>{uiCopy('u_a0ef277c1f6e7f7e')}</style>
+      <style>{"\n        @media (max-width: 768px) {\n          .podcast-grid {\n            grid-template-columns: 1fr !important;\n            gap: 40px !important;\n          }\n          .podcast-buttons {\n            flex-direction: column !important;\n          }\n          .podcast-buttons a {\n            text-align: center !important;\n          }\n        }\n      "}</style>
 
       <div className="podcast-grid" style={{
         display: 'grid',
@@ -66,25 +63,25 @@ export default function PodcastSection() {
             fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
             textTransform: 'uppercase', color: '#ffc300',
           }}>
-            🎙️ {t(dict, 'podcastSection.badge', uiCopy('u_fb3a1ade1690bf29'))}
+            🎙️ {t(dict, 'podcastSection.badge')}
           </div>
 
           <h2 style={{
             fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 900,
             lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 16px', color: '#fff',
           }}>
-            {t(dict, 'podcastSection.headlineLine1', uiCopy('u_d08bf11e443629d3'))}
+            {t(dict, 'podcastSection.headlineLine1')}
             <br />
-            {t(dict, 'podcastSection.headlineLine2Pre', uiCopy('u_a4911bf0956e29f3'))}{' '}
-            <span style={{ color: '#ffc300' }}>{t(dict, 'podcastSection.headlineLine2Highlight', uiCopy('u_94f8c2a178089ed0'))}</span>
+            {t(dict, 'podcastSection.headlineLine2Pre')}{' '}
+            <span style={{ color: '#ffc300' }}>{t(dict, 'podcastSection.headlineLine2Highlight')}</span>
           </h2>
 
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, lineHeight: 1.7, margin: '0 0 12px' }}>
-            {t(dict, 'podcastSection.intro', uiCopy('u_6a5fb80b8d3a2541'))}
+            {t(dict, 'podcastSection.intro')}
           </p>
 
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, lineHeight: 1.6, margin: '0 0 28px', fontStyle: 'italic' }}>
-            {t(dict, 'podcastSection.note', uiCopy('u_9dd43f71c286ae1f'))}
+            {t(dict, 'podcastSection.note')}
           </p>
 
           <div className="podcast-buttons" style={{ display: 'flex', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
@@ -94,7 +91,7 @@ export default function PodcastSection() {
                 fontSize: 14, padding: '12px 28px', borderRadius: 999,
                 textDecoration: 'none', display: 'inline-block',
               }}>
-              {t(dict, 'podcastSection.ctaPlans', uiCopy('u_d75e28fa1f9cffa0'))}
+              {t(dict, 'podcastSection.ctaPlans')}
             </Link>
             <Link href="/podcasters#how-it-works"
               style={{
@@ -103,7 +100,7 @@ export default function PodcastSection() {
                 borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)',
                 textDecoration: 'none', display: 'inline-block',
               }}>
-              {t(dict, 'podcastSection.ctaHow', uiCopy('u_d50dbe7a70670513'))} →
+              {t(dict, 'podcastSection.ctaHow')} →
             </Link>
           </div>
 

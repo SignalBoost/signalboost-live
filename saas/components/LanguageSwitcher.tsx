@@ -1,4 +1,6 @@
 "use client";
+import { uiText } from '@/lib/i18n/uiText'
+
 
 type Props = {
   current: string;
@@ -6,11 +8,11 @@ type Props = {
 };
 
 const LANGUAGES = [
-  { code: "en", label: "EN" },
-  { code: "es", label: "ES" },
-  { code: "pt", label: "PT" },
-  { code: "pl", label: "PL" },
-  { code: "ru", label: "RU" }
+  { code: "en", label: uiText('generatedUi.u_69374b09b1681162') },
+  { code: "es", label: uiText('generatedUi.u_ce344a418127968f') },
+  { code: "pt", label: uiText('generatedUi.u_169b032adf2ab80f') },
+  { code: "pl", label: uiText('generatedUi.u_293650de072648b9') },
+  { code: "ru", label: uiText('generatedUi.u_f37e3358243de943') }
 ];
 
 export default function LanguageSwitcher({

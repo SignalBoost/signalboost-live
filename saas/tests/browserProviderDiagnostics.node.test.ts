@@ -7,6 +7,8 @@ import {
   VercelBrowserAdapter,
   createBrowserProviderDiagnosticsSnapshot,
 } from '../lib/browser-provider/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('BPAL diagnostics snapshot is deterministic, detached, and deeply frozen', () => {
   const first = createBrowserProviderDiagnosticsSnapshot()
@@ -56,7 +58,7 @@ test('BPAL registration fails closed before diagnostics can expose a production 
 })
 
 test('Supervisor provider diagnostics page is admin-gated and contains no execution controls', async () => {
-  const source = await readFile(new URL('../app/dashboard/supervisor/providers/page.tsx', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../app/dashboard/supervisor/providers/page.tsx', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /getCurrentUser/)
   assert.match(source, /access\.isAdmin/)
   assert.match(source, /productionBrowserExecutionDisabled/)
@@ -81,7 +83,7 @@ test('Supervisor provider diagnostics labels are available in all five operator 
   ]
 
   for (const locale of locales) {
-    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8'))
+    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8').then(hydrateLocalizedSource))
     for (const key of keys) {
       const value = key.split('.').reduce((current, part) => current?.[part], dict)
       assert.equal(typeof value, 'string', `${locale}:${key}`)

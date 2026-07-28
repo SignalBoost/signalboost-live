@@ -25,8 +25,7 @@ import DemoRehearsal from '@/components/supervisor/DemoRehearsal'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 import { getSupervisorEntitlement } from '@/self-healing-host/supervisor-entitlement'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -55,37 +54,37 @@ type DemoCopy = {
 
 const COPY: Record<Language, DemoCopy> = {
   en: {
-    kicker: uiCopy('u_0212ac9103a37ba6'),
-    title: uiCopy('u_9f3bf76f6826cb14'),
-    subtitle: uiCopy('u_215adb4d3b21f103'),
-    adminOnly: uiCopy('u_d212ad35c9285ab8'),
-    licenceInstalled: uiCopy('u_9328be02b2ebd214'),
-    licenceMissing: uiCopy('u_3c7ed97079f09b44'),
-    licenceNote: uiCopy('u_b70e4e7314d03ec3'),
-    productionTitle: uiCopy('u_933872665c01b072'),
-    productionNote: uiCopy('u_f9a8036c1cc46631'),
-    emptyTitle: uiCopy('u_07a241cb52bf123d'),
-    emptyBody: uiCopy('u_2006f7f2e4cc1a34'),
-    runLabel: uiCopy('u_15241cb9fed1758f'),
-    stageLabels: [uiCopy('u_52549ef99d23969f'), uiCopy('u_938b8dec2b2ad9b9'), uiCopy('u_e8d3eaa2036ac899'), uiCopy('u_8e052c5e7b89f689'), uiCopy('u_2eb6728f656871b4'), uiCopy('u_a379a545edf75df2')],
+    kicker: uiText('generatedUi.u_1b0744fbc9a1e11e'),
+    title: uiText('generatedUi.u_31d02dcac4164cd3'),
+    subtitle: uiText('generatedUi.u_690951f895636bbd'),
+    adminOnly: uiText('generatedUi.u_f979b0fab059cfcb'),
+    licenceInstalled: uiText('generatedUi.u_7904bbe0a83ed7fe'),
+    licenceMissing: uiText('generatedUi.u_9902b165f11ce888'),
+    licenceNote: uiText('generatedUi.u_7b030b94cd49f490'),
+    productionTitle: uiText('generatedUi.u_9c7748eeb286ad16'),
+    productionNote: uiText('generatedUi.u_17def0152fc479ad'),
+    emptyTitle: uiText('generatedUi.u_de103e60b80d6627'),
+    emptyBody: uiText('generatedUi.u_666c1060da81decc'),
+    runLabel: uiText('generatedUi.u_00d60e31a4e6b834'),
+    stageLabels: [uiText('generatedUi.u_756a8ba97dce249a'), uiText('generatedUi.u_f3160cd7d6b6786e'), uiText('generatedUi.u_ad91f5e4de4b84f1'), uiText('generatedUi.u_3aa8b683ebf3703c'), uiText('generatedUi.u_4f7838402f37674e'), uiText('generatedUi.u_295f5bbed1e0e3a9')],
     stageBodies: [
-      uiCopy('u_3a8bf2a17433095e'),
-      uiCopy('u_2352efc2d0859840'),
-      uiCopy('u_853a130dd69bb71e'),
-      uiCopy('u_e6265dd1fb61b9a9'),
-      uiCopy('u_9d86437651b995b7'),
-      uiCopy('u_9886843e08e7eaf6'),
+      uiText('generatedUi.u_2e3d401b567e5d9d'),
+      uiText('generatedUi.u_1edc6a0edf627cf4'),
+      uiText('generatedUi.u_7fce5da26ef165c5'),
+      uiText('generatedUi.u_e12c0a488295a343'),
+      uiText('generatedUi.u_f370cea58f9ba7d9'),
+      uiText('generatedUi.u_1b789a1739a2a5b5'),
     ],
     fields: {
-      status: uiCopy('u_9048022108927903'), project: uiCopy('u_ea7daf1d6bd96fdb'), environment: uiCopy('u_42c2fadc887aab6e'), deployment: uiCopy('u_d965b440772d1881'),
-      errorCode: uiCopy('u_57e29be7c1eedb26'), severity: uiCopy('u_937afb9bc17c4b41'), plan: uiCopy('u_bd7bfcf067e560f8'), channel: uiCopy('u_588ab86098caba01'),
-      approvedSteps: uiCopy('u_1c6426fa8cbeedc1'), verification: uiCopy('u_55346e95faeb7393'), comparison: uiCopy('u_642bbe4377101d6b'),
+      status: "Status", project: uiText('generatedUi.u_9859597853197476'), environment: uiText('generatedUi.u_9e471951a1b4106e'), deployment: uiText('generatedUi.u_870a8ffd98f4f2bd'),
+      errorCode: uiText('generatedUi.u_0570b384c3cecf81'), severity: uiText('generatedUi.u_5e9f98120dbe5682'), plan: uiText('generatedUi.u_fa8ed0bdabdd6bcb'), channel: "Channel",
+      approvedSteps: uiText('generatedUi.u_b753fe0c7acec513'), verification: uiText('generatedUi.u_7140f4f19dec5259'), comparison: uiText('generatedUi.u_571527339d0e3e34'),
     },
-    none: uiCopy('u_bbfc4c41b86be72d'),
-    auditTitle: uiCopy('u_a2a7297ab6e409f8'),
-    auditNote: uiCopy('u_32c5421e7110e63c'),
-    evidenceTitle: uiCopy('u_f5f2e8928766c2eb'),
-    closing: uiCopy('u_73b9cc601ce66bfc'),
+    none: uiText('generatedUi.u_140bedbf9c3f6d56'),
+    auditTitle: uiText('generatedUi.u_c1ada08ce13857e4'),
+    auditNote: uiText('generatedUi.u_1e8771919b3b346d'),
+    evidenceTitle: uiText('generatedUi.u_03867aea70acaf4c'),
+    closing: uiText('generatedUi.u_305caed6e5caffa8'),
   },
   es: {
     kicker: 'Ejecución real',

@@ -2,15 +2,12 @@
 
 import { useEffect } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const ORIGINAL_TEXT = new WeakMap<Text, string>()
 const BUTTON_TAG = '<' + 'button>'
 const BUTTON_FINDING_DETAIL = `A ${BUTTON_TAG} has no onClick handler and is not a submit button — likely a dead click. (Heuristic: a handler passed via spread/variable can be a false positive — verify.)`
-const BUTTON_FIX_TEXT = uiCopy('u_7d282f116b1f63fc')
+const BUTTON_FIX_TEXT = "Bind an onClick to the action, turn it into a link with a real href, set type=\"submit\" inside a form, or remove the control."
 
 const STRINGS: Record<Lang, Record<string, string>> = {
   en: {},

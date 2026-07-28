@@ -8,22 +8,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageProps, TONES, cardStyle, labelStyle } from '../shared.tsx'
 import ProviderActionLauncher from '../ProviderActionLauncher.tsx'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // Native per-language copy for this console page. `lang` arrives via PageProps.
 const COPY: Record<string, Record<string, string>> = {
-  opsProduction: { en: uiCopy('u_e7fd68f70630b14c'), es: 'Operaciones y producción', pt: 'Operações e produção', pl: 'Operacje i produkcja', ru: 'Операции и продакшн' },
-  title: { en: uiCopy('u_380279aa64b46785'), es: 'Socios operativos del negocio', pt: 'Parceiros operacionais do negócio', pl: 'Partnerzy operacyjni firmy', ru: 'Операционные бизнес-партнёры' },
+  opsProduction: { en: uiText('generatedUi.u_e6c8ed547fda01b0'), es: 'Operaciones y producción', pt: 'Operações e produção', pl: 'Operacje i produkcja', ru: 'Операции и продакшн' },
+  title: { en: uiText('generatedUi.u_8e48e0d31472fc43'), es: 'Socios operativos del negocio', pt: 'Parceiros operacionais do negócio', pl: 'Partnerzy operacyjni firmy', ru: 'Операционные бизнес-партнёры' },
   subtitle: {
-    en: uiCopy('u_f29c0953373048b5'),
+    en: uiText('generatedUi.u_3c0bfb87f1eeb483'),
     es: 'Cuatro socios por página. Estado claro. Acciones claras. El objetivo es trabajar desde la consola siempre que sea posible.',
     pt: 'Quatro parceiros por página. Status claro. Ações claras. O objetivo é trabalhar pelo console sempre que possível.',
     pl: 'Czterech partnerów na stronę. Jasny status. Jasne akcje. Celem jest praca z poziomu konsoli, gdy to możliwe.',
     ru: 'Четыре партнёра на странице. Понятный статус. Понятные действия. Цель — работать из консоли, когда это возможно.',
   },
-  keySignals: { en: uiCopy('u_32130a76f187def1'), es: 'Señales clave', pt: 'Sinais principais', pl: 'Kluczowe sygnały', ru: 'Ключевые сигналы' },
-  healthy: { en: uiCopy('u_b804a6934807d782'), es: 'Saludable', pt: 'Saudável', pl: 'Sprawny', ru: 'В норме' },
+  keySignals: { en: uiText('generatedUi.u_9475389a9491e180'), es: 'Señales clave', pt: 'Sinais principais', pl: 'Kluczowe sygnały', ru: 'Ключевые сигналы' },
+  healthy: { en: uiText('generatedUi.u_7f1e323b6272c620'), es: 'Saludable', pt: 'Saudável', pl: 'Sprawny', ru: 'В норме' },
 }
 function tx(key: string, lang: string): string {
   return COPY[key]?.[lang] ?? COPY[key]?.en ?? key
@@ -92,8 +91,8 @@ const partner = (name: string, category: string, subtitle: string, status: Partn
 const PAGES: PartnerPage[] = [
   {
     id: 'mission-critical',
-    title: uiCopy('u_2374647eae1998c0'),
-    subtitle: uiCopy('u_6e5c642bfbd20ed4'),
+    title: uiText('generatedUi.u_b6c81d633d877df9'),
+    subtitle: uiText('generatedUi.u_4838e30f6f2cbec8'),
     partners: [
       partner('Supabase', 'Database', 'Backend, auth, users, storage', 'Healthy', ['Database healthy', 'Auth healthy', 'Storage healthy', 'API healthy'], [action('Open Supabase Dashboard', 'primary', 'https://supabase.com/dashboard'), action('Open Settings'), action('Run SQL'), action('Manage API Keys')], 'us-east-1'),
       partner('Vercel', 'Hosting', 'Frontend, deployments, domains', 'Healthy', ['Deployments healthy', 'Domains healthy', 'SSL healthy', 'Env vars covered'], [action('Open Vercel Dashboard', 'primary', 'https://vercel.com/dashboard'), action('Open Settings'), action('View Deployments'), action('Sync Project')]),
@@ -103,8 +102,8 @@ const PAGES: PartnerPage[] = [
   },
   {
     id: 'growth-ai',
-    title: uiCopy('u_8eceec827823838d'),
-    subtitle: uiCopy('u_d95b20979303750e'),
+    title: uiText('generatedUi.u_b5e7920119ad4a7d'),
+    subtitle: uiText('generatedUi.u_8e0b9baede98f14a'),
     partners: [
       partner('OpenAI', 'AI', 'Models, usage, tokens, keys', 'Needs Review', ['Usage elevated', 'Keys active', 'Rate limits ok', 'Models available'], [action('Open OpenAI Dashboard', 'primary', 'https://platform.openai.com/'), action('View Usage'), action('Manage API Keys'), action('Check Limits')]),
       partner('Anthropic', 'AI', 'Claude API, usage, keys', 'Healthy', ['Usage normal', 'Keys active', 'Limits ok', 'Models available'], [action('Open Anthropic Console', 'primary', 'https://console.anthropic.com/'), action('View Usage'), action('Manage API Keys'), action('Check Limits')]),
@@ -114,8 +113,8 @@ const PAGES: PartnerPage[] = [
   },
   {
     id: 'cloud',
-    title: uiCopy('u_7d63908ba995e140'),
-    subtitle: uiCopy('u_3ed7fc4decb41eaa'),
+    title: uiText('generatedUi.u_3373d0169a186f55'),
+    subtitle: uiText('generatedUi.u_c41f7ede572b8e51'),
     partners: [
       partner('AWS', 'Cloud', 'IAM, S3, compute, alerts', 'Action Needed', ['IAM warning', 'S3 review', 'Compute healthy', 'Keys need review'], [action('Open AWS Console', 'primary', 'https://console.aws.amazon.com/'), action('Review IAM'), action('Check S3'), action('Rotate Keys')], 'us-east-1'),
       partner('Google Cloud', 'Cloud', 'Projects, IAM, service accounts', 'Needs Review', ['Projects healthy', 'Old keys found', 'Roles need review', 'APIs healthy'], [action('Open GCP Console', 'primary', 'https://console.cloud.google.com/'), action('Review IAM'), action('Service Accounts'), action('Check APIs')]),
@@ -125,8 +124,8 @@ const PAGES: PartnerPage[] = [
   },
   {
     id: 'edge-app',
-    title: uiCopy('u_1dc29f8bae150d58'),
-    subtitle: uiCopy('u_afca4505aa3d48f3'),
+    title: uiText('generatedUi.u_eb9c5e4c508bd5f6'),
+    subtitle: uiText('generatedUi.u_8761808047afad23'),
     partners: [
       partner('Cloudflare', 'Edge/DNS', 'DNS, SSL, workers, proxy', 'Needs Review', ['DNS warning', 'SSL healthy', 'Proxy review', 'Workers healthy'], [action('Open Cloudflare', 'primary', 'https://dash.cloudflare.com/'), action('Open DNS'), action('Check SSL'), action('Review Proxy')]),
       partner('Firebase', 'App Backend', 'Auth, rules, storage', 'Healthy', ['Auth healthy', 'Rules healthy', 'Storage healthy', 'Usage normal'], [action('Open Firebase', 'primary', 'https://console.firebase.google.com/'), action('Review Rules'), action('Check Auth'), action('View Usage')]),
@@ -136,8 +135,8 @@ const PAGES: PartnerPage[] = [
   },
   {
     id: 'communication',
-    title: uiCopy('u_7162d754a482d99a'),
-    subtitle: uiCopy('u_6168b91807e2370f'),
+    title: uiText('generatedUi.u_c713529143e476e3'),
+    subtitle: uiText('generatedUi.u_900d18711fbde6d6'),
     partners: [
       partner('Twilio', 'Messaging', 'SMS, verify, phone', 'Healthy', ['SMS healthy', 'Verify healthy', 'Cost normal', 'Delivery healthy'], [action('Open Twilio', 'primary', 'https://console.twilio.com/'), action('View SMS'), action('Check Verify'), action('View Usage')]),
       partner('SendGrid', 'Email', 'Transactional email', 'Healthy', ['Delivery healthy', 'Bounces normal', 'Domain healthy', 'API active'], [action('Open SendGrid', 'primary', 'https://app.sendgrid.com/'), action('Check Delivery'), action('Review Bounces'), action('Domain Auth')]),
@@ -147,8 +146,8 @@ const PAGES: PartnerPage[] = [
   },
   {
     id: 'identity-data',
-    title: uiCopy('u_0fcd238fd0cd3fed'),
-    subtitle: uiCopy('u_2856db69f70f85bd'),
+    title: uiText('generatedUi.u_f08cee541a9ea847'),
+    subtitle: uiText('generatedUi.u_edd0a67452d3644f'),
     partners: [
       partner('Auth0', 'Identity', 'Clients, MFA, tenant, actions', 'Needs Review', ['Client secret aging', 'MFA healthy', 'Tenant healthy', 'Actions healthy'], [action('Open Auth0', 'primary', 'https://manage.auth0.com/'), action('Review Clients'), action('Check MFA'), action('Rotate Secret')]),
       partner('MongoDB Atlas', 'Database', 'Clusters, backups, network', 'Healthy', ['Cluster healthy', 'Backups healthy', 'Network healthy', 'Connections normal'], [action('Open MongoDB Atlas', 'primary', 'https://cloud.mongodb.com/'), action('Check Clusters'), action('Review Backups'), action('Network Access')]),
@@ -158,8 +157,8 @@ const PAGES: PartnerPage[] = [
   },
   {
     id: 'ops-visibility',
-    title: uiCopy('u_308a5e0abd531253'),
-    subtitle: uiCopy('u_4ef2809c72d0c93f'),
+    title: uiText('generatedUi.u_67b7a96e7a115d84'),
+    subtitle: uiText('generatedUi.u_960434503ec817ce'),
     partners: [
       partner('Sentry', 'Errors', 'Errors, releases, alerts', 'Healthy', ['Errors normal', 'Releases healthy', 'Alerts healthy', 'Projects active'], [action('Open Sentry', 'primary', 'https://sentry.io/'), action('View Errors'), action('Check Releases'), action('Review Alerts')]),
       partner('Datadog', 'Observability', 'Metrics, logs, monitors', 'Healthy', ['Monitors healthy', 'Logs normal', 'Metrics healthy', 'Usage normal'], [action('Open Datadog', 'primary', 'https://app.datadoghq.com/'), action('View Monitors'), action('Check Logs'), action('View Usage')]),
@@ -220,16 +219,16 @@ export default function ProviderExpansionPage({ lang }: PageProps) {
 
   return (
     <div className="partner-console" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
-      <style>{uiCopy('u_ed3e8d615c6789a1')}</style>
+      <style>{".partner-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.partner-card{min-height:510px}.partner-action{width:100%;display:flex;align-items:center;justify-content:center;gap:8px}.partner-signal{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:12.5px}.partner-page-tab{white-space:nowrap}@media(max-width:1180px){.partner-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.partner-card{min-height:460px}}@media(max-width:760px){.partner-grid{grid-template-columns:1fr}.partner-card{min-height:auto}}"}</style>
 
       <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>{tx(uiCopy('u_074c8a1af710243a'), lang)}</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{tx(uiCopy('u_94ccfea5b54e38d3'), lang)}</h2>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>{tx(uiCopy('u_f3bbcf50a1e78444'), lang)}</p>
+          <div style={labelStyle}>{tx("opsProduction", lang)}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{tx("title", lang)}</h2>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>{tx("subtitle", lang)}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ padding: '8px 12px', borderRadius: 999, border: '1px solid rgba(26,240,255,.35)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 12.5, fontWeight: 900 }}>{enabledCount}{uiCopy('u_5b0d31b9f12d5b7b')}</span>
+          <span style={{ padding: '8px 12px', borderRadius: 999, border: '1px solid rgba(26,240,255,.35)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 12.5, fontWeight: 900 }}>{enabledCount}{uiText('generatedUi.u_fb9cf75606b4070d')}</span>
           <span style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{pageIndex + 1} / {PAGES.length}</span>
         </div>
       </section>
@@ -241,8 +240,8 @@ export default function ProviderExpansionPage({ lang }: PageProps) {
             <div style={{ color: 'rgba(255,255,255,.58)', fontSize: 13.5, marginTop: 5 }}>{page.subtitle}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setPageIndex(Math.max(0, pageIndex - 1))} disabled={pageIndex === 0} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.045)', color: pageIndex === 0 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.72)', fontSize: 12, fontWeight: 900 }}>{uiCopy('u_b4a21c7785d6ca05')}</button>
-            <button onClick={() => setPageIndex(Math.min(PAGES.length - 1, pageIndex + 1))} disabled={pageIndex === PAGES.length - 1} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: `1px solid ${TONES.blue.border}`, background: TONES.blue.soft, color: pageIndex === PAGES.length - 1 ? 'rgba(255,255,255,.32)' : '#1af0ff', fontSize: 12, fontWeight: 900 }}>{uiCopy('u_9a704436385b7240')}</button>
+            <button onClick={() => setPageIndex(Math.max(0, pageIndex - 1))} disabled={pageIndex === 0} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.045)', color: pageIndex === 0 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.72)', fontSize: 12, fontWeight: 900 }}>{uiText('generatedUi.u_a57b08a480b822a0')}</button>
+            <button onClick={() => setPageIndex(Math.min(PAGES.length - 1, pageIndex + 1))} disabled={pageIndex === PAGES.length - 1} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: `1px solid ${TONES.blue.border}`, background: TONES.blue.soft, color: pageIndex === PAGES.length - 1 ? 'rgba(255,255,255,.32)' : '#1af0ff', fontSize: 12, fontWeight: 900 }}>{uiText('generatedUi.u_1ff57a29d7c9d11b')}</button>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '11px 13px', borderTop: '1px solid rgba(255,255,255,.08)' }}>
@@ -263,36 +262,36 @@ export default function ProviderExpansionPage({ lang }: PageProps) {
                     <h3 style={{ margin: '5px 0 3px', fontSize: 23, letterSpacing: '-.025em' }}>{item.name}</h3>
                     <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 13 }}>{item.subtitle}</div>
                   </div>
-                  <button onClick={() => togglePartner(item.name)} className="hub-chip" style={{ padding: '6px 9px', borderRadius: 999, border: '1px solid rgba(255,255,255,.13)', background: enabled ? 'rgba(34,197,94,.1)' : 'rgba(255,255,255,.045)', color: enabled ? '#86efac' : 'rgba(255,255,255,.55)', fontSize: 11.5, fontWeight: 900 }}>{enabled ? uiCopy('u_e2ce41d21ea0f1d4') : uiCopy('u_d553da631dbbe2b4')}</button>
+                  <button onClick={() => togglePartner(item.name)} className="hub-chip" style={{ padding: '6px 9px', borderRadius: 999, border: '1px solid rgba(255,255,255,.13)', background: enabled ? 'rgba(34,197,94,.1)' : 'rgba(255,255,255,.045)', color: enabled ? '#86efac' : 'rgba(255,255,255,.55)', fontSize: 11.5, fontWeight: 900 }}>{enabled ? uiText('generatedUi.u_130011756125313c') : uiText('generatedUi.u_ca7981b46ecf2c17')}</button>
                 </div>
 
                 <div style={{ padding: '11px 12px', borderRadius: 16, border: `1px solid ${tone.border}`, background: tone.bg }}>
-                  <div style={{ ...labelStyle, color: 'rgba(255,255,255,.58)' }}>{uiCopy('u_d24fcd8e4cacd9c9')}</div>
+                  <div style={{ ...labelStyle, color: 'rgba(255,255,255,.58)' }}>{uiText('generatedUi.u_920e413c7d411b61')}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, color: tone.color, fontSize: 15, fontWeight: 950 }}><span>{tone.dot}</span>{item.status}</div>
-                  <div style={{ color: 'rgba(255,255,255,.48)', fontSize: 12, marginTop: 5 }}>{uiCopy('u_f5f5f7d35df56b77')}{item.lastChecked}</div>
+                  <div style={{ color: 'rgba(255,255,255,.48)', fontSize: 12, marginTop: 5 }}>{uiText('generatedUi.u_b133524ea2458b16')}{item.lastChecked}</div>
                 </div>
 
                 <div>
-                  <div style={{ ...labelStyle, marginBottom: 5 }}>{tx(uiCopy('u_c955557a74e134ab'), lang)}</div>
-                  {item.signals.map(signal => <div key={signal} className="partner-signal"><span>{signal}</span><span style={{ color: '#86efac', fontWeight: 900 }}>{tx(uiCopy('u_7872072f62bc43a5'), lang)}</span></div>)}
+                  <div style={{ ...labelStyle, marginBottom: 5 }}>{tx("keySignals", lang)}</div>
+                  {item.signals.map(signal => <div key={signal} className="partner-signal"><span>{signal}</span><span style={{ color: '#86efac', fontWeight: 900 }}>{tx("healthy", lang)}</span></div>)}
                 </div>
 
                 <div style={{ marginTop: 'auto' }}>
-                  <div style={{ ...labelStyle, marginBottom: 8 }}>{uiCopy('u_88f8897e4da1faf6')}</div>
+                  <div style={{ ...labelStyle, marginBottom: 8 }}>{uiText('generatedUi.u_ff8059dc6752afdd')}</div>
                   <div style={{ display: 'grid', gap: 8 }}>
                     {PARTNER_TO_PROVIDER_ID[item.name] && (
                       <ProviderActionLauncher
                         providerId={PARTNER_TO_PROVIDER_ID[item.name]}
                         lang={lang}
                         variant="primary"
-                        label={uiCopy('u_d7148b2a74acc8d5')}
+                        label={uiText('generatedUi.u_4a021e9c3c1d8901')}
                       />
                     )}
                     {item.actions.map((button, index) => <button key={button.label} onClick={() => openAction(button)} className="hub-chip partner-action" style={{ padding: '9px 10px', borderRadius: 11, border: button.kind === 'primary' ? '1px solid rgba(26,240,255,.42)' : '1px solid rgba(255,255,255,.13)', background: button.kind === 'primary' ? 'rgba(26,240,255,.12)' : 'rgba(255,255,255,.045)', color: button.kind === 'primary' ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 12.5, fontWeight: 900 }}>{index === 0 ? '↗' : '⚙'} {button.label}</button>)}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'rgba(255,255,255,.46)', fontSize: 11.5, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 10 }}><span>{uiCopy('u_f0dfe30b434d86f3')}{item.region}</span><span>{uiCopy('u_5591ad8b6b04fb5e')}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'rgba(255,255,255,.46)', fontSize: 11.5, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 10 }}><span>{uiText('generatedUi.u_96185c58991e4438')}{item.region}</span><span>{uiText('generatedUi.u_805b37f62f6116b1')}</span></div>
               </article>
             )
           })}

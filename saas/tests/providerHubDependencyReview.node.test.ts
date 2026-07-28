@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { reviewProviderHubDependencies } from '../portable-mobile/provider-hub-dependency-review.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const valid = {
   portableId: 'provider-hub',
@@ -51,7 +53,7 @@ test('fails closed for dynamic, unapproved, mismatched, and unsafe dependency ev
 })
 
 test('dependency review source has no resolution, execution, signing, upload, or network capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/provider-hub-dependency-review.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/provider-hub-dependency-review.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ["from 'node:fs'", "from 'node:child_process'", 'fetch(', 'exec(', 'spawn(', 'gradlew', 'signingConfigs', 'androidpublisher']) {
     assert.equal(source.includes(forbidden), false, `dependency review must not contain ${forbidden}`)
   }

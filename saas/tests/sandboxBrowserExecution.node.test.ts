@@ -19,6 +19,8 @@ import {
   InMemoryBrowserSessionRegistry,
 } from '../lib/browser-runtime/execution-state.ts'
 import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const origin = 'http://localhost:4173'
 const secret = 'sandbox-execution-test-secret'
@@ -162,7 +164,7 @@ test('sandbox continuation rejects a reused nonce before the protected action', 
 
 test('sandbox adapter layer has no production browser/provider SDK imports and audit payloads are serializable without secrets', () => {
   for (const file of ['approval-replay-guard.ts','sandbox-execution-adapter.ts','sandbox-package-promoter.ts','sandbox-origin-policy.ts','sandbox-execution-schema.ts']) {
-    const src = readFileSync(new URL(`../lib/supervisor/executors/browser/${file}`, import.meta.url), 'utf8')
+    const src = hydrateLocalizedSource(readFileSync(new URL(`../lib/supervisor/executors/browser/${file}`, import.meta.url), 'utf8'))
     assert.doesNotMatch(src, /playwright|chromium|browser-use|stagehand|@vercel|stripe|supabase.*from|createClient/i)
   }
   assert.doesNotThrow(() => JSON.stringify(request('not-a-secret-token-name')))

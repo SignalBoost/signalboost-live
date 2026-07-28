@@ -14,6 +14,8 @@ import {
   type ProviderHubUiProjection,
   type ProviderHubVaultReference,
 } from '../provider-hub-core/host-ports.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('Provider Hub host ports preserve scoped opaque contracts', async () => {
   const actor: ProviderHubActorIdentity = Object.freeze({
@@ -62,7 +64,7 @@ test('Provider Hub host ports preserve scoped opaque contracts', async () => {
 })
 
 test('Provider Hub host port source exposes no plaintext secret retrieval or host dependency imports', async () => {
-  const source = await readFile(new URL('../provider-hub-core/host-ports.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../provider-hub-core/host-ports.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ['next/', '@supabase', 'vault/crypto', 'execute-runner', 'getSecret(', 'decrypt', 'plaintext']) {
     assert.equal(source.includes(forbidden), false, `host port contract must not include ${forbidden}`)
   }

@@ -8,9 +8,6 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import EmailHealthReport, { type EmailHealthReportView } from '@/components/audit/EmailHealthReport'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: EmailHealthReportView; error?: string }
 
@@ -32,7 +29,7 @@ export default function EmailHealthReportPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.email.loadError', uiCopy('u_72b101f49212a1e8')))
+          setError((json && json.error) || t('audit.email.loadError', "Could not load the email health report."))
           return
         }
         setData(json.report)
@@ -40,7 +37,7 @@ export default function EmailHealthReportPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.email.fetchError', uiCopy('u_823f600b4d984298')), { msg }))
+        setError(interpolate(t('audit.email.fetchError', "Error: {msg}"), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -50,7 +47,7 @@ export default function EmailHealthReportPage() {
 
   return (
     <div style={wrap}>
-      {loading && <p style={{ color: 'rgba(255,255,255,.65)', padding: 24 }}>{t('audit.email.loading', uiCopy('u_8423597d3064ff8b'))}</p>}
+      {loading && <p style={{ color: 'rgba(255,255,255,.65)', padding: 24 }}>{t('audit.email.loading', "Running live DNS checks…")}</p>}
       {!loading && error && <p style={{ color: '#fca5a5', padding: 24 }}>{error}</p>}
       {!loading && !error && data && <EmailHealthReport data={data} />}
     </div>

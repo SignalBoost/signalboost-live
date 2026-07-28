@@ -2,19 +2,18 @@
 
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<Lang, Record<string, string>> = {
   en: {
-    eyebrow: uiCopy('u_5c163a620e24715e'), title: uiCopy('u_48b76241d9ad5740'),
-    subtitle: uiCopy('u_24345bde15c77352'),
-    promptLabel: uiCopy('u_1bc7e6cc689a0ea6'),
-    promptPlaceholder: uiCopy('u_43906ae57b18c8f0'),
-    aspect: uiCopy('u_e5acd2507e52c9ec'), landscape: uiCopy('u_02412ff39eae5a3b'), square: uiCopy('u_34cf437e57985b7a'), portrait: uiCopy('u_ec366f18fdb7f4c7'),
-    generate: uiCopy('u_b790afed9d298de3'), generating: uiCopy('u_c865a1549eaa6f39'), download: uiCopy('u_4ac02cd04f33cc2b'), again: uiCopy('u_8b0f8bd64103fcbb'),
-    empty: uiCopy('u_0d74e0f96b6ba8cf'), errorGeneric: uiCopy('u_256378ae428c2473'),
+    eyebrow: uiText('generatedUi.u_c0a1ec0a03c6b0bf'), title: uiText('generatedUi.u_c0a1ec0a03c6b0bf'),
+    subtitle: uiText('generatedUi.u_8b17451fcb5cafdf'),
+    promptLabel: uiText('generatedUi.u_f0c4005c1962c887'),
+    promptPlaceholder: uiText('generatedUi.u_1a86b63cbc2be21f'),
+    aspect: uiText('generatedUi.u_e0e492707f85ff1f'), landscape: uiText('generatedUi.u_f286650191280073'), square: uiText('generatedUi.u_94136fd2d7290831'), portrait: uiText('generatedUi.u_66a1d9226c924d21'),
+    generate: uiText('generatedUi.u_1c9c87eec07e453b'), generating: uiText('generatedUi.u_d20a4476a0a85978'), download: uiText('generatedUi.u_3ac575dcce244f93'), again: uiText('generatedUi.u_556f4bba96daab7a'),
+    empty: uiText('generatedUi.u_af9d601dd49918f3'), errorGeneric: uiText('generatedUi.u_3ccd9d6586ef9143'),
   },
   es: {
     eyebrow: 'Estudio Creativo', title: 'Estudio Creativo',

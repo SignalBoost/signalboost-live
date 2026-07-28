@@ -6,16 +6,15 @@ import { Webhook, WebhookEvent } from '@/lib/hub/webhooks-service'
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const AVAILABLE_EVENTS = [
-  { id: 'rotation_success', label: uiCopy('u_ab6ef6247ee673cc') },
-  { id: 'rotation_failed', label: uiCopy('u_cda47095521f3860') },
-  { id: 'key_expiry', label: uiCopy('u_426c7d9c94edb102') },
-  { id: 'unauthorized_access', label: uiCopy('u_b3da4829a0d55aa3') },
-  { id: 'key_accessed', label: uiCopy('u_49fc1d2552964e79') },
-  { id: 'key_exported', label: uiCopy('u_d0c5aab5253590fb') },
+  { id: 'rotation_success', label: uiText('generatedUi.u_f05424185df1e047') },
+  { id: 'rotation_failed', label: uiText('generatedUi.u_a85e4b1f87c74ab0') },
+  { id: 'key_expiry', label: uiText('generatedUi.u_c287e8e44cd3cf35') },
+  { id: 'unauthorized_access', label: uiText('generatedUi.u_ae15c63406bbf91b') },
+  { id: 'key_accessed', label: uiText('generatedUi.u_1aec0978d0e33974') },
+  { id: 'key_exported', label: uiText('generatedUi.u_241c173b6601786c') },
 ]
 
 export function WebhooksPage() {
@@ -44,10 +43,10 @@ export function WebhooksPage() {
       if (data.ok) {
         setWebhooks(data.webhooks || [])
       } else {
-        setError(data.error || t(dict, 'console.webhooks.err.load', uiCopy('u_51153a67be626225')))
+        setError(data.error || t(dict, 'console.webhooks.err.load'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.loading', uiCopy('u_8af04c9a79de4422')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.loading'))
     } finally {
       setLoading(false)
     }
@@ -55,7 +54,7 @@ export function WebhooksPage() {
 
   async function addWebhook() {
     if (!formUrl.trim() || formEvents.length === 0) {
-      setError(t(dict, 'console.webhooks.err.required', uiCopy('u_7cbcead115f7fff6')))
+      setError(t(dict, 'console.webhooks.err.required'))
       return
     }
 
@@ -84,15 +83,15 @@ export function WebhooksPage() {
         fetchWebhooks()
         setError(null)
       } else {
-        setError(data.error || t(dict, 'console.webhooks.err.create', uiCopy('u_de4f20355c36a2c0')))
+        setError(data.error || t(dict, 'console.webhooks.err.create'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.creating', uiCopy('u_5c4f3962680ea34a')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.creating'))
     }
   }
 
   async function deleteWebhook(id: string) {
-    if (!confirm(t(dict, 'console.webhooks.confirmDelete', uiCopy('u_e60d7d2cad7f10a4')))) return
+    if (!confirm(t(dict, 'console.webhooks.confirmDelete'))) return
 
     try {
       const res = await fetch(`/api/hub/webhooks?id=${id}`, {
@@ -104,10 +103,10 @@ export function WebhooksPage() {
       if (data.ok) {
         fetchWebhooks()
       } else {
-        setError(data.error || t(dict, 'console.webhooks.err.delete', uiCopy('u_3b96f2be45382d26')))
+        setError(data.error || t(dict, 'console.webhooks.err.delete'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.deleting', uiCopy('u_fa546c34f9ec232d')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.deleting'))
     }
   }
 
@@ -121,12 +120,12 @@ export function WebhooksPage() {
 
       if (data.ok) {
         setError(null)
-        alert(`✓ ${t(dict, 'console.webhooks.testSuccess', uiCopy('u_f80f04011f7e9d26'))} (${data.statusCode}) - ${data.responseTime}ms`)
+        alert(`✓ ${t(dict, 'console.webhooks.testSuccess')} (${data.statusCode}) - ${data.responseTime}ms`)
       } else {
-        setError(`${t(dict, 'console.webhooks.testFailed', uiCopy('u_7d803043cffb8db8'))}: ${data.error}`)
+        setError(`${t(dict, 'console.webhooks.testFailed')}: ${data.error}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.testing', uiCopy('u_8f5a8a46de92cb0a')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.testing'))
     }
   }
 
@@ -134,10 +133,10 @@ export function WebhooksPage() {
     <div style={{ padding: '2rem', maxWidth: '1200px' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          {t(dict, 'console.webhooks.title', uiCopy('u_4941baafe5037313'))}
+          {t(dict, 'console.webhooks.title')}
         </h2>
         <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          {t(dict, 'console.webhooks.subtitle', uiCopy('u_70736638c2063965'))}
+          {t(dict, 'console.webhooks.subtitle')}
         </p>
       </div>
 
@@ -159,15 +158,15 @@ export function WebhooksPage() {
       {/* Add Webhook Form */}
       {showAddForm && (
         <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t(dict, 'console.webhooks.newWebhook', uiCopy('u_79217be9f83b086e'))}</h3>
+          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t(dict, 'console.webhooks.newWebhook')}</h3>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
-              {t(dict, 'console.webhooks.urlLabel', uiCopy('u_284f5b6249a6b11e'))}
+              {t(dict, 'console.webhooks.urlLabel')}
             </label>
             <input
               type="url"
-              placeholder={uiCopy('u_78c9cc3570bb3cb9')}
+              placeholder={uiText('generatedUi.u_d895e66303f88b95')}
               value={formUrl}
               onChange={e => setFormUrl(e.target.value)}
               style={{
@@ -184,7 +183,7 @@ export function WebhooksPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              {t(dict, 'console.webhooks.eventsLabel', uiCopy('u_18efc6a1e231e8e5'))}
+              {t(dict, 'console.webhooks.eventsLabel')}
             </label>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               {AVAILABLE_EVENTS.map(event => (
@@ -232,7 +231,7 @@ export function WebhooksPage() {
                 fontSize: '0.9rem',
               }}
             >
-              {t(dict, 'console.webhooks.create', uiCopy('u_d3f2592cd1042a48'))}
+              {t(dict, 'console.webhooks.create')}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
@@ -246,7 +245,7 @@ export function WebhooksPage() {
                 fontSize: '0.9rem',
               }}
             >
-              {t(dict, 'common.cancel', uiCopy('u_98f13d52f362178a'))}
+              {t(dict, 'common.cancel')}
             </button>
           </div>
         </div>
@@ -266,17 +265,17 @@ export function WebhooksPage() {
             marginBottom: '1.5rem',
           }}
         >
-          {t(dict, 'console.webhooks.add', uiCopy('u_1a31ed4b80dac5c8'))}
+          {t(dict, 'console.webhooks.add')}
         </button>
       )}
 {/* Webhooks List */}
       {loading ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          {t(dict, 'console.webhooks.loading', uiCopy('u_2d0ac0634164554a'))}
+          {t(dict, 'console.webhooks.loading')}
         </div>
       ) : webhooks.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          {t(dict, 'console.webhooks.empty', uiCopy('u_239cd318a646fc30'))}
+          {t(dict, 'console.webhooks.empty')}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
@@ -338,7 +337,7 @@ function WebhookCard({
             </div>
           </div>
           <div style={{ fontSize: '0.85rem', color: '#888' }}>
-            {webhook.events.length} {webhook.events.length === 1 ? t(dict, 'console.webhooks.eventSingular', uiCopy('u_dc7f0dd9cf1c863a')) : t(dict, 'console.webhooks.eventPlural', uiCopy('u_66cac6c1ffaf6c52'))} • {t(dict, 'console.webhooks.failures', uiCopy('u_003fb4485dfefdcf'))} {webhook.failureCount}
+            {webhook.events.length} {webhook.events.length === 1 ? t(dict, 'console.webhooks.eventSingular') : t(dict, 'console.webhooks.eventPlural')} • {t(dict, 'console.webhooks.failures')} {webhook.failureCount}
           </div>
         </div>
         <div style={{ fontSize: '1.5rem', color: '#666' }}>
@@ -351,7 +350,7 @@ function WebhookCard({
           {/* Events */}
           <div>
             <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              {t(dict, 'console.webhooks.subscribedEvents', uiCopy('u_89d1096cd4fdae0c'))}
+              {t(dict, 'console.webhooks.subscribedEvents')}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {webhook.events.map(event => {
@@ -378,7 +377,7 @@ function WebhookCard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                {t(dict, 'console.webhooks.created', uiCopy('u_92f36a112b0b2891'))}
+                {t(dict, 'console.webhooks.created')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
                 {new Date(webhook.createdAt).toLocaleDateString()}
@@ -387,10 +386,10 @@ function WebhookCard({
 
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                {t(dict, 'console.webhooks.lastFired', uiCopy('u_915c96beb227ceff'))}
+                {t(dict, 'console.webhooks.lastFired')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
-                {webhook.lastFiredAt ? new Date(webhook.lastFiredAt).toLocaleString() : t(dict, 'console.webhooks.never', uiCopy('u_274155e9e20a5bfe'))}
+                {webhook.lastFiredAt ? new Date(webhook.lastFiredAt).toLocaleString() : t(dict, 'console.webhooks.never')}
               </div>
             </div>
           </div>
@@ -411,7 +410,7 @@ function WebhookCard({
                 fontSize: '0.9rem',
               }}
             >
-              🧪 {t(dict, 'console.webhooks.test', uiCopy('u_8db0a6cef5a28a5e'))}
+              🧪 {t(dict, 'console.webhooks.test')}
             </button>
             <button
               onClick={onDelete}
@@ -427,7 +426,7 @@ function WebhookCard({
                 fontSize: '0.9rem',
               }}
             >
-              🗑️ {t(dict, 'console.webhooks.delete', uiCopy('u_b8b24d917dcc5f1b'))}
+              🗑️ {t(dict, 'console.webhooks.delete')}
             </button>
           </div>
         </div>

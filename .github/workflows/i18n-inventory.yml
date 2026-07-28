@@ -12,31 +12,15 @@ permissions:
 jobs:
   inventory:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: saas
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 24
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Capture literal hardcoded UI copy
-        run: node scripts/check-hardcoded-copy.mjs --list > ../hardcoded-ui-inventory.txt 2>&1
-      - name: Capture English translation fallbacks
-        run: node scripts/list-i18n-fallbacks.mjs > ../i18n-fallback-inventory.txt 2>&1
-      - name: Capture missing locale keys
-        run: node scripts/list-missing-i18n-keys.mjs > ../missing-i18n-keys.txt 2>&1
-      - name: Package source snapshot
-        run: tar --exclude=node_modules --exclude=.next --exclude=coverage -czf ../saas-source.tgz .
-      - name: Upload inventory and source snapshot
+          ref: fix/i18n-remove-hardcoded-english
+      - name: Package remediation branch source
+        run: tar --exclude='saas/node_modules' --exclude='saas/.next' --exclude='saas/coverage' -czf saas-source.tgz -C saas .
+      - name: Upload remediation source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: hardcoded-ui-inventory
-          path: |
-            hardcoded-ui-inventory.txt
-            i18n-fallback-inventory.txt
-            missing-i18n-keys.txt
-            saas-source.tgz
+          name: i18n-remediation-source
+          path: saas-source.tgz
           if-no-files-found: error

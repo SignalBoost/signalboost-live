@@ -14,7 +14,7 @@ const LOCALE_DIR = path.join(ROOT, 'locales')
 const TEMP_WORKFLOW_PATH = path.join(REPO_ROOT, '.github', 'workflows', 'complete-generated-ui-locales.yml')
 const WRITE = process.argv.includes('--write')
 const localeArgument = process.argv.find(argument => argument.startsWith('--locale='))
-const REQUEST_TIMEOUT_MS = Number(process.env.TRANSLATION_REQUEST_TIMEOUT_MS || 60000)
+const REQUEST_TIMEOUT_MS = Number(process.env.TRANSLATION_REQUEST_TIMEOUT_MS || 120000)
 
 const LANGUAGE_NAMES = {
   es: 'natural, neutral Latin American Spanish',
@@ -96,6 +96,8 @@ function modelConfig() {
       maxChars: 8000,
       maxItems: 80,
       requestConcurrency: 8,
+      requestSpacingMs: 0,
+      rateLimitCooldownMs: 10000,
     }
     return cachedModelConfig
   }
@@ -106,15 +108,21 @@ function modelConfig() {
       endpoint: 'https://models.github.ai/inference/chat/completions',
       token: process.env.GITHUB_TOKEN,
       model: process.env.GITHUB_MODELS_MODEL || 'openai/gpt-4o-mini',
-      maxTokens: 8000,
-      maxChars: 6000,
-      maxItems: 60,
-      requestConcurrency: 4,
+      maxTokens: 12000,
+      maxChars: 18000,
+      maxItems: 200,
+      requestConcurrency: 1,
+      requestSpacingMs: 7000,
+      rateLimitCooldownMs: 65000,
     }
     return cachedModelConfig
   }
 
   throw new Error('OPENAI_API_KEY or GITHUB_TOKEN is required to generate missing locale copy.')
+}
+
+function usesSerializedRequests() {
+  return modelConfig().provider === 'GitHub Models'
 }
 
 async function withRequestSlot(task) {
@@ -133,8 +141,10 @@ async function withRequestSlot(task) {
 }
 
 function retryDelay(response, attempt) {
+  const config = modelConfig()
   const retryAfter = Number(response?.headers?.get('retry-after') || 0)
-  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(retryAfter * 1000, 120000)
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.max(retryAfter * 1000, config.rateLimitCooldownMs)
+  if (response?.status === 429) return config.rateLimitCooldownMs
   return Math.min(2000 * (2 ** attempt), 60000)
 }
 
@@ -185,7 +195,9 @@ async function requestTranslation(locale, payload, attempt = 0) {
   if (!response.ok) {
     const body = await response.text()
     if ((response.status === 429 || response.status >= 500) && attempt < 7) {
-      await sleep(retryDelay(response, attempt))
+      const delay = retryDelay(response, attempt)
+      console.warn(`[i18n] ${locale}: request limited (${response.status}); retrying in ${Math.ceil(delay / 1000)}s.`)
+      await sleep(delay)
       return requestTranslation(locale, payload, attempt + 1)
     }
     throw new Error(`Translation request failed for ${locale} (${response.status}): ${body.slice(0, 1200)}`)
@@ -247,6 +259,12 @@ async function translateBatch(locale, batch) {
   } catch (error) {
     if (batch.length === 1 || !shouldSplitBatch(error)) throw error
     const middle = Math.ceil(batch.length / 2)
+    if (usesSerializedRequests()) {
+      const left = await translateBatch(locale, batch.slice(0, middle))
+      await sleep(modelConfig().requestSpacingMs)
+      const right = await translateBatch(locale, batch.slice(middle))
+      return new Map([...left, ...right])
+    }
     const [left, right] = await Promise.all([
       translateBatch(locale, batch.slice(0, middle)),
       translateBatch(locale, batch.slice(middle)),
@@ -303,10 +321,20 @@ async function buildLocale(locale, englishData, localizedData) {
   const batches = createBatches(missing)
   console.log(`[i18n] ${locale}: ${Object.keys(english).length} keys, ${missing.length} unique translations, ${batches.length} batches.`)
 
-  const batchResults = await Promise.all(batches.map(async (batch, index) => {
-    console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
-    return translateBatch(locale, batch)
-  }))
+  const batchResults = []
+  if (usesSerializedRequests()) {
+    for (let index = 0; index < batches.length; index += 1) {
+      const batch = batches[index]
+      console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
+      batchResults.push(await translateBatch(locale, batch))
+      if (index < batches.length - 1) await sleep(modelConfig().requestSpacingMs)
+    }
+  } else {
+    batchResults.push(...await Promise.all(batches.map(async (batch, index) => {
+      console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
+      return translateBatch(locale, batch)
+    })))
+  }
 
   for (const translated of batchResults) {
     for (const [source, value] of translated) resolvedBySource.set(source, value)

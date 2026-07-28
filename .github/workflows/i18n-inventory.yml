@@ -22,11 +22,15 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Capture all hardcoded UI copy
+      - name: Capture literal hardcoded UI copy
         run: node scripts/check-hardcoded-copy.mjs --list > ../hardcoded-ui-inventory.txt 2>&1
+      - name: Capture English translation fallbacks
+        run: node scripts/list-i18n-fallbacks.mjs > ../i18n-fallback-inventory.txt 2>&1
       - name: Upload inventory
         uses: actions/upload-artifact@v4
         with:
           name: hardcoded-ui-inventory
-          path: hardcoded-ui-inventory.txt
+          path: |
+            hardcoded-ui-inventory.txt
+            i18n-fallback-inventory.txt
           if-no-files-found: error

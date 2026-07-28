@@ -1,0 +1,51 @@
+name: I18n Zero-Copy Migration
+
+on:
+  push:
+    branches:
+      - fix/i18n-zero-hardcoded-copy-current
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/i18n-zero-hardcoded-copy-current
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Import tested localization guard
+        run: |
+          git fetch origin fix/i18n-remove-hardcoded-english --depth=1
+          git checkout FETCH_HEAD -- saas/scripts/enforce-localized-page-copy.mjs
+      - name: Centralize user-facing English
+        run: node scripts/enforce-localized-page-copy.mjs --write
+      - name: Clear resolved baseline
+        run: node scripts/check-hardcoded-copy.mjs --write-baseline
+      - name: Make localization guards blocking
+        run: npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/enforce-localized-page-copy.mjs'
+      - name: Validate zero hardcoded copy
+        run: npm run validate:i18n-copy
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+      - name: Unit and contract tests
+        run: npm test
+      - name: Commit validated migration
+        run: |
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add saas
+          git commit -m 'fix(i18n): eliminate hardcoded English UI copy'
+          git push origin HEAD:fix/i18n-zero-hardcoded-copy-current

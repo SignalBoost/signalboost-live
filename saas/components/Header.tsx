@@ -2,23 +2,44 @@
 
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
+
+const BRAND = '⚡ SignalBoost'
+
+type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+
+type HeaderCopy = {
+  podcasters: string
+  pricing: string
+  docs: string
+  dashboard: string
+  faq: string
+  getStarted: string
+}
+
+const COPY: Record<Language, HeaderCopy> = {
+  en: { podcasters: 'Podcasters', pricing: 'Pricing', docs: 'Docs', dashboard: 'Dashboard', faq: 'FAQ', getStarted: 'Get started' },
+  es: { podcasters: 'Podcasters', pricing: 'Precios', docs: 'Documentación', dashboard: 'Panel', faq: 'Preguntas frecuentes', getStarted: 'Comenzar' },
+  pt: { podcasters: 'Podcasters', pricing: 'Preços', docs: 'Documentação', dashboard: 'Painel', faq: 'Perguntas frequentes', getStarted: 'Começar' },
+  pl: { podcasters: 'Podcasterzy', pricing: 'Cennik', docs: 'Dokumentacja', dashboard: 'Panel', faq: 'Najczęstsze pytania', getStarted: 'Rozpocznij' },
+  ru: { podcasters: 'Подкастеры', pricing: 'Цены', docs: 'Документация', dashboard: 'Панель', faq: 'Частые вопросы', getStarted: 'Начать' },
+}
 
 export default function Header() {
-  const { dict } = useI18n()
+  const { lang } = useI18n()
+  const copy = COPY[(lang as Language) in COPY ? (lang as Language) : 'en']
 
   return (
     <header className="w-full px-6 py-4 flex items-center justify-between bg-[#0f0f0f] border-b border-white/10">
-      <Link href="/" className="text-white font-bold text-xl tracking-tight no-underline">⚡ SignalBoost</Link>
+      <Link href="/" className="text-white font-bold text-xl tracking-tight no-underline">{BRAND}</Link>
       <nav className="hidden md:flex gap-6 text-sm text-white/60">
-        <Link href="/podcasters" className="hover:text-white transition">{t(dict, 'podcasters', 'Podcasters')}</Link>
-        <Link href="/pricing" className="hover:text-white transition">{t(dict, 'pricing', 'Pricing')}</Link>
-        <Link href="/docs" className="hover:text-white transition">{t(dict, 'docs', 'Docs')}</Link>
-        <Link href="/dashboard" className="hover:text-white transition">{t(dict, 'dashboard', 'Dashboard')}</Link>
+        <Link href="/podcasters" className="hover:text-white transition">{copy.podcasters}</Link>
+        <Link href="/pricing" className="hover:text-white transition">{copy.pricing}</Link>
+        <Link href="/docs" className="hover:text-white transition">{copy.docs}</Link>
+        <Link href="/dashboard" className="hover:text-white transition">{copy.dashboard}</Link>
       </nav>
       <div className="flex gap-3">
-        <Link href="/faq" className="text-sm text-white/70 hover:text-white transition px-4 py-2">{t(dict, 'support.faq', 'FAQ')}</Link>
-        <Link href="/dashboard" className="text-sm bg-yellow-400 text-black font-semibold px-4 py-2 rounded-full hover:bg-yellow-300 transition">{t(dict, 'getStarted', 'Get started')}</Link>
+        <Link href="/faq" className="text-sm text-white/70 hover:text-white transition px-4 py-2">{copy.faq}</Link>
+        <Link href="/dashboard" className="text-sm bg-yellow-400 text-black font-semibold px-4 py-2 rounded-full hover:bg-yellow-300 transition">{copy.getStarted}</Link>
       </div>
     </header>
   )

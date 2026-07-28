@@ -1,9 +1,6 @@
 name: I18n Zero-Copy Migration
 
 on:
-  push:
-    branches:
-      - fix/i18n-zero-hardcoded-copy-current
   pull_request:
     branches:
       - main
@@ -13,6 +10,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: i18n-zero-copy-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 jobs:
   migrate-and-validate:
@@ -33,9 +34,19 @@ jobs:
       - name: Prepare page-only migration
         run: node scripts/prepare-i18n-zero-copy-migration.mjs
       - name: Centralize user-facing English
-        run: node scripts/enforce-localized-page-copy.mjs --write
+        run: |
+          if [ -f lib/i18n/generatedUiCopy.ts ]; then
+            echo 'Generated UI copy already exists; validating without regeneration.'
+          else
+            node scripts/enforce-localized-page-copy.mjs --write
+          fi
       - name: Clear resolved baseline
-        run: node scripts/check-hardcoded-copy.mjs --write-baseline
+        run: |
+          if [ -f lib/i18n/generatedUiCopy.ts ] && git ls-files --error-unmatch lib/i18n/generatedUiCopy.ts >/dev/null 2>&1; then
+            echo 'Migration already committed; preserving the zero baseline.'
+          else
+            node scripts/check-hardcoded-copy.mjs --write-baseline
+          fi
       - name: Make localization guards blocking
         run: npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/enforce-localized-page-copy.mjs'
       - name: Validate zero hardcoded copy

@@ -13,6 +13,12 @@ function replaceOnce(before, after, label) {
 }
 
 replaceOnce(
+  "const TECHNICAL_NAME = /(channels?|statuses?|stages?|types?|modes?|kinds?|codes?|keys?|routes?|urls?|paths?|slugs?|ids?)$/i",
+  "const TECHNICAL_NAME = /(channels?|statuses?|stages?|types?|modes?|kinds?|codes?|keys?|routes?|urls?|paths?|slugs?|ids?)$/i\nconst TECHNICAL_FIELD = /^(role|type|kind|mode|status|stage|channel|animation|dateStyle|timeStyle|format|method|variant|value|key|id|slug|path|route|url)$/i",
+  'technical field classification',
+)
+
+replaceOnce(
   "    if (typeof localized === 'string' && localized && localized !== englishValue && !map.has(englishValue)) map.set(englishValue, localized)",
   "    const normalizedEnglish = normalize(englishValue)\n    if (typeof localized === 'string' && localized && localized !== englishValue && !map.has(normalizedEnglish)) map.set(normalizedEnglish, localized)",
   'normalized reverse translation index',
@@ -22,6 +28,18 @@ replaceOnce(
   "  const text = normalize(value)\n  if (!isHumanCopy(text)) return null",
   "  const text = String(value)\n  if (!isHumanCopy(text)) return null",
   'exact English locale value preservation',
+)
+
+replaceOnce(
+  "function renderedJsxExpression(node) {",
+  "function inTechnicalProperty(node) {\n  for (let current = node.parent; current; current = current.parent) {\n    if (ts.isPropertyAssignment(current) && TECHNICAL_FIELD.test(propName(current.name))) return true\n    if (ts.isFunctionLike(current) || ts.isSourceFile(current)) break\n  }\n  return false\n}\n\nfunction renderedJsxExpression(node) {",
+  'technical property exclusion',
+)
+
+replaceOnce(
+  "    if (ts.isCallExpression(current)) {\n      const name = calleeName(current.expression)\n      if (name === 't' || name === 'uiText') return false\n    }",
+  "    if (ts.isCallExpression(current)) return false",
+  'function argument exclusion',
 )
 
 replaceOnce(
@@ -36,5 +54,11 @@ replaceOnce(
   'normalized JSX core copy',
 )
 
+replaceOnce(
+  "      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')",
+  "      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && !inTechnicalProperty(node) && (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')",
+  'technical literal preservation',
+)
+
 fs.writeFileSync(target, source, 'utf8')
-console.log('Prepared exact-value locale migration with JSX spacing safeguards.')
+console.log('Prepared exact-value locale migration with JSX spacing and technical-literal safeguards.')

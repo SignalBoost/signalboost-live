@@ -1,4 +1,4 @@
-name: Complete generated UI locales
+name: Validate generated UI locales
 
 on:
   pull_request:
@@ -14,91 +14,25 @@ on:
       - 'saas/scripts/translate-generated-ui-locales.mjs'
       - 'saas/scripts/translate-generated-ui-locales-public.mjs'
       - 'saas/package.json'
+      - 'saas/package-lock.json'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
+  group: validate-generated-ui-locales-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  generate-locale:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        locale: [es, pt, pl, ru]
+    timeout-minutes: 30
 
     steps:
-      - name: Check out triggering PR branch
+      - name: Check out triggering PR revision
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Generate ${{ matrix.locale }} catalog
-        env:
-          TRANSLATION_REQUEST_TIMEOUT_MS: '30000'
-          TRANSLATION_BATCH_MAX_ITEMS: '40'
-          TRANSLATION_BATCH_MAX_CHARS: '5000'
-        run: node saas/scripts/translate-generated-ui-locales-public.mjs --write --locale=${{ matrix.locale }}
-
-      - name: Stage generated catalog artifact
-        run: |
-          mkdir -p generated
-          cp "saas/locales/${{ matrix.locale }}.json" "generated/${{ matrix.locale }}.json"
-
-      - name: Upload generated catalog
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-ui-${{ matrix.locale }}
-          path: generated/${{ matrix.locale }}.json
-          if-no-files-found: error
-          retention-days: 1
-
-  generate-and-validate:
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    needs: generate-locale
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-
-    steps:
-      - name: Check out triggering PR branch
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Download generated catalogs
-        uses: actions/download-artifact@v4
-        with:
-          pattern: generated-ui-*
-          path: saas/locales
-          merge-multiple: true
-
-      - name: Restore protected tokens
-        working-directory: saas
-        run: node scripts/repair-generated-ui-token-mismatches.mjs
-
-      - name: Make five-language parity blocking
-        working-directory: saas
-        run: |
-          npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/migrate-page-copy-to-locales.mjs && node scripts/check-generated-ui-locale-completeness.mjs'
-          npm pkg set 'scripts.translate:i18n-generated-ui=node scripts/translate-generated-ui-locales.mjs --write'
-          npm pkg set 'scripts.translate:i18n-generated-ui-public=node scripts/translate-generated-ui-locales-public.mjs --write'
-          npm pkg set 'scripts.repair:i18n-generated-ui=node scripts/repair-generated-ui-token-mismatches.mjs'
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -111,7 +45,7 @@ jobs:
         working-directory: saas
         run: npm ci
 
-      - name: Validate localization
+      - name: Validate all five locale catalogs
         working-directory: saas
         run: npm run validate:i18n-copy
 
@@ -124,17 +58,3 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
         run: npm run build
-
-      - name: Commit completed locale catalogs
-        run: |
-          git config user.name 'SignalBoost Automation'
-          git config user.email 'actions@users.noreply.github.com'
-          git add \
-            saas/locales/es.json \
-            saas/locales/pt.json \
-            saas/locales/pl.json \
-            saas/locales/ru.json \
-            saas/package.json
-          git diff --cached --quiet && exit 0
-          git commit -m 'fix(i18n): commit complete five-language UI catalogs'
-          git push origin "HEAD:${HEAD_BRANCH}"

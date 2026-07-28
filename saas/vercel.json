@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run prebuild && next build",
   "crons": [
     {
       "path": "/api/cron/opportunity-scan",

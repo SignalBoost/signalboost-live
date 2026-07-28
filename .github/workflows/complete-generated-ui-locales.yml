@@ -1,33 +1,38 @@
-name: Complete generated UI locales
+name: Validate generated UI locales
 
 on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/complete-generated-ui-locales.yml'
+      - 'saas/locales/**'
+      - 'saas/scripts/check-generated-ui-locale-completeness.mjs'
+      - 'saas/scripts/generated-ui-locale-utils.mjs'
+      - 'saas/scripts/repair-generated-ui-token-mismatches.mjs'
+      - 'saas/scripts/translate-generated-ui-locales.mjs'
+      - 'saas/scripts/translate-generated-ui-locales-public.mjs'
+      - 'saas/package.json'
+      - 'saas/package-lock.json'
 
 permissions:
-  contents: write
-  models: read
+  contents: read
 
 concurrency:
-  group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  group: validate-generated-ui-locales-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  generate-and-validate:
-    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.repo.full_name == github.repository
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
-    env:
-      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+    timeout-minutes: 30
 
     steps:
-      - name: Check out triggering PR branch
+      - name: Check out triggering PR revision
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,24 +41,11 @@ jobs:
           cache: npm
           cache-dependency-path: saas/package-lock.json
 
-      - name: Generate missing translations
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODELS_MODEL: openai/gpt-4o-mini
-        run: node saas/scripts/translate-generated-ui-locales.mjs --write
-
-      - name: Make five-language parity blocking
-        working-directory: saas
-        run: |
-          npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/migrate-page-copy-to-locales.mjs && node scripts/check-generated-ui-locale-completeness.mjs'
-          npm pkg set 'scripts.translate:i18n-generated-ui=node scripts/translate-generated-ui-locales.mjs --write'
-
       - name: Install dependencies
         working-directory: saas
         run: npm ci
 
-      - name: Validate localization
+      - name: Validate all five locale catalogs
         working-directory: saas
         run: npm run validate:i18n-copy
 
@@ -66,13 +58,3 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
         run: npm run build
-
-      - name: Publish validated locale catalogs
-        run: |
-          rm .github/workflows/complete-generated-ui-locales.yml
-          git config user.name 'SignalBoost Automation'
-          git config user.email 'actions@users.noreply.github.com'
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -m 'fix(i18n): complete all five generated UI dictionaries'
-          git push origin "HEAD:${HEAD_BRANCH}"

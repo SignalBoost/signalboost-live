@@ -14,7 +14,7 @@ function replaceOnce(before, after, label) {
 
 replaceOnce(
   "const TECHNICAL_NAME = /(channels?|statuses?|stages?|types?|modes?|kinds?|codes?|keys?|routes?|urls?|paths?|slugs?|ids?)$/i",
-  "const TECHNICAL_NAME = /(channels?|statuses?|stages?|types?|modes?|kinds?|codes?|keys?|routes?|urls?|paths?|slugs?|ids?)$/i\nconst TECHNICAL_FIELD = /^(role|type|kind|mode|status|stage|channel|animation|dateStyle|timeStyle|format|method|variant|value|key|id|slug|path|route|url)$/i",
+  "const TECHNICAL_NAME = /(channels?|statuses?|stages?|types?|modes?|kinds?|codes?|keys?|routes?|urls?|paths?|slugs?|ids?)$/i\nconst TECHNICAL_FIELD = /^(role|type|kind|mode|status|stage|channel|animation|dateStyle|timeStyle|format|method|variant|value|key|id|slug|path|route|url|month|year|day|hour|minute|second)$/i",
   'technical field classification',
 )
 
@@ -55,10 +55,16 @@ replaceOnce(
 )
 
 replaceOnce(
+  "      if ((FALLBACK_PROPS.has(name) || UI_FIELDS.has(name) || displayStatus) && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init))) {",
+  "      if (!TECHNICAL_FIELD.test(name) && (FALLBACK_PROPS.has(name) || UI_FIELDS.has(name) || displayStatus) && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init))) {",
+  'technical object-field preservation',
+)
+
+replaceOnce(
   "      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')",
-  "      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && !inTechnicalProperty(node) && (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')",
-  'technical literal preservation',
+  "      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && !inTechnicalProperty(node) && (inEnglishCopyTable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')",
+  'remove unsafe generic copy-variable migration',
 )
 
 fs.writeFileSync(target, source, 'utf8')
-console.log('Prepared exact-value locale migration with JSX spacing and technical-literal safeguards.')
+console.log('Prepared exact-value locale migration with JSX spacing and strict technical-literal safeguards.')

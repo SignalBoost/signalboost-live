@@ -21,6 +21,7 @@ import type { ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
+import DemoRehearsal from '@/components/supervisor/DemoRehearsal'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 import { getSupervisorEntitlement } from '@/self-healing-host/supervisor-entitlement'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
@@ -35,6 +36,8 @@ type DemoCopy = {
   licenceInstalled: string
   licenceMissing: string
   licenceNote: string
+  productionTitle: string
+  productionNote: string
   emptyTitle: string
   emptyBody: string
   runLabel: string
@@ -57,6 +60,8 @@ const COPY: Record<Language, DemoCopy> = {
     licenceInstalled: 'Licence installed — planning and dispatch are enabled.',
     licenceMissing: 'No licence installed. Incidents are received and recorded, but not diagnosed.',
     licenceNote: 'The gate is fail-closed by design. An unlicensed deployment does not quietly behave like a licensed one.',
+    productionTitle: 'Production repair history',
+    productionNote: 'Below is a real repair run against this deployment\u2019s own production. Unlike the rehearsal above, it cannot be triggered on demand \u2014 it appears only after a genuine failure has been detected and processed.',
     emptyTitle: 'No repair run has been observed yet',
     emptyBody: 'Nothing is shown here until a real deployment failure has been detected and processed. This page will not invent one.',
     runLabel: 'Run',
@@ -88,6 +93,8 @@ const COPY: Record<Language, DemoCopy> = {
     licenceInstalled: 'Licencia instalada: planificación y ejecución habilitadas.',
     licenceMissing: 'Sin licencia instalada. Los incidentes se reciben y registran, pero no se diagnostican.',
     licenceNote: 'La comprobación falla de forma cerrada por diseño. Un despliegue sin licencia no se comporta discretamente como uno con licencia.',
+    productionTitle: 'Historial de reparaciones en producción',
+    productionNote: 'A continuación se muestra una reparación real en la producción de este despliegue. A diferencia del ensayo anterior, no puede activarse a voluntad: solo aparece tras detectarse y procesarse un fallo genuino.',
     emptyTitle: 'Todavía no se ha observado ninguna reparación',
     emptyBody: 'Aquí no se muestra nada hasta que se detecte y procese un fallo real de despliegue. Esta página no inventará uno.',
     runLabel: 'Ejecución',
@@ -119,6 +126,8 @@ const COPY: Record<Language, DemoCopy> = {
     licenceInstalled: 'Licença instalada — planeamento e execução ativos.',
     licenceMissing: 'Sem licença instalada. Os incidentes são recebidos e registados, mas não diagnosticados.',
     licenceNote: 'A verificação falha de forma fechada por desenho. Um ambiente sem licença não se comporta discretamente como um licenciado.',
+    productionTitle: 'Histórico de reparações em produção',
+    productionNote: 'Abaixo está uma reparação real na produção deste ambiente. Ao contrário do ensaio acima, não pode ser acionada a pedido: só aparece depois de uma falha genuína ser detetada e processada.',
     emptyTitle: 'Ainda não foi observada nenhuma reparação',
     emptyBody: 'Nada é mostrado aqui até que uma falha real de implantação seja detetada e processada. Esta página não inventará uma.',
     runLabel: 'Execução',
@@ -150,6 +159,8 @@ const COPY: Record<Language, DemoCopy> = {
     licenceInstalled: 'Licencja zainstalowana — planowanie i wykonanie są włączone.',
     licenceMissing: 'Brak zainstalowanej licencji. Incydenty są odbierane i zapisywane, ale nie diagnozowane.',
     licenceNote: 'Kontrola domyślnie odmawia. Wdrożenie bez licencji nie zachowuje się po cichu jak licencjonowane.',
+    productionTitle: 'Historia napraw na produkcji',
+    productionNote: 'Poniżej znajduje się rzeczywista naprawa na produkcji tego wdrożenia. W odróżnieniu od powyższej próby nie da się jej uruchomić na żądanie — pojawia się dopiero po wykryciu i przetworzeniu prawdziwej awarii.',
     emptyTitle: 'Nie zaobserwowano jeszcze żadnej naprawy',
     emptyBody: 'Nic nie zostanie tu pokazane, dopóki nie zostanie wykryta i przetworzona rzeczywista awaria wdrożenia. Ta strona jej nie wymyśli.',
     runLabel: 'Przebieg',
@@ -181,6 +192,8 @@ const COPY: Record<Language, DemoCopy> = {
     licenceInstalled: 'Лицензия установлена — планирование и выполнение включены.',
     licenceMissing: 'Лицензия не установлена. Инциденты принимаются и записываются, но не диагностируются.',
     licenceNote: 'Проверка по умолчанию запрещает. Развёртывание без лицензии не ведёт себя незаметно так же, как лицензированное.',
+    productionTitle: 'История восстановлений в продакшене',
+    productionNote: 'Ниже — реальное восстановление в продакшене этого развёртывания. В отличие от репетиции выше, его нельзя запустить по требованию: оно появляется только после того, как настоящий сбой был обнаружен и обработан.',
     emptyTitle: 'Восстановлений пока не наблюдалось',
     emptyBody: 'Здесь ничего не отображается, пока не обнаружен и не обработан реальный сбой развёртывания. Эта страница его не выдумает.',
     runLabel: 'Запуск',
@@ -237,7 +250,8 @@ export default async function SupervisorDemoPage() {
   if (!user) redirect('/login')
 
   const access = await getAccess()
-  const copy = COPY[pickLanguage((await cookies()).get('sb_locale')?.value)]
+  const lang = pickLanguage((await cookies()).get('sb_locale')?.value)
+  const copy = COPY[lang]
 
   if (!access.isAdmin) {
     return (
@@ -263,6 +277,13 @@ export default async function SupervisorDemoPage() {
           {entitlement.configured ? copy.licenceInstalled : `${copy.licenceMissing} (${entitlement.reason})`}
         </p>
         <p style={muted}>{copy.licenceNote}</p>
+
+        <div style={{ marginTop: 20 }}>
+          <DemoRehearsal lang={lang} />
+        </div>
+
+        <h2 style={{ marginBottom: 4, marginTop: 28 }}>{copy.productionTitle}</h2>
+        <p style={muted}>{copy.productionNote}</p>
 
         {!run ? (
           <section style={card}>

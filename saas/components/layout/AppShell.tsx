@@ -1,4 +1,6 @@
+// saas/components/layout/AppShell.tsx
 import Concierge from '@/components/Concierge'
+import ShareRouteChrome from '@/components/layout/ShareRouteChrome'
 import { AI_DOCK_CSS_VARS } from '@/lib/layout/aiDock'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -7,7 +9,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="sb-ai-workspace" role="presentation">
         {children}
       </div>
-      <Concierge />
+      <ShareRouteChrome>
+        <Concierge />
+      </ShareRouteChrome>
     </div>
   )
 }

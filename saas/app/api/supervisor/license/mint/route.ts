@@ -29,6 +29,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { getCurrentUser } from '@/lib/auth/permission-middleware'
+import type { LicenseMintResult } from '@/lib/supervisor/licenseMintContract'
 import {
   editionNames,
   featuresForEdition,
@@ -42,11 +43,15 @@ export const dynamic = 'force-dynamic'
 
 const PRODUCT_ID = 'self-healing-supervisor'
 
+function response(payload: LicenseMintResult, status: number) {
+  return NextResponse.json(payload, { status })
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req)
-  if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (!user) return response({ ok: false, errorCode: 'unauthorized' }, 401)
   if ((user as { role?: string }).role !== 'owner') {
-    return NextResponse.json({ ok: false, error: 'Forbidden — minting a licence is owner-only' }, { status: 403 })
+    return response({ ok: false, errorCode: 'ownerOnly' }, 403)
   }
 
   let body: Record<string, unknown> = {}
@@ -64,11 +69,11 @@ export async function POST(req: NextRequest) {
   const keepPublicKey = String(body.keepPublicKey || '').trim()
 
   if (!licensee) {
-    return NextResponse.json({
+    return response({
       ok: false,
-      error: 'A licensee is required — the legal name of the party this licence is issued to.',
-      remedy: 'For your own deployment, use your own entity name.',
-    }, { status: 400 })
+      errorCode: 'licenseeRequired',
+      remedyCode: 'useLegalEntityName',
+    }, 400)
   }
 
   // Features come from the catalogue, never from the request. A feature name no code checks
@@ -76,15 +81,15 @@ export async function POST(req: NextRequest) {
   // nobody finds out until an incident.
   const features = featuresForEdition(PRODUCT_ID, edition)
   if (!features) {
-    return NextResponse.json({
+    return response({
       ok: false,
-      error: `"${edition}" is not an edition of ${PRODUCT_ID}.`,
+      errorCode: 'invalidEdition',
       editions: editionNames(PRODUCT_ID),
-    }, { status: 400 })
+    }, 400)
   }
 
   if (!Number.isFinite(days) || days <= 0) {
-    return NextResponse.json({ ok: false, error: 'days must be a positive number' }, { status: 400 })
+    return response({ ok: false, errorCode: 'invalidDays' }, 400)
   }
 
   const { publicKeyPem, privateKeyPem } = generateIssuerKeyPair()
@@ -114,7 +119,7 @@ export async function POST(req: NextRequest) {
   const flatten = (pem: string) => pem.trim().replace(/\r?\n/g, '\\n')
   const publicKeys = [keepPublicKey, publicKeyPem].filter(Boolean).map(flatten).join(',')
 
-  return NextResponse.json({
+  return response({
     ok: true,
     schemaVersion: 'self-healing-license-mint-v1',
     licence: {
@@ -134,11 +139,11 @@ export async function POST(req: NextRequest) {
       SUPERVISOR_LICENSE_PUBLIC_KEYS: publicKeys,
     },
     privateKeyPem,
-    warnings: [
-      'The private key is shown once and is not stored anywhere. Put it in your vault now — it cannot be recovered, and it is the only thing that can mint a licence this deployment will accept.',
-      'Record the licence id. Revocation is by id, and you cannot revoke what you did not write down.',
-      'Seats and execution limits are recorded in the token but are NOT enforced by the product. They are contract terms.',
-      'Set the three environment variables in the deployment and redeploy. Licence configuration is read once per process, so an edit alone changes nothing until a new deployment starts.',
+    warningCodes: [
+      'privateKeyOnce',
+      'recordLicenseId',
+      'limitsNotEnforced',
+      'redeployRequired',
     ],
-  }, { status: 200 })
+  }, 200)
 }

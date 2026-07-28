@@ -10,8 +10,8 @@ permissions:
   models: read
 
 concurrency:
-  group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  group: complete-generated-ui-locales-${{ github.event.pull_request.number }}-${{ github.actor == 'github-actions[bot]' && github.run_id || 'operator' }}
+  cancel-in-progress: true
 
 jobs:
   generate-and-validate:

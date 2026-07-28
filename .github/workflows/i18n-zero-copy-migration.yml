@@ -30,10 +30,6 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Import tested localization guard
-        run: |
-          git fetch origin fix/i18n-remove-hardcoded-english --depth=1
-          git checkout FETCH_HEAD -- saas/scripts/enforce-localized-page-copy.mjs
       - name: Centralize user-facing English
         run: node scripts/enforce-localized-page-copy.mjs --write
       - name: Clear resolved baseline

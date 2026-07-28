@@ -1,6 +1,7 @@
-import type { Dict } from './loadLanguage.ts'
+type HomepageLocaleValue = string | string[] | HomepageLocaleDict
+type HomepageLocaleDict = { [key: string]: HomepageLocaleValue }
 
-export const HOMEPAGE_UI_LOCALES: Record<string, Dict> = {
+export const HOMEPAGE_UI_LOCALES: Record<string, HomepageLocaleDict> = {
   en: {
     languages: {
       en: 'English',

@@ -59,17 +59,30 @@ function wrapSourceReads(source, relativePath) {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      node.expression.text === 'readFileSync' &&
+      (node.expression.text === 'readFileSync' || node.expression.text === 'readFile') &&
       node.arguments.length >= 2 &&
       (ts.isStringLiteral(node.arguments[1]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[1])) &&
-      /^(utf8|utf-8)$/i.test(node.arguments[1].text) &&
-      !(
+      /^(utf8|utf-8)$/i.test(node.arguments[1].text)
+    ) {
+      const call = node.getText(sf)
+      const isSync = node.expression.text === 'readFileSync'
+      const alreadySyncWrapped =
         ts.isCallExpression(node.parent) &&
         ts.isIdentifier(node.parent.expression) &&
         node.parent.expression.text === 'hydrateLocalizedSource'
-      )
-    ) {
-      edits.push({ start: node.getStart(sf), end: node.end, text: `hydrateLocalizedSource(${node.getText(sf)})` })
+      const alreadyAsyncWrapped =
+        ts.isPropertyAccessExpression(node.parent) &&
+        node.parent.name.text === 'then' &&
+        ts.isCallExpression(node.parent.parent) &&
+        node.parent.parent.expression === node.parent
+
+      if (!alreadySyncWrapped && !alreadyAsyncWrapped) {
+        edits.push({
+          start: node.getStart(sf),
+          end: node.end,
+          text: isSync ? `hydrateLocalizedSource(${call})` : `${call}.then(hydrateLocalizedSource)`,
+        })
+      }
     }
     ts.forEachChild(node, visit)
   }
@@ -94,7 +107,11 @@ for (const relativePath of TEST_FILES) {
     source = `${source.slice(0, insertion)}\n${helperImport}${source.slice(insertion)}`
   }
 
-  if (wrapped.count === 0 && !source.includes('hydrateLocalizedSource(readFileSync(')) {
+  if (
+    wrapped.count === 0 &&
+    !source.includes('hydrateLocalizedSource(readFileSync(') &&
+    !source.includes('.then(hydrateLocalizedSource)')
+  ) {
     throw new Error(`No source reader was hydrated in ${relativePath}`)
   }
   fs.writeFileSync(fullPath, source, 'utf8')

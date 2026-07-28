@@ -12,11 +12,11 @@ import { LICENSE_SETUP_COPY } from '../lib/i18n/licenseSetupCopy'
 
 const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru'] as const
 
-function assertLocalizedRecord(
+function assertLocalizedRecord<Key extends string>(
   locale: (typeof supportedLocales)[number],
-  english: Record<string, string>,
-  localized: Record<string, string>,
-  keys: readonly string[],
+  english: Record<Key, string>,
+  localized: Record<Key, string>,
+  keys: readonly Key[],
   label: string,
 ) {
   assert.deepEqual(Object.keys(localized).sort(), [...keys].sort(), `${locale}.${label} must keep exact key parity`)

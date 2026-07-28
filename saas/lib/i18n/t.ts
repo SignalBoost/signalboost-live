@@ -6,6 +6,7 @@ import { PLATFORM_COPY } from '@/lib/i18n/platformCopy'
 import { SUITE_COPY } from '@/lib/i18n/suiteCopy'
 import { WORKSPACE_COPY } from '@/lib/i18n/workspaceCopy'
 import { BANK_COPY } from '@/lib/i18n/bankCopy'
+import { GLOBAL_COPY } from '@/lib/i18n/globalCopy'
 
 export function t(dict: Dict | null | undefined, path: string, fallback: string): string {
   const value = lookup(dict, path)
@@ -13,6 +14,11 @@ export function t(dict: Dict | null | undefined, path: string, fallback: string)
 
   const lang = (dict as any)?.__lang
   const safeLang = typeof lang === 'string' ? lang : 'en'
+
+  const globalForLang = GLOBAL_COPY[safeLang]
+  if (globalForLang && typeof globalForLang[path] === 'string') {
+    return globalForLang[path]
+  }
 
   const dashboardForLang = DASHBOARD_COPY[safeLang]
   if (dashboardForLang && typeof dashboardForLang[path] === 'string') {
@@ -47,6 +53,7 @@ export function t(dict: Dict | null | undefined, path: string, fallback: string)
   const englishValue = lookup(en as Dict, path)
   if (typeof englishValue === 'string') return englishValue
 
+  if (GLOBAL_COPY.en && typeof GLOBAL_COPY.en[path] === 'string') return GLOBAL_COPY.en[path]
   if (typeof DASHBOARD_COPY.en[path] === 'string') return DASHBOARD_COPY.en[path]
   if (typeof STUDIO_HUB_COPY.en[path] === 'string') return STUDIO_HUB_COPY.en[path]
   if (typeof WORKSPACE_COPY.en[path] === 'string') return WORKSPACE_COPY.en[path]

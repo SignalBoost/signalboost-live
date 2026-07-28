@@ -1,122 +1,404 @@
-#!/usr/bin/env node
 // saas/scripts/check-hardcoded-copy.mjs
 //
-// AST-BASED HARDCODED-UI-COPY GUARD.
+// i18n hardcoded-copy guard (AST-based).
 //
-// WHY THIS REPLACES THE OLD SCANNER. The previous version matched `>text<` with a
-// regex, which cannot tell JSX text apart from TypeScript generic syntax —
-// `Promise<T>` and `Record<K, V>` read as "text between angle brackets" to a regex
-// exactly the way `<p>Hello</p>` does. Run against this repository it produced 250+
-// hits, nearly all of them generic types in plain .ts library files with no UI at
-// all — and it MISSED every one of the real hardcoded pages checked against it by
-// hand. A check that is this noisy can never be turned on: the first thing a team
-// does with a gate that cries wolf on every PR is stop reading it, which is worse
-// than having no gate.
+// WHAT IT FLAGS
+//   A .tsx file under app/ or components/ that renders a LITERAL English string
+//   as visible UI: a JsxText node, or a literal placeholder / aria-label / title /
+//   alt attribute value.
 //
-// This version parses real syntax trees with the TypeScript compiler (already a
-// project dependency), so a JSX text node and a generic type parameter are never
-// confused — they are different node kinds to a real parser.
+//   The check is PER STRING, not per file. A file that correctly calls t() or
+//   useI18n() for its title and still ships a bare <button>Delete account</button>
+//   is flagged for that button. Earlier versions skipped the whole file as soon as
+//   they saw any i18n mechanism; that hid ~94 real leaks.
 //
-// WHAT IT FLAGS: a literal, visible English string in a .tsx file — JSX text content,
-// or a placeholder/aria-label/title/alt attribute. EVERY file is scanned, including
-// ones that already call useI18n()/useTranslation() or have a local COPY dictionary.
-// A file being partially wired does not excuse a literal string sitting next to a
-// t() call: `<h1>{t('title')}</h1><button>Delete account</button>` is exactly as
-// hardcoded as a file that never called t() at all.
+//   It never flags a JSX EXPRESSION ({item.name}, {t('key','Fallback')}) — so
+//   legitimate translation call sites, and data rendered through variables, are
+//   invisible to this guard by construction. Literal JSX text is UI copy wherever
+//   it sits.
 //
-// This is deliberately safe against the false-positive risk that motivated the
-// original whole-file skip: the check only ever flags a LITERAL string — a
-// ts.isJsxText node or a ts.isStringLiteral attribute initializer. A real
-// data-bound value (`{item.category}`, `{product.status}`) is a JsxExpression, a
-// different AST node kind entirely, and was never matched by this detector even
-// before this change. So there was never a genuine "that's actually data, not UI
-// copy" case that the per-file skip was protecting — literal JSX text is always UI
-// copy, whichever file it sits in.
+// BASELINE
+//   scripts/i18n-hardcoded-baseline.json captures day-one debt. Anything already in
+//   the baseline is REPORTED but does not block. Anything new fails the build.
+//
+//   Regenerating the baseline is legitimate exactly once per rule change — to
+//   capture pre-existing debt when a STRICTER rule turns on. Regenerating it to
+//   sweep away violations someone just introduced under the EXISTING rule defeats
+//   the guard entirely. Do not do that.
+//
+// USAGE
+//   node scripts/check-hardcoded-copy.mjs                 # check (exit 1 on new violations)
+//   node scripts/check-hardcoded-copy.mjs --write-baseline # regenerate baseline
+//   node scripts/check-hardcoded-copy.mjs --list           # print every violation, baselined or not
+//
+// EXIT CODES
+//   0 = no new violations (prints the success sentinel line below)
+//   1 = new violations, or the guard itself could not run
+//
+// SUCCESS SENTINEL (do not change without updating whatever asserts on it):
+//   [validate:i18n-copy] PASS
 
-import ts from 'typescript'
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
-import { join, relative, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const ROOT = process.cwd()
-const BASELINE_PATH = join(ROOT, 'scripts', 'i18n-hardcoded-baseline.json')
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const APP_ROOT = path.resolve(__dirname, '..');
+const BASELINE_PATH = path.join(APP_ROOT, 'scripts', 'i18n-hardcoded-baseline.json');
+const SCAN_ROOTS = ['app', 'components'];
+const CHECKED_ATTRS = new Set(['placeholder', 'aria-label', 'title', 'alt']);
+const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__']);
+const SENTINEL = '[validate:i18n-copy] PASS';
 
-function walk(dir, out = []) {
-  for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name.startsWith('.')) continue
-    const p = join(dir, name)
-    const st = statSync(p)
-    if (st.isDirectory()) walk(p, out)
-    else if (name.endsWith('.tsx')) out.push(p)
+let ts;
+try {
+  ts = require('typescript');
+} catch {
+  fail(
+    'Could not load the TypeScript compiler.\n' +
+    'This guard parses real ASTs; it cannot fall back to regex (regex cannot tell\n' +
+    'JSX text from generic syntax such as Promise<T>, which is why the previous\n' +
+    'regex version produced 250+ false hits and missed every real one).\n' +
+    'Run `npm install` and try again.'
+  );
+}
+
+function fail(message) {
+  console.error('\ni18n copy guard could not run:\n');
+  console.error(message);
+  process.exit(1);
+}
+
+/* ------------------------------------------------------------------ *
+ * File discovery
+ * ------------------------------------------------------------------ */
+
+function walk(dir, out) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
   }
-  return out
-}
-
-function hasWords(text) {
-  return /[A-Za-z]{3,}/.test(text) && !/^[\s\d.,:/#%()\-\u2013\u2014+*|]*$/.test(text)
-}
-
-function findHardcodedFiles() {
-  const roots = ['app', 'components'].map(d => join(ROOT, d)).filter(existsSync)
-  const files = roots.flatMap(r => walk(r))
-  const hits = []
-
-  for (const file of files) {
-    const src = readFileSync(file, 'utf8')
-    if (src.trim().length < 60) continue
-
-    const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-    let found = false
-    function walkAst(node) {
-      if (found) return
-      if (ts.isJsxText(node)) {
-        if (hasWords(node.getText(sf).trim())) { found = true; return }
-      }
-      if (ts.isJsxAttribute(node) && node.name && ['placeholder', 'aria-label', 'title', 'alt'].includes(node.name.getText(sf))) {
-        if (node.initializer && ts.isStringLiteral(node.initializer) && hasWords(node.initializer.text)) { found = true; return }
-      }
-      ts.forEachChild(node, walkAst)
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      walk(full, out);
+      continue;
     }
-    walkAst(sf)
-    if (found) hits.push(relative(ROOT, file).split('\\').join('/'))
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith('.tsx')) continue;
+    if (/\.(test|spec|stories)\.tsx$/.test(entry.name)) continue;
+    out.push(full);
   }
-  return hits.sort()
+  return out;
 }
 
-const baseline = existsSync(BASELINE_PATH) ? new Set(JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files) : new Set()
-const current = findHardcodedFiles()
+function collectFiles() {
+  const files = [];
+  for (const root of SCAN_ROOTS) walk(path.join(APP_ROOT, root), files);
+  return files.sort();
+}
 
-if (process.argv.includes('--write-baseline')) {
-  // Deliberately the SAME findHardcodedFiles() the check itself runs — a baseline
-  // generated by separate, drifting logic is how a file gets exempted for the wrong
-  // reason, which already happened once while building this guard.
+const relPath = (full) => path.relative(APP_ROOT, full).split(path.sep).join('/');
+
+/* ------------------------------------------------------------------ *
+ * Detection — the single source of truth.
+ * The check and --write-baseline both call this. Two copies of "similar"
+ * logic is how a file ends up exempted for the wrong reason.
+ * ------------------------------------------------------------------ */
+
+function normalize(raw) {
+  return String(raw).replace(/\s+/g, ' ').trim();
+}
+
+// Canonical form used ONLY for baseline comparison, so a whitespace or quote-style
+// difference between the baseline and a rescan cannot manufacture a false failure.
+function canonical(value) {
+  return normalize(value)
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isUserFacingCopy(value) {
+  const text = normalize(value);
+  if (!text) return false;
+  if (/^(&[a-zA-Z]+;|&#\d+;|\s)+$/.test(text)) return false; // entity-only, e.g. &nbsp;
+  if (!/[A-Za-z]{2,}/.test(text)) return false;               // punctuation, digits, bullets, single letters
+  return true;
+}
+
+function attributeName(node, sourceFile) {
+  if (!node.name) return '';
+  if (ts.isIdentifier(node.name)) return node.name.text;
+  try {
+    return node.name.getText(sourceFile);
+  } catch {
+    return '';
+  }
+}
+
+function detectHardcodedStrings(fullPath, sourceText) {
+  const sourceFile = ts.createSourceFile(
+    fullPath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TSX
+  );
+
+  const hits = [];
+  const seen = new Set();
+
+  const record = (node, value, kind) => {
+    const text = normalize(value);
+    if (!isUserFacingCopy(text)) return;
+    let line = 0;
+    try {
+      line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+    } catch {
+      line = 0;
+    }
+    const key = `${kind}:${line}:${text}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    hits.push({ text, line, kind });
+  };
+
+  const visit = (node) => {
+    if (ts.isJsxText(node)) {
+      record(node, node.text, 'jsx-text');
+    } else if (ts.isJsxAttribute(node)) {
+      const name = attributeName(node, sourceFile);
+      if (CHECKED_ATTRS.has(name) && node.initializer) {
+        const init = node.initializer;
+        if (ts.isStringLiteral(init)) {
+          record(init, init.text, `attr:${name}`);
+        } else if (
+          ts.isJsxExpression(init) &&
+          init.expression &&
+          ts.isStringLiteral(init.expression)
+        ) {
+          record(init.expression, init.expression.text, `attr:${name}`);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  hits.sort((a, b) => a.line - b.line || a.text.localeCompare(b.text));
+  return hits;
+}
+
+function scanRepo() {
+  const results = new Map(); // relPath -> hits[]
+  const files = collectFiles();
+
+  // A detector that finds nothing everywhere is a bug signal, not a clean repo.
+  // If the roots resolved wrong, this guard would "pass" while scanning nothing.
+  if (!files.length) {
+    fail(
+      `No .tsx files found under ${SCAN_ROOTS.join(', ')} in ${APP_ROOT}.\n` +
+      'The guard scanned nothing, so a pass here would be meaningless.\n' +
+      'Run it from the saas app (it expects to live at saas/scripts/).'
+    );
+  }
+
+  for (const full of files) {
+    let sourceText;
+    try {
+      sourceText = fs.readFileSync(full, 'utf8');
+    } catch {
+      continue;
+    }
+    const hits = detectHardcodedStrings(full, sourceText);
+    if (hits.length) results.set(relPath(full), hits);
+  }
+  return results;
+}
+
+/* ------------------------------------------------------------------ *
+ * Baseline loading — deliberately shape-tolerant.
+ * Accepts:  ["app/x.tsx", ...]
+ *           [{ file|path, strings? }, ...]
+ *           { "app/x.tsx": ["..."] | 3 | true | false }
+ *           { files: <any of the above> }
+ * Per-string data is used when present; otherwise the file is exempt wholesale.
+ * ------------------------------------------------------------------ */
+
+function loadBaseline() {
+  if (!fs.existsSync(BASELINE_PATH)) {
+    fail(
+      `Baseline not found: ${relPath(BASELINE_PATH)}\n` +
+      'Refusing to pass without it — a missing baseline would silently exempt nothing\n' +
+      'and fail every file, or (worse) be "fixed" by disabling the guard.\n' +
+      'Regenerate with: node scripts/check-hardcoded-copy.mjs --write-baseline'
+    );
+  }
+
+  let parsed;
+  const raw = fs.readFileSync(BASELINE_PATH, 'utf8');
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    fail(
+      `Baseline is not valid JSON: ${relPath(BASELINE_PATH)}\n${error.message}\n` +
+      'If this file was pasted over with something else, restore it before trusting a green build.'
+    );
+  }
+
+  const container =
+    parsed && !Array.isArray(parsed) && typeof parsed === 'object' && parsed.files !== undefined
+      ? parsed.files
+      : parsed;
+
+  const strings = new Map(); // relPath -> Set<canonical> | null (null = whole-file exemption)
+
+  const addEntry = (file, value) => {
+    if (typeof file !== 'string' || !file) return;
+    const key = file.split(path.sep).join('/').replace(/^\.\//, '');
+    if (value === false) return; // explicitly "not in baseline"
+    if (Array.isArray(value)) {
+      const set = new Set();
+      for (const item of value) {
+        if (typeof item === 'string') set.add(canonical(item));
+        else if (item && typeof item === 'object' && typeof item.text === 'string') set.add(canonical(item.text));
+      }
+      strings.set(key, set.size ? set : null);
+      return;
+    }
+    strings.set(key, null); // true / number / object / undefined -> file-level exemption
+  };
+
+  if (Array.isArray(container)) {
+    for (const entry of container) {
+      if (typeof entry === 'string') addEntry(entry, null);
+      else if (entry && typeof entry === 'object') {
+        const file = entry.file ?? entry.path ?? entry.filePath;
+        addEntry(file, entry.strings ?? entry.violations ?? null);
+      }
+    }
+  } else if (container && typeof container === 'object') {
+    for (const [file, value] of Object.entries(container)) addEntry(file, value);
+  } else {
+    fail(`Baseline has an unrecognized shape: ${relPath(BASELINE_PATH)}`);
+  }
+
+  return strings;
+}
+
+/* ------------------------------------------------------------------ *
+ * Modes
+ * ------------------------------------------------------------------ */
+
+function writeBaseline(results) {
+  const files = {};
+  for (const [file, hits] of [...results.entries()].sort()) {
+    files[file] = hits.map((hit) => hit.text);
+  }
   const payload = {
-    _comment: "Known hardcoded-UI-copy debt as of the AST-based guard's introduction. New files are NOT allowed here — the guard fails the build for anything not already listed. Remove an entry once its file is wired for i18n.",
-    generatedAt: new Date().toISOString().slice(0, 10),
-    files: current,
+    _path: 'saas/scripts/i18n-hardcoded-baseline.json',
+    _note:
+      'Known hardcoded-copy debt, captured by scripts/check-hardcoded-copy.mjs. ' +
+      'Files listed here are reported but do not fail the build. Regenerate ONLY when the ' +
+      'detection rule itself gets stricter — never to clear violations someone just added.',
+    generatedAt: new Date().toISOString(),
+    fileCount: Object.keys(files).length,
+    files,
+  };
+  fs.writeFileSync(BASELINE_PATH, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  const total = Object.values(files).reduce((sum, list) => sum + list.length, 0);
+  console.log(`Wrote ${relPath(BASELINE_PATH)}: ${Object.keys(files).length} files, ${total} strings.`);
+  console.log('Commit this only if the detection rule changed. Otherwise you just disabled the guard.');
+}
+
+function report(results, baseline, listEverything) {
+  const violations = [];
+  let baselinedFiles = 0;
+  let baselinedStrings = 0;
+
+  for (const [file, hits] of [...results.entries()].sort()) {
+    const known = baseline.get(file);
+    const inBaseline = baseline.has(file);
+    if (inBaseline) baselinedFiles += 1;
+
+    for (const hit of hits) {
+      const isKnown = inBaseline && (known === null || known.has(canonical(hit.text)));
+      if (isKnown) {
+        baselinedStrings += 1;
+        if (listEverything) console.log(`  known    ${file}:${hit.line}  ${JSON.stringify(hit.text)}`);
+      } else {
+        violations.push({ file, ...hit });
+        if (listEverything) console.log(`  NEW      ${file}:${hit.line}  ${JSON.stringify(hit.text)}`);
+      }
+    }
   }
-  const { writeFileSync } = await import('node:fs')
-  writeFileSync(BASELINE_PATH, JSON.stringify(payload, null, 2) + '\n')
-  console.log(`Baseline written: ${current.length} file(s).`)
-  process.exit(0)
+
+  if (!violations.length) {
+    console.log(
+      `${SENTINEL} — ${results.size} files with known copy debt ` +
+      `(${baselinedFiles} baselined, ${baselinedStrings} strings), 0 new violations.`
+    );
+    return 0;
+  }
+
+  console.error('\nHardcoded UI copy that is not in the i18n baseline:\n');
+  let currentFile = '';
+  for (const violation of violations) {
+    if (violation.file !== currentFile) {
+      currentFile = violation.file;
+      console.error(`  ${currentFile}`);
+    }
+    console.error(`    line ${violation.line}  [${violation.kind}]  ${JSON.stringify(violation.text)}`);
+  }
+  console.error(
+    `\n${violations.length} new hardcoded string(s) across ` +
+    `${new Set(violations.map((v) => v.file)).size} file(s).\n`
+  );
+  console.error(
+    'This is checked per string, so it applies even inside a file that already calls\n' +
+    "t() or useI18n() elsewhere. Route each string through this repo's i18n:\n" +
+    "  t('some.key', 'English fallback')            lib/i18n/t.ts\n" +
+    '  <LocalizedText fallback="English" />         components/i18n/LocalizedText.tsx\n' +
+    '  a per-component COPY dictionary keyed by language\n\n' +
+    'Do NOT regenerate the baseline to make this pass. The baseline exists to hold\n' +
+    'day-one debt, not to absorb new debt.\n'
+  );
+  return 1;
 }
 
-const newViolations = current.filter(f => !baseline.has(f))
-const fixed = [...baseline].filter(f => !current.includes(f))
+/* ------------------------------------------------------------------ *
+ * Entry point
+ * ------------------------------------------------------------------ */
 
-if (newViolations.length > 0) {
-  console.error('New hardcoded UI copy detected — literal English text found in JSX (or a placeholder/aria-label/title/alt attribute). This is checked per string, so it applies even inside a file that already calls t() or useI18n() elsewhere:')
-  for (const f of newViolations) console.error(`  - ${f}`)
-  console.error('')
-  console.error('Wire the file into i18n before merging, OR — if this is genuinely pre-existing debt being')
-  console.error(`moved rather than new — add it to ${relative(ROOT, BASELINE_PATH)} explicitly, with a reason.`)
-  process.exit(1)
+function main() {
+  const args = process.argv.slice(2);
+  const wantsBaseline = args.includes('--write-baseline');
+  const listEverything = args.includes('--list');
+
+  const results = scanRepo();
+
+  if (wantsBaseline) {
+    writeBaseline(results);
+    return 0;
+  }
+
+  return report(results, loadBaseline(), listEverything);
 }
 
-if (fixed.length > 0) {
-  console.log(`${fixed.length} file(s) no longer hardcoded and can be removed from the baseline:`)
-  for (const f of fixed) console.log(`  - ${f}`)
-  console.log('(Not failing the build for this — remove them from the baseline file when convenient.)')
+try {
+  process.exit(main());
+} catch (error) {
+  // A guard that dies quietly is not a guard. Any unexpected failure is a build failure.
+  console.error('\ni18n copy guard crashed:\n');
+  console.error(error && error.stack ? error.stack : error);
+  process.exit(1);
 }
-
-console.log(`Hardcoded-copy guard passed. ${current.length} file(s) remain in the known baseline; 0 new violations.`)

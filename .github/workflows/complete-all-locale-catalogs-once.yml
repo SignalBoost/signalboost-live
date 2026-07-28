@@ -1,0 +1,117 @@
+name: Complete all locale catalogs once
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/complete-all-locale-catalogs-once.yml'
+      - 'saas/scripts/complete-locale-catalogs-public.mjs'
+      - 'saas/scripts/generated-ui-locale-utils.mjs'
+      - 'saas/scripts/repair-generated-ui-token-mismatches.mjs'
+      - 'saas/locales/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: complete-all-locale-catalogs-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  complete-locale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        locale: [es, pt, pl, ru]
+
+    steps:
+      - name: Check out triggering PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Complete ${{ matrix.locale }} catalog
+        env:
+          TRANSLATION_REQUEST_TIMEOUT_MS: '30000'
+          TRANSLATION_BATCH_MAX_ITEMS: '40'
+          TRANSLATION_BATCH_MAX_CHARS: '5000'
+        run: node saas/scripts/complete-locale-catalogs-public.mjs --write --locale=${{ matrix.locale }}
+
+      - name: Stage completed locale artifact
+        run: |
+          mkdir -p completed
+          cp "saas/locales/${{ matrix.locale }}.json" "completed/${{ matrix.locale }}.json"
+
+      - name: Upload completed locale
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-locale-${{ matrix.locale }}
+          path: completed/${{ matrix.locale }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-bundle:
+    needs: complete-locale
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out triggering PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Download completed locale catalogs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: complete-locale-*
+          path: saas/locales
+          merge-multiple: true
+
+      - name: Restore protected tokens
+        working-directory: saas
+        run: node scripts/repair-generated-ui-token-mismatches.mjs
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install dependencies
+        working-directory: saas
+        run: npm ci
+
+      - name: Validate localization
+        working-directory: saas
+        run: npm run validate:i18n-copy
+
+      - name: Verify complete locale structure
+        run: node scripts/verify-repo-targeting.mjs --base origin/main --head HEAD --report qa/completed-locale-report.md
+
+      - name: Stage verified bundle
+        run: |
+          mkdir -p completed-bundle
+          cp saas/locales/es.json completed-bundle/es.json
+          cp saas/locales/pt.json completed-bundle/pt.json
+          cp saas/locales/pl.json completed-bundle/pl.json
+          cp saas/locales/ru.json completed-bundle/ru.json
+
+      - name: Upload verified locale bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-locale-bundle
+          path: completed-bundle
+          if-no-files-found: error
+          retention-days: 1

@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const read = (path: string) => readUiSource(new URL(path, import.meta.url))
 
 test('audit dashboard exposes one global approval and no per-finding patch approval control', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')

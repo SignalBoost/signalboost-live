@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 
-const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
-const preview = readFileSync(new URL('../components/home/PreviewProjects.tsx', import.meta.url), 'utf8')
+const homepage = readUiSource(new URL('../app/page.tsx', import.meta.url))
+const preview = readUiSource(new URL('../components/home/PreviewProjects.tsx', import.meta.url))
 
 test('homepage keeps roadmap previews separate from live portable runtime cards', () => {
   assert.match(homepage, /<PreviewProjects\s*\/>/)

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readUiSourceAsync } from './helpers/sourceWithUiCopy.mjs'
 import test from 'node:test'
 
 const layoutPath = new URL('../app/dashboard/supervisor/layout.tsx', import.meta.url)
 
 async function source() {
-  return readFile(layoutPath, 'utf8')
+  return readUiSourceAsync(layoutPath)
 }
 
 test('supervisor navigation exposes the protocol capability catalog', async () => {

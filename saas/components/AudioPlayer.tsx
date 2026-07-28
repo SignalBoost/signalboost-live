@@ -10,6 +10,7 @@ interface AudioPlayerProps {
   voiceModel: string;
 }
 
+const PROVIDER_NAME = 'OpenAI';
 const COPY = {
   en: { pause: 'Pause track', play: 'Play track', download: 'Download MP3' },
   es: { pause: 'Pausar pista', play: 'Reproducir pista', download: 'Descargar MP3' },
@@ -94,7 +95,7 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
         <h4 className="text-sm font-semibold truncate text-slate-100">{title}</h4>
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
-            OpenAI {voiceModel}
+            {PROVIDER_NAME} {voiceModel}
           </span>
           <span className="text-xs text-slate-400 font-mono">
             {formatTime(currentTime)} / {formatTime(duration)}

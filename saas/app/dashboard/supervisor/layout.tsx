@@ -1,21 +1,20 @@
 import Link from 'next/link'
-import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 import ProtocolCapabilitySummary from '@/components/supervisor/ProtocolCapabilitySummary'
+import { getServerLanguage } from '@/lib/i18n/serverLanguage'
 
 const copy = {
-  en: { brand: 'Supervisor', operations: 'Operations Center', capabilities: 'Protocol Capabilities', reviews: 'Mission Reviews', boundary: 'Read-only diagnostics', protocols: 'protocols', safety: 'safety-classified', supervisory: 'supervisory-only', mutating: 'declare mutation capability', safe: 'Read-only · no execution controls' },
-  es: { brand: 'Supervisor', operations: 'Centro de operaciones', capabilities: 'Capacidades de protocolo', reviews: 'Revisiones de misiones', boundary: 'Diagnóstico de solo lectura', protocols: 'protocolos', safety: 'clasificados por seguridad', supervisory: 'solo supervisión', mutating: 'declaran capacidad de modificación', safe: 'Solo lectura · sin controles de ejecución' },
-  pt: { brand: 'Supervisor', operations: 'Centro de operações', capabilities: 'Capacidades de protocolo', reviews: 'Revisões de missões', boundary: 'Diagnóstico somente leitura', protocols: 'protocolos', safety: 'classificados por segurança', supervisory: 'somente supervisão', mutating: 'declaram capacidade de alteração', safe: 'Somente leitura · sem controles de execução' },
-  pl: { brand: 'Nadzorca', operations: 'Centrum operacyjne', capabilities: 'Możliwości protokołów', reviews: 'Przeglądy misji', boundary: 'Diagnostyka tylko do odczytu', protocols: 'protokołów', safety: 'sklasyfikowanych pod kątem bezpieczeństwa', supervisory: 'tylko nadzorczych', mutating: 'deklaruje możliwość modyfikacji', safe: 'Tylko odczyt · bez kontroli wykonania' },
-  ru: { brand: 'Супервизор', operations: 'Операционный центр', capabilities: 'Возможности протоколов', reviews: 'Проверки миссий', boundary: 'Диагностика только для чтения', protocols: 'протоколов', safety: 'с классификацией безопасности', supervisory: 'только надзорных', mutating: 'допускают изменение', safe: 'Только чтение · без элементов выполнения' },
+  en: { brand: 'Supervisor', navigation: 'Supervisor navigation', operations: 'Operations Center', capabilities: 'Protocol Capabilities', reviews: 'Mission Reviews', boundary: 'Read-only diagnostics', protocols: 'protocols', safety: 'safety-classified', supervisory: 'supervisory-only', mutating: 'declare mutation capability', safe: 'Read-only · no execution controls' },
+  es: { brand: 'Supervisor', navigation: 'Navegación del Supervisor', operations: 'Centro de operaciones', capabilities: 'Capacidades de protocolo', reviews: 'Revisiones de misiones', boundary: 'Diagnóstico de solo lectura', protocols: 'protocolos', safety: 'clasificados por seguridad', supervisory: 'solo supervisión', mutating: 'declaran capacidad de modificación', safe: 'Solo lectura · sin controles de ejecución' },
+  pt: { brand: 'Supervisor', navigation: 'Navegação do Supervisor', operations: 'Centro de operações', capabilities: 'Capacidades de protocolo', reviews: 'Revisões de missões', boundary: 'Diagnóstico somente leitura', protocols: 'protocolos', safety: 'classificados por segurança', supervisory: 'somente supervisão', mutating: 'declaram capacidade de alteração', safe: 'Somente leitura · sem controles de execução' },
+  pl: { brand: 'Nadzorca', navigation: 'Nawigacja Nadzorcy', operations: 'Centrum operacyjne', capabilities: 'Możliwości protokołów', reviews: 'Przeglądy misji', boundary: 'Diagnostyka tylko do odczytu', protocols: 'protokołów', safety: 'sklasyfikowanych pod kątem bezpieczeństwa', supervisory: 'tylko nadzorczych', mutating: 'deklaruje możliwość modyfikacji', safe: 'Tylko odczyt · bez kontroli wykonania' },
+  ru: { brand: 'Супервизор', navigation: 'Навигация Супервизора', operations: 'Операционный центр', capabilities: 'Возможности протоколов', reviews: 'Проверки миссий', boundary: 'Диагностика только для чтения', protocols: 'протоколов', safety: 'с классификацией безопасности', supervisory: 'только надзорных', mutating: 'допускают изменение', safe: 'Только чтение · без элементов выполнения' },
 } as const
 
 type Lang = keyof typeof copy
 
 export default async function SupervisorLayout({ children }: { children: ReactNode }) {
-  const raw = (await cookies()).get('sb_locale')?.value?.slice(0, 2).toLowerCase()
-  const lang: Lang = raw && raw in copy ? raw as Lang : 'en'
+  const lang = await getServerLanguage() as Lang
   const t = copy[lang]
   const links = [
     { href: '/dashboard/supervisor', label: t.operations },
@@ -24,7 +23,7 @@ export default async function SupervisorLayout({ children }: { children: ReactNo
   ] as const
 
   return <div>
-    <nav aria-label="Supervisor navigation" style={nav}>
+    <nav aria-label={t.navigation} style={nav}>
       <strong style={brand}>{t.brand}</strong>
       <div style={linksStyle}>{links.map(link => <Link key={link.href} href={link.href} style={item}>{link.label}</Link>)}</div>
       <span style={boundary}>{t.boundary}</span>

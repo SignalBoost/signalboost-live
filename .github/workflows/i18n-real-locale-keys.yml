@@ -31,6 +31,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Restore the obsolete generated-copy migration
+        run: node scripts/restore-generated-ui-copy.mjs
       - name: Prepare migration safeguards
         run: node scripts/prepare-real-locale-migration.mjs
       - name: Move UI copy into locale dictionaries

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 
+// Rehydrate only the uiCopy keys referenced by the source under test.
 const generatedCopyUrl = new URL('../../lib/i18n/generatedUiCopy.ts', import.meta.url)
 let cachedCopy = null
 

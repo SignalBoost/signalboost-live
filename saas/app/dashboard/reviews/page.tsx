@@ -21,8 +21,7 @@ import {
   type ReviewSortMode,
   type ReviewSentiment,
 } from '@/lib/reviews'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GREEN = '#4ade80'
 const RED = '#f87171'
@@ -31,68 +30,68 @@ const GOLD = '#ffc300'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<string, Record<Lang, string>> = {
-  kicker:           { en: uiCopy('u_69bb3eb36d07242c'), es: 'Centro de mando de reseñas', pt: 'Central de avaliações', pl: 'Centrum zarządzania opiniami', ru: 'Центр управления отзывами' },
-  title:            { en: uiCopy('u_2582804c8e4cdc91'), es: 'Colector de reseñas', pt: 'Coletor de avaliações', pl: 'Kolektor opinii', ru: 'Сборщик отзывов' },
-  subtitle:         { en: uiCopy('u_185ef1177d974197'), es: 'Recopila reseñas multilingües, aprueba lo que se publica y monitorea el sentimiento.', pt: 'Colete avaliações multilíngues, aprove o que publica e monitore sentimentos.', pl: 'Zbieraj wielojęzyczne opinie, zatwierdzaj publikacje i monitoruj nastroje.', ru: 'Собирайте многоязычные отзывы, одобряйте публикации и отслеживайте настроения.' },
-  shareCta:         { en: uiCopy('u_45ba659958f98fc0'), es: 'Compartir enlace', pt: 'Compartilhar link', pl: 'Udostępnij link', ru: 'Поделиться ссылкой' },
-  adminCta:         { en: uiCopy('u_d5ed9e41311bf4bc'), es: 'Ver telemetría', pt: 'Ver telemetria', pl: 'Zobacz telemetrię', ru: 'Телеметрия' },
-  sendLinkTitle:    { en: uiCopy('u_93584087c182bbab'), es: 'Envía este enlace a tus clientes', pt: 'Envie este link para seus clientes', pl: 'Wyślij ten link swoim klientom', ru: 'Отправьте эту ссылку своим клиентам' },
-  submissionTitle:  { en: uiCopy('u_7b082765840cb456'), es: 'Envío de reseña localizada', pt: 'Envio de avaliação localizada', pl: 'Lokalizowane przesyłanie opinii', ru: 'Локализованная отправка отзыва' },
-  sendLinkDesc:     { en: uiCopy('u_05e58187c3f8fdf6'), es: 'Hacen clic, dejan una reseña en su idioma, adjuntan imágenes y aparece como Pendiente.', pt: 'Eles clicam, deixam uma avaliação no seu idioma, anexam imagens e aparece como Pendente.', pl: 'Klikają, zostawiają opinię w swoim języku, dołączają zdjęcia — pojawia się jako Oczekująca.', ru: 'Они нажимают, оставляют отзыв на своём языке — он появляется как Ожидающий.' },
-  loading:          { en: uiCopy('u_170f45a9126752a0'), es: 'Cargando…', pt: 'Carregando…', pl: 'Ładowanie…', ru: 'Загрузка…' },
-  pickHandleDesc:   { en: uiCopy('u_60fd2e6a45152553'), es: 'Elige un identificador — 3 a 30 letras minúsculas, dígitos y guiones.', pt: 'Escolha um identificador — 3 a 30 letras minúsculas, dígitos e hífens.', pl: 'Wybierz identyfikator — 3 do 30 małych liter, cyfr i myślników.', ru: 'Выберите идентификатор — 3–30 строчных букв, цифр и дефисов.' },
-  handlePlaceholder:{ en: uiCopy('u_6e0e4ce5ddd6b92f'), es: 'tu-identificador', pt: 'seu-identificador', pl: 'twoj-identyfikator', ru: 'ваш-идентификатор' },
-  saving:           { en: uiCopy('u_96ddd7a8e5569d50'), es: 'Guardando…', pt: 'Salvando…', pl: 'Zapisywanie…', ru: 'Сохранение…' },
-  claim:            { en: uiCopy('u_2c89e6fb56dd9b0f'), es: 'Reclamar', pt: 'Reivindicar', pl: 'Zarezerwuj', ru: 'Занять' },
-  copied:           { en: uiCopy('u_0b09741dbc1506b6'), es: 'Copiado', pt: 'Copiado', pl: 'Skopiowano', ru: 'Скопировано' },
-  copyLink:         { en: uiCopy('u_85dee4d6f0d73a02'), es: 'Copiar enlace', pt: 'Copiar link', pl: 'Kopiuj link', ru: 'Копировать ссылку' },
-  openNewTab:       { en: uiCopy('u_e02a401b21332048'), es: 'Abrir en nueva pestaña', pt: 'Abrir em nova aba', pl: 'Otwórz w nowej karcie', ru: 'Открыть в новой вкладке' },
-  previewText:      { en: uiCopy('u_a48702286b59e200'), es: 'Ejemplo de cómo se muestra una reseña — fechas y montos se adaptan a cada idioma:', pt: 'Exemplo de como uma avaliação aparece — datas e valores se adaptam a cada idioma:', pl: 'Przykład wyświetlania opinii — daty i kwoty dostosowują się do języka:', ru: 'Пример отображения отзыва — даты и суммы адаптируются к языку:' },
-  sampleBadge:      { en: uiCopy('u_d10011a520c6995a'), es: 'Vista de ejemplo', pt: 'Prévia de exemplo', pl: 'Przykładowy podgląd', ru: 'Пример' },
-  mediaLabel:       { en: uiCopy('u_14e2e14d26393114'), es: 'Archivos de imagen opcionales', pt: 'Anexos de imagem opcionais', pl: 'Opcjonalne załączniki obrazów', ru: 'Необязательные вложения изображений' },
-  conciergeTitle:   { en: uiCopy('u_2dccd2cffc856adf'), es: 'Concierge IA', pt: 'Concierge IA', pl: 'Concierge AI', ru: 'Консьерж ИИ' },
-  conciergeHeadline:{ en: uiCopy('u_e7b43863305b8c98'), es: 'Recomendaciones basadas en reseñas', pt: 'Recomendações baseadas em avaliações', pl: 'Rekomendacje oparte na opiniach', ru: 'Рекомендации на основе отзывов' },
-  conciergeBody:    { en: uiCopy('u_7204f77a67d90b06'), es: 'El Concierge sugiere acciones de moderación y propone campañas cuando el sentimiento es positivo.', pt: 'O Concierge sugere ações de moderação e propõe campanhas quando o sentimento é positivo.', pl: 'Concierge sugeruje działania moderacyjne i proponuje kampanie gdy nastroje są pozytywne.', ru: 'Консьерж предлагает действия модерации и кампании при позитивных настроениях.' },
-  noCampaigns:      { en: uiCopy('u_e96183a9a858b357'), es: 'Las reseñas positivas activarán ideas de campaña aquí.', pt: 'Avaliações positivas ativarão ideias de campanha aqui.', pl: 'Pozytywne opinie wyzwolą tutaj pomysły na kampanie.', ru: 'Положительные отзывы вызовут здесь идеи для кампаний.' },
-  yourReviews:      { en: uiCopy('u_cd6d32bcae27cb52'), es: 'Tus reseñas', pt: 'Suas avaliações', pl: 'Twoje opinie', ru: 'Ваши отзывы' },
-  summaryEmpty:     { en: uiCopy('u_04e2cde72ece88bf'), es: 'Nada aún. Comparte el enlace de arriba para comenzar.', pt: 'Nada ainda. Compartilhe o link acima para começar.', pl: 'Jeszcze nic. Udostępnij powyższy link, aby rozpocząć.', ru: 'Пока ничего. Поделитесь ссылкой выше, чтобы начать.' },
-  total:            { en: uiCopy('u_bdc77b911b7c6503'), es: 'total', pt: 'total', pl: 'łącznie', ru: 'всего' },
-  pending:          { en: uiCopy('u_183d21a88d568fef'), es: 'pendiente', pt: 'pendente', pl: 'oczekujące', ru: 'ожидающих' },
-  approved:         { en: uiCopy('u_26b124402e02d076'), es: 'aprobado', pt: 'aprovado', pl: 'zatwierdzone', ru: 'одобренных' },
-  flagged:          { en: uiCopy('u_51302e9ea7dc3652'), es: 'marcado', pt: 'sinalizado', pl: 'oflagowane', ru: 'отмеченных' },
-  avg:              { en: uiCopy('u_21fb429403592528'), es: 'prom', pt: 'méd', pl: 'śr', ru: 'ср' },
-  sortRelevance:    { en: uiCopy('u_c9463bf583802986'), es: 'Ordenar: relevancia', pt: 'Ordenar: relevância', pl: 'Sortuj: trafność', ru: 'Сортировка: релевантность' },
-  sortDate:         { en: uiCopy('u_819b5281129f0da8'), es: 'Ordenar: más reciente', pt: 'Ordenar: más reciente', pl: 'Sortuj: najnowsze', ru: 'Сортировка: новейшие' },
-  sortRating:       { en: uiCopy('u_c9c7b8f352274602'), es: 'Ordenar: calificación', pt: 'Ordenar: avaliação', pl: 'Sortuj: ocena', ru: 'Сортировка: рейтинг' },
-  allLanguages:     { en: uiCopy('u_f80360ab0b2feede'), es: 'Todos los idiomas', pt: 'Todos os idiomas', pl: 'Wszystkie języki', ru: 'Все языки' },
-  allPartners:      { en: uiCopy('u_f8bff8b9ab1df176'), es: 'Todos los socios', pt: 'Todos os parceiros', pl: 'Wszyscy partnerzy', ru: 'Все партнёры' },
-  allProducts:      { en: uiCopy('u_d6fc705da47611b5'), es: 'Todos los productos/servicios', pt: 'Todos os produtos/serviços', pl: 'Wszystkie produkty/usługi', ru: 'Все продукты/услуги' },
-  filterAll:        { en: uiCopy('u_5b546d93f661ae65'), es: 'Todos', pt: 'Todos', pl: 'Wszystkie', ru: 'Все' },
-  filterPending:    { en: uiCopy('u_52c2d281d630bcee'), es: 'Pendientes', pt: 'Pendentes', pl: 'Oczekujące', ru: 'Ожидающие' },
-  filterApproved:   { en: uiCopy('u_bb26d729f30641fa'), es: 'Aprobados', pt: 'Aprovados', pl: 'Zatwierdzone', ru: 'Одобренные' },
-  filterFlagged:    { en: uiCopy('u_1aaccc2060ce9278'), es: 'Marcados', pt: 'Sinalizados', pl: 'Oflagowane', ru: 'Отмеченные' },
-  generalService:   { en: uiCopy('u_5760ccc9dfa047e8'), es: 'Servicio general', pt: 'Serviço geral', pl: 'Usługa ogólna', ru: 'Общая услуга' },
-  verifiedPartner:  { en: uiCopy('u_fdbf8bc7a48cac5c'), es: 'Socio verificado', pt: 'Parceiro verificado', pl: 'Zweryfikowany partner', ru: 'Проверенный партнёр' },
-  media:            { en: uiCopy('u_4f60b4f5bccbef65'), es: 'medios', pt: 'mídia', pl: 'media', ru: 'медиа' },
-  unpublish:        { en: uiCopy('u_cd5b12a2f002f940'), es: 'Despublicar', pt: 'Despublicar', pl: 'Cofnij publikację', ru: 'Снять с публикации' },
-  approve:          { en: uiCopy('u_7f409a5f77a7f699'), es: 'Aprobar', pt: 'Aprovar', pl: 'Zatwierdź', ru: 'Одобрить' },
-  unflag:           { en: uiCopy('u_6fc8c50fc5b5a0fe'), es: 'Quitar marca', pt: 'Remover sinalização', pl: 'Usuń flagę', ru: 'Снять отметку' },
-  flag:             { en: uiCopy('u_303284d2f8f0b29a'), es: 'Marcar', pt: 'Sinalizar', pl: 'Oflaguj', ru: 'Отметить' },
-  translate:        { en: uiCopy('u_dc2361b9bdda3006'), es: 'Traducir con IA', pt: 'Traduzir com IA', pl: 'Tłumacz AI', ru: 'ИИ-перевод' },
-  delete:           { en: uiCopy('u_240524357b46f07b'), es: 'Eliminar', pt: 'Excluir', pl: 'Usuń', ru: 'Удалить' },
-  confirmDelete:    { en: uiCopy('u_ecf59b5562dd7030'), es: '¿Eliminar esta reseña? Esto no se puede deshacer.', pt: 'Excluir esta avaliação? Isso não pode ser desfeito.', pl: 'Usunąć tę opinię? Tego nie można cofnąć.', ru: 'Удалить этот отзыв? Это нельзя отменить.' },
-  adminConsole:     { en: uiCopy('u_0a408f7ad534b6b7'), es: 'Consola de Administrador', pt: 'Console do Administrador', pl: 'Konsola Administratora', ru: 'Консоль администратора' },
-  telemetryTitle:   { en: uiCopy('u_816d880db3625324'), es: 'Telemetría, sentimiento y moderación', pt: 'Telemetria, sentimento e moderação', pl: 'Telemetria, nastroje i moderacja', ru: 'Телеметрия, настроения и модерация' },
-  logsEnabled:      { en: uiCopy('u_7171bbed10cfb88e'), es: 'Envíos · Sentimiento IA · moderación', pt: 'Envios · Sentimento IA · moderação', pl: 'Zgłoszenia · Nastroje AI · moderacja', ru: 'Отправки · Настроения ИИ · модерация' },
-  localeVolume:     { en: uiCopy('u_a23e10c5a4f50df9'), es: 'Volumen por región', pt: 'Volume por região', pl: 'Wolumen według regionu', ru: 'Объём по регионам' },
-  sentimentTrend:   { en: uiCopy('u_e633713aa417a190'), es: 'Tendencia de sentimiento', pt: 'Tendência de sentimento', pl: 'Trend nastrojów', ru: 'Тенденция настроений' },
-  moderationQueue:  { en: uiCopy('u_65ab0023e20e1cd6'), es: 'Cola de moderación', pt: 'Fila de moderação', pl: 'Kolejka moderacji', ru: 'Очередь moderacji' },
-  outreachHooks:    { en: uiCopy('u_76b3d7e502cd6aa6'), es: 'Hooks Outreach + CRM', pt: 'Hooks Outreach + CRM', pl: 'Haki Outreach + CRM', ru: 'Хуки Outreach + CRM' },
-  crmRegression:    { en: uiCopy('u_b47fc216f29e1c3b'), es: 'Guardia de regresión: reseñas positivas → Leads → Oportunidades → Conversiones.', pt: 'Guarda de regressão: avaliações positivas → Leads → Oportunidades → Conversões.', pl: 'Ochrona regresji: zatwierdzone opinie → Leady → Szanse → Konwersje.', ru: 'Защита регрессии: одобренные отзывы → Лиды → Возможности → Конверсии.' },
-  errSignIn:        { en: uiCopy('u_9577a1f8ea50201a'), es: 'Por favor inicia sesión.', pt: 'Por favor faça login.', pl: 'Zaloguj się.', ru: 'Пожалуйста, войдите.' },
-  errLoad:          { en: uiCopy('u_239433e67e956938'), es: 'No se pudieron cargar las reseñas.', pt: 'Não foi possível carregar as avaliações.', pl: 'Nie można załadować opinii.', ru: 'Не удалось загрузить отзывы.' },
-  errPickHandle:    { en: uiCopy('u_81a5d8ed80def89a'), es: 'Elige un identificador para continuar.', pt: 'Escolha um identificador para continuar.', pl: 'Wybierz identyfikator.', ru: 'Выберите идентификатор.' },
-  errSaveHandle:    { en: uiCopy('u_9ca93e36cbf58dca'), es: 'No se pudo guardar el identificador.', pt: 'Não foi possível salvar o identificador.', pl: 'Nie można zapisać identyfikatora.', ru: 'Не удалось сохранить идентификатор.' },
+  kicker:           { en: uiText('generatedUi.u_eff4a1c2d650ac94'), es: 'Centro de mando de reseñas', pt: 'Central de avaliações', pl: 'Centrum zarządzania opiniami', ru: 'Центр управления отзывами' },
+  title:            { en: uiText('generatedUi.u_4637016c5e82d0d1'), es: 'Colector de reseñas', pt: 'Coletor de avaliações', pl: 'Kolektor opinii', ru: 'Сборщик отзывов' },
+  subtitle:         { en: uiText('generatedUi.u_360580113dbe96ab'), es: 'Recopila reseñas multilingües, aprueba lo que se publica y monitorea el sentimiento.', pt: 'Colete avaliações multilíngues, aprove o que publica e monitore sentimentos.', pl: 'Zbieraj wielojęzyczne opinie, zatwierdzaj publikacje i monitoruj nastroje.', ru: 'Собирайте многоязычные отзывы, одобряйте публикации и отслеживайте настроения.' },
+  shareCta:         { en: uiText('generatedUi.u_8410b494cae23dad'), es: 'Compartir enlace', pt: 'Compartilhar link', pl: 'Udostępnij link', ru: 'Поделиться ссылкой' },
+  adminCta:         { en: uiText('generatedUi.u_67838c7ad5459fc8'), es: 'Ver telemetría', pt: 'Ver telemetria', pl: 'Zobacz telemetrię', ru: 'Телеметрия' },
+  sendLinkTitle:    { en: uiText('generatedUi.u_e6d4f5ce8a93bd73'), es: 'Envía este enlace a tus clientes', pt: 'Envie este link para seus clientes', pl: 'Wyślij ten link swoim klientom', ru: 'Отправьте эту ссылку своим клиентам' },
+  submissionTitle:  { en: uiText('generatedUi.u_03329cf8efd5a913'), es: 'Envío de reseña localizada', pt: 'Envio de avaliação localizada', pl: 'Lokalizowane przesyłanie opinii', ru: 'Локализованная отправка отзыва' },
+  sendLinkDesc:     { en: uiText('generatedUi.u_be9601f482f01cb7'), es: 'Hacen clic, dejan una reseña en su idioma, adjuntan imágenes y aparece como Pendiente.', pt: 'Eles clicam, deixam uma avaliação no seu idioma, anexam imagens e aparece como Pendente.', pl: 'Klikają, zostawiają opinię w swoim języku, dołączają zdjęcia — pojawia się jako Oczekująca.', ru: 'Они нажимают, оставляют отзыв на своём языке — он появляется как Ожидающий.' },
+  loading:          { en: uiText('generatedUi.u_ba3bbbe10d8bef66'), es: 'Cargando…', pt: 'Carregando…', pl: 'Ładowanie…', ru: 'Загрузка…' },
+  pickHandleDesc:   { en: uiText('generatedUi.u_e9a31d81bf0a5910'), es: 'Elige un identificador — 3 a 30 letras minúsculas, dígitos y guiones.', pt: 'Escolha um identificador — 3 a 30 letras minúsculas, dígitos e hífens.', pl: 'Wybierz identyfikator — 3 do 30 małych liter, cyfr i myślników.', ru: 'Выберите идентификатор — 3–30 строчных букв, цифр и дефисов.' },
+  handlePlaceholder:{ en: uiText('generatedUi.u_957f19bade6f852b'), es: 'tu-identificador', pt: 'seu-identificador', pl: 'twoj-identyfikator', ru: 'ваш-идентификатор' },
+  saving:           { en: uiText('generatedUi.u_23e39291d6135814'), es: 'Guardando…', pt: 'Salvando…', pl: 'Zapisywanie…', ru: 'Сохранение…' },
+  claim:            { en: uiText('generatedUi.u_4ca41db028253700'), es: 'Reclamar', pt: 'Reivindicar', pl: 'Zarezerwuj', ru: 'Занять' },
+  copied:           { en: uiText('generatedUi.u_8d525e5f158b9afe'), es: 'Copiado', pt: 'Copiado', pl: 'Skopiowano', ru: 'Скопировано' },
+  copyLink:         { en: uiText('generatedUi.u_dbf362d4f210c780'), es: 'Copiar enlace', pt: 'Copiar link', pl: 'Kopiuj link', ru: 'Копировать ссылку' },
+  openNewTab:       { en: uiText('generatedUi.u_e0af5c0bc2457475'), es: 'Abrir en nueva pestaña', pt: 'Abrir em nova aba', pl: 'Otwórz w nowej karcie', ru: 'Открыть в новой вкладке' },
+  previewText:      { en: uiText('generatedUi.u_db1c141e18b2b208'), es: 'Ejemplo de cómo se muestra una reseña — fechas y montos se adaptan a cada idioma:', pt: 'Exemplo de como uma avaliação aparece — datas e valores se adaptam a cada idioma:', pl: 'Przykład wyświetlania opinii — daty i kwoty dostosowują się do języka:', ru: 'Пример отображения отзыва — даты и суммы адаптируются к языку:' },
+  sampleBadge:      { en: uiText('generatedUi.u_39d399369a105e93'), es: 'Vista de ejemplo', pt: 'Prévia de exemplo', pl: 'Przykładowy podgląd', ru: 'Пример' },
+  mediaLabel:       { en: uiText('generatedUi.u_a194e248c04648f4'), es: 'Archivos de imagen opcionales', pt: 'Anexos de imagem opcionais', pl: 'Opcjonalne załączniki obrazów', ru: 'Необязательные вложения изображений' },
+  conciergeTitle:   { en: uiText('generatedUi.u_bef4521095495dae'), es: 'Concierge IA', pt: 'Concierge IA', pl: 'Concierge AI', ru: 'Консьерж ИИ' },
+  conciergeHeadline:{ en: uiText('generatedUi.u_9e41a281f1dd39e9'), es: 'Recomendaciones basadas en reseñas', pt: 'Recomendações baseadas em avaliações', pl: 'Rekomendacje oparte na opiniach', ru: 'Рекомендации на основе отзывов' },
+  conciergeBody:    { en: uiText('generatedUi.u_23d79449120cd467'), es: 'El Concierge sugiere acciones de moderación y propone campañas cuando el sentimiento es positivo.', pt: 'O Concierge sugere ações de moderação e propõe campanhas quando o sentimento é positivo.', pl: 'Concierge sugeruje działania moderacyjne i proponuje kampanie gdy nastroje są pozytywne.', ru: 'Консьерж предлагает действия модерации и кампании при позитивных настроениях.' },
+  noCampaigns:      { en: uiText('generatedUi.u_d1bcf915c912b681'), es: 'Las reseñas positivas activarán ideas de campaña aquí.', pt: 'Avaliações positivas ativarão ideias de campanha aqui.', pl: 'Pozytywne opinie wyzwolą tutaj pomysły na kampanie.', ru: 'Положительные отзывы вызовут здесь идеи для кампаний.' },
+  yourReviews:      { en: uiText('generatedUi.u_d9058ab5c9016a86'), es: 'Tus reseñas', pt: 'Suas avaliações', pl: 'Twoje opinie', ru: 'Ваши отзывы' },
+  summaryEmpty:     { en: uiText('generatedUi.u_13350f41a3451583'), es: 'Nada aún. Comparte el enlace de arriba para comenzar.', pt: 'Nada ainda. Compartilhe o link acima para começar.', pl: 'Jeszcze nic. Udostępnij powyższy link, aby rozpocząć.', ru: 'Пока ничего. Поделитесь ссылкой выше, чтобы начать.' },
+  total:            { en: uiText('generatedUi.u_11239872d178729a'), es: 'total', pt: 'total', pl: 'łącznie', ru: 'всего' },
+  pending:          { en: uiText('generatedUi.u_62a2fed3d6e08c44'), es: 'pendiente', pt: 'pendente', pl: 'oczekujące', ru: 'ожидающих' },
+  approved:         { en: uiText('generatedUi.u_2687f86ed6784b8a'), es: 'aprobado', pt: 'aprovado', pl: 'zatwierdzone', ru: 'одобренных' },
+  flagged:          { en: uiText('generatedUi.u_5588be887fb18a7d'), es: 'marcado', pt: 'sinalizado', pl: 'oflagowane', ru: 'отмеченных' },
+  avg:              { en: uiText('generatedUi.u_ca5c8585b0760a76'), es: 'prom', pt: 'méd', pl: 'śr', ru: 'ср' },
+  sortRelevance:    { en: uiText('generatedUi.u_8edc2f421465ed23'), es: 'Ordenar: relevancia', pt: 'Ordenar: relevância', pl: 'Sortuj: trafność', ru: 'Сортировка: релевантность' },
+  sortDate:         { en: uiText('generatedUi.u_52a3d3605f7ac8aa'), es: 'Ordenar: más reciente', pt: 'Ordenar: más reciente', pl: 'Sortuj: najnowsze', ru: 'Сортировка: новейшие' },
+  sortRating:       { en: uiText('generatedUi.u_87eb14ddcee99d99'), es: 'Ordenar: calificación', pt: 'Ordenar: avaliação', pl: 'Sortuj: ocena', ru: 'Сортировка: рейтинг' },
+  allLanguages:     { en: uiText('generatedUi.u_acce3d0e30f951f6'), es: 'Todos los idiomas', pt: 'Todos os idiomas', pl: 'Wszystkie języki', ru: 'Все языки' },
+  allPartners:      { en: uiText('generatedUi.u_f1beb9d2a979e40b'), es: 'Todos los socios', pt: 'Todos os parceiros', pl: 'Wszyscy partnerzy', ru: 'Все партнёры' },
+  allProducts:      { en: uiText('generatedUi.u_c4b20188433a8c23'), es: 'Todos los productos/servicios', pt: 'Todos os produtos/serviços', pl: 'Wszystkie produkty/usługi', ru: 'Все продукты/услуги' },
+  filterAll:        { en: uiText('generatedUi.u_a52ace420f2175d0'), es: 'Todos', pt: 'Todos', pl: 'Wszystkie', ru: 'Все' },
+  filterPending:    { en: uiText('generatedUi.u_331551b0de4157c9'), es: 'Pendientes', pt: 'Pendentes', pl: 'Oczekujące', ru: 'Ожидающие' },
+  filterApproved:   { en: uiText('generatedUi.u_87b42e40c2a290e0'), es: 'Aprobados', pt: 'Aprovados', pl: 'Zatwierdzone', ru: 'Одобренные' },
+  filterFlagged:    { en: uiText('generatedUi.u_2f1978c6166e8980'), es: 'Marcados', pt: 'Sinalizados', pl: 'Oflagowane', ru: 'Отмеченные' },
+  generalService:   { en: uiText('generatedUi.u_8f69f60e6baeefad'), es: 'Servicio general', pt: 'Serviço geral', pl: 'Usługa ogólna', ru: 'Общая услуга' },
+  verifiedPartner:  { en: uiText('generatedUi.u_a38feefedc89c9bf'), es: 'Socio verificado', pt: 'Parceiro verificado', pl: 'Zweryfikowany partner', ru: 'Проверенный партнёр' },
+  media:            { en: uiText('generatedUi.u_721c9525ade2ea89'), es: 'medios', pt: 'mídia', pl: 'media', ru: 'медиа' },
+  unpublish:        { en: uiText('generatedUi.u_2db04a54fa743150'), es: 'Despublicar', pt: 'Despublicar', pl: 'Cofnij publikację', ru: 'Снять с публикации' },
+  approve:          { en: uiText('generatedUi.u_6007acbe30b2cd98'), es: 'Aprobar', pt: 'Aprovar', pl: 'Zatwierdź', ru: 'Одобрить' },
+  unflag:           { en: uiText('generatedUi.u_eaf05d552ed6174f'), es: 'Quitar marca', pt: 'Remover sinalização', pl: 'Usuń flagę', ru: 'Снять отметку' },
+  flag:             { en: uiText('generatedUi.u_552127973f8424e1'), es: 'Marcar', pt: 'Sinalizar', pl: 'Oflaguj', ru: 'Отметить' },
+  translate:        { en: uiText('generatedUi.u_bc4ac4d12a4a3f9c'), es: 'Traducir con IA', pt: 'Traduzir com IA', pl: 'Tłumacz AI', ru: 'ИИ-перевод' },
+  delete:           { en: uiText('generatedUi.u_e2d0a54968ead24e'), es: 'Eliminar', pt: 'Excluir', pl: 'Usuń', ru: 'Удалить' },
+  confirmDelete:    { en: uiText('generatedUi.u_3a14c8c6ad125718'), es: '¿Eliminar esta reseña? Esto no se puede deshacer.', pt: 'Excluir esta avaliação? Isso não pode ser desfeito.', pl: 'Usunąć tę opinię? Tego nie można cofnąć.', ru: 'Удалить этот отзыв? Это нельзя отменить.' },
+  adminConsole:     { en: uiText('generatedUi.u_104bfb7a21182419'), es: 'Consola de Administrador', pt: 'Console do Administrador', pl: 'Konsola Administratora', ru: 'Консоль администратора' },
+  telemetryTitle:   { en: uiText('generatedUi.u_baae6a3ac96fe8d3'), es: 'Telemetría, sentimiento y moderación', pt: 'Telemetria, sentimento e moderação', pl: 'Telemetria, nastroje i moderacja', ru: 'Телеметрия, настроения и модерация' },
+  logsEnabled:      { en: uiText('generatedUi.u_b89a7e7556dc6188'), es: 'Envíos · Sentimiento IA · moderación', pt: 'Envios · Sentimento IA · moderação', pl: 'Zgłoszenia · Nastroje AI · moderacja', ru: 'Отправки · Настроения ИИ · модерация' },
+  localeVolume:     { en: uiText('generatedUi.u_2f8e24f4121d45cb'), es: 'Volumen por región', pt: 'Volume por região', pl: 'Wolumen według regionu', ru: 'Объём по регионам' },
+  sentimentTrend:   { en: uiText('generatedUi.u_ae62485c8dc6c0ef'), es: 'Tendencia de sentimiento', pt: 'Tendência de sentimento', pl: 'Trend nastrojów', ru: 'Тенденция настроений' },
+  moderationQueue:  { en: uiText('generatedUi.u_50d92231eae4fdf6'), es: 'Cola de moderación', pt: 'Fila de moderação', pl: 'Kolejka moderacji', ru: 'Очередь moderacji' },
+  outreachHooks:    { en: uiText('generatedUi.u_cc612cb152574dab'), es: 'Hooks Outreach + CRM', pt: 'Hooks Outreach + CRM', pl: 'Haki Outreach + CRM', ru: 'Хуки Outreach + CRM' },
+  crmRegression:    { en: uiText('generatedUi.u_0f692ee6380efb1d'), es: 'Guardia de regresión: reseñas positivas → Leads → Oportunidades → Conversiones.', pt: 'Guarda de regressão: avaliações positivas → Leads → Oportunidades → Conversões.', pl: 'Ochrona regresji: zatwierdzone opinie → Leady → Szanse → Konwersje.', ru: 'Защита регрессии: одобренные отзывы → Лиды → Возможности → Конверсии.' },
+  errSignIn:        { en: uiText('generatedUi.u_58e6d73e7af5aa17'), es: 'Por favor inicia sesión.', pt: 'Por favor faça login.', pl: 'Zaloguj się.', ru: 'Пожалуйста, войдите.' },
+  errLoad:          { en: uiText('generatedUi.u_769bf34f0b1cc128'), es: 'No se pudieron cargar las reseñas.', pt: 'Não foi possível carregar as avaliações.', pl: 'Nie można załadować opinii.', ru: 'Не удалось загрузить отзывы.' },
+  errPickHandle:    { en: uiText('generatedUi.u_1e9091e22050fcad'), es: 'Elige un identificador para continuar.', pt: 'Escolha um identificador para continuar.', pl: 'Wybierz identyfikator.', ru: 'Выберите идентификатор.' },
+  errSaveHandle:    { en: uiText('generatedUi.u_a3c64e8773b22463'), es: 'No se pudo guardar el identificador.', pt: 'Não foi possível salvar o identificador.', pl: 'Nie można zapisać identyfikatora.', ru: 'Не удалось сохранить идентификатор.' },
 }
 
 function c(key: string, lang: string): string {
@@ -310,7 +309,7 @@ export default function ReviewsPage() {
               <p className="sb-eyebrow">{c('sendLinkTitle', l)}</p>
               <h2>{c('submissionTitle', l)}</h2>
             </div>
-            <span className="sb-review-pill">{uiCopy('u_eb55160cb3f189fb')}{getLocaleLabel(activeLocale)}</span>
+            <span className="sb-review-pill">{uiText('generatedUi.u_0d51008f777589f5')}{getLocaleLabel(activeLocale)}</span>
           </div>
           <p className="sb-caption">{c('sendLinkDesc', l)}</p>
           {slug.kind === 'loading' && <div className="sb-review-empty">{c('loading', l)}</div>}
@@ -318,7 +317,7 @@ export default function ReviewsPage() {
             <div className="sb-review-link-builder">
               <p>{c('pickHandleDesc', l)}</p>
               <div>
-                <span>{uiCopy('u_7e774b027bed12ea')}</span>
+                <span>{uiText('generatedUi.u_4da42d3253ab7a2e')}</span>
                 <input value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} placeholder={c('handlePlaceholder', l)} maxLength={30} onKeyDown={e => e.key === 'Enter' && saveSlug()} />
                 <button onClick={saveSlug} disabled={slugSaving || !slugDraft.trim()}>{slugSaving ? c('saving', l) : c('claim', l)}</button>
               </div>
@@ -334,7 +333,7 @@ export default function ReviewsPage() {
           )}
           <div className="sb-review-submission-preview" style={{ background: 'transparent', border: 0, borderLeft: '2px solid rgba(26,240,255,.4)', borderRadius: 0, padding: '4px 0 4px 14px' }}>
             <span className="sb-chip" style={{ marginBottom: 8 }}>{c('sampleBadge', l)}</span>
-            <div className="sb-stars" aria-label={uiCopy('u_76573e07e8d528d2')}>★★★★★</div>
+            <div className="sb-stars" aria-label={uiText('generatedUi.u_d6ad47db4d63b1b0')}>★★★★★</div>
             <p>{c('previewText', l)}</p>
             <strong>{formatReviewDate('2026-05-29T10:30:00.000Z', activeLocale)} · {formatReviewCurrency(49, activeLocale)}</strong>
             <label>
@@ -353,7 +352,7 @@ export default function ReviewsPage() {
       </section>
 
       {/* Filters */}
-      <section className="sb-review-controls" aria-label={uiCopy('u_484b3ffc65518986')}>
+      <section className="sb-review-controls" aria-label={uiText('generatedUi.u_f63c5fd9d87ec8f3')}>
         <div>
           <h2>{c('yourReviews', l)}</h2>
           <p>{reviewsLoading ? c('loading', l) : summaryLine}</p>
@@ -379,10 +378,10 @@ export default function ReviewsPage() {
         </div>
         <div className="sb-review-tabs">
           {([
-            { id: uiCopy('u_1114dc77efee50cc'),      label: `${c('filterAll', l)} (${enrichedReviews.length})` },
-            { id: uiCopy('u_1f5f41b895cc1e6a'),  label: `${c('filterPending', l)} (${pendingCount})` },
-            { id: uiCopy('u_1fb8eeff9c34e049'), label: `${c('filterApproved', l)} (${approvedCount})` },
-            { id: uiCopy('u_fe61c66bf9a53d76'),  label: `${c('filterFlagged', l)} (${flaggedCount})` },
+            { id: "all",      label: `${c('filterAll', l)} (${enrichedReviews.length})` },
+            { id: "pending",  label: `${c('filterPending', l)} (${pendingCount})` },
+            { id: "approved", label: `${c('filterApproved', l)} (${approvedCount})` },
+            { id: "flagged",  label: `${c('filterFlagged', l)} (${flaggedCount})` },
           ] as const).map(tab => (
             <button key={tab.id} onClick={() => setStatusFilter(tab.id)} className={statusFilter === tab.id ? 'is-active' : ''}>{tab.label}</button>
           ))}
@@ -390,7 +389,7 @@ export default function ReviewsPage() {
       </section>
 
       {/* Review feed */}
-      <section className="sb-review-feed" aria-label={uiCopy('u_a85c2600c825855a')}>
+      <section className="sb-review-feed" aria-label={uiText('generatedUi.u_4fb20d256acefb38')}>
         {visibleReviews.length === 0 && !reviewsLoading && (
           <div className="sb-review-empty">{c('summaryEmpty', l)}</div>
         )}
@@ -428,7 +427,7 @@ export default function ReviewsPage() {
 
       {/* Admin console — owner/admin only */}
       {isAdmin && (
-        <section id="admin-console" className="sb-admin-review-console" aria-label={uiCopy('u_394934810a662079')}>
+        <section id="admin-console" className="sb-admin-review-console" aria-label={uiText('generatedUi.u_89ea5bcb5575ffbc')}>
           <div className="sb-review-panel-header">
             <div>
               <p className="sb-eyebrow">{c('adminConsole', l)}</p>

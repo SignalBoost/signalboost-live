@@ -1,6 +1,5 @@
 import Link from 'next/link'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Props = { params: Promise<{ drilldown?: string[] }> }
 
@@ -11,14 +10,14 @@ export default async function AdminDrilldownFallbackPage({ params }: Props) {
   return (
     <div className="sb-cockpit-stack">
       <header className="sb-cockpit-hero">
-        <span className="sb-eyebrow">{uiCopy('u_0fd669b925bf3f4c')}</span>
-        <h2>{uiCopy('u_69ce2ebdf2eb71b7')}</h2>
-        <p>{uiCopy('u_51be576b12329506')}</p>
+        <span className="sb-eyebrow">{uiText('generatedUi.u_8f356c3f8ea695ae')}</span>
+        <h2>{uiText('generatedUi.u_854907d60f0780a2')}</h2>
+        <p>{uiText('generatedUi.u_2d921cdd79693599')}</p>
       </header>
-      <section className="sb-glass-panel sb-admin-action-card" aria-label={uiCopy('u_b60e9f7d3c5cb14a')}>
+      <section className="sb-glass-panel sb-admin-action-card" aria-label={uiText('generatedUi.u_9c12e1643c70fa1f')}>
         <h3>{path}</h3>
-        <p>{uiCopy('u_b5eb4408a4a11870')}</p>
-        <Link className="sb-admin-action-card__cue" href="/admin">{uiCopy('u_b07f847e1deb2cce')}</Link>
+        <p>{uiText('generatedUi.u_4a2bc995ecd33008')}</p>
+        <Link className="sb-admin-action-card__cue" href="/admin">{uiText('generatedUi.u_b99a6f6e1503c890')}</Link>
       </section>
     </div>
   )

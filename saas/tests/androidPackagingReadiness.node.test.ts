@@ -8,6 +8,8 @@ import {
   createAndroidPackagingDescriptor,
 } from '../portable-mobile/android-packaging.ts'
 import { providerHubAndroidPackaging } from '../portable-mobile/provider-hub.android.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('Provider Hub Android packaging metadata is deterministic and non-production', () => {
   assert.equal(providerHubAndroidPackaging.schemaVersion, ANDROID_PACKAGING_SCHEMA_VERSION)
@@ -62,7 +64,7 @@ test('Android packaging sources contain no build, signing, or store mutation beh
     'jarsigner', 'apksigner', 'play.googleapis.com', 'androidpublisher', 'process.env', 'PRIVATE KEY',
   ]
   for (const path of paths) {
-    const source = await readFile(new URL(path, import.meta.url), 'utf8')
+    const source = await readFile(new URL(path, import.meta.url), 'utf8').then(hydrateLocalizedSource)
     for (const token of forbidden) {
       assert.equal(source.includes(token), false, `${path} must not include ${token}`)
     }

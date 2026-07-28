@@ -3,38 +3,37 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY: Record<string, Record<Lang, string>> = {
-  eyebrow:       { en: uiCopy('u_dd39274274804181'), es: 'Constructor de sitios con IA', pt: 'Construtor de sites com IA', pl: 'Kreator stron z IA', ru: 'ИИ-конструктор сайтов' },
-  title:         { en: uiCopy('u_0e9629624a419d3c'), es: 'Construir sitio web', pt: 'Criar site', pl: 'Zbuduj stronę', ru: 'Создать сайт' },
-  subtitle:      { en: uiCopy('u_7a048a98f8c4a447'), es: 'Describe tu negocio y generaremos un sitio completo — luego refínalo visualmente con arrastrar y soltar.', pt: 'Descreva seu negócio e geraremos um site completo — depois refine-o visualmente com arrastar e soltar.', pl: 'Opisz swoją firmę, a wygenerujemy kompletną stronę — następnie dopracuj ją wizualnie metodą przeciągnij i upuść.', ru: 'Опишите бизнес — мы создадим сайт, а затем вы доработаете его визуально перетаскиванием.' },
-  placeholder:   { en: uiCopy('u_5e6347cdddd0bfda'), es: 'p.ej. Un acogedor restaurante italiano en el centro de Chicago especializado en pasta casera…', pt: 'ex. Um aconchegante restaurante italiano no centro de Chicago especializado em massa artesanal…', pl: 'np. Przytulna włoska restauracja w centrum Chicago specjalizująca się w domowym makaronie…', ru: 'напр. Уютный итальянский ресторан в центре Чикаго, специализирующийся на домашней пасте…' },
-  generateBtn:   { en: uiCopy('u_83db4ab7799927e9'), es: '✦ Generar sitio web', pt: '✦ Gerar site', pl: '✦ Generuj stronę', ru: '✦ Создать сайт' },
-  generatingBtn: { en: uiCopy('u_8ec85f56f9a38862'), es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
-  publishBtn:    { en: uiCopy('u_b98e2eb5e00a62b6'), es: '🚀 Publicar sitio', pt: '🚀 Publicar site', pl: '🚀 Opublikuj stronę', ru: '🚀 Опубликовать сайт' },
-  publishingBtn: { en: uiCopy('u_c21b8ce06984bc9b'), es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
-  regenerate:    { en: uiCopy('u_ef2060a5a27cc521'), es: '← Volver a empezar', pt: '← Recomeçar', pl: '← Zacznij od nowa', ru: '← Начать заново' },
-  viewLive:      { en: uiCopy('u_c282dbb6a684893d'), es: 'Ver en vivo →', pt: 'Ver ao vivo →', pl: 'Zobacz na żywo →', ru: 'Просмотреть →' },
-  previewTitle:  { en: uiCopy('u_6c9b4542fa3b476f'), es: 'Vista previa IA', pt: 'Pré-visualização IA', pl: 'Podgląd IA', ru: 'Предпросмотр ИИ' },
-  editTitle:     { en: uiCopy('u_29f637b9aa0c93b9'), es: 'Editor visual', pt: 'Editor visual', pl: 'Edytor wizualny', ru: 'Визуальный редактор' },
-  engineTitle:   { en: uiCopy('u_016c825d2dad5c7d'), es: 'Motor de generación', pt: 'Motor de geração', pl: 'Silnik generowania', ru: 'Движок генерации' },
-  hintLabel:     { en: uiCopy('u_b340af62ae94e3f0'), es: 'Consejos para mejores resultados', pt: 'Dicas para melhores resultados', pl: 'Wskazówki dla najlepszych wyników', ru: 'Советы для лучших результатов' },
-  hint1:         { en: uiCopy('u_3848958d573422a2'), es: 'Incluye el nombre de tu negocio, ubicación y qué te hace único', pt: 'Inclua o nome do seu negócio, localização e o que te torna único', pl: 'Podaj nazwę firmy, lokalizację i co Cię wyróżnia', ru: 'Укажите название бизнеса, местоположение и что вас выделяет' },
-  hint2:         { en: uiCopy('u_74919bf22dd56eb4'), es: 'Menciona tu público objetivo y principales servicios o productos', pt: 'Mencione seu público-alvo e principais serviços ou produtos', pl: 'Wspomnij o grupie docelowej i głównych usługach lub produktach', ru: 'Упомяните целевую аудиторию и основные услуги или продукты' },
-  hint3:         { en: uiCopy('u_ba79c757345c470f'), es: 'Agrega tono: profesional, amigable, audaz, minimalista, lujoso…', pt: 'Adicione tom: profissional, amigável, ousado, minimalista, luxuoso…', pl: 'Dodaj ton: profesjonalny, przyjazny, odważny, minimalistyczny, luksusowy…', ru: 'Добавьте тон: профессиональный, дружелюбный, смелый, минималистичный, люксовый…' },
-  errConnect:    { en: uiCopy('u_6aafe6ab3875dcd3'), es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
-  charCount:     { en: uiCopy('u_cefc757156217563'), es: 'caracteres', pt: 'caracteres', pl: 'znaków', ru: 'символов' },
-  tabPreview:    { en: uiCopy('u_81a50c63f8cfbc92'), es: 'Vista previa', pt: 'Pré-visualização', pl: 'Podgląd', ru: 'Предпросмотр' },
-  tabEditor:     { en: uiCopy('u_cb82ada66e50aa51'), es: '✏️ Editor visual', pt: '✏️ Editor visual', pl: '✏️ Edytor wizualny', ru: '✏️ Визуальный редактор' },
-  editorBadge:   { en: uiCopy('u_761989cbe3d11b71'), es: 'Arrastrar y soltar', pt: 'Arrastar e soltar', pl: 'Przeciągnij i upuść', ru: 'Перетаскивание' },
-  editorHint:    { en: uiCopy('u_9aff2c7dbc9eafd1'), es: 'Haz clic en cualquier elemento para editarlo. Arrastra bloques del panel derecho para agregar contenido.', pt: 'Clique em qualquer elemento para editá-lo. Arraste blocos do painel direito para adicionar conteúdo.', pl: 'Kliknij dowolny element, aby go edytować. Przeciągnij bloki z prawego panelu, aby dodać treść.', ru: 'Нажмите на любой элемент для редактирования. Перетащите блоки из правой панели для добавления контента.' },
-  loadingEditor: { en: uiCopy('u_7b557e98cac52834'), es: 'Cargando editor visual…', pt: 'Carregando editor visual…', pl: 'Ładowanie edytora wizualnego…', ru: 'Загрузка визуального редактора…' },
-  poweredBy:     { en: uiCopy('u_aa956f145cb7e02d'), es: 'Con tecnología de', pt: 'Desenvolvido com', pl: 'Napędzane przez', ru: 'На базе' },
-  seedTitle:     { en: uiCopy('u_144646190b4219fe'), es: 'Tu sitio', pt: 'Seu site', pl: 'Twoja strona', ru: 'Ваш сайт' },
+  eyebrow:       { en: uiText('generatedUi.u_3b10aa74ffbb9c3a'), es: 'Constructor de sitios con IA', pt: 'Construtor de sites com IA', pl: 'Kreator stron z IA', ru: 'ИИ-конструктор сайтов' },
+  title:         { en: uiText('generatedUi.u_56f560241a005104'), es: 'Construir sitio web', pt: 'Criar site', pl: 'Zbuduj stronę', ru: 'Создать сайт' },
+  subtitle:      { en: uiText('generatedUi.u_6db0240083deb371'), es: 'Describe tu negocio y generaremos un sitio completo — luego refínalo visualmente con arrastrar y soltar.', pt: 'Descreva seu negócio e geraremos um site completo — depois refine-o visualmente com arrastar e soltar.', pl: 'Opisz swoją firmę, a wygenerujemy kompletną stronę — następnie dopracuj ją wizualnie metodą przeciągnij i upuść.', ru: 'Опишите бизнес — мы создадим сайт, а затем вы доработаете его визуально перетаскиванием.' },
+  placeholder:   { en: uiText('generatedUi.u_d164ebdfd8991b41'), es: 'p.ej. Un acogedor restaurante italiano en el centro de Chicago especializado en pasta casera…', pt: 'ex. Um aconchegante restaurante italiano no centro de Chicago especializado em massa artesanal…', pl: 'np. Przytulna włoska restauracja w centrum Chicago specjalizująca się w domowym makaronie…', ru: 'напр. Уютный итальянский ресторан в центре Чикаго, специализирующийся на домашней пасте…' },
+  generateBtn:   { en: uiText('generatedUi.u_84eff7cab023bd40'), es: '✦ Generar sitio web', pt: '✦ Gerar site', pl: '✦ Generuj stronę', ru: '✦ Создать сайт' },
+  generatingBtn: { en: uiText('generatedUi.u_d20a4476a0a85978'), es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
+  publishBtn:    { en: uiText('generatedUi.u_8c0885071285755c'), es: '🚀 Publicar sitio', pt: '🚀 Publicar site', pl: '🚀 Opublikuj stronę', ru: '🚀 Опубликовать сайт' },
+  publishingBtn: { en: uiText('generatedUi.u_582e0f1abad43e9e'), es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
+  regenerate:    { en: uiText('generatedUi.u_a660f53036d3e429'), es: '← Volver a empezar', pt: '← Recomeçar', pl: '← Zacznij od nowa', ru: '← Начать заново' },
+  viewLive:      { en: uiText('generatedUi.u_41be12cb135baa53'), es: 'Ver en vivo →', pt: 'Ver ao vivo →', pl: 'Zobacz na żywo →', ru: 'Просмотреть →' },
+  previewTitle:  { en: uiText('generatedUi.u_3ce95322574a17cd'), es: 'Vista previa IA', pt: 'Pré-visualização IA', pl: 'Podgląd IA', ru: 'Предпросмотр ИИ' },
+  editTitle:     { en: uiText('generatedUi.u_a05f18eec8cedc73'), es: 'Editor visual', pt: 'Editor visual', pl: 'Edytor wizualny', ru: 'Визуальный редактор' },
+  engineTitle:   { en: uiText('generatedUi.u_48cd18631b3db7a0'), es: 'Motor de generación', pt: 'Motor de geração', pl: 'Silnik generowania', ru: 'Движок генерации' },
+  hintLabel:     { en: uiText('generatedUi.u_45557cba181ae1a4'), es: 'Consejos para mejores resultados', pt: 'Dicas para melhores resultados', pl: 'Wskazówki dla najlepszych wyników', ru: 'Советы для лучших результатов' },
+  hint1:         { en: uiText('generatedUi.u_291f5c873a26b229'), es: 'Incluye el nombre de tu negocio, ubicación y qué te hace único', pt: 'Inclua o nome do seu negócio, localização e o que te torna único', pl: 'Podaj nazwę firmy, lokalizację i co Cię wyróżnia', ru: 'Укажите название бизнеса, местоположение и что вас выделяет' },
+  hint2:         { en: uiText('generatedUi.u_87a4cda31d0f5a77'), es: 'Menciona tu público objetivo y principales servicios o productos', pt: 'Mencione seu público-alvo e principais serviços ou produtos', pl: 'Wspomnij o grupie docelowej i głównych usługach lub produktach', ru: 'Упомяните целевую аудиторию и основные услуги или продукты' },
+  hint3:         { en: uiText('generatedUi.u_817f7fb01beeaa9e'), es: 'Agrega tono: profesional, amigable, audaz, minimalista, lujoso…', pt: 'Adicione tom: profissional, amigável, ousado, minimalista, luxuoso…', pl: 'Dodaj ton: profesjonalny, przyjazny, odważny, minimalistyczny, luksusowy…', ru: 'Добавьте тон: профессиональный, дружелюбный, смелый, минималистичный, люксовый…' },
+  errConnect:    { en: uiText('generatedUi.u_e249ad0a23158084'), es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
+  charCount:     { en: uiText('generatedUi.u_25d939ffd0d79b73'), es: 'caracteres', pt: 'caracteres', pl: 'znaków', ru: 'символов' },
+  tabPreview:    { en: uiText('generatedUi.u_3ce95322574a17cd'), es: 'Vista previa', pt: 'Pré-visualização', pl: 'Podgląd', ru: 'Предпросмотр' },
+  tabEditor:     { en: uiText('generatedUi.u_6f022e9bc79c13c8'), es: '✏️ Editor visual', pt: '✏️ Editor visual', pl: '✏️ Edytor wizualny', ru: '✏️ Визуальный редактор' },
+  editorBadge:   { en: uiText('generatedUi.u_e9d7ea9fd591679a'), es: 'Arrastrar y soltar', pt: 'Arrastar e soltar', pl: 'Przeciągnij i upuść', ru: 'Перетаскивание' },
+  editorHint:    { en: uiText('generatedUi.u_532bd92d86be51fd'), es: 'Haz clic en cualquier elemento para editarlo. Arrastra bloques del panel derecho para agregar contenido.', pt: 'Clique em qualquer elemento para editá-lo. Arraste blocos do painel direito para adicionar conteúdo.', pl: 'Kliknij dowolny element, aby go edytować. Przeciągnij bloki z prawego panelu, aby dodać treść.', ru: 'Нажмите на любой элемент для редактирования. Перетащите блоки из правой панели для добавления контента.' },
+  loadingEditor: { en: uiText('generatedUi.u_4e5cf63c2c1c6baa'), es: 'Cargando editor visual…', pt: 'Carregando editor visual…', pl: 'Ładowanie edytora wizualnego…', ru: 'Загрузка визуального редактора…' },
+  poweredBy:     { en: uiText('generatedUi.u_fdc5d2e9410c2d88'), es: 'Con tecnología de', pt: 'Desenvolvido com', pl: 'Napędzane przez', ru: 'На базе' },
+  seedTitle:     { en: uiText('generatedUi.u_5af93124b370fbaf'), es: 'Tu sitio', pt: 'Seu site', pl: 'Twoja strona', ru: 'Ваш сайт' },
 }
 
 function c(key: string, lang: string): string {
@@ -177,7 +176,7 @@ function GrapesEditor({ html, css, lang }: { html: string; css: string; lang: st
         setLoading(false)
       } catch (err: any) {
         if (!destroyed) {
-          setError(uiCopy('u_8536973bf2984610'))
+          setError("Visual editor failed to load. Please refresh.")
           setLoading(false)
         }
       }
@@ -213,7 +212,7 @@ function GrapesEditor({ html, css, lang }: { html: string; css: string; lang: st
         </div>
       )}
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
-      <style>{uiCopy('u_ad87d5114d016ee7')}</style>
+      <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
     </div>
   )
 }
@@ -319,7 +318,7 @@ export default function BuilderPage() {
             <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0' }}>{c('title', l)}</h1>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', margin: '6px 0 0', maxWidth: 560 }}>{c('subtitle', l)}</p>
           </div>
-          <span className="sb-chip">{generating ? '...' : content ? uiCopy('u_58b424ff8d53b7ae') : uiCopy('u_73f752c0ed55c708')}</span>
+          <span className="sb-chip">{generating ? '...' : content ? uiText('generatedUi.u_c2e3ac47f4a32546') : uiText('generatedUi.u_01a3981a1797d6d5')}</span>
         </div>
 
         {/* ── Prompt + Tips ── */}
@@ -356,7 +355,7 @@ export default function BuilderPage() {
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>{hint}</span>
               </div>
             ))}
-            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,195,0,.08)', border: '1px solid rgba(255,195,0,.2)', fontSize: 12, color: 'rgba(255,195,0,.9)', lineHeight: 1.6 }}>{uiCopy('u_f7544d24fc36d52a')}{l === 'en' ? uiCopy('u_644047bee2711477') : l === 'es' ? uiCopy('u_a4101a55af75265e') : l === 'pt' ? uiCopy('u_e1db376fc6e8f06d') : l === 'pl' ? uiCopy('u_060d5f75df20109a') : 'для создания'}
+            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,195,0,.08)', border: '1px solid rgba(255,195,0,.2)', fontSize: 12, color: 'rgba(255,195,0,.9)', lineHeight: 1.6 }}>{uiText('generatedUi.u_558acbab0d6dbb51')}{l === 'en' ? uiText('generatedUi.u_ab60270939c04793') : l === 'es' ? uiText('generatedUi.u_7800b3fb3d7562e8') : l === 'pt' ? uiText('generatedUi.u_344259606eef14b7') : l === 'pl' ? uiText('generatedUi.u_0dce0a84f87a963d') : 'для создания'}
             </div>
           </div>
         </div>
@@ -408,7 +407,7 @@ export default function BuilderPage() {
 
             {/* Tab switcher */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-              {([uiCopy('u_5f40990c96345942'), uiCopy('u_db2e906bd8cf525c')] as Tab[]).map(tab => (
+              {(["preview", "editor"] as Tab[]).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -457,7 +456,7 @@ export default function BuilderPage() {
                 <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,195,0,.12)', border: '1px solid rgba(255,195,0,.25)', color: '#ffc300', fontWeight: 700, letterSpacing: '.04em' }}>
                   {c('editorBadge', l)}
                 </span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>{c('poweredBy', l)}{uiCopy('u_afdc8e3f6bd516ed')}</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>{c('poweredBy', l)}{uiText('generatedUi.u_711144dc4a1f92e2')}</span>
               </div>
             )}
           </div>

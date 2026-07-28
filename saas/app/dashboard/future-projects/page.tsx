@@ -2,8 +2,7 @@
 'use client'
 
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -31,30 +30,30 @@ type ProjectCopy = {
 
 const COPY: Record<Language, ProjectCopy> = {
   en: {
-    eyebrow: uiCopy('u_4b7b33393789fa3a'),
-    title: uiCopy('u_bfe47b027cd9d4f5'),
-    subtitle: uiCopy('u_c9873455a6e56fca'),
-    status: uiCopy('u_29350f7d0c31d482'),
-    badge: uiCopy('u_007b587bd1f25f90'),
-    projectTitle: uiCopy('u_9e0e6ffff0239104'),
-    projectSummary: uiCopy('u_b6482117f691ec26'),
-    goalTitle: uiCopy('u_26b79e2a1771b2d9'),
-    goal: uiCopy('u_f6de81b3db5e6807'),
-    agentsTitle: uiCopy('u_c8ed56ae0e9afd27'),
+    eyebrow: uiText('generatedUi.u_92375f997ffe65ab'),
+    title: uiText('generatedUi.u_04d04dbee162ea6d'),
+    subtitle: uiText('generatedUi.u_1a89fd23594015a9'),
+    status: "Concept — future build",
+    badge: uiText('generatedUi.u_e69601364bdac76e'),
+    projectTitle: uiText('generatedUi.u_3be08ed96f555110'),
+    projectSummary: uiText('generatedUi.u_9fe55e4439773677'),
+    goalTitle: uiText('generatedUi.u_cdbf6975e8a35b0d'),
+    goal: uiText('generatedUi.u_bfdba87b5cf21a45'),
+    agentsTitle: uiText('generatedUi.u_b3f38e2fe92276b3'),
     agents: [
-      { name: uiCopy('u_0bf08d27bef329f7'), description: uiCopy('u_1375ea1a06f87ada') },
-      { name: uiCopy('u_d7c5073f2ead611c'), description: uiCopy('u_e35442921c86c023') },
-      { name: uiCopy('u_3c4b96a8d0d2ef42'), description: uiCopy('u_08e2b7aa5f454811') },
-      { name: uiCopy('u_fa44f58210cbe855'), description: uiCopy('u_f130184ce656dddc') },
+      { name: uiText('generatedUi.u_9075c530f34fd906'), description: uiText('generatedUi.u_4051a2d2412f543c') },
+      { name: uiText('generatedUi.u_1708af0ba3272ae0'), description: uiText('generatedUi.u_74e6b1edda1dfbbd') },
+      { name: uiText('generatedUi.u_adca0ebb1ca7cd39'), description: uiText('generatedUi.u_72238b44d1ca378f') },
+      { name: uiText('generatedUi.u_f0f3047a6f7c9840'), description: uiText('generatedUi.u_7eb81fdd60d4e6f5') },
     ],
-    humanTitle: uiCopy('u_54f6dfe4204614cd'),
-    humanSteps: [uiCopy('u_117ede1fbd8089cb'), uiCopy('u_ea6be5ac8484c46f'), uiCopy('u_a870adbe8244e539'), uiCopy('u_fdb930e7401e6774')],
-    automationTitle: uiCopy('u_9d34d44e76f8a304'),
-    automationSteps: [uiCopy('u_95bb1ff426703c4d'), uiCopy('u_a36975177ef1caee'), uiCopy('u_bc7a7d9c6e47f5c1'), uiCopy('u_17ea756b9bdc6169'), uiCopy('u_93cb75e58e69fed3'), uiCopy('u_7e929c5c056a5e31')],
-    boundaryTitle: uiCopy('u_85291f9ba3f9e608'),
-    boundary: uiCopy('u_f4b3bffb06cce810'),
-    futureTitle: uiCopy('u_db5740a5c31d893b'),
-    future: uiCopy('u_41eaa0f4093da201'),
+    humanTitle: uiText('generatedUi.u_cb730300340b979f'),
+    humanSteps: [uiText('generatedUi.u_ffd7ab156583edd2'), uiText('generatedUi.u_638faa3ad9ba8f0b'), uiText('generatedUi.u_726f32ce8699fdfe'), uiText('generatedUi.u_36efbfb046708215')],
+    automationTitle: uiText('generatedUi.u_2c7fbd8dcaf4348e'),
+    automationSteps: [uiText('generatedUi.u_0e5ec72a83292ed8'), uiText('generatedUi.u_5b42b455dca44044'), uiText('generatedUi.u_39de626bb0bd42fc'), uiText('generatedUi.u_c16f0537966ff2e5'), uiText('generatedUi.u_509329ae163bd070'), uiText('generatedUi.u_922786d6d93f8a93')],
+    boundaryTitle: uiText('generatedUi.u_06422ea030934819'),
+    boundary: uiText('generatedUi.u_5d38a63e69c6704d'),
+    futureTitle: uiText('generatedUi.u_49a7d09f0847dabc'),
+    future: uiText('generatedUi.u_6ba36aa8182c1157'),
   },
   es: {
     eyebrow: 'Hoja de ruta',

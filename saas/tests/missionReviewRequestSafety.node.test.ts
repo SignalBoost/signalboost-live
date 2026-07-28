@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const client = () => readFileSync(new URL('../app/dashboard/supervisor/missions/reviews/MissionReviewClient.tsx', import.meta.url), 'utf8')
+
+const client = () => hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/missions/reviews/MissionReviewClient.tsx', import.meta.url), 'utf8'))
 
 test('a new list request aborts its predecessor and binds the GET request to its signal', () => {
   const source = client()

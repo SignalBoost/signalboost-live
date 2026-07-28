@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lead = {
   id: string
@@ -21,7 +20,7 @@ const FILTERS = ['all', 'pending', 'approved', 'rejected'] as const
 type Filter = typeof FILTERS[number]
 
 const TOGGLE_LABELS: Record<string, { more: string; less: string }> = {
-  en: { more: uiCopy('u_c03f2bc0bc69facb'), less: uiCopy('u_051927f473a6fe74') },
+  en: { more: uiText('generatedUi.u_89b73dc913ff887b'), less: uiText('generatedUi.u_3d7dddec86cab47b') },
   es: { more: 'Ver borrador completo', less: 'Ocultar borrador' },
   pt: { more: 'Ver rascunho completo', less: 'Ocultar rascunho' },
   pl: { more: 'Pokaż pełny szkic', less: 'Ukryj szkic' },
@@ -58,33 +57,33 @@ type ContactsCopy = {
 
 const COPY: Record<string, ContactsCopy> = {
   en: {
-    eyebrow: uiCopy('u_efe38ec71ea31dff'),
-    title: uiCopy('u_c77e2c37715e12e3'),
-    subtitle: uiCopy('u_a5cbed16686d043a'),
-    discoverNew: uiCopy('u_932169006177b9dd'),
-    loadError: uiCopy('u_666dd4682637781a'),
-    genericLoadError: uiCopy('u_a2f55f2661fc0275'),
-    loading: uiCopy('u_0166918cad60af7b'),
-    empty: uiCopy('u_434837507cd45633'),
-    analyzeFirst: uiCopy('u_74d335fa5f7ac69a'),
-    unnamedBusiness: uiCopy('u_f7115156c79401d2'),
-    willSendTo: uiCopy('u_7f032aca06493b7a'),
-    noRecipient: uiCopy('u_03a79887c611e61d'),
-    approve: uiCopy('u_1be2b701a9af1de6'),
-    approved: uiCopy('u_7621d076520651ef'),
-    reject: uiCopy('u_8bb7d73c4d4a546a'),
-    rejected: uiCopy('u_f23ab3f38795ec7b'),
-    openEngine: uiCopy('u_891b191286f0eec9'),
+    eyebrow: uiText('generatedUi.u_b450645debe2cf0a'),
+    title: uiText('generatedUi.u_ec61e19cdc4bdf53'),
+    subtitle: uiText('generatedUi.u_f5382e95e5e76d44'),
+    discoverNew: uiText('generatedUi.u_87d381d081c06cd5'),
+    loadError: uiText('generatedUi.u_c62c7867c77d5745'),
+    genericLoadError: uiText('generatedUi.u_28fe0493daaa996f'),
+    loading: uiText('generatedUi.u_9485587c4eb7c5d9'),
+    empty: uiText('generatedUi.u_1440d19814f62330'),
+    analyzeFirst: uiText('generatedUi.u_42706aa5940d64fd'),
+    unnamedBusiness: uiText('generatedUi.u_7ce58cbf9a0b335b'),
+    willSendTo: uiText('generatedUi.u_e2d9cd919167fa7d'),
+    noRecipient: uiText('generatedUi.u_35c790a34659ac93'),
+    approve: uiText('generatedUi.u_6007acbe30b2cd98'),
+    approved: uiText('generatedUi.u_87b42e40c2a290e0'),
+    reject: uiText('generatedUi.u_ab604a360777735f'),
+    rejected: uiText('generatedUi.u_aea4a04a80426ed8'),
+    openEngine: uiText('generatedUi.u_ab3746fe67822a78'),
     filters: {
-      all: uiCopy('u_0d3dfc4de5bbd979'),
-      pending: uiCopy('u_bfd64082999e8cc6'),
-      approved: uiCopy('u_283d1df4abbfb47c'),
-      rejected: uiCopy('u_05a7a22ca3d6ba11'),
+      all: uiText('generatedUi.u_a52ace420f2175d0'),
+      pending: uiText('generatedUi.u_331551b0de4157c9'),
+      approved: uiText('generatedUi.u_87b42e40c2a290e0'),
+      rejected: uiText('generatedUi.u_aea4a04a80426ed8'),
     },
     statuses: {
-      pending: uiCopy('u_70ca2d2aea396d13'),
-      approved: uiCopy('u_f021ec9d8fc4d446'),
-      rejected: uiCopy('u_e2966d05a55270fe'),
+      pending: uiText('generatedUi.u_62a2fed3d6e08c44'),
+      approved: uiText('generatedUi.u_2687f86ed6784b8a'),
+      rejected: uiText('generatedUi.u_20cd938a2ea64f61'),
     },
   },
   pt: {
@@ -324,9 +323,9 @@ export default function OutreachContactsPage() {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, flexWrap: 'wrap' }}>
             <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
               <div style={{ paddingTop: 0 }}><b className="gold">{leads.length}</b><span>{copy.filters.all}</span></div>
-              <div style={{ paddingTop: 0 }}><b className="warn">{countByStatus(uiCopy('u_c15699a1bbaae168'))}</b><span>{copy.filters.pending}</span></div>
-              <div style={{ paddingTop: 0 }}><b className="ok">{countByStatus(uiCopy('u_af361cf511670266'))}</b><span>{copy.filters.approved}</span></div>
-              <div style={{ paddingTop: 0 }}><b style={{ color: '#fca5a5' }}>{countByStatus(uiCopy('u_e625f9e391d12cc1'))}</b><span>{copy.filters.rejected}</span></div>
+              <div style={{ paddingTop: 0 }}><b className="warn">{countByStatus("pending")}</b><span>{copy.filters.pending}</span></div>
+              <div style={{ paddingTop: 0 }}><b className="ok">{countByStatus("approved")}</b><span>{copy.filters.approved}</span></div>
+              <div style={{ paddingTop: 0 }}><b style={{ color: '#fca5a5' }}>{countByStatus("rejected")}</b><span>{copy.filters.rejected}</span></div>
             </div>
             <Link className="sb-button-primary" href="/dashboard/outreach/discovery" style={{ whiteSpace: 'nowrap', fontSize: 13, padding: '9px 16px' }}>
               {copy.discoverNew}
@@ -402,11 +401,11 @@ export default function OutreachContactsPage() {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {lead.source_platform === 'strategist' ? (
-                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', color: '#c4b5fd', border: '1px solid rgba(196,181,253,.5)', borderRadius: 999, padding: '4px 10px' }}>{uiCopy('u_be045efc488af143')}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', color: '#c4b5fd', border: '1px solid rgba(196,181,253,.5)', borderRadius: 999, padding: '4px 10px' }}>{uiText('generatedUi.u_fec3f7a8a193d300')}</span>
                   ) : null}
                   {lead.created_at ? (
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
-                      {new Date(lead.created_at).toLocaleString(undefined, { dateStyle: uiCopy('u_9518c2bef0472365'), timeStyle: uiCopy('u_df6088daf748d82f') })}
+                      {new Date(lead.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
                     </span>
                   ) : null}
                   <span

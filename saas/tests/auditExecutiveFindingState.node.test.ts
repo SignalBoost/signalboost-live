@@ -7,6 +7,8 @@ import {
   type FindingStateMap,
 } from '../lib/audit/findingState.ts'
 import { buildExecutiveSummary } from '../lib/audit/execSummary.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 type TestFinding = {
   id: string
@@ -47,7 +49,7 @@ test('in-progress findings remain actionable while handled statuses do not', () 
 })
 
 test('executive summary overlays state before scoring and active-risk selection', () => {
-  const source = readFileSync(new URL('../lib/audit/execSummary.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../lib/audit/execSummary.ts', import.meta.url), 'utf8'))
   const overlayAt = source.indexOf('const findings = overlayFindingStates(')
   const scoreAt = source.indexOf('const score = scoreFromFindings(findings)')
 
@@ -65,7 +67,7 @@ test('executive summary resolves the existing findings engine with a workspace-l
 })
 
 test('executive route loads audit_finding_state and passes it into the summary', () => {
-  const source = readFileSync(new URL('../app/api/hub/audit/executive-summary/route.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../app/api/hub/audit/executive-summary/route.ts', import.meta.url), 'utf8'))
   assert.match(source, /from\('audit_finding_state'\)/)
   assert.match(source, /states = indexStates\(/)
   assert.match(source, /buildExecutiveSummary\(snapshot, \{ states \}\)/)

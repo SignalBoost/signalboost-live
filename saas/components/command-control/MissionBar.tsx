@@ -3,8 +3,7 @@
 
 import { Dot, LANGS, c, labelStyle, type HubData, type Lang } from '../hub/shared.tsx'
 import type { CommandPage } from './types.ts'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type MissionBarProps = {
   activePage: CommandPage
@@ -31,15 +30,15 @@ export default function MissionBar({ activePage, lang, data, loading, onLanguage
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.035)' }}>
-          <span style={labelStyle}>{uiCopy('u_5f3cfb04dd36ebeb')}</span>
-          <strong style={{ color: '#ffc300', fontSize: 12.5 }}>{uiCopy('u_4c31757bef99aa44')}</strong>
+          <span style={labelStyle}>{uiText('generatedUi.u_9e471951a1b4106e')}</span>
+          <strong style={{ color: '#ffc300', fontSize: 12.5 }}>{uiText('generatedUi.u_13a7c655a7d4213c')}</strong>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.035)' }}>
           <span style={labelStyle}>{c('systemHealth', lang)}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} />{uiCopy('u_7ce69d5a87d08dba')}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} />{uiCopy('u_f6761d8be25729b6')}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} />{uiCopy('u_f1409df87f8f6996')}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} />{uiText('generatedUi.u_fe7ceb7816ed0e35')}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} />{uiText('generatedUi.u_961a6062ba1ba2d8')}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} />{uiText('generatedUi.u_68edc75c015e2e10')}</span>
         </div>
 
         <div style={{ display: 'flex', gap: 5 }}>

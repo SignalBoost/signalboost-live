@@ -4,9 +4,6 @@ import { useEffect, useState } from 'react'
 import { inviteMember, removeMember, getTeamMembers, getUserSubscription, PLAN_SEATS } from '@/lib/seats'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 type Member = {
   id: string
   member_email: string
@@ -55,7 +52,7 @@ export default function TeamManager({ userId }: { userId: string }) {
       setMessage(result.error)
       setMessageType('error')
     } else {
-      setMessage(t(dict, 'team.inviteSent', uiCopy('u_a8344b89ace0e043')))
+      setMessage(t(dict, 'team.inviteSent'))
       setMessageType('success')
       setEmail('')
       load()
@@ -90,13 +87,13 @@ export default function TeamManager({ userId }: { userId: string }) {
       >
         <div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
-            {t(dict, 'team.teamSeats', uiCopy('u_768623a95c47c935'))}
+            {t(dict, 'team.teamSeats')}
           </div>
 
           <div style={{ fontSize: 22, fontWeight: 800 }}>
             {seatsUsed}
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 15 }}>
-              {' '}/ {seatsAllowed} {t(dict, 'team.used', uiCopy('u_f3f68b5f8c9b5bd6'))}
+              {' '}/ {seatsAllowed} {t(dict, 'team.used')}
             </span>
           </div>
         </div>
@@ -114,7 +111,7 @@ export default function TeamManager({ userId }: { userId: string }) {
             letterSpacing: '0.06em',
           }}
         >
-          {publicPlan} {t(dict, 'team.planSuffix', uiCopy('u_6082d4eb910227d7'))}
+          {publicPlan} {t(dict, 'team.planSuffix')}
         </div>
       </div>
 
@@ -146,11 +143,11 @@ export default function TeamManager({ userId }: { userId: string }) {
           }}
         >
           <span>
-            {t(dict, 'team.seatLimitReached', uiCopy('u_9c1493e141353b56'))}
+            {t(dict, 'team.seatLimitReached')}
           </span>
 
           <a href="/pricing" style={{ color: '#ffc300', fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>
-            {t(dict, 'team.upgrade', uiCopy('u_9ed900f54fe4d377'))} →
+            {t(dict, 'team.upgrade')} →
           </a>
         </div>
       )}
@@ -161,7 +158,7 @@ export default function TeamManager({ userId }: { userId: string }) {
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder={t(dict, 'team.emailPlaceholder', uiCopy('u_670ff80b0a3d45ae'))}
+            placeholder={t(dict, 'team.emailPlaceholder')}
             onKeyDown={(event) => event.key === 'Enter' && handleInvite()}
             style={{
               flex: 1,
@@ -190,7 +187,7 @@ export default function TeamManager({ userId }: { userId: string }) {
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? t(dict, 'team.sending', uiCopy('u_c3f36da144ff32ce')) : t(dict, 'team.invite', uiCopy('u_914c300979c06188'))}
+            {loading ? t(dict, 'team.sending') : t(dict, 'team.invite')}
           </button>
         </div>
       )}
@@ -214,7 +211,7 @@ export default function TeamManager({ userId }: { userId: string }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {members.length === 0 ? (
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: 24 }}>
-            {t(dict, 'team.noMembers', uiCopy('u_ad6a94a531ed5847'))}
+            {t(dict, 'team.noMembers')}
           </div>
         ) : (
           members.map((member) => (
@@ -251,7 +248,7 @@ export default function TeamManager({ userId }: { userId: string }) {
                   cursor: 'pointer',
                 }}
               >
-                {t(dict, 'team.remove', uiCopy('u_cd812216b61eede0'))}
+                {t(dict, 'team.remove')}
               </button>
             </div>
           ))

@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { VercelObserver, VercelObserverError, incidentSchema, sanitizeString } from '../lib/supervisor/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const now = new Date('2026-07-16T12:00:00.000Z')
 const dep = (o = {}) => ({ id: 'dpl_1', projectId: 'prj_1', state: 'READY', target: 'preview', createdAt: now.getTime() - 60_000, meta: {}, ...o })
@@ -33,8 +35,8 @@ test('tokens are redacted from provider errors', () => assert.doesNotMatch(sanit
 test('Authorization headers are never stored in incidents', async () => { const out = await incidents([dep({ state: 'ERROR', error: { message: 'Authorization: Bearer abc123' } })]); assert.doesNotMatch(JSON.stringify(out), /abc123|Authorization/i) })
 test('Raw API responses are not stored in incidents', async () => { const out = await incidents([dep({ state: 'ERROR', error: { message: '{"token":"abc","logs":["raw"]}' } })]); assert.doesNotMatch(JSON.stringify(out), /raw API|"logs"/) })
 test('Incident output passes the existing incident schema', async () => { for (const i of await incidents([dep({ state: 'ERROR' })])) assert.equal(incidentSchema.parse(i).provider, 'vercel') })
-test('The Observer has no Thinker dependency', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8'), /Thinker|proposeRepairPlan|LLM|OpenAI|Gemini/))
-test('The Observer has no Executor dependency', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8'), /Executor|execute\(/))
-test('The Observer has no Browser Runtime dependency', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8'), /BrowserRuntime|Playwright|Chromium|browser-runtime/))
-test('No mutation methods exist on the Vercel client interface', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-types.ts', import.meta.url), 'utf8'), /createDeployment|redeploy|cancelDeployment|updateProject|environment variable|delete|rotate|change domains/i))
+test('The Observer has no Thinker dependency', () => assert.doesNotMatch(hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8')), /Thinker|proposeRepairPlan|LLM|OpenAI|Gemini/))
+test('The Observer has no Executor dependency', () => assert.doesNotMatch(hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8')), /Executor|execute\(/))
+test('The Observer has no Browser Runtime dependency', () => assert.doesNotMatch(hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8')), /BrowserRuntime|Playwright|Chromium|browser-runtime/))
+test('No mutation methods exist on the Vercel client interface', () => assert.doesNotMatch(hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-types.ts', import.meta.url), 'utf8')), /createDeployment|redeploy|cancelDeployment|updateProject|environment variable|delete|rotate|change domains/i))
 test('Tests perform no real network requests', async () => { const original = globalThis.fetch; globalThis.fetch = async () => { throw new Error('network forbidden') }; try { assert.deepEqual(await incidents([dep()]), []) } finally { globalThis.fetch = original } })

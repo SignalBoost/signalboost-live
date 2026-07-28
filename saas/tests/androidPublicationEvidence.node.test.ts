@@ -6,6 +6,8 @@ import { validateAndroidBuildEvidence } from '../portable-mobile/android-build-e
 import { createAndroidPublicationReadiness } from '../portable-mobile/android-publication-readiness.ts'
 import { validateAndroidPublicationEvidence } from '../portable-mobile/android-publication-evidence.ts'
 import { validateAndroidSignedBundleEvidence } from '../portable-mobile/android-signed-bundle-evidence.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const build = validateAndroidBuildEvidence({
   portableId: 'provider-hub', packageName: 'com.signalboost.providerhub', scaffoldSchemaVersion: 'signalboost-android-scaffold-v1', buildPlanSchemaVersion: 'signalboost-android-build-plan-v1', sourceCommitSha: 'a'.repeat(40), jdkVersion: '17.0.12', androidSdkVersion: '35', gradleVersion: '8.10.2', lintPassed: true, testsPassed: true, unsignedAabPath: 'app/build/outputs/bundle/release/app-release.aab', unsignedAabSha256: 'b'.repeat(64), buildStartedAt: '2026-07-26T04:00:00.000Z', buildCompletedAt: '2026-07-26T04:05:00.000Z', artifactSigned: false, artifactUploaded: false, playConsolePublished: false, productionExecutionEnabled: false,
@@ -76,7 +78,7 @@ test('rejects coerced release numbers from untyped callers', () => {
 })
 
 test('publication evidence source has no store execution or mutation capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/android-publication-evidence.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/android-publication-evidence.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ["from 'node:child_process'", "from 'node:fs'", 'exec(', 'spawn(', 'fetch(', 'readFile(', 'writeFile(', 'androidpublisher', 'serviceAccountCredentials', 'insertEdit(', 'commitEdit(', 'uploadBundle(']) {
     assert.equal(source.includes(forbidden), false, `publication evidence contract must not contain ${forbidden}`)
   }

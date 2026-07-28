@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Source = 'website_optimizer' | 'repo_check' | 'cybersecurity_check' | 'audit_preview'
@@ -27,19 +26,19 @@ type Copy = {
 
 const COPY: Record<Lang, Copy> = {
   en: {
-    back: uiCopy('u_6fcc907ca85fa195'),
-    badge: uiCopy('u_955f627d3f0d1ab3'),
-    title: uiCopy('u_2eea4cf69900de3e'),
-    body: uiCopy('u_d1a3430896c4f98e'),
-    safe: uiCopy('u_2aa35256db9743ce'),
-    source: uiCopy('u_599c0ff7edcbe60f'),
-    targetUrl: uiCopy('u_260ddf859925c564'),
-    company: uiCopy('u_6a87da7b59cd42a8'),
-    optional: uiCopy('u_0c9374ecbf237cca'),
-    continue: uiCopy('u_d29fea77d4febfef'),
-    pricing: uiCopy('u_eb6a9b2653412666'),
-    note: uiCopy('u_42a076391aa8aaa3'),
-    options: { website_optimizer: uiCopy('u_717e2fca5cb3f31a'), repo_check: uiCopy('u_d349a544b5dc5f2b'), cybersecurity_check: uiCopy('u_2d857f9970381689'), audit_preview: uiCopy('u_b979d20197295c29') },
+    back: uiText('generatedUi.u_85647deec9865df5'),
+    badge: uiText('generatedUi.u_298a9207a732a11d'),
+    title: uiText('generatedUi.u_6355c7c1bd1fe92c'),
+    body: uiText('generatedUi.u_e7537dc059c3458d'),
+    safe: uiText('generatedUi.u_5a47e8e668406538'),
+    source: uiText('generatedUi.u_9b41efae340c46c7'),
+    targetUrl: uiText('generatedUi.u_b5a9404423a3f5ea'),
+    company: uiText('generatedUi.u_de4743c879734dc3'),
+    optional: uiText('generatedUi.u_ec91fdd9256cb75a'),
+    continue: uiText('generatedUi.u_fdb09f83be950afc'),
+    pricing: uiText('generatedUi.u_434dc3a581a65a52'),
+    note: uiText('generatedUi.u_90c6387f50e3f25b'),
+    options: { website_optimizer: uiText('generatedUi.u_7c0cbab9b791858b'), repo_check: uiText('generatedUi.u_870d4209c4350829'), cybersecurity_check: uiText('generatedUi.u_ed915f985534a061'), audit_preview: uiText('generatedUi.u_bfde463a8a1587f3') },
   },
   es: {
     back: 'SignalBoost',

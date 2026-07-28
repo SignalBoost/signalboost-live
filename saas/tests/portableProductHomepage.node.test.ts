@@ -3,9 +3,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { listPublicPortableProducts } from '../lib/portable-products/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
-const locales = JSON.parse(readFileSync(new URL('../lib/i18n/homepageLocales.json', import.meta.url), 'utf8')) as Record<string, { portables: Record<string, { name: string; desc: string }> }>
+
+const homepage = hydrateLocalizedSource(readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8'))
+const locales = JSON.parse(hydrateLocalizedSource(readFileSync(new URL('../lib/i18n/homepageLocales.json', import.meta.url), 'utf8'))) as Record<string, { portables: Record<string, { name: string; desc: string }> }>
 
 test('homepage renders public products from the registry selector without PORTABLES metadata', () => {
   assert.match(homepage, /import \{ listPublicPortableProducts \} from '@\/lib\/portable-products'/)

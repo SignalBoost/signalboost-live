@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type MetricValues = Record<string, number | string>
@@ -24,18 +23,18 @@ const COPY: Record<Lang, {
   sectionStatus: string
 }> = {
   en: {
-    eyebrow: uiCopy('u_10d571af7afbee11'),
-    title: uiCopy('u_dbd3c720dbc1d1d4'),
-    body: uiCopy('u_414a8e7e186fe808'),
-    role: uiCopy('u_389bd09b03ea3e92'),
-    open: uiCopy('u_2a30f95eb6af649a'),
-    loading: uiCopy('u_024ff537a3e02208'),
-    updated: uiCopy('u_47ed57d92f2659bd'),
-    live: uiCopy('u_e092b42946e3a916'),
-    noActivity: uiCopy('u_3901acde1bb0f29a'),
-    notConnected: uiCopy('u_73e7d946e42d9861'),
-    noneYet: uiCopy('u_2dfb724e0a1c44be'),
-    sectionStatus: uiCopy('u_0715477b5a0e73eb'),
+    eyebrow: uiText('generatedUi.u_f7d0be450adb7b21'),
+    title: uiText('generatedUi.u_4936fe9b0bc13549'),
+    body: uiText('generatedUi.u_95bedab368641b18'),
+    role: "Restricted: Owner/Admin",
+    open: uiText('generatedUi.u_6992a7968a788794'),
+    loading: uiText('generatedUi.u_3746550ab2d2d3c9'),
+    updated: uiText('generatedUi.u_3a5ecca188c0579c'),
+    live: uiText('generatedUi.u_0a165b533d15643d'),
+    noActivity: uiText('generatedUi.u_0a12b92ce7899469'),
+    notConnected: uiText('generatedUi.u_0303e18246708180'),
+    noneYet: uiText('generatedUi.u_adb85cf22bfc3254'),
+    sectionStatus: uiText('generatedUi.u_bf1e0a124a3d6d84'),
   },
   es: {
     eyebrow: 'Consola del propietario',
@@ -165,7 +164,7 @@ export default function AdminLandingPage() {
 
       {loading ? <p className="sb-caption">{c.loading}</p> : null}
 
-      <section className="sb-cockpit-grid" aria-label={uiCopy('u_807d4e2323988312')}>
+      <section className="sb-cockpit-grid" aria-label={uiText('generatedUi.u_526d8e0d47e07ebc')}>
         {ADMIN_SIDEBAR.map(item => {
           const rows = sectionSummary(item.href, values, c)
           return (

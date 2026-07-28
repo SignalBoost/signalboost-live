@@ -1,11 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const workflow = readFileSync(
+
+const workflow = hydrateLocalizedSource(readFileSync(
   new URL('../../.github/workflows/audit-remediation-regression.yml', import.meta.url),
   'utf8',
-)
+))
 
 test('audit remediation required workflow supports its actual push event', () => {
   assert.match(workflow, /^\s{2}push:\s*$/m)

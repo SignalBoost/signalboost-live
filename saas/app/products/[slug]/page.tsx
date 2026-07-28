@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type ProductSlug = 'audit-center' | 'cybersecurity-center' | 'identity-secrets' | 'console-hub' | 'pr-cockpit' | 'admin-cockpit' | 'marketing-sales' | 'promote-business' | 'outreach' | 'calendar' | 'spreadsheets' | 'video-studio'
@@ -21,7 +20,7 @@ type Product = {
 const STORAGE_KEY = 'signalboost_product_context'
 
 const CTA: Record<Lang, { back: string; kicker: string; included: string; gated: string; continue: string; pricing: string; notFound: string; notFoundBody: string }> = {
-  en: { back: 'SignalBoost', kicker: uiCopy('u_487430ac892f089b'), included: 'What you get', gated: 'Usage requires signup/login. Visitors can review the product before entering the workspace.', continue: 'Continue to SignalBoost', pricing: 'View pricing', notFound: 'Product not found', notFoundBody: 'This product page is not available yet.' },
+  en: { back: 'SignalBoost', kicker: uiText('generatedUi.u_4a0f386223ade820'), included: 'What you get', gated: 'Usage requires signup/login. Visitors can review the product before entering the workspace.', continue: 'Continue to SignalBoost', pricing: 'View pricing', notFound: 'Product not found', notFoundBody: 'This product page is not available yet.' },
   es: { back: 'SignalBoost', kicker: 'Vista del producto', included: 'Lo que incluye', gated: 'El uso requiere registro/login. Los visitantes pueden revisar el producto antes de entrar al workspace.', continue: 'Continuar a SignalBoost', pricing: 'Ver precios', notFound: 'Producto no encontrado', notFoundBody: 'Esta página de producto aún no está disponible.' },
   pt: { back: 'SignalBoost', kicker: 'Vitrine do produto', included: 'O que está incluído', gated: 'O uso requer cadastro/login. Visitantes podem revisar o produto antes de entrar no workspace.', continue: 'Continuar para o SignalBoost', pricing: 'Ver preços', notFound: 'Produto não encontrado', notFoundBody: 'Esta página de produto ainda não está disponível.' },
   pl: { back: 'SignalBoost', kicker: 'Okno produktu', included: 'Co otrzymujesz', gated: 'Użycie wymaga rejestracji/logowania. Odwiedzający mogą zobaczyć produkt przed wejściem do workspace.', continue: 'Kontynuuj do SignalBoost', pricing: 'Zobacz ceny', notFound: 'Nie znaleziono produktu', notFoundBody: 'Ta strona produktu nie jest jeszcze dostępna.' },

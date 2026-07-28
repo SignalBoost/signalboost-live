@@ -15,8 +15,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import RemediationLifecyclePanel, { type RemediationLifecycleState } from '@/components/audit/RemediationLifecyclePanel'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
 // the drawer without the global app shell/navbar. Each is code-split via lazy().
@@ -73,26 +72,26 @@ type AuditCopy = {
 
 const COPY: Record<string, AuditCopy> = {
   en: {
-    title: uiCopy('u_abe346381f79e154'), subtitle: uiCopy('u_850990aa62cb3956'),
-    viewPlans: uiCopy('u_63f5b4e7692739cb'),
-    approveAllFixes: uiCopy('u_fff32c1de6de76a8'), approvingAllFixes: uiCopy('u_a495b701956c39ad'), approvedAllFixes: uiCopy('u_99a77031e5f307db'), approvalFailed: uiCopy('u_40cb22ff7cf05b06'), approvalSafety: uiCopy('u_a8d851761ddebf72'),
-    pathLabel: uiCopy('u_29af571b1a45bf00'), maxLabel: uiCopy('u_780fda97fa4de79d'), run: uiCopy('u_d4a30db2ca1d2bce'), running: uiCopy('u_32eb19f76b973c96'),
-    filesScanned: uiCopy('u_bedaee3eb3daf8f4'), findings: uiCopy('u_daa0e8be656c762b'), clean: uiCopy('u_79f1048f2b8280f3'),
-    remediatedClean: uiCopy('u_46b3c2b27e3c6868'),
-    emptyHint: uiCopy('u_e2e673ded5f1c062'),
-    ownerOnly: uiCopy('u_e5a513305926b2de'), failed: uiCopy('u_ffddeba7c82c7a6f'), quotaExceeded: uiCopy('u_31ebf3a220be78a3'),
-    category: uiCopy('u_62bec507ad5d1c16'), recommendation: uiCopy('u_18ca22593ceea125'), line: uiCopy('u_180867603bc6f15f'),
-    history: uiCopy('u_a8cbffe616fcabe9'), noRuns: uiCopy('u_db639e042bc61d17'), refresh: uiCopy('u_b1aea919a7d8c025'),
-    statusRunning: uiCopy('u_66a3d383ab8f5c25'), statusComplete: uiCopy('u_b77e262ba03403fb'), statusApproved: uiCopy('u_bc607d3f8d6bb451'), statusFailed: uiCopy('u_b7f0bb2911aab014'),
-    detail: uiCopy('u_957ad8c5f49f2055'), close: uiCopy('u_f7a4698e00879f9c'), viewSource: uiCopy('u_b314ede958342833'),
-    trackScan: uiCopy('u_97e8a29dbeb4e606'), trackAnalyze: uiCopy('u_fc3ee9f17af1a994'), trackReport: uiCopy('u_c87ffe7ce272a027'), trackPrs: uiCopy('u_71bc4bf8382658e8'),
-    cmdTitle: uiCopy('u_447d83a74a477e42'), reportsTitle: uiCopy('u_f6e951a72bf9bacd'),
-    reportsSubtitle: uiCopy('u_c6f25feaea803565'),
-    openReport: uiCopy('u_312a72f56fa8bcc0'), reportOwnerOnly: uiCopy('u_272236b0e24c7416'),
-    reportSyncHint: uiCopy('u_d170c1a7f714b034'),
-    mvpBadge: uiCopy('u_bd076f7e0d5a1d5f'), viewOnline: uiCopy('u_9533aabf698bf4f3'),
-    runningHint: uiCopy('u_b7234a95d507607b'), pathHint: uiCopy('u_bf746a22563ed573'),
-    sev: { critical: uiCopy('u_b395c55ce3e1253f'), high: uiCopy('u_a940a83d1b51d669'), medium: uiCopy('u_b12f9d76a0cd3ea9'), low: uiCopy('u_fbdd598e582d90ee'), info: uiCopy('u_61e9e775f21fcb24') },
+    title: uiText('generatedUi.u_281ad82f2d803589'), subtitle: uiText('generatedUi.u_934a65fc9170e02d'),
+    viewPlans: uiText('generatedUi.u_a72e2bd3e148c05e'),
+    approveAllFixes: uiText('generatedUi.u_ff3970c54ab564ba'), approvingAllFixes: uiText('generatedUi.u_09dc0ab783f64c3d'), approvedAllFixes: uiText('generatedUi.u_e6a22d5b4457acd3'), approvalFailed: uiText('generatedUi.u_5d0112f98b838e49'), approvalSafety: uiText('generatedUi.u_ca33e010247b6d52'),
+    pathLabel: uiText('generatedUi.u_c83db0133850dfcc'), maxLabel: uiText('generatedUi.u_44a4735b1923c30e'), run: uiText('generatedUi.u_954b8f823bf04b88'), running: uiText('generatedUi.u_7b383bd141845ab4'),
+    filesScanned: uiText('generatedUi.u_cd24a02cc5f8ad4e'), findings: uiText('generatedUi.u_e171c2ff25b55e5a'), clean: uiText('generatedUi.u_c872f8542484120c'),
+    remediatedClean: uiText('generatedUi.u_9a3042753040b8a9'),
+    emptyHint: uiText('generatedUi.u_431c7f0b6c84900a'),
+    ownerOnly: uiText('generatedUi.u_f2358f72665a6cbd'), failed: uiText('generatedUi.u_892c84891df2323a'), quotaExceeded: uiText('generatedUi.u_1025689697be813c'),
+    category: uiText('generatedUi.u_292c06f0045a45d0'), recommendation: uiText('generatedUi.u_bc92e0e35c9a7ba1'), line: uiText('generatedUi.u_d7852cd0d2453e8c'),
+    history: uiText('generatedUi.u_addf321bfa5b8346'), noRuns: uiText('generatedUi.u_72a85758b69c1d33'), refresh: uiText('generatedUi.u_0e91610117029a62'),
+    statusRunning: uiText('generatedUi.u_f4ccae29e1bb0c20'), statusComplete: uiText('generatedUi.u_143b270a32602d41'), statusApproved: uiText('generatedUi.u_87b42e40c2a290e0'), statusFailed: uiText('generatedUi.u_031a8f0f659df890'),
+    detail: uiText('generatedUi.u_fb5f27d5457c4641'), close: uiText('generatedUi.u_7d9eb7acb13e2462'), viewSource: uiText('generatedUi.u_20672423d7169088'),
+    trackScan: uiText('generatedUi.u_52d920bb15637915'), trackAnalyze: uiText('generatedUi.u_a7a3824e7c240994'), trackReport: uiText('generatedUi.u_0fec6815da7d5965'), trackPrs: uiText('generatedUi.u_2a52812ce28a5eca'),
+    cmdTitle: uiText('generatedUi.u_aa1964c6fdf0133f'), reportsTitle: uiText('generatedUi.u_04f05c93f943a85f'),
+    reportsSubtitle: uiText('generatedUi.u_e1b6fab203c9da7c'),
+    openReport: uiText('generatedUi.u_dcc839a4015c4b7d'), reportOwnerOnly: uiText('generatedUi.u_e3d42d82c35cf42e'),
+    reportSyncHint: uiText('generatedUi.u_8a61828daee9b056'),
+    mvpBadge: uiText('generatedUi.u_3953f7eea41d0899'), viewOnline: uiText('generatedUi.u_9376bfd66b34be75'),
+    runningHint: uiText('generatedUi.u_642ddadbd00e1d09'), pathHint: uiText('generatedUi.u_0f89c02a75c394b0'),
+    sev: { critical: uiText('generatedUi.u_427dd2969bd140be'), high: uiText('generatedUi.u_c4ebc6d4a5832cd9'), medium: uiText('generatedUi.u_8e588cd187741f1c'), low: uiText('generatedUi.u_f793de205ead5ac3'), info: uiText('generatedUi.u_170322a32f3c35b2') },
   },
   es: {
     title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
@@ -188,18 +187,18 @@ function copyFor(lang: string): AuditCopy { return COPY[lang] || COPY.en }
 // The 12 compliance reports. `key` maps to the live report page at /hub/audit/<key>.
 type ReportCard = { key: string; icon: string; title: string; desc: string; mvp?: boolean }
 const REPORTS: ReportCard[] = [
-  { key: 'executive',   icon: '📑', title: uiCopy('u_c3e6b0cec7dc9541'),      desc: 'Synthesized markdown brief: posture, top risks, and the bottom line.', mvp: true },
-  { key: 'providers',   icon: '📦', title: uiCopy('u_daca4bc8ffb058bf'),          desc: 'Stripe, Vercel, Supabase, and GitHub connection status & risk.', mvp: true },
-  { key: 'identity',    icon: '👤', title: uiCopy('u_4c3d70d7768b1a34'),     desc: 'User access controls, owner rights, stale accounts, and MFA gaps.', mvp: true },
-  { key: 'secrets',     icon: '🔑', title: uiCopy('u_135f22da7617dd8d'),   desc: 'Hardcoded credentials, token rotation age, and exposure risk.', mvp: true },
-  { key: 'remediation', icon: '🛠️', title: uiCopy('u_ed82ca10b005267e'),         desc: 'The actionable fix engine: prioritized fixes, owners, due dates.', mvp: true },
-  { key: 'github',      icon: '🐙', title: uiCopy('u_c9aa515f03be6c2e'),  desc: 'Branch protection, open PRs, stale branches, unreviewed changes.' },
-  { key: 'vercel',      icon: '▲',  title: uiCopy('u_a808aa20bff76c7e'),      desc: 'Env vars, exposed variables, deployment and rollback status.' },
-  { key: 'supabase',    icon: '🗄️', title: uiCopy('u_f212a77f23bab9a5'), desc: 'RLS coverage, public tables, storage buckets, service-role use.' },
-  { key: 'stripe',      icon: '💳', title: uiCopy('u_6ceff88cbddd4ece'), desc: 'Products, prices, webhooks, and live vs test mode consistency.' },
-  { key: 'pr-cockpit',  icon: '🔀', title: uiCopy('u_be2ab9cb428db1f4'),    desc: 'Infrastructure change requests, approvals, and merge results.' },
-  { key: 'compliance',  icon: '⚖️', title: uiCopy('u_d034e42f9a6c7580'),  desc: 'SOC 2 / ISO 27001 / NIST CSF / CIS readiness — no certification claims.' },
-  { key: 'activity',    icon: '🧾', title: uiCopy('u_c63c48ffed43600f'),            desc: 'Activity timeline of actions, providers, risk, and results.' },
+  { key: 'executive',   icon: '📑', title: uiText('generatedUi.u_d2bced23821d0590'),      desc: 'Synthesized markdown brief: posture, top risks, and the bottom line.', mvp: true },
+  { key: 'providers',   icon: '📦', title: uiText('generatedUi.u_2a93e812bc1ecd33'),          desc: 'Stripe, Vercel, Supabase, and GitHub connection status & risk.', mvp: true },
+  { key: 'identity',    icon: '👤', title: uiText('generatedUi.u_d77b1e19b500e122'),     desc: 'User access controls, owner rights, stale accounts, and MFA gaps.', mvp: true },
+  { key: 'secrets',     icon: '🔑', title: uiText('generatedUi.u_64aac100a24f0a81'),   desc: 'Hardcoded credentials, token rotation age, and exposure risk.', mvp: true },
+  { key: 'remediation', icon: '🛠️', title: uiText('generatedUi.u_c84b05c33aa16e03'),         desc: 'The actionable fix engine: prioritized fixes, owners, due dates.', mvp: true },
+  { key: 'github',      icon: '🐙', title: uiText('generatedUi.u_2a9a976e1d717fbe'),  desc: 'Branch protection, open PRs, stale branches, unreviewed changes.' },
+  { key: 'vercel',      icon: '▲',  title: uiText('generatedUi.u_4fbd37cb0729b025'),      desc: 'Env vars, exposed variables, deployment and rollback status.' },
+  { key: 'supabase',    icon: '🗄️', title: uiText('generatedUi.u_238bfc2f353bf894'), desc: 'RLS coverage, public tables, storage buckets, service-role use.' },
+  { key: 'stripe',      icon: '💳', title: uiText('generatedUi.u_00f300f1151f4b6b'), desc: 'Products, prices, webhooks, and live vs test mode consistency.' },
+  { key: 'pr-cockpit',  icon: '🔀', title: uiText('generatedUi.u_597be1d5ba1ab0f5'),    desc: 'Infrastructure change requests, approvals, and merge results.' },
+  { key: 'compliance',  icon: '⚖️', title: uiText('generatedUi.u_c7aabad2515a60d0'),  desc: 'SOC 2 / ISO 27001 / NIST CSF / CIS readiness — no certification claims.' },
+  { key: 'activity',    icon: '🧾', title: uiText('generatedUi.u_2a2fd3b8331fbbd1'),            desc: 'Activity timeline of actions, providers, risk, and results.' },
 ]
 
 const SEV_ORDER: Sev[] = ['critical', 'high', 'medium', 'low', 'info']
@@ -500,7 +499,7 @@ export default function AuditCenterPage() {
               <input
                 value={prefix}
                 onChange={e => setPrefix(e.target.value)}
-                placeholder={uiCopy('u_fe975fb81a163a04')}
+                placeholder={uiText('generatedUi.u_d7606d02f5e08d7c')}
                 className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
               />
               <span className="text-[10.5px] leading-snug text-text-muted/80">{copy.pathHint}</span>
@@ -536,7 +535,7 @@ export default function AuditCenterPage() {
               <div className="h-full w-1/3 rounded-full bg-accent" style={{ animation: 'sbIndet 1.15s ease-in-out infinite' }} />
             </div>
             <p className="mt-2 text-[11.5px] leading-relaxed text-text-muted">{copy.runningHint}</p>
-            <style>{uiCopy('u_29a831c1a8fd3839')}</style>
+            <style>{"@keyframes sbIndet{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}"}</style>
           </div>
         )}
 
@@ -719,15 +718,15 @@ export default function AuditCenterPage() {
             {openReport.key === 'pr-cockpit' ? (
               <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4 rounded-md border border-border bg-bg p-6">
                 <span className="text-2xl" aria-hidden>🔀</span>
-                <p className="text-sm leading-relaxed text-text-muted">{t('audit.center.prCockpitPending', uiCopy('u_90c7b380e310b6aa'))}</p>
-                <a href="/hub" className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">{t('audit.center.openCockpit', uiCopy('u_cc552d94c5e8d818'))}</a>
+                <p className="text-sm leading-relaxed text-text-muted">{t('audit.center.prCockpitPending', "The PR Cockpit approval trail — infrastructure change requests, approvals, and merge results — lives in the Hub PR Cockpit. A dedicated report view is being wired to that data.")}</p>
+                <a href="/hub" className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">{t('audit.center.openCockpit', "Open PR Cockpit")}</a>
               </div>
             ) : isAdmin ? (
               <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-bg">
                 {(() => {
                   const ReportView = REPORT_VIEWS[openReport.key]
                   return ReportView ? (
-                    <Suspense fallback={<div className="p-6 text-sm text-text-muted">{t('audit.center.loading', uiCopy('u_d9dd4c4eda45f942'))}</div>}>
+                    <Suspense fallback={<div className="p-6 text-sm text-text-muted">{t('audit.center.loading', "Loading report…")}</div>}>
                       <ReportView key={refreshTick} />
                     </Suspense>
                   ) : null

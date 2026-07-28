@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createSiemAuditSink, formatEcsJson, formatCef, teeAuditSinks } from '../lib/supervisor/portable/siem-audit-sink.ts'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const ev: any = { eventId: 'ev-1', incidentId: 'inc-9', dispatchId: 'dsp-3', eventType: 'sandbox_execution_paused', occurredAt: '2026-07-23T05:00:00.000Z', payload: { stepId: 'migrate-db', reason: 'financial_gate' }, schemaVersion: 'supervisor-dispatch-audit-v1' }
 
@@ -33,7 +35,7 @@ test('tee delivers to every sink (buyer SIEM + platform ledger)', async () => {
 })
 
 test('sink stays host-agnostic (no env, no supabase, no seller brand)', () => {
-  const src = readFileSync(new URL('../lib/supervisor/portable/siem-audit-sink.ts', import.meta.url), 'utf8')
+  const src = hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/portable/siem-audit-sink.ts', import.meta.url), 'utf8'))
     .split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
   assert.ok(!/process\.env/.test(src))
   assert.ok(!/supabase/i.test(src))

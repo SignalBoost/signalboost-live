@@ -6,9 +6,6 @@ import { useTranslation } from '@/components/i18n/useTranslation'
 import { getVideoQueueCopy, type VideoQueueItemCopy } from '@/lib/cos/i18n/videoQueueCopy'
 import { getVideoWorkflowCopy } from '@/lib/cos/i18n/videoWorkflowCopy'
 import { ProductionJobsPanel } from './ProductionJobsPanel.tsx'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 
 type CampaignStatus = 'need_approval' | 'approved_rendering' | 'rejected' | 'on_hold' | 'in_progress' | 'final_review' | 'published'
@@ -194,7 +191,7 @@ export function VideoQueueClient() {
       </section>
 
       <ProductionJobsPanel />
-      <style>{uiCopy('u_478f0144301070ba')}</style>
+      <style>{"@media (max-width:1100px){.videoBoardGrid{grid-template-columns:1fr!important}.videoBoardGrid > section{grid-column:auto!important}}"}</style>
     </main>
   )
 }

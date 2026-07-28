@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -20,7 +19,7 @@ type ProductContext = {
 const STORAGE_KEY = 'signalboost_product_context'
 
 const COPY: Record<Lang, { prefix: string; body: string; continue: string; dismiss: string }> = {
-  en: { prefix: uiCopy('u_aba6eb58b886fc5f'), body: uiCopy('u_897dbf3562cd206e'), continue: uiCopy('u_2738e129cae209ce'), dismiss: uiCopy('u_fc8a086f3b697591') },
+  en: { prefix: uiText('generatedUi.u_1a2877296653964a'), body: uiText('generatedUi.u_723a333fc41aea3e'), continue: uiText('generatedUi.u_3ac48f57c27509c3'), dismiss: uiText('generatedUi.u_48845bff334a50a5') },
   es: { prefix: 'Llegaste por', body: 'SignalBoost recordó este producto localmente para que tu workspace empiece con contexto.', continue: 'Continuar configuración', dismiss: 'Cerrar' },
   pt: { prefix: 'Você veio por', body: 'O SignalBoost lembrou este produto localmente para que seu workspace comece com contexto.', continue: 'Continuar configuração', dismiss: 'Fechar' },
   pl: { prefix: 'Przyszedłeś po', body: 'SignalBoost zapamiętał ten produkt lokalnie, aby workspace zaczął z kontekstem.', continue: 'Kontynuuj konfigurację', dismiss: 'Zamknij' },

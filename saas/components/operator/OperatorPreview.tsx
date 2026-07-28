@@ -5,8 +5,7 @@
 // preview matches what will publish. Scaled down to fit a dashboard card.
 
 import { useEffect } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
 type FeatureItem = { title?: string; body?: string; icon?: string }
@@ -144,7 +143,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             <div key={i} style={{ padding: '32px 24px', textAlign: 'center', background: dark ? background : surface }}>
               {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, marginBottom: 12 }}>{h}</div>}
               <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ position: 'absolute', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{uiCopy('u_dca400edd970416d')}</span>
+                <span style={{ position: 'absolute', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{uiText('generatedUi.u_0e4c296c8449535e')}</span>
               </div>
             </div>
           )

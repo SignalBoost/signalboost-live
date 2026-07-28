@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 import { DefaultSupervisorPolicyEngine, SupervisorOrchestrator, incidentSchema, repairPlanSchema } from '../lib/supervisor/index.ts'
 import type { AuditEvent, ExecutionResult, PolicyDecision, Verifier } from '../lib/supervisor/index.ts'
 import { createReferenceVerifier } from '../lib/supervisor/portable/reference-verifier.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const incident = () => ({
   incidentId: 'INC-001', provider: 'vercel', environment: 'sandbox', severity: 'warning', detectedAt: '2026-07-16T00:00:00.000Z', source: 'api', errorMessage: 'Deployment failed.',
@@ -108,12 +110,12 @@ test('audit failure before execution prevents execution', async () => {
   assert.equal(d.executeCalls, 0)
 })
 test('Thinker contract has no Executor or Browser Runtime dependency', () => {
-  const source = readFileSync(new URL('../lib/supervisor/execution-contracts.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/execution-contracts.ts', import.meta.url), 'utf8'))
   assert.match(source, /interface Thinker \{\s*proposeRepairPlan\(incident: SupervisorIncident\)/)
   assert.doesNotMatch(source.match(/interface Thinker \{[\s\S]*?\n\}/)?.[0] || '', /Executor|BrowserRuntime|BrowserSession|BrowserTask/)
 })
 test('Observer contract has no Executor or Browser Runtime dependency', () => {
-  const source = readFileSync(new URL('../lib/supervisor/execution-contracts.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../lib/supervisor/execution-contracts.ts', import.meta.url), 'utf8'))
   assert.match(source, /interface Observer \{\s*observe\(context: ProviderObservationContext\)/)
   assert.doesNotMatch(source.match(/interface Observer \{[\s\S]*?\n\}/)?.[0] || '', /Executor|BrowserRuntime|BrowserSession|BrowserTask/)
 })

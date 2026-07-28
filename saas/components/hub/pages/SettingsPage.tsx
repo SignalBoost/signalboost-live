@@ -5,9 +5,6 @@ import { useState, useEffect } from 'react'
 import { ConsoleSettings, ApprovalPolicy } from '@/lib/hub/settings-service'
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 export function SettingsPage() {
   const { t } = useTranslation()
   const [settings, setSettings] = useState<ConsoleSettings | null>(null)
@@ -30,10 +27,10 @@ export function SettingsPage() {
         setSettings(data.settings)
         setPolicies(data.policies || [])
       } else {
-        setError(data.error || t('console.settings.err_load', uiCopy('u_d9236849d727c6e1')))
+        setError(data.error || t('console.settings.err_load', "Failed to load settings"))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('console.settings.err_load2', uiCopy('u_c303fc30e89b2599')))
+      setError(err instanceof Error ? err.message : t('console.settings.err_load2', "Error loading settings"))
     } finally {
       setLoading(false)
     }
@@ -57,17 +54,17 @@ export function SettingsPage() {
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
       } else {
-        setError(data.error || t('console.settings.err_update', uiCopy('u_34ce041668a69347')))
+        setError(data.error || t('console.settings.err_update', "Failed to update setting"))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('console.settings.err_update2', uiCopy('u_16aaf227d64da5be')))
+      setError(err instanceof Error ? err.message : t('console.settings.err_update2', "Error updating setting"))
     }
   }
 
   if (loading) {
     return (
       <div style={{ padding: '2rem' }}>
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.settings.loading', uiCopy('u_afd73fac2aa0ade2'))}</div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.settings.loading', "Loading settings...")}</div>
       </div>
     )
   }
@@ -76,7 +73,7 @@ export function SettingsPage() {
     return (
       <div style={{ padding: '2rem' }}>
         <div style={{ ...cardStyle, padding: '1rem', background: '#1a0000', color: '#ff6b6b' }}>
-          {error || t('console.settings.err_load', uiCopy('u_bf7defafdeaa4a52'))}
+          {error || t('console.settings.err_load', "Failed to load settings")}
         </div>
       </div>
     )
@@ -85,8 +82,8 @@ export function SettingsPage() {
   return (
     <div style={{ padding: '2rem', maxWidth: '1000px' }}>
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.settings.title', uiCopy('u_f1f9b3b71129410f'))}</h2>
-        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.settings.subtitle', uiCopy('u_bee25893c595d7f1'))}</p>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.settings.title', "Console Settings")}</h2>
+        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.settings.subtitle', "Configure security policies, approvals, and audit settings")}</p>
       </div>
 
       {saved && (
@@ -99,7 +96,7 @@ export function SettingsPage() {
             marginBottom: '1.5rem',
             fontSize: '0.9rem',
           }}
-        >{'✓ ' + t('console.settings.saved', uiCopy('u_4258422f33fad308'))}</div>
+        >{'✓ ' + t('console.settings.saved', "Settings saved")}</div>
       )}
 
       {error && (
@@ -119,32 +116,32 @@ export function SettingsPage() {
 
       {/* Security Settings */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'🔒 ' + t('console.settings.sec_security', uiCopy('u_398202a1f920d31f'))}</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'🔒 ' + t('console.settings.sec_security', "Security")}</h3>
 
         <ToggleSetting
-          label={t('console.settings.mfa_l', uiCopy('u_b60dc159beaf97e3'))}
-          description={t('console.settings.mfa_d', uiCopy('u_ed7918b94a04273d'))}
+          label={t('console.settings.mfa_l', "Require MFA for Unlock")}
+          description={t('console.settings.mfa_d', "Users must authenticate with TOTP before accessing the vault")}
           enabled={settings.requireMFA}
           onChange={value => updateSetting('requireMFA', value)}
         />
 
         <ToggleSetting
-          label={t('console.settings.rot_approval_l', uiCopy('u_d8c43e09a4050665'))}
-          description={t('console.settings.rot_approval_d', uiCopy('u_d085cf4c0d9b948d'))}
+          label={t('console.settings.rot_approval_l', "Require Approval for Key Rotation")}
+          description={t('console.settings.rot_approval_d', "Key rotations must be approved before execution")}
           enabled={settings.requireApprovalForRotation}
           onChange={value => updateSetting('requireApprovalForRotation', value)}
         />
 
         <ToggleSetting
-          label={t('console.settings.exp_approval_l', uiCopy('u_e2c2ee61367d50e4'))}
-          description={t('console.settings.exp_approval_d', uiCopy('u_f54d8b5b8542d190'))}
+          label={t('console.settings.exp_approval_l', "Require Approval for Export")}
+          description={t('console.settings.exp_approval_d', "Exporting secrets requires explicit approval")}
           enabled={settings.requireApprovalForExport}
           onChange={value => updateSetting('requireApprovalForExport', value)}
         />
 
         <ToggleSetting
-          label={t('console.settings.enc_l', uiCopy('u_67f48c99a043cb60'))}
-          description={t('console.settings.enc_d', uiCopy('u_9af48a6beacb1574'))}
+          label={t('console.settings.enc_l', "Encryption Enabled")}
+          description={t('console.settings.enc_d', "All secrets encrypted at rest")}
           enabled={settings.encryptionEnabled}
           onChange={value => updateSetting('encryptionEnabled', value)}
         />
@@ -152,18 +149,18 @@ export function SettingsPage() {
 
       {/* Automation Settings */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'⚙️ ' + t('console.settings.sec_automation', uiCopy('u_90214da8fb3d5f48'))}</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'⚙️ ' + t('console.settings.sec_automation', "Automation")}</h3>
 
         <ToggleSetting
-          label={t('console.settings.autorot_l', uiCopy('u_26831f3013517fbc'))}
-          description={t('console.settings.autorot_d', uiCopy('u_09c75276d43485d5'))}
+          label={t('console.settings.autorot_l', "Auto-Rotate Keys")}
+          description={t('console.settings.autorot_d', "Automatically rotate keys on a schedule")}
           enabled={settings.autoRotateKeys}
           onChange={value => updateSetting('autoRotateKeys', value)}
         />
 
         {settings.autoRotateKeys && (
           <NumberSetting
-            label={t('console.settings.autorot_int_l', uiCopy('u_40bba4a654a5da4d'))}
+            label={t('console.settings.autorot_int_l', "Auto-Rotate Interval (Days)")}
             value={settings.autoRotateIntervalDays}
             min={7}
             max={365}
@@ -174,48 +171,48 @@ export function SettingsPage() {
 
       {/* Audit & Retention */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'📊 ' + t('console.settings.sec_audit', uiCopy('u_5a1042409e9f9aa9'))}</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'📊 ' + t('console.settings.sec_audit', "Audit & Retention")}</h3>
 
         <NumberSetting
-          label={t('console.settings.audit_ret_l', uiCopy('u_4dfc99aa71c74765'))}
+          label={t('console.settings.audit_ret_l', "Audit Log Retention (Days)")}
           value={settings.auditLogRetentionDays}
           min={7}
           max={365}
-          description={t('console.settings.audit_ret_d', uiCopy('u_1d0966b2a8a89118'))}
+          description={t('console.settings.audit_ret_d', "How long to keep audit logs")}
           onChange={value => updateSetting('auditLogRetentionDays', value)}
         />
 
         <NumberSetting
-          label={t('console.settings.session_l', uiCopy('u_8b2d9122d43d501a'))}
+          label={t('console.settings.session_l', "Session Timeout (Minutes)")}
           value={settings.sessionTimeoutMinutes}
           min={5}
           max={480}
-          description={t('console.settings.session_d', uiCopy('u_3e86ebc4d6271b90'))}
+          description={t('console.settings.session_d', "Idle timeout before re-authentication required")}
           onChange={value => updateSetting('sessionTimeoutMinutes', value)}
         />
       </div>
 
       {/* Notifications */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'🔔 ' + t('console.settings.sec_notifications', uiCopy('u_1af26eeab89a63e4'))}</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'🔔 ' + t('console.settings.sec_notifications', "Notifications")}</h3>
 
         <ToggleSetting
-          label={t('console.settings.notify_unauth_l', uiCopy('u_c1e544e3d6f77372'))}
-          description={t('console.settings.notify_unauth_d', uiCopy('u_6f92abd49e851cbf'))}
+          label={t('console.settings.notify_unauth_l', "Notify on Unauthorized Access")}
+          description={t('console.settings.notify_unauth_d', "Send alerts when unauthorized access is detected")}
           enabled={settings.notifyOnUnauthorizedAccess}
           onChange={value => updateSetting('notifyOnUnauthorizedAccess', value)}
         />
 
         <ToggleSetting
-          label={t('console.settings.notify_rot_l', uiCopy('u_9244d69ff618eebe'))}
-          description={t('console.settings.notify_rot_d', uiCopy('u_c303b50f33fe4308'))}
+          label={t('console.settings.notify_rot_l', "Notify on Key Rotation")}
+          description={t('console.settings.notify_rot_d', "Send notifications when keys are rotated")}
           enabled={settings.notifyOnKeyRotation}
           onChange={value => updateSetting('notifyOnKeyRotation', value)}
         />
 
         <ToggleSetting
-          label={t('console.settings.notify_exp_l', uiCopy('u_7ffe449b970bf4e2'))}
-          description={t('console.settings.notify_exp_d', uiCopy('u_7c7991cdf05daa9a'))}
+          label={t('console.settings.notify_exp_l', "Notify on Key Expiry")}
+          description={t('console.settings.notify_exp_d', "Alert when keys are expiring soon")}
           enabled={settings.notifyOnKeyExpiry}
           onChange={value => updateSetting('notifyOnKeyExpiry', value)}
         />
@@ -223,17 +220,17 @@ export function SettingsPage() {
 
       {/* Advanced */}
       <div style={{ ...cardStyle }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'⚡ ' + t('console.settings.sec_advanced', uiCopy('u_d91329a6141b6527'))}</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'⚡ ' + t('console.settings.sec_advanced', "Advanced")}</h3>
 
         <ToggleSetting
-          label={t('console.settings.pub_l', uiCopy('u_ccb5f56460fb309e'))}
-          description={t('console.settings.pub_d', uiCopy('u_6ed3c786056c8815'))}
+          label={t('console.settings.pub_l', "Allow Public URLs")}
+          description={t('console.settings.pub_d', "Permit deployment to public URLs")}
           enabled={settings.allowPublicURLs}
           onChange={value => updateSetting('allowPublicURLs', value)}
         />
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#1a1a2e', borderRadius: '4px', fontSize: '0.85rem' }}>
-          <div style={{ color: '#888', marginBottom: '0.5rem' }}>{t('console.settings.last_updated', uiCopy('u_611361b966030218'))}</div>
+          <div style={{ color: '#888', marginBottom: '0.5rem' }}>{t('console.settings.last_updated', "Last Updated")}</div>
           <div style={{ color: '#1af0ff' }}>
             {new Date(settings.updatedAt).toLocaleString()}
           </div>

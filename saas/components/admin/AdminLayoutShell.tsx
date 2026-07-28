@@ -7,8 +7,7 @@ import { supabase } from '@/utils/supabase/client'
 import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import CosaNotificationCenter from '@/components/admin/CosaNotificationCenter'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const nav = ADMIN_SIDEBAR
 
@@ -17,12 +16,12 @@ const nav = ADMIN_SIDEBAR
 // shared ADMIN_SIDEBAR data structure doesn't need to change.
 const COPY: Record<string, Record<string, any>> = {
   en: {
-    checkingAccess: uiCopy('u_4439300654185c3e'),
-    ownerConsole: uiCopy('u_56143cf756a05d03'), controlRoom: uiCopy('u_d8627db551325aa8'),
-    controlRoomDesc: uiCopy('u_05c86d045aa6c92e'),
-    adminFlow: uiCopy('u_0f8a897f669d2cde'), execPreview: uiCopy('u_2a1ea5433e8c3ca4'), ownerRestricted: uiCopy('u_e612b82a91b89ca2'),
-    ownerRestrictedDesc: uiCopy('u_9d79f484e19783ef'),
-    nav: { 'Overview': uiCopy('u_bc5aabb255341c4b'), 'Logs': uiCopy('u_1aef1f2932a8beb8'), 'Outreach': uiCopy('u_b5223f1e29eb5733'), 'Marketing + Sales': uiCopy('u_77ee1300bfd8e22c'), 'Insights': uiCopy('u_26bfdaa00fec57fd'), 'Role Management': uiCopy('u_bf3e021d9aec877b'), 'Marketplace Monitor': uiCopy('u_bd978aa1705b188d'), 'SaaS Monitor': uiCopy('u_0e4c940f0f9cd725'), 'Concierge Monitor': uiCopy('u_a1d5bebba906f90e') },
+    checkingAccess: uiText('generatedUi.u_c6f0feac2ececca3'),
+    ownerConsole: uiText('generatedUi.u_f7d0be450adb7b21'), controlRoom: uiText('generatedUi.u_8ec96b16bae350b8'),
+    controlRoomDesc: uiText('generatedUi.u_22751c061570d2b5'),
+    adminFlow: uiText('generatedUi.u_db93cd9512403072'), execPreview: uiText('generatedUi.u_80ad3c268ddeb079'), ownerRestricted: uiText('generatedUi.u_3a4becb6a0f683e3'),
+    ownerRestrictedDesc: uiText('generatedUi.u_83984a699379c549'),
+    nav: { 'Overview': uiText('generatedUi.u_d4b1ea5708dd5329'), 'Logs': uiText('generatedUi.u_ea2100dc89ae9fe2'), 'Outreach': uiText('generatedUi.u_a5803fdf10e57e66'), 'Marketing + Sales': uiText('generatedUi.u_dcba31525bd63b56'), 'Insights': uiText('generatedUi.u_2a932f90172e99ea'), 'Role Management': uiText('generatedUi.u_a5b449f8e7b1f4be'), 'Marketplace Monitor': uiText('generatedUi.u_025e59e79d169987'), 'SaaS Monitor': uiText('generatedUi.u_45c0d5e16acb8738'), 'Concierge Monitor': uiText('generatedUi.u_a1f160e587a8808c') },
   },
   es: {
     checkingAccess: 'Comprobando acceso de propietario/administrador…',

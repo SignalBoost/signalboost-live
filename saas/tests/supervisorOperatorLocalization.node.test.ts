@@ -1,13 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 type Dictionary = Record<string, string>
 type LocaleFile = Record<string, { supervisorSoc: Dictionary }>
 
 const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru'] as const
 const locales = JSON.parse(
-  readFileSync(new URL('../lib/i18n/supervisorSocLocales.json', import.meta.url), 'utf8'),
+  hydrateLocalizedSource(readFileSync(new URL('../lib/i18n/supervisorSocLocales.json', import.meta.url), 'utf8')),
 ) as LocaleFile
 
 const criticalOperatorKeys = [

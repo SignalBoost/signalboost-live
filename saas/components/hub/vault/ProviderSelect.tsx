@@ -5,8 +5,7 @@
 
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { HUB_PROVIDERS } from '@/lib/hub/provider-registry'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export type ProviderSelectProps = {
   onSelect: (providerId: string, providerName: string) => void
@@ -205,7 +204,7 @@ export default function ProviderSelect({
             fontSize: 12,
             color: 'rgba(255,255,255,.5)',
           }}
-        >{uiCopy('u_c8bea98a0a0b6522')}{search}"
+        >{uiText('generatedUi.u_11c64c27285a3d62')}{search}"
         </div>
       )}
     </div>

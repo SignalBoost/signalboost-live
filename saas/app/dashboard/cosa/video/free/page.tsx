@@ -4,8 +4,7 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SignalBoostGuide } from '@/lib/cos/ui/SignalBoostGuide'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -15,31 +14,31 @@ const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
 const scenes = [
   {
-    label: uiCopy('u_3b15ceee3ea3971c'),
+    label: uiText('generatedUi.u_536ff5051d2541c9'),
     line: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.',
-    caption: uiCopy('u_8ad8d9ba961501c2'),
+    caption: uiText('generatedUi.u_7fa45e631489b427'),
     card: 'Official platform guide',
   },
   {
-    label: uiCopy('u_295d29ab022b69e5'),
+    label: uiText('generatedUi.u_a1c5ae7bcb34bbf4'),
     line: 'Many companies lose time jumping between dashboards, reviews, content tools, and approval steps.',
-    caption: uiCopy('u_4f3803dcd60310ce'),
+    caption: uiText('generatedUi.u_7c35f6b391218e08'),
     card: 'Scattered work',
   },
   {
-    label: uiCopy('u_4e25292c2db00d6f'),
+    label: uiText('generatedUi.u_c0323ea228dc7712'),
     line: 'SignalBoost brings the work into one console so you can see what needs attention and what should happen next.',
-    caption: uiCopy('u_b0199c277b3616de'),
+    caption: uiText('generatedUi.u_f84c985f6f8074d2'),
     card: 'Command console',
   },
   {
-    label: uiCopy('u_fda14b9bf4743d24'),
+    label: uiText('generatedUi.u_32d7e82082479b8c'),
     line: 'COSA can prepare recommendations and campaign drafts while you stay in control of approval.',
-    caption: uiCopy('u_6fe0a8fd57463cd7'),
+    caption: uiText('generatedUi.u_f4c326e52d26a9e0'),
     card: 'Approval workflow',
   },
   {
-    label: uiCopy('u_01fc71856332cc49'),
+    label: uiText('generatedUi.u_020620132bbb140f'),
     line: `Visit ${SAAS_URL} and see how SignalBoost can help your company turn scattered work into approved action.`,
     caption: `Visit ${SAAS_URL}`,
     card: 'Start the tour',
@@ -110,19 +109,19 @@ export default function FreeSignalBoostAiVideoPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_05e2f924ab864f84')} /></p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>{uiCopy('u_0e449292d2611174')}</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={uiCopy('u_f373631719de8bd0')} /></p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_7a0a9cf58d9b6ced')} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>{uiText('generatedUi.u_805f28d1fb580d2b')}</h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={uiText('generatedUi.u_9154369fa326bb0b')} /></p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={playing ? pause : start} style={primaryButton}>{playing ? uiCopy('u_d0156b50b1e8e2ed') : uiCopy('u_835459db365cb873')}</button>
-          <button onClick={next} style={secondaryButton}><LocalizedText fallback={uiCopy('u_5a3959c48df883d6')} /></button>
-          <a href="/dashboard/cosa/video/draft" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={uiCopy('u_fe7842749fb0018c')} /></a>
+          <button onClick={playing ? pause : start} style={primaryButton}>{playing ? uiText('generatedUi.u_06bdee6bbf1bdb4a') : uiText('generatedUi.u_425586dacde792e3')}</button>
+          <button onClick={next} style={secondaryButton}><LocalizedText fallback={uiText('generatedUi.u_b36a68683301b14f')} /></button>
+          <a href="/dashboard/cosa/video/draft" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={uiText('generatedUi.u_a7c564f97e266224')} /></a>
         </div>
       </section>
 
       <section style={stageWrap}>
         <div style={phoneFrame}>
-          <style>{uiCopy('u_53bd4d71dd2c85f5')}</style>
+          <style>{"\n            @keyframes freeScan { 0%{transform:translateX(-120%);opacity:0} 20%{opacity:1} 100%{transform:translateX(120%);opacity:0} }\n            @keyframes freePop { 0%,100%{transform:scale(.96);opacity:.72} 50%{transform:scale(1.04);opacity:1} }\n            @keyframes freeCard { 0%{transform:translateY(14px);opacity:.45} 100%{transform:translateY(0);opacity:1} }\n          "}</style>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 8%, rgba(255,195,0,.24), transparent 34%), linear-gradient(180deg, #020617, #0f172a)' }} />
           <span style={{ position: 'absolute', left: 0, right: 0, top: 126, height: 3, background: `linear-gradient(90deg, transparent, ${CYAN}, ${GOLD}, transparent)`, animation: 'freeScan 3s linear infinite' }} />
 
@@ -140,7 +139,7 @@ export default function FreeSignalBoostAiVideoPage() {
           </div>
 
           <div style={{ position: 'absolute', left: 18, right: 18, bottom: 62, zIndex: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {[uiCopy('u_34e92f38e9c75d38'), uiCopy('u_6216dd66a5616f8b'), uiCopy('u_afacf1b589b97a02'), uiCopy('u_27ada089270225e1')].map((label, itemIndex) => (
+            {["Console", "Reviews", "Approvals", "Content"].map((label, itemIndex) => (
               <div key={label} style={{ borderRadius: 12, padding: 8, background: itemIndex === index % 4 ? 'rgba(255,195,0,.18)' : 'rgba(255,255,255,.06)', border: itemIndex === index % 4 ? '1px solid rgba(255,195,0,.35)' : '1px solid rgba(255,255,255,.08)', color: '#fff', fontSize: 11, fontWeight: 850 }}>
                 {label}
               </div>
@@ -152,15 +151,15 @@ export default function FreeSignalBoostAiVideoPage() {
           </div>
 
           <div style={{ position: 'absolute', left: 18, right: 18, top: 18, display: 'flex', justifyContent: 'space-between', zIndex: 4 }}>
-            <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}><LocalizedText fallback={uiCopy('u_17c6b295c3a1402e')} /></span>
+            <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}><LocalizedText fallback={uiText('generatedUi.u_7200fc7bdc9fa562')} /></span>
             <span style={{ color: 'rgba(255,255,255,.58)', fontSize: 12 }}>{index + 1}/{scenes.length}</span>
           </div>
         </div>
 
         <section style={infoPanel}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_a1001041dbc117df')} /></p>
-          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}><LocalizedText fallback={uiCopy('u_2a3a20fb6907cb40')} /></h2>
-          <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}><LocalizedText fallback={uiCopy('u_9834f4c654a960e8')} /></p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_7b1f22020bc86744')} /></p>
+          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}><LocalizedText fallback={uiText('generatedUi.u_b187fef74f036969')} /></h2>
+          <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}><LocalizedText fallback={uiText('generatedUi.u_a7c2ff34b954f41f')} /></p>
           <pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.82)', background: 'rgba(0,0,0,.26)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, fontSize: 12, lineHeight: 1.6, maxHeight: 340, overflow: 'auto' }}>{script}</pre>
         </section>
       </section>

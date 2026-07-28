@@ -4,8 +4,7 @@
 import { PageProps, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const steps = [
   ['Connect OpenAI', 'Add API key and usage visibility', 'Ready'],
@@ -19,12 +18,12 @@ export default function SetupCenterPage(_props: PageProps) {
   return (
     <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingRight: 8 }}>
       <section style={{ marginBottom: 14 }}>
-        <div style={labelStyle}>{uiCopy('u_3d32afa76f00a2f7')}</div>
-        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.setup.title', uiCopy('u_56dbcf4fb60b8dca'))}</h2>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.setup.subtitle', uiCopy('u_54976c13511acdcf'))}</p>
+        <div style={labelStyle}>{uiText('generatedUi.u_b0b245993303b72a')}</div>
+        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.setup.title')}</h2>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.setup.subtitle')}</p>
       </section>
       <section style={{ ...cardStyle, padding: 16 }}>
-        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.setup.checklist', uiCopy('u_22b67c472eeee906'))}</h3>
+        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.setup.checklist')}</h3>
         <div style={{ display: 'grid', gap: 10 }}>
           {steps.map(([task, detail, status]) => <div key={task} style={rowStyle}><strong>{task}</strong><span>{detail}</span><span style={{ color: status === 'Ready' ? '#86efac' : '#ffc300' }}>{status}</span></div>)}
         </div>

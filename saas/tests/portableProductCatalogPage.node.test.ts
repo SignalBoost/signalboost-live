@@ -1,9 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const page = readFileSync(new URL('../app/dashboard/portable-products/page.tsx', import.meta.url), 'utf8')
-const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+
+const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/portable-products/page.tsx', import.meta.url), 'utf8'))
+const homepage = hydrateLocalizedSource(readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8'))
 
 test('internal catalog page reuses dashboard access and registry-backed serialization', () => {
   assert.match(page, /export default async function PortableProductsPage/); assert.match(page, /getCurrentUser/); assert.match(page, /getAccess/); assert.match(page, /access\.isAdmin/); assert.match(page, /listPortableProductCatalogItems/)

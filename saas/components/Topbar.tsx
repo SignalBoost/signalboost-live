@@ -4,14 +4,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient.ts";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { t } from "@/lib/i18n/t";
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const PLAN_STYLES: Record<string, { labelKey: string; fallback: string; bg: string; color: string }> = {
-  free:     { labelKey: "plan.free", fallback: uiCopy('u_a96e2af89fc18ffb'), bg: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" },
-  starter:  { labelKey: "plan.starter", fallback: uiCopy('u_3989bde0c654ce39'), bg: "rgba(59,130,246,0.18)",  color: "#7ab8ff" },
-  pro:      { labelKey: "plan.pro", fallback: uiCopy('u_1354560c854a6841'), bg: "rgba(255,195,0,0.18)",   color: "#ffc300" },
-  business: { labelKey: "plan.business", fallback: uiCopy('u_82cb271d997e9cfd'), bg: "rgba(74,222,128,0.18)",  color: "#4ade80" },
+  free:     { labelKey: "plan.free", fallback: uiText('generatedUi.u_f411a1fb62758b4c'), bg: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" },
+  starter:  { labelKey: "plan.starter", fallback: uiText('generatedUi.u_262b4ff6afdd7baa'), bg: "rgba(59,130,246,0.18)",  color: "#7ab8ff" },
+  pro:      { labelKey: "plan.pro", fallback: uiText('generatedUi.u_957b0b874524d09a'), bg: "rgba(255,195,0,0.18)",   color: "#ffc300" },
+  business: { labelKey: "plan.business", fallback: uiText('generatedUi.u_76f68a75f01ed76f'), bg: "rgba(74,222,128,0.18)",  color: "#4ade80" },
 };
 
 export default function Topbar() {
@@ -60,7 +59,7 @@ export default function Topbar() {
       }}
     >
       <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,195,0,0.95)", fontFamily: "monospace" }}>
-        ⚡ {credits} {credits === 1 ? t(dict, "topbar.credit", uiCopy('u_f3cd72c0b69b4e11')) : t(dict, "topbar.credits", uiCopy('u_3fa5152b241b271f'))}
+        ⚡ {credits} {credits === 1 ? t(dict, "topbar.credit") : t(dict, "topbar.credits")}
       </span>
 
       <span
@@ -79,7 +78,7 @@ export default function Topbar() {
       </span>
 
       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
-        {name ?? t(dict, "topbar.account", uiCopy('u_bac23feca0cc78a3'))}
+        {name ?? t(dict, "topbar.account")}
       </span>
     </header>
   );

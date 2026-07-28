@@ -4,8 +4,7 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useId, useMemo, useState } from 'react'
 import type { EnterpriseOption } from '@/lib/enterprise/masterConfig'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Props = {
   label: string
@@ -32,7 +31,7 @@ export function SearchableMultiSelect({ label, options, values, onChange, placeh
   return <div style={{ display: 'grid', gap: 7, position: 'relative' }}>
     <label htmlFor={id} style={{ color: '#fff', fontWeight: 850, fontSize: 13 }}>{label}</label>
     <button id={id} type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} style={{ minHeight: 44, width: '100%', textAlign: 'left', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(2,6,23,.78)', color: selected.length ? '#fff' : 'rgba(255,255,255,.55)', borderRadius: 12, padding: '8px 10px', cursor: disabled ? 'not-allowed' : 'pointer' }}>
-      {selected.length === 0 ? uiCopy('u_8d00bbab4b697588') : <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{selected.map((option) => <span key={option.value} style={{ borderRadius: 999, background: 'rgba(26,240,255,.12)', color: '#bffaff', padding: '4px 8px', fontSize: 11 }}>{option.label}</span>)}</span>}
+      {selected.length === 0 ? uiText('generatedUi.u_27dd1507cc7aff4f') : <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{selected.map((option) => <span key={option.value} style={{ borderRadius: 999, background: 'rgba(26,240,255,.12)', color: '#bffaff', padding: '4px 8px', fontSize: 11 }}>{option.label}</span>)}</span>}
     </button>
     {open && !disabled && <div style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%', marginTop: 6, border: '1px solid rgba(255,255,255,.15)', borderRadius: 14, padding: 8, background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)' }}>
       <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} autoFocus style={{ width: '100%', border: '1px solid rgba(255,255,255,.13)', background: '#020617', color: '#fff', borderRadius: 10, padding: '9px 10px', marginBottom: 7 }} />
@@ -44,9 +43,9 @@ export function SearchableMultiSelect({ label, options, values, onChange, placeh
             <span><strong style={{ display: 'block', fontSize: 13 }}>{option.label}</strong>{option.description && <small style={{ color: 'rgba(255,255,255,.55)' }}>{option.description}</small>}</span>
           </button>
         })}
-        {filtered.length === 0 && <p style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}><LocalizedText fallback={uiCopy('u_4ac50c9c7ad4f789')} /></p>}
+        {filtered.length === 0 && <p style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}><LocalizedText fallback={uiText('generatedUi.u_cd6bf89d9b3311af')} /></p>}
       </div>
-      <button type="button" onClick={() => { setOpen(false); setQuery('') }} style={{ width: '100%', marginTop: 7, border: '1px solid rgba(255,255,255,.14)', borderRadius: 9, background: 'rgba(255,255,255,.06)', color: '#fff', padding: 8, cursor: 'pointer' }}>{uiCopy('u_45a9b0afc629bbd2')}</button>
+      <button type="button" onClick={() => { setOpen(false); setQuery('') }} style={{ width: '100%', marginTop: 7, border: '1px solid rgba(255,255,255,.14)', borderRadius: 9, background: 'rgba(255,255,255,.06)', color: '#fff', padding: 8, cursor: 'pointer' }}>{uiText('generatedUi.u_11a6767d5674c7e4')}</button>
     </div>}
   </div>
 }

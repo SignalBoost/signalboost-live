@@ -2,8 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -89,10 +88,10 @@ function VideoOverlay({
 
   const licenseColor = asset.license === 'public' ? GREEN : asset.license === 'embeddable' ? GOLD : '#f87171'
   const licenseLabel = asset.license === 'public' 
-    ? `🟢 ${t(dict, 'lab.license.public', uiCopy('u_1bbbdab8600f1e35'))}` 
+    ? `🟢 ${t(dict, 'lab.license.public')}` 
     : asset.license === 'embeddable' 
-    ? `🟡 ${t(dict, 'lab.license.embeddable', uiCopy('u_60fd0dfa32aa2f9b'))}` 
-    : `🔴 ${t(dict, 'lab.license.restricted', uiCopy('u_84e6385f3da5685b'))}`
+    ? `🟡 ${t(dict, 'lab.license.embeddable')}` 
+    : `🔴 ${t(dict, 'lab.license.restricted')}`
 
   return (
     <div
@@ -112,7 +111,7 @@ function VideoOverlay({
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
           <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 999 }} />
         </div>
-        <button onClick={handleClose} style={{ position: 'absolute', top: 16, right: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: 32, height: 32, color: '#fff', cursor: 'pointer', fontSize: 14 }} aria-label={uiCopy('u_269ba42bf9f9c2aa')}>✕</button>
+        <button onClick={handleClose} style={{ position: 'absolute', top: 16, right: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: 32, height: 32, color: '#fff', cursor: 'pointer', fontSize: 14 }} aria-label={uiText('generatedUi.u_7d9eb7acb13e2462')}>✕</button>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
           <div style={{ width: 220, background: '#030407', borderRadius: 32, border: '1px solid rgba(255,255,255,0.12)', overflow: 'hidden', boxShadow: '0 24px 50px -12px rgba(0,0,0,0.7)' }}>
             <div style={{ background: '#0a0b12', height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -128,22 +127,22 @@ function VideoOverlay({
         </div>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{asset.title}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>{asset.source === 'youtube' ? uiCopy('u_ac0c7f53bcefe6d5') : uiCopy('u_a6000da4e87f6980')}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>{asset.source === 'youtube' ? uiText('generatedUi.u_ba522c40c0e1c5c5') : uiText('generatedUi.u_d962eab20dc7e5b8')}</div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: licenseColor, fontFamily: 'monospace' }}>{licenseLabel}</div>
         </div>
         <div style={{ background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
-          <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.8)', marginBottom: 6, fontFamily: 'monospace', fontSize: 12 }}>// {t(dict, 'lab.captionInfo.title', uiCopy('u_88473fabccfd0278'))}</div>
-          {t(dict, 'lab.captionInfo.description', uiCopy('u_4cf33def4320ddd3'))}
+          <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.8)', marginBottom: 6, fontFamily: 'monospace', fontSize: 12 }}>// {t(dict, 'lab.captionInfo.title')}</div>
+          {t(dict, 'lab.captionInfo.description')}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button onClick={() => { onCaption(asset); handleClose() }} style={{ width: '100%', padding: '14px', borderRadius: 10, background: GOLD, color: '#000', fontWeight: 800, fontSize: 15, border: 'none', cursor: 'pointer' }}>
-            💬 {t(dict, 'lab.generateSubtitles', uiCopy('u_70982ed025f1000e'))}
+            💬 {t(dict, 'lab.generateSubtitles')}
           </button>
           {asset.watchUrl && (
             <a href={asset.watchUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', padding: '14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontWeight: 700, fontSize: 15, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-              ↗ {t(dict, 'lab.openOriginal', uiCopy('u_e218d799588b1393'))} {asset.source === 'youtube' ? uiCopy('u_06daaccfccb5a243') : uiCopy('u_7916192fbe7613da')}
+              ↗ {t(dict, 'lab.openOriginal')} {asset.source === 'youtube' ? uiText('generatedUi.u_fb7accfff8c6f8ea') : uiText('generatedUi.u_d37d9d46ec979fd0')}
             </a>
           )}
         </div>
@@ -198,7 +197,7 @@ function GeneratePanel({
         } else if (data.status === 'failed') {
           clearInterval(pollRef.current)
           setStatus('failed')
-          setErrorMsg(t(dict, 'lab.genFailed', uiCopy('u_df1d568cecdbad1c')))
+          setErrorMsg(t(dict, 'lab.genFailed'))
         }
         // otherwise keep polling (rendering)
       } catch {
@@ -217,7 +216,7 @@ function GeneratePanel({
       if (vmode === 'image') {
         if (!firstImage?.file) {
           setStatus('idle')
-          setErrorMsg(t(dict, 'lab.needImage', uiCopy('u_154c591bb45b1ca5')))
+          setErrorMsg(t(dict, 'lab.needImage'))
           return
         }
         imageDataUri = await fileToDataUri(firstImage.file)
@@ -237,7 +236,7 @@ function GeneratePanel({
 
       if (!res.ok) {
         setStatus('failed')
-        setErrorMsg(data.error || t(dict, 'lab.genFailed', uiCopy('u_8d7c4270d78b5c1b')))
+        setErrorMsg(data.error || t(dict, 'lab.genFailed'))
         return
       }
 
@@ -246,7 +245,7 @@ function GeneratePanel({
       pollStatus(data.request_id, data.model)
     } catch (err: any) {
       setStatus('failed')
-      setErrorMsg(err.message || t(dict, 'lab.genFailed', uiCopy('u_9d505cd7a31e0e47')))
+      setErrorMsg(err.message || t(dict, 'lab.genFailed'))
     }
   }
 
@@ -256,15 +255,15 @@ return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{ width: 38, height: 38, borderRadius: 8, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🪄</div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{t(dict, 'lab.videoSynthesis', uiCopy('u_cc92e30481430dcb'))}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>{uiCopy('u_81d727a4649790b2')}{selectedFormat}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{t(dict, 'lab.videoSynthesis')}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>{uiText('generatedUi.u_aa8140602f18aa2b')}{selectedFormat}</div>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 6, background: 'rgba(4, 5, 11, 0.7)', padding: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', marginBottom: 16 }}>
-        {([uiCopy('u_469878998667aee3'), uiCopy('u_670ea7f3b9524243')] as const).map(vm => (
+        {(["text", "image"] as const).map(vm => (
           <button key={vm} onClick={() => setVmode(vm)} disabled={busy} style={{ flex: 1, padding: '10px 8px', borderRadius: 6, fontSize: 12, fontFamily: 'monospace', fontWeight: 700, border: 'none', cursor: busy ? 'default' : 'pointer', background: vmode === vm ? 'rgba(59,130,246,0.25)' : 'transparent', color: vmode === vm ? '#fff' : '#7a90b8' }}>
-            {vm === 'text' ? `📝 ${t(dict, 'lab.textToVideo', uiCopy('u_4c2d3839bb9a46dd'))}` : `🖼️ ${t(dict, 'lab.imageToVideo', uiCopy('u_af712a48978fa9da'))}`}
+            {vm === 'text' ? `📝 ${t(dict, 'lab.textToVideo')}` : `🖼️ ${t(dict, 'lab.imageToVideo')}`}
           </button>
         ))}
       </div>
@@ -272,18 +271,18 @@ return (
       {vmode === 'image' && (
         <div style={{ marginBottom: 16, fontSize: 12, fontFamily: 'monospace', color: firstImage ? GREEN : 'rgba(255,195,0,0.9)' }}>
           {firstImage
-            ? `🖼️ ${t(dict, 'lab.usingImage', uiCopy('u_4e3b411f092856d0'))}: ${firstImage.name}`
-            : `⚠️ ${t(dict, 'lab.attachImagePrompt', uiCopy('u_825847ee78fb1ae3'))}`}
+            ? `🖼️ ${t(dict, 'lab.usingImage')}: ${firstImage.name}`
+            : `⚠️ ${t(dict, 'lab.attachImagePrompt')}`}
         </div>
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{vmode === 'image' ? t(dict, 'lab.motionPrompt', uiCopy('u_10420b84e8555631')) : t(dict, 'lab.videoPrompt', uiCopy('u_1addbb79cc348bfc'))}]</label>
-        <textarea value={script} onChange={e => setScript(e.target.value)} rows={4} placeholder={vmode === 'image' ? t(dict, 'lab.motionPlaceholder', uiCopy('u_4333bf6aaacbd987')) : t(dict, 'lab.promptPlaceholder', uiCopy('u_4f2cace6fb471a65'))} style={{ width: '100%', background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 8, padding: '12px 16px', color: '#fff', fontSize: 14, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{vmode === 'image' ? t(dict, 'lab.motionPrompt') : t(dict, 'lab.videoPrompt')}]</label>
+        <textarea value={script} onChange={e => setScript(e.target.value)} rows={4} placeholder={vmode === 'image' ? t(dict, 'lab.motionPlaceholder') : t(dict, 'lab.promptPlaceholder')} style={{ width: '100%', background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 8, padding: '12px 16px', color: '#fff', fontSize: 14, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{t(dict, 'lab.aspectRatio', uiCopy('u_8cecd2e4e001fc6f'))}]</label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{t(dict, 'lab.aspectRatio')}]</label>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['9:16', '16:9', '1:1'] as const).map(f => (
             <button key={f} onClick={() => setSelectedFormat(f)} disabled={busy} style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: selectedFormat === f ? 'rgba(59,130,246,0.3)' : 'rgba(4, 5, 11, 0.6)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: busy ? 'default' : 'pointer' }}>{f}</button>
@@ -294,7 +293,7 @@ return (
       {status === 'rendering' && (
         <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 13, fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(59,130,246,0.4)', borderTopColor: BLUE, borderRadius: '50%', animation: 'lab-spin 0.9s linear infinite' }} />
-          {t(dict, 'lab.renderingNote', uiCopy('u_e8be2dce06875da6'))}
+          {t(dict, 'lab.renderingNote')}
         </div>
       )}
 
@@ -308,13 +307,13 @@ return (
         <div style={{ marginBottom: 16 }}>
           <video src={videoUrl} controls autoPlay loop style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 360 }} />
           <a href={videoUrl} download target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 10, width: '100%', padding: '12px', borderRadius: 8, background: GREEN, color: '#000', fontWeight: 800, fontSize: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }}>
-            ⬇ {t(dict, 'lab.downloadVideo', uiCopy('u_67350029773a441c'))}
+            ⬇ {t(dict, 'lab.downloadVideo')}
           </a>
         </div>
       )}
 
       <button onClick={handleGenerate} disabled={busy} style={{ width: '100%', padding: '14px', borderRadius: 8, background: busy ? 'rgba(255,255,255,0.04)' : status === 'done' ? 'rgba(74,222,128,0.12)' : GOLD, border: status === 'done' ? '1px solid rgba(74,222,128,0.35)' : 'none', color: busy ? 'rgba(255,255,255,0.4)' : status === 'done' ? GREEN : '#000', fontFamily: 'monospace', fontWeight: 800, fontSize: 14, cursor: busy ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-        {status === 'submitting' ? `⏳ ${t(dict, 'lab.submitting', uiCopy('u_7fd24de77197c0fa'))}` : status === 'rendering' ? `⏳ ${t(dict, 'lab.rendering', uiCopy('u_d4f1f7e999d95de9'))}` : status === 'done' ? `✓ ${t(dict, 'lab.generateAnother', uiCopy('u_ba522e70c280e0b0'))}` : `⚡ ${t(dict, 'lab.generateVideo', uiCopy('u_0f19ea88e153ee8d'))} (1 ${t(dict, 'lab.credit', uiCopy('u_e0742f18f9b7240a'))})`}
+        {status === 'submitting' ? `⏳ ${t(dict, 'lab.submitting')}` : status === 'rendering' ? `⏳ ${t(dict, 'lab.rendering')}` : status === 'done' ? `✓ ${t(dict, 'lab.generateAnother')}` : `⚡ ${t(dict, 'lab.generateVideo')} (1 ${t(dict, 'lab.credit')})`}
       </button>
     </div>
   )
@@ -326,7 +325,7 @@ function LabScene() {
       <div className="lab-floor" />
 
       <div className="lab-scr lab-scr-left">
-        <div className="lab-scr-head">{uiCopy('u_5d35a46bfc5b5fc7')}</div>
+        <div className="lab-scr-head">{uiText('generatedUi.u_6b02957341dc9327')}</div>
         <div className="lab-codeline"><span /><span /></div>
         <div className="lab-codeline"><span /><span /><span /></div>
         <div className="lab-codeline"><span /></div>
@@ -335,7 +334,7 @@ function LabScene() {
       </div>
 
       <div className="lab-scr lab-scr-right">
-        <div className="lab-scr-head">{uiCopy('u_22268109427ed227')}</div>
+        <div className="lab-scr-head">{uiText('generatedUi.u_a03bd0b454c4acb7')}</div>
         <div className="lab-codeline"><span /><span /></div>
         <div className="lab-codeline"><span /></div>
         <div className="lab-codeline"><span /><span /><span /></div>
@@ -351,7 +350,7 @@ function LabScene() {
       </div>
 
       <div className="lab-chamber">
-        <div className="lab-holo">{uiCopy('u_b7e959869d81572a')}</div>
+        <div className="lab-holo">{uiText('generatedUi.u_1c674a182a2de87c')}</div>
         <div className="lab-cap-top" />
         <div className="lab-glass">
           <div className="lab-bubbles"><span /><span /><span /><span /></div>
@@ -379,7 +378,7 @@ export default function LabPage() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [overlayAsset, setOverlayAsset] = useState<Asset | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
-  const [project, setProject] = useState(t(dict, 'lab.defaultProject', uiCopy('u_44561c5c4742e887')))
+  const [project, setProject] = useState(t(dict, 'lab.defaultProject'))
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [credits, setCredits] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -459,7 +458,7 @@ export default function LabPage() {
     setResults([])
     setGenerateData(null)
     setMessage(null)
-    setIntentText(t(dict, 'lab.evaluating', uiCopy('u_c3581e764fcee240')))
+    setIntentText(t(dict, 'lab.evaluating'))
     try {
       const res = await fetch('/api/video-search', {
         method: 'POST',
@@ -467,7 +466,7 @@ export default function LabPage() {
         body: JSON.stringify({ prompt: q, mode }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? t(dict, 'lab.searchFailed', uiCopy('u_a9fa2f424112e920')))
+      if (!res.ok) throw new Error(data.error ?? t(dict, 'lab.searchFailed'))
       setIntentText(data.intent ?? '')
       setMessage(data.message ?? null)
       if (data.mode === 'generate' && data.generate) {
@@ -479,7 +478,7 @@ export default function LabPage() {
       }
     } catch (err: any) {
       setIntentText('')
-      setMessage(err.message ?? t(dict, 'lab.somethingWrong', uiCopy('u_b551ebb04a0e6dcf')))
+      setMessage(err.message ?? t(dict, 'lab.somethingWrong'))
     } finally {
       setLoading(false)
     }
@@ -513,12 +512,12 @@ export default function LabPage() {
   const licenseBg = (l: string) => l === 'public' ? 'rgba(74,222,128,0.08)' : l === 'embeddable' ? 'rgba(255,195,0,0.08)' : 'rgba(239,68,68,0.06)'
 
   const SUGGESTIONS = [
-    { label: t(dict, 'lab.suggestion1', uiCopy('u_12f43a51c596b3d6')), prompt: uiCopy('u_eca69a43e5c46f5a') },
-    { label: t(dict, 'lab.suggestion2', uiCopy('u_ae128ab3668bb2ef')), prompt: uiCopy('u_2fc24a77362287b7') },
-    { label: t(dict, 'lab.suggestion3', uiCopy('u_a9ab46d97342542c')), prompt: uiCopy('u_01fe8e370e7ad67b') },
-    { label: t(dict, 'lab.suggestion4', uiCopy('u_a54450e7e7172d55')), prompt: uiCopy('u_56f90a776cd0aeb4') },
-    { label: t(dict, 'lab.suggestion5', uiCopy('u_1f1553ad1d33d3b8')), prompt: uiCopy('u_48103a287fa92ee1') },
-    { label: t(dict, 'lab.suggestion6', uiCopy('u_9513c1540031eb12')), prompt: uiCopy('u_450fc94119c64d3e') },
+    { label: t(dict, 'lab.suggestion1'), prompt: uiText('generatedUi.u_30ba61957cc67b5c') },
+    { label: t(dict, 'lab.suggestion2'), prompt: uiText('generatedUi.u_a9963695d08d948e') },
+    { label: t(dict, 'lab.suggestion3'), prompt: uiText('generatedUi.u_4f4acb9c9b74aaca') },
+    { label: t(dict, 'lab.suggestion4'), prompt: uiText('generatedUi.u_cd3d43ce74491538') },
+    { label: t(dict, 'lab.suggestion5'), prompt: uiText('generatedUi.u_6fd09d4802f00ee9') },
+    { label: t(dict, 'lab.suggestion6'), prompt: uiText('generatedUi.u_df7fd0ee007138fc') },
   ]
 
   return (
@@ -531,15 +530,15 @@ export default function LabPage() {
           <VideoOverlay asset={overlayAsset} onClose={() => setOverlayAsset(null)} onCaption={handleCaption} dict={dict} />
         )}
 
-        <style>{uiCopy('u_0acdd0576a58c76d')}</style>
+        <style>{"\n          body {\n            background-color: #0a0e1a !important;\n            background-image:\n              radial-gradient(ellipse 50% 45% at 50% 40%, rgba(0, 200, 255, 0.12) 0%, transparent 62%),\n              radial-gradient(ellipse 90% 50% at 50% 100%, rgba(20, 15, 60, 0.85) 0%, transparent 72%),\n              radial-gradient(ellipse 100% 60% at 50% 0%, rgba(10, 10, 40, 0.85) 0%, transparent 80%),\n              linear-gradient(180deg, #08090f 0%, #0c0f18 45%, #080a10 100%) !important;\n            background-attachment: fixed !important;\n          }\n          .fathom-glass {\n            background: rgba(18, 26, 45, 0.75) !important;\n            backdrop-filter: blur(30px) !important;\n            -webkit-backdrop-filter: blur(30px) !important;\n            border: 1px solid rgba(59, 130, 246, 0.3) !important;\n            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;\n          }\n          .recipe-node {\n            background: rgba(8, 10, 20, 0.5) !important;\n            border: 1px solid rgba(255, 255, 255, 0.08) !important;\n            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);\n          }\n          .recipe-node:hover {\n            background: rgba(20, 28, 50, 0.8) !important;\n            border-color: rgba(59, 130, 246, 0.5) !important;\n            transform: translateY(-1px);\n          }\n          .terminal-text {\n            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;\n          }\n          @keyframes pulse-slow {\n            0%, 100% { opacity: 0.3; transform: scale(1); filter: drop-shadow(0 0 10px rgba(59,130,246,0.3)); }\n            50% { opacity: 0.7; transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(59,130,246,0.6)); }\n          }\n\n          .lab-scene {\n            position: fixed; inset: 0; z-index: 0;\n            pointer-events: none; overflow: hidden;\n            font-family: 'JetBrains Mono', 'Courier New', monospace;\n          }\n          .lab-floor {\n            position: absolute; left: 0; right: 0; bottom: 0; height: 42%;\n            background: linear-gradient(180deg, transparent 0%, rgba(0,90,150,0.08) 60%, rgba(0,120,200,0.12) 100%);\n            background-image: repeating-linear-gradient(90deg, transparent, transparent 70px, rgba(0,180,255,0.05) 70px, rgba(0,180,255,0.05) 71px);\n          }\n          .lab-scr {\n            position: absolute; bottom: 22%; width: 170px; height: 168px;\n            border-radius: 10px; background: rgba(10,18,35,0.8);\n            border: 1px solid rgba(70,130,200,0.35);\n            box-shadow: 0 0 30px rgba(0,150,255,0.15), inset 0 0 24px rgba(0,120,255,0.1);\n            padding: 12px; overflow: hidden; opacity: 0.6;\n          }\n          .lab-scr-left { left: 4%; transform: perspective(700px) rotateY(20deg); }\n          .lab-scr-right { right: 4%; transform: perspective(700px) rotateY(-20deg); }\n          .lab-scr-head { font-size: 9px; color: #5cc8ff; letter-spacing: 0.05em; margin-bottom: 9px; text-shadow: 0 0 6px rgba(0,180,255,0.5); }\n          .lab-codeline { display: flex; gap: 4px; margin-bottom: 7px; }\n          .lab-codeline span { height: 4px; border-radius: 2px; background: rgba(0,180,255,0.35); animation: lab-type 3s ease-in-out infinite; }\n          .lab-codeline span:nth-child(1) { width: 44px; }\n          .lab-codeline span:nth-child(2) { width: 26px; }\n          .lab-codeline span:nth-child(3) { width: 16px; }\n          .lab-codeline:nth-child(3) span { animation-delay: -0.5s; }\n          .lab-codeline:nth-child(4) span { animation-delay: -1s; }\n          .lab-codeline:nth-child(5) span { animation-delay: -1.5s; }\n          .lab-bargraph { display: flex; align-items: flex-end; gap: 5px; height: 46px; margin-top: 12px; }\n          .lab-bargraph i { flex: 1; background: linear-gradient(180deg,#5cc8ff,#0a6cff); border-radius: 2px; box-shadow: 0 0 6px rgba(0,180,255,0.5); animation: lab-eq 1.4s ease-in-out infinite; }\n          .lab-bargraph i:nth-child(odd) { animation-delay: -0.4s; }\n          .lab-bargraph i:nth-child(3n) { animation-delay: -0.8s; }\n          .lab-wave { display: flex; align-items: center; gap: 3px; height: 50px; margin-top: 14px; }\n          .lab-wave i { flex: 1; background: #5cc8ff; border-radius: 2px; box-shadow: 0 0 5px rgba(0,180,255,0.5); animation: lab-eq 1.1s ease-in-out infinite; }\n          .lab-wave i:nth-child(even) { animation-delay: -0.3s; }\n          .lab-wave i:nth-child(3n) { animation-delay: -0.6s; }\n          .lab-wave i:nth-child(4n) { animation-delay: -0.9s; }\n          .lab-cables { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 340px; height: 90px; }\n          .lab-cables span { position: absolute; top: -4px; width: 2px; background: rgba(70,130,200,0.5); border-radius: 0 0 4px 4px; }\n          .lab-cables span:nth-child(1) { left: 30%; height: 72px; }\n          .lab-cables span:nth-child(2) { left: 50%; height: 56px; }\n          .lab-cables span:nth-child(3) { left: 68%; height: 84px; }\n          .lab-cables span::after { content: ''; position: absolute; bottom: -3px; left: -2px; width: 6px; height: 6px; border-radius: 50%; background: #33c8ff; box-shadow: 0 0 8px rgba(0,200,255,0.8); animation: pulse-slow 3s ease-in-out infinite; }\n          .lab-bench { position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%); width: 460px; height: 90px; }\n          .lab-bench-top { position: absolute; top: 0; left: 0; right: 0; height: 18px; border-radius: 8px; background: linear-gradient(180deg, rgba(35,55,90,0.95), rgba(15,20,35,0.98)); border: 1px solid rgba(80,140,210,0.3); box-shadow: 0 0 30px rgba(0,160,255,0.15); }\n          .lab-leds { position: absolute; top: 5px; left: 22px; display: flex; gap: 11px; }\n          .lab-leds i { width: 5px; height: 5px; border-radius: 50%; background: #33c8ff; box-shadow: 0 0 6px rgba(0,200,255,0.8); animation: lab-blink 2s ease-in-out infinite; }\n          .lab-leds i:nth-child(2n) { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.8); animation-delay: -0.4s; }\n          .lab-leds i:nth-child(3n) { background: #ffc300; box-shadow: 0 0 6px rgba(255,195,0,0.8); animation-delay: -0.8s; }\n          .lab-leds i:nth-child(5n) { animation-delay: -1.2s; }\n          .lab-vent { position: absolute; top: 28px; width: 74px; height: 5px; border-radius: 3px; background: rgba(0,170,255,0.2); box-shadow: 0 0 10px rgba(0,170,255,0.4); }\n          .lab-v1 { left: 26px; } .lab-v2 { left: 128px; } .lab-v3 { right: 128px; } .lab-v4 { right: 26px; }\n          .lab-chamber { position: absolute; left: 50%; bottom: calc(10% + 16px); transform: translateX(-50%); width: 150px; height: 240px; }\n          .lab-holo { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #5cc8ff; letter-spacing: 0.1em; padding: 3px 9px; border: 1px solid rgba(0,180,255,0.35); border-radius: 4px; background: rgba(0,120,255,0.08); text-shadow: 0 0 6px rgba(0,180,255,0.6); white-space: nowrap; animation: pulse-slow 3s ease-in-out infinite; }\n          .lab-cap-top { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 96px; height: 20px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, rgba(70,105,160,0.95), rgba(25,35,65,0.95)); border: 1px solid rgba(90,150,220,0.35); box-shadow: 0 0 16px rgba(0,170,255,0.3); }\n          .lab-glass { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 104px; height: 196px; border-radius: 14px; background: linear-gradient(100deg, rgba(150,225,255,0.12) 0%, rgba(0,150,255,0.06) 40%, rgba(120,200,255,0.15) 100%); border: 1px solid rgba(120,200,255,0.35); box-shadow: inset 0 0 30px rgba(0,180,255,0.2), 0 0 40px rgba(0,170,255,0.2); overflow: hidden; }\n          .lab-specimen { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #bdf6ff 0%, #33c8ff 35%, #0a78ff 72%, #062a4d 100%); box-shadow: 0 0 40px 12px rgba(0,200,255,0.6); animation: lab-float 5s ease-in-out infinite, pulse-slow 4s ease-in-out infinite; }\n          .lab-specimen-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(0,200,255,0.3) 0%, transparent 65%); animation: pulse-slow 4s ease-in-out infinite; }\n          .lab-ring { position: absolute; top: 50%; left: 50%; border-radius: 50%; border: 1px solid rgba(120,225,255,0.6); }\n          .lab-r1 { width: 82px; height: 82px; transform: translate(-50%,-50%); animation: lab-spin 9s linear infinite; border-top-color: rgba(170,240,255,0.95); }\n          .lab-r2 { width: 104px; height: 104px; transform: translate(-50%,-50%); animation: lab-spin 16s linear infinite reverse; border-left-color: rgba(80,160,255,0.8); }\n          .lab-bubbles span { position: absolute; bottom: 0; width: 4px; height: 4px; border-radius: 50%; background: rgba(170,240,255,0.8); box-shadow: 0 0 6px rgba(0,200,255,0.7); }\n          .lab-bubbles span:nth-child(1) { left: 30px; animation: lab-rise 4s linear infinite; }\n          .lab-bubbles span:nth-child(2) { left: 54px; animation: lab-rise 5.5s linear infinite; animation-delay: -2s; }\n          .lab-bubbles span:nth-child(3) { left: 70px; animation: lab-rise 4.8s linear infinite; animation-delay: -1s; }\n          .lab-bubbles span:nth-child(4) { left: 44px; animation: lab-rise 6s linear infinite; animation-delay: -3s; }\n          .lab-cap-base { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 26px; border-radius: 6px; background: linear-gradient(180deg, rgba(60,85,135,0.95), rgba(15,25,50,0.98)); border: 1px solid rgba(90,150,220,0.35); box-shadow: 0 0 20px rgba(0,170,255,0.35); }\n          .lab-base-glow { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 170px; height: 24px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,200,255,0.45) 0%, transparent 70%); filter: blur(4px); animation: pulse-slow 4s ease-in-out infinite; }\n          @keyframes lab-float { 0%,100% { margin-top: 0; } 50% { margin-top: -10px; } }\n          @keyframes lab-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }\n          @keyframes lab-rise { 0% { bottom: 0; opacity: 0; } 10% { opacity: 1; } 100% { bottom: 186px; opacity: 0; } }\n          @keyframes lab-eq { 0%,100% { height: 30%; } 50% { height: 100%; } }\n          @keyframes lab-blink { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }\n          @keyframes lab-type { 0%,100% { opacity: 0.3; } 50% { opacity: 0.9; } }\n          @media (max-width: 900px) {\n            .lab-scr { display: none; }\n          }\n        "}</style>
 
         <div className="fathom-glass terminal-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderRadius: 8, marginBottom: 28, fontSize: 12, color: '#7a90b8', letterSpacing: '0.05em' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: GREEN, filter: 'drop-shadow(0 0 4px #4ade80)' }}>●</span> {t(dict, 'lab.status', uiCopy('u_66417d54ed2e9ace'))}: <span style={{ color: '#fff' }}>{t(dict, 'lab.online', uiCopy('u_c6ef47a147e2b7f3'))}</span>
+            <span style={{ color: GREEN, filter: 'drop-shadow(0 0 4px #4ade80)' }}>●</span> {t(dict, 'lab.status')}: <span style={{ color: '#fff' }}>{t(dict, 'lab.online')}</span>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
-            <span>[{t(dict, 'lab.videoCredits', uiCopy('u_f24b24301fbff155'))}: <span style={{ color: GOLD }}>{credits === null ? '—' : credits}</span>]</span>
-            <span>[{t(dict, 'lab.compute', uiCopy('u_783bdae232d01cc0'))}: <span style={{ color: BLUE }}>{t(dict, 'lab.active', uiCopy('u_6d5003d4925ab9df'))}</span>]</span>
+            <span>[{t(dict, 'lab.videoCredits')}: <span style={{ color: GOLD }}>{credits === null ? '—' : credits}</span>]</span>
+            <span>[{t(dict, 'lab.compute')}: <span style={{ color: BLUE }}>{t(dict, 'lab.active')}</span>]</span>
           </div>
         </div>
 
@@ -549,22 +548,22 @@ export default function LabPage() {
             <div className="fathom-glass" style={{ borderRadius: 16, padding: '32px', marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
                 <div>
-                  <h1 className="terminal-text" style={{ fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#fff' }}>{t(dict, 'lab.title', uiCopy('u_a208572c184be8a7'))}</h1>
-                  <p style={{ fontSize: 14, color: '#7a90b8', marginTop: 6, lineHeight: 1.6 }}>{t(dict, 'lab.subtitle', uiCopy('u_80e4651bd1c0c13a'))}</p>
+                  <h1 className="terminal-text" style={{ fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#fff' }}>{t(dict, 'lab.title')}</h1>
+                  <p style={{ fontSize: 14, color: '#7a90b8', marginTop: 6, lineHeight: 1.6 }}>{t(dict, 'lab.subtitle')}</p>
                 </div>
               </div>
               <div style={{ background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: 10, padding: '8px', display: 'flex', gap: 6, alignItems: 'center', marginBottom: 20, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.5)' }}>
                 <span className="terminal-text" style={{ color: BLUE, paddingLeft: 12, fontWeight: 700, fontSize: 16 }}>$</span>
-                <input ref={inputRef} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && runSearch()} placeholder={t(dict, 'lab.placeholder', uiCopy('u_70c5a0ca72dd216b'))} className="terminal-text" style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 8px', color: '#fff', fontSize: 15, outline: 'none' }} />
+                <input ref={inputRef} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && runSearch()} placeholder={t(dict, 'lab.placeholder')} className="terminal-text" style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 8px', color: '#fff', fontSize: 15, outline: 'none' }} />
                 <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx,.txt" />
                 <button onClick={() => fileInputRef.current?.click()} className="terminal-text" style={{ padding: '10px 14px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  📎 <span style={{ fontSize: 11 }}>{t(dict, 'lab.attach', uiCopy('u_2fd3706da486aaf4'))}</span>
+                  📎 <span style={{ fontSize: 11 }}>{t(dict, 'lab.attach')}</span>
                 </button>
                 {hasSearched && (
-                  <button onClick={reset} className="terminal-text" style={{ padding: '10px 16px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer' }}>{t(dict, 'lab.abort', uiCopy('u_584fd5b35e667ffb'))}</button>
+                  <button onClick={reset} className="terminal-text" style={{ padding: '10px 16px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer' }}>{t(dict, 'lab.abort')}</button>
                 )}
                 <button onClick={() => runSearch()} disabled={loading || !prompt.trim()} className="terminal-text" style={{ padding: '12px 22px', borderRadius: 6, background: prompt.trim() && !loading ? BLUE : 'rgba(255,255,255,0.03)', color: prompt.trim() && !loading ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 12, border: 'none', cursor: prompt.trim() && !loading ? 'pointer' : 'default', filter: prompt.trim() && !loading ? 'drop-shadow(0 0 8px rgba(59,130,246,0.4))' : 'none' }}>
-                  {loading ? t(dict, 'lab.compiling', uiCopy('u_1db9a623553ea14c')) : t(dict, 'lab.runPrompt', uiCopy('u_992909fd92ebc437'))}
+                  {loading ? t(dict, 'lab.compiling') : t(dict, 'lab.runPrompt')}
                 </button>
               </div>
 
@@ -574,7 +573,7 @@ export default function LabPage() {
                     <div key={file.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, fontSize: 12 }}>
                       {file.preview && <img src={file.preview} alt={file.name} style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4 }} />}
                       <span style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>({Math.round(file.size / 1024)}{uiCopy('u_6b5bc02d46b905e3')}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>({Math.round(file.size / 1024)}{uiText('generatedUi.u_515205221528cb1f')}</span>
                       <button onClick={() => removeFile(file.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '0 4px', fontSize: 14 }}>✕</button>
                     </div>
                   ))}
@@ -593,14 +592,14 @@ export default function LabPage() {
 
             {intentText && (
               <div className="terminal-text" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 10, marginBottom: 20, fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
-                <span style={{ color: BLUE, fontWeight: 700 }}>▶ {t(dict, 'lab.agentReasoning', uiCopy('u_5bb0b5796c6fb6dd'))}:</span>
+                <span style={{ color: BLUE, fontWeight: 700 }}>▶ {t(dict, 'lab.agentReasoning')}:</span>
                 <span>{intentText}</span>
               </div>
             )}
 
             {message && (
               <div className="terminal-text" style={{ padding: '14px 18px', background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 10, fontSize: 13, color: 'rgba(255,195,0,0.9)', marginBottom: 20 }}>
-                ⚠️ [{t(dict, 'lab.warnConstraints', uiCopy('u_7cbf019407beeab5'))}] {message}
+                ⚠️ [{t(dict, 'lab.warnConstraints')}] {message}
               </div>
             )}
 
@@ -625,7 +624,7 @@ export default function LabPage() {
             {results.length > 0 && !loading && (
               <div style={{ marginBottom: 32 }}>
                 <div className="terminal-text" style={{ fontSize: 12, fontWeight: 700, color: '#7a90b8', letterSpacing: '0.08em', marginBottom: 14 }}>
-                  // {t(dict, 'lab.generatedMatrix', uiCopy('u_61c270ad12f1cc73'))}: {results.length} {t(dict, 'lab.nodesDetected', uiCopy('u_7a8b76a23ac5d051'))}
+                  // {t(dict, 'lab.generatedMatrix')}: {results.length} {t(dict, 'lab.nodesDetected')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
                   {results.map(result => {
@@ -646,16 +645,16 @@ export default function LabPage() {
                             <div className="terminal-text" style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4, background: licenseBg(result.license), color: licenseColor(result.license), border: `1px solid ${licenseColor(result.license)}33` }}>{result.license.toUpperCase()}</div>
                           </div>
                           <div style={{ position: 'absolute', top: 6, right: 6 }}>
-                            <div className="terminal-text" style={{ fontSize: 10, padding: '3px 6px', borderRadius: 4, background: 'rgba(0,0,0,0.7)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)' }}>{result.source === 'youtube' ? uiCopy('u_485059de5bb38c82') : uiCopy('u_c570fe304f881313')}</div>
+                            <div className="terminal-text" style={{ fontSize: 10, padding: '3px 6px', borderRadius: 4, background: 'rgba(0,0,0,0.7)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)' }}>{result.source === 'youtube' ? uiText('generatedUi.u_e499a90820e464b8') : uiText('generatedUi.u_e237563d9503bb38')}</div>
                           </div>
                           <div className="terminal-text" style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.8)', color: '#fff', fontSize: 10, padding: '3px 6px', borderRadius: 4 }}>{result.duration}</div>
                         </div>
                         <div style={{ padding: 10, background: 'rgba(4, 5, 11, 0.5)' }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, marginBottom: 8, height: 33 }}>{result.title}</div>
                           {isRestricted
-                            ? <div className="terminal-text" style={{ fontSize: 10, color: '#f87171' }}>{t(dict, 'lab.restrictedNode', uiCopy('u_483b504592d86bc7'))}</div>
+                            ? <div className="terminal-text" style={{ fontSize: 10, color: '#f87171' }}>{t(dict, 'lab.restrictedNode')}</div>
                             : <button onClick={e => { e.stopPropagation(); addAsset(result) }} className="terminal-text" style={{ width: '100%', fontSize: 11, padding: '6px 0', borderRadius: 4, border: `1px solid rgba(255,255,255,0.2)`, background: assets.find(a => a.id === result.id) ? 'rgba(74,222,128,0.08)' : 'rgba(255,255,255,0.03)', color: assets.find(a => a.id === result.id) ? GREEN : 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-                                {assets.find(a => a.id === result.id) ? `✓ ${t(dict, 'lab.pipeline', uiCopy('u_35a895f3fac90a3b'))}` : `+ ${t(dict, 'lab.inject', uiCopy('u_aad5df3ca5d26acb'))}`}
+                                {assets.find(a => a.id === result.id) ? `✓ ${t(dict, 'lab.pipeline')}` : `+ ${t(dict, 'lab.inject')}`}
                               </button>
                           }
                         </div>
@@ -672,9 +671,9 @@ export default function LabPage() {
                   <div style={{ width: 220, height: 220, background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%)', animation: 'pulse-slow 4s infinite ease-in-out' }} />
                 </div>
                 <div style={{ fontSize: 54, marginBottom: 16, animation: 'pulse-slow 4s infinite ease-in-out' }}>🧬</div>
-                <div className="terminal-text" style={{ fontSize: 15, fontWeight: 700, color: '#7a90b8', letterSpacing: '0.15em', marginBottom: 10 }}>{t(dict, 'lab.synthesisCore', uiCopy('u_4170b2d228411d40'))}</div>
+                <div className="terminal-text" style={{ fontSize: 15, fontWeight: 700, color: '#7a90b8', letterSpacing: '0.15em', marginBottom: 10 }}>{t(dict, 'lab.synthesisCore')}</div>
                 <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>
-                  {t(dict, 'lab.awaitingDirectives', uiCopy('u_a573d0d6d167dc73'))}
+                  {t(dict, 'lab.awaitingDirectives')}
                 </div>
               </div>
             )}
@@ -682,16 +681,16 @@ export default function LabPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div className="fathom-glass" style={{ borderRadius: 14, padding: 20 }}>
-              <div className="terminal-text" style={{ fontSize: 12, color: '#7a90b8', marginBottom: 14, fontWeight: 700 }}>// {t(dict, 'lab.coreScope', uiCopy('u_114d5cf98cff0d7e'))}</div>
+              <div className="terminal-text" style={{ fontSize: 12, color: '#7a90b8', marginBottom: 14, fontWeight: 700 }}>// {t(dict, 'lab.coreScope')}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{t(dict, 'lab.targetProjectId', uiCopy('u_e28dfb5b72315379'))}:</span>
+                <span className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{t(dict, 'lab.targetProjectId')}:</span>
                 <input value={project} onChange={e => setProject(e.target.value)} className="terminal-text" style={{ background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: 6, padding: '12px 14px', color: GOLD, fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontWeight: 700 }} />
               </div>
             </div>
 
             {!hasSearched && (
               <div className="fathom-glass" style={{ borderRadius: 14, padding: 20 }}>
-                <div className="terminal-text" style={{ fontSize: 12, color: '#7a90b8', marginBottom: 16, fontWeight: 700 }}>// {t(dict, 'lab.recipeTemplates', uiCopy('u_f4a99d289ed36938'))}</div>
+                <div className="terminal-text" style={{ fontSize: 12, color: '#7a90b8', marginBottom: 16, fontWeight: 700 }}>// {t(dict, 'lab.recipeTemplates')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {SUGGESTIONS.map(s => (
                     <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text recipe-node" style={{ width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 6, fontSize: 12, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
@@ -705,8 +704,8 @@ export default function LabPage() {
             {assets.length > 0 && (
               <div className="fathom-glass" style={{ borderRadius: 14, padding: 20, borderLeft: `3px solid ${BLUE}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div className="terminal-text" style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{t(dict, 'lab.pipelineStaging', uiCopy('u_f88b0f6298b70c50'))} ({assets.length})</div>
-                  <button onClick={() => setAssets([])} className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{t(dict, 'lab.purgeAll', uiCopy('u_603b95ae31937b18'))}</button>
+                  <div className="terminal-text" style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{t(dict, 'lab.pipelineStaging')} ({assets.length})</div>
+                  <button onClick={() => setAssets([])} className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{t(dict, 'lab.purgeAll')}</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {assets.map(asset => (
@@ -716,7 +715,7 @@ export default function LabPage() {
                         <span className="terminal-text" style={{ color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.title}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <button onClick={() => window.location.href = '/dashboard/video'} className="terminal-text" style={{ fontSize: 10, padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(59,130,246,0.35)', background: 'rgba(59,130,246,0.12)', color: BLUE, cursor: 'pointer' }}>{t(dict, 'lab.run', uiCopy('u_506af85633053780'))}</button>
+                        <button onClick={() => window.location.href = '/dashboard/video'} className="terminal-text" style={{ fontSize: 10, padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(59,130,246,0.35)', background: 'rgba(59,130,246,0.12)', color: BLUE, cursor: 'pointer' }}>{t(dict, 'lab.run')}</button>
                         <button onClick={() => setAssets(prev => prev.filter(a => a.id !== asset.id))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}>✕</button>
                       </div>
                     </div>

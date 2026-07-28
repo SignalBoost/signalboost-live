@@ -8,6 +8,8 @@ import {
   verifyAndroidScaffoldReviewBundle,
 } from '../portable-mobile/android-scaffold-review-bundle.ts'
 import { providerHubAndroidPackaging } from '../portable-mobile/provider-hub.android.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('creates a deterministic immutable Provider Hub scaffold review bundle', () => {
   const scaffold = createUnsignedAndroidScaffold(providerHubAndroidPackaging)
@@ -55,7 +57,7 @@ test('review bundle rejects unsafe paths and signing material', () => {
 })
 
 test('review bundle source has no filesystem, archive, build, signing, or submission capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/android-scaffold-review-bundle.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/android-scaffold-review-bundle.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ['node:fs', 'child_process', 'writeFile(', 'mkdir(', 'archiver', 'zip(', 'gradlew', 'bundleRelease', 'androidpublisher', 'fetch(']) {
     assert.equal(source.toLowerCase().includes(forbidden.toLowerCase()), false, `source must not contain ${forbidden}`)
   }

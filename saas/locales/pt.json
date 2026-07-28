@@ -712,5 +712,189 @@
       "approved": "Aprovado para o próximo passo do Studio.",
       "revision": "Retido para revisão no Studio."
     }
+  },
+  "generatedUi": {
+    "u_1dc83f605edf0ae2": "Monitoramento",
+    "u_920e413c7d411b61": "Status",
+    "u_d31de1a5c5c8ba2a": "Navegador",
+    "u_ba3bbbe10d8bef66": "Carregando…",
+    "u_30e9a089397b25b0": "Campanhas",
+    "u_c1c224b03cd9bc7b": "Administração",
+    "u_4b1b8aa3608a26da": "Proprietário",
+    "u_969ccbd3cf6300ec": "E-mail",
+    "u_19766ed6ccb2f4a3": "Cancelar",
+    "u_eebdd24a77d9ad32": "Confirmar",
+    "u_c4ebc6d4a5832cd9": "Alto",
+    "u_47bd29075f8b8019": "Conteúdo",
+    "u_8e588cd187741f1c": "Médio",
+    "u_c2c8b72e302ec730": "Tom",
+    "u_f6f4688ff23d50c6": "Enviar",
+    "u_0e76960093379060": "Histórico",
+    "u_7d9eb7acb13e2462": "Fechar",
+    "u_0e91610117029a62": "Atualizar",
+    "u_87b42e40c2a290e0": "Aprovado",
+    "u_47d2a515ef2f05b8": "Carregando...",
+    "u_2f343666aaa88c44": "Formato",
+    "u_268286d2ef7573e0": "Campanha",
+    "u_ab604a360777735f": "Rejeitar",
+    "u_50ab62def34755ef": "Centro de cibersegurança",
+    "u_369d154c24f90563": "Centro de auditoria",
+    "u_13d6ff07b8a5d792": "Repositório",
+    "u_5e9f98120dbe5682": "Gravidade",
+    "u_e3bee02722edac7c": "Aprovado por humano",
+    "u_aea4a04a80426ed8": "Rejeitado",
+    "u_ed077f3d8125d60d": "Aberto",
+    "u_cec3a9b89b2e3913": "Dados",
+    "u_11a6767d5674c7e4": "Concluído",
+    "u_54a0e8c17ebb21a1": "Erro",
+    "u_cdbf6975e8a35b0d": "Objetivo",
+    "u_89b633adede66a05": "Analisando…",
+    "u_ce4683e7013a18cd": "Canal",
+    "u_dcba31525bd63b56": "Marketing + Vendas",
+    "u_6007acbe30b2cd98": "Aprovar",
+    "u_b5a229ac8becc603": "Site",
+    "u_22965568d22a14ee": "Conectado",
+    "u_324b134f57c70c72": "Prévia",
+    "u_c21ead0614e7e1b7": "Fechado",
+    "u_d92c603b66e19cf6": "Acesso de administrador obrigatório.",
+    "u_7e8cd2056da73a7f": "Título",
+    "u_6ccaa6415b5ee449": "Corpo",
+    "u_4637016c5e82d0d1": "Coletor de avaliações",
+    "u_e2d0a54968ead24e": "Excluir",
+    "u_8de4e0ea7370e4e6": "Vendas",
+    "u_bddd837f1a0ce8ce": "Ainda não há dados.",
+    "u_dcd1d5223f73b3a9": "Nome",
+    "u_526e0087cc3f254d": "Descrição",
+    "u_9859597853197476": "Projeto",
+    "u_9e471951a1b4106e": "Ambiente",
+    "u_870a8ffd98f4f2bd": "Implantação",
+    "u_fa8ed0bdabdd6bcb": "Plano",
+    "u_b753fe0c7acec513": "Passos aprovados",
+    "u_03867aea70acaf4c": "Evidências",
+    "u_7e1b0d5641f2640c": "Conta",
+    "u_1509f561f2416598": "Salvar",
+    "u_dfe95783edfef791": "Preços",
+    "u_0711a8d636e4c068": "Risco",
+    "u_b764cdc0eab71374": "Desconhecido",
+    "u_8f6fb4eb7f42c0e2": "Segurança",
+    "u_74a883a037bc227f": "Configurações",
+    "u_fb9ef894175c3274": "Produto",
+    "u_3a78695388b38b5c": "Início",
+    "u_61e8d44ad423a4a0": "Começar",
+    "u_9296483909d17d1a": "Ferramentas públicas",
+    "u_5976c17e6bbdd35e": "Revisão do site",
+    "u_5b5353420d2d5a74": "Verificação de segurança",
+    "u_9df13ac00553006c": "Melhore seu site",
+    "u_068bb1a34377680c": "Estúdio de Campanhas",
+    "u_358cc201f87d9dc9": "Operações",
+    "u_0aa91af2ec4c1fd7": "Estúdio",
+    "u_095321ec675b9643": "Estúdio de vídeo",
+    "u_23b2d5dae0a87cf9": "Cibersegurança",
+    "u_c0c52c1e72197d6d": "Cockpit de Auditoria",
+    "u_49616145514e9abf": "Sair",
+    "u_4943e64e40762052": "Proprietário/Admin",
+    "u_3cbf6d117f4dc1b5": "Central de Controle",
+    "u_f411a1fb62758b4c": "Grátis",
+    "u_ea2100dc89ae9fe2": "Registros",
+    "u_c1a070e0a89b1d41": "Fila de aprovações",
+    "u_be379a30f1aa05d1": "créditos",
+    "u_11dde17d6c3e2098": "Ilimitado",
+    "u_87bf2bc08589f0bd": "Voz",
+    "u_472590ae974d4c1f": "Provedor",
+    "u_13a7c655a7d4213c": "Produção",
+    "u_51e716c2a48a766b": "Autoridade empresarial",
+    "u_7457215bf1064734": "Lidere com credibilidade, controle operacional e valor de negócio mensurável.",
+    "u_75c419ef704f82fe": "Demonstração de produto",
+    "u_988324fef9d35ba1": "Mostre o fluxo do produto e leve o público a um próximo passo concreto.",
+    "u_19b761b533fb818c": "Campanha educacional",
+    "u_d93a8bc97280279f": "Ensine o problema e a solução com clareza antes de apresentar a oferta.",
+    "u_3024d9fd1e6be7fd": "Site ou fonte do GitHub",
+    "u_3a59c0df4f617b9a": "O COSA analisa esta fonte pública e propõe um brief de campanha estruturado.",
+    "u_2bfac71b180af5fa": "Analisando fonte…",
+    "u_8db4b7da61625c04": "Analisar e preencher",
+    "u_b15d4e7cbfbc6316": "Fonte analisada",
+    "u_d3a008ef1335692d": "Região",
+    "u_545c02357695a6ff": "Público",
+    "u_c78ffe19571018fb": "Plataforma",
+    "u_2a8e278e97755982": "Tipo de oferta",
+    "u_0b28778c262112ff": "Estratégia de CTA",
+    "u_955fe28d6fc25bcd": "Direção criativa",
+    "u_5968f960f77a58a8": "Criando campanha…",
+    "u_4189932d0b20e615": "Aprovar brief e criar campanha",
+    "u_b44484a0fa28c471": "Setor",
+    "u_a4fe65264ef7dbb3": "Idioma",
+    "u_daee7606b339f3c3": "Repor",
+    "u_27dd1507cc7aff4f": "Selecione uma ou mais opções",
+    "u_fb1cbc38fb4060f4": "Selecione uma opção",
+    "u_a231ac201ef7c2ec": "https://exemplo.com ou https://github.com/org/repo",
+    "u_0d4f89f98ca0d154": "Analisar fonte",
+    "u_bf4768405082a5b7": "Gerar novas opções",
+    "u_8b925b14879ff054": "Listar Domínios",
+    "u_7f1e323b6272c620": "Saudável",
+    "u_b64ac05f17e64d03": "Ativo",
+    "u_424a2551d356754c": "Expirado",
+    "u_85a39ab345d672ff": "Sim",
+    "u_1ea442a134b2a184": "Não",
+    "u_8e16312c846c8068": "Editor de vídeo com legendas por IA",
+    "u_3a81e923b13cfadb": "Carregue um vídeo, gere legendas sincronizadas com IA, arraste sobreposições estilizadas na tela e exporte o vídeo legendado.",
+    "u_cb9e8664edea8cf5": "Nível"
+  },
+  "lab": {
+    "somethingWrong": "Algo deu errado"
+  },
+  "dash": {
+    "preview": {
+      "close": "Fechar"
+    }
+  },
+  "onboarding": {
+    "confirm": {
+      "tone": "Tom"
+    }
+  },
+  "podcasters_page": {
+    "plans": {
+      "indie": {
+        "cta": "Começar"
+      },
+      "pro": {
+        "cta": "Começar"
+      }
+    }
+  },
+  "pricing_page": {
+    "loading": "Carregando..."
+  },
+  "concierge": {
+    "send": "Enviar"
+  },
+  "topbar": {
+    "credits": "créditos",
+    "account": "Conta"
+  },
+  "console": {
+    "deploy": {
+      "heading": "Implantações",
+      "deployment": "Implantação"
+    },
+    "providerHealth": {
+      "open": "Aberto",
+      "environment": "Ambiente",
+      "provider": "Provedor",
+      "severity": "Gravidade"
+    },
+    "webhooks": {
+      "delete": "Excluir"
+    }
+  },
+  "common": {
+    "cancel": "Cancelar"
+  },
+  "vault": {
+    "mfa": {
+      "method": {
+        "email": "E-mail"
+      }
+    }
   }
 }

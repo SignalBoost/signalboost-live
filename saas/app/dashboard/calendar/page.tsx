@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { getNamedaysForDate } from '@/lib/cultural-calendar/pl-namedays'
 import { getRussianNamedaysForDate } from '@/lib/cultural-calendar/ru-namedays'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -41,25 +40,25 @@ type CalendarCopy = {
 
 const COPY: Record<string, CalendarCopy> = {
   en: {
-    eyebrow: uiCopy('u_f6685e395ce9e042'),
-    prev: uiCopy('u_3b50888fa78a154b'),
-    today: uiCopy('u_d55596796f399019'),
-    next: uiCopy('u_36d6af098c6cfd2a'),
-    loadError: uiCopy('u_a2efe48bcc4e9877'),
-    genericLoadError: uiCopy('u_3d66486a1ab6978c'),
-    saveError: uiCopy('u_faa0e021cbb4e323'),
-    loading: uiCopy('u_51696c318f4d5d0b'),
-    nameDaysHelp: uiCopy('u_8ad51074c8acd4a2'),
-    regularHelp: uiCopy('u_faf744cf3c382b88'),
-    addEvent: uiCopy('u_370e07b97540b6ce'),
-    eventTitlePlaceholder: uiCopy('u_234a8d0f3e7fb6cb'),
-    notesPlaceholder: uiCopy('u_4fc214dcd9094950'),
-    cancel: uiCopy('u_604cfcdbdf815179'),
-    saving: uiCopy('u_75c14b6bd85726cd'),
-    addEventButton: uiCopy('u_af451f8e0518f386'),
-    clickToDelete: uiCopy('u_b3eead5d6d32caea'),
-    months: [uiCopy('u_3076c38cf0e64421'), uiCopy('u_3bb88da4e8246f11'), uiCopy('u_32f391a311477ae0'), uiCopy('u_8c6947d80468e44d'), uiCopy('u_2b928741d59a9f60'), uiCopy('u_ef6a2b6165d77dac'), uiCopy('u_7417ec7a29ede411'), uiCopy('u_0a8b3ac8565e332c'), uiCopy('u_5ab5a87c818b99ff'), uiCopy('u_025f4fd7799ffca0'), uiCopy('u_8748d4ffc5eb0ceb'), uiCopy('u_5390ce09c0b5d1c4')],
-    weekdays: [uiCopy('u_a14ddd67e03ad1a0'), uiCopy('u_d572dc3f35b7834a'), uiCopy('u_a6eb5762df9c6e18'), uiCopy('u_d42c62f6302bb3f3'), uiCopy('u_63df04a1837ac891'), uiCopy('u_c3f06d032d201446'), uiCopy('u_4d8295b1b440cad6')],
+    eyebrow: uiText('generatedUi.u_d5d0a30b517e3bea'),
+    prev: uiText('generatedUi.u_525432ec085b139e'),
+    today: uiText('generatedUi.u_2b065c7c9ce466e5'),
+    next: uiText('generatedUi.u_bcf0489a7b45328d'),
+    loadError: uiText('generatedUi.u_8b9407e43903762a'),
+    genericLoadError: uiText('generatedUi.u_1e54c36c3bc2eb12'),
+    saveError: uiText('generatedUi.u_9ccc65e8c8afbf6f'),
+    loading: uiText('generatedUi.u_b3910a31805628d8'),
+    nameDaysHelp: uiText('generatedUi.u_ccb67766b7b94116'),
+    regularHelp: uiText('generatedUi.u_b926231d74a8e8a3'),
+    addEvent: uiText('generatedUi.u_57d208bc0d04773e'),
+    eventTitlePlaceholder: uiText('generatedUi.u_c91803a5ccbdf1e2'),
+    notesPlaceholder: uiText('generatedUi.u_6239b93e96e9a8ee'),
+    cancel: uiText('generatedUi.u_19766ed6ccb2f4a3'),
+    saving: uiText('generatedUi.u_23e39291d6135814'),
+    addEventButton: uiText('generatedUi.u_57d208bc0d04773e'),
+    clickToDelete: uiText('generatedUi.u_f0181e2baa845cb5'),
+    months: [uiText('generatedUi.u_37082e68df858e0b'), uiText('generatedUi.u_c877c6ff405ec29c'), uiText('generatedUi.u_9d95a2cf0d7180b5'), uiText('generatedUi.u_4afe6ea150d532c1'), uiText('generatedUi.u_8c78fe5b9936488c'), uiText('generatedUi.u_d5808c0e0a479813'), uiText('generatedUi.u_e9cf7a1ca4a76084'), uiText('generatedUi.u_a66d8970e569a944'), uiText('generatedUi.u_cd559ea0abca085e'), uiText('generatedUi.u_fdd791787b64d223'), uiText('generatedUi.u_9de6fe1d72659dae'), uiText('generatedUi.u_8fb204ca46096847')],
+    weekdays: [uiText('generatedUi.u_db18f17fe5320076'), uiText('generatedUi.u_f40d7f51f69edfaf'), uiText('generatedUi.u_d1eb39b09bf52b68'), uiText('generatedUi.u_58339f45df960408'), uiText('generatedUi.u_7da11212ed340ea7'), uiText('generatedUi.u_66dab40cea1dea5c'), uiText('generatedUi.u_fdeb71b569e0034d')],
   },
   pt: {
     eyebrow: 'Calendário',

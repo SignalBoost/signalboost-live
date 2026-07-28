@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const page = readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/page.tsx', import.meta.url), 'utf8')
-const client = readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/ProtocolCapabilityCatalogClient.tsx', import.meta.url), 'utf8')
+
+const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/page.tsx', import.meta.url), 'utf8'))
+const client = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/ProtocolCapabilityCatalogClient.tsx', import.meta.url), 'utf8'))
 
 test('protocol catalog resolves the five supported locales with English fallback', () => {
   for (const locale of ['en','es','pt','pl','ru']) assert.match(client, new RegExp(`\\b${locale}: \\{`))

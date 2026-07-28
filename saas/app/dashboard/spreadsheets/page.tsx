@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Item = {
   id: string
@@ -46,23 +45,23 @@ type SpreadsheetCopy = {
 
 const COPY: Record<string, SpreadsheetCopy> = {
   en: {
-    eyebrow: uiCopy('u_730292028aec1b11'),
-    title: uiCopy('u_0648477fb79470c5'),
-    subtitle: uiCopy('u_e69f467ac67e7bbe'),
-    importData: uiCopy('u_b99395ccf3d902e1'),
-    searchPlaceholder: uiCopy('u_9fd8fe510ec81606'),
-    rows: uiCopy('u_96f635f97b5ad1d6'),
-    sources: uiCopy('u_26a3767fb16d5987'),
-    loadError: uiCopy('u_d70e0971bdd7766c'),
-    genericLoadError: uiCopy('u_474cf998b64b193f'),
-    loading: uiCopy('u_36028642068ba6fc'),
-    empty: uiCopy('u_64654f4c85980859'),
-    importFirst: uiCopy('u_75f4321fefa20f43'),
-    tableName: uiCopy('u_bbbccd11c8be733c'),
-    tableCategory: uiCopy('u_4b4b5d3579d7edf0'),
-    tableDescription: uiCopy('u_42232f87233d857a'),
-    tableSource: uiCopy('u_6feba545002498df'),
-    sourceLink: uiCopy('u_cb2494a7b872b1d8'),
+    eyebrow: uiText('generatedUi.u_fdae6602c2bebdcc'),
+    title: uiText('generatedUi.u_ef2db884be0bbaa6'),
+    subtitle: uiText('generatedUi.u_5bc59329577e16fc'),
+    importData: uiText('generatedUi.u_22d78bd42504ba70'),
+    searchPlaceholder: uiText('generatedUi.u_a4e3a29111fd9122'),
+    rows: uiText('generatedUi.u_bc51e9e65d79e1c9'),
+    sources: uiText('generatedUi.u_878a52fc5ff6a57d'),
+    loadError: uiText('generatedUi.u_4914153de03cab24'),
+    genericLoadError: uiText('generatedUi.u_10c3977bdc16faf9'),
+    loading: uiText('generatedUi.u_d43f06e54f2af517'),
+    empty: uiText('generatedUi.u_bddd837f1a0ce8ce'),
+    importFirst: uiText('generatedUi.u_0ad3fa9389d30c5f'),
+    tableName: uiText('generatedUi.u_dcd1d5223f73b3a9'),
+    tableCategory: uiText('generatedUi.u_292c06f0045a45d0'),
+    tableDescription: uiText('generatedUi.u_526e0087cc3f254d'),
+    tableSource: uiText('generatedUi.u_0e570ca6fabe24f9'),
+    sourceLink: uiText('generatedUi.u_b1b1bdb480c61d07'),
   },
   pt: {
     eyebrow: 'Planilhas',

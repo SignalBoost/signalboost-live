@@ -14,8 +14,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const navbar = readFileSync(new URL('../components/PremiumCustomerNavbarV2.tsx', import.meta.url), 'utf8')
+
+const navbar = hydrateLocalizedSource(readFileSync(new URL('../components/PremiumCustomerNavbarV2.tsx', import.meta.url), 'utf8'))
 
 /** The single navbar entry object whose href is exactly the supervisor root. */
 function supervisorEntry(): string {

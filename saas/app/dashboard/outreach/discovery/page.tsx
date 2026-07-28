@@ -3,8 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const PLATFORMS = ['manual', 'google', 'facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'telegram', 'wechat', 'reddit', 'website', 'directory']
 const CATEGORIES = ['company', 'affiliate', 'media']
@@ -21,20 +20,20 @@ type DiscoveryCopy = {
 
 const COPY: Record<string, DiscoveryCopy> = {
   en: {
-    eyebrow: uiCopy('u_da776106b919a6e4'), title: uiCopy('u_dd9450a1cc1e7c64'),
-    subtitle: uiCopy('u_27ef602f06a6d5f3'),
-    urlLabel: uiCopy('u_5a544aea739cc95a'), nameLabel: uiCopy('u_4443a3d3ddaeda62'),
-    sourceLabel: uiCopy('u_7c3dd2e6ec59b706'), categoryLabel: uiCopy('u_1c713ccb37e4627e'), notesLabel: uiCopy('u_59ba795969cde0fc'),
-    urlPlaceholder: uiCopy('u_8b6738f082df58aa'), namePlaceholder: uiCopy('u_2153bfd2f7c6f37f'),
-    notesPlaceholder: uiCopy('u_5f94b8c2e005c218'),
-    missingUrl: uiCopy('u_b64c176ca3a4180e'),
-    analyzeError: uiCopy('u_512e416286dbb761'), genericError: uiCopy('u_42eb66692a9babf8'),
-    analyzing: uiCopy('u_6234bb18b6a38abf'), analyzeButton: uiCopy('u_705ba299fe64023a'), viewContacts: uiCopy('u_f68a6e749feca90f'),
-    leadQueued: uiCopy('u_a0b5042788f679c9'), newLead: uiCopy('u_7513c4af7a9ae15a'), draftFirstTouch: uiCopy('u_aa4896afa47ef36b'),
-    reviewContacts: uiCopy('u_7e24d5d9b233d466'), openEngine: uiCopy('u_b5ef59fda825e68f'),
-    generateDeck: uiCopy('u_b18d6f3e8b88eee4'), generatingDeck: uiCopy('u_0eacd0edf3acf725'), deckError: uiCopy('u_592801c7deb556a1'),
-    platforms: { manual: uiCopy('u_10775f4069b3f8e8'), google: uiCopy('u_04a19413e22dba30'), facebook: uiCopy('u_aaf7e9d570055096'), instagram: uiCopy('u_dbeb10d7cfb4802d'), linkedin: uiCopy('u_e4504c50472e69b4'), tiktok: uiCopy('u_4637e6ee2c532cc5'), youtube: uiCopy('u_9237c997795a375a'), telegram: uiCopy('u_aa58a4a6df4aac73'), wechat: uiCopy('u_9420117938118494'), reddit: uiCopy('u_dad2d1eb1e7e67b9'), website: uiCopy('u_81377b1b0dcb923f'), directory: uiCopy('u_492954b1731da3e4') },
-    categories: { company: uiCopy('u_5a97b10fa656e16a'), affiliate: uiCopy('u_40c1855f1fdd1153'), media: uiCopy('u_d229217d419e84ee') },
+    eyebrow: uiText('generatedUi.u_80fc402133201fbe'), title: uiText('generatedUi.u_fd218a2f0aee3625'),
+    subtitle: uiText('generatedUi.u_9fc5b09b58b6a40a'),
+    urlLabel: uiText('generatedUi.u_6b8429a51816b620'), nameLabel: uiText('generatedUi.u_42aa58c476c7087c'),
+    sourceLabel: uiText('generatedUi.u_0e570ca6fabe24f9'), categoryLabel: uiText('generatedUi.u_668d40509d247f7a'), notesLabel: uiText('generatedUi.u_a8f8518f0a46a5a8'),
+    urlPlaceholder: uiText('generatedUi.u_100680ad546ce6a5'), namePlaceholder: uiText('generatedUi.u_0879a2680a28956d'),
+    notesPlaceholder: uiText('generatedUi.u_474f51f3ea4e5a09'),
+    missingUrl: uiText('generatedUi.u_a677bab43f023ada'),
+    analyzeError: uiText('generatedUi.u_bd97a28105b09f69'), genericError: uiText('generatedUi.u_3ccd9d6586ef9143'),
+    analyzing: uiText('generatedUi.u_89b633adede66a05'), analyzeButton: uiText('generatedUi.u_336933b3829fa0ba'), viewContacts: uiText('generatedUi.u_537651bc1ab0a1f3'),
+    leadQueued: uiText('generatedUi.u_5f6b7a665b469a51'), newLead: uiText('generatedUi.u_fa865e07adc96fa0'), draftFirstTouch: uiText('generatedUi.u_e0a9aaad5ad30d23'),
+    reviewContacts: uiText('generatedUi.u_7bbeb237d3455e81'), openEngine: uiText('generatedUi.u_ab3746fe67822a78'),
+    generateDeck: uiText('generatedUi.u_a37f7e2c95754f91'), generatingDeck: uiText('generatedUi.u_ea34db4b205bc3d7'), deckError: uiText('generatedUi.u_eadf4b5082e2a3ae'),
+    platforms: { manual: uiText('generatedUi.u_b0b9fe24ffa96291'), google: uiText('generatedUi.u_ce770667e5f9b0d8'), facebook: uiText('generatedUi.u_d41f5b4977ee05c6'), instagram: uiText('generatedUi.u_bad57ef7837c8e6b'), linkedin: uiText('generatedUi.u_dd84425b72da12c6'), tiktok: uiText('generatedUi.u_1bb6fcfbf1368a7b'), youtube: uiText('generatedUi.u_fb7accfff8c6f8ea'), telegram: uiText('generatedUi.u_acdd1e734125f341'), wechat: uiText('generatedUi.u_b583907ae9880000'), reddit: uiText('generatedUi.u_eb0050f72303bcdb'), website: uiText('generatedUi.u_b5a229ac8becc603'), directory: uiText('generatedUi.u_c8f84c3c5378b920') },
+    categories: { company: uiText('generatedUi.u_de4743c879734dc3'), affiliate: uiText('generatedUi.u_c77364df760e0e13'), media: uiText('generatedUi.u_b638959dce9fcad1') },
   },
   es: {
     eyebrow: 'Descubrimiento', title: 'Encuentra un negocio y deja que la IA prepare la prospección.',

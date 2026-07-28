@@ -2,9 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createManualReviewDiagnosticsResponse, parseManualReviewDiagnosticsResponse } from '../lib/supervisor/missions/review-diagnostics.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const generatedAt = '2026-07-23T00:00:00.000Z'
-const source = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
+const source = (file: string) => hydrateLocalizedSource(readFileSync(new URL(file, import.meta.url), 'utf8'))
 
 test('empty, healthy, and warning status rules are deterministic', () => {
   assert.equal(createManualReviewDiagnosticsResponse({ total: 0, routed: 0 }, generatedAt).status, 'empty')

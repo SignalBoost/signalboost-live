@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -38,24 +37,24 @@ const COPY: Record<Lang, {
   footer: string
 }> = {
   en: {
-    eyebrow: uiCopy('u_df6255486862ffc2'),
-    title: uiCopy('u_e5bc979b416df86a'),
-    refresh: uiCopy('u_548717b1aed0f316'),
-    refreshing: uiCopy('u_1860ced9b942b0c7'),
-    loading: uiCopy('u_9253dc7483fd2c8d'),
-    noAccess: uiCopy('u_57efdec302629553'),
-    noAccessSub: uiCopy('u_70985a9c8edbbc66'),
-    stripePriceWarn: uiCopy('u_ea335a8990b8ec9c'),
-    mrr: uiCopy('u_5bcbd8895a5ed17f'),
-    arr: uiCopy('u_6b3775316e7d735c'),
-    activeSubs: uiCopy('u_25799df09f7de65c'),
-    activeWebsite: uiCopy('u_4fdfcff1d4b6c3b2'),
-    activePodcast: uiCopy('u_7bd78eb38f38d8ad'),
-    byPlan: uiCopy('u_013c52d9ce554026'),
-    noSubs: uiCopy('u_9fc0bb95ed131316'),
-    active: uiCopy('u_9252f0a409e870a2'),
-    perMonth: uiCopy('u_410de3f4611485ee'),
-    footer: uiCopy('u_dd70d05744fcffa7'),
+    eyebrow: uiText('generatedUi.u_62cd7f01157204c5'),
+    title: uiText('generatedUi.u_081276c1f045a8e8'),
+    refresh: uiText('generatedUi.u_9cbbfc3a6bd90021'),
+    refreshing: uiText('generatedUi.u_1c0def7be0607b96'),
+    loading: uiText('generatedUi.u_ba3bbbe10d8bef66'),
+    noAccess: uiText('generatedUi.u_c4b7330bd91e0c97'),
+    noAccessSub: uiText('generatedUi.u_13c79d778b19c315'),
+    stripePriceWarn: uiText('generatedUi.u_4461ddaff93a0bfc'),
+    mrr: uiText('generatedUi.u_4d6f9064a0fbeeb6'),
+    arr: uiText('generatedUi.u_47a1aeaaeccf89e4'),
+    activeSubs: uiText('generatedUi.u_df0a5aac1933a9f8'),
+    activeWebsite: uiText('generatedUi.u_69296894c28bab9f'),
+    activePodcast: uiText('generatedUi.u_214814a1b7d44362'),
+    byPlan: uiText('generatedUi.u_9ea817b82fb38fef'),
+    noSubs: uiText('generatedUi.u_0efad23779a4d47c'),
+    active: uiText('generatedUi.u_96879611650f80a8'),
+    perMonth: uiText('generatedUi.u_dcc954337afd7f3c'),
+    footer: uiText('generatedUi.u_00210fd619b065e6'),
   },
   es: {
     eyebrow: '💰 Admin · Ingresos',
@@ -168,10 +167,10 @@ export default function AdminRevenuePage() {
       const res = await fetch('/api/admin/revenue', { cache: 'no-store' })
       if (res.status === 401 || res.status === 403) { setNotAllowed(true); setLoading(false); return }
       const d = await res.json()
-      if (!res.ok) { setError(d?.error || uiCopy('u_8ce1aab04efce9a4')); setLoading(false); return }
+      if (!res.ok) { setError(d?.error || "Could not load revenue."); setLoading(false); return }
       setData(d)
     } catch {
-      setError(uiCopy('u_409cdae2ac1c4998'))
+      setError("Something went wrong loading revenue.")
     } finally {
       setLoading(false)
     }

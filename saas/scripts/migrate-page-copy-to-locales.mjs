@@ -33,6 +33,7 @@ const UI_FIELDS = new Set([
 ])
 const COPYISH_NAME = /(copy|text|label|title|description|message|prompt|placeholder|empty|note|heading|subtitle|kicker|eyebrow|caption|help|tooltip|intro|closing|badge)/i
 const TECHNICAL_NAME = /(channels?|statuses?|stages?|types?|modes?|kinds?|codes?|keys?|routes?|urls?|paths?|slugs?|ids?)$/i
+const TECHNICAL_FIELD = /^(role|type|kind|mode|status|stage|channel|animation|dateStyle|timeStyle|format|method|variant|value|key|id|slug|path|route|url|month|year|day|hour|minute|second)$/i
 const STYLE_FIELDS = new Set(['alignItems', 'background', 'border', 'borderColor', 'borderRadius', 'bottom', 'boxShadow', 'color', 'cursor', 'display', 'flex', 'flexDirection', 'flexWrap', 'fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'gap', 'gridTemplateColumns', 'height', 'justifyContent', 'left', 'letterSpacing', 'lineHeight', 'margin', 'marginBottom', 'marginLeft', 'marginRight', 'marginTop', 'maxHeight', 'maxWidth', 'minHeight', 'minWidth', 'opacity', 'overflow', 'padding', 'position', 'right', 'textAlign', 'textDecoration', 'textTransform', 'top', 'transform', 'transition', 'whiteSpace', 'width', 'zIndex'])
 const FALLBACK_PROPS = new Set([
   'fallback', 'fallbackLabel', 'fallbackPrompt', 'fallbackTitle', 'fallbackDescription',
@@ -166,14 +167,19 @@ function inStyleElement(node) {
   return false
 }
 
+function inTechnicalProperty(node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isPropertyAssignment(current) && TECHNICAL_FIELD.test(propName(current.name))) return true
+    if (ts.isFunctionLike(current) || ts.isSourceFile(current)) break
+  }
+  return false
+}
+
 function renderedJsxExpression(node) {
   if (comparisonOperand(node) || inIncludesReceiver(node) || inStyleElement(node)) return false
   for (let current = node.parent; current; current = current.parent) {
     if (ts.isElementAccessExpression(current) && current.argumentExpression === node) return false
-    if (ts.isCallExpression(current)) {
-      const name = calleeName(current.expression)
-      if (name === 't' || name === 'uiText') return false
-    }
+    if (ts.isCallExpression(current)) return false
     if (ts.isJsxAttribute(current)) {
       const name = propName(current.name)
       const parentTag = current.parent?.parent?.tagName
@@ -248,7 +254,8 @@ const reverseTranslations = Object.fromEntries(LOCALE_CODES.filter(code => code 
   const map = new Map()
   for (const [localePath, englishValue] of originalFlat.en.entries()) {
     const localized = originalFlat[code].get(localePath)
-    if (typeof localized === 'string' && localized && localized !== englishValue && !map.has(englishValue)) map.set(englishValue, localized)
+    const normalizedEnglish = normalize(englishValue)
+    if (typeof localized === 'string' && localized && localized !== englishValue && !map.has(normalizedEnglish)) map.set(normalizedEnglish, localized)
   }
   return [code, map]
 }))
@@ -267,7 +274,7 @@ function translationFor(value, code) {
 }
 
 function registerCopy(value, preferredPath = null) {
-  const text = normalize(value)
+  const text = String(value)
   if (!isHumanCopy(text)) return null
   const localePath = preferredPath || generatedPath(text)
   const existing = lookup(localeData.en, localePath)
@@ -325,7 +332,13 @@ function scanFile(full) {
     const localePath = registerCopy(value)
     if (!localePath) return
     const expression = `uiText('${localePath}')`
-    const replacement = options.jsxAttribute ? `{${expression}}` : options.jsxText ? `{${expression}}` : expression
+    let replacement = options.jsxAttribute ? `{${expression}}` : expression
+    if (options.jsxText) {
+      const original = String(options.originalText ?? value)
+      const leading = /^\s/.test(original) ? ' ' : ''
+      const trailing = /\s$/.test(original) ? ' ' : ''
+      replacement = `${leading}{${expression}}${trailing}`
+    }
     addEdit(options.start ?? node.getStart(sf), options.end ?? node.end, replacement, kind, node, value)
     needsUiText = true
   }
@@ -353,7 +366,7 @@ function scanFile(full) {
       }
     }
 
-    if (ts.isJsxText(node) && !inStyleElement(node)) addCopy(node, node.text, 'jsx-text', { start: node.pos, end: node.end, jsxText: true })
+    if (ts.isJsxText(node) && !inStyleElement(node)) addCopy(node, normalize(node.text), 'jsx-text', { start: node.pos, end: node.end, jsxText: true, originalText: node.text })
 
     if (ts.isJsxAttribute(node) && node.initializer) {
       const name = propName(node.name)
@@ -368,7 +381,7 @@ function scanFile(full) {
       const name = propName(node.name)
       const init = node.initializer
       const displayStatus = name === 'status' && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) && /\s/.test(init.text)
-      if ((FALLBACK_PROPS.has(name) || UI_FIELDS.has(name) || displayStatus) && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init))) {
+      if (!TECHNICAL_FIELD.test(name) && (FALLBACK_PROPS.has(name) || UI_FIELDS.has(name) || displayStatus) && (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init))) {
         if (localeBranch(init) === null || localeBranch(init) === 'en') addCopy(init, init.text, `property:${name}`)
       }
     }
@@ -379,7 +392,7 @@ function scanFile(full) {
       const isDirective = ts.isExpressionStatement(parent) && parent.expression === node
       const isPropertyKey = ts.isPropertyAssignment(parent) && parent.name === node
       const alreadyHandled = [...edits.values()].some(edit => edit.start <= node.getStart(sf) && edit.end >= node.end)
-      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && (inEnglishCopyTable(node) || inCopyishVariable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')
+      if (!isModule && !isDirective && !isPropertyKey && !alreadyHandled && !inTechnicalProperty(node) && (inEnglishCopyTable(node) || renderedJsxExpression(node))) addCopy(node, node.text, 'central-copy')
     }
 
     ts.forEachChild(node, visit)

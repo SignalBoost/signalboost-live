@@ -1,17 +1,16 @@
 'use client'
 
 import { EnterpriseLaunchpadPath } from '@/components/enterprise/EnterpriseLaunchpadPath'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const steps = [
-  { label: uiCopy('u_8b6de1ae75f68297'), description: uiCopy('u_6fa4380b2f5314f4'), href: '/dashboard/builder' },
-  { label: uiCopy('u_5ab448937e359740'), description: uiCopy('u_726156141dace88d'), href: '/dashboard/reviews' },
-  { label: uiCopy('u_490251146c80b3ae'), description: uiCopy('u_63fda75503d62f57'), href: '/dashboard/audio' },
-  { label: uiCopy('u_9cb5dd1ad36244d8'), description: uiCopy('u_929a6a3114e0b083'), href: '/dashboard/promote' },
-  { label: uiCopy('u_d0a3c921c2ccdd44'), description: uiCopy('u_e2024e344ecc7adb'), href: '/dashboard/metrics' },
+  { label: uiText('generatedUi.u_fcd8dcc60819fcbf'), description: uiText('generatedUi.u_bb0d145c1300291e'), href: '/dashboard/builder' },
+  { label: uiText('generatedUi.u_a82583e02b6549be'), description: uiText('generatedUi.u_11627927dc53f04c'), href: '/dashboard/reviews' },
+  { label: uiText('generatedUi.u_7b59fa6a8eb6129c'), description: uiText('generatedUi.u_9e476ca163d3ac20'), href: '/dashboard/audio' },
+  { label: uiText('generatedUi.u_edf26e40c950ccb9'), description: uiText('generatedUi.u_c702a814788e910f'), href: '/dashboard/promote' },
+  { label: uiText('generatedUi.u_aa5bb6e2f249dd12'), description: uiText('generatedUi.u_188bdf2732499348'), href: '/dashboard/metrics' },
 ]
 
 export default function BusinessLaunchpadPage() {
-  return <EnterpriseLaunchpadPath workspace="business" badge={uiCopy('u_7d9aa8032a0e8bae')} title={uiCopy('u_b05e782342519017')} subtitle={uiCopy('u_6f067e9bda6717bf')} steps={steps} />
+  return <EnterpriseLaunchpadPath workspace="business" badge={uiText('generatedUi.u_deffefa6bcb6ae6b')} title={uiText('generatedUi.u_8505cfabe476d766')} subtitle={uiText('generatedUi.u_153dbc9ebbf67b2e')} steps={steps} />
 }

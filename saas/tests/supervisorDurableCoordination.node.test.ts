@@ -2,13 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { InMemoryCoordinationStore, ownershipIdentity, SupabaseCoordinationStore, createSupervisorCoordinationStore } from '../lib/supervisor/coordination/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const at = new Date('2026-07-16T00:00:00.000Z')
 const instance = (runtimeId='runtime-1') => ({ instanceId:'supervisor-a', runtimeId, region:'iad1', availabilityZone:'iad1-a', startedAt:at.toISOString(), heartbeatAt:at.toISOString(), softwareVersion:'test', schemaVersion:'supervisor-instance-v1', supportedProviderKinds:['vercel'], status:'healthy' as const })
 const work = (id='work-1', provider='vercel', tenantId='tenant-a') => ({ workItemId:id, workItemType:'api_repair', incidentId:'inc-1', provider, tenantId, environment:'sandbox' as const, state:'queued' as const, priority:1, createdAt:at.toISOString(), availableAt:at.toISOString(), attempt:0, maxAttempts:3, policyVersion:'policy-v1', schemaVersion:'supervisor-work-v1' })
 
 test('migration creates durable coordination tables, RLS, and atomic lease RPC', () => {
-  const sql = readFileSync(new URL('../supabase/migrations/20260716_supervisor_federated_coordination.sql', import.meta.url),'utf8')
+  const sql = hydrateLocalizedSource(readFileSync(new URL('../supabase/migrations/20260716_supervisor_federated_coordination.sql', import.meta.url),'utf8'))
   for (const name of ['supervisor_instances','supervisor_work_items','supervisor_leases','supervisor_coordination_events']) assert.match(sql, new RegExp(`create table if not exists public\\.${name}`))
   assert.match(sql, /create or replace function public\.supervisor_acquire_lease/) 
   assert.match(sql, /for update/) 
@@ -49,7 +51,7 @@ test('Supabase store uses RPC for atomic lease operations and sanitizes errors',
 
 test('operator HA localization contains durable coordination labels in all required locales', () => {
   for (const lang of ['en','es','pt','pl','ru']) {
-    const json = JSON.parse(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url),'utf8'))
+    const json = JSON.parse(hydrateLocalizedSource(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url),'utf8')))
     for (const key of ['durableCoordination','coordinationStore','connected','supervisorInstance','runtimeId','lastHeartbeat','activeLease','leaseExpired','leaseOwner','fencingGeneration','workItem','queued','leased','processing','reassigned','abandoned','staleOwner','coordinationConflict','browserSessionLost','newExecutionRequired','providerWorker','reconciliation','noActiveLease','productionBrowserExecutionDisabled']) assert.equal(typeof json.supervisorHa[key], 'string', `${lang}.${key}`)
   }
 })

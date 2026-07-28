@@ -12,8 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import PressProviderConnectForm from './PressProviderConnectForm.tsx'
 import PressCompanyProfileForm from './PressCompanyProfileForm.tsx'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Provider = { id: string; label: string; type: string; cost: string; proof: string; needs: string[]; blurb: string; live: boolean; registered?: boolean }
 type Campaign = {
@@ -44,33 +43,33 @@ function noteStyle(note: Note) {
 
 const COPY: Record<string, any> = {
   en: {
-    eyebrow: uiCopy('u_a7e469ae8f42894b'), title: uiCopy('u_b8380466d75e5e38'),
-    intro: uiCopy('u_7d08ceb4a488e035'),
-    refresh: uiCopy('u_f907f1fcbf95b62b'), loading: uiCopy('u_96a2fc25959ba801'), types: uiCopy('u_1fc549c47045c303'), liveNow: uiCopy('u_87f0344bb011b614'), coming: uiCopy('u_e7300e08b1f34360'), recent: uiCopy('u_fc66d41d2761f3ce'),
-    live: uiCopy('u_28b87a8a1dcfec61'), comingSoon: uiCopy('u_721daf3e4b413488'), cost: uiCopy('u_89a06601e29f1121'), proof: uiCopy('u_c6d8e89308f6f1a5'), needs: uiCopy('u_f79278fd27d336e6'),
-    run: uiCopy('u_a84bcdfeb1f23afc'), close: uiCopy('u_dfba46b1855f4d4f'), goal: uiCopy('u_b7c5d4a243c7019c'),
-    editorEmail: uiCopy('u_9ffbc0db212218c4'), publication: uiCopy('u_c2dd554fee25db5f'), audience: uiCopy('u_a99af69c3a841cb5'),
-    ctaUrl: uiCopy('u_cc5d6f809a3c489c'), language: uiCopy('u_0e676cafddaa38c8'),
-    sendNow: uiCopy('u_f84606f9f5b17f40'), generate: uiCopy('u_597b4d22dbec2c7d'), working: uiCopy('u_9bdc1a95e6a05f54'),
-    connectComing: uiCopy('u_fd561df1f2943519'), methods: uiCopy('u_faac7d523c13aff4'),
-    methodsIntro: uiCopy('u_5c0cae89c4ecfb31'),
-    api: uiCopy('u_08ded6ccf0762acb'), cheapest: uiCopy('u_356d4d86ee0778f2'), apiText: uiCopy('u_5b3f030ec0d7873c'),
-    cosPr: uiCopy('u_61e520594dd43421'), cosPrText: uiCopy('u_f9623bf342960fea'),
-    agent: uiCopy('u_e9447d896b5e46ab'), premium: uiCopy('u_94fa917214f5597b'), agentText: uiCopy('u_8aa99e11b100bd0a'),
-    recentTitle: uiCopy('u_68a0ede5a9283bfa'), approve: uiCopy('u_96dfdca239e43955'), openLink: uiCopy('u_3dc9303a62259b48'),
-    recordUrl: uiCopy('u_b5b4e66f223471cb'), record: uiCopy('u_c4f473905be2d64b'), noContact: uiCopy('u_71f15154a4e79d06'),
-    opNote: uiCopy('u_ff36d06265e18903'), liveList: uiCopy('u_290f4dc064202bab'), none: uiCopy('u_3aa9aef839c69a1f'),
-    opText: uiCopy('u_1a09b0910199f495'),
-    submitted: uiCopy('u_44a01343b32d4d9f'),
-    queued: uiCopy('u_1f001665dacc1095'), dispatched: uiCopy('u_79269e817b19c468'), recorded: uiCopy('u_2352b78da14288d9'),
-    errRun: uiCopy('u_d41240c94a0f6c13'), errAction: uiCopy('u_3a4e8a6be1d516e6'), errLoad: uiCopy('u_8dd87018777530be'), noData: uiCopy('u_e592ffa110a3bd29'),
-    aiMode: uiCopy('u_e596412ad2345e3d'), manualMode: uiCopy('u_13f51a052d80c82b'), yourCopy: uiCopy('u_e8d1272b9ec64aa6'), reviewDraft: uiCopy('u_a181981b0ada8f19'), saveCopy: uiCopy('u_a42c45237f779a4a'), savedCopy: uiCopy('u_a16aff7328c89c48'), gaps: uiCopy('u_991fea28bb5c5862'),
+    eyebrow: uiText('generatedUi.u_f4deea1cb81c3089'), title: uiText('generatedUi.u_f5c310e7295dd07d'),
+    intro: uiText('generatedUi.u_f27ae735a727ef15'),
+    refresh: uiText('generatedUi.u_0e91610117029a62'), loading: uiText('generatedUi.u_ba3bbbe10d8bef66'), types: uiText('generatedUi.u_7173a6865ef023f5'), liveNow: uiText('generatedUi.u_9481e27eedadc390'), coming: uiText('generatedUi.u_ffbfabc54ca8a26e'), recent: uiText('generatedUi.u_0faf79b8a843d39d'),
+    live: uiText('generatedUi.u_247610f4dedd4ab7'), comingSoon: uiText('generatedUi.u_62bfdf0b726cbcc5'), cost: uiText('generatedUi.u_9f82f7b375f4aa1b'), proof: uiText('generatedUi.u_c1cda26362828b69'), needs: uiText('generatedUi.u_266d1c70a4cbe7cd'),
+    run: uiText('generatedUi.u_1bd5d1135886c648'), close: uiText('generatedUi.u_7d9eb7acb13e2462'), goal: uiText('generatedUi.u_27f1a08f581faa5f'),
+    editorEmail: uiText('generatedUi.u_a9db09236e11c5a5'), publication: uiText('generatedUi.u_eab011ad9ff060aa'), audience: uiText('generatedUi.u_c007a2b98203a7ad'),
+    ctaUrl: uiText('generatedUi.u_87d4d9ee57231e91'), language: uiText('generatedUi.u_2250dd890cb0159d'),
+    sendNow: uiText('generatedUi.u_2b87b1fef0081d3c'), generate: uiText('generatedUi.u_62b3119019ffde29'), working: uiText('generatedUi.u_5474eef8d0f179c7'),
+    connectComing: uiText('generatedUi.u_0eb68e9737caa733'), methods: uiText('generatedUi.u_575cb6ce8857a896'),
+    methodsIntro: uiText('generatedUi.u_64a3fbdc2b33f1f8'),
+    api: uiText('generatedUi.u_c8e5998f6a3955c2'), cheapest: uiText('generatedUi.u_637e3b25d0431416'), apiText: uiText('generatedUi.u_69ff2f4b1a627c47'),
+    cosPr: uiText('generatedUi.u_c180f8b15bf4980d'), cosPrText: uiText('generatedUi.u_8ebb94a729e22f74'),
+    agent: uiText('generatedUi.u_d87f4e7006767b32'), premium: uiText('generatedUi.u_137c7cd0f93235ea'), agentText: uiText('generatedUi.u_17f1b1ec0301eef8'),
+    recentTitle: uiText('generatedUi.u_96b03fffbcb2271e'), approve: uiText('generatedUi.u_05287cb5947ec007'), openLink: uiText('generatedUi.u_14269d3cc697c30f'),
+    recordUrl: uiText('generatedUi.u_d777b661aaf1cd1c'), record: uiText('generatedUi.u_4d824351a59edcac'), noContact: uiText('generatedUi.u_004aed77d2a51b49'),
+    opNote: uiText('generatedUi.u_fc9d7b8617a87ec1'), liveList: uiText('generatedUi.u_96436bc476ca1f65'), none: uiText('generatedUi.u_140bedbf9c3f6d56'),
+    opText: uiText('generatedUi.u_c0f35ee1a92a46e0'),
+    submitted: uiText('generatedUi.u_a1632d4194cfd329'),
+    queued: uiText('generatedUi.u_2186d15d9773df5b'), dispatched: uiText('generatedUi.u_160a54db2e9e66c5'), recorded: uiText('generatedUi.u_f1f216cbe0837cce'),
+    errRun: uiText('generatedUi.u_c9f2c1e726b0d3d1'), errAction: uiText('generatedUi.u_f71340014e775e6f'), errLoad: uiText('generatedUi.u_06c424b9a52e6aed'), noData: uiText('generatedUi.u_c5b7bfc3debee87b'),
+    aiMode: uiText('generatedUi.u_c74f582a0b8b4278'), manualMode: uiText('generatedUi.u_150b7a10d1fbf4b7'), yourCopy: uiText('generatedUi.u_69e1eb9215de56a4'), reviewDraft: uiText('generatedUi.u_c6e5edcb50ebc66f'), saveCopy: uiText('generatedUi.u_6b9aff7e65760726'), savedCopy: uiText('generatedUi.u_a18751e424e40a4d'), gaps: uiText('generatedUi.u_d17f5a09efdf59c8'),
     p: {
-      free_submission: { label: uiCopy('u_39e1d5b08c9f1c4a'), blurb: uiCopy('u_1ccdb24b9269c061') },
-      pr_wire: { label: uiCopy('u_dd35627482678066'), blurb: uiCopy('u_493dcc98d7be4ec7') },
-      media_database: { label: uiCopy('u_c0e3eea04d17d3c5'), blurb: uiCopy('u_22ce8b3ff8b66b37') },
-      ad_platform: { label: uiCopy('u_ca62f5ea99c93791'), blurb: uiCopy('u_86acbd80c50e26ae') },
-      direct_io: { label: uiCopy('u_f922a57ad8de9831'), blurb: uiCopy('u_9047d1ba0391b54d') },
+      free_submission: { label: uiText('generatedUi.u_0518cfc36ea495df'), blurb: uiText('generatedUi.u_5ba350de68479728') },
+      pr_wire: { label: uiText('generatedUi.u_42f670990dc80818'), blurb: uiText('generatedUi.u_342ded10124fb924') },
+      media_database: { label: uiText('generatedUi.u_9061f1ffbb8e740e'), blurb: uiText('generatedUi.u_46eac70451c13c23') },
+      ad_platform: { label: uiText('generatedUi.u_f325480f09a278cc'), blurb: uiText('generatedUi.u_ccfc6f9a149c7045') },
+      direct_io: { label: uiText('generatedUi.u_e81ce04aefd6c107'), blurb: uiText('generatedUi.u_b48adf346afd0975') },
     },
   },
   es: {
@@ -248,8 +247,8 @@ function ProviderCard({ provider, onRan, t }: { provider: Provider; onRan: () =>
     <p style={{ color: 'rgba(255,255,255,.66)', fontSize: 13, lineHeight: 1.6, margin: '12px 0 0' }}>{meta.blurb}</p>
 
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-      {chip(`${t.cost}: ${provider.cost}`, provider.cost === 'free' ? '#22c55e' : uiCopy('u_110183cb2099f93c'))}
-      {chip(`${t.proof}: ${provider.proof}`, uiCopy('u_be92f4efdb1866ca'))}
+      {chip(`${t.cost}: ${provider.cost}`, provider.cost === 'free' ? '#22c55e' : "#ffc300")}
+      {chip(`${t.proof}: ${provider.proof}`, "#1af0ff")}
       {provider.needs.map((n) => chip(`${t.needs}: ${n}`, '#94a3b8'))}
     </div>
 
@@ -407,9 +406,9 @@ export default function PressMediaProviderCockpit() {
     <PressCompanyProfileForm profile={data?.profile} onSaved={load} />
 
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-      <div style={panel}>{chip(t.types, uiCopy('u_88fd74efe53f9449'))}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.total ?? '-'}</h2></div>
+      <div style={panel}>{chip(t.types, "#1af0ff")}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.total ?? '-'}</h2></div>
       <div style={panel}>{chip(t.liveNow, '#22c55e')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.live ?? '-'}</h2></div>
-      <div style={panel}>{chip(t.coming, uiCopy('u_9719213280fd72ed'))}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.coming ?? '-'}</h2></div>
+      <div style={panel}>{chip(t.coming, "#ffc300")}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.coming ?? '-'}</h2></div>
       <div style={panel}>{chip(t.recent, '#94a3b8')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{campaigns.length}</h2></div>
     </section>
 

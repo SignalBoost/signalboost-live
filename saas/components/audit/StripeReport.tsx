@@ -9,9 +9,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 const RED = '#fca5a5'
@@ -57,53 +54,53 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.stripe.title', uiCopy('u_fcbec6881437e835'))} <span style={{ color: GOLD }}>·</span>
+          {t('audit.stripe.title', "Payments Configuration Report")} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>
-          {t('audit.stripe.subtitle', uiCopy('u_7d9a58392d77f08b'))}
+          {t('audit.stripe.subtitle', "Live mode, price tiers, webhook coverage, and price mismatches.")}
         </p>
       </div>
 
       {!data.configured && (
         <section style={{ ...glass, padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: GOLD }}>
-            {t('audit.stripe.notConfigured', uiCopy('u_0c6d1bead6fda4b2'))}
+            {t('audit.stripe.notConfigured', "Stripe is not connected, or its data could not be collected.")}
           </div>
         </section>
       )}
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.common.overallScore', uiCopy('u_e4172e5fcbe42b30'))} value={data.score.score} color={data.score.score >= 80 ? GREEN : data.score.score >= 60 ? GOLD : RED} />
-        <Stat label={t('audit.stripe.summary.tiers', uiCopy('u_1a60d9bcb18891e9'))} value={s.tiers} />
-        <Stat label={t('audit.stripe.summary.webhooks', uiCopy('u_e06ac6f5266c77c1'))} value={s.webhooks} color={s.webhooks ? undefined : ORANGE} />
-        <Stat label={t('audit.stripe.summary.mismatches', uiCopy('u_458862f0fbdfaff3'))} value={s.mismatches} color={s.mismatches ? RED : GREEN} />
+        <Stat label={t('audit.common.overallScore', "Overall Readiness Score")} value={data.score.score} color={data.score.score >= 80 ? GREEN : data.score.score >= 60 ? GOLD : RED} />
+        <Stat label={t('audit.stripe.summary.tiers', "Price tiers")} value={s.tiers} />
+        <Stat label={t('audit.stripe.summary.webhooks', "Webhooks")} value={s.webhooks} color={s.webhooks ? undefined : ORANGE} />
+        <Stat label={t('audit.stripe.summary.mismatches', "Price mismatches")} value={s.mismatches} color={s.mismatches ? RED : GREEN} />
       </section>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-          {t('audit.stripe.mode.title', uiCopy('u_e79da0142e4451dd'))}
+          {t('audit.stripe.mode.title', "Stripe mode")}
         </div>
         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#0a0e17', background: data.liveMode ? GREEN : GOLD, borderRadius: 999, padding: '3px 11px' }}>
-          {data.liveMode ? t('audit.stripe.mode.live', uiCopy('u_68d3a0e5746c5447')) : t('audit.stripe.mode.test', uiCopy('u_7ce500d8220c5004'))}
+          {data.liveMode ? t('audit.stripe.mode.live', "Live mode") : t('audit.stripe.mode.test', "Test mode")}
         </span>
       </section>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-          {t('audit.stripe.tiers.title', uiCopy('u_420e545ffec33ef5'))}
+          {t('audit.stripe.tiers.title', "Price tiers")}
         </div>
         {data.tiers.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREY }}>{t('audit.stripe.tiers.empty', uiCopy('u_5402e4e41ea34621'))}</div>
+          <div style={{ fontSize: 13, color: GREY }}>{t('audit.stripe.tiers.empty', "No price tiers collected.")}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.stripe.col.name', uiCopy('u_af1c25e607fbb9c2'))}</Th>
-                  <Th>{t('audit.stripe.col.price', uiCopy('u_043a57f4db9bcf72'))}</Th>
-                  <Th>{t('audit.stripe.col.interval', uiCopy('u_8ad85b2c071af911'))}</Th>
-                  <Th>{t('audit.stripe.col.priceId', uiCopy('u_4effe25237192168'))}</Th>
-                  <Th>{t('audit.stripe.col.status', uiCopy('u_813844918480a81d'))}</Th>
+                  <Th>{t('audit.stripe.col.name', "Tier")}</Th>
+                  <Th>{t('audit.stripe.col.price', "Price")}</Th>
+                  <Th>{t('audit.stripe.col.interval', "Interval")}</Th>
+                  <Th>{t('audit.stripe.col.priceId', "Price ID")}</Th>
+                  <Th>{t('audit.stripe.col.status', "Status")}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -115,7 +112,7 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
                     <Td><span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, color: 'rgba(255,255,255,.55)' }}>{tr.priceId || '—'}</span></Td>
                     <Td>
                       <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#0a0e17', background: tr.mismatch ? RED : GREEN, borderRadius: 999, padding: '2px 9px' }}>
-                        {tr.mismatch ? t('audit.stripe.status.mismatch', uiCopy('u_d384644897b998b0')) : t('audit.stripe.status.ok', uiCopy('u_9ea92d829e041333'))}
+                        {tr.mismatch ? t('audit.stripe.status.mismatch', "Mismatch") : t('audit.stripe.status.ok', "Active")}
                       </span>
                     </Td>
                   </tr>
@@ -128,18 +125,18 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
 
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-          {t('audit.stripe.webhooks.title', uiCopy('u_eb27951af3d77118'))}
+          {t('audit.stripe.webhooks.title', "Webhook endpoints")}
         </div>
         {data.webhooks.length === 0 ? (
-          <div style={{ fontSize: 13, color: ORANGE }}>{t('audit.stripe.webhooks.empty', uiCopy('u_8074476fc09262df'))}</div>
+          <div style={{ fontSize: 13, color: ORANGE }}>{t('audit.stripe.webhooks.empty', "No webhook endpoints configured.")}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.stripe.col.endpoint', uiCopy('u_a759f8a619b22005'))}</Th>
-                  <Th>{t('audit.stripe.col.whStatus', uiCopy('u_c8b75de188a42435'))}</Th>
-                  <Th>{t('audit.stripe.col.events', uiCopy('u_aa387ca778df3445'))}</Th>
+                  <Th>{t('audit.stripe.col.endpoint', "Endpoint")}</Th>
+                  <Th>{t('audit.stripe.col.whStatus', "Status")}</Th>
+                  <Th>{t('audit.stripe.col.events', "Events")}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -158,10 +155,10 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
 
       <section style={{ ...glass, padding: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-          {tt(uiCopy('u_ba745f823e78cdd4'), uiCopy('u_0e944dbd577771a9'), { n: data.findings.length })}
+          {tt("audit.stripe.findings.title", "Findings ({n})", { n: data.findings.length })}
         </div>
         {data.findings.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.stripe.findings.empty', uiCopy('u_ea27b756c5e9897e'))}</div>
+          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.stripe.findings.empty', "No payments findings — nothing flagged.")}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {data.findings.map((finding, i) => <FindingCard key={finding.id || i} finding={finding} />)}
@@ -186,7 +183,7 @@ function FindingCard({ finding }: { finding: Finding }) {
       </div>
       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{text.detail}</div>
       <div style={{ fontSize: 12, marginTop: 4 }}>
-        <strong>{t('audit.common.recommendation', uiCopy('u_b39d98fe99af7b5a'))}:</strong>{' '}
+        <strong>{t('audit.common.recommendation', "Recommendation")}:</strong>{' '}
         <span style={{ color: 'rgba(255,255,255,.78)' }}>{text.recommendation}</span>
       </div>
     </div>

@@ -6,8 +6,7 @@ import { HubUser, DEFAULT_ROLES, PERMISSION_GROUPS, Permission, Role } from '@/l
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export function UsersPage() {
   const { dict } = useI18n()
@@ -34,10 +33,10 @@ export function UsersPage() {
       if (data.ok) {
         setUsers(data.users || [])
       } else {
-        setError(data.error || t(dict, 'console.users.err.load', uiCopy('u_c38172463fee4094')))
+        setError(data.error || t(dict, 'console.users.err.load'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.loading', uiCopy('u_555da7f9d91f910a')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.loading'))
     } finally {
       setLoading(false)
     }
@@ -45,7 +44,7 @@ export function UsersPage() {
 
   async function inviteUser() {
     if (!inviteEmail.trim()) {
-      setError(t(dict, 'console.users.err.emailRequired', uiCopy('u_d9ebc8a0342b0f05')))
+      setError(t(dict, 'console.users.err.emailRequired'))
       return
     }
 
@@ -68,10 +67,10 @@ export function UsersPage() {
         fetchUsers()
         setError(null)
       } else {
-        setError(data.error || t(dict, 'console.users.err.invite', uiCopy('u_98686f7e2fe51e7d')))
+        setError(data.error || t(dict, 'console.users.err.invite'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.inviting', uiCopy('u_5c3ee439842f3f6f')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.inviting'))
     }
   }
 
@@ -89,15 +88,15 @@ export function UsersPage() {
         fetchUsers()
         setError(null)
       } else {
-        setError(data.error || t(dict, 'console.users.err.role', uiCopy('u_d7c53ff468bfb05f')))
+        setError(data.error || t(dict, 'console.users.err.role'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.updatingRole', uiCopy('u_25ee3d349c66b7ba')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.updatingRole'))
     }
   }
 
   async function removeUser(userId: string) {
-    if (!confirm(t(dict, 'console.users.confirmRemove', uiCopy('u_c6e1d3d8adebccb1')))) return
+    if (!confirm(t(dict, 'console.users.confirmRemove'))) return
 
     try {
       const res = await fetch(`/api/hub/users?id=${userId}`, {
@@ -110,10 +109,10 @@ export function UsersPage() {
         fetchUsers()
         setError(null)
       } else {
-        setError(data.error || t(dict, 'console.users.err.remove', uiCopy('u_6fbc934593f3a7fa')))
+        setError(data.error || t(dict, 'console.users.err.remove'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.removing', uiCopy('u_99ce00c27a0550f6')))
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.removing'))
     }
   }
 
@@ -121,10 +120,10 @@ export function UsersPage() {
     <div style={{ padding: '2rem', maxWidth: '1200px' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          {t(dict, 'console.users.title', uiCopy('u_2cf0bf287b515110'))}
+          {t(dict, 'console.users.title')}
         </h2>
         <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          {t(dict, 'console.users.subtitle', uiCopy('u_03e7ea42df59406f'))}
+          {t(dict, 'console.users.subtitle')}
         </p>
       </div>
 
@@ -146,15 +145,15 @@ export function UsersPage() {
       {/* Invite Form */}
       {showInviteForm && (
         <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t(dict, 'console.users.inviteTitle', uiCopy('u_1ffbd140b21e09c0'))}</h3>
+          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t(dict, 'console.users.inviteTitle')}</h3>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
-              {t(dict, 'console.users.emailLabel', uiCopy('u_b036d8f08c9c098b'))}
+              {t(dict, 'console.users.emailLabel')}
             </label>
             <input
               type="email"
-              placeholder={uiCopy('u_2191478c4ef3f8ce')}
+              placeholder={uiText('generatedUi.u_b4c9a289323b21a0')}
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && inviteUser()}
@@ -172,7 +171,7 @@ export function UsersPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
-              {t(dict, 'console.users.roleLabel', uiCopy('u_7b9bf8d64e8b35af'))}
+              {t(dict, 'console.users.roleLabel')}
             </label>
             <select
               value={inviteRole}
@@ -209,7 +208,7 @@ export function UsersPage() {
                 fontSize: '0.9rem',
               }}
             >
-              {t(dict, 'console.users.sendInvite', uiCopy('u_bf2b926cf8ee18ab'))}
+              {t(dict, 'console.users.sendInvite')}
             </button>
             <button
               onClick={() => setShowInviteForm(false)}
@@ -223,7 +222,7 @@ export function UsersPage() {
                 fontSize: '0.9rem',
               }}
             >
-              {t(dict, 'common.cancel', uiCopy('u_dcc33706dae125c8'))}
+              {t(dict, 'common.cancel')}
             </button>
           </div>
         </div>
@@ -243,17 +242,17 @@ export function UsersPage() {
             marginBottom: '1.5rem',
           }}
         >
-          {t(dict, 'console.users.inviteMember', uiCopy('u_1391fb8e36d1e628'))}
+          {t(dict, 'console.users.inviteMember')}
         </button>
       )}
 {/* Users List */}
       {loading ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          {t(dict, 'console.users.loading', uiCopy('u_64a284a05adf6e08'))}
+          {t(dict, 'console.users.loading')}
         </div>
       ) : users.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          {t(dict, 'console.users.empty', uiCopy('u_1b1817beb961b49e'))}
+          {t(dict, 'console.users.empty')}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
@@ -311,7 +310,7 @@ function UserCard({
             <span style={{ color: '#1af0ff', fontWeight: 'bold' }}>
               {user.role.toUpperCase()}
             </span>
-            {user.mfaEnabled && <span style={{ color: '#22c55e' }}>{uiCopy('u_c2133fceca11b20e')}</span>}
+            {user.mfaEnabled && <span style={{ color: '#22c55e' }}>{uiText('generatedUi.u_df5b1ae5e35c5910')}</span>}
           </div>
         </div>
         <div style={{ fontSize: '1.5rem', color: '#666' }}>
@@ -324,7 +323,7 @@ function UserCard({
           {/* Role Selection */}
           <div>
             <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              {t(dict, 'console.users.roleLabel', uiCopy('u_892af69a878c85e2'))}
+              {t(dict, 'console.users.roleLabel')}
             </label>
             <select
               value={user.role}
@@ -350,7 +349,7 @@ function UserCard({
             </select>
             {user.role === 'owner' && (
               <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                {t(dict, 'console.users.ownerLocked', uiCopy('u_db0afd13d078a65a'))}
+                {t(dict, 'console.users.ownerLocked')}
               </div>
             )}
           </div>
@@ -359,7 +358,7 @@ function UserCard({
           {roleInfo && (
             <div>
               <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                {t(dict, 'console.users.permissions', uiCopy('u_f0e5d8e764b5d024'))} ({roleInfo.permissions.length})
+                {t(dict, 'console.users.permissions')} ({roleInfo.permissions.length})
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 {roleInfo.permissions.map(perm => {
@@ -387,7 +386,7 @@ function UserCard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                {t(dict, 'console.users.joined', uiCopy('u_1ccc6a438ed3a808'))}
+                {t(dict, 'console.users.joined')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
                 {new Date(user.createdAt).toLocaleDateString()}
@@ -396,10 +395,10 @@ function UserCard({
 
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                {t(dict, 'console.users.lastLogin', uiCopy('u_445a2dff68451ad0'))}
+                {t(dict, 'console.users.lastLogin')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
-                {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : t(dict, 'console.users.never', uiCopy('u_111f3973d2fe91fc'))}
+                {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : t(dict, 'console.users.never')}
               </div>
             </div>
           </div>
@@ -419,7 +418,7 @@ function UserCard({
                 fontSize: '0.9rem',
               }}
             >
-              🗑️ {t(dict, 'console.users.removeUser', uiCopy('u_3f87a5c6602718fd'))}
+              🗑️ {t(dict, 'console.users.removeUser')}
             </button>
           )}
         </div>

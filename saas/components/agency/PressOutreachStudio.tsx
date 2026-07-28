@@ -5,8 +5,7 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { getAgencyCopy } from '@/lib/i18n/agencyCopy'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type PressCampaign = {
   id: string
@@ -60,33 +59,33 @@ export function PendingApprovalsTable({
     <section className="fathom-glass" style={panel} aria-labelledby="press-pending-title">
       <div style={sectionHead}>
         <span style={pill}>{copy.pendingBadge}</span>
-        <h2 id="press-pending-title" style={h2}><LocalizedText fallback={uiCopy('u_f060c8123468cd3b')} /></h2>
+        <h2 id="press-pending-title" style={h2}><LocalizedText fallback={uiText('generatedUi.u_07e8fb5d12b1d621')} /></h2>
       </div>
       {campaigns.length === 0 ? <p style={muted}>{copy.emptyPending}</p> : (
         <div style={cards}>
           {campaigns.map((campaign) => (
             <article key={campaign.id} style={approvalCard}>
               <div style={miniGrid}>
-                <p style={field}><strong>{uiCopy('u_246f7d72a04dfdf1')}</strong><span>{campaign.source || uiCopy('u_e699b6ba21139723')}</span></p>
-                <p style={field}><strong>{uiCopy('u_f1cb1eda8c152da7')}</strong><span>{campaign.channel || targetLabel(copy, campaign)}</span></p>
-                <p style={field}><strong>{uiCopy('u_840e2cd5f31fe7ce')}</strong><span>{campaign.publication_name || targetLabel(copy, campaign)}</span></p>
-                <p style={field}><strong>{uiCopy('u_50f3e1a174aea5e5')}</strong><span>{campaign.editor_contact || campaign.publication_contact}</span></p>
+                <p style={field}><strong>{uiText('generatedUi.u_0e570ca6fabe24f9')}</strong><span>{campaign.source || uiText('generatedUi.u_2be7c65058553436')}</span></p>
+                <p style={field}><strong>{uiText('generatedUi.u_ce4683e7013a18cd')}</strong><span>{campaign.channel || targetLabel(copy, campaign)}</span></p>
+                <p style={field}><strong>{uiText('generatedUi.u_15fc65b69327ad3a')}</strong><span>{campaign.publication_name || targetLabel(copy, campaign)}</span></p>
+                <p style={field}><strong>{uiText('generatedUi.u_2b5c3d26721ae9c3')}</strong><span>{campaign.editor_contact || campaign.publication_contact}</span></p>
               </div>
-              <h3 style={h3}>{campaign.headline || uiCopy('u_e93b56ded845edc7')}</h3>
-              <p style={muted}><strong style={{ color: '#fff' }}>{uiCopy('u_b664ed548facc5c1')}</strong> {campaign.cta_url || uiCopy('u_b8a9b36c8d0394ae')}</p>
+              <h3 style={h3}>{campaign.headline || uiText('generatedUi.u_128e51c1acf569a1')}</h3>
+              <p style={muted}><strong style={{ color: '#fff' }}>{uiText('generatedUi.u_60735360aecaf19e')}</strong> {campaign.cta_url || uiText('generatedUi.u_b7b9fc81a82f6021')}</p>
               <pre style={preview}>{campaign.content_body}</pre>
-              <label style={label}><LocalizedText fallback={uiCopy('u_047568b4fafdfb76')} /><input
+              <label style={label}><LocalizedText fallback={uiText('generatedUi.u_5a74dbb65bc9fd23')} /><input
                   value={publishUrls[campaign.id] ?? campaign.published_url ?? ''}
                   onChange={(event) => onUrlChange(campaign.id, event.target.value)}
-                  placeholder={uiCopy('u_8f5475ced40b2c5f')}
+                  placeholder={uiText('generatedUi.u_314f1d5543fd3c8b')}
                   style={input}
                 />
               </label>
               <div style={actions}>
                 <button disabled={saving === campaign.id} style={primary} onClick={() => onDecision(campaign, 'approve')}>
-                  {saving === campaign.id ? uiCopy('u_c73555802295cb60') : uiCopy('u_083432f58ea9c051')}
+                  {saving === campaign.id ? uiText('generatedUi.u_23e39291d6135814') : uiText('generatedUi.u_04bab00eb0f7c86b')}
                 </button>
-                <button disabled={saving === campaign.id} style={danger} onClick={() => onDecision(campaign, 'reject')}>{uiCopy('u_b12eb5c6c675fcbb')}</button>
+                <button disabled={saving === campaign.id} style={danger} onClick={() => onDecision(campaign, 'reject')}>{uiText('generatedUi.u_ab604a360777735f')}</button>
               </div>
             </article>
           ))}
@@ -111,7 +110,7 @@ export function CampaignHistoryTimeline({ campaigns, copy }: { campaigns: PressC
               <strong style={{ color: '#fff' }}>{copy.statuses[campaign.status]} · {targetLabel(copy, campaign)}</strong>
               <p style={muted}>{campaign.publication_name || campaign.publication_contact} · {formatDate(campaign.updated_at)}</p>
               <p style={{ ...muted, marginTop: 8 }}>{(campaign.headline || campaign.content_body).slice(0, 180)}{(campaign.headline || campaign.content_body).length > 180 ? '…' : ''}</p>
-              {campaign.published_url ? <a href={campaign.published_url} target="_blank" rel="noreferrer" style={link}>{uiCopy('u_a3e55f78e9d20ff0')}</a> : null}
+              {campaign.published_url ? <a href={campaign.published_url} target="_blank" rel="noreferrer" style={link}>{uiText('generatedUi.u_49ca9fb9c16cae68')}</a> : null}
             </div>
           </article>
         ))}
@@ -157,10 +156,10 @@ export default function PressOutreachStudio() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || 'Could not update press campaign.')
-      setNotice(decision === 'approve' ? uiCopy('u_6ea8ee7435e96b4a') : uiCopy('u_e142dcd1928c5abc'))
+      setNotice(decision === 'approve' ? "Approved. The owner proof email will include the published/proof link." : "Rejected. The campaign will not be published.")
       await load()
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : uiCopy('u_76f1c329026e1c56'))
+      setNotice(error instanceof Error ? error.message : "Could not update press campaign.")
     } finally {
       setSaving('')
     }
@@ -174,7 +173,7 @@ export default function PressOutreachStudio() {
       <section className="fathom-glass" style={hero}>
         <p style={eyebrow}>{copy.eyebrow}</p>
         <h1 style={h1}>{copy.title}</h1>
-        <p style={lead}><LocalizedText fallback={uiCopy('u_902b06dc2b384ffe')} /></p>
+        <p style={lead}><LocalizedText fallback={uiText('generatedUi.u_7debf3211dadefd4')} /></p>
         <div style={gridStats}>
           <div style={statCard}><span>{copy.pendingMetric}</span><strong>{pending.length}</strong></div>
           <div style={statCard}><span>{copy.publishedMetric}</span><strong>{campaigns.filter((campaign) => campaign.status === 'published').length}</strong></div>

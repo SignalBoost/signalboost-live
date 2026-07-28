@@ -2,9 +2,6 @@
 
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const steps = [
   { number: '01', key: 's1' },
   { number: '02', key: 's2' },
@@ -16,8 +13,8 @@ export default function FeaturesFlow() {
   return (
     <section id="how-it-works" className="sb-section" style={{ borderTop: '1px solid var(--border-soft)', borderBottom: '1px solid var(--border-soft)' }}>
       <div className="sb-page-shell">
-        <span className="sb-eyebrow">{t(dict, 'featuresFlow.eyebrow', uiCopy('u_5c000dc75ab27f3f'))}</span>
-        <h2 className="sb-h2" style={{ marginTop: 10, marginBottom: 24 }}>{t(dict, 'featuresFlow.heading', uiCopy('u_ce8108e57617b42c'))}</h2>
+        <span className="sb-eyebrow">{t(dict, 'featuresFlow.eyebrow')}</span>
+        <h2 className="sb-h2" style={{ marginTop: 10, marginBottom: 24 }}>{t(dict, 'featuresFlow.heading')}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
           {steps.map(step => (
             <article key={step.number} className="sb-card" style={{ padding: 24 }}>

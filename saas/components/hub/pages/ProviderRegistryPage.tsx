@@ -8,33 +8,32 @@
 import { useMemo, useState } from 'react'
 import { PageProps, TONES, cardStyle, bodyStyle, labelStyle } from '../shared.tsx'
 import { HUB_PROVIDER_TIERS, getHubProvidersByTier, HubProviderStatus } from '@/lib/hub/provider-registry'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // Native per-language copy for this console page. `lang` arrives via PageProps.
 const COPY: Record<string, Record<string, string>> = {
-  monitor3: { en: uiCopy('u_c9a2c7a9d8ac0801'), es: 'Monitor 3', pt: 'Monitor 3', pl: 'Monitor 3', ru: 'Монитор 3' },
-  title: { en: uiCopy('u_855f5904d6117cbb'), es: 'Registro de proveedores', pt: 'Registro de provedores', pl: 'Rejestr dostawców', ru: 'Реестр провайдеров' },
+  monitor3: { en: uiText('generatedUi.u_5173c68c4f32106a'), es: 'Monitor 3', pt: 'Monitor 3', pl: 'Monitor 3', ru: 'Монитор 3' },
+  title: { en: uiText('generatedUi.u_a3f792dda5fc8060'), es: 'Registro de proveedores', pt: 'Registro de provedores', pl: 'Rejestr dostawców', ru: 'Реестр провайдеров' },
   desc: {
-    en: uiCopy('u_e7e71e609fe6dcae'),
+    en: uiText('generatedUi.u_f5384c08daf2c30c'),
     es: 'Mapa de expansión para la consola de operaciones SaaS multimonitor. Capa de planificación de solo lectura.',
     pt: 'Mapa de expansão para o console de operações SaaS multimonitor. Camada de planejamento somente leitura.',
     pl: 'Mapa rozwoju dla wielomonitorowej konsoli operacji SaaS. Warstwa planowania tylko do odczytu.',
     ru: 'Карта расширения для многомониторной консоли операций SaaS. Слой планирования только для чтения.',
   },
-  credentialPatterns: { en: uiCopy('u_79781e262ffb36b4'), es: 'Patrones de credenciales', pt: 'Padrões de credenciais', pl: 'Wzorce poświadczeń', ru: 'Шаблоны учётных данных' },
-  policyActions: { en: uiCopy('u_36ee838c7521ce95'), es: 'Acciones de política', pt: 'Ações de política', pl: 'Akcje zasad', ru: 'Действия политики' },
+  credentialPatterns: { en: uiText('generatedUi.u_319215b37b1cc3ef'), es: 'Patrones de credenciales', pt: 'Padrões de credenciais', pl: 'Wzorce poświadczeń', ru: 'Шаблоны учётных данных' },
+  policyActions: { en: uiText('generatedUi.u_f326c235cd3a001c'), es: 'Acciones de política', pt: 'Ações de política', pl: 'Akcje zasad', ru: 'Действия политики' },
 }
 function tx(key: string, lang: string): string {
   return COPY[key]?.[lang] ?? COPY[key]?.en ?? key
 }
 
 const statusTone: Record<HubProviderStatus, { text: string; bg: string; border: string; label: string }> = {
-  live: { text: '#22c55e', bg: 'rgba(34,197,94,.10)', border: 'rgba(34,197,94,.35)', label: uiCopy('u_a4edf2eee077200a') },
-  ready: { text: uiCopy('u_1db542a86469b1aa'), bg: 'rgba(26,240,255,.10)', border: 'rgba(26,240,255,.35)', label: uiCopy('u_9ae5843e8d047eae') },
-  planned: { text: uiCopy('u_7b80c633cdf5a0a9'), bg: 'rgba(255,255,255,.04)', border: 'rgba(255,255,255,.12)', label: uiCopy('u_1ba3cd0c50cfd709') },
-  attention: { text: uiCopy('u_61fdde968368acba'), bg: 'rgba(255,195,0,.10)', border: 'rgba(255,195,0,.35)', label: uiCopy('u_972b21851114ade0') },
-  error: { text: uiCopy('u_ed50d0815f330aa8'), bg: 'rgba(239,68,68,.10)', border: 'rgba(239,68,68,.35)', label: uiCopy('u_ddfb877067074a50') },
+  live: { text: '#22c55e', bg: 'rgba(34,197,94,.10)', border: 'rgba(34,197,94,.35)', label: uiText('generatedUi.u_b64ac05f17e64d03') },
+  ready: { text: uiText('generatedUi.u_f626e0773adc2ce4'), bg: 'rgba(26,240,255,.10)', border: 'rgba(26,240,255,.35)', label: uiText('generatedUi.u_5fa7aac5375c5815') },
+  planned: { text: uiText('generatedUi.u_73ebe876e03eb938'), bg: 'rgba(255,255,255,.04)', border: 'rgba(255,255,255,.12)', label: uiText('generatedUi.u_fb6f7c93e6bf3dfa') },
+  attention: { text: uiText('generatedUi.u_6cbca33c4b1ba08b'), bg: 'rgba(255,195,0,.10)', border: 'rgba(255,195,0,.35)', label: uiText('generatedUi.u_c2eb8cd9d9564314') },
+  error: { text: uiText('generatedUi.u_42705fa9a635b690'), bg: 'rgba(239,68,68,.10)', border: 'rgba(239,68,68,.35)', label: uiText('generatedUi.u_54a0e8c17ebb21a1') },
 }
 
 export default function ProviderRegistryPage({ lang }: PageProps) {
@@ -49,14 +48,14 @@ export default function ProviderRegistryPage({ lang }: PageProps) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 14 }}>
       <section style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>{tx(uiCopy('u_9f707526c5cd59cf'), lang)}</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{tx(uiCopy('u_5497ffd41f7535d0'), lang)}</h2>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{tx(uiCopy('u_b98c662442fb6306'), lang)}</p>
+          <div style={labelStyle}>{tx("monitor3", lang)}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{tx("title", lang)}</h2>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{tx("desc", lang)}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ padding: '7px 11px', borderRadius: 999, background: statusTone.live.bg, border: `1px solid ${statusTone.live.border}`, color: statusTone.live.text, fontSize: 12.5, fontWeight: 700 }}>{liveCount}{uiCopy('u_3c7167199ccc5abf')}</span>
-          <span style={{ padding: '7px 11px', borderRadius: 999, background: statusTone.ready.bg, border: `1px solid ${statusTone.ready.border}`, color: statusTone.ready.text, fontSize: 12.5, fontWeight: 700 }}>{readyCount}{uiCopy('u_ae457b1cd0e55681')}</span>
-          <span style={{ padding: '7px 11px', borderRadius: 999, background: statusTone.planned.bg, border: `1px solid ${statusTone.planned.border}`, color: statusTone.planned.text, fontSize: 12.5, fontWeight: 700 }}>{plannedCount}{uiCopy('u_edf82f17643caf18')}</span>
+          <span style={{ padding: '7px 11px', borderRadius: 999, background: statusTone.live.bg, border: `1px solid ${statusTone.live.border}`, color: statusTone.live.text, fontSize: 12.5, fontWeight: 700 }}>{liveCount}{uiText('generatedUi.u_b64ac05f17e64d03')}</span>
+          <span style={{ padding: '7px 11px', borderRadius: 999, background: statusTone.ready.bg, border: `1px solid ${statusTone.ready.border}`, color: statusTone.ready.text, fontSize: 12.5, fontWeight: 700 }}>{readyCount}{uiText('generatedUi.u_5fa7aac5375c5815')}</span>
+          <span style={{ padding: '7px 11px', borderRadius: 999, background: statusTone.planned.bg, border: `1px solid ${statusTone.planned.border}`, color: statusTone.planned.text, fontSize: 12.5, fontWeight: 700 }}>{plannedCount}{uiText('generatedUi.u_fb6f7c93e6bf3dfa')}</span>
         </div>
       </section>
 
@@ -96,11 +95,11 @@ export default function ProviderRegistryPage({ lang }: PageProps) {
               </div>
               <div style={bodyStyle}>
                 <p style={{ margin: 0, color: 'rgba(255,255,255,.64)', fontSize: 12.8, lineHeight: 1.45 }}>{provider.description}</p>
-                <div style={labelStyle}>{tx(uiCopy('u_045ca044acc33a85'), lang)}</div>
+                <div style={labelStyle}>{tx("credentialPatterns", lang)}</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {provider.keyPatterns.map(pattern => <span key={pattern} style={{ padding: '4px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.68)', fontSize: 11 }}>{pattern}</span>)}
                 </div>
-                <div style={labelStyle}>{tx(uiCopy('u_83a6dffe59d89fdb'), lang)}</div>
+                <div style={labelStyle}>{tx("policyActions", lang)}</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {provider.primaryActions.map(action => <span key={action} style={{ padding: '4px 8px', borderRadius: 999, border: '1px solid rgba(26,240,255,.18)', background: 'rgba(26,240,255,.06)', color: 'rgba(26,240,255,.72)', fontSize: 11 }}>{action.replaceAll('_', ' ')}</span>)}
                 </div>

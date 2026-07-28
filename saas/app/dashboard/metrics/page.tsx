@@ -4,9 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 
 type Lead = { status?: 'pending' | 'approved' | 'rejected' }
@@ -24,7 +21,7 @@ type Data = {
 }
 
 const EMPTY: Data = {
-  plan: uiCopy('u_8a34b5acc2754b07'), credits: null, name: null, leads: [], sendLimit: null,
+  plan: "free", credits: null, name: null, leads: [], sendLimit: null,
   calendarCount: null, dataItems: null, dataSources: null, errors: [],
 }
 
@@ -141,9 +138,9 @@ export default function MetricsAnalyticsPage() {
           <>
             <div style={{ display: 'flex', height: 14, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,.06)' }}>
               {[
-                { v: leadStats.pending, c: uiCopy('u_4134a651ec9af3b4') },
-                { v: leadStats.approved, c: uiCopy('u_5578af1c9de1ca45') },
-                { v: leadStats.rejected, c: uiCopy('u_2dd2911c6c8975aa') },
+                { v: leadStats.pending, c: "#fde68a" },
+                { v: leadStats.approved, c: "#86efac" },
+                { v: leadStats.rejected, c: "#fca5a5" },
               ].map((s, i) => s.v > 0 && (
                 <div key={i} style={{ width: `${(s.v / leadStats.total) * 100}%`, background: s.c }} />
               ))}

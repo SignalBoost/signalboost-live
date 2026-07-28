@@ -3,25 +3,24 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY = {
-  eyebrow:     { en: uiCopy('u_70b7bcf496580344'), es: 'Pipeline', pt: 'Pipeline', pl: 'Pipeline', ru: 'Пайплайн' },
-  title:       { en: uiCopy('u_72013137646a3b23'), es: 'Cada lead, por etapa.', pt: 'Cada lead, por etapa.', pl: 'Każdy lead według etapu.', ru: 'Каждый лид по этапу.' },
-  subtitle:    { en: uiCopy('u_0444c16f44cd76f5'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do primeiro contato ao fechamento.', pl: 'Śledź prospektów od odkrycia do zamknięcia.', ru: 'Отслеживайте потенциальных клиентов от первого контакта до закрытия.' },
-  newLead:     { en: uiCopy('u_e5ae03c8a4fdb33a'), es: '+ Descubrir nuevo lead', pt: '+ Descobrir novo lead', pl: '+ Odkryj nowy lead', ru: '+ Найти новый лид' },
-  loading:     { en: uiCopy('u_4144ecfb65d7e5e6'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
-  loadError:   { en: uiCopy('u_220eb671f13b525c'), es: 'No se pudo cargar el pipeline.', pt: 'Não foi possível carregar o pipeline.', pl: 'Nie można załadować pipeline.', ru: 'Не удалось загрузить пайплайн.' },
-  unnamed:     { en: uiCopy('u_83c5422ff2ed3c08'), es: 'Sin nombre', pt: 'Sem nome', pl: 'Bez nazwy', ru: 'Без имени' },
+  eyebrow:     { en: uiText('generatedUi.u_37e1c775f452d695'), es: 'Pipeline', pt: 'Pipeline', pl: 'Pipeline', ru: 'Пайплайн' },
+  title:       { en: uiText('generatedUi.u_315608dbba443d6c'), es: 'Cada lead, por etapa.', pt: 'Cada lead, por etapa.', pl: 'Każdy lead według etapu.', ru: 'Каждый лид по этапу.' },
+  subtitle:    { en: uiText('generatedUi.u_9f3094181b64a341'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do primeiro contato ao fechamento.', pl: 'Śledź prospektów od odkrycia do zamknięcia.', ru: 'Отслеживайте потенциальных клиентов от первого контакта до закрытия.' },
+  newLead:     { en: uiText('generatedUi.u_87d381d081c06cd5'), es: '+ Descubrir nuevo lead', pt: '+ Descobrir novo lead', pl: '+ Odkryj nowy lead', ru: '+ Найти новый лид' },
+  loading:     { en: uiText('generatedUi.u_c0577197648affd1'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
+  loadError:   { en: uiText('generatedUi.u_9692050489a4cfa5'), es: 'No se pudo cargar el pipeline.', pt: 'Não foi possível carregar o pipeline.', pl: 'Nie można załadować pipeline.', ru: 'Не удалось загрузить пайплайн.' },
+  unnamed:     { en: uiText('generatedUi.u_e504e61521948e34'), es: 'Sin nombre', pt: 'Sem nome', pl: 'Bez nazwy', ru: 'Без имени' },
   empty:       { en: '—', es: '—', pt: '—', pl: '—', ru: '—' },
   stages: {
-    discovered: { en: uiCopy('u_1e09db267beada86'), es: 'Descubierto', pt: 'Descoberto', pl: 'Odkryty', ru: 'Обнаружен' },
-    contacted:  { en: uiCopy('u_205d9281d1874ec5'),  es: 'Contactado',  pt: 'Contactado',  pl: 'Skontaktowany', ru: 'Контакт' },
-    replied:    { en: uiCopy('u_d0ea3afebc132786'),    es: 'Respondió',   pt: 'Respondeu',   pl: 'Odpowiedział',  ru: 'Ответил' },
-    booked:     { en: uiCopy('u_b9325e02b0773133'),     es: 'Agendado',    pt: 'Agendado',    pl: 'Zarezerwowany', ru: 'Записан' },
-    closed:     { en: uiCopy('u_3308c4115a47f5ed'),     es: 'Cerrado',     pt: 'Fechado',     pl: 'Zamknięty',     ru: 'Закрыт' },
+    discovered: { en: uiText('generatedUi.u_96a5ba634bfc2ed4'), es: 'Descubierto', pt: 'Descoberto', pl: 'Odkryty', ru: 'Обнаружен' },
+    contacted:  { en: uiText('generatedUi.u_9c2e8e1786527e31'),  es: 'Contactado',  pt: 'Contactado',  pl: 'Skontaktowany', ru: 'Контакт' },
+    replied:    { en: uiText('generatedUi.u_1cd7fa936258e09c'),    es: 'Respondió',   pt: 'Respondeu',   pl: 'Odpowiedział',  ru: 'Ответил' },
+    booked:     { en: uiText('generatedUi.u_fd1331d7a6cd0309'),     es: 'Agendado',    pt: 'Agendado',    pl: 'Zarezerwowany', ru: 'Записан' },
+    closed:     { en: uiText('generatedUi.u_c21ead0614e7e1b7'),     es: 'Cerrado',     pt: 'Fechado',     pl: 'Zamknięty',     ru: 'Закрыт' },
   },
 }
 

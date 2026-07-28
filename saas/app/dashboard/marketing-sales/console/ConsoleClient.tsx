@@ -4,8 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { msT, type Lang } from '@/marketing-sales-core'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Row = {
   campaign: { id: string; objective: string; status: string; created_at?: string }
@@ -53,30 +52,30 @@ export default function ConsoleClient() {
   const badge = (s: string) => (
     <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', padding: '3px 9px', borderRadius: 999,
       color: STATUS_COLOR[s] || '#94a3b8', border: `1px solid ${STATUS_COLOR[s] || '#94a3b8'}55`, background: `${STATUS_COLOR[s] || '#94a3b8'}14` }}>
-      {msT(L, STATUS_KEY[s] || uiCopy('u_e4099f19615f7777'))}
+      {msT(L, STATUS_KEY[s] || "campaigns")}
     </span>
   )
 
   return (
     <main style={{ minHeight: 'calc(100vh - 80px)', padding: '28px 22px', maxWidth: 1040, margin: '0 auto', color: 'rgba(226,232,240,.92)' }}>
-      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#1af0ff', margin: 0 }}>{msT(L, uiCopy('u_24cdc1e1005e9612'))}</p>
+      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#1af0ff', margin: 0 }}>{msT(L, "console")}</p>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <h1 className="sb-h2" style={{ margin: '4px 0 18px' }}>{msT(L, uiCopy('u_6298e78aa2ad0e5a'))}</h1>
-        <a href="/dashboard/marketing-sales/review" style={{ color: '#1af0ff', fontWeight: 700, fontSize: 13 }}>{msT(L, uiCopy('u_785e46e75c5b1c22'))} →</a>
+        <h1 className="sb-h2" style={{ margin: '4px 0 18px' }}>{msT(L, "overview")}</h1>
+        <a href="/dashboard/marketing-sales/review" style={{ color: '#1af0ff', fontWeight: 700, fontSize: 13 }}>{msT(L, "pendingApproval")} →</a>
       </div>
 
       <p style={{ margin: '0 0 14px', fontSize: 13, opacity: .7 }}>
-        👁 {rows.reduce((n, r) => n + (r.views || 0), 0)} · {rows.length} {msT(L, uiCopy('u_8f18e3f07da059e8')).toLowerCase()}
+        👁 {rows.reduce((n, r) => n + (r.views || 0), 0)} · {rows.length} {msT(L, "campaigns").toLowerCase()}
       </p>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-        {[uiCopy('u_1dcc5d100243fad2'), ...statuses].map((s) => (
+        {["all", ...statuses].map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             style={{ fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
               border: `1px solid ${filter === s ? '#1af0ff' : 'rgba(255,255,255,.16)'}`,
               background: filter === s ? 'rgba(26,240,255,.12)' : 'transparent',
               color: filter === s ? '#1af0ff' : 'rgba(226,232,240,.7)' }}>
-            {s === 'all' ? msT(L, uiCopy('u_b39b2612a9ff16e9')) : msT(L, STATUS_KEY[s] || uiCopy('u_596ec11c78777437'))}
+            {s === 'all' ? msT(L, "all") : msT(L, STATUS_KEY[s] || "campaigns")}
           </button>
         ))}
       </div>
@@ -84,7 +83,7 @@ export default function ConsoleClient() {
       {loading ? (
         <p style={{ opacity: .6 }}>…</p>
       ) : shown.length === 0 ? (
-        <p style={{ opacity: .6 }}>{msT(L, uiCopy('u_bd80e8abdf01fcba'))}: 0</p>
+        <p style={{ opacity: .6 }}>{msT(L, "campaigns")}: 0</p>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {shown.map((r) => (
@@ -95,17 +94,17 @@ export default function ConsoleClient() {
                 <p style={{ fontWeight: 700, margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.campaign.objective}</p>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, opacity: .8 }}>
                   {badge(r.campaign.status)}
-                  <span>{msT(L, uiCopy('u_cacce143f051cd07'))}: {r.draftCount}</span>
-                  {r.connector ? <span>{msT(L, uiCopy('u_6fd403b61bc622f8'))}: {r.connector}</span> : null}
-                  <span title={uiCopy('u_2928756958c0244d')}>👁 {r.views || 0}</span>
+                  <span>{msT(L, "languages")}: {r.draftCount}</span>
+                  {r.connector ? <span>{msT(L, "channel")}: {r.connector}</span> : null}
+                  <span title={uiText('generatedUi.u_74883614c4c79e12')}>👁 {r.views || 0}</span>
                   {r.videoStatus && r.videoStatus !== 'none' ? (
-                    <span title={uiCopy('u_a3d21ce2da09898f')} style={{ fontWeight: 700, color: r.videoStatus === 'ready' ? '#34d399' : r.videoStatus === 'failed' ? '#f87171' : '#fbbf24' }}>🎬 {r.videoStatus === 'pending' ? uiCopy('u_4b52948ee431844a') : r.videoStatus}</span>
+                    <span title={uiText('generatedUi.u_8572217834292a96')} style={{ fontWeight: 700, color: r.videoStatus === 'ready' ? '#34d399' : r.videoStatus === 'failed' ? '#f87171' : '#fbbf24' }}>🎬 {r.videoStatus === 'pending' ? uiText('generatedUi.u_f748f8d90516c1ce') : r.videoStatus}</span>
                   ) : null}
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 {r.liveUrl ? (
-                  <a href={r.liveUrl} target="_blank" rel="noreferrer" style={{ color: '#1af0ff', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>{msT(L, uiCopy('u_8712ea9d6b93e552'))} →</a>
+                  <a href={r.liveUrl} target="_blank" rel="noreferrer" style={{ color: '#1af0ff', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>{msT(L, "viewLive")} →</a>
                 ) : null}
               </div>
             </div>

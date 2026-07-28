@@ -16,12 +16,14 @@ import {
   PORTABLE_ACTIVITY_SOURCES,
   portablesWithUnexplainedSilence,
 } from '../lib/portable-products/live-activity.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const route = () => readFileSync(new URL('../app/api/portable-products/live/route.ts', import.meta.url), 'utf8')
+
+const route = () => hydrateLocalizedSource(readFileSync(new URL('../app/api/portable-products/live/route.ts', import.meta.url), 'utf8'))
 const migration = () =>
-  readFileSync(new URL('../supabase/migrations/20260725_portable_browser_activity.sql', import.meta.url), 'utf8')
+  hydrateLocalizedSource(readFileSync(new URL('../supabase/migrations/20260725_portable_browser_activity.sql', import.meta.url), 'utf8'))
 const adapter = () =>
-  readFileSync(new URL('../lib/portable-browser/browser-activity-supabase.ts', import.meta.url), 'utf8')
+  hydrateLocalizedSource(readFileSync(new URL('../lib/portable-browser/browser-activity-supabase.ts', import.meta.url), 'utf8'))
 
 const tablesFor = (productId: string) => (PORTABLE_ACTIVITY_SOURCES[productId] ?? []).map((s) => s.table)
 

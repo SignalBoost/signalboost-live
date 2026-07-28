@@ -3,9 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { getVideoProductionCopy } from '@/lib/cos/i18n/videoProductionCopy'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 
 type Job = {
@@ -37,7 +34,7 @@ export function ProductionJobsPanel() {
       setJobs(Array.isArray(json.jobs) ? json.jobs : [])
       if (json.warning) setMessage(json.warning)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : uiCopy('u_006f62d12585739b'))
+      setMessage(error instanceof Error ? error.message : "load failed")
     } finally {
       setLoading(false)
     }

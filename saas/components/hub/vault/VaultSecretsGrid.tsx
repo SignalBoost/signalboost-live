@@ -8,8 +8,7 @@ import { useMemo } from 'react'
 import { VaultSecret, VaultExpirationAlert } from '@/lib/hub/vault-types'
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export type VaultSecretsGridProps = {
   secrets: VaultSecret[]
@@ -18,11 +17,11 @@ export type VaultSecretsGridProps = {
 }
 
 const statusIcon: Record<string, { icon: string; color: string; label: string }> = {
-  active: { icon: '🟢', color: '#22c55e', label: uiCopy('u_fb4a0c99fa4b7d1b') },
-  expiring_soon: { icon: '⚠️', color: '#ffc300', label: uiCopy('u_a715a4aa05548f3b') },
-  expired: { icon: '❌', color: '#ef4444', label: uiCopy('u_dd922102a21f25c2') },
-  rotated: { icon: '🔄', color: '#3b82f6', label: uiCopy('u_afb8ecad9b42280e') },
-  revoked: { icon: '🚫', color: '#9ca3af', label: uiCopy('u_efd14a438c87806f') },
+  active: { icon: '🟢', color: '#22c55e', label: uiText('generatedUi.u_92340695899bd2d8') },
+  expiring_soon: { icon: '⚠️', color: '#ffc300', label: uiText('generatedUi.u_0259442ce223a7ac') },
+  expired: { icon: '❌', color: '#ef4444', label: uiText('generatedUi.u_424a2551d356754c') },
+  rotated: { icon: '🔄', color: '#3b82f6', label: uiText('generatedUi.u_f6ec4027dbad291c') },
+  revoked: { icon: '🚫', color: '#9ca3af', label: uiText('generatedUi.u_f6f738d043929f59') },
 }
 
 // Maps a secret status to its localized label key under console.vaultx.grid.
@@ -57,8 +56,8 @@ export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: Va
   if (secrets.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.5)' }}>
-        <div style={{ fontSize: 14, marginBottom: 8 }}>{t('console.vaultx.grid.empty', uiCopy('u_4801baa50a0125bc'))}</div>
-        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.grid.emptyHint', uiCopy('u_8ded231966d185ab'))}</p>
+        <div style={{ fontSize: 14, marginBottom: 8 }}>{t('console.vaultx.grid.empty', "No secrets in vault")}</div>
+        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.grid.emptyHint', "Secrets from connected providers will appear here.")}</p>
       </div>
     )
   }
@@ -189,19 +188,19 @@ export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: Va
                 }}
               >
                 <span>{alert.severity === 'critical' ? '🔴' : '⚠️'}</span>
-                <span>{t('console.vaultx.grid.expiresIn', uiCopy('u_fd54571debbb8aaa'))} {alert.days_until_expiry} {alert.days_until_expiry === 1 ? t('console.vaultx.grid.day', uiCopy('u_954d1708fda54700')) : t('console.vaultx.grid.days', uiCopy('u_b2a5e697d718adcb'))}</span>
+                <span>{t('console.vaultx.grid.expiresIn', "Expires in")} {alert.days_until_expiry} {alert.days_until_expiry === 1 ? t('console.vaultx.grid.day', "day") : t('console.vaultx.grid.days', "days")}</span>
               </div>
             )}
 
             {/* Metadata */}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.45)', display: 'flex', flexDirection: 'column', gap: 3 }}>
               {secret.last_rotated_at && (
-                <div>{t('console.vaultx.grid.lastRotated', uiCopy('u_279675d128aa2dd6'))} {new Date(secret.last_rotated_at).toLocaleDateString()}</div>
+                <div>{t('console.vaultx.grid.lastRotated', "Last rotated:")} {new Date(secret.last_rotated_at).toLocaleDateString()}</div>
               )}
               {secret.expires_at && (
-                <div>{t('console.vaultx.grid.expires', uiCopy('u_a7f6ace5754fd539'))} {new Date(secret.expires_at).toLocaleDateString()}</div>
+                <div>{t('console.vaultx.grid.expires', "Expires:")} {new Date(secret.expires_at).toLocaleDateString()}</div>
               )}
-              <div>{t('console.vaultx.grid.created', uiCopy('u_a376a7284f22158f'))} {new Date(secret.created_at).toLocaleDateString()}</div>
+              <div>{t('console.vaultx.grid.created', "Created:")} {new Date(secret.created_at).toLocaleDateString()}</div>
             </div>
           </article>
         )

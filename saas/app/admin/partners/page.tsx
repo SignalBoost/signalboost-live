@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -20,24 +19,24 @@ function getLang(): Lang {
 
 const COPY = {
   en: {
-    eyebrow: uiCopy('u_f8bbede4e43a0e1c'),
-    heading: uiCopy('u_1142210d6397b86a'),
-    intro: uiCopy('u_6c854daad57ff08b'),
-    reviewBtn: uiCopy('u_d068488dc5cec76a'),
-    perfTitle: uiCopy('u_c876770f6caaf768'),
-    perfCaption: uiCopy('u_4958d8664a6d5466'),
-    addBtn: uiCopy('u_d4d98088ffc5616a'),
-    colIntent: uiCopy('u_bfe929856ccebad2'),
-    colPartner: uiCopy('u_d99da2bc7e578490'),
-    colClicks: uiCopy('u_75e87e12968a7b84'),
-    colStatus: uiCopy('u_fd7ee3f04bb7a170'),
-    empty: uiCopy('u_71f8ddb5ad3d943a'),
+    eyebrow: uiText('generatedUi.u_5dab502bfba3c3df'),
+    heading: uiText('generatedUi.u_6d748622bf7ba1e9'),
+    intro: uiText('generatedUi.u_5d902f6e8ec0bcf5'),
+    reviewBtn: uiText('generatedUi.u_9728ba1815917851'),
+    perfTitle: uiText('generatedUi.u_9126ee498b8cde5a'),
+    perfCaption: uiText('generatedUi.u_129c4e7592bb5124'),
+    addBtn: uiText('generatedUi.u_6aea65df8df4ba16'),
+    colIntent: uiText('generatedUi.u_29131ad07db3d306'),
+    colPartner: uiText('generatedUi.u_29035e784f9305c0'),
+    colClicks: uiText('generatedUi.u_921fc9804ed31b1a'),
+    colStatus: uiText('generatedUi.u_920e413c7d411b61'),
+    empty: uiText('generatedUi.u_c27bfe1094984053'),
     intents: [
-      [uiCopy('u_ebfa420c72d5710a'), uiCopy('u_3369479f4f9db46f'), uiCopy('u_4212d4b5faab5870')],
-      [uiCopy('u_e30c9cac6c60521d'), uiCopy('u_d49b7cfd9f85b21b'), uiCopy('u_f4e8c0299bdda984')],
-      [uiCopy('u_fb884ea9d995506c'), uiCopy('u_21d1bf0a6868bcaf'), uiCopy('u_99c6ff24bc415ef0')],
-      [uiCopy('u_fb9ab323aac6c2c3'), uiCopy('u_ce04dda5341ef6a8'), uiCopy('u_f26f8f5d7e5c8e20')],
-      [uiCopy('u_be24bc97bc0a193b'), uiCopy('u_68429b34ae19b6ba'), uiCopy('u_20cf103a0dcd837a')],
+      [uiText('generatedUi.u_f8f5aa2b57ba8689'), uiText('generatedUi.u_15f52bfc9eec0091'), uiText('generatedUi.u_401d9ae5641988a1')],
+      [uiText('generatedUi.u_9fb889ca7b718a04'), uiText('generatedUi.u_e082829f1348e8c8'), uiText('generatedUi.u_d10c1fbfc37a4c86')],
+      [uiText('generatedUi.u_f9dd1d5083748c36'), uiText('generatedUi.u_e38b4a7affd6ac4f'), uiText('generatedUi.u_fdbed438a1d5ba9f')],
+      [uiText('generatedUi.u_4594b737568af7e3'), uiText('generatedUi.u_f4675fac405d01f2'), uiText('generatedUi.u_c628815bba733c90')],
+      [uiText('generatedUi.u_4d0076e6b4c71059'), uiText('generatedUi.u_a207571fade7677d'), uiText('generatedUi.u_3ceb462567d0e0a3')],
     ],
   },
   es: {
@@ -131,7 +130,7 @@ type PartnerRow = { intent: string; partner: string; clicks: number | null; stat
 // Localized labels for the known status values the API emits. Unknown values
 // pass through unchanged so a new backend status never renders as a blank.
 const STATUS_COPY: Record<Lang, Record<string, string>> = {
-  en: { Active: uiCopy('u_90bc4d1e34d66644'), Paused: uiCopy('u_fcee2ed7adf14f00'), Pending: uiCopy('u_3ba65433865418e9') },
+  en: { Active: uiText('generatedUi.u_92340695899bd2d8'), Paused: uiText('generatedUi.u_e159b06187d369a0'), Pending: uiText('generatedUi.u_331551b0de4157c9') },
   es: { Active: 'Activo', Paused: 'En pausa', Pending: 'Pendiente' },
   pt: { Active: 'Ativo', Paused: 'Pausado', Pending: 'Pendente' },
   pl: { Active: 'Aktywny', Paused: 'Wstrzymany', Pending: 'Oczekujący' },

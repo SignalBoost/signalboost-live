@@ -5,9 +5,6 @@ import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { orchestrate, type OrchestrationPlan, type WorkflowStep } from '@/lib/orchestration'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 type OrchestrationPanelProps = {
   module?: string
   compact?: boolean
@@ -62,24 +59,23 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'start' }}>
         <div>
           <span className="sb-eyebrow">
-            {t(dict, 'orchestration.kicker', uiCopy('u_26e282e51f94a0b8'))}
+            {t(dict, 'orchestration.kicker')}
           </span>
 
           <h2 className={compact ? 'sb-h3' : 'sb-h2'} style={{ marginTop: 8 }}>
-            {t(dict, 'orchestration.title', uiCopy('u_c2a4ee145d14d40a'))}
+            {t(dict, 'orchestration.title')}
           </h2>
 
           <p className="sb-body" style={{ maxWidth: 720, fontSize: compact ? 13 : undefined }}>
             {t(
               dict,
               'orchestration.subtitle',
-              uiCopy('u_4b99963499763af9'),
             )}
           </p>
         </div>
 
         <Link href={plan.route.href} className="sb-button-primary">
-          {t(dict, 'orchestration.openRoute', uiCopy('u_cbd23549cb6fe769'))}
+          {t(dict, 'orchestration.openRoute')}
         </Link>
       </div>
 
@@ -93,7 +89,7 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
       >
         <div style={{ display: 'grid', gap: 10 }}>
           <label className="sb-caption" style={{ display: 'grid', gap: 8 }}>
-            {t(dict, 'orchestration.inputLabel', uiCopy('u_e144cd8ab3866804'))}
+            {t(dict, 'orchestration.inputLabel')}
 
             <textarea
               value={input}
@@ -105,7 +101,6 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
               placeholder={t(
                 dict,
                 'orchestration.placeholder',
-                uiCopy('u_20fb2071b4712965'),
               )}
               className="sb-input"
               style={{ borderRadius: 16, padding: 12, resize: 'vertical' }}
@@ -113,14 +108,14 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
           </label>
 
           <button type="button" className="sb-button-secondary" onClick={runOrchestration} style={{ cursor: 'pointer' }}>
-            {t(dict, 'orchestration.run', uiCopy('u_b86b88f631993df9'))}
+            {t(dict, 'orchestration.run')}
           </button>
         </div>
 
         <div style={{ display: 'grid', gap: 12 }}>
           <div style={{ borderTop: '1px solid rgba(34,211,238,.25)', borderLeft: '2px solid rgba(34,211,238,.4)', padding: '12px 0 12px 14px', marginTop: 4 }}>
             <span className="sb-caption">
-              {t(dict, 'orchestration.intentRouter', uiCopy('u_e214949aa7ab95c0'))}
+              {t(dict, 'orchestration.intentRouter')}
             </span>
 
             <h3 className="sb-h3" style={{ margin: '6px 0' }}>
@@ -128,7 +123,7 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
             </h3>
 
             <p className="sb-caption">
-              {t(dict, 'orchestration.confidence', uiCopy('u_c636be93e0e3fd42'))}: {Math.round(plan.route.confidence * 100)}%
+              {t(dict, 'orchestration.confidence')}: {Math.round(plan.route.confidence * 100)}%
             </p>
           </div>
 
@@ -153,21 +148,21 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
             <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(34,211,238,.3)', padding: '10px 0 10px 14px' }}>
-              <strong>{t(dict, 'orchestration.memory', uiCopy('u_1a69b47730c916e5'))}</strong>
+              <strong>{t(dict, 'orchestration.memory')}</strong>
               <p className="sb-caption">{plan.memory.map((item) => item.key).join(' · ')}</p>
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(34,211,238,.3)', padding: '10px 0 10px 14px' }}>
-              <strong>{t(dict, 'orchestration.operatorFallback', uiCopy('u_457a22dd64199323'))}</strong>
+              <strong>{t(dict, 'orchestration.operatorFallback')}</strong>
               <p className="sb-caption">
                 {plan.operatorFallback.enabled
-                  ? t(dict, 'common.enabled', uiCopy('u_01de9832a37103ee'))
-                  : t(dict, 'common.ready', uiCopy('u_f8a7d02b458030d9'))}
+                  ? t(dict, 'common.enabled')
+                  : t(dict, 'common.ready')}
               </p>
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(34,211,238,.3)', padding: '10px 0 10px 14px' }}>
-              <strong>{t(dict, 'orchestration.telemetry', uiCopy('u_9df178583d9eeda2'))}</strong>
+              <strong>{t(dict, 'orchestration.telemetry')}</strong>
               <p className="sb-caption">{plan.telemetry.map((event) => event.event).join(' · ')}</p>
             </div>
           </div>

@@ -5,8 +5,7 @@ import type { PointerEvent } from 'react'
 import { defaultCaptionStyle, type CaptionCue, type CaptionStyle, type SupportedVideoLocale, type VideoQuota } from '@/lib/video/types'
 import { calculateVideoQuota } from '@/lib/video/subscription'
 import { useTranslation } from '@/lib/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type ExportState = { status: 'idle' | 'recording' | 'ready' | 'failed'; message: string; url?: string }
@@ -23,14 +22,14 @@ type CanvasEditorProps = {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const starterCaptions: CaptionCue[] = [
-  { id: uiCopy('u_b0de0322a8eeb045'), start: 0, end: 2.8, text: uiCopy('u_386e4b553b9774e4') },
-  { id: uiCopy('u_64ce12097f1d82cc'), start: 3, end: 6, text: uiCopy('u_598d3d9cfaa3dab9') },
+  { id: "cue-1", start: 0, end: 2.8, text: uiText('generatedUi.u_397abc5f35051c66') },
+  { id: "cue-2", start: 3, end: 6, text: uiText('generatedUi.u_3374240e31c70e08') },
 ]
 const captionPresets: CaptionPreset[] = [
-  { id: uiCopy('u_2f911bc04e23c415'), label: uiCopy('u_df6d6933c23e14bf'), description: uiCopy('u_47e6eb62f355159b'), style: defaultCaptionStyle },
-  { id: uiCopy('u_07f6e65ddf795ef7'), label: uiCopy('u_4a9de86386ca1fc2'), description: uiCopy('u_26c79e67d9b6a114'), style: { ...defaultCaptionStyle, fontFamily: uiCopy('u_8e995edcc793970b'), fontSize: 48, color: uiCopy('u_730975815babead9'), backgroundColor: uiCopy('u_a25d580c2bd2e827'), animation: uiCopy('u_8345985fc77dc1ca'), x: 50, y: 76 } },
-  { id: uiCopy('u_354bcc4f6ec995cf'), label: uiCopy('u_5db306bd2f1a3a69'), description: uiCopy('u_5ac1b920286cf3f2'), style: { ...defaultCaptionStyle, fontFamily: uiCopy('u_30f4658278d757e1'), fontSize: 52, color: uiCopy('u_1c9bae927c2f8c02'), backgroundColor: uiCopy('u_f728dd921437b52d'), animation: uiCopy('u_acf49a3e9b4b7383'), x: 50, y: 70 } },
-  { id: uiCopy('u_f3db53a903cc25c8'), label: uiCopy('u_9feee843caca5e80'), description: uiCopy('u_754cdb6889a6a907'), style: { ...defaultCaptionStyle, fontFamily: uiCopy('u_109e696a1664bb2c'), fontSize: 32, color: uiCopy('u_ac3755ec2d14d83c'), backgroundColor: uiCopy('u_adc4f2139db2465e'), animation: uiCopy('u_a075032ac4531333'), x: 50, y: 84 } },
+  { id: "signal", label: uiText('generatedUi.u_85647deec9865df5'), description: uiText('generatedUi.u_ac374b17cd9f6da6'), style: defaultCaptionStyle },
+  { id: "tiktok", label: uiText('generatedUi.u_1637a20d79daaf83'), description: uiText('generatedUi.u_8383d64c2861e51e'), style: { ...defaultCaptionStyle, fontFamily: "Arial Black, Inter, sans-serif", fontSize: 48, color: "#ffffff", backgroundColor: "rgba(0,0,0,0.72)", animation: "pop", x: 50, y: 76 } },
+  { id: "hormozi", label: uiText('generatedUi.u_1a90986d0f221dc9'), description: uiText('generatedUi.u_1dd3dfc5045e0c3f'), style: { ...defaultCaptionStyle, fontFamily: "Impact, Inter, sans-serif", fontSize: 52, color: "#FFD700", backgroundColor: "rgba(0,0,0,0.86)", animation: "pop", x: 50, y: 70 } },
+  { id: "minimal", label: uiText('generatedUi.u_057b5de48d7b90f1'), description: uiText('generatedUi.u_6e761c8fe00d53f0'), style: { ...defaultCaptionStyle, fontFamily: "Inter, Arial, sans-serif", fontSize: 32, color: "#ffffff", backgroundColor: "rgba(15,23,42,0.52)", animation: "fade", x: 50, y: 84 } },
 ]
 const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-h-[72vh]', '1:1': 'aspect-square max-h-[72vh]', '16:9': 'aspect-video' }
 const canvasSizes: Record<AspectRatio, { width: number; height: number }> = { '9:16': { width: 720, height: 1280 }, '1:1': { width: 1080, height: 1080 }, '16:9': { width: 1280, height: 720 } }
@@ -155,7 +154,7 @@ const PRESET_DESC: Record<string, keyof typeof VID> = {
 // Starter-caption id → localized seed text key. Applied to the initial timeline
 // state so the on-load example captions match the active language.
 const SEED_TEXT: Record<string, keyof typeof VID> = {
-  'cue-1': uiCopy('u_12023366ae991426'), 'cue-2': uiCopy('u_6c2e611e98c3ad47'),
+  'cue-1': "seedCue1", 'cue-2': "seedCue2",
 }
 
 function activeCue(cues: CaptionCue[], time: number) { return cues.find((c) => time >= c.start && time <= c.end) || null }
@@ -209,7 +208,7 @@ function QuotaStatusBar({ quota }: { quota: VideoQuota }) {
 function BillingBanner({ quota }: { quota: VideoQuota }) {
   const { lang } = useTranslation()
   if (!quota.requiresOverageCharge) return null
-  return <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">{vt(VID.overage, lang).replace('{n}', String(quota.overageMinutes)).replace(uiCopy('u_1ba44325e21918ed'), quota.overageRateUsd.toFixed(2)).replace(uiCopy('u_814c63039147e52c'), String(quota.overageProvider))}</div>
+  return <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">{vt(VID.overage, lang).replace('{n}', String(quota.overageMinutes)).replace("{rate}", quota.overageRateUsd.toFixed(2)).replace("{provider}", String(quota.overageProvider))}</div>
 }
 
 function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPreset: (p: CaptionPreset) => void }) {
@@ -242,9 +241,9 @@ function StyleControls({ style, aspectRatio, onChange, onAspectRatio }: { style:
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
     <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.captionStyle, lang)}</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm">{vt(VID.format, lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">{uiCopy('u_062389dd33ff36a0')}</option><option value="1:1">{uiCopy('u_ee923fddbd88216e')}</option><option value="16:9">{uiCopy('u_5c55cf79dfadc165')}</option></select></label>
+      <label className="text-sm">{vt(VID.format, lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">{uiText('generatedUi.u_288da45c8292d920')}</option><option value="1:1">{uiText('generatedUi.u_fdbf5fd5f1c5a49c')}</option><option value="16:9">{uiText('generatedUi.u_d3f9447affc0ace4')}</option></select></label>
       <label className="text-sm">{vt(VID.fontFamily, lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.fontFamily} onChange={(e) => onChange({ ...style, fontFamily: e.target.value })} /></label>
-      <label className="text-sm">{vt(VID.size, lang)}: {style.fontSize}px<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
+      <label className="text-sm">{vt(VID.size, lang)}: {style.fontSize}{uiText('generatedUi.u_6ee2cc105a677431')}<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
       <label className="text-sm">{vt(VID.textColor, lang)}<input type="color" value={style.color} onChange={(e) => onChange({ ...style, color: e.target.value })} className="mt-1 block h-10 w-full rounded-xl" /></label>
       <label className="text-sm">{vt(VID.animation, lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={style.animation} onChange={(e) => onChange({ ...style, animation: e.target.value as CaptionStyle['animation'] })}><option value="none">{vt(VID.animNone, lang)}</option><option value="fade">{vt(VID.animFade, lang)}</option><option value="slide">{vt(VID.animSlide, lang)}</option><option value="pop">{vt(VID.animPop, lang)}</option></select></label>
       <label className="text-sm">{vt(VID.background, lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.backgroundColor} onChange={(e) => onChange({ ...style, backgroundColor: e.target.value })} /></label>
@@ -363,16 +362,16 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.canvasEditor, lang)}</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
       <div className={`relative mx-auto mt-4 w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
         {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; setTime(n); onTime(n) }} /> : null}
-        <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label={uiCopy('u_a0e77dcd0a4ccce2')} />
+        <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label={uiText('generatedUi.u_c407ce3132ddb126')} />
       </div>
       <div className="mt-4 space-y-3">
         <input type="range" min="0" max={Math.max(1, durationSec)} step="0.05" value={Math.min(time, Math.max(1, durationSec))} disabled={!videoUrl} onChange={(e) => seek(Number(e.target.value))} className="w-full" />
         <div className="flex flex-wrap gap-3">
-          <button className="rounded-full bg-[#FFD700] px-5 py-2 font-bold text-black disabled:opacity-50" disabled={!videoUrl} onClick={() => videoRef.current?.play()}>{isPlaying ? uiCopy('u_cd0bee571c9c2b71') : uiCopy('u_00a69c0098c70caf')}</button>
-          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => videoRef.current?.pause()}>{uiCopy('u_6c033eb22348fa81')}</button>
-          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => seek(time - 0.1)}>{uiCopy('u_ee1b00e8996f0b44')}</button>
-          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => seek(time + 0.1)}>{uiCopy('u_2e39c8078c0a110a')}</button>
-          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => seek(0)}>{uiCopy('u_7eaf63659e020442')}</button>
+          <button className="rounded-full bg-[#FFD700] px-5 py-2 font-bold text-black disabled:opacity-50" disabled={!videoUrl} onClick={() => videoRef.current?.play()}>{isPlaying ? uiText('generatedUi.u_deaf6f9d23bc24d4') : uiText('generatedUi.u_436e61016e26fcb7')}</button>
+          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => videoRef.current?.pause()}>{uiText('generatedUi.u_858e4ba7a29fd38b')}</button>
+          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => seek(time - 0.1)}>{uiText('generatedUi.u_e470488448217912')}</button>
+          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => seek(time + 0.1)}>{uiText('generatedUi.u_660a84a3c32904c2')}</button>
+          <button className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-50" disabled={!videoUrl} onClick={() => seek(0)}>{uiText('generatedUi.u_6b983a81e5e8099e')}</button>
         </div>
       </div>
     </section>
@@ -511,18 +510,18 @@ export default function VideoEditor() {
 
   return <main className="min-h-screen bg-[#05070b] p-6 text-white">
     <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.20),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-8">
-      <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('video.kicker', uiCopy('u_7fbb0e37220fa8ad'))}</p>
-      <h1 className="mt-4 text-4xl font-black">{t('video.title', uiCopy('u_051345b3ee09976a'))}</h1>
-      <p className="mt-3 max-w-3xl text-white/70">{t('video.subtitle', uiCopy('u_e39ff1e73c23ae54'))}</p>
+      <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('video.kicker', "Video Studio")}</p>
+      <h1 className="mt-4 text-4xl font-black">{t('video.title', "AI caption video editor")}</h1>
+      <p className="mt-3 max-w-3xl text-white/70">{t('video.subtitle', "Upload a video, generate synced AI captions, drag styled overlays on canvas, and export a captioned video file.")}</p>
     </section>
     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} /><BillingBanner quota={quota} /></div>
     <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.03] p-5 md:grid-cols-5">
       <label className="text-sm">{vt(VID.video, lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
       <div className="text-sm"><span>{vt(VID.aiCaptions, lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? vt(VID.transcribing, lang) : vt(VID.generateCaptions, lang)}</button></div>
       <label className="text-sm">{vt(VID.optionalSrt, lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
-      <label className="text-sm">{vt(VID.tier, lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">{uiCopy('u_786b0b8142574262')}</option><option value="launch">{uiCopy('u_87fe98c72264a9cd')}</option><option value="growth">{uiCopy('u_bbdd2cbc4d05f6b4')}</option><option value="command">{uiCopy('u_7ab9b2a083423321')}</option></select></label>
-      <label className="text-sm">{vt(VID.locale, lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
-      <p className="text-xs text-white/55 md:col-span-5">{uiCopy('u_a87d90fe8cc7f716')}{uploadState.message}<br />{uiCopy('u_4ad5c3f7210e8180')}{captionState.message}</p>
+      <label className="text-sm">{vt(VID.tier, lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">{uiText('generatedUi.u_ce2b317a0397b81c')}</option><option value="launch">{uiText('generatedUi.u_ccf56ef5db0b82a5')}</option><option value="growth">{uiText('generatedUi.u_66b06e996553a4e7')}</option><option value="command">{uiText('generatedUi.u_713166971d730f81')}</option></select></label>
+      <label className="text-sm">{vt(VID.locale, lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>{uiText('generatedUi.u_dbd3a49d0d906b4e')}</option><option>{uiText('generatedUi.u_c0bc1e08f9743b2d')}</option><option>{uiText('generatedUi.u_e75b11da693d7bb5')}</option><option>{uiText('generatedUi.u_3485639faf1591f3')}</option><option>{uiText('generatedUi.u_ed5ad332c1060437')}</option></select></label>
+      <p className="text-xs text-white/55 md:col-span-5">{uiText('generatedUi.u_b352f1eaae4d4d6d')}{uploadState.message}<br />{uiText('generatedUi.u_8e7581a1878c9e40')}{captionState.message}</p>
     </section>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
       <div className="space-y-6">

@@ -3,8 +3,7 @@
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useState } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -38,7 +37,7 @@ export default function CosaCreativeStrategyPage() {
       if (!json.ok) throw new Error(json.error || 'Unable to load creative strategy')
       setStrategy(json.strategy)
     } catch (err: any) {
-      setError(err?.message || uiCopy('u_ff652b9ea812f8d3'))
+      setError(err?.message || "Unable to load creative strategy")
     } finally {
       setLoading(false)
     }
@@ -49,10 +48,10 @@ export default function CosaCreativeStrategyPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>{uiCopy('u_3afb3686c0ffdb60')}</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>{uiCopy('u_aeb0ae1a9dcc815a')}</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 820 }}><LocalizedText fallback={uiCopy('u_91c0f97cb0c70c94')} /></p>
-        <button onClick={loadStrategy} disabled={loading} style={primaryButton}>{loading ? uiCopy('u_57051701fcaf7df0') : uiCopy('u_9d6a1beeafb42d65')}</button>
+        <p className="sb-eyebrow" style={{ margin: 0 }}>{uiText('generatedUi.u_3fab3cbca47ff745')}</p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>{uiText('generatedUi.u_e7f03a9cdd665d3e')}</h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 820 }}><LocalizedText fallback={uiText('generatedUi.u_48182b8f49bb7cc0')} /></p>
+        <button onClick={loadStrategy} disabled={loading} style={primaryButton}>{loading ? uiText('generatedUi.u_47d2a515ef2f05b8') : uiText('generatedUi.u_4ad93a523581bab8')}</button>
       </section>
 
       {error && <div style={errorCard}>{error}</div>}
@@ -60,27 +59,27 @@ export default function CosaCreativeStrategyPage() {
       {strategy && (
         <>
           <section style={gridTwo}>
-            <Panel title={uiCopy('u_29b2c429d2a8c1fc')} value={strategy.niche} />
-            <Panel title={uiCopy('u_1ea35b49c85b0575')} value={strategy.hero_name} />
-            <Panel title={uiCopy('u_99c5fb6d169a2417')} value={strategy.hero_problem} />
-            <Panel title={uiCopy('u_8d90e03fc29e1281')} value={strategy.emotional_hook} />
+            <Panel title={uiText('generatedUi.u_55df94e7d76d2922')} value={strategy.niche} />
+            <Panel title={uiText('generatedUi.u_72a9345fb29494a4')} value={strategy.hero_name} />
+            <Panel title={uiText('generatedUi.u_a5f6ecdff1aa2e1f')} value={strategy.hero_problem} />
+            <Panel title={uiText('generatedUi.u_15ac356c909395c7')} value={strategy.emotional_hook} />
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_f97bb710e2055e57')} /></p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_1fe13b875d9a846d')} /></p>
             <h2 style={{ color: '#fff', fontSize: 26, margin: '10px 0 0', lineHeight: 1.2 }}>{strategy.opening_line}</h2>
-            <p style={{ color: GOLD, fontWeight: 950, margin: '14px 0 0' }}>{uiCopy('u_b844986cef3295d6')}{strategy.destination_url}</p>
+            <p style={{ color: GOLD, fontWeight: 950, margin: '14px 0 0' }}>{uiText('generatedUi.u_0c109e62332e2b1b')}{strategy.destination_url}</p>
           </section>
 
           <section style={gridTwo}>
-            <ListPanel title={uiCopy('u_88421301d268633f')} items={strategy.story_arc} />
-            <ListPanel title={uiCopy('u_1055cf90e422f066')} items={strategy.short_video_angles} />
-            <ListPanel title={uiCopy('u_5e71c3dbfd852c04')} items={strategy.monetization_paths} />
-            <ListPanel title={uiCopy('u_0c4901f88b2ef591')} items={strategy.approval_gates} />
+            <ListPanel title={uiText('generatedUi.u_97fd65ddb4a9f7a5')} items={strategy.story_arc} />
+            <ListPanel title={uiText('generatedUi.u_10d71a093fa8c138')} items={strategy.short_video_angles} />
+            <ListPanel title={uiText('generatedUi.u_f9896162bc8d64a4')} items={strategy.monetization_paths} />
+            <ListPanel title={uiText('generatedUi.u_cbccfe0988105988')} items={strategy.approval_gates} />
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_2005e9c093e8a6ae')} /></p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_bd087b3ce4731d94')} /></p>
             <p style={{ color: 'rgba(255,255,255,.8)', lineHeight: 1.7, margin: '10px 0 0' }}>{strategy.proof_moment}</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
               {strategy.languages.map((language) => <span key={language} style={pill}>{language.toUpperCase()}</span>)}

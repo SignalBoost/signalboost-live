@@ -1,9 +1,6 @@
 'use client'
 
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 // Shows a preview of the REAL generated website content before publishing.
 // Backward compatible: still accepts the old plan-style fields if present.
 
@@ -43,14 +40,14 @@ export default function OperatorPlan({ plan }: { plan: OperatorPlanView }) {
 
   return (
     <section className="hero-panel" style={{ marginTop: 16, padding: 22 }}>
-      <h2 style={{ color: '#fff', marginTop: 0 }}>{t('operator.plan.previewTitle', uiCopy('u_76a5f48380744fd3'))}</h2>
+      <h2 style={{ color: '#fff', marginTop: 0 }}>{t('operator.plan.previewTitle', "Preview your website")}</h2>
       <p style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
-        {t('operator.plan.previewSubtitle', uiCopy('u_40852bbc3d43e7c3'))}
+        {t('operator.plan.previewSubtitle', "This is the content I generated. Approve it to publish your site live.")}
       </p>
 
       {/* Color swatches */}
       <div style={{ display: 'flex', gap: 8, margin: '14px 0' }}>
-        {([uiCopy('u_3f9d43d57f5bd865'), uiCopy('u_ffb04a4b501ffc91'), uiCopy('u_027e91635670e505'), uiCopy('u_8168cbdcfefc148f')] as const).map((k) => (
+        {(["primary", "accent", "background", "text"] as const).map((k) => (
           <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 18, height: 18, borderRadius: 5, background: (colors as any)[k], border: '1px solid rgba(255,255,255,.2)', display: 'inline-block' }} />
             <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{k}</span>

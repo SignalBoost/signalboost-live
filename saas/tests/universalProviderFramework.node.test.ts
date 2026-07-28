@@ -7,6 +7,8 @@ import {
   createUniversalSdkFromBrowserProvider,
 } from '../lib/provider-framework/index.ts'
 import { VercelBrowserAdapter } from '../lib/browser-provider/index.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 function provider(overrides = {}) {
   return {
@@ -72,7 +74,7 @@ test('bridges canonical BPAL metadata without Browser Runtime, Supervisor, dispa
   assert.ok(registered.metadata.capabilities.some(c => c.channels.includes('browser')))
 
   for (const file of ['types.ts', 'validation.ts', 'registry.ts', 'browser-provider-bridge.ts']) {
-    const text = await readFile(new URL(`../lib/provider-framework/${file}`, import.meta.url), 'utf8')
+    const text = await readFile(new URL(`../lib/provider-framework/${file}`, import.meta.url), 'utf8').then(hydrateLocalizedSource)
     assert.doesNotMatch(text, /browser-runtime|SupervisorDispatcher|policy-engine|fetch\(|XMLHttpRequest|@vercel|stripe|cloudflare|supabase-js/i)
   }
 })
@@ -87,7 +89,7 @@ test('future provider classes fit without architectural changes', () => {
 test('localization keys exist for all universal provider operator strings', async () => {
   const keys = ['universalProvider.operator.ownerTeam','universalProvider.operator.documentation','universalProvider.vercel.description']
   for (const locale of ['en','es','pt','pl','ru']) {
-    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8'))
+    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8').then(hydrateLocalizedSource))
     for (const key of keys) assert.ok(key.split('.').reduce((value, part) => value?.[part], dict), `${locale}:${key}`)
   }
 })

@@ -15,13 +15,12 @@
 
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 // Inline COPY: user-visible strings for the assistant message media cards,
 // co-located across all 5 languages (brand names like "Vimeo" stay as-is).
 const AM_COPY: Record<string, Record<string, string>> = {
-  en: { playlist: uiCopy('u_0da83d40e2e21bbd'), archive: uiCopy('u_ece345d1d2f31fc5'), video: uiCopy('u_feebfe5cb90187c7'), playing: uiCopy('u_57ad026ac369387c'), diagramAlt: uiCopy('u_0bc454d6594db5e1'), synthesizing: uiCopy('u_ca142cf5ba8ab076'), retry: uiCopy('u_6e22c96129b2fc16'), playBrief: uiCopy('u_482771102dac197f'), audioBrief: uiCopy('u_56e206174314983c'), audioError: uiCopy('u_d774bd78bee294b0') },
+  en: { playlist: uiText('generatedUi.u_7af36c508516cf27'), archive: uiText('generatedUi.u_66f4804ee23ddc09'), video: uiText('generatedUi.u_d534be829e32196b'), playing: uiText('generatedUi.u_deaf6f9d23bc24d4'), diagramAlt: uiText('generatedUi.u_77e3eec0fb29f153'), synthesizing: uiText('generatedUi.u_6156cfb891bf3fb9'), retry: uiText('generatedUi.u_942087cc2d41e013'), playBrief: uiText('generatedUi.u_ab2bba373c408e32'), audioBrief: uiText('generatedUi.u_2ff8bef07b0f0ae0'), audioError: uiText('generatedUi.u_6baeb568d576086e') },
   es: { playlist: 'Lista de reproducción', archive: 'Archivo', video: 'Video', playing: 'Reproduciendo', diagramAlt: 'Diagrama de arquitectura', synthesizing: 'Sintetizando…', retry: 'Reintentar', playBrief: 'Reproducir resumen', audioBrief: 'Resumen de audio', audioError: 'No se pudo sintetizar el audio.' },
   pt: { playlist: 'Lista de reprodução', archive: 'Arquivo', video: 'Vídeo', playing: 'Reproduzindo', diagramAlt: 'Diagrama de arquitetura', synthesizing: 'Sintetizando…', retry: 'Tentar novamente', playBrief: 'Reproduzir resumo', audioBrief: 'Resumo de áudio', audioError: 'Não foi possível sintetizar o áudio.' },
   pl: { playlist: 'Playlista', archive: 'Archiwum', video: 'Wideo', playing: 'Odtwarzanie', diagramAlt: 'Diagram architektury', synthesizing: 'Syntetyzowanie…', retry: 'Ponów', playBrief: 'Odtwórz streszczenie', audioBrief: 'Streszczenie audio', audioError: 'Nie udało się zsyntetyzować dźwięku.' },
@@ -172,9 +171,9 @@ function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
               onClick={() => setPlay(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(26,240,255,.12)', color: '#1af0ff', border: '1px solid rgba(26,240,255,.42)', borderRadius: 8, padding: '5px 13px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}
             >
-              <span style={{ fontSize: 10 }}>▶</span>{uiCopy('u_71ed45ea40a87fc7')}</button>
+              <span style={{ fontSize: 10 }}>▶</span>{uiText('generatedUi.u_436e61016e26fcb7')}</button>
           )}
-          <a href={watchUrl(refr)} target="_blank" rel="noopener noreferrer" style={{ ...linkStyle, fontSize: 11 }}>{uiCopy('u_84dcf2be65639275')}</a>
+          <a href={watchUrl(refr)} target="_blank" rel="noopener noreferrer" style={{ ...linkStyle, fontSize: 11 }}>{uiText('generatedUi.u_aed7112c3c66ec81')}</a>
         </div>
       </div>
     </div>
@@ -444,11 +443,11 @@ export default function AssistantMessage({ content }: { content: string }) {
   if (va) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {va.before.trim() ? <div>{renderText(va.before, uiCopy('u_a35a3b86956fa6a9'))}</div> : null}
+        {va.before.trim() ? <div>{renderText(va.before, "vb")}</div> : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' }}>
           {va.items.map((v, i) => <LazyMedia key={`va${i}`} refr={v.refr} title={v.title} />)}
         </div>
-        {va.after.trim() ? <div>{renderText(va.after, uiCopy('u_43596eb3083457ce'))}</div> : null}
+        {va.after.trim() ? <div>{renderText(va.after, "va")}</div> : null}
       </div>
     )
   }
@@ -466,7 +465,7 @@ export default function AssistantMessage({ content }: { content: string }) {
       const mer = /```mermaid\n([\s\S]*?)```/.exec(body)
       blocks.push(<Diagram key={`slot${i}`} code={mer ? mer[1] : body} />)
     } else if (tag === 'STRATEGIC_PITCH') {
-      blocks.push(<Card key={`slot${i}`} accent="#ffc300" label={uiCopy('u_ec91faf42496a144')}><div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.9)', whiteSpace: 'pre-wrap' }}>{body}</div></Card>)
+      blocks.push(<Card key={`slot${i}`} accent="#ffc300" label={uiText('generatedUi.u_f50dd87999bb5f32')}><div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.9)', whiteSpace: 'pre-wrap' }}>{body}</div></Card>)
     } else if (tag === 'AUDIO_BRIEF_SOURCE') {
       blocks.push(<AudioBrief key={`slot${i}`} script={body} />)
     } else if (tag === 'VIDEO' || tag === 'PLAYLIST') {
@@ -477,14 +476,14 @@ export default function AssistantMessage({ content }: { content: string }) {
       const u = (body.match(/https?:\/\/[^\s<>]+/) || [body])[0]
       blocks.push(<ImageEmbed key={`slot${i}`} src={u} />)
     } else {
-      blocks.push(<Card key={`slot${i}`} accent="#1af0ff" label={uiCopy('u_a36f711d3f52f6aa')}><pre style={codeBlock}>{body}</pre></Card>)
+      blocks.push(<Card key={`slot${i}`} accent="#1af0ff" label={uiText('generatedUi.u_2802c56bc0203a91')}><pre style={codeBlock}>{body}</pre></Card>)
     }
     last = m.index + m[0].length
     i++
   }
 
   const tail = content.slice(last)
-  if (tail.trim() || blocks.length === 0) blocks.push(<div key="tail">{renderText(tail, uiCopy('u_0d088deb11107331'))}</div>)
+  if (tail.trim() || blocks.length === 0) blocks.push(<div key="tail">{renderText(tail, "tail")}</div>)
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{blocks}</div>
 }

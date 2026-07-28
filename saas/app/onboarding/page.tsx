@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type Role = 'developer' | 'non_developer' | ''
 type ItLevel = 'beginner' | 'intermediate' | 'advanced' | ''
@@ -27,24 +26,24 @@ type AnalyticsPayload = {
 }
 
 const STEPS = [
-  { key: 'welcome', label: uiCopy('u_2b612a6f864ea749'), kicker: uiCopy('u_fc0c101cd542ab26'), icon: '👋' },
-  { key: 'profiling', label: uiCopy('u_d43c69a931c8e0a5'), kicker: uiCopy('u_80f26781e262bb3c'), icon: '🧭' },
-  { key: 'consent', label: uiCopy('u_04ec09eaf4669a9b'), kicker: uiCopy('u_b927597e75c4f6d8'), icon: '🛡️' },
-  { key: 'tone', label: uiCopy('u_e1b1dd0a9e7cc490'), kicker: uiCopy('u_41570a1f13d12b8b'), icon: '🎙️' },
-  { key: 'confirmation', label: uiCopy('u_840d30e8e6564380'), kicker: uiCopy('u_e38bb1c96b9a4669'), icon: '✅' },
+  { key: 'welcome', label: uiText('generatedUi.u_0e2226b5235f0ff9'), kicker: uiText('generatedUi.u_25a8d45469d1048c'), icon: '👋' },
+  { key: 'profiling', label: uiText('generatedUi.u_88d90d834b4293f5'), kicker: uiText('generatedUi.u_649474af418cac5d'), icon: '🧭' },
+  { key: 'consent', label: uiText('generatedUi.u_d37e0cd00f18a366'), kicker: uiText('generatedUi.u_394c36ddc82c4828'), icon: '🛡️' },
+  { key: 'tone', label: uiText('generatedUi.u_c2c8b72e302ec730'), kicker: uiText('generatedUi.u_339ade8c4bfedec5'), icon: '🎙️' },
+  { key: 'confirmation', label: uiText('generatedUi.u_d743070540a1268e'), kicker: uiText('generatedUi.u_0611075ce431266c'), icon: '✅' },
 ] as const
 
 const ROLE_OPTIONS = [
   {
     value: 'developer' as Role,
-    title: uiCopy('u_ae8b6d5948c0d0c6'),
-    body: uiCopy('u_a12e9c338c284b19'),
+    title: uiText('generatedUi.u_3fb7b39416f1d067'),
+    body: uiText('generatedUi.u_37508aae292abfd6'),
     icon: '⌘',
   },
   {
     value: 'non_developer' as Role,
-    title: uiCopy('u_20480f5489b7d1a9'),
-    body: uiCopy('u_2d49844d04559eb6'),
+    title: uiText('generatedUi.u_329492d1cd37847a'),
+    body: uiText('generatedUi.u_6f17cfe1e8a7ede4'),
     icon: '✨',
   },
 ]
@@ -52,37 +51,37 @@ const ROLE_OPTIONS = [
 const IT_LEVEL_OPTIONS = [
   {
     value: 'beginner' as ItLevel,
-    title: uiCopy('u_61d737d375c5a679'),
-    body: uiCopy('u_a0c7c3b658f84109'),
+    title: uiText('generatedUi.u_c865ebb3052c863b'),
+    body: uiText('generatedUi.u_bd4038773547e38d'),
   },
   {
     value: 'intermediate' as ItLevel,
-    title: uiCopy('u_382129d064bd2996'),
-    body: uiCopy('u_dcd4a04085719b29'),
+    title: uiText('generatedUi.u_3b1cfa63d7d9c2bc'),
+    body: uiText('generatedUi.u_b89bb39b76b79ff4'),
   },
   {
     value: 'advanced' as ItLevel,
-    title: uiCopy('u_34115a204b8c790b'),
-    body: uiCopy('u_9505190c568bc59c'),
+    title: uiText('generatedUi.u_9f088dbebd6c3c70'),
+    body: uiText('generatedUi.u_f89265c189803c04'),
   },
 ]
 
 const TONE_OPTIONS = [
   {
     value: 'friendly' as TonePreference,
-    title: uiCopy('u_ddd774b726159f28'),
+    title: uiText('generatedUi.u_397423500c32c55a'),
     sample: 'I will guide you step by step and keep things clear.',
     emoji: '🙂',
   },
   {
     value: 'professional' as TonePreference,
-    title: uiCopy('u_1d6ed373b14b9ed3'),
+    title: uiText('generatedUi.u_19c73a5cdf346d96'),
     sample: 'I will keep recommendations concise, direct, and business-ready.',
     emoji: '💼',
   },
   {
     value: 'playful' as TonePreference,
-    title: uiCopy('u_4eab7c0a2f6ce614'),
+    title: uiText('generatedUi.u_dde9ac29785b19e6'),
     sample: 'I will keep setup upbeat, creative, and momentum-focused.',
     emoji: '⚡',
   },
@@ -275,7 +274,7 @@ export default function OnboardingPage() {
   if (checking) {
     return (
       <main style={{ minHeight: '100vh', background: '#080b18', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.64)' }}>
-        {t(dict, 'onboarding.loading', uiCopy('u_5c5ad174af59899a'))}
+        {t(dict, 'onboarding.loading')}
       </main>
     )
   }
@@ -318,13 +317,13 @@ export default function OnboardingPage() {
       `}</style>
 
       <header className="topbar">
-        <div className="brand">{uiCopy('u_0cd570cb222a964e')}<span style={{ color: GOLD }}>{uiCopy('u_4697325d881aa657')}</span></div>
-        <button className="skipButton" onClick={() => finish(true)} disabled={saving}>{t(dict, 'onboarding.skip', uiCopy('u_cf45f7a4a7060eaa'))}</button>
+        <div className="brand">{uiText('generatedUi.u_d041924c15885af6')}<span style={{ color: GOLD }}>{uiText('generatedUi.u_ca4264faf5970fc6')}</span></div>
+        <button className="skipButton" onClick={() => finish(true)} disabled={saving}>{t(dict, 'onboarding.skip')}</button>
       </header>
 
-      <section className="layout" aria-label={uiCopy('u_ac9f6ee3a4683fa2')}>
-        <aside className="sidebar" aria-label={uiCopy('u_f5ffe41a1e7655dc')}>
-          <strong>{t(dict, 'onboarding.progressComplete', uiCopy('u_944c25f56709f4de')).replace(uiCopy('u_1e8f076dc904596d'), String(Math.round(progress)))}</strong>
+      <section className="layout" aria-label={uiText('generatedUi.u_011262fde9d974e5')}>
+        <aside className="sidebar" aria-label={uiText('generatedUi.u_ad8a0dac00a23008')}>
+          <strong>{t(dict, 'onboarding.progressComplete').replace("{pct}", String(Math.round(progress)))}</strong>
           <div className="progressTrack" aria-hidden="true"><div className="progressFill" style={{ width: `${progress}%` }} /></div>
           <div className="stepList">
             {STEPS.map((item, index) => (
@@ -340,14 +339,14 @@ export default function OnboardingPage() {
           {activeStep.key === 'welcome' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h1>{t(dict, 'onboarding.welcome.title', uiCopy('u_011e243e170b5c1e')).replace(uiCopy('u_27fda04f2e5ba487'), firstName)}</h1>
-              <p>{t(dict, 'onboarding.welcome.intro', uiCopy('u_0e0b19ab29e7e9c2'))}</p>
+              <h1>{t(dict, 'onboarding.welcome.title').replace("{name}", firstName)}</h1>
+              <p>{t(dict, 'onboarding.welcome.intro')}</p>
               <div className="workshopPreview">
-                <strong>{t(dict, 'onboarding.welcome.storyboardLabel', uiCopy('u_74a2577b6f124e42'))}</strong>
-                <p style={{ marginBottom: 0 }}>{t(dict, 'onboarding.welcome.storyboardBody', uiCopy('u_892da35ce389fb60'))}</p>
+                <strong>{t(dict, 'onboarding.welcome.storyboardLabel')}</strong>
+                <p style={{ marginBottom: 0 }}>{t(dict, 'onboarding.welcome.storyboardBody')}</p>
               </div>
               <div className="footerActions">
-                <button className="primaryButton" onClick={() => goTo(1)}>{t(dict, 'onboarding.welcome.start', uiCopy('u_289c44aee60e3427'))}</button>
+                <button className="primaryButton" onClick={() => goTo(1)}>{t(dict, 'onboarding.welcome.start')}</button>
               </div>
             </div>
           )}
@@ -355,8 +354,8 @@ export default function OnboardingPage() {
           {activeStep.key === 'profiling' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>{t(dict, 'onboarding.profiling.heading', uiCopy('u_808e5abb0c58edd7'))}</h2>
-              <p>{t(dict, 'onboarding.profiling.intro', uiCopy('u_ba23ec30f8e30fba'))}</p>
+              <h2>{t(dict, 'onboarding.profiling.heading')}</h2>
+              <p>{t(dict, 'onboarding.profiling.intro')}</p>
               <div className="optionGrid">
                 {ROLE_OPTIONS.map((option) => (
                   <button key={option.value} className={`optionCard ${answers.role === option.value ? 'optionCardActive' : ''}`} onClick={() => setAnswers((current) => ({ ...current, role: option.value }))}>
@@ -366,7 +365,7 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
-              <strong>{t(dict, 'onboarding.profiling.itComfort', uiCopy('u_b1ce9dbaf61fa288'))}</strong>
+              <strong>{t(dict, 'onboarding.profiling.itComfort')}</strong>
               <div className="levelGrid">
                 {IT_LEVEL_OPTIONS.map((option) => (
                   <button key={option.value} className={`optionCard ${answers.itLevel === option.value ? 'optionCardActive' : ''}`} onClick={() => setAnswers((current) => ({ ...current, itLevel: option.value }))}>
@@ -376,8 +375,8 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(0, 'back')}>{t(dict, 'onboarding.common.back', uiCopy('u_4f6437bbbca087be'))}</button>
-                <button className="primaryButton" onClick={() => goTo(2)} disabled={!canContinue}>{t(dict, 'onboarding.common.continue', uiCopy('u_bbb5b450368cbfba'))}</button>
+                <button className="ghostButton" onClick={() => goTo(0, 'back')}>{t(dict, 'onboarding.common.back')}</button>
+                <button className="primaryButton" onClick={() => goTo(2)} disabled={!canContinue}>{t(dict, 'onboarding.common.continue')}</button>
               </div>
             </div>
           )}
@@ -385,18 +384,18 @@ export default function OnboardingPage() {
           {activeStep.key === 'consent' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>{t(dict, 'onboarding.consent.heading', uiCopy('u_0712d84786192f5a'))}</h2>
-              <p>{t(dict, 'onboarding.consent.intro', uiCopy('u_6f0bd1ae550a005a'))}</p>
+              <h2>{t(dict, 'onboarding.consent.heading')}</h2>
+              <p>{t(dict, 'onboarding.consent.intro')}</p>
               <label className="consentBox">
                 <input type="checkbox" checked={answers.consentAiTraining} onChange={(event) => setAnswers((current) => ({ ...current, consentAiTraining: event.target.checked }))} />
                 <span>
-                  <strong>{t(dict, 'onboarding.consent.checkboxLabel', uiCopy('u_0ac6448542d96df7'))}</strong>
-                  <p style={{ margin: '.35rem 0 0' }}>{t(dict, 'onboarding.consent.checkboxBody', uiCopy('u_91d2d538b6e4ab72'))}</p>
+                  <strong>{t(dict, 'onboarding.consent.checkboxLabel')}</strong>
+                  <p style={{ margin: '.35rem 0 0' }}>{t(dict, 'onboarding.consent.checkboxBody')}</p>
                 </span>
               </label>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(1, 'back')}>{t(dict, 'onboarding.common.back', uiCopy('u_1739a25e1e0879af'))}</button>
-                <button className="primaryButton" onClick={() => goTo(3)}>{answers.consentAiTraining ? t(dict, 'onboarding.consent.save', uiCopy('u_de31e99d97b39c6b')) : t(dict, 'onboarding.consent.continueWithout', uiCopy('u_61ade22ccde07c0a'))}</button>
+                <button className="ghostButton" onClick={() => goTo(1, 'back')}>{t(dict, 'onboarding.common.back')}</button>
+                <button className="primaryButton" onClick={() => goTo(3)}>{answers.consentAiTraining ? t(dict, 'onboarding.consent.save') : t(dict, 'onboarding.consent.continueWithout')}</button>
               </div>
             </div>
           )}
@@ -404,8 +403,8 @@ export default function OnboardingPage() {
           {activeStep.key === 'tone' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>{t(dict, 'onboarding.tone.heading', uiCopy('u_79ca8cbfdeff184b'))}</h2>
-              <p>{t(dict, 'onboarding.tone.intro', uiCopy('u_a3eec0548d5bf6ff'))}</p>
+              <h2>{t(dict, 'onboarding.tone.heading')}</h2>
+              <p>{t(dict, 'onboarding.tone.intro')}</p>
               <div className="toneGrid">
                 {TONE_OPTIONS.map((option) => (
                   <button key={option.value} className={`optionCard ${answers.tonePreference === option.value ? 'optionCardActive' : ''}`} onClick={() => setAnswers((current) => ({ ...current, tonePreference: option.value }))}>
@@ -416,8 +415,8 @@ export default function OnboardingPage() {
                 ))}
               </div>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(2, 'back')}>{t(dict, 'onboarding.common.back', uiCopy('u_07f939854367f0d6'))}</button>
-                <button className="primaryButton" onClick={() => goTo(4)} disabled={!canContinue}>{t(dict, 'onboarding.common.continue', uiCopy('u_1aadcd32444d0e4d'))}</button>
+                <button className="ghostButton" onClick={() => goTo(2, 'back')}>{t(dict, 'onboarding.common.back')}</button>
+                <button className="primaryButton" onClick={() => goTo(4)} disabled={!canContinue}>{t(dict, 'onboarding.common.continue')}</button>
               </div>
             </div>
           )}
@@ -425,21 +424,21 @@ export default function OnboardingPage() {
           {activeStep.key === 'confirmation' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>{t(dict, 'onboarding.confirm.heading', uiCopy('u_dd9b5b056332c677'))}</h2>
-              <p>{t(dict, 'onboarding.confirm.intro', uiCopy('u_c2748314453e3031'))}</p>
+              <h2>{t(dict, 'onboarding.confirm.heading')}</h2>
+              <p>{t(dict, 'onboarding.confirm.intro')}</p>
               <div className="summaryGrid">
-                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.role', uiCopy('u_5322322d37315305'))}</span><h3>{answers.role === 'developer' ? t(dict, 'onboarding.roles.developer.title', uiCopy('u_90eb625804e1d852')) : t(dict, 'onboarding.roles.non_developer.title', uiCopy('u_45a9da974a9304cf'))}</h3></div>
-                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.itLevel', uiCopy('u_1801af2e6f4178f2'))}</span><h3>{answers.itLevel ? t(dict, 'onboarding.itLevels.' + answers.itLevel + '.title', answers.itLevel) : t(dict, 'onboarding.confirm.notSelected', uiCopy('u_b037e1a341a49b72'))}</h3></div>
-                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.tone', uiCopy('u_2d1548fc22da194a'))}</span><h3>{t(dict, 'onboarding.tones.' + (answers.tonePreference || 'friendly') + '.title', answers.tonePreference || 'friendly')}</h3></div>
-                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.consent', uiCopy('u_d8f68c312a6f282e'))}</span><h3>{answers.consentAiTraining ? t(dict, 'onboarding.confirm.granted', uiCopy('u_99659229ae3bab26')) : t(dict, 'onboarding.confirm.notGranted', uiCopy('u_fea784ced20dfc41'))}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.role')}</span><h3>{answers.role === 'developer' ? t(dict, 'onboarding.roles.developer.title') : t(dict, 'onboarding.roles.non_developer.title')}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.itLevel')}</span><h3>{answers.itLevel ? t(dict, 'onboarding.itLevels.' + answers.itLevel + '.title', answers.itLevel) : t(dict, 'onboarding.confirm.notSelected')}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.tone')}</span><h3>{t(dict, 'onboarding.tones.' + (answers.tonePreference || 'friendly') + '.title', answers.tonePreference || 'friendly')}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.consent')}</span><h3>{answers.consentAiTraining ? t(dict, 'onboarding.confirm.granted') : t(dict, 'onboarding.confirm.notGranted')}</h3></div>
               </div>
               <div className="workshopPreview">
-                <strong>{t(dict, 'onboarding.confirm.previewLabel', uiCopy('u_b6efc7ee16066254'))}</strong>
-                <p style={{ marginBottom: 0 }}>{answers.itLevel === 'advanced' ? t(dict, 'onboarding.confirm.previewAdvanced', uiCopy('u_ac60977f1edee76c')) : answers.itLevel === 'intermediate' ? t(dict, 'onboarding.confirm.previewIntermediate', uiCopy('u_926197316a22384d')) : t(dict, 'onboarding.confirm.previewBeginner', uiCopy('u_44124c2da711d527'))}</p>
+                <strong>{t(dict, 'onboarding.confirm.previewLabel')}</strong>
+                <p style={{ marginBottom: 0 }}>{answers.itLevel === 'advanced' ? t(dict, 'onboarding.confirm.previewAdvanced') : answers.itLevel === 'intermediate' ? t(dict, 'onboarding.confirm.previewIntermediate') : t(dict, 'onboarding.confirm.previewBeginner')}</p>
               </div>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(3, 'back')}>{t(dict, 'onboarding.confirm.editTone', uiCopy('u_6985ec667cb300d8'))}</button>
-                <button className="primaryButton" onClick={() => finish()} disabled={saving}>{saving ? t(dict, 'onboarding.confirm.saving', uiCopy('u_2ce1e68a5654f617')) : t(dict, 'onboarding.confirm.complete', uiCopy('u_6eed779448353e6c'))}</button>
+                <button className="ghostButton" onClick={() => goTo(3, 'back')}>{t(dict, 'onboarding.confirm.editTone')}</button>
+                <button className="primaryButton" onClick={() => finish()} disabled={saving}>{saving ? t(dict, 'onboarding.confirm.saving') : t(dict, 'onboarding.confirm.complete')}</button>
               </div>
             </div>
           )}

@@ -1,8 +1,8 @@
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+import { uiText } from '@/lib/i18n/uiText'
 const metrics = [
-  { value: '1,200+', label: uiCopy('u_148d24cc79b85be9') },
-  { value: '4.9★', label: uiCopy('u_6ea5419d77cea9a9') },
-  { value: '3x', label: uiCopy('u_a271f20da3c24d29') },
+  { value: '1,200+', label: uiText('generatedUi.u_ea730b4a1ad0280b') },
+  { value: '4.9★', label: uiText('generatedUi.u_df99f9ff9fd5b3b9') },
+  { value: '3x', label: uiText('generatedUi.u_522f9a85e004484b') },
 ]
 
 export default function Metrics() {

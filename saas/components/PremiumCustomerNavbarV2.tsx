@@ -7,8 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import AuthModal from './AuthModal.tsx'
 import { supabase } from '@/utils/supabase/client'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 type NavItem = {
   icon: string
@@ -33,121 +32,121 @@ const GROUPS: NavGroup[] = [
   {
     id: 'public-tools',
     labelKey: 'nav.publicTools.label',
-    fallbackLabel: uiCopy('u_7b63c42a076c3271'),
+    fallbackLabel: uiText('generatedUi.u_9296483909d17d1a'),
     items: [
-      { icon: '◎', labelKey: 'nav.publicTools.siteReview', fallbackLabel: uiCopy('u_971a85e57fb17f34'), href: '/dashboard/audit' },
-      { icon: '🛡️', labelKey: 'nav.publicTools.securityCheck', fallbackLabel: uiCopy('u_1314f9ab8bba5333'), href: '/cybersecurity-check' },
-      { icon: '✦', labelKey: 'nav.publicTools.improveYourSite', fallbackLabel: uiCopy('u_d9dd1f9cf90b9411'), href: '/dashboard/improve' },
-      { icon: '🚀', labelKey: 'nav.publicTools.websiteOptimizer', fallbackLabel: uiCopy('u_0e8d1d237be22b26'), href: '/website-optimizer' },
+      { icon: '◎', labelKey: 'nav.publicTools.siteReview', fallbackLabel: uiText('generatedUi.u_5976c17e6bbdd35e'), href: '/dashboard/audit' },
+      { icon: '🛡️', labelKey: 'nav.publicTools.securityCheck', fallbackLabel: uiText('generatedUi.u_5b5353420d2d5a74'), href: '/cybersecurity-check' },
+      { icon: '✦', labelKey: 'nav.publicTools.improveYourSite', fallbackLabel: uiText('generatedUi.u_9df13ac00553006c'), href: '/dashboard/improve' },
+      { icon: '🚀', labelKey: 'nav.publicTools.websiteOptimizer', fallbackLabel: uiText('generatedUi.u_7c0cbab9b791858b'), href: '/website-optimizer' },
     ],
   },
   {
     id: 'campaigns',
     labelKey: 'nav.campaigns',
-    fallbackLabel: uiCopy('u_34fa42e803e01c5e'),
+    fallbackLabel: uiText('generatedUi.u_30e9a089397b25b0'),
     items: [
-      { icon: '🎥', labelKey: 'nav.campaignStudio', fallbackLabel: uiCopy('u_4d5f5e61a757906a'), href: '/agency' },
-      { icon: '📈', labelKey: 'nav.marketingSales', fallbackLabel: uiCopy('u_1dbe62ee7a5ad852'), href: '/dashboard/sales' },
-      { icon: '🧭', labelKey: 'nav.marketingSetup', fallbackLabel: uiCopy('u_4e3eb759ebbdb7d4'), href: '/onboarding' },
-      { icon: '📧', labelKey: 'nav.emailOutreach', fallbackLabel: uiCopy('u_eb8a4c64968e9600'), href: '/dashboard/outreach' },
-      { icon: '📣', labelKey: 'nav.campaignConsole', fallbackLabel: uiCopy('u_b9689ff4157b08aa'), href: '/dashboard/cosa' },
-      { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: uiCopy('u_35d2313ede0d7109'), href: '/dashboard/cosa/video-pipeline' },
-      { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: uiCopy('u_4ad98aa98f64a8d6'), href: '/dashboard/marketing/press-print' },
-      { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: uiCopy('u_5eb9149f04ab588c'), href: '/dashboard/marketing/press-outreach' },
-      { icon: '📰', labelKey: 'nav.pressProviders', fallbackLabel: uiCopy('u_0bd0a7e53ad136d5'), href: '/dashboard/marketing/press-providers' },
-      { icon: '📢', labelKey: 'nav.promote', fallbackLabel: uiCopy('u_7fac063ce53c4317'), href: '/dashboard/promote' },
-      { icon: '🔗', labelKey: 'nav.socialConnections', fallbackLabel: uiCopy('u_51bc210696ef9aac'), href: '/dashboard/outreach/social' },
-      { icon: '🗃️', labelKey: 'nav.allCampaigns', fallbackLabel: uiCopy('u_5a819cf2ddaf1089'), href: '/dashboard/campaigns' },
-      { icon: '💡', labelKey: 'nav.opportunities', fallbackLabel: uiCopy('u_b20b3a5c7c614067'), href: '/dashboard/opportunities' },
-      { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: uiCopy('u_24204f180e27d302'), href: '/dashboard/sales/pipeline' },
-      { icon: '📨', labelKey: 'nav.myOutreach', fallbackLabel: uiCopy('u_0585b1ed52f8649c'), href: '/dashboard/my-outreach' },
-      { icon: '⛏️', labelKey: 'nav.cosMining', fallbackLabel: uiCopy('u_06ab3bf1bf4f82b0'), href: '/dashboard/cos-mining' },
-      { icon: '🖥️', labelKey: 'nav.marketingConsole', fallbackLabel: uiCopy('u_16d4c0dc2e4362cb'), href: '/dashboard/marketing-sales/console' },
+      { icon: '🎥', labelKey: 'nav.campaignStudio', fallbackLabel: uiText('generatedUi.u_068bb1a34377680c'), href: '/agency' },
+      { icon: '📈', labelKey: 'nav.marketingSales', fallbackLabel: uiText('generatedUi.u_dcba31525bd63b56'), href: '/dashboard/sales' },
+      { icon: '🧭', labelKey: 'nav.marketingSetup', fallbackLabel: uiText('generatedUi.u_115d07a265435234'), href: '/onboarding' },
+      { icon: '📧', labelKey: 'nav.emailOutreach', fallbackLabel: uiText('generatedUi.u_fb03f7ab12994d23'), href: '/dashboard/outreach' },
+      { icon: '📣', labelKey: 'nav.campaignConsole', fallbackLabel: uiText('generatedUi.u_5a6c6aa4a802b400'), href: '/dashboard/cosa' },
+      { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: uiText('generatedUi.u_36d4f0c2fcf34e05'), href: '/dashboard/cosa/video-pipeline' },
+      { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: uiText('generatedUi.u_ba2f8d68f462717f'), href: '/dashboard/marketing/press-print' },
+      { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: uiText('generatedUi.u_8dc7472b90ff7180'), href: '/dashboard/marketing/press-outreach' },
+      { icon: '📰', labelKey: 'nav.pressProviders', fallbackLabel: uiText('generatedUi.u_9d597b5a530fd867'), href: '/dashboard/marketing/press-providers' },
+      { icon: '📢', labelKey: 'nav.promote', fallbackLabel: uiText('generatedUi.u_5834dab085442471'), href: '/dashboard/promote' },
+      { icon: '🔗', labelKey: 'nav.socialConnections', fallbackLabel: uiText('generatedUi.u_819abac9f5ab2dd3'), href: '/dashboard/outreach/social' },
+      { icon: '🗃️', labelKey: 'nav.allCampaigns', fallbackLabel: uiText('generatedUi.u_350fd0c928342e75'), href: '/dashboard/campaigns' },
+      { icon: '💡', labelKey: 'nav.opportunities', fallbackLabel: uiText('generatedUi.u_1e6e878c9dc923dd'), href: '/dashboard/opportunities' },
+      { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: uiText('generatedUi.u_22a3534629d2dcf1'), href: '/dashboard/sales/pipeline' },
+      { icon: '📨', labelKey: 'nav.myOutreach', fallbackLabel: uiText('generatedUi.u_04c411dc1ee0d29f'), href: '/dashboard/my-outreach' },
+      { icon: '⛏️', labelKey: 'nav.cosMining', fallbackLabel: uiText('generatedUi.u_e595ed3d019ad2a5'), href: '/dashboard/cos-mining' },
+      { icon: '🖥️', labelKey: 'nav.marketingConsole', fallbackLabel: uiText('generatedUi.u_c14b309b4fa21c68'), href: '/dashboard/marketing-sales/console' },
     ],
   },
   {
     id: 'operations',
     labelKey: 'nav.operations',
-    fallbackLabel: uiCopy('u_d4680bb875b41b8e'),
+    fallbackLabel: uiText('generatedUi.u_358cc201f87d9dc9'),
     items: [
-      { icon: '🏠', labelKey: 'nav.dashboard', fallbackLabel: uiCopy('u_06558cb3f8826057'), href: '/dashboard' },
-      { icon: '📅', labelKey: 'nav.calendar', fallbackLabel: uiCopy('u_ab5b00fefeb2ad90'), href: '/dashboard/calendar' },
-      { icon: '📑', labelKey: 'nav.spreadsheets', fallbackLabel: uiCopy('u_273d6402c23d9333'), href: '/dashboard/spreadsheets' },
-      { icon: '⭐', labelKey: 'nav.reviews', fallbackLabel: uiCopy('u_da8642977f92b192'), href: '/dashboard/reviews' },
-      { icon: '🤖', labelKey: 'nav.concierge', fallbackLabel: uiCopy('u_e9057925110de5e1'), href: '/dashboard/assistant' },
-      { icon: '💬', labelKey: 'nav.feedback', fallbackLabel: uiCopy('u_55a9f18716ece64c'), href: '/dashboard/feedback' },
-      { icon: '🔌', labelKey: 'nav.integrations', fallbackLabel: uiCopy('u_d497947000b68d9a'), href: '/integrations' },
-      { icon: '📋', labelKey: 'nav.infrastructure', fallbackLabel: uiCopy('u_b746e55f7a20a49b'), href: '/dashboard/infrastructure' },
-      { icon: '👥', labelKey: 'nav.team', fallbackLabel: uiCopy('u_a5201d7942214f19'), href: '/dashboard/team' },
-      { icon: '📊', labelKey: 'nav.operationsDashboard', fallbackLabel: uiCopy('u_0445d4a621d16193'), href: '/dashboard/operations' },
-      { icon: '🧩', labelKey: 'nav.enterpriseIntegrations', fallbackLabel: uiCopy('u_fe250fdab7c4d527'), href: '/enterprise-integration-builder' },
+      { icon: '🏠', labelKey: 'nav.dashboard', fallbackLabel: uiText('generatedUi.u_67b696468610b879'), href: '/dashboard' },
+      { icon: '📅', labelKey: 'nav.calendar', fallbackLabel: uiText('generatedUi.u_d5d0a30b517e3bea'), href: '/dashboard/calendar' },
+      { icon: '📑', labelKey: 'nav.spreadsheets', fallbackLabel: uiText('generatedUi.u_fdae6602c2bebdcc'), href: '/dashboard/spreadsheets' },
+      { icon: '⭐', labelKey: 'nav.reviews', fallbackLabel: uiText('generatedUi.u_84cb7871b741c32e'), href: '/dashboard/reviews' },
+      { icon: '🤖', labelKey: 'nav.concierge', fallbackLabel: uiText('generatedUi.u_6fd6628dffd218e9'), href: '/dashboard/assistant' },
+      { icon: '💬', labelKey: 'nav.feedback', fallbackLabel: uiText('generatedUi.u_aac77df347205252'), href: '/dashboard/feedback' },
+      { icon: '🔌', labelKey: 'nav.integrations', fallbackLabel: uiText('generatedUi.u_090512d93fcc3c0d'), href: '/integrations' },
+      { icon: '📋', labelKey: 'nav.infrastructure', fallbackLabel: uiText('generatedUi.u_ed227cdaeb4a7009'), href: '/dashboard/infrastructure' },
+      { icon: '👥', labelKey: 'nav.team', fallbackLabel: uiText('generatedUi.u_5985039f106df054'), href: '/dashboard/team' },
+      { icon: '📊', labelKey: 'nav.operationsDashboard', fallbackLabel: uiText('generatedUi.u_d6027e4da26e9e17'), href: '/dashboard/operations' },
+      { icon: '🧩', labelKey: 'nav.enterpriseIntegrations', fallbackLabel: uiText('generatedUi.u_78f6bc201cc6de7e'), href: '/enterprise-integration-builder' },
     ],
   },
   {
     id: 'studio',
     labelKey: 'nav.studio',
-    fallbackLabel: uiCopy('u_657cf7701e62136d'),
+    fallbackLabel: uiText('generatedUi.u_0aa91af2ec4c1fd7'),
     items: [
-      { icon: '🌐', labelKey: 'nav.websiteBuilder', fallbackLabel: uiCopy('u_113726bc02323df0'), href: '/dashboard/builder' },
-      { icon: '✨', labelKey: 'nav.improveContent', fallbackLabel: uiCopy('u_aa206397b58f72c0'), href: '/dashboard/improve' },
-      { icon: '🚀', labelKey: 'nav.launchpad', fallbackLabel: uiCopy('u_41c427cfa6648a82'), href: '/dashboard/launchpad' },
-      { icon: '🏢', labelKey: 'nav.buildBusiness', fallbackLabel: uiCopy('u_58dc29265123c0e1'), href: '/dashboard/launchpad/business' },
-      { icon: '🛒', labelKey: 'nav.onlineStore', fallbackLabel: uiCopy('u_88b5023b1d6ccbde'), href: '/dashboard/launchpad/store' },
-      { icon: '🎙️', labelKey: 'nav.podcastLaunchpad', fallbackLabel: uiCopy('u_a4c48ee816d49c1c'), href: '/dashboard/launchpad/podcast' },
-      { icon: '🎚️', labelKey: 'nav.podcastStudio', fallbackLabel: uiCopy('u_2eff6e8b7221ae96'), href: '/dashboard/podcast/studio' },
-      { icon: '🎬', labelKey: 'nav.videoStudio', fallbackLabel: uiCopy('u_4f402e1588cbfa21'), href: '/dashboard/video' },
-      { icon: '🎧', labelKey: 'nav.audioStudio', fallbackLabel: uiCopy('u_9ca31c7e07b485c5'), href: '/dashboard/audio' },
-      { icon: '🛠️', labelKey: 'nav.apprentice', fallbackLabel: uiCopy('u_adb17dcbfaf7108d'), href: '/dashboard/apprentice' },
-      { icon: '🎨', labelKey: 'nav.creativeStudio', fallbackLabel: uiCopy('u_8692437eb360e142'), href: '/dashboard/creative' },
-      { icon: '🎨', labelKey: 'nav.cosaCreative', fallbackLabel: uiCopy('u_7d0891c61f9b1ae0'), href: '/dashboard/cosa/creative' },
-      { icon: '🆓', labelKey: 'nav.freeVideo', fallbackLabel: uiCopy('u_b00f69437492c88b'), href: '/dashboard/cosa/video/free' },
-      { icon: '🎞️', labelKey: 'nav.motionVideo', fallbackLabel: uiCopy('u_45406b69a2d4b7ee'), href: '/dashboard/cosa/video/motion' },
-      { icon: '🎙️', labelKey: 'nav.podcasters', fallbackLabel: uiCopy('u_d4a0229437e6d3cd'), href: '/podcasters' },
+      { icon: '🌐', labelKey: 'nav.websiteBuilder', fallbackLabel: uiText('generatedUi.u_b68eb23d99aa29c6'), href: '/dashboard/builder' },
+      { icon: '✨', labelKey: 'nav.improveContent', fallbackLabel: uiText('generatedUi.u_2ed13e9a9e34f4b7'), href: '/dashboard/improve' },
+      { icon: '🚀', labelKey: 'nav.launchpad', fallbackLabel: uiText('generatedUi.u_08c9188c5d641e94'), href: '/dashboard/launchpad' },
+      { icon: '🏢', labelKey: 'nav.buildBusiness', fallbackLabel: uiText('generatedUi.u_a5efa3ab38ed3235'), href: '/dashboard/launchpad/business' },
+      { icon: '🛒', labelKey: 'nav.onlineStore', fallbackLabel: uiText('generatedUi.u_c50970c1903db9ae'), href: '/dashboard/launchpad/store' },
+      { icon: '🎙️', labelKey: 'nav.podcastLaunchpad', fallbackLabel: uiText('generatedUi.u_ca8fc15614d107f2'), href: '/dashboard/launchpad/podcast' },
+      { icon: '🎚️', labelKey: 'nav.podcastStudio', fallbackLabel: uiText('generatedUi.u_12942e73e6627f61'), href: '/dashboard/podcast/studio' },
+      { icon: '🎬', labelKey: 'nav.videoStudio', fallbackLabel: uiText('generatedUi.u_095321ec675b9643'), href: '/dashboard/video' },
+      { icon: '🎧', labelKey: 'nav.audioStudio', fallbackLabel: uiText('generatedUi.u_c15e3ff611a391cb'), href: '/dashboard/audio' },
+      { icon: '🛠️', labelKey: 'nav.apprentice', fallbackLabel: uiText('generatedUi.u_dbda3b1dfdc32198'), href: '/dashboard/apprentice' },
+      { icon: '🎨', labelKey: 'nav.creativeStudio', fallbackLabel: uiText('generatedUi.u_c0a1ec0a03c6b0bf'), href: '/dashboard/creative' },
+      { icon: '🎨', labelKey: 'nav.cosaCreative', fallbackLabel: uiText('generatedUi.u_9c73f7d33e13eb8f'), href: '/dashboard/cosa/creative' },
+      { icon: '🆓', labelKey: 'nav.freeVideo', fallbackLabel: uiText('generatedUi.u_1f73646d46903441'), href: '/dashboard/cosa/video/free' },
+      { icon: '🎞️', labelKey: 'nav.motionVideo', fallbackLabel: uiText('generatedUi.u_9ee9ed1ac60866b3'), href: '/dashboard/cosa/video/motion' },
+      { icon: '🎙️', labelKey: 'nav.podcasters', fallbackLabel: uiText('generatedUi.u_0d74ad5328bfdd35'), href: '/podcasters' },
     ],
   },
   {
     id: 'security',
     labelKey: 'nav.security',
-    fallbackLabel: uiCopy('u_0b9b247b1ead11b3'),
+    fallbackLabel: uiText('generatedUi.u_8f6fb4eb7f42c0e2'),
     items: [
-      { icon: '🛡️', labelKey: 'nav.cybersecurity', fallbackLabel: uiCopy('u_701b1d08d831d045'), href: '/dashboard/cybersecurity' },
-      { icon: '📋', labelKey: 'nav.auditConsole', fallbackLabel: uiCopy('u_268ad558d5aa3d8c'), href: '/dashboard/audit' },
-      { icon: '🎛️', labelKey: 'nav.auditCockpit', fallbackLabel: uiCopy('u_ded936012731458b'), href: '/hub/audit' },
+      { icon: '🛡️', labelKey: 'nav.cybersecurity', fallbackLabel: uiText('generatedUi.u_23b2d5dae0a87cf9'), href: '/dashboard/cybersecurity' },
+      { icon: '📋', labelKey: 'nav.auditConsole', fallbackLabel: uiText('generatedUi.u_281ad82f2d803589'), href: '/dashboard/audit' },
+      { icon: '🎛️', labelKey: 'nav.auditCockpit', fallbackLabel: uiText('generatedUi.u_c0c52c1e72197d6d'), href: '/hub/audit' },
     ],
   },
   {
     id: 'help',
     labelKey: 'nav.help',
-    fallbackLabel: uiCopy('u_0a9220d1225a7449'),
+    fallbackLabel: uiText('generatedUi.u_b79cac926e0b2e34'),
     items: [
-      { icon: '❓', labelKey: 'nav.coreHelp', fallbackLabel: uiCopy('u_e109d0c0c821d704'), href: '/support' },
-      { icon: '📖', labelKey: 'nav.documentation', fallbackLabel: uiCopy('u_81f0d902558e5ff8'), href: '/docs' },
-      { icon: '❔', labelKey: 'nav.faq', fallbackLabel: uiCopy('u_175fdade64fb31e9'), href: '/faq' },
-      { icon: '📝', labelKey: 'nav.requestPlan', fallbackLabel: uiCopy('u_f90535ab95bd7d68'), href: '/request-plan' },
-      { icon: '↪', labelKey: 'nav.logOut', fallbackLabel: uiCopy('u_6add3a2cae40c355'), action: 'logout' },
+      { icon: '❓', labelKey: 'nav.coreHelp', fallbackLabel: uiText('generatedUi.u_f8d47b82e285ba95'), href: '/support' },
+      { icon: '📖', labelKey: 'nav.documentation', fallbackLabel: uiText('generatedUi.u_c205924de0fe636c'), href: '/docs' },
+      { icon: '❔', labelKey: 'nav.faq', fallbackLabel: uiText('generatedUi.u_dbc468a14b601d5d'), href: '/faq' },
+      { icon: '📝', labelKey: 'nav.requestPlan', fallbackLabel: uiText('generatedUi.u_3f7c9eb705ada714'), href: '/request-plan' },
+      { icon: '↪', labelKey: 'nav.logOut', fallbackLabel: uiText('generatedUi.u_49616145514e9abf'), action: 'logout' },
     ],
   },
   {
     id: 'admin',
     labelKey: 'nav.admin',
-    fallbackLabel: uiCopy('u_1be5b765450c80c4'),
+    fallbackLabel: uiText('generatedUi.u_c1c224b03cd9bc7b'),
     items: [
-      { icon: '🤖', labelKey: 'nav.cosAssistant', fallbackLabel: uiCopy('u_039ab7623db6fea9'), href: '/dashboard/assistant', requiresOwner: true },
-      { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: uiCopy('u_6b2220fcb5f6bd39'), href: '/admin', requiresOwner: true },
-      { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: uiCopy('u_724bb9a980f6fb51'), href: '/dashboard/supervisor', requiresOwner: true },
-      { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: uiCopy('u_0901fdf27b97a07f'), href: '/hub', requiresOwner: true },
-      { icon: '🔐', labelKey: 'nav.vault', fallbackLabel: uiCopy('u_193c26e3bd1fbfc0'), href: '/vault', requiresOwner: true },
-      { icon: '🧠', labelKey: 'nav.cosHub', fallbackLabel: uiCopy('u_f266515241e624a8'), href: '/hub/cos', requiresOwner: true },
-      { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: uiCopy('u_790d97e417789db1'), href: '/admin/onboarding', requiresOwner: true },
-      { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiCopy('u_2b0fc72a2eaeffa3'), href: '/dashboard/supervisor/ha', requiresOwner: true },
-      { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiCopy('u_76c4147116e8af7f'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },
-      { icon: '🧩', labelKey: 'nav.providerHubStatus', fallbackLabel: uiCopy('u_d53671c280ba44af'), href: '/dashboard/provider-hub', requiresOwner: true },
-      { icon: '📦', labelKey: 'nav.portableReadiness', fallbackLabel: uiCopy('u_146d43f4b3511f7b'), href: '/dashboard/portable-products/readiness', requiresOwner: true },
-      { icon: '📊', labelKey: 'nav.adminOverview', fallbackLabel: uiCopy('u_68708b9be71b4558'), href: '/admin/overview', requiresOwner: true },
-      { icon: '💰', labelKey: 'nav.adminRevenue', fallbackLabel: uiCopy('u_9d466ccf3c55fea5'), href: '/admin/revenue', requiresOwner: true },
-      { icon: '⚙️', labelKey: 'nav.adminSettings', fallbackLabel: uiCopy('u_bfa9ef910a43bc42'), href: '/admin/settings', requiresOwner: true },
-      { icon: '📨', labelKey: 'nav.hubEmailHealth', fallbackLabel: uiCopy('u_2edef47ce0cfb649'), href: '/hub/audit/email', requiresOwner: true },
-      { icon: '▲', labelKey: 'nav.hubVercel', fallbackLabel: uiCopy('u_e1792fe3d5010149'), href: '/hub/vercel', requiresOwner: true },
+      { icon: '🤖', labelKey: 'nav.cosAssistant', fallbackLabel: uiText('generatedUi.u_f7186e7e576a60ad'), href: '/dashboard/assistant', requiresOwner: true },
+      { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: uiText('generatedUi.u_4943e64e40762052'), href: '/admin', requiresOwner: true },
+      { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: uiText('generatedUi.u_67524288ec825ae4'), href: '/dashboard/supervisor', requiresOwner: true },
+      { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: uiText('generatedUi.u_3cbf6d117f4dc1b5'), href: '/hub', requiresOwner: true },
+      { icon: '🔐', labelKey: 'nav.vault', fallbackLabel: uiText('generatedUi.u_e7ccb35263c6b8a0'), href: '/vault', requiresOwner: true },
+      { icon: '🧠', labelKey: 'nav.cosHub', fallbackLabel: uiText('generatedUi.u_a4a4f4e10a389fd8'), href: '/hub/cos', requiresOwner: true },
+      { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: uiText('generatedUi.u_6cda524ff713f2b8'), href: '/admin/onboarding', requiresOwner: true },
+      { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiText('generatedUi.u_4f794af09d6d3e3c'), href: '/dashboard/supervisor/ha', requiresOwner: true },
+      { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiText('generatedUi.u_68cb08a39a30554a'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },
+      { icon: '🧩', labelKey: 'nav.providerHubStatus', fallbackLabel: uiText('generatedUi.u_9a955057059a488c'), href: '/dashboard/provider-hub', requiresOwner: true },
+      { icon: '📦', labelKey: 'nav.portableReadiness', fallbackLabel: uiText('generatedUi.u_627f029b2aaae158'), href: '/dashboard/portable-products/readiness', requiresOwner: true },
+      { icon: '📊', labelKey: 'nav.adminOverview', fallbackLabel: uiText('generatedUi.u_9ccfc43a0487068a'), href: '/admin/overview', requiresOwner: true },
+      { icon: '💰', labelKey: 'nav.adminRevenue', fallbackLabel: uiText('generatedUi.u_8e2318e66508c35e'), href: '/admin/revenue', requiresOwner: true },
+      { icon: '⚙️', labelKey: 'nav.adminSettings', fallbackLabel: uiText('generatedUi.u_1f87f883cc7e9c47'), href: '/admin/settings', requiresOwner: true },
+      { icon: '📨', labelKey: 'nav.hubEmailHealth', fallbackLabel: uiText('generatedUi.u_273085d2c705ed33'), href: '/hub/audit/email', requiresOwner: true },
+      { icon: '▲', labelKey: 'nav.hubVercel', fallbackLabel: uiText('generatedUi.u_a3ee7cfb19f57ef7'), href: '/hub/vercel', requiresOwner: true },
     ],
   },
 ]
@@ -188,8 +187,8 @@ export default function PremiumCustomerNavbarV2() {
 
   const searchableItems = useMemo(
     () => [
-      { icon: '⌂', label: t('nav.home', uiCopy('u_37510590ca9959a8')), href: '/' },
-      { icon: '💳', label: t('nav.pricing', uiCopy('u_5929927b200ce5aa')), href: '/pricing' },
+      { icon: '⌂', label: t('nav.home', "Home"), href: '/' },
+      { icon: '💳', label: t('nav.pricing', "Pricing"), href: '/pricing' },
       ...groups.flatMap(group => group.items.filter(item => item.href).map(item => ({
         ...item,
         label: t(item.labelKey, item.fallbackLabel),
@@ -325,10 +324,10 @@ export default function PremiumCustomerNavbarV2() {
         @media (max-width: 1280px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth, .sbnav-credits { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; max-height: calc(100vh - 62px); overflow-y: auto; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
       `}</style>
       <nav className="sbnav" ref={navRef}>
-        <Link href="/" className="sbnav-brand"><span className="sbnav-brand-mark" aria-hidden>⌁</span><span>{uiCopy('u_1dcdffcc33a9519f')}</span></Link>
+        <Link href="/" className="sbnav-brand"><span className="sbnav-brand-mark" aria-hidden>⌁</span><span>{uiText('generatedUi.u_7bc314f625464478')}</span></Link>
         <div className="sbnav-desktop">
-          <Link href="/" className={`sbnav-trigger ${itemIsActive(pathname, '/') ? 'sbnav-trigger-active' : ''}`}>{t('nav.home', uiCopy('u_1118d8a6794760fe'))}</Link>
-          <Link href="/pricing" className={`sbnav-trigger sbnav-pricing ${itemIsActive(pathname, '/pricing') ? 'sbnav-trigger-active' : ''}`}>{t('nav.pricing', uiCopy('u_7414fbff0b0fe576'))}</Link>
+          <Link href="/" className={`sbnav-trigger ${itemIsActive(pathname, '/') ? 'sbnav-trigger-active' : ''}`}>{t('nav.home', "Home")}</Link>
+          <Link href="/pricing" className={`sbnav-trigger sbnav-pricing ${itemIsActive(pathname, '/pricing') ? 'sbnav-trigger-active' : ''}`}>{t('nav.pricing', "Pricing")}</Link>
           {groups.map(group => {
             const open = openMenu === group.id
             const active = group.items.some(item => itemIsActive(pathname, item.href))
@@ -343,25 +342,25 @@ export default function PremiumCustomerNavbarV2() {
           })}
         </div>
         <div className="sbnav-search">
-          <input type="search" value={query} placeholder={t('nav.searchPlaceholder', uiCopy('u_27de70abde1818df'))} aria-label={t('nav.searchLabel', uiCopy('u_50083d85ced6b9a0'))} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
-          {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', uiCopy('u_d48cbcae16a847cb'))}</span>}</div> : null}
+          <input type="search" value={query} placeholder={t('nav.searchPlaceholder', "Search sections")} aria-label={t('nav.searchLabel', "Search navigation")} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
+          {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', "No matching sections")}</span>}</div> : null}
         </div>
-        {user ? <span className="sbnav-credits" aria-live="polite" title={t('nav.credits.label', uiCopy('u_bf049bc741dc77d9'))}>⚡ {ownerAccess ? t('nav.credits.unlimited', uiCopy('u_17bd13c3e66f30cb')) : (credits === null ? '…' : credits.toLocaleString())}</span> : null}
-        <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', uiCopy('u_fca7957f21786e9f'))} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}</select>
-        {user ? null : <button type="button" className="sbnav-auth" onClick={() => setShowAuth(true)}>{t('nav.getStarted', uiCopy('u_3b6cf16b20654bfd'))}</button>}
-        <button type="button" className="sbnav-burger" aria-label={t('nav.menu', uiCopy('u_1fb8ad5ad99b48f1'))} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
+        {user ? <span className="sbnav-credits" aria-live="polite" title={t('nav.credits.label', "credits")}>⚡ {ownerAccess ? t('nav.credits.unlimited', "Unlimited") : (credits === null ? '…' : credits.toLocaleString())}</span> : null}
+        <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', "Language")} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}</select>
+        {user ? null : <button type="button" className="sbnav-auth" onClick={() => setShowAuth(true)}>{t('nav.getStarted', "Get started")}</button>}
+        <button type="button" className="sbnav-burger" aria-label={t('nav.menu', "Menu")} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>
       {mobileOpen ? (
         <div className="sbnav-mobile">
-          {user ? <div className="sbnav-mobile-row" aria-live="polite">⚡ <span>{ownerAccess ? t('nav.credits.unlimited', uiCopy('u_f9e7b106426b90d1')) : (credits === null ? '…' : credits.toLocaleString())} {t('nav.credits.label', uiCopy('u_e58e79ea3663c027'))}</span></div> : null}
+          {user ? <div className="sbnav-mobile-row" aria-live="polite">⚡ <span>{ownerAccess ? t('nav.credits.unlimited', "Unlimited") : (credits === null ? '…' : credits.toLocaleString())} {t('nav.credits.label', "credits")}</span></div> : null}
           <div className="sbnav-search sbnav-mobile-search">
-            <input type="search" value={query} placeholder={t('nav.searchPlaceholder', uiCopy('u_a1fb3df3e417f9b3'))} aria-label={t('nav.searchLabel', uiCopy('u_783b39417a33ce3c'))} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
-            {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', uiCopy('u_d9452179571172f2'))}</span>}</div> : null}
+            <input type="search" value={query} placeholder={t('nav.searchPlaceholder', "Search sections")} aria-label={t('nav.searchLabel', "Search navigation")} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />
+            {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', "No matching sections")}</span>}</div> : null}
           </div>
-          <Link href="/" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">⌂<span>{t('nav.home', uiCopy('u_9cd2140230bc0604'))}</span></Link>
-          <Link href="/pricing" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">💳<span>{t('nav.pricing', uiCopy('u_cfbf6bcb1442be71'))}</span></Link>
+          <Link href="/" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">⌂<span>{t('nav.home', "Home")}</span></Link>
+          <Link href="/pricing" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">💳<span>{t('nav.pricing', "Pricing")}</span></Link>
           {groups.map(group => <div key={group.id} className="sbnav-mobile-group"><span className="sbnav-mobile-label">{t(group.labelKey, group.fallbackLabel)}</span>{group.items.map(item => renderItem(item, true))}</div>)}
-          {user ? null : <button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setShowAuth(true) }}>{t('nav.getStarted', uiCopy('u_f2552ff6493f57f2'))}</button>}
+          {user ? null : <button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setShowAuth(true) }}>{t('nav.getStarted', "Get started")}</button>}
         </div>
       ) : null}
       {showAuth ? <AuthModal onClose={() => setShowAuth(false)} /> : null}

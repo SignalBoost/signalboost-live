@@ -11,8 +11,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -45,29 +44,29 @@ const COPY: Record<Lang, {
   errNetwork: string
 }> = {
   en: {
-    leaveReview: uiCopy('u_ef413a4fa4091fbd'),
-    pageNotFound: uiCopy('u_83d9090cf1eda724'),
-    pageNotFoundSub: uiCopy('u_ee2c5a614efe509a'),
-    thankYou: uiCopy('u_1e1699cef3922434'),
-    thankYouSub: uiCopy('u_6bc44845759900c6'),
-    ratingLabel: uiCopy('u_eaab7f1f9db2d9a5'),
+    leaveReview: uiText('generatedUi.u_c52d5e6ddad7a60b'),
+    pageNotFound: uiText('generatedUi.u_a469ab4ca4e55bf5'),
+    pageNotFoundSub: uiText('generatedUi.u_2b45b9ca90fa2a58'),
+    thankYou: uiText('generatedUi.u_268bc1833e83306f'),
+    thankYouSub: uiText('generatedUi.u_5d5b8afd972f3139'),
+    ratingLabel: uiText('generatedUi.u_68548b47e72ee1a5'),
     starLabel: (n) => `${n} star${n > 1 ? 's' : ''}`,
-    nameLabel: uiCopy('u_9e0b11346b894305'),
-    namePlaceholder: uiCopy('u_46425bddb90956c4'),
-    emailLabel: uiCopy('u_64b1be831495683e'),
-    emailPlaceholder: uiCopy('u_58c4abce3aa0344a'),
-    emailNote: uiCopy('u_7923a8331d539d0b'),
-    reviewLabel: uiCopy('u_b9e72696173c68e8'),
-    reviewPlaceholder: uiCopy('u_5d058fdf9ee26b3a'),
-    submitBtn: uiCopy('u_44cada490a2d7c4f'),
-    submittingBtn: uiCopy('u_97a102a4301fac42'),
-    disclaimer: uiCopy('u_eb8556ba32a4213f'),
-    errName: uiCopy('u_193cd31564e3cf25'),
-    errEmail: uiCopy('u_faafa5db401886d5'),
-    errRating: uiCopy('u_b289201b3bf8e2ff'),
-    errReview: uiCopy('u_2d1b94f8a24e69d4'),
-    errGeneric: uiCopy('u_2a929561c59176d4'),
-    errNetwork: uiCopy('u_de6c366e22ffcb09'),
+    nameLabel: uiText('generatedUi.u_2c6b2e253c01fb2e'),
+    namePlaceholder: uiText('generatedUi.u_01332c876518a793'),
+    emailLabel: uiText('generatedUi.u_33fe95ce02091218'),
+    emailPlaceholder: uiText('generatedUi.u_8c87b489ce35cf2e'),
+    emailNote: uiText('generatedUi.u_70bd825a6905a917'),
+    reviewLabel: uiText('generatedUi.u_44237ef936d0a92c'),
+    reviewPlaceholder: uiText('generatedUi.u_f6679b3065ec0062'),
+    submitBtn: uiText('generatedUi.u_cb81e6b1cd1a3f98'),
+    submittingBtn: uiText('generatedUi.u_49195f559e4a9f5b'),
+    disclaimer: uiText('generatedUi.u_6c57a7561ee74ab6'),
+    errName: uiText('generatedUi.u_f9b561ae22951d84'),
+    errEmail: uiText('generatedUi.u_a76e25f9ec97e69f'),
+    errRating: uiText('generatedUi.u_4cf9d15dd9974f62'),
+    errReview: uiText('generatedUi.u_a64ae8f7198dfb64'),
+    errGeneric: uiText('generatedUi.u_0c953ab32c603ec4'),
+    errNetwork: uiText('generatedUi.u_9ff8cfaf7d943153'),
   },
   es: {
     leaveReview: 'Deja una reseña para',

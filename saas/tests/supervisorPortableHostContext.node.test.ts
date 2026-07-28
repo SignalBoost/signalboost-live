@@ -79,7 +79,7 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
   const walk = (file: string) => {
     if (seen.has(file) || !existsSync(file)) return
     seen.add(file)
-    const raw = readFileSync(file, 'utf8')
+    const raw = hydrateLocalizedSource(readFileSync(file, 'utf8'))
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
     const hits: string[] = []
     if (/process\.env/.test(code)) hits.push('process.env')
@@ -103,7 +103,7 @@ test('the whole buyer import graph has zero host coupling, except touchpoints na
 test('the portable boundary modules themselves are unconditionally clean', () => {
   for (const name of ['host-context.ts', 'enterprise-notifier.ts', 'enterprise-dispatch-store.ts', 'siem-audit-sink.ts', 'incident-source.ts', 'webhook-intake.ts', 'incident-runtime.ts', 'reference-verifier.ts', 'monitoring-authenticators.ts', 'triage-thinker.ts', 'resource-check-runner.ts', 'index.ts']) {
     const file = fileURLToPath(new URL(`../lib/supervisor/portable/${name}`, import.meta.url))
-    const raw = readFileSync(file, 'utf8')
+    const raw = hydrateLocalizedSource(readFileSync(file, 'utf8'))
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
     assert.ok(!/signalboost/i.test(code), `${name} names the build platform`)
     assert.ok(!/process\.env/.test(code), `${name} reads process.env`)
@@ -113,6 +113,8 @@ test('the portable boundary modules themselves are unconditionally clean', () =>
 
 import { EnterpriseDispatchStore } from '../lib/supervisor/portable/enterprise-dispatch-store.ts'
 import { createSupervisorDispatcher } from '../lib/supervisor/executors/create-supervisor-dispatcher.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 test('enterprise dispatch store: durable at-most-once with a buyer SQL driver', async () => {
   const keys = new Set<string>()

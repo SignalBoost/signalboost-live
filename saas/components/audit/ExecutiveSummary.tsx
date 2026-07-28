@@ -9,9 +9,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 const RED = '#fca5a5'
@@ -46,35 +43,35 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.exec.title', uiCopy('u_eae15f0909579410'))} <span style={{ color: GOLD }}>·</span>
+          {t('audit.exec.title', "Executive Risk Summary")} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>
-          {t('audit.exec.subtitle', uiCopy('u_02f1b33c01471de3'))}
+          {t('audit.exec.subtitle', "Overall readiness score, finding counts, and top risks.")}
         </p>
       </div>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>
-            {t('audit.common.overallScore', uiCopy('u_d0c81512d2270fa3'))}
+            {t('audit.common.overallScore', "Overall Readiness Score")}
           </div>
           <div style={{ fontSize: 44, fontWeight: 800, color: scoreColor(s.score), fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 1.1 }}>
             {s.score}<span style={{ fontSize: 18, color: 'rgba(255,255,255,.4)' }}>/100</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          <Sev label={t('audit.severity.critical', uiCopy('u_aa0d77b7efd4b6be'))} n={s.critical} color={RED} />
-          <Sev label={t('audit.severity.high', uiCopy('u_125b159b808adb07'))} n={s.high} color={ORANGE} />
-          <Sev label={t('audit.severity.medium', uiCopy('u_0328688d937db301'))} n={s.medium} color={GOLD} />
-          <Sev label={t('audit.severity.low', uiCopy('u_25df3dd7970b8d61'))} n={s.low} color={CYAN} />
-          <Sev label={t('audit.common.evidenceRequired', uiCopy('u_eff4c716fec9e717'))} n={data.evidenceRequired} color={'rgba(255,255,255,.6)'} />
+          <Sev label={t('audit.severity.critical', "Critical")} n={s.critical} color={RED} />
+          <Sev label={t('audit.severity.high', "High")} n={s.high} color={ORANGE} />
+          <Sev label={t('audit.severity.medium', "Medium")} n={s.medium} color={GOLD} />
+          <Sev label={t('audit.severity.low', "Low")} n={s.low} color={CYAN} />
+          <Sev label={t('audit.common.evidenceRequired', "Evidence required")} n={data.evidenceRequired} color={'rgba(255,255,255,.6)'} />
         </div>
       </section>
 
       {data.narrative ? (
         <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 10 }}>
-            {t('audit.exec.narrativeTitle', uiCopy('u_0d759ec407e13742'))}
+            {t('audit.exec.narrativeTitle', "Summary")}
           </div>
           {data.narrative.split('\n').filter(Boolean).map((para, i) => (
             <p key={i} style={{ margin: '0 0 10px', fontSize: 13.5, color: 'rgba(255,255,255,.78)', lineHeight: 1.6 }}>{para}</p>
@@ -84,10 +81,10 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
 
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-          {t('audit.exec.topRisksTitle', uiCopy('u_4547be57da0ac87f'))}
+          {t('audit.exec.topRisksTitle', "Top Risks")}
         </div>
         {data.topRisks.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.exec.noRisks', uiCopy('u_556f28aa7280ff89'))}</div>
+          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.exec.noRisks', "No risks above the reporting threshold.")}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {data.topRisks.map(f => <RiskCard key={f.id} finding={f} t={t} />)}
@@ -98,7 +95,7 @@ export default function ExecutiveSummary({ data }: { data: ExecutiveSummaryView 
       {data.providers.length > 0 && (
         <section style={{ ...glass, padding: 20 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-            {t('audit.exec.providersTitle', uiCopy('u_a7bacb669fb1ad2d'))}
+            {t('audit.exec.providersTitle', "Providers")}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {data.providers.map(p => {
@@ -147,7 +144,7 @@ function RiskCard({ finding, t }: { finding: Finding; t: TFn }) {
       </div>
       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{text.detail}</div>
       <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 6 }}>
-        <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('audit.common.recommendation', uiCopy('u_0702bf6e2f2a23ca'))}:</strong> {text.recommendation}
+        <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('audit.common.recommendation', "Recommendation")}:</strong> {text.recommendation}
       </div>
     </div>
   )

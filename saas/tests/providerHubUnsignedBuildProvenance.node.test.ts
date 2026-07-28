@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { createProviderHubUnsignedBuildProvenance } from '../portable-mobile/provider-hub-unsigned-build-provenance.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const digest = 'a'.repeat(64)
 const valid = {
@@ -61,7 +63,7 @@ test('fails closed for identity, exact asset inventory, missing checks, traversa
 })
 
 test('provenance contract has no build, artifact, signing, network, or store capability', async () => {
-  const source = await readFile(new URL('../portable-mobile/provider-hub-unsigned-build-provenance.ts', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../portable-mobile/provider-hub-unsigned-build-provenance.ts', import.meta.url), 'utf8').then(hydrateLocalizedSource)
   for (const forbidden of ["from 'node:fs'", "from 'node:child_process'", 'readFile(', 'writeFile(', 'exec(', 'spawn(', 'fetch(', 'gradlew', 'signingConfigs', 'play.googleapis.com', 'process.env']) {
     assert.equal(source.includes(forbidden), false, `provenance contract must not contain ${forbidden}`)
   }

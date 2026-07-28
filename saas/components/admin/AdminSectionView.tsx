@@ -12,8 +12,7 @@ import AdminMetricCard from '@/components/admin/AdminMetricCard'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { getAdminMetricAction } from '@/lib/admin/metricActions'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru'])
 const PLACEHOLDER_VALUES = new Set([
@@ -37,7 +36,7 @@ function isPlaceholderValue(value: unknown): boolean {
 
 function emptyMetricLabel(lang: string): string {
   const copy: Record<string, string> = {
-    en: uiCopy('u_73c8bb697429a865'),
+    en: uiText('generatedUi.u_0e12a227f0c09e85'),
     es: 'Métrica activa de la plataforma',
     pt: 'Métrica ativa da plataforma',
     pl: 'Aktywna metryka platformy',
@@ -48,7 +47,7 @@ function emptyMetricLabel(lang: string): string {
 
 function noActivityLabel(lang: string): string {
   const copy: Record<string, string> = {
-    en: uiCopy('u_974825e1674fe2b2'),
+    en: uiText('generatedUi.u_0a12b92ce7899469'),
     es: 'Sin actividad todavía',
     pt: 'Sem atividade ainda',
     pl: 'Brak aktywności',
@@ -59,7 +58,7 @@ function noActivityLabel(lang: string): string {
 
 function noneYetLabel(lang: string): string {
   const copy: Record<string, string> = {
-    en: uiCopy('u_ee11c6f387f8a12a'),
+    en: uiText('generatedUi.u_adb85cf22bfc3254'),
     es: 'Nada aún',
     pt: 'Nada ainda',
     pl: 'Jeszcze brak',
@@ -87,7 +86,7 @@ function systemTone(value: string | number): 'danger' | 'warning' | 'healthy' | 
 
 function notConnectedLabel(lang: string): string {
   const copy: Record<string, string> = {
-    en: uiCopy('u_025d181b8df9790d'),
+    en: uiText('generatedUi.u_0303e18246708180'),
     es: 'No conectado',
     pt: 'Não conectado',
     pl: 'Nie połączono',
@@ -150,26 +149,26 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
 
   const totals = intel?.totals
   const totalRows: [string, number | null | undefined][] = [
-    [t('audit.admin.totAccounts', uiCopy('u_f4130742d67a8775')), totals?.accounts],
-    [t('audit.admin.totPaid', uiCopy('u_38518469b0f2aee3')), totals?.paidSubs],
-    [t('audit.admin.totFree', uiCopy('u_fbd24f0729156e0a')), totals?.freeSubs],
-    [t('audit.admin.totProspects', uiCopy('u_2587e2f76b6f0f24')), totals?.prospects],
-    [t('audit.admin.totOutreach', uiCopy('u_e9364cdce27511c3')), totals?.outreachSends],
-    [t('audit.admin.totAi', uiCopy('u_530db3225ba33cb3')), totals?.aiTasks],
-    [t('audit.admin.totSites', uiCopy('u_279d629729dbe8c4')), totals?.sites],
-    [t('audit.admin.totVideos', uiCopy('u_528019f3b0edcc41')), totals?.videos],
-    [t('audit.admin.totReviews', uiCopy('u_88e3954ee398b3b3')), totals?.reviews],
+    [t('audit.admin.totAccounts', "Accounts"), totals?.accounts],
+    [t('audit.admin.totPaid', "Paid subscriptions"), totals?.paidSubs],
+    [t('audit.admin.totFree', "Free subscriptions"), totals?.freeSubs],
+    [t('audit.admin.totProspects', "Prospects"), totals?.prospects],
+    [t('audit.admin.totOutreach', "Outreach sends"), totals?.outreachSends],
+    [t('audit.admin.totAi', "AI tasks"), totals?.aiTasks],
+    [t('audit.admin.totSites', "Sites built"), totals?.sites],
+    [t('audit.admin.totVideos', "Video jobs"), totals?.videos],
+    [t('audit.admin.totReviews', "Reviews"), totals?.reviews],
   ]
 
   return (
     <div className="sb-cockpit-stack" role="region" aria-label={`${section.title} admin console section`}>
       <header className="sb-cockpit-hero">
-        <span className="sb-eyebrow">{t('audit.admin.eyebrow', uiCopy('u_ca3a1e6fad88ff80'))}</span>
+        <span className="sb-eyebrow">{t('audit.admin.eyebrow', "NASA-style admin console")}</span>
         <h2>{section.title}</h2>
         <p>{section.description}</p>
       </header>
 
-      <section className="sb-cockpit-grid" aria-label={uiCopy('u_de1f10a55caca384')}>
+      <section className="sb-cockpit-grid" aria-label={uiText('generatedUi.u_e76527c4052cd890')}>
         {section.metrics.map(metric => {
           const action = getAdminMetricAction(rawSection.key, metric.key)
           const value = metricValue(metric.label, metric.key, metric.value)
@@ -189,40 +188,40 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         })}
       </section>
 
-      <section className="sb-mission-grid" aria-label={uiCopy('u_d42fb903e3a00f78')}>
-        <section className="sb-glass-panel sb-admin-action-card" aria-label={uiCopy('u_2b8aa5d8fca3ee27')}>
-          <h3>{t('audit.admin.platformTotals', uiCopy('u_6f9751cea39b528d'))}</h3>
+      <section className="sb-mission-grid" aria-label={uiText('generatedUi.u_29bd70cc7ccbc28a')}>
+        <section className="sb-glass-panel sb-admin-action-card" aria-label={uiText('generatedUi.u_fde2679f289907b5')}>
+          <h3>{t('audit.admin.platformTotals', "Platform totals")}</h3>
           {totalRows.map(([label, value], index) => (
             <Link key={label} href={`/admin/analytics/platform?total=${index}`} aria-label={`View ${label} total details`}>
               <strong>{label}</strong> · {fmt(value)}
             </Link>
           ))}
-          <Link className="sb-admin-action-card__cue" href="/admin/analytics/platform">{uiCopy('u_bcd29a6797905732')}</Link>
+          <Link className="sb-admin-action-card__cue" href="/admin/analytics/platform">{uiText('generatedUi.u_774a3a596063ee67')}</Link>
         </section>
-        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/accounts?range=7d" aria-label={uiCopy('u_9bf8ced3bc0c8fee')}>
-          <h3>{t('audit.admin.newAccounts', uiCopy('u_7f3379f4d49ee656'))}</h3>
-          <p><strong>{t('audit.admin.win7', uiCopy('u_f3d0ee8d3baea56d'))}</strong> · {fmt(intel?.windows.accounts7)}</p>
-          <p><strong>{t('audit.admin.win30', uiCopy('u_c0b992b77fc67414'))}</strong> · {fmt(intel?.windows.accounts30)}</p>
-          <p><strong>{t('audit.admin.win90', uiCopy('u_d4621269aee28168'))}</strong> · {fmt(intel?.windows.accounts90)}</p>
-          <span className="sb-admin-action-card__cue">{uiCopy('u_b0b44c1cf23e9d52')}</span>
+        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/accounts?range=7d" aria-label={uiText('generatedUi.u_8d961cce50d0c498')}>
+          <h3>{t('audit.admin.newAccounts', "New accounts")}</h3>
+          <p><strong>{t('audit.admin.win7', "Last 7 days")}</strong> · {fmt(intel?.windows.accounts7)}</p>
+          <p><strong>{t('audit.admin.win30', "Last 30 days")}</strong> · {fmt(intel?.windows.accounts30)}</p>
+          <p><strong>{t('audit.admin.win90', "Last 90 days")}</strong> · {fmt(intel?.windows.accounts90)}</p>
+          <span className="sb-admin-action-card__cue">{uiText('generatedUi.u_774a3a596063ee67')}</span>
         </Link>
-        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/integrations/supabase" aria-label={uiCopy('u_1bd0d223d3988cc7')}>
-          <h3>{t('audit.admin.operationalHealth', uiCopy('u_0c2f1b8071059a66'))}</h3>
-          <p><strong>{t('audit.admin.supabase', uiCopy('u_5281648e4927f4b7'))}</strong> · {intel?.health.supabase ?? notConnectedLabel(activeLang)}</p>
-          <p><strong>{t('audit.admin.errors', uiCopy('u_abdc2e1659c75eab'))}</strong> · {fmt(intel?.health.errors)}</p>
-          <p><strong>{t('audit.admin.lastOutreach', uiCopy('u_a32e18c283d801a6'))}</strong> · {intel?.health.lastOutreach ?? empty}</p>
-          <p><strong>{t('audit.admin.lastProspect', uiCopy('u_3a302c8fec644583'))}</strong> · {intel?.health.lastProspect ?? empty}</p>
-          <span className="sb-admin-action-card__cue">{uiCopy('u_5fac5f47fe9fca1c')}</span>
+        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/integrations/supabase" aria-label={uiText('generatedUi.u_c58b6953fdd7a819')}>
+          <h3>{t('audit.admin.operationalHealth', "Operational health")}</h3>
+          <p><strong>{t('audit.admin.supabase', "Supabase")}</strong> · {intel?.health.supabase ?? notConnectedLabel(activeLang)}</p>
+          <p><strong>{t('audit.admin.errors', "Logged errors")}</strong> · {fmt(intel?.health.errors)}</p>
+          <p><strong>{t('audit.admin.lastOutreach', "Last outreach run")}</strong> · {intel?.health.lastOutreach ?? empty}</p>
+          <p><strong>{t('audit.admin.lastProspect', "Last prospect run")}</strong> · {intel?.health.lastProspect ?? empty}</p>
+          <span className="sb-admin-action-card__cue">{uiText('generatedUi.u_289ddb3c038edede')}</span>
         </Link>
-        <AdminMetricCard title={t('audit.admin.totPaid', uiCopy('u_21a2e50378a5edc5'))} value={fmt(totals?.paidSubs)} subtitle={uiCopy('u_dcd59dc84fa8c9cb')} href="/admin/billing/subscriptions?status=paid" actionLabel={uiCopy('u_c738f86fe57a43fd')} tone={missionCardTone(totals?.paidSubs)} />
-        <AdminMetricCard title={t('audit.admin.totFree', uiCopy('u_5055561009fd516a'))} value={fmt(totals?.freeSubs)} subtitle={uiCopy('u_7ddf3ad1cd5e3749')} href="/admin/billing/subscriptions?status=free" actionLabel={uiCopy('u_928ea9cd78849a21')} tone={missionCardTone(totals?.freeSubs)} />
-        <AdminMetricCard title={t('audit.admin.totProspects', uiCopy('u_4f71225eafd8825e'))} value={fmt(totals?.prospects)} subtitle={uiCopy('u_a7bb5ffe14d63eb8')} href="/admin/prospects" actionLabel={uiCopy('u_663dfa26542007c3')} tone={missionCardTone(totals?.prospects)} />
+        <AdminMetricCard title={t('audit.admin.totPaid', "Paid subscriptions")} value={fmt(totals?.paidSubs)} subtitle={uiText('generatedUi.u_b2b89e1f2349ab1f')} href="/admin/billing/subscriptions?status=paid" actionLabel={uiText('generatedUi.u_774a3a596063ee67')} tone={missionCardTone(totals?.paidSubs)} />
+        <AdminMetricCard title={t('audit.admin.totFree', "Free subscriptions")} value={fmt(totals?.freeSubs)} subtitle={uiText('generatedUi.u_b2b89e1f2349ab1f')} href="/admin/billing/subscriptions?status=free" actionLabel={uiText('generatedUi.u_774a3a596063ee67')} tone={missionCardTone(totals?.freeSubs)} />
+        <AdminMetricCard title={t('audit.admin.totProspects', "Prospects")} value={fmt(totals?.prospects)} subtitle={uiText('generatedUi.u_0d9ed04771c0755a')} href="/admin/prospects" actionLabel={uiText('generatedUi.u_774a3a596063ee67')} tone={missionCardTone(totals?.prospects)} />
       </section>
 
       <section className="sb-orbit-table" aria-label={section.tableTitle}>
         <div className="sb-orbit-table__header">
           <h3>{section.tableTitle}</h3>
-          <span>{t('audit.admin.filters', uiCopy('u_f06408f9d3380c64'))}</span>
+          <span>{t('audit.admin.filters', "Filters: date range • product • country • plan • role")}</span>
         </div>
         <table>
           <thead>
@@ -238,7 +237,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
             ) : (
               <tr>
                 <td colSpan={section.tableColumns.length}>
-                  {t('audit.admin.noRecords', uiCopy('u_1d33683583af9f7c'))}
+                  {t('audit.admin.noRecords', "No activity recorded for this view yet. New platform events will appear here automatically.")}
                 </td>
               </tr>
             )}

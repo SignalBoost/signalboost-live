@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -33,18 +32,18 @@ const COPY: Record<Lang, {
   flags: Record<string, { label: string; desc: string }>
 }> = {
   en: {
-    eyebrow: uiCopy('u_19bfb5d51389b2ee'),
-    title: uiCopy('u_e16349f03a3b22d6'),
-    subtitle: uiCopy('u_9d62a29d4c77d74d'),
-    saving: uiCopy('u_8870b711176b2790'),
-    loading: uiCopy('u_677b035839c79d53'),
-    footer: uiCopy('u_23cbcf5b895ad875'),
-    notAllowedTitle: uiCopy('u_d3c60eecce742215'),
-    notAllowedBody: uiCopy('u_fa63c1cade6844b1'),
+    eyebrow: uiText('generatedUi.u_c1c224b03cd9bc7b'),
+    title: uiText('generatedUi.u_28c83220eb3316b6'),
+    subtitle: uiText('generatedUi.u_6a03592a29caad34'),
+    saving: uiText('generatedUi.u_945d2c03508adc66'),
+    loading: uiText('generatedUi.u_e71a13459ccdcc88'),
+    footer: uiText('generatedUi.u_2987a13f062a435c'),
+    notAllowedTitle: uiText('generatedUi.u_502d9f3ec97225bc'),
+    notAllowedBody: uiText('generatedUi.u_ce2d5dade0659930'),
     flags: {
-      outreach_sending_disabled: { label: uiCopy('u_0e39fcbfd4f15c61'), desc: uiCopy('u_bb1812257ccf8a0d') },
-      signups_paused: { label: uiCopy('u_b2311394b683f902'), desc: uiCopy('u_2129a3eedd8ecda2') },
-      maintenance_mode: { label: uiCopy('u_2622e6c83e14b41c'), desc: uiCopy('u_5708c9e233223ecf') },
+      outreach_sending_disabled: { label: uiText('generatedUi.u_267775fc98f11247'), desc: uiText('generatedUi.u_665e52e8f1e417db') },
+      signups_paused: { label: uiText('generatedUi.u_9218d14c1c3792b2'), desc: uiText('generatedUi.u_d232597107f969c7') },
+      maintenance_mode: { label: uiText('generatedUi.u_20b9595b93571625'), desc: uiText('generatedUi.u_7ccf42212ccf69ad') },
     },
   },
   es: {
@@ -127,10 +126,10 @@ export default function AdminSettingsPage() {
       const res = await fetch('/api/admin/settings', { cache: 'no-store' })
       if (res.status === 401 || res.status === 403) { setNotAllowed(true); setLoading(false); return }
       const data = await res.json()
-      if (!res.ok) { setError(data?.error || uiCopy('u_00e86d2f0aa4e104')); setLoading(false); return }
+      if (!res.ok) { setError(data?.error || "Could not load settings."); setLoading(false); return }
       setFlags(Array.isArray(data.flags) ? data.flags : [])
     } catch {
-      setError(uiCopy('u_4b9445189c2469c4'))
+      setError("Something went wrong loading settings.")
     } finally {
       setLoading(false)
     }
@@ -150,13 +149,13 @@ export default function AdminSettingsPage() {
       if (!res.ok) {
         setFlags(prev => prev.map(f => (f.key === key ? { ...f, on: !next } : f)))
         const d = await res.json().catch(() => ({}))
-        setError(d?.error || uiCopy('u_a60c8beb967ac649'))
+        setError(d?.error || "Could not save that setting.")
       } else {
         setError('')
       }
     } catch {
       setFlags(prev => prev.map(f => (f.key === key ? { ...f, on: !next } : f)))
-      setError(uiCopy('u_7284d6b7ce7c1b86'))
+      setError("Could not save that setting.")
     } finally {
       setSavingKey(null)
     }

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
 
 const routePath = new URL('../app/api/internal/supervisor/protocol-capabilities/route.ts', import.meta.url)
 
 async function routeSource(): Promise<string> {
-  return readFile(routePath, 'utf8')
+  return readFile(routePath, 'utf8').then(hydrateLocalizedSource)
 }
 
 test('protocol capability diagnostics route requires admin access', async () => {

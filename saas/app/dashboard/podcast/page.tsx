@@ -8,8 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 const GOLD = '#ffc300'
 
@@ -101,7 +100,7 @@ export default function PodcastPage() {
 
           <div className="sb-telemetry">
             <div><b className="gold">{episodeCount || 3}</b><span>{tr('podcasters.episodes', 'Episodes')}</span></div>
-            <div><b className={translating ? 'warn' : sketch ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{translating ? '...' : sketch ? uiCopy('u_c0c02acacb9c459f') : uiCopy('u_a2957334c438cdad')}</b><span>{tr('podcasters.badge', 'Podcast page')}</span></div>
+            <div><b className={translating ? 'warn' : sketch ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{translating ? '...' : sketch ? uiText('generatedUi.u_c2e3ac47f4a32546') : uiText('generatedUi.u_53dd5f4b25e5f226')}</b><span>{tr('podcasters.badge', 'Podcast page')}</span></div>
             {checklistCount ? <div><b>{checklistCount}</b><span>{tr('podcasters.checklist', 'Launch checklist')}</span></div> : null}
           </div>
         </header>

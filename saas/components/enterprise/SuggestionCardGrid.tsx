@@ -1,6 +1,5 @@
 'use client'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export type SuggestionCard = {
   id: string
@@ -22,7 +21,7 @@ export function SuggestionCardGrid({ label, suggestions, selectedId, onSelect, o
   return <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 10 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
       <legend style={{ color: '#fff', fontWeight: 850, fontSize: 13 }}>{label}</legend>
-      {onRefresh && <button type="button" disabled={refreshing} onClick={onRefresh} style={{ border: '1px solid rgba(255,255,255,.14)', borderRadius: 10, background: 'rgba(255,255,255,.05)', color: '#fff', padding: '7px 10px', cursor: refreshing ? 'wait' : 'pointer', fontSize: 12 }}>{refreshing ? uiCopy('u_0da4854d155b3ca5') : uiCopy('u_ed49e31a7e037473')}</button>}
+      {onRefresh && <button type="button" disabled={refreshing} onClick={onRefresh} style={{ border: '1px solid rgba(255,255,255,.14)', borderRadius: 10, background: 'rgba(255,255,255,.05)', color: '#fff', padding: '7px 10px', cursor: refreshing ? 'wait' : 'pointer', fontSize: 12 }}>{refreshing ? uiText('generatedUi.u_d20a4476a0a85978') : uiText('generatedUi.u_bf4768405082a5b7')}</button>}
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
       {suggestions.map((suggestion) => {

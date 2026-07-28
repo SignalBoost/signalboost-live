@@ -6,8 +6,7 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 // counted into ms_events (the optimization loop's data source).
 import { getAdminSupabase } from '@/utils/supabase/server'
 import PublicCampaign from './PublicCampaign.tsx'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
+import { uiText } from '@/lib/i18n/uiText'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +19,7 @@ export default async function PublishedCampaignPage({ params }: { params: Promis
   if (!campaign) {
     return (
       <main style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', color: 'rgba(226,232,240,.65)' }}>
-        <p><LocalizedText fallback={uiCopy('u_bafc5eddc22f18fb')} /></p>
+        <p><LocalizedText fallback={uiText('generatedUi.u_e3ebaa16dd9d9b9f')} /></p>
       </main>
     )
   }

@@ -7,9 +7,6 @@
 import { VaultAuditLog as VaultAuditLogType } from '@/lib/hub/vault-types'
 import { labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { uiCopy } from '@/lib/i18n/generatedUiCopy'
-
-
 export type VaultAuditLogProps = {
   logs: VaultAuditLogType[]
   isLoading?: boolean
@@ -40,8 +37,8 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
             margin: '0 auto 12px',
           }}
         />
-        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.audit.loading', uiCopy('u_a2b5bab4fa4d7215'))}</p>
-        <style>{uiCopy('u_25832c704b16236e')}</style>
+        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.audit.loading', "Loading audit log...")}</p>
+        <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
       </div>
     )
   }
@@ -49,14 +46,14 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
   if (logs.length === 0) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.5)' }}>
-        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.audit.empty', uiCopy('u_0ff4559b5bd1c9bc'))}</p>
+        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.audit.empty', "No audit log entries")}</p>
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={labelStyle}>{t('console.vaultx.audit.trail', uiCopy('u_a9189cf2517b5d59'))}</div>
+      <div style={labelStyle}>{t('console.vaultx.audit.trail', "Audit Trail")}</div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {logs.slice(0, 50).map(log => {
@@ -98,8 +95,8 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
                   </span>
                   <span style={{ fontSize: 10, color: statusColor, fontWeight: 700 }}>
                     {log.status === 'success'
-                      ? `✓ ${t('console.vaultx.audit.success', uiCopy('u_fc9e23879103a0b0'))}`
-                      : `✗ ${t('console.vaultx.audit.failed', uiCopy('u_f685dc6618958a1d'))}`}
+                      ? `✓ ${t('console.vaultx.audit.success', "Success")}`
+                      : `✗ ${t('console.vaultx.audit.failed', "Failed")}`}
                   </span>
                 </div>
 
@@ -116,7 +113,7 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
                   }}
                 >
                   {log.user_email && <span>{log.user_email}</span>}
-                  {log.ip_address && <span>{t('console.vaultx.audit.ip', uiCopy('u_1f09ae18d3ee58c3'))} {log.ip_address}</span>}
+                  {log.ip_address && <span>{t('console.vaultx.audit.ip', "IP:")} {log.ip_address}</span>}
                   <span>
                     {dateStr} {timeStr}
                   </span>
@@ -129,7 +126,7 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
 
       {logs.length > 50 && (
         <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,.45)', padding: '8px 0' }}>
-          {t('console.vaultx.audit.showing', uiCopy('u_3ddd2cdba64f52cd'))} {logs.length} {t('console.vaultx.audit.entries', uiCopy('u_0da7b521c5308522'))}
+          {t('console.vaultx.audit.showing', "Showing latest 50 of")} {logs.length} {t('console.vaultx.audit.entries', "entries")}
         </div>
       )}
     </div>

@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { loadLanguage } from '@/lib/i18n/loadLanguage'
+import { getServerLanguage } from '@/lib/i18n/serverLanguage'
 
 export default async function SupervisorHaPage({ searchParams }: { searchParams?: Promise<{ lang?: string }> }) {
   const params = await searchParams
-  const dict = await loadLanguage(params?.lang || 'en')
+  const lang = await getServerLanguage(params?.lang)
+  const dict = await loadLanguage(lang)
   const t = dict.supervisorHa as Record<string, string>
   const rows = [
     { label: t.coordinationStoreHealth, value: `${t.coordinationStore} · ${t.connected}` },

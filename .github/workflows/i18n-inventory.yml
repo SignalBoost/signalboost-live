@@ -1,4 +1,4 @@
-name: I18n Failure Diagnostics
+name: Fix I18n Source Contract Tests
 
 on:
   pull_request:
@@ -6,15 +6,16 @@ on:
       - '.github/workflows/i18n-inventory.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  repair-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/i18n-remove-hardcoded-english
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -23,22 +24,107 @@ jobs:
       - name: Install dependencies
         working-directory: saas
         run: npm ci --dangerously-allow-all-scripts
-      - name: Capture failing suites
-        working-directory: saas
-        shell: bash
+      - name: Add localized source reader
         run: |
-          set +e
-          npm test > ../unit-tests.log 2>&1
-          echo $? > ../unit-tests.status
-          npm run test:audit-remediation > ../audit-remediation.log 2>&1
-          echo $? > ../audit-remediation.status
-          exit 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: i18n-failure-diagnostics
-          path: |
-            unit-tests.log
-            unit-tests.status
-            audit-remediation.log
-            audit-remediation.status
-          if-no-files-found: error
+          mkdir -p saas/tests/helpers
+          cat > saas/tests/helpers/sourceWithUiCopy.mjs <<'EOF'
+          import { readFileSync } from 'node:fs'
+          import { readFile } from 'node:fs/promises'
+
+          const generatedCopyUrl = new URL('../../lib/i18n/generatedUiCopy.ts', import.meta.url)
+          let cachedCopy = null
+
+          function loadCopy() {
+            if (cachedCopy) return cachedCopy
+            const source = readFileSync(generatedCopyUrl, 'utf8')
+            const copy = new Map()
+            const row = /^\s*("u_[a-f0-9]+"):\s*("(?:[^"\\]|\\.)*"),?\s*$/gm
+            for (const match of source.matchAll(row)) copy.set(JSON.parse(match[1]), JSON.parse(match[2]))
+            cachedCopy = copy
+            return copy
+          }
+
+          function quote(value) {
+            return `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n')}'`
+          }
+
+          export function hydrateUiCopy(source) {
+            const copy = loadCopy()
+            return source.replace(/uiCopy\(\s*(['"])(u_[a-f0-9]+)\1\s*\)/g, (call, _quote, key) => {
+              const value = copy.get(key)
+              return value === undefined ? call : quote(value)
+            })
+          }
+
+          export function readUiSource(url) {
+            return hydrateUiCopy(readFileSync(url, 'utf8'))
+          }
+
+          export async function readUiSourceAsync(url) {
+            return hydrateUiCopy(await readFile(url, 'utf8'))
+          }
+          EOF
+      - name: Preserve source-contract assertions through centralized copy
+        run: |
+          cat > /tmp/patch-tests.py <<'PY'
+          from pathlib import Path
+
+          root = Path('saas/tests')
+
+          def replace_once(path, before, after, label):
+              source = path.read_text()
+              if source.count(before) != 1:
+                  raise RuntimeError(f'{path}: expected one {label}, found {source.count(before)}')
+              path.write_text(source.replace(before, after, 1))
+
+          path = root / 'auditAutonomousRemediation.node.test.ts'
+          replace_once(path, "import { existsSync, readFileSync } from 'node:fs'", "import { existsSync } from 'node:fs'\nimport { readUiSource } from './helpers/sourceWithUiCopy.mjs'", 'audit autonomous import')
+          replace_once(path, "const read = (path: string) => readFileSync(url(path), 'utf8')", "const read = (path: string) => readUiSource(url(path))", 'audit autonomous reader')
+
+          for name in ['auditGlobalApproval.node.test.ts', 'auditRemediationSystem.node.test.ts']:
+              path = root / name
+              replace_once(path, "import { readFileSync } from 'node:fs'", "import { readUiSource } from './helpers/sourceWithUiCopy.mjs'", f'{name} import')
+              replace_once(path, "const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')", "const read = (path: string) => readUiSource(new URL(path, import.meta.url))", f'{name} reader')
+
+          path = root / 'cybersecurityLiveProgress.node.test.ts'
+          replace_once(path, "import { readFileSync } from 'node:fs'", "import { readUiSource } from './helpers/sourceWithUiCopy.mjs'", 'cyber import')
+          replace_once(path, "const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')", "const read = (path: string) => readUiSource(new URL(path, import.meta.url))", 'cyber reader')
+
+          path = root / 'homepagePreviewProjects.node.test.ts'
+          replace_once(path, "import { readFileSync } from 'node:fs'", "import { readUiSource } from './helpers/sourceWithUiCopy.mjs'", 'homepage import')
+          replace_once(path, "readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')", "readUiSource(new URL('../app/page.tsx', import.meta.url))", 'homepage reader')
+          replace_once(path, "readFileSync(new URL('../components/home/PreviewProjects.tsx', import.meta.url), 'utf8')", "readUiSource(new URL('../components/home/PreviewProjects.tsx', import.meta.url))", 'preview reader')
+
+          for name in ['providerActionExecutionGate.node.test.ts', 'providerHubStatusDashboard.node.test.ts', 'providerReviewedPathSelector.node.test.ts', 'supervisorSectionNavigation.node.test.ts']:
+              path = root / name
+              replace_once(path, "import { readFile } from 'node:fs/promises'", "import { readUiSourceAsync } from './helpers/sourceWithUiCopy.mjs'", f'{name} import')
+              source = path.read_text()
+              source = source.replace("return readFile(path, 'utf8')", "return readUiSourceAsync(path)")
+              source = source.replace("return readFile(componentPath, 'utf8')", "return readUiSourceAsync(componentPath)")
+              source = source.replace("return readFile(layoutPath, 'utf8')", "return readUiSourceAsync(layoutPath)")
+              source = source.replace("readFile(selfServiceUrl, 'utf8')", "readUiSourceAsync(selfServiceUrl)")
+              source = source.replace("readFile(adminUrl, 'utf8')", "readUiSourceAsync(adminUrl)")
+              source = source.replace("readFile(componentUrl, 'utf8')", "readUiSourceAsync(componentUrl)")
+              if "readFile(" in source:
+                  raise RuntimeError(f'{name}: unresolved readFile call')
+              path.write_text(source)
+
+          path = root / 'providerExecutionModePanel.node.test.ts'
+          replace_once(path, "import { readFileSync } from 'node:fs'", "import { readUiSource } from './helpers/sourceWithUiCopy.mjs'", 'provider mode import')
+          replace_once(path, "readFileSync(new URL('../components/hub/ProviderExecutionModePanel.tsx', import.meta.url), 'utf8')", "readUiSource(new URL('../components/hub/ProviderExecutionModePanel.tsx', import.meta.url))", 'provider mode reader')
+          PY
+          python /tmp/patch-tests.py
+          node --check saas/tests/helpers/sourceWithUiCopy.mjs
+      - name: Run complete unit suite
+        working-directory: saas
+        run: npm test
+      - name: Run audit remediation contract suite
+        working-directory: saas
+        run: npm run test:audit-remediation
+      - name: Commit test compatibility
+        run: |
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add saas/tests
+          git commit -m 'test(i18n): resolve centralized UI copy in source contracts'
+          git push origin HEAD:fix/i18n-remove-hardcoded-english

@@ -47,14 +47,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MODELS_MODEL: openai/gpt-4o-mini
         run: |
-          set -euo pipefail
+          set -uo pipefail
           for locale in es pt pl ru; do
+            set +e
             node saas/scripts/translate-generated-ui-locales.mjs --write --locale="$locale"
+            status=$?
+            set -e
+
             git pull --rebase --autostash origin "$HEAD_BRANCH"
             git add "saas/locales/$locale.json"
             if ! git diff --cached --quiet; then
-              git commit -m "fix(i18n): complete $locale generated UI dictionary"
+              if [ "$status" -eq 0 ]; then
+                git commit -m "fix(i18n): complete $locale generated UI dictionary"
+              else
+                git commit -m "fix(i18n): checkpoint $locale generated UI dictionary"
+              fi
               git push origin "HEAD:${HEAD_BRANCH}"
+            fi
+
+            if [ "$status" -ne 0 ]; then
+              exit "$status"
             fi
           done
 

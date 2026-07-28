@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: complete-generated-ui-locales-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   generate-locale:
@@ -44,11 +44,22 @@ jobs:
         with:
           node-version: 24
 
+      - name: Require OpenAI translation credential
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          test -n "$OPENAI_API_KEY" || {
+            echo 'OPENAI_API_KEY is required for the one-time full catalog generation.' >&2
+            exit 1
+          }
+
       - name: Generate ${{ matrix.locale }} catalog
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_TRANSLATION_MODEL: gpt-4o-mini
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MODELS_MODEL: openai/gpt-4o-mini
-          TRANSLATION_REQUEST_TIMEOUT_MS: '180000'
+          TRANSLATION_REQUEST_TIMEOUT_MS: '120000'
         run: node saas/scripts/translate-generated-ui-locales.mjs --write --locale=${{ matrix.locale }}
 
       - name: Stage generated catalog artifact

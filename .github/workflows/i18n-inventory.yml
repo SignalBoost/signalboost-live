@@ -1,0 +1,32 @@
+name: I18n Full Inventory
+
+on:
+  pull_request:
+    paths:
+      - 'saas/**'
+      - '.github/workflows/i18n-inventory.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Capture all hardcoded UI copy
+        run: node scripts/check-hardcoded-copy.mjs --list > ../hardcoded-ui-inventory.txt 2>&1
+      - name: Upload inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardcoded-ui-inventory
+          path: hardcoded-ui-inventory.txt
+          if-no-files-found: error

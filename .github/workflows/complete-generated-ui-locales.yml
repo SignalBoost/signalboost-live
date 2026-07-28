@@ -10,6 +10,7 @@ on:
       - 'saas/locales/**'
       - 'saas/scripts/check-generated-ui-locale-completeness.mjs'
       - 'saas/scripts/generated-ui-locale-utils.mjs'
+      - 'saas/scripts/repair-generated-ui-token-mismatches.mjs'
       - 'saas/scripts/translate-generated-ui-locales.mjs'
       - 'saas/scripts/translate-generated-ui-locales-public.mjs'
       - 'saas/package.json'
@@ -87,12 +88,17 @@ jobs:
           path: saas/locales
           merge-multiple: true
 
+      - name: Restore protected tokens
+        working-directory: saas
+        run: node scripts/repair-generated-ui-token-mismatches.mjs
+
       - name: Make five-language parity blocking
         working-directory: saas
         run: |
           npm pkg set 'scripts.validate:i18n-copy=node scripts/check-hardcoded-copy.mjs && node scripts/migrate-page-copy-to-locales.mjs && node scripts/check-generated-ui-locale-completeness.mjs'
           npm pkg set 'scripts.translate:i18n-generated-ui=node scripts/translate-generated-ui-locales.mjs --write'
           npm pkg set 'scripts.translate:i18n-generated-ui-public=node scripts/translate-generated-ui-locales-public.mjs --write'
+          npm pkg set 'scripts.repair:i18n-generated-ui=node scripts/repair-generated-ui-token-mismatches.mjs'
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

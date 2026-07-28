@@ -18,35 +18,31 @@
 
 import { useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { LICENSE_SETUP_COPY } from '@/lib/i18n/licenseSetupCopy'
+import { LICENSE_SETUP_COPY, type LicenseSetupCopy } from '@/lib/i18n/licenseSetupCopy'
+import {
+  LICENSE_EDITIONS,
+  type LicenseEdition,
+  type LicenseMintFeatureId,
+  type LicenseMintResult,
+} from '@/lib/supervisor/licenseMintContract'
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-
-// Catalogue identifiers, not UI copy — they are never translated.
-const EDITIONS = ['standard', 'enterprise']
-
-type MintResult = {
-  ok?: boolean
-  error?: string
-  remedy?: string
-  editions?: string[]
-  licence?: {
-    licenseId?: string
-    licensee?: string
-    issuer?: string
-    edition?: string
-    features?: string[]
-    expiresAt?: string
-    graceDays?: number
-  }
-  environment?: Record<string, string>
-  privateKeyPem?: string
-  warnings?: string[]
-}
 
 function pick(value?: string): Language {
   const short = String(value || 'en').slice(0, 2).toLowerCase()
   return (['en', 'es', 'pt', 'pl', 'ru'] as Language[]).includes(short as Language) ? (short as Language) : 'en'
+}
+
+function editionLabel(copy: LicenseSetupCopy, value?: string) {
+  return value && LICENSE_EDITIONS.includes(value as LicenseEdition)
+    ? copy.editions[value as LicenseEdition]
+    : copy.notAvailable
+}
+
+function featureLabel(copy: LicenseSetupCopy, value: string) {
+  return value in copy.featureLabels
+    ? copy.featureLabels[value as LicenseMintFeatureId]
+    : copy.notAvailable
 }
 
 export default function SupervisorLicensePage() {
@@ -54,10 +50,10 @@ export default function SupervisorLicensePage() {
   const copy = LICENSE_SETUP_COPY[pick(lang as string)]
 
   const [licensee, setLicensee] = useState('')
-  const [edition, setEdition] = useState('enterprise')
+  const [edition, setEdition] = useState<LicenseEdition>('enterprise')
   const [days, setDays] = useState('365')
   const [state, setState] = useState<'idle' | 'running'>('idle')
-  const [result, setResult] = useState<MintResult | null>(null)
+  const [result, setResult] = useState<LicenseMintResult | null>(null)
   const [error, setError] = useState('')
 
   async function mint() {
@@ -75,16 +71,22 @@ export default function SupervisorLicensePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ licensee: licensee.trim(), edition, days: Number(days) || 365 }),
       })
-      const payload = (await response.json()) as MintResult
+      const payload = (await response.json()) as LicenseMintResult
+      if (!response.ok && !payload.errorCode) {
+        setError(copy.failed)
+        return
+      }
       setResult(payload)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.failed)
+    } catch {
+      setError(copy.failed)
     } finally {
       setState('idle')
     }
   }
 
   const env = result?.environment
+  const resultError = result?.errorCode ? copy.errors[result.errorCode] : ''
+  const resultRemedy = result?.remedyCode ? copy.remedies[result.remedyCode] : ''
 
   return (
     <main style={page}>
@@ -99,9 +101,9 @@ export default function SupervisorLicensePage() {
           </label>
           <label style={field}>
             <span style={label}>{copy.edition}</span>
-            <select value={edition} onChange={e => setEdition(e.target.value)} style={input}>
-              {EDITIONS.map(name => (
-                <option key={name} value={name} style={{ color: '#000' }}>{name}</option>
+            <select value={edition} onChange={e => setEdition(e.target.value as LicenseEdition)} style={input}>
+              {LICENSE_EDITIONS.map(name => (
+                <option key={name} value={name} style={{ color: '#000' }}>{copy.editions[name]}</option>
               ))}
             </select>
           </label>
@@ -115,7 +117,7 @@ export default function SupervisorLicensePage() {
           {state === 'running' ? copy.minting : copy.mint}
         </button>
         {error ? <p role="alert" style={alert}>{error}</p> : null}
-        {result?.error ? <p role="alert" style={alert}>{result.error}{result.remedy ? ` — ${result.remedy}` : ''}</p> : null}
+        {resultError ? <p role="alert" style={alert}>{resultError}{resultRemedy ? ` — ${resultRemedy}` : ''}</p> : null}
 
         {env ? (
           <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
@@ -143,25 +145,25 @@ export default function SupervisorLicensePage() {
               <dl style={grid}>
                 <div>
                   <dt style={muted}>{copy.licenseId}</dt>
-                  <dd style={dd}>{result?.licence?.licenseId}</dd>
+                  <dd style={dd}>{result?.licence?.licenseId || copy.notAvailable}</dd>
                 </div>
                 <div>
                   <dt style={muted}>{copy.edition}</dt>
-                  <dd style={dd}>{result?.licence?.edition}</dd>
+                  <dd style={dd}>{editionLabel(copy, result?.licence?.edition)}</dd>
                 </div>
                 <div>
                   <dt style={muted}>{copy.expires}</dt>
-                  <dd style={dd}>{result?.licence?.expiresAt}</dd>
+                  <dd style={dd}>{result?.licence?.expiresAt || copy.notAvailable}</dd>
                 </div>
                 <div>
                   <dt style={muted}>{copy.features}</dt>
-                  <dd style={dd}>{(result?.licence?.features || []).join(', ')}</dd>
+                  <dd style={dd}>{(result?.licence?.features || []).map(item => featureLabel(copy, item)).join(', ') || copy.notAvailable}</dd>
                 </div>
               </dl>
-              {result?.warnings?.length ? (
+              {result?.warningCodes?.length ? (
                 <ul style={muted}>
-                  {result.warnings.map(item => (
-                    <li key={item}>{item}</li>
+                  {result.warningCodes.map(code => (
+                    <li key={code}>{copy.warnings[code]}</li>
                   ))}
                 </ul>
               ) : null}

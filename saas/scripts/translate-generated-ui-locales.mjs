@@ -273,6 +273,21 @@ async function translateBatch(locale, batch) {
   }
 }
 
+function materializeLocale(english, localizedData, resolvedBySource) {
+  const generatedUi = {}
+  const existing = localizedData.generatedUi && typeof localizedData.generatedUi === 'object' && !Array.isArray(localizedData.generatedUi)
+    ? localizedData.generatedUi
+    : {}
+
+  for (const [key, source] of Object.entries(english)) {
+    const resolved = resolvedBySource.get(source)
+    const current = existing[key]
+    generatedUi[key] = resolved ?? (typeof current === 'string' && current.trim() ? current : source)
+  }
+
+  return { ...localizedData, generatedUi }
+}
+
 async function buildLocale(locale, englishData, localizedData) {
   const english = englishData.generatedUi
   if (!english || typeof english !== 'object' || Array.isArray(english)) throw new Error('English generatedUi dictionary is missing.')
@@ -321,28 +336,27 @@ async function buildLocale(locale, englishData, localizedData) {
   const batches = createBatches(missing)
   console.log(`[i18n] ${locale}: ${Object.keys(english).length} keys, ${missing.length} unique translations, ${batches.length} batches.`)
 
-  const batchResults = []
   if (usesSerializedRequests()) {
     for (let index = 0; index < batches.length; index += 1) {
       const batch = batches[index]
       console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
-      batchResults.push(await translateBatch(locale, batch))
+      const translated = await translateBatch(locale, batch)
+      for (const [source, value] of translated) resolvedBySource.set(source, value)
+      writeLocale(locale, materializeLocale(english, localizedData, resolvedBySource))
+      console.log(`[i18n] ${locale}: checkpoint ${index + 1}/${batches.length} written.`)
       if (index < batches.length - 1) await sleep(modelConfig().requestSpacingMs)
     }
   } else {
-    batchResults.push(...await Promise.all(batches.map(async (batch, index) => {
+    const batchResults = await Promise.all(batches.map(async (batch, index) => {
       console.log(`[i18n] ${locale}: batch ${index + 1}/${batches.length} (${batch.length} values)`)
       return translateBatch(locale, batch)
-    })))
+    }))
+    for (const translated of batchResults) {
+      for (const [source, value] of translated) resolvedBySource.set(source, value)
+    }
   }
 
-  for (const translated of batchResults) {
-    for (const [source, value] of translated) resolvedBySource.set(source, value)
-  }
-
-  const generatedUi = {}
-  for (const [key, source] of Object.entries(english)) generatedUi[key] = resolvedBySource.get(source) ?? source
-  return { ...localizedData, generatedUi }
+  return materializeLocale(english, localizedData, resolvedBySource)
 }
 
 function selectedLocales() {

@@ -1,7 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
+const require = createRequire(import.meta.url)
+const ts = require('typescript')
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const guardPath = path.join(__dirname, 'enforce-localized-page-copy.mjs')
@@ -46,11 +49,42 @@ const TEST_FILES = [
   'tests/supervisorSectionNavigation.node.test.ts',
 ]
 const helperImport = "import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'"
-const readPattern = /(?<!hydrateLocalizedSource\()readFileSync\(([^;\n]*?),\s*(['"])(utf-?8)\2\)/g
+const oldHelperImport = "import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource'"
+
+function wrapSourceReads(source, relativePath) {
+  const sf = ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const edits = []
+
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'readFileSync' &&
+      node.arguments.length >= 2 &&
+      (ts.isStringLiteral(node.arguments[1]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[1])) &&
+      /^(utf8|utf-8)$/i.test(node.arguments[1].text) &&
+      !(
+        ts.isCallExpression(node.parent) &&
+        ts.isIdentifier(node.parent.expression) &&
+        node.parent.expression.text === 'hydrateLocalizedSource'
+      )
+    ) {
+      edits.push({ start: node.getStart(sf), end: node.end, text: `hydrateLocalizedSource(${node.getText(sf)})` })
+    }
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sf)
+  edits.sort((a, b) => b.start - a.start)
+  for (const edit of edits) source = source.slice(0, edit.start) + edit.text + source.slice(edit.end)
+  return { source, count: edits.length }
+}
 
 for (const relativePath of TEST_FILES) {
   const fullPath = path.join(ROOT, relativePath)
-  let source = fs.readFileSync(fullPath, 'utf8')
+  let source = fs.readFileSync(fullPath, 'utf8').replace(oldHelperImport, helperImport)
+  const wrapped = wrapSourceReads(source, relativePath)
+  source = wrapped.source
 
   if (!source.includes(helperImport)) {
     const imports = [...source.matchAll(/^import .*$/gm)]
@@ -60,10 +94,9 @@ for (const relativePath of TEST_FILES) {
     source = `${source.slice(0, insertion)}\n${helperImport}${source.slice(insertion)}`
   }
 
-  source = source.replace(
-    readPattern,
-    (_match, args, quote, encoding) => `hydrateLocalizedSource(readFileSync(${args}, ${quote}${encoding}${quote}))`,
-  )
+  if (wrapped.count === 0 && !source.includes('hydrateLocalizedSource(readFileSync(')) {
+    throw new Error(`No source reader was hydrated in ${relativePath}`)
+  }
   fs.writeFileSync(fullPath, source, 'utf8')
 }
 

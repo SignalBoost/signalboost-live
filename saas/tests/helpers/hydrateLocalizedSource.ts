@@ -14,19 +14,33 @@ function loadGeneratedCopy(): ReadonlyMap<string, string> {
     entries.set(JSON.parse(match[1]) as string, JSON.parse(match[2]) as string)
   }
 
+  if (entries.size === 0) throw new Error('Generated UI copy table could not be parsed')
   generatedCopy = entries
   return generatedCopy
 }
 
+function asSingleQuotedLiteral(value: string): string {
+  return `'${value
+    .replaceAll('\\', '\\\\')
+    .replaceAll("'", "\\'")
+    .replaceAll('\r', '\\r')
+    .replaceAll('\n', '\\n')
+    .replaceAll('\u2028', '\\u2028')
+    .replaceAll('\u2029', '\\u2029')}'`
+}
+
 /**
  * Source-inspection tests assert product behavior, not where English is stored.
- * Resolve uiCopy() references into comments so existing positive and negative
- * assertions continue to inspect the effective copy for that specific file.
+ * Resolve uiCopy() references back to equivalent string literals so assertions
+ * inspect the effective copy for that specific source file.
  */
 export function hydrateLocalizedSource(source: string): string {
   const copy = loadGeneratedCopy()
   return source.replace(
     /uiCopy\(\s*(['"])(u_[a-f0-9]+)\1\s*\)/g,
-    (call, _quote: string, key: string) => `${call} /* ${JSON.stringify(copy.get(key) ?? '')} */`,
+    (call, _quote: string, key: string) => {
+      const value = copy.get(key)
+      return value === undefined ? call : asSingleQuotedLiteral(value)
+    },
   )
 }

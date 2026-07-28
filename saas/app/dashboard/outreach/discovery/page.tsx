@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const PLATFORMS = ['manual', 'google', 'facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'telegram', 'wechat', 'reddit', 'website', 'directory']
 const CATEGORIES = ['company', 'affiliate', 'media']
@@ -19,20 +21,20 @@ type DiscoveryCopy = {
 
 const COPY: Record<string, DiscoveryCopy> = {
   en: {
-    eyebrow: 'Discovery', title: 'Find a business and let AI prepare the outreach.',
-    subtitle: 'Paste a public website, Google profile, or social page. SignalBoost analyzes the business, predicts its needs, and drops a ready-to-review lead into your contacts queue.',
-    urlLabel: 'Business URL or profile *', nameLabel: 'Business name (optional)',
-    sourceLabel: 'Source', categoryLabel: 'Outreach type', notesLabel: 'Public text / notes (optional)',
-    urlPlaceholder: 'https://example.com', namePlaceholder: 'e.g. Luna Travel',
-    notesPlaceholder: 'Paste a bio, reviews, or anything that describes what they do.',
-    missingUrl: 'Add a business URL or profile link to analyze.',
-    analyzeError: 'Could not analyze this lead.', genericError: 'Something went wrong. Please try again.',
-    analyzing: 'Analyzing…', analyzeButton: 'Analyze & queue lead', viewContacts: 'View contacts queue',
-    leadQueued: 'Lead queued', newLead: 'New lead', draftFirstTouch: 'Draft first touch',
-    reviewContacts: 'Review in contacts', openEngine: 'Open engine',
-    generateDeck: 'Generate pitch deck', generatingDeck: 'Building deck…', deckError: 'Could not generate the deck.',
-    platforms: { manual: 'Manual', google: 'Google', facebook: 'Facebook', instagram: 'Instagram', linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram', wechat: 'WeChat', reddit: 'Reddit', website: 'Website', directory: 'Directory' },
-    categories: { company: 'Company', affiliate: 'Affiliate / Partner', media: 'Media Platform' },
+    eyebrow: uiCopy('u_da776106b919a6e4'), title: uiCopy('u_dd9450a1cc1e7c64'),
+    subtitle: uiCopy('u_27ef602f06a6d5f3'),
+    urlLabel: uiCopy('u_5a544aea739cc95a'), nameLabel: uiCopy('u_4443a3d3ddaeda62'),
+    sourceLabel: uiCopy('u_7c3dd2e6ec59b706'), categoryLabel: uiCopy('u_1c713ccb37e4627e'), notesLabel: uiCopy('u_59ba795969cde0fc'),
+    urlPlaceholder: uiCopy('u_8b6738f082df58aa'), namePlaceholder: uiCopy('u_2153bfd2f7c6f37f'),
+    notesPlaceholder: uiCopy('u_5f94b8c2e005c218'),
+    missingUrl: uiCopy('u_b64c176ca3a4180e'),
+    analyzeError: uiCopy('u_512e416286dbb761'), genericError: uiCopy('u_42eb66692a9babf8'),
+    analyzing: uiCopy('u_6234bb18b6a38abf'), analyzeButton: uiCopy('u_705ba299fe64023a'), viewContacts: uiCopy('u_f68a6e749feca90f'),
+    leadQueued: uiCopy('u_a0b5042788f679c9'), newLead: uiCopy('u_7513c4af7a9ae15a'), draftFirstTouch: uiCopy('u_aa4896afa47ef36b'),
+    reviewContacts: uiCopy('u_7e24d5d9b233d466'), openEngine: uiCopy('u_b5ef59fda825e68f'),
+    generateDeck: uiCopy('u_b18d6f3e8b88eee4'), generatingDeck: uiCopy('u_0eacd0edf3acf725'), deckError: uiCopy('u_592801c7deb556a1'),
+    platforms: { manual: uiCopy('u_10775f4069b3f8e8'), google: uiCopy('u_04a19413e22dba30'), facebook: uiCopy('u_aaf7e9d570055096'), instagram: uiCopy('u_dbeb10d7cfb4802d'), linkedin: uiCopy('u_e4504c50472e69b4'), tiktok: uiCopy('u_4637e6ee2c532cc5'), youtube: uiCopy('u_9237c997795a375a'), telegram: uiCopy('u_aa58a4a6df4aac73'), wechat: uiCopy('u_9420117938118494'), reddit: uiCopy('u_dad2d1eb1e7e67b9'), website: uiCopy('u_81377b1b0dcb923f'), directory: uiCopy('u_492954b1731da3e4') },
+    categories: { company: uiCopy('u_5a97b10fa656e16a'), affiliate: uiCopy('u_40c1855f1fdd1153'), media: uiCopy('u_d229217d419e84ee') },
   },
   es: {
     eyebrow: 'Descubrimiento', title: 'Encuentra un negocio y deja que la IA prepare la prospección.',

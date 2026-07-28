@@ -1,9 +1,11 @@
 'use client'
 
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const COPY = {
-  en: { navigation: 'Admin navigation', operator: 'Operator' },
+  en: { navigation: uiCopy('u_9eb199a84782f63f'), operator: uiCopy('u_dfb33ca11f19a938') },
   es: { navigation: 'Navegación de administración', operator: 'Operador' },
   pt: { navigation: 'Navegação administrativa', operator: 'Operador' },
   pl: { navigation: 'Nawigacja administracyjna', operator: 'Operator' },

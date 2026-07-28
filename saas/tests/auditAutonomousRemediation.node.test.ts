@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
+import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 
 // Audit completion must report active risk, not replay fixed scan findings.
 const url = (path: string) => new URL(path, import.meta.url)
-const read = (path: string) => readFileSync(url(path), 'utf8')
+const read = (path: string) => readUiSource(url(path))
 
 test('Audit Console exposes one run-scoped approval and the AI performs the rest', () => {
   const dashboard = read('../app/dashboard/audit/page.tsx')

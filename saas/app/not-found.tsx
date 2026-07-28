@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY: Record<Lang, { heading: string; body: string; cta: string }> = {
-  en: { heading: '404', body: 'Page not found', cta: '← Back to dashboard' },
+  en: { heading: '404', body: uiCopy('u_5b346b71b45aa0ab'), cta: uiCopy('u_0fb0916dd363c9d4') },
   es: { heading: '404', body: 'Página no encontrada', cta: '← Volver al panel' },
   pt: { heading: '404', body: 'Página não encontrada', cta: '← Voltar ao painel' },
   pl: { heading: '404', body: 'Strona nie znaleziona', cta: '← Wróć do panelu' },

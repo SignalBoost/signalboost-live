@@ -16,6 +16,8 @@ import {
   type StructuredCampaignBrief,
 } from '@/lib/enterprise/campaignBrief'
 import type { UrlIntelligenceResult } from '@/lib/enterprise/url-intelligence/types'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export type PromoteCampaignRequest = {
   businessName: string
@@ -35,20 +37,20 @@ type Props = {
 const concepts: SuggestionCard[] = [
   {
     id: 'authority',
-    title: 'Business authority',
-    description: 'Lead with credibility, proof, and a clear business outcome.',
+    title: uiCopy('u_12f657cd77286b81'),
+    description: uiCopy('u_bdb55b1b013834a8'),
     metadata: ['Trust', 'Proof', 'Value'],
   },
   {
     id: 'offer',
-    title: 'Offer-led campaign',
-    description: 'Present the strongest source-backed offer and move customers toward action.',
+    title: uiCopy('u_ee81f9877e809128'),
+    description: uiCopy('u_c69ed094ff23a1ec'),
     metadata: ['Offer', 'Urgency', 'CTA'],
   },
   {
     id: 'education',
-    title: 'Educational campaign',
-    description: 'Explain the customer problem and solution before presenting the next step.',
+    title: uiCopy('u_0fe11301146f2ff4'),
+    description: uiCopy('u_efaf1b6b5b51a874'),
     metadata: ['Education', 'Clarity', 'Conversion'],
   },
 ]
@@ -126,7 +128,7 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
       setCtaStrategy(result.detected.ctaStrategy.value)
     } catch (value) {
       setIntelligence(null)
-      setError(value instanceof Error ? value.message : 'URL analysis failed.')
+      setError(value instanceof Error ? value.message : uiCopy('u_369f987a1fb1bf6a'))
     } finally {
       setAnalyzing(false)
     }
@@ -135,11 +137,11 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!intelligence) {
-      setError('Analyze the source URL before building the campaign.')
+      setError(uiCopy('u_8427e3168bc95759'))
       return
     }
     if (!ready) {
-      setError('Review the analyzed source and complete every required campaign option.')
+      setError(uiCopy('u_9217ddcb9615bd41'))
       return
     }
 
@@ -176,14 +178,14 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
   return (
     <form onSubmit={submit} style={{ display: 'grid', gap: 14 }}>
       <SourceUrlField
-        label="Website or GitHub source"
+        label={uiCopy('u_e84f9a3558b13139')}
         value={sourceUrl}
         onChange={(value) => {
           setSourceUrl(value)
           setIntelligence(null)
         }}
         required
-        helperText="Campaign Studio analyzes this public source and proposes a structured campaign brief."
+        helperText={uiCopy('u_acb46bcc528bddad')}
       />
 
       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
@@ -202,7 +204,7 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
             opacity: busy || analyzing || Boolean(validateSourceUrl(sourceUrl)) ? 0.55 : 1,
           }}
         >
-          {analyzing ? 'Analyzing source…' : 'Analyze and prefill'}
+          {analyzing ? uiCopy('u_90cf835bd785ee2c') : uiCopy('u_d279f9201e903ca7')}
         </button>
       </div>
 
@@ -216,42 +218,39 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
             padding: 14,
           }}
         >
-          <p style={{ margin: 0, color: '#ffc300', fontSize: 12, fontWeight: 900 }}>
-            Source intelligence ready · {intelligence.sourceType}
+          <p style={{ margin: 0, color: '#ffc300', fontSize: 12, fontWeight: 900 }}>{uiCopy('u_7012147b77f7fc0c')}{intelligence.sourceType}
           </p>
           <h3 style={{ color: '#fff', margin: '8px 0 4px', fontSize: 16 }}>
-            {intelligence.title || intelligence.organization || 'Analyzed source'}
+            {intelligence.title || intelligence.organization || uiCopy('u_9c439c49c29af677')}
           </h3>
           <p style={{ color: 'rgba(255,255,255,.68)', margin: 0, lineHeight: 1.5 }}>
-            {intelligence.description || 'No source description was available.'}
+            {intelligence.description || uiCopy('u_838cb071898efea9')}
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-            <span style={{ color: '#fff', fontSize: 11 }}>Goal {intelligence.detected.goal.confidence}%</span>
-            <span style={{ color: '#fff', fontSize: 11 }}>Tone {intelligence.detected.tone.confidence}%</span>
-            <span style={{ color: '#fff', fontSize: 11 }}>Region {intelligence.detected.region.confidence}%</span>
-            <span style={{ color: '#fff', fontSize: 11 }}>Format {intelligence.detected.format.confidence}%</span>
+            <span style={{ color: '#fff', fontSize: 11 }}>{uiCopy('u_16889f775f178b77')}{intelligence.detected.goal.confidence}%</span>
+            <span style={{ color: '#fff', fontSize: 11 }}>{uiCopy('u_067f6d72279b0838')}{intelligence.detected.tone.confidence}%</span>
+            <span style={{ color: '#fff', fontSize: 11 }}>{uiCopy('u_998c26d160695c48')}{intelligence.detected.region.confidence}%</span>
+            <span style={{ color: '#fff', fontSize: 11 }}>{uiCopy('u_1155c36e89fa3ab4')}{intelligence.detected.format.confidence}%</span>
           </div>
           {intelligence.requiresConfirmation.length > 0 && (
-            <p style={{ color: '#ffc300', margin: '10px 0 0', fontSize: 12 }}>
-              Review recommended for: {intelligence.requiresConfirmation.join(', ')}. The selections below remain editable before approval.
-            </p>
+            <p style={{ color: '#ffc300', margin: '10px 0 0', fontSize: 12 }}>{uiCopy('u_bd9bdeaa7b68e972')}{intelligence.requiresConfirmation.join(', ')}{uiCopy('u_57f5d15c173ca514')}</p>
           )}
         </section>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <SearchableSelect label="Goal" options={enterpriseOptions.goals} value={goal} onChange={setGoal} required />
-        <SearchableMultiSelect label="Audience" options={enterpriseOptions.audiences} values={audiences} onChange={setAudiences} />
-        <SearchableSelect label="Tone" options={enterpriseOptions.tones} value={tone} onChange={setTone} required />
-        <SearchableSelect label="Region" options={enterpriseOptions.regions} value={region} onChange={setRegion} required />
-        <SearchableMultiSelect label="Platforms" options={enterpriseOptions.platforms} values={platforms} onChange={setPlatforms} />
-        <SearchableSelect label="Format" options={enterpriseOptions.formats} value={format} onChange={setFormat} required />
-        <SearchableSelect label="Offer type" options={enterpriseOptions.offer_types} value={offerType} onChange={setOfferType} required />
-        <SearchableSelect label="CTA strategy" options={enterpriseOptions.cta_strategies} value={ctaStrategy} onChange={setCtaStrategy} required />
+        <SearchableSelect label={uiCopy('u_2dbd965beb155bce')} options={enterpriseOptions.goals} value={goal} onChange={setGoal} required />
+        <SearchableMultiSelect label={uiCopy('u_f07fb5753d96af0e')} options={enterpriseOptions.audiences} values={audiences} onChange={setAudiences} />
+        <SearchableSelect label={uiCopy('u_cc044631313e5600')} options={enterpriseOptions.tones} value={tone} onChange={setTone} required />
+        <SearchableSelect label={uiCopy('u_703a9f4c7e013163')} options={enterpriseOptions.regions} value={region} onChange={setRegion} required />
+        <SearchableMultiSelect label={uiCopy('u_362b89a19dcb59f1')} options={enterpriseOptions.platforms} values={platforms} onChange={setPlatforms} />
+        <SearchableSelect label={uiCopy('u_6579885cd57aacd3')} options={enterpriseOptions.formats} value={format} onChange={setFormat} required />
+        <SearchableSelect label={uiCopy('u_0bda27d5e0dcca01')} options={enterpriseOptions.offer_types} value={offerType} onChange={setOfferType} required />
+        <SearchableSelect label={uiCopy('u_b4669bc55ec221bc')} options={enterpriseOptions.cta_strategies} value={ctaStrategy} onChange={setCtaStrategy} required />
       </div>
 
       <SuggestionCardGrid
-        label="Creative direction"
+        label={uiCopy('u_fe9fdd2218b13f73')}
         suggestions={concepts}
         selectedId={concept}
         onSelect={setConcept}
@@ -272,9 +271,7 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
             padding: '10px 14px',
             fontWeight: 800,
           }}
-        >
-          Reset
-        </button>
+        >{uiCopy('u_d0d58834d74115a5')}</button>
         <button
           type="submit"
           disabled={busy || analyzing || !ready}
@@ -289,7 +286,7 @@ export function PromoteCampaignConfigurator({ busy, language, onSubmit, onReset 
             opacity: busy || analyzing || !ready ? 0.55 : 1,
           }}
         >
-          {busy ? 'Building campaign…' : 'Approve brief and build campaign'}
+          {busy ? uiCopy('u_337a5600d24cb518') : uiCopy('u_4045562f5e9cc98f')}
         </button>
       </div>
       <input type="hidden" name="language" value={language} readOnly />

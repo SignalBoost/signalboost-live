@@ -3,6 +3,8 @@
 
 import { Dot, LANGS, c, labelStyle, type HubData, type Lang } from '../hub/shared.tsx'
 import type { CommandPage } from './types.ts'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type MissionBarProps = {
   activePage: CommandPage
@@ -29,15 +31,15 @@ export default function MissionBar({ activePage, lang, data, loading, onLanguage
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.035)' }}>
-          <span style={labelStyle}>Environment</span>
-          <strong style={{ color: '#ffc300', fontSize: 12.5 }}>Production</strong>
+          <span style={labelStyle}>{uiCopy('u_5f3cfb04dd36ebeb')}</span>
+          <strong style={{ color: '#ffc300', fontSize: 12.5 }}>{uiCopy('u_4c31757bef99aa44')}</strong>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.035)' }}>
           <span style={labelStyle}>{c('systemHealth', lang)}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} /> Supabase</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} /> Stripe</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} /> Vercel</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} />{uiCopy('u_7ce69d5a87d08dba')}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} />{uiCopy('u_f6761d8be25729b6')}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} />{uiCopy('u_f1409df87f8f6996')}</span>
         </div>
 
         <div style={{ display: 'flex', gap: 5 }}>

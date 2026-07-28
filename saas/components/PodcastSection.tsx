@@ -2,6 +2,8 @@
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export default function PodcastSection() {
   const { dict } = useI18n()
@@ -9,35 +11,35 @@ export default function PodcastSection() {
   const FEATURES = [
     {
       icon: '🎙️',
-      title: t(dict, 'podcastSection.f1.title', 'Sound like a local'),
-      desc: t(dict, 'podcastSection.f1.desc', 'We convert your episode into native-sounding audio in Portuguese, Spanish, Polish and Russian. Not subtitles — real voices.'),
+      title: t(dict, 'podcastSection.f1.title', uiCopy('u_88c25c28fd056ad6')),
+      desc: t(dict, 'podcastSection.f1.desc', uiCopy('u_2aa3b367b91f5ebc')),
     },
     {
       icon: '✂️',
-      title: t(dict, 'podcastSection.f2.title', 'Go viral in 5 languages'),
-      desc: t(dict, 'podcastSection.f2.desc', 'Auto-generate short clips for TikTok, Reels and YouTube Shorts from every episode — in all your languages.'),
+      title: t(dict, 'podcastSection.f2.title', uiCopy('u_a6851607474e9528')),
+      desc: t(dict, 'podcastSection.f2.desc', uiCopy('u_834961795e696221')),
     },
     {
       icon: '💬',
-      title: t(dict, 'podcastSection.f3.title', 'Captions in every language'),
-      desc: t(dict, 'podcastSection.f3.desc', 'Auto-generate subtitles and captions for your videos — burned in or as separate files. Perfect for silent scrollers.'),
+      title: t(dict, 'podcastSection.f3.title', uiCopy('u_ca2e38895ba558a6')),
+      desc: t(dict, 'podcastSection.f3.desc', uiCopy('u_6676f72a5c360580')),
     },
     {
       icon: '🌐',
-      title: t(dict, 'podcastSection.f4.title', 'Your show, your site'),
-      desc: t(dict, 'podcastSection.f4.desc', 'A branded podcast website with episode player, multilingual show notes and listener reviews.'),
+      title: t(dict, 'podcastSection.f4.title', uiCopy('u_21a00a040b131bb5')),
+      desc: t(dict, 'podcastSection.f4.desc', uiCopy('u_87011cc8e5213c5b')),
     },
     {
       icon: '⭐',
-      title: t(dict, 'podcastSection.f5.title', 'Build your community'),
-      desc: t(dict, 'podcastSection.f5.desc', 'Collect listener reviews and testimonials in their native language. Show the world your audience loves you.'),
+      title: t(dict, 'podcastSection.f5.title', uiCopy('u_cb54809571f7d5fc')),
+      desc: t(dict, 'podcastSection.f5.desc', uiCopy('u_edee7b8505ef5d81')),
     },
   ]
 
   const PODCASTERS = [
-    { name: 'Joe Rogan', flag: '🇺🇸', reach: t(dict, 'podcastSection.podcaster1.reach', '190M listeners') },
-    { name: 'Flow Podcast', flag: '🇧🇷', reach: t(dict, 'podcastSection.podcaster2.reach', '#1 in Brazil') },
-    { name: 'Máxima FM', flag: '🇪🇸', reach: t(dict, 'podcastSection.podcaster3.reach', 'Top LATAM') },
+    { name: 'Joe Rogan', flag: '🇺🇸', reach: t(dict, 'podcastSection.podcaster1.reach', uiCopy('u_d4ac3e03b54a5e40')) },
+    { name: 'Flow Podcast', flag: '🇧🇷', reach: t(dict, 'podcastSection.podcaster2.reach', uiCopy('u_0ed1c090bec585f1')) },
+    { name: 'Máxima FM', flag: '🇪🇸', reach: t(dict, 'podcastSection.podcaster3.reach', uiCopy('u_0fbce73610c7d7aa')) },
   ]
 
   return (
@@ -47,20 +49,7 @@ export default function PodcastSection() {
       margin: '0 auto',
       fontFamily: 'system-ui',
     }}>
-      <style>{`
-        @media (max-width: 768px) {
-          .podcast-grid {
-            grid-template-columns: 1fr !important;
-            gap: 40px !important;
-          }
-          .podcast-buttons {
-            flex-direction: column !important;
-          }
-          .podcast-buttons a {
-            text-align: center !important;
-          }
-        }
-      `}</style>
+      <style>{uiCopy('u_a0ef277c1f6e7f7e')}</style>
 
       <div className="podcast-grid" style={{
         display: 'grid',
@@ -77,25 +66,25 @@ export default function PodcastSection() {
             fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
             textTransform: 'uppercase', color: '#ffc300',
           }}>
-            🎙️ {t(dict, 'podcastSection.badge', 'For podcasters')}
+            🎙️ {t(dict, 'podcastSection.badge', uiCopy('u_fb3a1ade1690bf29'))}
           </div>
 
           <h2 style={{
             fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 900,
             lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 16px', color: '#fff',
           }}>
-            {t(dict, 'podcastSection.headlineLine1', 'You record it.')}
+            {t(dict, 'podcastSection.headlineLine1', uiCopy('u_d08bf11e443629d3'))}
             <br />
-            {t(dict, 'podcastSection.headlineLine2Pre', 'We take it')}{' '}
-            <span style={{ color: '#ffc300' }}>{t(dict, 'podcastSection.headlineLine2Highlight', 'global.')}</span>
+            {t(dict, 'podcastSection.headlineLine2Pre', uiCopy('u_a4911bf0956e29f3'))}{' '}
+            <span style={{ color: '#ffc300' }}>{t(dict, 'podcastSection.headlineLine2Highlight', uiCopy('u_94f8c2a178089ed0'))}</span>
           </h2>
 
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, lineHeight: 1.7, margin: '0 0 12px' }}>
-            {t(dict, 'podcastSection.intro', 'Once your episode is recorded, SignalBoost handles everything else — native voiceover in 5 languages, captions, social clips, your show website and listener reviews.')}
+            {t(dict, 'podcastSection.intro', uiCopy('u_6a5fb80b8d3a2541'))}
           </p>
 
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, lineHeight: 1.6, margin: '0 0 28px', fontStyle: 'italic' }}>
-            {t(dict, 'podcastSection.note', 'We do not do hardware or raw audio editing — just bring us your finished episode.')}
+            {t(dict, 'podcastSection.note', uiCopy('u_9dd43f71c286ae1f'))}
           </p>
 
           <div className="podcast-buttons" style={{ display: 'flex', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
@@ -105,7 +94,7 @@ export default function PodcastSection() {
                 fontSize: 14, padding: '12px 28px', borderRadius: 999,
                 textDecoration: 'none', display: 'inline-block',
               }}>
-              {t(dict, 'podcastSection.ctaPlans', 'See podcast plans')}
+              {t(dict, 'podcastSection.ctaPlans', uiCopy('u_d75e28fa1f9cffa0'))}
             </Link>
             <Link href="/podcasters#how-it-works"
               style={{
@@ -114,7 +103,7 @@ export default function PodcastSection() {
                 borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)',
                 textDecoration: 'none', display: 'inline-block',
               }}>
-              {t(dict, 'podcastSection.ctaHow', 'How it works')} →
+              {t(dict, 'podcastSection.ctaHow', uiCopy('u_d50dbe7a70670513'))} →
             </Link>
           </div>
 

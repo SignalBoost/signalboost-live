@@ -4,6 +4,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SignalBoostGuide } from '@/lib/cos/ui/SignalBoostGuide'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -13,31 +15,31 @@ const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
 const scenes = [
   {
-    label: 'Hook',
+    label: uiCopy('u_3b15ceee3ea3971c'),
     line: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.',
-    caption: 'Meet SignalBoost AI',
+    caption: uiCopy('u_8ad8d9ba961501c2'),
     card: 'Official platform guide',
   },
   {
-    label: 'Problem',
+    label: uiCopy('u_295d29ab022b69e5'),
     line: 'Many companies lose time jumping between dashboards, reviews, content tools, and approval steps.',
-    caption: 'Too many tools. Not enough clarity.',
+    caption: uiCopy('u_4f3803dcd60310ce'),
     card: 'Scattered work',
   },
   {
-    label: 'Tour',
+    label: uiCopy('u_4e25292c2db00d6f'),
     line: 'SignalBoost brings the work into one console so you can see what needs attention and what should happen next.',
-    caption: 'One console. One next action.',
+    caption: uiCopy('u_b0199c277b3616de'),
     card: 'Command console',
   },
   {
-    label: 'Control',
+    label: uiCopy('u_fda14b9bf4743d24'),
     line: 'COSA can prepare recommendations and campaign drafts while you stay in control of approval.',
-    caption: 'AI operates. Humans approve.',
+    caption: uiCopy('u_6fe0a8fd57463cd7'),
     card: 'Approval workflow',
   },
   {
-    label: 'CTA',
+    label: uiCopy('u_01fc71856332cc49'),
     line: `Visit ${SAAS_URL} and see how SignalBoost can help your company turn scattered work into approved action.`,
     caption: `Visit ${SAAS_URL}`,
     card: 'Start the tour',
@@ -108,23 +110,19 @@ export default function FreeSignalBoostAiVideoPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Free COSA Video Mode"} /></p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Low-cost SignalBoost AI presenter short</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={"This is the cheap/free version: animated SignalBoost AI mascot, browser narration, captions, fast scene changes, product cards, and CTA. It does not require HeyGen, D-ID, or paid avatar rendering."} /></p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_05e2f924ab864f84')} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>{uiCopy('u_0e449292d2611174')}</h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={uiCopy('u_f373631719de8bd0')} /></p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={playing ? pause : start} style={primaryButton}>{playing ? 'Pause short' : 'Play free AI short'}</button>
-          <button onClick={next} style={secondaryButton}><LocalizedText fallback={"Next scene"} /></button>
-          <a href="/dashboard/cosa/video/draft" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Presenter draft"} /></a>
+          <button onClick={playing ? pause : start} style={primaryButton}>{playing ? uiCopy('u_d0156b50b1e8e2ed') : uiCopy('u_835459db365cb873')}</button>
+          <button onClick={next} style={secondaryButton}><LocalizedText fallback={uiCopy('u_5a3959c48df883d6')} /></button>
+          <a href="/dashboard/cosa/video/draft" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={uiCopy('u_fe7842749fb0018c')} /></a>
         </div>
       </section>
 
       <section style={stageWrap}>
         <div style={phoneFrame}>
-          <style>{`
-            @keyframes freeScan { 0%{transform:translateX(-120%);opacity:0} 20%{opacity:1} 100%{transform:translateX(120%);opacity:0} }
-            @keyframes freePop { 0%,100%{transform:scale(.96);opacity:.72} 50%{transform:scale(1.04);opacity:1} }
-            @keyframes freeCard { 0%{transform:translateY(14px);opacity:.45} 100%{transform:translateY(0);opacity:1} }
-          `}</style>
+          <style>{uiCopy('u_53bd4d71dd2c85f5')}</style>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 8%, rgba(255,195,0,.24), transparent 34%), linear-gradient(180deg, #020617, #0f172a)' }} />
           <span style={{ position: 'absolute', left: 0, right: 0, top: 126, height: 3, background: `linear-gradient(90deg, transparent, ${CYAN}, ${GOLD}, transparent)`, animation: 'freeScan 3s linear infinite' }} />
 
@@ -142,7 +140,7 @@ export default function FreeSignalBoostAiVideoPage() {
           </div>
 
           <div style={{ position: 'absolute', left: 18, right: 18, bottom: 62, zIndex: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {['Console', 'Reviews', 'Approvals', 'Content'].map((label, itemIndex) => (
+            {[uiCopy('u_34e92f38e9c75d38'), uiCopy('u_6216dd66a5616f8b'), uiCopy('u_afacf1b589b97a02'), uiCopy('u_27ada089270225e1')].map((label, itemIndex) => (
               <div key={label} style={{ borderRadius: 12, padding: 8, background: itemIndex === index % 4 ? 'rgba(255,195,0,.18)' : 'rgba(255,255,255,.06)', border: itemIndex === index % 4 ? '1px solid rgba(255,195,0,.35)' : '1px solid rgba(255,255,255,.08)', color: '#fff', fontSize: 11, fontWeight: 850 }}>
                 {label}
               </div>
@@ -154,15 +152,15 @@ export default function FreeSignalBoostAiVideoPage() {
           </div>
 
           <div style={{ position: 'absolute', left: 18, right: 18, top: 18, display: 'flex', justifyContent: 'space-between', zIndex: 4 }}>
-            <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}><LocalizedText fallback={"SignalBoost AI"} /></span>
+            <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}><LocalizedText fallback={uiCopy('u_17c6b295c3a1402e')} /></span>
             <span style={{ color: 'rgba(255,255,255,.58)', fontSize: 12 }}>{index + 1}/{scenes.length}</span>
           </div>
         </div>
 
         <section style={infoPanel}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"What this solves"} /></p>
-          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}><LocalizedText fallback={"Cheaper than avatar APIs, better than static cards"} /></h2>
-          <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}><LocalizedText fallback={"This is not as advanced as paid AI-video services, but it gives you a recognizable host, fast captions, short-form framing, narration, product motion, and a CTA for very low cost."} /></p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_a1001041dbc117df')} /></p>
+          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}><LocalizedText fallback={uiCopy('u_2a3a20fb6907cb40')} /></h2>
+          <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}><LocalizedText fallback={uiCopy('u_9834f4c654a960e8')} /></p>
           <pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.82)', background: 'rgba(0,0,0,.26)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, fontSize: 12, lineHeight: 1.6, maxHeight: 340, overflow: 'auto' }}>{script}</pre>
         </section>
       </section>

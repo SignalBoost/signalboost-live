@@ -7,6 +7,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 // It does not read provider secrets, execute provider actions, or bypass Hub policy.
 
 import { PROVIDER_MATRIX_BROWSER_RULES, providerMatrixDisplayLabel } from '@/lib/hub/provider-matrix-policy'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export default function ProviderMatrixSafetyBanner() {
   const chips = [
@@ -19,7 +21,7 @@ export default function ProviderMatrixSafetyBanner() {
 
   return (
     <section
-      aria-label="Provider Matrix safety policy"
+      aria-label={uiCopy('u_a5debcf53ee43ade')}
       style={{
         border: '1px solid rgba(26,240,255,.22)',
         borderRadius: 16,
@@ -32,8 +34,8 @@ export default function ProviderMatrixSafetyBanner() {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ color: '#ffc300', fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={"Provider Matrix Guardrails"} /></div>
-          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 12.5, marginTop: 4 }}><LocalizedText fallback={"Provider status may be displayed here, but provider changes still run through Hub Actions or Infrastructure PR approval."} /></div>
+          <div style={{ color: '#ffc300', fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}><LocalizedText fallback={uiCopy('u_ffae63c3d0f62f1e')} /></div>
+          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 12.5, marginTop: 4 }}><LocalizedText fallback={uiCopy('u_916e9c714bb930a1')} /></div>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>

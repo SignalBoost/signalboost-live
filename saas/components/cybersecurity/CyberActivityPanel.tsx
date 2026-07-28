@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export type CyberActivityStatus = 'running' | 'completed' | 'failed'
 
@@ -35,8 +37,8 @@ type Copy = {
 
 const COPY: Record<string, Copy> = {
   en: {
-    title: 'Live cybersecurity activity', active: 'System activity detected', delayed: 'Activity update delayed', stale: 'No recent system activity', stalled: 'No forward progress — recovery may be required', completed: 'Operation completed', failed: 'Operation failed', lastActivity: 'Last activity', stageChanged: 'Stage changed', elapsed: 'Elapsed', progress: 'Progress',
-    stages: { starting: 'Starting cybersecurity operation', repository: 'Connecting to GitHub', manifests: 'Reading package manifests', packages: 'Building dependency inventory', advisories: 'Checking vulnerability advisories', saving: 'Saving scan results', alerts: 'Updating alert inbox', complete: 'Completed', monitor: 'Saving repository monitor', plan: 'Preparing remediation plan', approval: 'Recording approval', github_pr: 'Preparing protected GitHub proposal', failed: 'Stopped' },
+    title: uiCopy('u_f4acc999a52a7065'), active: uiCopy('u_e74ac86ae753336a'), delayed: uiCopy('u_930a22f3368ea6b1'), stale: uiCopy('u_9aa13358ab05cb00'), stalled: uiCopy('u_288c62af9eb93193'), completed: uiCopy('u_15cbabf9163c3577'), failed: uiCopy('u_9a19db6677e8dc28'), lastActivity: uiCopy('u_3be679f87902644d'), stageChanged: uiCopy('u_63efaea1ee75a339'), elapsed: uiCopy('u_f110e98e06d34bde'), progress: uiCopy('u_721ce079b30506e7'),
+    stages: { starting: uiCopy('u_21f2294194eca7a7'), repository: uiCopy('u_5a24e2a1b9a598cb'), manifests: uiCopy('u_ee5a0feb3e9b963b'), packages: uiCopy('u_cf679679accdeb7e'), advisories: uiCopy('u_6df74583c117c56f'), saving: uiCopy('u_c14d72abbbcbb900'), alerts: uiCopy('u_0681cf126e38da0b'), complete: uiCopy('u_2322b46162bff2ec'), monitor: uiCopy('u_03192cead7a84c67'), plan: uiCopy('u_fb716d291c6428e1'), approval: uiCopy('u_cdae03f0fcbd1521'), github_pr: uiCopy('u_7c154e3fb6cdfb4d'), failed: uiCopy('u_cf87c3654a684fc0') },
   },
   es: {
     title: 'Actividad de ciberseguridad en vivo', active: 'Actividad del sistema detectada', delayed: 'La actualización de actividad está retrasada', stale: 'No hay actividad reciente del sistema', stalled: 'No hay progreso — puede ser necesaria la recuperación', completed: 'Operación completada', failed: 'La operación falló', lastActivity: 'Última actividad', stageChanged: 'Cambio de etapa', elapsed: 'Transcurrido', progress: 'Progreso',
@@ -134,11 +136,7 @@ export default function CyberActivityPanel({ activity, lang }: { activity: Cyber
 
       {activity.error ? <p className="mt-2 text-[12px] leading-relaxed text-danger">{activity.error}</p> : null}
 
-      <style>{`
-        @keyframes sbCyberProgressFlow { 0% { transform: translateX(-140%); } 100% { transform: translateX(900%); } }
-        .sb-cyber-progress-flow { background: linear-gradient(90deg, transparent, rgba(255,255,255,.88), transparent); animation: sbCyberProgressFlow 1.35s linear infinite; }
-        @media (prefers-reduced-motion: reduce) { .sb-cyber-progress-flow { animation: none; opacity: 0; } }
-      `}</style>
+      <style>{uiCopy('u_c7ebf30d7acef930')}</style>
     </section>
   )
 }

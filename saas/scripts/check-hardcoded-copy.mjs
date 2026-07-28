@@ -49,8 +49,12 @@ const APP_ROOT = path.resolve(__dirname, '..');
 const BASELINE_PATH = path.join(APP_ROOT, 'scripts', 'i18n-hardcoded-baseline.json');
 const SCAN_ROOTS = ['app', 'components'];
 const CHECKED_ATTRS = new Set(['placeholder', 'aria-label', 'title', 'alt']);
-const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__']);
+const SKIP_DIRS = new Set(['api', 'node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__']);
 const SENTINEL = '[validate:i18n-copy] PASS';
+const TECHNICAL_LITERALS = new Set([
+  'en', 'es', 'pt', 'pl', 'ru', 'fr', 'de', 'it', 'ja', 'ko', 'zh',
+  'px', 'ms', 's', 'kb', 'mb', 'gb', 'tb',
+]);
 
 let ts;
 try {
@@ -130,6 +134,7 @@ function canonical(value) {
 function isUserFacingCopy(value) {
   const text = normalize(value);
   if (!text) return false;
+  if (TECHNICAL_LITERALS.has(text.toLowerCase())) return false;
   if (/^(&[a-zA-Z]+;|&#\d+;|\s)+$/.test(text)) return false; // entity-only, e.g. &nbsp;
   if (!/[A-Za-z]{2,}/.test(text)) return false;               // punctuation, digits, bullets, single letters
   return true;

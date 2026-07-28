@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import CompanyIdentityPrompt from '@/components/company/CompanyIdentityPrompt'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export const FREE_ORGANIC_MODE = true
 export const ENTERPRISE_READY = true
@@ -98,52 +100,52 @@ const ORGANIC_COPY: Record<string, {
   }
 }> = {
   en: {
-    formTitle: 'Describe your campaign in one prompt',
-    companyLabel: 'Company or brand name',
-    companyPlaceholder: 'e.g. Acme Analytics',
-    announcementLabel: 'What are you announcing or promoting?',
-    announcementPlaceholder: 'e.g. Launching our new AI reporting dashboard for small agencies',
-    audienceLabel: 'Target audience (optional)',
-    audiencePlaceholder: 'e.g. Marketing directors at mid-size agencies',
-    websiteLabel: 'Website or CTA link (optional)',
-    generate: 'Generate organic campaign assets',
-    generating: 'Generating campaign assets…',
-    resultsTitle: 'Your organic campaign assets',
-    copyBtn: 'Copy',
-    copied: 'Copied',
-    regenerate: 'Regenerate',
-    genError: 'Generation failed. Please try again in a moment.',
-    requiredError: 'Enter your company name and what you are announcing.',
-    dispatchTitle: 'Dispatch this press release',
-    dispatchBody: 'Queue the press release for real email dispatch. It goes to owner review first — nothing is sent to the journalist until it is approved in the Marketing workspace.',
-    publicationLabel: 'Publication name',
-    publicationPlaceholder: 'e.g. TechCrunch, Local Business Journal',
-    editorEmailLabel: 'Editor / journalist email',
-    dispatchBtn: 'Queue press release for dispatch',
-    dispatching: 'Queuing for approval…',
-    dispatchQueued: 'Queued. The press release is locked for owner approval and will be emailed to the journalist once approved.',
-    dispatchError: 'Could not queue the press release. Please try again.',
-    emailInvalid: 'Enter the publication name and a valid editor email.',
-    byokTitle: 'Power it with your own AI account',
-    byokBody: 'You pay your AI provider directly — roughly $0.03 per generation with Claude, less with OpenAI. Your key is used only for this request, never stored, never logged.',
-    byokProviderLabel: 'AI provider',
-    byokKeyLabel: 'Your API key',
-    byokKeyRequired: 'Paste your AI provider API key to generate. You pay the provider directly per generation.',
-    byokKeyInvalid: 'Your API key was rejected by the provider. Check it and try again.',
-    byokLiveLabel: 'Available now',
-    byokComingLabel: 'Coming soon',
-    byokConnected: 'Connected',
-    byokSaveKey: 'Save this key to my account for next time',
-    byokDisconnect: 'Disconnect',
-    sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release email' },
+    formTitle: uiCopy('u_02c3fd8e6ccdf284'),
+    companyLabel: uiCopy('u_1d71e0efe48a2963'),
+    companyPlaceholder: uiCopy('u_a981877661a9d2c9'),
+    announcementLabel: uiCopy('u_61616c730d7fd4e2'),
+    announcementPlaceholder: uiCopy('u_be52ea54845d1dff'),
+    audienceLabel: uiCopy('u_9b343917affbeca0'),
+    audiencePlaceholder: uiCopy('u_f6cbae8fbf3fbb27'),
+    websiteLabel: uiCopy('u_7a9a4ed4bc9619d2'),
+    generate: uiCopy('u_7b0e248cdc83450b'),
+    generating: uiCopy('u_f2a1832f4ba7d267'),
+    resultsTitle: uiCopy('u_06ec671b45b7ac24'),
+    copyBtn: uiCopy('u_6c342e152d4943fd'),
+    copied: uiCopy('u_093262e3caafb313'),
+    regenerate: uiCopy('u_5ee98cdcf833218b'),
+    genError: uiCopy('u_92e543e9a9a5b232'),
+    requiredError: uiCopy('u_4f97b8ad706f3124'),
+    dispatchTitle: uiCopy('u_be334365cfcce3af'),
+    dispatchBody: uiCopy('u_d9bd662413a78696'),
+    publicationLabel: uiCopy('u_7d8c9dffda4b8ec9'),
+    publicationPlaceholder: uiCopy('u_82216d36a3e66320'),
+    editorEmailLabel: uiCopy('u_c18d625e718aaa0f'),
+    dispatchBtn: uiCopy('u_9df5135138046744'),
+    dispatching: uiCopy('u_58ddf7eeaf63cbb9'),
+    dispatchQueued: uiCopy('u_8f780558cf83a760'),
+    dispatchError: uiCopy('u_a3c4cddb80f1f184'),
+    emailInvalid: uiCopy('u_801edbd336f08b01'),
+    byokTitle: uiCopy('u_acfbc607edebc065'),
+    byokBody: uiCopy('u_e0a34f791f19cd5e'),
+    byokProviderLabel: uiCopy('u_6a3aeed260416e95'),
+    byokKeyLabel: uiCopy('u_05dbd782a360b598'),
+    byokKeyRequired: uiCopy('u_2a20a9e2edabc263'),
+    byokKeyInvalid: uiCopy('u_02bb8c1a636f423a'),
+    byokLiveLabel: uiCopy('u_8b63b7892bfc2a41'),
+    byokComingLabel: uiCopy('u_f8aa484704277912'),
+    byokConnected: uiCopy('u_a96e22ef2fd69102'),
+    byokSaveKey: uiCopy('u_4d503880fe72c315'),
+    byokDisconnect: uiCopy('u_3a9d6370caff2ddb'),
+    sections: { youtube: uiCopy('u_442bf6796820214c'), linkedin: uiCopy('u_f38d822b123931d6'), press: uiCopy('u_f6024adb3e7f64a8') },
     labels: {
-      youtubeTitle: 'Video title',
-      youtubeDescription: 'Video description',
-      youtubeCommunityPost: 'Community post',
-      linkedinCompanyPost: 'Company page post',
-      linkedinFounderPost: 'Founder post',
-      pressReleaseSubject: 'Email subject',
-      pressReleaseBody: 'Email body',
+      youtubeTitle: uiCopy('u_de458df7bb015815'),
+      youtubeDescription: uiCopy('u_82cfdcaa3bd04509'),
+      youtubeCommunityPost: uiCopy('u_af30a9cafad89c02'),
+      linkedinCompanyPost: uiCopy('u_29cc4c6bb7716954'),
+      linkedinFounderPost: uiCopy('u_c6a23c38099e1385'),
+      pressReleaseSubject: uiCopy('u_885d14b574935284'),
+      pressReleaseBody: uiCopy('u_7d358249cea72ae7'),
     },
   },
   es: {
@@ -658,8 +660,8 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                 <label style={{ display: 'grid', gap: 6 }}>
                   <span className="sb-caption">{oc.byokProviderLabel}</span>
                   <select value={apiProvider} onChange={(e) => setApiProvider(e.target.value === 'openai' ? 'openai' : 'anthropic')} style={fieldStyle}>
-                    <option value="anthropic">{"Claude (Anthropic)"}</option>
-                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">{uiCopy('u_9e7c5b7a6b2fb064')}</option>
+                    <option value="openai">{uiCopy('u_b31ef3b03639831b')}</option>
                   </select>
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
@@ -690,7 +692,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
               </label>
               <label style={{ display: 'grid', gap: 6 }}>
                 <span className="sb-caption">{oc.websiteLabel}</span>
-                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" maxLength={200} style={fieldStyle} />
+                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder={uiCopy('u_984b8dbb8960eb18')} maxLength={200} style={fieldStyle} />
               </label>
             </div>
             <div className="sb-cta-row">
@@ -738,7 +740,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                       </label>
                       <label style={{ display: 'grid', gap: 6 }}>
                         <span className="sb-caption">{oc.editorEmailLabel}</span>
-                        <input value={editorEmail} onChange={(e) => setEditorEmail(e.target.value)} placeholder="editor@publication.com" maxLength={200} style={fieldStyle} />
+                        <input value={editorEmail} onChange={(e) => setEditorEmail(e.target.value)} placeholder={uiCopy('u_daf14eaf9ccfa07f')} maxLength={200} style={fieldStyle} />
                       </label>
                     </div>
                     <div className="sb-cta-row">

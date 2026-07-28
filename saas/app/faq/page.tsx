@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const CATEGORIES = ['gettingStarted', 'billing', 'websites', 'reviews', 'audioVideo', 'support'] as const
 const QUESTIONS = [
@@ -33,20 +35,20 @@ export default function FAQPage() {
     <main className="sb-page" style={{ maxWidth: 980 }}>
       <section style={{ borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 14, marginBottom: 14, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
-          <div className="sb-kicker">❓ {t(dict, 'faq.kicker', 'Help center')}</div>
-          <h1 style={{ fontSize: 24, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1, margin: '4px 0 0' }}>{t(dict, 'faq.title', 'Frequently asked questions')}</h1>
+          <div className="sb-kicker">❓ {t(dict, 'faq.kicker', uiCopy('u_21d19b2991b8a022'))}</div>
+          <h1 style={{ fontSize: 24, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1, margin: '4px 0 0' }}>{t(dict, 'faq.title', uiCopy('u_cf5884c4ebd74a8e'))}</h1>
         </div>
         <input
           className="sb-input"
           value={query}
           onChange={event => setQuery(event.target.value)}
-          placeholder={t(dict, 'faq.search', 'Search questions...')}
+          placeholder={t(dict, 'faq.search', uiCopy('u_5478884549f3dbb0'))}
           style={{ flex: '1 1 260px', maxWidth: 360, padding: '11px 14px' }}
         />
       </section>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-        <button className={category === 'all' ? 'sb-button-primary' : 'sb-button-ghost'} onClick={() => setCategory('all')}>{t(dict, 'faq.categories.all', 'All')}</button>
+        <button className={category === 'all' ? 'sb-button-primary' : 'sb-button-ghost'} onClick={() => setCategory('all')}>{t(dict, 'faq.categories.all', uiCopy('u_60cbc992693c2ed9'))}</button>
         {CATEGORIES.map(key => (
           <button key={key} className={category === key ? 'sb-button-primary' : 'sb-button-ghost'} onClick={() => setCategory(key)}>
             {t(dict, `faq.categories.${key}`, key)}
@@ -63,14 +65,14 @@ export default function FAQPage() {
         ))}
         {!rows.length && (
           <div className="sb-empty">
-            {t(dict, 'faq.empty', 'No answers matched your search.')}
+            {t(dict, 'faq.empty', uiCopy('u_d7617582a9ed86e2'))}
           </div>
         )}
       </section>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
-        <Link href="/support" className="sb-button-primary" style={{ textDecoration: 'none' }}>✉️ {t(dict, 'support.contact', 'Contact Support')}</Link>
-        <Link href="/docs" className="sb-button-ghost" style={{ textDecoration: 'none' }}>📖 {t(dict, 'support.documentation', 'Documentation')}</Link>
+        <Link href="/support" className="sb-button-primary" style={{ textDecoration: 'none' }}>✉️ {t(dict, 'support.contact', uiCopy('u_7c2ebe42a7bf7552'))}</Link>
+        <Link href="/docs" className="sb-button-ghost" style={{ textDecoration: 'none' }}>📖 {t(dict, 'support.documentation', uiCopy('u_0671caff8119f233'))}</Link>
       </div>
     </main>
   )

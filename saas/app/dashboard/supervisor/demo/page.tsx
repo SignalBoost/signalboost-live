@@ -25,6 +25,8 @@ import DemoRehearsal from '@/components/supervisor/DemoRehearsal'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 import { getSupervisorEntitlement } from '@/self-healing-host/supervisor-entitlement'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -53,37 +55,37 @@ type DemoCopy = {
 
 const COPY: Record<Language, DemoCopy> = {
   en: {
-    kicker: 'Live run',
-    title: 'Self-Healing Supervisor',
-    subtitle: 'A real repair run against this deployment. Every value below is read from the audit store, not staged for this page.',
-    adminOnly: 'This page is available to administrators.',
-    licenceInstalled: 'Licence installed — planning and dispatch are enabled.',
-    licenceMissing: 'No licence installed. Incidents are received and recorded, but not diagnosed.',
-    licenceNote: 'The gate is fail-closed by design. An unlicensed deployment does not quietly behave like a licensed one.',
-    productionTitle: 'Production repair history',
-    productionNote: 'Below is a real repair run against this deployment\u2019s own production. Unlike the rehearsal above, it cannot be triggered on demand \u2014 it appears only after a genuine failure has been detected and processed.',
-    emptyTitle: 'No repair run has been observed yet',
-    emptyBody: 'Nothing is shown here until a real deployment failure has been detected and processed. This page will not invent one.',
-    runLabel: 'Run',
-    stageLabels: ['Detected', 'Diagnosed', 'Gated', 'Executed', 'Verified', 'Audited'],
+    kicker: uiCopy('u_0212ac9103a37ba6'),
+    title: uiCopy('u_9f3bf76f6826cb14'),
+    subtitle: uiCopy('u_215adb4d3b21f103'),
+    adminOnly: uiCopy('u_d212ad35c9285ab8'),
+    licenceInstalled: uiCopy('u_9328be02b2ebd214'),
+    licenceMissing: uiCopy('u_3c7ed97079f09b44'),
+    licenceNote: uiCopy('u_b70e4e7314d03ec3'),
+    productionTitle: uiCopy('u_933872665c01b072'),
+    productionNote: uiCopy('u_f9a8036c1cc46631'),
+    emptyTitle: uiCopy('u_07a241cb52bf123d'),
+    emptyBody: uiCopy('u_2006f7f2e4cc1a34'),
+    runLabel: uiCopy('u_15241cb9fed1758f'),
+    stageLabels: [uiCopy('u_52549ef99d23969f'), uiCopy('u_938b8dec2b2ad9b9'), uiCopy('u_e8d3eaa2036ac899'), uiCopy('u_8e052c5e7b89f689'), uiCopy('u_2eb6728f656871b4'), uiCopy('u_a379a545edf75df2')],
     stageBodies: [
-      'A failure was observed in production without anyone reporting it.',
-      'The supervisor produced a repair plan with verification steps, rather than a guess.',
-      'Consequential steps stop for a named human. There is no edition in which they do not.',
-      'Only the steps a human approved were carried out.',
-      'The result was checked against the verification steps in the plan, not assumed.',
-      'Every step above left a record. This is the trail your SIEM receives.',
+      uiCopy('u_3a8bf2a17433095e'),
+      uiCopy('u_2352efc2d0859840'),
+      uiCopy('u_853a130dd69bb71e'),
+      uiCopy('u_e6265dd1fb61b9a9'),
+      uiCopy('u_9d86437651b995b7'),
+      uiCopy('u_9886843e08e7eaf6'),
     ],
     fields: {
-      status: 'Status', project: 'Project', environment: 'Environment', deployment: 'Deployment',
-      errorCode: 'Error code', severity: 'Severity', plan: 'Plan', channel: 'Channel',
-      approvedSteps: 'Approved steps', verification: 'Verification', comparison: 'Comparison',
+      status: uiCopy('u_9048022108927903'), project: uiCopy('u_ea7daf1d6bd96fdb'), environment: uiCopy('u_42c2fadc887aab6e'), deployment: uiCopy('u_d965b440772d1881'),
+      errorCode: uiCopy('u_57e29be7c1eedb26'), severity: uiCopy('u_937afb9bc17c4b41'), plan: uiCopy('u_bd7bfcf067e560f8'), channel: uiCopy('u_588ab86098caba01'),
+      approvedSteps: uiCopy('u_1c6426fa8cbeedc1'), verification: uiCopy('u_55346e95faeb7393'), comparison: uiCopy('u_642bbe4377101d6b'),
     },
-    none: 'none',
-    auditTitle: 'Audit trail',
-    auditNote: 'Ordered as it happened. This is a convenience view; the record of account is what reaches your SIEM.',
-    evidenceTitle: 'Evidence',
-    closing: 'Nothing on this page required a person to be watching when the failure happened.',
+    none: uiCopy('u_bbfc4c41b86be72d'),
+    auditTitle: uiCopy('u_a2a7297ab6e409f8'),
+    auditNote: uiCopy('u_32c5421e7110e63c'),
+    evidenceTitle: uiCopy('u_f5f2e8928766c2eb'),
+    closing: uiCopy('u_73b9cc601ce66bfc'),
   },
   es: {
     kicker: 'Ejecución real',

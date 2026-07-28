@@ -4,6 +4,8 @@
 import { PageProps, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const events = [
   ['2 min ago', 'Provider Health check completed', 'System'],
@@ -17,12 +19,12 @@ export default function AuditLogPage(_props: PageProps) {
   return (
     <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingRight: 8 }}>
       <section style={{ marginBottom: 14 }}>
-        <div style={labelStyle}>Monitor 7</div>
-        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.auditLog.title', 'Audit Log')}</h2>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.auditLog.subtitle', 'One job: show what changed, who changed it, and when.')}</p>
+        <div style={labelStyle}>{uiCopy('u_f7e6a74052bbf8a6')}</div>
+        <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.auditLog.title', uiCopy('u_5c397d453e979ce0'))}</h2>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5 }}>{t(dict, 'console.auditLog.subtitle', uiCopy('u_16f9e55e94fc4954'))}</p>
       </section>
       <section style={{ ...cardStyle, padding: 16 }}>
-        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.auditLog.recent', 'Recent Activity')}</h3>
+        <h3 style={{ margin: '0 0 12px' }}>{t(dict, 'console.auditLog.recent', uiCopy('u_83af74e456c00a12'))}</h3>
         <div style={{ display: 'grid', gap: 10 }}>
           {events.map(([time, action, actor]) => <div key={action} style={rowStyle}><span style={{ color: '#1af0ff' }}>{time}</span><strong>{action}</strong><span style={{ color: 'rgba(255,255,255,.56)' }}>{actor}</span></div>)}
         </div>

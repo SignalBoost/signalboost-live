@@ -5,70 +5,72 @@ import Link from 'next/link'
 import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { supabase } from '@/utils/supabase/client'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type ItLevel = 'beginner' | 'intermediate' | 'advanced'
 type WorkshopProfile = { it_level: ItLevel | null; role: string | null; tone_preference: string | null }
 
 const COPY = {
-  eyebrow:        { en: 'Workshop Apprentice', es: 'Taller Aprendiz', pt: 'Oficina Aprendiz', pl: 'Warsztat Adepta', ru: 'Мастерская' },
-  title:          { en: 'Workshop Apprentice', es: 'Taller Aprendiz', pt: 'Oficina Aprendiz', pl: 'Warsztat Adepta', ru: 'Мастерская стажёра' },
-  toneLabel:      { en: 'Tone', es: 'Tono', pt: 'Tom', pl: 'Ton', ru: 'Тон' },
-  roleLabel:      { en: 'Role', es: 'Rol', pt: 'Função', pl: 'Rola', ru: 'Роль' },
-  notSet:         { en: 'not set', es: 'no definido', pt: 'não definido', pl: 'nie ustawiono', ru: 'не задано' },
-  tutorialsTitle: { en: 'New service tutorials', es: 'Tutoriales de nuevos servicios', pt: 'Tutoriais de novos serviços', pl: 'Nowe samouczki usług', ru: 'Обучающие материалы' },
-  startTutorial:  { en: 'Start tutorial', es: 'Iniciar tutorial', pt: 'Iniciar tutorial', pl: 'Rozpocznij samouczek', ru: 'Начать обучение' },
-  visualExamples: { en: 'Visual examples', es: 'Ejemplos visuales', pt: 'Exemplos visuais', pl: 'Przykłady wizualne', ru: 'Визуальные примеры' },
+  eyebrow:        { en: uiCopy('u_45e35331e5bacf05'), es: 'Taller Aprendiz', pt: 'Oficina Aprendiz', pl: 'Warsztat Adepta', ru: 'Мастерская' },
+  title:          { en: uiCopy('u_9e88791bf71dd5b6'), es: 'Taller Aprendiz', pt: 'Oficina Aprendiz', pl: 'Warsztat Adepta', ru: 'Мастерская стажёра' },
+  toneLabel:      { en: uiCopy('u_21219d0d72bf6c09'), es: 'Tono', pt: 'Tom', pl: 'Ton', ru: 'Тон' },
+  roleLabel:      { en: uiCopy('u_db8633706eeda2f7'), es: 'Rol', pt: 'Função', pl: 'Rola', ru: 'Роль' },
+  notSet:         { en: uiCopy('u_9146c958560d281b'), es: 'no definido', pt: 'não definido', pl: 'nie ustawiono', ru: 'не задано' },
+  tutorialsTitle: { en: uiCopy('u_ac618ab9f918a8ec'), es: 'Tutoriales de nuevos servicios', pt: 'Tutoriais de novos serviços', pl: 'Nowe samouczki usług', ru: 'Обучающие материалы' },
+  startTutorial:  { en: uiCopy('u_494044f697ed14e0'), es: 'Iniciar tutorial', pt: 'Iniciar tutorial', pl: 'Rozpocznij samouczek', ru: 'Начать обучение' },
+  visualExamples: { en: uiCopy('u_e06530578c5e8340'), es: 'Ejemplos visuales', pt: 'Exemplos visuais', pl: 'Przykłady wizualne', ru: 'Визуальные примеры' },
   modules: {
-    website:       { en: 'Website Builder', es: 'Constructor de sitios', pt: 'Construtor de sites', pl: 'Kreator stron', ru: 'Конструктор сайтов' },
-    podcast:       { en: 'Podcast', es: 'Podcast', pt: 'Podcast', pl: 'Podcast', ru: 'Подкаст' },
-    outreach:      { en: 'Outreach', es: 'Prospección', pt: 'Prospecção', pl: 'Outreach', ru: 'Аутрич' },
-    reviews:       { en: 'Reviews', es: 'Reseñas', pt: 'Avaliações', pl: 'Opinie', ru: 'Отзывы' },
-    video:         { en: 'Video', es: 'Video', pt: 'Vídeo', pl: 'Wideo', ru: 'Видео' },
-    improve:       { en: 'Improve Website', es: 'Mejorar sitio', pt: 'Melhorar site', pl: 'Ulepsz stronę', ru: 'Улучшить сайт' },
-    podcastStudio: { en: 'Optimize Podcast Studio', es: 'Optimizar Podcast Studio', pt: 'Otimizar Podcast Studio', pl: 'Optymalizuj Podcast Studio', ru: 'Оптимизация студии' },
+    website:       { en: uiCopy('u_ac846e15ae00783a'), es: 'Constructor de sitios', pt: 'Construtor de sites', pl: 'Kreator stron', ru: 'Конструктор сайтов' },
+    podcast:       { en: uiCopy('u_79c0de33921bcb83'), es: 'Podcast', pt: 'Podcast', pl: 'Podcast', ru: 'Подкаст' },
+    outreach:      { en: uiCopy('u_71a88fb8e3b3fe7e'), es: 'Prospección', pt: 'Prospecção', pl: 'Outreach', ru: 'Аутрич' },
+    reviews:       { en: uiCopy('u_4958f5ccdc07964e'), es: 'Reseñas', pt: 'Avaliações', pl: 'Opinie', ru: 'Отзывы' },
+    video:         { en: uiCopy('u_58e087959f6b6490'), es: 'Video', pt: 'Vídeo', pl: 'Wideo', ru: 'Видео' },
+    improve:       { en: uiCopy('u_f6de2a18dfead6a5'), es: 'Mejorar sitio', pt: 'Melhorar site', pl: 'Ulepsz stronę', ru: 'Улучшить сайт' },
+    podcastStudio: { en: uiCopy('u_7a084abc09a9b5c4'), es: 'Optimizar Podcast Studio', pt: 'Otimizar Podcast Studio', pl: 'Optymalizuj Podcast Studio', ru: 'Оптимизация студии' },
   },
   levels: {
     beginner: {
-      badge:    { en: 'Guided beginner path', es: 'Ruta guiada para principiantes', pt: 'Caminho guiado para iniciantes', pl: 'Ścieżka dla początkujących', ru: 'Путь для начинающих' },
-      subtitle: { en: 'Every module includes plain-English definitions, safe defaults, and one step at a time.', es: 'Cada módulo incluye definiciones simples, valores seguros y un paso a la vez.', pt: 'Cada módulo inclui definições simples, padrões seguros e um passo de cada vez.', pl: 'Każdy moduł zawiera proste definicje, bezpieczne ustawienia i jeden krok na raz.', ru: 'Каждый модуль содержит простые определения, безопасные настройки и пошаговые инструкции.' },
+      badge:    { en: uiCopy('u_3fb7afa9e577af32'), es: 'Ruta guiada para principiantes', pt: 'Caminho guiado para iniciantes', pl: 'Ścieżka dla początkujących', ru: 'Путь для начинающих' },
+      subtitle: { en: uiCopy('u_50b50d6ab61de25a'), es: 'Cada módulo incluye definiciones simples, valores seguros y un paso a la vez.', pt: 'Cada módulo inclui definições simples, padrões seguros e um passo de cada vez.', pl: 'Każdy moduł zawiera proste definicje, bezpieczne ustawienia i jeden krok na raz.', ru: 'Каждый модуль содержит простые определения, безопасные настройки и пошаговые инструкции.' },
       tasks: {
-        t1: { en: 'Start with the launch checklist', es: 'Comienza con la lista de lanzamiento', pt: 'Comece com a lista de lançamento', pl: 'Zacznij od listy startowej', ru: 'Начните со списка запуска' },
-        t2: { en: 'Use templates before advanced settings', es: 'Usa plantillas antes de configuraciones avanzadas', pt: 'Use modelos antes das configurações avançadas', pl: 'Używaj szablonów przed zaawansowanymi ustawieniami', ru: 'Используйте шаблоны перед расширенными настройками' },
-        t3: { en: 'Review each recommendation before publishing', es: 'Revisa cada recomendación antes de publicar', pt: 'Revise cada recomendação antes de publicar', pl: 'Przejrzyj każdą rekomendację przed publikacją', ru: 'Проверяйте каждую рекомендацию перед публикацией' },
+        t1: { en: uiCopy('u_81bd2d2fe3a26136'), es: 'Comienza con la lista de lanzamiento', pt: 'Comece com a lista de lançamento', pl: 'Zacznij od listy startowej', ru: 'Начните со списка запуска' },
+        t2: { en: uiCopy('u_732195a6687e5c01'), es: 'Usa plantillas antes de configuraciones avanzadas', pt: 'Use modelos antes das configurações avançadas', pl: 'Używaj szablonów przed zaawansowanymi ustawieniami', ru: 'Используйте шаблоны перед расширенными настройками' },
+        t3: { en: uiCopy('u_26e57c7a45a9e4ca'), es: 'Revisa cada recomendación antes de publicar', pt: 'Revise cada recomendação antes de publicar', pl: 'Przejrzyj każdą rekomendację przed publikacją', ru: 'Проверяйте каждую рекомендацию перед публикацией' },
       },
     },
     intermediate: {
-      badge:    { en: 'Balanced builder path', es: 'Ruta equilibrada de construcción', pt: 'Caminho equilibrado de construção', pl: 'Zrównoważona ścieżka budowania', ru: 'Сбалансированный путь' },
-      subtitle: { en: 'Modules blend guided explanations with practical shortcuts and configurable workflows.', es: 'Los módulos combinan explicaciones guiadas con atajos prácticos y flujos configurables.', pt: 'Os módulos combinam explicações guiadas com atalhos práticos e fluxos configuráveis.', pl: 'Moduły łączą wyjaśnienia z praktycznymi skrótami i konfigurowalnymi przepływami.', ru: 'Модули сочетают пошаговые объяснения с практическими ярлыками и настраиваемыми процессами.' },
+      badge:    { en: uiCopy('u_1a9ae65b462bb9a7'), es: 'Ruta equilibrada de construcción', pt: 'Caminho equilibrado de construção', pl: 'Zrównoważona ścieżka budowania', ru: 'Сбалансированный путь' },
+      subtitle: { en: uiCopy('u_51a7292405746f42'), es: 'Los módulos combinan explicaciones guiadas con atajos prácticos y flujos configurables.', pt: 'Os módulos combinam explicações guiadas com atalhos práticos e fluxos configuráveis.', pl: 'Moduły łączą wyjaśnienia z praktycznymi skrótami i konfigurowalnymi przepływami.', ru: 'Модули сочетают пошаговые объяснения с практическими ярлыками и настраиваемыми процессами.' },
       tasks: {
-        t1: { en: 'Compare recommended settings', es: 'Compara las configuraciones recomendadas', pt: 'Compare as configurações recomendadas', pl: 'Porównaj zalecane ustawienia', ru: 'Сравните рекомендуемые настройки' },
-        t2: { en: 'Customize automation rules', es: 'Personaliza las reglas de automatización', pt: 'Personalize as regras de automação', pl: 'Dostosuj reguły automatyzacji', ru: 'Настройте правила автоматизации' },
-        t3: { en: 'Review analytics after each launch', es: 'Revisa los análisis después de cada lanzamiento', pt: 'Revise as análises após cada lançamento', pl: 'Przeglądaj analizy po każdym uruchomieniu', ru: 'Анализируйте результаты после каждого запуска' },
+        t1: { en: uiCopy('u_ad9d944717899c07'), es: 'Compara las configuraciones recomendadas', pt: 'Compare as configurações recomendadas', pl: 'Porównaj zalecane ustawienia', ru: 'Сравните рекомендуемые настройки' },
+        t2: { en: uiCopy('u_902ca216af59e64d'), es: 'Personaliza las reglas de automatización', pt: 'Personalize as regras de automação', pl: 'Dostosuj reguły automatyzacji', ru: 'Настройте правила автоматизации' },
+        t3: { en: uiCopy('u_ef327108c9a433d0'), es: 'Revisa los análisis después de cada lanzamiento', pt: 'Revise as análises após cada lançamento', pl: 'Przeglądaj analizy po każdym uruchomieniu', ru: 'Анализируйте результаты после каждого запуска' },
       },
     },
     advanced: {
-      badge:    { en: 'Advanced operator path', es: 'Ruta de operador avanzado', pt: 'Caminho de operador avançado', pl: 'Ścieżka zaawansowanego operatora', ru: 'Расширенный путь оператора' },
-      subtitle: { en: 'Modules emphasize diagnostics, deployment checks, logs, integrations, and fast execution.', es: 'Los módulos enfatizan diagnósticos, verificaciones de despliegue, registros, integraciones y ejecución rápida.', pt: 'Os módulos enfatizam diagnósticos, verificações de implantação, logs, integrações e execução rápida.', pl: 'Moduły kładą nacisk na diagnostykę, sprawdzanie wdrożeń, logi, integracje i szybkie wykonanie.', ru: 'Модули акцентируют диагностику, проверки развёртывания, логи, интеграции и быстрое выполнение.' },
+      badge:    { en: uiCopy('u_dcffcb245230ff5d'), es: 'Ruta de operador avanzado', pt: 'Caminho de operador avançado', pl: 'Ścieżka zaawansowanego operatora', ru: 'Расширенный путь оператора' },
+      subtitle: { en: uiCopy('u_44e1d95ff82792fd'), es: 'Los módulos enfatizan diagnósticos, verificaciones de despliegue, registros, integraciones y ejecución rápida.', pt: 'Os módulos enfatizam diagnósticos, verificações de implantação, logs, integrações e execução rápida.', pl: 'Moduły kładą nacisk na diagnostykę, sprawdzanie wdrożeń, logi, integracje i szybkie wykonanie.', ru: 'Модули акцентируют диагностику, проверки развёртывания, логи, интеграции и быстрое выполнение.' },
       tasks: {
-        t1: { en: 'Inspect deployment and API logs', es: 'Inspecciona los registros de despliegue y API', pt: 'Inspecione logs de implantação e API', pl: 'Sprawdzaj logi wdrożeń i API', ru: 'Проверяйте логи развёртывания и API' },
-        t2: { en: 'Tune integrations and data sources', es: 'Ajusta integraciones y fuentes de datos', pt: 'Ajuste integrações e fontes de dados', pl: 'Dostrajaj integracje i źródła danych', ru: 'Настройте интеграции и источники данных' },
-        t3: { en: 'Validate performance budgets before release', es: 'Valida los presupuestos de rendimiento antes del lanzamiento', pt: 'Valide os orçamentos de desempenho antes do lançamento', pl: 'Sprawdzaj budżety wydajności przed wydaniem', ru: 'Проверяйте бюджеты производительности перед релизом' },
+        t1: { en: uiCopy('u_ae2ab5e32f8cb54f'), es: 'Inspecciona los registros de despliegue y API', pt: 'Inspecione logs de implantação e API', pl: 'Sprawdzaj logi wdrożeń i API', ru: 'Проверяйте логи развёртывания и API' },
+        t2: { en: uiCopy('u_b59187a20b206615'), es: 'Ajusta integraciones y fuentes de datos', pt: 'Ajuste integrações e fontes de dados', pl: 'Dostrajaj integracje i źródła danych', ru: 'Настройте интеграции и источники данных' },
+        t3: { en: uiCopy('u_ea9fc2475d7f8d27'), es: 'Valida los presupuestos de rendimiento antes del lanzamiento', pt: 'Valide os orçamentos de desempenho antes do lançamento', pl: 'Sprawdzaj budżety wydajności przed wydaniem', ru: 'Проверяйте бюджеты производительности перед релизом' },
       },
     },
   },
   tutorials: {
     improve: {
-      title: { en: 'Improve Website', es: 'Mejorar sitio web', pt: 'Melhorar site', pl: 'Ulepsz stronę', ru: 'Улучшить сайт' },
-      step1: { en: 'Paste the website URL and identify the primary conversion goal.', es: 'Pega la URL del sitio e identifica el objetivo de conversión principal.', pt: 'Cole a URL do site e identifique o objetivo de conversão principal.', pl: 'Wklej URL strony i zidentyfikuj główny cel konwersji.', ru: 'Вставьте URL сайта и определите основную цель конверсии.' },
-      step2: { en: 'Review visual examples for hero, CTA, SEO, accessibility, and speed fixes.', es: 'Revisa ejemplos visuales para hero, CTA, SEO, accesibilidad y velocidad.', pt: 'Revise exemplos visuais para hero, CTA, SEO, acessibilidade e velocidade.', pl: 'Przejrzyj przykłady wizualne dla hero, CTA, SEO, dostępności i szybkości.', ru: 'Изучите визуальные примеры для hero, CTA, SEO, доступности и скорости.' },
-      step3: { en: 'Apply the prioritized checklist and open the optimization module.', es: 'Aplica la lista priorizada y abre el módulo de optimización.', pt: 'Aplique a lista priorizada e abra o módulo de otimização.', pl: 'Zastosuj priorytetową listę i otwórz moduł optymalizacji.', ru: 'Примените приоритетный список и откройте модуль оптимизации.' },
+      title: { en: uiCopy('u_2cc3f7d9bb16984b'), es: 'Mejorar sitio web', pt: 'Melhorar site', pl: 'Ulepsz stronę', ru: 'Улучшить сайт' },
+      step1: { en: uiCopy('u_a534bfd3495d2f5b'), es: 'Pega la URL del sitio e identifica el objetivo de conversión principal.', pt: 'Cole a URL do site e identifique o objetivo de conversão principal.', pl: 'Wklej URL strony i zidentyfikuj główny cel konwersji.', ru: 'Вставьте URL сайта и определите основную цель конверсии.' },
+      step2: { en: uiCopy('u_556c318c6449fca7'), es: 'Revisa ejemplos visuales para hero, CTA, SEO, accesibilidad y velocidad.', pt: 'Revise exemplos visuais para hero, CTA, SEO, acessibilidade e velocidade.', pl: 'Przejrzyj przykłady wizualne dla hero, CTA, SEO, dostępności i szybkości.', ru: 'Изучите визуальные примеры для hero, CTA, SEO, доступности и скорости.' },
+      step3: { en: uiCopy('u_04070223bf057779'), es: 'Aplica la lista priorizada y abre el módulo de optimización.', pt: 'Aplique a lista priorizada e abra o módulo de otimização.', pl: 'Zastosuj priorytetową listę i otwórz moduł optymalizacji.', ru: 'Примените приоритетный список и откройте модуль оптимизации.' },
     },
     podcastStudio: {
-      title: { en: 'Optimize Podcast Studio', es: 'Optimizar Podcast Studio', pt: 'Otimizar Podcast Studio', pl: 'Optymalizuj Podcast Studio', ru: 'Оптимизация студии подкастов' },
-      step1: { en: 'Upload or link an episode and confirm the show goal.', es: 'Sube o enlaza un episodio y confirma el objetivo del programa.', pt: 'Faça upload ou vincule um episódio e confirme o objetivo do programa.', pl: 'Prześlij lub podlinkuj odcinek i potwierdź cel programu.', ru: 'Загрузите или свяжите эпизод и подтвердите цель шоу.' },
-      step2: { en: 'Review visual examples for transcript cleanup, short clips, titles, and metadata.', es: 'Revisa ejemplos visuales para limpieza de transcripción, clips cortos, títulos y metadatos.', pt: 'Revise exemplos visuais para limpeza de transcrição, clipes curtos, títulos e metadados.', pl: 'Przejrzyj przykłady wizualne dla czyszczenia transkryptów, krótkich klipów, tytułów i metadanych.', ru: 'Изучите визуальные примеры для очистки транскриптов, коротких клипов, заголовков и метаданных.' },
-      step3: { en: 'Approve the distribution checklist and open the podcast studio optimizer.', es: 'Aprueba la lista de distribución y abre el optimizador del estudio de podcast.', pt: 'Aprove a lista de distribuição e abra o otimizador do estúdio de podcast.', pl: 'Zatwierdź listę dystrybucji i otwórz optymalizator studia podcastów.', ru: 'Утвердите список распространения и откройте оптимизатор студии подкастов.' },
+      title: { en: uiCopy('u_94b4026355cc638d'), es: 'Optimizar Podcast Studio', pt: 'Otimizar Podcast Studio', pl: 'Optymalizuj Podcast Studio', ru: 'Оптимизация студии подкастов' },
+      step1: { en: uiCopy('u_8804aa7f7a4ff104'), es: 'Sube o enlaza un episodio y confirma el objetivo del programa.', pt: 'Faça upload ou vincule um episódio e confirme o objetivo do programa.', pl: 'Prześlij lub podlinkuj odcinek i potwierdź cel programu.', ru: 'Загрузите или свяжите эпизод и подтвердите цель шоу.' },
+      step2: { en: uiCopy('u_dc87aab4ef375831'), es: 'Revisa ejemplos visuales para limpieza de transcripción, clips cortos, títulos y metadatos.', pt: 'Revise exemplos visuais para limpeza de transcrição, clipes curtos, títulos e metadados.', pl: 'Przejrzyj przykłady wizualne dla czyszczenia transkryptów, krótkich klipów, tytułów i metadanych.', ru: 'Изучите визуальные примеры для очистки транскриптов, коротких клипов, заголовков и метаданных.' },
+      step3: { en: uiCopy('u_22ce9e583064f220'), es: 'Aprueba la lista de distribución y abre el optimizador del estudio de podcast.', pt: 'Aprove a lista de distribuição e abra o otimizador do estúdio de podcast.', pl: 'Zatwierdź listę dystrybucji i otwórz optymalizator studia podcastów.', ru: 'Утвердите список распространения и откройте оптимизатор студии подкастов.' },
     },
   },
 }
@@ -125,7 +127,7 @@ export default function ApprenticeWorkshopPage() {
         <p className="sb-body">{c(levelData.subtitle, l)}</p>
         <div className="sb-telemetry">
           <div><b className="gold" style={{ fontSize: 14, textTransform: 'capitalize' }}>{level}</b><span>{c(levelData.badge, l)}</span></div>
-          <div><b style={{ fontSize: 14, textTransform: 'capitalize' }}>{profile.tone_preference || 'friendly'}</b><span>{c(COPY.toneLabel, l)}</span></div>
+          <div><b style={{ fontSize: 14, textTransform: 'capitalize' }}>{profile.tone_preference || uiCopy('u_4a0bf20c7a5472b8')}</b><span>{c(COPY.toneLabel, l)}</span></div>
           <div><b style={{ fontSize: 14 }}>{profile.role || c(COPY.notSet, l)}</b><span>{c(COPY.roleLabel, l)}</span></div>
           <div><b>{moduleItems.length}</b><span>{c(COPY.tutorialsTitle, l)}</span></div>
         </div>
@@ -157,7 +159,7 @@ export default function ApprenticeWorkshopPage() {
       <div>
         <h2 style={{ fontSize: 'clamp(18px,3vw,26px)', fontWeight: 900, letterSpacing: '-.03em', margin: '0 0 16px' }}>{c(COPY.tutorialsTitle, l)}</h2>
         <div style={{ display: 'grid', gap: 16 }}>
-          {(['improve', 'podcastStudio'] as const).map(key => {
+          {([uiCopy('u_0417072bdcca46bc'), uiCopy('u_729cb565900ef8f7')] as const).map(key => {
             const tut = COPY.tutorials[key]
             const href = key === 'improve' ? '/dashboard/improve' : '/dashboard/podcast/studio'
             return (

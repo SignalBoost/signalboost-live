@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -60,46 +62,46 @@ type FeedbackCopy = {
 
 const COPY: Record<string, FeedbackCopy> = {
   en: {
-    title: 'Feedback',
-    subtitle: 'Help us build SignalBoost better. Your feedback goes directly to Luis.',
-    submitTab: '✍️ Submit feedback',
-    boardTab: '📋 Feedback board',
-    thankYou: 'Thank you',
-    thankYouMessage: 'Your feedback has been received. Luis reads every single submission personally.',
-    submitMore: 'Submit more feedback',
-    viewBoard: 'View feedback board',
-    ratingLabel: 'How would you rate SignalBoost overall? *',
-    categoryLabel: 'What kind of feedback is this? *',
-    messageLabel: 'Your feedback *',
+    title: uiCopy('u_fea40eb7b13e9636'),
+    subtitle: uiCopy('u_912fb3f58f8b843b'),
+    submitTab: uiCopy('u_8fa622edb8348441'),
+    boardTab: uiCopy('u_2e8fcbb8c7a3eb34'),
+    thankYou: uiCopy('u_673eaf28d199901c'),
+    thankYouMessage: uiCopy('u_9fc9e5eb1da9e35e'),
+    submitMore: uiCopy('u_f14ee8de1de118bf'),
+    viewBoard: uiCopy('u_986945ce090e0fd3'),
+    ratingLabel: uiCopy('u_c62c5a8ebb7578bd'),
+    categoryLabel: uiCopy('u_341333097c272a93'),
+    messageLabel: uiCopy('u_bd80828b8c22788e'),
     placeholders: {
-      bug: 'Describe what happened and what you expected to happen...',
-      feature: 'Describe the feature you would like to see...',
-      praise: 'Tell us what you love about SignalBoost...',
-      general: 'Share your thoughts...',
+      bug: uiCopy('u_b02e3ecc6c2f5f0d'),
+      feature: uiCopy('u_b0326a7dcecfbd28'),
+      praise: uiCopy('u_4bc06b64015e0c76'),
+      general: uiCopy('u_53ed905062b32822'),
     },
-    characters: 'characters',
-    notice: '💡 Your feedback is visible to other SignalBoost users on the feedback board. This helps everyone see what is being worked on. Do not include personal or sensitive information.',
-    submitting: 'Submitting...',
-    submit: 'Submit feedback',
-    communityFeedback: 'Community feedback',
-    all: 'All',
-    loading: 'Loading feedback...',
-    emptyTitle: 'No feedback yet',
-    emptyText: 'Be the first to share your thoughts!',
-    you: 'You',
-    time: { days: 'd', hours: 'h', mins: 'm', ago: 'ago', now: 'Just now' },
-    ratings: ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'],
+    characters: uiCopy('u_616ffd10d827cdfd'),
+    notice: uiCopy('u_7a87edce26a05175'),
+    submitting: uiCopy('u_691f260fd7593218'),
+    submit: uiCopy('u_2f2fe7b1befc4f5f'),
+    communityFeedback: uiCopy('u_40226571d55bebd3'),
+    all: uiCopy('u_03fb965bd5526063'),
+    loading: uiCopy('u_98de8abb072466e3'),
+    emptyTitle: uiCopy('u_fcf3d145c26d6b36'),
+    emptyText: uiCopy('u_4196635fc8542152'),
+    you: uiCopy('u_1450b97dc8c1585b'),
+    time: { days: 'd', hours: 'h', mins: 'm', ago: uiCopy('u_07565f1600326806'), now: uiCopy('u_c19475397076b502') },
+    ratings: ['', uiCopy('u_10d78e7cf147f8bc'), uiCopy('u_24a6a75053a5a84c'), uiCopy('u_bc65273d40e5f1a5'), uiCopy('u_48c6718088cd1e24'), uiCopy('u_89d7db142509d208')],
     categories: [
-      { id: 'praise', icon: '🎉', label: 'Praise', desc: 'Something you love about SignalBoost' },
-      { id: 'feature', icon: '💡', label: 'Feature request', desc: 'Something you wish SignalBoost could do' },
-      { id: 'bug', icon: '🐛', label: 'Bug report', desc: 'Something that is not working correctly' },
-      { id: 'general', icon: '💬', label: 'General', desc: 'Anything else on your mind' },
+      { id: uiCopy('u_d440cf82e08685d8'), icon: '🎉', label: uiCopy('u_3c6ba3bb48da8f86'), desc: uiCopy('u_4138fd4f0ecf67c1') },
+      { id: uiCopy('u_95f410beaefd9b65'), icon: '💡', label: uiCopy('u_0e2985dc23c80f39'), desc: uiCopy('u_e8199202083429b9') },
+      { id: uiCopy('u_2997ad0e4626d39e'), icon: '🐛', label: uiCopy('u_f32a0160d55c47b3'), desc: uiCopy('u_99a8f54c5feebed3') },
+      { id: uiCopy('u_45189849031cb670'), icon: '💬', label: uiCopy('u_08afe29d087cb337'), desc: uiCopy('u_f886fe134d56a749') },
     ],
     statuses: {
-      new: 'New',
-      reviewing: 'Under review',
-      planned: 'Planned',
-      done: 'Done',
+      new: uiCopy('u_cde519f6512d9d98'),
+      reviewing: uiCopy('u_5a05c192553973ca'),
+      planned: uiCopy('u_00f1f6df430b9496'),
+      done: uiCopy('u_b8de5f1577781f20'),
     },
   },
 
@@ -409,8 +411,8 @@ export default function FeedbackPage() {
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
         {[
-          { id: 'submit', label: copy.submitTab },
-          { id: 'board', label: `${copy.boardTab} ${allFeedback.length > 0 ? `(${allFeedback.length})` : ''}` },
+          { id: uiCopy('u_55a9ae0be7a5d1a5'), label: copy.submitTab },
+          { id: uiCopy('u_2599261290753fd9'), label: `${copy.boardTab} ${allFeedback.length > 0 ? `(${allFeedback.length})` : ''}` },
         ].map((item) => (
           <button
             key={item.id}
@@ -601,7 +603,7 @@ export default function FeedbackPage() {
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{copy.communityFeedback}</h2>
 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {[{ id: 'all', label: copy.all }, ...copy.categories.map((cat) => ({ id: cat.id, label: `${cat.icon} ${cat.label}` }))].map((filter) => (
+              {[{ id: uiCopy('u_14b9a86b88d738f3'), label: copy.all }, ...copy.categories.map((cat) => ({ id: cat.id, label: `${cat.icon} ${cat.label}` }))].map((filter) => (
                 <button
                   key={filter.id}
                   onClick={() => setFilterCategory(filter.id)}

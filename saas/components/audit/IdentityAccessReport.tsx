@@ -10,6 +10,8 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding } from '@/lib/audit/reportModel'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // ── Types (mirror reportModel / reports shapes) ─────────────────────────────
 
@@ -193,7 +195,7 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
       {/* ── Header ── */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.identity.tableTitle', 'All Identities')}
+          {t('audit.identity.tableTitle', uiCopy('u_b10f35dc58eba899'))}
           <span style={{ color: GOLD }}> ·</span>
         </h1>
         {generatedDate && (
@@ -205,11 +207,11 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
 
       {/* ── Summary stats + score ── */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'stretch', marginBottom: 24 }}>
-        <StatCard label={t('audit.identity.summary.total', 'Identities')} value={summary.total} />
-        <StatCard label={t('audit.identity.summary.privileged', 'Privileged')} value={summary.privileged} accent={GOLD} />
-        <StatCard label={t('audit.identity.summary.stale', 'Stale')} value={summary.stale} accent={ORANGE} />
-        <StatCard label={t('audit.identity.summary.noMfa', 'Priv. no MFA')} value={summary.privilegedNoMfa} accent={RED} />
-        <StatCard label={t('audit.identity.summary.mfaUnknown', 'MFA unknown')} value={summary.mfaUnknown} accent={CYAN} />
+        <StatCard label={t('audit.identity.summary.total', uiCopy('u_75a607a1852e3de3'))} value={summary.total} />
+        <StatCard label={t('audit.identity.summary.privileged', uiCopy('u_e53ff0db52829ab9'))} value={summary.privileged} accent={GOLD} />
+        <StatCard label={t('audit.identity.summary.stale', uiCopy('u_081d12d5dca9e164'))} value={summary.stale} accent={ORANGE} />
+        <StatCard label={t('audit.identity.summary.noMfa', uiCopy('u_b0e7d35d3ed0e820'))} value={summary.privilegedNoMfa} accent={RED} />
+        <StatCard label={t('audit.identity.summary.mfaUnknown', uiCopy('u_9e54d9c91f9c9770'))} value={summary.mfaUnknown} accent={CYAN} />
 
         {/* Score card */}
         <div style={{
@@ -223,9 +225,7 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
         }}>
           <ScoreRing score={score} />
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-              Score
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>{uiCopy('u_d4e2b0fff2401bbf')}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: scoreColor(score) }}>
               {score >= 80 ? '✓' : score >= 50 ? '⚠' : '✕'}
             </div>
@@ -236,12 +236,12 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
       {/* ── Findings ── */}
       <section style={{ ...glass, padding: 20, marginBottom: 24 }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 14 }}>
-          {t('audit.identity.findingsTitle', 'Access Findings')}
+          {t('audit.identity.findingsTitle', uiCopy('u_c251af43025ecacc'))}
         </div>
 
         {findings.length === 0 ? (
           <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,.45)' }}>
-            {t('audit.identity.noFindings', 'No access findings.')}
+            {t('audit.identity.noFindings', uiCopy('u_b941683c74427931'))}
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -265,13 +265,13 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
                   </p>
                   {resolved.recommendation && (
                     <div style={{ fontSize: 12, color: CYAN, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700 }}>{t('audit.common.recommendation', 'Recommendation')}: </span>
+                      <span style={{ fontWeight: 700 }}>{t('audit.common.recommendation', uiCopy('u_4a04b7647a671a9e'))}: </span>
                       {resolved.recommendation}
                     </div>
                   )}
                   {resolved.impact && (
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
-                      <span style={{ fontWeight: 700 }}>{t('audit.common.impact', 'Impact')}: </span>
+                      <span style={{ fontWeight: 700 }}>{t('audit.common.impact', uiCopy('u_28bfcee83cb6f880'))}: </span>
                       {resolved.impact}
                     </div>
                   )}
@@ -285,12 +285,12 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
       {/* ── Identities table ── */}
       <section style={{ ...glass, padding: 20 }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 14 }}>
-          {t('audit.identity.tableTitle', 'All Identities')}
+          {t('audit.identity.tableTitle', uiCopy('u_2b8cfb320a413e6c'))}
         </div>
 
         {rows.length === 0 ? (
           <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,.45)' }}>
-            {t('audit.identity.empty', 'No identities found.')}
+            {t('audit.identity.empty', uiCopy('u_d6ee7e09982e9e0e'))}
           </p>
         ) : (
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 420px)' }}>
@@ -298,13 +298,13 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
               <thead>
                 <tr>
                   {[
-                    t('audit.identity.col.principal', 'Principal'),
-                    t('audit.identity.col.provider', 'Provider'),
-                    t('audit.identity.col.kind', 'Type'),
-                    t('audit.identity.col.role', 'Role'),
-                    t('audit.identity.col.mfa', 'MFA'),
-                    t('audit.identity.col.lastSeen', 'Last seen'),
-                    t('audit.identity.col.flags', 'Flags'),
+                    t('audit.identity.col.principal', uiCopy('u_7ec81182d932422b')),
+                    t('audit.identity.col.provider', uiCopy('u_86c561e71bd17f99')),
+                    t('audit.identity.col.kind', uiCopy('u_52151156ead65d7a')),
+                    t('audit.identity.col.role', uiCopy('u_28763eb17f84f96e')),
+                    t('audit.identity.col.mfa', uiCopy('u_eb51192e48f36989')),
+                    t('audit.identity.col.lastSeen', uiCopy('u_38df584f9fdea2f4')),
+                    t('audit.identity.col.flags', uiCopy('u_0e8c14f82b86bbf1')),
                   ].map(h => (
                     <th key={h} style={{
                       textAlign: 'left',
@@ -330,10 +330,10 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
               <tbody>
                 {rows.map((row, i) => {
                   const lastSeenLabel = row.lastSeenDays === null
-                    ? t('audit.identity.never', 'Never')
+                    ? t('audit.identity.never', uiCopy('u_8c000d22925f4ad8'))
                     : row.lastSeenDays === 0
                       ? '< 1d'
-                      : interpolate(t('audit.identity.daysAgo', '{days}d ago'), { days: String(row.lastSeenDays) })
+                      : interpolate(t('audit.identity.daysAgo', uiCopy('u_613d34957138b453')), { days: String(row.lastSeenDays) })
 
                   const mfaLabel = t(`audit.identity.mfa.${row.mfaState}`, row.mfaState)
                   const mfaColor = row.mfaState === 'enabled' ? GREEN : row.mfaState === 'disabled' ? RED : 'rgba(255,255,255,.4)'
@@ -344,9 +344,7 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
                       <td style={{ padding: '10px 12px', color: '#fff', fontWeight: 600, wordBreak: 'break-all', minWidth: 160 }}>
                         {row.principal}
                         {row.isPrivileged && (
-                          <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: GOLD, border: `1px solid ${GOLD}55`, borderRadius: 999, padding: '1px 6px' }}>
-                            PRIV
-                          </span>
+                          <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: GOLD, border: `1px solid ${GOLD}55`, borderRadius: 999, padding: '1px 6px' }}>{uiCopy('u_2db7c54434f414c7')}</span>
                         )}
                       </td>
                       <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,.65)' }}>{row.provider}</td>

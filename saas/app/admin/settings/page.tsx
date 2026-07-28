@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 
@@ -31,18 +33,18 @@ const COPY: Record<Lang, {
   flags: Record<string, { label: string; desc: string }>
 }> = {
   en: {
-    eyebrow: 'Admin',
-    title: 'System settings',
-    subtitle: 'Owner-only switches that affect the whole platform.',
-    saving: 'saving…',
-    loading: 'Loading settings…',
-    footer: 'Changes take effect immediately. The outreach kill-switch is already enforced by the sending routes; the others are stored and ready to wire into behavior.',
-    notAllowedTitle: 'Admin settings',
-    notAllowedBody: 'Only the account owner can change system settings.',
+    eyebrow: uiCopy('u_19bfb5d51389b2ee'),
+    title: uiCopy('u_e16349f03a3b22d6'),
+    subtitle: uiCopy('u_9d62a29d4c77d74d'),
+    saving: uiCopy('u_8870b711176b2790'),
+    loading: uiCopy('u_677b035839c79d53'),
+    footer: uiCopy('u_23cbcf5b895ad875'),
+    notAllowedTitle: uiCopy('u_d3c60eecce742215'),
+    notAllowedBody: uiCopy('u_fa63c1cade6844b1'),
     flags: {
-      outreach_sending_disabled: { label: 'Pause outreach sending', desc: 'Master kill-switch: when on, no outreach messages are sent.' },
-      signups_paused: { label: 'Pause new signups', desc: 'When on, new account creation is discouraged in the UI.' },
-      maintenance_mode: { label: 'Maintenance banner', desc: 'When on, you can show a maintenance notice to users.' },
+      outreach_sending_disabled: { label: uiCopy('u_0e39fcbfd4f15c61'), desc: uiCopy('u_bb1812257ccf8a0d') },
+      signups_paused: { label: uiCopy('u_b2311394b683f902'), desc: uiCopy('u_2129a3eedd8ecda2') },
+      maintenance_mode: { label: uiCopy('u_2622e6c83e14b41c'), desc: uiCopy('u_5708c9e233223ecf') },
     },
   },
   es: {
@@ -125,10 +127,10 @@ export default function AdminSettingsPage() {
       const res = await fetch('/api/admin/settings', { cache: 'no-store' })
       if (res.status === 401 || res.status === 403) { setNotAllowed(true); setLoading(false); return }
       const data = await res.json()
-      if (!res.ok) { setError(data?.error || 'Could not load settings.'); setLoading(false); return }
+      if (!res.ok) { setError(data?.error || uiCopy('u_00e86d2f0aa4e104')); setLoading(false); return }
       setFlags(Array.isArray(data.flags) ? data.flags : [])
     } catch {
-      setError('Something went wrong loading settings.')
+      setError(uiCopy('u_4b9445189c2469c4'))
     } finally {
       setLoading(false)
     }
@@ -148,13 +150,13 @@ export default function AdminSettingsPage() {
       if (!res.ok) {
         setFlags(prev => prev.map(f => (f.key === key ? { ...f, on: !next } : f)))
         const d = await res.json().catch(() => ({}))
-        setError(d?.error || 'Could not save that setting.')
+        setError(d?.error || uiCopy('u_a60c8beb967ac649'))
       } else {
         setError('')
       }
     } catch {
       setFlags(prev => prev.map(f => (f.key === key ? { ...f, on: !next } : f)))
-      setError('Could not save that setting.')
+      setError(uiCopy('u_7284d6b7ce7c1b86'))
     } finally {
       setSavingKey(null)
     }

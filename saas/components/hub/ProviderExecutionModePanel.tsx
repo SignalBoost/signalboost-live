@@ -6,6 +6,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type CapabilityResponse = {
   ok: boolean
@@ -34,10 +36,10 @@ type PreviewResponse = {
 }
 
 const LABELS: Record<ProviderExecutionMode, string> = {
-  direct: 'Direct API',
-  cosa_pr: 'Governed AI infrastructure PR',
-  browser_agent: 'Browser Agent assistance',
-  manual: 'Direct configuration',
+  direct: uiCopy('u_7c61c36a8a4e8f94'),
+  cosa_pr: uiCopy('u_8fdfb6ad7cc267fb'),
+  browser_agent: uiCopy('u_f20e46951457fda9'),
+  manual: uiCopy('u_ed7a1f19a41da460'),
 }
 
 export type ProviderExecutionModePanelProps = {
@@ -143,14 +145,14 @@ export default function ProviderExecutionModePanel({
   const availableModes = capabilityResponse?.availableModes ?? []
 
   return (
-    <section aria-label="Provider execution mode" style={{ display: 'grid', gap: 10 }}>
+    <section aria-label={uiCopy('u_997f30e573833d7b')} style={{ display: 'grid', gap: 10 }}>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}><LocalizedText fallback={"Execution path"} /></div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}><LocalizedText fallback={"Only reviewed and implemented paths are shown."} /></div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}><LocalizedText fallback={uiCopy('u_f3f55093762bfecd')} /></div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 3 }}><LocalizedText fallback={uiCopy('u_3508c106d23a9ca6')} /></div>
       </div>
 
       {capabilityLoading && (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>Loading reviewed execution paths…</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_b89173e3e563080e')}</div>
       )}
 
       {!capabilityLoading && capabilityResponse?.ok && (
@@ -184,19 +186,18 @@ export default function ProviderExecutionModePanel({
           </div>
 
           {capabilityResponse.reviewed && (
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.42)' }}>
-              Reviewed by {capabilityResponse.reviewed.reviewer} · {capabilityResponse.reviewed.reviewedAt}
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.42)' }}>{uiCopy('u_30fb5cf1bb804ce3')}{capabilityResponse.reviewed.reviewer} · {capabilityResponse.reviewed.reviewedAt}
             </div>
           )}
         </>
       )}
 
       {!capabilityLoading && capabilityResponse && !capabilityResponse.ok && (
-        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{capabilityResponse.error || 'Execution paths unavailable'}</div>
+        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{capabilityResponse.error || uiCopy('u_0b50a8e0ebabc880')}</div>
       )}
 
       {previewEnabled && previewLoading && (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>Preparing governed preview…</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_863094e9e7907780')}</div>
       )}
 
       {previewEnabled && !previewLoading && previewResponse?.ok && previewResponse.preview && (
@@ -205,13 +206,13 @@ export default function ProviderExecutionModePanel({
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.62)' }}>{previewResponse.preview.target}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.62)' }}>{previewResponse.preview.expectedVerification}</div>
           <div style={{ fontSize: 11, color: previewResponse.preview.executesProviderMutation ? '#fbbf24' : '#22c55e' }}>
-            {previewResponse.preview.executesProviderMutation ? 'Provider mutation occurs only after confirmation.' : 'This path does not directly mutate the provider.'}
+            {previewResponse.preview.executesProviderMutation ? uiCopy('u_cb31f7112763c6e7') : uiCopy('u_7bf76f842e57a1e9')}
           </div>
         </div>
       )}
 
       {previewEnabled && !previewLoading && previewResponse && !previewResponse.ok && (
-        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{previewResponse.error || 'Preview unavailable'}</div>
+        <div role="alert" style={{ fontSize: 12, color: '#fca5a5' }}>{previewResponse.error || uiCopy('u_fc8544fc1bbfc66a')}</div>
       )}
     </section>
   )

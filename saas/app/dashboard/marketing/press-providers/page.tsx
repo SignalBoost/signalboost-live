@@ -12,6 +12,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import PressProviderConnectForm from './PressProviderConnectForm.tsx'
 import PressCompanyProfileForm from './PressCompanyProfileForm.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Provider = { id: string; label: string; type: string; cost: string; proof: string; needs: string[]; blurb: string; live: boolean; registered?: boolean }
 type Campaign = {
@@ -42,33 +44,33 @@ function noteStyle(note: Note) {
 
 const COPY: Record<string, any> = {
   en: {
-    eyebrow: 'Enterprise plug-and-play', title: 'Press & Media Provider Cockpit',
-    intro: 'Connect your own media providers and one governed engine drives them all: brief, AI-written release, owner approval, spend gate, dispatch, and provider-shaped proof. SignalBoost runs on the free provider; resourced buyers switch on the paid ones — no backend change.',
-    refresh: 'Refresh', loading: 'Loading…', types: 'provider types', liveNow: 'live now', coming: 'coming', recent: 'recent campaigns',
-    live: 'live', comingSoon: 'coming soon', cost: 'cost', proof: 'proof', needs: 'needs',
-    run: 'Run a press campaign', close: 'Close', goal: 'What should this release say? e.g. Announce our AI audit tool to free IT magazines.',
-    editorEmail: 'Verified editor email (real contact only)', publication: 'Publication name', audience: 'Audience (optional)',
-    ctaUrl: 'Call-to-action URL (optional)', language: 'Language (optional, e.g. es, pt)',
-    sendNow: 'Send now (owner only — otherwise it queues for approval)', generate: 'Generate & run', working: 'Working…',
-    connectComing: 'Connect provider (coming)', methods: 'Connection method — API · COS+PR · Browser Agent',
-    methodsIntro: 'When this provider is enabled you connect your OWN account — the platform never fronts the spend. All three paths reach the same result.',
-    api: 'API', cheapest: '· cheapest', apiText: "Paste this provider's API key; the engine drives it directly.",
-    cosPr: 'COS + PR', cosPrText: 'Stage the provider credentials as an infrastructure PR, review and merge, then connect.',
-    agent: 'Browser Agent', premium: '· premium', agentText: "Assisted setup that drives the provider's own screens and pauses for login / 2FA.",
-    recentTitle: 'Recent press campaigns', approve: 'Approve & dispatch', openLink: 'Open published link',
-    recordUrl: 'Record real published URL', record: 'Record URL', noContact: 'no contact',
-    opNote: 'Operational note', liveList: 'Live now', none: 'none',
-    opText: 'The other provider types are structurally supported and go live once connected — the card switches automatically. Paid providers never send without owner budget approval, and no published link is ever invented: the owner records the real one.',
-    submitted: 'Submitted to the editor — proof stays pending until you record the published link.',
-    queued: 'Queued for owner approval', dispatched: 'Dispatched through the provider.', recorded: 'Published link recorded.',
-    errRun: 'Could not run the campaign.', errAction: 'Action failed.', errLoad: 'Could not load press providers.', noData: 'No provider data returned.',
-    aiMode: 'AI writes it', manualMode: 'I write it myself', yourCopy: 'Paste your own release copy', reviewDraft: 'Review draft', saveCopy: 'Save copy', savedCopy: 'Copy saved.', gaps: 'Unfilled facts — replace these before sending:',
+    eyebrow: uiCopy('u_a7e469ae8f42894b'), title: uiCopy('u_b8380466d75e5e38'),
+    intro: uiCopy('u_7d08ceb4a488e035'),
+    refresh: uiCopy('u_f907f1fcbf95b62b'), loading: uiCopy('u_96a2fc25959ba801'), types: uiCopy('u_1fc549c47045c303'), liveNow: uiCopy('u_87f0344bb011b614'), coming: uiCopy('u_e7300e08b1f34360'), recent: uiCopy('u_fc66d41d2761f3ce'),
+    live: uiCopy('u_28b87a8a1dcfec61'), comingSoon: uiCopy('u_721daf3e4b413488'), cost: uiCopy('u_89a06601e29f1121'), proof: uiCopy('u_c6d8e89308f6f1a5'), needs: uiCopy('u_f79278fd27d336e6'),
+    run: uiCopy('u_a84bcdfeb1f23afc'), close: uiCopy('u_dfba46b1855f4d4f'), goal: uiCopy('u_b7c5d4a243c7019c'),
+    editorEmail: uiCopy('u_9ffbc0db212218c4'), publication: uiCopy('u_c2dd554fee25db5f'), audience: uiCopy('u_a99af69c3a841cb5'),
+    ctaUrl: uiCopy('u_cc5d6f809a3c489c'), language: uiCopy('u_0e676cafddaa38c8'),
+    sendNow: uiCopy('u_f84606f9f5b17f40'), generate: uiCopy('u_597b4d22dbec2c7d'), working: uiCopy('u_9bdc1a95e6a05f54'),
+    connectComing: uiCopy('u_fd561df1f2943519'), methods: uiCopy('u_faac7d523c13aff4'),
+    methodsIntro: uiCopy('u_5c0cae89c4ecfb31'),
+    api: uiCopy('u_08ded6ccf0762acb'), cheapest: uiCopy('u_356d4d86ee0778f2'), apiText: uiCopy('u_5b3f030ec0d7873c'),
+    cosPr: uiCopy('u_61e520594dd43421'), cosPrText: uiCopy('u_f9623bf342960fea'),
+    agent: uiCopy('u_e9447d896b5e46ab'), premium: uiCopy('u_94fa917214f5597b'), agentText: uiCopy('u_8aa99e11b100bd0a'),
+    recentTitle: uiCopy('u_68a0ede5a9283bfa'), approve: uiCopy('u_96dfdca239e43955'), openLink: uiCopy('u_3dc9303a62259b48'),
+    recordUrl: uiCopy('u_b5b4e66f223471cb'), record: uiCopy('u_c4f473905be2d64b'), noContact: uiCopy('u_71f15154a4e79d06'),
+    opNote: uiCopy('u_ff36d06265e18903'), liveList: uiCopy('u_290f4dc064202bab'), none: uiCopy('u_3aa9aef839c69a1f'),
+    opText: uiCopy('u_1a09b0910199f495'),
+    submitted: uiCopy('u_44a01343b32d4d9f'),
+    queued: uiCopy('u_1f001665dacc1095'), dispatched: uiCopy('u_79269e817b19c468'), recorded: uiCopy('u_2352b78da14288d9'),
+    errRun: uiCopy('u_d41240c94a0f6c13'), errAction: uiCopy('u_3a4e8a6be1d516e6'), errLoad: uiCopy('u_8dd87018777530be'), noData: uiCopy('u_e592ffa110a3bd29'),
+    aiMode: uiCopy('u_e596412ad2345e3d'), manualMode: uiCopy('u_13f51a052d80c82b'), yourCopy: uiCopy('u_e8d1272b9ec64aa6'), reviewDraft: uiCopy('u_a181981b0ada8f19'), saveCopy: uiCopy('u_a42c45237f779a4a'), savedCopy: uiCopy('u_a16aff7328c89c48'), gaps: uiCopy('u_991fea28bb5c5862'),
     p: {
-      free_submission: { label: 'Free editor submission', blurb: 'Submit AI-written releases to verified editors and free / trade press. Zero cost; the editor decides if and when it runs.' },
-      pr_wire: { label: 'PR wire distribution', blurb: 'Business Wire, PR Newswire, GlobeNewswire, EIN Presswire. Guaranteed distribution with a report back — billed per release on your own account.' },
-      media_database: { label: 'Media database', blurb: 'Cision, Muck Rack, Meltwater. Supplies verified journalist contacts that feed target validation for the other providers.' },
-      ad_platform: { label: 'Ad platform', blurb: 'Google, LinkedIn, Meta, Taboola, Outbrain. Budgeted paid distribution with a real-time report — spend runs on your own ad account.' },
-      direct_io: { label: 'Direct insertion order', blurb: 'Print, IT magazines, TV, radio via a publisher or media agency. Insertion-order workflow; proof is a tearsheet or affidavit, weeks later.' },
+      free_submission: { label: uiCopy('u_39e1d5b08c9f1c4a'), blurb: uiCopy('u_1ccdb24b9269c061') },
+      pr_wire: { label: uiCopy('u_dd35627482678066'), blurb: uiCopy('u_493dcc98d7be4ec7') },
+      media_database: { label: uiCopy('u_c0e3eea04d17d3c5'), blurb: uiCopy('u_22ce8b3ff8b66b37') },
+      ad_platform: { label: uiCopy('u_ca62f5ea99c93791'), blurb: uiCopy('u_86acbd80c50e26ae') },
+      direct_io: { label: uiCopy('u_f922a57ad8de9831'), blurb: uiCopy('u_9047d1ba0391b54d') },
     },
   },
   es: {
@@ -246,8 +248,8 @@ function ProviderCard({ provider, onRan, t }: { provider: Provider; onRan: () =>
     <p style={{ color: 'rgba(255,255,255,.66)', fontSize: 13, lineHeight: 1.6, margin: '12px 0 0' }}>{meta.blurb}</p>
 
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-      {chip(`${t.cost}: ${provider.cost}`, provider.cost === 'free' ? '#22c55e' : '#ffc300')}
-      {chip(`${t.proof}: ${provider.proof}`, '#1af0ff')}
+      {chip(`${t.cost}: ${provider.cost}`, provider.cost === 'free' ? '#22c55e' : uiCopy('u_110183cb2099f93c'))}
+      {chip(`${t.proof}: ${provider.proof}`, uiCopy('u_be92f4efdb1866ca'))}
       {provider.needs.map((n) => chip(`${t.needs}: ${n}`, '#94a3b8'))}
     </div>
 
@@ -405,9 +407,9 @@ export default function PressMediaProviderCockpit() {
     <PressCompanyProfileForm profile={data?.profile} onSaved={load} />
 
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-      <div style={panel}>{chip(t.types, '#1af0ff')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.total ?? '-'}</h2></div>
+      <div style={panel}>{chip(t.types, uiCopy('u_88fd74efe53f9449'))}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.total ?? '-'}</h2></div>
       <div style={panel}>{chip(t.liveNow, '#22c55e')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.live ?? '-'}</h2></div>
-      <div style={panel}>{chip(t.coming, '#ffc300')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.coming ?? '-'}</h2></div>
+      <div style={panel}>{chip(t.coming, uiCopy('u_9719213280fd72ed'))}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{data?.summary?.coming ?? '-'}</h2></div>
       <div style={panel}>{chip(t.recent, '#94a3b8')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{campaigns.length}</h2></div>
     </section>
 

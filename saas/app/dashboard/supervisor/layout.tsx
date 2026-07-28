@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 import ProtocolCapabilitySummary from '@/components/supervisor/ProtocolCapabilitySummary'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const copy = {
-  en: { brand: 'Supervisor', operations: 'Operations Center', capabilities: 'Protocol Capabilities', reviews: 'Mission Reviews', boundary: 'Read-only diagnostics', protocols: 'protocols', safety: 'safety-classified', supervisory: 'supervisory-only', mutating: 'declare mutation capability', safe: 'Read-only · no execution controls' },
+  en: { brand: uiCopy('u_95745057f79500bb'), operations: uiCopy('u_99c236fe8d134c0f'), capabilities: uiCopy('u_23c3827d5f49d062'), reviews: uiCopy('u_f24fbad9d666b17b'), boundary: uiCopy('u_250b8ab053560a6e'), protocols: uiCopy('u_71d9151411e5a229'), safety: uiCopy('u_93aa6fb592998d62'), supervisory: uiCopy('u_c83c5f5dd49301a7'), mutating: uiCopy('u_e16874d19dec336b'), safe: uiCopy('u_f79f2be2de7733be') },
   es: { brand: 'Supervisor', operations: 'Centro de operaciones', capabilities: 'Capacidades de protocolo', reviews: 'Revisiones de misiones', boundary: 'Diagnóstico de solo lectura', protocols: 'protocolos', safety: 'clasificados por seguridad', supervisory: 'solo supervisión', mutating: 'declaran capacidad de modificación', safe: 'Solo lectura · sin controles de ejecución' },
   pt: { brand: 'Supervisor', operations: 'Centro de operações', capabilities: 'Capacidades de protocolo', reviews: 'Revisões de missões', boundary: 'Diagnóstico somente leitura', protocols: 'protocolos', safety: 'classificados por segurança', supervisory: 'somente supervisão', mutating: 'declaram capacidade de alteração', safe: 'Somente leitura · sem controles de execução' },
   pl: { brand: 'Nadzorca', operations: 'Centrum operacyjne', capabilities: 'Możliwości protokołów', reviews: 'Przeglądy misji', boundary: 'Diagnostyka tylko do odczytu', protocols: 'protokołów', safety: 'sklasyfikowanych pod kątem bezpieczeństwa', supervisory: 'tylko nadzorczych', mutating: 'deklaruje możliwość modyfikacji', safe: 'Tylko odczyt · bez kontroli wykonania' },
@@ -24,7 +26,7 @@ export default async function SupervisorLayout({ children }: { children: ReactNo
   ] as const
 
   return <div>
-    <nav aria-label="Supervisor navigation" style={nav}>
+    <nav aria-label={uiCopy('u_6bb079952a4fd53e')} style={nav}>
       <strong style={brand}>{t.brand}</strong>
       <div style={linksStyle}>{links.map(link => <Link key={link.href} href={link.href} style={item}>{link.label}</Link>)}</div>
       <span style={boundary}>{t.boundary}</span>

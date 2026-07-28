@@ -10,6 +10,8 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import type { Severity } from '@/lib/audit/reportModel'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -50,17 +52,17 @@ export default function ComplianceReport({ data }: { data: ComplianceReportView 
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.compliance.title', 'Compliance Readiness Matrix')} <span style={{ color: GOLD }}>·</span>
+          {t('audit.compliance.title', uiCopy('u_fb443445380fcce3'))} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 680, lineHeight: 1.5 }}>
-          {t('audit.compliance.subtitle', 'Readiness against SOC 2, ISO 27001, NIST CSF, and CIS — mapped from your current findings.')}
+          {t('audit.compliance.subtitle', uiCopy('u_08ffb99ac78c2e03'))}
         </p>
       </div>
 
       {/* Disclaimer */}
       <section style={{ ...glass, padding: 14, marginBottom: 16, borderColor: 'rgba(255,195,0,.25)' }}>
         <div style={{ fontSize: 12, color: GOLD }}>
-          {t('audit.compliance.disclaimer', 'Readiness indication only — this is not a certification, attestation, or formal audit. Reference codes are indicative.')}
+          {t('audit.compliance.disclaimer', uiCopy('u_7ac909c90f96d10d'))}
         </div>
       </section>
 
@@ -68,12 +70,12 @@ export default function ComplianceReport({ data }: { data: ComplianceReportView 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 26, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: 34, fontWeight: 800, color: pctColor(data.overallPct), fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{data.overallPct}%</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)' }}>{t('audit.compliance.overall', 'Overall readiness')}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)' }}>{t('audit.compliance.overall', uiCopy('u_11ebd4c1d356d14f'))}</div>
         </div>
-        <Stat label={t('audit.compliance.summary.families', 'Control families')} value={s.families} />
-        <Stat label={t('audit.compliance.summary.ready', 'Ready')} value={s.ready} color={s.ready ? GREEN : undefined} />
-        <Stat label={t('audit.compliance.summary.attention', 'Needs attention')} value={s.attention} color={s.attention ? GOLD : undefined} />
-        <Stat label={t('audit.compliance.summary.gaps', 'Gaps')} value={s.gaps} color={s.gaps ? RED : undefined} />
+        <Stat label={t('audit.compliance.summary.families', uiCopy('u_15374c061a224d27'))} value={s.families} />
+        <Stat label={t('audit.compliance.summary.ready', uiCopy('u_8ec80696f9bbe759'))} value={s.ready} color={s.ready ? GREEN : undefined} />
+        <Stat label={t('audit.compliance.summary.attention', uiCopy('u_f7df6f4236473501'))} value={s.attention} color={s.attention ? GOLD : undefined} />
+        <Stat label={t('audit.compliance.summary.gaps', uiCopy('u_fcdda4f59b4738a5'))} value={s.gaps} color={s.gaps ? RED : undefined} />
       </section>
 
       {/* Per-framework cards */}
@@ -83,7 +85,7 @@ export default function ComplianceReport({ data }: { data: ComplianceReportView 
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{t(`audit.compliance.fw.${fw.id}`, fw.id)}</div>
             <div style={{ fontSize: 26, fontWeight: 800, color: pctColor(fw.pct), fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{fw.pct}%</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>
-              {tt('audit.compliance.readyOf', '{ready} of {total} ready', { ready: fw.ready, total: fw.total })}
+              {tt(uiCopy('u_d5ac06ee58a89893'), uiCopy('u_d4caab173b26a160'), { ready: fw.ready, total: fw.total })}
             </div>
           </div>
         ))}
@@ -92,15 +94,15 @@ export default function ComplianceReport({ data }: { data: ComplianceReportView 
       {/* Family crosswalk matrix */}
       <section style={{ ...glass, padding: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-          {t('audit.compliance.matrix.title', 'Control families')}
+          {t('audit.compliance.matrix.title', uiCopy('u_e98d19a01470fc3a'))}
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                <Th>{t('audit.compliance.col.family', 'Control family')}</Th>
-                <Th>{t('audit.compliance.col.status', 'Status')}</Th>
-                <Th>{t('audit.compliance.col.findings', 'Findings')}</Th>
+                <Th>{t('audit.compliance.col.family', uiCopy('u_7af1c9aee589bb66'))}</Th>
+                <Th>{t('audit.compliance.col.status', uiCopy('u_5eec1d127e5d64b0'))}</Th>
+                <Th>{t('audit.compliance.col.findings', uiCopy('u_61e755632a22ceef'))}</Th>
                 {FRAMEWORKS.map(fw => <Th key={fw}>{t(`audit.compliance.fw.${fw}`, fw)}</Th>)}
               </tr>
             </thead>

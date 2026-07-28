@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 import test from 'node:test'
 
-const source = readFileSync(new URL('../components/hub/ProviderExecutionModePanel.tsx', import.meta.url), 'utf8')
+const source = readUiSource(new URL('../components/hub/ProviderExecutionModePanel.tsx', import.meta.url))
 
 test('provider execution mode panel uses the governed preview route', () => {
   assert.match(source, /\/api\/hub\/action\/preview/)

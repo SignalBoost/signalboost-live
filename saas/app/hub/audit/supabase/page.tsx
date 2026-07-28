@@ -10,6 +10,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import SupabaseReport, { type SupabaseReportView } from '@/components/audit/SupabaseReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: SupabaseReportView; error?: string }
@@ -32,7 +34,7 @@ export default function SupabaseReportPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.supabase.loadError', 'Could not load the Supabase report.'))
+          setError((json && json.error) || t('audit.supabase.loadError', uiCopy('u_72b70e4c7fcab33f')))
           return
         }
         setData(json.report)
@@ -40,7 +42,7 @@ export default function SupabaseReportPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.supabase.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.supabase.fetchError', uiCopy('u_c12c563a159ef29d')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -51,7 +53,7 @@ export default function SupabaseReportPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.supabase.loading', 'Loading Supabase report…')}
+        {t('audit.supabase.loading', uiCopy('u_fda484d365c4c963'))}
       </main>
     )
   }

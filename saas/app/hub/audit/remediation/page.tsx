@@ -12,6 +12,8 @@ import RemediationRoadmap, { type RemediationRoadmapView } from '@/components/au
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
 import { indexStates, type FindingStateMap, type FindingStateRow } from '@/lib/audit/findingState'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type ReportResponse = { ok: boolean; report?: RemediationRoadmapView; error?: string }
 type StatesResponse = { ok: boolean; states?: FindingStateRow[]; error?: string }
@@ -37,7 +39,7 @@ export default function RemediationPage() {
         const sJson = (await sRes.json().catch(() => null)) as StatesResponse | null
         if (!alive) return
         if (!rJson || !rJson.ok || !rJson.report) {
-          setError((rJson && rJson.error) || t('audit.remediation.loadError', 'Could not load the roadmap.'))
+          setError((rJson && rJson.error) || t('audit.remediation.loadError', uiCopy('u_a6361bcabe5e4716')))
           return
         }
         setData(rJson.report)
@@ -46,7 +48,7 @@ export default function RemediationPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.remediation.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.remediation.fetchError', uiCopy('u_698417b8081327b7')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -55,7 +57,7 @@ export default function RemediationPage() {
   }, [t])
 
   if (loading) {
-    return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>{t('audit.remediation.loading', 'Building remediation roadmap…')}</main>
+    return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>{t('audit.remediation.loading', uiCopy('u_44c716fc4bff135e'))}</main>
   }
   if (error) {
     return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>{error}</main>

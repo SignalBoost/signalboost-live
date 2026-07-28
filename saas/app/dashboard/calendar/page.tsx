@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { getNamedaysForDate } from '@/lib/cultural-calendar/pl-namedays'
 import { getRussianNamedaysForDate } from '@/lib/cultural-calendar/ru-namedays'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 
@@ -39,25 +41,25 @@ type CalendarCopy = {
 
 const COPY: Record<string, CalendarCopy> = {
   en: {
-    eyebrow: 'Calendar',
-    prev: '← Prev',
-    today: 'Today',
-    next: 'Next →',
-    loadError: 'Could not load your events.',
-    genericLoadError: 'Something went wrong loading your calendar.',
-    saveError: 'Could not save the event.',
-    loading: 'Loading calendar…',
-    nameDaysHelp: '🎉 = name days for this locale. Click any day to add an event; click an event to delete it.',
-    regularHelp: 'Click any day to add an event; click an event to delete it.',
-    addEvent: 'Add event',
-    eventTitlePlaceholder: 'Event title (e.g. Launch promo)',
-    notesPlaceholder: 'Notes (optional)',
-    cancel: 'Cancel',
-    saving: 'Saving…',
-    addEventButton: 'Add event',
-    clickToDelete: 'click to delete',
-    months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-    weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    eyebrow: uiCopy('u_f6685e395ce9e042'),
+    prev: uiCopy('u_3b50888fa78a154b'),
+    today: uiCopy('u_d55596796f399019'),
+    next: uiCopy('u_36d6af098c6cfd2a'),
+    loadError: uiCopy('u_a2efe48bcc4e9877'),
+    genericLoadError: uiCopy('u_3d66486a1ab6978c'),
+    saveError: uiCopy('u_faa0e021cbb4e323'),
+    loading: uiCopy('u_51696c318f4d5d0b'),
+    nameDaysHelp: uiCopy('u_8ad51074c8acd4a2'),
+    regularHelp: uiCopy('u_faf744cf3c382b88'),
+    addEvent: uiCopy('u_370e07b97540b6ce'),
+    eventTitlePlaceholder: uiCopy('u_234a8d0f3e7fb6cb'),
+    notesPlaceholder: uiCopy('u_4fc214dcd9094950'),
+    cancel: uiCopy('u_604cfcdbdf815179'),
+    saving: uiCopy('u_75c14b6bd85726cd'),
+    addEventButton: uiCopy('u_af451f8e0518f386'),
+    clickToDelete: uiCopy('u_b3eead5d6d32caea'),
+    months: [uiCopy('u_3076c38cf0e64421'), uiCopy('u_3bb88da4e8246f11'), uiCopy('u_32f391a311477ae0'), uiCopy('u_8c6947d80468e44d'), uiCopy('u_2b928741d59a9f60'), uiCopy('u_ef6a2b6165d77dac'), uiCopy('u_7417ec7a29ede411'), uiCopy('u_0a8b3ac8565e332c'), uiCopy('u_5ab5a87c818b99ff'), uiCopy('u_025f4fd7799ffca0'), uiCopy('u_8748d4ffc5eb0ceb'), uiCopy('u_5390ce09c0b5d1c4')],
+    weekdays: [uiCopy('u_a14ddd67e03ad1a0'), uiCopy('u_d572dc3f35b7834a'), uiCopy('u_a6eb5762df9c6e18'), uiCopy('u_d42c62f6302bb3f3'), uiCopy('u_63df04a1837ac891'), uiCopy('u_c3f06d032d201446'), uiCopy('u_4d8295b1b440cad6')],
   },
   pt: {
     eyebrow: 'Calendário',

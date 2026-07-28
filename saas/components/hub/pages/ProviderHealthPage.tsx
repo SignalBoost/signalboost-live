@@ -8,6 +8,8 @@ import { useMemo, useState } from 'react'
 import { PageProps, TONES, cardStyle, labelStyle, rowStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Env = 'Production' | 'Staging' | 'Dev'
 type HealthStatus = 'healthy' | 'degraded' | 'issues'
@@ -20,9 +22,9 @@ type HealthMonitor = { id: string; icon: string; title: string; subtitle: string
 
 const environments: Env[] = ['Production', 'Staging', 'Dev']
 const monitors: HealthMonitor[] = [
-  { id: 'core-cloud', icon: '🧱', title: 'Health Monitor 1 — Core Clouds', subtitle: 'AWS, Google Cloud, and Azure health signals.', providers: ['AWS', 'GCP', 'Azure'] },
-  { id: 'app-edge', icon: '🌐', title: 'Health Monitor 2 — App, DNS + Edge', subtitle: 'Cloudflare and Firebase operational health.', providers: ['Cloudflare', 'Firebase'] },
-  { id: 'identity-infra', icon: '🗄️', title: 'Health Monitor 3 — Identity + Infrastructure', subtitle: 'Auth0 and DigitalOcean health signals.', providers: ['Auth0', 'DigitalOcean'] },
+  { id: 'core-cloud', icon: '🧱', title: uiCopy('u_d237b1a6d9a9a5a0'), subtitle: uiCopy('u_2acb4cffa16ee917'), providers: ['AWS', 'GCP', 'Azure'] },
+  { id: 'app-edge', icon: '🌐', title: uiCopy('u_3c830b944d96cf99'), subtitle: uiCopy('u_cbe216a7d34f1f6a'), providers: ['Cloudflare', 'Firebase'] },
+  { id: 'identity-infra', icon: '🗄️', title: uiCopy('u_636acaf55fc826b9'), subtitle: uiCopy('u_f9c6909df157f09e'), providers: ['Auth0', 'DigitalOcean'] },
 ]
 
 const healthRows: ProviderHealth[] = [
@@ -38,17 +40,17 @@ const healthRows: ProviderHealth[] = [
 ]
 
 const issueRows: ProviderIssue[] = [
-  { id: 'aws-s3-public', severity: 'Critical', provider: 'AWS', environment: 'Production', type: 'Misconfiguration', summary: 'Public S3 bucket in production', detected: '2 min ago', status: 'Open', description: 'A production S3 bucket appears to be publicly readable.', impact: 'Sensitive files may be accessible from the internet.', fix: 'Review bucket ACL and block public access unless public access is intentional.', consoleUrl: 'https://console.aws.amazon.com/s3/' },
-  { id: 'aws-admin-key', severity: 'High', provider: 'AWS', environment: 'Production', type: 'Key issue', summary: 'IAM key has AdministratorAccess', detected: '4 min ago', status: 'Open', description: 'An IAM access key is attached to a principal with broad AdministratorAccess.', impact: 'If compromised, the key can control most AWS resources.', fix: 'Reduce privileges using least privilege and rotate the access key.', consoleUrl: 'https://console.aws.amazon.com/iam/' },
-  { id: 'cf-origin-exposed', severity: 'High', provider: 'Cloudflare', environment: 'Production', type: 'Misconfiguration', summary: 'DNS record exposes origin IP', detected: '5 min ago', status: 'Open', description: 'A Cloudflare DNS record appears to have proxy disabled.', impact: 'Attackers may bypass Cloudflare protections and target the origin directly.', fix: 'Enable proxy for the record or move the origin behind a protected endpoint.', consoleUrl: 'https://dash.cloudflare.com/' },
-  { id: 'gcp-old-key', severity: 'Medium', provider: 'GCP', environment: 'Production', type: 'Key issue', summary: 'Service account key older than policy', detected: '11 min ago', status: 'Acknowledged', description: 'A service account key is older than the allowed rotation window.', impact: 'Older keys increase the risk of credential leakage and stale permissions.', fix: 'Rotate the service account key and remove the old key.', consoleUrl: 'https://console.cloud.google.com/iam-admin/serviceaccounts' },
-  { id: 'do-open-port', severity: 'Medium', provider: 'DigitalOcean', environment: 'Production', type: 'Misconfiguration', summary: 'Droplet open to 0.0.0.0/0 without firewall', detected: '14 min ago', status: 'Open', description: 'A droplet has public exposure without a matching firewall restriction.', impact: 'Public services may be reachable by anyone on the internet.', fix: 'Attach a DigitalOcean firewall and restrict inbound traffic.', consoleUrl: 'https://cloud.digitalocean.com/networking/firewalls' },
+  { id: 'aws-s3-public', severity: 'Critical', provider: 'AWS', environment: 'Production', type: 'Misconfiguration', summary: 'Public S3 bucket in production', detected: '2 min ago', status: uiCopy('u_d7165f7f3f6c3d46'), description: uiCopy('u_c54329b1756116bf'), impact: 'Sensitive files may be accessible from the internet.', fix: 'Review bucket ACL and block public access unless public access is intentional.', consoleUrl: 'https://console.aws.amazon.com/s3/' },
+  { id: 'aws-admin-key', severity: 'High', provider: 'AWS', environment: 'Production', type: 'Key issue', summary: 'IAM key has AdministratorAccess', detected: '4 min ago', status: uiCopy('u_99f5862fa97b688b'), description: uiCopy('u_81a6eb655f04116e'), impact: 'If compromised, the key can control most AWS resources.', fix: 'Reduce privileges using least privilege and rotate the access key.', consoleUrl: 'https://console.aws.amazon.com/iam/' },
+  { id: 'cf-origin-exposed', severity: 'High', provider: 'Cloudflare', environment: 'Production', type: 'Misconfiguration', summary: 'DNS record exposes origin IP', detected: '5 min ago', status: uiCopy('u_793c4905d4361d17'), description: uiCopy('u_44c92feb455b126a'), impact: 'Attackers may bypass Cloudflare protections and target the origin directly.', fix: 'Enable proxy for the record or move the origin behind a protected endpoint.', consoleUrl: 'https://dash.cloudflare.com/' },
+  { id: 'gcp-old-key', severity: 'Medium', provider: 'GCP', environment: 'Production', type: 'Key issue', summary: 'Service account key older than policy', detected: '11 min ago', status: uiCopy('u_8632ddf5d6309f5d'), description: uiCopy('u_8619555e2424d035'), impact: 'Older keys increase the risk of credential leakage and stale permissions.', fix: 'Rotate the service account key and remove the old key.', consoleUrl: 'https://console.cloud.google.com/iam-admin/serviceaccounts' },
+  { id: 'do-open-port', severity: 'Medium', provider: 'DigitalOcean', environment: 'Production', type: 'Misconfiguration', summary: 'Droplet open to 0.0.0.0/0 without firewall', detected: '14 min ago', status: uiCopy('u_486c9208a2cabcc6'), description: uiCopy('u_24bc6b4bd195bdae'), impact: 'Public services may be reachable by anyone on the internet.', fix: 'Attach a DigitalOcean firewall and restrict inbound traffic.', consoleUrl: 'https://cloud.digitalocean.com/networking/firewalls' },
 ]
 
 const statusStyle: Record<HealthStatus, { label: string; color: string; bg: string; border: string }> = {
-  healthy: { label: '🟢 Healthy', color: '#86efac', bg: 'rgba(34,197,94,.12)', border: 'rgba(34,197,94,.35)' },
-  degraded: { label: '🟡 Degraded', color: '#ffc300', bg: 'rgba(255,195,0,.11)', border: 'rgba(255,195,0,.38)' },
-  issues: { label: '🔴 Issues', color: '#fca5a5', bg: 'rgba(239,68,68,.11)', border: 'rgba(239,68,68,.38)' },
+  healthy: { label: uiCopy('u_5598ddab933d6fbb'), color: '#86efac', bg: 'rgba(34,197,94,.12)', border: 'rgba(34,197,94,.35)' },
+  degraded: { label: uiCopy('u_11bfdd2cd53c6089'), color: '#ffc300', bg: 'rgba(255,195,0,.11)', border: 'rgba(255,195,0,.38)' },
+  issues: { label: uiCopy('u_5cad21c824c5b55d'), color: '#fca5a5', bg: 'rgba(239,68,68,.11)', border: 'rgba(239,68,68,.38)' },
 }
 
 const severityStyle: Record<Severity, { color: string; bg: string; border: string }> = {
@@ -74,21 +76,21 @@ export default function ProviderHealthPage(_props: PageProps) {
 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 14 }}>
       <section style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>{t(dict, 'console.providerHealth.monitor', 'Monitor 3')}</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t(dict, 'console.providerHealth.title', 'Provider Health')}</h2>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 780 }}>{t(dict, 'console.providerHealth.subtitle', 'Provider Health is now split into smaller health monitors so cards stay visible and calm.')}</p>
+          <div style={labelStyle}>{t(dict, 'console.providerHealth.monitor', uiCopy('u_bd5dc961f0aa603f'))}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t(dict, 'console.providerHealth.title', uiCopy('u_9e28e58f3343953a'))}</h2>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 780 }}>{t(dict, 'console.providerHealth.subtitle', uiCopy('u_893e9b4bc140d578'))}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ padding: '7px 11px', borderRadius: 999, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.12)', color: '#fca5a5', fontSize: 12.5, fontWeight: 900 }}>{criticalCount} {t(dict, 'console.providerHealth.critical', 'Critical')}</span>
-          <span style={{ padding: '7px 11px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{openCount} {t(dict, 'console.providerHealth.open', 'Open')}</span>
+          <span style={{ padding: '7px 11px', borderRadius: 999, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.12)', color: '#fca5a5', fontSize: 12.5, fontWeight: 900 }}>{criticalCount} {t(dict, 'console.providerHealth.critical', uiCopy('u_9d6b7572e6d41153'))}</span>
+          <span style={{ padding: '7px 11px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{openCount} {t(dict, 'console.providerHealth.open', uiCopy('u_32e670cfc0ad3915'))}</span>
         </div>
       </section>
 
       <section style={{ ...cardStyle, padding: 14, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={labelStyle}>{t(dict, 'console.providerHealth.environment', 'Environment')}</span>
+          <span style={labelStyle}>{t(dict, 'console.providerHealth.environment', uiCopy('u_dc2e43d1b0ede32a'))}</span>
           {environments.map(env => <button key={env} onClick={() => setEnvironment(env)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 10, border: environment === env ? `1px solid ${TONES.gold.border}` : '1px solid rgba(255,255,255,.12)', background: environment === env ? TONES.gold.soft : 'rgba(255,255,255,.04)', color: environment === env ? '#ffc300' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 800 }}>{env}</button>)}
-          <span style={{ ...labelStyle, marginLeft: 8 }}>{t(dict, 'console.providerHealth.monitor', 'Health Monitor')}</span>
+          <span style={{ ...labelStyle, marginLeft: 8 }}>{t(dict, 'console.providerHealth.monitor', uiCopy('u_60dba3ec4f40856f'))}</span>
           {monitors.map((item, index) => <button key={item.id} onClick={() => setMonitorIndex(index)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 10, border: monitorIndex === index ? `1px solid ${TONES.blue.border}` : '1px solid rgba(255,255,255,.12)', background: monitorIndex === index ? TONES.blue.soft : 'rgba(255,255,255,.04)', color: monitorIndex === index ? '#1af0ff' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 800 }}>{item.icon} {index + 1}</button>)}
         </div>
       </section>
@@ -100,7 +102,7 @@ export default function ProviderHealthPage(_props: PageProps) {
         </section>
 
         <section style={{ marginBottom: 18 }}>
-          <div style={{ ...labelStyle, marginBottom: 10 }}>{t(dict, 'console.providerHealth.statusCards', 'Provider Status Cards')}</div>
+          <div style={{ ...labelStyle, marginBottom: 10 }}>{t(dict, 'console.providerHealth.statusCards', uiCopy('u_d8642f48014b4a11'))}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
             {filteredHealth.map(row => {
               const tone = statusStyle[row.status]
@@ -117,7 +119,7 @@ export default function ProviderHealthPage(_props: PageProps) {
                   </div>
                   <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {row.signals.slice(0, 3).map(signal => <div key={signal} style={rowStyle}><span>{signal}</span></div>)}
-                    <div style={{ color: 'rgba(255,255,255,.44)', fontSize: 12, marginTop: 4 }}>{t(dict, 'console.providerHealth.lastChecked', 'Last checked:')} {row.lastChecked}</div>
+                    <div style={{ color: 'rgba(255,255,255,.44)', fontSize: 12, marginTop: 4 }}>{t(dict, 'console.providerHealth.lastChecked', uiCopy('u_4be063af65fc3308'))} {row.lastChecked}</div>
                   </div>
                 </article>
               )
@@ -128,8 +130,8 @@ export default function ProviderHealthPage(_props: PageProps) {
         <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(295px, .48fr)', gap: 14, alignItems: 'start' }}>
           <div style={{ ...cardStyle, overflow: 'hidden' }}>
             <div style={{ padding: '13px 15px', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)' }}>
-              <div style={{ fontSize: 17, fontWeight: 950 }}>{t(dict, 'console.providerHealth.issues', 'Issues & Alerts')}</div>
-              <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12.5, marginTop: 3 }}>{t(dict, 'console.providerHealth.issuesDesc', 'Only alerts for this smaller monitor page.')}</div>
+              <div style={{ fontSize: 17, fontWeight: 950 }}>{t(dict, 'console.providerHealth.issues', uiCopy('u_3aacceb2a28274e4'))}</div>
+              <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12.5, marginTop: 3 }}>{t(dict, 'console.providerHealth.issuesDesc', uiCopy('u_5b6c617d1741a1fa'))}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {filteredIssues.map(issue => {
@@ -148,7 +150,7 @@ export default function ProviderHealthPage(_props: PageProps) {
                   </button>
                 )
               })}
-              {filteredIssues.length === 0 && <div style={{ padding: 18, color: 'rgba(255,255,255,.55)' }}>{t(dict, 'console.providerHealth.noAlerts', 'No essential alerts for this health monitor.')}</div>}
+              {filteredIssues.length === 0 && <div style={{ padding: 18, color: 'rgba(255,255,255,.55)' }}>{t(dict, 'console.providerHealth.noAlerts', uiCopy('u_c6c2af7891ce67ff'))}</div>}
             </div>
           </div>
 
@@ -156,28 +158,28 @@ export default function ProviderHealthPage(_props: PageProps) {
             {selectedIssue ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
-                  <div style={labelStyle}>{t(dict, 'console.providerHealth.alertDetail', 'Alert detail')}</div>
+                  <div style={labelStyle}>{t(dict, 'console.providerHealth.alertDetail', uiCopy('u_f338be12d81cee45'))}</div>
                   <h3 style={{ margin: '4px 0 0', fontSize: 18 }}>{selectedIssue.summary}</h3>
                 </div>
                 <div style={rowStyle}>
-                  <strong>{t(dict, 'console.providerHealth.provider', 'Provider')}</strong>
+                  <strong>{t(dict, 'console.providerHealth.provider', uiCopy('u_45999f6d9d5a5669'))}</strong>
                   <span>{selectedIssue.provider}</span>
                 </div>
                 <div style={rowStyle}>
-                  <strong>{t(dict, 'console.providerHealth.severity', 'Severity')}</strong>
+                  <strong>{t(dict, 'console.providerHealth.severity', uiCopy('u_db1b28e4a32b5c72'))}</strong>
                   <span>{selectedIssue.severity}</span>
                 </div>
                 <div>
-                  <div style={labelStyle}>{t(dict, 'console.providerHealth.impact', 'Impact')}</div>
+                  <div style={labelStyle}>{t(dict, 'console.providerHealth.impact', uiCopy('u_3204f1d0a6d93f11'))}</div>
                   <p style={{ margin: '5px 0 0', color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{selectedIssue.impact}</p>
                 </div>
                 <div>
-                  <div style={labelStyle}>{t(dict, 'console.providerHealth.fix', 'Recommended fix')}</div>
+                  <div style={labelStyle}>{t(dict, 'console.providerHealth.fix', uiCopy('u_9ec9084dd6413f9c'))}</div>
                   <p style={{ margin: '5px 0 0', color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{selectedIssue.fix}</p>
                 </div>
               </div>
             ) : (
-              <div style={{ color: 'rgba(255,255,255,.55)' }}>{t(dict, 'console.providerHealth.selectAlert', 'Select an alert to inspect details.')}</div>
+              <div style={{ color: 'rgba(255,255,255,.55)' }}>{t(dict, 'console.providerHealth.selectAlert', uiCopy('u_8324a5bd4cad19dd'))}</div>
             )}
           </aside>
         </section>

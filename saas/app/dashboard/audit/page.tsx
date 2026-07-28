@@ -15,6 +15,8 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import RemediationLifecyclePanel, { type RemediationLifecycleState } from '@/components/audit/RemediationLifecyclePanel'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
 // the drawer without the global app shell/navbar. Each is code-split via lazy().
@@ -71,26 +73,26 @@ type AuditCopy = {
 
 const COPY: Record<string, AuditCopy> = {
   en: {
-    title: 'Audit Console', subtitle: 'Deep security & quality scans, isolated from live console traffic.',
-    viewPlans: 'View plans',
-    approveAllFixes: 'Approve all fixes', approvingAllFixes: 'Approving all fixes…', approvedAllFixes: 'All fixes approved for this audit run.', approvalFailed: 'Could not approve all fixes.', approvalSafety: 'This is the only approval. After you approve, SignalBoost AI prepares every supported safe fix, creates the protected internal pull request, waits for checks, merges automatically, verifies the result, and records what was fixed. No further action is required.',
-    pathLabel: 'Repository URL', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
-    filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
-    remediatedClean: 'No active findings remain — all approved findings were fixed and verified.',
-    emptyHint: 'Set a path and run a scan, or pick a past run.',
-    ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed', quotaExceeded: 'Monthly limit reached: {used}/{cap} scans used. Upgrade your plan to run more.',
-    category: 'Category', recommendation: 'Recommendation', line: 'Line',
-    history: 'Run history', noRuns: 'No runs yet.', refresh: 'Refresh',
-    statusRunning: 'Running', statusComplete: 'Complete', statusApproved: 'Approved', statusFailed: 'Failed',
-    detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
-    trackScan: 'Scanning target', trackAnalyze: 'Running analyzers', trackReport: 'Generating report', trackPrs: 'Preparing patches',
-    cmdTitle: 'Audit Command Center', reportsTitle: 'Compliance & Readiness Reports',
-    reportsSubtitle: 'Twelve readiness reports across identity, providers, secrets, code, billing, and remediation.',
-    openReport: 'View', reportOwnerOnly: 'These readiness reports are scoped to the workspace owner. Upgrade your plan to generate reports for your own connected stack.',
-    reportSyncHint: 'Synced with your latest scan.',
-    mvpBadge: 'MVP', viewOnline: 'View online',
-    runningHint: 'Large scopes can take a few minutes — this stays live, keep the tab open.', pathHint: 'Paste a public GitHub repo URL, e.g. https://github.com/owner/repo',
-    sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
+    title: uiCopy('u_abe346381f79e154'), subtitle: uiCopy('u_850990aa62cb3956'),
+    viewPlans: uiCopy('u_63f5b4e7692739cb'),
+    approveAllFixes: uiCopy('u_fff32c1de6de76a8'), approvingAllFixes: uiCopy('u_a495b701956c39ad'), approvedAllFixes: uiCopy('u_99a77031e5f307db'), approvalFailed: uiCopy('u_40cb22ff7cf05b06'), approvalSafety: uiCopy('u_a8d851761ddebf72'),
+    pathLabel: uiCopy('u_29af571b1a45bf00'), maxLabel: uiCopy('u_780fda97fa4de79d'), run: uiCopy('u_d4a30db2ca1d2bce'), running: uiCopy('u_32eb19f76b973c96'),
+    filesScanned: uiCopy('u_bedaee3eb3daf8f4'), findings: uiCopy('u_daa0e8be656c762b'), clean: uiCopy('u_79f1048f2b8280f3'),
+    remediatedClean: uiCopy('u_46b3c2b27e3c6868'),
+    emptyHint: uiCopy('u_e2e673ded5f1c062'),
+    ownerOnly: uiCopy('u_e5a513305926b2de'), failed: uiCopy('u_ffddeba7c82c7a6f'), quotaExceeded: uiCopy('u_31ebf3a220be78a3'),
+    category: uiCopy('u_62bec507ad5d1c16'), recommendation: uiCopy('u_18ca22593ceea125'), line: uiCopy('u_180867603bc6f15f'),
+    history: uiCopy('u_a8cbffe616fcabe9'), noRuns: uiCopy('u_db639e042bc61d17'), refresh: uiCopy('u_b1aea919a7d8c025'),
+    statusRunning: uiCopy('u_66a3d383ab8f5c25'), statusComplete: uiCopy('u_b77e262ba03403fb'), statusApproved: uiCopy('u_bc607d3f8d6bb451'), statusFailed: uiCopy('u_b7f0bb2911aab014'),
+    detail: uiCopy('u_957ad8c5f49f2055'), close: uiCopy('u_f7a4698e00879f9c'), viewSource: uiCopy('u_b314ede958342833'),
+    trackScan: uiCopy('u_97e8a29dbeb4e606'), trackAnalyze: uiCopy('u_fc3ee9f17af1a994'), trackReport: uiCopy('u_c87ffe7ce272a027'), trackPrs: uiCopy('u_71bc4bf8382658e8'),
+    cmdTitle: uiCopy('u_447d83a74a477e42'), reportsTitle: uiCopy('u_f6e951a72bf9bacd'),
+    reportsSubtitle: uiCopy('u_c6f25feaea803565'),
+    openReport: uiCopy('u_312a72f56fa8bcc0'), reportOwnerOnly: uiCopy('u_272236b0e24c7416'),
+    reportSyncHint: uiCopy('u_d170c1a7f714b034'),
+    mvpBadge: uiCopy('u_bd076f7e0d5a1d5f'), viewOnline: uiCopy('u_9533aabf698bf4f3'),
+    runningHint: uiCopy('u_b7234a95d507607b'), pathHint: uiCopy('u_bf746a22563ed573'),
+    sev: { critical: uiCopy('u_b395c55ce3e1253f'), high: uiCopy('u_a940a83d1b51d669'), medium: uiCopy('u_b12f9d76a0cd3ea9'), low: uiCopy('u_fbdd598e582d90ee'), info: uiCopy('u_61e9e775f21fcb24') },
   },
   es: {
     title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
@@ -186,18 +188,18 @@ function copyFor(lang: string): AuditCopy { return COPY[lang] || COPY.en }
 // The 12 compliance reports. `key` maps to the live report page at /hub/audit/<key>.
 type ReportCard = { key: string; icon: string; title: string; desc: string; mvp?: boolean }
 const REPORTS: ReportCard[] = [
-  { key: 'executive',   icon: '📑', title: 'Executive Risk Summary',      desc: 'Synthesized markdown brief: posture, top risks, and the bottom line.', mvp: true },
-  { key: 'providers',   icon: '📦', title: 'Provider Inventory',          desc: 'Stripe, Vercel, Supabase, and GitHub connection status & risk.', mvp: true },
-  { key: 'identity',    icon: '👤', title: 'Identity & Access Review',     desc: 'User access controls, owner rights, stale accounts, and MFA gaps.', mvp: true },
-  { key: 'secrets',     icon: '🔑', title: 'Secrets & API Key Exposure',   desc: 'Hardcoded credentials, token rotation age, and exposure risk.', mvp: true },
-  { key: 'remediation', icon: '🛠️', title: 'Remediation Roadmap',         desc: 'The actionable fix engine: prioritized fixes, owners, due dates.', mvp: true },
-  { key: 'github',      icon: '🐙', title: 'GitHub / Code Change Report',  desc: 'Branch protection, open PRs, stale branches, unreviewed changes.' },
-  { key: 'vercel',      icon: '▲',  title: 'Vercel / Env Var Report',      desc: 'Env vars, exposed variables, deployment and rollback status.' },
-  { key: 'supabase',    icon: '🗄️', title: 'Supabase / Database Security', desc: 'RLS coverage, public tables, storage buckets, service-role use.' },
-  { key: 'stripe',      icon: '💳', title: 'Stripe / Billing Configuration', desc: 'Products, prices, webhooks, and live vs test mode consistency.' },
-  { key: 'pr-cockpit',  icon: '🔀', title: 'PR Cockpit Approval Trail',    desc: 'Infrastructure change requests, approvals, and merge results.' },
-  { key: 'compliance',  icon: '⚖️', title: 'Compliance Readiness Matrix',  desc: 'SOC 2 / ISO 27001 / NIST CSF / CIS readiness — no certification claims.' },
-  { key: 'activity',    icon: '🧾', title: 'Audit Log Export',            desc: 'Activity timeline of actions, providers, risk, and results.' },
+  { key: 'executive',   icon: '📑', title: uiCopy('u_c3e6b0cec7dc9541'),      desc: 'Synthesized markdown brief: posture, top risks, and the bottom line.', mvp: true },
+  { key: 'providers',   icon: '📦', title: uiCopy('u_daca4bc8ffb058bf'),          desc: 'Stripe, Vercel, Supabase, and GitHub connection status & risk.', mvp: true },
+  { key: 'identity',    icon: '👤', title: uiCopy('u_4c3d70d7768b1a34'),     desc: 'User access controls, owner rights, stale accounts, and MFA gaps.', mvp: true },
+  { key: 'secrets',     icon: '🔑', title: uiCopy('u_135f22da7617dd8d'),   desc: 'Hardcoded credentials, token rotation age, and exposure risk.', mvp: true },
+  { key: 'remediation', icon: '🛠️', title: uiCopy('u_ed82ca10b005267e'),         desc: 'The actionable fix engine: prioritized fixes, owners, due dates.', mvp: true },
+  { key: 'github',      icon: '🐙', title: uiCopy('u_c9aa515f03be6c2e'),  desc: 'Branch protection, open PRs, stale branches, unreviewed changes.' },
+  { key: 'vercel',      icon: '▲',  title: uiCopy('u_a808aa20bff76c7e'),      desc: 'Env vars, exposed variables, deployment and rollback status.' },
+  { key: 'supabase',    icon: '🗄️', title: uiCopy('u_f212a77f23bab9a5'), desc: 'RLS coverage, public tables, storage buckets, service-role use.' },
+  { key: 'stripe',      icon: '💳', title: uiCopy('u_6ceff88cbddd4ece'), desc: 'Products, prices, webhooks, and live vs test mode consistency.' },
+  { key: 'pr-cockpit',  icon: '🔀', title: uiCopy('u_be2ab9cb428db1f4'),    desc: 'Infrastructure change requests, approvals, and merge results.' },
+  { key: 'compliance',  icon: '⚖️', title: uiCopy('u_d034e42f9a6c7580'),  desc: 'SOC 2 / ISO 27001 / NIST CSF / CIS readiness — no certification claims.' },
+  { key: 'activity',    icon: '🧾', title: uiCopy('u_c63c48ffed43600f'),            desc: 'Activity timeline of actions, providers, risk, and results.' },
 ]
 
 const SEV_ORDER: Sev[] = ['critical', 'high', 'medium', 'low', 'info']
@@ -498,7 +500,7 @@ export default function AuditCenterPage() {
               <input
                 value={prefix}
                 onChange={e => setPrefix(e.target.value)}
-                placeholder="https://github.com/owner/repo"
+                placeholder={uiCopy('u_fe975fb81a163a04')}
                 className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
               />
               <span className="text-[10.5px] leading-snug text-text-muted/80">{copy.pathHint}</span>
@@ -534,7 +536,7 @@ export default function AuditCenterPage() {
               <div className="h-full w-1/3 rounded-full bg-accent" style={{ animation: 'sbIndet 1.15s ease-in-out infinite' }} />
             </div>
             <p className="mt-2 text-[11.5px] leading-relaxed text-text-muted">{copy.runningHint}</p>
-            <style>{`@keyframes sbIndet{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}`}</style>
+            <style>{uiCopy('u_29a831c1a8fd3839')}</style>
           </div>
         )}
 
@@ -717,15 +719,15 @@ export default function AuditCenterPage() {
             {openReport.key === 'pr-cockpit' ? (
               <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4 rounded-md border border-border bg-bg p-6">
                 <span className="text-2xl" aria-hidden>🔀</span>
-                <p className="text-sm leading-relaxed text-text-muted">{t('audit.center.prCockpitPending', 'The PR Cockpit approval trail — infrastructure change requests, approvals, and merge results — lives in the Hub PR Cockpit. A dedicated report view is being wired to that data.')}</p>
-                <a href="/hub" className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">{t('audit.center.openCockpit', 'Open PR Cockpit')}</a>
+                <p className="text-sm leading-relaxed text-text-muted">{t('audit.center.prCockpitPending', uiCopy('u_90c7b380e310b6aa'))}</p>
+                <a href="/hub" className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">{t('audit.center.openCockpit', uiCopy('u_cc552d94c5e8d818'))}</a>
               </div>
             ) : isAdmin ? (
               <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-bg">
                 {(() => {
                   const ReportView = REPORT_VIEWS[openReport.key]
                   return ReportView ? (
-                    <Suspense fallback={<div className="p-6 text-sm text-text-muted">{t('audit.center.loading', 'Loading report…')}</div>}>
+                    <Suspense fallback={<div className="p-6 text-sm text-text-muted">{t('audit.center.loading', uiCopy('u_d9dd4c4eda45f942'))}</div>}>
                       <ReportView key={refreshTick} />
                     </Suspense>
                   ) : null

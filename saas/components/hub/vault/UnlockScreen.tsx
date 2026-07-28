@@ -7,6 +7,8 @@
 import { useState } from 'react'
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export type UnlockScreenProps = {
   onUnlock: (sessionId: string) => void
@@ -35,7 +37,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setError('')
 
     if (!password.trim()) {
-      setError(t('console.vaultx.unlock.errPasswordRequired', 'Password is required'))
+      setError(t('console.vaultx.unlock.errPasswordRequired', uiCopy('u_6285206ffb3aa0ad')))
       return
     }
 
@@ -58,7 +60,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       const data = await response.json()
 
       if (!data.ok) {
-        setError(data.error || 'Failed to start TOTP')
+        setError(data.error || uiCopy('u_67aa93969bb3daca'))
         return
       }
 
@@ -86,7 +88,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setError('')
 
     if (!totpCode.trim() || totpCode.length !== 6) {
-      setError(t('console.vaultx.unlock.errInvalidCode', 'Enter a valid 6-digit code'))
+      setError(t('console.vaultx.unlock.errInvalidCode', uiCopy('u_1c9d35cc41c48818')))
       return
     }
 
@@ -103,7 +105,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       const data = await response.json()
 
       if (!data.ok) {
-        setError(data.error || 'Invalid code')
+        setError(data.error || uiCopy('u_d3810a634d4ed700'))
         setTotpCode('')
         setIsVerifying(false)
         return
@@ -123,7 +125,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setError('')
 
     if (!totpCode.trim() || totpCode.length !== 6) {
-      setError(t('console.vaultx.unlock.errInvalidCode', 'Enter a valid 6-digit code'))
+      setError(t('console.vaultx.unlock.errInvalidCode', uiCopy('u_be93f7a33be923ae')))
       return
     }
 
@@ -140,7 +142,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       const data = await response.json()
 
       if (!data.ok) {
-        setError(data.error || 'Invalid code')
+        setError(data.error || uiCopy('u_e4fd4e12a2d6408e'))
         setTotpCode('')
         setIsVerifying(false)
         return
@@ -200,7 +202,7 @@ const handleGoBack = () => {
           gap: 6,
         }}
       >
-        ↻ {t('console.vaultx.unlock.refresh', 'Refresh')}
+        ↻ {t('console.vaultx.unlock.refresh', uiCopy('u_2f15700e2189925c'))}
       </button>
 
       <div
@@ -215,16 +217,16 @@ const handleGoBack = () => {
       >
         {/* Header */}
         <div>
-          <div style={labelStyle}>{t('console.vaultx.unlock.secureAccess', 'Secure Access Required')}</div>
+          <div style={labelStyle}>{t('console.vaultx.unlock.secureAccess', uiCopy('u_99627f0ddeeae358'))}</div>
           <h2 style={{ margin: '6px 0 2px', fontSize: 18, fontWeight: 900 }}>
-            {step === 'password' && t('console.vaultx.unlock.unlockVault', 'Unlock Vault')}
-            {step === 'totp-setup' && t('console.vaultx.unlock.enable2fa', 'Enable 2FA')}
-            {step === 'totp-verify' && t('console.vaultx.unlock.enter2faCode', 'Enter 2FA Code')}
+            {step === 'password' && t('console.vaultx.unlock.unlockVault', uiCopy('u_9ecb8319eb12f748'))}
+            {step === 'totp-setup' && t('console.vaultx.unlock.enable2fa', uiCopy('u_d0107f9e3555fb46'))}
+            {step === 'totp-verify' && t('console.vaultx.unlock.enter2faCode', uiCopy('u_2514b4fcc659833d'))}
           </h2>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
-            {step === 'password' && t('console.vaultx.unlock.enterPassword', 'Enter your password')}
-            {step === 'totp-setup' && t('console.vaultx.unlock.scanQr', 'Scan QR code with Google Authenticator')}
-            {step === 'totp-verify' && t('console.vaultx.unlock.sessionExpire', 'This session will expire in 30 minutes for security.')}
+            {step === 'password' && t('console.vaultx.unlock.enterPassword', uiCopy('u_2fd805cf1463717e'))}
+            {step === 'totp-setup' && t('console.vaultx.unlock.scanQr', uiCopy('u_5fda67426d49cb5e'))}
+            {step === 'totp-verify' && t('console.vaultx.unlock.sessionExpire', uiCopy('u_90835902f502d9fc'))}
           </p>
         </div>
 {/* Password Step */}
@@ -232,7 +234,7 @@ const handleGoBack = () => {
           <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                {t('console.vaultx.unlock.password', 'Password')}
+                {t('console.vaultx.unlock.password', uiCopy('u_fdc3d94d047d98da'))}
               </label>
               <input
                 type="password"
@@ -274,7 +276,7 @@ const handleGoBack = () => {
                 opacity: isLoading ? 0.6 : 1,
               }}
             >
-              {isLoading ? t('console.vaultx.unlock.verifying', 'Verifying...') : t('console.vaultx.unlock.continue', 'Continue')}
+              {isLoading ? t('console.vaultx.unlock.verifying', uiCopy('u_60ee2c8114c651ed')) : t('console.vaultx.unlock.continue', uiCopy('u_ba6635010dd1b4a6'))}
             </button>
           </form>
         )}
@@ -285,17 +287,17 @@ const handleGoBack = () => {
             <div style={{ textAlign: 'center' }}>
               <img
                 src={totpSetup.qrCodeUrl}
-                alt="TOTP QR Code"
+                alt={uiCopy('u_faec7b10e9e2512f')}
                 style={{ width: 200, height: 200, borderRadius: 10, border: '2px solid rgba(26,240,255,.2)' }}
               />
               <p style={{ margin: '12px 0 0', fontSize: 11, color: 'rgba(255,255,255,.6)' }}>
-                {t('console.vaultx.unlock.scanAuthApps', 'Scan with Google Authenticator, Microsoft Authenticator, or Authy')}
+                {t('console.vaultx.unlock.scanAuthApps', uiCopy('u_c8c98447aa1e2e4f'))}
               </p>
             </div>
 
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                {t('console.vaultx.unlock.enter6digit', 'Enter 6-digit code to confirm')}
+                {t('console.vaultx.unlock.enter6digit', uiCopy('u_0f426467c621a5ed'))}
               </label>
               <input
                 type="text"
@@ -328,7 +330,7 @@ width: '100%',
 
             <div style={{ borderRadius: 8, background: 'rgba(255,193,0,.1)', border: '1px solid rgba(255,193,0,.2)', padding: 10 }}>
               <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,193,0,.8)', lineHeight: 1.5 }}>
-                <strong>{t('console.vaultx.unlock.saveBackup', 'Save these backup codes:')}</strong>
+                <strong>{t('console.vaultx.unlock.saveBackup', uiCopy('u_3563a66cb7c3a3f5'))}</strong>
                 <br />
                 {totpSetup.backupCodes.join(', ')}
               </p>
@@ -352,7 +354,7 @@ width: '100%',
                   opacity: isVerifying ? 0.5 : 1,
                 }}
               >
-                {t('console.vaultx.unlock.back', 'Back')}
+                {t('console.vaultx.unlock.back', uiCopy('u_68db7f6af7305d31'))}
               </button>
               <button
                 type="submit"
@@ -370,7 +372,7 @@ width: '100%',
                   opacity: isVerifying || totpCode.length !== 6 ? 0.6 : 1,
                 }}
               >
-                {isVerifying ? t('console.vaultx.unlock.verifying', 'Verifying...') : t('console.vaultx.unlock.unlock', 'Unlock')}
+                {isVerifying ? t('console.vaultx.unlock.verifying', uiCopy('u_7dce98b312a0e332')) : t('console.vaultx.unlock.unlock', uiCopy('u_105d38585b32fcc6'))}
               </button>
             </div>
           </form>
@@ -381,7 +383,7 @@ width: '100%',
           <form onSubmit={handleTOTPVerify} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                {t('console.vaultx.unlock.twofaCode', '2FA Code')}
+                {t('console.vaultx.unlock.twofaCode', uiCopy('u_5863ab8b7c106219'))}
               </label>
               <input
                 type="text"
@@ -430,7 +432,7 @@ width: '100%',
                   opacity: isVerifying ? 0.5 : 1,
                 }}
               >
-                {t('console.vaultx.unlock.back', 'Back')}
+                {t('console.vaultx.unlock.back', uiCopy('u_aa5c34c95a81b18c'))}
               </button>
               <button
                 type="submit"
@@ -448,7 +450,7 @@ width: '100%',
                   opacity: isVerifying || totpCode.length !== 6 ? 0.6 : 1,
                 }}
               >
-                {isVerifying ? t('console.vaultx.unlock.verifying', 'Verifying...') : t('console.vaultx.unlock.unlock', 'Unlock')}
+                {isVerifying ? t('console.vaultx.unlock.verifying', uiCopy('u_397bfc6f4e3cb96e')) : t('console.vaultx.unlock.unlock', uiCopy('u_0940364073fc66bd'))}
               </button>
             </div>
           </form>

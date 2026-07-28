@@ -6,6 +6,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { EnterpriseLaunchpadConfigurator, type LaunchpadApprovalPackage, type LaunchpadWorkspace } from './EnterpriseLaunchpadConfigurator.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Step = { label: string; description: string; href: string }
 type Props = { workspace: LaunchpadWorkspace; badge: string; title: string; subtitle: string; steps: Step[] }
@@ -40,7 +42,7 @@ export function EnterpriseLaunchpadPath({ workspace, badge, title, subtitle, ste
 
   const completed = done.filter(Boolean).length
   return <main style={{ maxWidth: 920, margin: '0 auto', display: 'grid', gap: 16 }}>
-    <Link href="/dashboard/launchpad" style={{ color: 'rgba(255,255,255,.55)', textDecoration: 'none', fontSize: 13 }}>← Back to Launchpad</Link>
+    <Link href="/dashboard/launchpad" style={{ color: 'rgba(255,255,255,.55)', textDecoration: 'none', fontSize: 13 }}>{uiCopy('u_354e8ba09302374d')}</Link>
     <header className="sb-console" style={{ margin: 0 }}>
       <span className="sb-eyebrow">{badge}</span>
       <h1 style={{ margin: '6px 0', fontSize: 24 }}>{title}</h1>
@@ -50,15 +52,15 @@ export function EnterpriseLaunchpadPath({ workspace, badge, title, subtitle, ste
     {approval && <section aria-live="polite" style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20 }}><LocalizedText fallback={"Approved launch path"} /></h2>
+          <h2 style={{ margin: 0, fontSize: 20 }}><LocalizedText fallback={uiCopy('u_dc1398d1093766c6')} /></h2>
           <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,.55)', fontSize: 13 }}>{approval.organization} · {approval.industry}</p>
         </div>
-        <strong style={{ color: '#ffc300' }}>{completed}/{steps.length} complete</strong>
+        <strong style={{ color: '#ffc300' }}>{completed}/{steps.length}{uiCopy('u_2b153ca78a78d14e')}</strong>
       </div>
       {steps.map((step, index) => <article key={step.href} style={{ display: 'grid', gridTemplateColumns: '34px minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: 12, border: '1px solid rgba(255,255,255,.09)', borderRadius: 14 }}>
         <button type="button" onClick={() => toggle(index)} aria-label={`${done[index] ? 'Mark incomplete' : 'Mark complete'}: ${step.label}`} style={{ width: 30, height: 30, borderRadius: 999, border: done[index] ? '1px solid #86efac' : '1px solid rgba(255,255,255,.3)', background: done[index] ? '#86efac' : 'transparent', color: done[index] ? '#05210f' : '#fff', fontWeight: 900 }}>{done[index] ? '✓' : index + 1}</button>
         <div><strong style={{ display: 'block', color: done[index] ? '#86efac' : '#fff' }}>{step.label}</strong><span style={{ color: 'rgba(255,255,255,.55)', fontSize: 13 }}>{step.description}</span></div>
-        <Link href={`${step.href}?source=${encodeURIComponent(approval.sourceUrl)}`} style={{ padding: '9px 13px', borderRadius: 10, background: '#ffc300', color: '#1a1300', fontWeight: 900, textDecoration: 'none', whiteSpace: 'nowrap' }}>Open →</Link>
+        <Link href={`${step.href}?source=${encodeURIComponent(approval.sourceUrl)}`} style={{ padding: '9px 13px', borderRadius: 10, background: '#ffc300', color: '#1a1300', fontWeight: 900, textDecoration: 'none', whiteSpace: 'nowrap' }}>{uiCopy('u_52128470f4ba66e8')}</Link>
       </article>)}
     </section>}
   </main>

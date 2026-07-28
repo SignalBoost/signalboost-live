@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslation } from "@/components/i18n/useTranslation";
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 interface Props {
   usedCredits: number;
@@ -22,7 +24,7 @@ export default function CreditUsage({
 
   return (
     <div className="rounded-2xl border border-white/10 bg-[#111722]/80 p-4">
-      <h3 className="mb-2 text-sm font-black text-yellow-400">{t('credits.usage.title', 'Credit Usage')}</h3>
+      <h3 className="mb-2 text-sm font-black text-yellow-400">{t('credits.usage.title', uiCopy('u_5e88e5a79ce5d6ea'))}</h3>
 
       <div className="h-3 w-full rounded-full bg-gray-800">
         <div
@@ -38,20 +40,20 @@ export default function CreditUsage({
       </div>
 
       <p className="mt-2 text-xs text-gray-300">
-        {usedCredits} / {totalCredits} {t('credits.usage.used', 'credits used')}
+        {usedCredits} / {totalCredits} {t('credits.usage.used', uiCopy('u_81eff03d1a01f54f'))}
       </p>
 
       {isWarning && (
         <p className="mt-2 text-xs text-orange-400">
-          {t('credits.usage.warning', 'Over 80% used. Consider upgrading.')}
+          {t('credits.usage.warning', uiCopy('u_f5d75f283453a5fa'))}
         </p>
       )}
 
       {isCritical && (
         <p className="mt-2 text-xs font-bold text-red-400">
           {autoTopUpEnabled
-            ? t('credits.usage.autoTopup', 'Auto top-up will add more credits.')
-            : t('credits.usage.limitReached', 'Credit limit reached.')}
+            ? t('credits.usage.autoTopup', uiCopy('u_7187c2a332734c92'))
+            : t('credits.usage.limitReached', uiCopy('u_6bc31bcf3271ce87'))}
         </p>
       )}
     </div>

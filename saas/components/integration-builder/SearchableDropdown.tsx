@@ -4,9 +4,11 @@
 import { useId, useMemo, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import type { Option } from './mockApi.ts'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const COPY = {
-  en: { select: 'Select an option', search: 'Search metadata', done: 'Done' },
+  en: { select: uiCopy('u_13c90768879af58e'), search: uiCopy('u_1c74b2f0bfe4b2a2'), done: uiCopy('u_89c306614cd125af') },
   es: { select: 'Selecciona una opción', search: 'Buscar metadatos', done: 'Listo' },
   pt: { select: 'Selecione uma opção', search: 'Pesquisar metadados', done: 'Concluído' },
   pl: { select: 'Wybierz opcję', search: 'Szukaj metadanych', done: 'Gotowe' },

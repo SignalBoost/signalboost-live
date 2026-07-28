@@ -2,17 +2,19 @@
 
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<Lang, Record<string, string>> = {
   en: {
-    eyebrow: 'Creative Studio', title: 'Creative Studio',
-    subtitle: 'Generate professional promo banners and campaign visuals powered by AI.',
-    promptLabel: 'Describe the image you want',
-    promptPlaceholder: 'e.g. A vibrant promo banner for a São Paulo coffee shop, warm tones, people laughing, cinematic lighting',
-    aspect: 'Shape', landscape: 'Landscape (16:9)', square: 'Square (1:1)', portrait: 'Portrait (4:5)',
-    generate: 'Generate image', generating: 'Generating…', download: 'Download image', again: 'Generate another',
-    empty: 'Your generated image will appear here.', errorGeneric: 'Something went wrong. Please try again.',
+    eyebrow: uiCopy('u_5c163a620e24715e'), title: uiCopy('u_48b76241d9ad5740'),
+    subtitle: uiCopy('u_24345bde15c77352'),
+    promptLabel: uiCopy('u_1bc7e6cc689a0ea6'),
+    promptPlaceholder: uiCopy('u_43906ae57b18c8f0'),
+    aspect: uiCopy('u_e5acd2507e52c9ec'), landscape: uiCopy('u_02412ff39eae5a3b'), square: uiCopy('u_34cf437e57985b7a'), portrait: uiCopy('u_ec366f18fdb7f4c7'),
+    generate: uiCopy('u_b790afed9d298de3'), generating: uiCopy('u_c865a1549eaa6f39'), download: uiCopy('u_4ac02cd04f33cc2b'), again: uiCopy('u_8b0f8bd64103fcbb'),
+    empty: uiCopy('u_0d74e0f96b6ba8cf'), errorGeneric: uiCopy('u_256378ae428c2473'),
   },
   es: {
     eyebrow: 'Estudio Creativo', title: 'Estudio Creativo',

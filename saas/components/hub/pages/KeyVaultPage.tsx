@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { PageProps, Lang, c, TONES, Tone, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Band, Status } from '../shared.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const V: Record<string, Record<Lang, string>> = {
   mySafe:      { en: 'My Safe', es: 'Mi Caja Fuerte', pt: 'Meu Cofre', pl: 'Mój Sejf', ru: 'Мой сейф' },
@@ -59,11 +61,11 @@ function toneFor(provider: string): Tone { return PROVIDER_TONES[provider.toLowe
 
 type ProviderGroup = { key: string; title: string; icon: string; tone: Tone; prefixes: string[] }
 const GROUPS: ProviderGroup[] = [
-  { key: 'supabase', title: 'Supabase', icon: '🗄️', tone: TONES.green,  prefixes: ['SUPABASE', 'NEXT_PUBLIC_SUPABASE'] },
-  { key: 'stripe',   title: 'Stripe',   icon: '💳', tone: TONES.blue,   prefixes: ['STRIPE'] },
-  { key: 'vercel',   title: 'Vercel',   icon: '🌐', tone: TONES.purple, prefixes: ['VERCEL'] },
-  { key: 'openai',   title: 'OpenAI',   icon: '🤖', tone: TONES.cyan,   prefixes: ['OPENAI'] },
-  { key: 'github',   title: 'GitHub',   icon: '🐙', tone: TONES.gray,   prefixes: ['GITHUB'] },
+  { key: 'supabase', title: uiCopy('u_bd18cce139a353a9'), icon: '🗄️', tone: TONES.green,  prefixes: ['SUPABASE', 'NEXT_PUBLIC_SUPABASE'] },
+  { key: 'stripe',   title: uiCopy('u_3aea295ff04fc0aa'),   icon: '💳', tone: TONES.blue,   prefixes: ['STRIPE'] },
+  { key: 'vercel',   title: uiCopy('u_802b2ad5db5c32ce'),   icon: '🌐', tone: TONES.purple, prefixes: ['VERCEL'] },
+  { key: 'openai',   title: uiCopy('u_39ae86805674c307'),   icon: '🤖', tone: TONES.cyan,   prefixes: ['OPENAI'] },
+  { key: 'github',   title: uiCopy('u_c33c985939dea16e'),   icon: '🐙', tone: TONES.gray,   prefixes: ['GITHUB'] },
   { key: 'other',    title: '',         icon: '🧩', tone: TONES.gold,   prefixes: [] },
 ]
 function groupFor(name: string): string {
@@ -361,10 +363,10 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       <section style={{ flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800 }}>🔐 {v('mySafe', lang)}</div>
-            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v('safeSub', lang)}</div>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>🔐 {v(uiCopy('u_696e9e9690d59058'), lang)}</div>
+            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v(uiCopy('u_fe7ccc8ca32d7842'), lang)}</div>
           </div>
-          <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
+          <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v(uiCopy('u_0e1b39176c8af80f'), lang)}</button>
         </div>
 
         {safeError && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span><span style={{ flex: 1 }}>{safeError}</span><button onClick={() => setSafeError(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer' }}>×</button></div>}
@@ -374,12 +376,12 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
           <div style={{ position: 'relative', flex: 1, maxWidth: 440 }}>
             <button onClick={() => setDdOpen(o => !o)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 11, fontSize: 13.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: ddOpen ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.16)', color: selProvider ? '#fff' : 'rgba(255,255,255,.5)', textAlign: 'left' }}>
               <span style={{ fontSize: 16 }}>{selProvider ? (PROVIDERS.find(p => p.name === selProvider)?.icon || '🧩') : '🗂️'}</span>
-              <span style={{ flex: 1 }}>{selProvider || v('pickProv', lang)}</span>
+              <span style={{ flex: 1 }}>{selProvider || v(uiCopy('u_fde253e19841f262'), lang)}</span>
               <span style={{ color: 'rgba(255,255,255,.45)' }}>{ddOpen ? '▴' : '▾'}</span>
             </button>
             {ddOpen && (
               <div className="hub-panel" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid rgba(26,240,255,.35)', background: 'linear-gradient(180deg, rgba(15,23,42,.99), rgba(3,7,18,1))', boxShadow: '0 24px 60px rgba(0,0,0,.6)', padding: 8 }}>
-                {provList.length === 0 && <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{v('noProviders', lang)}</div>}
+                {provList.length === 0 && <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{v(uiCopy('u_10fe7d1bfc415bfa'), lang)}</div>}
                 {CAT_ORDER.map(cat => {
                   const inCat = provList.filter(p => (CATEGORY[p.provider] || 'Other') === cat)
                   if (inCat.length === 0) return null
@@ -401,12 +403,12 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
         </div>
         {selProvider && (
           <button onClick={refreshNow} disabled={safeLoading || refreshing} className="hub-btn" title={v('refreshBtn', lang)} style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', cursor: safeLoading || refreshing ? 'wait' : 'pointer', opacity: safeLoading || refreshing ? 0.6 : 1 }}>
-            {safeLoading || refreshing ? '⏳' : refreshFlash ? v('refreshed', lang) : v('refreshBtn', lang)}
+            {safeLoading || refreshing ? '⏳' : refreshFlash ? v(uiCopy('u_577c55c7223fc15d'), lang) : v(uiCopy('u_6cd5106e830cc7d9'), lang)}
           </button>
         )}
         </div>
 
-        {safeLoading && <div className="hub-loading" style={{ padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(26,240,255,.3)', background: 'rgba(26,240,255,.05)', fontSize: 12.5, color: '#1af0ff', marginBottom: 8 }}>⏳ {v('retrieving', lang)}</div>}
+        {safeLoading && <div className="hub-loading" style={{ padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(26,240,255,.3)', background: 'rgba(26,240,255,.05)', fontSize: 12.5, color: '#1af0ff', marginBottom: 8 }}>⏳ {v(uiCopy('u_9568bd9492aff773'), lang)}</div>}
 
         {(() => {
           const now = Date.now()
@@ -414,8 +416,8 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
           const nSoon = items.filter(i => i.expires_at && new Date(i.expires_at).getTime() >= now && new Date(i.expires_at).getTime() < now + 14 * DAY).length
           return (
             <>
-              {nExpired > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.5)', background: 'rgba(239,68,68,.1)', fontSize: 12.5, marginBottom: 8 }}><span>⛔</span>{nExpired} {v('expBannerRed', lang)}</div>}
-              {nSoon > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.08)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span>{nSoon} {v('expBannerYel', lang)}</div>}
+              {nExpired > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.5)', background: 'rgba(239,68,68,.1)', fontSize: 12.5, marginBottom: 8 }}><span>⛔</span>{nExpired} {v(uiCopy('u_0f0170382f8e3f47'), lang)}</div>}
+              {nSoon > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.08)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span>{nSoon} {v(uiCopy('u_eea3b35e396fceb8'), lang)}</div>}
             </>
           )
         })()}
@@ -432,7 +434,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                     <div style={{ fontSize: 14.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label} <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 12 }}>›</span></div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => shown ? hideKey(item.id) : revealKey(item.id)} title="Reveal" className="hub-chip" style={{ padding: '6px 10px', borderRadius: 9, fontSize: 14, background: shown ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.05)', border: shown ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.15)' }}>{shown ? '🙈' : '👁'}</button>
+                    <button onClick={() => shown ? hideKey(item.id) : revealKey(item.id)} title={uiCopy('u_16d2c7da59bac5f5')} className="hub-chip" style={{ padding: '6px 10px', borderRadius: 9, fontSize: 14, background: shown ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.05)', border: shown ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.15)' }}>{shown ? '🙈' : '👁'}</button>
                     <button onClick={() => setConfirmId(item.id)} title={v('deleteBtn', lang)} className="hub-chip" style={{ padding: '6px 10px', borderRadius: 9, fontSize: 13, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.35)', color: '#fca5a5' }}>🗑</button>
                   </div>
                 </div>
@@ -441,17 +443,17 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ ...monoStyle, fontSize: 12, wordBreak: 'break-all', padding: '8px 10px', borderRadius: 9, background: 'rgba(26,240,255,.06)', border: '1px solid rgba(26,240,255,.3)' }}>{shown}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button onClick={() => copyKey(item.id)} className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(26,240,255,.45)', background: 'rgba(26,240,255,.1)', color: '#1af0ff', fontSize: 12, fontWeight: 700 }}>{copiedId === item.id ? v('copied', lang) : v('copyBtn', lang)}</button>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v('hidesSoon', lang)} · {v('clipClears', lang)}</span>
+                      <button onClick={() => copyKey(item.id)} className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(26,240,255,.45)', background: 'rgba(26,240,255,.1)', color: '#1af0ff', fontSize: 12, fontWeight: 700 }}>{copiedId === item.id ? v(uiCopy('u_25a003163608cc46'), lang) : v(uiCopy('u_20a78452d3c44fb4'), lang)}</button>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v(uiCopy('u_39115581b631cb7b'), lang)} · {v(uiCopy('u_e49fe854cd33f29f'), lang)}</span>
                     </div>
                   </div>
                 )}
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v('lastUsed', lang)}: {fmtDate(item.last_accessed_at)}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v(uiCopy('u_b74a2948ab9aeb73'), lang)}: {fmtDate(item.last_accessed_at)}</div>
                 {item.expires_at && (() => {
                   const t = new Date(item.expires_at).getTime()
                   const expired = t < Date.now()
                   const soon = !expired && t < Date.now() + 14 * DAY
-                  return <div style={{ fontSize: 11, fontWeight: 700, color: expired ? '#fca5a5' : soon ? '#ffc300' : 'rgba(255,255,255,.45)' }}>{expired ? '⛔ ' + v('expired', lang) : (soon ? '⚠️ ' : '') + v('expires', lang) + ': ' + fmtDate(item.expires_at)}{soon && !expired ? ' · ' + v('expSoon', lang) : ''}</div>
+                  return <div style={{ fontSize: 11, fontWeight: 700, color: expired ? '#fca5a5' : soon ? '#ffc300' : 'rgba(255,255,255,.45)' }}>{expired ? '⛔ ' + v(uiCopy('u_9b033a73c13c2665'), lang) : (soon ? '⚠️ ' : '') + v(uiCopy('u_3a9e7f1d6432af65'), lang) + ': ' + fmtDate(item.expires_at)}{soon && !expired ? ' · ' + v(uiCopy('u_81ef5d303c7840bc'), lang) : ''}</div>
                 })()}
               </div>
             )
@@ -462,9 +464,9 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       {/* ── Activity timeline (vault_audit) ─────────────────────────── */}
       <section style={{ flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-          <div style={labelStyle}>{v('timelineT', lang)}</div>
-          {['all', 'add', 'reveal', 'copy', 'delete'].map(f => (
-            <button key={f} onClick={() => setTlFilter(f)} className="hub-chip" style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, textTransform: f === 'all' ? 'none' : 'lowercase', background: tlFilter === f ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.04)', border: tlFilter === f ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.12)', color: tlFilter === f ? '#1af0ff' : 'rgba(255,255,255,.55)' }}>{f === 'all' ? v('tlAll', lang) : f}</button>
+          <div style={labelStyle}>{v(uiCopy('u_8098a51f711320fa'), lang)}</div>
+          {[uiCopy('u_4919bb2c3df2ff05'), uiCopy('u_88fced4bc0773006'), uiCopy('u_dbd7876235d567d4'), uiCopy('u_0ba111fb0121ce2b'), uiCopy('u_36ea22f96f52c5a2')].map(f => (
+            <button key={f} onClick={() => setTlFilter(f)} className="hub-chip" style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, textTransform: f === 'all' ? 'none' : 'lowercase', background: tlFilter === f ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.04)', border: tlFilter === f ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.12)', color: tlFilter === f ? '#1af0ff' : 'rgba(255,255,255,.55)' }}>{f === 'all' ? v(uiCopy('u_757f7fb2baff3376'), lang) : f}</button>
           ))}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }} className="hub-panel">
@@ -482,7 +484,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
 
       {/* ── SECTION 2: Platform keys (Vercel mirror) ───────────────── */}
       <section style={{ flexShrink: 0 }}>
-        <div style={{ ...labelStyle, marginBottom: 8 }}>{v('platformKeys', lang)}</div>
+        <div style={{ ...labelStyle, marginBottom: 8 }}>{v(uiCopy('u_f570bc8ab9d188c4'), lang)}</div>
         {!loading && !configured && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(255,195,0,.45)', background: 'rgba(255,195,0,.07)', fontSize: 13 }}><span>⚠️</span>{c('vaultNeedsToken', lang)}</div>
         )}
@@ -553,16 +555,16 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
               <div style={{ ...monoStyle, fontSize: 13, padding: '10px 13px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>••••••••••••{item.last4}</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.55)' }}>{v('createdT', lang)}</span><span style={monoStyle}>{fmtDate(item.created_at)}</span></div>
-                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.55)' }}>{v('lastUsed', lang)}</span><span style={monoStyle}>{fmtDate(item.last_accessed_at)}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.55)' }}>{v(uiCopy('u_a8ad5a9e519b21c9'), lang)}</span><span style={monoStyle}>{fmtDate(item.created_at)}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.55)' }}>{v(uiCopy('u_0e23debafd6d5376'), lang)}</span><span style={monoStyle}>{fmtDate(item.last_accessed_at)}</span></div>
                 <div style={{ ...rowStyle, border: expired ? '1px solid rgba(239,68,68,.5)' : soon ? '1px solid rgba(255,195,0,.5)' : rowStyle.border }}>
-                  <span style={{ color: 'rgba(255,255,255,.55)' }}>{v('expires', lang)}</span>
+                  <span style={{ color: 'rgba(255,255,255,.55)' }}>{v(uiCopy('u_7e5bb0fd3cac0430'), lang)}</span>
                   <span style={{ ...monoStyle, color: expired ? '#fca5a5' : soon ? '#ffc300' : undefined }}>{item.expires_at ? (expired ? '⛔ ' : soon ? '⚠️ ' : '') + fmtDate(item.expires_at) : '—'}</span>
                 </div>
               </div>
 
               <div>
-                <div style={{ ...labelStyle, marginBottom: 7 }}>{v('historyT', lang)}</div>
+                <div style={{ ...labelStyle, marginBottom: 7 }}>{v(uiCopy('u_508e0cc677a0fa07'), lang)}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {history.map(a => (
                     <div key={a.id} style={{ ...rowStyle, gap: 10 }}>
@@ -571,13 +573,13 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                       <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'right' }}>{a.actor}</span>
                     </div>
                   ))}
-                  {history.length === 0 && <div style={{ ...rowStyle, color: 'rgba(255,255,255,.45)' }}>{v('noHistory', lang)}</div>}
+                  {history.length === 0 && <div style={{ ...rowStyle, color: 'rgba(255,255,255,.45)' }}>{v(uiCopy('u_d09d8d05b1c64ef9'), lang)}</div>}
                 </div>
               </div>
 
               <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {dash && <a href={dash} target="_blank" rel="noreferrer" className="hub-btn" style={{ display: 'block', textAlign: 'center', padding: '11px 14px', borderRadius: 11, border: `1px solid ${tone.border}`, background: tone.soft, color: '#fff', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>↗ {v('openDash', lang)}</a>}
-                <button onClick={() => setConfirmId(item.id)} className="hub-btn" style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.1)', color: '#fca5a5', fontSize: 13.5, fontWeight: 800 }}>🗑 {v('deleteBtn', lang)}</button>
+                {dash && <a href={dash} target="_blank" rel="noreferrer" className="hub-btn" style={{ display: 'block', textAlign: 'center', padding: '11px 14px', borderRadius: 11, border: `1px solid ${tone.border}`, background: tone.soft, color: '#fff', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>↗ {v(uiCopy('u_9d27609e224616e1'), lang)}</a>}
+                <button onClick={() => setConfirmId(item.id)} className="hub-btn" style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.1)', color: '#fca5a5', fontSize: 13.5, fontWeight: 800 }}>🗑 {v(uiCopy('u_ec35144b4fc82ae7'), lang)}</button>
               </div>
             </div>
           </div>
@@ -588,9 +590,9 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       {showAdd && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(3,7,18,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }} onClick={() => !savingKey && setShowAdd(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px, 100%)', borderRadius: 16, border: '1px solid rgba(255,195,0,.4)', background: 'linear-gradient(160deg, rgba(15,23,42,.97), rgba(3,7,18,.99))', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 30px 80px rgba(0,0,0,.6)' }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>🔐 {v('addKey', lang).replace('+ ', '')}</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>🔐 {v(uiCopy('u_17e34574906ba766'), lang).replace('+ ', '')}</div>
             <div>
-              <div style={{ ...labelStyle, marginBottom: 5 }}>{v('provider', lang)}</div>
+              <div style={{ ...labelStyle, marginBottom: 5 }}>{v(uiCopy('u_b4674c2e454ac736'), lang)}</div>
               {!customP && fProvider && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderRadius: 10, border: '1px solid rgba(255,195,0,.55)', background: 'rgba(255,195,0,.1)', fontSize: 14, fontWeight: 800, color: '#ffc300' }}>
@@ -598,7 +600,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                     {fProvider}
                     <span style={{ marginLeft: 'auto', color: '#86efac' }}>✓</span>
                   </div>
-                  <button onClick={() => { setFProvider(''); setPSearch('') }} className="hub-chip" style={{ padding: '9px 14px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.65)', flexShrink: 0 }}>↩ Change</button>
+                  <button onClick={() => { setFProvider(''); setPSearch('') }} className="hub-chip" style={{ padding: '9px 14px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.65)', flexShrink: 0 }}>{uiCopy('u_654213bb2ad4344a')}</button>
                 </div>
               )}
               {!customP && !fProvider && (
@@ -608,43 +610,43 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                     {PROVIDERS.filter(p => p.name.toLowerCase().includes(pSearch.trim().toLowerCase())).map(p => (
                       <button key={p.name} onClick={() => { setFProvider(p.name); setPSearch(''); if (!fLabel) setFLabel(p.labels[0]) }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.12)', color: 'rgba(255,255,255,.7)' }}>{p.icon} {p.name}</button>
                     ))}
-                    <button onClick={() => { setCustomP(true); setFProvider('') }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px dashed rgba(255,255,255,.25)', color: 'rgba(255,255,255,.55)' }}>✏️ Custom…</button>
+                    <button onClick={() => { setCustomP(true); setFProvider('') }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px dashed rgba(255,255,255,.25)', color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_ed0414979fe37e54')}</button>
                   </div>
                 </>
               )}
               {customP && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={fProvider} onChange={e => setFProvider(e.target.value)} placeholder="Provider name" style={inputStyle} autoFocus />
+                  <input value={fProvider} onChange={e => setFProvider(e.target.value)} placeholder={uiCopy('u_248c14d8ee254af3')} style={inputStyle} autoFocus />
                   <button onClick={() => { setCustomP(false); setFProvider('') }} className="hub-chip" style={{ padding: '6px 12px', borderRadius: 10, fontSize: 12.5, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: 'rgba(255,255,255,.6)', flexShrink: 0 }}>↩</button>
                 </div>
               )}
             </div>
             <div>
-              <div style={{ ...labelStyle, marginBottom: 5 }}>{v('labelF', lang)}</div>
-              <input value={fLabel} onChange={e => setFLabel(e.target.value)} placeholder="Production API key" style={inputStyle} />
+              <div style={{ ...labelStyle, marginBottom: 5 }}>{v(uiCopy('u_91ce8e3a0075a011'), lang)}</div>
+              <input value={fLabel} onChange={e => setFLabel(e.target.value)} placeholder={uiCopy('u_081dd20514c66816')} style={inputStyle} />
               {(() => {
                 const sugg = PROVIDERS.find(p => p.name === fProvider)?.labels || []
                 if (sugg.length === 0) return null
                 return (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,.4)', alignSelf: 'center' }}>{v('suggest', lang)}:</span>
+                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,.4)', alignSelf: 'center' }}>{v(uiCopy('u_013d433e02888b1b'), lang)}:</span>
                     {sugg.map(s => (<button key={s} onClick={() => setFLabel(s)} className="hub-chip" style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11.5, background: 'rgba(26,240,255,.08)', border: '1px solid rgba(26,240,255,.3)', color: '#1af0ff' }}>{s}</button>))}
                   </div>
                 )
               })()}
             </div>
             <div>
-              <div style={{ ...labelStyle, marginBottom: 5 }}>{v('valueF', lang)}</div>
-              <input value={fValue} onChange={e => setFValue(e.target.value)} type="password" autoComplete="off" placeholder="sk-…" style={inputStyle} />
-              {formatLooksOff(fProvider, fValue) && <div style={{ display: 'flex', gap: 7, marginTop: 6, fontSize: 11.5, color: '#ffc300' }}><span>⚠️</span>{v('formatWarn', lang)}</div>}
+              <div style={{ ...labelStyle, marginBottom: 5 }}>{v(uiCopy('u_000deac05213addd'), lang)}</div>
+              <input value={fValue} onChange={e => setFValue(e.target.value)} type="password" autoComplete="off" placeholder={uiCopy('u_6a6b878ea391a21d')} style={inputStyle} />
+              {formatLooksOff(fProvider, fValue) && <div style={{ display: 'flex', gap: 7, marginTop: 6, fontSize: 11.5, color: '#ffc300' }}><span>⚠️</span>{v(uiCopy('u_e077b9eb1eef902a'), lang)}</div>}
             </div>
             <div>
-              <div style={{ ...labelStyle, marginBottom: 5 }}>{v('expiresF', lang)}</div>
+              <div style={{ ...labelStyle, marginBottom: 5 }}>{v(uiCopy('u_3ac47ccefaee647b'), lang)}</div>
               <input value={fExpires} onChange={e => setFExpires(e.target.value)} type="date" style={{ ...inputStyle, colorScheme: 'dark' }} />
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-              <button onClick={() => setShowAdd(false)} disabled={savingKey} className="hub-chip" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 700 }}>{v('cancel', lang)}</button>
-              <button onClick={addKey} disabled={savingKey || !fProvider.trim() || !fLabel.trim() || !fValue} className="hub-btn" style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(255,195,0,.55)', background: 'rgba(255,195,0,.16)', color: '#ffc300', fontSize: 13, fontWeight: 800, opacity: savingKey || !fProvider.trim() || !fLabel.trim() || !fValue ? .5 : 1 }}>{savingKey ? v('saving', lang) : v('save', lang)}</button>
+              <button onClick={() => setShowAdd(false)} disabled={savingKey} className="hub-chip" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 700 }}>{v(uiCopy('u_0a66347d6e9dc6e5'), lang)}</button>
+              <button onClick={addKey} disabled={savingKey || !fProvider.trim() || !fLabel.trim() || !fValue} className="hub-btn" style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(255,195,0,.55)', background: 'rgba(255,195,0,.16)', color: '#ffc300', fontSize: 13, fontWeight: 800, opacity: savingKey || !fProvider.trim() || !fLabel.trim() || !fValue ? .5 : 1 }}>{savingKey ? v(uiCopy('u_88216d8f3c6a0587'), lang) : v(uiCopy('u_30739a03dfebc7ab'), lang)}</button>
             </div>
           </div>
         </div>
@@ -654,11 +656,11 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       {confirmId && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(3,7,18,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }} onClick={() => setConfirmId(null)}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(400px, 100%)', borderRadius: 16, border: '1px solid rgba(239,68,68,.45)', background: 'linear-gradient(160deg, rgba(15,23,42,.97), rgba(3,7,18,.99))', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 30px 80px rgba(0,0,0,.6)' }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>🗑 {v('confirmTitle', lang)}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>{v('confirmBody', lang)}</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>🗑 {v(uiCopy('u_074e7ccff75720e3'), lang)}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>{v(uiCopy('u_2c0fec7fb76daf90'), lang)}</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-              <button onClick={() => setConfirmId(null)} className="hub-chip" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 700 }}>{v('cancel', lang)}</button>
-              <button onClick={() => deleteKey(confirmId)} className="hub-btn" style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(239,68,68,.55)', background: 'rgba(239,68,68,.16)', color: '#fca5a5', fontSize: 13, fontWeight: 800 }}>{v('deleteBtn', lang)}</button>
+              <button onClick={() => setConfirmId(null)} className="hub-chip" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 700 }}>{v(uiCopy('u_5938363ed8f40fe8'), lang)}</button>
+              <button onClick={() => deleteKey(confirmId)} className="hub-btn" style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(239,68,68,.55)', background: 'rgba(239,68,68,.16)', color: '#fca5a5', fontSize: 13, fontWeight: 800 }}>{v(uiCopy('u_1da5e61618c04855'), lang)}</button>
             </div>
           </div>
         </div>

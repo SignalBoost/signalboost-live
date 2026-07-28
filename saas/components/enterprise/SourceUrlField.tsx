@@ -2,6 +2,8 @@
 
 import { useId, useMemo } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Props = {
   label: string
@@ -23,8 +25,8 @@ type ValidationCopy = {
 
 const COPY = {
   en: {
-    validation: { required: 'Enter a website or GitHub URL.', protocol: 'Only HTTP and HTTPS URLs are supported.', publicUrl: 'Use a publicly accessible URL.', invalid: 'Enter a valid URL.' },
-    placeholder: 'https://example.com or https://github.com/org/repo', analyzing: 'Analyzing…', analyze: 'Analyze source', helper: 'The server will validate and extract metadata before using this source.',
+    validation: { required: uiCopy('u_20971c0ba4e2b646'), protocol: uiCopy('u_9a3da5d5c6ddbef0'), publicUrl: uiCopy('u_89ed741c22d77682'), invalid: uiCopy('u_65f043d25385285b') },
+    placeholder: uiCopy('u_ac0d42c49b4c57bb'), analyzing: uiCopy('u_ae5057940dbd1edb'), analyze: uiCopy('u_857d5834713134e0'), helper: uiCopy('u_fb30e43cc9019f49'),
   },
   es: {
     validation: { required: 'Ingresa la URL de un sitio web o de GitHub.', protocol: 'Solo se admiten URL HTTP y HTTPS.', publicUrl: 'Usa una URL de acceso público.', invalid: 'Ingresa una URL válida.' },

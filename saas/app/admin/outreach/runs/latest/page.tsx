@@ -1,14 +1,16 @@
 import AdminDrilldownPage from '@/components/admin/AdminDrilldownPage'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export default function Page() {
   return (
     <AdminDrilldownPage
-      title='Last Successful Outreach Run'
-      status='Monitoring'
-      action='Confirm the latest outreach run completed successfully and inspect delivery anomalies.'
+      title={uiCopy('u_cda6be7c10ec43f5')}
+      status={uiCopy('u_e90a1e9921d0db8f')}
+      action={uiCopy('u_649787610a3c4b14')}
       externalUrl={undefined}
       externalLabel={undefined}
-      events={[{ label: 'Last Successful Outreach Run', status: 'Monitoring', detail: 'Awaiting live event feed for this owner/admin drill-down.' }]}
+      events={[{ label: uiCopy('u_7a7f7064dac09830'), status: uiCopy('u_5d5d5eb70920d030'), detail: uiCopy('u_8f12e927d8894cfc') }]}
     />
   )
 }

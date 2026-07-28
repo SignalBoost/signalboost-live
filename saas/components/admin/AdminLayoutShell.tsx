@@ -7,6 +7,8 @@ import { supabase } from '@/utils/supabase/client'
 import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import CosaNotificationCenter from '@/components/admin/CosaNotificationCenter'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const nav = ADMIN_SIDEBAR
 
@@ -15,12 +17,12 @@ const nav = ADMIN_SIDEBAR
 // shared ADMIN_SIDEBAR data structure doesn't need to change.
 const COPY: Record<string, Record<string, any>> = {
   en: {
-    checkingAccess: 'Checking owner/admin access…',
-    ownerConsole: 'Owner Console', controlRoom: 'Control room',
-    controlRoomDesc: 'Overview, Logs, Outreach, Insights, Role Management, Marketplace Monitor, SaaS Monitor, and Concierge Monitor stay in one scan path.',
-    adminFlow: 'Admin flow', execPreview: 'Executive preview', ownerRestricted: 'Owner/admin restricted',
-    ownerRestrictedDesc: 'Financial, KPI, CRM, Outreach, Forecasting, and Concierge recommendations are restricted to owner/admin roles.',
-    nav: { 'Overview': 'Overview', 'Logs': 'Logs', 'Outreach': 'Outreach', 'Marketing + Sales': 'Marketing + Sales', 'Insights': 'Insights', 'Role Management': 'Role Management', 'Marketplace Monitor': 'Marketplace Monitor', 'SaaS Monitor': 'SaaS Monitor', 'Concierge Monitor': 'Concierge Monitor' },
+    checkingAccess: uiCopy('u_4439300654185c3e'),
+    ownerConsole: uiCopy('u_56143cf756a05d03'), controlRoom: uiCopy('u_d8627db551325aa8'),
+    controlRoomDesc: uiCopy('u_05c86d045aa6c92e'),
+    adminFlow: uiCopy('u_0f8a897f669d2cde'), execPreview: uiCopy('u_2a1ea5433e8c3ca4'), ownerRestricted: uiCopy('u_e612b82a91b89ca2'),
+    ownerRestrictedDesc: uiCopy('u_9d79f484e19783ef'),
+    nav: { 'Overview': uiCopy('u_bc5aabb255341c4b'), 'Logs': uiCopy('u_1aef1f2932a8beb8'), 'Outreach': uiCopy('u_b5223f1e29eb5733'), 'Marketing + Sales': uiCopy('u_77ee1300bfd8e22c'), 'Insights': uiCopy('u_26bfdaa00fec57fd'), 'Role Management': uiCopy('u_bf3e021d9aec877b'), 'Marketplace Monitor': uiCopy('u_bd978aa1705b188d'), 'SaaS Monitor': uiCopy('u_0e4c940f0f9cd725'), 'Concierge Monitor': uiCopy('u_a1d5bebba906f90e') },
   },
   es: {
     checkingAccess: 'Comprobando acceso de propietario/administrador…',

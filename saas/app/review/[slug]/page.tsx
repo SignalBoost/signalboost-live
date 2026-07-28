@@ -11,6 +11,8 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -43,29 +45,29 @@ const COPY: Record<Lang, {
   errNetwork: string
 }> = {
   en: {
-    leaveReview: 'Leave a review for',
-    pageNotFound: 'Page not found',
-    pageNotFoundSub: "This review link doesn't exist or has been removed.",
-    thankYou: 'Thank you',
-    thankYouSub: 'Your review has been submitted. It will appear publicly once the owner reviews it.',
-    ratingLabel: 'Your rating',
+    leaveReview: uiCopy('u_ef413a4fa4091fbd'),
+    pageNotFound: uiCopy('u_83d9090cf1eda724'),
+    pageNotFoundSub: uiCopy('u_ee2c5a614efe509a'),
+    thankYou: uiCopy('u_1e1699cef3922434'),
+    thankYouSub: uiCopy('u_6bc44845759900c6'),
+    ratingLabel: uiCopy('u_eaab7f1f9db2d9a5'),
     starLabel: (n) => `${n} star${n > 1 ? 's' : ''}`,
-    nameLabel: 'Your name',
-    namePlaceholder: 'Jane Doe',
-    emailLabel: 'Your email',
-    emailPlaceholder: 'jane@example.com',
-    emailNote: "Only shared with the person you're reviewing. Never shown publicly.",
-    reviewLabel: 'Your review',
-    reviewPlaceholder: 'Tell others about your experience…',
-    submitBtn: 'Submit review',
-    submittingBtn: 'Submitting…',
-    disclaimer: 'By submitting, you confirm this is your honest experience.',
-    errName: 'Please enter your name.',
-    errEmail: 'Please enter a valid email.',
-    errRating: 'Please choose a rating from 1 to 5.',
-    errReview: 'Please write your review.',
-    errGeneric: 'Something went wrong.',
-    errNetwork: 'Network error. Please try again.',
+    nameLabel: uiCopy('u_9e0b11346b894305'),
+    namePlaceholder: uiCopy('u_46425bddb90956c4'),
+    emailLabel: uiCopy('u_64b1be831495683e'),
+    emailPlaceholder: uiCopy('u_58c4abce3aa0344a'),
+    emailNote: uiCopy('u_7923a8331d539d0b'),
+    reviewLabel: uiCopy('u_b9e72696173c68e8'),
+    reviewPlaceholder: uiCopy('u_5d058fdf9ee26b3a'),
+    submitBtn: uiCopy('u_44cada490a2d7c4f'),
+    submittingBtn: uiCopy('u_97a102a4301fac42'),
+    disclaimer: uiCopy('u_eb8556ba32a4213f'),
+    errName: uiCopy('u_193cd31564e3cf25'),
+    errEmail: uiCopy('u_faafa5db401886d5'),
+    errRating: uiCopy('u_b289201b3bf8e2ff'),
+    errReview: uiCopy('u_2d1b94f8a24e69d4'),
+    errGeneric: uiCopy('u_2a929561c59176d4'),
+    errNetwork: uiCopy('u_de6c366e22ffcb09'),
   },
   es: {
     leaveReview: 'Deja una reseña para',

@@ -2,21 +2,23 @@
 
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY = {
-  eyebrow:      { en: 'Podcast Studio', es: 'Podcast Studio', pt: 'Podcast Studio', pl: 'Podcast Studio', ru: 'Студия подкастов' },
-  title:        { en: '🎚️ Optimize Podcast Studio', es: '🎚️ Optimizar Podcast Studio', pt: '🎚️ Otimizar Podcast Studio', pl: '🎚️ Optymalizuj Podcast Studio', ru: '🎚️ Оптимизация студии подкастов' },
-  subtitle:     { en: 'Audit your podcast feed for Apple/Spotify requirements, episode quality, and growth — and get a prioritized action plan.', es: 'Audita tu feed de podcast para requisitos de Apple/Spotify, calidad de episodios y crecimiento — y obtén un plan de acción priorizado.', pt: 'Audite seu feed de podcast para requisitos da Apple/Spotify, qualidade dos episódios e crescimento — e obtenha um plano de ação priorizado.', pl: 'Sprawdź swój feed podcastu pod kątem wymagań Apple/Spotify, jakości odcinków i wzrostu — i uzyskaj priorytetowy plan działania.', ru: 'Проверьте ваш RSS-фид на соответствие требованиям Apple/Spotify, качество эпизодов и рост — и получите приоритетный план действий.' },
-  placeholder:  { en: 'Your RSS feed URL, or an Apple Podcasts link', es: 'URL de tu feed RSS o enlace de Apple Podcasts', pt: 'URL do seu feed RSS ou link do Apple Podcasts', pl: 'URL Twojego feeda RSS lub link do Apple Podcasts', ru: 'URL вашего RSS-фида или ссылка на Apple Podcasts' },
-  hint:         { en: "Don't have your feed URL? Paste your Apple Podcasts page link and we'll find it.", es: '¿No tienes tu URL de feed? Pega el enlace de tu página de Apple Podcasts y lo encontraremos.', pt: 'Não tem a URL do seu feed? Cole o link da sua página do Apple Podcasts e encontraremos.', pl: 'Nie masz URL feeda? Wklej link do swojej strony Apple Podcasts, a my go znajdziemy.', ru: 'Нет URL фида? Вставьте ссылку на страницу Apple Podcasts, и мы найдём его.' },
-  auditing:     { en: 'Auditing…', es: 'Auditando…', pt: 'Auditando…', pl: 'Audytowanie…', ru: 'Аудит…' },
-  auditBtn:     { en: 'Audit podcast', es: 'Auditar podcast', pt: 'Auditar podcast', pl: 'Audytuj podcast', ru: 'Аудит подкаста' },
-  fetching:     { en: 'Fetching your feed and running checks…', es: 'Obteniendo tu feed y ejecutando verificaciones…', pt: 'Buscando seu feed e executando verificações…', pl: 'Pobieranie feeda i uruchamianie sprawdzeń…', ru: 'Загрузка фида и выполнение проверок…' },
-  episodes:     { en: 'episodes', es: 'episodios', pt: 'episódios', pl: 'odcinki', ru: 'эпизодов' },
-  aiTip:        { en: 'Tip: connect an AI key for a richer, written action plan.', es: 'Consejo: conecta una clave AI para un plan de acción más completo.', pt: 'Dica: conecte uma chave AI para um plano de ação mais completo.', pl: 'Wskazówka: połącz klucz AI, aby uzyskać bogatszy plan działania.', ru: 'Совет: подключите ключ AI для более подробного плана действий.' },
-  defaultError: { en: 'Could not audit that feed.', es: 'No se pudo auditar ese feed.', pt: 'Não foi possível auditar esse feed.', pl: 'Nie można przeprowadzić audytu tego feeda.', ru: 'Не удалось проверить этот фид.' },
-  genericError: { en: 'Something went wrong running the audit.', es: 'Algo salió mal durante la auditoría.', pt: 'Algo deu errado durante a auditoria.', pl: 'Coś poszło nie tak podczas audytu.', ru: 'Что-то пошло не так при выполнении аудита.' },
+  eyebrow:      { en: uiCopy('u_b1c7278f51a1a448'), es: 'Podcast Studio', pt: 'Podcast Studio', pl: 'Podcast Studio', ru: 'Студия подкастов' },
+  title:        { en: uiCopy('u_60d616e08333d9ce'), es: '🎚️ Optimizar Podcast Studio', pt: '🎚️ Otimizar Podcast Studio', pl: '🎚️ Optymalizuj Podcast Studio', ru: '🎚️ Оптимизация студии подкастов' },
+  subtitle:     { en: uiCopy('u_114a3115e13dbb3c'), es: 'Audita tu feed de podcast para requisitos de Apple/Spotify, calidad de episodios y crecimiento — y obtén un plan de acción priorizado.', pt: 'Audite seu feed de podcast para requisitos da Apple/Spotify, qualidade dos episódios e crescimento — e obtenha um plano de ação priorizado.', pl: 'Sprawdź swój feed podcastu pod kątem wymagań Apple/Spotify, jakości odcinków i wzrostu — i uzyskaj priorytetowy plan działania.', ru: 'Проверьте ваш RSS-фид на соответствие требованиям Apple/Spotify, качество эпизодов и рост — и получите приоритетный план действий.' },
+  placeholder:  { en: uiCopy('u_f8e6362647d5a2ce'), es: 'URL de tu feed RSS o enlace de Apple Podcasts', pt: 'URL do seu feed RSS ou link do Apple Podcasts', pl: 'URL Twojego feeda RSS lub link do Apple Podcasts', ru: 'URL вашего RSS-фида или ссылка на Apple Podcasts' },
+  hint:         { en: uiCopy('u_e5dd229cbcf4770c'), es: '¿No tienes tu URL de feed? Pega el enlace de tu página de Apple Podcasts y lo encontraremos.', pt: 'Não tem a URL do seu feed? Cole o link da sua página do Apple Podcasts e encontraremos.', pl: 'Nie masz URL feeda? Wklej link do swojej strony Apple Podcasts, a my go znajdziemy.', ru: 'Нет URL фида? Вставьте ссылку на страницу Apple Podcasts, и мы найдём его.' },
+  auditing:     { en: uiCopy('u_71aaae4c2ebd9bf1'), es: 'Auditando…', pt: 'Auditando…', pl: 'Audytowanie…', ru: 'Аудит…' },
+  auditBtn:     { en: uiCopy('u_1acf9db61851fbc8'), es: 'Auditar podcast', pt: 'Auditar podcast', pl: 'Audytuj podcast', ru: 'Аудит подкаста' },
+  fetching:     { en: uiCopy('u_9d7f99dd61dce470'), es: 'Obteniendo tu feed y ejecutando verificaciones…', pt: 'Buscando seu feed e executando verificações…', pl: 'Pobieranie feeda i uruchamianie sprawdzeń…', ru: 'Загрузка фида и выполнение проверок…' },
+  episodes:     { en: uiCopy('u_7ac671637fe499e1'), es: 'episodios', pt: 'episódios', pl: 'odcinki', ru: 'эпизодов' },
+  aiTip:        { en: uiCopy('u_c3934bd14873d883'), es: 'Consejo: conecta una clave AI para un plan de acción más completo.', pt: 'Dica: conecte uma chave AI para um plano de ação mais completo.', pl: 'Wskazówka: połącz klucz AI, aby uzyskać bogatszy plan działania.', ru: 'Совет: подключите ключ AI для более подробного плана действий.' },
+  defaultError: { en: uiCopy('u_bfca18c4e0caef5d'), es: 'No se pudo auditar ese feed.', pt: 'Não foi possível auditar esse feed.', pl: 'Nie można przeprowadzić audytu tego feeda.', ru: 'Не удалось проверить этот фид.' },
+  genericError: { en: uiCopy('u_540c9505919f96ca'), es: 'Algo salió mal durante la auditoría.', pt: 'Algo deu errado durante a auditoria.', pl: 'Coś poszło nie tak podczas audytu.', ru: 'Что-то пошло не так при выполнении аудита.' },
 }
 
 function c(key: string, lang: string): string {

@@ -9,6 +9,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 interface ProviderMeta {
   id: string;
@@ -94,31 +96,31 @@ export function ProviderConsole({
             checked={auto}
             onChange={(e) => setAuto(e.target.checked)}
           />
-          <span>Auto-Optimize</span>
+          <span>{uiCopy('u_b27dbd67fdaa52d1')}</span>
         </label>
 
         {auto ? (
           <select
-            aria-label="Routing policy"
+            aria-label={uiCopy('u_b85866845b4a23c9')}
             value={policy}
             onChange={(e) => setPolicy(e.target.value as Policy)}
             style={S.select}
           >
-            <option value="auto">Auto (capability + cost)</option>
-            <option value="cost">Cheapest</option>
-            <option value="latency">Fastest</option>
-            <option value="capability">Best capability match</option>
+            <option value="auto">{uiCopy('u_68a38bb4b6c04325')}</option>
+            <option value="cost">{uiCopy('u_ebfba834bfec6f5c')}</option>
+            <option value="latency">{uiCopy('u_a2755c58f6ad87de')}</option>
+            <option value="capability">{uiCopy('u_556bcae20df5b687')}</option>
           </select>
         ) : (
           <select
-            aria-label="Provider"
+            aria-label={uiCopy('u_510e0df61bd0a569')}
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
             style={S.select}
           >
             {providers.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.label} — ${p.cost_per_1k_output}/1k out · ~{p.avg_latency_ms}ms
+                {p.label} — ${p.cost_per_1k_output}{uiCopy('u_7a9f30b56f8480ef')}{p.avg_latency_ms}ms
               </option>
             ))}
           </select>
@@ -128,13 +130,13 @@ export function ProviderConsole({
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Enter a prompt…"
+        placeholder={uiCopy('u_78237926d497fdcb')}
         rows={4}
         style={S.textarea}
       />
 
       <button onClick={run} disabled={loading || !prompt} style={S.button}>
-        {loading ? 'Routing…' : auto ? 'Run (Auto)' : `Run on ${provider}`}
+        {loading ? uiCopy('u_8b7ebf6bcdb54d4c') : auto ? uiCopy('u_fb600bb56ef8ff55') : `Run on ${provider}`}
       </button>
 
       {error && <div style={S.error}>{error}</div>}
@@ -143,10 +145,10 @@ export function ProviderConsole({
         <div style={S.result}>
           <div style={S.output}>{result.output}</div>
           <div style={S.meta}>
-            <span>Provider: <b>{result.provider}</b></span>
-            <span>Tokens: {result.tokens_used.total}</span>
-            <span>Latency: {result.latency_ms}ms</span>
-            <span>Cost: ${result.cost_usd.toFixed(6)}</span>
+            <span>{uiCopy('u_0308afd33897e9b0')}<b>{result.provider}</b></span>
+            <span>{uiCopy('u_e2e7dea8e81d6d41')}{result.tokens_used.total}</span>
+            <span>{uiCopy('u_5079d8b4eb9eec39')}{result.latency_ms}ms</span>
+            <span>{uiCopy('u_3f6d4e8c2b932c9e')}{result.cost_usd.toFixed(6)}</span>
           </div>
         </div>
       )}

@@ -10,6 +10,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import StripeReport, { type StripeReportView } from '@/components/audit/StripeReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: StripeReportView; error?: string }
@@ -32,7 +34,7 @@ export default function StripeReportPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.stripe.loadError', 'Could not load the Stripe report.'))
+          setError((json && json.error) || t('audit.stripe.loadError', uiCopy('u_1b6ce9b21c1b3db3')))
           return
         }
         setData(json.report)
@@ -40,7 +42,7 @@ export default function StripeReportPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.stripe.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.stripe.fetchError', uiCopy('u_f8f813fd388b2782')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -51,7 +53,7 @@ export default function StripeReportPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.stripe.loading', 'Loading Stripe report…')}
+        {t('audit.stripe.loading', uiCopy('u_4aec379ba89a7090'))}
       </main>
     )
   }

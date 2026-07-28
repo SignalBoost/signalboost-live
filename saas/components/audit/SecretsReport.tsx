@@ -9,6 +9,8 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -52,25 +54,25 @@ export default function SecretsReport({ data }: { data: SecretsReportView }) {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.secret.title', 'Secrets & API Key Exposure')} <span style={{ color: GOLD }}>·</span>
+          {t('audit.secret.title', uiCopy('u_50973a82c39a7a45'))} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 660, lineHeight: 1.5 }}>
-          {t('audit.secret.subtitle', 'Configured credentials by environment and rotation posture. Metadata only — no secret values are read or shown.')}
+          {t('audit.secret.subtitle', uiCopy('u_85b2f20e6e0e0149'))}
         </p>
       </div>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.secret.summary.total', 'Credentials')} value={s.total} />
-        <Stat label={t('audit.secret.summary.clientExposed', 'Client-exposed')} value={s.clientExposed} color={s.clientExposed ? RED : undefined} />
-        <Stat label={t('audit.secret.summary.rotationUnknown', 'Rotation unknown')} value={s.rotationUnknown} color={s.rotationUnknown ? GOLD : undefined} />
+        <Stat label={t('audit.secret.summary.total', uiCopy('u_ace911aeaa1f1926'))} value={s.total} />
+        <Stat label={t('audit.secret.summary.clientExposed', uiCopy('u_4f18a5adae0b36d9'))} value={s.clientExposed} color={s.clientExposed ? RED : undefined} />
+        <Stat label={t('audit.secret.summary.rotationUnknown', uiCopy('u_1f50c66c88eb6770'))} value={s.rotationUnknown} color={s.rotationUnknown ? GOLD : undefined} />
       </section>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-          {t('audit.secret.findingsTitle', 'Exposure Findings')}
+          {t('audit.secret.findingsTitle', uiCopy('u_dbc8e7ff6a7d2749'))}
         </div>
         {data.findings.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.secret.noFindings', 'No exposure findings.')}</div>
+          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.secret.noFindings', uiCopy('u_3573d2d32e2c6a16'))}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {data.findings.map(f => <FindingCard key={f.id} finding={f} t={t} />)}
@@ -80,21 +82,21 @@ export default function SecretsReport({ data }: { data: SecretsReportView }) {
 
       <section style={{ ...glass, padding: 20 }}>
         <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 12 }}>
-          {t('audit.secret.tableTitle', 'Configured Credentials')}
+          {t('audit.secret.tableTitle', uiCopy('u_1ca67bdd91d9f345'))}
         </div>
         {data.rows.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREY }}>{t('audit.secret.empty', 'No credentials found.')}</div>
+          <div style={{ fontSize: 13, color: GREY }}>{t('audit.secret.empty', uiCopy('u_b7e0f23bb5485e4a'))}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.secret.col.name', 'Name')}</Th>
-                  <Th>{t('audit.secret.col.provider', 'Provider')}</Th>
-                  <Th>{t('audit.secret.col.environment', 'Environment')}</Th>
-                  <Th>{t('audit.secret.col.exposure', 'Exposure')}</Th>
-                  <Th>{t('audit.secret.col.rotation', 'Rotation')}</Th>
-                  <Th>{t('audit.secret.col.risk', 'Risk')}</Th>
+                  <Th>{t('audit.secret.col.name', uiCopy('u_57e3497846683099'))}</Th>
+                  <Th>{t('audit.secret.col.provider', uiCopy('u_583ce93dbe08d4d4'))}</Th>
+                  <Th>{t('audit.secret.col.environment', uiCopy('u_daedf291932e2365'))}</Th>
+                  <Th>{t('audit.secret.col.exposure', uiCopy('u_82613a3f9c44f18b'))}</Th>
+                  <Th>{t('audit.secret.col.rotation', uiCopy('u_fdbf76d80cf89e47'))}</Th>
+                  <Th>{t('audit.secret.col.risk', uiCopy('u_0dfa57760e5bd71a'))}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -107,13 +109,13 @@ export default function SecretsReport({ data }: { data: SecretsReportView }) {
                       <Td>{t(`audit.secret.env.${r.environment}`, r.environment)}</Td>
                       <Td>
                         {r.publicExposed
-                          ? <span style={{ color: RED, fontWeight: 600 }}>{t('audit.secret.exposure.client', 'Client-exposed')}</span>
-                          : <span style={{ color: GREEN }}>{t('audit.secret.exposure.server', 'Server-only')}</span>}
+                          ? <span style={{ color: RED, fontWeight: 600 }}>{t('audit.secret.exposure.client', uiCopy('u_a915d65885ae295b'))}</span>
+                          : <span style={{ color: GREEN }}>{t('audit.secret.exposure.server', uiCopy('u_0ef24e64d746c4c1'))}</span>}
                       </Td>
                       <Td>
                         {r.rotationKnown
-                          ? <span style={{ color: 'rgba(255,255,255,.7)' }}>{t('audit.secret.rotation.known', 'Tracked')}</span>
-                          : <span style={{ color: GOLD }}>{t('audit.secret.rotation.unknown', 'Unknown')}</span>}
+                          ? <span style={{ color: 'rgba(255,255,255,.7)' }}>{t('audit.secret.rotation.known', uiCopy('u_91da881549a481c3'))}</span>
+                          : <span style={{ color: GOLD }}>{t('audit.secret.rotation.unknown', uiCopy('u_40de0d7c0ec1b0fb'))}</span>}
                       </Td>
                       <Td>
                         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#0a0e17', background: rc, borderRadius: 999, padding: '2px 9px' }}>
@@ -125,7 +127,7 @@ export default function SecretsReport({ data }: { data: SecretsReportView }) {
                 })}
               </tbody>
             </table>
-            <p style={{ marginTop: 12, fontSize: 11, color: GREY }}>{t('audit.secret.metadataNote', 'Metadata only — secret values are never read or displayed.')}</p>
+            <p style={{ marginTop: 12, fontSize: 11, color: GREY }}>{t('audit.secret.metadataNote', uiCopy('u_ee267bd6dae38a8a'))}</p>
           </div>
         )}
       </section>
@@ -162,7 +164,7 @@ function FindingCard({ finding, t }: { finding: Finding; t: TFn }) {
       </div>
       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{text.detail}</div>
       <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 6 }}>
-        <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('audit.common.recommendation', 'Recommendation')}:</strong> {text.recommendation}
+        <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('audit.common.recommendation', uiCopy('u_3f0515e8610e818d'))}:</strong> {text.recommendation}
       </div>
     </div>
   )

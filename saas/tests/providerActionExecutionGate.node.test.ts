@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { readFile } from 'node:fs/promises'
+import { readUiSourceAsync } from './helpers/sourceWithUiCopy.mjs'
 
 const gatePath = new URL('../components/hub/ProviderActionExecutionGate.tsx', import.meta.url)
 const modalPath = new URL('../components/hub/ProviderActionModal.tsx', import.meta.url)
 
 async function source(path: URL): Promise<string> {
-  return readFile(path, 'utf8')
+  return readUiSourceAsync(path)
 }
 
 test('execution gate uses the fail-closed reviewed capability discovery client', async () => {

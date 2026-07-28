@@ -1,5 +1,7 @@
 // saas/components/VideoPreview.tsx
 import { useRef, useState } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export default function VideoPreview({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -28,7 +30,7 @@ export default function VideoPreview({ src }: { src: string }) {
         onClick={togglePlay}
         className="bg-yellow-400 text-black px-4 py-2 rounded-full font-bold hover:scale-105 transition-transform"
       >
-        {isPlaying ? 'Pause' : 'Play'}
+        {isPlaying ? uiCopy('u_7c66e39ba2e2faae') : uiCopy('u_8775909cabc383fc')}
       </button>
     </div>
   )

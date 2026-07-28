@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 
@@ -66,10 +68,10 @@ export default function CampaignsPage() {
     try {
       const res = await fetch('/api/marketing/campaigns', { cache: 'no-store' })
       const data = await res.json()
-      if (!res.ok) setError(data?.error || 'Could not load campaigns.')
+      if (!res.ok) setError(data?.error || uiCopy('u_142ae93ab3d85168'))
       setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : [])
     } catch {
-      setError('Something went wrong loading campaigns.')
+      setError(uiCopy('u_00ec3d7dff8318f0'))
     } finally {
       setLoading(false)
     }
@@ -102,12 +104,12 @@ export default function CampaignsPage() {
           body: JSON.stringify({ name: name.trim(), type, channel: channel.trim(), goal: goal.trim(), audience: audience.trim() }),
         })
         const data = await res.json()
-        if (!res.ok) { setError(data?.error || 'Could not create campaign.'); setSaving(false); return }
+        if (!res.ok) { setError(data?.error || uiCopy('u_4827b5728938e298')); setSaving(false); return }
       }
       setName(''); setChannel(''); setGoal(''); setAudience(''); setAbTest(false); setShowForm(false)
       await load()
     } catch {
-      setError('Could not create the campaign.')
+      setError(uiCopy('u_9545043ada7094f9'))
     } finally {
       setSaving(false)
     }
@@ -168,15 +170,15 @@ return (
       {/* Funnel roll-up */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10, marginBottom: 22 }}>
         {[
-          { label: tr('campaigns.sent', 'Sent'), value: totals.sent, accent: '#fff' },
-          { label: tr('campaigns.opened', 'Opened'), value: totals.opened, accent: '#fde68a', rate: pct(totals.opened, totals.sent) },
-          { label: tr('campaigns.clicked', 'Clicked'), value: totals.clicked, accent: '#c4b5fd', rate: pct(totals.clicked, totals.opened) },
-          { label: tr('campaigns.converted', 'Converted'), value: totals.converted, accent: '#86efac', rate: pct(totals.converted, totals.clicked) },
-          { label: tr('campaigns.roi', 'ROI'), value: roi === null ? '—' : `${roi}%`, accent: roi !== null && roi >= 0 ? '#86efac' : '#fca5a5' },
+          { label: tr('campaigns.sent', 'Sent'), value: totals.sent, accent: uiCopy('u_0bf3fca36ff0179c') },
+          { label: tr('campaigns.opened', 'Opened'), value: totals.opened, accent: uiCopy('u_db0c9903d1f57924'), rate: pct(totals.opened, totals.sent) },
+          { label: tr('campaigns.clicked', 'Clicked'), value: totals.clicked, accent: uiCopy('u_ead585c16d930539'), rate: pct(totals.clicked, totals.opened) },
+          { label: tr('campaigns.converted', 'Converted'), value: totals.converted, accent: uiCopy('u_ad51a2c3ddaf1e7d'), rate: pct(totals.converted, totals.clicked) },
+          { label: tr('campaigns.roi', 'ROI'), value: roi === null ? '—' : `${roi}%`, accent: roi !== null && roi >= 0 ? uiCopy('u_97d7f469c6ce9364') : uiCopy('u_c536dd1bb5919233') },
         ].map(c => (
           <div key={c.label} className="sb-card" style={{ padding: 16 }}>
             <div style={{ fontSize: 24, fontWeight: 900, color: c.accent }}>{c.value}</div>
-            <div className="sb-caption">{c.label}{'rate' in c && c.rate !== null && c.rate !== undefined ? ` · ${c.rate}%` : ''}</div>
+            <div className="sb-caption">{c.label}{uiCopy('u_007605f48d851616') in c && c.rate !== null && c.rate !== undefined ? ` · ${c.rate}%` : ''}</div>
           </div>
         ))}
       </section>
@@ -265,7 +267,7 @@ return (
                 ) : (
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 10 }}>
-                      {(['sent', 'opened', 'clicked', 'converted', 'spend', 'revenue'] as const).map(key => (
+                      {([uiCopy('u_65660ad7977674b0'), uiCopy('u_1d514cf516a0d48d'), uiCopy('u_ce2e3f8d65c3083d'), uiCopy('u_e05f2d085c9e1e22'), uiCopy('u_b31ed8fa12b3e3d4'), uiCopy('u_8e9d5431fe227f5f')] as const).map(key => (
                         <label key={key} style={{ fontSize: 12, color: 'rgba(255,255,255,.7)' }}>
                           {tr(`campaigns.${key}`, key)}
                           <input

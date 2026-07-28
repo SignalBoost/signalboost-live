@@ -2,56 +2,58 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY = {
-  eyebrow:       { en: 'Data', es: 'Datos', pt: 'Dados', pl: 'Dane', ru: 'Данные' },
-  title:         { en: 'Universal Data Connector', es: 'Conector universal de datos', pt: 'Conector universal de dados', pl: 'Uniwersalny łącznik danych', ru: 'Универсальный коннектор данных' },
-  subtitle:      { en: 'Bring your catalog into SignalBoost from a CSV, a live API, or scraper output — then reuse it across sites, reviews, and outreach.', es: 'Importa tu catálogo a SignalBoost desde un CSV, una API en vivo o un scraper — y reutilízalo en sitios, reseñas y prospección.', pt: 'Traga seu catálogo para o SignalBoost via CSV, API ao vivo ou scraper — e reutilize em sites, avaliações e prospecção.', pl: 'Wprowadź swój katalog do SignalBoost z CSV, API lub scrapera — i używaj go na stronach, w opiniach i outreachu.', ru: 'Импортируйте каталог в SignalBoost из CSV, API или скрейпера — и используйте его на сайтах, в отзывах и аутриче.' },
-  tItems:        { en: 'Items imported', es: 'Elementos importados', pt: 'Itens importados', pl: 'Zaimportowane', ru: 'Импортировано' },
-  tCategories:   { en: 'Categories', es: 'Categorías', pt: 'Categorias', pl: 'Kategorie', ru: 'Категории' },
-  tSources:      { en: 'Sources', es: 'Fuentes', pt: 'Fontes', pl: 'Źródła', ru: 'Источники' },
+  eyebrow:       { en: uiCopy('u_a4bb01fd6a43a45b'), es: 'Datos', pt: 'Dados', pl: 'Dane', ru: 'Данные' },
+  title:         { en: uiCopy('u_c161cce73d974bd3'), es: 'Conector universal de datos', pt: 'Conector universal de dados', pl: 'Uniwersalny łącznik danych', ru: 'Универсальный коннектор данных' },
+  subtitle:      { en: uiCopy('u_90e2d2677f85cfd8'), es: 'Importa tu catálogo a SignalBoost desde un CSV, una API en vivo o un scraper — y reutilízalo en sitios, reseñas y prospección.', pt: 'Traga seu catálogo para o SignalBoost via CSV, API ao vivo ou scraper — e reutilize em sites, avaliações e prospecção.', pl: 'Wprowadź swój katalog do SignalBoost z CSV, API lub scrapera — i używaj go na stronach, w opiniach i outreachu.', ru: 'Импортируйте каталог в SignalBoost из CSV, API или скрейпера — и используйте его на сайтах, в отзывах и аутриче.' },
+  tItems:        { en: uiCopy('u_6f32e95ece816e68'), es: 'Elementos importados', pt: 'Itens importados', pl: 'Zaimportowane', ru: 'Импортировано' },
+  tCategories:   { en: uiCopy('u_b5932db63153e2c9'), es: 'Categorías', pt: 'Categorias', pl: 'Kategorie', ru: 'Категории' },
+  tSources:      { en: uiCopy('u_03e5a2cb610b31bd'), es: 'Fuentes', pt: 'Fontes', pl: 'Źródła', ru: 'Источники' },
   /* ── Drop zone ── */
-  dropTitle:     { en: 'Drop files or a folder here', es: 'Suelta archivos o una carpeta aquí', pt: 'Solte arquivos ou uma pasta aqui', pl: 'Upuść pliki lub folder tutaj', ru: 'Перетащите файлы или папку сюда' },
-  dropSub:       { en: 'CSV and JSON files supported · or click to browse', es: 'Archivos CSV y JSON · o haz clic para explorar', pt: 'Arquivos CSV e JSON · ou clique para procurar', pl: 'Pliki CSV i JSON · lub kliknij, aby przeglądać', ru: 'Файлы CSV и JSON · или нажмите для выбора' },
-  dropFolder:    { en: 'Upload folder', es: 'Subir carpeta', pt: 'Enviar pasta', pl: 'Prześlij folder', ru: 'Загрузить папку' },
-  dropFiles:     { en: 'Upload files', es: 'Subir archivos', pt: 'Enviar arquivos', pl: 'Prześlij pliki', ru: 'Загрузить файлы' },
-  queueTitle:    { en: 'Upload queue', es: 'Cola de carga', pt: 'Fila de envio', pl: 'Kolejka przesyłania', ru: 'Очередь загрузки' },
-  queueClear:    { en: 'Clear done', es: 'Limpiar completados', pt: 'Limpar concluídos', pl: 'Wyczyść gotowe', ru: 'Очистить завершённые' },
-  queueImportAll:{ en: 'Import all pending', es: 'Importar todos pendientes', pt: 'Importar todos pendentes', pl: 'Importuj wszystkie oczekujące', ru: 'Импортировать все ожидающие' },
-  queueEmpty:    { en: 'No files queued yet — drag files or a folder above.', es: 'No hay archivos en cola — arrastra archivos o una carpeta arriba.', pt: 'Nenhum arquivo na fila — arraste arquivos ou uma pasta acima.', pl: 'Brak plików w kolejce — przeciągnij pliki lub folder powyżej.', ru: 'Очередь пуста — перетащите файлы или папку выше.' },
-  statusPending: { en: 'Pending', es: 'Pendiente', pt: 'Pendente', pl: 'Oczekuje', ru: 'Ожидает' },
-  statusImporting:{ en: 'Importing…', es: 'Importando…', pt: 'Importando…', pl: 'Importowanie…', ru: 'Импорт…' },
-  statusDone:    { en: 'Done', es: 'Listo', pt: 'Pronto', pl: 'Gotowe', ru: 'Готово' },
-  statusError:   { en: 'Error', es: 'Error', pt: 'Erro', pl: 'Błąd', ru: 'Ошибка' },
-  unsupported:   { en: 'Only .csv and .json files are supported.', es: 'Solo se admiten archivos .csv y .json.', pt: 'Apenas arquivos .csv e .json são suportados.', pl: 'Obsługiwane są tylko pliki .csv i .json.', ru: 'Поддерживаются только файлы .csv и .json.' },
+  dropTitle:     { en: uiCopy('u_1bc961318b76274c'), es: 'Suelta archivos o una carpeta aquí', pt: 'Solte arquivos ou uma pasta aqui', pl: 'Upuść pliki lub folder tutaj', ru: 'Перетащите файлы или папку сюда' },
+  dropSub:       { en: uiCopy('u_011b8a930dfcadb4'), es: 'Archivos CSV y JSON · o haz clic para explorar', pt: 'Arquivos CSV e JSON · ou clique para procurar', pl: 'Pliki CSV i JSON · lub kliknij, aby przeglądać', ru: 'Файлы CSV и JSON · или нажмите для выбора' },
+  dropFolder:    { en: uiCopy('u_4631719a6fa56e29'), es: 'Subir carpeta', pt: 'Enviar pasta', pl: 'Prześlij folder', ru: 'Загрузить папку' },
+  dropFiles:     { en: uiCopy('u_9ffc5567cd887444'), es: 'Subir archivos', pt: 'Enviar arquivos', pl: 'Prześlij pliki', ru: 'Загрузить файлы' },
+  queueTitle:    { en: uiCopy('u_2ac508c081feab46'), es: 'Cola de carga', pt: 'Fila de envio', pl: 'Kolejka przesyłania', ru: 'Очередь загрузки' },
+  queueClear:    { en: uiCopy('u_86de0cd6c8ed04bb'), es: 'Limpiar completados', pt: 'Limpar concluídos', pl: 'Wyczyść gotowe', ru: 'Очистить завершённые' },
+  queueImportAll:{ en: uiCopy('u_4cebfeb81f388025'), es: 'Importar todos pendientes', pt: 'Importar todos pendentes', pl: 'Importuj wszystkie oczekujące', ru: 'Импортировать все ожидающие' },
+  queueEmpty:    { en: uiCopy('u_ccf63e50094385be'), es: 'No hay archivos en cola — arrastra archivos o una carpeta arriba.', pt: 'Nenhum arquivo na fila — arraste arquivos ou uma pasta acima.', pl: 'Brak plików w kolejce — przeciągnij pliki lub folder powyżej.', ru: 'Очередь пуста — перетащите файлы или папку выше.' },
+  statusPending: { en: uiCopy('u_644628ead3736640'), es: 'Pendiente', pt: 'Pendente', pl: 'Oczekuje', ru: 'Ожидает' },
+  statusImporting:{ en: uiCopy('u_b8d8d281342bdfe3'), es: 'Importando…', pt: 'Importando…', pl: 'Importowanie…', ru: 'Импорт…' },
+  statusDone:    { en: uiCopy('u_2504cfcaf4dae522'), es: 'Listo', pt: 'Pronto', pl: 'Gotowe', ru: 'Готово' },
+  statusError:   { en: uiCopy('u_e196352041ba1980'), es: 'Error', pt: 'Erro', pl: 'Błąd', ru: 'Ошибка' },
+  unsupported:   { en: uiCopy('u_c22f62cbf18142b7'), es: 'Solo se admiten archivos .csv y .json.', pt: 'Apenas arquivos .csv e .json são suportados.', pl: 'Obsługiwane są tylko pliki .csv i .json.', ru: 'Поддерживаются только файлы .csv и .json.' },
   /* ── CSV panel ── */
-  csvTitle:      { en: 'Upload CSV', es: 'Subir CSV', pt: 'Enviar CSV', pl: 'Prześlij CSV', ru: 'Загрузить CSV' },
-  csvHint:       { en: 'Header row + one item per line', es: 'Fila de encabezado + un elemento por línea', pt: 'Linha de cabeçalho + um item por linha', pl: 'Wiersz nagłówka + jeden element na linię', ru: 'Строка заголовка + один элемент на строку' },
-  csvLabel:      { en: 'CSV content', es: 'Contenido CSV', pt: 'Conteúdo CSV', pl: 'Zawartość CSV', ru: 'Содержимое CSV' },
-  csvBtn:        { en: 'Import CSV', es: 'Importar CSV', pt: 'Importar CSV', pl: 'Importuj CSV', ru: 'Импорт CSV' },
+  csvTitle:      { en: uiCopy('u_7d3b6b4b04309428'), es: 'Subir CSV', pt: 'Enviar CSV', pl: 'Prześlij CSV', ru: 'Загрузить CSV' },
+  csvHint:       { en: uiCopy('u_d52ba2e2e1ad8e7e'), es: 'Fila de encabezado + un elemento por línea', pt: 'Linha de cabeçalho + um item por linha', pl: 'Wiersz nagłówka + jeden element na linię', ru: 'Строка заголовка + один элемент на строку' },
+  csvLabel:      { en: uiCopy('u_fde2e1d2b77caee8'), es: 'Contenido CSV', pt: 'Conteúdo CSV', pl: 'Zawartość CSV', ru: 'Содержимое CSV' },
+  csvBtn:        { en: uiCopy('u_b342ee8cea0a8d18'), es: 'Importar CSV', pt: 'Importar CSV', pl: 'Importuj CSV', ru: 'Импорт CSV' },
   /* ── API panel ── */
-  apiTitle:      { en: 'API connector', es: 'Conector API', pt: 'Conector API', pl: 'Łącznik API', ru: 'API-коннектор' },
-  apiHint:       { en: 'Pull items from a live endpoint', es: 'Obtén elementos de un endpoint en vivo', pt: 'Busque itens de um endpoint ao vivo', pl: 'Pobieraj elementy z endpointu', ru: 'Получайте элементы из эндпоинта' },
-  apiEndpoint:   { en: 'Endpoint URL', es: 'URL del endpoint', pt: 'URL do endpoint', pl: 'Adres endpointu', ru: 'URL эндпоинта' },
-  apiMapping:    { en: 'Field mapping (JSON)', es: 'Mapeo de campos (JSON)', pt: 'Mapeamento de campos (JSON)', pl: 'Mapowanie pól (JSON)', ru: 'Сопоставление полей (JSON)' },
-  apiBtn:        { en: 'Run API import', es: 'Ejecutar importación API', pt: 'Executar importação API', pl: 'Uruchom import API', ru: 'Запустить импорт API' },
+  apiTitle:      { en: uiCopy('u_35f2f20803e7f27b'), es: 'Conector API', pt: 'Conector API', pl: 'Łącznik API', ru: 'API-коннектор' },
+  apiHint:       { en: uiCopy('u_2af5c007b3b8fba0'), es: 'Obtén elementos de un endpoint en vivo', pt: 'Busque itens de um endpoint ao vivo', pl: 'Pobieraj elementy z endpointu', ru: 'Получайте элементы из эндпоинта' },
+  apiEndpoint:   { en: uiCopy('u_6c005b2d85af6c77'), es: 'URL del endpoint', pt: 'URL do endpoint', pl: 'Adres endpointu', ru: 'URL эндпоинта' },
+  apiMapping:    { en: uiCopy('u_cdf7011555329dca'), es: 'Mapeo de campos (JSON)', pt: 'Mapeamento de campos (JSON)', pl: 'Mapowanie pól (JSON)', ru: 'Сопоставление полей (JSON)' },
+  apiBtn:        { en: uiCopy('u_20348172c89c3023'), es: 'Ejecutar importación API', pt: 'Executar importação API', pl: 'Uruchom import API', ru: 'Запустить импорт API' },
   /* ── Scraper panel ── */
-  scrTitle:      { en: 'Scraper connector', es: 'Conector de scraper', pt: 'Conector de scraper', pl: 'Łącznik scrapera', ru: 'Скрейпер-коннектор' },
-  scrHint:       { en: 'Paste structured scraper output', es: 'Pega la salida estructurada del scraper', pt: 'Cole a saída estruturada do scraper', pl: 'Wklej dane wyjściowe scrapera', ru: 'Вставьте структурированный вывод скрейпера' },
-  scrLabel:      { en: 'Items (JSON array)', es: 'Elementos (arreglo JSON)', pt: 'Itens (array JSON)', pl: 'Elementy (tablica JSON)', ru: 'Элементы (JSON-массив)' },
-  scrBtn:        { en: 'Run scraper import', es: 'Ejecutar importación', pt: 'Executar importação', pl: 'Uruchom import', ru: 'Запустить импорт' },
+  scrTitle:      { en: uiCopy('u_cf95db2251a7c640'), es: 'Conector de scraper', pt: 'Conector de scraper', pl: 'Łącznik scrapera', ru: 'Скрейпер-коннектор' },
+  scrHint:       { en: uiCopy('u_0bb3edd0fc2e2ffc'), es: 'Pega la salida estructurada del scraper', pt: 'Cole a saída estruturada do scraper', pl: 'Wklej dane wyjściowe scrapera', ru: 'Вставьте структурированный вывод скрейпера' },
+  scrLabel:      { en: uiCopy('u_3270afdb06484dee'), es: 'Elementos (arreglo JSON)', pt: 'Itens (array JSON)', pl: 'Elementy (tablica JSON)', ru: 'Элементы (JSON-массив)' },
+  scrBtn:        { en: uiCopy('u_67511ff439dddcc8'), es: 'Ejecutar importación', pt: 'Executar importação', pl: 'Uruchom import', ru: 'Запустить импорт' },
   /* ── shared ── */
-  importing:     { en: 'Importing…', es: 'Importando…', pt: 'Importando…', pl: 'Importowanie…', ru: 'Импорт…' },
-  done:          { en: 'Done — {count} item(s) inserted', es: 'Listo — {count} elemento(s) insertado(s)', pt: 'Pronto — {count} item(ns) inserido(s)', pl: 'Gotowe — {count} element(ów) dodano', ru: 'Готово — добавлено {count} элемент(ов)' },
-  invalidJson:   { en: 'That JSON could not be parsed — check the syntax and try again.', es: 'No se pudo analizar el JSON — revisa la sintaxis e inténtalo de nuevo.', pt: 'Não foi possível analisar o JSON — verifique a sintaxe e tente novamente.', pl: 'Nie udało się przetworzyć JSON — sprawdź składnię i spróbuj ponownie.', ru: 'Не удалось разобрать JSON — проверьте синтаксис и повторите.' },
-  failed:        { en: 'Import failed: {error}', es: 'Importación fallida: {error}', pt: 'Falha na importação: {error}', pl: 'Import nieudany: {error}', ru: 'Импорт не удался: {error}' },
-  itemsTitle:    { en: 'Imported items by category', es: 'Elementos importados por categoría', pt: 'Itens importados por categoria', pl: 'Zaimportowane elementy wg kategorii', ru: 'Импортированные элементы по категориям' },
-  itemsEmpty:    { en: 'Nothing imported yet. Run any connector above and your items will appear here, grouped by category.', es: 'Aún no hay importaciones. Ejecuta un conector arriba y tus elementos aparecerán aquí, agrupados por categoría.', pt: 'Nada importado ainda. Execute um conector acima e seus itens aparecerão aqui, agrupados por categoria.', pl: 'Jeszcze nic nie zaimportowano. Uruchom łącznik powyżej, a elementy pojawią się tutaj pogrupowane.', ru: 'Пока ничего не импортировано. Запустите коннектор выше — элементы появятся здесь по категориям.' },
-  srcTitle:      { en: 'Source history', es: 'Historial de fuentes', pt: 'Histórico de fontes', pl: 'Historia źródeł', ru: 'История источников' },
-  srcEmpty:      { en: 'No sources yet — each import is logged here with its type and time.', es: 'Sin fuentes aún — cada importación se registra aquí con su tipo y hora.', pt: 'Sem fontes ainda — cada importação é registrada aqui com tipo e hora.', pl: 'Brak źródeł — każdy import jest tu rejestrowany z typem i czasem.', ru: 'Источников пока нет — каждый импорт фиксируется здесь с типом и временем.' },
-  loading:       { en: 'Loading your imports…', es: 'Cargando tus importaciones…', pt: 'Carregando suas importações…', pl: 'Ładowanie importów…', ru: 'Загрузка импортов…' },
+  importing:     { en: uiCopy('u_89706901c9f931a0'), es: 'Importando…', pt: 'Importando…', pl: 'Importowanie…', ru: 'Импорт…' },
+  done:          { en: uiCopy('u_0c9a62ab4f7d750b'), es: 'Listo — {count} elemento(s) insertado(s)', pt: 'Pronto — {count} item(ns) inserido(s)', pl: 'Gotowe — {count} element(ów) dodano', ru: 'Готово — добавлено {count} элемент(ов)' },
+  invalidJson:   { en: uiCopy('u_d5cec01aae7556ce'), es: 'No se pudo analizar el JSON — revisa la sintaxis e inténtalo de nuevo.', pt: 'Não foi possível analisar o JSON — verifique a sintaxe e tente novamente.', pl: 'Nie udało się przetworzyć JSON — sprawdź składnię i spróbuj ponownie.', ru: 'Не удалось разобрать JSON — проверьте синтаксис и повторите.' },
+  failed:        { en: uiCopy('u_c27b9b25c2d8532a'), es: 'Importación fallida: {error}', pt: 'Falha na importação: {error}', pl: 'Import nieudany: {error}', ru: 'Импорт не удался: {error}' },
+  itemsTitle:    { en: uiCopy('u_dd9064e15a86f2a8'), es: 'Elementos importados por categoría', pt: 'Itens importados por categoria', pl: 'Zaimportowane elementy wg kategorii', ru: 'Импортированные элементы по категориям' },
+  itemsEmpty:    { en: uiCopy('u_9d50be29eff7de30'), es: 'Aún no hay importaciones. Ejecuta un conector arriba y tus elementos aparecerán aquí, agrupados por categoría.', pt: 'Nada importado ainda. Execute um conector acima e seus itens aparecerão aqui, agrupados por categoria.', pl: 'Jeszcze nic nie zaimportowano. Uruchom łącznik powyżej, a elementy pojawią się tutaj pogrupowane.', ru: 'Пока ничего не импортировано. Запустите коннектор выше — элементы появятся здесь по категориям.' },
+  srcTitle:      { en: uiCopy('u_d22e8ea4138fc660'), es: 'Historial de fuentes', pt: 'Histórico de fontes', pl: 'Historia źródeł', ru: 'История источников' },
+  srcEmpty:      { en: uiCopy('u_83d370b5b9056c45'), es: 'Sin fuentes aún — cada importación se registra aquí con su tipo y hora.', pt: 'Sem fontes ainda — cada importação é registrada aqui com tipo e hora.', pl: 'Brak źródeł — każdy import jest tu rejestrowany z typem i czasem.', ru: 'Источников пока нет — каждый импорт фиксируется здесь с типом и временем.' },
+  loading:       { en: uiCopy('u_b4c9f74d36a1bd1c'), es: 'Cargando tus importaciones…', pt: 'Carregando suas importações…', pl: 'Ładowanie importów…', ru: 'Загрузка импортов…' },
 }
 
 function c(obj: Record<Lang, string>, lang: Lang): string {
@@ -149,7 +151,7 @@ export default function DataConnectorsPage() {
   function runApi() {
     try {
       const mapping = JSON.parse(apiMapping)
-      submit({ mode: 'api', endpoint: apiEndpoint, mapping, config: { label: 'API import' } })
+      submit({ mode: 'api', endpoint: apiEndpoint, mapping, config: { label: uiCopy('u_4e6be5f5e341bf58') } })
     } catch {
       setStatus({ kind: 'err', text: c(COPY.invalidJson, l) })
     }
@@ -519,9 +521,7 @@ export default function DataConnectorsPage() {
                     className="sb-button-primary"
                     style={{ fontSize: 11, padding: '3px 12px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
                     onClick={() => importQueueItem(item.id)}
-                  >
-                    Import
-                  </button>
+                  >{uiCopy('u_741622117d9486e7')}</button>
                 )}
 
                 {/* remove button */}
@@ -529,7 +529,7 @@ export default function DataConnectorsPage() {
                   <button
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.35)', fontSize: 16, padding: '0 2px', lineHeight: 1 }}
                     onClick={() => setQueue(prev => prev.filter(q => q.id !== item.id))}
-                    title="Remove"
+                    title={uiCopy('u_17b8b7e703f7a748')}
                   >
                     ×
                   </button>

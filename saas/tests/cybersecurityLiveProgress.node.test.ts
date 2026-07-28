@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 
 // Re-run against the current main integration surface, including Press & Media host dependencies.
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const read = (path: string) => readUiSource(new URL(path, import.meta.url))
 
 test('Cybersecurity dependency scans stream real server progress', () => {
   const scanner = read('../lib/cyber/dependencyScanner.ts')

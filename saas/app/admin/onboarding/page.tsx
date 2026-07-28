@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type AnalyticsEvent = {
   event_id: string
@@ -39,57 +41,57 @@ type Feedback = {
 
 const COPY = {
   en: {
-    pill: 'Live onboarding analytics',
-    title: 'Onboarding Command Center',
-    subtitle: 'Completion, funnel drop-off, consent, tone, QA, feedback, A/B readiness.',
-    loading: 'Loading data…',
+    pill: uiCopy('u_6332e49d5fab708e'),
+    title: uiCopy('u_5c7e5e748eef6e87'),
+    subtitle: uiCopy('u_2e6dd41395393a11'),
+    loading: uiCopy('u_eebfd7706acfab0c'),
     eventsAnalyzed: (n: number) => `${n} events analyzed`,
-    completionRate: 'Completion rate',
+    completionRate: uiCopy('u_01898fb46b162deb'),
     completionSub: (done: number, total: number) => `${done} completed / ${total} profiled`,
-    consentOptIn: 'Consent opt-in',
+    consentOptIn: uiCopy('u_6c6c04190a9c4e40'),
     consentSub: (n: number) => `${n} training consents captured`,
-    skips: 'Skips',
-    skipsSub: 'Skip button events across the flow',
-    errors: 'Errors',
-    errorsSub: 'Recent onboarding client/server errors',
-    funnelTitle: 'Funnel drop-off by step',
-    views: 'views',
-    toneTitle: 'Tone distribution',
-    monitoringTitle: 'Monitoring setup',
+    skips: uiCopy('u_9b865c6ef2913603'),
+    skipsSub: uiCopy('u_5726fbd871080c8b'),
+    errors: uiCopy('u_70c0ac905f601d02'),
+    errorsSub: uiCopy('u_8ec2f3ad5d9f29de'),
+    funnelTitle: uiCopy('u_e99e0653ba6e3aa3'),
+    views: uiCopy('u_aee9bc9b20c01086'),
+    toneTitle: uiCopy('u_6c7fa35e5e0ecc8f'),
+    monitoringTitle: uiCopy('u_6ff7fd175144e798'),
     monitoringItems: [
-      'Analytics tracking: onboarding events are sent to the custom Supabase event table, plus Google Analytics, Mixpanel, and LogRocket when browser SDKs are present.',
-      'Error logging: client exceptions are forwarded to Sentry and LogRocket when configured; recent database-backed errors are surfaced here.',
-      'Performance monitoring: QA should validate Lighthouse mobile performance and compare event timestamps for slow step transitions.',
-      'Feedback loop: yes/no feedback distribution appears below for post-onboarding satisfaction checks.',
-      'Compliance & privacy: consent opt-in remains unchecked by default and is timestamped in user profile records.',
+      uiCopy('u_6affe4796769ce92'),
+      uiCopy('u_b5e91bc0aa062393'),
+      uiCopy('u_4b0e6e2ed4d016f3'),
+      uiCopy('u_80e7a58a013b2c09'),
+      uiCopy('u_0a119ab1a437753f'),
     ],
-    deviceTitle: 'Device mix',
-    feedbackTitle: 'Feedback',
-    qaTitle: 'User-facing QA script',
+    deviceTitle: uiCopy('u_a93748e48712ebec'),
+    feedbackTitle: uiCopy('u_2a98eb2eae746356'),
+    qaTitle: uiCopy('u_f2967b85feeb57bf'),
     qaItems: [
-      'Verify the skip button appears on every onboarding step and routes to the dashboard.',
-      'Confirm profiling selections persist after reload and re-opening onboarding.',
-      'Confirm consent is unchecked by default and only timestamps when opted in.',
-      'Verify tone persistence appears in the confirmation summary and user profile settings.',
-      'Test responsiveness at mobile, tablet, and desktop widths.',
-      'Run performance and cross-browser checks in Chrome, Safari, Firefox, and Edge.',
+      uiCopy('u_e102a2e0da357eaa'),
+      uiCopy('u_98e0dd453081b673'),
+      uiCopy('u_fe74f5ee2496c2e0'),
+      uiCopy('u_6ffa9f0286db8e39'),
+      uiCopy('u_27e2007896f5627d'),
+      uiCopy('u_80d59b0762725663'),
     ],
-    devTitle: 'Developer verification checklist',
+    devTitle: uiCopy('u_62bfb9c32dbde2cd'),
     devItems: [
-      'Responsive units, fluid grids, touch-friendly 44px controls, and media queries are present.',
-      'Glassmorphism panels and neon accents match SignalBoost visual language.',
-      'Skip logic, profile upsert, consent handling, tone persistence, and analytics insert paths complete without console errors.',
-      'Apprentice Workshop adapts copy and task depth from the stored IT level.',
-      'Keyboard focus, semantic labels, color contrast, and reduced layout shift are verified.',
+      uiCopy('u_8eec1b192768c8c4'),
+      uiCopy('u_8e33ef47c4b0991f'),
+      uiCopy('u_285f9a622d2b5f05'),
+      uiCopy('u_14a48920f82d1286'),
+      uiCopy('u_d1ff5bf25e1a8786'),
     ],
-    recentTitle: 'Recent onboarding events',
-    colStep: 'Step',
-    colAction: 'Action',
-    colDevice: 'Device',
-    colBrowser: 'Browser',
-    colTimestamp: 'Timestamp',
-    noEvents: 'No onboarding events found yet.',
-    abTitle: 'A/B testing layout',
+    recentTitle: uiCopy('u_444fe86a1cb24ae0'),
+    colStep: uiCopy('u_0e5afc7e8c7542e5'),
+    colAction: uiCopy('u_481ea8b25a1240fa'),
+    colDevice: uiCopy('u_053ee3f798480a34'),
+    colBrowser: uiCopy('u_738511273250d9e1'),
+    colTimestamp: uiCopy('u_011e533d920ecf7a'),
+    noEvents: uiCopy('u_1d6474d6b360fc97'),
+    abTitle: uiCopy('u_81ec5b6500caa491'),
     abDesc: (n: number) => `Use variant tags in onboarding_analytics.action values such as viewed_variant_a or viewed_variant_b, then compare completion, consent opt-in, and feedback response rates in this dashboard. Confirmation completions tracked: ${n}`,
   },
   es: {
@@ -379,32 +381,7 @@ export default function OnboardingAnalyticsDashboardPage() {
 
   return (
     <main className="dashboardShell">
-      <style>{`
-        .dashboardShell { color: #fff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-        .dashboardShell .hero { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-end; border-bottom: 1px solid rgba(255,255,255,.09); padding-bottom: .8rem; margin-bottom: 1.1rem; }
-        .dashboardShell h1 { font-size: 22px; font-weight: 950; line-height: 1.1; letter-spacing: -.045em; margin: 4px 0 4px; color: #fff; }
-        .dashboardShell p, .dashboardShell span { color: rgba(255,255,255,.66); }
-        .dashboardShell .grid { display: grid; gap: 1rem; }
-        .dashboardShell .kpiGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }
-        .dashboardShell .panelGrid { grid-template-columns: 1.2fr .8fr; align-items: start; }
-        .dashboardShell .card { border: 0; border-top: 1px solid rgba(255,255,255,.08); border-radius: 0; background: transparent; box-shadow: none; padding: .9rem 0 0; }
-        .dashboardShell .kpi { border-top: 0; border-left: 2px solid rgba(26,240,255,.4); padding: 0 0 0 .85rem; }
-        .dashboardShell .kpi strong { display: block; font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -.03em; color: #9ff7ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-        .barRow { display: grid; grid-template-columns: 8rem 1fr 4rem; gap: .75rem; align-items: center; margin: .9rem 0; }
-        .barTrack { height: .8rem; border-radius: 999px; background: rgba(255,255,255,.09); overflow: hidden; }
-        .barFill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, #ffc300); }
-        .donutList { display: grid; gap: .8rem; }
-        .legend { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,.09); padding-bottom: .6rem; }
-        .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 999px; margin-right: .4rem; }
-        .taskList { display: grid; gap: .65rem; padding: 0; margin: .5rem 0 0; list-style: none; }
-        .dashboardShell .taskList li { border: 0; border-top: 1px solid rgba(255,255,255,.07); border-left: 2px solid rgba(56,189,248,.4); padding: .7rem 0 .7rem .8rem; }
-        .statusPill { display: inline-flex; border-radius: 999px; padding: .35rem .65rem; background: rgba(34,197,94,.12); color: #86efac; font-size: .82rem; font-weight: 800; }
-        .table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-        .table th, .table td { text-align: left; border-bottom: 1px solid rgba(255,255,255,.08); padding: .75rem .5rem; }
-        .table th { color: rgba(255,255,255,.48); font-size: .75rem; text-transform: uppercase; letter-spacing: .12em; }
-        @media (max-width: 980px) { .kpiGrid, .panelGrid { grid-template-columns: 1fr 1fr; } .hero { align-items: flex-start; flex-direction: column; } }
-        @media (max-width: 680px) { .kpiGrid, .panelGrid { grid-template-columns: 1fr; } .barRow { grid-template-columns: 1fr; gap: .35rem; } }
-      `}</style>
+      <style>{uiCopy('u_2312443420a697e4')}</style>
 
       <section className="hero">
         <div>
@@ -415,7 +392,7 @@ export default function OnboardingAnalyticsDashboardPage() {
         <p>{loading ? c.loading : c.eventsAnalyzed(events.length)}</p>
       </section>
 
-      <section className="grid kpiGrid" aria-label="Onboarding KPIs">
+      <section className="grid kpiGrid" aria-label={uiCopy('u_572631b0979b36ed')}>
         <div className="card kpi">
           <span>{c.completionRate}</span>
           <strong>{percent(completedProfiles.length, profiles.length)}</strong>

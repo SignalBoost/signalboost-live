@@ -9,6 +9,8 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import type { Severity } from '@/lib/audit/reportModel'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -54,40 +56,40 @@ export default function ProviderInventoryReport({ data }: { data: ProviderInvent
 
   const s = data.summary
   const riskLabel = (r: string) =>
-    r === 'unknown' ? t('audit.provider.risk.unknown', 'Unknown') : t(`audit.severity.${r}`, r)
+    r === 'unknown' ? t('audit.provider.risk.unknown', uiCopy('u_5e223902d3b46dc6')) : t(`audit.severity.${r}`, r)
 
   return (
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.provider.title', 'Provider Inventory')} <span style={{ color: GOLD }}>·</span>
+          {t('audit.provider.title', uiCopy('u_cb2bcd8367b51905'))} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>
-          {t('audit.provider.subtitle', 'Every connected provider with status, risk, and last check.')}
+          {t('audit.provider.subtitle', uiCopy('u_005ffba13b165656'))}
         </p>
       </div>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.provider.summary.total', 'Providers')} value={s.total} />
-        <Stat label={t('audit.provider.summary.connected', 'Connected')} value={s.connected} color={s.connected ? GREEN : undefined} />
-        <Stat label={t('audit.provider.summary.error', 'Errored')} value={s.error} color={s.error ? RED : undefined} />
-        <Stat label={t('audit.provider.summary.notConfigured', 'Not configured')} value={s.notConfigured} />
+        <Stat label={t('audit.provider.summary.total', uiCopy('u_3af7790cf6feb8b7'))} value={s.total} />
+        <Stat label={t('audit.provider.summary.connected', uiCopy('u_60fea481caff96fc'))} value={s.connected} color={s.connected ? GREEN : undefined} />
+        <Stat label={t('audit.provider.summary.error', uiCopy('u_c99ade8c870f580e'))} value={s.error} color={s.error ? RED : undefined} />
+        <Stat label={t('audit.provider.summary.notConfigured', uiCopy('u_37682b085b345bd5'))} value={s.notConfigured} />
       </section>
 
       <section style={{ ...glass, padding: 20 }}>
         {data.rows.length === 0 ? (
-          <div style={{ fontSize: 13, color: GREY }}>{t('audit.provider.empty', 'No providers found.')}</div>
+          <div style={{ fontSize: 13, color: GREY }}>{t('audit.provider.empty', uiCopy('u_d9ad3fdc2d9b5d6b'))}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
-                  <Th>{t('audit.provider.col.provider', 'Provider')}</Th>
-                  <Th>{t('audit.provider.col.category', 'Category')}</Th>
-                  <Th>{t('audit.provider.col.status', 'Status')}</Th>
-                  <Th>{t('audit.provider.col.risk', 'Risk')}</Th>
-                  <Th>{t('audit.provider.col.findings', 'Findings')}</Th>
-                  <Th>{t('audit.provider.col.lastChecked', 'Last checked')}</Th>
+                  <Th>{t('audit.provider.col.provider', uiCopy('u_1756f2be905f0628'))}</Th>
+                  <Th>{t('audit.provider.col.category', uiCopy('u_83f6213f289d95b4'))}</Th>
+                  <Th>{t('audit.provider.col.status', uiCopy('u_775070f8c704a59f'))}</Th>
+                  <Th>{t('audit.provider.col.risk', uiCopy('u_c3c0564ceb4a38ef'))}</Th>
+                  <Th>{t('audit.provider.col.findings', uiCopy('u_686e2bd8409cdfe3'))}</Th>
+                  <Th>{t('audit.provider.col.lastChecked', uiCopy('u_eeaae9f036621bac'))}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -108,7 +110,7 @@ export default function ProviderInventoryReport({ data }: { data: ProviderInvent
                         <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{r.findingCount}</span>
                         {r.evidenceRequired > 0 && (
                           <span style={{ marginLeft: 6, fontSize: 10, color: CYAN }}>
-                            {tt('audit.provider.evidenceShort', '({n} evidence)', { n: r.evidenceRequired })}
+                            {tt(uiCopy('u_afd1e3715aca5d3c'), uiCopy('u_acddf6b3725ca248'), { n: r.evidenceRequired })}
                           </span>
                         )}
                       </Td>

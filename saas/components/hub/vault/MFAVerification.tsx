@@ -8,6 +8,8 @@ import { useState } from 'react'
 import { cardStyle, labelStyle } from '../shared.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export type MFAVerificationProps = {
   operation: 'rotation' | 'revocation' | 'export'
@@ -33,9 +35,9 @@ export default function MFAVerification({
   const [error, setError] = useState<string | null>(null)
 
   const operationLabels = {
-    rotation: t(dict, 'vault.mfa.op.rotation', 'Rotate this credential'),
-    revocation: t(dict, 'vault.mfa.op.revocation', 'Revoke this credential'),
-    export: t(dict, 'vault.mfa.op.export', 'Export this credential'),
+    rotation: t(dict, uiCopy('u_32253806a9cd8061'), uiCopy('u_683e3e21e1382935')),
+    revocation: t(dict, uiCopy('u_5f0a5c25aecb9cea'), uiCopy('u_c0712f15a7234aaa')),
+    export: t(dict, uiCopy('u_930592ed0b21db16'), uiCopy('u_0660feda96a0441f')),
   }
 
   const handleSelectMethod = (m: MFAMethod) => {
@@ -51,7 +53,7 @@ export default function MFAVerification({
 
     try {
       if (!code.trim() || code.length < 6) {
-        setError(t(dict, 'vault.mfa.invalidLength', 'Enter a valid code'))
+        setError(t(dict, 'vault.mfa.invalidLength', uiCopy('u_a1c764f6bbc605c5')))
         setIsVerifying(false)
         return
       }
@@ -66,7 +68,7 @@ export default function MFAVerification({
       const data = await response.json().catch(() => null)
 
       if (!response.ok || !data?.ok) {
-        setError(data?.error || t(dict, 'vault.mfa.invalid', 'Invalid code. Please try again.'))
+        setError(data?.error || t(dict, 'vault.mfa.invalid', uiCopy('u_331a09d68beea635')))
         setCode('')
         setIsVerifying(false)
         return
@@ -77,7 +79,7 @@ export default function MFAVerification({
         onSuccess()
       }, 1500)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t(dict, 'vault.mfa.failed', 'Verification failed')
+      const msg = err instanceof Error ? err.message : t(dict, 'vault.mfa.failed', uiCopy('u_90ed87de2bc96867'))
       setError(msg)
       setIsVerifying(false)
     }
@@ -108,9 +110,9 @@ export default function MFAVerification({
       >
         {/* Header */}
         <div>
-          <div style={labelStyle}>{t(dict, 'vault.mfa.eyebrow', 'Security Verification')}</div>
+          <div style={labelStyle}>{t(dict, 'vault.mfa.eyebrow', uiCopy('u_ab59db294400b3d0'))}</div>
           <h2 style={{ margin: '6px 0 2px', fontSize: 18, fontWeight: 900 }}>
-            {t(dict, 'vault.mfa.title', 'Verify Your Identity')}
+            {t(dict, 'vault.mfa.title', uiCopy('u_3cf13eea39e7dcc1'))}
           </h2>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
             {operationLabels[operation]}: {secret_name}
@@ -120,7 +122,7 @@ export default function MFAVerification({
         {/* Method selection */}
         {step === 'method-select' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(['totp', 'email', 'sms'] as MFAMethod[]).map(m => (
+            {([uiCopy('u_37d55f5c3332c88e'), uiCopy('u_1862635f5d1ca4c4'), uiCopy('u_b0ad26c1fccfb553')] as MFAMethod[]).map(m => (
               <button
                 key={m}
                 onClick={() => handleSelectMethod(m)}
@@ -155,14 +157,14 @@ export default function MFAVerification({
                 </span>
                 <div>
                   <div style={{ fontWeight: 700 }}>
-                    {m === 'totp' && t(dict, 'vault.mfa.method.totp', 'Authenticator App')}
-                    {m === 'email' && t(dict, 'vault.mfa.method.email', 'Email')}
-                    {m === 'sms' && t(dict, 'vault.mfa.method.sms', 'SMS')}
+                    {m === 'totp' && t(dict, 'vault.mfa.method.totp', uiCopy('u_a02ca551ba6d214a'))}
+                    {m === 'email' && t(dict, 'vault.mfa.method.email', uiCopy('u_7cc03db6562defca'))}
+                    {m === 'sms' && t(dict, 'vault.mfa.method.sms', uiCopy('u_efa956410f58c510'))}
                   </div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>
-                    {m === 'totp' && t(dict, 'vault.mfa.method.totpDesc', 'Use your authenticator app')}
-                    {m === 'email' && t(dict, 'vault.mfa.method.emailDesc', 'Code sent to your email')}
-                    {m === 'sms' && t(dict, 'vault.mfa.method.smsDesc', 'Code sent to your phone')}
+                    {m === 'totp' && t(dict, 'vault.mfa.method.totpDesc', uiCopy('u_251631d9e90ba2a2'))}
+                    {m === 'email' && t(dict, 'vault.mfa.method.emailDesc', uiCopy('u_97c66934d8808aaf'))}
+                    {m === 'sms' && t(dict, 'vault.mfa.method.smsDesc', uiCopy('u_82526bf3e9ef7f4e'))}
                   </div>
                 </div>
               </button>
@@ -183,7 +185,7 @@ export default function MFAVerification({
                   cursor: 'pointer',
                 }}
               >
-                {t(dict, 'common.cancel', 'Cancel')}
+                {t(dict, 'common.cancel', uiCopy('u_49e61c6490bc347b'))}
               </button>
             </div>
           </div>
@@ -194,7 +196,7 @@ export default function MFAVerification({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                {t(dict, 'vault.mfa.enterCode', 'Enter 6-digit code')}
+                {t(dict, 'vault.mfa.enterCode', uiCopy('u_c32f4243740b1dea'))}
               </label>
               <input
                 type="text"
@@ -249,7 +251,7 @@ export default function MFAVerification({
                   opacity: isVerifying ? 0.5 : 1,
                 }}
               >
-                {t(dict, 'common.cancel', 'Cancel')}
+                {t(dict, 'common.cancel', uiCopy('u_ad2b95ef0089f2fc'))}
               </button>
               <button
                 onClick={handleVerify}
@@ -267,7 +269,7 @@ export default function MFAVerification({
                   opacity: isVerifying || code.length < 6 ? 0.6 : 1,
                 }}
               >
-                {isVerifying ? t(dict, 'vault.mfa.verifying', 'Verifying...') : t(dict, 'vault.mfa.verify', 'Verify')}
+                {isVerifying ? t(dict, 'vault.mfa.verifying', uiCopy('u_bc2a8c63fe0180ac')) : t(dict, 'vault.mfa.verify', uiCopy('u_b0244f8bf628791b'))}
               </button>
             </div>
           </div>
@@ -278,10 +280,10 @@ export default function MFAVerification({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '20px 0' }}>
             <div style={{ fontSize: 32 }}>✓</div>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#86efac' }}>
-              {t(dict, 'vault.mfa.success', 'Verified successfully')}
+              {t(dict, 'vault.mfa.success', uiCopy('u_bf972ab4289f120e'))}
             </p>
             <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,.55)' }}>
-              {t(dict, 'vault.mfa.proceeding', 'Proceeding with operation...')}
+              {t(dict, 'vault.mfa.proceeding', uiCopy('u_4db6054d3af184d4'))}
             </p>
           </div>
         )}

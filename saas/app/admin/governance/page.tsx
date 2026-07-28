@@ -4,6 +4,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export default function Page() {
   const [data, setData] = useState<any>(null)
@@ -20,25 +22,25 @@ export default function Page() {
   return (
     <div className="sb-cockpit-stack">
       <header className="sb-cockpit-hero">
-        <span className="sb-eyebrow">Owner/Admin Governance</span>
-        <h2><LocalizedText fallback={"COS governance telemetry"} /></h2>
-        <p><LocalizedText fallback={"Live where connected to COS campaign queue and decision logs. Any fallback or empty-state figures are marked as examples until telemetry is available."} /></p>
+        <span className="sb-eyebrow">{uiCopy('u_77d2602007790878')}</span>
+        <h2><LocalizedText fallback={uiCopy('u_5724e1d1c4fffba9')} /></h2>
+        <p><LocalizedText fallback={uiCopy('u_56ca69f8e8a4bd9b')} /></p>
       </header>
-      <section className="sb-cockpit-grid" aria-label="Governance pipelines">
+      <section className="sb-cockpit-grid" aria-label={uiCopy('u_eb9e010716a4b819')}>
         {pipelines.length ? pipelines.map((p: any) => (
           <article className="sb-neon-panel" key={p.id}>
             <p>{p.name}</p>
             <strong>{p.healthScore ?? '—'}%</strong>
-            <span>Status: {p.status || 'unknown'} · Source: {p.telemetry?.source || 'live/default mix'}</span>
+            <span>{uiCopy('u_278b7f3de2b05a0f')}{p.status || uiCopy('u_6be3461d008fa6de')}{uiCopy('u_28e1b35eaebf517a')}{p.telemetry?.source || uiCopy('u_4ca162e524ff924d')}</span>
           </article>
         )) : (
-          <article className="sb-neon-panel"><p><LocalizedText fallback={"Example governance pipeline"} /></p><strong>Demo</strong><span><LocalizedText fallback={"No live governance telemetry returned yet."} /></span></article>
+          <article className="sb-neon-panel"><p><LocalizedText fallback={uiCopy('u_d1cedafcbc3a68e6')} /></p><strong>{uiCopy('u_801f55fa73f2217d')}</strong><span><LocalizedText fallback={uiCopy('u_6fdb7a2423d1a4a1')} /></span></article>
         )}
       </section>
-      <section className="sb-orbit-table" aria-label="Governance timeline">
-        <div className="sb-orbit-table__header"><h3><LocalizedText fallback={"Recent governance events"} /></h3><Link href="/admin/timeline">Open full timeline →</Link></div>
-        <table><thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Source</th></tr></thead><tbody>
-          {timeline.length ? timeline.map((e: any) => <tr key={e.id}><td>{e.timestamp ? new Date(e.timestamp).toLocaleString() : '—'}</td><td>{e.title}</td><td>{e.status}</td><td>{e.telemetry?.row ? 'cos_decisions live log' : 'derived telemetry/example'}</td></tr>) : <tr><td colSpan={4}><LocalizedText fallback={"No live governance events yet. Demo examples are intentionally not shown as live activity."} /></td></tr>}
+      <section className="sb-orbit-table" aria-label={uiCopy('u_8d54ee8fdca55f5c')}>
+        <div className="sb-orbit-table__header"><h3><LocalizedText fallback={uiCopy('u_834c7a31c494d52d')} /></h3><Link href="/admin/timeline">{uiCopy('u_386616ec3a82dde2')}</Link></div>
+        <table><thead><tr><th>{uiCopy('u_cf135fe25010ca9e')}</th><th>{uiCopy('u_ff0a911ef8dd1faa')}</th><th>{uiCopy('u_7d761eb666ce4523')}</th><th>{uiCopy('u_5e16cc66ae23706c')}</th></tr></thead><tbody>
+          {timeline.length ? timeline.map((e: any) => <tr key={e.id}><td>{e.timestamp ? new Date(e.timestamp).toLocaleString() : '—'}</td><td>{e.title}</td><td>{e.status}</td><td>{e.telemetry?.row ? uiCopy('u_427b7d4b8034a6c8') : uiCopy('u_d1f672d01f81bb64')}</td></tr>) : <tr><td colSpan={4}><LocalizedText fallback={uiCopy('u_eb82536c8de0430a')} /></td></tr>}
         </tbody></table>
       </section>
     </div>

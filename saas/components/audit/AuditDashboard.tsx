@@ -12,6 +12,8 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -53,13 +55,13 @@ type AuditCopy = {
 
 const COPY: Record<string, AuditCopy> = {
   en: {
-    title: 'Audit Workspace', subtitle: 'Run deep audits, track usage, and scale your plan.',
-    creditUsage: 'Credit usage', currentPlan: 'Current plan', unlimited: 'Unlimited',
-    meterVideo: 'Video', meterImage: 'Image', meterAi: 'AI', usedOf: 'used of',
-    upgradeTitle: 'Scale up', upgradeSubtitle: 'More credits, deeper audits, higher limits.', upgrade: 'Upgrade to', redirecting: 'Redirecting…', upgradeError: 'Could not start checkout.',
-    buyTitle: 'Buy audit credits', buySubtitle: 'One-time credit packs — added to your balance right after checkout.', buyCta: 'Buy', creditsWord: 'credits', buyError: 'Could not start checkout.',
-    loading: 'Loading usage…', loadError: 'Could not load usage.', popular: 'Most popular',
-    plan: { free: 'Free Demo', launch: 'Launch', growth: 'Growth', command: 'Command' },
+    title: uiCopy('u_f436769ebf5066f2'), subtitle: uiCopy('u_9aa5d1c678b6f56d'),
+    creditUsage: uiCopy('u_28f5a1d988fbd251'), currentPlan: uiCopy('u_9a85b9456ec1b58e'), unlimited: uiCopy('u_1e39feb4d7d0e76f'),
+    meterVideo: uiCopy('u_5676c61e9df3eeae'), meterImage: uiCopy('u_5db3f4e18d589ea3'), meterAi: uiCopy('u_b4a9ab6dacbdb9b8'), usedOf: uiCopy('u_15fcf00e58db0994'),
+    upgradeTitle: uiCopy('u_dcfcced41b076886'), upgradeSubtitle: uiCopy('u_96448d916058018b'), upgrade: uiCopy('u_46790ae902b8b25f'), redirecting: uiCopy('u_ca0fe31468cf4b2d'), upgradeError: uiCopy('u_e89c7350dfa31ca6'),
+    buyTitle: uiCopy('u_aef02a111528cb37'), buySubtitle: uiCopy('u_06714569722856c3'), buyCta: uiCopy('u_9ad509d194b06824'), creditsWord: uiCopy('u_4eebd90b0d365c24'), buyError: uiCopy('u_23a85a15d2e2a80c'),
+    loading: uiCopy('u_a42f933b2d338c36'), loadError: uiCopy('u_76a7e7197901b53a'), popular: uiCopy('u_42ae6d018e2e79c9'),
+    plan: { free: uiCopy('u_ecff7c27a3ab815c'), launch: uiCopy('u_5d73c804538dc8c8'), growth: uiCopy('u_55d1790c34856d0d'), command: uiCopy('u_4302b78c6bd92475') },
   },
   es: {
     title: 'Espacio de Auditoría', subtitle: 'Ejecuta auditorías profundas, controla el uso y amplía tu plan.',

@@ -4,6 +4,8 @@ import { useRef, useState } from 'react'
 import { PromoteCampaignConfigurator, type PromoteCampaignRequest } from '@/components/enterprise/PromoteCampaignConfigurator'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 
@@ -18,7 +20,7 @@ type Campaign = {
 }
 
 const UI: Record<string, Record<string, string>> = {
-  en: { success: 'Campaign ready.', working: 'SignalBoost is creating your campaign…', reset: 'Reset', website: 'Website', socialPosts: 'Social posts', email: 'Email', video: 'Video', reviewFollowUp: 'Review follow-up', languageIdeas: 'Language ideas', copy: 'Copy', copied: 'Copied!', noContent: 'No content for this channel.', title: 'Title', body: 'Body', cta: 'CTA', subject: 'Subject', hook: 'Hook', script: 'Script', message: 'Message', idea: 'Idea' },
+  en: { success: 'Campaign ready.', working: 'SignalBoost is creating your campaign…', reset: 'Reset', website: 'Website', socialPosts: 'Social posts', email: 'Email', video: 'Video', reviewFollowUp: 'Review follow-up', languageIdeas: 'Language ideas', copy: 'Copy', copied: 'Copied!', noContent: 'No content for this channel.', title: uiCopy('u_7ab731ae95decd74'), body: uiCopy('u_6e5d30cb2854e456'), cta: 'CTA', subject: 'Subject', hook: 'Hook', script: 'Script', message: String(uiCopy('u_9dd10bcd5fe39631')), idea: 'Idea' },
   es: { success: 'Campaña lista.', working: 'SignalBoost está creando tu campaña…', reset: 'Restablecer', website: 'Sitio web', socialPosts: 'Publicaciones sociales', email: 'Email', video: 'Video', reviewFollowUp: 'Seguimiento de reseñas', languageIdeas: 'Ideas por idioma', copy: 'Copiar', copied: '¡Copiado!', noContent: 'Sin contenido para este canal.', title: 'Título', body: 'Cuerpo', cta: 'CTA', subject: 'Asunto', hook: 'Gancho', script: 'Guion', message: 'Mensaje', idea: 'Idea' },
   pt: { success: 'Campanha pronta.', working: 'SignalBoost está criando sua campanha…', reset: 'Limpar', website: 'Site', socialPosts: 'Posts sociais', email: 'Email', video: 'Vídeo', reviewFollowUp: 'Pedido de avaliação', languageIdeas: 'Ideias por idioma', copy: 'Copiar', copied: 'Copiado!', noContent: 'Sem conteúdo para este canal.', title: 'Título', body: 'Corpo', cta: 'CTA', subject: 'Assunto', hook: 'Gancho', script: 'Roteiro', message: 'Mensagem', idea: 'Ideia' },
   pl: { success: 'Kampania gotowa.', working: 'SignalBoost tworzy kampanię…', reset: 'Reset', website: 'Strona', socialPosts: 'Posty społecznościowe', email: 'Email', video: 'Wideo', reviewFollowUp: 'Prośba o opinię', languageIdeas: 'Pomysły językowe', copy: 'Kopiuj', copied: 'Skopiowano!', noContent: 'Brak treści dla tego kanału.', title: 'Tytuł', body: 'Treść', cta: 'CTA', subject: 'Temat', hook: 'Haczyk', script: 'Skrypt', message: 'Wiadomość', idea: 'Pomysł' },
@@ -59,9 +61,9 @@ function ResultPanel({ campaign, ui }: { campaign: Campaign; ui: Record<string, 
       { label: ui.cta, value: campaign.website?.cta || '' },
     ],
     social: [
-      { label: 'Facebook', value: campaign.social?.facebook || '' },
-      { label: 'Instagram', value: campaign.social?.instagram || '' },
-      { label: 'TikTok', value: campaign.social?.tiktok || '' },
+      { label: uiCopy('u_b16eb47768bdabb2'), value: campaign.social?.facebook || '' },
+      { label: uiCopy('u_c5d8070d95ba4e97'), value: campaign.social?.instagram || '' },
+      { label: uiCopy('u_44304ad61b7b7a48'), value: campaign.social?.tiktok || '' },
     ],
     email: [
       { label: ui.subject, value: campaign.email?.subject || '' },
@@ -79,7 +81,7 @@ function ResultPanel({ campaign, ui }: { campaign: Campaign; ui: Record<string, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 480 }}>
-      <div role="tablist" aria-label="Campaign channels" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+      <div role="tablist" aria-label={uiCopy('u_0ad6b03999c4a4b0')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -137,7 +139,7 @@ export default function PromotePage() {
       setCampaign(payload.campaign)
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Could not generate campaign')
+      setError(value instanceof Error ? value.message : uiCopy('u_055fe28b23fef499'))
     } finally {
       setLoading(false)
     }
@@ -152,32 +154,32 @@ export default function PromotePage() {
     <main style={{ maxWidth: 1240, margin: '0 auto' }}>
       <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 12, marginBottom: 18 }}>
         <div>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>📣 {t(dict, 'promote_page.badge', 'Promote My Business')}</p>
-          <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', margin: '4px 0 0', color: '#fff' }}>{t(dict, 'promote_page.title', 'Create a full campaign')}</h1>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>📣 {t(dict, 'promote_page.badge', uiCopy('u_39e9d0998ea8daab'))}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', margin: '4px 0 0', color: '#fff' }}>{t(dict, 'promote_page.title', uiCopy('u_19de95d069c1ae2d'))}</h1>
         </div>
-        <span className="sb-chip" aria-live="polite">{loading ? '…' : campaign ? `✓ ${ui.success}` : 'IDLE'}</span>
+        <span className="sb-chip" aria-live="polite">{loading ? '…' : campaign ? `✓ ${ui.success}` : uiCopy('u_817cba317587e444')}</span>
       </header>
 
       <div className="promote-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24, alignItems: 'start' }}>
-        <section aria-label="Enterprise campaign brief">
+        <section aria-label={uiCopy('u_8051cafa8a6a0eae')}>
           <PromoteCampaignConfigurator busy={loading} language={lang} onSubmit={handleGenerate} onReset={reset} />
           {error && <p role="alert" style={{ marginTop: 12, color: '#f87171', fontSize: 13 }}>{error}</p>}
         </section>
 
-        <section ref={resultRef} aria-label="Campaign preview" style={{ borderLeft: campaign ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingLeft: 20, minHeight: 480 }}>
+        <section ref={resultRef} aria-label={uiCopy('u_bc6342310f8317bc')} style={{ borderLeft: campaign ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingLeft: 20, minHeight: 480 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <strong style={{ color: GOLD, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>
-              {campaign ? `✅ ${ui.success}` : t(dict, 'promote_page.preview.title', 'Campaign preview')}
+              {campaign ? `✅ ${ui.success}` : t(dict, 'promote_page.preview.title', uiCopy('u_7f7ebbeac22993a3'))}
             </strong>
             {campaign && <button type="button" onClick={reset} style={ghostButton}>{ui.reset}</button>}
           </div>
           {loading && <div aria-live="polite" style={emptyState}><div style={{ fontSize: 40 }}>📣</div><p>{ui.working}</p></div>}
-          {!loading && !campaign && <div style={emptyState}><div style={{ fontSize: 48 }}>📣</div><p>{t(dict, 'promote_page.subtitle', 'Analyze a source, review the structured brief, and approve it to create the campaign.')}</p></div>}
+          {!loading && !campaign && <div style={emptyState}><div style={{ fontSize: 48 }}>📣</div><p>{t(dict, 'promote_page.subtitle', uiCopy('u_93441ad3e4a49147'))}</p></div>}
           {!loading && campaign && <ResultPanel campaign={campaign} ui={ui} />}
         </section>
       </div>
 
-      <style>{`@media (max-width: 860px) { .promote-grid { grid-template-columns: 1fr !important; } }`}</style>
+      <style>{uiCopy('u_830f22e1d34533ef')}</style>
     </main>
   )
 }

@@ -4,13 +4,15 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import Link from 'next/link'
 import { FormEvent, useState, type CSSProperties } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type PressChannel = 'online-newspapers' | 'print-newspapers' | 'trade-press'
 
 const CHANNEL_LABELS: Record<PressChannel, string> = {
-  'online-newspapers': 'Online newspaper / digital publisher',
-  'print-newspapers': 'Print newspaper / offline placement',
-  'trade-press': 'Magazine / IT trade press',
+  'online-newspapers': uiCopy('u_8c03b5e254ac0503'),
+  'print-newspapers': uiCopy('u_e46d89eebf67a470'),
+  'trade-press': uiCopy('u_ee15f1ec792f22cf'),
 }
 
 export default function DirectPressCampaignPage() {
@@ -54,13 +56,13 @@ export default function DirectPressCampaignPage() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || 'Could not create campaign.')
-      setMessage('Campaign created. It is now available in Press & Print Media for local review.')
+      setMessage(uiCopy('u_07df21cb9694f789'))
       setPublication('')
       setContact('')
       setHeadline('')
       setNotes('')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not create campaign.')
+      setMessage(error instanceof Error ? error.message : uiCopy('u_ad1ec9251d129ad1'))
     } finally {
       setBusy(false)
     }
@@ -69,42 +71,42 @@ export default function DirectPressCampaignPage() {
   return (
     <main style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Marketing + Sales · Press & Print Media</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"Start a staff-led press campaign"} /></h1>
-        <p style={body}><LocalizedText fallback={"Use this when the team will identify the publication, prepare the article or ad, coordinate with the editor or media contact, and handle the campaign directly. No rich-media workflow is required."} /></p>
-        <Link href="/dashboard/marketing/press-print" className="sb-button-secondary" style={{ textDecoration: 'none', display: 'inline-flex', marginTop: 12 }}><LocalizedText fallback={"Back to Press & Print Media"} /></Link>
+        <p className="sb-eyebrow" style={{ margin: 0 }}>{uiCopy('u_ec2f1761fb12c7b7')}</p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={uiCopy('u_cf6c48fc5098c4ca')} /></h1>
+        <p style={body}><LocalizedText fallback={uiCopy('u_f87cbd2b496ad2e7')} /></p>
+        <Link href="/dashboard/marketing/press-print" className="sb-button-secondary" style={{ textDecoration: 'none', display: 'inline-flex', marginTop: 12 }}><LocalizedText fallback={uiCopy('u_0d433e5473978012')} /></Link>
       </section>
 
       <form onSubmit={submit} style={card}>
         <label style={field}>
-          <span className="sb-caption">Channel</span>
+          <span className="sb-caption">{uiCopy('u_557384529a3f522d')}</span>
           <select value={channel} onChange={(event) => setChannel(event.target.value as PressChannel)} style={input}>
-            <option value="online-newspapers"><LocalizedText fallback={"Online newspaper / digital publisher"} /></option>
-            <option value="print-newspapers"><LocalizedText fallback={"Print newspaper / offline placement"} /></option>
-            <option value="trade-press"><LocalizedText fallback={"Magazine / IT trade press"} /></option>
+            <option value="online-newspapers"><LocalizedText fallback={uiCopy('u_0c0f6202af8a2558')} /></option>
+            <option value="print-newspapers"><LocalizedText fallback={uiCopy('u_b887a722dc30ffd9')} /></option>
+            <option value="trade-press"><LocalizedText fallback={uiCopy('u_6694f71bc04a01b9')} /></option>
           </select>
         </label>
         <label style={field}>
-          <span className="sb-caption"><LocalizedText fallback={"Publication name"} /></span>
-          <input value={publication} onChange={(event) => setPublication(event.target.value)} style={input} placeholder="Example: local newspaper, IT magazine, trade publication" />
+          <span className="sb-caption"><LocalizedText fallback={uiCopy('u_b3c1b806bcde0e6c')} /></span>
+          <input value={publication} onChange={(event) => setPublication(event.target.value)} style={input} placeholder={uiCopy('u_2cb50df1d5e3e49f')} />
         </label>
         <label style={field}>
-          <span className="sb-caption"><LocalizedText fallback={"Editor / media contact"} /></span>
-          <input value={contact} onChange={(event) => setContact(event.target.value)} style={input} placeholder="Name, email, phone, media-kit link, or notes" />
+          <span className="sb-caption"><LocalizedText fallback={uiCopy('u_6d07e3fac1ea0fc9')} /></span>
+          <input value={contact} onChange={(event) => setContact(event.target.value)} style={input} placeholder={uiCopy('u_73fd2d1ce6e84228')} />
         </label>
         <label style={field}>
-          <span className="sb-caption"><LocalizedText fallback={"Headline / campaign title"} /></span>
-          <input value={headline} onChange={(event) => setHeadline(event.target.value)} style={input} placeholder="Working headline or ad title" />
+          <span className="sb-caption"><LocalizedText fallback={uiCopy('u_4af31aba610cb07e')} /></span>
+          <input value={headline} onChange={(event) => setHeadline(event.target.value)} style={input} placeholder={uiCopy('u_a2256a59d4255cc3')} />
         </label>
         <label style={field}>
-          <span className="sb-caption"><LocalizedText fallback={"Article / ad notes"} /></span>
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} style={{ ...input, minHeight: 140 }} placeholder="What the team will prepare, submit, or publish." />
+          <span className="sb-caption"><LocalizedText fallback={uiCopy('u_5f1e76ae36a1ba3b')} /></span>
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} style={{ ...input, minHeight: 140 }} placeholder={uiCopy('u_f0f113287850caf0')} />
         </label>
         <label style={field}>
-          <span className="sb-caption"><LocalizedText fallback={"CTA URL"} /></span>
+          <span className="sb-caption"><LocalizedText fallback={uiCopy('u_53ea8e3306b8e02d')} /></span>
           <input value={ctaUrl} onChange={(event) => setCtaUrl(event.target.value)} style={input} />
         </label>
-        <button disabled={busy} type="submit" style={primary}>{busy ? 'Creating…' : 'Create press campaign record'}</button>
+        <button disabled={busy} type="submit" style={primary}>{busy ? uiCopy('u_dbbc9261b4447df8') : uiCopy('u_1dad72ce56c26796')}</button>
         {message ? <p className="sb-caption" style={{ color: '#fde68a' }}>{message}</p> : null}
       </form>
     </main>

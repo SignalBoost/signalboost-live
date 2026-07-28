@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { readFile } from 'node:fs/promises'
+import { readUiSourceAsync } from './helpers/sourceWithUiCopy.mjs'
 
 const componentPath = new URL('../components/hub/ProviderActionExecutionGate.tsx', import.meta.url)
 
 async function source(): Promise<string> {
-  return readFile(componentPath, 'utf8')
+  return readUiSourceAsync(componentPath)
 }
 
 test('execution gate renders only normalized reviewed capabilities', async () => {

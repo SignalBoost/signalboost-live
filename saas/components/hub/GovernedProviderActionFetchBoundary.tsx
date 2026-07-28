@@ -8,6 +8,8 @@ import {
   type ProviderCapabilityResponse,
 } from '@/lib/hub/provider-action-client'
 import type { ProviderExecutionHandoff } from './ProviderActionExecutionGate.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const LEGACY_ACTION_ENDPOINTS = new Set([
   '/api/hub/action',
@@ -85,7 +87,7 @@ export default function GovernedProviderActionFetchBoundary({
           mode: plan.mode,
           productLabel: plan.productLabel,
           executesProviderMutation: false,
-          message: 'No automated provider request is sent for Direct configuration.',
+          message: String(uiCopy('u_3c3093b8e941e4e9')),
           data: plan.body,
         }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       }

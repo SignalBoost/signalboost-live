@@ -2,6 +2,8 @@
 'use client'
 
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -29,30 +31,30 @@ type ProjectCopy = {
 
 const COPY: Record<Language, ProjectCopy> = {
   en: {
-    eyebrow: 'Roadmap',
-    title: 'Future Projects',
-    subtitle: 'Concepts being considered for future SignalBoost development. These projects are not active production features yet.',
-    status: 'Concept — future build',
-    badge: 'FUTURE',
-    projectTitle: 'AI Platform Connection Gateway',
-    projectSummary: 'A guided gateway, browser copilot, OAuth agent, and platform automation system that helps users connect services such as Facebook, Instagram, Reddit, TikTok, LinkedIn, YouTube, Telegram, and WeChat.',
-    goalTitle: 'Goal',
-    goal: 'Reduce platform setup to the smallest required human approval step, then automate supported work through official APIs and securely managed tokens.',
-    agentsTitle: 'Proposed agents',
+    eyebrow: uiCopy('u_4b7b33393789fa3a'),
+    title: uiCopy('u_bfe47b027cd9d4f5'),
+    subtitle: uiCopy('u_c9873455a6e56fca'),
+    status: uiCopy('u_29350f7d0c31d482'),
+    badge: uiCopy('u_007b587bd1f25f90'),
+    projectTitle: uiCopy('u_9e0e6ffff0239104'),
+    projectSummary: uiCopy('u_b6482117f691ec26'),
+    goalTitle: uiCopy('u_26b79e2a1771b2d9'),
+    goal: uiCopy('u_f6de81b3db5e6807'),
+    agentsTitle: uiCopy('u_c8ed56ae0e9afd27'),
     agents: [
-      { name: 'Gateway Agent', description: 'Coordinates onboarding, explains requirements, and moves the user through each connection stage.' },
-      { name: 'Browser Copilot', description: 'Guides the user through provider screens, highlights the next action, and explains errors without bypassing security controls.' },
-      { name: 'OAuth Agent', description: 'Handles token exchange, encrypted storage, scope validation, refresh, connection health, and supported webhook setup after approval.' },
-      { name: 'Platform Automation Agent', description: 'Uses approved APIs to publish, schedule, collect analytics, manage comments, support outreach, and run permitted workflows.' },
+      { name: uiCopy('u_0bf08d27bef329f7'), description: uiCopy('u_1375ea1a06f87ada') },
+      { name: uiCopy('u_d7c5073f2ead611c'), description: uiCopy('u_e35442921c86c023') },
+      { name: uiCopy('u_3c4b96a8d0d2ef42'), description: uiCopy('u_08e2b7aa5f454811') },
+      { name: uiCopy('u_fa44f58210cbe855'), description: uiCopy('u_f130184ce656dddc') },
     ],
-    humanTitle: 'Human approval boundary',
-    humanSteps: ['Sign in with the provider', 'Complete CAPTCHA, identity checks, or 2FA', 'Accept provider or developer terms', 'Click Allow or Grant Access when consent is required'],
-    automationTitle: 'What SignalBoost could automate afterward',
-    automationSteps: ['Validate and refresh tokens', 'Check scopes and connection health', 'Configure supported webhooks', 'Publish and schedule content', 'Collect analytics and comments', 'Run permitted campaigns and outreach workflows'],
-    boundaryTitle: 'Safety and policy boundary',
-    boundary: 'The project must use official provider authorization and APIs. It must not automate credential entry, bypass CAPTCHA or 2FA, impersonate user consent, or evade platform restrictions.',
-    futureTitle: 'Planning note',
-    future: 'Before implementation, each provider will need a separate capability review because approval steps, token lifetimes, scopes, app-review requirements, and allowed automation differ by platform.',
+    humanTitle: uiCopy('u_54f6dfe4204614cd'),
+    humanSteps: [uiCopy('u_117ede1fbd8089cb'), uiCopy('u_ea6be5ac8484c46f'), uiCopy('u_a870adbe8244e539'), uiCopy('u_fdb930e7401e6774')],
+    automationTitle: uiCopy('u_9d34d44e76f8a304'),
+    automationSteps: [uiCopy('u_95bb1ff426703c4d'), uiCopy('u_a36975177ef1caee'), uiCopy('u_bc7a7d9c6e47f5c1'), uiCopy('u_17ea756b9bdc6169'), uiCopy('u_93cb75e58e69fed3'), uiCopy('u_7e929c5c056a5e31')],
+    boundaryTitle: uiCopy('u_85291f9ba3f9e608'),
+    boundary: uiCopy('u_f4b3bffb06cce810'),
+    futureTitle: uiCopy('u_db5740a5c31d893b'),
+    future: uiCopy('u_41eaa0f4093da201'),
   },
   es: {
     eyebrow: 'Hoja de ruta',

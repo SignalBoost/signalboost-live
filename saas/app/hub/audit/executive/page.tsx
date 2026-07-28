@@ -11,6 +11,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import ExecutiveSummary, { type ExecutiveSummaryView } from '@/components/audit/ExecutiveSummary'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — the repo's tsconfig is non-strict, so discriminated unions
 // do not narrow on `if (!json.ok)`. Keep ok/report/error on one object.
@@ -34,11 +36,11 @@ export default function ExecutiveSummaryPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json) {
-          setError(t('audit.exec.loadError', 'Could not load the summary.'))
+          setError(t('audit.exec.loadError', uiCopy('u_163ba5a87e64f98b')))
           return
         }
         if (!json.ok || !json.report) {
-          setError(json.error || t('audit.exec.loadError', 'Could not load the summary.'))
+          setError(json.error || t('audit.exec.loadError', uiCopy('u_90147b35c0eee334')))
           return
         }
         setData(json.report)
@@ -46,7 +48,7 @@ export default function ExecutiveSummaryPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.exec.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.exec.fetchError', uiCopy('u_ade7e17383fbad20')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -57,7 +59,7 @@ export default function ExecutiveSummaryPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.exec.loading', 'Building executive summary…')}
+        {t('audit.exec.loading', uiCopy('u_fe34fb636d51d9fc'))}
       </main>
     )
   }
@@ -85,7 +87,7 @@ export default function ExecutiveSummaryPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 14px' }}>
             <span aria-hidden style={{ color: '#ffc300' }}>✍️</span>
             <h2 style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', margin: 0 }}>
-              {t('audit.exec.deepTitle', 'Full Narrative Report')}
+              {t('audit.exec.deepTitle', uiCopy('u_d247fccd9650cdf2'))}
             </h2>
           </div>
           <article style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, background: 'rgba(255,255,255,.02)', padding: '18px 24px' }}>

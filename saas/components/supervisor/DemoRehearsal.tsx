@@ -28,6 +28,7 @@
 
 import { useState } from 'react'
 import { uiText } from '@/lib/i18n/uiText'
+import { DEMO_PUBLISH_COPY, type DemoPublishLanguage } from '@/lib/i18n/demoPublishCopy'
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -264,6 +265,102 @@ export default function DemoRehearsal({ lang }: { lang: Language }) {
   const [drill, setDrill] = useState<DrillRecord | null>(null)
   const [drillError, setDrillError] = useState('')
 
+  // Publishing turns a run into a link a prospect can open without an account. It is always
+  // an explicit press: nothing is published as a side effect of running a rehearsal or drill.
+  const pub = DEMO_PUBLISH_COPY[(lang as DemoPublishLanguage)] ?? DEMO_PUBLISH_COPY.en
+  const [shared, setShared] = useState<Record<string, { shareUrl: string; expiresAt?: string; recordId: string } | null>>({})
+  const [publishBusy, setPublishBusy] = useState('')
+  const [publishError, setPublishError] = useState('')
+  const [revokedKinds, setRevokedKinds] = useState<Record<string, boolean>>({})
+
+  async function publish(kind: 'rehearsal' | 'drill', payload: unknown) {
+    if (publishBusy) return
+    setPublishBusy(kind)
+    setPublishError('')
+    try {
+      const response = await fetch('/api/supervisor/demo/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, record: payload }),
+      })
+      const result = await response.json()
+      if (!result?.ok) {
+        setPublishError(String(result?.error || pub.failed))
+        return
+      }
+      setShared(current => ({ ...current, [kind]: { shareUrl: result.shareUrl, expiresAt: result.expiresAt, recordId: result.recordId } }))
+      setRevokedKinds(current => ({ ...current, [kind]: false }))
+    } catch (cause) {
+      setPublishError(cause instanceof Error ? cause.message : pub.failed)
+    } finally {
+      setPublishBusy('')
+    }
+  }
+
+  async function revoke(kind: 'rehearsal' | 'drill') {
+    const entry = shared[kind]
+    if (!entry || publishBusy) return
+    setPublishBusy(`revoke:${kind}`)
+    setPublishError('')
+    try {
+      const response = await fetch(`/api/supervisor/demo/publish?recordId=${encodeURIComponent(entry.recordId)}`, { method: 'DELETE' })
+      const result = await response.json()
+      if (!result?.ok) {
+        setPublishError(String(result?.error || pub.failed))
+        return
+      }
+      setRevokedKinds(current => ({ ...current, [kind]: true }))
+    } catch (cause) {
+      setPublishError(cause instanceof Error ? cause.message : pub.failed)
+    } finally {
+      setPublishBusy('')
+    }
+  }
+
+  function publishPanel(kind: 'rehearsal' | 'drill', payload: unknown) {
+    const entry = shared[kind]
+    const isRevoked = revokedKinds[kind] === true
+    return (
+      <section style={subcard}>
+        <p style={muted}>{pub.publishNote}</p>
+        <button
+          type="button"
+          onClick={() => publish(kind, payload)}
+          disabled={publishBusy !== ''}
+          style={{ ...button, cursor: publishBusy !== '' ? 'wait' : 'pointer' }}
+        >
+          {publishBusy === kind ? pub.publishing : pub.publishButton}
+        </button>
+        {publishError ? <p role="alert" style={alert}>{publishError}</p> : null}
+        {entry ? (
+          <div style={{ marginTop: 12 }}>
+            <h4 style={{ margin: '0 0 6px' }}>{pub.linkTitle}</h4>
+            <input readOnly value={entry.shareUrl} style={linkBox} />
+            <p style={warn}>{pub.publicWarning}</p>
+            <p style={muted}>{pub.linkHint}</p>
+            {entry.expiresAt ? (
+              <p style={muted}>
+                {pub.expiresLabel}: {entry.expiresAt}
+              </p>
+            ) : null}
+            {isRevoked ? (
+              <p style={warn}>{pub.revoked}</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => revoke(kind)}
+                disabled={publishBusy !== ''}
+                style={{ ...button, background: 'transparent', color: '#ffb3c1', border: '1px solid rgba(255,107,107,.5)' }}
+              >
+                {publishBusy === `revoke:${kind}` ? pub.revoking : pub.revokeButton}
+              </button>
+            )}
+          </div>
+        ) : null}
+      </section>
+    )
+  }
+
   async function run() {
     if (state === 'running') return
     setState('running')
@@ -366,6 +463,7 @@ export default function DemoRehearsal({ lang }: { lang: Language }) {
                 ) : null}
               </section>
             ))}
+            {publishPanel('rehearsal', record)}
           </div>
         ) : null}
       </section>
@@ -430,6 +528,7 @@ export default function DemoRehearsal({ lang }: { lang: Language }) {
             <p style={muted}>
               {copy.ranAtLabel} {drill.ranAt}
             </p>
+            {publishPanel('drill', drill)}
           </div>
         ) : null}
       </section>
@@ -444,6 +543,7 @@ const dd = { margin: 0, wordBreak: 'break-word' as const, fontWeight: 700 }
 const badgeRow = { display: 'flex', gap: 8, flexWrap: 'wrap' as const }
 const badge = { border: '1px solid rgba(245,196,81,.6)', borderRadius: 999, padding: '6px 12px', color: '#f5c451', fontSize: 12, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' as const }
 const button = { border: 0, borderRadius: 12, padding: '14px 20px', fontWeight: 900, fontSize: 15, color: '#07111f', background: '#f5c451' }
+const linkBox = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', background: '#07111f', color: '#c3ccdf', fontFamily: 'ui-monospace, monospace', fontSize: 12, boxSizing: 'border-box' as const }
 const muted = { color: 'rgba(255,255,255,.68)' }
 const warn = { color: '#ffd8a8', fontWeight: 700 }
 const alert = { color: '#ffb3c1', fontWeight: 700 }

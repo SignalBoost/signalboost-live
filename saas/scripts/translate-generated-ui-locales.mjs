@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
   TARGET_UI_LOCALES,
@@ -123,6 +124,32 @@ function modelConfig() {
 
 function usesSerializedRequests() {
   return modelConfig().provider === 'GitHub Models'
+}
+
+function canPublishCheckpoints() {
+  return process.env.GITHUB_ACTIONS === 'true' && Boolean(process.env.HEAD_BRANCH)
+}
+
+function runGit(args, options = {}) {
+  return execFileSync('git', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    stdio: options.quiet ? 'ignore' : 'inherit',
+  })
+}
+
+function publishCheckpoint(locale, index, total) {
+  if (!canPublishCheckpoints()) return
+
+  const branch = process.env.HEAD_BRANCH
+  runGit(['pull', '--rebase', '--autostash', 'origin', branch])
+  runGit(['add', `saas/locales/${locale}.json`])
+  const clean = spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: REPO_ROOT }).status === 0
+  if (clean) return
+
+  const state = index === total ? 'complete' : `checkpoint ${index} of ${total}`
+  runGit(['commit', '-m', `fix(i18n): ${state} ${locale} generated UI dictionary`])
+  runGit(['push', 'origin', `HEAD:${branch}`])
 }
 
 async function withRequestSlot(task) {
@@ -343,7 +370,8 @@ async function buildLocale(locale, englishData, localizedData) {
       const translated = await translateBatch(locale, batch)
       for (const [source, value] of translated) resolvedBySource.set(source, value)
       writeLocale(locale, materializeLocale(english, localizedData, resolvedBySource))
-      console.log(`[i18n] ${locale}: checkpoint ${index + 1}/${batches.length} written.`)
+      publishCheckpoint(locale, index + 1, batches.length)
+      console.log(`[i18n] ${locale}: checkpoint ${index + 1}/${batches.length} published.`)
       if (index < batches.length - 1) await sleep(modelConfig().requestSpacingMs)
     }
   } else {

@@ -108,7 +108,7 @@ function modelConfig() {
       provider: 'GitHub Models',
       endpoint: 'https://models.github.ai/inference/chat/completions',
       token: process.env.GITHUB_TOKEN,
-      model: process.env.GITHUB_MODELS_MODEL || 'openai/gpt-4o-mini',
+      model: process.env.GITHUB_TRANSLATION_MODEL || 'openai/gpt-4.1',
       maxTokens: 8000,
       maxChars: 6000,
       maxItems: 60,

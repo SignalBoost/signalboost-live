@@ -1,4 +1,4 @@
-import type { Dict } from './loadLanguage'
+import type { Dict } from './loadLanguage.ts'
 
 export const HOMEPAGE_UI_LOCALES: Record<string, Dict> = {
   en: {

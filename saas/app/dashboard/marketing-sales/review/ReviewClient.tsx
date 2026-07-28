@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { msT, type Lang } from '@/marketing-sales-core'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Draft = { id: string; lang: string; title: string; body: string }
 type Item = { campaign: { id: string; objective: string; status: string; created_at?: string }; drafts: Draft[] }
@@ -63,13 +65,13 @@ export default function ReviewClient() {
 
   return (
     <main style={{ minHeight: 'calc(100vh - 80px)', padding: '28px 22px', maxWidth: 920, margin: '0 auto', color: 'rgba(226,232,240,.92)' }}>
-      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#1af0ff', margin: 0 }}>{msT(L, 'department')}</p>
-      <h1 className="sb-h2" style={{ margin: '4px 0 18px' }}>{msT(L, 'pendingApproval')}</h1>
+      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: '#1af0ff', margin: 0 }}>{msT(L, uiCopy('u_cc92b542bde22577'))}</p>
+      <h1 className="sb-h2" style={{ margin: '4px 0 18px' }}>{msT(L, uiCopy('u_094542f6f2149007'))}</h1>
 
       {loading ? (
         <p style={{ opacity: .6 }}>…</p>
       ) : items.length === 0 ? (
-        <p style={{ opacity: .6 }}>{msT(L, 'campaigns')}: 0</p>
+        <p style={{ opacity: .6 }}>{msT(L, uiCopy('u_a9b4e1a97a4fb690'))}: 0</p>
       ) : (
         <section style={{ display: 'grid', gap: 14 }}>
           {items.map(({ campaign, drafts }) => {
@@ -98,17 +100,17 @@ export default function ReviewClient() {
 
                 {liveUrl ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 800, color: '#22c55e' }}>✓ {msT(L, 'published')}</span>
-                    <a href={liveUrl} target="_blank" rel="noreferrer" style={{ color: '#1af0ff', fontWeight: 700, textDecoration: 'underline' }}>{msT(L, 'viewLive')} →</a>
+                    <span style={{ fontWeight: 800, color: '#22c55e' }}>✓ {msT(L, uiCopy('u_9b70d0359a828ac9'))}</span>
+                    <a href={liveUrl} target="_blank" rel="noreferrer" style={{ color: '#1af0ff', fontWeight: 700, textDecoration: 'underline' }}>{msT(L, uiCopy('u_867419997bc9c6c4'))} →</a>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button disabled={busy === campaign.id} onClick={() => approveAndPublish(campaign.id)}
-                      style={{ background: '#ffc300', color: '#000', border: 'none', borderRadius: 999, padding: '9px 18px', fontWeight: 900, cursor: 'pointer', opacity: busy === campaign.id ? .6 : 1 }}>{msT(L, 'approveAndPublish')}</button>
+                      style={{ background: '#ffc300', color: '#000', border: 'none', borderRadius: 999, padding: '9px 18px', fontWeight: 900, cursor: 'pointer', opacity: busy === campaign.id ? .6 : 1 }}>{msT(L, uiCopy('u_41771e6b83018098'))}</button>
                     <button disabled={busy === campaign.id} onClick={() => decide(campaign.id, 'edits')}
-                      style={{ background: 'transparent', color: 'rgba(226,232,240,.85)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 999, padding: '9px 18px', fontWeight: 700, cursor: 'pointer' }}>{msT(L, 'requestEdits')}</button>
+                      style={{ background: 'transparent', color: 'rgba(226,232,240,.85)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 999, padding: '9px 18px', fontWeight: 700, cursor: 'pointer' }}>{msT(L, uiCopy('u_b57bd00392cc2bb1'))}</button>
                     <button disabled={busy === campaign.id} onClick={() => decide(campaign.id, 'reject')}
-                      style={{ background: 'transparent', color: '#f87171', border: '1px solid rgba(248,113,113,.4)', borderRadius: 999, padding: '9px 18px', fontWeight: 700, cursor: 'pointer' }}>{msT(L, 'reject')}</button>
+                      style={{ background: 'transparent', color: '#f87171', border: '1px solid rgba(248,113,113,.4)', borderRadius: 999, padding: '9px 18px', fontWeight: 700, cursor: 'pointer' }}>{msT(L, uiCopy('u_6c579daba17e74cb'))}</button>
                   </div>
                 )}
               </article>

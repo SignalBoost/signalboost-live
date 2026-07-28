@@ -4,6 +4,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useId, useMemo, useState } from 'react'
 import type { EnterpriseOption } from '@/lib/enterprise/masterConfig'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Props = {
   label: string
@@ -53,7 +55,7 @@ export function SearchableSelect({ label, options, value, onChange, placeholder 
       }}
       style={{ width: '100%', textAlign: 'left', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(2,6,23,.78)', color: selected ? '#fff' : 'rgba(255,255,255,.55)', borderRadius: 12, padding: '11px 12px', cursor: disabled ? 'not-allowed' : 'pointer' }}
     >
-      {selected?.label || 'Select an option'}
+      {selected?.label || uiCopy('u_9de88b6fd0aa81bc')}
     </button>
     {open && !disabled && <div style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%', marginTop: 6, border: '1px solid rgba(255,255,255,.15)', borderRadius: 14, padding: 8, background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)' }}>
       <input
@@ -85,7 +87,7 @@ export function SearchableSelect({ label, options, value, onChange, placeholder 
           <strong style={{ display: 'block', fontSize: 13 }}>{option.label}</strong>
           {option.description && <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 11 }}>{option.description}</span>}
         </button>)}
-        {filtered.length === 0 && <p role="status" style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}><LocalizedText fallback={"No matching options."} /></p>}
+        {filtered.length === 0 && <p role="status" style={{ color: 'rgba(255,255,255,.55)', margin: 8, fontSize: 12 }}><LocalizedText fallback={uiCopy('u_b4d02c2e9f89a423')} /></p>}
       </div>
     </div>}
   </div>

@@ -3,6 +3,8 @@
 // Rich preview that mirrors the published renderer (saas/app/s/[handle]/page.tsx).
 
 import { useEffect } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
 type FeatureItem = { title?: string; body?: string; icon?: string; image_url?: string; logo_url?: string; imageAlt?: string; logoAlt?: string }
@@ -203,7 +205,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                         />
-                      ) : 'No image URL'}
+                      ) : uiCopy('u_bbc6488d74400c7e')}
                     </div>
                     <div style={{ padding: '10px 12px', flex: 1 }}>
                       {it.title && (
@@ -221,9 +223,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                 ))}
               </div>
               {hasWikipediaContent && (
-                <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: 'center' }}>
-                  Content from Wikipedia · CC BY-SA 4.0
-                </div>
+                <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: 'center' }}>{uiCopy('u_d4745647eeedd18f')}</div>
               )}
             </div>
           )
@@ -281,7 +281,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                 ) : (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff', padding: 20 }}>
                     <span style={{ fontSize: 28, lineHeight: 1 }}>🎬</span>
-                    <span style={{ fontFamily: display, fontWeight: 800, fontSize: 15 }}>{h || 'Brand story video'}</span>
+                    <span style={{ fontFamily: display, fontWeight: 800, fontSize: 15 }}>{h || uiCopy('u_98fc3c0996ef337a')}</span>
                     {body && <span style={{ maxWidth: 320, fontSize: 11, lineHeight: 1.5, opacity: 0.85 }}>{body}</span>}
                   </div>
                 )}

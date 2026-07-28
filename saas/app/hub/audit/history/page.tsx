@@ -8,6 +8,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Run = {
   id: string
@@ -40,14 +42,14 @@ export default function AuditHistoryPage() {
       const res = await fetch('/api/hub/audit/history', { credentials: 'include' })
       const json = (await res.json().catch(() => null)) as RunsResponse | null
       if (!json || !json.ok) {
-        setError((json && json.error) || t('audit.history.loadError', 'Could not load history.'))
+        setError((json && json.error) || t('audit.history.loadError', uiCopy('u_2506120426bd093d')))
         return
       }
       setRuns(json.runs || [])
       setError(null)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setError(interpolate(t('audit.history.fetchError', 'Error: {msg}'), { msg }))
+      setError(interpolate(t('audit.history.fetchError', uiCopy('u_89d1a54ce79e53c3')), { msg }))
     } finally {
       setLoading(false)
     }
@@ -61,13 +63,13 @@ export default function AuditHistoryPage() {
       const res = await fetch('/api/hub/audit/history', { method: 'POST', credentials: 'include' })
       const json = (await res.json().catch(() => null)) as SnapResponse | null
       if (!json || !json.ok) {
-        setError((json && json.error) || t('audit.history.snapshotError', 'Could not take snapshot.'))
+        setError((json && json.error) || t('audit.history.snapshotError', uiCopy('u_556ac2a3189778d5')))
         return
       }
       await load()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setError(interpolate(t('audit.history.fetchError', 'Error: {msg}'), { msg }))
+      setError(interpolate(t('audit.history.fetchError', uiCopy('u_d1d168d5694403da')), { msg }))
     } finally {
       setSnapping(false)
     }
@@ -78,11 +80,11 @@ export default function AuditHistoryPage() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-text">{t('audit.history.title', 'Readiness History')}</h1>
-            <p className="mt-1 text-sm text-text-muted">{t('audit.history.subtitle', 'Track how your readiness score moves over time.')}</p>
+            <h1 className="text-lg font-semibold text-text">{t('audit.history.title', uiCopy('u_2bc07c620a1206fd'))}</h1>
+            <p className="mt-1 text-sm text-text-muted">{t('audit.history.subtitle', uiCopy('u_ab411d2f2305fee4'))}</p>
           </div>
           <button type="button" onClick={snapshot} disabled={snapping} className={PRIMARY}>
-            {snapping ? t('audit.history.snapshotting', 'Saving…') : t('audit.history.snapshot', 'Snapshot now')}
+            {snapping ? t('audit.history.snapshotting', uiCopy('u_b517e3c7fddbb70c')) : t('audit.history.snapshot', uiCopy('u_68ff1e899a71228a'))}
           </button>
         </header>
 
@@ -91,12 +93,12 @@ export default function AuditHistoryPage() {
         ) : null}
 
         {loading ? (
-          <div className="text-sm text-text-muted">{t('audit.history.loading', 'Loading history…')}</div>
+          <div className="text-sm text-text-muted">{t('audit.history.loading', uiCopy('u_864d679ad17828cd'))}</div>
         ) : runs.length === 0 ? (
-          <div className={`${CARD} text-sm text-text-muted`}>{t('audit.history.empty', 'No snapshots yet. Take your first one above.')}</div>
+          <div className={`${CARD} text-sm text-text-muted`}>{t('audit.history.empty', uiCopy('u_a82db0d2638011fc'))}</div>
         ) : (
           <div className="flex flex-col gap-4">
-            <TrendChart runs={runs} label={t('audit.history.trendTitle', 'Score over time')} />
+            <TrendChart runs={runs} label={t('audit.history.trendTitle', uiCopy('u_4736cc1a51b7bcd3'))} />
             <RunsTable runs={runs} t={t} />
           </div>
         )}
@@ -148,12 +150,12 @@ function RunsTable({ runs, t }: { runs: Run[]; t: TFn }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted">
-              <th className="px-3 py-2 font-medium">{t('audit.history.col.date', 'Date')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.common.overallScore', 'Score')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.critical', 'Critical')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.high', 'High')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.medium', 'Medium')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.low', 'Low')}</th>
+              <th className="px-3 py-2 font-medium">{t('audit.history.col.date', uiCopy('u_13754e35c41bf3bc'))}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('audit.common.overallScore', uiCopy('u_6ea4cfcf0508cfd8'))}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.critical', uiCopy('u_d388fe481fe58d29'))}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.high', uiCopy('u_17dca004a6ea62af'))}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.medium', uiCopy('u_d70be8474d75e37d'))}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.low', uiCopy('u_735c4877ea039d54'))}</th>
             </tr>
           </thead>
           <tbody>

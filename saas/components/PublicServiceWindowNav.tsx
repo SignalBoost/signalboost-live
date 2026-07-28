@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type GroupId = 'free' | 'growth' | 'office'
@@ -43,10 +45,10 @@ const GROUPS: Array<{ id: GroupId; itemIds: ItemId[] }> = [
 
 const COPY: Record<Lang, Copy> = {
   en: {
-    intro: 'Quick access before signing up',
-    gated: 'learn more',
-    groups: { free: 'Free tools', growth: 'Marketing + Sales', office: 'Office tools' },
-    items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo Check', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
+    intro: uiCopy('u_786cb118db2ef251'),
+    gated: uiCopy('u_e6f51e6793ca739c'),
+    groups: { free: uiCopy('u_c2d4a7aa2bc068d6'), growth: uiCopy('u_4c6958b65c131242'), office: uiCopy('u_cb1fbfbfc7cfbc91') },
+    items: { websiteOptimizer: uiCopy('u_457018484f95e12c'), repoCheck: uiCopy('u_39ccc0313b9c656a'), agencyEngine: uiCopy('u_41000752ba7fadbd'), promoteBusiness: uiCopy('u_b56ac3782bfea62c'), outreach: uiCopy('u_09ec97ab6fa6e758'), calendar: uiCopy('u_40ce3dbea80334f6'), spreadsheets: uiCopy('u_5653193d38d3f387') },
   },
   es: {
     intro: 'Acceso rápido antes de registrarte',
@@ -88,14 +90,7 @@ export default function PublicServiceWindowNav() {
 
   return (
     <section aria-label={copy.intro} style={{ position: 'relative', zIndex: 90, borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(2,6,23,.82)', backdropFilter: 'blur(12px)', overflow: 'visible' }}>
-      <style>{`
-        .sb-public-window{display:flex;gap:10px;align-items:center;flex-wrap:wrap;overflow:visible;padding:8px 22px;}
-        .sb-public-group{position:relative;flex:0 0 auto;}
-        .sb-public-panel{position:absolute;top:calc(100% + 8px);left:0;width:310px;max-width:92vw;border:1px solid rgba(26,240,255,.22);background:linear-gradient(145deg,rgba(3,7,18,.99),rgba(15,23,42,.98));border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:12px;z-index:1200;}
-        .sb-public-link{display:flex;gap:10px;align-items:center;text-decoration:none;color:#fff;border-radius:12px;padding:10px;}
-        .sb-public-link:hover{background:rgba(255,255,255,.07);}
-        @media(max-width:760px){.sb-public-window{padding:8px 14px}.sb-public-intro{display:none}.sb-public-panel{position:fixed;left:12px;right:12px;width:auto;top:108px}}
-      `}</style>
+      <style>{uiCopy('u_817603d2f6b9d4d6')}</style>
       <div className="sb-public-window">
         <span className="sb-public-intro" style={{ color: 'rgba(148,163,184,.88)', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{copy.intro}</span>
         {GROUPS.map(group => {

@@ -3,6 +3,8 @@
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type DomainRow = {
   domain: string
@@ -57,7 +59,7 @@ export default function ImprovMXPage() {
     } catch (err) {
       setDomains([])
       setDomain('')
-      setError(err instanceof Error ? err.message : 'Unable to load ImprovMX domains')
+      setError(err instanceof Error ? err.message : uiCopy('u_e195f5a8783c0abf'))
     } finally {
       setLoadingDomains(false)
     }
@@ -88,7 +90,7 @@ export default function ImprovMXPage() {
       setAliases(rows)
     } catch (err) {
       setAliases([])
-      setError(err instanceof Error ? err.message : 'Unable to load ImprovMX aliases')
+      setError(err instanceof Error ? err.message : uiCopy('u_93302de8001f84d1'))
     } finally {
       setLoadingAliases(false)
     }
@@ -131,7 +133,7 @@ export default function ImprovMXPage() {
       setForward('')
       await loadAliases(domain)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to create alias')
+      setError(err instanceof Error ? err.message : uiCopy('u_8f6856d8e0626090'))
     } finally {
       setSaving(false)
     }
@@ -153,7 +155,7 @@ export default function ImprovMXPage() {
 
       await loadAliases(domain)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete alias')
+      setError(err instanceof Error ? err.message : uiCopy('u_6ad3cf58260d88eb'))
     }
   }
 
@@ -171,25 +173,24 @@ export default function ImprovMXPage() {
     <div style={{ padding: 18, color: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0 }}><LocalizedText fallback={"ImprovMX Email Forwarding"} /></h2>
-          <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 4 }}><LocalizedText fallback={"Live domains and aliases loaded through the protected SignalBoost backend."} /></div>
+          <h2 style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_0ffce93022be7b1a')} /></h2>
+          <div style={{ color: 'rgba(255,255,255,.55)', marginTop: 4 }}><LocalizedText fallback={uiCopy('u_5aea9f9d9db3c662')} /></div>
         </div>
-        <button onClick={() => void loadDomains()} style={{ padding: '9px 13px', borderRadius: 9, cursor: 'pointer' }}><LocalizedText fallback={"Refresh live data"} /></button>
+        <button onClick={() => void loadDomains()} style={{ padding: '9px 13px', borderRadius: 9, cursor: 'pointer' }}><LocalizedText fallback={uiCopy('u_346a26f37b62a803')} /></button>
       </div>
 
       {error && (
-        <div style={{ padding: 12, border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, color: '#fca5a5', marginBottom: 14 }}>
-          Metrics Sync Failed: {error}
+        <div style={{ padding: 12, border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, color: '#fca5a5', marginBottom: 14 }}>{uiCopy('u_59cb6172a015118a')}{error}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14, marginBottom: 18 }}>
         <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,.10)', padding: 16, borderRadius: 12 }}>
-          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={"List Domains"} /></div>
+          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={uiCopy('u_6e47564b86f0609f')} /></div>
           {loadingDomains ? (
-            <div style={{ color: 'rgba(255,255,255,.55)' }}>Fetching live ImprovMX domains…</div>
+            <div style={{ color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_db26b02ace00b47b')}</div>
           ) : domains.length === 0 ? (
-            <div style={{ color: 'rgba(255,255,255,.55)' }}><LocalizedText fallback={"No connected domains returned."} /></div>
+            <div style={{ color: 'rgba(255,255,255,.55)' }}><LocalizedText fallback={uiCopy('u_52ef1cd9eebabc32')} /></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
               {domains.map(item => {
@@ -215,7 +216,7 @@ export default function ImprovMXPage() {
                   >
                     <span style={{ fontFamily: 'monospace' }}>{item.domain}</span>
                     <span style={{ fontSize: 11, color: active ? '#34d399' : '#f87171' }}>
-                      {active ? 'Active' : 'Setup Required'}
+                      {active ? uiCopy('u_1dc5f5050156aaf5') : uiCopy('u_5b6cc1c05879ba19')}
                     </span>
                   </button>
                 )
@@ -225,46 +226,46 @@ export default function ImprovMXPage() {
         </div>
 
         <div style={{ background: '#0b1220', border: '1px solid rgba(255,255,255,.10)', padding: 16, borderRadius: 12 }}>
-          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={"Domain Status Overview"} /></div>
+          <div style={{ color: '#22d3ee', fontWeight: 800, marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}><LocalizedText fallback={uiCopy('u_f952a9681c9ff30d')} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ background: '#070b14', padding: 16, borderRadius: 9, textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800 }}>{domains.length}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={"Total Monitored"} /></div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={uiCopy('u_ba4f038acc09b571')} /></div>
             </div>
             <div style={{ background: '#070b14', padding: 16, borderRadius: 9, textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#34d399' }}>{activeDomains}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={"Active Routes"} /></div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textTransform: 'uppercase' }}><LocalizedText fallback={uiCopy('u_ddf3ee07272914e1')} /></div>
             </div>
           </div>
         </div>
       </div>
 
-      <label style={{ display: 'block', marginBottom: 6 }}><LocalizedText fallback={"Selected domain"} /></label>
+      <label style={{ display: 'block', marginBottom: 6 }}><LocalizedText fallback={uiCopy('u_4b88483b191ab83e')} /></label>
       <select value={domain} onChange={event => setDomain(event.target.value)} style={{ ...inputStyle, marginBottom: 18 }}>
-        <option value=""><LocalizedText fallback={"Select a domain"} /></option>
+        <option value=""><LocalizedText fallback={uiCopy('u_2b4de4db3bfd411f')} /></option>
         {domainOptions.map(name => <option key={name} value={name}>{name}</option>)}
       </select>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, marginBottom: 18 }}>
-        <input value={alias} onChange={event => setAlias(event.target.value)} placeholder="Alias, e.g. saaspartners" style={inputStyle} />
-        <input value={forward} onChange={event => setForward(event.target.value)} placeholder="Forward to email" type="email" style={inputStyle} />
+        <input value={alias} onChange={event => setAlias(event.target.value)} placeholder={uiCopy('u_8a2e3e7bde8f0798')} style={inputStyle} />
+        <input value={forward} onChange={event => setForward(event.target.value)} placeholder={uiCopy('u_e2a996872e379ca9')} type="email" style={inputStyle} />
         <button disabled={saving || !domain} onClick={() => void createAlias()} style={{ padding: '9px 14px', borderRadius: 9, cursor: 'pointer' }}>
-          {saving ? 'Creating…' : 'Create alias'}
+          {saving ? uiCopy('u_67310c543a7dec8f') : uiCopy('u_2bb28e9b2487f9a1')}
         </button>
       </div>
 
       <div style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, overflow: 'hidden' }}>
         {loadingAliases ? (
-          <div style={{ padding: 16, color: 'rgba(255,255,255,.55)' }}>Loading live aliases…</div>
+          <div style={{ padding: 16, color: 'rgba(255,255,255,.55)' }}>{uiCopy('u_272e2743163c767f')}</div>
         ) : aliases.length === 0 ? (
           <div style={{ padding: 16, color: 'rgba(255,255,255,.55)' }}>
-            {domain ? 'No aliases returned for this domain.' : 'Select a domain to view aliases.'}
+            {domain ? uiCopy('u_0b5b6eccc6144d35') : uiCopy('u_0d7b7a17992487fb')}
           </div>
         ) : aliases.map(row => (
           <div key={row.alias} style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr auto', gap: 12, padding: 12, borderBottom: '1px solid rgba(255,255,255,.08)', alignItems: 'center' }}>
             <strong>{row.alias}@{domain}</strong>
             <span>{row.forward}</span>
-            <button onClick={() => void deleteAlias(row.alias)} style={{ padding: '7px 10px', borderRadius: 8, cursor: 'pointer' }}>Delete</button>
+            <button onClick={() => void deleteAlias(row.alias)} style={{ padding: '7px 10px', borderRadius: 8, cursor: 'pointer' }}>{uiCopy('u_d56fde6470453832')}</button>
           </div>
         ))}
       </div>

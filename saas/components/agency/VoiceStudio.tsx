@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -81,26 +83,26 @@ const COPY: Record<Lang, {
   walletNote: string
 }> = {
   en: {
-    eyebrow: 'Voice Studio',
-    title: 'Generate a production-ready voiceover',
-    body: 'Choose a voice, review the estimated provider cost, and generate only when you are ready. Nothing is spent until you press Generate voiceover.',
-    scriptLabel: 'Voiceover script',
-    scriptPlaceholder: 'Enter the final approved script for this voiceover.',
-    voiceLabel: 'Voice',
-    fundingLabel: 'Funding method',
-    creditsMode: 'Use SignalBoost render credits',
-    byokMode: 'Use my connected ElevenLabs key',
-    estimateLabel: 'Estimated provider cost',
-    estimatedCredits: 'credits before platform markup',
-    generate: 'Generate voiceover',
-    generating: 'Generating voiceover…',
-    previewTitle: 'Generated voiceover',
-    download: 'Open audio file',
-    emptyError: 'Enter a voiceover script before generating.',
-    requestError: 'Voiceover generation failed.',
-    characterLimit: 'Maximum 5,000 characters',
-    byokNote: 'BYOK mode uses your stored ElevenLabs key and does not charge SignalBoost render credits.',
-    walletNote: 'Wallet mode reserves credits before the provider is called. Failed provider renders are refunded.',
+    eyebrow: uiCopy('u_de31066ecf797530'),
+    title: uiCopy('u_8413a34983b1311c'),
+    body: uiCopy('u_a3f5e84c837a7dfe'),
+    scriptLabel: uiCopy('u_884fefec9c95f634'),
+    scriptPlaceholder: uiCopy('u_288fe94d771dcf6e'),
+    voiceLabel: uiCopy('u_60b74ee20fb0d6b8'),
+    fundingLabel: uiCopy('u_cd917ec826355343'),
+    creditsMode: uiCopy('u_92b7dec629c404cb'),
+    byokMode: uiCopy('u_a72092cc1110a1d2'),
+    estimateLabel: uiCopy('u_0491d864725a6219'),
+    estimatedCredits: uiCopy('u_90de34db4a2869ee'),
+    generate: uiCopy('u_5be1798e9b08d92a'),
+    generating: uiCopy('u_42be882f9d4f6f29'),
+    previewTitle: uiCopy('u_12a8eb2aa8eb0ea8'),
+    download: uiCopy('u_363e4c25faea7dab'),
+    emptyError: uiCopy('u_d89be013bef60ead'),
+    requestError: uiCopy('u_f0da28c17105ba07'),
+    characterLimit: uiCopy('u_064935640f4c9a4b'),
+    byokNote: uiCopy('u_729a81017b1ac208'),
+    walletNote: uiCopy('u_af8d7d5e8f2074ba'),
   },
   es: {
     eyebrow: 'Estudio de voz',

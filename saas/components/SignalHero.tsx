@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SignalCanvas from './SignalCanvas.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const LANGS = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -445,37 +447,7 @@ export default function SignalHero() {
         <span style={{ color: '#ffc300', fontSize: 18 }}>↓</span>
       </div>
 
-      <style>{`
-        @keyframes tagFloat {
-          0% {
-            opacity: 0;
-            transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(0.8);
-          }
-          12% { opacity: 1; }
-          75% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-
-        @keyframes fadeSlide {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-
-        @keyframes bounce {
-          0%, 100% { transform: translateX(-50%) translateY(0); }
-          50% { transform: translateX(-50%) translateY(6px); }
-        }
-
-        @keyframes tickerScroll {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
+      <style>{uiCopy('u_e6faa4598376105a')}</style>
     </section>
   )
 }

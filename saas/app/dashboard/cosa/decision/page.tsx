@@ -3,6 +3,8 @@
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useState } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 
@@ -35,7 +37,7 @@ export default function CosaMarketingDecisionPage() {
       if (!json.ok) throw new Error(json.error || 'Unable to load marketing decision')
       setDecision(json.decision)
     } catch (err: any) {
-      setError(err?.message || 'Unable to load marketing decision')
+      setError(err?.message || uiCopy('u_6eac05f24a0792ca'))
     } finally {
       setLoading(false)
     }
@@ -46,10 +48,10 @@ export default function CosaMarketingDecisionPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"COSA marketing decision engine"} /></p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"COSA chooses the hero, format, storyboard, traffic path, and monetization path"} /></h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}><LocalizedText fallback={"The owner should not have to choose the creative direction. COSA should use mined signals, prediction rules, and marketing logic to recommend the strongest direction before rendering."} /></p>
-        <button onClick={loadDecision} disabled={loading} style={primaryButton}>{loading ? 'Loading...' : 'Refresh COSA decision'}</button>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_6e3be2662646e40d')} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={uiCopy('u_c42158c01f0c8a8a')} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 860 }}><LocalizedText fallback={uiCopy('u_2cfeb79987425180')} /></p>
+        <button onClick={loadDecision} disabled={loading} style={primaryButton}>{loading ? uiCopy('u_866432a708be1f65') : uiCopy('u_e25629f7c9ed8343')}</button>
       </section>
 
       {error && <div style={errorCard}>{error}</div>}
@@ -57,24 +59,24 @@ export default function CosaMarketingDecisionPage() {
       {decision && (
         <>
           <section style={gridThree}>
-            <Metric title="Hero" value={decision.recommended_hero} />
-            <Metric title="Format" value={decision.recommended_format} />
-            <Metric title="Confidence" value={`${decision.confidence_score}%`} />
+            <Metric title={uiCopy('u_94f9891cdaea7e02')} value={decision.recommended_hero} />
+            <Metric title={uiCopy('u_18571a341c04c72e')} value={decision.recommended_format} />
+            <Metric title={uiCopy('u_b82186a056f130da')} value={`${decision.confidence_score}%`} />
           </section>
 
           <section style={panel}>
-            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Prediction summary"} /></p>
+            <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_1d8599137386f818')} /></p>
             <h2 style={{ color: '#fff', fontSize: 24, lineHeight: 1.25, margin: '10px 0 0' }}>{decision.prediction_summary}</h2>
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7 }}>{decision.creative_brief}</p>
           </section>
 
           <section style={gridTwo}>
-            <ListPanel title="Mined signals" items={decision.mining_summary} />
-            <ListPanel title="Scene design" items={decision.recommended_scene_designs} />
-            <ListPanel title="Storyboard direction" items={decision.storyboard_direction} />
-            <ListPanel title="Traffic plan" items={decision.traffic_plan} />
-            <ListPanel title="Monetization plan" items={decision.monetization_plan} />
-            <ListPanel title="Approval gates" items={decision.approval_required} />
+            <ListPanel title={uiCopy('u_aa92207f5bc1d606')} items={decision.mining_summary} />
+            <ListPanel title={uiCopy('u_34b0472bffda3063')} items={decision.recommended_scene_designs} />
+            <ListPanel title={uiCopy('u_312a3bf8dd956e86')} items={decision.storyboard_direction} />
+            <ListPanel title={uiCopy('u_1196303899e31e37')} items={decision.traffic_plan} />
+            <ListPanel title={uiCopy('u_162259bb5a468c8c')} items={decision.monetization_plan} />
+            <ListPanel title={uiCopy('u_faae02eb70c24a74')} items={decision.approval_required} />
           </section>
         </>
       )}

@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { Suspense, useEffect, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lead = {
   id: string
@@ -39,8 +41,8 @@ const STATUS_COLOR: Record<string, string> = {
 const CHANNELS: Record<string, ChannelConfig> = {
   'online-newspapers': {
     eyebrow: 'Digital news outreach',
-    title: 'Online newspaper and digital publisher campaign',
-    body: 'Plan outreach to online newspapers, local digital newsrooms, business news sites, and technology news portals. This channel tracks only digital newspaper/publication campaign records.',
+    title: uiCopy('u_27894fe891cae803'),
+    body: uiCopy('u_b07d5057540832fa'),
     targets: ['Local online newspapers', 'Regional digital newsrooms', 'Business news websites', 'Technology news portals', 'Industry newsletter editors'],
     workflow: ['Prepare pitch angle and proof points', 'Build editor/reporter contact list', 'Draft message and follow-up cadence', 'Review locally before sending', 'Track responses in the outreach pipeline'],
     ctaHref: '/dashboard/outreach/discovery?channel=online-newspapers',
@@ -48,8 +50,8 @@ const CHANNELS: Record<string, ChannelConfig> = {
   },
   'print-newspapers': {
     eyebrow: 'Print newspaper outreach',
-    title: 'Offline newspaper placement planning',
-    body: 'Plan outreach to non-digital newspapers: print editions, local papers, community papers, and traditional editorial or advertising desks. This channel starts at zero until print-newspaper campaign records are created.',
+    title: uiCopy('u_aeb70a4c51ebf8a4'),
+    body: uiCopy('u_3e1c59bfb6fa14be'),
     targets: ['Local print newspapers', 'Community newspapers', 'Regional print business sections', 'Sunday feature editors', 'Print advertising desks'],
     workflow: ['Confirm print region and publication schedule', 'Prepare print-ready pitch or placement brief', 'Collect editorial or advertising contacts', 'Review local campaign message before outreach', 'Track print follow-up and placement status'],
     ctaHref: '/dashboard/outreach/discovery?channel=print-newspapers',
@@ -57,8 +59,8 @@ const CHANNELS: Record<string, ChannelConfig> = {
   },
   'trade-press': {
     eyebrow: 'Magazine / trade press outreach',
-    title: 'IT-specialized magazine and trade publication campaign',
-    body: 'Plan outreach to IT-specialized magazines, SaaS publications, cybersecurity magazines, MSP/channel publications, startup media, and business technology trade press. This channel has its own targets, workflow, and counts.',
+    title: uiCopy('u_a24865bbd799359a'),
+    body: uiCopy('u_1f9eda93782261db'),
     targets: ['IT trade magazines', 'SaaS and cloud publications', 'Cybersecurity magazines', 'MSP and channel publications', 'Startup and business technology magazines'],
     workflow: ['Define the technical audience and publication fit', 'Prepare founder/product angle and credibility proof', 'Build editor, contributor, and media-kit contacts', 'Review pitch and supporting assets inside Marketing + Sales', 'Track magazine outreach and follow-up dates'],
     ctaHref: '/dashboard/outreach/discovery?channel=trade-press',
@@ -68,31 +70,31 @@ const CHANNELS: Record<string, ChannelConfig> = {
 
 const COPY: Record<string, any> = {
   en: {
-    eyebrow: 'Email Outreach',
-    title: 'Your email outreach command center.',
-    subtitle: 'Analyze businesses, review AI-prepared email leads, and move prospects through the email pipeline — all from one place.',
-    loadError: 'Could not load email outreach data.',
-    genericLoadError: 'Something went wrong loading email outreach.',
-    loading: 'Loading…',
-    sendsLeft: 'email sends left today',
-    totalLeads: 'Total email leads',
-    pending: 'Pending',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    recentLeads: 'Recent email leads',
-    channelLeads: 'Channel records',
-    viewAll: 'View all →',
-    noLeadsStart: 'No email leads yet. Start with',
-    noChannelLeads: 'No records exist for this channel yet. Start the channel list to create the first campaign records.',
-    discoveryLink: 'Discovery',
-    unnamedBusiness: 'Unnamed business',
+    eyebrow: uiCopy('u_f10f079e102eda9d'),
+    title: uiCopy('u_fa925f8bea50ca46'),
+    subtitle: uiCopy('u_8f709f7300e734d6'),
+    loadError: uiCopy('u_1da0984d51d7d2b0'),
+    genericLoadError: uiCopy('u_8bfdde82d66dbd47'),
+    loading: uiCopy('u_f9038c08ca53efc4'),
+    sendsLeft: uiCopy('u_663f8002b0110049'),
+    totalLeads: uiCopy('u_814faadd34aef50e'),
+    pending: uiCopy('u_270a64ad1b5f5e1a'),
+    approved: uiCopy('u_4188eb0c225bb839'),
+    rejected: uiCopy('u_a8bc080d12ed8a73'),
+    recentLeads: uiCopy('u_700cf3d23f7962c6'),
+    channelLeads: uiCopy('u_ba08195e280aa3bd'),
+    viewAll: uiCopy('u_1a8af66bdb88ccdc'),
+    noLeadsStart: uiCopy('u_8344db22d39842c2'),
+    noChannelLeads: uiCopy('u_29447b497a5af3b9'),
+    discoveryLink: uiCopy('u_95481b16e95adaae'),
+    unnamedBusiness: uiCopy('u_9f2b5cd7382f6dfd'),
     tools: [
-      { icon: '🔎', title: 'Email Discovery', desc: 'Analyze a new business and queue an email lead.', href: '/dashboard/outreach/discovery' },
-      { icon: '📇', title: 'Email Contacts', desc: 'Review analyzed email leads.', href: '/dashboard/outreach/contacts' },
-      { icon: '📊', title: 'Email Pipeline', desc: 'Track email prospects by stage.', href: '/dashboard/outreach/pipeline' },
-      { icon: '⚙️', title: 'Email Engine', desc: 'Turn a lead into an email campaign.', href: '/dashboard/outreach/outreach' },
+      { icon: '🔎', title: uiCopy('u_7ef7b3984b5c7dac'), desc: uiCopy('u_1e899c84209e1c62'), href: uiCopy('u_8d39912e12f57b0b') },
+      { icon: '📇', title: uiCopy('u_4bcef8e27ab0f266'), desc: uiCopy('u_7dc388566f9860ea'), href: uiCopy('u_70e6fd6ecf33873f') },
+      { icon: '📊', title: uiCopy('u_118252938098cbd9'), desc: uiCopy('u_2b89cafe8c606178'), href: uiCopy('u_c1b6431361329063') },
+      { icon: '⚙️', title: uiCopy('u_ef22b4e05ce76ee6'), desc: uiCopy('u_1375703d8bb82f11'), href: uiCopy('u_7ed0ec56b716bb8a') },
     ],
-    statuses: { pending: 'pending', approved: 'approved', rejected: 'rejected' },
+    statuses: { pending: uiCopy('u_4004019cb2a6d95f'), approved: uiCopy('u_9affa539fbe59730'), rejected: uiCopy('u_e98c4a7e7cf2472d') },
   },
   pt: {
     eyebrow: 'Email Outreach', title: 'Seu centro de comando de email outreach.', subtitle: 'Analise negócios, revise leads de email preparados por IA e mova prospects pelo pipeline de email — tudo em um só lugar.', loadError: 'Não foi possível carregar os dados de email outreach.', genericLoadError: 'Algo deu errado ao carregar o email outreach.', loading: 'Carregando…', sendsLeft: 'envios de email restantes hoje', totalLeads: 'Total de leads de email', pending: 'Pendentes', approved: 'Aprovados', rejected: 'Rejeitados', recentLeads: 'Leads de email recentes', channelLeads: 'Registros do canal', viewAll: 'Ver todos →', noLeadsStart: 'Ainda não há leads de email. Comece com', noChannelLeads: 'Ainda não existem registros para este canal. Inicie a lista do canal para criar os primeiros registros de campanha.', discoveryLink: 'Descoberta', unnamedBusiness: 'Negócio sem nome',
@@ -116,7 +118,7 @@ function leadChannel(lead: Lead) {
 
 export default function OutreachHubPage() {
   return (
-    <Suspense fallback={<main style={{ color: 'var(--text-primary)' }}><p className="sb-body">Loading…</p></main>}>
+    <Suspense fallback={<main style={{ color: 'var(--text-primary)' }}><p className="sb-body">{uiCopy('u_b07bc57b27863299')}</p></main>}>
       <OutreachHubContent />
     </Suspense>
   )
@@ -213,8 +215,8 @@ function OutreachHubContent() {
 function ChannelWorkspace({ channel, noRecords }: { channel: ChannelConfig; noRecords: string }) {
   return (
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14, margin: '18px 0 24px' }}>
-      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={"Target publication types"} /></h2><ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.targets.map((item) => <li key={item}>{item}</li>)}</ul></article>
-      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={"Channel workflow"} /></h2><ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.workflow.map((item) => <li key={item}>{item}</li>)}</ol>{noRecords ? <p className="sb-caption" style={{ color: '#fde68a', marginTop: 12 }}>{noRecords}</p> : null}<Link href={channel.ctaHref} className="sb-button-primary" style={{ display: 'inline-flex', marginTop: 14, textDecoration: 'none' }}>{channel.cta}</Link></article>
+      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={uiCopy('u_d6e8dc8a1bc5f775')} /></h2><ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.targets.map((item) => <li key={item}>{item}</li>)}</ul></article>
+      <article style={channelCard}><h2 className="sb-h3" style={{ marginTop: 0 }}><LocalizedText fallback={uiCopy('u_4590f2ad0d7ab7b8')} /></h2><ol style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.76)', lineHeight: 1.7 }}>{channel.workflow.map((item) => <li key={item}>{item}</li>)}</ol>{noRecords ? <p className="sb-caption" style={{ color: '#fde68a', marginTop: 12 }}>{noRecords}</p> : null}<Link href={channel.ctaHref} className="sb-button-primary" style={{ display: 'inline-flex', marginTop: 14, textDecoration: 'none' }}>{channel.cta}</Link></article>
     </section>
   )
 }

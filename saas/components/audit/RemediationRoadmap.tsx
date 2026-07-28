@@ -11,6 +11,8 @@ import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import { resolveFinding, type Finding, type AuditScore, type Severity } from '@/lib/audit/reportModel'
 import { isHandled, normalizeStatus, type FindingStateMap } from '@/lib/audit/findingState'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -57,24 +59,24 @@ export default function RemediationRoadmap({
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.remediation.title', 'Remediation Roadmap')} <span style={{ color: GOLD }}>·</span>
+          {t('audit.remediation.title', uiCopy('u_64c95de253a57520'))} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 700, lineHeight: 1.5 }}>
-          {t('audit.remediation.subtitle', 'Read-only priority and completion status. After the single Audit Console approval, SignalBoost AI handles every supported remediation step automatically.')}
+          {t('audit.remediation.subtitle', uiCopy('u_d71652524c4d5578'))}
         </p>
       </div>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-        <Stat label={t('audit.remediation.summary.now', 'Now')} value={activeCount('now')} color={activeCount('now') ? RED : undefined} />
-        <Stat label={t('audit.remediation.summary.next', 'Next')} value={activeCount('next')} color={activeCount('next') ? ORANGE : undefined} />
-        <Stat label={t('audit.remediation.summary.later', 'Later')} value={activeCount('later')} color={activeCount('later') ? CYAN : undefined} />
-        <Stat label={t('audit.remediation.summary.evidence', 'Evidence')} value={evidenceActive.length} />
-        <Stat label={t('audit.remediation.summary.handled', 'Completed')} value={handled.length} color={handled.length ? GREEN : undefined} />
+        <Stat label={t('audit.remediation.summary.now', uiCopy('u_c83ba55ec527dd53'))} value={activeCount('now')} color={activeCount('now') ? RED : undefined} />
+        <Stat label={t('audit.remediation.summary.next', uiCopy('u_e0734a778870ff8e'))} value={activeCount('next')} color={activeCount('next') ? ORANGE : undefined} />
+        <Stat label={t('audit.remediation.summary.later', uiCopy('u_c065d7a881145325'))} value={activeCount('later')} color={activeCount('later') ? CYAN : undefined} />
+        <Stat label={t('audit.remediation.summary.evidence', uiCopy('u_b014b7d56d54a252'))} value={evidenceActive.length} />
+        <Stat label={t('audit.remediation.summary.handled', uiCopy('u_43a207b62b249fa9'))} value={handled.length} color={handled.length ? GREEN : undefined} />
       </section>
 
       {data.items.length === 0 && data.evidence.length === 0 && (
         <section style={{ ...glass, padding: 20 }}>
-          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.remediation.empty', 'Nothing to remediate — no open findings.')}</div>
+          <div style={{ fontSize: 13, color: GREEN }}>{t('audit.remediation.empty', uiCopy('u_6715d9dc91d42f84'))}</div>
         </section>
       )}
 
@@ -102,10 +104,10 @@ export default function RemediationRoadmap({
       {evidenceActive.length > 0 && (
         <section style={{ ...glass, padding: 20, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: CYAN, marginBottom: 4 }}>
-            {t('audit.remediation.evidenceTitle', 'Evidence Required')}
+            {t('audit.remediation.evidenceTitle', uiCopy('u_7e51453ee3943050'))}
           </div>
           <p style={{ margin: '0 0 12px', fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>
-            {t('audit.remediation.evidenceSubtitle', 'Items that cannot be changed safely without external evidence remain visible and are never forced by the AI.')}
+            {t('audit.remediation.evidenceSubtitle', uiCopy('u_95e9551c83c0a366'))}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {evidenceActive.map(finding => (
@@ -118,10 +120,10 @@ export default function RemediationRoadmap({
       {handled.length > 0 && (
         <section style={{ ...glass, padding: 20, opacity: 0.85 }}>
           <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: GREEN, marginBottom: 4 }}>
-            {t('audit.remediation.handled.title', 'Completed')}
+            {t('audit.remediation.handled.title', uiCopy('u_3ab6f773db9b53af'))}
           </div>
           <p style={{ margin: '0 0 12px', fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>
-            {t('audit.remediation.handled.subtitle', 'Findings recorded as resolved, accepted, or not applicable by the governed remediation lifecycle.')}
+            {t('audit.remediation.handled.subtitle', uiCopy('u_d261767ef42084a0'))}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {handled.map(finding => (
@@ -172,11 +174,11 @@ function FixCard({
       </div>
       <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{text.detail}</div>
       <div style={{ fontSize: 12, color: CYAN, marginTop: 6 }}>
-        <strong>{t('audit.common.recommendation', 'Recommendation')}:</strong> <span style={{ color: 'rgba(255,255,255,.78)' }}>{text.recommendation}</span>
+        <strong>{t('audit.common.recommendation', uiCopy('u_b490c395a8cc2f68'))}:</strong> <span style={{ color: 'rgba(255,255,255,.78)' }}>{text.recommendation}</span>
       </div>
       {text.impact && !evidence && (
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', marginTop: 4 }}>
-          <strong style={{ color: 'rgba(255,255,255,.7)' }}>{t('audit.common.impact', 'Impact')}:</strong> {text.impact}
+          <strong style={{ color: 'rgba(255,255,255,.7)' }}>{t('audit.common.impact', uiCopy('u_892804331b96889b'))}:</strong> {text.impact}
         </div>
       )}
     </div>

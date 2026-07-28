@@ -12,6 +12,8 @@ import type {
 } from '@/lib/hub/provider-action-client'
 import type { ProviderExecutionMode } from '@/lib/hub/provider-execution-modes'
 import GovernedProviderActionFetchBoundary from './GovernedProviderActionFetchBoundary.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export type ReviewedProviderCapability = ReviewedProviderCapabilitySnapshot
 
@@ -30,10 +32,10 @@ export type ProviderActionExecutionGateProps = Readonly<{
 }>
 
 const LABELS: Record<ProviderExecutionMode, string> = {
-  direct: 'Direct API',
-  cosa_pr: 'Governed AI infrastructure PR',
-  browser_agent: 'Browser Agent assistance',
-  manual: 'Direct configuration',
+  direct: uiCopy('u_8f159b4423080fb3'),
+  cosa_pr: uiCopy('u_51388eb5cf2a90df'),
+  browser_agent: uiCopy('u_bccb9d4b68a34fa6'),
+  manual: uiCopy('u_5a6542d0c355388b'),
 }
 
 const DETAILS: Record<ProviderExecutionMode, string> = {
@@ -87,9 +89,9 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
     setSelectedMode(preferred)
   }, [available, response, selectedMode])
 
-  if (loading) return <GateNotice title="Checking reviewed execution paths…" />
-  if (!response?.ok) return <GateNotice title="Execution paths unavailable" detail={response?.error || 'provider_capabilities_unavailable'} danger />
-  if (available.length === 0) return <GateNotice title="No reviewed execution path is available" detail="This action is blocked by default." danger />
+  if (loading) return <GateNotice title={uiCopy('u_3aaccb4b9dbf6fa6')} />
+  if (!response?.ok) return <GateNotice title={uiCopy('u_00a9dbcb7426b92b')} detail={response?.error || 'provider_capabilities_unavailable'} danger />
+  if (available.length === 0) return <GateNotice title={uiCopy('u_6e341cbe2e60495a')} detail={uiCopy('u_c8c391aa14f56b90')} danger />
 
   const selected = available.find(capability => capability.mode === selectedMode) || available[0]
   const handoff: ProviderExecutionHandoff = Object.freeze({
@@ -104,9 +106,9 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <section aria-label="Reviewed provider execution paths" style={{ padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,.10)', background: 'rgba(3,7,18,.38)', display: 'grid', gap: 8, flex: '0 0 auto' }}>
+      <section aria-label={uiCopy('u_33750e5280bf07af')} style={{ padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,.10)', background: 'rgba(3,7,18,.38)', display: 'grid', gap: 8, flex: '0 0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-          <strong style={{ fontSize: 11, color: '#86efac' }}><LocalizedText fallback={"Reviewed execution path"} /></strong>
+          <strong style={{ fontSize: 11, color: '#86efac' }}><LocalizedText fallback={uiCopy('u_9e9aca2c32768d86')} /></strong>
           {response.review && <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,.42)' }}>{response.review.reviewer} · {response.review.reviewedAt}</span>}
         </div>
         <div role="radiogroup" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 7 }}>

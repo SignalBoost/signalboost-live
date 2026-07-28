@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -18,24 +20,24 @@ function getLang(): Lang {
 
 const COPY = {
   en: {
-    eyebrow: 'Partners',
-    heading: 'Organized by what the traveler needs next.',
-    intro: 'Instead of one flat partner list, this console groups supply by human intent: getting there, staying there, connecting, feeling protected, and doing something memorable.',
-    reviewBtn: 'Review partners',
-    perfTitle: 'Partner performance by intent',
-    perfCaption: 'Filters: date range • country • user intent • partner category',
-    addBtn: 'Add partner',
-    colIntent: 'Intent',
-    colPartner: 'Partner',
-    colClicks: 'Clicks',
-    colStatus: 'Status',
-    empty: 'No partner clicks recorded yet — connect partner click analytics to populate this organized view.',
+    eyebrow: uiCopy('u_f8bbede4e43a0e1c'),
+    heading: uiCopy('u_1142210d6397b86a'),
+    intro: uiCopy('u_6c854daad57ff08b'),
+    reviewBtn: uiCopy('u_d068488dc5cec76a'),
+    perfTitle: uiCopy('u_c876770f6caaf768'),
+    perfCaption: uiCopy('u_4958d8664a6d5466'),
+    addBtn: uiCopy('u_d4d98088ffc5616a'),
+    colIntent: uiCopy('u_bfe929856ccebad2'),
+    colPartner: uiCopy('u_d99da2bc7e578490'),
+    colClicks: uiCopy('u_75e87e12968a7b84'),
+    colStatus: uiCopy('u_fd7ee3f04bb7a170'),
+    empty: uiCopy('u_71f8ddb5ad3d943a'),
     intents: [
-      ['Flights', 'Help travelers get there first.', 'Compare flight offers, regional carriers, and urgency-based travel promos.'],
-      ['Hotels', 'Give them a safe place to land.', 'Surface lodging partners by budget, location, cancellation flexibility, and trust.'],
-      ['SIM Cards', 'Keep customers connected on arrival.', 'Prioritize eSIM/SIM partners with country fit, setup clarity, and support quality.'],
-      ['Insurance', 'Reduce travel anxiety.', 'Group medical, trip, and gear protection around confidence and compliance.'],
-      ['Activities', 'Turn arrival into an experience.', 'Recommend tours, events, dining, and local experiences by intent and region.'],
+      [uiCopy('u_ebfa420c72d5710a'), uiCopy('u_3369479f4f9db46f'), uiCopy('u_4212d4b5faab5870')],
+      [uiCopy('u_e30c9cac6c60521d'), uiCopy('u_d49b7cfd9f85b21b'), uiCopy('u_f4e8c0299bdda984')],
+      [uiCopy('u_fb884ea9d995506c'), uiCopy('u_21d1bf0a6868bcaf'), uiCopy('u_99c6ff24bc415ef0')],
+      [uiCopy('u_fb9ab323aac6c2c3'), uiCopy('u_ce04dda5341ef6a8'), uiCopy('u_f26f8f5d7e5c8e20')],
+      [uiCopy('u_be24bc97bc0a193b'), uiCopy('u_68429b34ae19b6ba'), uiCopy('u_20cf103a0dcd837a')],
     ],
   },
   es: {
@@ -129,7 +131,7 @@ type PartnerRow = { intent: string; partner: string; clicks: number | null; stat
 // Localized labels for the known status values the API emits. Unknown values
 // pass through unchanged so a new backend status never renders as a blank.
 const STATUS_COPY: Record<Lang, Record<string, string>> = {
-  en: { Active: 'Active', Paused: 'Paused', Pending: 'Pending' },
+  en: { Active: uiCopy('u_90bc4d1e34d66644'), Paused: uiCopy('u_fcee2ed7adf14f00'), Pending: uiCopy('u_3ba65433865418e9') },
   es: { Active: 'Activo', Paused: 'En pausa', Pending: 'Pendiente' },
   pt: { Active: 'Ativo', Paused: 'Pausado', Pending: 'Pendente' },
   pl: { Active: 'Aktywny', Paused: 'Wstrzymany', Pending: 'Oczekujący' },

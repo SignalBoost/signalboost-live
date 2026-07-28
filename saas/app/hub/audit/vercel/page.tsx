@@ -10,6 +10,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import VercelReport, { type VercelReportView } from '@/components/audit/VercelReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: VercelReportView; error?: string }
@@ -32,7 +34,7 @@ export default function VercelReportPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.vercel.loadError', 'Could not load the deployment report.'))
+          setError((json && json.error) || t('audit.vercel.loadError', uiCopy('u_e175cc0c5066f397')))
           return
         }
         setData(json.report)
@@ -40,7 +42,7 @@ export default function VercelReportPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.vercel.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.vercel.fetchError', uiCopy('u_379c30d174fac561')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -51,7 +53,7 @@ export default function VercelReportPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.vercel.loading', 'Loading deployment report…')}
+        {t('audit.vercel.loading', uiCopy('u_1e1e71250db0ddd0'))}
       </main>
     )
   }

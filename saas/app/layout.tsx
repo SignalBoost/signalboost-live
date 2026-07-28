@@ -7,11 +7,13 @@ import LanguageSuggestion from '@/components/LanguageSuggestion'
 import ProductContextBridge from '@/components/ProductContextBridge'
 import { I18nProvider } from '@/components/i18n/I18nProvider'
 import { Analytics } from '@vercel/analytics/react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const SITE_URL = 'https://saas.signalboostapp.com'
-const SITE_TITLE = 'SignalBoost — AI Websites, Reviews & Content in Any Language'
+const SITE_TITLE = uiCopy('u_501dbbf02b667774')
 const SITE_DESCRIPTION =
-  'AI-powered websites, customer reviews, audio and video content for businesses that want to grow in every language. Build, optimize, and broadcast from one platform.'
+  uiCopy('u_97e79f4cd174f704')
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

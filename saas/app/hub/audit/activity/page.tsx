@@ -10,6 +10,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import ActivityReport, { type ActivityReportView } from '@/components/audit/ActivityReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: ActivityReportView; error?: string }
@@ -32,7 +34,7 @@ export default function ActivityReportPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.activity.loadError', 'Could not load the activity log.'))
+          setError((json && json.error) || t('audit.activity.loadError', uiCopy('u_7deeaff050444dce')))
           return
         }
         setData(json.report)
@@ -40,7 +42,7 @@ export default function ActivityReportPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.activity.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.activity.fetchError', uiCopy('u_ccc76a4050761d99')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -51,7 +53,7 @@ export default function ActivityReportPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.activity.loading', 'Loading activity log…')}
+        {t('audit.activity.loading', uiCopy('u_0cffce0190cb85cb'))}
       </main>
     )
   }

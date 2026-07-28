@@ -5,6 +5,8 @@ import { useMemo } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { SERVICES } from '@/lib/services/catalog'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Credit pack pricing renders only when the activation flag is on (Vercel env:
 // NEXT_PUBLIC_CREDITS_ACTIVATION=1). Off by default so the public console never
@@ -30,18 +32,18 @@ export default function PublicSaaSConsole() {
   })), [dict])
 
   return (
-    <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 p-5 shadow-2xl shadow-cyan-950/30 md:p-7" aria-label={t(dict, 'studio.catalog.aria', 'Universal Media Hub service catalog')}>
+    <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 p-5 shadow-2xl shadow-cyan-950/30 md:p-7" aria-label={t(dict, 'studio.catalog.aria', uiCopy('u_db33699214d429b5'))}>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,.20),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(255,195,0,.16),transparent_28%),linear-gradient(135deg,rgba(255,255,255,.08),transparent_45%)]" />
       <div className="relative">
-        <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-200">{t(dict, 'studio.catalog.eyebrow', 'Universal Media Hub')}</p>
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-200">{t(dict, 'studio.catalog.eyebrow', uiCopy('u_56c336e4934d13c0'))}</p>
         <div className="mt-3 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
-            <h2 className="text-3xl font-black tracking-tight text-white md:text-5xl">{t(dict, 'studio.catalog.title', 'Choose the exact outcome you want.')}</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{t(dict, 'studio.catalog.subtitle', 'Studio now mirrors the Home Page taxonomy: nine services and free utilities grouped by real intent, with COS Core v1 preparing drafts silently until you approve the next financial step.')}</p>
+            <h2 className="text-3xl font-black tracking-tight text-white md:text-5xl">{t(dict, 'studio.catalog.title', uiCopy('u_376351e6e08aeb81'))}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{t(dict, 'studio.catalog.subtitle', uiCopy('u_d8fe41c2e5f00b25'))}</p>
           </div>
           {CREDITS_ACTIVATION && (
             <div className="rounded-2xl border border-amber-200/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
-              {t(dict, 'credits.packs', 'Starter Pack: 50 Credits = $15 · Pro Pack: 200 Credits = $50.')}
+              {t(dict, 'credits.packs', uiCopy('u_b926d668a60bb759'))}
             </div>
           )}
         </div>
@@ -54,9 +56,9 @@ export default function PublicSaaSConsole() {
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-xl font-black text-white">{t(dict, `studio.group.${group.key}.title`, group.key)}</h3>
-                    <p className="mt-1 text-sm text-slate-400">{t(dict, `studio.group.${group.key}.desc`, 'Select a guided path.')}</p>
+                    <p className="mt-1 text-sm text-slate-400">{t(dict, `studio.group.${group.key}.desc`, uiCopy('u_0ddcf1f792b1037f'))}</p>
                   </div>
-                  <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[.16em] text-cyan-100">COS Core v1</span>
+                  <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[.16em] text-cyan-100">{uiCopy('u_cf6ad4fc7ed92e19')}</span>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {services.map(service => (

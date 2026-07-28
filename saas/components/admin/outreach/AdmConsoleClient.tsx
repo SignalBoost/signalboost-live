@@ -4,6 +4,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { useEffect, useMemo, useState } from 'react'
 import CosaCampaignFeed, { type CosaCampaignFeedItem } from '@/components/cosa/CosaCampaignFeed'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type OutreachRow = {
   id: string
@@ -49,7 +51,7 @@ export default function AdmConsoleClient() {
       setData(json)
       setSelected((current) => current ? json.recentOutreach.find((row: OutreachRow) => row.id === current.id) || current : json.recentOutreach[0] || null)
     } else {
-      setMessage(json.error || 'Failed to load ADM Console')
+      setMessage(json.error || uiCopy('u_9027c6a74e0c8fd9'))
     }
     setLoading(false)
   }
@@ -85,7 +87,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ id, status }),
     })
     const json = await res.json()
-    setMessage(res.ok ? `Outreach ${status}.` : json.error || 'Update failed')
+    setMessage(res.ok ? `Outreach ${status}.` : json.error || uiCopy('u_e7333e74e51068cb'))
     setBusy(false)
     await load()
   }
@@ -102,9 +104,9 @@ export default function AdmConsoleClient() {
     if (res.ok) {
       const mode = String(json?.providerResult?.mode || '')
       const reallyEmailed = mode !== '' && mode !== 'manual_record_only'
-      setMessage(reallyEmailed ? `✅ Email sent (${mode}).` : '⚠️ Recorded only — no email was sent.')
+      setMessage(reallyEmailed ? `✅ Email sent (${mode}).` : uiCopy('u_08971d48290fae0b'))
     } else {
-      setMessage(json.error || 'Send failed')
+      setMessage(json.error || uiCopy('u_7dd7b8610fdb32c8'))
     }
     setBusy(false)
     await load()
@@ -118,7 +120,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ business_url: sourceUrl, business_name: businessName, source_platform: 'manual' }),
     })
     const json = await res.json()
-    setMessage(res.ok ? 'Business analyzed and queued.' : json.error || 'Analysis failed')
+    setMessage(res.ok ? uiCopy('u_9d3175917d947606') : json.error || uiCopy('u_2edadc1c9807289f'))
     setBusy(false)
     if (res.ok) { setSourceUrl(''); setBusinessName('') }
     await load()
@@ -132,7 +134,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ limit: 10 }),
     })
     const json = await res.json()
-    setMessage(res.ok ? `Digits sync processed ${json.processed || 0} partners.` : json.error || 'Digits sync failed')
+    setMessage(res.ok ? `Digits sync processed ${json.processed || 0} partners.` : json.error || uiCopy('u_885c9cad5ad43590'))
     setBusy(false)
     await load()
   }
@@ -145,14 +147,14 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ outreach_sending_disabled: value }),
     })
     const json = await res.json()
-    setMessage(res.ok ? (value ? 'Panic switch enabled.' : 'Panic switch disabled.') : json.error || 'Setting update failed')
+    setMessage(res.ok ? (value ? uiCopy('u_c5d98c84a7b9a4f0') : uiCopy('u_25d7d845a8f1d78b')) : json.error || uiCopy('u_0eb75fe90071b4e7'))
     setBusy(false)
     await load()
   }
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-white/60"><LocalizedText fallback={"Loading ADM Console..."} /></div>
+      <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-white/60"><LocalizedText fallback={uiCopy('u_1ea3053b716cad0c')} /></div>
     )
   }
 
@@ -168,14 +170,14 @@ export default function AdmConsoleClient() {
       <section className="rounded-[20px] border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-7 shadow-2xl shadow-black/50 backdrop-blur-md">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span className="sb-eyebrow"><LocalizedText fallback={"ADM Console"} /></span>
-            <h1 className="sb-h2 mt-3">Dashboards → Security Logs → Outreach Control → Predictive Insights.</h1>
-            <p className="sb-body max-w-2xl">{data?.hmi.summary || 'AI outreach command center with human approval, predictive needs, and security visibility.'}</p>
+            <span className="sb-eyebrow"><LocalizedText fallback={uiCopy('u_c9e247bb379ea87d')} /></span>
+            <h1 className="sb-h2 mt-3">{uiCopy('u_f1b92abc3a943d97')}</h1>
+            <p className="sb-body max-w-2xl">{data?.hmi.summary || uiCopy('u_bdeace793ea128eb')}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button disabled={busy} onClick={syncDigits} className="sb-button-secondary" style={{ opacity: busy ? 0.5 : 1 }}><LocalizedText fallback={"Sync Digits"} /></button>
+            <button disabled={busy} onClick={syncDigits} className="sb-button-secondary" style={{ opacity: busy ? 0.5 : 1 }}><LocalizedText fallback={uiCopy('u_2220fea1690ca6a2')} /></button>
             <button disabled={busy} onClick={() => togglePanic(!data?.metrics.panicSwitch)} className="sb-button-primary" style={{ border: 'none', opacity: busy ? 0.5 : 1 }}>
-              {data?.metrics.panicSwitch ? 'Disable Panic Switch' : 'Enable Panic Switch'}
+              {data?.metrics.panicSwitch ? uiCopy('u_3a9b0eb7cd21b9ec') : uiCopy('u_2659745de08845c5')}
             </button>
           </div>
         </div>
@@ -187,7 +189,7 @@ export default function AdmConsoleClient() {
         </div>
       )}
 
-      <section aria-label="Dashboards" className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
+      <section aria-label={uiCopy('u_e6103da109efd0f4')} className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
         {dashboardMetrics.map(([label, value]) => (
           <div key={String(label)} className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
             <p className="m-0 text-[11px] uppercase tracking-widest text-white/45">{label}</p>
@@ -196,39 +198,38 @@ export default function AdmConsoleClient() {
         ))}
       </section>
 
-      <section aria-label="Security Logs" className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+      <section aria-label={uiCopy('u_aa274a128a2bc5ba')} className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <span className="sb-eyebrow"><LocalizedText fallback={"Security Logs"} /></span>
-            <h2 className="sb-h3 mt-2"><LocalizedText fallback={"Safety before scale."} /></h2>
+            <span className="sb-eyebrow"><LocalizedText fallback={uiCopy('u_7106d995317c767f')} /></span>
+            <h2 className="sb-h3 mt-2"><LocalizedText fallback={uiCopy('u_9dbde8307f819142')} /></h2>
           </div>
-          <span className="rounded-full border border-cyan-300/30 px-3 py-1 text-xs text-cyan-300/85">
-            24h events: {data?.metrics.security24h ?? 0}
+          <span className="rounded-full border border-cyan-300/30 px-3 py-1 text-xs text-cyan-300/85">{uiCopy('u_8f5f85c42e287571')}{data?.metrics.security24h ?? 0}
           </span>
         </div>
-        <InfoCard title="Recent Security Events" data={data?.recentSecurityEvents?.slice(0, 5)} />
+        <InfoCard title={uiCopy('u_21240c5bb85d273d')} data={data?.recentSecurityEvents?.slice(0, 5)} />
       </section>
 
-      <section aria-label="Outreach Control" className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
+      <section aria-label={uiCopy('u_8bf8ed2b02547182')} className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
-            <span className="sb-eyebrow"><LocalizedText fallback={"Outreach Control"} /></span>
-            <h2 className="sb-h3 mt-2"><LocalizedText fallback={"Analyze a business."} /></h2>
-            <p className="mt-2 text-xs text-white/45"><LocalizedText fallback={"AI suggestion: start with businesses that show urgency but weak proof."} /></p>
+            <span className="sb-eyebrow"><LocalizedText fallback={uiCopy('u_b579d2397ee0c78f')} /></span>
+            <h2 className="sb-h3 mt-2"><LocalizedText fallback={uiCopy('u_233777e90d0e6e9e')} /></h2>
+            <p className="mt-2 text-xs text-white/45"><LocalizedText fallback={uiCopy('u_368838d87fc593d1')} /></p>
             <div className="mt-4 flex flex-col gap-3">
-              <input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Business name" className="sb-input w-full rounded-xl px-3 py-2.5 text-sm" />
-              <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="Public website or social URL" className="sb-input w-full rounded-xl px-3 py-2.5 text-sm" />
-              <button disabled={busy || !sourceUrl} onClick={runManualAnalysis} className="sb-button-primary w-full" style={{ border: 'none', opacity: busy || !sourceUrl ? 0.5 : 1 }}>Generate Assets + Queue</button>
+              <input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder={uiCopy('u_dbfd50a2c8be3b7a')} className="sb-input w-full rounded-xl px-3 py-2.5 text-sm" />
+              <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder={uiCopy('u_f00148e9c1daf7c7')} className="sb-input w-full rounded-xl px-3 py-2.5 text-sm" />
+              <button disabled={busy || !sourceUrl} onClick={runManualAnalysis} className="sb-button-primary w-full" style={{ border: 'none', opacity: busy || !sourceUrl ? 0.5 : 1 }}>{uiCopy('u_e6294a47504ea75a')}</button>
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
-            <h3 className="sb-h3"><LocalizedText fallback={"Approval Queue"} /></h3>
+            <h3 className="sb-h3"><LocalizedText fallback={uiCopy('u_0c3bd3cffa9b7b93')} /></h3>
             <div className="mt-4">
               <CosaCampaignFeed
                 campaigns={campaignFeed}
                 selectedId={selected?.id}
-                emptyLabel="No outreach records yet."
+                emptyLabel={uiCopy('u_56822fca6a1363c8')}
                 onSelect={(campaign) => {
                   const row = data?.recentOutreach.find(item => item.id === campaign.id)
                   if (row) setSelected(row)
@@ -243,52 +244,52 @@ export default function AdmConsoleClient() {
             <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <span className="sb-eyebrow"><LocalizedText fallback={"Generated Assets"} /></span>
+                  <span className="sb-eyebrow"><LocalizedText fallback={uiCopy('u_47b866eeec68ad74')} /></span>
                   <h3 className="mt-2 text-xl font-semibold text-white">{selected.business_name}</h3>
                   <p className="mt-1 text-sm text-white/45">{selected.business_url}</p>
                   <p className="mt-2 text-sm font-bold" style={{ color: selected.contact_email ? '#1af0ff' : '#f59e0b' }}>
-                    {selected.contact_email ? `Will send to: ${selected.contact_email}` : 'No recipient email found — this draft cannot be sent.'}
+                    {selected.contact_email ? `Will send to: ${selected.contact_email}` : uiCopy('u_1d55ac58ff89bd87')}
                   </p>
                   <p className="mt-3 text-sm text-white/70">{selected.analyzer_summary?.hmi_summary}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button disabled={busy || selected.status === 'approved'} onClick={() => patchOutreach(selected.id, 'approved')} className="sb-button-primary" style={{ border: 'none', opacity: busy || selected.status === 'approved' ? 0.5 : 1 }}>Approve</button>
-                  <button disabled={busy || selected.status === 'rejected'} onClick={() => patchOutreach(selected.id, 'rejected')} className="rounded-full border-0 bg-red-600 px-4 py-2 text-sm font-bold text-white" style={{ opacity: busy || selected.status === 'rejected' ? 0.5 : 1 }}>Reject</button>
+                  <button disabled={busy || selected.status === 'approved'} onClick={() => patchOutreach(selected.id, 'approved')} className="sb-button-primary" style={{ border: 'none', opacity: busy || selected.status === 'approved' ? 0.5 : 1 }}>{uiCopy('u_f32de49da23ec667')}</button>
+                  <button disabled={busy || selected.status === 'rejected'} onClick={() => patchOutreach(selected.id, 'rejected')} className="rounded-full border-0 bg-red-600 px-4 py-2 text-sm font-bold text-white" style={{ opacity: busy || selected.status === 'rejected' ? 0.5 : 1 }}>{uiCopy('u_541162baf721a598')}</button>
                 </div>
               </div>
 
               <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
-                <InfoCard title="Analyzer" data={selected.analyzer_summary} />
-                <InfoCard title="Profiler" data={selected.business_model_profile} />
-                <InfoCard title="Predictive Intelligence" data={selected.predictive_needs} />
-                <InfoCard title="Review Strategy" data={selected.review_strategy} />
-                <InfoCard title="Social Plan" data={selected.social_plan} />
-                <InfoCard title="Promo Campaign" data={selected.promo_plan} />
+                <InfoCard title={uiCopy('u_fbd4bdb92e7c90f3')} data={selected.analyzer_summary} />
+                <InfoCard title={uiCopy('u_49b0793870f9e157')} data={selected.business_model_profile} />
+                <InfoCard title={uiCopy('u_9bbbc764edf9d56c')} data={selected.predictive_needs} />
+                <InfoCard title={uiCopy('u_7796b793264037be')} data={selected.review_strategy} />
+                <InfoCard title={uiCopy('u_52b8a268af240e71')} data={selected.social_plan} />
+                <InfoCard title={uiCopy('u_1cba30ada3708fef')} data={selected.promo_plan} />
               </div>
 
               <div className="sb-ai-feedback mt-5">
-                <strong><LocalizedText fallback={"AI feedback"} /></strong>
-                <p><LocalizedText fallback={"This campaign looks strong for urgency, but you could add a testimonial before sending."} /></p>
+                <strong><LocalizedText fallback={uiCopy('u_26f3df5a67ed3d8c')} /></strong>
+                <p><LocalizedText fallback={uiCopy('u_17f7f658e14c1382')} /></p>
               </div>
 
               <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
-                <h4 className="m-0 font-semibold text-white"><LocalizedText fallback={"Outreach Message"} /></h4>
+                <h4 className="m-0 font-semibold text-white"><LocalizedText fallback={uiCopy('u_ae6956e18483cc43')} /></h4>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/70">{selected.outreach_message}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder="Optional email recipient" className="sb-input min-w-[180px] flex-1 rounded-xl px-3 py-2.5 text-sm" />
-                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}><LocalizedText fallback={"Send Now"} /></button>
+                  <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder={uiCopy('u_4f5c9e09eb7ae599')} className="sb-input min-w-[180px] flex-1 rounded-xl px-3 py-2.5 text-sm" />
+                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}><LocalizedText fallback={uiCopy('u_5ec3b498506948ce')} /></button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-white/40"><LocalizedText fallback={"No outreach records yet."} /></div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-white/40"><LocalizedText fallback={uiCopy('u_8d67877afc61e182')} /></div>
           )}
         </div>
       </section>
 
-      <section aria-label="Predictive Insights" className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
-        <InfoCard title="Predictive Insights" data={predictedNeeds} />
-        <InfoCard title="AI Behavior Monitor" data={data?.recentAiTasks?.slice(0, 5)} />
+      <section aria-label={uiCopy('u_e632eca471c3de0a')} className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
+        <InfoCard title={uiCopy('u_722defbb0d515750')} data={predictedNeeds} />
+        <InfoCard title={uiCopy('u_bd057d17c39fd5fe')} data={data?.recentAiTasks?.slice(0, 5)} />
       </section>
     </div>
   )

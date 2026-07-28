@@ -3,35 +3,37 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY = {
-  eyebrow:     { en: 'Grow', es: 'Crecer', pt: 'Crescer', pl: 'Rozwój', ru: 'Рост' },
-  title:       { en: 'My Outreach', es: 'Mi prospección', pt: 'Minha prospecção', pl: 'Mój outreach', ru: 'Мой аутрич' },
-  subtitle:    { en: 'Create AI-quality outreach messages for your business, review them, and send from your own email.', es: 'Crea mensajes de prospección de calidad IA para tu negocio, revísalos y envíalos desde tu propio correo.', pt: 'Crie mensagens de prospecção com qualidade de IA para o seu negócio, revise e envie do seu próprio e-mail.', pl: 'Twórz wiadomości outreach jakości AI dla swojej firmy, sprawdzaj je i wysyłaj z własnej poczty.', ru: 'Создавайте аутрич-сообщения уровня ИИ для вашего бизнеса, проверяйте и отправляйте со своей почты.' },
-  tip:         { en: '💡 Tip: ask the Concierge to write drafts for you — e.g. "Draft an outreach message to a local hotel for my business".', es: '💡 Consejo: pide al Concierge que escriba borradores — p. ej. "Redacta un mensaje de prospección a un hotel local para mi negocio".', pt: '💡 Dica: peça ao Concierge para escrever rascunhos — ex. "Redija uma mensagem de prospecção para um hotel local para o meu negócio".', pl: '💡 Wskazówka: poproś Concierge o napisanie szkiców — np. "Napisz wiadomość outreach do lokalnego hotelu dla mojej firmy".', ru: '💡 Совет: попросите Консьержа написать черновики — напр. «Составь аутрич-сообщение местному отелю для моего бизнеса».' },
-  upgradeTitle:{ en: 'Outreach is a Growth & Command feature', es: 'La prospección es una función de Growth y Command', pt: 'A prospecção é um recurso dos planos Growth e Command', pl: 'Outreach to funkcja planów Growth i Command', ru: 'Аутрич доступен на планах Growth и Command' },
-  upgradeBody: { en: 'Upgrade your plan to let SignalBoost AI write, manage, and track outreach for your business.', es: 'Mejora tu plan para que la IA de SignalBoost escriba, gestione y haga seguimiento de tu prospección.', pt: 'Faça upgrade do plano para que a IA do SignalBoost escreva, gerencie e acompanhe sua prospecção.', pl: 'Ulepsz plan, aby AI SignalBoost pisała, zarządzała i śledziła Twój outreach.', ru: 'Обновите план, чтобы ИИ SignalBoost писал, управлял и отслеживал ваш аутрич.' },
-  upgradeCta:  { en: 'View plans', es: 'Ver planes', pt: 'Ver planos', pl: 'Zobacz plany', ru: 'Смотреть планы' },
-  newDraft:    { en: 'New draft', es: 'Nuevo borrador', pt: 'Novo rascunho', pl: 'Nowy szkic', ru: 'Новый черновик' },
-  bizName:     { en: 'Target business name', es: 'Nombre del negocio objetivo', pt: 'Nome do negócio-alvo', pl: 'Nazwa firmy docelowej', ru: 'Название целевой компании' },
-  bizUrl:      { en: 'Target website (https://…)', es: 'Sitio web objetivo (https://…)', pt: 'Site-alvo (https://…)', pl: 'Strona docelowa (https://…)', ru: 'Сайт цели (https://…)' },
-  message:     { en: 'Your outreach message (40–2,400 characters)', es: 'Tu mensaje (40–2.400 caracteres)', pt: 'Sua mensagem (40–2.400 caracteres)', pl: 'Twoja wiadomość (40–2400 znaków)', ru: 'Ваше сообщение (40–2400 символов)' },
-  create:      { en: 'Create draft', es: 'Crear borrador', pt: 'Criar rascunho', pl: 'Utwórz szkic', ru: 'Создать черновик' },
-  creating:    { en: 'Creating…', es: 'Creando…', pt: 'Criando…', pl: 'Tworzenie…', ru: 'Создание…' },
-  empty:       { en: 'No drafts yet. Create one below or ask the Concierge.', es: 'Aún no hay borradores. Crea uno abajo o pide al Concierge.', pt: 'Ainda não há rascunhos. Crie um abaixo ou peça ao Concierge.', pl: 'Brak szkiców. Utwórz poniżej lub poproś Concierge.', ru: 'Черновиков пока нет. Создайте ниже или попросите Консьержа.' },
-  approve:     { en: 'Approve', es: 'Aprobar', pt: 'Aprovar', pl: 'Zatwierdź', ru: 'Одобрить' },
-  reject:      { en: 'Reject', es: 'Rechazar', pt: 'Rejeitar', pl: 'Odrzuć', ru: 'Отклонить' },
-  openEmail:   { en: '✉️ Open in email app', es: '✉️ Abrir en tu correo', pt: '✉️ Abrir no e-mail', pl: '✉️ Otwórz w poczcie', ru: '✉️ Открыть в почте' },
-  copyMsg:     { en: '📋 Copy message', es: '📋 Copiar mensaje', pt: '📋 Copiar mensagem', pl: '📋 Kopiuj wiadomość', ru: '📋 Копировать' },
-  copied:      { en: 'Copied!', es: '¡Copiado!', pt: 'Copiado!', pl: 'Skopiowano!', ru: 'Скопировано!' },
-  usage:       { en: 'drafts today', es: 'borradores hoy', pt: 'rascunhos hoje', pl: 'szkice dzisiaj', ru: 'черновиков сегодня' },
-  loadError:   { en: 'Could not load your drafts.', es: 'No se pudieron cargar tus borradores.', pt: 'Não foi possível carregar seus rascunhos.', pl: 'Nie udało się załadować szkiców.', ru: 'Не удалось загрузить черновики.' },
+  eyebrow:     { en: uiCopy('u_3cd9534adc8725ab'), es: 'Crecer', pt: 'Crescer', pl: 'Rozwój', ru: 'Рост' },
+  title:       { en: uiCopy('u_360de2e3ec76723c'), es: 'Mi prospección', pt: 'Minha prospecção', pl: 'Mój outreach', ru: 'Мой аутрич' },
+  subtitle:    { en: uiCopy('u_173227f3a28f0d42'), es: 'Crea mensajes de prospección de calidad IA para tu negocio, revísalos y envíalos desde tu propio correo.', pt: 'Crie mensagens de prospecção com qualidade de IA para o seu negócio, revise e envie do seu próprio e-mail.', pl: 'Twórz wiadomości outreach jakości AI dla swojej firmy, sprawdzaj je i wysyłaj z własnej poczty.', ru: 'Создавайте аутрич-сообщения уровня ИИ для вашего бизнеса, проверяйте и отправляйте со своей почты.' },
+  tip:         { en: uiCopy('u_7d3b64798a852d4b'), es: '💡 Consejo: pide al Concierge que escriba borradores — p. ej. "Redacta un mensaje de prospección a un hotel local para mi negocio".', pt: '💡 Dica: peça ao Concierge para escrever rascunhos — ex. "Redija uma mensagem de prospecção para um hotel local para o meu negócio".', pl: '💡 Wskazówka: poproś Concierge o napisanie szkiców — np. "Napisz wiadomość outreach do lokalnego hotelu dla mojej firmy".', ru: '💡 Совет: попросите Консьержа написать черновики — напр. «Составь аутрич-сообщение местному отелю для моего бизнеса».' },
+  upgradeTitle:{ en: uiCopy('u_bb262f5f224dbaa8'), es: 'La prospección es una función de Growth y Command', pt: 'A prospecção é um recurso dos planos Growth e Command', pl: 'Outreach to funkcja planów Growth i Command', ru: 'Аутрич доступен на планах Growth и Command' },
+  upgradeBody: { en: uiCopy('u_f81038979c3152fa'), es: 'Mejora tu plan para que la IA de SignalBoost escriba, gestione y haga seguimiento de tu prospección.', pt: 'Faça upgrade do plano para que a IA do SignalBoost escreva, gerencie e acompanhe sua prospecção.', pl: 'Ulepsz plan, aby AI SignalBoost pisała, zarządzała i śledziła Twój outreach.', ru: 'Обновите план, чтобы ИИ SignalBoost писал, управлял и отслеживал ваш аутрич.' },
+  upgradeCta:  { en: uiCopy('u_86544fa181bd8d40'), es: 'Ver planes', pt: 'Ver planos', pl: 'Zobacz plany', ru: 'Смотреть планы' },
+  newDraft:    { en: uiCopy('u_c3dd0329d236ef1e'), es: 'Nuevo borrador', pt: 'Novo rascunho', pl: 'Nowy szkic', ru: 'Новый черновик' },
+  bizName:     { en: uiCopy('u_2c4258918ed0ecd8'), es: 'Nombre del negocio objetivo', pt: 'Nome do negócio-alvo', pl: 'Nazwa firmy docelowej', ru: 'Название целевой компании' },
+  bizUrl:      { en: uiCopy('u_1d0df3b11dd808df'), es: 'Sitio web objetivo (https://…)', pt: 'Site-alvo (https://…)', pl: 'Strona docelowa (https://…)', ru: 'Сайт цели (https://…)' },
+  message:     { en: uiCopy('u_fbca0deca4fe7b6c'), es: 'Tu mensaje (40–2.400 caracteres)', pt: 'Sua mensagem (40–2.400 caracteres)', pl: 'Twoja wiadomość (40–2400 znaków)', ru: 'Ваше сообщение (40–2400 символов)' },
+  create:      { en: uiCopy('u_00e4af76f30a1514'), es: 'Crear borrador', pt: 'Criar rascunho', pl: 'Utwórz szkic', ru: 'Создать черновик' },
+  creating:    { en: uiCopy('u_b593abccaa02251f'), es: 'Creando…', pt: 'Criando…', pl: 'Tworzenie…', ru: 'Создание…' },
+  empty:       { en: uiCopy('u_524c29235ba75859'), es: 'Aún no hay borradores. Crea uno abajo o pide al Concierge.', pt: 'Ainda não há rascunhos. Crie um abaixo ou peça ao Concierge.', pl: 'Brak szkiców. Utwórz poniżej lub poproś Concierge.', ru: 'Черновиков пока нет. Создайте ниже или попросите Консьержа.' },
+  approve:     { en: uiCopy('u_3111d9789eb0ec41'), es: 'Aprobar', pt: 'Aprovar', pl: 'Zatwierdź', ru: 'Одобрить' },
+  reject:      { en: uiCopy('u_ec6b15387cb5d0c8'), es: 'Rechazar', pt: 'Rejeitar', pl: 'Odrzuć', ru: 'Отклонить' },
+  openEmail:   { en: uiCopy('u_b14b5f6d7823feb7'), es: '✉️ Abrir en tu correo', pt: '✉️ Abrir no e-mail', pl: '✉️ Otwórz w poczcie', ru: '✉️ Открыть в почте' },
+  copyMsg:     { en: uiCopy('u_dc61d6e064588710'), es: '📋 Copiar mensaje', pt: '📋 Copiar mensagem', pl: '📋 Kopiuj wiadomość', ru: '📋 Копировать' },
+  copied:      { en: uiCopy('u_0759c5cf0b946708'), es: '¡Copiado!', pt: 'Copiado!', pl: 'Skopiowano!', ru: 'Скопировано!' },
+  usage:       { en: uiCopy('u_8396b84fac643caa'), es: 'borradores hoy', pt: 'rascunhos hoje', pl: 'szkice dzisiaj', ru: 'черновиков сегодня' },
+  loadError:   { en: uiCopy('u_9cad60e488718867'), es: 'No se pudieron cargar tus borradores.', pt: 'Não foi possível carregar seus rascunhos.', pl: 'Nie udało się załadować szkiców.', ru: 'Не удалось загрузить черновики.' },
   statuses: {
-    pending:  { en: 'Pending',  es: 'Pendiente', pt: 'Pendente', pl: 'Oczekuje', ru: 'Ожидает' },
-    approved: { en: 'Approved', es: 'Aprobado',  pt: 'Aprovado', pl: 'Zatwierdzony', ru: 'Одобрен' },
-    rejected: { en: 'Rejected', es: 'Rechazado', pt: 'Rejeitado', pl: 'Odrzucony', ru: 'Отклонён' },
+    pending:  { en: uiCopy('u_ddd011218e9ae442'),  es: 'Pendiente', pt: 'Pendente', pl: 'Oczekuje', ru: 'Ожидает' },
+    approved: { en: uiCopy('u_7e147b996ea4339a'), es: 'Aprobado',  pt: 'Aprovado', pl: 'Zatwierdzony', ru: 'Одобрен' },
+    rejected: { en: uiCopy('u_2f8a787783d414df'), es: 'Rechazado', pt: 'Rejeitado', pl: 'Odrzucony', ru: 'Отклонён' },
   },
 }
 
@@ -101,11 +103,11 @@ export default function MyOutreachPage() {
         body: JSON.stringify({ businessName: bizName, businessUrl: bizUrl, message }),
       })
       const data = await res.json()
-      if (!res.ok) { setNotice(String(data?.error || 'Error')); return }
+      if (!res.ok) { setNotice(String(data?.error || uiCopy('u_919bf40474c36cc1'))); return }
       setBizName(''); setBizUrl(''); setMessage('')
       await load()
     } catch {
-      setNotice('Error')
+      setNotice(uiCopy('u_bb273a16c071fc1a'))
     } finally {
       setCreating(false)
     }
@@ -119,11 +121,11 @@ export default function MyOutreachPage() {
         body: JSON.stringify({ id, status }),
       })
       const data = await res.json()
-      if (!res.ok) { setNotice(String(data?.error || 'Error')); return }
+      if (!res.ok) { setNotice(String(data?.error || uiCopy('u_546c98f185c56988'))); return }
       setNotice('')
       setDrafts(prev => prev.map(d => (d.id === id ? { ...d, status } : d)))
     } catch {
-      setNotice('Error')
+      setNotice(uiCopy('u_6f9403ebba7d60d7'))
     }
   }
 
@@ -214,10 +216,10 @@ export default function MyOutreachPage() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {d.source_platform === 'concierge' ? (
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: '#c4b5fd', border: '1px solid rgba(196,181,253,.5)', borderRadius: 999, padding: '3px 9px' }}>🤖 Concierge</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: '#c4b5fd', border: '1px solid rgba(196,181,253,.5)', borderRadius: 999, padding: '3px 9px' }}>{uiCopy('u_b0d14ce512b342b9')}</span>
                   ) : null}
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
-                    {new Date(d.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    {new Date(d.created_at).toLocaleString(undefined, { dateStyle: uiCopy('u_3f17a8121c4a515f'), timeStyle: uiCopy('u_f811f5b1d095f12b') })}
                   </span>
                   <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: STATUS_COLOR[status] || '#fff', border: `1px solid ${STATUS_COLOR[status] || '#fff'}`, borderRadius: 999, padding: '3px 10px' }}>
                     {c(COPY.statuses[status as keyof typeof COPY.statuses] || COPY.statuses.pending, l)}

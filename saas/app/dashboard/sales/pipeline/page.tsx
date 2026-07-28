@@ -2,28 +2,30 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY = {
-  eyebrow:    { en: 'Sales', es: 'Ventas', pt: 'Vendas', pl: 'Sprzedaż', ru: 'Продажи' },
-  title:      { en: 'Sales Pipeline', es: 'Pipeline de Ventas', pt: 'Pipeline de Vendas', pl: 'Pipeline Sprzedaży', ru: 'Пайплайн продаж' },
-  subtitle:   { en: 'Track prospects from discovery to client.', es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do descobrimento ao cliente.', pl: 'Śledź prospektów od odkrycia do klienta.', ru: 'Отслеживайте потенциальных клиентов от поиска до закрытия.' },
-  loading:    { en: 'Loading pipeline…', es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
-  noLeads:    { en: 'No leads', es: 'Sin leads', pt: 'Sem leads', pl: 'Brak leadów', ru: 'Нет лидов' },
-  unnamed:    { en: 'Unnamed company', es: 'Empresa sin nombre', pt: 'Empresa sem nome', pl: 'Firma bez nazwy', ru: 'Компания без названия' },
-  noIndustry: { en: 'No industry', es: 'Sin industria', pt: 'Sem indústria', pl: 'Brak branży', ru: 'Без отрасли' },
-  noCountry:  { en: 'No country', es: 'Sin país', pt: 'Sem país', pl: 'Brak kraju', ru: 'Без страны' },
-  noEmail:    { en: 'No email', es: 'Sin email', pt: 'Sem email', pl: 'Brak emaila', ru: 'Без email' },
-  draft:      { en: 'Draft:', es: 'Borrador:', pt: 'Rascunho:', pl: 'Szkic:', ru: 'Черновик:' },
+  eyebrow:    { en: uiCopy('u_450bb30ab73bb46a'), es: 'Ventas', pt: 'Vendas', pl: 'Sprzedaż', ru: 'Продажи' },
+  title:      { en: uiCopy('u_c11866a27141275d'), es: 'Pipeline de Ventas', pt: 'Pipeline de Vendas', pl: 'Pipeline Sprzedaży', ru: 'Пайплайн продаж' },
+  subtitle:   { en: uiCopy('u_5ca0593f655a6ab1'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do descobrimento ao cliente.', pl: 'Śledź prospektów od odkrycia do klienta.', ru: 'Отслеживайте потенциальных клиентов от поиска до закрытия.' },
+  loading:    { en: uiCopy('u_19bfd438dee3ffb2'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
+  noLeads:    { en: uiCopy('u_bed4cadef6c3795d'), es: 'Sin leads', pt: 'Sem leads', pl: 'Brak leadów', ru: 'Нет лидов' },
+  unnamed:    { en: uiCopy('u_021c15323a531b55'), es: 'Empresa sin nombre', pt: 'Empresa sem nome', pl: 'Firma bez nazwy', ru: 'Компания без названия' },
+  noIndustry: { en: uiCopy('u_c10bca942322592e'), es: 'Sin industria', pt: 'Sem indústria', pl: 'Brak branży', ru: 'Без отрасли' },
+  noCountry:  { en: uiCopy('u_d40afa13cd239993'), es: 'Sin país', pt: 'Sem país', pl: 'Brak kraju', ru: 'Без страны' },
+  noEmail:    { en: uiCopy('u_002cf49c64ab3a9d'), es: 'Sin email', pt: 'Sem email', pl: 'Brak emaila', ru: 'Без email' },
+  draft:      { en: uiCopy('u_6a6d60020e822b19'), es: 'Borrador:', pt: 'Rascunho:', pl: 'Szkic:', ru: 'Черновик:' },
   statuses: {
-    discovered:   { en: 'Discovered',   es: 'Descubierto',  pt: 'Descoberto',  pl: 'Odkryty',        ru: 'Обнаружен' },
-    approved:     { en: 'Approved',     es: 'Aprobado',     pt: 'Aprovado',    pl: 'Zatwierdzony',   ru: 'Одобрен' },
-    draft_ready:  { en: 'Draft Ready',  es: 'Borrador listo', pt: 'Rascunho pronto', pl: 'Szkic gotowy', ru: 'Черновик готов' },
-    sketch_ready: { en: 'Sketch Ready', es: 'Esquema listo', pt: 'Esboço pronto', pl: 'Szkic gotowy', ru: 'Эскиз готов' },
-    sent:         { en: 'Sent',         es: 'Enviado',      pt: 'Enviado',     pl: 'Wysłany',        ru: 'Отправлен' },
-    replied:      { en: 'Replied',      es: 'Respondió',    pt: 'Respondeu',   pl: 'Odpowiedział',   ru: 'Ответил' },
-    client:       { en: 'Client',       es: 'Cliente',      pt: 'Cliente',     pl: 'Klient',         ru: 'Клиент' },
-    draft_failed: { en: 'Draft Failed', es: 'Borrador fallido', pt: 'Rascunho falhou', pl: 'Szkic nieudany', ru: 'Ошибка черновика' },
+    discovered:   { en: uiCopy('u_e8a9100ba08e6153'),   es: 'Descubierto',  pt: 'Descoberto',  pl: 'Odkryty',        ru: 'Обнаружен' },
+    approved:     { en: uiCopy('u_443d1228245c7e7d'),     es: 'Aprobado',     pt: 'Aprovado',    pl: 'Zatwierdzony',   ru: 'Одобрен' },
+    draft_ready:  { en: uiCopy('u_84b4b600828468bd'),  es: 'Borrador listo', pt: 'Rascunho pronto', pl: 'Szkic gotowy', ru: 'Черновик готов' },
+    sketch_ready: { en: uiCopy('u_4034bd7e268165fc'), es: 'Esquema listo', pt: 'Esboço pronto', pl: 'Szkic gotowy', ru: 'Эскиз готов' },
+    sent:         { en: uiCopy('u_9064d6aa0d30bad5'),         es: 'Enviado',      pt: 'Enviado',     pl: 'Wysłany',        ru: 'Отправлен' },
+    replied:      { en: uiCopy('u_0af5913feed511d3'),      es: 'Respondió',    pt: 'Respondeu',   pl: 'Odpowiedział',   ru: 'Ответил' },
+    client:       { en: uiCopy('u_c42bb2aca25c7862'),       es: 'Cliente',      pt: 'Cliente',     pl: 'Klient',         ru: 'Клиент' },
+    draft_failed: { en: uiCopy('u_21a0a3b8d2606b91'), es: 'Borrador fallido', pt: 'Rascunho falhou', pl: 'Szkic nieudany', ru: 'Ошибка черновика' },
   },
 }
 

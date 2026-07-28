@@ -3,23 +3,25 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY = {
-  eyebrow:     { en: 'Pipeline', es: 'Pipeline', pt: 'Pipeline', pl: 'Pipeline', ru: 'Пайплайн' },
-  title:       { en: 'Every lead, by stage.', es: 'Cada lead, por etapa.', pt: 'Cada lead, por etapa.', pl: 'Każdy lead według etapu.', ru: 'Каждый лид по этапу.' },
-  subtitle:    { en: 'Track prospects from first discovery through to a closed deal.', es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do primeiro contato ao fechamento.', pl: 'Śledź prospektów od odkrycia do zamknięcia.', ru: 'Отслеживайте потенциальных клиентов от первого контакта до закрытия.' },
-  newLead:     { en: '+ Discover new lead', es: '+ Descubrir nuevo lead', pt: '+ Descobrir novo lead', pl: '+ Odkryj nowy lead', ru: '+ Найти новый лид' },
-  loading:     { en: 'Loading pipeline…', es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
-  loadError:   { en: 'Could not load the pipeline.', es: 'No se pudo cargar el pipeline.', pt: 'Não foi possível carregar o pipeline.', pl: 'Nie można załadować pipeline.', ru: 'Не удалось загрузить пайплайн.' },
-  unnamed:     { en: 'Unnamed', es: 'Sin nombre', pt: 'Sem nome', pl: 'Bez nazwy', ru: 'Без имени' },
+  eyebrow:     { en: uiCopy('u_70b7bcf496580344'), es: 'Pipeline', pt: 'Pipeline', pl: 'Pipeline', ru: 'Пайплайн' },
+  title:       { en: uiCopy('u_72013137646a3b23'), es: 'Cada lead, por etapa.', pt: 'Cada lead, por etapa.', pl: 'Każdy lead według etapu.', ru: 'Каждый лид по этапу.' },
+  subtitle:    { en: uiCopy('u_0444c16f44cd76f5'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do primeiro contato ao fechamento.', pl: 'Śledź prospektów od odkrycia do zamknięcia.', ru: 'Отслеживайте потенциальных клиентов от первого контакта до закрытия.' },
+  newLead:     { en: uiCopy('u_e5ae03c8a4fdb33a'), es: '+ Descubrir nuevo lead', pt: '+ Descobrir novo lead', pl: '+ Odkryj nowy lead', ru: '+ Найти новый лид' },
+  loading:     { en: uiCopy('u_4144ecfb65d7e5e6'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
+  loadError:   { en: uiCopy('u_220eb671f13b525c'), es: 'No se pudo cargar el pipeline.', pt: 'Não foi possível carregar o pipeline.', pl: 'Nie można załadować pipeline.', ru: 'Не удалось загрузить пайплайн.' },
+  unnamed:     { en: uiCopy('u_83c5422ff2ed3c08'), es: 'Sin nombre', pt: 'Sem nome', pl: 'Bez nazwy', ru: 'Без имени' },
   empty:       { en: '—', es: '—', pt: '—', pl: '—', ru: '—' },
   stages: {
-    discovered: { en: 'Discovered', es: 'Descubierto', pt: 'Descoberto', pl: 'Odkryty', ru: 'Обнаружен' },
-    contacted:  { en: 'Contacted',  es: 'Contactado',  pt: 'Contactado',  pl: 'Skontaktowany', ru: 'Контакт' },
-    replied:    { en: 'Replied',    es: 'Respondió',   pt: 'Respondeu',   pl: 'Odpowiedział',  ru: 'Ответил' },
-    booked:     { en: 'Booked',     es: 'Agendado',    pt: 'Agendado',    pl: 'Zarezerwowany', ru: 'Записан' },
-    closed:     { en: 'Closed',     es: 'Cerrado',     pt: 'Fechado',     pl: 'Zamknięty',     ru: 'Закрыт' },
+    discovered: { en: uiCopy('u_1e09db267beada86'), es: 'Descubierto', pt: 'Descoberto', pl: 'Odkryty', ru: 'Обнаружен' },
+    contacted:  { en: uiCopy('u_205d9281d1874ec5'),  es: 'Contactado',  pt: 'Contactado',  pl: 'Skontaktowany', ru: 'Контакт' },
+    replied:    { en: uiCopy('u_d0ea3afebc132786'),    es: 'Respondió',   pt: 'Respondeu',   pl: 'Odpowiedział',  ru: 'Ответил' },
+    booked:     { en: uiCopy('u_b9325e02b0773133'),     es: 'Agendado',    pt: 'Agendado',    pl: 'Zarezerwowany', ru: 'Записан' },
+    closed:     { en: uiCopy('u_3308c4115a47f5ed'),     es: 'Cerrado',     pt: 'Fechado',     pl: 'Zamknięty',     ru: 'Закрыт' },
   },
 }
 

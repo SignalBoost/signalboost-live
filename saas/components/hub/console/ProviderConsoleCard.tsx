@@ -17,6 +17,8 @@ import { getTemplate } from '@/lib/hub/provider-templates'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
 import { type Lang } from '../shared.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Derive the effective live/credential state for a provider.
 function deriveState(providerId: string, status: ProviderLiveStatus | undefined, statusLoaded: boolean) {
@@ -40,7 +42,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
   const { t, dict } = useTranslation()
   const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
   const needsKeys = hasBackend && statusLoaded && !configured
-  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
+  const keyHint = t('console.cui.add_keys_hint', uiCopy('u_0393f2ac69d530df')).replace('{keys}', missing.join(', '))
   return (
     <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* Card Header Band */}
@@ -54,18 +56,16 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {!hasBackend ? (
-            <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', 'Soon')}</span>
+            <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', uiCopy('u_2c316d45d78e5a4e'))}</span>
           ) : needsKeys ? (
-            <span title={keyHint} style={{ fontSize: 8.5, fontWeight: 800, color: '#1af0ff', background: 'rgba(26,240,255,0.1)', border: '1px solid rgba(26,240,255,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'help' }}>{t('console.cui.connect_keys', 'Connect keys')}</span>
+            <span title={keyHint} style={{ fontSize: 8.5, fontWeight: 800, color: '#1af0ff', background: 'rgba(26,240,255,0.1)', border: '1px solid rgba(26,240,255,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'help' }}>{t('console.cui.connect_keys', uiCopy('u_ad812ad60c9b68be'))}</span>
           ) : configured ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8.5, fontWeight: 800, color: '#22c55e', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
-              {t('console.cui.live', 'Live')}
+              {t('console.cui.live', uiCopy('u_b6865541b5c6100c'))}
             </span>
           ) : null}
-          <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
-            Workspace →
-          </button>
+          <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>{uiCopy('u_8813ae867f08e43f')}</button>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
                 const title = runnable
                   ? template.label
                   : incomplete
-                    ? t('console.cui.not_available', 'Not available yet')
+                    ? t('console.cui.not_available', uiCopy('u_0e6d81d0c651fb06'))
                     : needsKeys
                       ? keyHint
                       : t('console.cui.coming_soon')
@@ -125,7 +125,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
                   >
                     <span style={{ fontSize: 11 }}>{template.icon}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
-                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', 'SOON')}</span>}
+                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', uiCopy('u_3fa00f042207d372'))}</span>}
                   </button>
                 )
               })}
@@ -153,27 +153,27 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
   const { t, dict } = useTranslation()
   const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
   const needsKeys = hasBackend && statusLoaded && !configured
-  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
+  const keyHint = t('console.cui.add_keys_hint', uiCopy('u_95d4e89babf641a7')).replace('{keys}', missing.join(', '))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
       {/* Dynamic Breadcrumb Track Navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
-        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>🎛️ Hub Home</button>
+        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{uiCopy('u_5d4116b814de7ad1')}</button>
         <span>/</span>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{tierLabel}</button>
         <span>/</span>
-        <span style={{ color: '#fff', fontWeight: 800 }}>{t('console.cui.workspace_title', '{name} Workspace').replace('{name}', provider.name)}</span>
+        <span style={{ color: '#fff', fontWeight: 800 }}>{t('console.cui.workspace_title', uiCopy('u_95a09755ef468e3f')).replace(uiCopy('u_4c08b9ec516f7fab'), provider.name)}</span>
       </div>
 
       {!hasBackend && (
         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#ffc300', background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 8, padding: '8px 12px' }}>
-          {t('console.cui.coming_soon_banner').replace('{name}', provider.name)}
+          {t('console.cui.coming_soon_banner').replace(uiCopy('u_a9a58d07fd9a3d5a'), provider.name)}
         </div>
       )}
 
       {needsKeys && (
         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1af0ff', background: 'rgba(26,240,255,0.08)', border: '1px solid rgba(26,240,255,0.28)', borderRadius: 8, padding: '8px 12px' }}>
-          {t('console.cui.connect_keys_banner', '🔑 {name} is ready — add {keys} in Vercel to activate these actions.').replace('{name}', provider.name).replace('{keys}', missing.join(', '))}
+          {t('console.cui.connect_keys_banner', uiCopy('u_87082f75199f4c0e')).replace(uiCopy('u_a1c2283996e42250'), provider.name).replace(uiCopy('u_10010d110aca0017'), missing.join(', '))}
         </div>
       )}
 
@@ -199,7 +199,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
                 const title = runnable
                   ? template.label
                   : incomplete
-                    ? t('console.cui.not_available', 'Not available yet')
+                    ? t('console.cui.not_available', uiCopy('u_af14bdcf326ad276'))
                     : needsKeys
                       ? keyHint
                       : t('console.cui.coming_soon')
@@ -231,7 +231,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
                         <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.description}</div>
                       </div>
                     </div>
-                    <span style={{ color: incomplete ? '#ffc300' : isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: incomplete ? 8 : 11, fontWeight: 800, paddingLeft: 4, flexShrink: 0, letterSpacing: incomplete ? '0.04em' : undefined }}>{incomplete ? 'SOON' : '→'}</span>
+                    <span style={{ color: incomplete ? '#ffc300' : isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: incomplete ? 8 : 11, fontWeight: 800, paddingLeft: 4, flexShrink: 0, letterSpacing: incomplete ? '0.04em' : undefined }}>{incomplete ? uiCopy('u_442be1f5594d11dc') : '→'}</span>
                   </div>
                 )
               })}

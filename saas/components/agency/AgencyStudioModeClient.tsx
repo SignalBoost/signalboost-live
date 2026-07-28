@@ -5,6 +5,8 @@ import { useState } from 'react'
 import PublicAgencyClient from './PublicAgencyClient.tsx'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Props = { copy: AgencyCopy['client'] }
 type StudioMode = 'manual' | 'ai'
@@ -48,20 +50,20 @@ const TEXT: Record<string, {
   fields: Record<keyof ManualDraft, string>
 }> = {
   en: {
-    title: 'Choose how you want to build this campaign',
-    body: 'Manual writing is always available. AI assistance is optional.',
-    manual: 'Write manually', ai: 'Use AI assistance',
-    manualTitle: 'Manual Campaign Studio',
-    manualBody: 'Write and edit every campaign asset yourself. Nothing is generated, published, or sent automatically.',
-    youtube: 'YouTube', linkedin: 'LinkedIn', press: 'Press release',
-    publication: 'Publication name', email: 'Editor or journalist email',
-    queue: 'Queue press release for owner approval', queuing: 'Queuing…',
-    queued: 'Queued for owner approval. Nothing will be sent until approved.',
-    error: 'Add a press release subject and body, publication name, and a valid email.',
+    title: uiCopy('u_670504c6bd5b7611'),
+    body: uiCopy('u_563dec4d20f74d9c'),
+    manual: uiCopy('u_61128407fed4b639'), ai: uiCopy('u_c743db52264f0bb5'),
+    manualTitle: uiCopy('u_eacd6dd403f84056'),
+    manualBody: uiCopy('u_80ddcc0aa62352f5'),
+    youtube: uiCopy('u_d0b68efb847f14f8'), linkedin: uiCopy('u_a399f75c02ead764'), press: uiCopy('u_0dadce0f737ec068'),
+    publication: uiCopy('u_e206973874cbd6e5'), email: uiCopy('u_9f9f94a4b5335eb8'),
+    queue: uiCopy('u_f9c09912c8649696'), queuing: uiCopy('u_68b35027e1ba8248'),
+    queued: uiCopy('u_441b81d416418705'),
+    error: uiCopy('u_94bca82bc3ec1158'),
     fields: {
-      youtubeTitle: 'Video title', youtubeDescription: 'Video description', youtubeCommunityPost: 'Community post',
-      linkedinCompanyPost: 'Company page post', linkedinFounderPost: 'Founder post',
-      pressReleaseSubject: 'Email subject', pressReleaseBody: 'Email body',
+      youtubeTitle: uiCopy('u_5684a141de248a94'), youtubeDescription: uiCopy('u_77a1d55d8ff4426d'), youtubeCommunityPost: uiCopy('u_8fccbf7da7711aeb'),
+      linkedinCompanyPost: uiCopy('u_50719bf30239932c'), linkedinFounderPost: uiCopy('u_234213d37b689738'),
+      pressReleaseSubject: uiCopy('u_99d8b52dbcab495e'), pressReleaseBody: uiCopy('u_4cb3335979a47e4d'),
     },
   },
   es: {
@@ -172,9 +174,9 @@ export default function AgencyStudioModeClient({ copy }: Props) {
           <div className="sb-glass" style={{ padding: 28, display: 'grid', gap: 18 }}>
             <div><span className="sb-eyebrow">{t.manual}</span><h2 className="sb-h2">{t.manualTitle}</h2><p className="sb-body">{t.manualBody}</p></div>
             {([
-              [t.youtube, ['youtubeTitle', 'youtubeDescription', 'youtubeCommunityPost']],
-              [t.linkedin, ['linkedinCompanyPost', 'linkedinFounderPost']],
-              [t.press, ['pressReleaseSubject', 'pressReleaseBody']],
+              [t.youtube, [uiCopy('u_99856f596077bb7c'), uiCopy('u_f02666fb64eb0f56'), uiCopy('u_f13f66b287fdb697')]],
+              [t.linkedin, [uiCopy('u_f753b12cb6f7fc2e'), uiCopy('u_7483bb29d2161904')]],
+              [t.press, [uiCopy('u_b88c75ac72db65a4'), uiCopy('u_0a2ca8c4563ac99a')]],
             ] as const).map(([section, fields]) => (
               <section className="sb-card" style={{ padding: 18, display: 'grid', gap: 12 }} key={section}>
                 <h3 className="sb-h3" style={{ margin: 0 }}>{section}</h3>

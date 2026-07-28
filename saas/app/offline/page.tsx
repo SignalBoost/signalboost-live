@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Navbar from '@/components/Navbar'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY: Record<Lang, { heading: string; body: string; cta: string }> = {
-  en: { heading: 'No signal', body: 'You appear to be offline. Check your connection and try again.', cta: 'Try again' },
+  en: { heading: uiCopy('u_86c0b0c349aa5700'), body: uiCopy('u_653426d0b1749642'), cta: uiCopy('u_e15934d2f5210bed') },
   es: { heading: 'Sin señal', body: 'Parece que estás sin conexión. Verifica tu conexión e inténtalo de nuevo.', cta: 'Intentar de nuevo' },
   pt: { heading: 'Sem sinal', body: 'Parece que você está offline. Verifique sua conexão e tente novamente.', cta: 'Tentar novamente' },
   pl: { heading: 'Brak sygnału', body: 'Wygląda na to, że jesteś offline. Sprawdź połączenie i spróbuj ponownie.', cta: 'Spróbuj ponownie' },

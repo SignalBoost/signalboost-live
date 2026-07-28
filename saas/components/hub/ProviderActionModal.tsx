@@ -15,6 +15,8 @@ import { getHubProvider } from '@/lib/hub/provider-registry'
 import ProviderActionForm from './ProviderActionForm.tsx'
 import ProviderActionExecutionGate from './ProviderActionExecutionGate.tsx'
 import { Lang, cardStyle, bodyStyle } from './shared.tsx'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export type ProviderActionModalProps = {
   providerId: string
@@ -68,10 +70,10 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
     return (
       <div style={modalShellStyle}>
         <div style={{ ...bodyStyle, overflowY: 'auto' }}>
-          <div style={{ color: 'rgba(255,255,255,.5)' }}>{t('console.cui.provider_not_found', 'Provider not found: {id}').replace('{id}', providerId)}</div>
+          <div style={{ color: 'rgba(255,255,255,.5)' }}>{t('console.cui.provider_not_found', uiCopy('u_c6dd3c900a41d366')).replace(uiCopy('u_fdfdcaaae2b816d2'), providerId)}</div>
         </div>
         <div style={footerStyle}>
-          <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
+          <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', uiCopy('u_28244a064119784e'))}</button>
         </div>
       </div>
     )
@@ -81,10 +83,10 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
     return (
       <div style={modalShellStyle}>
         <div style={{ ...bodyStyle, overflowY: 'auto' }}>
-          <div style={{ color: 'rgba(255,255,255,.5)' }}>{t('console.cui.no_actions', 'No actions available for {name}').replace('{name}', provider.name)}</div>
+          <div style={{ color: 'rgba(255,255,255,.5)' }}>{t('console.cui.no_actions', uiCopy('u_9130636ea2c64ed4')).replace(uiCopy('u_6a0ae98ce6f69742'), provider.name)}</div>
         </div>
         <div style={footerStyle}>
-          <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
+          <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', uiCopy('u_9735ff70fbb583d7'))}</button>
         </div>
       </div>
     )
@@ -121,8 +123,8 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 24 }}>🎯</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{t('console.cui.actions_for', 'Actions for {name}').replace('{name}', provider.name)}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{(templates.length === 1 ? t('console.cui.available_one', '{n} available action') : t('console.cui.available_many', '{n} available actions')).replace('{n}', String(templates.length))}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{t('console.cui.actions_for', uiCopy('u_d2b821f7107d6cae')).replace(uiCopy('u_ddf18f9698fd7f59'), provider.name)}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{(templates.length === 1 ? t('console.cui.available_one', uiCopy('u_cb0e5dd7345cd151')) : t('console.cui.available_many', uiCopy('u_b59e2519873b72d2'))).replace('{n}', String(templates.length))}</div>
           </div>
         </div>
       </div>
@@ -174,7 +176,7 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
       </div>
 
       <div style={footerStyle}>
-        <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
+        <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', uiCopy('u_0bee042541dbad50'))}</button>
       </div>
     </div>
   )

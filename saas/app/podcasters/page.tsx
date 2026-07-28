@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const CONTACT_EMAIL = 'saassupport@signalboostapp.com'
 
@@ -67,10 +69,10 @@ export default function PodcastersPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        setCheckoutError(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
+        setCheckoutError(t(dict, 'pricing_page.errorGeneric', uiCopy('u_b78445b2ddcd244d')))
       }
     } catch {
-      setCheckoutError(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
+      setCheckoutError(t(dict, 'pricing_page.errorGeneric', uiCopy('u_9dac7c5a9d8a9a01')))
     } finally {
       setLoading(null)
     }
@@ -78,57 +80,57 @@ export default function PodcastersPage() {
 
   const PLANS = [
     {
-      name: t(dict, 'podcasters_page.plans.indie.name', 'Indie'),
+      name: t(dict, 'podcasters_page.plans.indie.name', uiCopy('u_bba02cef0b59447a')),
       key:  'indie',
       price: { USD: 29, BRL: 149, PLN: 120, MXN: 540, EUR: 27 },
-      description: t(dict, 'podcasters_page.plans.indie.description', 'Perfect for independent podcasters getting started globally.'),
+      description: t(dict, 'podcasters_page.plans.indie.description', uiCopy('u_6bf6d7e2fcb82844')),
       features: [
-        t(dict, 'podcasters_page.plans.indie.f1', '1 show'),
-        t(dict, 'podcasters_page.plans.indie.f2', '4 episodes per month'),
-        t(dict, 'podcasters_page.plans.indie.f3', '2 languages'),
-        t(dict, 'podcasters_page.plans.indie.f4', 'Native AI voiceover'),
-        t(dict, 'podcasters_page.plans.indie.f5', 'Captions in 2 languages'),
-        t(dict, 'podcasters_page.plans.indie.f6', 'Basic clip generation'),
-        t(dict, 'podcasters_page.plans.indie.f7', 'Podcast website'),
-        t(dict, 'podcasters_page.plans.indie.f8', 'Listener reviews'),
+        t(dict, 'podcasters_page.plans.indie.f1', uiCopy('u_de935868f8f9b17b')),
+        t(dict, 'podcasters_page.plans.indie.f2', uiCopy('u_8a42fea5777664ea')),
+        t(dict, 'podcasters_page.plans.indie.f3', uiCopy('u_9b44cb6ee3d836f3')),
+        t(dict, 'podcasters_page.plans.indie.f4', uiCopy('u_409e90d3e2ebcaf7')),
+        t(dict, 'podcasters_page.plans.indie.f5', uiCopy('u_86c99845909e9234')),
+        t(dict, 'podcasters_page.plans.indie.f6', uiCopy('u_bca03686e9f507f4')),
+        t(dict, 'podcasters_page.plans.indie.f7', uiCopy('u_16b25941b78921bb')),
+        t(dict, 'podcasters_page.plans.indie.f8', uiCopy('u_d5331ed348ebb235')),
       ],
-      cta:       t(dict, 'podcasters_page.plans.indie.cta', 'Get started'),
+      cta:       t(dict, 'podcasters_page.plans.indie.cta', uiCopy('u_eec1cb130f27033f')),
       highlight: false,
     },
     {
-      name: t(dict, 'podcasters_page.plans.pro.name', 'Pro'),
+      name: t(dict, 'podcasters_page.plans.pro.name', uiCopy('u_28257c8865c7b87a')),
       key:  'pro',
       price: { USD: 79, BRL: 399, PLN: 320, MXN: 1450, EUR: 74 },
-      description: t(dict, 'podcasters_page.plans.pro.description', 'For serious podcasters who want global reach.'),
+      description: t(dict, 'podcasters_page.plans.pro.description', uiCopy('u_dd12953037996f2d')),
       features: [
-        t(dict, 'podcasters_page.plans.pro.f1', '3 shows'),
-        t(dict, 'podcasters_page.plans.pro.f2', 'Unlimited episodes'),
-        t(dict, 'podcasters_page.plans.pro.f3', 'All 5 languages'),
-        t(dict, 'podcasters_page.plans.pro.f4', 'Native AI voiceover'),
-        t(dict, 'podcasters_page.plans.pro.f5', 'Captions in all 5 languages'),
-        t(dict, 'podcasters_page.plans.pro.f6', 'Clip factory'),
-        t(dict, 'podcasters_page.plans.pro.f7', 'Multi-language podcast website'),
-        t(dict, 'podcasters_page.plans.pro.f8', 'Analytics'),
+        t(dict, 'podcasters_page.plans.pro.f1', uiCopy('u_bb760c4708396665')),
+        t(dict, 'podcasters_page.plans.pro.f2', uiCopy('u_d313667da043825d')),
+        t(dict, 'podcasters_page.plans.pro.f3', uiCopy('u_9e17a9df6acc0bde')),
+        t(dict, 'podcasters_page.plans.pro.f4', uiCopy('u_8cc4333d298fc1e2')),
+        t(dict, 'podcasters_page.plans.pro.f5', uiCopy('u_7049ef8e42c95665')),
+        t(dict, 'podcasters_page.plans.pro.f6', uiCopy('u_d16cc972dc14f964')),
+        t(dict, 'podcasters_page.plans.pro.f7', uiCopy('u_f0dde638d8f7f01c')),
+        t(dict, 'podcasters_page.plans.pro.f8', uiCopy('u_5b25279a71e18294')),
       ],
-      cta:       t(dict, 'podcasters_page.plans.pro.cta', 'Get started'),
+      cta:       t(dict, 'podcasters_page.plans.pro.cta', uiCopy('u_f71b1b231272d6e8')),
       highlight: true,
     },
     {
-      name: t(dict, 'podcasters_page.plans.network.name', 'Network'),
+      name: t(dict, 'podcasters_page.plans.network.name', uiCopy('u_4fa45de4b1fa1d1f')),
       key:  'network',
       price: { USD: 299, BRL: 1490, PLN: 1200, MXN: 5400, EUR: 279 },
-      description: t(dict, 'podcasters_page.plans.network.description', 'For podcast networks managing multiple shows.'),
+      description: t(dict, 'podcasters_page.plans.network.description', uiCopy('u_f33622a4c9ff0112')),
       features: [
-        t(dict, 'podcasters_page.plans.network.f1', 'Unlimited shows'),
-        t(dict, 'podcasters_page.plans.network.f2', 'Unlimited episodes'),
-        t(dict, 'podcasters_page.plans.network.f3', 'All languages plus custom'),
-        t(dict, 'podcasters_page.plans.network.f4', 'Dedicated processing'),
-        t(dict, 'podcasters_page.plans.network.f5', 'Custom caption formats'),
-        t(dict, 'podcasters_page.plans.network.f6', 'White label website'),
-        t(dict, 'podcasters_page.plans.network.f7', 'API access'),
-        t(dict, 'podcasters_page.plans.network.f8', 'Dedicated account manager'),
+        t(dict, 'podcasters_page.plans.network.f1', uiCopy('u_37d0f8d762a57b80')),
+        t(dict, 'podcasters_page.plans.network.f2', uiCopy('u_d70f43e59950b456')),
+        t(dict, 'podcasters_page.plans.network.f3', uiCopy('u_6edde6db80324855')),
+        t(dict, 'podcasters_page.plans.network.f4', uiCopy('u_a31d3e9164e2100d')),
+        t(dict, 'podcasters_page.plans.network.f5', uiCopy('u_e6e0147ba1c705c1')),
+        t(dict, 'podcasters_page.plans.network.f6', uiCopy('u_86f03b2ab96498c0')),
+        t(dict, 'podcasters_page.plans.network.f7', uiCopy('u_18d2ef5895518539')),
+        t(dict, 'podcasters_page.plans.network.f8', uiCopy('u_9c3d67429771bc70')),
       ],
-      cta:       t(dict, 'podcasters_page.plans.network.cta', 'Contact us'),
+      cta:       t(dict, 'podcasters_page.plans.network.cta', uiCopy('u_8e01973fc95e2dae')),
       highlight: false,
     },
   ]
@@ -169,24 +171,10 @@ export default function PodcastersPage() {
       {checkoutError && (
         <div role="alert" style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, maxWidth: 480, width: 'calc(100% - 32px)', padding: '12px 16px', borderRadius: 12, background: 'rgba(255,59,48,.14)', border: '1px solid rgba(255,107,107,.5)', color: '#ffb3b3', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 30px rgba(0,0,0,.5)', backdropFilter: 'blur(6px)' }}>
           <span style={{ flex: 1 }}>{checkoutError}</span>
-          <button onClick={() => setCheckoutError(null)} aria-label="Dismiss" style={{ background: 'transparent', border: 'none', color: '#ffb3b3', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+          <button onClick={() => setCheckoutError(null)} aria-label={uiCopy('u_858378be171a55d7')} style={{ background: 'transparent', border: 'none', color: '#ffb3b3', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
         </div>
       )}
-      <style>{`
-        @keyframes wave {
-          0%,100% { height: 18%; opacity: .45; }
-          50%      { height: 100%; opacity: 1;  }
-        }
-        @keyframes floatPanel {
-          0%,100% { transform: translateY(0);   }
-          50%     { transform: translateY(-8px); }
-        }
-        @media (max-width: 900px) {
-          .studio-hero { grid-template-columns: 1fr !important; }
-          .pricing-grid, .deliver-grid, .how-grid { grid-template-columns: 1fr !important; }
-          .studio-card { min-height: auto !important; }
-        }
-      `}</style>
+      <style>{uiCopy('u_87edd80307024b8a')}</style>
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section
@@ -220,7 +208,7 @@ export default function PodcastersPage() {
             }}
           >
             <span style={{ color: '#ef4444' }}>●</span>
-            {P('hero.liveBadge', 'PODCAST_STUDIO // LIVE')}
+            {P(uiCopy('u_8511079ec80d5f31'), uiCopy('u_afa9942db9db860b'))}
           </div>
 
           <h1
@@ -232,15 +220,15 @@ export default function PodcastersPage() {
               fontWeight:    950,
             }}
           >
-            {P('hero.line1', 'Your podcast.')}
+            {P(uiCopy('u_1d613f0e12d3c34c'), uiCopy('u_d2660e690238f0d1'))}
             <br />
-            {P('hero.line2', 'Your studio.')}
+            {P(uiCopy('u_cc97e11eae71ec29'), uiCopy('u_be83117382c998ca'))}
             <br />
-            <span style={{ color: GOLD }}>{P('hero.line3', 'Your global audience.')}</span>
+            <span style={{ color: GOLD }}>{P(uiCopy('u_7c46270a1ed9f876'), uiCopy('u_d161d26e9fa0abd2'))}</span>
           </h1>
 
           <p style={{ marginTop: 16, color: 'rgba(255,255,255,.58)', fontSize: 15, lineHeight: 1.65, maxWidth: 560 }}>
-            {P('hero.subtitle', 'Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.')}
+            {P(uiCopy('u_41b02204e9b85abe'), uiCopy('u_a64b288b909b039c'))}
           </p>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 22 }}>
@@ -248,14 +236,14 @@ export default function PodcastersPage() {
               href="/dashboard/podcast/studio"
               style={{ background: GOLD, color: '#000', fontWeight: 900, padding: '14px 28px', borderRadius: 999, textDecoration: 'none' }}
             >
-              {P('hero.openStudio', 'Open Studio')}
+              {P(uiCopy('u_fc10b0f19538adfd'), uiCopy('u_84b9b92fe220a668'))}
             </Link>
 
             <Link
               href="#how-it-works"
               style={{ background: 'rgba(255,255,255,.06)', color: '#fff', fontWeight: 800, padding: '14px 28px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', textDecoration: 'none' }}
             >
-              {P('hero.howItWorks', 'How it works')} →
+              {P(uiCopy('u_6762396bda747f2d'), uiCopy('u_e765deb6e6d9096e'))} →
             </Link>
           </div>
         </div>
@@ -288,15 +276,15 @@ export default function PodcastersPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <div>
                 <div style={{ fontSize: 11, letterSpacing: '.12em', color: 'rgba(255,255,255,.45)', fontWeight: 900 }}>
-                  {P('panel.foundry', 'SIGNALBOOST AUDIO FOUNDRY')}
+                  {P(uiCopy('u_fe61776ea8eacff3'), uiCopy('u_5ce91204786ecee5'))}
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 900, marginTop: 4 }}>
-                  {P('panel.episodeFile', 'Episode_034.wav')}
+                  {P(uiCopy('u_6f552914f631e48b'), uiCopy('u_0b591c1223667f54'))}
                 </div>
               </div>
 
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 999, padding: '7px 12px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.28)', color: '#fecaca', fontSize: 12, fontWeight: 900 }}>
-                🔴 {P('panel.onAir', 'ON AIR')}
+                🔴 {P(uiCopy('u_9397c970702e4f1f'), uiCopy('u_a80dd11ca6bc7f46'))}
               </div>
             </div>
 
@@ -345,10 +333,10 @@ export default function PodcastersPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 18 }}>
               <Link href="/dashboard/video" style={{ border: 'none', borderRadius: 999, padding: '13px 14px', background: GOLD, color: '#000', fontWeight: 900, cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}>
-                {P('actions.generateClips', 'Generate clips')}
+                {P(uiCopy('u_324a3f6cf50151a7'), uiCopy('u_85267c1140826a87'))}
               </Link>
               <Link href="/dashboard/video" style={{ border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '13px 14px', background: 'rgba(255,255,255,.06)', color: '#fff', fontWeight: 900, cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}>
-                {P('actions.uploadEpisode', 'Upload episode')}
+                {P(uiCopy('u_7329c9353f29eea3'), uiCopy('u_1b94958bc20264c8'))}
               </Link>
             </div>
           </div>
@@ -379,10 +367,10 @@ export default function PodcastersPage() {
       {/* ── Deliverables ──────────────────────────────────────────────────── */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '20px 24px 70px' }}>
         <h2 style={{ fontSize: 'clamp(30px, 5vw, 52px)', margin: '0 0 14px', letterSpacing: '-.04em', textAlign: 'center' }}>
-          {P('section.fullStudioTitle', 'A full production studio after you record')}
+          {P(uiCopy('u_26b2be8fc0b26705'), uiCopy('u_8713314ba4854a0a'))}
         </h2>
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,.48)', maxWidth: 620, margin: '0 auto 36px', lineHeight: 1.7 }}>
-          {P('section.fullStudioSubtitle', 'You focus on the conversation. SignalBoost helps turn that episode into clips, captions, translated content, voiceovers, pages and promotional assets.')}
+          {P(uiCopy('u_8f9eb197c7a42e8f'), uiCopy('u_2492ae4da4f955ce'))}
         </p>
 
         <div className="deliver-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
@@ -402,15 +390,15 @@ export default function PodcastersPage() {
       {/* ── How it works ──────────────────────────────────────────────────── */}
       <section id="how-it-works" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 70px' }}>
         <h2 style={{ textAlign: 'center', fontSize: 38, marginBottom: 36 }}>
-          {t(dict, 'podcasters_page.howTitle', 'How it works')}
+          {t(dict, 'podcasters_page.howTitle', uiCopy('u_182fb8e79f48b4c1'))}
         </h2>
 
         <div className="how-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
-            ['01', P('how.step1.title', 'Upload your episode'), P('how.step1.desc', 'Bring the finished audio or video.')],
-            ['02', P('how.step2.title', 'Choose outputs'),      P('how.step2.desc', 'Clips, captions, languages, voiceover and show notes.')],
-            ['03', P('how.step3.title', 'AI crew works'),       P('how.step3.desc', 'Transcript, clip, translation and distribution agents prepare assets.')],
-            ['04', P('how.step4.title', 'Publish everywhere'),  P('how.step4.desc', 'Download or prepare content for every channel.')],
+            ['01', P(uiCopy('u_ff6ad2dc7d479a6e'), uiCopy('u_710b7d183430e684')), P(uiCopy('u_20817171aea69b74'), uiCopy('u_76c96dc9c282af84'))],
+            ['02', P(uiCopy('u_a0a7ee4b788990d9'), uiCopy('u_ce64110eada9669f')),      P(uiCopy('u_dbe242aea1bd6ed4'), uiCopy('u_ee124b5419c8cf3c'))],
+            ['03', P(uiCopy('u_26042741dff45017'), uiCopy('u_98dc0df87661b221')),       P(uiCopy('u_a0016a6658c9ade5'), uiCopy('u_306fb7adf023f71b'))],
+            ['04', P(uiCopy('u_6b15e860d84cdfd5'), uiCopy('u_9183f92eb44a2598')),  P(uiCopy('u_7a03551c959f1fd6'), uiCopy('u_40388e59f074f0bb'))],
           ].map(step => (
             <div
               key={step[0]}
@@ -429,11 +417,11 @@ export default function PodcastersPage() {
       {/* ── Pricing ───────────────────────────────────────────────────────── */}
       <section id="plans" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 90px' }}>
         <h2 style={{ fontSize: 38, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>
-          {t(dict, 'podcasters_page.plansTitle', 'Podcast plans')}
+          {t(dict, 'podcasters_page.plansTitle', uiCopy('u_88c7c0e99006fab8'))}
         </h2>
 
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 15, marginBottom: 32 }}>
-          {t(dict, 'podcasters_page.plansSubtitle', 'Sketch your idea for free with our preview tier, then pick a podcast plan when you are ready to publish.')}
+          {t(dict, 'podcasters_page.plansSubtitle', uiCopy('u_7349683bdaf7fd46'))}
         </p>
 
         {/* Currency switcher */}
@@ -486,7 +474,7 @@ export default function PodcastersPage() {
                     borderRadius: 999,
                   }}
                 >
-                  {t(dict, 'podcasters_page.mostPopular', 'Most popular')}
+                  {t(dict, 'podcasters_page.mostPopular', uiCopy('u_b346607d9b4ab412'))}
                 </div>
               )}
 
@@ -502,7 +490,7 @@ export default function PodcastersPage() {
                   {(plan.price as any)[currency]}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>
-                  {t(dict, 'podcasters_page.perMonth', '/mo')}
+                  {t(dict, 'podcasters_page.perMonth', uiCopy('u_45f7815531a5688c'))}
                 </span>
               </div>
 
@@ -528,7 +516,7 @@ export default function PodcastersPage() {
                 }}
               >
                 {loading === plan.key
-                  ? t(dict, 'pricing_page.loading', 'Loading...')
+                  ? t(dict, 'pricing_page.loading', uiCopy('u_288f95ffe3f522d3'))
                   : plan.cta}
               </button>
 

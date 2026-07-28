@@ -5,6 +5,8 @@
 // report is supported, and browser print/save-PDF fallback for every report.
 
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const btn: React.CSSProperties = {
   fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
@@ -65,14 +67,14 @@ export default function ReportExportBar({ filename, csv, reportId }: { filename:
 
   return (
     <div className="no-print" style={{ maxWidth: 1100, margin: '0 auto', padding: '16px 24px 0', display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-      <style>{`@media print { .no-print { display: none !important; } html, body { background: #ffffff !important; } main, main * { color: #1a1a1a !important; } main a { color: #1a1a1a !important; text-decoration: none; } }`}</style>
+      <style>{uiCopy('u_c039af8290230805')}</style>
       {csv ? (
-        <button type="button" onClick={downloadCsv} style={btn}>{t('audit.export.csv', 'Export CSV')}</button>
+        <button type="button" onClick={downloadCsv} style={btn}>{t('audit.export.csv', uiCopy('u_3c22b0bb624f949d'))}</button>
       ) : null}
       {resolvedReport ? (
-        <button type="button" onClick={downloadPdf} style={btn}>{t('audit.export.downloadPdf', 'Download PDF')}</button>
+        <button type="button" onClick={downloadPdf} style={btn}>{t('audit.export.downloadPdf', uiCopy('u_0ef971877cd9b63c'))}</button>
       ) : null}
-      <button type="button" onClick={printPdf} style={btn}>{t('audit.export.pdf', 'Print / Save PDF')}</button>
+      <button type="button" onClick={printPdf} style={btn}>{t('audit.export.pdf', uiCopy('u_03386ef574866806'))}</button>
     </div>
   )
 }

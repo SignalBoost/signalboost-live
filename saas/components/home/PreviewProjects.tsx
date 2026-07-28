@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type LocalizedText = Readonly<Record<SupportedLanguage, string>>
@@ -15,11 +17,11 @@ type PreviewProject = Readonly<{
 }>
 
 const TEXT = {
-  heading: { en: 'Strategic projects — preview', es: 'Proyectos estratégicos — vista previa', pt: 'Projetos estratégicos — prévia', pl: 'Projekty strategiczne — podgląd', ru: 'Стратегические проекты — предварительный обзор' },
-  intro: { en: 'Visible roadmap initiatives. Preview only: not a claim of commercial readiness, production execution, or availability for licensing.', es: 'Iniciativas visibles de la hoja de ruta. Solo vista previa: no implica preparación comercial, ejecución en producción ni disponibilidad de licencia.', pt: 'Iniciativas visíveis do roteiro. Apenas prévia: não indica prontidão comercial, execução em produção nem disponibilidade para licenciamento.', pl: 'Widoczne inicjatywy z mapy rozwoju. Tylko podgląd: nie oznacza gotowości handlowej, wykonania produkcyjnego ani dostępności licencji.', ru: 'Видимые инициативы дорожной карты. Только предварительный обзор: это не означает коммерческую готовность, работу в продакшене или доступность лицензирования.' },
-  badge: { en: 'Preview', es: 'Vista previa', pt: 'Prévia', pl: 'Podgląd', ru: 'Предпросмотр' },
-  foundation: { en: 'Foundation', es: 'Base', pt: 'Base', pl: 'Podstawa', ru: 'Основа' },
-  details: { en: 'Explore real implementation →', es: 'Explorar implementación real →', pt: 'Explorar implementação real →', pl: 'Zobacz rzeczywistą implementację →', ru: 'Открыть реальную реализацию →' },
+  heading: { en: uiCopy('u_fafb8406a071e5fa'), es: 'Proyectos estratégicos — vista previa', pt: 'Projetos estratégicos — prévia', pl: 'Projekty strategiczne — podgląd', ru: 'Стратегические проекты — предварительный обзор' },
+  intro: { en: uiCopy('u_734371ba18357dc1'), es: 'Iniciativas visibles de la hoja de ruta. Solo vista previa: no implica preparación comercial, ejecución en producción ni disponibilidad de licencia.', pt: 'Iniciativas visíveis do roteiro. Apenas prévia: não indica prontidão comercial, execução em produção nem disponibilidade para licenciamento.', pl: 'Widoczne inicjatywy z mapy rozwoju. Tylko podgląd: nie oznacza gotowości handlowej, wykonania produkcyjnego ani dostępności licencji.', ru: 'Видимые инициативы дорожной карты. Только предварительный обзор: это не означает коммерческую готовность, работу в продакшене или доступность лицензирования.' },
+  badge: { en: uiCopy('u_4c3d485b3d6925ce'), es: 'Vista previa', pt: 'Prévia', pl: 'Podgląd', ru: 'Предпросмотр' },
+  foundation: { en: uiCopy('u_94b29a939e334deb'), es: 'Base', pt: 'Base', pl: 'Podstawa', ru: 'Основа' },
+  details: { en: uiCopy('u_a495a4e1020fdccb'), es: 'Explorar implementación real →', pt: 'Explorar implementação real →', pl: 'Zobacz rzeczywistą implementację →', ru: 'Открыть реальную реализацию →' },
 } satisfies Record<string, LocalizedText>
 
 const PROJECTS: readonly PreviewProject[] = Object.freeze([

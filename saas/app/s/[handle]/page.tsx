@@ -9,6 +9,8 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import type { CSSProperties } from 'react'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export const dynamic = 'force-dynamic'
 
@@ -96,7 +98,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { handle } = await params
   const site = await getSite(handle)
-  if (!site) return { title: 'Site not found' }
+  if (!site) return { title: uiCopy('u_720c1f2460ff1cb9') }
   const c = site.content
   const firstHeading = c.sections?.find(s => s.heading)?.heading
   return {
@@ -260,7 +262,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
             ) : (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', padding: 28, background: `linear-gradient(135deg, ${withAlpha(primary, 0.95)}, ${withAlpha(accent, 0.95)})` }}>
                 <span style={{ fontSize: 44, lineHeight: 1 }} aria-hidden="true">🎬</span>
-                <strong style={{ fontFamily: displayFont, fontSize: 'clamp(20px, 3vw, 30px)' }}>{heading || 'Brand story video'}</strong>
+                <strong style={{ fontFamily: displayFont, fontSize: 'clamp(20px, 3vw, 30px)' }}>{heading || uiCopy('u_e04a889031304264')}</strong>
                 {(sub || section.body) && <span style={{ maxWidth: 560, color: 'rgba(255,255,255,0.86)', fontSize: 15, lineHeight: 1.6 }}>{sub || section.body}</span>}
               </div>
             )}
@@ -326,7 +328,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 22 }}>
             {section.testimonials.map((q, j) => (
               <div key={j} style={{ background: withAlpha('#ffffff', dark ? 0.04 : 0.06), border: `1px solid ${withAlpha('#ffffff', 0.1)}`, borderRadius: 20, padding: 28 }}>
-                <div style={{ fontSize: 30, color: accent, lineHeight: 1, fontFamily: displayFont }}>&ldquo;</div>
+                <div style={{ fontSize: 30, color: accent, lineHeight: 1, fontFamily: displayFont }}>{uiCopy('u_55c2c8bd52c94511')}</div>
                 {q.quote && <p style={{ fontSize: 16, lineHeight: 1.6, margin: '8px 0 18px' }}>{q.quote}</p>}
                 <div style={{ fontWeight: 800, fontSize: 14 }}>{q.author}</div>
                 {q.role && <div style={{ fontSize: 13, opacity: 0.6 }}>{q.role}</div>}
@@ -406,8 +408,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ han
           <SectionView key={i} section={section} theme={theme} displayFont={displayFont} idx={i} siteContent={c} />
         ))}
         <footer style={{ padding: '36px 28px', textAlign: 'center', borderTop: `1px solid ${withAlpha(theme.text, 0.1)}`, fontSize: 13, color: theme.muted, background: theme.background }}>
-          {c.businessName || site.name} · Powered by SignalBoost
-        </footer>
+          {c.businessName || site.name}{uiCopy('u_0d557f9518555eb5')}</footer>
       </main>
     </>
   )

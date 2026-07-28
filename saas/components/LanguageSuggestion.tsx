@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import ReportTextLocalizer from '@/components/i18n/ReportTextLocalizer'
 import AssistantHistoryLayoutPatch from '@/components/AssistantHistoryLayoutPatch'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const MAP: Record<string, string> = {
   en: 'English',
@@ -18,8 +20,8 @@ const MAP: Record<string, string> = {
 // suggested language code rather than pulling from the active dictionary.
 const STRINGS: Record<string, { title: string; body: string; switch: string; keep: string }> = {
   en: {
-    title: '🌎 Language suggestion',
-    body: 'We noticed you may prefer',
+    title: uiCopy('u_4dcb980fca873290'),
+    body: uiCopy('u_cb539be697b7271d'),
     switch: 'Switch',
     keep: 'Keep current',
   },

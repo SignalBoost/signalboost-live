@@ -3,27 +3,29 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<string, Record<Lang, string>> = {
-  eyebrow:      { en: 'AI Website Builder', es: 'Constructor de sitios con IA', pt: 'Construtor de sites com IA', pl: 'Kreator stron z IA', ru: 'ИИ-конструктор сайтов' },
-  title:        { en: 'Build Website', es: 'Construir sitio web', pt: 'Criar site', pl: 'Zbuduj stronę', ru: 'Создать сайт' },
-  subtitle:     { en: 'Describe your business and we\'ll generate a complete, multilingual website you can publish instantly.', es: 'Describe tu negocio y generaremos un sitio web completo y multilingüe que puedes publicar al instante.', pt: 'Descreva seu negócio e geraremos um site completo e multilíngue que você pode publicar instantaneamente.', pl: 'Opisz swoją firmę, a wygenerujemy kompletną, wielojęzyczną stronę, którą możesz natychmiast opublikować.', ru: 'Опишите свой бизнес, и мы создадим полноценный многоязычный сайт.' },
-  placeholder:  { en: 'e.g. A cozy Italian restaurant in downtown Chicago specializing in homemade pasta and wood-fired pizza…', es: 'p.ej. Un acogedor restaurante italiano en el centro de Chicago especializado en pasta casera…', pt: 'ex. Um aconchegante restaurante italiano no centro de Chicago especializado em massa artesanal…', pl: 'np. Przytulna włoska restauracja w centrum Chicago specjalizująca się w domowym makaronie…', ru: 'напр. Уютный итальянский ресторан в центре Чикаго, специализирующийся на домашней пасте…' },
-  generateBtn:  { en: '✦ Generate website', es: '✦ Generar sitio web', pt: '✦ Gerar site', pl: '✦ Generuj stronę', ru: '✦ Создать сайт' },
-  generatingBtn:{ en: 'Generating…', es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
-  publishBtn:   { en: '🚀 Publish site', es: '🚀 Publicar sitio', pt: '🚀 Publicar site', pl: '🚀 Opublikuj stronę', ru: '🚀 Опубликовать сайт' },
-  publishingBtn:{ en: 'Publishing…', es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
-  regenerate:   { en: 'Regenerate', es: 'Regenerar', pt: 'Regenerar', pl: 'Wygeneruj ponownie', ru: 'Создать заново' },
-  viewLive:     { en: 'View live →', es: 'Ver en vivo →', pt: 'Ver ao vivo →', pl: 'Zobacz na żywo →', ru: 'Просмотреть →' },
-  previewTitle: { en: 'Preview', es: 'Vista previa', pt: 'Pré-visualização', pl: 'Podgląd', ru: 'Предпросмотр' },
-  engineTitle:  { en: 'Generation engine', es: 'Motor de generación', pt: 'Motor de geração', pl: 'Silnik generowania', ru: 'Движок генерации' },
-  hintLabel:    { en: 'Tips for best results', es: 'Consejos para mejores resultados', pt: 'Dicas para melhores resultados', pl: 'Wskazówki dla najlepszych wyników', ru: 'Советы для лучших результатов' },
-  hint1:        { en: 'Include your business name, location, and what makes you unique', es: 'Incluye el nombre de tu negocio, ubicación y qué te hace único', pt: 'Inclua o nome do seu negócio, localização e o que te torna único', pl: 'Podaj nazwę firmy, lokalizację i co Cię wyróżnia', ru: 'Укажите название бизнеса, местоположение и что вас выделяет' },
-  hint2:        { en: 'Mention your target audience and main services or products', es: 'Menciona tu público objetivo y principales servicios o productos', pt: 'Mencione seu público-alvo e principais serviços ou produtos', pl: 'Wspomnij o grupie docelowej i głównych usługach lub produktach', ru: 'Упомяните целевую аудиторию и основные услуги или продукты' },
-  hint3:        { en: 'Add tone: professional, friendly, bold, minimalist, luxury…', es: 'Agrega tono: profesional, amigable, audaz, minimalista, lujoso…', pt: 'Adicione tom: profissional, amigável, ousado, minimalista, luxuoso…', pl: 'Dodaj ton: profesjonalny, przyjazny, odważny, minimalistyczny, luksusowy…', ru: 'Добавьте тон: профессиональный, дружелюбный, смелый, минималистичный, люксовый…' },
-  errConnect:   { en: 'Could not connect. Please try again.', es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
-  charCount:    { en: 'characters', es: 'caracteres', pt: 'caracteres', pl: 'znaków', ru: 'символов' },
+  eyebrow:      { en: uiCopy('u_d7be13d80a67f976'), es: 'Constructor de sitios con IA', pt: 'Construtor de sites com IA', pl: 'Kreator stron z IA', ru: 'ИИ-конструктор сайтов' },
+  title:        { en: uiCopy('u_e81eb2130c6ae275'), es: 'Construir sitio web', pt: 'Criar site', pl: 'Zbuduj stronę', ru: 'Создать сайт' },
+  subtitle:     { en: uiCopy('u_8df4d373fe140bb5'), es: 'Describe tu negocio y generaremos un sitio web completo y multilingüe que puedes publicar al instante.', pt: 'Descreva seu negócio e geraremos um site completo e multilíngue que você pode publicar instantaneamente.', pl: 'Opisz swoją firmę, a wygenerujemy kompletną, wielojęzyczną stronę, którą możesz natychmiast opublikować.', ru: 'Опишите свой бизнес, и мы создадим полноценный многоязычный сайт.' },
+  placeholder:  { en: uiCopy('u_d5a9cce45609447d'), es: 'p.ej. Un acogedor restaurante italiano en el centro de Chicago especializado en pasta casera…', pt: 'ex. Um aconchegante restaurante italiano no centro de Chicago especializado em massa artesanal…', pl: 'np. Przytulna włoska restauracja w centrum Chicago specjalizująca się w domowym makaronie…', ru: 'напр. Уютный итальянский ресторан в центре Чикаго, специализирующийся на домашней пасте…' },
+  generateBtn:  { en: uiCopy('u_d541469dd8340ef5'), es: '✦ Generar sitio web', pt: '✦ Gerar site', pl: '✦ Generuj stronę', ru: '✦ Создать сайт' },
+  generatingBtn:{ en: uiCopy('u_ae25be1d086beb48'), es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
+  publishBtn:   { en: uiCopy('u_daa036d20d611e7a'), es: '🚀 Publicar sitio', pt: '🚀 Publicar site', pl: '🚀 Opublikuj stronę', ru: '🚀 Опубликовать сайт' },
+  publishingBtn:{ en: uiCopy('u_2078b1be7cad1d5d'), es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
+  regenerate:   { en: uiCopy('u_93adbe6eb7834aa8'), es: 'Regenerar', pt: 'Regenerar', pl: 'Wygeneruj ponownie', ru: 'Создать заново' },
+  viewLive:     { en: uiCopy('u_07b479b16a78f954'), es: 'Ver en vivo →', pt: 'Ver ao vivo →', pl: 'Zobacz na żywo →', ru: 'Просмотреть →' },
+  previewTitle: { en: uiCopy('u_5f8b2097bde5a605'), es: 'Vista previa', pt: 'Pré-visualização', pl: 'Podgląd', ru: 'Предпросмотр' },
+  engineTitle:  { en: uiCopy('u_1a93fb88ce0644b6'), es: 'Motor de generación', pt: 'Motor de geração', pl: 'Silnik generowania', ru: 'Движок генерации' },
+  hintLabel:    { en: uiCopy('u_d670569ee639867b'), es: 'Consejos para mejores resultados', pt: 'Dicas para melhores resultados', pl: 'Wskazówki dla najlepszych wyników', ru: 'Советы для лучших результатов' },
+  hint1:        { en: uiCopy('u_fde3f79922bd77ea'), es: 'Incluye el nombre de tu negocio, ubicación y qué te hace único', pt: 'Inclua o nome do seu negócio, localização e o que te torna único', pl: 'Podaj nazwę firmy, lokalizację i co Cię wyróżnia', ru: 'Укажите название бизнеса, местоположение и что вас выделяет' },
+  hint2:        { en: uiCopy('u_9857c279ded6c8cc'), es: 'Menciona tu público objetivo y principales servicios o productos', pt: 'Mencione seu público-alvo e principais serviços ou produtos', pl: 'Wspomnij o grupie docelowej i głównych usługach lub produktach', ru: 'Упомяните целевую аудиторию и основные услуги или продукты' },
+  hint3:        { en: uiCopy('u_4c81ffb63fdc83c1'), es: 'Agrega tono: profesional, amigable, audaz, minimalista, lujoso…', pt: 'Adicione tom: profissional, amigável, ousado, minimalista, luxuoso…', pl: 'Dodaj ton: profesjonalny, przyjazny, odważny, minimalistyczny, luksusowy…', ru: 'Добавьте тон: профессиональный, дружелюбный, смелый, минималистичный, люксовый…' },
+  errConnect:   { en: uiCopy('u_39d93c88ebfb344a'), es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
+  charCount:    { en: uiCopy('u_86320b42b1c47a0a'), es: 'caracteres', pt: 'caracteres', pl: 'znaków', ru: 'символов' },
 }
 
 function c(key: string, lang: string): string {
@@ -125,7 +127,7 @@ export default function OperatorPage() {
             <p className="sb-eyebrow" style={{ margin: 0 }}>🌐 {c('eyebrow', l)}</p>
             <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0' }}>{c('title', l)}</h1>
           </div>
-          <span className="sb-chip">{generating ? '...' : content ? 'READY' : 'IDLE'}</span>
+          <span className="sb-chip">{generating ? '...' : content ? uiCopy('u_a0cee16f46adf788') : uiCopy('u_8ade651566e21460')}</span>
         </div>
 
         {/* Main grid */}
@@ -165,8 +167,7 @@ export default function OperatorPage() {
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>{hint}</span>
               </div>
             ))}
-            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,195,0,.08)', border: '1px solid rgba(255,195,0,.2)', fontSize: 12, color: 'rgba(255,195,0,.9)', lineHeight: 1.6 }}>
-              ⌘ + Enter {l === 'en' ? 'to generate' : l === 'es' ? 'para generar' : l === 'pt' ? 'para gerar' : l === 'pl' ? 'aby wygenerować' : 'для создания'}
+            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,195,0,.08)', border: '1px solid rgba(255,195,0,.2)', fontSize: 12, color: 'rgba(255,195,0,.9)', lineHeight: 1.6 }}>{uiCopy('u_124a928e0ad4aa1c')}{l === 'en' ? uiCopy('u_3d904f9aa4e99443') : l === 'es' ? uiCopy('u_db2b78a29812ec92') : l === 'pt' ? uiCopy('u_2ad33fee7ffd2e55') : l === 'pl' ? uiCopy('u_eab35f72fe77edce') : 'для создания'}
             </div>
           </div>
         </div>

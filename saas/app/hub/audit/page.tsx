@@ -6,6 +6,8 @@
 
 import type { CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -19,7 +21,7 @@ const glass: CSSProperties = {
 type ReportCard = { key: string; href: string; accent: string; title?: string; desc?: string }
 
 const REPORTS: ReportCard[] = [
-  { key: 'cybersecurity', href: '/dashboard/cybersecurity', accent: CYAN, title: 'Cybersecurity Center', desc: 'Dependency advisory monitoring and technical cybersecurity checks separate from audit readiness reports.' },
+  { key: 'cybersecurity', href: '/dashboard/cybersecurity', accent: CYAN, title: uiCopy('u_f6106e41cefcf023'), desc: 'Dependency advisory monitoring and technical cybersecurity checks separate from audit readiness reports.' },
   { key: 'executive',   href: '/hub/audit/executive',   accent: GOLD },
   { key: 'identity',    href: '/hub/audit/identity',    accent: CYAN },
   { key: 'providers',   href: '/hub/audit/providers',   accent: GOLD },
@@ -42,10 +44,10 @@ export default function AuditCenterPage() {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('audit.center.title', 'Audit Center')} <span style={{ color: GOLD }}>·</span>
+          {t('audit.center.title', uiCopy('u_27368d36d40db872'))} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'rgba(255,255,255,.62)', maxWidth: 680, lineHeight: 1.5 }}>
-          {t('audit.center.subtitle', 'Operational readiness reports across identity, providers, secrets, and remediation — scored deterministically.')}
+          {t('audit.center.subtitle', uiCopy('u_7d0c317146d458f4'))}
         </p>
       </div>
 
@@ -67,7 +69,7 @@ export default function AuditCenterPage() {
               {t(`audit.center.${r.key}.desc`, r.desc || '')}
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: r.accent, marginTop: 4 }}>
-              {t('audit.center.open', 'Open report')} →
+              {t('audit.center.open', uiCopy('u_46038765bf5c0a8c'))} →
             </div>
           </a>
         ))}

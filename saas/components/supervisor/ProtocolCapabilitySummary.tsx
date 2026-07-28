@@ -5,6 +5,8 @@ import {
   type ProtocolDiagnosticsSnapshot,
   validateProtocolDiagnosticsSnapshot,
 } from '@/lib/supervisor/protocol-diagnostics-client'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Labels = { protocols: string; safety: string; supervisory: string; mutating: string; safe: string }
 
@@ -25,7 +27,7 @@ export default function ProtocolCapabilitySummary({ labels }: { labels: Labels }
 
   if (!snapshot) return null
 
-  return <aside aria-label="Protocol capability summary" style={box}>
+  return <aside aria-label={uiCopy('u_26ac1a8ed80135ec')} style={box}>
     <strong>{snapshot.summary.protocols} {labels.protocols}</strong>
     <span>{snapshot.summary.safetyClassifiedProtocols} {labels.safety}</span>
     <span>{snapshot.summary.supervisoryOnlyProtocols} {labels.supervisory}</span>

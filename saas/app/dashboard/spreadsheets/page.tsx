@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Item = {
   id: string
@@ -44,23 +46,23 @@ type SpreadsheetCopy = {
 
 const COPY: Record<string, SpreadsheetCopy> = {
   en: {
-    eyebrow: 'Spreadsheets',
-    title: 'Your imported data, in one grid.',
-    subtitle: 'Every item pulled in through your data connectors — searchable and grouped by category.',
-    importData: '+ Import data',
-    searchPlaceholder: 'Search items, categories, descriptions…',
-    rows: 'rows',
-    sources: 'sources',
-    loadError: 'Could not load your data.',
-    genericLoadError: 'Something went wrong loading your data.',
-    loading: 'Loading data…',
-    empty: 'No data yet.',
-    importFirst: 'Import your first dataset',
-    tableName: 'Name',
-    tableCategory: 'Category',
-    tableDescription: 'Description',
-    tableSource: 'Source',
-    sourceLink: 'link',
+    eyebrow: uiCopy('u_730292028aec1b11'),
+    title: uiCopy('u_0648477fb79470c5'),
+    subtitle: uiCopy('u_e69f467ac67e7bbe'),
+    importData: uiCopy('u_b99395ccf3d902e1'),
+    searchPlaceholder: uiCopy('u_9fd8fe510ec81606'),
+    rows: uiCopy('u_96f635f97b5ad1d6'),
+    sources: uiCopy('u_26a3767fb16d5987'),
+    loadError: uiCopy('u_d70e0971bdd7766c'),
+    genericLoadError: uiCopy('u_474cf998b64b193f'),
+    loading: uiCopy('u_36028642068ba6fc'),
+    empty: uiCopy('u_64654f4c85980859'),
+    importFirst: uiCopy('u_75f4321fefa20f43'),
+    tableName: uiCopy('u_bbbccd11c8be733c'),
+    tableCategory: uiCopy('u_4b4b5d3579d7edf0'),
+    tableDescription: uiCopy('u_42232f87233d857a'),
+    tableSource: uiCopy('u_6feba545002498df'),
+    sourceLink: uiCopy('u_cb2494a7b872b1d8'),
   },
   pt: {
     eyebrow: 'Planilhas',

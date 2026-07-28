@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Truthful live status for the audit remediation lifecycle. The stage bar is
 // determinate; the moving light appears only while the dashboard is receiving
@@ -66,11 +68,11 @@ type Copy = {
 
 const COPY: Record<string, Copy> = {
   en: {
-    preparing: 'SignalBoost AI is preparing the approved fixes', checksPending: 'SignalBoost AI is validating the fixes', autoMergeQueued: 'Automatic merge is queued', partial: 'Safe fixes completed with exceptions', merged: 'Approved fixes completed', failed: 'Automated remediation needs attention',
-    detailPreparing: 'The AI is creating the protected remediation branch and internal pull request.', detailChecks: 'The AI is waiting for every protected repository check to pass.', detailQueued: 'The AI will merge automatically after every protected requirement passes.', detailPartial: 'The AI completed every supported safe fix. Unsupported findings remain visible and were not forced.', detailMerged: 'The AI merged the verified changes to main and marked findings fixed only after GitHub confirmed the merge.', detailFailed: 'The recovery worker retries temporary failures automatically; permanent errors remain visible.',
-    fixed: 'fixed', approved: 'approved', skipped: 'skipped', pipelineLabel: 'Audit remediation progress',
-    stepApproval: 'Approval recorded', stepPrepare: 'AI prepares fixes', stepChecks: 'AI validates', stepMerge: 'AI merges', stepVerified: 'AI verifies',
-    workerActive: 'AI worker active', checksMonitored: 'Live monitor: waiting for GitHub checks', mergeMonitored: 'Live monitor: waiting for automatic merge', checkingActivity: 'Checking system activity', heartbeatDelayed: 'Activity update delayed', heartbeatStale: 'No recent system heartbeat', checksFailedActivity: 'GitHub checks failed — AI repair required', repairingActivity: 'AI is repairing the remediation branch', stalledActivity: 'No forward progress — recovery required', failedChecksLabel: 'Failed checks', activityComplete: 'Workflow completed', activityStopped: 'Workflow stopped', lastChecked: 'Last checked', lastChanged: 'Stage changed', stage: 'Stage', of: 'of',
+    preparing: uiCopy('u_9c0f74ba82e27565'), checksPending: uiCopy('u_c517298669baaeb3'), autoMergeQueued: uiCopy('u_bf796793e2536db0'), partial: uiCopy('u_fd275fed1c256a61'), merged: uiCopy('u_07e373bd5b805f6b'), failed: uiCopy('u_b991a6576e84f5c4'),
+    detailPreparing: uiCopy('u_b6536978c5348555'), detailChecks: uiCopy('u_7ca7329421117176'), detailQueued: uiCopy('u_a6b754f7c79f12bd'), detailPartial: uiCopy('u_e3ff2d9438c41d08'), detailMerged: uiCopy('u_04ae66b8e404ddb2'), detailFailed: uiCopy('u_d34431efbb70eb01'),
+    fixed: uiCopy('u_568de3173d0c55bd'), approved: uiCopy('u_1495deb35d4882c7'), skipped: uiCopy('u_8a06f5ac5259619b'), pipelineLabel: uiCopy('u_4ca354b28c198f43'),
+    stepApproval: uiCopy('u_6b20bc6b0b5d3f79'), stepPrepare: uiCopy('u_39a49f0bc2c9a031'), stepChecks: uiCopy('u_29ed2ad9a4663123'), stepMerge: uiCopy('u_f569e728cc9578d8'), stepVerified: uiCopy('u_5628643b1fe89b5c'),
+    workerActive: uiCopy('u_0889415bf63ac85f'), checksMonitored: uiCopy('u_179612f589a4e92c'), mergeMonitored: uiCopy('u_a4c54ce179a3c4a7'), checkingActivity: uiCopy('u_82004c107482fd71'), heartbeatDelayed: uiCopy('u_1b8c174481dc9e70'), heartbeatStale: uiCopy('u_e0d778c31a3e431f'), checksFailedActivity: uiCopy('u_909265ff5a6e1a3e'), repairingActivity: uiCopy('u_ca9cca8c32f64b6f'), stalledActivity: uiCopy('u_84579d640dfbc6e3'), failedChecksLabel: uiCopy('u_95f91a28dd4ea66f'), activityComplete: uiCopy('u_7f77497da96a3247'), activityStopped: uiCopy('u_fbfd4baa6a014236'), lastChecked: uiCopy('u_34b3281c4ddc5e20'), lastChanged: uiCopy('u_8e98aed160fe78e3'), stage: uiCopy('u_b7265dc161639149'), of: uiCopy('u_56b2064447d546a7'),
   },
   es: {
     preparing: 'SignalBoost AI está preparando las correcciones aprobadas', checksPending: 'SignalBoost AI está validando las correcciones', autoMergeQueued: 'La fusión automática está en cola', partial: 'Correcciones seguras completadas con excepciones', merged: 'Correcciones aprobadas completadas', failed: 'La corrección automática necesita atención',
@@ -279,27 +281,7 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
         })}
       </ol>
 
-      <style>{`
-        @keyframes sbAuditProgressFlow {
-          0% { transform: translateX(-120%); }
-          100% { transform: translateX(320%); }
-        }
-        @keyframes sbAuditHeartbeat {
-          0%, 100% { transform: scale(1); opacity: .65; }
-          50% { transform: scale(1.55); opacity: 1; }
-        }
-        .sb-audit-progress-flow {
-          width: 34%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);
-          animation: sbAuditProgressFlow 1.45s linear infinite;
-        }
-        .sb-audit-heartbeat {
-          animation: sbAuditHeartbeat 1.4s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .sb-audit-progress-flow, .sb-audit-heartbeat { animation: none; }
-        }
-      `}</style>
+      <style>{uiCopy('u_7b3d28401d5e1493')}</style>
     </div>
   )
 }

@@ -10,6 +10,8 @@ import { VaultSecret, VaultExpirationAlert, VaultAuditLog as VaultAuditLogType, 
 import { notifyBoth } from '@/lib/hub/vault-notifications'
 import { PageProps, cardStyle, labelStyle } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Mock data for W1 (read-only demo)
 const MOCK_SECRETS: VaultSecret[] = [
@@ -100,7 +102,7 @@ const MOCK_AUDIT_LOGS: VaultAuditLogType[] = [
     timestamp: '2024-06-13T08:45:00Z',
     ip_address: '192.168.1.1',
     status: 'success',
-    message: 'Stripe API key accessed',
+    message: String(uiCopy('u_a0a6742eaa75fde0')),
   },
   {
     id: '2',
@@ -111,7 +113,7 @@ const MOCK_AUDIT_LOGS: VaultAuditLogType[] = [
     timestamp: '2024-06-01T10:00:00Z',
     ip_address: '192.168.1.1',
     status: 'success',
-    message: 'GitHub PAT rotated',
+    message: String(uiCopy('u_12f4a38abbcffe64')),
   },
   {
     id: '3',
@@ -122,7 +124,7 @@ const MOCK_AUDIT_LOGS: VaultAuditLogType[] = [
     timestamp: '2024-06-13T09:30:00Z',
     ip_address: '192.168.1.1',
     status: 'success',
-    message: 'Supabase service key accessed',
+    message: String(uiCopy('u_7075d71f0c3672a2')),
   },
   {
     id: '4',
@@ -133,7 +135,7 @@ const MOCK_AUDIT_LOGS: VaultAuditLogType[] = [
     timestamp: '2024-03-10T10:00:00Z',
     ip_address: '192.168.1.1',
     status: 'success',
-    message: 'Vercel deploy token created',
+    message: String(uiCopy('u_93c948bec025f094')),
   },
 ]
 
@@ -187,18 +189,18 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       {/* Header */}
       <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>{t('console.vaultx.page.ops', 'Operations & Production')}</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t('console.vaultx.page.keysSecrets', 'Keys & Secrets')}</h2>
+          <div style={labelStyle}>{t('console.vaultx.page.ops', uiCopy('u_89cfe2933e6684e6'))}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t('console.vaultx.page.keysSecrets', uiCopy('u_274194323027a634'))}</h2>
           <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>
-            {t('console.vaultx.page.inventory', 'Credential inventory, expiration alerts, and rotation status.')} {MOCK_STATS.total_secrets} {MOCK_STATS.total_secrets === 1 ? t('console.vaultx.page.secretWord', 'secret') : t('console.vaultx.page.secretsWord', 'secrets')} {t('console.vaultx.page.stored', 'stored.')}
+            {t('console.vaultx.page.inventory', uiCopy('u_43de3cdeec51d514'))} {MOCK_STATS.total_secrets} {MOCK_STATS.total_secrets === 1 ? t('console.vaultx.page.secretWord', uiCopy('u_7b1d737d789e28d0')) : t('console.vaultx.page.secretsWord', uiCopy('u_6a7b4db0d8ce84d6'))} {t('console.vaultx.page.stored', uiCopy('u_e8ec10fcc95e2a55'))}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, fontSize: 11.5, fontWeight: 600, flexWrap: 'wrap' }}>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,.35)', background: 'rgba(34,197,94,.08)', color: '#86efac' }}>
-            {MOCK_STATS.active_secrets} {t('console.vaultx.page.active', 'Active')}
+            {MOCK_STATS.active_secrets} {t('console.vaultx.page.active', uiCopy('u_d3c1e85be71cb8a1'))}
           </span>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.35)', background: 'rgba(255,195,0,.08)', color: '#ffc300' }}>
-            {MOCK_STATS.expiring_soon} {t('console.vaultx.page.expiring', 'Expiring')}
+            {MOCK_STATS.expiring_soon} {t('console.vaultx.page.expiring', uiCopy('u_cd0f99c3b6c0e6f5'))}
           </span>
           <button
             onClick={() => setIsUnlocked(false)}
@@ -213,7 +215,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               cursor: 'pointer',
             }}
           >
-            {t('console.vaultx.page.lockVault', 'Lock Vault')}
+            {t('console.vaultx.page.lockVault', uiCopy('u_863d49a57aa3e3d8'))}
           </button>
         </div>
       </section>
@@ -221,12 +223,12 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 28, paddingRight: 8 }}>
         {/* Provider selector */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ ...labelStyle }}>{t('console.vaultx.page.browseSecrets', 'Browse Secrets')}</div>
+          <div style={{ ...labelStyle }}>{t('console.vaultx.page.browseSecrets', uiCopy('u_7e3dc5f3fd61b863'))}</div>
           <div style={{ ...cardStyle, padding: 14 }}>
-            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder={t('console.vaultx.page.providerPlaceholder', 'Search and select a provider...')} />
+            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder={t('console.vaultx.page.providerPlaceholder', uiCopy('u_d5547091784e5c2b'))} />
             {selectedProviderName && (
               <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(26,240,255,.8)' }}>
-                {t('console.vaultx.page.selected', 'Selected:')} <strong>{selectedProviderName}</strong>
+                {t('console.vaultx.page.selected', uiCopy('u_7410aff51c9451f8'))} <strong>{selectedProviderName}</strong>
               </div>
             )}
           </div>
@@ -237,17 +239,17 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
           if (secrets.length === 0) return null
 
           const statusLabels: Record<string, string> = {
-            active: t('console.vaultx.page.statusActive', 'Active Secrets'),
-            expiring_soon: t('console.vaultx.page.statusExpiringSoon', 'Expiring Soon'),
-            expired: t('console.vaultx.page.statusExpired', 'Expired'),
-            rotated: t('console.vaultx.page.statusRotated', 'Recently Rotated'),
-            revoked: t('console.vaultx.page.statusRevoked', 'Revoked'),
+            active: t(uiCopy('u_c3df501cb8cb14be'), uiCopy('u_f303fdb4839b261a')),
+            expiring_soon: t(uiCopy('u_4b4e2efa9b829307'), uiCopy('u_f745e41c99640528')),
+            expired: t(uiCopy('u_a49bea69ba65d31d'), uiCopy('u_9e9a6aa960f26c14')),
+            rotated: t(uiCopy('u_c40c0c63ed6a0c5e'), uiCopy('u_485ec1dd0e2baa8f')),
+            revoked: t(uiCopy('u_c3414a608041e544'), uiCopy('u_92ec999d4076bac7')),
           }
 
           return (
             <section key={status}>
               <div style={{ ...labelStyle, marginBottom: 12 }}>
-                {statusLabels[status]} — {secrets.length} {secrets.length === 1 ? t('console.vaultx.page.secretWord', 'secret') : t('console.vaultx.page.secretsWord', 'secrets')}
+                {statusLabels[status]} — {secrets.length} {secrets.length === 1 ? t('console.vaultx.page.secretWord', uiCopy('u_608592f60025a6c0')) : t('console.vaultx.page.secretsWord', uiCopy('u_f6a562672012a2ef'))}
               </div>
               <VaultSecretsGrid secrets={secrets} alerts={MOCK_ALERTS} onSelectSecret={setSelectedSecret} />
             </section>
@@ -312,7 +314,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {t('console.vaultx.page.maskedValue', 'Masked Value')}
+                  {t('console.vaultx.page.maskedValue', uiCopy('u_7f8c34471d2792f4'))}
                 </div>
                 <div
                   style={{
@@ -328,20 +330,20 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
                   {selectedSecret.masked_value}
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
-                  {t('console.vaultx.page.encryptedNote', 'Full value is encrypted and not displayed in the UI.')}
+                  {t('console.vaultx.page.encryptedNote', uiCopy('u_39e918af28bff68c'))}
                 </p>
               </div>
 
               {selectedSecret.expires_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    {t('console.vaultx.page.expiration', 'Expiration')}
+                    {t('console.vaultx.page.expiration', uiCopy('u_99d0a522d7f6766a'))}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
-                    {new Date(selectedSecret.expires_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
+                    {new Date(selectedSecret.expires_at).toLocaleDateString(uiCopy('u_eca0d3faa96deb68'), {
+                      year: uiCopy('u_fe4234ad7e314d46'),
+                      month: uiCopy('u_e44f894cb9d24b41'),
+                      day: uiCopy('u_04982f49819aeded'),
                     })}
                   </div>
                 </div>
@@ -350,13 +352,13 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               {selectedSecret.last_rotated_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    {t('console.vaultx.page.lastRotated', 'Last Rotated')}
+                    {t('console.vaultx.page.lastRotated', uiCopy('u_9d26ed456f913170'))}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
-                    {new Date(selectedSecret.last_rotated_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
+                    {new Date(selectedSecret.last_rotated_at).toLocaleDateString(uiCopy('u_dbafb0647e7ec012'), {
+                      year: uiCopy('u_662380e4269a2141'),
+                      month: uiCopy('u_88386889047fca84'),
+                      day: uiCopy('u_d5ab0a8c1e455605'),
                     })}
                   </div>
                 </div>
@@ -364,7 +366,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
 
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {t('console.vaultx.page.typeEnv', 'Type & Environment')}
+                  {t('console.vaultx.page.typeEnv', uiCopy('u_d80458a391d4d84c'))}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <span

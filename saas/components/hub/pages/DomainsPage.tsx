@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { VercelDomain, SSLCertificate, Domain } from '@/lib/hub/domains-types'
 import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared.tsx'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export function DomainsPage() {
   const { t } = useTranslation()
@@ -27,10 +29,10 @@ export function DomainsPage() {
       if (data.ok) {
         setDomains(data.domains || [])
       } else {
-        setError(data.error || t('console.domains.err_load', 'Failed to load domains'))
+        setError(data.error || t('console.domains.err_load', uiCopy('u_7239222ea768991d')))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('console.domains.err_load2', 'Error loading domains'))
+      setError(err instanceof Error ? err.message : t('console.domains.err_load2', uiCopy('u_9a0631b6cb534e73')))
     } finally {
       setLoading(false)
     }
@@ -52,10 +54,10 @@ export function DomainsPage() {
         setNewDomain('')
         fetchDomains()
       } else {
-        setError(data.error || t('console.domains.err_add', 'Failed to add domain'))
+        setError(data.error || t('console.domains.err_add', uiCopy('u_0007461ebfcfe7bc')))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('console.domains.err_add2', 'Error adding domain'))
+      setError(err instanceof Error ? err.message : t('console.domains.err_add2', uiCopy('u_96dee6267388bb97')))
     }
   }
 
@@ -72,28 +74,28 @@ export function DomainsPage() {
       if (data.ok) {
         fetchDomains()
       } else {
-        setError(data.error || t('console.domains.err_verify', 'Verification failed'))
+        setError(data.error || t('console.domains.err_verify', uiCopy('u_56939eee0e1cefa8')))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('console.domains.err_verify2', 'Error verifying domain'))
+      setError(err instanceof Error ? err.message : t('console.domains.err_verify2', uiCopy('u_a5c83fc2ff969478')))
     }
   }
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px' }}>
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.domains.title', 'Domains & DNS')}</h2>
-        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.domains.subtitle', 'Manage domains, DNS records, and SSL certificates')}</p>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.domains.title', uiCopy('u_0c8693d397593cc1'))}</h2>
+        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.domains.subtitle', uiCopy('u_6024253f8e8726ea'))}</p>
       </div>
 
       {/* Add Domain Form */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t('console.domains.add_domain', 'Add Domain')}</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t('console.domains.add_domain', uiCopy('u_0c951ff68ba611b2'))}</h3>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <input
             type="text"
-            placeholder="example.com"
+            placeholder={uiCopy('u_72ac77e6542a2c08')}
             value={newDomain}
             onChange={e => setNewDomain(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addDomain()}
@@ -121,7 +123,7 @@ export function DomainsPage() {
               fontSize: '0.9rem',
               opacity: !newDomain.trim() || loading ? 0.5 : 1,
             }}
-          >{t('console.domains.add', 'Add')}</button>
+          >{t('console.domains.add', uiCopy('u_1136397b843a24bb'))}</button>
         </div>
 
         {error && (
@@ -133,9 +135,9 @@ export function DomainsPage() {
 
       {/* Domains List */}
       {loading ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.domains.loading', 'Loading domains...')}</div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.domains.loading', uiCopy('u_f06dfeb4451f48a4'))}</div>
       ) : domains.length === 0 ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.domains.empty', 'No domains configured yet')}</div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.domains.empty', uiCopy('u_29881c03b6d4e0d7'))}</div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
           {domains.map(domain => (
@@ -166,7 +168,7 @@ function DomainCard({
 }) {
   const { t } = useTranslation()
   const statusColor = domain.verified ? '#22c55e' : '#fbbf24'
-  const statusText = domain.verified ? t('console.domains.verified', 'Verified') : t('console.domains.pending', 'Pending Verification')
+  const statusText = domain.verified ? t('console.domains.verified', uiCopy('u_fcba7f7be9c2bbf9')) : t('console.domains.pending', uiCopy('u_84ff87625fb1ad66'))
 
   return (
     <div style={cardStyle}>
@@ -199,7 +201,7 @@ function DomainCard({
           {/* Verification */}
           {!domain.verified && domain.verification && (
             <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px', borderLeft: `3px solid #fbbf24` }}>
-              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.verification_required', 'Verification Required')}</div>
+              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.verification_required', uiCopy('u_62ee9386f5aed7da'))}</div>
               {domain.verification.map((v, i) => (
                 <div key={i} style={{ fontSize: '0.85rem', marginBottom: '0.5rem', fontFamily: 'monospace' }}>
                   <div style={{ color: '#888' }}>{v.type.toUpperCase()}</div>
@@ -219,23 +221,23 @@ function DomainCard({
                   fontSize: '0.85rem',
                   fontWeight: 'bold',
                 }}
-              >{t('console.domains.check_verification', 'Check Verification')}</button>
+              >{t('console.domains.check_verification', uiCopy('u_f823b6d1cc967e35'))}</button>
             </div>
           )}
 
           {/* SSL Certificate */}
           {domain.ssl && (
             <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px' }}>
-              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.ssl_cert', 'SSL Certificate')}</div>
+              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.ssl_cert', uiCopy('u_769e050f89bf8e54'))}</div>
               <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.85rem' }}>
                 <div>
-                  <span style={{ color: '#888' }}>{t('console.domains.status', 'Status')}: </span>
+                  <span style={{ color: '#888' }}>{t('console.domains.status', uiCopy('u_28b2f3faa62c4517'))}: </span>
                   <span style={{ color: domain.ssl.status === 'issued' ? '#22c55e' : '#fbbf24' }}>
                     {domain.ssl.status}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#888' }}>{t('console.domains.expires', 'Expires')}: </span>
+                  <span style={{ color: '#888' }}>{t('console.domains.expires', uiCopy('u_c08995a91cfe3a36'))}: </span>
                   <span style={{ color: '#1af0ff' }}>
                     {new Date(domain.ssl.expiresAt).toLocaleDateString()}
                   </span>
@@ -247,10 +249,10 @@ function DomainCard({
           {/* Nameservers */}
           {domain.verified && (
             <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px' }}>
-              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.nameservers', 'Nameservers')}</div>
+              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.nameservers', uiCopy('u_6e91024f19bffd0c'))}</div>
               <div style={{ display: 'grid', gap: '0.25rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                <div>ns1.vercel-dns.com</div>
-                <div>ns2.vercel-dns.com</div>
+                <div>{uiCopy('u_95be428791dc2b05')}</div>
+                <div>{uiCopy('u_1f76838761903212')}</div>
               </div>
             </div>
           )}
@@ -258,11 +260,11 @@ function DomainCard({
           {/* Quick Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
-              <div style={{ color: '#888', marginBottom: '0.25rem' }}>{t('console.domains.created', 'Created')}</div>
+              <div style={{ color: '#888', marginBottom: '0.25rem' }}>{t('console.domains.created', uiCopy('u_522675ca903ee67d'))}</div>
               <div style={{ color: '#1af0ff' }}>{new Date(domain.createdAt).toLocaleDateString()}</div>
             </div>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
-              <div style={{ color: '#888', marginBottom: '0.25rem' }}>{t('console.domains.updated', 'Updated')}</div>
+              <div style={{ color: '#888', marginBottom: '0.25rem' }}>{t('console.domains.updated', uiCopy('u_20909d57d659bc66'))}</div>
               <div style={{ color: '#1af0ff' }}>{new Date(domain.updatedAt).toLocaleDateString()}</div>
             </div>
           </div>

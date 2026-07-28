@@ -10,6 +10,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import GithubReport, { type GithubReportView } from '@/components/audit/GithubReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: GithubReportView; error?: string }
@@ -32,7 +34,7 @@ export default function GithubReportPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.github.loadError', 'Could not load the GitHub report.'))
+          setError((json && json.error) || t('audit.github.loadError', uiCopy('u_35a391708dd2a948')))
           return
         }
         setData(json.report)
@@ -40,7 +42,7 @@ export default function GithubReportPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.github.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.github.fetchError', uiCopy('u_4046eb02552fe1a0')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -51,7 +53,7 @@ export default function GithubReportPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.github.loading', 'Loading GitHub report…')}
+        {t('audit.github.loading', uiCopy('u_db83de8c5fccc207'))}
       </main>
     )
   }

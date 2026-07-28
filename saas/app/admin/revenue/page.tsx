@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 
@@ -36,24 +38,24 @@ const COPY: Record<Lang, {
   footer: string
 }> = {
   en: {
-    eyebrow: '💰 Admin · Revenue',
-    title: 'Live MRR from Stripe',
-    refresh: '↻ Refresh',
-    refreshing: 'Refreshing…',
-    loading: 'Loading…',
-    noAccess: 'Revenue',
-    noAccessSub: 'Only the account owner can view revenue.',
-    stripePriceWarn: "Stripe prices couldn't be read, so MRR may show $0. Check that STRIPE_SECRET_KEY and the STRIPE_PRICE_* variables are set correctly in your environment.",
-    mrr: 'MRR (monthly recurring)',
-    arr: 'ARR (annual run-rate)',
-    activeSubs: 'Active subscriptions',
-    activeWebsite: 'Active website plans',
-    activePodcast: 'Active podcast plans',
-    byPlan: 'By plan',
-    noSubs: 'No active subscriptions yet.',
-    active: 'active',
-    perMonth: '/mo',
-    footer: 'From active subscriptions in your database, priced live from Stripe. This is a dashboard estimate, not an accounting ledger — reconcile against Stripe for official figures. Generated',
+    eyebrow: uiCopy('u_df6255486862ffc2'),
+    title: uiCopy('u_e5bc979b416df86a'),
+    refresh: uiCopy('u_548717b1aed0f316'),
+    refreshing: uiCopy('u_1860ced9b942b0c7'),
+    loading: uiCopy('u_9253dc7483fd2c8d'),
+    noAccess: uiCopy('u_57efdec302629553'),
+    noAccessSub: uiCopy('u_70985a9c8edbbc66'),
+    stripePriceWarn: uiCopy('u_ea335a8990b8ec9c'),
+    mrr: uiCopy('u_5bcbd8895a5ed17f'),
+    arr: uiCopy('u_6b3775316e7d735c'),
+    activeSubs: uiCopy('u_25799df09f7de65c'),
+    activeWebsite: uiCopy('u_4fdfcff1d4b6c3b2'),
+    activePodcast: uiCopy('u_7bd78eb38f38d8ad'),
+    byPlan: uiCopy('u_013c52d9ce554026'),
+    noSubs: uiCopy('u_9fc0bb95ed131316'),
+    active: uiCopy('u_9252f0a409e870a2'),
+    perMonth: uiCopy('u_410de3f4611485ee'),
+    footer: uiCopy('u_dd70d05744fcffa7'),
   },
   es: {
     eyebrow: '💰 Admin · Ingresos',
@@ -166,10 +168,10 @@ export default function AdminRevenuePage() {
       const res = await fetch('/api/admin/revenue', { cache: 'no-store' })
       if (res.status === 401 || res.status === 403) { setNotAllowed(true); setLoading(false); return }
       const d = await res.json()
-      if (!res.ok) { setError(d?.error || 'Could not load revenue.'); setLoading(false); return }
+      if (!res.ok) { setError(d?.error || uiCopy('u_8ce1aab04efce9a4')); setLoading(false); return }
       setData(d)
     } catch {
-      setError('Something went wrong loading revenue.')
+      setError(uiCopy('u_409cdae2ac1c4998'))
     } finally {
       setLoading(false)
     }

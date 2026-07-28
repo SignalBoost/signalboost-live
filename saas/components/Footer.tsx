@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const BRAND = 'SignalBoost'
@@ -36,7 +38,7 @@ type FooterCopy = {
 
 const COPY: Record<Language, FooterCopy> = {
   en: {
-    product: 'Product', home: 'Home', pricing: 'Pricing', repoCheck: 'Free Repo Check', websiteOptimizer: 'Free Website Optimizer', dashboard: 'Dashboard', documentation: 'Documentation', faq: 'FAQ', podcasters: 'Podcasters', build: 'Build', buildWebsite: 'Build a website', collectReviews: 'Collect reviews', generateNativeAudio: 'Generate native audio', createVideos: 'Create videos', company: 'Company', about: 'About', partners: 'Partners', privacy: 'Privacy', contact: 'Contact', nativeExperiences: 'Native experiences available in', poweredBy: 'Powered by',
+    product: uiCopy('u_f6c2a37d5674a049'), home: uiCopy('u_2742b68cb5e3034c'), pricing: uiCopy('u_c38bc5a996802a03'), repoCheck: uiCopy('u_3739e2a269f1a5da'), websiteOptimizer: uiCopy('u_fd3fc3d3742daa36'), dashboard: uiCopy('u_2419d769a0e4163d'), documentation: uiCopy('u_dafcf754def0fcf4'), faq: uiCopy('u_327ddb725f37432c'), podcasters: uiCopy('u_e69d9f4c10880709'), build: uiCopy('u_b1e7ecd0f0736d68'), buildWebsite: uiCopy('u_16546e3882337db2'), collectReviews: uiCopy('u_5505ded130cfe875'), generateNativeAudio: uiCopy('u_1f56f9863432a198'), createVideos: uiCopy('u_cae9c0a6ecb95397'), company: uiCopy('u_c549f87d7cbd312c'), about: uiCopy('u_46f2b33a8b5e778b'), partners: uiCopy('u_00d0874f2e403ad3'), privacy: uiCopy('u_9456f608b52bec8b'), contact: uiCopy('u_5d7961c2350d98b7'), nativeExperiences: uiCopy('u_065e388536138856'), poweredBy: uiCopy('u_1be3d77adb95e486'),
   },
   es: {
     product: 'Producto', home: 'Inicio', pricing: 'Precios', repoCheck: 'Revisión gratuita del repositorio', websiteOptimizer: 'Optimizador web gratuito', dashboard: 'Panel', documentation: 'Documentación', faq: 'Preguntas frecuentes', podcasters: 'Podcasters', build: 'Crear', buildWebsite: 'Crear un sitio web', collectReviews: 'Recopilar reseñas', generateNativeAudio: 'Generar audio nativo', createVideos: 'Crear videos', company: 'Empresa', about: 'Acerca de', partners: 'Socios', privacy: 'Privacidad', contact: 'Contacto', nativeExperiences: 'Experiencias nativas disponibles en', poweredBy: 'Desarrollado por',

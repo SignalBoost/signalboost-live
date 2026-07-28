@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string }
@@ -31,34 +33,34 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // ── Copy ─────────────────────────────────────────────────────────────────────
 const COPY = {
-  eyebrow:      { en: 'Assistant',                              es: 'Asistente',                           pt: 'Assistente',                          pl: 'Asystent',                            ru: 'Ассистент' },
-  title:        { en: 'Your SignalBoost concierge',             es: 'Tu concierge de SignalBoost',         pt: 'Seu concierge SignalBoost',            pl: 'Twój concierge SignalBoost',           ru: 'Ваш консьерж SignalBoost' },
-  subtitle:     { en: 'Ask anything about building, promoting, reviews, audio, video, or your account.', es: 'Pregunta sobre construcción, promoción, reseñas, audio, video o tu cuenta.', pt: 'Pergunte sobre construção, promoção, avaliações, áudio, vídeo ou sua conta.', pl: 'Pytaj o budowanie, promocję, opinie, audio, wideo lub swoje konto.', ru: 'Спрашивайте о создании, продвижении, отзывах, аудио, видео или вашем аккаунте.' },
-  empty:        { en: 'Ask me anything, or start with one of these:',                                     es: 'Pregúntame lo que quieras, o empieza con una de estas:',                          pt: 'Pergunte-me qualquer coisa, ou comece com uma destas:',                        pl: 'Zapytaj mnie o cokolwiek lub zacznij od jednego z tych:',                      ru: 'Спросите меня что угодно или начните с одного из вариантов:' },
-  thinking:     { en: 'Thinking…',                             es: 'Pensando…',                           pt: 'Pensando…',                            pl: 'Myślę…',                               ru: 'Думаю…' },
-  placeholder:  { en: 'Ask the concierge…',                    es: 'Pregunta al concierge…',              pt: 'Pergunte ao concierge…',               pl: 'Zapytaj concierge…',                   ru: 'Спросите консьержа…' },
-  send:         { en: 'Send',                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
-  error:        { en: 'Sorry, I could not answer that right now.', es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
-  history:      { en: 'History',                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
-  newChat:      { en: 'New chat',                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
-  noHistory:    { en: 'No conversations yet.',                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
-  loadingHistory: { en: 'Loading…',                            es: 'Cargando…',                           pt: 'Carregando…',                          pl: 'Ładowanie…',                           ru: 'Загрузка…' },
-  historyError: { en: 'Could not load history.',               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Не удалось загрузить историю.' },
-  deleteConfirm: { en: 'Delete this conversation?',            es: '¿Eliminar esta conversación?',        pt: 'Excluir esta conversa?',               pl: 'Usunąć tę rozmowę?',                   ru: 'Удалить этот разговор?' },
-  untitled:     { en: 'Untitled conversation',                 es: 'Conversación sin título',             pt: 'Conversa sem título',                  pl: 'Rozmowa bez tytułu',                   ru: 'Разговор без названия' },
-  close:        { en: 'Close',                                  es: 'Cerrar',                              pt: 'Fechar',                               pl: 'Zamknij',                              ru: 'Закрыть' },
-  dropHere:     { en: 'Drop files here',                       es: 'Suelta archivos aquí',                pt: 'Solte arquivos aqui',                  pl: 'Upuść pliki tutaj',                    ru: 'Перетащите файлы сюда' },
-  fileTooLarge: { en: 'File too large (max 10 MB)',            es: 'Archivo demasiado grande (máx 10 MB)', pt: 'Arquivo muito grande (máx 10 MB)',    pl: 'Plik za duży (maks. 10 MB)',           ru: 'Файл слишком большой (макс. 10 МБ)' },
-  fileTypeErr:  { en: 'File type not supported',               es: 'Tipo de archivo no admitido',         pt: 'Tipo de arquivo não suportado',        pl: 'Nieobsługiwany typ pliku',             ru: 'Тип файла не поддерживается' },
+  eyebrow:      { en: uiCopy('u_75ced0a299f0579e'),                              es: 'Asistente',                           pt: 'Assistente',                          pl: 'Asystent',                            ru: 'Ассистент' },
+  title:        { en: uiCopy('u_d253ab51f3f35ebf'),             es: 'Tu concierge de SignalBoost',         pt: 'Seu concierge SignalBoost',            pl: 'Twój concierge SignalBoost',           ru: 'Ваш консьерж SignalBoost' },
+  subtitle:     { en: uiCopy('u_a92942ef5da0eaef'), es: 'Pregunta sobre construcción, promoción, reseñas, audio, video o tu cuenta.', pt: 'Pergunte sobre construção, promoção, avaliações, áudio, vídeo ou sua conta.', pl: 'Pytaj o budowanie, promocję, opinie, audio, wideo lub swoje konto.', ru: 'Спрашивайте о создании, продвижении, отзывах, аудио, видео или вашем аккаунте.' },
+  empty:        { en: uiCopy('u_644dc64e8bfca792'),                                     es: 'Pregúntame lo que quieras, o empieza con una de estas:',                          pt: 'Pergunte-me qualquer coisa, ou comece com uma destas:',                        pl: 'Zapytaj mnie o cokolwiek lub zacznij od jednego z tych:',                      ru: 'Спросите меня что угодно или начните с одного из вариантов:' },
+  thinking:     { en: uiCopy('u_ba6a0fa5c4000aa0'),                             es: 'Pensando…',                           pt: 'Pensando…',                            pl: 'Myślę…',                               ru: 'Думаю…' },
+  placeholder:  { en: uiCopy('u_65402edcd286ab48'),                    es: 'Pregunta al concierge…',              pt: 'Pergunte ao concierge…',               pl: 'Zapytaj concierge…',                   ru: 'Спросите консьержа…' },
+  send:         { en: uiCopy('u_71ff8ef2f57ae39d'),                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
+  error:        { en: uiCopy('u_4532a80906ec08c9'), es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
+  history:      { en: uiCopy('u_e4320a49dfbb5369'),                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
+  newChat:      { en: uiCopy('u_f6e734ca61c92256'),                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
+  noHistory:    { en: uiCopy('u_ac25c06c36898d36'),                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
+  loadingHistory: { en: uiCopy('u_b1eee3af3d99f0ce'),                            es: 'Cargando…',                           pt: 'Carregando…',                          pl: 'Ładowanie…',                           ru: 'Загрузка…' },
+  historyError: { en: uiCopy('u_69d77b84271d853d'),               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Не удалось загрузить историю.' },
+  deleteConfirm: { en: uiCopy('u_f975c9e028338d29'),            es: '¿Eliminar esta conversación?',        pt: 'Excluir esta conversa?',               pl: 'Usunąć tę rozmowę?',                   ru: 'Удалить этот разговор?' },
+  untitled:     { en: uiCopy('u_c05676c0ff43aef2'),                 es: 'Conversación sin título',             pt: 'Conversa sem título',                  pl: 'Rozmowa bez tytułu',                   ru: 'Разговор без названия' },
+  close:        { en: uiCopy('u_8ea6593dcc651e7f'),                                  es: 'Cerrar',                              pt: 'Fechar',                               pl: 'Zamknij',                              ru: 'Закрыть' },
+  dropHere:     { en: uiCopy('u_387f2e3ea5b3b96b'),                       es: 'Suelta archivos aquí',                pt: 'Solte arquivos aqui',                  pl: 'Upuść pliki tutaj',                    ru: 'Перетащите файлы сюда' },
+  fileTooLarge: { en: uiCopy('u_c36ff8c8e5139214'),            es: 'Archivo demasiado grande (máx 10 MB)', pt: 'Arquivo muito grande (máx 10 MB)',    pl: 'Plik za duży (maks. 10 MB)',           ru: 'Файл слишком большой (макс. 10 МБ)' },
+  fileTypeErr:  { en: uiCopy('u_c576f4579941fc44'),               es: 'Tipo de archivo no admitido',         pt: 'Tipo de arquivo não suportado',        pl: 'Nieobsługiwany typ pliku',             ru: 'Тип файла не поддерживается' },
   suggestions: {
-    s1: { en: 'How do I publish my first website?',            es: '¿Cómo publico mi primer sitio web?',  pt: 'Como publico meu primeiro site?',      pl: 'Jak opublikować moją pierwszą stronę?', ru: 'Как опубликовать первый сайт?' },
-    s2: { en: 'Help me plan an outreach campaign',             es: 'Ayúdame a planificar una campaña de prospección', pt: 'Me ajude a planejar uma campanha de prospecção', pl: 'Pomóż mi zaplanować kampanię outreach', ru: 'Помоги спланировать кампанию аутрич' },
-    s3: { en: 'What does my plan include?',                    es: '¿Qué incluye mi plan?',               pt: 'O que inclui meu plano?',              pl: 'Co zawiera mój plan?',                 ru: 'Что включает мой план?' },
-    s4: { en: 'How do I collect customer reviews?',            es: '¿Cómo recopilo reseñas de clientes?', pt: 'Como coleo avaliações de clientes?',   pl: 'Jak zbierać opinie klientów?',         ru: 'Как собирать отзывы клиентów?' },
+    s1: { en: uiCopy('u_dfb2235ff30c45ff'),            es: '¿Cómo publico mi primer sitio web?',  pt: 'Como publico meu primeiro site?',      pl: 'Jak opublikować moją pierwszą stronę?', ru: 'Как опубликовать первый сайт?' },
+    s2: { en: uiCopy('u_5f8a759166b41eb9'),             es: 'Ayúdame a planificar una campaña de prospección', pt: 'Me ajude a planejar uma campanha de prospecção', pl: 'Pomóż mi zaplanować kampanię outreach', ru: 'Помоги спланировать кампанию аутрич' },
+    s3: { en: uiCopy('u_608ff927ba314b3e'),                    es: '¿Qué incluye mi plan?',               pt: 'O que inclui meu plano?',              pl: 'Co zawiera mój plan?',                 ru: 'Что включает мой план?' },
+    s4: { en: uiCopy('u_49e0971e2efe1836'),            es: '¿Cómo recopilo reseñas de clientes?', pt: 'Como coleo avaliações de clientes?',   pl: 'Jak zbierać opinie klientów?',         ru: 'Как собирать отзывы клиентów?' },
   },
 }
 
-const DATE_LOCALES: Record<Lang, string> = { en: 'en-US', es: 'es-MX', pt: 'pt-BR', pl: 'pl-PL', ru: 'ru-RU' }
+const DATE_LOCALES: Record<Lang, string> = { en: uiCopy('u_8da8a528f9f2bea2'), es: 'es-MX', pt: 'pt-BR', pl: 'pl-PL', ru: 'ru-RU' }
 
 function c(obj: any, lang: string): string {
   return obj?.[lang as Lang] ?? obj?.en ?? ''
@@ -100,7 +102,7 @@ function VideoJsonMessage({ content }: { content: string }) {
             </div>
             <div style={{ padding: 10 }}>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', lineHeight: 1.35 }}>{video.title}</div>
-              <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#1af0ff', fontSize: 11.5, textDecoration: 'underline' }}>Open on YouTube ↗</a>
+              <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#1af0ff', fontSize: 11.5, textDecoration: 'underline' }}>{uiCopy('u_dccb4b9005ac5ca4')}</a>
             </div>
           </div>
         ))}
@@ -494,7 +496,7 @@ export default function AssistantPage() {
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,.45)' }}>{formatBytes(f.size)}</div>
                 </div>
-                <button onClick={() => removeFile(f.id)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', fontSize: 13, padding: 0, lineHeight: 1, flexShrink: 0 }}>✕</button>
+                <button onClick={() => removeFile(f.id)} title={uiCopy('u_e7d381e657f85e8b')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', fontSize: 13, padding: 0, lineHeight: 1, flexShrink: 0 }}>✕</button>
               </div>
             ))}
           </div>
@@ -518,8 +520,8 @@ export default function AssistantPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            title="Attach files"
-            aria-label="Attach files"
+            title={uiCopy('u_e8151a3faee76c09')}
+            aria-label={uiCopy('u_fe537702b4225ce5')}
             style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 12, background: stagedFiles.length > 0 ? 'rgba(26,240,255,.15)' : 'rgba(255,255,255,.06)', border: `1px solid ${stagedFiles.length > 0 ? 'rgba(26,240,255,.45)' : 'rgba(255,255,255,.15)'}`, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, opacity: loading ? 0.5 : 1, transition: 'background .15s, border-color .15s', color: stagedFiles.length > 0 ? '#1af0ff' : 'rgba(255,255,255,.7)' }}
           >
             📎

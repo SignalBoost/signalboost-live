@@ -5,6 +5,8 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useEffect, useMemo, useState } from 'react'
 import LocalVideoPreviewReview from '@/components/studio/LocalVideoPreviewReview'
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const GOLD = '#ffc300'
 const SAAS_URL = 'www.' + 'saas.signalboostapp.com'
@@ -34,18 +36,18 @@ const fallbackDraft: PresenterDraft = {
   presenter_name: 'SignalBoost AI',
   presenter_role: 'official platform guide',
   tone: 'professional_friendly',
-  title: 'SignalBoost AI guided platform tour',
+  title: uiCopy('u_c7313ddc3a382a59'),
   duration_seconds: 25,
   opening_hook: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.',
   destination_url: SAAS_URL,
   cta: `Visit ${SAAS_URL}`,
   approval_gates: ['Approve presenter style.', 'Approve opening hook.', 'Approve product tour flow.', 'Approve final video before release.'],
   scenes: [
-    { label: 'Presenter intro', presenter_line: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.', caption: 'Meet SignalBoost AI', visual_direction: 'Show the SignalBoost AI guide with a friendly wave and branded glow.', goal: 'Create attention in the first three seconds.' },
-    { label: 'Business pain', presenter_line: 'Many companies lose time switching between dashboards, reviews, content tools, and approval steps.', caption: 'Too many tools. Not enough clarity.', visual_direction: 'Show scattered product cards moving into one clean console.', goal: 'Make the viewer recognize the problem quickly.' },
-    { label: 'Platform tour', presenter_line: 'SignalBoost brings the work into one place so you can see what needs attention and what action should happen next.', caption: 'One console for the next action', visual_direction: 'Zoom into the platform console and highlight recommendations, approvals, provider data, and content tools.', goal: 'Show product value visually.' },
-    { label: 'Approval moment', presenter_line: 'COSA can prepare the recommendation, draft the campaign, and organize the work while you stay in control of approval.', caption: 'AI operates. Humans approve.', visual_direction: 'Animate approve, reject, queue, and ready cards moving through a clean workflow.', goal: 'Build trust by showing control.' },
-    { label: 'CTA', presenter_line: `Visit ${SAAS_URL} and see how SignalBoost can help your company turn scattered work into approved action.`, caption: `Visit ${SAAS_URL}`, visual_direction: 'End with the guide beside the branded URL, CTA button, and final product screen.', goal: 'Drive traffic to the SaaS platform.' },
+    { label: uiCopy('u_fb3b88d0fc9f1a85'), presenter_line: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.', caption: uiCopy('u_9db3bf86ab6567bd'), visual_direction: 'Show the SignalBoost AI guide with a friendly wave and branded glow.', goal: 'Create attention in the first three seconds.' },
+    { label: uiCopy('u_05c2d4a3f760aeea'), presenter_line: 'Many companies lose time switching between dashboards, reviews, content tools, and approval steps.', caption: uiCopy('u_4fba1522264f0613'), visual_direction: 'Show scattered product cards moving into one clean console.', goal: 'Make the viewer recognize the problem quickly.' },
+    { label: uiCopy('u_27e9cd2665a8d709'), presenter_line: 'SignalBoost brings the work into one place so you can see what needs attention and what action should happen next.', caption: uiCopy('u_a3e95697b3a90089'), visual_direction: 'Zoom into the platform console and highlight recommendations, approvals, provider data, and content tools.', goal: 'Show product value visually.' },
+    { label: uiCopy('u_68b237d2cf471952'), presenter_line: 'COSA can prepare the recommendation, draft the campaign, and organize the work while you stay in control of approval.', caption: uiCopy('u_d98cfdf6cf179417'), visual_direction: 'Animate approve, reject, queue, and ready cards moving through a clean workflow.', goal: 'Build trust by showing control.' },
+    { label: uiCopy('u_239b3777ef1cc841'), presenter_line: `Visit ${SAAS_URL} and see how SignalBoost can help your company turn scattered work into approved action.`, caption: `Visit ${SAAS_URL}`, visual_direction: 'End with the guide beside the branded URL, CTA button, and final product screen.', goal: 'Drive traffic to the SaaS platform.' },
   ],
 }
 
@@ -63,17 +65,17 @@ export default function CosaInstantVideoDraftPage() {
   const [message, setMessage] = useState('Loading SignalBoost AI presenter draft...')
 
   async function loadDraft() {
-    setMessage('Loading SignalBoost AI presenter draft...')
+    setMessage(uiCopy('u_1078aa1e8d1a45d7'))
     try {
       const res = await fetch('/api/cos/presenter-video', { cache: 'no-store' })
       const json = await res.json()
       if (!json.ok || !json.draft) throw new Error(json.error || 'No presenter draft returned.')
       setDraft(json.draft)
       setLoadedFromEngine(true)
-      setMessage('SignalBoost AI presenter draft loaded from COSA.')
+      setMessage(uiCopy('u_551e24bf19d16425'))
     } catch (err) {
       setLoadedFromEngine(false)
-      setMessage(err instanceof Error ? `Using fallback presenter draft: ${err.message}` : 'Using fallback presenter draft.')
+      setMessage(err instanceof Error ? `Using fallback presenter draft: ${err.message}` : uiCopy('u_fe435d717c148f44'))
     }
   }
 
@@ -103,32 +105,32 @@ export default function CosaInstantVideoDraftPage() {
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
       <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"COSA Video Draft Studio"} /></p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={"SignalBoost AI presenter video"} /></h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={"COSA now creates a presenter-led platform tour. The default host is SignalBoost AI, the official guide that opens the video, explains the problem, gives a quick product tour, and closes with a clear CTA."} /></p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_fb17b66829bef7fa')} /></p>
+        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}><LocalizedText fallback={uiCopy('u_712214ed27cfb57a')} /></h1>
+        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 880 }}><LocalizedText fallback={uiCopy('u_84b79cc56244ec48')} /></p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={loadDraft} style={primaryButton}><LocalizedText fallback={"Reload presenter draft"} /></button>
-          <a href="/dashboard/cosa/video" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Advanced campaign queue"} /></a>
-          <a href="/dashboard/cosa/video/quality" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Quality test"} /></a>
-          <a href="/dashboard/cosa/decision" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={"Marketing decision"} /></a>
+          <button onClick={loadDraft} style={primaryButton}><LocalizedText fallback={uiCopy('u_3282a5abdcc78c5f')} /></button>
+          <a href="/dashboard/cosa/video" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={uiCopy('u_493dd4b3e0185d83')} /></a>
+          <a href="/dashboard/cosa/video/quality" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={uiCopy('u_eff710048bb53ca3')} /></a>
+          <a href="/dashboard/cosa/decision" style={{ ...secondaryButton, textDecoration: 'none' }}><LocalizedText fallback={uiCopy('u_2321a95409a7148f')} /></a>
         </div>
       </section>
 
       <section style={statusCard}>
         <div>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>{loadedFromEngine ? 'COSA presenter engine active' : 'Fallback presenter draft'}</p>
-          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 22 }}>{draft.presenter_name} · {draft.duration_seconds}s tour</h2>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>{loadedFromEngine ? uiCopy('u_33822a6815eb2609') : uiCopy('u_800ea81694b39ad9')}</p>
+          <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 22 }}>{draft.presenter_name} · {draft.duration_seconds}{uiCopy('u_5b30db117bc3d526')}</h2>
           <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.6, margin: '8px 0 0' }}>{message}</p>
         </div>
         <div style={{ display: 'grid', gap: 8, minWidth: 240 }}>
-          <Badge label="Presenter" value={draft.presenter_name} />
-          <Badge label="Destination" value={draft.destination_url} />
-          <Badge label="Scenes" value={`${draft.scenes.length}`} />
+          <Badge label={uiCopy('u_dbc7ad1c6573114a')} value={draft.presenter_name} />
+          <Badge label={uiCopy('u_58b43ed746c99907')} value={draft.destination_url} />
+          <Badge label={uiCopy('u_15cf2fa7cef8b3ea')} value={`${draft.scenes.length}`} />
         </div>
       </section>
 
       <section style={finalDraftFrame}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Presenter-led video player</p>
+        <p className="sb-eyebrow" style={{ margin: 0 }}>{uiCopy('u_6f35dee185cd6973')}</p>
         <VideoPreviewRenderer title={draft.title} scenes={previewScenes} callToAction={draft.cta} />
       </section>
 
@@ -136,21 +138,21 @@ export default function CosaInstantVideoDraftPage() {
 
       <section style={gridTwo}>
         <section style={instructionCard}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Presenter storyboard"} /></p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_a57a39f1594e838b')} /></p>
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
             {draft.scenes.map((scene, index) => (
               <div key={`${scene.label}-${index}`} style={sceneCard}>
                 <strong style={{ color: '#fff' }}>{index + 1}. {scene.label}</strong>
                 <p style={{ color: GOLD, lineHeight: 1.55, margin: '6px 0 0', fontWeight: 850 }}>{scene.caption}</p>
                 <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.55, margin: '6px 0 0' }}>{scene.presenter_line}</p>
-                <p style={{ color: 'rgba(255,195,0,.86)', lineHeight: 1.45, margin: '6px 0 0', fontSize: 12 }}>Visual: {scene.visual_direction}</p>
+                <p style={{ color: 'rgba(255,195,0,.86)', lineHeight: 1.45, margin: '6px 0 0', fontSize: 12 }}>{uiCopy('u_217f2e85d7d076d7')}{scene.visual_direction}</p>
               </div>
             ))}
           </div>
         </section>
 
         <section style={instructionCard}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={"Final presenter script"} /></p>
+          <p className="sb-eyebrow" style={{ margin: 0 }}><LocalizedText fallback={uiCopy('u_abe7f470d96d9363')} /></p>
           <pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.82)', background: 'rgba(0,0,0,.26)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, fontSize: 12, lineHeight: 1.6, margin: '12px 0 0', maxHeight: 560, overflow: 'auto' }}>{finalDraft}</pre>
         </section>
       </section>

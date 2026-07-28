@@ -1,7 +1,8 @@
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
 const metrics = [
-  { value: '1,200+', label: 'Voice ads created' },
-  { value: '4.9★', label: 'Average rating' },
-  { value: '3x', label: 'Avg. engagement lift' },
+  { value: '1,200+', label: uiCopy('u_148d24cc79b85be9') },
+  { value: '4.9★', label: uiCopy('u_6ea5419d77cea9a9') },
+  { value: '3x', label: uiCopy('u_a271f20da3c24d29') },
 ]
 
 export default function Metrics() {

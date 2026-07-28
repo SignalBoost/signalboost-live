@@ -10,6 +10,8 @@ import { interpolate } from '@/lib/i18n/interpolate'
 import ProviderInventoryReport, { type ProviderInventoryView } from '@/components/audit/ProviderInventoryReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: ProviderInventoryView; error?: string }
@@ -32,7 +34,7 @@ export default function ProviderInventoryPage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.provider.loadError', 'Could not load the inventory.'))
+          setError((json && json.error) || t('audit.provider.loadError', uiCopy('u_58751ffd7e24cc30')))
           return
         }
         setData(json.report)
@@ -40,7 +42,7 @@ export default function ProviderInventoryPage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.provider.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.provider.fetchError', uiCopy('u_2da90cab18a6ea34')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -51,7 +53,7 @@ export default function ProviderInventoryPage() {
   if (loading) {
     return (
       <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.provider.loading', 'Loading provider inventory…')}
+        {t('audit.provider.loading', uiCopy('u_c9efd2b8cf0bf995'))}
       </main>
     )
   }

@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation'
 import EnterpriseIntegrationBuilder from '@/components/integration-builder/EnterpriseIntegrationBuilder'
 import { getAccess } from '@/lib/auth/access'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 export const metadata = {
-  title: 'Enterprise Integration Builder · SignalBoost',
-  description: 'No-code provider-backed integration blueprint builder.',
+  title: uiCopy('u_023955647b791864'),
+  description: uiCopy('u_9addb1e2352bbb56'),
 }
 
 export default async function EnterpriseIntegrationBuilderPage() {

@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Source = 'website_optimizer' | 'repo_check' | 'cybersecurity_check' | 'audit_preview'
@@ -25,19 +27,19 @@ type Copy = {
 
 const COPY: Record<Lang, Copy> = {
   en: {
-    back: 'SignalBoost',
-    badge: 'Next step',
-    title: 'Continue in SignalBoost to fix this.',
-    body: 'The free public tool already showed the signal. To get the issue fixed or turned into a full improvement workflow, continue to SignalBoost and sign up like any other customer.',
-    safe: 'No automatic email, no hidden follow-up, and no changes without approval.',
-    source: 'Tool used',
-    targetUrl: 'Website or repo checked',
-    company: 'Company',
-    optional: 'optional',
-    continue: 'Continue to SignalBoost',
-    pricing: 'View pricing',
-    note: 'Company information is optional. It only helps keep the context clear when you continue.',
-    options: { website_optimizer: 'Website Optimizer', repo_check: 'Repo / Audit Check', cybersecurity_check: 'Cybersecurity Check', audit_preview: 'Audit Preview' },
+    back: uiCopy('u_6fcc907ca85fa195'),
+    badge: uiCopy('u_955f627d3f0d1ab3'),
+    title: uiCopy('u_2eea4cf69900de3e'),
+    body: uiCopy('u_d1a3430896c4f98e'),
+    safe: uiCopy('u_2aa35256db9743ce'),
+    source: uiCopy('u_599c0ff7edcbe60f'),
+    targetUrl: uiCopy('u_260ddf859925c564'),
+    company: uiCopy('u_6a87da7b59cd42a8'),
+    optional: uiCopy('u_0c9374ecbf237cca'),
+    continue: uiCopy('u_d29fea77d4febfef'),
+    pricing: uiCopy('u_eb6a9b2653412666'),
+    note: uiCopy('u_42a076391aa8aaa3'),
+    options: { website_optimizer: uiCopy('u_717e2fca5cb3f31a'), repo_check: uiCopy('u_d349a544b5dc5f2b'), cybersecurity_check: uiCopy('u_2d857f9970381689'), audit_preview: uiCopy('u_b979d20197295c29') },
   },
   es: {
     back: 'SignalBoost',

@@ -22,6 +22,8 @@ import { useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { auditUiText } from '@/lib/i18n/auditUiCopy'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type Check = { id: string; title: string; passed: boolean; detail: string }
 type Run = { category: string; passed: boolean; checks: Check[]; auditEventTypes: string[]; summary: string }
@@ -45,9 +47,9 @@ export default function SupervisorAcceptancePage() {
       setRecord(payload)
       // 409 is a real answer, not a transport failure: it means a check failed, or the host
       // context could not be built. Only a non-JSON or network error is an error here.
-      if (!response.ok && !payload) setError(`${auditUiText(lang, 'Request failed')} (${response.status})`)
+      if (!response.ok && !payload) setError(`${auditUiText(lang, uiCopy('u_7ccc04956353c4be'))} (${response.status})`)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : auditUiText(lang, 'The request did not complete'))
+      setError(cause instanceof Error ? cause.message : auditUiText(lang, uiCopy('u_96295d47047129db')))
     } finally {
       setState('done')
     }
@@ -56,9 +58,9 @@ export default function SupervisorAcceptancePage() {
   const passed = record?.passed === true
 
   return <main style={{ padding: 24, maxWidth: 900 }}>
-    <h1 style={{ marginTop: 0 }}><LocalizedText fallback="Self-Healing Supervisor — acceptance" /></h1>
+    <h1 style={{ marginTop: 0 }}><LocalizedText fallback={uiCopy('u_86c038d54aaafe1d')} /></h1>
     <p style={muted}>
-      <LocalizedText fallback={"Runs one rehearsal incident per risk category against this deployment’s real wiring: a safe step executes, a consequential step must pause, the approver is notified through the real channel, and an audit trail is produced. Nothing consequential can execute — the dangerous step is required to pause. Approvers receive real email."} />
+      <LocalizedText fallback={uiCopy('u_98a86dffe59fc7cb')} />
     </p>
 
     <section style={panel}>
@@ -68,21 +70,21 @@ export default function SupervisorAcceptancePage() {
         disabled={state === 'running'}
         style={{ border: 0, borderRadius: 12, padding: '14px 20px', fontWeight: 900, fontSize: 15, cursor: state === 'running' ? 'wait' : 'pointer', color: '#07111f', background: '#f5c451' }}
       >
-        {state === 'running' ? <LocalizedText fallback="Running all three categories…" /> : <LocalizedText fallback="Run acceptance" />}
+        {state === 'running' ? <LocalizedText fallback={uiCopy('u_2ffaf1267da5961c')} /> : <LocalizedText fallback={uiCopy('u_9258ec35ce1ca77a')} />}
       </button>
-      {state === 'running' ? <p style={muted}><LocalizedText fallback="Sending real notifications. This takes a few seconds." /></p> : null}
+      {state === 'running' ? <p style={muted}><LocalizedText fallback={uiCopy('u_82bfd3314c068cf3')} /></p> : null}
       {error ? <p role="alert" style={{ color: '#ffb3c1', fontWeight: 700 }}>{error}</p> : null}
     </section>
 
     {record?.error ? <section style={{ ...panel, borderColor: '#ffb020' }}>
-      <h2 style={{ marginTop: 0, color: '#ffcf7a' }}><LocalizedText fallback="Not run" /></h2>
+      <h2 style={{ marginTop: 0, color: '#ffcf7a' }}><LocalizedText fallback={uiCopy('u_cb92953eac1ea34e')} /></h2>
       <p>{record.error}</p>
       {record.remedy ? <p style={muted}>{record.remedy}</p> : null}
     </section> : null}
 
     {record?.runs?.length ? <>
       <section style={{ ...panel, borderColor: passed ? '#38f2a4' : '#ff5c7a' }}>
-        <h2 style={{ marginTop: 0, color: passed ? '#71ffc1' : '#ff8ca2' }}>{passed ? <LocalizedText fallback="PASSED" /> : <LocalizedText fallback="FAILED" />}</h2>
+        <h2 style={{ marginTop: 0, color: passed ? '#71ffc1' : '#ff8ca2' }}>{passed ? <LocalizedText fallback={uiCopy('u_e550f0c93cc52a5d')} /> : <LocalizedText fallback={uiCopy('u_c871b08fa18d019f')} />}</h2>
         <p>{record.meaning}</p>
         {record.blocking?.length ? <ul>{record.blocking.map(item => <li key={item}>{item}</li>)}</ul> : null}
         <p style={muted}>{record.productName} · {record.ranAt}</p>
@@ -92,7 +94,7 @@ export default function SupervisorAcceptancePage() {
         <h3 style={{ marginTop: 0 }}>{item.category}</h3>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
           {item.checks.map(check => <li key={check.id}>
-            <strong style={{ color: check.passed ? '#71ffc1' : '#ff8ca2' }}>{check.passed ? <LocalizedText fallback="PASS" /> : <LocalizedText fallback="FAIL" />}</strong>{' '}
+            <strong style={{ color: check.passed ? '#71ffc1' : '#ff8ca2' }}>{check.passed ? <LocalizedText fallback={uiCopy('u_a4670dbaedfe9af6')} /> : <LocalizedText fallback={uiCopy('u_f46da2f57394a7f8')} />}</strong>{' '}
             {check.title}
             <div style={muted}>{check.detail}</div>
           </li>)}
@@ -100,8 +102,8 @@ export default function SupervisorAcceptancePage() {
       </section>)}
 
       <section style={panel}>
-        <h3 style={{ marginTop: 0 }}><LocalizedText fallback="Evidence record" /></h3>
-        <p style={muted}><LocalizedText fallback="This is the artifact that closes item 7 of the integration guide. Keep it." /></p>
+        <h3 style={{ marginTop: 0 }}><LocalizedText fallback={uiCopy('u_c50e58c44d637620')} /></h3>
+        <p style={muted}><LocalizedText fallback={uiCopy('u_ce93bd6dd12e77e2')} /></p>
         <textarea readOnly value={JSON.stringify(record, null, 2)} style={{ width: '100%', minHeight: 220, background: '#07111f', color: '#c3ccdf', border: '1px solid rgba(255,255,255,.14)', borderRadius: 10, padding: 12, fontFamily: 'ui-monospace, monospace', fontSize: 12 }} />
       </section>
     </> : null}

@@ -19,6 +19,8 @@ import {
   Project,
 } from '@/lib/projects'
 import { getGreeting, SupportedLocale } from '@/lib/cultural-calendar'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const BLUE = '#3b82f6'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
@@ -83,16 +85,16 @@ export default function DashboardOverviewPage() {
     if (!projectsLoaded) {
       return {
         icon: '🛰️',
-        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
-        message: t(dict, 'dash.concierge.loading', 'Loading your workspace and checking what needs attention.')
+        title: t(dict, 'dash.concierge.title', uiCopy('u_d8ac3b158ef95e30')),
+        message: t(dict, 'dash.concierge.loading', uiCopy('u_20d6dd5f4c3831c5'))
       }
     }
 
     if (projects.length === 0) {
       return {
         icon: '👋',
-        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
-        message: t(dict, 'dash.concierge.welcome', 'Welcome. Start by creating your first project, or ask SignalBoost what to build first.')
+        title: t(dict, 'dash.concierge.title', uiCopy('u_5ac5ed9c7976038a')),
+        message: t(dict, 'dash.concierge.welcome', uiCopy('u_0f90b87d32f1eab5'))
       }
     }
 
@@ -102,51 +104,51 @@ export default function DashboardOverviewPage() {
     if (draftProjects.length > 0) {
       return {
         icon: '🧭',
-        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+        title: t(dict, 'dash.concierge.title', uiCopy('u_999e24395f19f75e')),
         message: draftProjects.length > 1
-          ? t(dict, 'dash.concierge.drafts.many', 'You have {count} draft projects. Open one and publish when ready.').replace('{count}', String(draftProjects.length))
-          : t(dict, 'dash.concierge.drafts.one', 'You have 1 draft project. Open one and publish when ready.')
+          ? t(dict, 'dash.concierge.drafts.many', uiCopy('u_d903bcd9f41cba27')).replace('{count}', String(draftProjects.length))
+          : t(dict, 'dash.concierge.drafts.one', uiCopy('u_4711ea35d8a5a8a6'))
       }
     }
 
     if (liveProjects.length > 0) {
       return {
         icon: '🚀',
-        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+        title: t(dict, 'dash.concierge.title', uiCopy('u_6090fbcc1d3bbfa0')),
         message: liveProjects.length > 1
-          ? t(dict, 'dash.concierge.live.many', 'You have {count} live projects. Next step: promote, collect reviews, or create content.').replace('{count}', String(liveProjects.length))
-          : t(dict, 'dash.concierge.live.one', 'You have 1 live project. Next step: promote, collect reviews, or create content.')
+          ? t(dict, 'dash.concierge.live.many', uiCopy('u_ff1476b90fc636cc')).replace('{count}', String(liveProjects.length))
+          : t(dict, 'dash.concierge.live.one', uiCopy('u_91a4c2affccd691b'))
       }
     }
 
     return {
       icon: '💡',
-      title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
-      message: t(dict, 'dash.concierge.help', 'Need help choosing the next move? Ask SignalBoost below.')
+      title: t(dict, 'dash.concierge.title', uiCopy('u_47a5e6c9de50d7d3')),
+      message: t(dict, 'dash.concierge.help', uiCopy('u_578002b64088bb23'))
     }
   }, [dict, projects, projectsLoaded])
 
   const promptRef = useRef<HTMLDivElement>(null)
 
   const QUICK_ACTIONS = [
-    { type: 'website' as const, icon: '🌐', label: t(dict, 'dash.actions.website.label', 'Build a website'), subline: t(dict, 'dash.actions.website.subline', 'Create or edit your online presence'), href: '/dashboard/builder' },
-    { type: 'review' as const, icon: '⭐', label: t(dict, 'dash.actions.review.label', 'Collect reviews'), subline: t(dict, 'dash.actions.review.subline', 'Get feedback and testimonials'), href: '/dashboard/reviews' },
-    { type: 'podcast' as const, icon: '🎙️', label: t(dict, 'dash.actions.podcast.label', 'Generate native audio'), subline: t(dict, 'dash.actions.podcast.subline', 'Create voice content in multiple languages'), href: '/dashboard/audio' },
-    { type: 'video' as const, icon: '🎬', label: t(dict, 'dash.actions.video.label', 'Create videos'), subline: t(dict, 'dash.actions.video.subline', 'Turn content into visual assets'), href: '/dashboard/video' },
+    { type: 'website' as const, icon: '🌐', label: t(dict, 'dash.actions.website.label', uiCopy('u_a0b24f92e9133217')), subline: t(dict, 'dash.actions.website.subline', uiCopy('u_e9ead4cd40a02e00')), href: '/dashboard/builder' },
+    { type: 'review' as const, icon: '⭐', label: t(dict, 'dash.actions.review.label', uiCopy('u_da70fdf5fcdca570')), subline: t(dict, 'dash.actions.review.subline', uiCopy('u_326d63debe6da8da')), href: '/dashboard/reviews' },
+    { type: 'podcast' as const, icon: '🎙️', label: t(dict, 'dash.actions.podcast.label', uiCopy('u_f4b8bf83c09e0395')), subline: t(dict, 'dash.actions.podcast.subline', uiCopy('u_0372628b331222ef')), href: '/dashboard/audio' },
+    { type: 'video' as const, icon: '🎬', label: t(dict, 'dash.actions.video.label', uiCopy('u_99034581bc7afdd2')), subline: t(dict, 'dash.actions.video.subline', uiCopy('u_8f5d02a7b2580cfc')), href: '/dashboard/video' },
   ]
 
   const NEW_USER_PROMPTS = [
-    t(dict, 'dash.prompts.new.p1', 'What plan is right for me?'),
-    t(dict, 'dash.prompts.new.p2', 'How do I build my first website?'),
-    t(dict, 'dash.prompts.new.p3', 'What languages do you support?'),
-    t(dict, 'dash.prompts.new.p4', 'How does the free plan work?'),
+    t(dict, uiCopy('u_283fbeb48d06439f'), uiCopy('u_c56bb50df1fd4191')),
+    t(dict, uiCopy('u_32d6461c65a2c77f'), uiCopy('u_7ef09bb1674f2209')),
+    t(dict, uiCopy('u_984feb60a34b960c'), uiCopy('u_d1488603d5e379a6')),
+    t(dict, uiCopy('u_43d7dfd63c8f4414'), uiCopy('u_27428353f93db530')),
   ]
 
   const RETURNING_PROMPTS = [
-    t(dict, 'dash.prompts.returning.p1', 'How do I add a new language?'),
-    t(dict, 'dash.prompts.returning.p2', 'How do I upload a podcast episode?'),
-    t(dict, 'dash.prompts.returning.p3', 'How do I collect reviews?'),
-    t(dict, 'dash.prompts.returning.p4', 'How do I upgrade my plan?'),
+    t(dict, uiCopy('u_f99e2557f24136f5'), uiCopy('u_fc4e4df7d542e6d6')),
+    t(dict, uiCopy('u_ad98392e828fe39c'), uiCopy('u_fd1d7209f7d4c745')),
+    t(dict, uiCopy('u_9fecd7958f3df5a3'), uiCopy('u_78fbbd7e002436aa')),
+    t(dict, uiCopy('u_9168a1ae86c117f3'), uiCopy('u_aa233c9c3055c9d0')),
   ]
 
   useEffect(() => {
@@ -193,7 +195,7 @@ export default function DashboardOverviewPage() {
 
     const newMessages: Message[] = [
       ...promptMessages,
-      { role: 'user', content },
+      { role: uiCopy('u_2822e22665bb91ba'), content },
     ]
 
     setPromptMessages(newMessages)
@@ -220,7 +222,7 @@ export default function DashboardOverviewPage() {
         ...prev,
         {
           role: 'assistant',
-          content: data.reply || t(dict, 'dash.connectionError', 'Having trouble connecting. Please try again.'),
+          content: data.reply || t(dict, 'dash.connectionError', uiCopy('u_af9d0e957a5157ed')),
         },
       ])
 
@@ -232,7 +234,7 @@ export default function DashboardOverviewPage() {
         ...prev,
         {
           role: 'assistant',
-          content: t(dict, 'dash.connectionError', 'Having trouble connecting. Please try again.'),
+          content: t(dict, 'dash.connectionError', uiCopy('u_62b54d88e055fd23')),
         },
       ])
     }
@@ -256,11 +258,11 @@ export default function DashboardOverviewPage() {
     const hours = Math.floor(mins / 60)
     const days = Math.floor(hours / 24)
 
-    if (days > 0) return `${days}${t(dict, 'dash.time.daysShort', 'd')} ${t(dict, 'dash.time.ago', 'ago')}`
-    if (hours > 0) return `${hours}${t(dict, 'dash.time.hoursShort', 'h')} ${t(dict, 'dash.time.ago', 'ago')}`
-    if (mins > 0) return `${mins}${t(dict, 'dash.time.minsShort', 'm')} ${t(dict, 'dash.time.ago', 'ago')}`
+    if (days > 0) return `${days}${t(dict, 'dash.time.daysShort', 'd')} ${t(dict, 'dash.time.ago', uiCopy('u_e020bc7db895fe82'))}`
+    if (hours > 0) return `${hours}${t(dict, 'dash.time.hoursShort', 'h')} ${t(dict, 'dash.time.ago', uiCopy('u_f6edb238b3436b9e'))}`
+    if (mins > 0) return `${mins}${t(dict, 'dash.time.minsShort', 'm')} ${t(dict, 'dash.time.ago', uiCopy('u_aa7fd53ec401c906'))}`
 
-    return t(dict, 'dash.time.justNow', 'Just now')
+    return t(dict, 'dash.time.justNow', uiCopy('u_a5457d6a8a5ce636'))
   }
 
   const isNewUser = projectsLoaded && projects.length === 0
@@ -273,8 +275,8 @@ export default function DashboardOverviewPage() {
   const promptSuggestions = isNewUser ? NEW_USER_PROMPTS : RETURNING_PROMPTS
 
   const projectsTitle = firstName
-    ? t(dict, 'dash.projectsTitleNamed', "{name}'s projects").replace('{name}', firstName)
-    : t(dict, 'dash.projectsTitle', 'Your projects')
+    ? t(dict, 'dash.projectsTitleNamed', uiCopy('u_fe9337f4984a21e9')).replace('{name}', firstName)
+    : t(dict, 'dash.projectsTitle', uiCopy('u_3c977813be6ff01d'))
 
   const atLimit = projects.length >= projectLimit
   const greetingHidden = hasTyped || promptMessages.length > 0
@@ -291,53 +293,28 @@ export default function DashboardOverviewPage() {
   // termCase(value, lang) handles language-aware casing in render — so JSON
   // values should be NATURAL (e.g. "Quick actions"), not pre-shouted.
   const L = {
-    quickActions: t(dict, 'dash.preview.quickActions', 'Quick actions'),
-    yourProjects: t(dict, 'dash.preview.yourProjects', 'Your projects'),
-    createProject: t(dict, 'dash.preview.createProject', '+ Create project'),
-    openProject: t(dict, 'dash.preview.openProject', 'Open project'),
-    updated: t(dict, 'dash.preview.updated', 'Updated'),
-    execute: t(dict, 'dash.preview.execute', 'Execute inquiry'),
-    thinking: t(dict, 'dash.preview.thinking', 'Thinking…'),
-    thinkingMsg: t(dict, 'dash.preview.thinkingMsg', 'SignalBoost is thinking…'),
-    livePreview: t(dict, 'dash.preview.label', 'Live preview'),
-    close: t(dict, 'dash.preview.close', 'Close'),
-    openInBuilder: t(dict, 'dash.preview.openInBuilder', 'Open in builder →'),
-    upgrade: t(dict, 'dash.upgrade', 'Upgrade'),
-    team: t(dict, 'dash.team', 'Team'),
-    loadingTeam: t(dict, 'dash.loadingTeam', 'Loading team…'),
-    noProjects: t(dict, 'dash.noProjects', 'No projects yet'),
-    noProjectsSub: t(dict, 'dash.noProjectsSub', 'Create your first project above'),
-    feedback: t(dict, 'dash.feedback', 'Share feedback — every message helps improve SignalBoost'),
-    headlineFallback: t(dict, 'dash.sketch.headlineFallback', 'Your headline here'),
+    quickActions: t(dict, 'dash.preview.quickActions', uiCopy('u_ac45fa49dc9d61a8')),
+    yourProjects: t(dict, 'dash.preview.yourProjects', uiCopy('u_bf039b8d761e9b73')),
+    createProject: t(dict, 'dash.preview.createProject', uiCopy('u_0abe21f8dcca3b61')),
+    openProject: t(dict, 'dash.preview.openProject', uiCopy('u_957f1c1192a3df8a')),
+    updated: t(dict, 'dash.preview.updated', uiCopy('u_adc62c361a4390ab')),
+    execute: t(dict, 'dash.preview.execute', uiCopy('u_eaceadb56b59dd8a')),
+    thinking: t(dict, 'dash.preview.thinking', uiCopy('u_40f69f348ec0d58b')),
+    thinkingMsg: t(dict, 'dash.preview.thinkingMsg', uiCopy('u_910b5d13e3f09ad4')),
+    livePreview: t(dict, 'dash.preview.label', uiCopy('u_34e6fac40d879f3e')),
+    close: t(dict, 'dash.preview.close', uiCopy('u_e22e0ba8f7820440')),
+    openInBuilder: t(dict, 'dash.preview.openInBuilder', uiCopy('u_33eb46b827b10d70')),
+    upgrade: t(dict, 'dash.upgrade', uiCopy('u_38b9b7c8491c0960')),
+    team: t(dict, 'dash.team', uiCopy('u_0405d5430c14b459')),
+    loadingTeam: t(dict, 'dash.loadingTeam', uiCopy('u_64116e768be05aa3')),
+    noProjects: t(dict, 'dash.noProjects', uiCopy('u_fad08ae257c3edb3')),
+    noProjectsSub: t(dict, 'dash.noProjectsSub', uiCopy('u_4c107bc247a3a838')),
+    feedback: t(dict, 'dash.feedback', uiCopy('u_7ee9f2f1f650c8cd')),
+    headlineFallback: t(dict, 'dash.sketch.headlineFallback', uiCopy('u_750ec85e898b4641')),
   }
 return (
     <div style={{ color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
-      <style>{`
-        body {
-          background-color: #060913 !important;
-          background-image:
-            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(255, 195, 0, 0.05) 0px, transparent 50%) !important;
-          background-attachment: fixed;
-        }
-        .fathom-glass {
-          background: rgba(6, 9, 19, 0.61);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .terminal-text {
-          font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-        }
-        @keyframes shimmer {
-          0% { background-position: 0% center; }
-          100% { background-position: 300% center; }
-        }
-        @keyframes cardIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      <style>{uiCopy('u_a4ba98f7ce17ecde')}</style>
 
       {showLoginGate && <AuthModal onClose={() => {}} />}
 
@@ -389,11 +366,11 @@ return (
             </div>
 
             <button
-              onClick={() => { setPromptOpen(true); setPromptInput(t(dict, 'dash.prompt.nextAction', 'What should I do next?')) }}
+              onClick={() => { setPromptOpen(true); setPromptInput(t(dict, 'dash.prompt.nextAction', uiCopy('u_dd00bdf557b794bf'))) }}
               className="terminal-text"
               style={{ border: '1px solid rgba(255,195,0,.25)', background: 'rgba(255,195,0,.08)', color: GOLD, borderRadius: 999, padding: '9px 12px', fontSize: 10, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
-              {termCase(t(dict, 'dash.concierge.askNext', 'Ask next'), lang)}
+              {termCase(t(dict, 'dash.concierge.askNext', uiCopy('u_128aa5ed0b8398bb')), lang)}
             </button>
           </div>
 
@@ -413,7 +390,7 @@ return (
                 value={promptInput}
                 onChange={(e) => { setPromptInput(e.target.value); if (e.target.value.length > 0 && !hasTyped) setHasTyped(true) }}
                 onKeyDown={(e) => { if (e.key === 'Enter') sendPrompt() }}
-                placeholder={t(dict, 'dash.askPlaceholder', 'Ask SignalBoost anything…')}
+                placeholder={t(dict, 'dash.askPlaceholder', uiCopy('u_025bdbc9b47cb6c9'))}
                 className="terminal-text"
                 style={{ flex: 1, padding: '12px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }}
               />
@@ -539,10 +516,10 @@ return (
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 28 }}>
           {[
-            { label: t(dict, 'dash.stats.activeSites', 'Active sites'), value: projects.filter(p => p.status === 'live').length },
-            { label: t(dict, 'dash.stats.projects', 'Projects'), value: `${projects.length}/${projectLimit === 999 ? '∞' : projectLimit}` },
-            { label: t(dict, 'dash.stats.audioGenerated', 'Audio generated'), value: `0 ${t(dict, 'dash.stats.min', 'min')}` },
-            { label: t(dict, 'dash.stats.videosCreated', 'Videos created'), value: '0' },
+            { label: t(dict, 'dash.stats.activeSites', uiCopy('u_6f1bc9465f51e610')), value: projects.filter(p => p.status === 'live').length },
+            { label: t(dict, 'dash.stats.projects', uiCopy('u_6fdf2fb16d445375')), value: `${projects.length}/${projectLimit === 999 ? '∞' : projectLimit}` },
+            { label: t(dict, 'dash.stats.audioGenerated', uiCopy('u_8e282c2cf7050ba7')), value: `0 ${t(dict, 'dash.stats.min', uiCopy('u_832f1a45a905f06b'))}` },
+            { label: t(dict, 'dash.stats.videosCreated', uiCopy('u_ea9d210a5b776c73')), value: '0' },
           ].map(stat => (
             <div key={stat.label} className="fathom-glass" style={{ borderRadius: 12, padding: 16, background: 'rgba(6, 9, 19, 0.3)' }}>
               <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>

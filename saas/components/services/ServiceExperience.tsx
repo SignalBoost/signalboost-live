@@ -6,6 +6,8 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import type { ServiceCatalogItem } from '@/lib/services/catalog'
 import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 const panelStyle = {
   border: '1px solid rgba(255,255,255,.1)',
@@ -49,7 +51,7 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
   return (
     <main className="sb-page-shell sb-section">
       <section className="sb-glass" style={{ padding: 28, marginBottom: 22 }}>
-        <span className="sb-eyebrow">{t(dict, 'services.kicker', 'SignalBoost service')}</span>
+        <span className="sb-eyebrow">{t(dict, 'services.kicker', uiCopy('u_b5332c948a758c6c'))}</span>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 20, alignItems: 'center' }}>
           <div>
             <h1 className="sb-h1" style={{ marginTop: 10 }}><span aria-hidden="true">{service.icon}</span> {title}</h1>
@@ -57,7 +59,7 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
           </div>
           <div className="sb-cta-row">
             <Link className="sb-button-primary" href={service.dashboardHref}>{cta}</Link>
-            <Link className="sb-button-secondary" href="/pricing">{t(dict, 'services.comparePricing', 'Compare pricing')}</Link>
+            <Link className="sb-button-secondary" href="/pricing">{t(dict, 'services.comparePricing', uiCopy('u_08e36082f80d10db'))}</Link>
           </div>
         </div>
       </section>
@@ -66,37 +68,37 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 16 }}>
         <article style={panelStyle}>
-          <span className="sb-eyebrow">{t(dict, 'services.workflow', 'Guided workflow')}</span>
+          <span className="sb-eyebrow">{t(dict, 'services.workflow', uiCopy('u_2364361f99a1dfcc'))}</span>
           <ol className="sb-body" style={{ paddingLeft: 20, display: 'grid', gap: 10 }}>
             {steps.map((step) => <li key={step}>{step}</li>)}
           </ol>
         </article>
 
         <article style={panelStyle}>
-          <span className="sb-eyebrow">{t(dict, 'services.inputs', 'Inputs')}</span>
+          <span className="sb-eyebrow">{t(dict, 'services.inputs', uiCopy('u_6e4d5d009bf1449d'))}</span>
           <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
             {(service.inputType === 'url' || service.inputType === 'upload-url') && (
               <label className="sb-caption" style={{ display: 'grid', gap: 6 }}>
-                {t(dict, 'services.urlInput', 'URL input')}
-                <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com" style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(0,0,0,.25)', color: '#fff', padding: 12 }} />
+                {t(dict, 'services.urlInput', uiCopy('u_14ef1383e3d4a48a'))}
+                <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder={uiCopy('u_04008102db2e4ebc')} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(0,0,0,.25)', color: '#fff', padding: 12 }} />
               </label>
             )}
             {(service.inputType === 'upload' || service.inputType === 'upload-url') && (
               <label className="sb-caption" style={{ display: 'grid', gap: 6 }}>
-                {t(dict, 'services.uploadInput', 'Upload input')}
+                {t(dict, 'services.uploadInput', uiCopy('u_cc8f34f2d37183a1'))}
                 <input type="file" onChange={(event) => setFileName(event.target.files?.[0]?.name || '')} />
                 {fileName && <span>{fileName}</span>}
               </label>
             )}
             <label className="sb-caption" style={{ display: 'grid', gap: 6 }}>
-              {t(dict, 'services.briefInput', 'Brief')}
-              <textarea value={brief} onChange={(event) => setBrief(event.target.value)} rows={5} placeholder={t(dict, 'services.briefPlaceholder', 'Describe the goal, audience, offer, and preferred tone.')} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(0,0,0,.25)', color: '#fff', padding: 12 }} />
+              {t(dict, 'services.briefInput', uiCopy('u_18a0a57e62bac97f'))}
+              <textarea value={brief} onChange={(event) => setBrief(event.target.value)} rows={5} placeholder={t(dict, 'services.briefPlaceholder', uiCopy('u_e8593a7f9cacfde2'))} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(0,0,0,.25)', color: '#fff', padding: 12 }} />
             </label>
           </div>
         </article>
 
         <article style={panelStyle}>
-          <span className="sb-eyebrow">{t(dict, 'services.aiSuggestions', 'AI suggestions')}</span>
+          <span className="sb-eyebrow">{t(dict, 'services.aiSuggestions', uiCopy('u_7ec50b9a51e6e6ed'))}</span>
           <ul className="sb-body" style={{ paddingLeft: 18, display: 'grid', gap: 10 }}>
             {suggestions.map((suggestion) => <li key={suggestion}>{suggestion}</li>)}
           </ul>
@@ -106,12 +108,12 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
       <section className="sb-card" style={{ marginTop: 16, padding: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <span className="sb-eyebrow">{t(dict, 'services.resultsPanel', 'Results panel')}</span>
-            <h2 className="sb-h2" style={{ marginTop: 10 }}>{t(dict, 'services.resultsTitle', 'What SignalBoost prepares')}</h2>
+            <span className="sb-eyebrow">{t(dict, 'services.resultsPanel', uiCopy('u_5de93ff0d07f7730'))}</span>
+            <h2 className="sb-h2" style={{ marginTop: 10 }}>{t(dict, 'services.resultsTitle', uiCopy('u_ce0079583be2091e'))}</h2>
           </div>
           <div className="sb-cta-row">
-            <Link className="sb-button-primary" href={service.dashboardHref}>{mode === 'landing' ? cta : t(dict, 'services.generateResults', 'Generate results')}</Link>
-            <Link className="sb-button-secondary" href={service.landingHref}>{t(dict, 'services.viewLanding', 'View landing page')}</Link>
+            <Link className="sb-button-primary" href={service.dashboardHref}>{mode === 'landing' ? cta : t(dict, 'services.generateResults', uiCopy('u_40cb62f44dcf10f7'))}</Link>
+            <Link className="sb-button-secondary" href={service.landingHref}>{t(dict, 'services.viewLanding', uiCopy('u_55994cb254f8b6f5'))}</Link>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 16 }}>

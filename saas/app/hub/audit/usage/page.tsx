@@ -5,6 +5,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import UsageDashboard, { type UsageDashboardView } from '@/components/audit/UsageDashboard'
+import { uiCopy } from '@/lib/i18n/generatedUiCopy'
+
 
 type ApiResponse = { ok: boolean; report?: UsageDashboardView; error?: string }
 const wrap: CSSProperties = { minHeight: 'calc(100vh - 80px)' }
@@ -24,7 +26,7 @@ export default function UsagePage() {
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.usage.loadError', 'Could not load usage.'))
+          setError((json && json.error) || t('audit.usage.loadError', uiCopy('u_da29df94ccbe478f')))
           return
         }
         setData(json.report)
@@ -32,7 +34,7 @@ export default function UsagePage() {
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.usage.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.usage.fetchError', uiCopy('u_6b9df18065a9d2b3')), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -41,7 +43,7 @@ export default function UsagePage() {
   }, [t])
 
   if (loading) {
-    return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>{t('audit.usage.loading', 'Loading usage…')}</main>
+    return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>{t('audit.usage.loading', uiCopy('u_b9b8a72947749ccf'))}</main>
   }
   if (error) {
     return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>{error}</main>

@@ -45,7 +45,7 @@ export interface SupervisorDispatchRequest {
   executionDecision?: ExecutionDecision
   coordinationStore?: DispatchCoordinationStore
 }
-export type DispatchAuditEventType = 'dispatch_requested' | 'dispatch_rejected' | 'dispatch_started' | 'dispatch_completed' | 'dispatch_failed' | 'executor_missing' | 'duplicate_dispatch_rejected' | 'approval_continuation_accepted' | 'approval_continuation_rejected' | 'browser_adapter_started' | 'browser_package_created' | 'browser_package_rejected' | 'browser_dry_run_ready' | 'sandbox_execution_requested' | 'sandbox_package_promoted' | 'sandbox_execution_started' | 'sandbox_execution_paused' | 'sandbox_continuation_started' | 'sandbox_execution_completed' | 'sandbox_execution_failed' | 'sandbox_verification_failed' | 'dispatch_fenced'
+export type DispatchAuditEventType = 'dispatch_requested' | 'dispatch_rejected' | 'dispatch_started' | 'dispatch_completed' | 'dispatch_failed' | 'executor_missing' | 'duplicate_dispatch_rejected' | 'browser_adapter_started' | 'browser_package_created' | 'browser_package_rejected' | 'browser_dry_run_ready' | 'sandbox_execution_requested' | 'sandbox_package_promoted' | 'sandbox_execution_started' | 'sandbox_execution_paused' | 'sandbox_continuation_started' | 'sandbox_execution_completed' | 'sandbox_execution_failed' | 'sandbox_verification_failed' | 'dispatch_fenced'
 export interface DispatchAuditEvent { eventId: string; incidentId: string; dispatchId: string; eventType: DispatchAuditEventType; occurredAt: string; payload: Record<string, SerializableValue>; schemaVersion: string }
 export interface DispatchAuditSink { write(event: Readonly<DispatchAuditEvent>): Promise<void> | void }
 

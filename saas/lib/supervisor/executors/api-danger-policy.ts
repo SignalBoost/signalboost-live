@@ -60,6 +60,17 @@ function paused(step: RepairStep, provider: string, reason: string, capabilityMa
   }
 }
 
+/** Remove executable authority from a semantic mismatch, even after approval. */
+function nonApprovable(match: ApiCapabilityMatch, reason: string): ApiCapabilityMatch {
+  return {
+    actionId: match.actionId,
+    method: match.method,
+    resource: match.resource,
+    allowed: false,
+    reason,
+  }
+}
+
 export function classifyStep(
   step: RepairStep,
   targetProvider: string,
@@ -84,13 +95,16 @@ export function classifyStep(
 
     if (step.action === 'read' || step.action === 'verify') {
       if (capability.mutation) {
-        return paused(step, targetProvider, `${step.action} label cannot authorize a mutating capability.`, match)
+        const reason = `${step.action} label cannot authorize a mutating capability.`
+        return paused(step, targetProvider, reason, nonApprovable(match, reason))
       }
       if (capability.riskClass !== 'read_only') {
-        return paused(step, targetProvider, `${step.action} requires a read-only capability.`, match)
+        const reason = `${step.action} requires a read-only capability.`
+        return paused(step, targetProvider, reason, nonApprovable(match, reason))
       }
       if (!['GET', 'HEAD'].includes(match.method)) {
-        return paused(step, targetProvider, `${step.action} requires GET or HEAD, not ${match.method}.`, match)
+        const reason = `${step.action} requires GET or HEAD, not ${match.method}.`
+        return paused(step, targetProvider, reason, nonApprovable(match, reason))
       }
     }
 

@@ -2,8 +2,6 @@
 //
 // STATIC IDEAS LAYER — COS's stable beliefs about how this business works.
 // The owner revises these over time; COS only reads them, never edits them.
-// To teach COS a new source or a new sensitive action, edit THIS file.
-// No logic elsewhere needs to change.
 //
 // v1 matches objectives to beliefs by `signals` (term matching).
 // v2 will replace signal-matching with LLM semantic matching against `describes`.
@@ -39,8 +37,8 @@ export interface SafeInternalAction {
 }
 
 // Order = precedence. First belief whose signals match wins.
-// signalboost_public_website is first so "affiliates SHOWN on signalboostapp.com"
-// routes to the public site, while a bare "affiliates" routes to internal_database.
+// New-company / buyer discovery must route to the live public web before the
+// internal CRM belief. Existing saved leads still route to crm_or_leads.
 export const SOURCE_BELIEFS: readonly SourceBelief[] = [
   {
     id: 'signalboost_public_website',
@@ -68,13 +66,29 @@ export const SOURCE_BELIEFS: readonly SourceBelief[] = [
     mustUseTool: true,
   },
   {
+    id: 'live_public_website',
+    describes:
+      'Current public facts outside SignalBoost, including new-company discovery, buyer research, competitor information, market data, leadership, services, size, and public professional profiles.',
+    signals: [
+      'competitor', 'competitors', 'market', 'trending', 'latest',
+      'current price of', 'who is', 'news', 'on the web',
+      'potential buyer', 'potential buyers', 'design partner', 'design partners',
+      'prospect list', 'find companies', 'find businesses', 'find potential',
+      'qualified companies', 'qualification score', 'linkedin profile',
+      'managed service provider', 'managed cloud-service provider',
+      'cloud-focused msp', 'devops consultancy', 'sre consultancy',
+    ],
+    liveFactsOnly: true,
+    mustUseTool: true,
+  },
+  {
     id: 'crm_or_leads',
     describes:
-      'Sales/outreach pipeline — leads, prospects, partners to recruit, hotels, restaurants, agencies, contacts, outreach targets.',
+      'Existing saved sales and outreach records already inside SignalBoost — the lead pipeline, saved prospects, queued drafts, and known contacts. It is not a source for discovering new companies.',
     signals: [
-      'lead', 'leads', 'prospect', 'prospects', 'pipeline', 'outreach target',
-      'hotel', 'hotels', 'restaurant', 'restaurants', 'agency', 'agencies',
-      'partner with', 'partners with', 'find partners', 'contacts',
+      'my leads', 'existing leads', 'saved leads', 'lead pipeline', 'sales pipeline',
+      'saved prospects', 'existing prospects', 'outreach queue', 'queued outreach',
+      'outreach drafts', 'known contacts', 'contact records',
     ],
     liveFactsOnly: true,
     mustUseTool: true,
@@ -111,17 +125,6 @@ export const SOURCE_BELIEFS: readonly SourceBelief[] = [
       'visitor', 'visitors', 'traffic', 'conversion rate', 'conversions', 'seo',
       'funnel', 'funnels', 'attribution', 'campaign performance',
       'click-through', 'ctr', 'bounce rate', 'sessions',
-    ],
-    liveFactsOnly: true,
-    mustUseTool: true,
-  },
-  {
-    id: 'live_public_website',
-    describes:
-      'Current public facts OUTSIDE SignalBoost — competitor info, market data, anything on the live public web.',
-    signals: [
-      'competitor', 'competitors', 'market', 'trending', 'latest',
-      'current price of', 'who is', 'news', 'on the web',
     ],
     liveFactsOnly: true,
     mustUseTool: true,
@@ -187,8 +190,7 @@ export const CHANNEL_BELIEFS: readonly ChannelBelief[] = [
 
 // The reflex's editable target list. The approval-floor mechanism is fixed in
 // code; WHICH actions count as sensitive lives here so the owner can tune it.
-// COS may only read this and may only ESCALATE into it — never relax it. A
-// match here ALWAYS wins over SAFE_INTERNAL_ACTIONS below, no exceptions.
+// A match here ALWAYS wins over SAFE_INTERNAL_ACTIONS below, no exceptions.
 export const SENSITIVE_CATEGORIES: readonly SensitiveCategory[] = [
   { id: 'public-facing communication', describes: 'Anything published or shown publicly.', signals: ['publish', 'post ', 'go live', 'make a video', 'make a post', 'tweet', 'announce', 'launch'] },
   { id: 'email sending', describes: 'Sending email to anyone.', signals: ['send email', 'email them', 'send the email', 'send a campaign', 'blast'] },
@@ -205,12 +207,8 @@ export const SENSITIVE_CATEGORIES: readonly SensitiveCategory[] = [
   { id: 'contacting leads or customers', describes: 'Reaching out to people.', signals: ['contact', 'reach out', 'message them', 'partner with', 'partners with', 'cold email', 'dm them'] },
 ];
 
-// NEW: internal-only COSA operations. Nothing external happens, nothing is
-// spent, nothing leaves the private queue — so these may EXECUTE without
-// stopping for owner approval, matching "AI runs day-to-day, human only
-// starts and gives final approval." A SENSITIVE_CATEGORIES match always
-// overrides a match here — this list can only ever narrow the approval
-// floor for things that are provably safe, never widen what's exempt from it.
+// Internal-only COSA operations. Nothing external happens, nothing is spent,
+// and nothing leaves the private queue. A sensitive match above always wins.
 export const SAFE_INTERNAL_ACTIONS: readonly SafeInternalAction[] = [
   { id: 'draft preparation', describes: 'Drafting content that has not been sent or published anywhere.', signals: ['draft', 'prepare a draft', 'write a draft', 'draft script', 'draft a script', 'draft the'] },
   { id: 'content generation', describes: 'Generating scripts, storyboards, or copy variants inside the private queue.', signals: ['generate', 'write a script', 'write script', 'storyboard', 'outline'] },
@@ -219,9 +217,8 @@ export const SAFE_INTERNAL_ACTIONS: readonly SafeInternalAction[] = [
   { id: 'internal queueing', describes: 'Moving work between internal queue stages, never past the approval gate.', signals: ['queue', 'requeue', 'move to review', 'stage for approval'] },
 ];
 
-// Verbs that mean "do something in the world." Note: "find" is deliberately
-// EXCLUDED — research is not an action. So "find hotels" stays a read, but
-// "find hotels to partner with" trips because "partner with" is an action.
+// Verbs that mean "do something in the world." "find" remains excluded because
+// research is read-only. Negated verbs are filtered in reasoningCore.ts.
 export const ACTION_VERBS: readonly string[] = [
   'make', 'create', 'build', 'send', 'publish', 'post', 'launch', 'deploy',
   'update', 'change', 'delete', 'remove', 'add', 'set', 'run', 'charge',
@@ -229,8 +226,6 @@ export const ACTION_VERBS: readonly string[] = [
   'schedule', 'rotate', 'wipe', 'purge', 'drop',
 ];
 
-// Used by the router fallback: objective asks for a current fact but matched
-// no specific source.
 export const CURRENT_FACT_SIGNALS: readonly string[] = [
   'how many', 'how much', 'what is the current', 'count', 'number of',
   'right now', 'currently', 'today', 'latest',

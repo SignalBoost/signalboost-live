@@ -34,26 +34,10 @@ export interface OwnerNotifier {
   (input: { dispatchId: string; incidentId: string; step: RepairStep; verdict: DangerVerdict }): Promise<void> | void
 }
 
-const defaultRunner: ApiStepRunner = async (step, targetProvider) => {
-  try {
-    const { runUniversalProvider } = await import('@/lib/engine/universalRunner')
-    const p = (step.parameters || {}) as Record<string, SerializableValue>
-    const actionId = typeof p.actionId === 'string' ? p.actionId
-      : typeof p.action_id === 'string' ? p.action_id
-      : step.action
-    const result = await runUniversalProvider({
-      providerId: targetProvider,
-      actionId,
-      variables: p as Record<string, unknown>,
-    })
-    return {
-      ok: Boolean((result as { ok?: boolean }).ok),
-      summary: (result as { ok?: boolean }).ok ? `Provider ${targetProvider}/${actionId} responded ok.` : `Provider ${targetProvider}/${actionId} returned not-ok.`,
-    }
-  } catch (err) {
-    return { ok: false, summary: `Provider call failed: ${err instanceof Error ? err.message : 'unknown error'}` }
-  }
-}
+const missingRunner: ApiStepRunner = async () => ({
+  ok: false,
+  summary: 'No API runner was configured. Execution failed closed.',
+})
 
 export interface APIExecutorOptions {
   runner?: ApiStepRunner
@@ -70,7 +54,7 @@ export class APIExecutor implements SupervisorExecutor {
   private readonly approvalVerifier?: ApprovalContinuationVerifier
 
   constructor(options: APIExecutorOptions = {}) {
-    this.runner = options.runner ?? defaultRunner
+    this.runner = options.runner ?? missingRunner
     this.notifyOwner = options.notifyOwner
     this.capabilityRegistry = options.capabilityRegistry ?? emptyApiCapabilityRegistry
     this.approvalVerifier = options.approvalVerifier

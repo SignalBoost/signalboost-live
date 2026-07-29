@@ -1,18 +1,21 @@
 // saas/lib/supervisor/executors/approval-continuation.ts
 //
 // A consequential API step may execute only when the caller supplies a signed,
-// single-use continuation proof bound to the exact incident, plan, dispatch and
-// approved step scope. The verifier is host-agnostic: the buyer supplies its
-// approver public keys, durable nonce store and audit-event lookup.
+// single-use continuation proof bound to the exact incident, canonical plan
+// contents, fresh dispatch and approved step scope. The verifier is host-
+// agnostic: the buyer supplies approver public keys, a durable nonce store and
+// an audit-event lookup.
 
-import { verify as verifySignature } from 'node:crypto'
+import { createHash, verify as verifySignature } from 'node:crypto'
+import type { RepairPlan } from '../repair-plan-schema.ts'
 
-export const APPROVAL_CONTINUATION_SCHEMA_VERSION = 'supervisor-approval-continuation-v1'
+export const APPROVAL_CONTINUATION_SCHEMA_VERSION = 'supervisor-approval-continuation-v2'
 
 export interface ApprovalContinuationProof {
   schemaVersion: typeof APPROVAL_CONTINUATION_SCHEMA_VERSION
   incidentId: string
   planId: string
+  planFingerprint: string
   dispatchId: string
   approvedStepIds: string[]
   approverId: string
@@ -27,6 +30,7 @@ export interface ApprovalContinuationProof {
 export interface ApprovalContinuationContext {
   incidentId: string
   planId: string
+  planFingerprint: string
   dispatchId: string
   approvedStepIds: string[]
 }
@@ -36,6 +40,7 @@ export interface ApprovalContinuationVerdict {
   reason: string
   approverId?: string
   previousAuditEventId?: string
+  planFingerprint?: string
 }
 
 export interface ApprovalNonceStore {
@@ -54,6 +59,7 @@ export interface Ed25519ApprovalVerifierOptions {
     eventId: string
     incidentId: string
     planId: string
+    planFingerprint: string
     approvedStepIds: string[]
   }): Promise<boolean> | boolean
   now?: () => Date
@@ -68,6 +74,26 @@ function sameOrderedScope(left: readonly string[], right: readonly string[]): bo
   return left.length === right.length && left.every((value, index) => value === right[index])
 }
 
+function canonicalize(value: unknown): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, nested]) => nested !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => [key, canonicalize(nested)])
+    return Object.fromEntries(entries)
+  }
+  return String(value)
+}
+
+/** Stable SHA-256 identity for every execution-relevant plan field. */
+export function fingerprintRepairPlan(plan: RepairPlan): string {
+  const canonical = JSON.stringify(canonicalize(plan))
+  return `sha256:${createHash('sha256').update(canonical, 'utf8').digest('hex')}`
+}
+
 function unsignedProof(proof: ApprovalContinuationProof): Omit<ApprovalContinuationProof, 'signature'> {
   const { signature: _signature, ...unsigned } = proof
   return unsigned
@@ -80,6 +106,7 @@ export function canonicalApprovalPayload(proof: ApprovalContinuationProof): stri
     schemaVersion: value.schemaVersion,
     incidentId: value.incidentId,
     planId: value.planId,
+    planFingerprint: value.planFingerprint,
     dispatchId: value.dispatchId,
     approvedStepIds: [...value.approvedStepIds],
     approverId: value.approverId,
@@ -111,11 +138,13 @@ export function createEd25519ApprovalVerifier(options: Ed25519ApprovalVerifierOp
         if (!proof || proof.schemaVersion !== APPROVAL_CONTINUATION_SCHEMA_VERSION) return invalid('approval proof schema is unsupported')
         if (!Array.isArray(proof.approvedStepIds) || proof.approvedStepIds.length === 0) return invalid('approval proof scope is empty')
         if (new Set(proof.approvedStepIds).size !== proof.approvedStepIds.length) return invalid('approval proof scope contains duplicate step IDs')
-        for (const field of ['incidentId', 'planId', 'dispatchId', 'approverId', 'approvedAt', 'expiresAt', 'nonce', 'keyId', 'previousAuditEventId', 'signature'] as const) {
+        for (const field of ['incidentId', 'planId', 'planFingerprint', 'dispatchId', 'approverId', 'approvedAt', 'expiresAt', 'nonce', 'keyId', 'previousAuditEventId', 'signature'] as const) {
           if (!nonEmpty(proof[field])) return invalid(`approval proof is missing ${field}`)
         }
+        if (!/^sha256:[a-f0-9]{64}$/.test(proof.planFingerprint)) return invalid('approval proof plan fingerprint is invalid')
         if (proof.incidentId !== context.incidentId) return invalid('approval proof incident does not match')
         if (proof.planId !== context.planId) return invalid('approval proof plan does not match')
+        if (proof.planFingerprint !== context.planFingerprint) return invalid('approval proof plan contents do not match')
         if (proof.dispatchId !== context.dispatchId) return invalid('approval proof dispatch does not match')
         if (!sameOrderedScope(proof.approvedStepIds, context.approvedStepIds)) return invalid('approval proof scope does not exactly match')
 
@@ -136,9 +165,10 @@ export function createEd25519ApprovalVerifier(options: Ed25519ApprovalVerifierOp
           eventId: proof.previousAuditEventId,
           incidentId: proof.incidentId,
           planId: proof.planId,
+          planFingerprint: proof.planFingerprint,
           approvedStepIds: [...proof.approvedStepIds],
         })
-        if (!eventExists) return invalid('approval proof does not reference a valid prior pause event')
+        if (!eventExists) return invalid('approval proof does not reference a valid prior pause event for this exact plan')
 
         const consumed = await options.nonceStore.consume(proof.nonce, proof.expiresAt)
         if (!consumed) return invalid('approval proof nonce was already used')
@@ -148,6 +178,7 @@ export function createEd25519ApprovalVerifier(options: Ed25519ApprovalVerifierOp
           reason: 'signed approval continuation accepted',
           approverId: proof.approverId,
           previousAuditEventId: proof.previousAuditEventId,
+          planFingerprint: proof.planFingerprint,
         }
       } catch (error) {
         return invalid(`approval proof validation failed: ${error instanceof Error ? error.message : 'unknown error'}`)

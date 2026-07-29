@@ -49,6 +49,22 @@ export interface ObservationCopy {
     retryAfterBackoff: string
     rejectedByPolicy: string
   }
+  diagnoses: {
+    deploymentFailed: string
+    repeatedFailure: string
+    stuckDeployment: string
+    canceledProduction: string
+    unknownState: string
+    apiUnavailable: string
+    authFailed: string
+    unsupported: string
+  }
+  verification: {
+    readFailed: string
+    rejected: string
+    failedWithReasons: string
+    verifyReadOnly: string
+  }
   evidence: {
     deploymentState: string
     eventsRead: string
@@ -84,6 +100,22 @@ const COPY: Record<SupervisorLocale, ObservationCopy> = {
       retryAfterBackoff: 'Retry read-only Vercel status/deployment reads after the bounded observer backoff window.',
       rejectedByPolicy: 'Ownership, policy, or scope validation rejected the run.',
     },
+    diagnoses: {
+      deploymentFailed: 'A deployment failed. Diagnose from the latest failed deployment, its events, and sanitized logs before proposing any repair.',
+      repeatedFailure: 'Multiple recent deployments failed consecutively. Compare the failed deployments and logs to identify a shared root cause.',
+      stuckDeployment: 'A deployment appears stuck beyond the configured threshold. Confirm current provider state and events before any intervention.',
+      canceledProduction: 'A production deployment was canceled. Inspect production aliases to determine whether live traffic is affected before any recovery action.',
+      unknownState: 'The provider returned an unknown deployment state. Fail closed and gather read-only details for human review.',
+      apiUnavailable: 'Provider read APIs are unavailable or rate-limited. Do not infer an application repair until provider reads recover.',
+      authFailed: 'The observer cannot authenticate. Treat this as provider connection configuration work requiring protected approval.',
+      unsupported: 'Unsupported incident shape. Fail closed and request human review.',
+    },
+    verification: {
+      readFailed: 'A required read-only evidence read failed.',
+      rejected: 'Ownership, policy, or scope validation rejected the run.',
+      failedWithReasons: 'Verification failed: {reasons}',
+      verifyReadOnly: 'Verification uses read-only observations only.',
+    },
     evidence: {
       deploymentState: 'Deployment {id} state is {state}.',
       eventsRead: 'Read {count} deployment events/log entries for {id}.',
@@ -116,6 +148,22 @@ const COPY: Record<SupervisorLocale, ObservationCopy> = {
       unsupportedProvider: 'Proveedor o tipo de incidente no admitido.',
       retryAfterBackoff: 'Reintentar las lecturas de solo lectura tras la ventana de espera acotada del observador.',
       rejectedByPolicy: 'La validación de propiedad, política o alcance rechazó la ejecución.',
+    },
+    diagnoses: {
+      deploymentFailed: 'Un despliegue falló. Diagnostique a partir del último despliegue fallido, sus eventos y los registros saneados antes de proponer cualquier reparación.',
+      repeatedFailure: 'Varios despliegues recientes fallaron consecutivamente. Compare los despliegues fallidos y los registros para identificar una causa raíz común.',
+      stuckDeployment: 'Un despliegue parece bloqueado más allá del umbral configurado. Confirme el estado actual del proveedor y los eventos antes de intervenir.',
+      canceledProduction: 'Se canceló un despliegue de producción. Inspeccione los alias de producción para determinar si el tráfico activo está afectado antes de cualquier recuperación.',
+      unknownState: 'El proveedor devolvió un estado de despliegue desconocido. Falle de forma cerrada y recopile detalles de solo lectura para revisión humana.',
+      apiUnavailable: 'Las API de lectura del proveedor no están disponibles o están limitadas. No infiera una reparación hasta que se recuperen las lecturas.',
+      authFailed: 'El observador no puede autenticarse. Trátelo como configuración de la conexión del proveedor, que requiere aprobación protegida.',
+      unsupported: 'Forma de incidente no admitida. Falle de forma cerrada y solicite revisión humana.',
+    },
+    verification: {
+      readFailed: 'Falló una lectura de evidencia de solo lectura requerida.',
+      rejected: 'La validación de propiedad, política o alcance rechazó la ejecución.',
+      failedWithReasons: 'La verificación falló: {reasons}',
+      verifyReadOnly: 'La verificación usa únicamente observaciones de solo lectura.',
     },
     evidence: {
       deploymentState: 'El estado del despliegue {id} es {state}.',
@@ -150,6 +198,22 @@ const COPY: Record<SupervisorLocale, ObservationCopy> = {
       retryAfterBackoff: 'Repetir as leituras só de leitura após a janela de espera limitada do observador.',
       rejectedByPolicy: 'A validação de propriedade, política ou âmbito rejeitou a execução.',
     },
+    diagnoses: {
+      deploymentFailed: 'Uma implantação falhou. Diagnostique a partir da última implantação falhada, dos seus eventos e dos registos sanitizados antes de propor qualquer reparação.',
+      repeatedFailure: 'Várias implantações recentes falharam consecutivamente. Compare as implantações falhadas e os registos para identificar uma causa raiz comum.',
+      stuckDeployment: 'Uma implantação parece bloqueada além do limite configurado. Confirme o estado atual do fornecedor e os eventos antes de intervir.',
+      canceledProduction: 'Uma implantação de produção foi cancelada. Inspecione os aliases de produção para determinar se o tráfego ativo é afetado antes de qualquer recuperação.',
+      unknownState: 'O fornecedor devolveu um estado de implantação desconhecido. Falhe de forma fechada e recolha detalhes só de leitura para revisão humana.',
+      apiUnavailable: 'As APIs de leitura do fornecedor estão indisponíveis ou limitadas. Não infira uma reparação até as leituras recuperarem.',
+      authFailed: 'O observador não consegue autenticar-se. Trate isto como configuração da ligação ao fornecedor, exigindo aprovação protegida.',
+      unsupported: 'Forma de incidente não suportada. Falhe de forma fechada e peça revisão humana.',
+    },
+    verification: {
+      readFailed: 'Falhou uma leitura de evidência só de leitura necessária.',
+      rejected: 'A validação de propriedade, política ou âmbito rejeitou a execução.',
+      failedWithReasons: 'A verificação falhou: {reasons}',
+      verifyReadOnly: 'A verificação usa apenas observações só de leitura.',
+    },
     evidence: {
       deploymentState: 'O estado da implantação {id} é {state}.',
       eventsRead: 'Foram lidos {count} eventos ou entradas de registo da implantação {id}.',
@@ -183,6 +247,22 @@ const COPY: Record<SupervisorLocale, ObservationCopy> = {
       retryAfterBackoff: 'Ponów odczyty tylko do odczytu po ograniczonym oknie oczekiwania obserwatora.',
       rejectedByPolicy: 'Walidacja własności, polityki lub zakresu odrzuciła przebieg.',
     },
+    diagnoses: {
+      deploymentFailed: 'Wdrożenie nie powiodło się. Postaw diagnozę na podstawie ostatniego nieudanego wdrożenia, jego zdarzeń i oczyszczonych logów, zanim zaproponujesz naprawę.',
+      repeatedFailure: 'Kilka ostatnich wdrożeń nie powiodło się po kolei. Porównaj nieudane wdrożenia i logi, aby znaleźć wspólną przyczynę źródłową.',
+      stuckDeployment: 'Wdrożenie wydaje się zablokowane poza skonfigurowanym progiem. Potwierdź bieżący stan dostawcy i zdarzenia przed jakąkolwiek interwencją.',
+      canceledProduction: 'Wdrożenie produkcyjne zostało anulowane. Sprawdź aliasy produkcyjne, aby ustalić, czy ruch produkcyjny jest dotknięty, zanim podejmiesz działania naprawcze.',
+      unknownState: 'Dostawca zwrócił nieznany stan wdrożenia. Zatrzymaj się bezpiecznie i zbierz dane tylko do odczytu do weryfikacji przez człowieka.',
+      apiUnavailable: 'API odczytu dostawcy są niedostępne lub ograniczone. Nie wnioskuj o naprawie, dopóki odczyty nie wrócą.',
+      authFailed: 'Obserwator nie może się uwierzytelnić. Potraktuj to jako konfigurację połączenia z dostawcą, wymagającą chronionego zatwierdzenia.',
+      unsupported: 'Nieobsługiwana postać incydentu. Zatrzymaj się bezpiecznie i poproś o weryfikację przez człowieka.',
+    },
+    verification: {
+      readFailed: 'Wymagany odczyt dowodów tylko do odczytu nie powiódł się.',
+      rejected: 'Walidacja własności, polityki lub zakresu odrzuciła przebieg.',
+      failedWithReasons: 'Weryfikacja nie powiodła się: {reasons}',
+      verifyReadOnly: 'Weryfikacja opiera się wyłącznie na obserwacjach tylko do odczytu.',
+    },
     evidence: {
       deploymentState: 'Stan wdrożenia {id} to {state}.',
       eventsRead: 'Odczytano {count} zdarzeń lub wpisów logu dla wdrożenia {id}.',
@@ -215,6 +295,22 @@ const COPY: Record<SupervisorLocale, ObservationCopy> = {
       unsupportedProvider: 'Неподдерживаемый поставщик или тип инцидента.',
       retryAfterBackoff: 'Повторить чтение только для чтения после ограниченного окна ожидания наблюдателя.',
       rejectedByPolicy: 'Проверка владения, политики или области действия отклонила запуск.',
+    },
+    diagnoses: {
+      deploymentFailed: 'Развёртывание завершилось неудачей. Поставьте диагноз по последнему неудавшемуся развёртыванию, его событиям и очищенным журналам, прежде чем предлагать восстановление.',
+      repeatedFailure: 'Несколько последних развёртываний подряд завершились неудачей. Сравните их и журналы, чтобы найти общую первопричину.',
+      stuckDeployment: 'Развёртывание выглядит зависшим сверх заданного порога. Подтвердите текущее состояние у поставщика и события до любого вмешательства.',
+      canceledProduction: 'Продакшен-развёртывание было отменено. Проверьте продакшен-алиасы, чтобы определить, затронут ли рабочий трафик, до любых действий по восстановлению.',
+      unknownState: 'Поставщик вернул неизвестное состояние развёртывания. Безопасно остановитесь и соберите данные только для чтения для проверки человеком.',
+      apiUnavailable: 'API чтения поставщика недоступны или ограничены. Не делайте выводов о восстановлении, пока чтение не восстановится.',
+      authFailed: 'Наблюдатель не может пройти аутентификацию. Считайте это настройкой подключения поставщика, требующей защищённого согласования.',
+      unsupported: 'Неподдерживаемая форма инцидента. Безопасная остановка и запрос проверки человеком.',
+    },
+    verification: {
+      readFailed: 'Требуемое чтение данных только для чтения не удалось.',
+      rejected: 'Проверка владения, политики или области действия отклонила запуск.',
+      failedWithReasons: 'Проверка не пройдена: {reasons}',
+      verifyReadOnly: 'Проверка использует только наблюдения в режиме чтения.',
     },
     evidence: {
       deploymentState: 'Состояние развёртывания {id} — {state}.',

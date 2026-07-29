@@ -37,7 +37,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const TABLE = 'supervisor_demo_records'
-const KINDS = new Set(['rehearsal', 'drill'])
+const KINDS = new Set(['rehearsal', 'drill', 'production'])
 const DEFAULT_EXPIRY_DAYS = 30
 const MAX_EXPIRY_DAYS = 180
 
@@ -49,11 +49,22 @@ const REDACTED_KEYS = new Set([
   'teamId', 'token', 'url',
 ])
 
+// Values that identify real infrastructure. Masked rather than removed, because the fact that
+// a specific deployment was identified is the evidence; which deployment it was is not.
+const MASK_PATTERNS: Array<[RegExp, string]> = [
+  [/\bdpl_[A-Za-z0-9]+/g, 'dpl_[redacted]'],
+  [/\bprj_[A-Za-z0-9]+/g, 'prj_[redacted]'],
+  [/\bteam_[A-Za-z0-9]+/g, 'team_[redacted]'],
+  [/\b[a-z0-9-]+\.vercel\.app\b/g, '[redacted host]'],
+]
+
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
 const URL_LIKE = /https?:\/\/[^\s"')]+/g
 
 function scrubString(value: string): string {
-  return value.replace(EMAIL, '[redacted address]').replace(URL_LIKE, '[redacted url]')
+  let out = value.replace(EMAIL, '[redacted address]').replace(URL_LIKE, '[redacted url]')
+  for (const [pattern, replacement] of MASK_PATTERNS) out = out.replace(pattern, replacement)
+  return out
 }
 
 function redact(value: unknown, depth = 0): unknown {
@@ -90,7 +101,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: false,
       error: `kind must be one of: ${[...KINDS].join(', ')}`,
-      note: 'Production repair history is not publishable — it describes real infrastructure.',
+      note: 'Publishable kinds are a rehearsal, a drill, or a production run with identifiers masked.',
     }, { status: 400 })
   }
 
@@ -100,7 +111,8 @@ export async function POST(req: NextRequest) {
   }
 
   const days = Math.min(Math.max(Number(body.expiresInDays ?? DEFAULT_EXPIRY_DAYS) || DEFAULT_EXPIRY_DAYS, 1), MAX_EXPIRY_DAYS)
-  const title = String(body.title || (kind === 'rehearsal' ? 'Approval rehearsal' : 'Incident drill')).slice(0, 200)
+  const defaultTitle = kind === 'rehearsal' ? 'Approval rehearsal' : kind === 'drill' ? 'Incident drill' : 'Production incident'
+  const title = String(body.title || defaultTitle).slice(0, 200)
 
   const payload = redact(record) as Record<string, unknown>
   const shareToken = randomBytes(24).toString('hex')

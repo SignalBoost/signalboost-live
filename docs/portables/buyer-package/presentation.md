@@ -1,153 +1,151 @@
 <!-- docs/portables/buyer-package/presentation.md -->
 
-# Self-Healing Supervisor
+# Self-Healing Supervisor — Design-Partner Evaluation
 
-**Incident remediation that runs inside your environment — and stops for a human before it
-does anything consequential.**
+**Buyer-hosted incident supervision with explicit capability validation, named-human approval, signed continuation, and audit evidence.**
 
-*Prepared by SignalBoost · Luis de Andrade, Founder · support@signalboostapp.com*
-
----
-
-> Prices below are list. The pilot terms are the standard offer. Change them deliberately if a
-> particular deal warrants it — but send this as it stands rather than with blanks in it.
+*Prepared by SignalBoost · technical evaluation material · not an offer or production commitment*
 
 ---
 
-## 1. In one paragraph
+## 1. The problem
 
-An alert fires from the monitoring you already run. The supervisor authenticates it,
-deduplicates it, diagnoses the incident, and produces a repair plan with verification steps.
-It classifies every step by risk. Safe steps run immediately with nobody watching. Anything
-consequential — credentials, deletion, permissions, money — stops and waits for a named
-person to approve it. Approved steps execute through a runner your team supplies. Results are
-checked against the plan rather than assumed. Every action, decision and refusal is written
-to your SIEM.
+Automated remediation becomes dangerous when an AI-generated description, an unfamiliar provider action, or a broad approval can reach production systems without a precise technical boundary.
 
-## 2. Why this is not another AIOps tool
+The Self-Healing Supervisor evaluation is designed to answer one question with evidence:
 
-**It runs inside your infrastructure.** No service of ours in the path. No account with us.
-No telemetry. We cannot see your incidents, and could not if we wanted to.
+> Can a buyer keep routine reversible actions bounded while forcing every unknown or consequential action through a named-human, exact-scope approval path?
 
-That removes most of a standard vendor security review, because the questions have no subject
-matter: no data processing agreement over data we never receive, no subprocessor list, no
-vendor-side breach notification, no uptime commitment on a service that does not exist.
+## 2. The evaluation architecture
 
-**The approval gate is a property, not a setting.** There is no edition, configuration or
-licence state in which a consequential step executes without a named human approving it. We
-do not sell a cheaper version that skips it.
-
-**Your people are written to in their own language.** Approval requests, diagnoses, plan steps
-and evidence are produced in English, Spanish, Portuguese, Polish or Russian, set once in
-configuration. Audit event types and step identifiers are identical in every language, so your
-SIEM rules and reports are unaffected.
-
-**Nothing is gated that shouldn't be.** Receiving, recording and auditing incidents work even
-with no licence installed at all. A licence controls diagnosis and dispatch — never your
-visibility into your own systems.
-
-## 3. Installing it
-
-```bash
-npm install ./signalboost-self-healing-supervisor-1.0.0.tgz
+```text
+buyer incident source
+→ authentication, normalization, deduplication
+→ repair-plan proposal
+→ policy decision
+→ explicit provider/action capability validation
+→ pause unknown or consequential work
+→ named-human approval
+→ signed exact-scope continuation
+→ buyer-controlled runner
+→ read-only verification
+→ buyer audit/SIEM
 ```
 
-A Node package. **Zero third-party dependencies** — Node built-ins only. Nothing to audit
-beyond the product itself, and no transitive supply chain arriving with it.
+The vendor operates no control plane in this path and receives no telemetry from it.
 
-You write one file: a host adapter implementing `HostContext`. It supplies your secrets
-store, your datastore for the dispatch ledger, your notification channel, your SIEM sink, and
-the executor that touches your systems. That adapter is the entire integration surface, and
-it is why the product is portable rather than merely configurable — your infrastructure stays
-yours, and none of ours appears in it.
+## 3. What authorizes execution
 
-Budget roughly half a day of one engineer's time to first incident.
+Descriptions and keywords do not authorize execution.
 
-## 4. Evidence you can check
+A routine action can run automatically only when all of these match an explicit buyer registration:
 
-**A real production incident, detected unattended.** On 29 July 2026 a production deployment
-was cancelled. Nobody reported it. Within the observation window the supervisor detected it,
-classified it as `VERCEL_CANCELED` at warning severity, produced a plan, evaluated policy,
-resolved a read-only capability, dispatched an inspection, read the deployment and its
-production aliases, verified the diagnosis against that evidence, and wrote fourteen audit
-events.
+- provider;
+- stable action ID;
+- HTTP method;
+- resource pattern;
+- parameter schema, including nested values;
+- reversible risk classification;
+- automatic-execution flag;
+- execution limit.
 
-**A rehearsal across three risk categories.** One scripted incident each for financial,
-destructive and credential-security risk, run against real wiring: fifteen checks, all
-passing. The consequential step paused every time. The approver was notified through a real
-channel. An audit trail was produced. Had the dangerous step ever executed, the run would
-have reported FAILED.
+Everything unknown pauses by default.
 
-Ask for a share link to either. It opens without an account.
+## 4. What happens after approval
 
-## 5. What it will not do
+A consequential action resumes only when an Ed25519-signed continuation validates the exact:
 
-Stated here rather than discovered in your review.
+- incident ID;
+- plan ID;
+- fresh continuation dispatch ID;
+- ordered approved step IDs;
+- approver identity;
+- approval and expiration times;
+- one-time nonce;
+- signing key ID;
+- prior pause audit-event ID.
 
-**It ships no execution runner.** Repair steps run through code your team supplies. Until you
-provide one, the supervisor receives, diagnoses, gates, verifies and audits — then reports
-honestly that nothing was repaired, rather than claiming a fix that did not happen.
+Modification, expiration, missing audit binding, unknown key, invalid signature, extra scope, and nonce replay fail closed before the buyer runner.
 
-**Monitoring adapters are mapped but unproven against live traffic.** Datadog, PagerDuty,
-CloudWatch, Alertmanager, Splunk, Azure Monitor, Grafana and Google Cloud Operations are each
-mapped against fixtures. Your first alert is the first time that mapping meets a real payload
-from your account.
+## 5. Buyer-hosted boundary
 
-**No SOC 2 report, no ISO 27001, no third-party penetration test.**
+The buyer supplies:
 
-**No unattended retry.** Recovery actions require a person to start them.
+- secret manager;
+- notification sink;
+- named approver directory;
+- product branding and locale;
+- durable dispatch ledger;
+- durable approval nonce store;
+- audit repository and SIEM transport;
+- provider capability registry;
+- provider API runner;
+- approval public-key directory;
+- repair-plan thinker and read-only verifier;
+- licence token and accepted issuer keys.
 
-**Seat and execution limits are contract terms, not technical controls.** The software records
-them and does not enforce them.
+Paid planning and dispatch are constructed only through the packaged `createLicensedSelfHealingSupervisor` factory.
 
-## 6. Editions
+Because the buyer receives source, licence enforcement is contractual rather than tamper-proof.
 
-| | Standard | Enterprise |
-| --- | --- | --- |
-| Intake, diagnosis, policy gating, approval routing, audit | ✓ | ✓ |
-| Repair steps through your API runner | ✓ | ✓ |
-| Repair steps driven through a browser runtime | | ✓ |
+## 6. Package evidence
 
-The boundary is real rather than commercial: browser-driven steps need a Chromium runtime
-somebody has to operate.
+The canonical release workflow must produce and validate one evidence set:
 
-## 7. Commercials
+- compiled JavaScript;
+- `.d.ts` declarations;
+- manifest with source commit and file hashes;
+- CycloneDX SBOM;
+- package and archive checksums;
+- clean installation into a fresh project;
+- public package import;
+- focused release-blocker regression tests;
+- five notification languages;
+- three consequential risk categories.
 
-**Enterprise — $48,000 per production environment, per year.**
+The package is rejected if any step fails.
 
-**Standard — $30,000 per production environment, per year.**
+## 7. Current version and positioning
 
-Before that, a **60-day pilot at no cost**, running against a real environment of yours, so the
-decision rests on evidence rather than a demonstration. First-year pricing is negotiable for a
-design partner willing to act as a reference.
+The current release is:
 
-During the pilot: support with defined response targets by severity, a named security contact
-for vulnerability reports, and a short pilot agreement your counsel and ours work from. The
-full support terms and the draft agreement are attached separately.
+```text
+@signalboost/self-healing-supervisor 1.0.0-rc.2
+```
 
-## 8. What happens next
+It is a **design-partner evaluation**, not production `1.0.0` and not a production licence grant.
 
-1. **A 30-minute session.** A live incident run in front of you — diagnosis, the step that
-   refuses to execute, the approval request arriving, the record it leaves.
-2. **Your engineers, half a day.** The integration guide and the host-adapter interface.
-3. **A pilot.** Your environment, your monitoring, your approvers, your data. We see none of
-   it.
+Accurate positioning:
 
-**Luis de Andrade · Founder, SignalBoost · support@signalboostapp.com**
+> Buyer-hosted incident intake, diagnosis, explicit capability validation, approval routing, signed exact-scope continuation, bounded buyer-runner execution, read-only verification, and audit evidence.
 
----
+## 8. What is not yet proven
 
-## The rest of the documentation
+- clean external acceptance by a buyer or independent evaluator;
+- real provider runners and capability registrations;
+- durable nonce behavior under buyer concurrency;
+- buyer SSO approver authorization and key operations;
+- live SIEM delivery and retention;
+- staged monitoring adapters against buyer traffic;
+- upgrade and rollback from archived artifacts;
+- operational response capacity;
+- finalized software licence and pilot agreement;
+- finalized pricing, fees, governing law, liability allocation, termination terms, and SLA;
+- repository-visibility and source-licensing model;
+- SOC 2, ISO 27001, or third-party penetration-test evidence.
 
-Supplied as your review reaches each stage, rather than all at once.
+## 9. Evaluation sequence
 
-| Document | Answers |
-| --- | --- |
-| Integration guide | What you supply, the interfaces, the dispatch ledger, what "live" requires |
-| Incident intake guide | The incident contract and payload |
-| Monitoring connections | The endpoint, per-vendor field mapping, a verification procedure |
-| Licence installation | Where the licence goes and what it controls |
-| Operations runbook | Running it day to day |
-| Security and data handling | Written for a vendor security questionnaire, gaps included |
-| Support terms | Severity definitions, response targets, version support |
-| Pilot agreement | A draft for counsel |
+1. Verify the archive checksum, manifest, and SBOM.
+2. Install the tarball in a clean project and import the public package name.
+3. Run the offline acceptance scenario for all three risk categories and five locales.
+4. Review the capability registry and signed-continuation contracts.
+5. Run adversarial tests for unknown actions, nested values, method/resource mismatch, tampering, expiration, missing audit binding, and nonce replay.
+6. Connect only a read-only or isolated staging runner.
+7. Test valid entitlement and refusal through the packaged licensed factory.
+8. Record upgrade and rollback evidence from archived artifacts.
+9. Decide whether production criteria and legal terms can be completed.
+
+## 10. Commercial status
+
+No price, no-cost pilot, 24/7 support target, production warranty, or production availability is promised by this document. Those terms require a signed agreement identifying the vendor legal entity and completed commercial, operational, security, and legal review.

@@ -1,67 +1,38 @@
 // saas/lib/supervisor/executors/create-supervisor-dispatcher.ts
 //
-// The canonical way to build a Supervisor dispatcher. It registers the API executor
-// (with its danger-gate notification path wired in), plus the browser and manual
-// executors, and returns a ready dispatcher.
-//
-// Two ways to supply the notification path, because this portable is sold into other
-// companies' systems:
-//
-//   • ENTERPRISE (the product): pass a `host: HostContext`. The dispatcher wires the
-//     host-agnostic enterprise notifier, so a paused dangerous step routes through
-//     THE BUYER'S approver directory and notification channel with THEIR branding.
-//     No platform is named, no env var is read, no host singleton is imported.
-//
-//   • PLATFORM (the test rig only): pass nothing for notifications. As a convenience
-//     for developing the portable on the build platform, the factory falls back
-//     to the platform email notifier. This path is NOT part of the sellable portable —
-//     an enterprise buyer always supplies a HostContext.
-//
-// `notifyOwner` may still be injected directly to override either default (used by
-// tests and by any caller that wants a custom sink).
+// Internal dispatcher construction. All infrastructure boundaries are injected;
+// this module contains no platform email, provider, database or browser-runtime
+// fallback.
 
 import { APIExecutor } from './api-executor.ts'
-import { BrowserExecutor } from './browser-executor.ts'
+import { PortableBrowserExecutor } from './portable-browser-executor.ts'
 import { ManualExecutor } from './manual-executor.ts'
 import { ExecutorRegistry } from './executor-registry.ts'
 import { SupervisorDispatcher } from './supervisor-dispatcher.ts'
 import type { DispatchAuditSink } from './executor-types.ts'
 import type { DispatchStore } from './dispatch-store.ts'
 import type { ApiStepRunner, OwnerNotifier } from './api-executor.ts'
+import type { ApiCapabilityRegistry } from './api-capability-registry.ts'
+import type { ApprovalContinuationVerifier } from './approval-continuation.ts'
 import type { HostContext } from '../portable/host-context.ts'
 import { createEnterpriseNotifier } from '../portable/enterprise-notifier.ts'
 
 export interface CreateSupervisorDispatcherOptions {
   audit: DispatchAuditSink
   dispatchStore?: DispatchStore
-  /** Override the API step runner (defaults to the universal-provider runner). */
   apiRunner?: ApiStepRunner
-  /** Enterprise integration: the buyer's infrastructure boundary. */
+  apiCapabilities?: ApiCapabilityRegistry
+  approvalVerifier?: ApprovalContinuationVerifier
   host?: HostContext
-  /** Directly override the pause notifier (takes precedence over `host`). */
   notifyOwner?: OwnerNotifier
-  /** Platform-only fallback dashboard URL. Ignored in enterprise mode. */
-  dashboardUrl?: string
 }
 
-function platformFallbackNotifier(dashboardUrl?: string): OwnerNotifier {
-  return async (input) => {
-    try {
-      const [{ sendEmail }, { createOwnerEmailNotifier }] = await Promise.all([
-        import('@/lib/email'),
-        import('@/lib/supervisor/executors/owner-notifier'),
-      ])
-      await createOwnerEmailNotifier({ send: opts => sendEmail(opts), dashboardUrl })(input)
-    } catch {
-      // best-effort: notification must never throw into the executor
-    }
-  }
-}
+const noNotificationSink: OwnerNotifier = async () => {}
 
 function resolveNotifier(options: CreateSupervisorDispatcherOptions): OwnerNotifier {
   if (options.notifyOwner) return options.notifyOwner
   if (options.host) return createEnterpriseNotifier(options.host)
-  return platformFallbackNotifier(options.dashboardUrl)
+  return noNotificationSink
 }
 
 export function createSupervisorDispatcher(options: CreateSupervisorDispatcherOptions): SupervisorDispatcher {
@@ -69,8 +40,10 @@ export function createSupervisorDispatcher(options: CreateSupervisorDispatcherOp
   registry.register('api', new APIExecutor({
     runner: options.apiRunner,
     notifyOwner: resolveNotifier(options),
+    capabilityRegistry: options.apiCapabilities,
+    approvalVerifier: options.approvalVerifier,
   }))
-  registry.register('browser', new BrowserExecutor())
+  registry.register('browser', new PortableBrowserExecutor())
   registry.register('manual', new ManualExecutor())
   return new SupervisorDispatcher({
     registry,

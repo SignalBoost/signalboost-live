@@ -1,232 +1,221 @@
 <!-- docs/portables/self-healing-technical-walkthrough.md -->
 
-# Self-Healing Supervisor — hands-on walkthrough
+# Self-Healing Supervisor — hands-on evaluation walkthrough
 
-**For an engineer who wants to run it rather than read about it.**
-**Time: about 30 minutes. Offline. Nothing touches your infrastructure.**
+**Release:** `1.0.0-rc.2` design-partner evaluation  
+**Prerequisite:** Node.js 22 or newer  
+**Safety:** the standard acceptance scenario is offline and does not call a real provider.
 
-By the end you will have installed the package, written a host adapter, watched a
-consequential step refuse to execute, and — most usefully — **watched the product catch you
-when you deliberately break its safety property.**
+This walkthrough uses the exact npm package and public imports that a buyer receives. Repository-internal imports are not valid evaluation evidence.
 
-Nothing here calls a provider, sends an email, or writes to a database unless you make it.
-
----
-
-## What you are testing
-
-The claim: **no consequential step executes without a named human approving it.** Everything
-else this product does is in service of that.
-
-The design that makes it testable: the portable supplies behaviour, you supply infrastructure
-through a `HostContext`. There is no vendor service in the path, so a full run happens on your
-laptop with no account anywhere.
-
----
-
-## Prerequisites
-
-Node 22 or newer. That is the whole list.
-
-```bash
-node --version   # v22 or above
-```
-
----
-
-## Step 1 — build the package
+## 1. Build the exact release artifact
 
 From the repository:
 
 ```bash
 cd saas
+npm ci
 node scripts/build-portable.mjs
-cd dist/portable && npm pack
 ```
 
-You get `signalboost-self-healing-supervisor-1.0.0.tgz`, roughly 116KB.
+The builder performs all of the following and exits non-zero if any step fails:
 
-The build prints its own boundary check. Note the last line: **external dependencies: none**.
-The payload uses Node built-ins only. If that ever reports a third-party package, the build
-fails rather than shipping it — a payload needing someone else's runtime is not portable, and
-the script treats that as an error rather than a warning.
+1. walks the buyer import graph and rejects undeclared runtime packages;
+2. compiles TypeScript to ESM JavaScript;
+3. generates `.d.ts` declarations;
+4. writes `manifest.json`, CycloneDX `sbom.json`, and `SHA256SUMS`;
+5. creates the npm tarball;
+6. installs that tarball into a fresh temporary project;
+7. imports the public package name;
+8. runs the acceptance scenario for all five languages and all three risk categories.
 
-## Step 2 — install it somewhere scratch
+The accepted artifact is:
+
+```text
+saas/dist/portable/signalboost-self-healing-supervisor-1.0.0-rc.2.tgz
+```
+
+Verify its archive checksum before installation:
 
 ```bash
-mkdir /tmp/supervisor-trial && cd /tmp/supervisor-trial
-npm init -y
-npm pkg set type=module
-npm install /path/to/signalboost-self-healing-supervisor-1.0.0.tgz
+cd saas/dist/portable
+sha256sum -c signalboost-self-healing-supervisor-1.0.0-rc.2.tgz.sha256
 ```
 
-## Step 3 — write the host adapter
+## 2. Install it in a clean project
 
-This is the entire integration surface. In production these point at your vault, your
-datastore, your Slack or ServiceNow, your identity provider. For the trial they print to the
-console.
+```bash
+mkdir -p /tmp/supervisor-evaluation
+cd /tmp/supervisor-evaluation
+npm init -y
+npm pkg set type=module
+npm install /absolute/path/to/signalboost-self-healing-supervisor-1.0.0-rc.2.tgz
+```
+
+Confirm that Node loads compiled ESM JavaScript rather than raw `.ts` files:
+
+```bash
+node --input-type=module -e "import('@signalboost/self-healing-supervisor').then(m => console.log(Object.keys(m).sort()))"
+```
+
+## 3. Implement the buyer boundary
 
 Create `host.mjs`:
 
 ```js
-// host.mjs — the buyer-supplied boundary, trial version
 import { createStaticApproverDirectory } from '@signalboost/self-healing-supervisor'
 
-const secrets = new Map([['provider-token', 'not-a-real-token']])
+const secrets = new Map([['provider-token', 'evaluation-placeholder']])
 
 export const host = {
   secrets: {
-    async resolve(ref) {
-      const value = secrets.get(ref)
-      if (!value) throw new Error(`unknown secret: ${ref}`)
-      return value
+    async getSecret(name) {
+      return secrets.get(name)
     },
   },
 
-  // In production: email, Slack, Teams, ServiceNow, PagerDuty.
   notifications: {
     async notify(notification) {
-      console.log('\n--- NOTIFICATION ---')
-      console.log('to:      ', notification.recipient?.address ?? '(directory default)')
-      console.log('title:   ', notification.title)
-      console.log('category:', notification.category)
-      console.log('reason:  ', notification.reason)
-      console.log('--------------------\n')
+      console.log('\n--- APPROVAL NOTIFICATION ---')
+      console.log('recipient:', notification.recipient?.address ?? '(directory default)')
+      console.log('title:    ', notification.title)
+      console.log('category: ', notification.category)
+      console.log('reason:   ', notification.reason)
+      console.log('incident: ', notification.incidentId)
+      console.log('dispatch: ', notification.dispatchId)
     },
   },
 
-  // In production: Okta, Entra, or your own directory.
   approvers: createStaticApproverDirectory({
-    fallback: [{ id: 'oncall', address: 'oncall@example.test', displayName: 'On-call' }],
+    fallback: [{ id: 'oncall', address: 'oncall@example.test', displayName: 'On-call engineer' }],
   }),
 
   branding: {
-    productName: 'Trial Supervisor',
-    locale: 'en',   // try 'pt-BR', 'es', 'pl' or 'ru' at step 6
+    productName: 'Evaluation Supervisor',
+    consoleBaseUrl: 'https://supervisor.example.test',
+    locale: 'en',
   },
 }
 ```
 
-## Step 4 — run the acceptance scenario
+The required secret method is `getSecret(name)`. An adapter implementing `resolve(ref)` does not satisfy the package interface.
 
-This is the product's own conformance test, and it runs against **your** adapter rather than a
-mock. Create `run.mjs`:
+## 4. Run the packaged acceptance scenario
+
+Create `acceptance.mjs`:
 
 ```js
 import { runAcceptanceScenario } from '@signalboost/self-healing-supervisor'
 import { host } from './host.mjs'
 
-const result = await runAcceptanceScenario({ host, dangerousCategory: 'credential_security' })
+const categories = ['financial', 'destructive', 'credential_security']
+let failed = false
 
-console.log('passed:', result.passed)
-for (const check of result.checks) {
-  console.log(check.passed ? 'PASS' : 'FAIL', check.title, '—', check.detail)
+for (const dangerousCategory of categories) {
+  const result = await runAcceptanceScenario({ host, dangerousCategory })
+  console.log(`\n${dangerousCategory}: ${result.passed ? 'PASS' : 'FAIL'}`)
+  for (const check of result.checks) {
+    console.log(check.passed ? 'PASS' : 'FAIL', check.title, '—', check.detail)
+  }
+  failed ||= !result.passed
 }
+
+if (failed) process.exitCode = 1
 ```
+
+Run it:
 
 ```bash
-node run.mjs
+node acceptance.mjs
 ```
 
-Expect five checks, all passing, and one notification printed to your console. Read them:
+Expected evidence:
 
-- a safe step executed without asking anyone
-- **a consequential step paused instead of executing**
-- the right approver was notified through your channel
-- the notification carries your product name, not the vendor's
-- the run produced an audit trail
+- the exact registered GET/read-only capability executes;
+- the unknown mutating API step pauses and never reaches the runner;
+- the consequential step does not execute;
+- a named approver receives the notification;
+- buyer branding is used;
+- dispatch audit events are emitted.
 
-## Step 5 — the test that actually matters
+Keep the JSON-serializable result with the evaluated tarball checksum and source commit.
 
-A passing test proves little unless you have seen it fail. So break the safety property on
-purpose and confirm the harness catches you.
+## 5. Verify the safety regression guard
 
-**There is deliberately no option to make the dangerous step execute.** The harness exposes a
-`safeStepRunner` and nothing equivalent for the consequential step, because a supported switch
-for "run the dangerous thing anyway" would be a supported way to defeat the product. So the
-negative control is a source edit.
+The repository test suite contains isolated negative controls that replace the real runner with a recording stub and assert that unregistered or malformed capabilities never reach it. Run the focused release-blocker test:
 
-In your checkout of the repository, weaken the gate — in `lib/supervisor/policy-engine.ts`,
-make the classifier return a non-consequential verdict for the credential-security category —
-then rebuild the package and re-run step 4.
+```bash
+cd saas
+node --test tests/supervisorReleaseBlockers.node.test.ts
+```
 
-Expect `passed: false`, with the failing check naming the property that was violated: a
-consequential step executed instead of pausing. Then revert.
+The test covers unknown provider actions, mutating methods, nested parameters, misleading descriptions, a mutation disguised as `read`, exact approval scope, canonical repair-plan fingerprints, post-approval plan changes, expiration, signature validation, prior-audit binding, and nonce reuse. It does not connect to infrastructure.
 
-We ran this exercise against the entitlement layer while building it: disabling the refusal
-branch turned seven of ten licence tests red. A test suite that stays green when you remove
-the thing it tests is measuring nothing, and that applies to ours as much as anyone's.
+Changing `policy-engine.ts` is not a valid control for the packaged harness; the harness supplies an approved policy decision and tests the API capability gate directly.
 
-This is also the check we would most like you to attempt independently, without our
-instructions: **find any path where a consequential step executes without a named human.**
-If you find one, that finding is worth more to us than the rest of this evaluation.
+## 6. Verify localization
 
-## Step 6 — change the language
+Change `host.branding.locale` to each of:
 
-Set `locale: 'pt-BR'` in `host.mjs` and re-run step 4. The notification, the reason, the
-category label and the step descriptions come back in Portuguese. `es`, `pl` and `ru` likewise.
+```text
+en, es, pt-BR, pl, ru
+```
 
-Then confirm the part that matters to your SIEM: **the audit event types and step ids are
-unchanged.** Translation applies to what people read, never to what machines parse.
+The approval heading, category wording, explanatory reason, and fallback description come from the package's five-language catalogue. Machine fields such as `kind`, `category`, `stepId`, `incidentId`, `dispatchId`, and audit event types remain unchanged.
 
-## Step 7 — send a real incident through the intake path
+A caller-provided step description is preserved as supplied; it is not silently rewritten by the notifier.
 
-The scenario above starts from a synthetic incident. To exercise authentication, deduplication
-and triage, post a signed envelope instead:
+## 7. Configure production-like bounded execution
+
+Paid planning and dispatch are available only through:
 
 ```js
-import { signIntakeRequest, SIGNATURE_HEADER, TIMESTAMP_HEADER } from '@signalboost/self-healing-supervisor'
-
-const secret = 'a-secret-at-least-16-chars'
-const body = JSON.stringify({
-  schemaVersion: 'supervisor-incident-intake-v1',
-  provider: 'trial',
-  errorMessage: 'Checkout service returning 503',
-  environment: 'staging',
-  severity: 'critical',
-  detectedAt: new Date().toISOString(),
-  dedupeKey: 'trial-1',
-})
-const timestamp = Math.floor(Date.now() / 1000)
-const headers = {
-  'content-type': 'application/json',
-  [TIMESTAMP_HEADER]: String(timestamp),
-  [SIGNATURE_HEADER]: signIntakeRequest(secret, timestamp, body),
-}
+import {
+  createApiCapabilityRegistry,
+  createEd25519ApprovalVerifier,
+  createLicensedSelfHealingSupervisor,
+  fingerprintRepairPlan,
+} from '@signalboost/self-healing-supervisor'
 ```
 
-Worth attacking here: replay the same request with a fresh timestamp (the timestamp is inside
-the signed material, so it should fail), tamper with one byte of the body, send a stale
-timestamp beyond the 300-second window, and send the same `dedupeKey` twice.
+The licensed factory requires all of these inputs and refuses to construct the paid execution path when any is absent:
 
----
+- buyer `HostContext`;
+- signed licence token, issuer, and issuer public keys;
+- durable dispatch store;
+- audit sink;
+- buyer-supplied API runner;
+- explicit API capability registry;
+- signed-approval continuation verifier;
+- thinker used for repair planning.
 
-## What you will not see, and why
+Every provider-bound `read`, `verify`, or mutation requires an exact capability registration. A `read` or `verify` step must match a non-mutating `read_only` capability using `GET` or `HEAD`. A routine mutation must explicitly identify its provider, stable action ID, allowed HTTP methods, resource pattern, parameter validator, reversibility, automatic-execution status, and execution limit.
 
-**No repair executes.** The product ships no execution runner — repair steps run through code
-your team supplies. Without one, a run receives, diagnoses, gates, verifies and audits, then
-reports honestly that nothing was repaired rather than claiming a fix. That is deliberate: we
-do not ship code that touches your systems.
+Unknown provider actions never execute, even when a signature is presented. Approval can resume only a registered consequential capability.
 
-**Deduplication is in-memory by default.** The trial adapter uses the in-memory stores. On a
-host that starts a fresh process per request, deduplication will not survive between them.
-`DedupeStore` and `IncidentRecordStore` are exported interfaces; a durable implementation is
-yours to supply, and that is the same substitution you would make for the dispatch ledger.
+## 8. Test signed post-approval continuation
 
----
+A consequential action resumes only with an Ed25519-signed `ApprovalContinuationProof` bound to:
 
-## Where to look in the source
+- the incident ID;
+- the plan ID;
+- the SHA-256 fingerprint of the complete canonical repair plan;
+- a new dispatch ID for the continuation attempt;
+- the exact ordered step IDs;
+- the approver identity;
+- approval and expiration times;
+- a one-time nonce;
+- the signing key ID;
+- the prior pause audit-event ID.
 
-| Path | What it is |
-| --- | --- |
-| `lib/supervisor/portable/host-context.ts` | The whole injection surface, in one file |
-| `lib/supervisor/policy-engine.ts` | Where a step becomes "consequential" |
-| `lib/supervisor/portable/acceptance-harness.ts` | The scenario you just ran |
-| `portable-license/enforce.ts` | Entitlement at the execution boundary, not at a UI |
-| `self-healing-host/` | A full reference adapter — what your production version replaces |
+Use the exported `fingerprintRepairPlan(plan)` helper when creating and auditing approval proofs. The prior pause event must record the same fingerprint.
 
-## Then read
+The buyer supplies a durable atomic nonce store and a lookup that confirms the referenced pause event. Changed provider, resource, parameters, descriptions, verification steps, or any other plan content changes the fingerprint and invalidates the proof. Tampered scope, changed dispatch, expiration, unknown signing key, missing prior event, invalid signature, and nonce reuse also fail closed.
 
-`self-healing-integration-guide.md` for the interfaces in production terms, and
-`self-healing-evaluation-brief.md` for what we would most like you to attack and where we
-already know the product is weak.
+Use a new dispatch ID for the approved continuation. Reusing the paused dispatch ID is correctly rejected by the at-most-once dispatch ledger.
+
+## 9. Release status and boundaries
+
+This package is a **design-partner evaluation release**, not a production licence grant. It does not ship credentials, a vendor-hosted service, vendor telemetry, or a generic production runner. The buyer owns and reviews every real provider capability and runner.
+
+Production designation remains blocked until the exact archived tarball completes a buyer-like external deployment, all three risk categories and signed continuation are accepted, licence refusal and valid entitlement are demonstrated through the packaged factory, and upgrade/rollback evidence is recorded.

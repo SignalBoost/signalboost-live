@@ -2,188 +2,195 @@
 
 # Self-Healing Supervisor — evaluation brief
 
-**For:** an engineer evaluating this portable on behalf of a prospective buyer or partner.
-**Time to a useful opinion:** about 30 minutes reading, plus 20 minutes running tests.
+**Release:** `1.0.0-rc.2` design-partner evaluation  
+**Audience:** buyer engineering, operations, security, and procurement reviewers
 
-This document is written to be checked, not believed. Every claim below names the file that
-either proves or disproves it. Where something is unproven, it says so — the gaps section is
-not an appendix, it is the part worth reading first if you are short on time.
+This document distinguishes package evidence from claims that still require buyer validation. Do not evaluate the demo console as the product; evaluate the exact archived npm tarball and its public API.
 
----
+## 1. What the evaluation package is
 
-## 1. What this is
+The Self-Healing Supervisor is buyer-hosted source software. It has no vendor-operated control plane and no vendor telemetry in the execution path. The buyer supplies credentials, stores, notifications, identity, provider capabilities, provider runners, approval keys, and audit transport.
 
-A self-healing incident supervisor sold as a **portable**: source that runs inside the
-buyer's own environment, with no vendor-operated service, no vendor account, and no
-telemetry. The buyer supplies infrastructure through injected interfaces; the product
-supplies behaviour.
+The intended loop is:
 
-The loop it implements: an incident arrives → it is authenticated, deduplicated and stored →
-a repair plan is produced → policy classifies each step → consequential steps **stop for a
-named human** → approved steps execute → results are verified → everything is audited to the
-buyer's SIEM.
-
-The safety property, and the thing worth attacking hardest during evaluation: **no
-consequential step executes without a named human approving it, in any edition, including
-with no licence installed.**
-
----
-
-## 2. Getting it running
-
-**Install the package.** Every push to `main` builds it — open the repository's Actions tab,
-pick the newest `portable-package` run, and download the artifact. That is a real npm package
-with **zero third-party dependencies**; Node built-ins only.
-
-```bash
-npm install ./signalboost-self-healing-supervisor-1.0.0.tgz
+```text
+authenticated incident
+→ durable intake and deduplication
+→ repair-plan proposal
+→ policy and exact capability validation
+→ pause consequential or unknown actions
+→ named-human approval
+→ signed exact-scope continuation
+→ buyer runner
+→ read-only verification
+→ durable audit evidence
 ```
 
-To build it yourself instead:
+The primary safety property is:
 
-```bash
-cd saas && node scripts/build-portable.mjs && cd dist/portable && npm pack
+> No consequential step may reach a buyer runner unless an exact, current, signed approval continuation from a named approver validates.
+
+Unknown API actions are consequential by default. Model-written descriptions and keyword matches do not authorize execution.
+
+## 2. Release status
+
+This package is **not production `1.0.0`**. It is `1.0.0-rc.2` and evaluation-only.
+
+The build platform can prove package compilation, declarations, supply-chain files, clean installation, public import, focused safety regressions, and offline acceptance. It cannot prove the buyer's real identity provider, database, provider runner, key custody, SIEM, operational staffing, upgrade process, or rollback process.
+
+Production designation remains blocked until one clean buyer-like environment accepts the exact archived tarball and records upgrade/rollback evidence.
+
+## 3. Install the exact artifact
+
+Use the artifact produced by the GitHub Actions workflow named **Self-Healing portable release** for the commit under evaluation.
+
+Expected files:
+
+```text
+signalboost-self-healing-supervisor-1.0.0-rc.2.tgz
+signalboost-self-healing-supervisor-1.0.0-rc.2.tgz.sha256
+manifest.json
+sbom.json
+SHA256SUMS
 ```
 
-**Then follow `self-healing-technical-walkthrough.md`** — about thirty minutes, entirely
-offline, no account anywhere. It has you write a small host adapter, run the product's own
-acceptance scenario against it, deliberately break the safety property to confirm the harness
-catches you, and attack the signed intake path.
+Verify and install:
 
-Read the source alongside it.
+```bash
+sha256sum -c signalboost-self-healing-supervisor-1.0.0-rc.2.tgz.sha256
+npm install ./signalboost-self-healing-supervisor-1.0.0-rc.2.tgz
+node --input-type=module -e "import('@signalboost/self-healing-supervisor').then(m => console.log(Object.keys(m).sort()))"
+```
 
-## 3. Where the code is
+The tarball must load compiled `.js` files and publish `.d.ts` declarations. Any dependency on raw `.ts` loading is a release failure.
 
-| Path | What it is |
-| --- | --- |
-| `saas/lib/supervisor/portable/` | The portable core — incident runtime, sources, host-context contract, acceptance harness |
-| `saas/lib/supervisor/executors/` | Dispatcher, executor contracts, API and browser executors |
-| `saas/lib/supervisor/policy-engine.ts` | Step classification and gating decisions |
-| `saas/lib/supervisor/orchestrator.ts` | The run loop that ties thinker → policy → dispatch → verify → audit |
-| `saas/portable-license/` | Entitlement layer: signed offline tokens, catalogue, guard, revocation |
-| `saas/portable-kernel/`, `saas/portable-audit/` | Shared kernel and audit contracts |
-| `saas/self-healing-host/` | **Reference host adapter.** SignalBoost's own wiring — an example of what a buyer writes, not part of the product |
-
-Read `self-healing-host/` to understand the boundary. Everything platform-specific lives
-there; if you find platform coupling inside the core directories, that is a genuine defect
-and we want to hear about it.
-
----
-
-## 4. Suggested reading order
-
-1. `docs/portables/self-healing-integration-guide.md` — the buyer-provided interfaces, the
-   dispatch ledger schema, reference wiring, and what "live" requires.
-2. `saas/lib/supervisor/portable/host-context.ts` — the whole injection surface in one file.
-3. `saas/lib/supervisor/policy-engine.ts` — where a step becomes "consequential".
-4. `saas/portable-license/enforce.ts` and `guard.ts` — how entitlement is enforced at the
-   execution boundary rather than at a UI.
-5. `docs/portables/self-healing-security-and-data-handling.md` — written for a security
-   reviewer, including the gaps.
-
----
-
-## 5. Running the tests
-
-Node 22 or newer. The suites run `node --test` directly against `.ts` sources — Node strips
-types rather than compiling, which is why a strip-safety guard exists in the build.
+To reproduce from source:
 
 ```bash
 cd saas
-npm install
-npm run test:supervisor          # supervisor core, dispatch, health, coordination
-node --test tests/portableLicense*.node.test.ts
-node --test tests/supervisorEntitlementWiring.node.test.ts
-node --test tests/supervisorAcceptanceHarness.node.test.ts
-npm run typecheck
-npm run prebuild                 # route-config, strip-safety and i18n guards
+npm ci
+node scripts/build-portable.mjs
 ```
 
-There are 49 test files touching the supervisor, licensing and acceptance paths.
+The builder itself performs a clean temporary installation and imports the public package name before accepting the release.
 
-**A test worth reading rather than just running:** `supervisorEntitlementWiring.node.test.ts`
-asserts that an unlicensed deployment still *receives and records* an incident but does not
-diagnose it. Dropping a customer's incident because of a billing state would be a hostage
-tactic; refusing to act on it is enforcement. The distinction is deliberate.
+## 4. Suggested reading order
 
----
+1. `self-healing-technical-walkthrough.md` — exact install and acceptance commands.
+2. `self-healing-integration-guide.md` — buyer boundaries, ledger, capability registry, continuation proof, and licensed factory.
+3. `saas/lib/supervisor/portable/licensed-supervisor.ts` — mandatory paid-path construction.
+4. `saas/lib/supervisor/executors/api-capability-registry.ts` — explicit default-deny execution policy.
+5. `saas/lib/supervisor/executors/approval-continuation.ts` — signature, scope, expiry, audit binding, and nonce replay controls.
+6. `saas/lib/supervisor/executors/api-executor.ts` — the last boundary before the buyer runner.
+7. `saas/portable-license/` — offline licence verification and feature enforcement.
+8. `self-healing-security-and-data-handling.md` — security assumptions and known gaps.
 
-## 6. What is proven, and how
+## 5. Canonical buyer surface
 
-- **Approval gating.** `runAcceptanceScenario` runs one rehearsal incident per risk category
-  (financial, destructive, credential security) against a real host context. The dangerous
-  step is *required* to pause; if it ever executes, the run reports FAILED. Exercised on a
-  live deployment on 27 July 2026: 15 checks, all passing, with a real approval email
-  delivered and an audit trail produced.
-- **Entitlement enforcement.** Ten tests, plus a negative control: the gate's refusal branch
-  was deliberately disabled and 7 of 10 went red, then restored. A licence for a different
-  product does not unlock this one; a token signed by a foreign key is refused; an expired
-  licence is refused.
-- **Incident authentication.** HMAC-SHA256 over `${timestamp}.${body}`, timestamp inside the
-  signed material so a captured request cannot be replayed with a fresh one. 300-second
-  replay window, 60-second clock skew, 128KB body cap, 16-character minimum secret.
+Paid planning and dispatch are created only through:
 
----
+```ts
+import { createLicensedSelfHealingSupervisor } from '@signalboost/self-healing-supervisor'
+```
 
-## 7. What is NOT proven — read this before forming a view
+The factory requires a licence token, issuer keys, durable dispatch store, audit sink, buyer runner, explicit capability registry, approval verifier, host context, and thinker. It refuses incomplete configuration.
 
-- **Eight monitoring vendor adapters are `staged`, not validated.** Datadog, PagerDuty,
-  CloudWatch/EventBridge, Alertmanager, Splunk, Azure Monitor, Grafana, Google Cloud
-  Operations. Each was mapped against fixtures; none has met live traffic from a real
-  account. A buyer's first alert is the first time that mapping meets reality.
-- **No repair executes without a buyer-supplied runner.** The product ships no execution step
-  runner. With none configured it receives, diagnoses, gates, verifies read-only steps and
-  audits — then ends `unresolved` and records why, rather than claiming a fix. Intended
-  behaviour, documented in the integration guide, section 4.
-- **In-memory defaults.** The reference host uses in-memory dedupe and incident record
-  stores. On a serverless host those do not survive between invocations. `DedupeStore` and
-  `IncidentRecordStore` are exported interfaces; a durable implementation is the buyer's to
-  supply.
-- **Seats and execution limits are not enforced.** They are recorded in the licence token and
-  are contract terms only. No technical control reads them.
-- **No SOC 2 report, no ISO 27001, no third-party penetration test**, no published
-  coordinated-disclosure timeline, no signed release artifacts, no reproducible-build
-  attestation.
-- **No unattended retry.** There is no durable attempt counter, so recovery actions require a
-  human to initiate them. An automatic retry driven by a failure webhook would loop.
+The npm package does not export an equivalent unguarded dispatcher factory. Because buyers receive source, this enforcement is contractual rather than tamper-proof; evaluate the legal model together with the technical controls.
 
----
+## 6. Evidence generated by the canonical workflow
 
-## 8. What we would most like you to attack
+The release workflow must pass all of these against one commit:
 
-1. **Find a path where a consequential step executes without a named human.** This is the
-   product's central claim. If it can be broken, everything else is decoration.
-2. **Find platform coupling inside the core.** Any `process.env`, vendor name, network
-   destination or host singleton reached from `lib/supervisor/portable/`,
-   `portable-license/`, `portable-kernel/` or `portable-audit/`.
-3. **Attack the intake authenticator.** Replay, timing, signature comparison, body-size
-   handling, malformed payloads.
-4. **Judge the host-context boundary as an integrator would.** Is `HostContext` the right
-   shape to implement against? What would you have to fake, wrap or fork to run this on your
-   own stack?
-5. **Tell us where the audit trail could lie.** Any path where a record could claim a
-   step ran, or omit one that did, is the most serious class of defect in this product.
+- focused release-blocker regression tests;
+- portable dependency-boundary check;
+- TypeScript compilation;
+- declaration generation;
+- manifest and CycloneDX SBOM generation;
+- package-file and archive checksums;
+- credential-shaped-material scan;
+- clean npm installation;
+- public package import;
+- acceptance in `en`, `es`, `pt`, `pl`, and `ru`;
+- acceptance for financial, destructive, and credential-security categories.
 
----
+Retain the workflow run ID, source commit, tarball checksum, manifest, SBOM, and acceptance output as one evidence set.
 
-## 9. What not to spend time on
+## 7. Controls to attack
 
-The UI. The pages under `saas/app/dashboard/supervisor/` are SignalBoost's own operator
-console and demo surface — a test rig, not part of what a buyer receives. The same is true of
-anything under `saas/app/`, `saas/components/` and `saas/app/api/`. Judge the portable by the
-directories in section 2.
+### Package boundary
 
----
+Confirm that no platform email client, provider singleton, Supabase client, environment-specific secret loader, or other host dependency is reachable from the installed public entry point.
 
-## 10. Documents in this set
+### Capability default deny
 
-All under `docs/portables/`:
+Attempt unknown and misleading actions, including:
 
-`self-healing-integration-guide.md` · `self-healing-incident-intake-guide.md` ·
-`self-healing-monitoring-connections.md` · `self-healing-license-installation.md` ·
-`self-healing-operations-runbook.md` · `self-healing-security-and-data-handling.md` ·
-`self-healing-support-terms.md` · `self-healing-pilot-agreement.md` ·
-`self-healing-technical-walkthrough.md`
+- unfamiliar provider and action IDs;
+- `POST`, `PUT`, and `PATCH` mutations;
+- nested objects and arrays;
+- multilingual descriptions;
+- harmless-sounding descriptions paired with destructive resources;
+- method, resource, and parameter mismatches;
+- disabled or exceeded execution limits.
 
-The support terms and pilot agreement are commercial drafts, not engineering documents. The
-pilot agreement is a structural draft for counsel and is not ready to sign.
+None may reach the runner without a valid continuation.
+
+### Approval continuation
+
+Test modification of every signed field, expiration, future approval time, unknown signing key, invalid signature, missing prior pause event, changed step order, extra step, missing step, changed dispatch ID, changed plan ID, changed incident ID, and nonce replay.
+
+Every case must fail closed before the runner.
+
+### Entitlement
+
+Test missing token, malformed token, foreign signer, wrong issuer, wrong product, missing feature, not-before date, expiration, grace rules, and revocation. Perform tests through the packaged `createLicensedSelfHealingSupervisor` factory, not only through seller-host wrappers.
+
+### Audit truthfulness
+
+Check that audit records never report a step as executed unless the buyer runner returned success, that failed audit writes block execution where required, and that continuation evidence identifies the approver and prior pause event without recording token or signature material.
+
+### Localization stability
+
+Confirm the human approval heading, category wording, explanatory reason, and fallback description for all five languages. Confirm machine identifiers do not change when locale changes.
+
+## 8. What is proven by repository tests
+
+Repository tests are designed to prove these code properties in isolation:
+
+- unknown and adversarial API mutations pause by default;
+- only an exact registered routine-reversible capability auto-executes;
+- a valid signed continuation can resume its exact scope;
+- replay of the same nonce is refused;
+- tampered, expired, unbound, and missing-event proofs fail;
+- all five locale catalogues reach enterprise notifications without changing IDs;
+- incomplete licence configuration is refused;
+- paid planning is guarded through the packaged factory.
+
+Treat a green repository run as necessary evidence, not sufficient production acceptance.
+
+## 9. What is not yet proven
+
+- external clean-room deployment by a buyer or independent evaluator;
+- production provider capabilities and runners;
+- buyer key-generation, key-rotation, and key-revocation operations;
+- durable nonce-store behavior under real concurrency;
+- real SSO/IdP approver authorization;
+- real SIEM delivery and retention;
+- staged monitoring adapters against live buyer traffic;
+- upgrade and rollback from archived artifacts;
+- operational response capacity;
+- finalized commercial licence and pilot agreement;
+- deliberate repository-visibility and source-licensing model;
+- SOC 2, ISO 27001, third-party penetration testing, or signed provenance attestation.
+
+## 10. Commercial interpretation
+
+Do not describe this release as:
+
+> Self-Healing Supervisor 1.0 — production-ready automated remediation.
+
+Accurate positioning is:
+
+> Self-Healing Supervisor Design-Partner Evaluation — buyer-hosted incident intake, diagnosis, explicit capability validation, approval routing, signed exact-scope continuation, bounded buyer-runner execution, read-only verification, and audit evidence. Production use remains subject to buyer acceptance and a separate signed agreement.
+
+The support terms and pilot agreement remain drafts until the vendor legal entity, fees, governing law, liability allocation, support capacity, termination terms, and counsel review are complete.

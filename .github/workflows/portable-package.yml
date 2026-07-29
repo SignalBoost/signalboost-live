@@ -1,17 +1,11 @@
 # .github/workflows/portable-package.yml
 #
-# BUILD THE SELLABLE ARTIFACT ON EVERY PUSH.
-#
-# scripts/build-portable.mjs produces the installable package, but it has to run somewhere.
-# Nobody here has a terminal, so it runs on GitHub and attaches the result to the workflow run:
-# a buyer or an evaluator gets a .tgz to download rather than instructions to clone and build.
-#
-# IT ALSO FAILS THE RUN IF THE BOUNDARY LEAKS. The build refuses to package a payload that
-# reaches a third-party package, so this workflow is the standing test of the product's central
-# technical claim — that it installs with zero dependencies. If someone adds an import that
-# drags an SDK into the payload, this goes red on that commit rather than in a buyer's audit.
+# Canonical Self-Healing Supervisor release path. A release artifact is uploaded
+# only after the portable boundary, focused safety regressions, TypeScript
+# compilation, declarations, checksums, SBOM, clean npm install, public import
+# and five-language acceptance all pass against the exact tarball.
 
-name: portable-package
+name: Self-Healing portable release
 
 on:
   push:
@@ -19,40 +13,78 @@ on:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/portable-license/**'
-      - 'saas/portable-kernel/**'
-      - 'saas/portable-audit/**'
+      - 'saas/tests/supervisorReleaseBlockers.node.test.ts'
       - 'saas/scripts/build-portable.mjs'
+      - 'docs/portables/self-healing-*.md'
+      - '.github/workflows/portable-package.yml'
+  pull_request:
+    paths:
+      - 'saas/lib/supervisor/**'
+      - 'saas/portable-license/**'
+      - 'saas/tests/supervisorReleaseBlockers.node.test.ts'
+      - 'saas/scripts/build-portable.mjs'
+      - 'docs/portables/self-healing-*.md'
       - '.github/workflows/portable-package.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  package:
+  release:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
 
-      - name: Verify the portable boundary
-        working-directory: saas
+      - name: Install locked build dependencies
+        run: npm ci
+
+      - name: Run audited release-blocker regressions
+        run: node --test tests/supervisorReleaseBlockers.node.test.ts
+
+      - name: Verify buyer boundary
         run: node scripts/build-portable.mjs --check
 
-      - name: Build the package
-        working-directory: saas
+      - name: Build, pack, clean-install and accept exact tarball
         run: node scripts/build-portable.mjs
 
-      - name: Pack it
-        working-directory: saas/dist/portable
-        run: npm pack
+      - name: Verify package and archive checksums
+        run: |
+          set -euo pipefail
+          cd dist/portable
+          test -f manifest.json
+          test -f sbom.json
+          test -f SHA256SUMS
+          sha256sum -c ./*.tgz.sha256
 
-      # Named with the commit so a tester can say exactly which build they evaluated, and so a
-      # buyer's finding can be traced back to a specific tree rather than "the version I had".
-      - name: Publish as a downloadable artifact
+      - name: Reject credential-shaped material
+        run: |
+          set -euo pipefail
+          if grep -rInE '(BEGIN [A-Z ]*PRIVATE KEY|sk-[A-Za-z0-9]{20,}|xox[baprs]-)' dist/self-healing-build/package/dist; then
+            echo '::error::credential-shaped material found in compiled payload'
+            exit 1
+          fi
+
+      - name: Upload exact evaluated release
         uses: actions/upload-artifact@v4
         with:
           name: self-healing-supervisor-${{ github.sha }}
-          path: saas/dist/portable/*.tgz
+          path: |
+            saas/dist/portable/*.tgz
+            saas/dist/portable/*.tgz.sha256
+            saas/dist/portable/manifest.json
+            saas/dist/portable/sbom.json
+            saas/dist/portable/SHA256SUMS
           retention-days: 90
           if-no-files-found: error

@@ -15,7 +15,7 @@ The buyer supplies infrastructure through the portable interfaces below.
 | `SecretsProvider` | Vault or cloud secrets manager |
 | `NotificationSink` | Email, Slack, Teams, ServiceNow, or PagerDuty |
 | `ApproverDirectory` | Okta, Entra, or another identity provider |
-| `HostBranding` | Product name and console URL |
+| `HostBranding` | Product name, console URL, and the language your people are written to |
 | `SqlExecutor` | Durable dispatch ledger database |
 | `SiemTransport` | SIEM collector transport |
 | `IncidentSource` | Generic signed webhook or staged vendor adapter |
@@ -87,14 +87,70 @@ audited. What it will not do is claim a repair happened: the orchestration ends
 `unresolved` and records why. That is intended behaviour rather than a defect. A
 fabricated success is the one thing an operator must never find in an audit trail.
 
-## 5. Incident intake
+## 5. Language
+
+Everything this product writes for a person to read is produced in the language you set. Not
+the console only — the substance.
+
+Set `locale` on `HostBranding`:
+
+```ts
+branding: {
+  productName: 'Acme Supervisor',
+  consoleBaseUrl: 'https://ops.acme.example/console',
+  locale: 'pt-BR',
+}
+```
+
+Supported: `en`, `es`, `pt`, `pl`, `ru`. Region tags are accepted — `pt-BR`, `es-MX` — because
+you configure a region rather than a language code. An unrecognised or absent value falls back
+to English.
+
+### What it changes
+
+The approval request your named approver receives: subject, explanation, every field label,
+the button, and the risk category itself. The plan's diagnosis — the sentence stating what went
+wrong. Every step description and expected result. Every stop reason. Every evidence summary
+and verification result.
+
+This matters most for the approval request, which reaches someone who may never open the
+console and asks them to consent to a consequential action. Comprehension is part of consent.
+In a language your engineer does not read, the approval gate degrades from a safety control
+into a delay.
+
+### What it does not change
+
+**Anything a machine parses.** Audit event types (`dispatch_requested`, `policy_evaluated`),
+step ids (`read-deployment`, `verify-read-only-diagnosis`), incident types (`VERCEL_CANCELED`)
+and severities are identical in every locale. A SIEM rule, a report or an alerting threshold
+built on them does not break when a team switches language.
+
+### When text is translated
+
+At the moment it is written, not when it is displayed. An evidence record is a statement about
+what was observed at a point in time, so it keeps the language it was recorded in. Changing
+this setting affects what happens next; it does not rewrite history.
+
+### If you write your own notification sink
+
+The translations are part of the product, not the reference adapter. Import them:
+
+```ts
+import { approvalCopy, categoryLabel } from '@signalboost/self-healing-supervisor'
+```
+
+Your approvers get the same wording they would from the reference implementation, in your
+configured language. You are not expected to supply your own translations to get a message
+your staff can read.
+
+## 6. Incident intake
 
 Companies can use the generic signed webhook immediately or one of the staged vendor
 adapters. Vendor adapters only map fields into `IncidentMapping`; the universal core
 handles normalization, sanitation, validation, fingerprinting, deduplication, storage,
 and source health.
 
-## 6. What “live” requires
+## 7. What “live” requires
 
 A buyer deployment is genuinely live only after all of these are proven in its own
 environment:
@@ -109,7 +165,7 @@ environment:
 7. Audit evidence reaches the configured SIEM.
 8. A staging incident completes the full workflow without unsupported production claims.
 
-## 7. Acceptance rehearsal
+## 8. Acceptance rehearsal
 
 ```bash
 node scripts/run-self-healing-acceptance.mjs ./my-host.mjs --out acceptance-record.json

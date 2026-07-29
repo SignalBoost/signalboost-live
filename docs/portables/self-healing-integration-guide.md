@@ -14,7 +14,7 @@ Paid planning and dispatch must be constructed only through:
 import { createLicensedSelfHealingSupervisor } from '@signalboost/self-healing-supervisor'
 ```
 
-The npm package does not export an equivalent unguarded dispatcher factory. Reading incidents, read-only observation, and audit export remain available independently of a paid execution path.
+The npm package does not export an equivalent unguarded dispatcher factory. Reading incidents, observation, and audit export remain available independently of a paid execution path. Any provider-bound `read` or `verify` still requires an explicit read-only capability.
 
 Source delivery makes licence enforcement contractual rather than tamper-proof. The commercial agreement must state that plainly.
 
@@ -30,7 +30,7 @@ Source delivery makes licence enforcement contractual rather than tamper-proof. 
 | `DispatchAuditSink` | Durable audit/SIEM transport |
 | `ApiStepRunner` | The only code permitted to call a real provider |
 | `ApiCapabilityRegistry` | Explicit provider/action allow-list and validation boundary |
-| `ApprovalContinuationVerifier` | Signed exact-scope approval validation |
+| `ApprovalContinuationVerifier` | Signed exact-plan and exact-scope approval validation |
 | `ApprovalNonceStore` | Durable atomic one-time nonce consumption |
 | `Thinker` | Repair-plan proposal implementation |
 | licence configuration | Token, issuer, and accepted issuer public keys |
@@ -84,12 +84,26 @@ The exported `InMemoryApprovalNonceStore` is for tests and single-process evalua
 
 ## 5. Explicit API capability policy
 
-The package does not infer execution safety from descriptions or keywords. Automatic execution requires an exact registered capability:
+The package does not infer execution safety from descriptions, action labels, or keywords. Every provider-bound `api_request`, `read`, or `verify` requires an exact registered capability:
 
 ```ts
 import { createApiCapabilityRegistry } from '@signalboost/self-healing-supervisor'
 
 const apiCapabilities = createApiCapabilityRegistry([
+  {
+    provider: 'example-cloud',
+    actionId: 'read-service-status',
+    mutation: false,
+    riskClass: 'read_only',
+    approvalRequired: false,
+    autoExecutable: true,
+    methods: ['GET'],
+    resourcePattern: /^\/services\/[a-z0-9-]+\/status$/,
+    validateParameters(parameters) {
+      return parameters.includeSecrets !== true
+    },
+    maximumExecutionsPerDispatch: 1,
+  },
   {
     provider: 'example-cloud',
     actionId: 'restart-service',
@@ -107,7 +121,11 @@ const apiCapabilities = createApiCapabilityRegistry([
 ])
 ```
 
-Automatic execution occurs only when provider, stable action ID, method, resource pattern, parameter validation, reversibility, auto-execution status, and execution limit all match. Unknown providers, unknown action IDs, method mismatch, resource mismatch, invalid nested parameters, disabled limits, and consequential registrations pause.
+Execution occurs only when provider, stable action ID, method, resource pattern, parameter validation, risk class, execution status, and execution limit all match.
+
+A `read` or `verify` step is executable only when the matched capability is non-mutating, has `riskClass: 'read_only'`, and uses `GET` or `HEAD`. A mutation disguised with a `read` label is non-executable; approval does not restore its authority.
+
+Unknown providers and action IDs never execute, even after a valid signature is presented. Method mismatch, resource mismatch, invalid nested parameters, semantic action mismatch, and disabled limits also fail closed. A registered consequential capability may resume only through the signed continuation path.
 
 Descriptions may help label a paused risk category; they never grant authority.
 
@@ -116,7 +134,12 @@ Descriptions may help label a paused risk category; they never grant authority.
 Create the verifier with buyer-controlled Ed25519 public keys, a durable nonce store, and a durable audit lookup:
 
 ```ts
-import { createEd25519ApprovalVerifier } from '@signalboost/self-healing-supervisor'
+import {
+  createEd25519ApprovalVerifier,
+  fingerprintRepairPlan,
+} from '@signalboost/self-healing-supervisor'
+
+const planFingerprint = fingerprintRepairPlan(repairPlan)
 
 const approvalVerifier = createEd25519ApprovalVerifier({
   publicKeyFor: keyId => approvalKeyDirectory.getPublicKey(keyId),
@@ -126,6 +149,7 @@ const approvalVerifier = createEd25519ApprovalVerifier({
       eventId: input.eventId,
       incidentId: input.incidentId,
       planId: input.planId,
+      planFingerprint: input.planFingerprint,
       approvedStepIds: input.approvedStepIds,
     })
   },
@@ -136,6 +160,7 @@ An `ApprovalContinuationProof` is valid only when its Ed25519 signature and all 
 
 - incident ID;
 - plan ID;
+- SHA-256 fingerprint of the complete canonical repair plan;
 - continuation dispatch ID;
 - exact ordered approved step IDs;
 - approver identity;
@@ -145,7 +170,9 @@ An `ApprovalContinuationProof` is valid only when its Ed25519 signature and all 
 - signing key ID;
 - prior pause audit-event ID.
 
-Signature failure, field modification, extra steps, missing steps, order changes, expiration, excessive future clock skew, unknown key, missing pause event, and nonce replay fail closed.
+The approval signer and dispatcher must use the exported `fingerprintRepairPlan` helper. Audit the fingerprint when the action first pauses, include the same value in the signed proof, and confirm it in `previousAuditEventExists`.
+
+Changing any plan content—including provider, resource, method, nested parameters, descriptions, risk metadata, or verification steps—changes the fingerprint and invalidates the approval. Signature failure, field modification, extra steps, missing steps, order changes, expiration, excessive future clock skew, unknown key, missing pause event, and nonce replay also fail closed.
 
 ## 7. Canonical licensed wiring
 
@@ -156,6 +183,7 @@ import {
   createEnterpriseDispatchStore,
   createLicensedSelfHealingSupervisor,
   createSiemAuditSink,
+  fingerprintRepairPlan,
   type HostContext,
 } from '@signalboost/self-healing-supervisor'
 
@@ -209,7 +237,7 @@ import { approvalCopy, categoryLabel } from '@signalboost/self-healing-superviso
 
 ## 9. Verification and incident intake
 
-Read-only verification does not widen execution authority. A verifier may only inspect the allowed read/verify surfaces configured by the buyer.
+Read-only verification does not widen execution authority. A verifier may only inspect explicitly registered read-only capabilities configured by the buyer.
 
 Incident sources authenticate, normalize, sanitize, fingerprint, deduplicate, and store deliveries before orchestration. Durable dedupe and incident stores are required for multi-process or serverless production deployments; in-memory stores are evaluation-only.
 
@@ -218,16 +246,16 @@ Incident sources authenticate, normalize, sanitize, fingerprint, deduplicate, an
 A deployment is not production-ready until the exact archived tarball proves all of the following in a clean buyer-like environment:
 
 1. package checksum, manifest, SBOM, and source commit are retained;
-2. npm installation and public import succeed without repository paths;
+2. npm installation and public ESM import succeed without repository paths;
 3. missing and invalid licences refuse planning and dispatch through the packaged factory;
 4. valid entitlement permits only licensed features;
 5. all three consequential categories pause and notify the intended named approvers;
-6. registered routine capabilities execute only on an exact match;
-7. unknown and adversarial capabilities pause;
-8. valid signed continuation executes only its exact scope;
-9. tampering, expiration, missing audit binding, and nonce replay fail closed;
-10. provider execution is verified through read-only observation;
-11. audit evidence reaches durable storage and the configured SIEM;
+6. registered routine and read-only capabilities execute only on an exact semantic match;
+7. unknown actions and mutations disguised as reads never execute, including after approval;
+8. valid signed continuation executes only the exact registered consequential capability, plan fingerprint, and step scope;
+9. plan changes, tampering, expiration, missing audit binding, and nonce replay fail closed;
+10. provider execution is verified through explicitly registered read-only observation;
+11. audit evidence records the canonical plan fingerprint and reaches durable storage and the configured SIEM;
 12. all five notification locales are accepted while machine identifiers remain stable;
 13. upgrade and rollback are tested from archived artifacts.
 

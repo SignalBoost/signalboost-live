@@ -22,6 +22,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
 import DemoRehearsal from '@/components/supervisor/DemoRehearsal'
+import { DEMO_STAGE_COPY, type DemoStageLanguage } from '@/lib/i18n/demoStageCopy'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 import { getSupervisorEntitlement } from '@/self-healing-host/supervisor-entitlement'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
@@ -252,6 +253,7 @@ export default async function SupervisorDemoPage() {
 
   const access = await getAccess()
   const lang = pickLanguage((await cookies()).get('sb_locale')?.value)
+  const stageCopy = DEMO_STAGE_COPY[(lang as DemoStageLanguage)] ?? DEMO_STAGE_COPY.en
   const copy = COPY[lang]
 
   if (!access.isAdmin) {
@@ -270,6 +272,8 @@ export default async function SupervisorDemoPage() {
   // healthy observation that happened to run last, instead of the evidence worth showing.
   const runs = await new SupabaseVercelHealthStore(getAdminSupabase()).listRuns({ limit: 25 }).catch(() => [])
   const run = runs.find(candidate => candidate.status !== 'healthy' && candidate.incident) ?? runs[0]
+  const steps: string[] = (run?.approvedStepIds ?? []) as string[]
+  const readOnlyRun = steps.length > 0 && steps.every(id => id.startsWith('read-') || id.startsWith('verify-'))
 
   return (
     <main style={page}>
@@ -299,6 +303,7 @@ export default async function SupervisorDemoPage() {
           <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
             <p style={muted}>
               {copy.runLabel} <code>{run.runId}</code>
+              {readOnlyRun ? <span style={readOnlyBadge}>{stageCopy.readOnlyBadge}</span> : null}
             </p>
 
             <Stage index={0} label={copy.stageLabels[0]} body={copy.stageBodies[0]}>
@@ -319,13 +324,13 @@ export default async function SupervisorDemoPage() {
               </dl>
             </Stage>
 
-            <Stage index={2} label={copy.stageLabels[2]} body={copy.stageBodies[2]}>
+            <Stage index={2} label={copy.stageLabels[2]} body={readOnlyRun ? stageCopy.readOnlyGated : copy.stageBodies[2]}>
               <dl style={grid}>
                 <Field k={copy.fields.approvedSteps} v={run.approvedStepIds.join(', ') || copy.none} />
               </dl>
             </Stage>
 
-            <Stage index={3} label={copy.stageLabels[3]} body={copy.stageBodies[3]}>
+            <Stage index={3} label={copy.stageLabels[3]} body={readOnlyRun ? stageCopy.readOnlyExecuted : copy.stageBodies[3]}>
               <dl style={grid}>
                 <Field k={copy.fields.comparison} v={run.comparisonStatus} />
               </dl>
@@ -380,3 +385,4 @@ const muted = { color: 'rgba(255,255,255,.68)' }
 const notice = { color: '#b8ffdd', fontWeight: 700 }
 const warn = { color: '#ffd8a8', fontWeight: 700 }
 const kicker = { color: '#1af0ff', fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1 }
+const readOnlyBadge = { marginLeft: 8, border: '1px solid rgba(26,240,255,.5)', borderRadius: 999, padding: '4px 10px', color: '#8be9ff', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1 }

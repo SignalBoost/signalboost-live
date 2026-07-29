@@ -1,0 +1,58 @@
+# .github/workflows/portable-package.yml
+#
+# BUILD THE SELLABLE ARTIFACT ON EVERY PUSH.
+#
+# scripts/build-portable.mjs produces the installable package, but it has to run somewhere.
+# Nobody here has a terminal, so it runs on GitHub and attaches the result to the workflow run:
+# a buyer or an evaluator gets a .tgz to download rather than instructions to clone and build.
+#
+# IT ALSO FAILS THE RUN IF THE BOUNDARY LEAKS. The build refuses to package a payload that
+# reaches a third-party package, so this workflow is the standing test of the product's central
+# technical claim — that it installs with zero dependencies. If someone adds an import that
+# drags an SDK into the payload, this goes red on that commit rather than in a buyer's audit.
+
+name: portable-package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/supervisor/**'
+      - 'saas/portable-license/**'
+      - 'saas/portable-kernel/**'
+      - 'saas/portable-audit/**'
+      - 'saas/scripts/build-portable.mjs'
+      - '.github/workflows/portable-package.yml'
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify the portable boundary
+        working-directory: saas
+        run: node scripts/build-portable.mjs --check
+
+      - name: Build the package
+        working-directory: saas
+        run: node scripts/build-portable.mjs
+
+      - name: Pack it
+        working-directory: saas/dist/portable
+        run: npm pack
+
+      # Named with the commit so a tester can say exactly which build they evaluated, and so a
+      # buyer's finding can be traced back to a specific tree rather than "the version I had".
+      - name: Publish as a downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-healing-supervisor-${{ github.sha }}
+          path: saas/dist/portable/*.tgz
+          retention-days: 90
+          if-no-files-found: error

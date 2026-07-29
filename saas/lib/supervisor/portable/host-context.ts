@@ -63,6 +63,22 @@ export interface ApproverDirectory {
 export interface HostBranding {
   productName: string
   consoleBaseUrl?: string
+  /**
+   * The buyer's locale, as a language or region tag: 'pt', 'pt-BR', 'es-MX', 'en'.
+   *
+   * It governs the language of messages this product sends to PEOPLE — above all the approval
+   * request, which reaches an engineer who may never open the console and asks them to consent
+   * to a consequential action. Comprehension is part of consent, so a buyer operating in
+   * Portuguese should have their approvers asked in Portuguese.
+   *
+   * Supported: en, es, pt, pl, ru. An unrecognised or absent value falls back to English —
+   * a request in the wrong language is bad, and no request at all would be worse.
+   *
+   * It does NOT change machine-readable output. Audit event types, step ids and incident
+   * identifiers stay stable across locales, because a SIEM rule written against them must not
+   * break when someone changes this field.
+   */
+  locale?: string
 }
 
 // The aggregate context the buyer assembles once and hands to the portable factory.

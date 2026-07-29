@@ -21,7 +21,7 @@ node scripts/build-portable.mjs
 The builder performs all of the following and exits non-zero if any step fails:
 
 1. walks the buyer import graph and rejects undeclared runtime packages;
-2. compiles TypeScript to JavaScript;
+2. compiles TypeScript to ESM JavaScript;
 3. generates `.d.ts` declarations;
 4. writes `manifest.json`, CycloneDX `sbom.json`, and `SHA256SUMS`;
 5. creates the npm tarball;
@@ -52,7 +52,7 @@ npm pkg set type=module
 npm install /absolute/path/to/signalboost-self-healing-supervisor-1.0.0-rc.2.tgz
 ```
 
-Confirm that Node loads compiled JavaScript rather than raw `.ts` files:
+Confirm that Node loads compiled ESM JavaScript rather than raw `.ts` files:
 
 ```bash
 node --input-type=module -e "import('@signalboost/self-healing-supervisor').then(m => console.log(Object.keys(m).sort()))"
@@ -131,8 +131,8 @@ node acceptance.mjs
 
 Expected evidence:
 
-- the built-in read step executes;
-- the unknown mutating API step pauses;
+- the exact registered GET/read-only capability executes;
+- the unknown mutating API step pauses and never reaches the runner;
 - the consequential step does not execute;
 - a named approver receives the notification;
 - buyer branding is used;
@@ -149,7 +149,7 @@ cd saas
 node --test tests/supervisorReleaseBlockers.node.test.ts
 ```
 
-The test covers unknown provider actions, mutating methods, nested parameters, misleading descriptions, exact approval scope, expiration, signature validation, prior-audit binding, and nonce reuse. It does not connect to infrastructure.
+The test covers unknown provider actions, mutating methods, nested parameters, misleading descriptions, a mutation disguised as `read`, exact approval scope, canonical repair-plan fingerprints, post-approval plan changes, expiration, signature validation, prior-audit binding, and nonce reuse. It does not connect to infrastructure.
 
 Changing `policy-engine.ts` is not a valid control for the packaged harness; the harness supplies an approved policy decision and tests the API capability gate directly.
 
@@ -174,6 +174,7 @@ import {
   createApiCapabilityRegistry,
   createEd25519ApprovalVerifier,
   createLicensedSelfHealingSupervisor,
+  fingerprintRepairPlan,
 } from '@signalboost/self-healing-supervisor'
 ```
 
@@ -188,7 +189,9 @@ The licensed factory requires all of these inputs and refuses to construct the p
 - signed-approval continuation verifier;
 - thinker used for repair planning.
 
-A routine capability must explicitly identify its provider, stable action ID, allowed HTTP methods, resource pattern, parameter validator, reversibility, automatic-execution status, and execution limit. Unknown provider actions pause by default, including unfamiliar descriptions, nested parameters, multilingual text, and mutating methods.
+Every provider-bound `read`, `verify`, or mutation requires an exact capability registration. A `read` or `verify` step must match a non-mutating `read_only` capability using `GET` or `HEAD`. A routine mutation must explicitly identify its provider, stable action ID, allowed HTTP methods, resource pattern, parameter validator, reversibility, automatic-execution status, and execution limit.
+
+Unknown provider actions never execute, even when a signature is presented. Approval can resume only a registered consequential capability.
 
 ## 8. Test signed post-approval continuation
 
@@ -196,6 +199,7 @@ A consequential action resumes only with an Ed25519-signed `ApprovalContinuation
 
 - the incident ID;
 - the plan ID;
+- the SHA-256 fingerprint of the complete canonical repair plan;
 - a new dispatch ID for the continuation attempt;
 - the exact ordered step IDs;
 - the approver identity;
@@ -204,7 +208,9 @@ A consequential action resumes only with an Ed25519-signed `ApprovalContinuation
 - the signing key ID;
 - the prior pause audit-event ID.
 
-The buyer supplies a durable atomic nonce store and a lookup that confirms the referenced pause event. Tampered scope, changed dispatch, changed plan, expiration, unknown signing key, missing prior event, invalid signature, and nonce reuse must all fail closed.
+Use the exported `fingerprintRepairPlan(plan)` helper when creating and auditing approval proofs. The prior pause event must record the same fingerprint.
+
+The buyer supplies a durable atomic nonce store and a lookup that confirms the referenced pause event. Changed provider, resource, parameters, descriptions, verification steps, or any other plan content changes the fingerprint and invalidates the proof. Tampered scope, changed dispatch, expiration, unknown signing key, missing prior event, invalid signature, and nonce reuse also fail closed.
 
 Use a new dispatch ID for the approved continuation. Reusing the paused dispatch ID is correctly rejected by the at-most-once dispatch ledger.
 

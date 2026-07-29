@@ -1,95 +1,125 @@
 <!-- docs/portables/self-healing-support-terms.md -->
 
-# Self-Healing Supervisor — support terms
+# Self-Healing Supervisor — proposed support framework
 
-**Status: values set for pilot and first-year agreements. They are commercial commitments that cost money to honour — change them deliberately, not casually.** Have counsel review before this is attached to an order form.
+**Status: commercial draft for counsel and capacity review. Not an SLA, not incorporated into any agreement, and not ready to sign.**
 
-## What is supported
+No response target in this document is binding unless a signed order form or pilot agreement identifies the vendor legal entity, customer, supported version, support period, channels, hours, staffing model, fees, exclusions, escalation path, and remedies.
 
-The Self-Healing Supervisor payload, at a version listed under "Supported versions" below, deployed against interfaces the customer has implemented per the integration guide.
+## 1. Current evaluation support
 
-Support covers the product's own behaviour: incident classification, repair-plan generation, the approval gate, the audit trail, entitlement checks, and the acceptance harness.
+Version `1.0.0-rc.2` is a design-partner evaluation release. Release candidates are not supported for production use and carry no 24/7 response commitment.
 
-## What is not supported
+During an authorized evaluation, support is limited to reasonable-effort assistance with:
 
-These are outside the product and outside support, because they are not ours to fix:
+- installation of the exact archived package;
+- interpretation of manifest, SBOM, checksums, and acceptance results;
+- defects reproducible in unmodified package code;
+- clarification of the public interfaces and documented boundaries;
+- security reports concerning the package itself.
 
-- The customer's implementations of `SecretsProvider`, `SqlExecutor`, `NotificationSink`, `ApproverDirectory`, `HostBranding`, `SiemTransport` or `ApiStepRunner`.
-- The customer's database, identity provider, secret manager, notification channel, SIEM, network or cloud account.
-- Outages, rate limits, billing or behaviour changes at any third party the customer's implementations call.
-- Browser-backed repair steps, which require a Chromium runtime the customer or a provider operates.
-- Incident sources. The product acts on incidents it is given; ingestion is host-side.
-- Any modification the customer makes to payload files. Modified payloads are unsupported until the modification is reverted or upstreamed.
-- Consequences of an approval decision. A human approved the step; the product recorded who and when.
+The evaluator and vendor must agree on the working contact channel before the evaluation starts. A personal message or an unacknowledged email does not create a contractual support ticket.
 
-## Severity
+## 2. Potential production scope
 
-Severity is set by operational impact, not by how the ticket is written.
+A future production support agreement may cover product behavior in a supported, unmodified release:
 
-| | Definition |
+- licence and feature enforcement;
+- explicit API capability validation;
+- approval pause and signed continuation validation;
+- dispatch scope and at-most-once behavior;
+- package audit events;
+- reference notification localization;
+- packaged acceptance tooling.
+
+Production support cannot begin until production `1.0.0` is earned through external acceptance and a signed agreement defines the service commitment.
+
+## 3. Buyer-controlled components
+
+The following are buyer infrastructure and are excluded unless an order form expressly adds integration services:
+
+- `SecretsProvider`, `NotificationSink`, `ApproverDirectory`, and `HostBranding` implementations;
+- `SqlExecutor`, dispatch ledger, approval nonce store, audit repository, and SIEM transport;
+- provider capability registrations and parameter validators;
+- `ApiStepRunner`, verification runners, and provider credentials;
+- databases, cloud accounts, identity providers, secret managers, networks, notification systems, and SIEMs;
+- third-party outages, billing, rate limits, API changes, and provider behavior;
+- browser runtimes and browser-backed repair implementations;
+- monitoring-source mappings not specifically accepted against buyer traffic;
+- modified or forked package code;
+- the business consequences of a buyer's approval decision.
+
+The vendor can diagnose the package boundary but cannot administer infrastructure it does not operate or access.
+
+## 4. Severity definitions for future contracting
+
+Severity is based on operational impact and reproducibility.
+
+| Severity | Proposed definition |
 | --- | --- |
-| **1 — Critical** | The product is not gating consequential steps, or approval requests are not reaching approvers, in production. Anything where the safety property has failed. |
-| **2 — High** | Production incidents are not being processed, or the audit trail is not reaching the SIEM. The product is not working but nothing unsafe is happening. |
-| **3 — Normal** | A defect with a workaround, or a non-production environment is affected. |
-| **4 — Low** | Questions, documentation, feature requests, cosmetic issues. |
+| **1 — Critical** | A reproducible package defect permits a consequential step to reach the buyer runner without a valid exact-scope approval continuation, or falsely records execution authority. |
+| **2 — High** | A reproducible package defect prevents licensed production incident processing, approval routing, signed continuation, or required audit emission without an available workaround. |
+| **3 — Normal** | A package defect has a reasonable workaround, affects a non-production environment, or degrades a non-safety function. |
+| **4 — Low** | Documentation questions, feature requests, usability issues, or cosmetic defects. |
 
-A gating failure is always Severity 1 even if nothing has gone wrong yet. The whole point of the product is that consequential changes stop for a human; if that is not happening, the customer is exposed whether or not they have noticed.
+A buyer infrastructure outage is not automatically a package Severity 1. Triage must first identify whether the failure is in the package or a buyer-controlled boundary.
 
-## Response targets
+## 5. Response targets are intentionally unset
 
-Targets are for **first substantive response**, not resolution. A resolution commitment on a defect nobody has diagnosed yet is a commitment nobody can keep.
+The earlier draft promised a four-hour Severity 1 response, 24/7. That commitment is removed because it must not be offered without demonstrated staffing, monitoring, backup coverage, escalation capability, and commercial pricing.
 
-| Severity | Target | Hours |
-| --- | --- | --- |
-| 1 | 4 hours | 24/7 |
-| 2 | 1 business day | Business hours |
-| 3 | 2 business days | Business hours |
-| 4 | 5 business days | Business hours |
+Before any target is signed, the vendor must document:
 
-Business hours are 09:00–18:00, Monday to Friday, Central Time (America/Mexico_City), excluding public holidays in the vendor's jurisdiction.
+- named primary and backup responders;
+- covered time zone and holidays;
+- after-hours alerting and acknowledgement method;
+- maximum concurrent incidents;
+- security escalation process;
+- dependency on third-party specialists;
+- first-response versus restoration expectations;
+- exclusions and customer cooperation requirements;
+- service credits or other remedies, if any.
 
-Support is raised by email to **support@signalboostapp.com**. A ticket exists when that address acknowledges it; a message to an individual is not a ticket.
+Until those items are approved, support is reasonable-effort during mutually agreed business hours only.
 
-## Security fixes
+## 6. Security reports
 
-A vulnerability in the payload is handled on the Severity 1 path regardless of whether it is currently being exploited.
+A suspected vulnerability in the package should be handled confidentially through the security contact identified in the signed evaluation or order form. The evaluator should include the package version, source commit, archive checksum, affected public API, reproduction steps, observed result, expected result, and whether a real runner was connected.
 
-Fixes ship as a new patch version with release notes naming the issue and the affected versions. Customers on a supported version are notified. Because the payload holds no state and rolls back by restoring the previous archive, a security patch is a file replacement and an acceptance re-run, not a migration.
+Do not include production credentials, licence tokens, approval signatures, private keys, customer data, or full secret-bearing logs.
 
-Report suspected vulnerabilities to **security@signalboostapp.com**. Do not raise them through the ordinary support channel.
+A security fix should ship as a new archived package with release notes, manifest, SBOM, checksums, regression coverage, clean-install evidence, and explicit affected-version information.
 
-## Supported versions
+## 7. Supported versions — proposed policy
 
-The current minor version and the one before it. When a new minor version ships, the one two behind it leaves support 90 days later.
+- release candidates are evaluation-only;
+- production support begins only with a signed agreement naming the supported release;
+- a future standard policy may support the current minor version and one previous minor version;
+- end-of-support notice periods must be stated in the applicable order form;
+- emergency security support for older versions is not implied unless expressly purchased.
 
-A major version is supported for 12 months after its successor ships.
+## 8. Buyer responsibilities
 
-Release candidates (`-rc`) are not supported for production use.
+A production buyer would remain responsible for:
 
-## What the customer is responsible for
+- keeping approver identity and authorization current;
+- protecting licence tokens, issuer keys, approval private keys, and provider credentials;
+- operating a durable atomic dispatch ledger and nonce store;
+- reviewing every capability registration and runner change;
+- running acceptance after installation, upgrade, rollback, key rotation, notification changes, approver changes, capability changes, runner changes, and SIEM changes;
+- retaining the exact package, checksum, manifest, SBOM, source commit, configuration version, incident ID, plan ID, dispatch ID, and relevant audit-event IDs;
+- maintaining tested backup, restore, upgrade, and rollback procedures;
+- preventing unsupported modifications from being represented as the vendor release.
 
-- Keeping the approver directory accurate. An approver who has left the company is a gating failure the product cannot detect.
-- Running the acceptance harness after every upgrade, rollback, or change to notification, approver or SIEM wiring.
-- Backing up the ledger table and their own wiring.
-- Keeping their licence current.
-- Quoting the `version`, `sourceCommit`, dispatch id and incident id when raising a ticket. Those four values identify exactly what was running.
+## 9. Known commercial limitations
 
-## Escalation
+- source delivery makes licence enforcement contractual rather than tamper-proof;
+- licence seats and aggregate execution limits are not currently technical counters;
+- the vendor does not operate the buyer's environment and cannot independently observe an outage;
+- no 24/7 operations team, SOC 2 report, ISO 27001 certification, or third-party penetration-test commitment is represented by this draft;
+- monitoring adapters remain staged until accepted against buyer traffic;
+- no production warranty, SLA, service credit, or end-of-life commitment exists until signed.
 
-If a Severity 1 has not had a substantive response inside its target, the customer escalates to **escalation@signalboostapp.com**, which reaches the vendor's principal directly. Escalation is by severity and elapsed time, not by relationship.
+## 10. Required approvals before use
 
-## Maintenance
-
-There is no vendor-operated service to take down, so there are no maintenance windows. Upgrades happen on the customer's schedule.
-
-## Known limitations
-
-Carried here so they cannot be discovered during an incident:
-
-- Seats and execution limits are recorded in the licence and are contract terms. There is no counter in the product that enforces them.
-- A licence that has lapsed stops execution and dispatch. Reading incident history, audit and SIEM output continue.
-- A revocation check that fails does not revoke. If the customer's revocation source is unreachable, revocation is not being enforced, and the product reports that through `onStale` rather than guessing.
-
-## End of life
-
-If the product is discontinued, customers under an active agreement receive 12 months' notice, security fixes for that period, and a final archive they may keep and run under the terms of their licence.
+This framework must be reviewed and completed by the vendor's commercial decision-maker, operations owner, security owner, and qualified counsel. It must not be attached to a proposal as binding terms while any material field remains unresolved.

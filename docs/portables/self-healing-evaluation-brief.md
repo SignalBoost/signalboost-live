@@ -29,7 +29,30 @@ with no licence installed.**
 
 ---
 
-## 2. Where the code is
+## 2. Getting it running
+
+**Install the package.** Every push to `main` builds it — open the repository's Actions tab,
+pick the newest `portable-package` run, and download the artifact. That is a real npm package
+with **zero third-party dependencies**; Node built-ins only.
+
+```bash
+npm install ./signalboost-self-healing-supervisor-1.0.0.tgz
+```
+
+To build it yourself instead:
+
+```bash
+cd saas && node scripts/build-portable.mjs && cd dist/portable && npm pack
+```
+
+**Then follow `self-healing-technical-walkthrough.md`** — about thirty minutes, entirely
+offline, no account anywhere. It has you write a small host adapter, run the product's own
+acceptance scenario against it, deliberately break the safety property to confirm the harness
+catches you, and attack the signed intake path.
+
+Read the source alongside it.
+
+## 3. Where the code is
 
 | Path | What it is |
 | --- | --- |
@@ -47,7 +70,7 @@ and we want to hear about it.
 
 ---
 
-## 3. Suggested reading order
+## 4. Suggested reading order
 
 1. `docs/portables/self-healing-integration-guide.md` — the buyer-provided interfaces, the
    dispatch ledger schema, reference wiring, and what "live" requires.
@@ -60,7 +83,7 @@ and we want to hear about it.
 
 ---
 
-## 4. Running the tests
+## 5. Running the tests
 
 Node 22 or newer. The suites run `node --test` directly against `.ts` sources — Node strips
 types rather than compiling, which is why a strip-safety guard exists in the build.
@@ -85,7 +108,7 @@ tactic; refusing to act on it is enforcement. The distinction is deliberate.
 
 ---
 
-## 5. What is proven, and how
+## 6. What is proven, and how
 
 - **Approval gating.** `runAcceptanceScenario` runs one rehearsal incident per risk category
   (financial, destructive, credential security) against a real host context. The dangerous
@@ -102,7 +125,7 @@ tactic; refusing to act on it is enforcement. The distinction is deliberate.
 
 ---
 
-## 6. What is NOT proven — read this before forming a view
+## 7. What is NOT proven — read this before forming a view
 
 - **Eight monitoring vendor adapters are `staged`, not validated.** Datadog, PagerDuty,
   CloudWatch/EventBridge, Alertmanager, Splunk, Azure Monitor, Grafana, Google Cloud
@@ -126,7 +149,7 @@ tactic; refusing to act on it is enforcement. The distinction is deliberate.
 
 ---
 
-## 7. What we would most like you to attack
+## 8. What we would most like you to attack
 
 1. **Find a path where a consequential step executes without a named human.** This is the
    product's central claim. If it can be broken, everything else is decoration.
@@ -143,7 +166,7 @@ tactic; refusing to act on it is enforcement. The distinction is deliberate.
 
 ---
 
-## 8. What not to spend time on
+## 9. What not to spend time on
 
 The UI. The pages under `saas/app/dashboard/supervisor/` are SignalBoost's own operator
 console and demo surface — a test rig, not part of what a buyer receives. The same is true of
@@ -152,14 +175,15 @@ directories in section 2.
 
 ---
 
-## 9. Documents in this set
+## 10. Documents in this set
 
 All under `docs/portables/`:
 
 `self-healing-integration-guide.md` · `self-healing-incident-intake-guide.md` ·
 `self-healing-monitoring-connections.md` · `self-healing-license-installation.md` ·
 `self-healing-operations-runbook.md` · `self-healing-security-and-data-handling.md` ·
-`self-healing-support-terms.md` · `self-healing-pilot-agreement.md`
+`self-healing-support-terms.md` · `self-healing-pilot-agreement.md` ·
+`self-healing-technical-walkthrough.md`
 
 The support terms and pilot agreement are commercial drafts, not engineering documents. The
 pilot agreement is a structural draft for counsel and is not ready to sign.

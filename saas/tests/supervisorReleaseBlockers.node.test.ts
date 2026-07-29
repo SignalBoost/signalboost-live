@@ -108,6 +108,21 @@ function signedProof(privateKeyPem: string, overrides: Partial<ApprovalContinuat
   }
 }
 
+function consequentialRegistry() {
+  return createApiCapabilityRegistry([{
+    provider: 'example-cloud',
+    actionId: 'shutdown',
+    mutation: true,
+    riskClass: 'consequential',
+    approvalRequired: true,
+    autoExecutable: false,
+    methods: ['POST'],
+    resourcePattern: /^\/systems\/[a-z0-9-]+\/actions\/shutdown$/,
+    validateParameters: parameters => parameters.confirmed === true,
+    maximumExecutionsPerDispatch: 1,
+  }])
+}
+
 test('unknown and adversarial API mutations pause by default', () => {
   const cases = [
     apiStep({ parameters: { actionId: 'terminate', method: 'POST', resource: '/instances/abc/actions/terminate' } }),
@@ -157,17 +172,17 @@ test('only an exact registered reversible capability auto-executes', async () =>
   assert.deepEqual(calls, ['step-1'])
 })
 
-test('signed approval continuation executes exact scope once and rejects replay', async () => {
+test('signed continuation executes a registered consequential capability once', async () => {
   const keys = approvalKeys()
-  const nonceStore = new InMemoryApprovalNonceStore()
   const verifier = createEd25519ApprovalVerifier({
     publicKeyFor: keyId => keyId === 'approval-key-1' ? keys.publicKeyPem : undefined,
-    nonceStore,
+    nonceStore: new InMemoryApprovalNonceStore(),
     previousAuditEventExists: input => input.eventId === 'pause-event-1' && input.incidentId === 'incident-1' && input.planId === 'plan-1',
     now: () => new Date(NOW),
   })
   const calls: string[] = []
   const executor = new APIExecutor({
+    capabilityRegistry: consequentialRegistry(),
     approvalVerifier: verifier,
     runner: async step => {
       calls.push(step.stepId)
@@ -175,10 +190,8 @@ test('signed approval continuation executes exact scope once and rejects replay'
     },
   })
   const proof = signedProof(keys.privateKeyPem)
-  const input = {
-    ...executorInput(apiStep({ parameters: { actionId: 'shutdown', method: 'POST', resource: '/systems/primary/actions/shutdown' } }), proof.dispatchId),
-    approvalContinuation: proof,
-  }
+  const step = apiStep({ parameters: { actionId: 'shutdown', method: 'POST', resource: '/systems/primary/actions/shutdown', confirmed: true } })
+  const input = { ...executorInput(step, proof.dispatchId), approvalContinuation: proof }
 
   const first = await executor.execute(input as never)
   assert.equal(first.status, 'completed')
@@ -188,6 +201,31 @@ test('signed approval continuation executes exact scope once and rejects replay'
   const replay = await executor.execute(input as never)
   assert.equal(replay.status, 'paused_for_approval')
   assert.deepEqual(calls, ['step-1'])
+})
+
+test('signed approval never authorizes an unregistered capability', async () => {
+  const keys = approvalKeys()
+  const verifier = createEd25519ApprovalVerifier({
+    publicKeyFor: () => keys.publicKeyPem,
+    nonceStore: new InMemoryApprovalNonceStore(),
+    previousAuditEventExists: () => true,
+    now: () => new Date(NOW),
+  })
+  const calls: string[] = []
+  const proof = signedProof(keys.privateKeyPem, { nonce: 'nonce-unregistered' })
+  const executor = new APIExecutor({
+    approvalVerifier: verifier,
+    runner: async step => {
+      calls.push(step.stepId)
+      return { ok: true, summary: 'must never run' }
+    },
+  })
+  const step = apiStep({ parameters: { actionId: 'shutdown', method: 'POST', resource: '/systems/primary/actions/shutdown', confirmed: true } })
+  const result = await executor.execute({ ...executorInput(step, proof.dispatchId), approvalContinuation: proof } as never)
+
+  assert.equal(result.status, 'paused_for_approval')
+  assert.deepEqual(calls, [])
+  assert.ok(result.evidence.some(event => event.type === 'api_unregistered_capability_paused'))
 })
 
 test('tampered, expired and unbound approval proofs fail closed', async () => {
@@ -255,8 +293,8 @@ test('packaged factory refuses incomplete licence configuration and guards paid 
     features: ['repair.plan', 'repair.dispatch'],
     seats: 5,
     maxExecutions: null,
-    issuedAt: new Date(NOW - 60_000).toISOString(),
-    notBefore: new Date(NOW - 60_000).toISOString(),
+    issuedAt: new Date(Date.now() - 60_000).toISOString(),
+    notBefore: new Date(Date.now() - 60_000).toISOString(),
     expiresAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
     graceDays: 0,
   }

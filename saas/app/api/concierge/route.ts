@@ -7,6 +7,12 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+// The support route has its own 240-second model/tool budget. Keep a smaller
+// outer deadline so the browser always receives a terminal response before the
+// platform-level 300-second limit. A timed-out research request must never leave
+// the dashboard on an endless "Thinking…" state.
+const PRIMARY_TIMEOUT_MS = 195_000
+
 function latestUserText(body: any): string {
   const messages = Array.isArray(body?.messages) ? body.messages : []
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -49,17 +55,45 @@ function timestamp(): string {
   return new Date().toISOString().replace('T', ' ').replace('Z', '')
 }
 
+function boundedPrimary(req: NextRequest): Promise<{ response: Response | null; timedOut: boolean }> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<{ response: null; timedOut: true }>((resolve) => {
+    timer = setTimeout(() => resolve({ response: null, timedOut: true }), PRIMARY_TIMEOUT_MS)
+  })
+  const primary = supportPost(new NextRequest(req.clone()))
+    .then((response) => ({ response, timedOut: false as const }))
+    .catch(() => ({ response: null, timedOut: false as const }))
+  return Promise.race([primary, deadline]).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
+}
+
+function timeoutReply(language: string) {
+  const messages: Record<string, string> = {
+    en: 'This research request reached the bounded processing limit before the final report was ready. No one was contacted and no external action was taken. Please submit the remaining companies as a smaller research batch.',
+    es: 'Esta solicitud de investigación alcanzó el límite de procesamiento antes de que el informe final estuviera listo. No se contactó a nadie ni se realizó ninguna acción externa. Envíe las empresas restantes en un lote de investigación más pequeño.',
+    pt: 'Esta solicitação de pesquisa atingiu o limite de processamento antes de o relatório final ficar pronto. Ninguém foi contatado e nenhuma ação externa foi realizada. Envie as empresas restantes em um lote de pesquisa menor.',
+    pl: 'To zadanie badawcze osiągnęło limit przetwarzania, zanim raport końcowy był gotowy. Z nikim się nie skontaktowano i nie wykonano żadnej czynności zewnętrznej. Prześlij pozostałe firmy jako mniejszą partię badawczą.',
+    ru: 'Этот исследовательский запрос достиг лимита обработки до подготовки итогового отчета. Ни с кем не связывались и никаких внешних действий не выполнялось. Отправьте оставшиеся компании меньшей исследовательской партией.',
+  }
+  return messages[language] || messages.en
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
 
-  let primary: Response | null = null
-  try {
-    primary = await supportPost(new NextRequest(req.clone()))
-  } catch {
-    primary = null
+  const primaryRun = await boundedPrimary(req)
+  if (primaryRun.timedOut) {
+    return NextResponse.json({
+      reply: timeoutReply(language),
+      source: 'cos-bounded-timeout',
+      timed_out: true,
+      execution_allowed: false,
+    })
   }
+  const primary = primaryRun.response
 
   // Primary authentication, authorization, validation, and rate-limit decisions
   // are terminal. Backup COS must never turn a governed 4xx denial into HTTP 200,

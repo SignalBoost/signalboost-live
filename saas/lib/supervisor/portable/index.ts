@@ -1,10 +1,51 @@
 // saas/lib/supervisor/portable/index.ts
 //
-// The public integration surface of the Self-Healing Supervisor portable. An
-// enterprise buyer imports everything they need to plug the portable into their
-// stack from here: the HostContext boundary they implement, and the host-agnostic
-// building blocks (enterprise notifier, database-neutral dispatch store) that the
-// portable's factory wires to it.
+// Public buyer surface. Paid planning and dispatch are constructed only through
+// createLicensedSelfHealingSupervisor; lower-level unguarded factories are not
+// exported from the package entry point.
+
+export {
+  createLicensedSelfHealingSupervisor,
+  SELF_HEALING_PRODUCT_ID,
+} from './licensed-supervisor.ts'
+export type {
+  CreateLicensedSelfHealingSupervisorOptions,
+  LicensedSelfHealingSupervisor,
+  SelfHealingLicenseConfig,
+} from './licensed-supervisor.ts'
+
+export {
+  createApiCapabilityRegistry,
+  emptyApiCapabilityRegistry,
+  apiActionId,
+  apiMethod,
+  apiResource,
+} from '../executors/api-capability-registry.ts'
+export type {
+  ApiCapability,
+  ApiCapabilityMatch,
+  ApiCapabilityRegistry,
+  ApiRiskClass,
+} from '../executors/api-capability-registry.ts'
+
+export {
+  APPROVAL_CONTINUATION_SCHEMA_VERSION,
+  canonicalApprovalPayload,
+  createEd25519ApprovalVerifier,
+  InMemoryApprovalNonceStore,
+} from '../executors/approval-continuation.ts'
+export type {
+  ApprovalContinuationContext,
+  ApprovalContinuationProof,
+  ApprovalContinuationVerdict,
+  ApprovalContinuationVerifier,
+  ApprovalNonceStore,
+  Ed25519ApprovalVerifierOptions,
+} from '../executors/approval-continuation.ts'
+export type { ApiStepRunner } from '../executors/api-executor.ts'
+export type { DispatchStore, DispatchClaim } from '../executors/dispatch-store.ts'
+export type { DispatchAuditSink, DispatchAuditEvent } from '../executors/executor-types.ts'
+export type { Thinker } from '../execution-contracts.ts'
 
 export type {
   HostContext,
@@ -161,9 +202,6 @@ export type {
   ReadOnlyExecutorOptions,
 } from './resource-check-runner.ts'
 
-// Locale-aware copy for the messages this product sends to PEOPLE. Exported because a buyer
-// writing their own notification sink needs the same wording their approvers would otherwise
-// get from the reference adapter — the translations belong to the product, not to the host.
 export {
   approvalCopy,
   categoryLabel,

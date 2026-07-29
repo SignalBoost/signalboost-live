@@ -32,8 +32,9 @@ function decisionId(): string {
 }
 
 function isQuestion(text: string): boolean {
-  if (text.includes('?')) return true;
-  return /^(how|what|why|which|who|where|when|do|does|did|is|are|should|can|could|would)\b/.test(text);
+  const normalized = text.trimStart();
+  if (normalized.includes('?')) return true;
+  return /^(how|what|why|which|who|where|when|do|does|did|is|are|should|can|could|would)\b/.test(normalized);
 }
 
 const NEGATION_PATTERN = /\b(?:do not|don't|never|must not|should not|shall not|cannot|can't|without)\b/g;
@@ -64,12 +65,24 @@ function isNegatedActionAt(text: string, actionIndex: number): boolean {
   return !NEGATION_BREAK_PATTERN.test(afterNegation);
 }
 
+/**
+ * Some action words also occur as fields to research. "Best person or job title
+ * to contact" requests contact identification; it does not authorize outreach.
+ */
+function isReadOnlyActionReference(text: string, action: string, actionIndex: number): boolean {
+  if (action !== 'contact') return false;
+  const prefix = text.slice(Math.max(0, actionIndex - 100), actionIndex);
+  const suffix = text.slice(actionIndex, actionIndex + 60);
+  if (/\b(?:person(?:\s+or\s+job title)?|job title|contact person|contact name|title|name|profile)\s+to\s*$/.test(prefix)) return true;
+  return /^contact\s+(?:information|details|name|person|profile|title)\b/.test(suffix);
+}
+
 function containsAffirmativeAction(text: string, action: string): boolean {
   let from = 0;
   while (from < text.length) {
     const index = text.indexOf(action, from);
     if (index < 0) return false;
-    if (!isNegatedActionAt(text, index)) return true;
+    if (!isNegatedActionAt(text, index) && !isReadOnlyActionReference(text, action, index)) return true;
     from = index + Math.max(action.length, 1);
   }
   return false;

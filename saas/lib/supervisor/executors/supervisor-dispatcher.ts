@@ -60,7 +60,7 @@ export class SupervisorDispatcher {
   private get store(): DispatchStore { if (this.deps.dispatchStore) return this.deps.dispatchStore; if (!this.defaultStore) this.defaultStore = new InMemoryDispatchStore(); return this.defaultStore }
   async dispatch(raw: SupervisorDispatchRequest): Promise<SupervisorExecutorResult> {
     const kind = isExecutorKind(raw.requestedExecutorKind) ? raw.requestedExecutorKind : 'manual'
-    try { await this.audit(raw, 'dispatch_requested', { requestedExecutorKind: raw.requestedExecutorKind, approvedStepIds: raw.approvedStepIds }) } catch (e) { return fail(raw.dispatchId || 'unknown', kind, `Audit failed before execution: ${e instanceof Error ? e.message : 'unknown'}`) }
+    try { await this.audit(raw, 'dispatch_requested', { requestedExecutorKind: raw.requestedExecutorKind, approvedStepIds: raw.approvedStepIds, approvalContinuationPresented: Boolean(raw.approvalContinuation), approvalContinuationKeyId: raw.approvalContinuation?.keyId, previousAuditEventId: raw.approvalContinuation?.previousAuditEventId }) } catch (e) { return fail(raw.dispatchId || 'unknown', kind, `Audit failed before execution: ${e instanceof Error ? e.message : 'unknown'}`) }
     try {
       const request = this.validate(raw)
       if (request.executionDecision && request.coordinationStore) {
@@ -78,9 +78,9 @@ export class SupervisorDispatcher {
         executionId: request.executionContext.executionId,
       })
       if (!claimed) { await this.audit(raw, 'duplicate_dispatch_rejected', { dispatchId: request.dispatchId }); throw new DispatchValidationError('Duplicate dispatchId rejected.') }
-      await this.audit(raw, 'dispatch_started', { executorKind: request.requestedExecutorKind, approvedStepIds: request.approvedStepIds })
+      await this.audit(raw, 'dispatch_started', { executorKind: request.requestedExecutorKind, approvedStepIds: request.approvedStepIds, approvalContinuationPresented: Boolean(request.approvalContinuation) })
       let result: SupervisorExecutorResult
-      try { result = await executor.execute({ incident: request.incident, plan: request.plan, approvedStepIds: [...request.approvedStepIds], executionContext: request.executionContext, dispatch: { dispatchId: request.dispatchId, requestedExecutorKind: request.requestedExecutorKind, requestedAt: now() } }) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Executor exception', [], request.approvedStepIds) }
+      try { result = await executor.execute({ incident: request.incident, plan: request.plan, approvedStepIds: [...request.approvedStepIds], executionContext: request.executionContext, dispatch: { dispatchId: request.dispatchId, requestedExecutorKind: request.requestedExecutorKind, requestedAt: now() }, approvalContinuation: request.approvalContinuation }) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Executor exception', [], request.approvedStepIds) }
       try { validateExecutorResult(result, request.dispatchId, request.requestedExecutorKind, request.approvedStepIds) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Invalid executor result', [], request.approvedStepIds) }
       await this.audit(raw, result.status === 'failed' || result.status === 'rejected' ? 'dispatch_failed' : 'dispatch_completed', { status: result.status, executedStepIds: result.executedStepIds, skippedStepIds: result.skippedStepIds, error: result.error?.message })
       return result
@@ -97,13 +97,19 @@ export class SupervisorDispatcher {
     const planIds = new Set(plan.steps.map(s => s.stepId)); for (const sid of raw.approvedStepIds) if (!planIds.has(sid)) throw new DispatchValidationError('Unknown approved step ID rejected.')
     const policyIds = new Set(raw.policyDecision.approvedStepIds); for (const sid of raw.approvedStepIds) if (!policyIds.has(sid)) throw new DispatchValidationError('Unapproved step rejected.')
     if (raw.approvedStepIds.length !== raw.policyDecision.approvedStepIds.length) throw new DispatchValidationError('Approval scope must exactly match policy approvedStepIds.')
+    if (raw.approvalContinuation) {
+      if (raw.approvalContinuation.dispatchId !== raw.dispatchId) throw new DispatchValidationError('Approval continuation dispatchId mismatch.')
+      if (raw.approvalContinuation.incidentId !== incident.incidentId) throw new DispatchValidationError('Approval continuation incidentId mismatch.')
+      if (raw.approvalContinuation.planId !== plan.planId) throw new DispatchValidationError('Approval continuation planId mismatch.')
+      if (raw.approvalContinuation.approvedStepIds.length !== raw.approvedStepIds.length || raw.approvalContinuation.approvedStepIds.some((stepId, index) => stepId !== raw.approvedStepIds[index])) throw new DispatchValidationError('Approval continuation scope mismatch.')
+    }
     const approved = steps(plan, raw.approvedStepIds); assertPlanCompatible(plan, approved, raw.requestedExecutorKind, raw.policyDecision)
     if (raw.executionDecision) {
       const d = raw.executionDecision
       if (Date.parse(d.expiresAt) <= Date.now()) throw new DispatchValidationError('Execution decision expired.')
       if (d.selectedChannel !== raw.requestedExecutorKind) throw new DispatchValidationError('Decision channel does not match executor.')
       if (d.fencingToken < 1 || !d.ownerInstanceId || !d.ownerRuntimeId) throw new DispatchValidationError('Decision missing ownership fence.')
-      if (d.approvedStepIds.length !== raw.approvedStepIds.length || d.approvedStepIds.some((id, idx) => id !== raw.approvedStepIds[idx])) throw new DispatchValidationError('Decision approved step scope mismatch.')
+      if (d.approvedStepIds.length !== raw.approvedStepIds.length || d.approvedStepIds.some((stepId, index) => stepId !== raw.approvedStepIds[index])) throw new DispatchValidationError('Decision approved step scope mismatch.')
       if (raw.requestedExecutorKind === 'api' && d.selectedChannel === 'browser') throw new DispatchValidationError('API decision cannot route to BrowserExecutor.')
       if (raw.requestedExecutorKind === 'browser' && (!d.browserReason || !browserReasons.includes(d.browserReason.reason))) throw new DispatchValidationError('Browser decision requires an accepted browser reason.')
     }

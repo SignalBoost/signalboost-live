@@ -1,10 +1,11 @@
 // saas/lib/supervisor/executors/create-supervisor-dispatcher.ts
 //
 // Internal dispatcher construction. All infrastructure boundaries are injected;
-// this module contains no platform email, provider or environment fallback.
+// this module contains no platform email, provider, database or browser-runtime
+// fallback.
 
 import { APIExecutor } from './api-executor.ts'
-import { BrowserExecutor } from './browser-executor.ts'
+import { PortableBrowserExecutor } from './portable-browser-executor.ts'
 import { ManualExecutor } from './manual-executor.ts'
 import { ExecutorRegistry } from './executor-registry.ts'
 import { SupervisorDispatcher } from './supervisor-dispatcher.ts'
@@ -42,7 +43,7 @@ export function createSupervisorDispatcher(options: CreateSupervisorDispatcherOp
     capabilityRegistry: options.apiCapabilities,
     approvalVerifier: options.approvalVerifier,
   }))
-  registry.register('browser', new BrowserExecutor())
+  registry.register('browser', new PortableBrowserExecutor())
   registry.register('manual', new ManualExecutor())
   return new SupervisorDispatcher({
     registry,

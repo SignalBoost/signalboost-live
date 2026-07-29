@@ -1,11 +1,9 @@
 // saas/scripts/build-portable.mjs
 //
-// Canonical Self-Healing Supervisor release builder.
-//
-// The release is accepted only after source-boundary validation, TypeScript
-// compilation, declaration generation, manifest/SBOM/checksum creation, npm
-// packing, installation into a fresh project, public-import verification and
-// the documented acceptance scenario in all five supported languages.
+// Canonical Self-Healing Supervisor release builder. It accepts a release only
+// after boundary validation, strict ESM compilation, declaration generation,
+// supply-chain evidence, npm packing, clean installation, public import and the
+// five-language / three-risk-category acceptance matrix.
 
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -23,11 +21,11 @@ const ARTIFACT_ROOT = path.join(APP_ROOT, 'dist', 'portable')
 const ENTRY_POINT = 'lib/supervisor/portable/index.ts'
 const PACKAGE_NAME = '@signalboost/self-healing-supervisor'
 const PACKAGE_VERSION = '1.0.0-rc.2'
+const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.mjs']
 const ALLOWED_BUILTINS = new Set([
   'assert', 'buffer', 'crypto', 'events', 'http', 'https', 'net', 'os', 'path',
   'perf_hooks', 'stream', 'timers', 'tls', 'url', 'util', 'worker_threads', 'zlib',
 ])
-const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.mjs']
 const DOCS = [
   ['../docs/portables/self-healing-technical-walkthrough.md', 'technical-walkthrough.md'],
   ['../docs/portables/self-healing-integration-guide.md', 'integration-guide.md'],
@@ -44,9 +42,23 @@ function normalize(file) {
   return file.split(path.sep).join('/')
 }
 
+function run(command, args, options = {}) {
+  return execFileSync(command, args, {
+    cwd: options.cwd ?? APP_ROOT,
+    stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    env: { ...process.env, ...(options.env ?? {}) },
+    encoding: options.capture ? 'utf8' : undefined,
+  })
+}
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex')
+}
+
 function isBuiltin(specifier) {
-  if (specifier.startsWith('node:')) return ALLOWED_BUILTINS.has(specifier.slice(5))
-  return ALLOWED_BUILTINS.has(specifier)
+  return specifier.startsWith('node:')
+    ? ALLOWED_BUILTINS.has(specifier.slice(5))
+    : ALLOWED_BUILTINS.has(specifier)
 }
 
 function resolveLocal(specifier, fromFile) {
@@ -62,25 +74,18 @@ function resolveLocal(specifier, fromFile) {
     for (const extension of ['.ts', '.tsx', '.mts']) candidates.push(withoutExtension + extension)
   }
   for (const extension of SOURCE_EXTENSIONS) candidates.push(path.join(base, `index${extension}`))
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return path.resolve(candidate)
-  }
-  return null
+  return candidates.find(candidate => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) ?? null
 }
 
 function importSpecifiers(source) {
   const found = new Set()
-  const stripped = source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
-  const patterns = [
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  for (const pattern of [
     /\bfrom\s*['"]([^'"]+)['"]/g,
     /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     /\bimport\s*['"]([^'"]+)['"]/g,
     /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-  ]
-  for (const pattern of patterns) {
+  ]) {
     let match
     while ((match = pattern.exec(stripped)) !== null) found.add(match[1])
   }
@@ -104,11 +109,8 @@ function walkGraph() {
     for (const specifier of importSpecifiers(source)) {
       if (isBuiltin(specifier)) continue
       const resolved = resolveLocal(specifier, absolute)
-      if (resolved) {
-        queue.push(resolved)
-        continue
-      }
-      if (specifier.startsWith('.') || specifier.startsWith('@/')) unresolved.push({ from: absolute, specifier })
+      if (resolved) queue.push(path.resolve(resolved))
+      else if (specifier.startsWith('.') || specifier.startsWith('@/')) unresolved.push({ from: absolute, specifier })
       else {
         if (!external.has(specifier)) external.set(specifier, new Set())
         external.get(specifier).add(absolute)
@@ -134,31 +136,17 @@ function compiledSpecifier(specifier, fromFile) {
 }
 
 function rewriteImports(source, fromFile) {
-  return source.replace(/(['"])(@\/[^'"]+|\.{1,2}\/[^'"]+)\1/g, (whole, quote, specifier) => {
+  return source.replace(/(['"])(@\/[^'"]+|\.{1,2}\/[^'"]+)\1/g, (_whole, quote, specifier) => {
     return `${quote}${compiledSpecifier(specifier, fromFile)}${quote}`
   })
 }
 
 function writeSources(files) {
   for (const [absolute, source] of files) {
-    const relative = path.relative(APP_ROOT, absolute)
-    const destination = path.join(SOURCE_ROOT, relative)
+    const destination = path.join(SOURCE_ROOT, path.relative(APP_ROOT, absolute))
     fs.mkdirSync(path.dirname(destination), { recursive: true })
     fs.writeFileSync(destination, rewriteImports(source, absolute), 'utf8')
   }
-}
-
-function run(command, args, options = {}) {
-  return execFileSync(command, args, {
-    cwd: options.cwd ?? APP_ROOT,
-    stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-    env: { ...process.env, ...(options.env ?? {}) },
-    encoding: options.capture ? 'utf8' : undefined,
-  })
-}
-
-function sha256(value) {
-  return crypto.createHash('sha256').update(value).digest('hex')
 }
 
 function allFiles(root) {
@@ -211,9 +199,7 @@ function writePackageMetadata(moduleCount) {
     license: 'UNLICENSED',
   }
   fs.writeFileSync(path.join(PACKAGE_ROOT, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`)
-
-  fs.writeFileSync(path.join(PACKAGE_ROOT, 'README.md'), `# Self-Healing Supervisor — Design-Partner Evaluation\n\nThis package runs inside the buyer's environment. It has no vendor-hosted control plane and no vendor telemetry.\n\n## Install\n\n\`\`\`bash\nnpm install ./signalboost-self-healing-supervisor-${PACKAGE_VERSION}.tgz\n\`\`\`\n\n## Import\n\n\`\`\`js\nimport { createLicensedSelfHealingSupervisor } from '${PACKAGE_NAME}'\n\`\`\`\n\nPaid planning and dispatch can be constructed only through the licensed factory. The buyer supplies the host boundary, durable dispatch ledger, execution runner, explicit API capability registry and signed-approval verifier. Unknown mutating capabilities pause by default.\n\nThis is an evaluation release, not a production licence grant. See LICENSE-EVALUATION.md.\n`)
-
+  fs.writeFileSync(path.join(PACKAGE_ROOT, 'README.md'), `# Self-Healing Supervisor — Design-Partner Evaluation\n\nThis package runs inside the buyer's environment. It has no vendor-hosted control plane and no vendor telemetry.\n\n## Install\n\n\`\`\`bash\nnpm install ./signalboost-self-healing-supervisor-${PACKAGE_VERSION}.tgz\n\`\`\`\n\n## Import\n\n\`\`\`js\nimport { createLicensedSelfHealingSupervisor } from '${PACKAGE_NAME}'\n\`\`\`\n\nPaid planning and dispatch can be constructed only through the licensed factory. Every provider-bound read, verification or mutation requires an explicit buyer capability. Unknown capabilities never execute, even after approval. Registered consequential capabilities require an exact signed continuation bound to the canonical plan fingerprint.\n\nThis is an evaluation release, not a production licence grant. See LICENSE-EVALUATION.md.\n`)
   fs.writeFileSync(path.join(PACKAGE_ROOT, 'LICENSE-EVALUATION.md'), `# Evaluation-only notice\n\nVersion ${PACKAGE_VERSION} is supplied only for technical evaluation by an authorized design partner. It does not grant production, redistribution, resale, sublicensing or public-hosting rights. Production use requires a separate signed software agreement identifying the vendor legal entity, buyer, fees, governing law, liability terms, support terms and termination rights.\n`)
 
   const compiledFiles = allFiles(path.join(PACKAGE_ROOT, 'dist')).map(file => ({
@@ -236,11 +222,12 @@ function writePackageMetadata(moduleCount) {
       model: 'contractual source delivery; not tamper-proof',
       planningFeature: 'repair.plan',
       dispatchFeature: 'repair.dispatch',
-      alwaysAvailable: ['read', 'observe', 'audit export'],
+      alwaysAvailable: ['observe', 'audit export'],
     },
     safety: {
-      unknownApiCapabilities: 'pause',
-      consequentialContinuation: 'exact-scope Ed25519 proof, expiration, prior-audit reference and one-time nonce',
+      providerCalls: 'explicit capability required for read, verify and mutation',
+      unknownApiCapabilities: 'never executable',
+      consequentialContinuation: 'canonical plan SHA-256, exact scope, Ed25519 signature, expiration, prior-audit reference and one-time nonce',
       platformFallbacks: false,
     },
     knownLimitations: [
@@ -274,8 +261,7 @@ function writePackageMetadata(moduleCount) {
 
 function writeChecksums() {
   const files = allFiles(PACKAGE_ROOT).filter(file => path.basename(file) !== 'SHA256SUMS')
-  const lines = files.map(file => `${sha256(fs.readFileSync(file))}  ${normalize(path.relative(PACKAGE_ROOT, file))}`)
-  fs.writeFileSync(path.join(PACKAGE_ROOT, 'SHA256SUMS'), `${lines.join('\n')}\n`)
+  fs.writeFileSync(path.join(PACKAGE_ROOT, 'SHA256SUMS'), `${files.map(file => `${sha256(fs.readFileSync(file))}  ${normalize(path.relative(PACKAGE_ROOT, file))}`).join('\n')}\n`)
 }
 
 function pack() {
@@ -290,9 +276,9 @@ function pack() {
   try { filename = JSON.parse(output)[0].filename } catch { fail(`npm pack did not return parseable JSON: ${output}`) }
   const archive = path.join(ARTIFACT_ROOT, filename)
   if (!fs.existsSync(archive)) fail(`npm pack did not produce ${archive}`)
-  fs.copyFileSync(path.join(PACKAGE_ROOT, 'manifest.json'), path.join(ARTIFACT_ROOT, 'manifest.json'))
-  fs.copyFileSync(path.join(PACKAGE_ROOT, 'sbom.json'), path.join(ARTIFACT_ROOT, 'sbom.json'))
-  fs.copyFileSync(path.join(PACKAGE_ROOT, 'SHA256SUMS'), path.join(ARTIFACT_ROOT, 'SHA256SUMS'))
+  for (const name of ['manifest.json', 'sbom.json', 'SHA256SUMS']) {
+    fs.copyFileSync(path.join(PACKAGE_ROOT, name), path.join(ARTIFACT_ROOT, name))
+  }
   fs.writeFileSync(`${archive}.sha256`, `${sha256(fs.readFileSync(archive))}  ${path.basename(archive)}\n`)
   return archive
 }
@@ -308,6 +294,7 @@ function cleanInstallAndAccept(archive) {
         'createLicensedSelfHealingSupervisor',
         'createApiCapabilityRegistry',
         'createEd25519ApprovalVerifier',
+        'fingerprintRepairPlan',
         'runAcceptanceScenario',
         'approvalCopy',
       ]
@@ -333,7 +320,7 @@ function cleanInstallAndAccept(archive) {
           }
         }
       }
-      console.log('clean install, public import, five-language acceptance: pass')
+      console.log('clean install, public ESM import, five-language acceptance: pass')
     `
     fs.writeFileSync(path.join(work, 'acceptance.mjs'), script)
     run(process.execPath, ['acceptance.mjs'], { cwd: work })
@@ -354,6 +341,9 @@ function main() {
   fs.rmSync(BUILD_ROOT, { recursive: true, force: true })
   fs.mkdirSync(SOURCE_ROOT, { recursive: true })
   fs.mkdirSync(PACKAGE_ROOT, { recursive: true })
+  // Under NodeNext, the nearest package.json determines whether .ts sources emit
+  // ESM or CommonJS. Establish ESM identity before invoking TypeScript.
+  fs.writeFileSync(path.join(BUILD_ROOT, 'package.json'), `${JSON.stringify({ private: true, type: 'module' }, null, 2)}\n`)
   writeSources(files)
 
   const tsconfig = {

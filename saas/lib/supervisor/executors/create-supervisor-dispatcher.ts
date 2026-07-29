@@ -1,8 +1,7 @@
 // saas/lib/supervisor/executors/create-supervisor-dispatcher.ts
 //
-// Internal dispatcher construction. The buyer-facing package exports the licensed
-// factory from portable/index.ts; this lower-level factory remains an internal
-// building block and is not a package export.
+// Internal dispatcher construction. All infrastructure boundaries are injected;
+// this module contains no platform email, provider or environment fallback.
 
 import { APIExecutor } from './api-executor.ts'
 import { BrowserExecutor } from './browser-executor.ts'
@@ -25,27 +24,14 @@ export interface CreateSupervisorDispatcherOptions {
   approvalVerifier?: ApprovalContinuationVerifier
   host?: HostContext
   notifyOwner?: OwnerNotifier
-  dashboardUrl?: string
 }
 
-function platformFallbackNotifier(dashboardUrl?: string): OwnerNotifier {
-  return async (input) => {
-    try {
-      const [{ sendEmail }, { createOwnerEmailNotifier }] = await Promise.all([
-        import('@/lib/email'),
-        import('@/lib/supervisor/executors/owner-notifier'),
-      ])
-      await createOwnerEmailNotifier({ send: opts => sendEmail(opts), dashboardUrl })(input)
-    } catch {
-      // best-effort: notification must never throw into the executor
-    }
-  }
-}
+const noNotificationSink: OwnerNotifier = async () => {}
 
 function resolveNotifier(options: CreateSupervisorDispatcherOptions): OwnerNotifier {
   if (options.notifyOwner) return options.notifyOwner
   if (options.host) return createEnterpriseNotifier(options.host)
-  return platformFallbackNotifier(options.dashboardUrl)
+  return noNotificationSink
 }
 
 export function createSupervisorDispatcher(options: CreateSupervisorDispatcherOptions): SupervisorDispatcher {

@@ -1,7 +1,8 @@
 # .github/workflows/portable-release.yml
 #
-# Builds each portable that has a release spec, then verifies the artifact with
-# a second script that shares no logic with the one that produced it.
+# Generic release builder for portables other than Self-Healing Supervisor.
+# Self-Healing has one canonical compiled clean-install path in
+# .github/workflows/portable-package.yml.
 
 name: Portable release
 
@@ -9,27 +10,27 @@ on:
   push:
     branches: [main]
     paths:
-      - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
       - 'saas/provider-hub-core/**'
       - 'saas/press-media-core/**'
       - 'saas/portable-kernel/**'
       - 'saas/portable-audit/**'
       - 'saas/portable-license/**'
-      - 'saas/portable-release/**'
+      - 'saas/portable-release/press-media.release.json'
+      - 'saas/portable-release/provider-hub.release.json'
       - 'saas/scripts/package-portable.mjs'
       - 'saas/scripts/verify-release.mjs'
       - '.github/workflows/portable-release.yml'
   pull_request:
     paths:
-      - 'saas/lib/supervisor/**'
       - 'saas/lib/browser-runtime/**'
       - 'saas/provider-hub-core/**'
       - 'saas/press-media-core/**'
       - 'saas/portable-kernel/**'
       - 'saas/portable-audit/**'
       - 'saas/portable-license/**'
-      - 'saas/portable-release/**'
+      - 'saas/portable-release/press-media.release.json'
+      - 'saas/portable-release/provider-hub.release.json'
       - 'saas/scripts/package-portable.mjs'
       - 'saas/scripts/verify-release.mjs'
       - '.github/workflows/portable-release.yml'
@@ -42,7 +43,6 @@ jobs:
       fail-fast: false
       matrix:
         spec:
-          - self-healing.release.json
           - press-media.release.json
           - provider-hub.release.json
     steps:

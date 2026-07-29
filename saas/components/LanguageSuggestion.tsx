@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import ReportTextLocalizer from '@/components/i18n/ReportTextLocalizer'
+import GeneratedContentLocalizer from '@/components/i18n/GeneratedContentLocalizer'
 import AssistantHistoryLayoutPatch from '@/components/AssistantHistoryLayoutPatch'
 
 const SUPPORTED_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
@@ -46,7 +46,7 @@ function AutoLanguageInitializer() {
 export default function LanguageSuggestion() {
   return (
     <>
-      <ReportTextLocalizer />
+      <GeneratedContentLocalizer />
       <AssistantHistoryLayoutPatch />
       <AutoLanguageInitializer />
     </>

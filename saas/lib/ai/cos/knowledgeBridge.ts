@@ -3,14 +3,12 @@
 // KNOWLEDGE LAYER v1 — turns the reasoning core's `mustUseTool` flag into a real
 // fetch from the routed source, using connectors that ALREADY exist. Where a
 // source has no connector, it returns an honest "not wired" note — never a
-// fabricated result. This is the bridge between "COS knows which source to
-// check" and "COS actually checked it."
+// fabricated result.
 //
 // tsconfig is non-strict: flat results; never throws to the caller.
 
 import type { CosSourceType, CosReasoningOutput } from './reasoningTypes.ts'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics'
-import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { listRepoFiles } from '@/lib/ai/tools/repoReader'
 import { getVercelDeployments, type Deployment } from '@/lib/hub/deployments-service'
@@ -46,6 +44,15 @@ function summarizeDeployments(deps: Deployment[]): string {
   ].join('\n')
 }
 
+function isProspectDiscovery(objective: string): boolean {
+  return /potential buyers?|design partners?|prospect list|find (?:companies|businesses|prospects)|cloud-focused msp|devops (?:and |&)??sre|managed cloud-service provider/i.test(objective)
+}
+
+function prospectDiscoveryQuery(objective: string): string {
+  const region = /united states|\bu\.s\.\b|\busa\b/i.test(objective) ? 'United States ' : ''
+  return `${region}cloud MSP DevOps SRE consultancy managed AWS Azure Google Cloud Kubernetes incident response monitoring managed services companies`
+}
+
 export async function gatherEvidence(source: CosSourceType, objective: string): Promise<CosEvidence> {
   try {
     switch (source) {
@@ -54,23 +61,25 @@ export async function gatherEvidence(source: CosSourceType, objective: string): 
         if (!r.ok || !r.metrics) return { source, connectorWired: true, fetched: false, summary: '', error: r.error || 'metrics fetch failed' }
         return { source, connectorWired: true, fetched: true, summary: formatMetricsForAI(r.metrics) }
       }
-      case 'crm_or_leads': {
-        // Existing connector covers the current partner/affiliate COUNT. Lead
-        // DISCOVERY (e.g. finding new hotels) is not wired here — that path uses
-        // the live public web instead.
-        const r = await getAffiliateCount()
-        if (!r.ok || !r.metrics) return { source, connectorWired: true, fetched: false, summary: '', error: r.error || 'affiliate fetch failed' }
-        return { source, connectorWired: true, fetched: true, summary: formatAffiliatesForAI(r.metrics) }
-      }
+      case 'crm_or_leads':
+        return notWired(
+          source,
+          'The existing lead/outreach pipeline does not yet expose a general read connector to the COS knowledge bridge. New-company discovery must use the live public web; existing saved leads cannot be reported from affiliate counts.',
+        )
       case 'signalboost_public_website': {
         const r = await getExternalInfo(`${objective} site:signalboostapp.com`)
         if (!r.ok) return { source, connectorWired: true, fetched: false, summary: '', error: r.error }
         return { source, connectorWired: true, fetched: true, summary: formatExternalInfoForAI(objective, r.results) }
       }
       case 'live_public_website': {
-        const r = await getExternalInfo(objective)
+        const query = isProspectDiscovery(objective) ? prospectDiscoveryQuery(objective) : objective
+        const r = await getExternalInfo(query)
         if (!r.ok) return { source, connectorWired: true, fetched: false, summary: '', error: r.error }
-        return { source, connectorWired: true, fetched: true, summary: formatExternalInfoForAI(objective, r.results) }
+        const formatted = formatExternalInfoForAI(query, r.results)
+        const summary = isProspectDiscovery(objective)
+          ? `INITIAL PROSPECT-DISCOVERY EVIDENCE. This is a candidate seed set, not a finished qualification list. Continue with multiple targeted live-web searches, verify each company against its official website, and do not claim a contact, size, LinkedIn profile, or competitive assessment that was not found in public evidence.\n\n${formatted}`
+          : formatted
+        return { source, connectorWired: true, fetched: true, summary }
       }
       case 'github_repo': {
         const r = await listRepoFiles()
@@ -104,8 +113,6 @@ export async function gatherEvidence(source: CosSourceType, objective: string): 
   }
 }
 
-// Run the reasoning core's verdict through the knowledge layer: if the decision
-// requires a tool, fetch the routed source; otherwise return no evidence.
 export async function groundCosDecision(
   output: CosReasoningOutput,
 ): Promise<{ decisionId: string; evidence: CosEvidence | null }> {

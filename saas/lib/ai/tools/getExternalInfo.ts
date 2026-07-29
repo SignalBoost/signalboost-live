@@ -3,9 +3,9 @@
 // Returns structured top results (title, url, snippet) for market/competitor/news queries.
 //
 // PORTABLE: the search provider is INJECTED. The default adapter uses the Brave
-// Search API (BRAVE_SEARCH_API_KEY; free tier: 2,000 queries/month) — unchanged
-// behavior for this deployment. A buyer of the Chief-of-Staff portable calls
-// setWebSearchPort(...) once to use their own search provider and key.
+// Search API (BRAVE_SEARCH_API_KEY; free tier: 2,000 queries/month). A buyer of
+// the Chief-of-Staff portable calls setWebSearchPort(...) once to use their own
+// search provider and key.
 
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
@@ -21,8 +21,10 @@ export interface WebSearchPort {
 const cache = new Map<string, { at: number; results: SearchResult[] }>()
 const CACHE_MS = 5 * 60 * 1000 // 5 minutes
 const MAX_CACHE_ENTRIES = 50
+const DEFAULT_RESULT_COUNT = 10
+const MAX_RESULT_COUNT = 12
 
-// ── Default adapter: Brave Search (unchanged behavior) ───────────────────────
+// ── Default adapter: Brave Search ─────────────────────────────────────────────
 let searchPort: WebSearchPort | null = null
 
 function defaultSearchPort(): WebSearchPort {
@@ -64,18 +66,19 @@ function defaultSearchPort(): WebSearchPort {
 export function setWebSearchPort(p: WebSearchPort): void { searchPort = p }
 export function getWebSearchPort(): WebSearchPort { return searchPort ?? defaultSearchPort() }
 
-export async function getExternalInfo(query: string): Promise<{ ok: boolean; results: SearchResult[]; error?: string }> {
+export async function getExternalInfo(query: string, requestedCount = DEFAULT_RESULT_COUNT): Promise<{ ok: boolean; results: SearchResult[]; error?: string }> {
   const q = String(query || '').trim().slice(0, 400)
   if (!q) return { ok: false, results: [], error: 'Empty search query.' }
+  const count = Math.max(1, Math.min(Number(requestedCount) || DEFAULT_RESULT_COUNT, MAX_RESULT_COUNT))
 
-  const key = q.toLowerCase()
+  const key = `${count}:${q.toLowerCase()}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < CACHE_MS) {
     return { ok: true, results: hit.results }
   }
 
   try {
-    const results = await getWebSearchPort().search(q, 6)
+    const results = await getWebSearchPort().search(q, count)
     if (!results.length) return { ok: false, results: [], error: 'No results found.' }
 
     if (cache.size >= MAX_CACHE_ENTRIES) {
@@ -118,7 +121,6 @@ export function formatExternalInfoForAI(query: string, results: SearchResult[]):
   const base = `Live web search results for "${query}" (retrieved just now — treat as current external data, cite sources by URL when making claims):\n\n${lines.join('\n\n')}`
 
   if (!shouldAttachCosIntelligence(query)) return base
-
   const externalSignals = results.map((result, index) => signalFromResult(query, result, index))
   const intelligence = buildCosChatIntelligence({ user_text: query, external_signals: externalSignals })
   return `${base}\n\n${intelligence.formatted_for_chat}`

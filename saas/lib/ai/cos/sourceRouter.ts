@@ -8,11 +8,25 @@
 import type { CosSourceRouting } from './reasoningTypes.ts';
 import { SOURCE_BELIEFS, CURRENT_FACT_SIGNALS } from './cosBeliefs.ts';
 
+const PROSPECT_DISCOVERY_PATTERN = /potential buyers?|design partners?|prospect list|find (?:companies|businesses|prospects)|cloud-focused msp|managed cloud-service provider|devops (?:and |&)??sre|qualification score|linkedin profile/;
+
 export function routeCosSource(objective: string): CosSourceRouting {
   const text = ` ${(objective || '').toLowerCase().trim()} `;
 
   if (text.trim().length === 0) {
     return { requiredSource: 'no_tool_required', mustUseTool: false, reason: 'Empty objective.' };
+  }
+
+  // Discovery of companies that do not already exist in SignalBoost must use
+  // the public web. This explicit precedence prevents incidental words such as
+  // "customers" or "partners" inside a research brief from routing the whole
+  // request to internal metrics or the saved-lead pipeline.
+  if (PROSPECT_DISCOVERY_PATTERN.test(text)) {
+    return {
+      requiredSource: 'live_public_website',
+      mustUseTool: true,
+      reason: 'New-company and buyer discovery requires current public-web research; internal customer, affiliate, and saved-lead records are not the source of truth.',
+    };
   }
 
   for (const belief of SOURCE_BELIEFS) {

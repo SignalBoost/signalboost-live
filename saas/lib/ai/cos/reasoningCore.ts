@@ -11,9 +11,7 @@
 //     internal action (SAFE_INTERNAL_ACTIONS) still conservatively defaults
 //     to approval. Only actions provably internal-only (drafting, rendering,
 //     scoring, queueing — nothing external, nothing spent) may EXECUTE
-//     without stopping for the owner. This is what makes day-to-day COSA
-//     operation autonomous while every external/irreversible action still
-//     stops at the owner, exactly once, before it leaves the building.
+//     without stopping for the owner.
 
 import type {
   CosReasoningInput,
@@ -38,9 +36,48 @@ function isQuestion(text: string): boolean {
   return /^(how|what|why|which|who|where|when|do|does|did|is|are|should|can|could|would)\b/.test(text);
 }
 
+const NEGATION_PATTERN = /\b(?:do not|don't|never|must not|should not|shall not|cannot|can't|without)\b/g;
+const NEGATION_BREAK_PATTERN = /\b(?:but|however|instead|except)\b/;
+
+/**
+ * Determine whether an action-word occurrence is inside a negative instruction,
+ * such as "do not contact anyone, send messages, or submit forms". The prior
+ * implementation used substring matching and interpreted that safety constraint
+ * as a request to contact people.
+ */
+function isNegatedActionAt(text: string, actionIndex: number): boolean {
+  const punctuationStart = Math.max(
+    text.lastIndexOf('.', actionIndex - 1),
+    text.lastIndexOf('!', actionIndex - 1),
+    text.lastIndexOf('?', actionIndex - 1),
+    text.lastIndexOf('\n', actionIndex - 1),
+  );
+  const windowStart = Math.max(punctuationStart + 1, actionIndex - 180);
+  const prefix = text.slice(windowStart, actionIndex);
+  const matches = Array.from(prefix.matchAll(NEGATION_PATTERN));
+  const last = matches[matches.length - 1];
+  if (!last || last.index === undefined) return false;
+
+  // A contrast after the negation starts a new positive instruction:
+  // "do not wait; instead contact support".
+  const afterNegation = prefix.slice(last.index + last[0].length);
+  return !NEGATION_BREAK_PATTERN.test(afterNegation);
+}
+
+function containsAffirmativeAction(text: string, action: string): boolean {
+  let from = 0;
+  while (from < text.length) {
+    const index = text.indexOf(action, from);
+    if (index < 0) return false;
+    if (!isNegatedActionAt(text, index)) return true;
+    from = index + Math.max(action.length, 1);
+  }
+  return false;
+}
+
 function detectProposesAction(text: string): boolean {
   if (isQuestion(text)) return false;
-  return ACTION_VERBS.some((v) => text.includes(v));
+  return ACTION_VERBS.some((verb) => containsAffirmativeAction(text, verb));
 }
 
 function classifyChannel(text: string): CosChannel {
@@ -61,26 +98,17 @@ function channelBelief(channel: CosChannel) {
   return CHANNEL_BELIEFS.find((c) => c.id === channel) ?? CHANNEL_BELIEFS[CHANNEL_BELIEFS.length - 1];
 }
 
-// Fixed mechanism. Owner tunes WHICH actions are sensitive (in cosBeliefs);
-// this function can escalate to requiredApproval=true from a sensitive match,
-// or clear it ONLY for a known-safe internal action. Anything matching
-// neither list stays conservative: default to approval.
 function approvalFloor(text: string, proposesAction: boolean): { requiredApproval: boolean; approvalReasons: string[] } {
   if (!proposesAction) return { requiredApproval: false, approvalReasons: [] };
 
-  // Sensitivity is a one-way ratchet: a match here can NEVER be cleared below.
   const sensitiveReasons = SENSITIVE_CATEGORIES
     .filter((c) => c.signals.some((s) => text.includes(s)))
     .map((c) => c.id);
   if (sensitiveReasons.length > 0) return { requiredApproval: true, approvalReasons: sensitiveReasons };
 
-  // Not sensitive — is it a known-safe, internal-only COSA operation?
-  // Nothing external happens, nothing is spent, nothing leaves the private
-  // queue, so it may execute without stopping for the owner.
   const safeMatch = SAFE_INTERNAL_ACTIONS.find((a) => a.signals.some((s) => text.includes(s)));
   if (safeMatch) return { requiredApproval: false, approvalReasons: [] };
 
-  // Unclassified action → conservative reflex: default to approval.
   return { requiredApproval: true, approvalReasons: ['unclassified action — defaulting to approval'] };
 }
 
@@ -132,7 +160,6 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
   const shouldPrepareNow = !blocked;
   const shouldExecuteNow = state === 'EXECUTE';
 
-  // ---- analysis ----
   const constraints = [
     'COS may PREPARE and EXECUTE known-safe internal actions on its own; anything sensitive or unclassified requires explicit owner approval.',
     'COS may not answer current-fact questions from memory; it must use the routed source.',
@@ -151,7 +178,6 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     missingInfo.push('Objective is broad; clarify the desired outcome for a sharper recommendation.');
   }
 
-  // ---- decision ----
   let confidence = blocked ? 0 : 0.4;
   if (!blocked && channel !== 'analysis_only') confidence += 0.2;
   if (!blocked && sourceRouting.requiredSource !== 'no_tool_required') confidence += 0.2;
@@ -174,7 +200,6 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     requiredApproval ? `Approval required: ${approvalReasons.join(', ')}.` : 'No owner approval required — either a read, or a known-safe internal action.',
   ];
 
-  // ---- execution plan ----
   const steps: string[] = [];
   if (blocked) {
     steps.push('Do nothing; ask the owner for a valid objective.');
@@ -192,7 +217,6 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     }
   }
 
-  // ---- feedback plan ----
   const feedbackPlan = {
     metricsToWatch: cb.metricsToWatch,
     successCriteria: blocked
@@ -207,7 +231,6 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     ],
   };
 
-  // ---- report ----
   const report = [
     `COS Decision ${id}`,
     ``,

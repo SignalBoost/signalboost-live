@@ -32,6 +32,7 @@ export {
   APPROVAL_CONTINUATION_SCHEMA_VERSION,
   canonicalApprovalPayload,
   createEd25519ApprovalVerifier,
+  fingerprintRepairPlan,
   InMemoryApprovalNonceStore,
 } from '../executors/approval-continuation.ts'
 export type {

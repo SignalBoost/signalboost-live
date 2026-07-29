@@ -3,7 +3,6 @@ import { repairPlanSchema, type RepairPlan, type RepairStep } from '../repair-pl
 import type { PolicyDecision } from '../execution-contracts.ts'
 import { ExecutorRegistry } from './executor-registry.ts'
 import { DispatchValidationError, ExecutorRegistryError } from './errors.ts'
-import { ownershipIdentity } from '../coordination/index.ts'
 import { browserReasons } from '../execution-policy/index.ts'
 import { InMemoryDispatchStore, type DispatchStore } from './dispatch-store.ts'
 import { apiCompatibleActions, browserCompatibleActions, dispatcherAuditSchemaVersion, executorSchemaVersion, isExecutorKind, manualCompatibleActions, type DispatchAuditEvent, type DispatchAuditEventType, type DispatchAuditSink, type ExecutorKind, type SupervisorDispatchRequest, type SupervisorExecutorResult } from './executor-types.ts'

@@ -83,11 +83,12 @@ test('continuity policy flags material short-answer shadow divergence', () => {
   }), ['primary_backup_quality_divergence'])
 })
 
-test('prospect discovery routes to the live web and remains read-only', () => {
+test('the full buyer-research brief routes to the live web and remains read-only', () => {
   const result = runCosReasoning({
-    objective: `Find 20 strong potential buyers and design partners in the United States.
-Prioritize cloud-focused MSPs and DevOps or SRE consultancies.
-Do not contact anyone, send messages, submit forms, or share product files.`,
+    objective: `Find 20 strong potential buyers, starting in the United States.
+Prioritize cloud-focused MSPs that serve multiple business customers and provide monitoring, incident response, DevOps, SRE, or cloud operations.
+For each company provide the best person or job title to contact, a LinkedIn profile when available, and a qualification score.
+Do not contact anyone, send messages, submit forms, or share product files. Only produce the researched prospect list for my review.`,
   })
   assert.equal(result.sourceRouting.requiredSource, 'live_public_website')
   assert.equal(result.sourceRouting.mustUseTool, true)
@@ -126,10 +127,12 @@ test('Concierge bounds long Primary work and returns a terminal timeout response
 
 test('prospect evidence never substitutes affiliate counts for CRM or discovery', async () => {
   const bridge = await readFile(path.resolve(process.cwd(), 'lib/ai/cos/knowledgeBridge.ts'), 'utf8').then(hydrateLocalizedSource)
+  const router = await readFile(path.resolve(process.cwd(), 'lib/ai/cos/sourceRouter.ts'), 'utf8').then(hydrateLocalizedSource)
   const search = await readFile(path.resolve(process.cwd(), 'lib/ai/tools/getExternalInfo.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(bridge, /case 'crm_or_leads':\s*return notWired/)
   assert.doesNotMatch(bridge, /getAffiliateCount/)
   assert.match(bridge, /INITIAL PROSPECT-DISCOVERY EVIDENCE/)
+  assert.match(router, /PROSPECT_DISCOVERY_PATTERN/)
   assert.match(search, /const DEFAULT_RESULT_COUNT = 10/)
 })
 

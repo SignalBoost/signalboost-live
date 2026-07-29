@@ -1,8 +1,9 @@
 // saas/lib/supervisor/executors/api-executor.ts
 //
 // API execution is default-deny. Routine automatic work must match the buyer's
-// explicit capability registry. Consequential work pauses unless a signed,
-// unexpired, single-use continuation proof validates the exact dispatch scope.
+// explicit capability registry. Consequential work must also be registered and
+// pauses unless a signed, unexpired, single-use continuation proof validates the
+// exact dispatch scope. Approval never authorizes an unknown capability.
 
 import {
   apiCompatibleActions,
@@ -100,10 +101,28 @@ export class APIExecutor implements SupervisorExecutor {
       return continuationVerdict
     }
 
+    const pause = async (step: RepairStep, verdict: DangerVerdict, evidenceType = 'api_step_paused_for_approval'): Promise<SupervisorExecutorResult> => {
+      try { await this.notifyOwner?.({ dispatchId, incidentId: input.incident.incidentId, step, verdict }) } catch { /* best effort */ }
+      evidence.push({
+        evidenceId: `${dispatchId}-${step.stepId}-paused`,
+        type: evidenceType,
+        summary: `Paused before "${step.stepId}": ${verdict.reason} Nothing was executed.`,
+        data: {
+          stepId: step.stepId,
+          category: verdict.category ?? 'destructive',
+          action: step.action,
+          targetProvider: input.plan.targetProvider,
+        },
+      })
+      const index = approvedSteps.indexOf(step)
+      skipped.push(...approvedSteps.slice(index).map(candidate => candidate.stepId))
+      return this.result(input, startedAt, 'paused_for_approval', executed, skipped, evidence)
+    }
+
     for (const step of approvedSteps) {
       if (step.action === 'stop') {
         evidence.push({ evidenceId: `${dispatchId}-${step.stepId}-stop`, type: 'api_stop', summary: `Stopped at step ${step.stepId} as planned.` })
-        skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step) + 1).map(s => s.stepId))
+        skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step) + 1).map(candidate => candidate.stepId))
         break
       }
 
@@ -115,8 +134,8 @@ export class APIExecutor implements SupervisorExecutor {
             type: 'api_request_approval',
             summary: `Step ${step.stepId} requests owner approval before proceeding.`,
           })
-          const idx = approvedSteps.indexOf(step)
-          skipped.push(...approvedSteps.slice(idx).map(s => s.stepId))
+          const index = approvedSteps.indexOf(step)
+          skipped.push(...approvedSteps.slice(index).map(candidate => candidate.stepId))
           return this.result(input, startedAt, 'paused_for_approval', executed, skipped, evidence)
         }
         evidence.push({
@@ -133,39 +152,46 @@ export class APIExecutor implements SupervisorExecutor {
       }
 
       const verdict = classifyStep(step, input.plan.targetProvider, this.capabilityRegistry)
+      const capability = verdict.capabilityMatch?.capability
 
       if (verdict.dangerous) {
+        // A human may approve only a capability that the buyer registered and
+        // reviewed. A signature never turns an unknown action into authority.
+        if (!capability) return pause(step, verdict, 'api_unregistered_capability_paused')
+
         const continuation = await validateContinuation()
-        if (!continuation.valid) {
-          try { await this.notifyOwner?.({ dispatchId, incidentId: input.incident.incidentId, step, verdict }) } catch { /* best effort */ }
-          evidence.push({
-            evidenceId: `${dispatchId}-${step.stepId}-paused`,
-            type: 'api_step_paused_for_approval',
-            summary: `Paused before "${step.stepId}": ${verdict.reason} Nothing was executed.`,
-            data: { stepId: step.stepId, category: verdict.category ?? 'destructive', action: step.action, targetProvider: input.plan.targetProvider },
-          })
-          const idx = approvedSteps.indexOf(step)
-          skipped.push(...approvedSteps.slice(idx).map(s => s.stepId))
-          return this.result(input, startedAt, 'paused_for_approval', executed, skipped, evidence)
-        }
+        if (!continuation.valid) return pause(step, verdict)
+
         evidence.push({
           evidenceId: `${dispatchId}-${step.stepId}-continuation`,
           type: 'api_approval_continuation_accepted',
-          summary: `Signed approval continuation accepted for consequential step ${step.stepId}.`,
+          summary: `Signed approval continuation accepted for registered consequential step ${step.stepId}.`,
           data: {
             stepId: step.stepId,
+            provider: capability.provider,
+            actionId: capability.actionId,
             approverId: continuation.approverId ?? 'unknown',
             previousAuditEventId: continuation.previousAuditEventId ?? 'unknown',
           },
         })
       }
 
-      const capability = verdict.capabilityMatch?.capability
-      if (capability?.maximumExecutionsPerDispatch !== undefined) {
+      if (!capability) {
+        // Defensive invariant: every api_request reaching the runner must have
+        // an exact registry match, including apparently non-dangerous requests.
+        return pause(step, {
+          dangerous: true,
+          category: 'destructive',
+          reason: 'No registered capability matched the API request.',
+          capabilityMatch: verdict.capabilityMatch,
+        }, 'api_unregistered_capability_paused')
+      }
+
+      if (capability.maximumExecutionsPerDispatch !== undefined) {
         const capabilityKey = `${capability.provider}/${capability.actionId}`
         const count = capabilityExecutions.get(capabilityKey) ?? 0
         if (count >= capability.maximumExecutionsPerDispatch) {
-          skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step)).map(s => s.stepId))
+          skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step)).map(candidate => candidate.stepId))
           return this.result(input, startedAt, 'rejected', executed, skipped, evidence, {
             code: 'api_execution_limit_exceeded',
             message: `Execution limit exceeded for ${capabilityKey}.`,
@@ -183,7 +209,7 @@ export class APIExecutor implements SupervisorExecutor {
       if (run.data) execEvidence.data = run.data
       evidence.push(execEvidence)
       if (!run.ok) {
-        skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step) + 1).map(s => s.stepId))
+        skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step) + 1).map(candidate => candidate.stepId))
         return this.result(input, startedAt, 'failed', executed, skipped, evidence, { code: 'api_step_failed', message: `Step ${step.stepId} failed: ${run.summary}` })
       }
       executed.push(step.stepId)

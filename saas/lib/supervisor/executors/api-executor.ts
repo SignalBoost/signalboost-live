@@ -3,7 +3,8 @@
 // API execution is default-deny. Routine automatic work must match the buyer's
 // explicit capability registry. Consequential work must also be registered and
 // pauses unless a signed, unexpired, single-use continuation proof validates the
-// exact dispatch scope. Approval never authorizes an unknown capability.
+// exact plan contents and dispatch scope. Approval never authorizes an unknown
+// capability.
 
 import {
   apiCompatibleActions,
@@ -20,9 +21,10 @@ import {
   emptyApiCapabilityRegistry,
   type ApiCapabilityRegistry,
 } from './api-capability-registry.ts'
-import type {
-  ApprovalContinuationVerdict,
-  ApprovalContinuationVerifier,
+import {
+  fingerprintRepairPlan,
+  type ApprovalContinuationVerdict,
+  type ApprovalContinuationVerifier,
 } from './approval-continuation.ts'
 
 function now() { return new Date().toISOString() }
@@ -64,6 +66,7 @@ export class APIExecutor implements SupervisorExecutor {
   async execute(input: SupervisorExecutorInput): Promise<SupervisorExecutorResult> {
     const startedAt = now()
     const dispatchId = input.dispatch.dispatchId
+    const planFingerprint = fingerprintRepairPlan(input.plan)
     const approved = new Set(input.approvedStepIds)
     const approvedSteps = input.plan.steps.filter(step => approved.has(step.stepId))
 
@@ -95,6 +98,7 @@ export class APIExecutor implements SupervisorExecutor {
       continuationVerdict = await this.approvalVerifier.verify(input.approvalContinuation, {
         incidentId: input.incident.incidentId,
         planId: input.plan.planId,
+        planFingerprint,
         dispatchId,
         approvedStepIds: [...input.approvedStepIds],
       })
@@ -109,6 +113,7 @@ export class APIExecutor implements SupervisorExecutor {
         summary: `Paused before "${step.stepId}": ${verdict.reason} Nothing was executed.`,
         data: {
           stepId: step.stepId,
+          planFingerprint,
           category: verdict.category ?? 'destructive',
           action: step.action,
           targetProvider: input.plan.targetProvider,
@@ -133,6 +138,7 @@ export class APIExecutor implements SupervisorExecutor {
             evidenceId: `${dispatchId}-${step.stepId}-approval`,
             type: 'api_request_approval',
             summary: `Step ${step.stepId} requests owner approval before proceeding.`,
+            data: { planFingerprint },
           })
           const index = approvedSteps.indexOf(step)
           skipped.push(...approvedSteps.slice(index).map(candidate => candidate.stepId))
@@ -143,6 +149,7 @@ export class APIExecutor implements SupervisorExecutor {
           type: 'api_request_approval_satisfied',
           summary: `Signed approval continuation accepted for control step ${step.stepId}.`,
           data: {
+            planFingerprint,
             approverId: continuation.approverId ?? 'unknown',
             previousAuditEventId: continuation.previousAuditEventId ?? 'unknown',
           },
@@ -155,8 +162,6 @@ export class APIExecutor implements SupervisorExecutor {
       const capability = verdict.capabilityMatch?.capability
 
       if (verdict.dangerous) {
-        // A human may approve only a capability that the buyer registered and
-        // reviewed. A signature never turns an unknown action into authority.
         if (!capability) return pause(step, verdict, 'api_unregistered_capability_paused')
 
         const continuation = await validateContinuation()
@@ -168,6 +173,7 @@ export class APIExecutor implements SupervisorExecutor {
           summary: `Signed approval continuation accepted for registered consequential step ${step.stepId}.`,
           data: {
             stepId: step.stepId,
+            planFingerprint,
             provider: capability.provider,
             actionId: capability.actionId,
             approverId: continuation.approverId ?? 'unknown',
@@ -177,8 +183,6 @@ export class APIExecutor implements SupervisorExecutor {
       }
 
       if (!capability) {
-        // Defensive invariant: every api_request reaching the runner must have
-        // an exact registry match, including apparently non-dangerous requests.
         return pause(step, {
           dangerous: true,
           category: 'destructive',
@@ -205,8 +209,9 @@ export class APIExecutor implements SupervisorExecutor {
         evidenceId: `${dispatchId}-${step.stepId}-exec`,
         type: run.ok ? 'api_step_executed' : 'api_step_failed',
         summary: `${step.stepId} (${step.action}): ${run.summary}`,
+        data: { planFingerprint },
       }
-      if (run.data) execEvidence.data = run.data
+      if (run.data) execEvidence.data = { ...execEvidence.data, ...run.data }
       evidence.push(execEvidence)
       if (!run.ok) {
         skipped.push(...approvedSteps.slice(approvedSteps.indexOf(step) + 1).map(candidate => candidate.stepId))

@@ -11,6 +11,7 @@ import {
   APPROVAL_CONTINUATION_SCHEMA_VERSION,
   canonicalApprovalPayload,
   createEd25519ApprovalVerifier,
+  fingerprintRepairPlan,
   InMemoryApprovalNonceStore,
   type ApprovalContinuationProof,
 } from '../lib/supervisor/executors/approval-continuation.ts'
@@ -42,13 +43,13 @@ function apiStep(overrides: Record<string, unknown> = {}) {
     action: 'api_request',
     description: 'Apply the requested state.',
     protectedAction: true,
-    parameters: {
-      actionId: 'restart-service',
-      method: 'POST',
-      resource: '/services/api/actions/restart',
-    },
+    parameters: { actionId: 'restart-service', method: 'POST', resource: '/services/api/actions/restart' },
     ...overrides,
   }
+}
+
+function shutdownStep(resource = '/systems/primary/actions/shutdown') {
+  return apiStep({ parameters: { actionId: 'shutdown', method: 'POST', resource, confirmed: true } })
 }
 
 function plan(step = apiStep(), planId = 'plan-1') {
@@ -86,11 +87,16 @@ function approvalKeys() {
   }
 }
 
-function signedProof(privateKeyPem: string, overrides: Partial<ApprovalContinuationProof> = {}): ApprovalContinuationProof {
+function signedProof(
+  privateKeyPem: string,
+  boundPlan: ReturnType<typeof plan>,
+  overrides: Partial<ApprovalContinuationProof> = {},
+): ApprovalContinuationProof {
   const unsigned: ApprovalContinuationProof = {
     schemaVersion: APPROVAL_CONTINUATION_SCHEMA_VERSION,
     incidentId: 'incident-1',
-    planId: 'plan-1',
+    planId: boundPlan.planId,
+    planFingerprint: fingerprintRepairPlan(boundPlan as never),
     dispatchId: 'dispatch-continuation-1',
     approvedStepIds: ['step-1'],
     approverId: 'approver-1',
@@ -131,7 +137,6 @@ test('unknown and adversarial API mutations pause by default', () => {
     apiStep({ description: 'Aplicar el estado solicitado.', parameters: { actionId: 'shutdown', method: 'POST', resource: '/systems/primary/actions/shutdown' } }),
     apiStep({ description: 'Apply requested state.', parameters: { actionId: 'replacePrimary', method: 'PATCH', resource: '/database/primary' } }),
   ]
-
   for (const step of cases) {
     const verdict = classifyStep(step as never, 'example-cloud')
     assert.equal(verdict.dangerous, true, JSON.stringify(step.parameters))
@@ -162,22 +167,56 @@ test('only an exact registered reversible capability auto-executes', async () =>
   })
 
   const exact = apiStep({ parameters: { actionId: 'restart-service', method: 'POST', resource: '/services/api/actions/restart', confirmed: true } })
-  const accepted = await executor.execute(executorInput(exact) as never)
-  assert.equal(accepted.status, 'completed')
+  assert.equal((await executor.execute(executorInput(exact) as never)).status, 'completed')
   assert.deepEqual(calls, ['step-1'])
 
   const wrongSchema = apiStep({ parameters: { actionId: 'restart-service', method: 'POST', resource: '/services/api/actions/restart', confirmed: false } })
-  const refused = await executor.execute(executorInput(wrongSchema, 'dispatch-2') as never)
-  assert.equal(refused.status, 'paused_for_approval')
+  assert.equal((await executor.execute(executorInput(wrongSchema, 'dispatch-2') as never)).status, 'paused_for_approval')
   assert.deepEqual(calls, ['step-1'])
+})
+
+test('mutating provider calls disguised as read are never executable', async () => {
+  const registry = createApiCapabilityRegistry([{
+    provider: 'example-cloud',
+    actionId: 'delete-instance',
+    mutation: true,
+    riskClass: 'routine_reversible',
+    approvalRequired: false,
+    autoExecutable: true,
+    methods: ['DELETE'],
+    resourcePattern: /^\/instances\/[a-z0-9-]+$/,
+    validateParameters: () => true,
+    maximumExecutionsPerDispatch: 1,
+  }])
+  const calls: string[] = []
+  const executor = new APIExecutor({
+    capabilityRegistry: registry,
+    runner: async step => {
+      calls.push(step.stepId)
+      return { ok: true, summary: 'must never run' }
+    },
+  })
+  const disguised = apiStep({
+    action: 'read',
+    protectedAction: false,
+    parameters: { actionId: 'delete-instance', method: 'DELETE', resource: '/instances/abc' },
+  })
+  const result = await executor.execute(executorInput(disguised) as never)
+  assert.equal(result.status, 'paused_for_approval')
+  assert.deepEqual(calls, [])
+  assert.ok(result.evidence.some(event => event.type === 'api_unregistered_capability_paused'))
 })
 
 test('signed continuation executes a registered consequential capability once', async () => {
   const keys = approvalKeys()
+  const boundPlan = plan(shutdownStep())
   const verifier = createEd25519ApprovalVerifier({
     publicKeyFor: keyId => keyId === 'approval-key-1' ? keys.publicKeyPem : undefined,
     nonceStore: new InMemoryApprovalNonceStore(),
-    previousAuditEventExists: input => input.eventId === 'pause-event-1' && input.incidentId === 'incident-1' && input.planId === 'plan-1',
+    previousAuditEventExists: input => input.eventId === 'pause-event-1'
+      && input.incidentId === 'incident-1'
+      && input.planId === 'plan-1'
+      && input.planFingerprint === fingerprintRepairPlan(boundPlan as never),
     now: () => new Date(NOW),
   })
   const calls: string[] = []
@@ -189,22 +228,21 @@ test('signed continuation executes a registered consequential capability once', 
       return { ok: true, summary: 'approved consequential action executed' }
     },
   })
-  const proof = signedProof(keys.privateKeyPem)
-  const step = apiStep({ parameters: { actionId: 'shutdown', method: 'POST', resource: '/systems/primary/actions/shutdown', confirmed: true } })
-  const input = { ...executorInput(step, proof.dispatchId), approvalContinuation: proof }
+  const proof = signedProof(keys.privateKeyPem, boundPlan)
+  const input = { ...executorInput(shutdownStep(), proof.dispatchId), approvalContinuation: proof }
 
   const first = await executor.execute(input as never)
   assert.equal(first.status, 'completed')
   assert.deepEqual(calls, ['step-1'])
   assert.ok(first.evidence.some(event => event.type === 'api_approval_continuation_accepted'))
 
-  const replay = await executor.execute(input as never)
-  assert.equal(replay.status, 'paused_for_approval')
+  assert.equal((await executor.execute(input as never)).status, 'paused_for_approval')
   assert.deepEqual(calls, ['step-1'])
 })
 
 test('signed approval never authorizes an unregistered capability', async () => {
   const keys = approvalKeys()
+  const boundPlan = plan(shutdownStep())
   const verifier = createEd25519ApprovalVerifier({
     publicKeyFor: () => keys.publicKeyPem,
     nonceStore: new InMemoryApprovalNonceStore(),
@@ -212,7 +250,7 @@ test('signed approval never authorizes an unregistered capability', async () => 
     now: () => new Date(NOW),
   })
   const calls: string[] = []
-  const proof = signedProof(keys.privateKeyPem, { nonce: 'nonce-unregistered' })
+  const proof = signedProof(keys.privateKeyPem, boundPlan, { nonce: 'nonce-unregistered' })
   const executor = new APIExecutor({
     approvalVerifier: verifier,
     runner: async step => {
@@ -220,39 +258,42 @@ test('signed approval never authorizes an unregistered capability', async () => 
       return { ok: true, summary: 'must never run' }
     },
   })
-  const step = apiStep({ parameters: { actionId: 'shutdown', method: 'POST', resource: '/systems/primary/actions/shutdown', confirmed: true } })
-  const result = await executor.execute({ ...executorInput(step, proof.dispatchId), approvalContinuation: proof } as never)
-
+  const result = await executor.execute({ ...executorInput(shutdownStep(), proof.dispatchId), approvalContinuation: proof } as never)
   assert.equal(result.status, 'paused_for_approval')
   assert.deepEqual(calls, [])
-  assert.ok(result.evidence.some(event => event.type === 'api_unregistered_capability_paused'))
 })
 
-test('tampered, expired and unbound approval proofs fail closed', async () => {
+test('approval proof rejects altered plan contents, tampering, expiry and missing audit binding', async () => {
   const keys = approvalKeys()
+  const boundPlan = plan(shutdownStep())
+  const planFingerprint = fingerprintRepairPlan(boundPlan as never)
   const createVerifier = () => createEd25519ApprovalVerifier({
     publicKeyFor: () => keys.publicKeyPem,
     nonceStore: new InMemoryApprovalNonceStore(),
-    previousAuditEventExists: input => input.eventId === 'pause-event-1',
+    previousAuditEventExists: input => input.eventId === 'pause-event-1' && input.planFingerprint === planFingerprint,
     now: () => new Date(NOW),
   })
-  const context = { incidentId: 'incident-1', planId: 'plan-1', dispatchId: 'dispatch-continuation-1', approvedStepIds: ['step-1'] }
+  const context = { incidentId: 'incident-1', planId: 'plan-1', planFingerprint, dispatchId: 'dispatch-continuation-1', approvedStepIds: ['step-1'] }
 
-  const tampered = signedProof(keys.privateKeyPem)
+  const alteredPlan = plan(shutdownStep('/systems/secondary/actions/shutdown'))
+  const alteredContext = { ...context, planFingerprint: fingerprintRepairPlan(alteredPlan as never) }
+  assert.match((await createVerifier().verify(signedProof(keys.privateKeyPem, boundPlan), alteredContext)).reason, /plan contents/)
+
+  const tampered = signedProof(keys.privateKeyPem, boundPlan, { nonce: 'nonce-tampered' })
   tampered.approverId = 'different-approver'
   assert.equal((await createVerifier().verify(tampered, context)).valid, false)
 
-  const expired = signedProof(keys.privateKeyPem, {
+  const expired = signedProof(keys.privateKeyPem, boundPlan, {
     approvedAt: new Date(NOW - 20 * 60_000).toISOString(),
     expiresAt: new Date(NOW - 10 * 60_000).toISOString(),
     nonce: 'nonce-expired',
   })
   assert.match((await createVerifier().verify(expired, context)).reason, /expired/)
 
-  const wrongScope = signedProof(keys.privateKeyPem, { approvedStepIds: ['step-other'], nonce: 'nonce-scope' })
+  const wrongScope = signedProof(keys.privateKeyPem, boundPlan, { approvedStepIds: ['step-other'], nonce: 'nonce-scope' })
   assert.match((await createVerifier().verify(wrongScope, context)).reason, /scope/)
 
-  const missingEvent = signedProof(keys.privateKeyPem, { previousAuditEventId: 'unknown-event', nonce: 'nonce-event' })
+  const missingEvent = signedProof(keys.privateKeyPem, boundPlan, { previousAuditEventId: 'unknown-event', nonce: 'nonce-event' })
   assert.match((await createVerifier().verify(missingEvent, context)).reason, /prior pause event/)
 })
 

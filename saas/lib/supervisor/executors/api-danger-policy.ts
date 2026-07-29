@@ -1,9 +1,9 @@
 // saas/lib/supervisor/executors/api-danger-policy.ts
 //
-// Classification is default-deny. Model-written descriptions and keyword
-// matches may help label a paused action, but they never authorize execution.
-// An API request is automatic only when the buyer's explicit capability
-// registry validates its provider, action, method, resource and parameters.
+// Classification is default-deny. Model-written descriptions, action labels and
+// keyword matches may help label a paused action, but they never authorize
+// execution. Every provider-bound read, verify or mutation must match the
+// buyer's explicit capability registry.
 
 import type { RepairStep } from '../repair-plan-schema.ts'
 import {
@@ -51,45 +51,59 @@ function categoryFor(step: RepairStep, provider: string): DangerCategory {
   return 'destructive'
 }
 
-/**
- * Read/verify control steps are intrinsically non-mutating. Every api_request
- * must match the explicit registry. Everything unknown pauses.
- */
+function paused(step: RepairStep, provider: string, reason: string, capabilityMatch?: ApiCapabilityMatch): DangerVerdict {
+  return {
+    dangerous: true,
+    category: categoryFor(step, provider),
+    reason,
+    ...(capabilityMatch ? { capabilityMatch } : {}),
+  }
+}
+
 export function classifyStep(
   step: RepairStep,
   targetProvider: string,
   registry: ApiCapabilityRegistry = emptyApiCapabilityRegistry,
 ): DangerVerdict {
   try {
-    if (step.action === 'read' || step.action === 'verify' || step.action === 'stop') {
-      return { dangerous: false, reason: `Built-in ${step.action} step is non-mutating.` }
+    if (step.action === 'stop') {
+      return { dangerous: false, reason: 'Built-in stop step performs no provider call.' }
     }
     if (step.action === 'request_approval') {
-      return { dangerous: true, category: categoryFor(step, targetProvider), reason: 'Step explicitly requests human approval.' }
+      return paused(step, targetProvider, 'Step explicitly requests human approval.')
     }
-    if (step.action !== 'api_request') {
-      return { dangerous: true, category: categoryFor(step, targetProvider), reason: `Action ${step.action} is not auto-executable by the API executor.` }
+    if (!['api_request', 'read', 'verify'].includes(step.action)) {
+      return paused(step, targetProvider, `Action ${step.action} is not executable by the API executor.`)
     }
 
     const match = registry.match(step, targetProvider)
-    if (!match.allowed) {
-      return {
-        dangerous: true,
-        category: categoryFor(step, targetProvider),
-        reason: match.reason,
-        capabilityMatch: match,
+    if (!match.allowed) return paused(step, targetProvider, match.reason, match)
+
+    const capability = match.capability
+    if (!capability) return paused(step, targetProvider, 'No registered capability matched the provider call.', match)
+
+    if (step.action === 'read' || step.action === 'verify') {
+      if (capability.mutation) {
+        return paused(step, targetProvider, `${step.action} label cannot authorize a mutating capability.`, match)
+      }
+      if (capability.riskClass !== 'read_only') {
+        return paused(step, targetProvider, `${step.action} requires a read-only capability.`, match)
+      }
+      if (!['GET', 'HEAD'].includes(match.method)) {
+        return paused(step, targetProvider, `${step.action} requires GET or HEAD, not ${match.method}.`, match)
       }
     }
+
     return {
       dangerous: false,
       reason: match.reason,
       capabilityMatch: match,
     }
   } catch (error) {
-    return {
-      dangerous: true,
-      category: categoryFor(step, targetProvider),
-      reason: `Could not validate API capability; pausing for safety (${error instanceof Error ? error.message : 'unknown error'}).`,
-    }
+    return paused(
+      step,
+      targetProvider,
+      `Could not validate API capability; pausing for safety (${error instanceof Error ? error.message : 'unknown error'}).`,
+    )
   }
 }

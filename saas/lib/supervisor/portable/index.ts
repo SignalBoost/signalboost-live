@@ -160,3 +160,14 @@ export type {
   HttpResourceCheckOptions,
   ReadOnlyExecutorOptions,
 } from './resource-check-runner.ts'
+
+// Locale-aware copy for the messages this product sends to PEOPLE. Exported because a buyer
+// writing their own notification sink needs the same wording their approvers would otherwise
+// get from the reference adapter — the translations belong to the product, not to the host.
+export {
+  approvalCopy,
+  categoryLabel,
+  resolveSupervisorLocale,
+  SUPERVISOR_LOCALES,
+} from './notification-copy.ts'
+export type { ApprovalCopy, SupervisorLocale } from './notification-copy.ts'

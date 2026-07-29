@@ -2,7 +2,7 @@
 
 # Self-Healing Supervisor — support terms
 
-**Status: draft for approval. The five values marked SET are commercial commitments only the vendor can make, and they cost money to honour. Everything else follows from how the product actually works.** Have counsel review before this is attached to an order form.
+**Status: values set for pilot and first-year agreements. They are commercial commitments that cost money to honour — change them deliberately, not casually.** Have counsel review before this is attached to an order form.
 
 ## What is supported
 
@@ -41,13 +41,14 @@ Targets are for **first substantive response**, not resolution. A resolution com
 
 | Severity | Target | Hours |
 | --- | --- | --- |
-| 1 | **SET** — 4 business hours suggested | **SET** — 24/7 suggested for Sev 1 only |
-| 2 | **SET** — 1 business day suggested | Business hours |
-| 3 | **SET** — 2 business days suggested | Business hours |
-| 4 | **SET** — 5 business days suggested | Business hours |
+| 1 | 4 hours | 24/7 |
+| 2 | 1 business day | Business hours |
+| 3 | 2 business days | Business hours |
+| 4 | 5 business days | Business hours |
 
-**SET** — business hours definition and time zone.
-**SET** — the support channel and where tickets are raised.
+Business hours are 09:00–18:00, Monday to Friday, Central Time (America/Mexico_City), excluding public holidays in the vendor's jurisdiction.
+
+Support is raised by email to **support@signalboostapp.com**. A ticket exists when that address acknowledges it; a message to an individual is not a ticket.
 
 ## Security fixes
 
@@ -55,13 +56,13 @@ A vulnerability in the payload is handled on the Severity 1 path regardless of w
 
 Fixes ship as a new patch version with release notes naming the issue and the affected versions. Customers on a supported version are notified. Because the payload holds no state and rolls back by restoring the previous archive, a security patch is a file replacement and an acceptance re-run, not a migration.
 
-Report suspected vulnerabilities to **SET** — security contact address. Do not raise them through the ordinary support channel.
+Report suspected vulnerabilities to **security@signalboostapp.com**. Do not raise them through the ordinary support channel.
 
 ## Supported versions
 
-The current minor version and the one before it. When a new minor version ships, the one two behind it leaves support **SET** — 90 days suggested — later.
+The current minor version and the one before it. When a new minor version ships, the one two behind it leaves support 90 days later.
 
-A major version is supported for **SET** — 12 months suggested — after its successor ships.
+A major version is supported for 12 months after its successor ships.
 
 Release candidates (`-rc`) are not supported for production use.
 
@@ -75,7 +76,7 @@ Release candidates (`-rc`) are not supported for production use.
 
 ## Escalation
 
-If a Severity 1 has not had a substantive response inside its target, the customer escalates to **SET** — escalation contact. Escalation is by severity and elapsed time, not by relationship.
+If a Severity 1 has not had a substantive response inside its target, the customer escalates to **escalation@signalboostapp.com**, which reaches the vendor's principal directly. Escalation is by severity and elapsed time, not by relationship.
 
 ## Maintenance
 
@@ -91,4 +92,4 @@ Carried here so they cannot be discovered during an incident:
 
 ## End of life
 
-If the product is discontinued, customers under an active agreement receive **SET** — 12 months suggested — notice, security fixes for that period, and a final archive they may keep and run under the terms of their licence.
+If the product is discontinued, customers under an active agreement receive 12 months' notice, security fixes for that period, and a final archive they may keep and run under the terms of their licence.

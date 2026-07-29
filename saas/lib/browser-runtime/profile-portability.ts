@@ -11,9 +11,14 @@ export interface BrowserProfileCookie {
   readonly sameSite?: 'Strict' | 'Lax' | 'None'
 }
 
+export interface BrowserProfileStorageItem {
+  readonly name: string
+  readonly value: string
+}
+
 export interface BrowserProfileOriginStorage {
   readonly origin: string
-  readonly localStorage: readonly Readonly<{ name: string; value: string }>[]
+  readonly localStorage: readonly Readonly<BrowserProfileStorageItem>[]
 }
 
 export interface BrowserProfileSnapshot {
@@ -58,7 +63,7 @@ export function normalizeBrowserProfileSnapshot(value: BrowserProfileSnapshot): 
   if (!Array.isArray(value.cookies) || value.cookies.length > 10000) throw new Error('browser_profile_cookies_invalid')
   if (!Array.isArray(value.origins) || value.origins.length > 1000) throw new Error('browser_profile_origins_invalid')
 
-  const cookies = value.cookies.map(cookie => Object.freeze({
+  const cookies = value.cookies.map((cookie: BrowserProfileCookie) => Object.freeze({
     name: requireString(cookie?.name, 'browser_profile_cookie_invalid', 1024),
     value: requireString(cookie?.value, 'browser_profile_cookie_invalid', 16384),
     domain: requireString(cookie?.domain, 'browser_profile_cookie_invalid', 512),
@@ -67,24 +72,24 @@ export function normalizeBrowserProfileSnapshot(value: BrowserProfileSnapshot): 
     ...(cookie.httpOnly === undefined ? {} : { httpOnly: cookie.httpOnly === true }),
     ...(cookie.secure === undefined ? {} : { secure: cookie.secure === true }),
     ...(cookie.sameSite === undefined ? {} : { sameSite: cookie.sameSite }),
-  })).sort((a, b) => `${a.domain}\0${a.path}\0${a.name}`.localeCompare(`${b.domain}\0${b.path}\0${b.name}`))
+  })).sort((a: Readonly<BrowserProfileCookie>, b: Readonly<BrowserProfileCookie>) => `${a.domain}\0${a.path}\0${a.name}`.localeCompare(`${b.domain}\0${b.path}\0${b.name}`))
 
-  const cookieKeys = cookies.map(cookie => `${cookie.domain}\0${cookie.path}\0${cookie.name}`)
+  const cookieKeys = cookies.map((cookie: Readonly<BrowserProfileCookie>) => `${cookie.domain}\0${cookie.path}\0${cookie.name}`)
   if (new Set(cookieKeys).size !== cookieKeys.length) throw new Error('browser_profile_cookie_duplicate')
-  if (cookies.some(cookie => cookie.sameSite !== undefined && !['Strict', 'Lax', 'None'].includes(cookie.sameSite))) throw new Error('browser_profile_cookie_invalid')
+  if (cookies.some((cookie: Readonly<BrowserProfileCookie>) => cookie.sameSite !== undefined && !['Strict', 'Lax', 'None'].includes(cookie.sameSite))) throw new Error('browser_profile_cookie_invalid')
 
-  const origins = value.origins.map(entry => {
+  const origins = value.origins.map((entry: BrowserProfileOriginStorage) => {
     const origin = normalizeOrigin(entry?.origin)
     if (!Array.isArray(entry.localStorage) || entry.localStorage.length > 10000) throw new Error('browser_profile_storage_invalid')
-    const localStorage = entry.localStorage.map(item => Object.freeze({
+    const localStorage = entry.localStorage.map((item: Readonly<BrowserProfileStorageItem>) => Object.freeze({
       name: requireString(item?.name, 'browser_profile_storage_invalid', 4096),
       value: requireString(item?.value, 'browser_profile_storage_invalid', 1048576),
-    })).sort((a, b) => a.name.localeCompare(b.name))
-    if (new Set(localStorage.map(item => item.name)).size !== localStorage.length) throw new Error('browser_profile_storage_duplicate')
+    })).sort((a: Readonly<BrowserProfileStorageItem>, b: Readonly<BrowserProfileStorageItem>) => a.name.localeCompare(b.name))
+    if (new Set(localStorage.map((item: Readonly<BrowserProfileStorageItem>) => item.name)).size !== localStorage.length) throw new Error('browser_profile_storage_duplicate')
     return Object.freeze({ origin, localStorage: Object.freeze(localStorage) })
-  }).sort((a, b) => a.origin.localeCompare(b.origin))
+  }).sort((a: Readonly<BrowserProfileOriginStorage>, b: Readonly<BrowserProfileOriginStorage>) => a.origin.localeCompare(b.origin))
 
-  if (new Set(origins.map(entry => entry.origin)).size !== origins.length) throw new Error('browser_profile_origin_duplicate')
+  if (new Set(origins.map((entry: Readonly<BrowserProfileOriginStorage>) => entry.origin)).size !== origins.length) throw new Error('browser_profile_origin_duplicate')
 
   return deepFreeze({
     schemaVersion: BROWSER_PROFILE_SNAPSHOT_SCHEMA_VERSION,

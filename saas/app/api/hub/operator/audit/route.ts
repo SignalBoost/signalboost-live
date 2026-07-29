@@ -122,7 +122,15 @@ export async function POST(req: NextRequest) {
           findings_count: result.findings.length, provider: 'openai', model: 'gpt-5.5',
         }).eq('id', runId)
 
-        const payload = { runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings, lang }
+        const payload = {
+          runId,
+          prefix,
+          filesScanned: result.filesScanned,
+          findingsCount: result.findings.length,
+          findings: result.findings,
+          narrative: result.narrative || '',
+          lang,
+        }
         await admin.from('audit_logs').insert({ run_id: runId, user_id: ctx.userId, payload })
 
         try {

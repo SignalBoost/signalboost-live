@@ -36,23 +36,178 @@ Facts that change what a good deliverable looks like. Ignore them and you will w
 - **A migration in the repo is not a migration in the database.** Nothing records which have
   been applied. See section 5.
 
-## 3. Build guards
+## 3. Build guards and zero-hardcoded-English policy
 
 `prebuild` runs on every deploy and blocks it on failure. As of this writing:
 `validate:next-routes`, `validate:strip-safe`, then `validate:i18n-copy`, which itself chains
 several i18n scripts.
 
-**The i18n chain has changed three times in one day.** Read `package.json` to see what is
-actually live rather than assuming. Current rule for new UI: **user-facing English may not
-appear inside `app/` or `components/`.** Put copy in `lib/i18n/<feature>Copy.ts` and import it —
-`lib/` is not scanned, the pattern passes every version of the guard so far, and it keeps the
-five languages authored together.
+Read `saas/package.json` before relying on this description because the chain can change. The
+mandatory rule is:
+
+> **All user-facing copy must come from locale dictionaries. Do not hide English in a
+> TypeScript/JavaScript copy table merely because a scanner does not inspect that directory.**
+
+The earlier advice to put new copy in `lib/i18n/<feature>Copy.ts` because `lib/` was not scanned
+was a loophole, not a localization architecture. Do not follow it. A green guard is not proof
+that visible English has been removed if the English was only moved outside the scan roots.
+
+### Completed page-and-component migration — PR #883
+
+PR #883, `fix(i18n): replace hardcoded English with real locale keys`, was merged on
+28 July 2026.
+
+- Merge commit: `b9ab0973fe3057128bea8c596d62a39b0727ee6f`
+- Validated head: `c6fdc2d44f47412ee3fa47c0d1fb8527404f1f13`
+- Scope: 351 changed files across 17 commits; 9,277 additions and 10,078 deletions.
+- The rejected PR #882 generated-English-table approach was closed. Do not revive
+  `generatedUiCopy.ts` or create an equivalent English lookup module.
+- Page and component source was changed from literal English to locale keys.
+- Canonical English UI copy now lives in `saas/locales/en.json`.
+- Matching Spanish, Portuguese, Polish and Russian values live in `es.json`, `pt.json`,
+  `pl.json` and `ru.json`.
+- Existing translations were reused where they were already known.
+- Inline English fallback arguments in imported `t(...)` calls were moved into locale files.
+- `saas/lib/i18n/uiText.ts` reads the active dictionary, falls back to the English locale
+  dictionary, and returns the key only if neither dictionary contains a string.
+- The i18n provider now supplies the active runtime dictionary to that shared resolver.
+- Source-reading tests were updated through locale-hydration helpers instead of restoring
+  English to production source.
+- Migration, hardcoded-copy detection, generated-locale completeness and publishing safeguards
+  were added under `saas/scripts/`, `saas/tests/helpers/` and `.github/workflows/`.
+- `saas/scripts/i18n-hardcoded-baseline.json` was reset to `fileCount: 0`.
+- The locale guards, rejection of the generated English table, TypeScript, production build and
+  full unit/contract test suite passed on the migrated tree before merge.
+
+### What the completed migration proves — and what it does not
+
+The completed migration and current blocking detector cover rendered UI in `saas/app/` and
+`saas/components/`, including literal JSX text, selected accessibility attributes, display
+props and other copy contexts recognized by the migration script.
+
+That is a major platform migration, but it is not by itself proof that **every** user-facing
+English string anywhere in the repository has been removed. Current scan roots do not fully
+cover every possible runtime surface under `lib/`, workers, notification catalogues, email
+builders, server-returned messages, portable packages, manifests or provider adapters.
+
+The literal zero-hardcoded-English objective is complete only when every runtime path that can
+put words in front of a person is locale-backed and guarded. Existing code-backed catalogues
+must therefore be treated as migration candidates, even when they contain all five languages.
+
+### What counts as forbidden hardcoded English
+
+Forbidden copy includes any English text a user, buyer, evaluator, administrator, operator or
+assistive-technology user can receive:
+
+- JSX text and rendered string expressions;
+- buttons, links, headings, tabs, menus, badges, statuses, notices, instructions and empty states;
+- errors, confirmations, success messages, help, tooltips and captions;
+- `placeholder`, `aria-label`, `title` and `alt` values;
+- display props and display-data fields such as `label`, `description`, `message`, `detail`,
+  `note`, `subtitle`, `helperText`, `tooltip` and fallback text;
+- English fallback arguments passed to translation helpers;
+- notification, email, evidence-summary, approval-request and operator-facing server messages;
+- human-readable labels derived from technical states.
+
+Do not translate machine contracts merely to remove English-looking tokens. Routes, keys, ids,
+slugs, enum values, database values, provider/API identifiers, HTTP methods, CSS classes, style
+values, environment-variable names, protocol tokens, exact placeholders, URLs and code symbols
+remain stable when they are not displayed as prose.
+
+A technical value becomes localization work when it is shown to a person. Keep the stored value
+stable and map it to a localized display label.
+
+### Mandatory pattern for every new or changed string
+
+1. Add a locale key; do not embed English in production `.ts` or `.tsx` source.
+2. Put the English value in `saas/locales/en.json`.
+3. Add the same key with an actual translation to `es.json`, `pt.json`, `pl.json` and `ru.json`.
+4. Prefer stable semantic namespaces for new copy. Existing `generatedUi.u_*` keys may remain;
+   do not rename them casually because source, tests and all locale files must move together.
+5. Use the established locale hook or translation helper. Use `uiText(...)` only on surfaces
+   where that shared runtime pattern is appropriate.
+6. Do not pass English source fallbacks. `t(dict, 'account.delete', 'Delete account')` is
+   forbidden; the fallback belongs in the locale dictionary.
+7. Preserve interpolation placeholders, URLs, email addresses and code tokens exactly across
+   translations.
+8. Do not create a component-local English map, a central English TypeScript object or a
+   generated English module as a workaround.
+9. If source-based tests need readable English, hydrate locale keys in the test helper rather
+   than reintroducing literals into production files.
+10. Keep technical states and APIs unchanged; localize only their presentation.
+
+### Work still required for repository-wide literal zero
+
+Complete the following as a bounded follow-up rather than weakening the current guard:
+
+1. Inventory every production source that can emit human-readable text, including `lib/`,
+   server routes, workers, notifications, emails, approvals, evidence, portable entry points and
+   provider-facing operator messages.
+2. Classify each string as user-facing copy or a machine contract. Record explicit technical
+   exclusions so the detector does not depend on directory loopholes.
+3. Migrate code-backed English and multilingual copy catalogues to locale JSON namespaces or a
+   locale-data format that contains no English prose in executable source.
+4. Expand AST detection beyond `app/` and `components/` to the identified runtime surfaces,
+   while excluding tests, fixtures, documentation and genuine protocol constants.
+5. Expand locale-completeness checks to every migrated namespace, not only `generatedUi`.
+6. Add focused tests for notifications, emails, approval text, evidence text, server-returned
+   user messages and portable output in `en`, `es`, `pt`, `pl` and `ru`.
+7. Add runtime or screenshot checks that fail when the selected non-English locale renders an
+   English fallback or a raw translation key.
+8. Keep the hardcoded-copy baseline at zero. A stricter detector may expose older debt, but that
+   debt should be removed in the same migration rather than permanently baselined.
+9. Run TypeScript, production build, relevant focused suites and the full test suite on the exact
+   commit that will be merged.
+10. Review the final diff for accidental changes to routes, ids, machine statuses, CSS, API
+    contracts, typed constants or behavior.
+
+### Current localization validation
+
+Run from `saas/`:
+
+```bash
+npm run validate:i18n-copy
+npm run typecheck
+npm run build
+npm test
+git diff --check
+```
+
+For investigation:
+
+```bash
+node scripts/check-hardcoded-copy.mjs --list
+node scripts/migrate-page-copy-to-locales.mjs
+```
+
+`validate:i18n-copy` currently runs:
+
+- `scripts/check-hardcoded-copy.mjs`;
+- `scripts/migrate-page-copy-to-locales.mjs` in detection mode;
+- `scripts/check-generated-ui-locale-completeness.mjs`.
+
+Do not remove the check, weaken the detector, move English outside its scan roots, regenerate the
+baseline to excuse a new violation or bypass `prebuild`.
+
+Files to inspect before localization work:
+
+- `saas/locales/en.json`, `es.json`, `pt.json`, `pl.json`, `ru.json`
+- `saas/lib/i18n/uiText.ts`
+- `saas/lib/i18n/t.ts`
+- `saas/components/i18n/I18nProvider.tsx`
+- `saas/scripts/check-hardcoded-copy.mjs`
+- `saas/scripts/migrate-page-copy-to-locales.mjs`
+- `saas/scripts/check-generated-ui-locale-completeness.mjs`
+- `saas/scripts/generated-ui-locale-utils.mjs`
+- `saas/scripts/i18n-hardcoded-baseline.json`
+- `saas/tests/helpers/hydrateLocalizedSource.ts`
+- `saas/tests/helpers/sourceWithUiCopy.mjs`
 
 Two guards worth knowing because they encode real incidents:
 
 - **`check-hardcoded-copy.mjs`** is AST-based and checks per string, so it catches a bare
   `<button>Delete account</button>` inside a file that correctly calls `t()` elsewhere. Its
-  baseline is now empty: any new literal fails the build immediately.
+  baseline is empty: any new covered literal fails the build immediately.
 - **`build-portable.mjs --check`** fails if the portable payload reaches any third-party
   package. Zero dependencies is a selling point, and this is what keeps it true.
 

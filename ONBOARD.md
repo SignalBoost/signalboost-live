@@ -36,8 +36,7 @@ Facts that change what a good deliverable looks like:
   `main` immediately before editing it. Do not replace newer work with an older branch copy.
 - **A migration committed to the repository is not proof that it ran in the database.** Verify
   applied state independently.
-- **Never claim a test, build, deployment, push, PR, or merge succeeded unless it was actually
-  verified.**
+- **Never claim a test, build, deployment, push, PR, or merge succeeded unless it was actually verified.**
 
 Core product principle:
 

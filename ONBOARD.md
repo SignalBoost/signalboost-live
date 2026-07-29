@@ -570,3 +570,161 @@ inspection, and the repository's required pull-request workflows.
 - Do not change machine-readable identifiers when translating human-readable text.
 - Update this file whenever the current product state, buyer package, localization architecture,
   safety boundary, or required validation process changes.
+
+---
+
+## 14. Completed report and document translation architecture
+
+This section records the implementation completed immediately before this onboarding update. It
+supplements the unfinished repository-wide work in section 9; it does not mean all hardcoded
+user-facing English has been eliminated.
+
+### Audit-specific historical report translation — PR #891
+
+**PR #891 — `feat(audit): regenerate reports in the selected language`** was merged into `main`.
+
+- Merge commit: `2b2a104177dfb81603f6260c43dc5eda06f247fb`
+- Supported languages: `en`, `es`, `pt`, `pl`, `ru`
+
+Behavior now established for audit reports:
+
+- new audit reports are generated in the user's selected language;
+- opening a historical audit under another language creates or reuses a translated display copy;
+- translated finding fields and narrative are cached in `audit_logs`;
+- switching back to a previously generated language reuses that cached copy;
+- original `audit_findings` rows remain immutable;
+- approval and remediation continue to use original finding identity and source records;
+- the report narrative and source language are persisted for later translation;
+- file paths, code, routes, environment variables, SQL identifiers, package names, URLs and quoted
+  technical literals remain unchanged.
+
+Primary files:
+
+- `saas/lib/audit/reportTranslation.ts`
+- `saas/app/api/hub/operator/audit/route.ts`
+- `saas/app/api/hub/operator/audit/runs/route.ts`
+- `saas/tests/auditReportTranslation.node.test.ts`
+
+The audit-specific path must remain separate where governance requires it. A translated audit
+finding is display-only and must never become the source for approval, patch generation, or
+remediation execution.
+
+### Platform-wide generated free-text translation — PR #892
+
+**PR #892 — `feat(i18n): translate all generated reports and documents`** was merged into
+`main`.
+
+- Merge commit: `d4dcb1d2c14526a70992b50c3f4c3b5b09ece479`
+- Supported languages: `en`, `es`, `pt`, `pl`, `ru`
+
+Completed implementation:
+
+- `saas/components/LanguageSuggestion.tsx` mounts translation behavior globally;
+- `saas/components/i18n/GeneratedContentLocalizer.tsx` observes generated long-form DOM content;
+- `saas/components/i18n/ReportTextLocalizer.tsx` remains a compatibility alias;
+- `saas/app/api/i18n/translate-content/route.ts` provides one authenticated shared endpoint;
+- `saas/lib/i18n/contentTranslation.ts` provides the bounded translation engine;
+- `saas/supabase/migrations/20260729_generated_content_translations.sql` defines durable per-user
+  translation caching;
+- `saas/tests/generatedContentTranslation.node.test.ts` protects original preservation, global
+  mounting, technical-literal safety and cache isolation contracts.
+
+The global localizer covers eligible reports, documents, narratives, proposals, analyses,
+assistant responses, headings, lists and long-form table values when the language dropdown
+changes. It captures original text and retranslates from that original; it never translates a
+previous translation. A `MutationObserver` detects newly rendered or changed content, requests
+bounded batches, applies complete one-for-one results and leaves the original visible if
+translation fails.
+
+The shared server engine treats every segment as untrusted data rather than an instruction. It
+preserves segment ids and order and rejects missing or mismatched output. It preserves names,
+numbers, dates, certainty, URLs, email addresses, code, commands, file paths, route names,
+environment-variable names, package names, model names and database identifiers.
+
+No new Vercel environment variable was introduced. The path uses the existing AI model router
+and the AI provider credentials already configured for the platform.
+
+### Required markup for new generated-content surfaces
+
+New reports and documents should declare a generated-content boundary using the established
+attributes:
+
+- `data-sb-generated-content`
+- `data-sb-report` for reports
+- `data-sb-document` for documents
+- `data-sb-source-language` when the source language is known
+
+Existing compatibility selectors also include `data-generated-content`, `data-report-content`,
+`data-document-content`, `data-ai-content`, assistant-message role attributes, `article`,
+`role=document`, `.prose`, `.markdown-body`, `.report-content`, `.document-content`,
+`.assistant-message`, and `.message-content`.
+
+Mark stable technical values with `data-sb-no-translate` or `translate=no`. The localizer already
+skips scripts, styles, code, preformatted text, keyboard/sample text, form controls, buttons,
+navigation and editable content.
+
+Fixed buttons, controls, safety notices and navigation must still use locale keys. Do not place
+known UI copy inside a generated-content boundary to bypass the hardcoded-copy guard.
+
+### Durable cache deployment requirement
+
+Apply this migration through the normal Supabase migration path in every environment where
+cross-session translation reuse is required:
+
+`saas/supabase/migrations/20260729_generated_content_translations.sql`
+
+It creates `public.generated_content_translations` with:
+
+- per-user ownership;
+- a source hash rather than a duplicate source document;
+- source-language, target-language and content-kind metadata;
+- a translated JSON payload;
+- uniqueness by user, source hash and target language;
+- row-level security limiting a user to that user's cached copies.
+
+The original feature table remains authoritative. The cache table is not a second document
+store. Translation still works when the migration has not yet been applied, but a later browser
+session may need to regenerate the copy. Cache failure must never hide the original.
+
+### Boundaries and limitations
+
+- The shared translation API is authenticated. Signed-out public generated content needs
+  locale-authored copy, server-side localized generation, or a separately reviewed anonymous
+  translation design.
+- The browser layer translates rendered DOM text. It does not translate text embedded in images,
+  screenshots, canvas output, audio, video, scanned PDFs, binary files, or third-party iframes.
+- A downloaded PDF, DOCX, CSV, presentation, image, audio file, caption file, or other export does
+  not change after the dropdown changes. Exporters must generate a new artifact in the selected
+  language while preserving the original.
+- Very large documents are processed in bounded segments. Features should preserve headings,
+  paragraphs, lists and table structure rather than render one unbounded text node.
+- Source-language detection exists when metadata is absent, but explicit stored language metadata
+  is preferred.
+- The global localizer is a compatibility and free-text layer, not evidence that static UI is
+  fully localized.
+
+### Required validation for this architecture
+
+Localization or generated-content changes should include, where applicable:
+
+```bash
+cd saas
+npm run validate:i18n-copy
+node --test tests/generatedContentTranslation.node.test.ts tests/auditReportTranslation.node.test.ts
+npm run typecheck
+npm run prebuild
+npm run build
+npm run test:playwright
+git diff --check
+```
+
+Manual acceptance must switch a current and historical report through all five languages,
+confirm every translation derives from the original, confirm technical identifiers remain
+unchanged, confirm translation failure leaves the original visible, confirm cache isolation by
+user, test signed-out behavior separately, and regenerate downloadable artifacts in the selected
+language.
+
+The completed PRs solve generated report/document language switching. Section 9 remains the
+mandatory plan for eliminating the rest of the hardcoded user-facing English in UI, APIs,
+metadata, notifications, emails, exports, accessibility copy, public pages and portable runtime
+surfaces.

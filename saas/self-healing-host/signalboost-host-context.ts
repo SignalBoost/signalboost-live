@@ -31,6 +31,8 @@ import {
   type NotificationSink,
   type PortableNotification,
   type SecretsProvider,
+  approvalCopy,
+  resolveSupervisorLocale,
 } from '@/lib/supervisor/portable'
 
 /** Owner addresses, from the same environment variables the platform already uses. */
@@ -62,6 +64,17 @@ const platformSecrets: SecretsProvider = {
   },
 }
 
+/**
+ * The locale every human-facing message from this deployment is written in.
+ *
+ * SUPERVISOR_LOCALE is the buyer-equivalent setting: a buyer operating in Brazil sets pt-BR
+ * once and their approvers are asked in Portuguese. Region tags are accepted because that is
+ * how an operator thinks about it; anything unsupported falls back to English.
+ */
+function platformLocale(): string {
+  return resolveSupervisorLocale(process.env.SUPERVISOR_LOCALE || process.env.NEXT_PUBLIC_DEFAULT_LOCALE)
+}
+
 function notificationHtml(notification: PortableNotification): string {
   const rows: Array<[string, string]> = [
     ['Category', notification.category],
@@ -71,14 +84,15 @@ function notificationHtml(notification: PortableNotification): string {
     ['Incident', notification.incidentId],
     ['Dispatch', notification.dispatchId],
   ]
+  const copy = approvalCopy(platformLocale())
   const escape = (value: string) => value.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] || c)
   return [
     `<h2>${escape(notification.title)}</h2>`,
-    '<p>A consequential step is paused and will not execute until it is approved.</p>',
+    `<p>${escape(copy.intro)}</p>`,
     '<table cellpadding="6" style="border-collapse:collapse">',
     ...rows.map(([label, value]) => `<tr><td><strong>${label}</strong></td><td>${escape(String(value))}</td></tr>`),
     '</table>',
-    notification.consoleUrl ? `<p><a href="${escape(notification.consoleUrl)}">Review and approve</a></p>` : '',
+    notification.consoleUrl ? `<p><a href="${escape(notification.consoleUrl)}">${escape(copy.cta)}</a></p>` : '',
   ].join('\n')
 }
 
@@ -124,6 +138,7 @@ export function createSignalBoostHostContext(overrides: Partial<HostContext> = {
     approvers: createStaticApproverDirectory({ fallback: approvers }),
     branding: {
       productName: 'SignalBoost Supervisor',
+      locale: platformLocale(),
       // The approval link in every paused-step email is built from this. It must point
       // at the DASHBOARD section, not the site root — and NEXT_PUBLIC_APP_URL is the
       // site root, used everywhere else in the app. Reading it directly dropped the

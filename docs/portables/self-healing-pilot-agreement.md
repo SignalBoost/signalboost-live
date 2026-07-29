@@ -2,186 +2,187 @@
 
 # Pilot Agreement — Self-Healing Supervisor
 
-**This is a structural draft for counsel, not legal advice and not ready to sign.** It exists
-so a qualified lawyer starts from a document that already reflects how the product actually
-works, rather than from a blank page or from a template written for hosted software. Every
-value in **[SET]** is a commercial decision only the vendor can make. Every clause is subject
-to counsel's revision or deletion.
+**Structural draft for qualified counsel. Not legal advice, not an offer, and not ready to sign.**
 
-Companion documents, referenced rather than repeated here:
-[self-healing-support-terms.md](./self-healing-support-terms.md),
-[self-healing-security-and-data-handling.md](./self-healing-security-and-data-handling.md),
-[self-healing-license-installation.md](./self-healing-license-installation.md).
+No pilot may begin under this draft until every bracketed item is completed and approved, including the vendor legal entity, customer, release checksum, licence term, fees, governing law, venue, liability cap, confidentiality period, termination periods, support framework, security contact, and signature authority.
 
----
+## 1. Parties and effective date
 
-## 1. Parties and term
+This agreement would be between **[VENDOR LEGAL ENTITY, JURISDICTION, REGISTERED ADDRESS]** (“Vendor”) and **[CUSTOMER LEGAL ENTITY, JURISDICTION, ADDRESS]** (“Customer”), effective on the last signature date.
 
-This Agreement is between **[SET — vendor legal entity, jurisdiction of incorporation,
-registered address]** ("Vendor") and the customer identified on the signature page
-("Customer"), effective on the last signature date.
+## 2. Evaluation purpose and term
 
-The pilot runs for **[SET — 60 or 90 days suggested]** from the effective date. It ends
-automatically at that point unless both parties agree in writing to extend or to convert it
-under section 9.
+The purpose is technical and operational evaluation of the Self-Healing Supervisor inside Customer's environment. The pilot term is **[60/90 DAYS OR OTHER TERM]**. Neither party is obligated to enter a production agreement.
 
-## 2. Purpose
+The software supplied for the pilot is the exact archived release identified on the signature page by package version, source commit, tarball filename, and SHA-256 checksum. The present engineering candidate is `1.0.0-rc.2`; it is not production `1.0.0`.
 
-The purpose is evaluation. Customer deploys the Self-Healing Supervisor in its own
-environment, connects it to its own monitoring, and determines whether it is fit for its
-operations. Vendor obtains feedback from real use.
+## 3. Buyer-hosted model
 
-Nothing in this Agreement obliges either party to enter a longer-term agreement.
+The software runs inside Customer's environment. Vendor does not operate a control plane in the execution path and does not receive telemetry by default.
 
-## 3. What is provided
+Customer supplies and controls:
 
-Vendor provides the Self-Healing Supervisor portable in the **[SET — standard or
-enterprise]** edition, together with a licence token valid for the pilot term, and the
-documentation set referenced above.
+- credentials and secret storage;
+- incident sources and durable records;
+- dispatch ledger and approval nonce store;
+- approver identity and authorization;
+- provider capability registrations and parameter validators;
+- provider runners and verification runners;
+- approval signing keys and public-key directory;
+- notification channels and SIEM transport;
+- backup, upgrade, rollback, and retention procedures.
 
-**The software runs entirely inside Customer's environment.** Vendor operates no service on
-Customer's behalf, holds no account, and receives no telemetry. Vendor has no access to
-Customer's systems, credentials, or data at any point during the pilot, and no support
-process asks for them. The consequences of this are set out in the security and
-data-handling statement.
+No statement in this draft eliminates Customer's security review or Vendor's disclosure obligations.
 
-## 4. Licence
+## 4. Evaluation licence
 
-Vendor grants Customer a non-exclusive, non-transferable, non-sublicensable licence to
-install and use the software for its own internal operations for the pilot term only.
+Subject to signature and any agreed fees, Vendor would grant Customer a limited, non-exclusive, non-transferable, non-sublicensable right to install and evaluate the identified release for Customer's internal evaluation during the pilot term.
 
-Customer will not resell, distribute, or make the software available to third parties;
-remove or alter licensing, audit, or approval mechanisms; or use it to provide a service to
-anyone other than itself. Reverse engineering is prohibited except to the extent that
-prohibition is unenforceable under applicable law.
+The draft grants no production, resale, redistribution, public-hosting, service-provider, or sublicensing right. Production use requires a separate signed agreement.
 
-Vendor retains all intellectual property in the software. Customer retains all rights in its
-own data, configuration, and any implementations it writes against the software's
-interfaces.
+Customer would not remove or represent as Vendor-approved any modification to licensing, capability validation, approval continuation, audit, or package-integrity controls. Any reverse-engineering restriction remains subject to applicable law and counsel review.
 
-**Seat counts and execution limits recorded in a licence token are contract terms, not
-technical controls. The software does not enforce them.**
+Customer retains its data, configurations, adapters, and buyer-written boundary implementations. Ownership and licence treatment for feedback, fixes, and jointly developed integration code must be stated in the final agreement.
 
-## 5. What each party does
+Because Customer receives source, licence enforcement is contractual rather than tamper-proof. Seat counts and aggregate execution limits in a token are contract terms unless a future release expressly implements technical counters.
 
-**Customer** deploys the software, supplies the infrastructure it depends on, connects its
-own monitoring sources, names the approvers who will receive gated steps, and provides
-reasonable feedback during the pilot.
+## 5. Technical safety boundary
 
-**Vendor** supplies the licence token, and provides support in accordance with
-[self-healing-support-terms.md](./self-healing-support-terms.md), including its severity
-definitions and response targets. Those targets — **[SET — the four response targets,
-whether Severity 1 is 24/7, the business-hours definition and time zone, the support
-channel, and the security contact]** — are incorporated by reference and are commitments for
-the pilot term.
+The evaluation package uses explicit provider/action capability registration. Unknown API actions pause by default.
 
-## 6. Approval gating
+A consequential action may resume only after a signed approval continuation validates the incident, plan, fresh dispatch ID, exact ordered step scope, named approver, time window, one-time nonce, signing key, and prior pause audit event.
 
-The software routes consequential steps to a named human approver before they execute. This
-behaviour is not configurable off, and is not an edition feature. Customer is responsible
-for designating competent approvers and for the consequences of approvals its personnel
-give.
+Customer is responsible for approver competence, authorization, key custody, capability review, runner behavior, and the business consequences of an approval. Vendor remains responsible for defects in the unmodified package code, subject to the final warranty and liability terms.
 
-## 7. Fees
+No clause should describe the approval boundary as configurable off.
 
-The pilot fee is **[SET — a figure, or "none"]**, payable **[SET — terms, if any]**.
+## 6. Pilot activities and acceptance record
 
-## 8. Confidentiality
+Customer would:
 
-Each party will protect the other's non-public information disclosed in connection with the
-pilot with at least reasonable care, use it only for the purposes of this Agreement, and
-disclose it only to personnel who need it and are bound by comparable obligations. The
-obligation survives for **[SET — 3 years suggested]** after the pilot ends. It does not
-apply to information that is public through no fault of the recipient, independently
-developed, or lawfully received from a third party, or where disclosure is legally
-compelled.
+1. verify the archive checksum, manifest, and SBOM;
+2. install the exact tarball in a clean environment;
+3. use only public package imports;
+4. test missing, invalid, and valid entitlement through the packaged licensed factory;
+5. test all three consequential categories;
+6. test exact registered routine capabilities;
+7. test signed continuation and failure cases;
+8. confirm five-language notification behavior and stable machine identifiers;
+9. connect only reviewed staging runners;
+10. test read-only verification, audit delivery, upgrade, and rollback;
+11. retain the resulting evidence.
 
-## 9. Feedback
+The acceptance record should identify the package version, source commit, archive checksum, configuration version, tests run, results, limitations, approvers, and sign-off participants.
 
-Customer may give feedback. Vendor may use it without restriction or obligation. Feedback
-does not transfer any of Customer's confidential information or intellectual property, and
-Customer is not required to give any.
+Passing a pilot does not create a production licence unless a successor agreement is signed.
 
-## 10. Warranty and liability during a pilot
+## 7. Vendor activities
 
-**The software is provided for evaluation on an "as is" basis, without warranties of any
-kind, express or implied**, including merchantability, fitness for a particular purpose, and
-non-infringement. This is stated plainly because it is what a pilot is: the parties are
-finding out whether it works.
+Vendor would provide:
 
-Neither party is liable for indirect, incidental, consequential, special, or punitive
-damages, or for lost profits or lost data. Each party's total aggregate liability arising
-out of this Agreement is limited to **[SET — a figure; fees paid, or a fixed cap if the
-pilot is unpaid]**.
+- the identified evaluation archive and package evidence;
+- an evaluation licence token for the agreed term;
+- the technical documentation set;
+- reasonable-effort evaluation assistance under the separately approved support framework;
+- fixes or documented workarounds for reproducible package defects where commercially reasonable;
+- disclosure of known material limitations.
 
-These limits do not apply to a party's breach of the licence restrictions in section 4, to
-breach of confidentiality, or to liability that cannot be limited under applicable law.
+Vendor does not administer Customer systems, hold Customer credentials, approve Customer actions, or operate Customer's provider runner.
 
-## 11. Known limitations, disclosed before signature
+## 8. Fees and expenses
 
-Stated here rather than discovered during the pilot:
+Pilot fees: **[AMOUNT OR NO-COST TERMS]**.  
+Payment schedule: **[TERMS]**.  
+Taxes: **[ALLOCATION]**.  
+Travel or third-party expenses: **[PRE-APPROVAL AND REIMBURSEMENT TERMS]**.
 
-- Vendor holds no SOC 2 report, ISO 27001 certification, or third-party penetration test.
-- The monitoring vendor adapters are staged. Customer's first alert is the first time a
-  given mapping meets live traffic from Customer's account.
-- The software has no attempt-counter for unattended retry, so recovery actions require a
-  human to initiate them.
+No price, discount, or future production credit is binding until completed here and signed.
 
-## 12. Termination
+## 9. Support and security contacts
 
-Either party may terminate for convenience on **[SET — 10 days suggested]** written notice,
-or immediately for material breach that is not cured within **[SET — 15 days suggested]** of
-notice.
+The proposed support framework is not an SLA until expressly incorporated into the signed agreement.
 
-On expiry or termination, Customer stops using the software and deletes its copies. The
-licence token ceases to be valid at the end of the pilot term. Customer's incident records,
-audit trail, and configuration remain Customer's, in Customer's systems; Vendor cannot
-delete or retrieve them because Vendor never held them.
+The final agreement must identify:
 
-Sections 4 (as to restrictions), 8, 9, 10, and 13 survive.
+- covered hours and time zone;
+- named support and security channels;
+- primary and backup responders;
+- response targets by severity;
+- exclusions and cooperation requirements;
+- escalation path;
+- remedies, if any.
 
-## 13. General
+No 24/7 or four-hour Severity 1 commitment is included by default.
 
-Neither party may use the other's name, logo, or the existence of this pilot publicly
-without prior written consent.
+## 10. Confidentiality and security reporting
 
-This Agreement is governed by the laws of **[SET — governing law]**, and the parties submit
-to the exclusive jurisdiction of the courts of **[SET — venue]**.
+Each party's confidentiality obligations, exclusions, compelled-disclosure process, duration, standard of care, permitted recipients, and return/destruction obligations are **[TO BE COMPLETED BY COUNSEL]**.
 
-This Agreement is the entire agreement on its subject matter, supersedes prior discussions,
-and may be amended only in writing signed by both parties. Neither party may assign it
-without the other's consent, except to a successor of all or substantially all of its
-business. If a provision is unenforceable, the rest remains in effect.
+Security reports must not include production credentials, licence tokens, approval signatures, private keys, or unnecessary Customer data.
 
-## 14. Conversion
+## 11. Warranties and disclaimers
 
-If both parties wish to continue, they will negotiate a subsequent agreement in good faith.
-Indicative terms for that agreement — **[SET — price, edition, term, and whether pilot fees
-credit against it]** — are not binding until executed. Absent a signed successor agreement,
-this pilot ends on its expiry date.
+The evaluation software is expected to be supplied “as is” for technical evaluation, but the exact disclaimer, non-infringement language, authority warranties, malware warranty, and any security commitments are **[TO BE COMPLETED BY COUNSEL]**.
 
----
+This draft makes no production availability, automated-remediation success, compliance certification, or fitness representation.
 
-## Signatures
+## 12. Liability and indemnity
 
-| | Vendor | Customer |
-|---|---|---|
-| Entity | **[SET]** | |
-| Name | | |
-| Title | | |
-| Date | | |
-| Signature | | |
+The liability cap, excluded damages, confidentiality and IP carve-outs, security carve-outs, indemnities, defence control, and claims procedure are **[TO BE COMPLETED BY COUNSEL]**.
+
+Do not send this draft for signature with those terms unresolved.
+
+## 13. Known limitations disclosed before signature
+
+At minimum, the final pilot agreement should disclose:
+
+- `1.0.0-rc.2` is evaluation-only and has not earned external production acceptance;
+- production runners and capabilities are buyer-supplied;
+- monitoring adapters remain staged until accepted against buyer traffic;
+- in-memory stores are not production durable boundaries;
+- licence enforcement in source delivery is contractual rather than tamper-proof;
+- seats and aggregate execution limits are not technical counters;
+- no SOC 2 report, ISO 27001 certification, or third-party penetration test is represented;
+- no production SLA or 24/7 staffing is represented;
+- repository visibility and the long-term source-licensing model require a commercial decision.
+
+## 14. Termination and end of pilot
+
+Convenience notice: **[PERIOD]**.  
+Breach notice and cure: **[PERIOD]**.  
+Immediate termination events: **[EVENTS]**.  
+Post-termination licence and deletion obligations: **[TERMS]**.  
+Evidence and Customer-owned records retained by Customer: **[TERMS]**.
+
+Vendor cannot delete Customer records held only in Customer systems.
+
+## 15. Governing law and general terms
+
+Governing law: **[JURISDICTION]**.  
+Venue/dispute process: **[COURTS, ARBITRATION, OR OTHER]**.  
+Assignment, publicity, notices, force majeure, export controls, sanctions, severability, waiver, order of precedence, and entire-agreement terms: **[TO BE COMPLETED BY COUNSEL]**.
+
+## 16. Production conversion
+
+Any production relationship requires a separate signed agreement identifying the production release, supported environments, licence scope, price, term, support commitment, security terms, warranty, liability, and acceptance criteria.
+
+Absent that successor agreement, the pilot ends on its stated date and no production right is implied.
 
 ---
 
-## Note to counsel
+## Signature page — incomplete draft
 
-Three things in this draft are unusual for software and are deliberate rather than
-oversights. First, the software runs wholly in Customer's environment with no vendor-side
-service, so the usual hosted-software provisions — uptime, service credits, data processing,
-subprocessors, breach notification for vendor-held data — have no subject matter. A DPA is
-likely unnecessary for the product itself, and the reasoning is set out in the security and
-data-handling statement. Second, the approval-gating clause in section 6 describes a safety
-property of the product and should not be softened into a configurable feature. Third,
-section 11 discloses gaps most vendors omit; leaving them in is the intent, since a buyer's
-security review finds them regardless and the disclosure is worth more than the omission.
+| Field | Vendor | Customer |
+| --- | --- | --- |
+| Legal entity | **[REQUIRED]** | **[REQUIRED]** |
+| Authorized signer | **[REQUIRED]** | **[REQUIRED]** |
+| Title | **[REQUIRED]** | **[REQUIRED]** |
+| Date | **[REQUIRED]** | **[REQUIRED]** |
+| Signature | **[REQUIRED]** | **[REQUIRED]** |
+| Package version | `1.0.0-rc.2` | |
+| Source commit | **[REQUIRED]** | |
+| Tarball SHA-256 | **[REQUIRED]** | |
+| Pilot term | **[REQUIRED]** | |
+| Pilot fee | **[REQUIRED]** | |
+
+**Do not sign while any required field or material clause remains unresolved.**

@@ -1,118 +1,86 @@
 <!-- docs/portables/buyer-package/overview.md -->
 
-# Self-Healing Supervisor
+# Self-Healing Supervisor — Design-Partner Evaluation
 
-**Incident remediation that runs inside your environment — and stops for a human before it
-does anything consequential.**
+**Buyer-hosted incident supervision with explicit capability controls, named-human approval, signed continuation, and audit evidence.**
 
----
+## Current status
+
+The current package is `1.0.0-rc.2`, an evaluation release. It is not represented as production-ready automated remediation and carries no production licence, warranty, SLA, or 24/7 support commitment.
+
+The purpose of the evaluation is to produce evidence in a clean buyer-like environment against the exact archived npm package.
 
 ## What it does
 
-An alert fires from the monitoring you already use. The supervisor authenticates it,
-deduplicates it, and diagnoses the incident. It produces a repair plan with verification
-steps, and classifies each step by risk.
+An authenticated incident enters the buyer's environment, is normalized and deduplicated, and can be used to propose a repair plan. Before any API step reaches a buyer runner, the package validates the exact provider, stable action ID, HTTP method, resource pattern, parameter schema, risk class, automatic-execution status, and execution limit.
 
-Safe steps run immediately, with nobody watching. Anything consequential — touching
-credentials, deleting data, moving money, changing permissions — **stops and waits for a
-named person to approve it.** That person gets a notification through your own channel with
-the step, the reason it was held, and the incident id.
+A registered routine-reversible capability may run automatically. Anything unknown or consequential pauses. A consequential step can resume only with an Ed25519-signed continuation bound to the incident, plan, a fresh dispatch ID, exact ordered step IDs, named approver, time window, one-time nonce, signing key, and prior pause audit event.
 
-Approved steps execute. Results are checked against the plan rather than assumed. Every
-action, decision and refusal is written to your SIEM.
-
----
+The buyer's read-only verifier checks the result, and the buyer's audit sink receives the evidence.
 
 ## Where it runs
 
-**Inside your infrastructure.** There is no service of ours in the path, no account with us,
-and no telemetry. We could not see your incidents if we wanted to.
+The package runs inside the buyer's infrastructure. It has no vendor-hosted control plane and no vendor telemetry in the execution path. The buyer supplies all credentials, storage, notifications, approver identity, provider capabilities, provider runners, approval keys, and SIEM transport.
 
-Practically, that means most of a standard vendor security review has no subject matter
-here. There is no data processing agreement to negotiate over data we never receive, no
-subprocessor list, no vendor-side breach notification, no uptime commitment on a service
-that does not exist.
+That reduces vendor-side data handling, but it does not eliminate security review. Buyers must still review the delivered source, package evidence, licence model, key custody, capability registrations, runners, legal terms, and operational procedures.
 
----
-
-## Installing it
-
-It is a Node package. One command, then one file you write.
+## Installing the evaluation package
 
 ```bash
-npm install ./signalboost-self-healing-supervisor-1.0.0.tgz
+sha256sum -c signalboost-self-healing-supervisor-1.0.0-rc.2.tgz.sha256
+npm install ./signalboost-self-healing-supervisor-1.0.0-rc.2.tgz
 ```
 
-**It has no third-party dependencies.** Node built-ins only. Nothing to audit beyond the
-product itself, and no transitive supply chain arriving with it.
+The package must contain compiled JavaScript and `.d.ts` declarations. The canonical workflow also produces `manifest.json`, CycloneDX `sbom.json`, `SHA256SUMS`, and an archive checksum, then installs and imports the exact tarball in a fresh project.
 
-The one file you write is a host adapter: your secrets store, your datastore for the
-dispatch ledger, your notification channel, your SIEM sink, and the executor that touches
-your systems. That adapter is the whole integration surface, and it is the reason the
-product is portable rather than merely configurable — your infrastructure stays yours, and
-ours never appears in it.
+## Buyer integration boundary
 
----
+Paid planning and dispatch are created only through:
 
-## What it will not do
+```js
+import { createLicensedSelfHealingSupervisor } from '@signalboost/self-healing-supervisor'
+```
 
-Stated here rather than discovered later.
+The factory requires:
 
-**It ships no execution runner.** Repair steps run through code your team supplies. Until
-you provide one, the supervisor receives, diagnoses, gates and audits — then reports
-honestly that nothing was repaired, rather than claiming a fix that did not happen.
+- buyer host context;
+- signed licence token and accepted issuer public keys;
+- durable dispatch store;
+- durable audit sink;
+- buyer API runner;
+- explicit API capability registry;
+- signed-approval verifier and durable nonce store;
+- repair-plan thinker.
 
-**Monitoring adapters are mapped but not yet proven against live traffic.** Datadog,
-PagerDuty, CloudWatch, Alertmanager, Splunk, Azure Monitor, Grafana and Google Cloud
-Operations are each mapped against fixtures. Your first alert is the first time that mapping
-meets a real payload from your account.
+It refuses incomplete paid-path configuration. Reading, observation, and audit export remain available independently.
 
-**We hold no SOC 2 report, no ISO 27001 certification, and no third-party penetration
-test.**
+Because the buyer receives source, licence enforcement is contractual rather than tamper-proof.
 
-**There is no unattended retry.** Recovery actions require a person to start them.
+## What the evaluation must prove
 
----
+- clean package installation and public import;
+- no platform or third-party runtime dependency in the public graph;
+- missing and invalid licences refuse paid paths through the packaged factory;
+- valid entitlement permits only licensed features;
+- all unknown and adversarial actions pause;
+- exact registered routine capabilities run only within their limits;
+- all three consequential categories route to the intended named approvers;
+- valid signed continuation executes only its exact scope;
+- tampering, expiration, missing audit binding, and nonce replay fail closed;
+- five notification languages work without changing machine identifiers;
+- read-only verification and audit delivery are truthful;
+- upgrade and rollback work from archived artifacts.
 
-## What cannot be turned off
+## Known limitations
 
-There is no edition, configuration, or licence state in which a consequential step executes
-without a named human approving it. It is not a setting. We do not sell a cheaper version
-that skips it.
+- no independent buyer acceptance has yet earned production `1.0.0`;
+- real provider runners and capability registrations are buyer-supplied and unproven until reviewed and tested;
+- monitoring adapters remain staged until accepted against buyer traffic;
+- in-memory stores are evaluation-only;
+- no SOC 2 report, ISO 27001 certification, or third-party penetration test is represented;
+- no finalized production licence, pilot agreement, pricing, liability terms, governing law, or SLA exists;
+- repository visibility and the long-term source-licensing model require a deliberate commercial decision.
 
-Receiving, recording and auditing incidents are never gated either — including with no
-licence installed at all. A licence controls diagnosis and dispatch, not your visibility
-into your own systems.
+## Accurate commercial positioning
 
----
-
-## Editions and price
-
-| | Standard | Enterprise |
-| --- | --- | --- |
-| Incident intake, diagnosis, policy gating, approval routing, audit | ✓ | ✓ |
-| Repair steps through your API runner | ✓ | ✓ |
-| Repair steps driven through a browser runtime | | ✓ |
-
-**[SET — price] per production environment, per year.**
-
-Before that: a **[SET — 60 or 90]-day pilot at [SET — fee or "no cost"]**, running against a
-real environment of yours, so the decision rests on evidence rather than a demonstration.
-
----
-
-## Seeing it work
-
-Ask for a share link. It opens without an account and shows a real run against a live
-deployment: a consequential step refusing to execute, the approval request that was raised,
-and the audit trail it produced.
-
----
-
-## What happens next
-
-A 30-minute session where a live incident is run in front of you — diagnosis, the step that
-refuses, the approval arriving, the record it leaves. After that, your engineers will want
-the integration guide and roughly half a day.
-
-**[SET — your name, title, email]**
+> Self-Healing Supervisor Design-Partner Evaluation — buyer-hosted incident intake, diagnosis, explicit capability validation, approval routing, signed exact-scope continuation, bounded buyer-runner execution, read-only verification, and audit evidence. Production use remains subject to buyer acceptance and a separate signed agreement.

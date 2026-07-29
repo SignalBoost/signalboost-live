@@ -28,7 +28,7 @@ type NodeEntry = {
 }
 
 type CacheEntry = {
-  source: string
+  sourceHash: string
   translated: string
   touchedAt: number
 }
@@ -201,7 +201,7 @@ function translationCacheKey(source: string, targetLanguage: string): string {
 
 function loadCache(): Record<string, CacheEntry> {
   try {
-    const parsed = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    const parsed = JSON.parse(sessionStorage.getItem(CACHE_KEY) || '{}')
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, CacheEntry>
       : {}
@@ -215,7 +215,7 @@ function saveCache(cache: Record<string, CacheEntry>) {
     const ordered = Object.entries(cache)
       .sort((a, b) => Number(b[1]?.touchedAt || 0) - Number(a[1]?.touchedAt || 0))
       .slice(0, CACHE_LIMIT)
-    localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(ordered)))
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(ordered)))
   } catch {
     // Browser cache is an optimization; the server cache remains authoritative.
   }
@@ -304,7 +304,8 @@ export default function GeneratedContentLocalizer() {
 
           const key = translationCacheKey(entry.text, targetLanguage)
           const cached = cache[key]
-          if (cached?.source === entry.text && typeof cached.translated === 'string') {
+          const sourceHash = fastHash(entry.text)
+          if (cached?.sourceHash === sourceHash && typeof cached.translated === 'string') {
             cached.touchedAt = Date.now()
             renderEntry(entry, cached.translated)
           } else {
@@ -321,7 +322,7 @@ export default function GeneratedContentLocalizer() {
             const value = translated.get(entry.id)
             if (typeof value !== 'string' || !value) continue
             cache[translationCacheKey(entry.text, targetLanguage)] = {
-              source: entry.text,
+              sourceHash: fastHash(entry.text),
               translated: value,
               touchedAt: Date.now(),
             }

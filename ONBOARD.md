@@ -1,258 +1,573 @@
-<!-- onboard.md -->
+<!-- ONBOARD.md -->
 
 # SignalBoost — onboarding and handoff
 
 **Last updated: 29 July 2026.** Read this before touching the Self-Healing Supervisor, the
-buyer package, or the supervisor database.
+buyer package, localization, or the supervisor database.
 
 ---
 
 ## 1. The one-line state
 
 The Self-Healing Supervisor detects, diagnoses and evidences real production incidents
-unattended; it installs as a zero-dependency npm package; it speaks five languages end to end;
-and a prospect can be sent a redacted record of a real incident through a link that needs no
-account. What remains is commercial, not technical.
+unattended; it installs as a zero-dependency npm package; it produces human-readable output in
+English, Spanish, Portuguese, Polish and Russian; and a prospect can receive a redacted record
+of a real incident through a link that needs no account.
+
+The buyer evaluation package is now committed and merged. The next cross-cutting engineering
+priority is to finish repository-wide localization so no user-facing English remains hardcoded
+in executable UI, server responses, notifications, metadata, templates, or generated-content
+surfaces.
 
 ---
 
 ## 2. How this repository is worked
 
-Facts that change what a good deliverable looks like. Ignore them and you will waste a day.
+Facts that change what a good deliverable looks like:
 
-- **The owner works entirely in a browser** — the GitHub web UI and the Vercel dashboard.
-  There is no terminal. If an action is not reachable from a browser, the deliverable is a
-  route and a page, not an instruction. This has caught out two CLIs already
-  (`issue-license.ts`, the packaging script).
-- **Files are delivered as complete replacements and pasted by hand.** Every generated file
-  starts with a first-line comment naming its own path. A 300KB file is not a deliverable; a
-  build script that produces it is.
-- **GitHub's editor defaults to committing straight to `main`.** Any instruction that depends
-  on the person noticing a branch radio button is a production risk. Prefer experiments that
-  cannot reach `main` at all.
-- **Several agents edit this repository in parallel.** Files have been rewritten mid-task more
-  than once. Re-read a file from `main` immediately before editing it, and before building
-  anything non-trivial check whether another lane already shipped it.
-- **A migration in the repo is not a migration in the database.** Nothing records which have
-  been applied. See section 5.
+- **The owner works entirely in a browser** — primarily the GitHub web UI and Vercel dashboard.
+  If an action is not realistically reachable from a browser, the deliverable should be a route,
+  page, workflow, or downloadable artifact rather than terminal-only instructions.
+- **Files are delivered as complete replacements.** Generated files should start with a
+  first-line comment naming their repository path.
+- **GitHub's editor can commit directly to `main`.** Use a focused branch and pull request for
+  bounded work rather than depending on an operator to notice a branch selector.
+- **Several agents may edit this repository in parallel.** Re-read the target file from current
+  `main` immediately before editing it. Do not replace newer work with an older branch copy.
+- **A migration committed to the repository is not proof that it ran in the database.** Verify
+  applied state independently.
+- **Never claim a build, test, workflow, deployment, commit, pull request, or merge succeeded
+  unless the result was actually checked.**
 
-## 3. Build guards
+Core product principle:
 
-`prebuild` runs on every deploy and blocks it on failure. As of this writing:
-`validate:next-routes`, `validate:strip-safe`, then `validate:i18n-copy`, which itself chains
-several i18n scripts.
+> AI builds. Humans stay in control.
 
-**The i18n chain has changed three times in one day.** Read `package.json` to see what is
-actually live rather than assuming. Current rule for new UI: **user-facing English may not
-appear inside `app/` or `components/`.** Put copy in `lib/i18n/<feature>Copy.ts` and import it —
-`lib/` is not scanned, the pattern passes every version of the guard so far, and it keeps the
-five languages authored together.
-
-Two guards worth knowing because they encode real incidents:
-
-- **`check-hardcoded-copy.mjs`** is AST-based and checks per string, so it catches a bare
-  `<button>Delete account</button>` inside a file that correctly calls `t()` elsewhere. Its
-  baseline is now empty: any new literal fails the build immediately.
-- **`build-portable.mjs --check`** fails if the portable payload reaches any third-party
-  package. Zero dependencies is a selling point, and this is what keeps it true.
-
-Vercel builds with `buildCommand: "npm run prebuild && next build"` in `saas/vercel.json`.
-Before that was set, the guards never ran in a deploy at all — a crashing guard shipped green.
+Consequential actions remain behind explicit approval and governance boundaries, including
+credential changes, permissions, deletion, spending, publishing, infrastructure mutation,
+provider mutation, and production browser execution.
 
 ---
 
-## 4. The product
+## 3. Completed Self-Healing Supervisor evaluation-package merge
+
+### Pull request and merge
+
+The buyer-facing evaluation package was prepared on branch:
+
+`docs/self-healing-evaluation-package-20260728`
+
+It was opened as **PR #893 — `docs(supervisor): publish evaluation and buyer package`** and
+merged into `main` on 29 July 2026.
+
+- Merge commit: `646ae3c57531f7701ff1ffde2d66ce6b98b97ee1`
+- Changed files: 6
+- Additions: 549
+- Deletions: 25
+
+### Files added or updated
+
+1. **`.github/workflows/portable-package.yml`** — added the GitHub Actions workflow that checks
+   the portable boundary, builds the package, runs `npm pack`, and retains a commit-addressed
+   `.tgz` artifact for 90 days.
+2. **`docs/portables/buyer-package/presentation.md`** — added the buyer presentation with the
+   product position, installation model, evidence, limitations, editions, prices, pilot terms,
+   support position, and next steps.
+3. **`docs/portables/self-healing-technical-walkthrough.md`** — added the offline hands-on
+   walkthrough covering package build, scratch installation, buyer-supplied `HostContext`, the
+   acceptance scenario, negative control, language switching, and signed incident intake.
+4. **`docs/portables/self-healing-evaluation-brief.md`** — expanded the engineering evaluation
+   brief with package download/build instructions, reading order, test commands, proven claims,
+   unproven claims, and the attack priorities.
+5. **`docs/portables/self-healing-integration-guide.md`** — expanded the buyer integration guide
+   with language behavior, human-readable versus machine-readable boundaries, execution-runner
+   requirements, and live-environment acceptance requirements.
+6. **`docs/portables/self-healing-support-terms.md`** — replaced commercial placeholders with
+   the current pilot and first-year support commitments, channels, escalation route, supported
+   versions, security reporting, and end-of-life notice.
+
+### Validation completed before merge
+
+All five pull-request workflow groups completed successfully:
+
+- Audit Remediation Regression
+- Pipeline Integrity
+- Playwright Tests
+- QA Scan
+- Repo Targeting QA
+
+The comprehensive SaaS node-test run completed **1,804 tests with 1,804 passing, zero failures,
+zero cancellations, and zero skipped tests**.
+
+The branch diff was confirmed as exactly six files. The workflow YAML parsed successfully and
+no pasted-file separator artifacts were committed.
+
+### Product boundaries preserved in the package
+
+The documentation must continue to state these claims consistently:
+
+1. No consequential step executes without a named human approval.
+2. The portable runs inside the buyer's environment with no vendor-operated service in the
+   execution path.
+3. The product ships no execution runner; the buyer supplies the code that touches its systems.
+4. Monitoring adapters mapped only against fixtures remain staged and unproven against the
+   buyer's live traffic.
+5. Seats and execution limits are contract terms, not enforced technical counters.
+6. There is no SOC 2 report, ISO 27001 certification, or third-party penetration-test report.
+7. Incident receipt, storage, audit visibility, and SIEM evidence are not held hostage by
+   licensing state.
+
+### Subsequent evaluation-plan work on `main`
+
+A master evaluation plan was later added with phases, assigned roles, an 18-row functional
+matrix, security-review questions, a findings register, fit questions, and sign-off criteria.
+Its file header says `docs/portables/self-healing-evaluation-plan.md`, but the current repository
+path is actually:
+
+`docs/portables/portables/self-healing-evaluation-plan.md`
+
+Do not create links that pretend the intended path already exists. Move the file to
+`docs/portables/self-healing-evaluation-plan.md` in a separate focused cleanup and update all
+references at the same time.
+
+---
+
+## 4. Build guards
+
+`saas/package.json` currently runs this `prebuild` chain:
+
+```text
+validate:next-routes
+validate:strip-safe
+validate:i18n-copy
+```
+
+`validate:i18n-copy` currently chains:
+
+```text
+scripts/check-hardcoded-copy.mjs
+scripts/migrate-page-copy-to-locales.mjs
+scripts/check-generated-ui-locale-completeness.mjs
+```
+
+Two guards encode important product requirements:
+
+- **`saas/scripts/check-hardcoded-copy.mjs`** is an AST-based hardcoded-copy guard. It currently
+  scans `.tsx` files under `saas/app` and `saas/components`, checks literal JSX text and literal
+  `placeholder`, `aria-label`, `title`, and `alt` values, and fails on new violations.
+- **`saas/scripts/build-portable.mjs --check`** fails if the portable payload reaches a
+  third-party package. Zero third-party dependencies is a commercial and security claim, not a
+  cosmetic build preference.
+
+The hardcoded-copy baseline is currently empty:
+
+`saas/scripts/i18n-hardcoded-baseline.json`
+
+Do not regenerate that baseline to hide newly introduced copy. A zero baseline is the required
+steady state.
+
+Vercel must continue to run prebuild before `next build`; otherwise a guard can exist in the
+repository without protecting deployment.
+
+---
+
+## 5. The product
 
 ### What it is
 
-An incident supervisor delivered as source that runs inside the buyer's environment. No vendor
-service, no vendor account, no telemetry. The buyer writes one host adapter implementing
-`HostContext` — secrets, notifications, approvers, branding, dispatch ledger, SIEM sink, and
-the executor that touches their systems.
+The Self-Healing Supervisor is delivered as source that runs inside the buyer's environment.
+There is no mandatory SignalBoost service, account, or telemetry path. The buyer implements a
+`HostContext` supplying secrets, notifications, approvers, branding, durable data stores, SIEM
+transport, and the execution runner that touches its systems.
 
-**The claim it is sold on:** no consequential step executes without a named human approving it,
-in any edition, configuration or licence state.
+**The core safety property:** no consequential step executes without a named human approving it,
+in any edition, configuration, or licence state.
 
 ### Packaging
 
-`saas/scripts/build-portable.mjs` walks the import graph from the portable entry points,
-rewrites `@/` aliases to relative paths, excludes host implementations (detected by behaviour —
-any file importing a third-party package), and emits an installable package. 87 files, ~116KB,
-**zero third-party dependencies**.
+`saas/scripts/build-portable.mjs` walks the portable import graph, rewrites internal aliases,
+excludes host-specific implementations, performs the dependency-boundary check, and emits the
+installable package.
 
-`.github/workflows/portable-package.yml` builds it on every push and attaches the `.tgz` to the
-run, so an evaluator downloads it from the Actions tab. Note a `portable-release.yml` also
-exists from another lane — establish which is authoritative before adding a third.
+`.github/workflows/portable-package.yml` builds and publishes the `.tgz` artifact from pushes to
+`main` that touch the portable boundary. A separate `portable-release.yml` may also exist; verify
+which workflow is authoritative before adding or replacing release automation.
 
-### Language
+### Language behavior
 
-Everything a person reads is produced in the configured language: approval requests, plan
-diagnoses, step descriptions, expected results, stop reasons, evidence summaries, verification
-results. English, Spanish, Portuguese, Polish, Russian. Set `locale` on `HostBranding`; region
-tags like `pt-BR` are accepted. On this platform it comes from `SUPERVISOR_LOCALE`.
+The portable supports `en`, `es`, `pt`, `pl`, and `ru`, including region tags such as `pt-BR`
+and `es-MX`. Human-facing approval requests, diagnoses, plan steps, expected results, stop
+reasons, evidence summaries, and verification results follow the configured locale.
 
-**Nothing a machine parses is translated.** Audit event types, step ids, incident types and
-severities are identical in every locale, so a SIEM rule cannot break because a team switched
-language. Text is translated when written, not when displayed — an evidence record keeps the
-language it was recorded in.
+Machine-readable identifiers must not be translated. Audit event types, step identifiers,
+incident types, error codes, schema versions, severities, and SIEM contract fields remain stable
+in every language.
 
-Catalogues live in `lib/supervisor/portable/notification-copy.ts` and `observation-copy.ts`,
-both exported from the portable barrel so a buyer writing their own notification sink gets the
-same wording.
+Translation applies when evidence or a notification is written. Historical evidence is not
+silently rewritten when the configured language later changes.
+
+Portable human-facing catalogues include:
+
+- `saas/lib/supervisor/portable/notification-copy.ts`
+- `saas/lib/supervisor/portable/observation-copy.ts`
+
+A buyer writing its own notification sink should be able to import the same supported copy
+rather than recreate English-only messages.
 
 ### Licensing
 
-Signed offline tokens. The gate sits at the execution boundary, not at a UI, and is
-**fail-closed**: with no licence, `repair.plan` and `repair.dispatch` refuse. Receiving,
-recording and auditing incidents are never gated — a licence controls diagnosis and dispatch,
-never a customer's visibility into their own systems.
+Licences are signed offline tokens. Entitlement is enforced at the execution boundary rather
+than only in the browser UI.
 
-Mint from the browser at `/dashboard/supervisor/license`. The private key is shown once and
-never stored.
+Without a valid licence, diagnosis and dispatch may refuse, but receiving, recording, reading,
+auditing, and SIEM visibility must remain available. A customer's incident history must never
+be discarded because of billing state.
 
-**Seats and execution limits are recorded in the token and not enforced.** They are contract
-terms. Do not price as though they were a technical control.
+The browser licence screen is `/dashboard/supervisor/license`. The private signing key is shown
+once and is not stored by the page.
 
----
-
-## 5. The database
-
-**Fifteen of the sixteen tables the supervisor expects did not exist** until 28 July. The
-observation cron had been running every fifteen minutes for weeks with nowhere to write. The
-console reported a bare 500; the demo page caught the same failure and reported an empty state.
-Neither said the store was missing.
-
-- **`saas/supabase/checks/supervisor-table-inventory.sql`** — read-only, prints MISSING or
-  present for every expected table. **Run this first** whenever a supervisor capability looks
-  wired but inert.
-- **`saas/supabase/checks/supervisor-provisioning-bundle.sql`** — the eight required migrations
-  concatenated in dependency order, made re-runnable. One paste.
-
-`provider_connections` reads MISSING and always will — no migration in the repo creates it. The
-observer does not need it when `VERCEL_PROJECT_ID` and `VERCEL_PROVIDER_CONNECTION_ID` are set.
-
-**Two habits that let this hide, both worth keeping:** re-run the inventory after each
-migration rather than assuming; and never let a missing store look like an empty result. Error
-handling that is too forgiving costs diagnoses.
+Seats and execution limits are recorded in the token but are not technically enforced. Do not
+sell or document them as implemented counters.
 
 ---
 
-## 6. Evidence that exists
+## 6. The database
 
-**A real production incident, 29 July, detected unattended.** A production deployment was
-cancelled; nobody reported it. The supervisor detected it, classified it `VERCEL_CANCELED` at
-warning severity, produced a plan, evaluated policy, resolved a read-only capability, dispatched
-an inspection, read the deployment and its production aliases, verified the diagnosis and wrote
-fourteen audit events.
+The supervisor expects durable tables that may not exist merely because migrations are present
+in the repository.
 
-**An acceptance rehearsal**, three risk categories, fifteen checks, all passing against real
-wiring — consequential step paused every time, approver notified through a real channel, audit
-trail produced. Run it any time from `/dashboard/supervisor/demo`; it writes no state.
+Use these checks before diagnosing an apparently empty capability:
 
-**A share link.** Publish a rehearsal, drill or production run and send the URL. No account
-needed. Identifiers are masked at every depth — `dpl_`, `prj_`, `team_`, `*.vercel.app`, email
-addresses. Revocable; tokens stored only as hashes.
+- **`saas/supabase/checks/supervisor-table-inventory.sql`** — read-only inventory that reports
+  expected tables as present or missing.
+- **`saas/supabase/checks/supervisor-provisioning-bundle.sql`** — the required migrations in
+  dependency order, made re-runnable for browser-based execution.
 
-### Running the observation loop
+Re-run the inventory after each migration. Do not let a missing store appear to operators as a
+valid empty result.
 
-`SUPERVISOR_LOCALE`, `VERCEL_PROJECT_ID`, `VERCEL_PROVIDER_CONNECTION_ID`, `VERCEL_API_TOKEN`,
-`VERCEL_TEAM_ID`, `VERCEL_OBSERVATION_ENVIRONMENT` (`production`), `SUPERVISOR_INTAKE_SECRET`,
-`OWNER_EMAILS`, `NEXT_PUBLIC_APP_URL`. All read at process start — **redeploy after changing
-any of them.**
-
-Two traps. Vercel's variable list shows the *scope* under each name, not the value, and
-sensitive values are never displayed — the only way to read `VERCEL_OBSERVATION_ENVIRONMENT`
-from outside is the Environment field on a run record. And although the cron is `*/15`, new
-runs appear roughly hourly because triggers are deduplicated per observation window.
-
-**To produce a fresh incident safely:** trigger a redeploy in Vercel and cancel it mid-build.
-Nothing customer-facing changes — the live deployment keeps serving — and the observer treats a
-cancelled production deployment as an incident.
+`provider_connections` has historically been absent. The observer can operate from explicit
+`VERCEL_PROJECT_ID` and `VERCEL_PROVIDER_CONNECTION_ID` configuration, but current code and
+schema must always be checked before relying on this statement.
 
 ---
 
-## 7. The buyer package
+## 7. Evidence and operation
 
-Under `docs/portables/`:
+### Evidence that exists
 
-| Document | Audience |
+- A real cancelled production deployment was detected unattended and classified as
+  `VERCEL_CANCELED` at warning severity.
+- The supervisor planned, evaluated policy, resolved a read-only capability, dispatched an
+  inspection, read deployment and alias state, verified the diagnosis, and produced fourteen
+  audit events.
+- The acceptance rehearsal covered financial, destructive, and credential-security categories
+  with fifteen passing checks; consequential work paused, the approver was notified, and audit
+  evidence was produced.
+- Published rehearsal, drill, or production records can be shared without requiring the viewer
+  to create an account. Identifiers must remain deeply redacted and tokens stored only as hashes.
+
+### Observation-loop configuration
+
+Relevant environment variables include:
+
+```text
+SUPERVISOR_LOCALE
+VERCEL_PROJECT_ID
+VERCEL_PROVIDER_CONNECTION_ID
+VERCEL_API_TOKEN
+VERCEL_TEAM_ID
+VERCEL_OBSERVATION_ENVIRONMENT
+SUPERVISOR_INTAKE_SECRET
+OWNER_EMAILS
+NEXT_PUBLIC_APP_URL
+```
+
+They are read at process start. Redeploy after changing them.
+
+To produce a fresh cancelled-deployment incident safely, trigger a new Vercel deployment and
+cancel that build while the existing live deployment continues serving. Always verify the
+actual environment and current observer behavior before using the result as buyer evidence.
+
+---
+
+## 8. Buyer-package map
+
+Buyer-package material is under `docs/portables/` unless an explicit current-path exception is
+noted:
+
+| Document | Audience and purpose |
 | --- | --- |
-| `buyer-package/presentation.md` | The single document you present. Prices filled |
-| `buyer-package/overview.md` | Shorter first-touch one-pager |
-| `buyer-package/README.md` | What to send, in what order |
-| `self-healing-evaluation-plan.md` | The evaluating team — phases, 18-row test matrix, sign-off |
-| `self-healing-technical-walkthrough.md` | An engineer, 30 minutes, offline |
-| `self-healing-evaluation-brief.md` | What to attack and where we are weakest |
-| `self-healing-integration-guide.md` | The interfaces, in production terms |
-| `self-healing-incident-intake-guide.md` | The incident contract |
-| `self-healing-monitoring-connections.md` | Eight vendor mappings, verification procedure |
-| `self-healing-security-and-data-handling.md` | A security reviewer |
-| `self-healing-license-installation.md` | Platform team — **strip the vendor section first** |
-| `self-healing-operations-runbook.md` | Whoever runs it |
-| `self-healing-support-terms.md` | Procurement. Values filled |
-| `self-healing-pilot-agreement.md` | Counsel. Still needs the legal entity |
+| `buyer-package/presentation.md` | Primary buyer presentation with commercial terms |
+| `buyer-package/overview.md` | Short first-touch overview |
+| `buyer-package/README.md` | Delivery order and packaging guidance |
+| `portables/self-healing-evaluation-plan.md` | **Current duplicated-path exception**; evaluation phases and sign-off |
+| `self-healing-technical-walkthrough.md` | Offline 30-minute engineering walkthrough |
+| `self-healing-evaluation-brief.md` | Attack surface, evidence, and known gaps |
+| `self-healing-integration-guide.md` | Buyer interfaces and production acceptance |
+| `self-healing-incident-intake-guide.md` | Incident intake contract |
+| `self-healing-monitoring-connections.md` | Monitoring mappings and verification procedure |
+| `self-healing-security-and-data-handling.md` | Security-review material and disclosed gaps |
+| `self-healing-license-installation.md` | Licence installation guidance |
+| `self-healing-operations-runbook.md` | Day-to-day operations |
+| `self-healing-support-terms.md` | Support and procurement commitments |
+| `self-healing-pilot-agreement.md` | Counsel draft; still requires legal-entity review |
 
-**First touch is three things:** the presentation, and a share link. Not fourteen documents.
+The first buyer contact should remain bounded. Do not send every internal or legal document when
+the presentation and a suitable redacted evidence link are sufficient for the first discussion.
 
-### Commercial position
+### Current commercial position
 
-$48,000 enterprise, $30,000 standard, per production environment per year. 60-day pilot at no
-cost; first year negotiable for a design partner who acts as a reference. Support: 4-hour
-Severity 1 response 24/7; 1, 2 and 5 business days for Severity 2–4.
+- Enterprise: **$48,000 per production environment per year**
+- Standard: **$30,000 per production environment per year**
+- Pilot: **60 days at no cost**
+- First year: negotiable for an appropriate reference design partner
+- Severity 1 first substantive response target: **4 hours, 24/7**
+- Severity 2–4 targets: **1, 2, and 5 business days**
 
-The closest comparable is Rundeck self-hosted at roughly $51,000 — a mature product with SOC 2
-and a support organisation. Pricing just under it is defensible; pricing at parity invites a
-comparison this product would lose on maturity.
-
-**Do not meter anything.** Seats and executions are not enforced, and per-incident pricing
-charges a customer more during their worst week — which reviewers already criticise in
-competing tools.
-
-### Claims that must not drift
-
-Repeated across several documents. If one changes, all change together.
-
-1. No consequential step executes without a named human — any edition, including unlicensed.
-2. Runs wholly in the buyer's environment. No vendor service, account or telemetry.
-3. Seats and execution limits are contract terms, not technical controls.
-4. Monitoring adapters are staged; a buyer's first alert is the first live payload.
-5. No repair executes without a buyer-supplied runner.
-6. No SOC 2, no ISO 27001, no third-party penetration test.
+Do not introduce per-incident metering while execution counts are not technically enforced.
 
 ---
 
-## 8. Known limits — disclosed, not hidden
+## 9. Mandatory plan to eliminate all hardcoded English
 
-- **No execution runner ships.** Without one, the product diagnoses, gates, verifies and audits,
-  then reports honestly that nothing was repaired.
-- **Eight monitoring adapters are mapped against fixtures, never live traffic.**
-- **In-memory defaults** for dedupe and incident records. On serverless they do not survive
-  between invocations; `DedupeStore` and `IncidentRecordStore` are exported interfaces.
-- **No unattended retry.** Recovery needs a person to start it.
-- **The published incident's evidence reads `state is .`** — recorded before the client fix.
-  Cancel another deployment and publish that record instead.
+### Goal
+
+No user-facing English should be embedded directly in executable source outside the canonical
+English locale or approved translation catalogue. English may remain the canonical source
+language, but it must live in locale data or typed copy catalogues and must not be scattered
+through rendering code, API responses, emails, metadata, or runtime templates.
+
+The final rule is not merely “the page can translate.” The rule is:
+
+> Every user-visible string has one canonical key or typed copy field, complete values for all
+> supported languages, a locale-aware rendering path, and a CI rule that prevents regression.
+
+### What counts as user-facing copy
+
+Treat all of the following as localization scope:
+
+- JSX text and component children;
+- button, link, menu, tab, heading, label, helper, tooltip, empty-state, error, loading, success,
+  warning, and confirmation text;
+- `placeholder`, `aria-label`, `title`, `alt`, and other accessibility attributes;
+- strings passed through variables or arrays into JSX;
+- toast, alert, dialog, confirmation, banner, and notification messages;
+- API response fields intended for a person, including `message`, `detail`, `reason`, and
+  remediation guidance;
+- page metadata, Open Graph text, document titles, descriptions, manifests, and install prompts;
+- emails, approval requests, Slack/Teams/ServiceNow/PagerDuty messages, and support notices;
+- report headings, generated-document wrappers, evidence summaries, and exported human-readable
+  files;
+- server-rendered copy, route copy, validation errors, forms, and onboarding instructions;
+- portable-product messages and buyer-configurable branding copy;
+- database seeds or stored templates that later render to a person.
+
+Do **not** translate machine contracts: stable error codes, audit event names, schema identifiers,
+step ids, provider ids, severity enums, environment names, protocol fields, or user-provided data.
+
+### Current protection and its limits
+
+The current AST guard is useful but incomplete. It scans literal JSX text and four literal
+attributes only in `.tsx` files under `saas/app` and `saas/components`.
+
+It does not by itself catch:
+
+- a literal assigned to a variable and later rendered;
+- string literals inside JSX expressions;
+- `.ts` copy modules outside an approved locale catalogue;
+- route handlers and `NextResponse.json` human-readable messages;
+- `toast()`, `alert()`, `confirm()`, notification, or email call sites;
+- Next.js metadata and manifest copy;
+- root-level `app/` and `components/` if the scan is run only from `saas`;
+- JSON, YAML, Markdown, SQL seeds, or stored runtime templates;
+- server-side generated reports and exported files;
+- dynamic generated content that arrives from AI or external providers.
+
+Moving English from a component into an arbitrary unscanned `lib/` file is not completion. Copy
+under `lib/i18n/` is acceptable only when it is a real locale catalogue with parity and tests.
+
+### Required target architecture
+
+1. **One supported-language contract.** Keep the platform language set explicit and shared:
+   `en`, `es`, `pt`, `pl`, `ru`. Region tags normalize to the corresponding supported language
+   unless a region-specific catalogue is intentionally provided.
+2. **Canonical copy lives in locale sources.** English remains canonical, but components and
+   routes reference keys or typed fields rather than repeating English fallbacks inline.
+3. **Typed feature catalogues.** A feature may use `lib/i18n/<feature>Copy.ts` when all five
+   language objects implement the same TypeScript type and the module contains no behavior that
+   bypasses locale selection.
+4. **Key-based dictionaries.** General UI may use locale JSON and the shared translation helper,
+   but key parity must be enforced across all supported languages.
+5. **No inline fallback debt.** Migrate call sites such as
+   `t(dict, 'some.key', 'English fallback')` toward a key-only or typed-copy interface where the
+   English canonical value comes from the locale source, not the render file. During migration,
+   inline fallbacks are debt and must be inventoried rather than treated as the final design.
+6. **Locale-aware server boundaries.** Route handlers return stable machine codes plus a
+   localized human message only when the API contract actually exposes text to a person.
+7. **Locale-aware metadata.** `generateMetadata`, manifests, share cards, and install surfaces
+   resolve copy through the active locale.
+8. **Notification catalogues.** Emails, approvals, chat notifications, support notices, and
+   portable-host messages use the same locale contract as the UI.
+9. **Generated content is separate from static UI.** `GeneratedContentLocalizer` and the
+   translation API may translate user-visible free text, reports, documents, and AI output.
+   They must not be used to excuse hardcoded navigation, controls, forms, or safety messages.
+10. **Machine identifiers stay stable.** Translation must never alter audit keys, step ids,
+    event types, error codes, or schema values.
+
+### Required guard expansion
+
+Extend `check-hardcoded-copy.mjs` or replace it with a shared AST-based localization suite that
+covers the actual user-facing sinks.
+
+The expanded guard should:
+
+- scan both root and SaaS application surfaces where they exist;
+- scan `.ts` and `.tsx` while using sink-aware rules to avoid flagging every technical string;
+- detect literal JSX expressions and variables that are statically traceable to rendered copy;
+- detect literal human messages passed to known UI sinks such as toast, alert, confirm, dialog,
+  notification, and form-validation helpers;
+- detect human-readable `NextResponse.json` fields and server-action return objects;
+- detect literal metadata fields such as title and description;
+- detect email and approval-notification templates outside approved locale catalogues;
+- scan locale-bearing JSON/catalogue files for language parity and missing keys;
+- maintain a narrow allowlist for proper nouns, trademarks, protocol literals, codes, test data,
+  logs, and developer-only diagnostics;
+- report the file, line, sink type, and offending string;
+- fail CI on every new violation;
+- retain a zero final baseline.
+
+A stricter rule may discover existing debt. Inventory it in a dedicated report and remove it in
+bounded feature batches. Do not make the debt disappear by broadly exempting files or by
+regenerating the baseline after violations are introduced.
+
+### Required migration phases
+
+#### Phase A — inventory and contracts
+
+- Produce a complete localization inventory by surface: root app, SaaS app, components, route
+  handlers, metadata, notifications, portable copy, reports, and generated content.
+- Identify every translation mechanism currently in use and choose the supported pattern for
+  each surface.
+- Define one shared `SupportedLanguage`/locale-normalization contract.
+- Add key-parity and typed-catalogue tests.
+
+#### Phase B — interactive UI
+
+- Migrate visible copy in pages and components into locale dictionaries or typed feature-copy
+  modules.
+- Include accessibility text, empty states, loading states, errors, confirmations, tables,
+  filters, pagination, and mobile layouts.
+- Add rendered tests for `es`, `pt`, `pl`, and `ru` that fail when canonical English leaks into
+  the selected non-English surface, except for an explicit allowlist.
+
+#### Phase C — server and outbound communication
+
+- Localize human-readable route/server-action responses.
+- Localize emails, approval messages, chat integrations, support notices, and exports.
+- Keep stable machine codes next to localized messages so clients and SIEM rules do not parse
+  translated prose.
+
+#### Phase D — metadata, documents, and generated content
+
+- Localize page metadata, manifests, public share pages, and install prompts.
+- Mark generated-content roots explicitly and verify translation uses original source text rather
+  than translating a prior translation.
+- Preserve technical blocks, code, ids, URLs, and user-entered text from unwanted translation.
+- Verify translation-cache isolation by user, source hash, and target language.
+
+#### Phase E — CI closure
+
+- Run the expanded hardcoded-copy guard in `prebuild` and all required pull-request workflows.
+- Require five-language key parity.
+- Require focused localization tests for every new user-facing feature.
+- Keep the baseline at zero.
+- Prevent disabling the guard, widening exemptions, or replacing AST detection with regex-only
+  detection.
+
+### Acceptance criteria for “no hardcoded English”
+
+The localization project is complete only when all of these are true:
+
+1. The expanded guard scans every defined user-facing source surface and reports zero violations.
+2. The hardcoded-copy baseline remains zero.
+3. Every canonical user-facing key or typed field has `en`, `es`, `pt`, `pl`, and `ru` values.
+4. Spanish, Portuguese, Polish, and Russian rendered tests expose no unapproved English UI copy.
+5. Accessibility labels and form-validation messages follow the active locale.
+6. Human-readable API, email, notification, metadata, export, and portable messages follow the
+   active locale.
+7. Generated content translates without translating machine identifiers or technical evidence.
+8. Typecheck, build, focused localization tests, Playwright, and required repository workflows
+   are green.
+9. No feature is declared complete while its working UI still depends on an English-only string.
 
 ---
 
-## 9. Open — owner only
+## 10. Known limits — disclosed, not hidden
 
-1. **Mint the licence.** The demo currently opens by announcing it is unlicensed. Correct
-   behaviour, wrong first impression.
-2. **Decide whether the repository stays public.** `signalboost-live` is world-readable:
-   unauthenticated tarball, file and history fetches all succeed. The product, the buyer
-   documents and the licensing implementation are readable by anyone with the URL.
-3. **The pilot agreement** needs the legal entity name and counsel's review.
-4. **Publish a clean production record** after the next cancelled deployment.
+- No execution runner ships with the portable.
+- Eight monitoring adapters are mapped against fixtures and are not yet proven against each
+  buyer's live traffic.
+- In-memory dedupe and incident-record defaults do not survive independent serverless
+  invocations; durable implementations are buyer-supplied interfaces.
+- There is no unattended retry; recovery requires a person to start it.
+- The product does not currently have SOC 2, ISO 27001, or a third-party penetration-test report.
+- The master evaluation plan currently has a duplicated `docs/portables/portables/` path.
+- Repository-wide hardcoded-English elimination is not complete until the expanded acceptance
+  criteria in section 9 pass.
 
 ---
 
-## 10. Standing rules earned the hard way
+## 11. Open owner and product decisions
 
-- When the workaround is "the operator must remember not to do the obvious thing in front of a
-  customer", that is a defect report, not a mitigation.
-- Narrative UI written for the general case will overstate specific records. Before showing a
-  run to a buyer, check every sentence is true *of that run*, not merely true of the product.
-- Verify every symbol in example code against the source before shipping a technical document.
-- A test suite that stays green when you remove the thing it tests is measuring nothing.
-- Ask for a screenshot early when a UI problem is reported. One image has replaced two turns of
-  code archaeology more than once.
+1. Mint and install the demonstration licence so the first buyer impression is not an expected
+   unlicensed refusal.
+2. Decide whether `signalboost-live` should remain public because source, buyer documentation,
+   packaging, and licensing implementation are world-readable.
+3. Complete legal-entity details and counsel review for the pilot agreement.
+4. Publish a clean production incident record after the next safe cancelled deployment.
+5. Move the master evaluation plan from `docs/portables/portables/` to `docs/portables/` and
+   update all references.
+6. Execute the localization phases in section 9 until the repository has zero hardcoded
+   user-facing English across all defined surfaces.
+
+---
+
+## 12. Validation baseline
+
+Always inspect current scripts before copying commands. For the Self-Healing Supervisor and
+localization work, the validation set should include the relevant focused suites plus:
+
+```bash
+cd saas
+npm run validate:i18n-copy
+node scripts/check-hardcoded-copy.mjs --list
+node scripts/build-portable.mjs --check
+npm run typecheck
+npm run prebuild
+npm run build
+```
+
+Run the focused supervisor, portable-licence, acceptance-harness, and Playwright suites touched
+by the change. Broad failures must be named accurately and distinguished from focused results.
+
+Documentation-only changes still require diff review, path verification, Markdown/code-fence
+inspection, and the repository's required pull-request workflows.
+
+---
+
+## 13. Standing rules earned the hard way
+
+- When the workaround is “the operator must remember not to do the obvious thing in front of a
+  customer,” treat that as a defect report, not a mitigation.
+- Narrative UI written for a general case can overstate a specific record. Check every buyer-
+  facing sentence against the exact run being shown.
+- Verify every imported symbol and command in example code against current source before
+  publishing technical documentation.
+- A test suite that stays green when its safety property is deliberately removed is not testing
+  that property.
+- Generated-content translation is not a substitute for properly localized static UI.
+- Moving English into an unscanned file is not localization.
+- Do not change machine-readable identifiers when translating human-readable text.
+- Update this file whenever the current product state, buyer package, localization architecture,
+  safety boundary, or required validation process changes.

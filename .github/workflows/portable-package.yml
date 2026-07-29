@@ -1,9 +1,9 @@
 # .github/workflows/portable-package.yml
 #
 # Canonical Self-Healing Supervisor release path. A release artifact is uploaded
-# only after the portable boundary, TypeScript compilation, declarations,
-# checksums, SBOM, clean npm install, public import and five-language acceptance
-# all pass against the exact tarball.
+# only after the portable boundary, focused safety regressions, TypeScript
+# compilation, declarations, checksums, SBOM, clean npm install, public import
+# and five-language acceptance all pass against the exact tarball.
 
 name: Self-Healing portable release
 
@@ -13,6 +13,7 @@ on:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/portable-license/**'
+      - 'saas/tests/supervisorReleaseBlockers.node.test.ts'
       - 'saas/scripts/build-portable.mjs'
       - 'docs/portables/self-healing-*.md'
       - '.github/workflows/portable-package.yml'
@@ -20,6 +21,7 @@ on:
     paths:
       - 'saas/lib/supervisor/**'
       - 'saas/portable-license/**'
+      - 'saas/tests/supervisorReleaseBlockers.node.test.ts'
       - 'saas/scripts/build-portable.mjs'
       - 'docs/portables/self-healing-*.md'
       - '.github/workflows/portable-package.yml'
@@ -47,6 +49,9 @@ jobs:
 
       - name: Install locked build dependencies
         run: npm ci
+
+      - name: Run audited release-blocker regressions
+        run: node --test tests/supervisorReleaseBlockers.node.test.ts
 
       - name: Verify buyer boundary
         run: node scripts/build-portable.mjs --check

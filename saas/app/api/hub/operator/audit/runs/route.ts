@@ -1,11 +1,22 @@
 // Audit run history and detail. Because approval is already durable, an owner
 // history refresh may safely recover the newest approved run's single remediation
 // PR. The operation is idempotent and never approves a run or writes to main.
+//
+// Report language behavior:
+//   - the original audit_findings rows are immutable source records;
+//   - translated display copies are cached as audit_report_translation logs;
+//   - reopening a run after a language change reuses an existing translation or
+//     generates one once, without changing remediation inputs.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import type { ApprovedRunRemediationResult } from '@/lib/audit/approvedRunRemediation'
 import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
+import {
+  AUDIT_REPORT_TRANSLATION_KIND,
+  translateAuditReport,
+  type AuditReportTranslationPayload,
+} from '@/lib/audit/reportTranslation'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { localizeKnownFindingText, normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
 
@@ -38,31 +49,109 @@ function localizeFinding(row: any, lang: string) {
   }
 }
 
-function localizeLogPayload(payload: any, lang: string) {
+function applyTranslation(
+  rows: any[],
+  translation: AuditReportTranslationPayload | null,
+  sourceLang: string,
+  targetLang: string,
+) {
+  if (normalizeReportLang(sourceLang) === normalizeReportLang(targetLang)) return rows
+  if (!translation) return rows.map((row) => localizeFinding(row, targetLang))
+
+  const translatedById = new Map(
+    translation.findings.map((finding) => [String(finding.id), finding]),
+  )
+  return rows.map((row) => {
+    const translated = translatedById.get(String(row?.id))
+    if (!translated) return localizeFinding(row, targetLang)
+    return {
+      ...row,
+      category: translated.category || row?.category,
+      title: translated.title || row?.title,
+      detail: translated.detail || row?.detail,
+      recommendation: translated.recommendation || row?.recommendation,
+    }
+  })
+}
+
+function renderLogPayload(
+  payload: any,
+  findings: any[],
+  translation: AuditReportTranslationPayload | null,
+  targetLang: string,
+) {
   if (!payload || typeof payload !== 'object') return payload ?? null
-  if (!Array.isArray(payload.findings)) return payload
   return {
     ...payload,
-    findings: payload.findings.map((finding: any) => localizeFinding(finding, lang)),
+    lang: normalizeReportLang(targetLang),
+    findings,
+    narrative: translation?.narrative ?? String(payload.narrative || ''),
   }
 }
 
-function splitAuditPayloads(rows: any[]) {
+function splitAuditPayloads(rows: any[], targetLang: string) {
   let scan: any = null
   let remediation: RemediationWithHeartbeat | null = null
   let remediationUpdatedAt = ''
+  let translation: AuditReportTranslationPayload | null = null
+  const availableLanguages = new Set<string>()
+
   for (const row of rows || []) {
     const payload = row?.payload
     if (!payload || typeof payload !== 'object') continue
+
+    if (payload.kind === AUDIT_REPORT_TRANSLATION_KIND) {
+      const translatedLang = normalizeReportLang(payload.targetLang)
+      availableLanguages.add(translatedLang)
+      if (!translation && translatedLang === normalizeReportLang(targetLang)) {
+        translation = payload as AuditReportTranslationPayload
+      }
+      continue
+    }
+
     if (!remediation && payload.kind === 'audit_batch_remediation' && payload.approval === 'final') {
       remediation = payload as RemediationWithHeartbeat
       remediationUpdatedAt = typeof row?.created_at === 'string' ? row.created_at : ''
       continue
     }
     if (!scan && Array.isArray(payload.findings)) scan = payload
-    if (scan && remediation) break
   }
-  return { scan, remediation, remediationUpdatedAt }
+
+  if (scan?.lang) availableLanguages.add(normalizeReportLang(scan.lang))
+  return { scan, remediation, remediationUpdatedAt, translation, availableLanguages }
+}
+
+async function createCachedTranslation(params: {
+  admin: any
+  runId: string
+  userId: string
+  sourceLang: string
+  targetLang: string
+  findings: any[]
+  narrative: string
+}): Promise<AuditReportTranslationPayload | null> {
+  if (normalizeReportLang(params.sourceLang) === normalizeReportLang(params.targetLang)) return null
+  try {
+    const translation = await translateAuditReport({
+      runId: params.runId,
+      sourceLang: params.sourceLang,
+      targetLang: params.targetLang,
+      findings: params.findings,
+      narrative: params.narrative,
+    })
+    const inserted = await params.admin.from('audit_logs').insert({
+      run_id: params.runId,
+      user_id: params.userId,
+      payload: translation,
+    })
+    if (inserted.error) {
+      console.error('audit report translation cache write failed', inserted.error.message)
+    }
+    return translation
+  } catch (error) {
+    console.error('audit report translation failed', error instanceof Error ? error.message : error)
+    return null
+  }
 }
 
 async function recoverApprovedRun(admin: any, runId: string, actorUserId: string) {
@@ -130,9 +219,9 @@ export async function GET(req: NextRequest) {
     if (findingsResult.error) {
       return NextResponse.json({ ok: false, error: findingsResult.error.message }, { status: 500 })
     }
-    const findings = (findingsResult.data || []).slice().sort(
+    const sourceFindings = (findingsResult.data || []).slice().sort(
       (a: any, b: any) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9),
-    ).map((row: any) => localizeFinding(row, lang))
+    )
 
     const [logRows, heartbeatRow] = await Promise.all([
       admin
@@ -150,7 +239,23 @@ export async function GET(req: NextRequest) {
         .limit(1)
         .maybeSingle(),
     ])
-    const payloads = splitAuditPayloads(logRows.data || [])
+    const payloads = splitAuditPayloads(logRows.data || [], lang)
+    const sourceLang = normalizeReportLang(payloads.scan?.lang)
+
+    if (!payloads.translation && sourceLang !== lang) {
+      payloads.translation = await createCachedTranslation({
+        admin,
+        runId,
+        userId: ctx.userId,
+        sourceLang,
+        targetLang: lang,
+        findings: sourceFindings,
+        narrative: String(payloads.scan?.narrative || ''),
+      })
+      if (payloads.translation) payloads.availableLanguages.add(lang)
+    }
+
+    const findings = applyTranslation(sourceFindings, payloads.translation, sourceLang, lang)
     const persistedHeartbeatAt = typeof heartbeatRow.data?.created_at === 'string'
       ? heartbeatRow.data.created_at
       : ''
@@ -164,7 +269,10 @@ export async function GET(req: NextRequest) {
       ok: true,
       run: run.data,
       findings,
-      log: localizeLogPayload(payloads.scan, lang),
+      log: renderLogPayload(payloads.scan, findings, payloads.translation, lang),
+      reportLanguage: lang,
+      sourceLanguage: sourceLang,
+      availableLanguages: Array.from(payloads.availableLanguages).sort(),
       // For approved runs, the recovery call is the freshest lifecycle state.
       // Older durable logs remain the fallback for already-remediated history.
       remediation,

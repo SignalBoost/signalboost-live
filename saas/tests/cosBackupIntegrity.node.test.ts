@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { compareCosDecisions, createCosSyncLog } from '../lib/cos-backup/index.ts'
 import { detectPrimaryCorruption } from '../lib/cos-backup/policy.ts'
+import { runCosReasoning } from '../lib/ai/cos/reasoningCore.ts'
 import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
-
 
 const backup = {
   ok: true,
@@ -60,7 +60,6 @@ test('continuity policy quarantines HTTP, empty, and canned failures', () => {
     detectPrimaryCorruption({ status: 500, reply: '', source: '' }),
     ['primary_http_failure', 'primary_empty_reply'],
   )
-
   const reasons = detectPrimaryCorruption({
     status: 200,
     reply: 'Concierge created the Press & Print campaign with a verified publisher target.',
@@ -84,16 +83,54 @@ test('continuity policy flags material short-answer shadow divergence', () => {
   }), ['primary_backup_quality_divergence'])
 })
 
+test('prospect discovery routes to the live web and remains read-only', () => {
+  const result = runCosReasoning({
+    objective: `Find 20 strong potential buyers and design partners in the United States.
+Prioritize cloud-focused MSPs and DevOps or SRE consultancies.
+Do not contact anyone, send messages, submit forms, or share product files.`,
+  })
+  assert.equal(result.sourceRouting.requiredSource, 'live_public_website')
+  assert.equal(result.sourceRouting.mustUseTool, true)
+  assert.equal(result.executionPlan.proposesAction, false)
+  assert.equal(result.executionPlan.requiredApproval, false)
+  assert.equal(result.executionPlan.state, 'RETRIEVE_AND_ANSWER')
+})
+
+test('an affirmative contact request still requires approval', () => {
+  const result = runCosReasoning({ objective: 'Contact the strongest prospects and send them an outreach message.' })
+  assert.equal(result.executionPlan.proposesAction, true)
+  assert.equal(result.executionPlan.requiredApproval, true)
+  assert.equal(result.executionPlan.state, 'PREPARE_AND_HOLD')
+})
+
 test('Concierge preserves Primary denials and returns healthy Primary without waiting for Backup COS', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /POST as supportPost/)
-  assert.match(source, /primary = await supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
+  assert.match(source, /supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
   assert.match(source, /primary\.status >= 400 && primary\.status < 500\) return primary/)
   assert.match(source, /if \(primary && immediateReasons\.length === 0\)/)
   assert.match(source, /after\(async \(\) =>/)
   assert.match(source, /return healthyPrimary/)
   assert.doesNotMatch(source, /const backupPromise = runBackupCos/)
   assert.doesNotMatch(source, /Promise\.all\s*\(\s*\[\s*primaryPromise\s*,\s*backupPromise/)
+})
+
+test('Concierge bounds long Primary work and returns a terminal timeout response', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
+  assert.match(source, /const PRIMARY_TIMEOUT_MS = 195_000/)
+  assert.match(source, /function boundedPrimary/)
+  assert.match(source, /source: 'cos-bounded-timeout'/)
+  assert.match(source, /timed_out: true/)
+  assert.match(source, /execution_allowed: false/)
+})
+
+test('prospect evidence never substitutes affiliate counts for CRM or discovery', async () => {
+  const bridge = await readFile(path.resolve(process.cwd(), 'lib/ai/cos/knowledgeBridge.ts'), 'utf8').then(hydrateLocalizedSource)
+  const search = await readFile(path.resolve(process.cwd(), 'lib/ai/tools/getExternalInfo.ts'), 'utf8').then(hydrateLocalizedSource)
+  assert.match(bridge, /case 'crm_or_leads':\s*return notWired/)
+  assert.doesNotMatch(bridge, /getAffiliateCount/)
+  assert.match(bridge, /INITIAL PROSPECT-DISCOVERY EVIDENCE/)
+  assert.match(search, /const DEFAULT_RESULT_COUNT = 10/)
 })
 
 test('Concierge keeps Backup COS read-only and free of direct business effects', async () => {

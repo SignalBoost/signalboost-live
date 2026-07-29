@@ -36,6 +36,12 @@ Facts that change what a good deliverable looks like. Ignore them and you will w
 - **A migration in the repo is not a migration in the database.** Nothing records which have
   been applied. See section 5.
 
+Core governance doctrine:
+
+- **AI builds. Humans stay in control.**
+- Never claim a test, build, deployment, push, PR, or merge succeeded unless it was actually verified.
+- Sensitive actions remain behind explicit governance and approval gates.
+
 ## 3. Build guards and zero-hardcoded-English policy
 
 `prebuild` runs on every deploy and blocks it on failure. As of this writing:

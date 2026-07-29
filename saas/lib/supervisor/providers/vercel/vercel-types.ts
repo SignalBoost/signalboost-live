@@ -18,6 +18,12 @@ export interface VercelObserverConfig {
   repeatedFailureThreshold: number
   stuckDeploymentThresholdMs: number
   maxAttempts: number
+  /**
+   * Language the plan and evidence text is WRITTEN in. Machine-readable fields — step ids,
+   * incident types, audit event types — are unaffected, so reports and SIEM rules built on
+   * them stay stable whatever a human reads.
+   */
+  locale?: string
   clock: Clock
   sleeper: Sleeper
 }

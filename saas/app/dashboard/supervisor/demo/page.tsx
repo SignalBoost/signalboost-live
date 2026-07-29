@@ -264,8 +264,12 @@ export default async function SupervisorDemoPage() {
   }
 
   const entitlement = getSupervisorEntitlement()
-  const runs = await new SupabaseVercelHealthStore(getAdminSupabase()).listRuns({ limit: 1 }).catch(() => [])
-  const run = runs[0]
+  // Show the most recent run that actually FOUND something, falling back to the newest run
+  // when there has never been an incident. Showing only the newest would mean a prospect
+  // opening this page an hour after a real detection sees 'no incident detected' — the
+  // healthy observation that happened to run last, instead of the evidence worth showing.
+  const runs = await new SupabaseVercelHealthStore(getAdminSupabase()).listRuns({ limit: 25 }).catch(() => [])
+  const run = runs.find(candidate => candidate.status !== 'healthy' && candidate.incident) ?? runs[0]
 
   return (
     <main style={page}>

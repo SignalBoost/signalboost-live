@@ -5,6 +5,7 @@ import { ExecutorRegistry } from './executor-registry.ts'
 import { DispatchValidationError, ExecutorRegistryError } from './errors.ts'
 import { browserReasons } from '../execution-policy/index.ts'
 import { InMemoryDispatchStore, type DispatchStore } from './dispatch-store.ts'
+import { fingerprintRepairPlan } from './approval-continuation.ts'
 import { apiCompatibleActions, browserCompatibleActions, dispatcherAuditSchemaVersion, executorSchemaVersion, isExecutorKind, manualCompatibleActions, type DispatchAuditEvent, type DispatchAuditEventType, type DispatchAuditSink, type ExecutorKind, type SupervisorDispatchRequest, type SupervisorExecutorResult } from './executor-types.ts'
 
 const secretPattern = /(secret|token|password|authorization|cookie|api[_-]?key|private[_-]?key|bearer\s+[a-z0-9._-]+)/i
@@ -59,15 +60,16 @@ export class SupervisorDispatcher {
   private get store(): DispatchStore { if (this.deps.dispatchStore) return this.deps.dispatchStore; if (!this.defaultStore) this.defaultStore = new InMemoryDispatchStore(); return this.defaultStore }
   async dispatch(raw: SupervisorDispatchRequest): Promise<SupervisorExecutorResult> {
     const kind = isExecutorKind(raw.requestedExecutorKind) ? raw.requestedExecutorKind : 'manual'
-    try { await this.audit(raw, 'dispatch_requested', { requestedExecutorKind: raw.requestedExecutorKind, approvedStepIds: raw.approvedStepIds, approvalContinuationPresented: Boolean(raw.approvalContinuation), approvalContinuationKeyId: raw.approvalContinuation?.keyId, previousAuditEventId: raw.approvalContinuation?.previousAuditEventId }) } catch (e) { return fail(raw.dispatchId || 'unknown', kind, `Audit failed before execution: ${e instanceof Error ? e.message : 'unknown'}`) }
+    try { await this.audit(raw, 'dispatch_requested', { requestedExecutorKind: raw.requestedExecutorKind, approvedStepIds: raw.approvedStepIds, approvalContinuationPresented: Boolean(raw.approvalContinuation), approvalContinuationKeyId: raw.approvalContinuation?.keyId, approvalPlanFingerprint: raw.approvalContinuation?.planFingerprint, previousAuditEventId: raw.approvalContinuation?.previousAuditEventId }) } catch (e) { return fail(raw.dispatchId || 'unknown', kind, `Audit failed before execution: ${e instanceof Error ? e.message : 'unknown'}`) }
     try {
       const request = this.validate(raw)
+      const planFingerprint = fingerprintRepairPlan(request.plan)
       if (request.executionDecision && request.coordinationStore) {
         await request.coordinationStore.assertFence(request.executionDecision.workItemId, { leaseId: request.executionDecision.auditMetadata.leaseId as string || `lease-${request.executionDecision.workItemId}-${request.executionDecision.fencingToken}`, ownerInstanceId: request.executionDecision.ownerInstanceId, ownerRuntimeId: request.executionDecision.ownerRuntimeId, fencingToken: request.executionDecision.fencingToken })
-        await this.audit(raw, 'dispatch_fenced', { workItemId: request.executionDecision.workItemId, fencingToken: request.executionDecision.fencingToken })
+        await this.audit(raw, 'dispatch_fenced', { workItemId: request.executionDecision.workItemId, fencingToken: request.executionDecision.fencingToken, planFingerprint })
       }
       let executor
-      try { executor = this.deps.registry.resolve(request.requestedExecutorKind) } catch (e) { await this.audit(raw, 'executor_missing', { reason: e instanceof Error ? e.message : 'missing' }); throw e }
+      try { executor = this.deps.registry.resolve(request.requestedExecutorKind) } catch (e) { await this.audit(raw, 'executor_missing', { reason: e instanceof Error ? e.message : 'missing', planFingerprint }); throw e }
       const claimed = await this.store.claim({
         dispatchId: request.dispatchId,
         incidentId: request.incident.incidentId,
@@ -76,12 +78,12 @@ export class SupervisorDispatcher {
         workItemId: request.executionDecision?.workItemId,
         executionId: request.executionContext.executionId,
       })
-      if (!claimed) { await this.audit(raw, 'duplicate_dispatch_rejected', { dispatchId: request.dispatchId }); throw new DispatchValidationError('Duplicate dispatchId rejected.') }
-      await this.audit(raw, 'dispatch_started', { executorKind: request.requestedExecutorKind, approvedStepIds: request.approvedStepIds, approvalContinuationPresented: Boolean(request.approvalContinuation) })
+      if (!claimed) { await this.audit(raw, 'duplicate_dispatch_rejected', { dispatchId: request.dispatchId, planFingerprint }); throw new DispatchValidationError('Duplicate dispatchId rejected.') }
+      await this.audit(raw, 'dispatch_started', { executorKind: request.requestedExecutorKind, approvedStepIds: request.approvedStepIds, approvalContinuationPresented: Boolean(request.approvalContinuation), planId: request.plan.planId, planFingerprint })
       let result: SupervisorExecutorResult
       try { result = await executor.execute({ incident: request.incident, plan: request.plan, approvedStepIds: [...request.approvedStepIds], executionContext: request.executionContext, dispatch: { dispatchId: request.dispatchId, requestedExecutorKind: request.requestedExecutorKind, requestedAt: now() }, approvalContinuation: request.approvalContinuation }) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Executor exception', [], request.approvedStepIds) }
       try { validateExecutorResult(result, request.dispatchId, request.requestedExecutorKind, request.approvedStepIds) } catch (e) { result = fail(request.dispatchId, request.requestedExecutorKind, e instanceof Error ? e.message : 'Invalid executor result', [], request.approvedStepIds) }
-      await this.audit(raw, result.status === 'failed' || result.status === 'rejected' ? 'dispatch_failed' : 'dispatch_completed', { status: result.status, executedStepIds: result.executedStepIds, skippedStepIds: result.skippedStepIds, error: result.error?.message })
+      await this.audit(raw, result.status === 'failed' || result.status === 'rejected' ? 'dispatch_failed' : 'dispatch_completed', { status: result.status, planId: request.plan.planId, planFingerprint, approvedStepIds: request.approvedStepIds, executedStepIds: result.executedStepIds, skippedStepIds: result.skippedStepIds, error: result.error?.message })
       return result
     } catch (e) { try { await this.audit(raw, e instanceof DispatchValidationError && e.message.includes('Duplicate') ? 'duplicate_dispatch_rejected' : 'dispatch_rejected', { reason: e instanceof Error ? e.message : 'rejected' }) } catch {} return fail(raw.dispatchId || 'unknown', kind, e instanceof Error ? e.message : 'Dispatch rejected') }
   }
@@ -100,6 +102,7 @@ export class SupervisorDispatcher {
       if (raw.approvalContinuation.dispatchId !== raw.dispatchId) throw new DispatchValidationError('Approval continuation dispatchId mismatch.')
       if (raw.approvalContinuation.incidentId !== incident.incidentId) throw new DispatchValidationError('Approval continuation incidentId mismatch.')
       if (raw.approvalContinuation.planId !== plan.planId) throw new DispatchValidationError('Approval continuation planId mismatch.')
+      if (raw.approvalContinuation.planFingerprint !== fingerprintRepairPlan(plan)) throw new DispatchValidationError('Approval continuation plan contents mismatch.')
       if (raw.approvalContinuation.approvedStepIds.length !== raw.approvedStepIds.length || raw.approvalContinuation.approvedStepIds.some((stepId, index) => stepId !== raw.approvedStepIds[index])) throw new DispatchValidationError('Approval continuation scope mismatch.')
     }
     const approved = steps(plan, raw.approvedStepIds); assertPlanCompatible(plan, approved, raw.requestedExecutorKind, raw.policyDecision)

@@ -1,3 +1,4 @@
+// saas/app/dashboard/outreach/contacts/page.tsx
 'use client'
 
 import Link from 'next/link'
@@ -76,6 +77,15 @@ export default function OutreachContactsPage() {
   }), [leads])
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
 
+  // Keep the reader where they were. Approving row 13 of 100 used to jump the list
+  // back to page 1 (and switch tabs), so working through a queue three rows at a time
+  // meant clicking Next four times after every single decision. The only legitimate
+  // reason to move the page is that the page stopped existing — when a filter change
+  // or a decision shrinks the list past the current position, clamp to the last page.
+  useEffect(() => {
+    setPage(current => (current > pages - 1 ? Math.max(0, pages - 1) : current))
+  }, [pages])
+
   async function decide(id: string, status: 'approved' | 'rejected') {
     setBusyId(id)
     setError('')
@@ -94,11 +104,9 @@ export default function OutreachContactsPage() {
       else if (data?.release?.ok) setNotice(copy.sentNotice)
       else setNotice(`${copy.notSent}${data?.release?.error ? ` ${data.release.error}` : ''}`)
 
+      // Deliberately does NOT switch filter or reset the page: the notice above
+      // already reports what happened, and the owner is mid-way through a queue.
       await load()
-      if (status === 'approved' && data?.release?.ok) {
-        setFilter('sent')
-        setPage(0)
-      }
     } catch (reason: any) {
       setError(reason?.message || copy.updateError)
     } finally {
@@ -121,11 +129,8 @@ export default function OutreachContactsPage() {
       const data = await response.json()
       if (!response.ok || !data?.ok) throw new Error(data?.error || copy.updateError)
       setNotice(fill(copy.batchDone, { sent: data.sent || 0, skipped: data.skipped || 0 }))
+      // Same reasoning as decide(): report the result, keep their position.
       await load()
-      if ((data.sent || 0) > 0) {
-        setFilter('sent')
-        setPage(0)
-      }
     } catch (reason: any) {
       setError(reason?.message || copy.updateError)
     } finally {

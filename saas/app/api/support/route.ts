@@ -14,6 +14,7 @@ import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory
 import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConversations } from '@/lib/ai/tools/conversationHistory'
 import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner'
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
+import { createProspectCampaignJob, getProspectCampaignJob, listProspectCampaignJobs, summarizeProspectCampaign } from '@/lib/outreach/prospectCampaign'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { createPressCampaignFromAgent } from '@/lib/ai/tools/pressCampaign'
@@ -203,7 +204,7 @@ GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
 2. PROPOSE: when you have a concrete strategy worth pursuing, present it fully in chat AND store it with proposeGrowthPlan (title, objective, full plan with numbered actions). Begin the presentation with a header line containing today's date (e.g. "PROPOSAL — 12 Jun 2026"). Tell the owner it awaits their approval.
 3. APPROVAL: NEVER mark a plan approved unless the owner has explicitly approved it in this conversation ("approved", "yes, proceed", or equivalent). On approval call updateGrowthPlanStatus with status approved; on rejection, rejected. Use the exact plan id from the PENDING PLANS block above; if it is not there, call listGrowthPlans to locate it — never guess an id. If the owner requests changes, revise and propose again.
-4. EXECUTE: only for APPROVED plans. Use createOutreachDraft to place outreach into the pipeline (one call per target; requires the target's business name AND website URL — ask the owner if unknown). Each message MUST be 40-2,400 characters and must not promise guaranteed results — longer or non-compliant messages are auto-rejected. If a draft is rejected, shorten it and retry once.
+4. EXECUTE: only for APPROVED plans. MULTI-TARGET RULE: if the owner asks for more than TWO companies at once ("find 10", "run an outreach campaign", "build a prospect list"), call startProspectCampaign ONCE and stop — do NOT loop createOutreachDraft, and do NOT try to research several companies inside this turn: the turn is time-bounded and will die before finishing, which is a silent failure. Use createOutreachDraft to place outreach into the pipeline (one call per target; requires the target's business name AND website URL — ask the owner if unknown). Each message MUST be 40-2,400 characters and must not promise guaranteed results — longer or non-compliant messages are auto-rejected. If a draft is rejected, shorten it and retry once.
 
    OUTREACH HONESTY — hard rules, never break them:
    • createOutreachDraft does NOT send anything. It first searches the target's own website for a REAL, published email. If it finds one, it QUEUES a draft (status 'pending') and returns { ok:true, contactEmail }. If it finds NONE, it SKIPS that company and returns { skipped:true } — no draft is created. State exactly that, e.g. "Queued 4 drafts; skipped 11 (no published email found)."
@@ -549,6 +550,42 @@ const TOOL_LIST_MY_OUTREACH: ChatTool = {
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }
+// A chat turn is one bounded request (BUDGET_MS below), so "find N companies and
+// draft to each" can never complete inline — it is 2+ model round trips per company.
+// These two tools hand the work to the background worker instead: the turn returns a
+// job id immediately and the cron drafts across many short invocations.
+const TOOL_START_PROSPECT_CAMPAIGN: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'startProspectCampaign',
+    description: 'Start a BACKGROUND prospect campaign: discover companies matching a target profile, then draft one outreach message per company into the pending outreach queue. Call this INSTEAD of looping createOutreachDraft whenever the owner asks for more than two target companies at once ("find 10", "run an outreach campaign", "build me a prospect list"). Returns immediately with a job id; the worker runs afterwards, a few companies every couple of minutes. It NEVER sends — drafts land as pending and still need the owner\'s approval in the Outreach console. Report the job id and tell the owner drafts will appear over the next several minutes; do NOT claim any company has been contacted.',
+    parameters: {
+      type: 'object',
+      properties: {
+        offer: { type: 'string', description: 'What is being sold, in enough detail to write a real email: the product, what it does, and the specific buyer value. Carry over the owner\'s own wording.' },
+        targetCriteria: { type: 'string', description: 'Who to look for: company type, size, stack, and any disqualifiers. This becomes the discovery search, so make it concrete.' },
+        region: { type: 'string', description: 'Geography to search, e.g. "United States". Optional.' },
+        requestedCount: { type: 'number', description: 'How many drafts to produce. 1-25, default 5.' },
+        language: { type: 'string', description: 'Draft language: en, es, pt, pl, or ru. Default en. The pipeline still re-localizes per target region on insert.' },
+      },
+      required: ['offer', 'targetCriteria'],
+    },
+  },
+}
+const TOOL_PROSPECT_CAMPAIGN_STATUS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'getProspectCampaignStatus',
+    description: 'Check background prospect campaigns: how many drafts are queued, how many companies were skipped and why. Call when the owner asks how a campaign is going, or right after starting one if they ask what happens next. Pass a job id for one campaign, or omit it for the most recent campaigns.',
+    parameters: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: 'Campaign job id. Omit to list recent campaigns.' },
+      },
+      required: [],
+    },
+  },
+}
 const TOOL_SEARCH_HISTORY: ChatTool = {
   type: 'function',
   function: {
@@ -686,6 +723,8 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
   TOOL_CREATE_OUTREACH_DRAFT,
+  TOOL_START_PROSPECT_CAMPAIGN,
+  TOOL_PROSPECT_CAMPAIGN_STATUS,
   TOOL_PROPOSE_INFRA_PR,
   TOOL_LIST_INFRA_PRS,
   TOOL_LIST_PROVIDER_ACTIONS,
@@ -1149,6 +1188,35 @@ if (name === 'createOutreachDraft') {
     return result.ok
       ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`
       : `Outreach draft failed: ${result.error ?? 'unknown error'}.`
+  }
+if (name === 'startProspectCampaign') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const started = await createProspectCampaignJob({
+      offer: String(args?.offer || ''),
+      targetCriteria: String(args?.targetCriteria || ''),
+      region: args?.region ? String(args.region) : null,
+      requestedCount: Number(args?.requestedCount) || 5,
+      language: args?.language ? String(args.language) : 'en',
+      createdBy: userId || null,
+    })
+    if (!started.ok || !started.job) return `Prospect campaign could not be started: ${started.error ?? 'unknown error'}.`
+    return `Prospect campaign QUEUED (job id ${started.job.id}), target ${started.job.requested_count} drafts. The background worker discovers companies and drafts one message each, a few every couple of minutes; drafts land in the outreach queue as PENDING. NOTHING has been sent and no company has been contacted — say exactly that, tell the owner drafts will appear over the next several minutes, and that they approve and send from the Outreach console.`
+  }
+if (name === 'getProspectCampaignStatus') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const jobId = String(args?.jobId || '').trim()
+    if (jobId) {
+      const one = await getProspectCampaignJob(jobId)
+      if (!one.ok || !one.job) return `Campaign not found: ${one.error ?? 'unknown error'}.`
+      const detail = (one.job.results || []).slice(-10).map(r => `${r.outcome.toUpperCase()} ${r.name} (${r.url})${r.detail ? ` — ${r.detail}` : ''}`).join('\n')
+      return `${summarizeProspectCampaign(one.job)}\n${detail || 'No companies processed yet.'}`
+    }
+    const many = await listProspectCampaignJobs(5)
+    if (!many.ok) return `Campaigns could not be retrieved: ${many.error ?? 'unknown error'}.`
+    if (!many.jobs.length) return 'No background prospect campaigns exist yet.'
+    return many.jobs.map(job => `${job.id} — ${summarizeProspectCampaign(job)}`).join('\n')
   }
 if (name === 'createMyOutreachDraft') {
     if (!userId) {

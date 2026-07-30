@@ -86,10 +86,19 @@ potential companies:
   the reason for each skip. Never silently substitute affiliate counts or existing CRM
   rows for new-company research.
 • Send NOTHING. Direct the owner to /dashboard/outreach/contacts or /admin/outreach to
-  review each draft. Approved email sending remains a separate human action protected
-  by the panic switch, daily send limit, guardrails, and audit logging.
-• If the owner says research only, do not contact, do not send, or otherwise negates
-  outreach action, produce the researched list only and call no draft or send tool.
+  review each pending draft. Approved email sending remains a separate human action
+  protected by the panic switch, daily send limit, guardrails, and audit logging.
+• IMPORTANT DISTINCTION: "do not send", "do not contact anyone", "I will approve later",
+  or "I will send them myself" prohibits EXTERNAL ACTION only. It does NOT prohibit
+  creating internal pending drafts. When the owner requests drafts for review, still call
+  createOutreachDraft for every verified prospect and place them in the approval queue.
+• Suppress createOutreachDraft only when the owner explicitly requests RESEARCH ONLY or
+  explicitly says not to create, store, save, or queue drafts. In that narrow case,
+  return the researched list in chat and take no draft or send action.
+• Never satisfy an outreach-draft request by printing drafts only in chat when the owner
+  asked for a campaign, approval, queueing, or later review. The approval-queue handoff is
+  part of the requested workflow, and the job is incomplete until the tool returns draft
+  ids or explicit skip/failure reasons.
 • For a manually supplied company, use the same approval pipeline. The human console at
   /admin/outreach supports manual analysis, approval/rejection, email sending after
   approval, and manual-record-only tracking for another channel.

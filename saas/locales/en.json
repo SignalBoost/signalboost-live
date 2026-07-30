@@ -4040,5 +4040,8 @@
     "resultsTitle": "What SignalBoost prepares",
     "generateResults": "Generate results",
     "viewLanding": "View landing page"
+  },
+  "navExtra": {
+    "admOutreachConsole": "ADM Console (Outreach)"
   }
 }

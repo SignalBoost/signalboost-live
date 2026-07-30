@@ -95,12 +95,12 @@ test('human approval releases the email through Resend while preserving every sa
 
 test('contacts show Sent, release approved records, and expose the Resend evidence monitor', async () => {
   const contacts = await source('app/dashboard/outreach/contacts/page.tsx')
-  assert.match(contacts, /type OutreachStatus = 'pending' \| 'approved' \| 'rejected' \| 'sent'/)
+  assert.match(contacts, /type Status = 'pending' \| 'approved' \| 'sent' \| 'rejected'/)
   assert.match(contacts, /Approve & Send/)
   assert.match(contacts, /\/api\/admin\/outreach\/send-ready\?send=1&limit=10/)
   assert.match(contacts, /\/admin\/outreach\/delivery/)
-  assert.match(contacts, /countByStatus\('sent'\)/)
-  assert.match(contacts, /data\.release\?\.ok/)
+  assert.match(contacts, /sent: leads\.filter\(row => row\.status === 'sent'\)\.length/)
+  assert.match(contacts, /data\?\.release\?\.ok/)
 })
 
 test('sent lifecycle tolerates production schema drift without losing the durable send ledger', async () => {

@@ -649,7 +649,8 @@
     "credits": {
       "label": "créditos",
       "unlimited": "Ilimitado"
-    }
+    },
+    "outreachApprovals": "Aprobaciones de prospección"
   },
   "credits": {
     "usage": {
@@ -4040,5 +4041,32 @@
     "resultsTitle": "Lo que prepara SignalBoost",
     "generateResults": "Generar resultados",
     "viewLanding": "Ver página de destino"
+  },
+  "outreachApprovals": {
+    "title": "Aprobaciones de prospección",
+    "subtitle": "Revisa las acciones exactas del proveedor redactadas por COS. Nada se ejecuta hasta que apruebes y fusiones.",
+    "refresh": "Actualizar",
+    "loading": "Cargando aprobaciones…",
+    "empty": "No hay aprobaciones pendientes.",
+    "loadError": "No se pudieron cargar las aprobaciones.",
+    "mergeError": "No se pudo fusionar la aprobación.",
+    "closeError": "No se pudo cerrar la aprobación.",
+    "risk": "riesgo",
+    "steps": "Pasos planificados",
+    "provider": "Proveedor",
+    "template": "Plantilla",
+    "payload": "Datos de la solicitud",
+    "merge": "Aprobar / Fusionar",
+    "merging": "Fusionando…",
+    "close": "Cerrar",
+    "closing": "Cerrando…",
+    "confirmTitle": "Esto ejecuta en vivo las acciones del proveedor indicadas. Confirma que revisaste cada dato de la solicitud.",
+    "confirm": "Confirmar fusión en vivo",
+    "cancel": "Cancelar",
+    "risks": {
+      "low": "Bajo",
+      "medium": "Medio",
+      "high": "Alto"
+    }
   }
 }

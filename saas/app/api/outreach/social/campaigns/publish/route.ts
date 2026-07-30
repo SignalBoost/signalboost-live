@@ -1,3 +1,4 @@
+// saas/app/api/outreach/social/campaigns/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   const selected = (posts || []).filter((post: any) => sendablePost(post, platformFilter))
   if (!selected.length) return NextResponse.json({ ok: false, error: 'No approved social posts are ready to publish.' }, { status: 409 })
 
-  const limit = await enforceDailySendLimit(ctx.admin, 50)
+  const limit = await enforceDailySendLimit(ctx.admin)
   if (limit.count + selected.length > limit.limit) return NextResponse.json({ ok: false, error: 'Daily outreach send limit reached', sendLimit: limit }, { status: 429 })
 
   const results: any[] = []

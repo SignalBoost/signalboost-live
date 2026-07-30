@@ -1,9 +1,19 @@
+// saas/app/api/outreach/send/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
+
+// A COSA-drafted campaign carries its own subject line (written with the body in
+// the campaign language). Use it when present; otherwise keep the generic one so
+// manually generated outreach behaves exactly as before.
+function draftedSubject(outreach: any): string {
+  const summary = outreach?.analyzer_summary
+  const subject = summary && typeof summary === 'object' ? summary.outreach_subject : ''
+  return typeof subject === 'string' ? subject.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
+}
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -41,7 +51,7 @@ export async function POST(req: NextRequest) {
     const sent = await sendEmail({
       from: 'saasSales',
       to: toEmail,
-      subject: `Useful SignalBoost growth preview for ${outreach.business_name}`,
+      subject: draftedSubject(outreach) || `Useful SignalBoost growth preview for ${outreach.business_name}`,
       html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${String(outreach.outreach_message).replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))}</div>`,
     })
     if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed' }, { status: 502 })

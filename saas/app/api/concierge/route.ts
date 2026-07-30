@@ -9,17 +9,23 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// The support route has its own 240-second model/tool budget. Keep a smaller
-// outer deadline so the browser always receives a terminal response before the
-// platform-level 300-second limit. A timed-out research request must never leave
-// the dashboard on an endless "Thinking…" state.
-const PRIMARY_TIMEOUT_MS = 195_000
+// The support route has its own 240-second model/tool budget, WITH ITS OWN
+// graceful degradation built in (round cap, forced final synthesis, self-
+// correction). This outer deadline MUST stay ABOVE that 240s inner budget —
+// setting it lower (as a prior version of this file did, at 195s) silently
+// discards the inner route's real, synthesized answer every time, before its
+// own degradation logic ever runs, and replaces it with this file's much
+// weaker single-search fallback. 260s leaves the inner route its full 240s
+// plus buffer, while staying under the platform-level 300-second limit so the
+// browser still always receives a terminal response instead of an endless
+// "Thinking…" state.
+const PRIMARY_TIMEOUT_MS = 260_000
 
 // Start a read-only research lifeline shortly before the hard outer deadline.
 // Normal requests never pay for this duplicate lookup: the timer is cancelled
 // when Primary finishes. If Primary is still running, the lifeline preserves a
 // bounded set of source-backed results for an honest partial response.
-const RESEARCH_LIFELINE_START_MS = 165_000
+const RESEARCH_LIFELINE_START_MS = 235_000
 const RESEARCH_RESULT_LIMIT = 12
 
 function latestUserText(body: any): string {

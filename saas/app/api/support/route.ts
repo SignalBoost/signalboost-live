@@ -27,6 +27,7 @@ import { OWNER_ONLY_TOOLS, adminReadOnlyBlock } from '@/lib/ai/accessTier'
 import { promptCompilerModule } from '@/lib/ai/promptCompiler'
 import { cosArchitectModule, cosExecuteDirective } from '@/lib/ai/cosArchitect'
 import { proposeCampaign } from '@/lib/ai/proposeCampaign'
+import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 
 export const maxDuration = 300
 
@@ -1431,6 +1432,13 @@ export async function POST(req: NextRequest) {
     let systemContent = isPrivileged
       ? chiefOfStaffPrompt(language, liveMetrics, pendingPlans)
       : conciergePrompt(language)
+
+    // Product self-knowledge: every AI persona here works for SignalBoost and
+    // must know its own employer's real product lineup without being told in
+    // every prompt — this was a real gap (raised directly by the owner) and
+    // is now closed by reading the canonical registry, not a hand-maintained
+    // list that would drift.
+    systemContent += `\n\n${buildProductCatalogSummary()}`
 
     // Access tiering: the owner keeps full execution authority; an admin (privileged
     // but not owner) is held to read/diagnose only. The owner-only tools are already

@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
+import { applyOutreachSignature } from '@/lib/outreach/signature'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
@@ -45,6 +46,16 @@ export async function GET(req: NextRequest) {
   const send = url.searchParams.get('send') === '1'
   const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '5', 10), 1), 10)
 
+  // TARGETING. Without these the query returned approved rows in unspecified order,
+  // which in practice meant the OLDEST rows in the table — drafts from long-finished
+  // campaigns aimed at entirely different businesses. A batch send is irreversible, so
+  // "whatever the database returned first" is the wrong selection rule.
+  const ids = String(url.searchParams.get('ids') || '')
+    .split(',').map(value => value.trim()).filter(Boolean).slice(0, 50)
+  const sinceHours = Math.max(0, Math.min(parseInt(url.searchParams.get('sinceHours') || '0', 10) || 0, 24 * 90))
+  const source = String(url.searchParams.get('source') || '').trim().slice(0, 60)
+  const oldestFirst = url.searchParams.get('oldestFirst') === '1'
+
   if (await isOutreachSendingDisabled(ctx.admin)) {
     return NextResponse.json({ ok: false, error: 'Outreach sending is disabled by the panic switch.' }, { status: 423 })
   }
@@ -56,11 +67,18 @@ export async function GET(req: NextRequest) {
 
   // Fetch more than needed, because some approved rows may have already been sent
   // but still have stale status='approved'. We filter those out below.
-  const { data: candidates, error } = await ctx.admin
+  let query = ctx.admin
     .from('outreach_queue')
-    .select('id,business_id,business_name,contact_email,outreach_message,status')
+    .select('id,business_id,business_name,business_url,contact_email,outreach_message,status,sender_key,source_platform,created_at')
     .eq('status', 'approved')
     .not('contact_email', 'is', null)
+
+  if (ids.length) query = query.in('id', ids)
+  if (sinceHours) query = query.gte('created_at', new Date(Date.now() - sinceHours * 3_600_000).toISOString())
+  if (source) query = query.eq('source_platform', source)
+
+  const { data: candidates, error } = await query
+    .order('created_at', { ascending: oldestFirst })
     .limit(Math.min(50, Math.max(batchLimit * 5, batchLimit)))
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
@@ -100,7 +118,7 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    const message = String(row.outreach_message || '')
+    const message = applyOutreachSignature(String(row.outreach_message || ''), row.sender_key || 'saasSales')
     const safe = assertSafeOutreachMessage(message)
     if (!safe.ok) {
       skippedCount++
@@ -109,7 +127,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!send) {
-      results.push({ id: row.id, business: row.business_name, ok: true, dryRun: true, toEmail })
+      results.push({ id: row.id, business: row.business_name, businessUrl: row.business_url, source: row.source_platform, createdAt: row.created_at, ok: true, dryRun: true, toEmail, messagePreview: message.slice(0, 220), messageTail: message.slice(-140) })
       continue
     }
 
@@ -178,6 +196,7 @@ export async function GET(req: NextRequest) {
     skipped: skippedCount,
     duplicateSkipped,
     sendLimit: { ...daily, countAfter: daily.count + sentCount },
+    selection: { ids: ids.length ? ids : null, sinceHours: sinceHours || null, source: source || null, order: oldestFirst ? 'oldest_first' : 'newest_first' },
     hint: send ? 'Real send attempted. Check outreachSendsRows and Resend Emails.' : 'Dry run only. Append &send=1 to send this batch.',
     results,
   })

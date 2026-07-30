@@ -1,3 +1,4 @@
+// saas/lib/outreach/security.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
 import { getAccess } from '@/lib/auth/access'
@@ -85,7 +86,32 @@ export async function isOutreachSendingDisabled(admin: ReturnType<typeof getAdmi
   return data?.value === true || data?.value?.disabled === true
 }
 
-export async function enforceDailySendLimit(admin: ReturnType<typeof getAdminSupabase>, limit = 50): Promise<{ ok: boolean; count: number; limit: number }> {
+// Rolling 24-hour send cap.
+//
+// The cap is now OFF by default at the owner's instruction: OUTREACH_DAILY_SEND_LIMIT
+// is unset, so `limit` resolves to 0 and every send is allowed. The counting still
+// happens — `count` remains accurate and is surfaced in the console and in every send
+// response — so volume stays observable even with no ceiling on it.
+//
+// Setting OUTREACH_DAILY_SEND_LIMIT to a positive number in Vercel re-imposes a cap
+// without a code change. The database trigger reads the same value from
+// system_settings.outreach_daily_send_limit; keep the two in step if you set either.
+//
+// Callers that pass an explicit number still win, so a future route can cap itself.
+const UNLIMITED = 0
+
+function configuredDailyLimit(): number {
+  const raw = String(process.env.OUTREACH_DAILY_SEND_LIMIT ?? '').trim().toLowerCase()
+  if (!raw || raw === 'off' || raw === 'none' || raw === 'unlimited') return UNLIMITED
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : UNLIMITED
+}
+
+export async function enforceDailySendLimit(
+  admin: ReturnType<typeof getAdminSupabase>,
+  limit?: number,
+): Promise<{ ok: boolean; count: number; limit: number; unlimited: boolean }> {
+  const effective = typeof limit === 'number' && limit > 0 ? limit : configuredDailyLimit()
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { count } = await admin
     .from('outreach_sends')
@@ -93,5 +119,6 @@ export async function enforceDailySendLimit(admin: ReturnType<typeof getAdminSup
     .gte('sent_at', since)
 
   const current = count || 0
-  return { ok: current < limit, count: current, limit }
+  if (effective === UNLIMITED) return { ok: true, count: current, limit: 0, unlimited: true }
+  return { ok: current < effective, count: current, limit: effective, unlimited: false }
 }

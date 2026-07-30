@@ -649,7 +649,8 @@
     "credits": {
       "label": "credits",
       "unlimited": "Unlimited"
-    }
+    },
+    "outreachApprovals": "Outreach Approvals"
   },
   "credits": {
     "usage": {
@@ -4040,5 +4041,32 @@
     "resultsTitle": "What SignalBoost prepares",
     "generateResults": "Generate results",
     "viewLanding": "View landing page"
+  },
+  "outreachApprovals": {
+    "title": "Outreach approvals",
+    "subtitle": "Review the exact provider actions drafted by COS. Nothing runs until you approve and merge.",
+    "refresh": "Refresh",
+    "loading": "Loading approvals…",
+    "empty": "No open approvals.",
+    "loadError": "Approvals could not be loaded.",
+    "mergeError": "The approval could not be merged.",
+    "closeError": "The approval could not be closed.",
+    "risk": "risk",
+    "steps": "Planned steps",
+    "provider": "Provider",
+    "template": "Template",
+    "payload": "Payload",
+    "merge": "Approve / Merge",
+    "merging": "Merging…",
+    "close": "Close",
+    "closing": "Closing…",
+    "confirmTitle": "This runs the listed provider actions live. Confirm that you reviewed every payload.",
+    "confirm": "Confirm live merge",
+    "cancel": "Cancel",
+    "risks": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
   }
 }

@@ -649,7 +649,8 @@
     "credits": {
       "label": "credits",
       "unlimited": "Unlimited"
-    }
+    },
+    "outreachApprovals": "Outreach approvals"
   },
   "credits": {
     "usage": {
@@ -4043,5 +4044,32 @@
   },
   "navExtra": {
     "admOutreachConsole": "ADM Console (Outreach)"
+  },
+  "outreachApprovals": {
+    "title": "Outreach approvals",
+    "subtitle": "Review the provider actions COS staged as infrastructure PRs (including outreach email sends). Separate from the customer Outreach Queue. Nothing runs until you approve and merge.",
+    "refresh": "Refresh",
+    "loading": "Loading approvals…",
+    "empty": "No open approvals.",
+    "loadError": "Could not load approvals.",
+    "mergeError": "Could not merge the approval.",
+    "closeError": "Could not close the approval.",
+    "risk": "risk",
+    "steps": "Planned steps",
+    "provider": "Provider",
+    "template": "Template",
+    "payload": "Payload",
+    "merge": "Approve / Merge",
+    "merging": "Merging…",
+    "close": "Close",
+    "closing": "Closing…",
+    "confirmTitle": "This runs the listed provider actions live. Confirm you reviewed every payload.",
+    "confirm": "Confirm live merge",
+    "cancel": "Cancel",
+    "risks": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
   }
 }

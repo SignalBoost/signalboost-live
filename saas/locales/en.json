@@ -3374,7 +3374,10 @@
     "u_caa79af4db67695c": "duration",
     "u_dcb3eeed0f2b911b": "captions",
     "u_dffa16af9340e30f": "exports record from canvas in real time.",
-    "u_1f6fa6f69d185e60": " min"
+    "u_1f6fa6f69d185e60": " min",
+    "u_dfca6272ec004413": "Request stopped. Nothing was sent and no external action was taken.",
+    "u_dd8433ee354c3e99": "This task ran past the request limit, so COS could not finish it in one turn. Nothing was sent and no external action was taken. Large jobs (research several companies, then draft to each) need to be split — ask for one company at a time, or run it from the Outreach console.",
+    "u_cae7d57bc067a514": "Stop"
   },
   "lab": {
     "license": {

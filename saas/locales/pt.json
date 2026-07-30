@@ -649,8 +649,7 @@
     "credits": {
       "label": "créditos",
       "unlimited": "Ilimitado"
-    },
-    "outreachApprovals": "Aprovações de prospecção"
+    }
   },
   "credits": {
     "usage": {
@@ -4042,31 +4041,7 @@
     "generateResults": "Gerar resultados",
     "viewLanding": "Ver página de destino"
   },
-  "outreachApprovals": {
-    "title": "Aprovações de prospecção",
-    "subtitle": "Revise as ações exatas do provedor elaboradas pelo COS. Nada é executado até você aprovar e mesclar.",
-    "refresh": "Atualizar",
-    "loading": "Carregando aprovações…",
-    "empty": "Nenhuma aprovação pendente.",
-    "loadError": "Não foi possível carregar as aprovações.",
-    "mergeError": "Não foi possível mesclar a aprovação.",
-    "closeError": "Não foi possível fechar a aprovação.",
-    "risk": "risco",
-    "steps": "Etapas planejadas",
-    "provider": "Provedor",
-    "template": "Modelo",
-    "payload": "Dados da solicitação",
-    "merge": "Aprovar / Mesclar",
-    "merging": "Mesclando…",
-    "close": "Fechar",
-    "closing": "Fechando…",
-    "confirmTitle": "Isso executa ao vivo as ações do provedor listadas. Confirme que você revisou cada dado da solicitação.",
-    "confirm": "Confirmar mesclagem ao vivo",
-    "cancel": "Cancelar",
-    "risks": {
-      "low": "Baixo",
-      "medium": "Médio",
-      "high": "Alto"
-    }
+  "navExtra": {
+    "admOutreachConsole": "Console ADM (Prospecção)"
   }
 }

@@ -1,3 +1,4 @@
+// saas/app/dashboard/assistant/page.tsx
 'use client'
 
 import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
@@ -40,6 +41,9 @@ const COPY = {
   placeholder:  { en: uiText('generatedUi.u_2efcbbb4418f49eb'),                    es: 'Pregunta al concierge…',              pt: 'Pergunte ao concierge…',               pl: 'Zapytaj concierge…',                   ru: 'Спросите консьержа…' },
   send:         { en: uiText('generatedUi.u_f6f4688ff23d50c6'),                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
   error:        { en: uiText('generatedUi.u_7a8adaf287716b05'), es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
+  stopped:      { en: 'Request stopped. Nothing was sent and no external action was taken.', es: 'Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.', pt: 'Solicitação interrompida. Nada foi enviado e nenhuma ação externa foi realizada.', pl: 'Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.', ru: 'Запрос остановлен. Ничего не отправлено, внешние действия не выполнялись.' },
+  timedOut:     { en: 'This task ran past the request limit, so COS could not finish it in one turn. Nothing was sent and no external action was taken. Large jobs (research several companies, then draft to each) need to be split — ask for one company at a time, or run it from the Outreach console.', es: 'Esta tarea superó el límite de la solicitud y COS no pudo terminarla en un turno. No se envió nada ni se realizó ninguna acción externa. Los trabajos grandes deben dividirse: pide una empresa a la vez o ejecútalo desde la consola de prospección.', pt: 'Esta tarefa ultrapassou o limite da solicitação e o COS não conseguiu concluí-la em um turno. Nada foi enviado e nenhuma ação externa foi realizada. Trabalhos grandes precisam ser divididos: peça uma empresa por vez ou execute pelo console de prospecção.', pl: 'To zadanie przekroczyło limit żądania i COS nie mógł go dokończyć w jednej turze. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej. Duże zadania trzeba dzielić: poproś o jedną firmę naraz lub uruchom to z konsoli outreach.', ru: 'Задача превысила лимит запроса, и COS не смог завершить её за один ход. Ничего не отправлено, внешние действия не выполнялись. Крупные задания нужно разбивать: запрашивайте по одной компании или запускайте из консоли аутрича.' },
+  stop:         { en: 'Stop', es: 'Detener', pt: 'Parar', pl: 'Zatrzymaj', ru: 'Остановить' },
   history:      { en: uiText('generatedUi.u_0e76960093379060'),                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
   newChat:      { en: uiText('generatedUi.u_db18382a249e0206'),                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
   noHistory:    { en: uiText('generatedUi.u_52a8737366b2b6bd'),                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
@@ -137,6 +141,13 @@ export default function AssistantPage() {
   const [loading, setLoading] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>('')
+  // The chat turn is a single bounded request: the server gives up at ~4 minutes.
+  // Without a client deadline a lost response leaves the bubble spinning forever
+  // with no error and no way out — which is exactly what "Thinking… for 10
+  // minutes" was. This aborts just after the server's own ceiling and always
+  // resolves the turn into a readable message.
+  const abortRef = useRef<AbortController | null>(null)
+  const CLIENT_DEADLINE_MS = 290_000
 
   // Attachment state
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([])
@@ -278,23 +289,47 @@ export default function AssistantPage() {
         dataUrl: f.dataUrl,
       }))
 
-      const res = await fetch('/api/concierge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: apiMessages,
-          attachments: attachments.length ? attachments : undefined,
-          context: { language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current },
-        }),
-      })
+      const controller = new AbortController()
+      abortRef.current = controller
+      let hitDeadline = false
+      const deadline = setTimeout(() => { hitDeadline = true; controller.abort() }, CLIENT_DEADLINE_MS)
 
-      const data = await res.json()
-      setMessages([...next, { role: 'assistant', content: data?.reply || data?.error || c(COPY.error, l) }])
+      try {
+        const res = await fetch('/api/concierge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            messages: apiMessages,
+            attachments: attachments.length ? attachments : undefined,
+            context: { language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current },
+          }),
+        })
+
+        // A gateway timeout or crash returns HTML, not JSON. Parsing it blindly
+        // threw and produced a generic error with no explanation of what happened.
+        const raw = await res.text()
+        let data: any = null
+        try { data = JSON.parse(raw) } catch { data = null }
+
+        const reply = data?.reply || data?.error || (res.ok ? '' : c(COPY.timedOut, l)) || c(COPY.error, l)
+        setMessages([...next, { role: 'assistant', content: reply }])
+      } catch (err: any) {
+        const aborted = err?.name === 'AbortError'
+        setMessages([...next, { role: 'assistant', content: aborted ? (hitDeadline ? c(COPY.timedOut, l) : c(COPY.stopped, l)) : c(COPY.error, l) }])
+      } finally {
+        clearTimeout(deadline)
+        abortRef.current = null
+      }
     } catch {
       setMessages([...next, { role: 'assistant', content: c(COPY.error, l) }])
     } finally {
       setLoading(false)
     }
+  }
+
+  function stopRequest() {
+    abortRef.current?.abort()
   }
 
   // ── History helpers ─────────────────────────────────────────────────────────
@@ -440,6 +475,13 @@ export default function AssistantPage() {
               <div style={{ padding: '12px 16px', borderRadius: 16, borderTopLeftRadius: 4, background: 'rgba(26,240,255,.07)', border: '1px solid rgba(26,240,255,.2)', color: 'rgba(255,255,255,.5)', fontSize: 14 }}>
                 {c(COPY.thinking, l)}
               </div>
+              <button
+                type="button"
+                onClick={stopRequest}
+                style={{ marginLeft: 10, alignSelf: 'center', padding: '6px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.2)', background: 'transparent', color: 'rgba(255,255,255,.7)', fontSize: 13, cursor: 'pointer' }}
+              >
+                {c(COPY.stop, l)}
+              </button>
             </div>
           )}
         </div>

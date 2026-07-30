@@ -1,3 +1,4 @@
+// saas/app/api/cos/campaign-queue/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { buildDefaultMarketingRecommendation } from '@/lib/cos/recommendation/engine'
@@ -7,6 +8,7 @@ import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-co
 import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 import { startSiteVideo } from '@/lib/operator/video'
 import { computeCampaignContentHash, withApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
+import { callModel } from '@/lib/ai/modelRouter'
 
 export const dynamic = 'force-dynamic'
 
@@ -266,9 +268,85 @@ function recommendationFromDepartmentRequest(input: unknown): CosRecommendation 
   return { id: id(request.autonomous ? 'rec_auto' : 'rec_manual'), department, title, summary, recommended_channel: channel, priority, confidence: confidenceForPriority(priority), expected_roi: expectedRoiForPriority(priority), estimated_cost_usd: estimatedCostUsd, reason: request.autonomous ? `Autonomous COSA command interpreted into a governed campaign. Channel=${channel}; outreach_channel=${effectiveOutreachChannel || 'none'}; priority=${priority}; language=${language}.` : `Marketing/Sales department request created by an administrator. Channel=${channel}; outreach_channel=${effectiveOutreachChannel || 'none'}; priority=${priority}; language=${language}.`, signals, approval_status: 'pending_approval', created_at: now }
 }
 
+// ── COSA drafting step ────────────────────────────────────────────────────────
+// The COS request says WHAT the campaign must achieve. COSA turns that request
+// into a real outreach email (subject + body) that the owner can read, edit and
+// approve before anything is sent. If the model is unavailable the campaign
+// objective is used verbatim, so the queue row is still created and reviewable —
+// AI is assistance here, never a hard dependency.
+
+const OUTREACH_LANGUAGE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian' }
+
+type DraftedOutreachEmail = { subject: string; body: string; drafted_by: 'cosa_model' | 'objective_fallback'; language: string }
+
+function firstLanguage(campaign: any): string {
+  const languages = campaign?.languages
+  if (Array.isArray(languages) && typeof languages[0] === 'string' && allowedLanguages.includes(languages[0] as SupportedCampaignLanguage)) return languages[0]
+  return 'en'
+}
+
+function parseDraftedEmail(raw: string | null): { subject: string; body: string } | null {
+  const text = String(raw || '').replace(/```json/gi, '').replace(/```/g, '').trim()
+  if (!text) return null
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1))
+      const subject = typeof parsed?.subject === 'string' ? parsed.subject.replace(/\s+/g, ' ').trim() : ''
+      const body = typeof parsed?.body === 'string' ? parsed.body.trim() : ''
+      if (body) return { subject: subject.slice(0, 160), body: body.slice(0, 4_000) }
+    } catch {
+      // fall through to plain-text handling below
+    }
+  }
+  // Model answered in plain text: keep the draft rather than losing it.
+  return { subject: '', body: text.slice(0, 4_000) }
+}
+
+async function draftOutreachEmailForCampaign(campaign: any, outreachChannel: OutreachChannel): Promise<DraftedOutreachEmail> {
+  const language = firstLanguage(campaign)
+  const languageName = OUTREACH_LANGUAGE_NAMES[language] || 'English'
+  const title = cleanString(campaign?.title, titleForChannel('outreach', outreachChannel), 140)
+  const objective = cleanLongText(campaign?.objective, `Prepare ${outreachChannel.replace(/-/g, ' ')} outreach for SignalBoost.`, 1_500)
+  const audience = cleanString(campaign?.audience, 'Business owners and operators who need more growth capacity without adding manual work.', 240)
+
+  const systemPrompt = [
+    'You are COSA, the campaign drafting agent for SignalBoost.',
+    'You write short, specific, honest B2B outreach emails a founder would be comfortable sending under their own name.',
+    'Lead with the problem the recipient actually has, then introduce SignalBoost as the answer.',
+    'No hype, no invented metrics, no invented client names, no false claim of previous contact.',
+    'One clear call to action at the end. Body length 120-200 words.',
+    `Write both the subject and the body in ${languageName}.`,
+    'Return ONLY a JSON object shaped {"subject": "...", "body": "..."} with no commentary and no markdown fences.',
+  ].join(' ')
+
+  const prompt = [
+    `Campaign title: ${title}`,
+    `Outreach channel: ${outreachChannel.replace(/-/g, ' ')}`,
+    `Target audience: ${audience}`,
+    `Objective from the Chief of Staff request: ${objective}`,
+    `Sender: SignalBoost (${SAAS_URL})`,
+    '',
+    'Draft the outreach email now.',
+  ].join('\n')
+
+  let raw: string | null = null
+  try {
+    raw = await callModel({ modelPreference: 'claude', systemPrompt, prompt, maxTokens: 900 })
+  } catch {
+    raw = null
+  }
+
+  const parsed = parseDraftedEmail(raw)
+  if (!parsed || !parsed.body) return { subject: title, body: objective, drafted_by: 'objective_fallback', language }
+  return { subject: parsed.subject || title, body: cleanDestination(parsed.body), drafted_by: 'cosa_model', language }
+}
+
 async function mirrorCosaCampaignToOutreachQueue(admin: any, campaign: any, outreachChannel: OutreachChannel | null) {
   if (!outreachChannel || campaign.channel !== 'outreach') return { mirrored: false }
   const now = new Date().toISOString()
+  const draft = await draftOutreachEmailForCampaign(campaign, outreachChannel)
   const { data: existing } = await admin.from('outreach_queue').select('id').eq('source_platform', 'cos_campaign_queue').eq('business_id', campaign.id).limit(1)
   if (Array.isArray(existing) && existing.length) return { mirrored: true, existing: true, outreach_id: existing[0].id }
   const row = {
@@ -276,20 +354,20 @@ async function mirrorCosaCampaignToOutreachQueue(admin: any, campaign: any, outr
     source_platform: 'cos_campaign_queue',
     business_name: campaign.title || titleForChannel('outreach', outreachChannel),
     business_url: SAAS_URL,
-    analyzer_summary: { source: 'cosa_campaign_queue', cos_campaign_id: campaign.id, outreach_channel: outreachChannel, objective: campaign.objective || '' },
+    analyzer_summary: { source: 'cosa_campaign_queue', cos_campaign_id: campaign.id, outreach_channel: outreachChannel, objective: campaign.objective || '', outreach_subject: draft.subject, drafted_by: draft.drafted_by, draft_language: draft.language },
     business_model_profile: { channel: outreachChannel, workspace: 'marketing-sales' },
     predictive_needs: { next_step: 'Build media/contact list for selected channel.' },
     website_json: { channel: outreachChannel, outreach_channel: outreachChannel, cos_campaign_id: campaign.id, source: 'cosa' },
     review_strategy: { local_review_context: 'Marketing + Sales', approval_surface: 'COSA Campaign Console and channel Outreach workspace' },
     social_plan: { channel: outreachChannel, dispatch_locked: true },
     promo_plan: { channel: outreachChannel, dispatch_locked: true },
-    outreach_message: cleanLongText(campaign.objective, `Prepare ${outreachChannel.replace(/-/g, ' ')} outreach for SignalBoost.`, 1_500),
+    outreach_message: draft.body,
     status: 'pending',
     created_at: now,
   }
   const { data, error } = await admin.from('outreach_queue').insert(row).select('*').single()
   if (error) return { mirrored: false, error: error.message }
-  return { mirrored: true, outreach_id: data?.id || null }
+  return { mirrored: true, outreach_id: data?.id || null, drafted_by: draft.drafted_by, subject: draft.subject }
 }
 
 export async function GET(req: NextRequest) {

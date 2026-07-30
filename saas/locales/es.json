@@ -649,7 +649,8 @@
     "credits": {
       "label": "créditos",
       "unlimited": "Ilimitado"
-    }
+    },
+    "outreachApprovals": "Aprobaciones de prospección"
   },
   "credits": {
     "usage": {
@@ -4043,5 +4044,32 @@
   },
   "navExtra": {
     "admOutreachConsole": "Consola ADM (Prospección)"
+  },
+  "outreachApprovals": {
+    "title": "Aprobaciones de prospección",
+    "subtitle": "Revisa las acciones de proveedor que COS preparó como PR de infraestructura (incluidos los envíos de correo de prospección). Independiente de la Cola de Prospección de clientes. Nada se ejecuta hasta que apruebes y fusiones.",
+    "refresh": "Actualizar",
+    "loading": "Cargando aprobaciones…",
+    "empty": "No hay aprobaciones abiertas.",
+    "loadError": "No se pudieron cargar las aprobaciones.",
+    "mergeError": "No se pudo fusionar la aprobación.",
+    "closeError": "No se pudo cerrar la aprobación.",
+    "risk": "riesgo",
+    "steps": "Pasos previstos",
+    "provider": "Proveedor",
+    "template": "Plantilla",
+    "payload": "Carga útil",
+    "merge": "Aprobar / Fusionar",
+    "merging": "Fusionando…",
+    "close": "Cerrar",
+    "closing": "Cerrando…",
+    "confirmTitle": "Esto ejecuta en vivo las acciones de proveedor indicadas. Confirma que revisaste cada carga útil.",
+    "confirm": "Confirmar fusión en vivo",
+    "cancel": "Cancelar",
+    "risks": {
+      "low": "Bajo",
+      "medium": "Medio",
+      "high": "Alto"
+    }
   }
 }

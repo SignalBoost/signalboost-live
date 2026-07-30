@@ -75,15 +75,69 @@ test('Admin sidebar restores a dedicated Outreach monitoring destination', async
   const adminPage = await source('app/admin/outreach/page.tsx')
   assert.match(platform, /label: 'Outreach', href: '\/admin\/outreach'/)
   assert.match(adminPage, /AdmConsoleClient/)
+  assert.match(adminPage, /\/admin\/outreach\/delivery/)
 })
 
-test('existing approval, panic switch, daily limit, audit, and manual record safeguards remain intact', async () => {
+test('human approval releases the email through Resend while preserving every safety gate', async () => {
+  const queueRoute = await source('app/api/outreach/queue/route.ts')
+  assert.match(queueRoute, /status === 'approved' && body\?\.release !== false/)
+  assert.match(queueRoute, /from\('outreach_sends'\)[\s\S]*eq\('outreach_id', id\)/)
+  assert.match(queueRoute, /isOutreachSendingDisabled/)
+  assert.match(queueRoute, /enforceDailySendLimit\(ctx\.admin, 50\)/)
+  assert.match(queueRoute, /assertSafeOutreachMessage/)
+  assert.match(queueRoute, /sendEmail\(\{/)
+  assert.match(queueRoute, /from: 'saasSales'/)
+  assert.match(queueRoute, /from\('outreach_sends'\)\.insert/)
+  assert.match(queueRoute, /markOutreachSent/)
+  assert.match(queueRoute, /outreach\.approved_and_sent/)
+  assert.match(queueRoute, /alreadySent: true/)
+})
+
+test('contacts show Sent, release approved records, and expose the Resend evidence monitor', async () => {
+  const contacts = await source('app/dashboard/outreach/contacts/page.tsx')
+  assert.match(contacts, /type OutreachStatus = 'pending' \| 'approved' \| 'rejected' \| 'sent'/)
+  assert.match(contacts, /Approve & Send/)
+  assert.match(contacts, /\/api\/admin\/outreach\/send-ready\?send=1&limit=10/)
+  assert.match(contacts, /\/admin\/outreach\/delivery/)
+  assert.match(contacts, /countByStatus\('sent'\)/)
+  assert.match(contacts, /data\.release\?\.ok/)
+})
+
+test('sent lifecycle tolerates production schema drift without losing the durable send ledger', async () => {
+  const markSent = await source('lib/outreach/markSent.ts')
+  const sendRoute = await source('app/api/outreach/send/route.ts')
+  const batchRoute = await source('app/api/admin/outreach/send-ready/route.ts')
+
+  assert.match(markSent, /update\(\{ status: 'sent', sent_at: sentAt \}\)/)
+  assert.match(markSent, /update\(\{ status: 'sent' \}\)/)
+  assert.match(markSent, /usedStatusOnlyFallback/)
+  assert.match(sendRoute, /markOutreachSent/)
+  assert.match(batchRoute, /markOutreachSent/)
+  assert.match(batchRoute, /Already has outreach_sends record/)
+})
+
+test('Resend delivery history is visible and reconciles historical sends', async () => {
+  const deliveryPage = await source('app/admin/outreach/delivery/page.tsx')
+  const deliveryRoute = await source('app/api/admin/outreach/delivery-check/route.ts')
+  const selftest = await source('app/api/admin/outreach/selftest/route.ts')
+  const email = await source('lib/email.ts')
+
+  assert.match(deliveryPage, /Verify what was really sent/)
+  assert.match(deliveryPage, /\/api\/admin\/outreach\/selftest/)
+  assert.match(deliveryPage, /\/api\/admin\/outreach\/delivery-check\?limit=25/)
+  assert.match(deliveryRoute, /https:\/\/api\.resend\.com/)
+  assert.match(deliveryRoute, /markOutreachSent/)
+  assert.match(deliveryRoute, /statusOnlyFallbacks/)
+  assert.match(selftest, /outreachSendsRows/)
+  assert.match(selftest, /deliveryEventRows/)
+  assert.match(selftest, /replyRows/)
+  assert.match(email, /mode: 'resend'/)
+})
+
+test('manual record mode and the separate operational send route remain available', async () => {
   const sendRoute = await source('app/api/outreach/send/route.ts')
   const adminConsole = await source('components/admin/outreach/AdmConsoleClient.tsx')
-  assert.match(sendRoute, /isOutreachSendingDisabled/)
-  assert.match(sendRoute, /enforceDailySendLimit\(ctx\.admin, 50\)/)
   assert.match(sendRoute, /outreach\.status !== 'approved'/)
-  assert.match(sendRoute, /auditAdminAction/)
   assert.match(sendRoute, /mode: 'manual_record_only'/)
   assert.match(adminConsole, /channel: sendEmail \? 'email' : 'manual'/)
   assert.match(adminConsole, /selected\.status !== 'approved'/)

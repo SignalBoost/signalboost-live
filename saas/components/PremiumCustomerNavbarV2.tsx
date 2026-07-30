@@ -61,6 +61,7 @@ const GROUPS: NavGroup[] = [
       { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: uiText('generatedUi.u_22a3534629d2dcf1'), href: '/dashboard/sales/pipeline' },
       { icon: '📨', labelKey: 'nav.myOutreach', fallbackLabel: uiText('generatedUi.u_04c411dc1ee0d29f'), href: '/dashboard/my-outreach' },
       { icon: '📇', labelKey: 'nav.admOutreachConsole', fallbackLabel: uiText('navExtra.admOutreachConsole'), href: '/admin/outreach', requiresOwner: true },
+      { icon: '🛡️', labelKey: 'nav.outreachApprovals', fallbackLabel: uiText('outreachApprovals.title'), href: '/dashboard/hub/outreach-approvals', requiresOwner: true },
       { icon: '⛏️', labelKey: 'nav.cosMining', fallbackLabel: uiText('generatedUi.u_e595ed3d019ad2a5'), href: '/dashboard/cos-mining' },
       { icon: '🖥️', labelKey: 'nav.marketingConsole', fallbackLabel: uiText('generatedUi.u_c14b309b4fa21c68'), href: '/dashboard/marketing-sales/console' },
     ],

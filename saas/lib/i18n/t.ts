@@ -6,13 +6,19 @@ import { PLATFORM_COPY } from '@/lib/i18n/platformCopy'
 import { SUITE_COPY } from '@/lib/i18n/suiteCopy'
 import { WORKSPACE_COPY } from '@/lib/i18n/workspaceCopy'
 import { BANK_COPY } from '@/lib/i18n/bankCopy'
+import { outreachNavLabel } from '@/lib/i18n/outreachCopy'
 
 export function t(dict: Dict | null | undefined, path: string, fallback = ''): string {
-  const value = lookup(dict, path)
-  if (typeof value === 'string') return value
-
   const lang = (dict as any)?.__lang
   const safeLang = typeof lang === 'string' ? lang : 'en'
+
+  // The legacy locale key is intentionally retained so old components keep
+  // working, but its old "Email Outreach" value is no longer authoritative.
+  // Outreach is the umbrella workflow; email is one governed channel.
+  if (path === 'nav.emailOutreach') return outreachNavLabel(safeLang)
+
+  const value = lookup(dict, path)
+  if (typeof value === 'string') return value
 
   const dashboardForLang = DASHBOARD_COPY[safeLang]
   if (dashboardForLang && typeof dashboardForLang[path] === 'string') {

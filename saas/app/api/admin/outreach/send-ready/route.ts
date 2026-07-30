@@ -6,12 +6,13 @@
 // - never selects rows that already have an outreach_sends record
 // - checks again per row before sending to reduce duplicate/race risk
 // - records the Resend provider id in outreach_sends
-// - marks the outreach_queue row as sent and reports any status-update failure
+// - marks the outreach_queue row as sent with a schema-tolerant fallback
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { sendEmail } from '@/lib/email'
+import { markOutreachSent } from '@/lib/outreach/markSent'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -120,7 +121,7 @@ export async function GET(req: NextRequest) {
     })
 
     if (!sent.ok) {
-      results.push({ id: row.id, business: row.business_name, ok: false, toEmail, error: sent.error || 'Email send failed' })
+      results.push({ id: row.id, business: row.business_name, ok: false, toEmail, error: sent.error || 'Email send failed', providerResult: sent })
       continue
     }
 
@@ -138,10 +139,7 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    const { error: updateError } = await ctx.admin
-      .from('outreach_queue')
-      .update({ status: 'sent', sent_at: sentAt })
-      .eq('id', row.id)
+    const queueReconcile = await markOutreachSent(ctx.admin, row.id, sentAt)
 
     await auditAdminAction({
       admin: ctx.admin,
@@ -149,7 +147,7 @@ export async function GET(req: NextRequest) {
       action: 'outreach.batch_send_ready',
       targetType: 'outreach_queue',
       targetId: row.id,
-      metadata: { channel: 'email', providerResult: sent, toEmail, statusUpdateError: updateError?.message || null },
+      metadata: { channel: 'email', providerResult: sent, toEmail, queueReconcile },
     })
 
     sentCount++
@@ -161,8 +159,10 @@ export async function GET(req: NextRequest) {
       sentAt,
       toEmail,
       providerResult: sent,
-      statusUpdated: !updateError,
-      statusUpdateError: updateError?.message || null,
+      statusUpdated: queueReconcile.ok,
+      statusOnlyFallback: queueReconcile.usedStatusOnlyFallback,
+      statusUpdateError: queueReconcile.error,
+      firstStatusUpdateError: queueReconcile.firstError,
     })
   }
 

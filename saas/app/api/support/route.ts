@@ -1631,7 +1631,7 @@ ${ev.summary}`
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
     // while time remains, so a recoverable blip never hard-freezes the assistant.
-    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign') => {
+    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect') => {
       let lastErr: any = null
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -1643,7 +1643,7 @@ ${ev.summary}`
               system: cachedSystem(systemContent) as any, // ephemeral prompt cache: caches the tools+system prefix across the multi-turn tool loop
               messages: convo as any,
               tools: anthropicTools as any,
-              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
           // Meter every model call (owner Chief of Staff vs external Concierge),
@@ -1679,14 +1679,30 @@ ${ev.summary}`
     // video (any of the 5 platform languages), the FIRST model call is forced to
     // invoke proposeMarketingCampaign — replying with campaign copy in prose and
     // never inserting a row is exactly the silent failure this prevents.
+    // Owner MULTI-PROSPECT forcer. This runs BEFORE the campaign forcer and wins,
+    // because the two overlap badly: "Run an outreach campaign ... Start in the
+    // United States. Find 10." trips CAMPAIGN_VERB ("Start") and CAMPAIGN_NOUN
+    // ("campaign"), so the first call was hard-forced to proposeMarketingCampaign
+    // and startProspectCampaign never got a chance — the turn then spent its whole
+    // budget trying to research ten companies inline and died at the limit. A
+    // request naming a COUNT of companies is a background job, not a campaign row.
+    const PROSPECT_COUNT = /\b(?:find|get|build|list|source|research|encontr\w*|busca\w*|znajd\w*|найд\w*)\D{0,24}(\d{1,3})\b|\b(\d{1,3})\s*(?:companies|company|prospects?|leads?|targets?|accounts?|empresas?|firmas?|firmy|компани\w*)/i
+    const PROSPECT_CONTEXT = /(outreach|prospect|cold email|email campaign|campaign|sell|sales|lead gen|prospec\w*|sprzeda\w*|аутрич|продаж)/i
+    const prospectMatch = latestUserMessage.match(PROSPECT_COUNT)
+    const prospectCount = prospectMatch ? Number(prospectMatch[1] || prospectMatch[2] || 0) : 0
+    const forceProspect = isOwner && !forceAction && prospectCount >= 3 && prospectCount <= 100 && PROSPECT_CONTEXT.test(latestUserMessage)
+    if (forceProspect) {
+      systemContent += `\n\nOWNER MULTI-PROSPECT REQUEST: the owner asked for ${prospectCount} target companies in this message. You MUST call startProspectCampaign now, exactly once. Put the owner's description of what is being sold into offer (keep their wording and detail), their description of who to target — including geography and any disqualifiers — into targetCriteria, and set requestedCount to ${prospectCount}. Do NOT call createOutreachDraft, do NOT call proposeMarketingCampaign, and do NOT try to research or name any company yourself: this turn is time-bounded and researching companies inline will kill it before it answers. After the tool returns, report the job id, say plainly that discovery and drafting run in the background over the next several minutes, that NOTHING has been sent and no company has been contacted, and that drafts appear in the Outreach console for approval.`
+    }
+
     const CAMPAIGN_VERB = /(cri(e|ar)|fa(ç|c)a|fazer|gerar?|lan(ç|c)ar|lance|create|make|generate|launch|start|produz|prepare|montar?|stw(ó|o)rz|utw(ó|o)rz|созда|запусти)/i
     const CAMPAIGN_NOUN = /(campanha|campaign|kampani|кампани|v(í|i)deo|video|wideo|видео|reels?|shorts?|tiktok)/i
-    const forceCampaign = isOwner && !forceAction && CAMPAIGN_VERB.test(latestUserMessage) && CAMPAIGN_NOUN.test(latestUserMessage)
+    const forceCampaign = isOwner && !forceAction && !forceProspect && CAMPAIGN_VERB.test(latestUserMessage) && CAMPAIGN_NOUN.test(latestUserMessage)
     if (forceCampaign) {
       systemContent += '\n\nOWNER CAMPAIGN REQUEST: the owner asked for a campaign/video in this message. You MUST call proposeMarketingCampaign now. Pass the owner\'s FULL message verbatim as sourceMaterial, and extract goal, audience, channel, offer, and language from it. Do NOT answer a campaign request with campaign copy in prose: a reply that describes a campaign but contains no campaign id from the tool is a failure.'
     }
 
-    let msg        = await callModel(forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
+    let msg        = await callModel(forceProspect ? 'prospect' : forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
     let toolRounds = 0
     let timedOut   = msg === null
 

@@ -28,12 +28,25 @@ type ProjectCopy = {
   future: string
 }
 
+type FutureIdeaCopy = {
+  status: string
+  badge: string
+  title: string
+  summary: string
+  reasonTitle: string
+  reason: string
+  firstVersionTitle: string
+  firstVersion: string[]
+  decisionTitle: string
+  decision: string
+}
+
 const COPY: Record<Language, ProjectCopy> = {
   en: {
     eyebrow: uiText('generatedUi.u_92375f997ffe65ab'),
     title: uiText('generatedUi.u_04d04dbee162ea6d'),
     subtitle: uiText('generatedUi.u_1a89fd23594015a9'),
-    status: "Concept — future build",
+    status: 'Concept — future build',
     badge: uiText('generatedUi.u_e69601364bdac76e'),
     projectTitle: uiText('generatedUi.u_3be08ed96f555110'),
     projectSummary: uiText('generatedUi.u_9fe55e4439773677'),
@@ -161,9 +174,74 @@ const COPY: Record<Language, ProjectCopy> = {
   },
 }
 
+const MULTI_AI_COPY: Record<Language, FutureIdeaCopy> = {
+  en: {
+    status: 'Idea saved for later review',
+    badge: 'DEFERRED',
+    title: 'Multi-AI Project Consultation Workspace',
+    summary: 'One shared project room where OpenAI, Anthropic, Gemini and other selected AI providers can review the same project context, answer side by side, critique selected responses and help prepare one saved decision.',
+    reasonTitle: 'Why this idea exists',
+    reason: 'During project development, the owner often consults several AI systems and manually carries context and recommendations between separate services. This workspace would organize that real internal workflow in one place.',
+    firstVersionTitle: 'Possible first version',
+    firstVersion: ['Shared project context and files', 'Send one question to selected providers', 'Side-by-side responses', 'Ask one provider to critique another response', 'Create and save a combined recommendation', 'Display provider, model, usage, cost and audit history'],
+    decisionTitle: 'Current decision',
+    decision: 'Do not treat this as an active build or a proven commercial product. Revisit it later as an internal SignalBoost productivity tool, then decide whether broader usage justifies productization.',
+  },
+  es: {
+    status: 'Idea guardada para revisión futura',
+    badge: 'POSPUESTO',
+    title: 'Espacio de Consulta de Proyectos con Múltiples IA',
+    summary: 'Una sala de proyecto compartida donde OpenAI, Anthropic, Gemini y otros proveedores seleccionados revisen el mismo contexto, respondan en paralelo, critiquen respuestas y ayuden a guardar una decisión final.',
+    reasonTitle: 'Por qué existe esta idea',
+    reason: 'Durante el desarrollo, el propietario consulta con frecuencia varios sistemas de IA y traslada manualmente contexto y recomendaciones entre servicios separados. Este espacio organizaría ese flujo interno real en un solo lugar.',
+    firstVersionTitle: 'Primera versión posible',
+    firstVersion: ['Contexto y archivos compartidos del proyecto', 'Enviar una pregunta a proveedores seleccionados', 'Respuestas en paralelo', 'Pedir a un proveedor que critique otra respuesta', 'Crear y guardar una recomendación combinada', 'Mostrar proveedor, modelo, uso, costo e historial de auditoría'],
+    decisionTitle: 'Decisión actual',
+    decision: 'No tratarlo como desarrollo activo ni como producto comercial probado. Revisarlo más adelante como herramienta interna de productividad y decidir después si el uso justifica convertirlo en producto.',
+  },
+  pt: {
+    status: 'Ideia salva para análise futura',
+    badge: 'ADIADO',
+    title: 'Espaço de Consulta de Projetos com Múltiplas IAs',
+    summary: 'Uma sala de projeto compartilhada onde OpenAI, Anthropic, Gemini e outros provedores selecionados analisem o mesmo contexto, respondam lado a lado, critiquem respostas e ajudem a salvar uma decisão final.',
+    reasonTitle: 'Por que esta ideia existe',
+    reason: 'Durante o desenvolvimento, o proprietário consulta com frequência vários sistemas de IA e transfere manualmente contexto e recomendações entre serviços separados. Este espaço organizaria esse fluxo interno real em um só lugar.',
+    firstVersionTitle: 'Possível primeira versão',
+    firstVersion: ['Contexto e arquivos compartilhados do projeto', 'Enviar uma pergunta aos provedores selecionados', 'Respostas lado a lado', 'Pedir a um provedor para criticar outra resposta', 'Criar e salvar uma recomendação combinada', 'Mostrar provedor, modelo, uso, custo e histórico de auditoria'],
+    decisionTitle: 'Decisão atual',
+    decision: 'Não tratar como desenvolvimento ativo nem como produto comercial comprovado. Rever mais tarde como ferramenta interna de produtividade e decidir depois se o uso justifica transformá-la em produto.',
+  },
+  pl: {
+    status: 'Pomysł zapisany do późniejszej oceny',
+    badge: 'ODŁOŻONE',
+    title: 'Przestrzeń Konsultacji Projektów z Wieloma AI',
+    summary: 'Wspólna przestrzeń projektu, w której OpenAI, Anthropic, Gemini i inni wybrani dostawcy analizują ten sam kontekst, odpowiadają obok siebie, oceniają odpowiedzi i pomagają zapisać końcową decyzję.',
+    reasonTitle: 'Dlaczego powstał ten pomysł',
+    reason: 'Podczas tworzenia projektów właściciel często konsultuje się z kilkoma systemami AI i ręcznie przenosi kontekst oraz rekomendacje między osobnymi usługami. Ta przestrzeń uporządkowałaby ten rzeczywisty wewnętrzny proces.',
+    firstVersionTitle: 'Możliwa pierwsza wersja',
+    firstVersion: ['Wspólny kontekst i pliki projektu', 'Wysłanie jednego pytania do wybranych dostawców', 'Odpowiedzi obok siebie', 'Ocena odpowiedzi jednego AI przez inne', 'Utworzenie i zapisanie wspólnej rekomendacji', 'Dostawca, model, użycie, koszt i historia audytu'],
+    decisionTitle: 'Obecna decyzja',
+    decision: 'Nie traktować jako aktywnej budowy ani sprawdzonego produktu komercyjnego. Wrócić do pomysłu później jako wewnętrznego narzędzia produktywności i dopiero wtedy ocenić zasadność komercjalizacji.',
+  },
+  ru: {
+    status: 'Идея сохранена для будущего рассмотрения',
+    badge: 'ОТЛОЖЕНО',
+    title: 'Рабочее пространство для консультаций нескольких ИИ',
+    summary: 'Общая проектная комната, где OpenAI, Anthropic, Gemini и другие выбранные поставщики анализируют один контекст, отвечают параллельно, критикуют ответы и помогают сохранить итоговое решение.',
+    reasonTitle: 'Почему появилась эта идея',
+    reason: 'При разработке проектов владелец часто консультируется с несколькими системами ИИ и вручную переносит контекст и рекомендации между отдельными сервисами. Это пространство организует такой реальный внутренний процесс в одном месте.',
+    firstVersionTitle: 'Возможная первая версия',
+    firstVersion: ['Общий контекст и файлы проекта', 'Один вопрос выбранным поставщикам', 'Параллельные ответы', 'Критика одного ответа другим ИИ', 'Создание и сохранение общей рекомендации', 'Поставщик, модель, использование, стоимость и журнал аудита'],
+    decisionTitle: 'Текущее решение',
+    decision: 'Не считать активной разработкой или подтверждённым коммерческим продуктом. Вернуться к идее позже как к внутреннему инструменту SignalBoost и затем решить, оправдывает ли использование коммерциализацию.',
+  },
+}
+
 export default function FutureProjectsPage() {
   const { lang } = useI18n()
-  const copy = COPY[(lang as Language) in COPY ? (lang as Language) : 'en']
+  const language = (lang as Language) in COPY ? (lang as Language) : 'en'
+  const copy = COPY[language]
+  const multiAi = MULTI_AI_COPY[language]
 
   return (
     <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', color: 'var(--text-primary)' }}>
@@ -224,6 +302,35 @@ export default function FutureProjectsPage() {
         <section style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, marginTop: 20 }}>
           <h3 className="sb-h3">{copy.futureTitle}</h3>
           <p className="sb-body" style={{ marginBottom: 0 }}>{copy.future}</p>
+        </section>
+      </article>
+
+      <article className="sb-console" style={{ padding: 24, marginTop: 18 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+          <div>
+            <div className="sb-eyebrow">{multiAi.status}</div>
+            <h2 style={{ margin: '8px 0 0', fontSize: 'clamp(1.5rem, 3vw, 2.25rem)' }}>{multiAi.title}</h2>
+          </div>
+          <span style={{ border: '1px solid rgba(167,139,250,.5)', borderRadius: 999, padding: '7px 12px', color: '#c4b5fd', fontSize: 12, fontWeight: 800 }}>{multiAi.badge}</span>
+        </div>
+
+        <p className="sb-body" style={{ maxWidth: 900, marginTop: 18 }}>{multiAi.summary}</p>
+
+        <section style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, marginTop: 20 }}>
+          <h3 className="sb-h3">{multiAi.reasonTitle}</h3>
+          <p className="sb-body">{multiAi.reason}</p>
+        </section>
+
+        <section style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, marginTop: 20 }}>
+          <h3 className="sb-h3">{multiAi.firstVersionTitle}</h3>
+          <ul className="sb-body" style={{ paddingLeft: 20 }}>
+            {multiAi.firstVersion.map(item => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
+          </ul>
+        </section>
+
+        <section style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, marginTop: 20 }}>
+          <h3 className="sb-h3">{multiAi.decisionTitle}</h3>
+          <p className="sb-body" style={{ marginBottom: 0 }}>{multiAi.decision}</p>
         </section>
       </article>
     </main>

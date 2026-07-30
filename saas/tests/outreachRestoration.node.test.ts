@@ -52,8 +52,22 @@ test('Chief of Staff stages verified prospect drafts but never treats staging as
   assert.match(architect, /call createOutreachDraft/)
   assert.match(architect, /status PENDING/)
   assert.match(architect, /Send NOTHING/)
-  assert.match(architect, /If the owner says research only/)
   assert.match(architect, /Never invent a company, URL, contact/)
+})
+
+test('do-not-send language preserves the internal outreach approval handoff', async () => {
+  const architect = await source('lib/ai/cosArchitect.ts')
+  assert.match(architect, /"do not send"[\s\S]*prohibits EXTERNAL ACTION only/)
+  assert.match(architect, /It does NOT prohibit[\s\S]*internal pending drafts/)
+  assert.match(architect, /still call[\s\S]*createOutreachDraft[\s\S]*approval queue/)
+  assert.match(architect, /Suppress createOutreachDraft only when[\s\S]*RESEARCH ONLY/)
+  assert.match(architect, /not to create, store, save, or queue drafts/)
+  assert.match(architect, /Never satisfy an outreach-draft request by printing drafts only in chat/)
+  assert.doesNotMatch(
+    architect,
+    /research only, do not contact, do not send, or otherwise negates[\s\S]*call no draft/,
+    'do-not-send must not be conflated with do-not-stage',
+  )
 })
 
 test('Admin sidebar restores a dedicated Outreach monitoring destination', async () => {

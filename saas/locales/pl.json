@@ -649,7 +649,8 @@
     "credits": {
       "label": "kredyty",
       "unlimited": "Bez limitu"
-    }
+    },
+    "outreachApprovals": "Zatwierdzenia outreach"
   },
   "credits": {
     "usage": {
@@ -3373,7 +3374,10 @@
     "u_caa79af4db67695c": "czas trwania",
     "u_dcb3eeed0f2b911b": "napisy",
     "u_dffa16af9340e30f": "eksportuje rekord z płótna w czasie rzeczywistym.",
-    "u_1f6fa6f69d185e60": " min"
+    "u_1f6fa6f69d185e60": " min",
+    "u_dfca6272ec004413": "Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.",
+    "u_dd8433ee354c3e99": "To zadanie przekroczyło limit żądania i COS nie mógł go dokończyć w jednej turze. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej. Duże zadania (zbadanie kilku firm, a potem napisanie do każdej) trzeba dzielić: poproś o jedną firmę naraz lub uruchom to z konsoli outreach.",
+    "u_cae7d57bc067a514": "Zatrzymaj"
   },
   "lab": {
     "somethingWrong": "Coś poszło nie tak",
@@ -4043,5 +4047,32 @@
   },
   "navExtra": {
     "admOutreachConsole": "Konsola ADM (Outreach)"
+  },
+  "outreachApprovals": {
+    "title": "Zatwierdzenia outreach",
+    "subtitle": "Sprawdź działania dostawców przygotowane przez COS jako PR infrastruktury (w tym wysyłki e-maili outreach). Oddzielne od Kolejki Outreach dla klientów. Nic nie zostanie wykonane przed zatwierdzeniem i scaleniem.",
+    "refresh": "Odśwież",
+    "loading": "Ładowanie zatwierdzeń…",
+    "empty": "Brak otwartych zatwierdzeń.",
+    "loadError": "Nie udało się wczytać zatwierdzeń.",
+    "mergeError": "Nie udało się scalić zatwierdzenia.",
+    "closeError": "Nie udało się zamknąć zatwierdzenia.",
+    "risk": "ryzyko",
+    "steps": "Planowane kroki",
+    "provider": "Dostawca",
+    "template": "Szablon",
+    "payload": "Dane",
+    "merge": "Zatwierdź / Scal",
+    "merging": "Scalanie…",
+    "close": "Zamknij",
+    "closing": "Zamykanie…",
+    "confirmTitle": "Spowoduje to wykonanie na żywo wymienionych działań dostawców. Potwierdź sprawdzenie wszystkich danych.",
+    "confirm": "Potwierdź scalenie na żywo",
+    "cancel": "Anuluj",
+    "risks": {
+      "low": "Niskie",
+      "medium": "Średnie",
+      "high": "Wysokie"
+    }
   }
 }

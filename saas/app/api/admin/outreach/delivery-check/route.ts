@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
+import { markOutreachSent } from '@/lib/outreach/markSent'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -47,18 +48,6 @@ async function fetchResendEmail(id: string) {
   const text = await res.text()
   if (!res.ok) return { ok: false as const, error: `Resend ${res.status}: ${text.slice(0, 300)}` }
   return { ok: true as const, json: text ? JSON.parse(text) : {} }
-}
-
-async function reconcileQueue(ctx: any, row: any) {
-  if (!row?.outreach_id) return { ok: false, error: 'Missing outreach_id' }
-  // Production outreach_queue does not have sent_at. Update status only.
-  const { data, error } = await ctx.admin
-    .from('outreach_queue')
-    .update({ status: 'sent' })
-    .eq('id', row.outreach_id)
-    .select('id,status')
-    .maybeSingle()
-  return { ok: !error && data?.status === 'sent', error: error?.message || null, row: data || null }
 }
 
 async function storeDeliveryOnSend(ctx: any, row: any, resendJson: any, toEmail: string | null) {
@@ -115,7 +104,9 @@ export async function GET(req: NextRequest) {
   for (const row of sendRows) {
     const resendId = getProviderId(row)
     const toEmail = getToEmail(row)
-    const queueReconcile = await reconcileQueue(ctx, row)
+    const queueReconcile = row?.outreach_id
+      ? await markOutreachSent(ctx.admin, row.outreach_id, row.sent_at || new Date().toISOString())
+      : { ok: false, usedStatusOnlyFallback: false, firstError: null, error: 'Missing outreach_id', row: null }
 
     if (!resendId) {
       results.push({ outreachSendId: row.id, outreachId: row.outreach_id, ok: false, error: 'Missing Resend providerResult.id', sentAt: row.sent_at, toEmail, queueReconcile })
@@ -167,8 +158,10 @@ export async function GET(req: NextRequest) {
       bounced: hasStatus('bounced'),
       complained: hasStatus('complained'),
       opened: hasStatus('opened'),
+      clicked: hasStatus('clicked'),
       unknown: results.filter(r => !r.status || r.status === 'unknown').length,
       queueReconciled: results.filter(r => r.queueReconcile?.ok).length,
+      statusOnlyFallbacks: results.filter(r => r.queueReconcile?.usedStatusOnlyFallback).length,
       deliveryStatusSynced: results.filter(r => r.deliveryStatusSynced).length,
       deliveryStorage: 'outreach_sends.metadata.delivery',
     },

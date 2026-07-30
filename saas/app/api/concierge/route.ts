@@ -1,5 +1,7 @@
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as supportPost } from '@/app/api/support/route'
+import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, type VerifiedResearchResult } from '@/lib/ai/cos/researchBudget'
+import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
 
@@ -12,6 +14,13 @@ export const maxDuration = 300
 // platform-level 300-second limit. A timed-out research request must never leave
 // the dashboard on an endless "Thinking…" state.
 const PRIMARY_TIMEOUT_MS = 195_000
+
+// Start a read-only research lifeline shortly before the hard outer deadline.
+// Normal requests never pay for this duplicate lookup: the timer is cancelled
+// when Primary finishes. If Primary is still running, the lifeline preserves a
+// bounded set of source-backed results for an honest partial response.
+const RESEARCH_LIFELINE_START_MS = 165_000
+const RESEARCH_RESULT_LIMIT = 12
 
 function latestUserText(body: any): string {
   const messages = Array.isArray(body?.messages) ? body.messages : []
@@ -68,13 +77,44 @@ function boundedPrimary(req: NextRequest): Promise<{ response: Response | null; 
   })
 }
 
+type ResearchLifeline = {
+  cancel: () => void
+  results: () => Promise<VerifiedResearchResult[]>
+}
+
+function createResearchLifeline(plan: ResearchTaskPlan | null): ResearchLifeline | null {
+  if (!plan) return null
+
+  let resultPromise: Promise<VerifiedResearchResult[]> | null = null
+  const start = () => {
+    if (!resultPromise) {
+      resultPromise = getExternalInfo(
+        plan.researchQuery,
+        Math.min(plan.requestedTotal, RESEARCH_RESULT_LIMIT),
+      )
+        .then((result) => result.ok ? result.results : [])
+        .catch(() => [])
+    }
+    return resultPromise
+  }
+
+  const timer = setTimeout(() => { void start() }, RESEARCH_LIFELINE_START_MS)
+  return {
+    cancel: () => clearTimeout(timer),
+    results: () => {
+      clearTimeout(timer)
+      return start()
+    },
+  }
+}
+
 function timeoutReply(language: string) {
   const messages: Record<string, string> = {
-    en: 'This research request reached the bounded processing limit before the final report was ready. No one was contacted and no external action was taken. Please submit the remaining companies as a smaller research batch.',
-    es: 'Esta solicitud de investigación alcanzó el límite de procesamiento antes de que el informe final estuviera listo. No se contactó a nadie ni se realizó ninguna acción externa. Envíe las empresas restantes en un lote de investigación más pequeño.',
-    pt: 'Esta solicitação de pesquisa atingiu o limite de processamento antes de o relatório final ficar pronto. Ninguém foi contatado e nenhuma ação externa foi realizada. Envie as empresas restantes em um lote de pesquisa menor.',
-    pl: 'To zadanie badawcze osiągnęło limit przetwarzania, zanim raport końcowy był gotowy. Z nikim się nie skontaktowano i nie wykonano żadnej czynności zewnętrznej. Prześlij pozostałe firmy jako mniejszą partię badawczą.',
-    ru: 'Этот исследовательский запрос достиг лимита обработки до подготовки итогового отчета. Ни с кем не связывались и никаких внешних действий не выполнялось. Отправьте оставшиеся компании меньшей исследовательской партией.',
+    en: 'This request reached the bounded processing limit before the final response was ready. No one was contacted and no external action was taken. Reply “continue this task” and COS will continue from the original request.',
+    es: 'Esta solicitud alcanzó el límite de procesamiento antes de que la respuesta final estuviera lista. No se contactó a nadie ni se realizó ninguna acción externa. Responda “continuar esta tarea” y COS continuará desde la solicitud original.',
+    pt: 'Esta solicitação atingiu o limite de processamento antes de a resposta final ficar pronta. Ninguém foi contatado e nenhuma ação externa foi realizada. Responda “continuar esta tarefa” e o COS continuará a partir do pedido original.',
+    pl: 'To żądanie osiągnęło limit przetwarzania, zanim odpowiedź końcowa była gotowa. Z nikim się nie skontaktowano i nie wykonano żadnej czynności zewnętrznej. Odpowiedz „kontynuuj to zadanie”, a COS podejmie pracę od pierwotnej prośby.',
+    ru: 'Этот запрос достиг лимита обработки до подготовки итогового ответа. Ни с кем не связывались и никаких внешних действий не выполнялось. Ответьте «продолжить эту задачу», и COS продолжит исходный запрос.',
   }
   return messages[language] || messages.en
 }
@@ -83,16 +123,47 @@ export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
+  const researchPlan = planResearchTask(input)
+  const researchLifeline = createResearchLifeline(researchPlan)
 
   const primaryRun = await boundedPrimary(req)
   if (primaryRun.timedOut) {
+    if (researchPlan && researchLifeline) {
+      const partial = buildBoundedResearchPartial(
+        researchPlan,
+        await researchLifeline.results(),
+        language,
+      )
+      return NextResponse.json({
+        reply: partial.reply,
+        source: 'cos-bounded-research-partial',
+        timed_out: true,
+        partial_completion: true,
+        completed_count: partial.completed,
+        total_count: partial.total,
+        remaining_count: partial.remaining,
+        continuation_available: partial.continuationAvailable,
+        continuation_prompt: partial.continuationPrompt,
+        deliverables: {
+          research: partial.researchState,
+          outreach_draft: partial.draftState,
+        },
+        execution_allowed: partial.executionAllowed,
+        external_action_taken: partial.externalActionTaken,
+      })
+    }
+
     return NextResponse.json({
       reply: timeoutReply(language),
       source: 'cos-bounded-timeout',
       timed_out: true,
+      continuation_available: true,
+      continuation_prompt: 'Continue the previous task from the original request. Do not take any external action without explicit human approval.',
       execution_allowed: false,
+      external_action_taken: false,
     })
   }
+  researchLifeline?.cancel()
   const primary = primaryRun.response
 
   // Primary authentication, authorization, validation, and rate-limit decisions

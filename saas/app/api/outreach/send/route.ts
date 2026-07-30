@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
+import { applyOutreachSignature } from '@/lib/outreach/signature'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
@@ -63,7 +64,11 @@ export async function POST(req: NextRequest) {
 
   if (outreach.status !== 'approved') return NextResponse.json({ error: 'Outreach must be approved before sending.' }, { status: 409 })
 
-  const safe = assertSafeOutreachMessage(String(outreach.outreach_message || ''))
+  // Signature and platform link are enforced here, not left to the draft: this covers
+  // rows written by every pipeline, including ones approved before the rule existed.
+  const outboundMessage = applyOutreachSignature(String(outreach.outreach_message || ''), outreach.sender_key || 'saasSales')
+
+  const safe = assertSafeOutreachMessage(outboundMessage)
   if (!safe.ok) return NextResponse.json({ error: safe.reason }, { status: 400 })
 
   const limit = await enforceDailySendLimit(ctx.admin, 50)
@@ -75,7 +80,7 @@ export async function POST(req: NextRequest) {
       from: 'saasSales',
       to: toEmail,
       subject: draftedSubject(outreach) || `Useful SignalBoost growth preview for ${outreach.business_name}`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${String(outreach.outreach_message).replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))}</div>`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${outboundMessage.replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))}</div>`,
     })
     if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed', providerResult: sent }, { status: 502 })
     providerResult = sent

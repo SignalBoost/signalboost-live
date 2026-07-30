@@ -76,6 +76,7 @@ test('Admin sidebar restores a dedicated Outreach monitoring destination', async
   assert.match(platform, /label: 'Outreach', href: '\/admin\/outreach'/)
   assert.match(adminPage, /AdmConsoleClient/)
   assert.match(adminPage, /\/admin\/outreach\/delivery/)
+  assert.match(adminPage, /outreachDeliveryCopyFor/)
 })
 
 test('human approval releases the email through Resend while preserving every safety gate', async () => {
@@ -95,8 +96,10 @@ test('human approval releases the email through Resend while preserving every sa
 
 test('contacts show Sent, release approved records, and expose the Resend evidence monitor', async () => {
   const contacts = await source('app/dashboard/outreach/contacts/page.tsx')
-  assert.match(contacts, /type Status = 'pending' \| 'approved' \| 'sent' \| 'rejected'/)
-  assert.match(contacts, /Approve & Send/)
+  const releaseCopy = await source('lib/i18n/outreachReleaseCopy.ts')
+  assert.match(contacts, /type OutreachReleaseStatus as Status/)
+  assert.match(contacts, /outreachContactsCopyFor/)
+  assert.match(releaseCopy, /Approve & Send/)
   assert.match(contacts, /\/api\/admin\/outreach\/send-ready\?send=1&limit=10/)
   assert.match(contacts, /\/admin\/outreach\/delivery/)
   assert.match(contacts, /sent: leads\.filter\(row => row\.status === 'sent'\)\.length/)
@@ -120,9 +123,11 @@ test('Resend delivery history is visible and reconciles historical sends', async
   const deliveryPage = await source('app/admin/outreach/delivery/page.tsx')
   const deliveryRoute = await source('app/api/admin/outreach/delivery-check/route.ts')
   const selftest = await source('app/api/admin/outreach/selftest/route.ts')
+  const releaseCopy = await source('lib/i18n/outreachReleaseCopy.ts')
   const email = await source('lib/email.ts')
 
-  assert.match(deliveryPage, /Verify what was really sent/)
+  assert.match(releaseCopy, /Verify what was really sent/)
+  assert.match(deliveryPage, /outreachDeliveryCopyFor/)
   assert.match(deliveryPage, /\/api\/admin\/outreach\/selftest/)
   assert.match(deliveryPage, /\/api\/admin\/outreach\/delivery-check\?limit=25/)
   assert.match(deliveryRoute, /https:\/\/api\.resend\.com/)

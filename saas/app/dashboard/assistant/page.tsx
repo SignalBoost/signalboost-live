@@ -312,11 +312,20 @@ export default function AssistantPage() {
         let data: any = null
         try { data = JSON.parse(raw) } catch { data = null }
 
-        const reply = data?.reply || data?.error || (res.ok ? '' : c(COPY.timedOut, l)) || c(COPY.error, l)
+        // Surface WHY it failed. The bare generic message told the owner nothing —
+        // a 500, a 200 with an empty body, and a dropped connection all looked
+        // identical, so a failing request could not be diagnosed without server logs.
+        // The status and the first part of the raw body are appended in brackets;
+        // they are diagnostics, not copy, so they are not translated.
+        const gateway = res.status === 504 || res.status === 408 || res.status === 524
+        const detail = `[${res.status}] ${String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 300)}`.trim()
+        const fallback = gateway ? c(COPY.timedOut, l) : `${c(COPY.error, l)} ${detail}`
+        const reply = data?.reply || data?.error || fallback
         setMessages([...next, { role: 'assistant', content: reply }])
       } catch (err: any) {
         const aborted = err?.name === 'AbortError'
-        setMessages([...next, { role: 'assistant', content: aborted ? (hitDeadline ? c(COPY.timedOut, l) : c(COPY.stopped, l)) : c(COPY.error, l) }])
+        const failure = `${c(COPY.error, l)} [${String(err?.name || '')}] ${String(err?.message || '')}`.trim()
+        setMessages([...next, { role: 'assistant', content: aborted ? (hitDeadline ? c(COPY.timedOut, l) : c(COPY.stopped, l)) : failure }])
       } finally {
         clearTimeout(deadline)
         abortRef.current = null

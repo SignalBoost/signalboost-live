@@ -44,7 +44,9 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url)
   const send = url.searchParams.get('send') === '1'
-  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '5', 10), 1), 10)
+  // Per-call batch ceiling. Raised from 10 now that the rolling daily cap is off by
+  // default; a single call is still bounded so one mistyped URL cannot drain the queue.
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '5', 10), 1), 50)
 
   // TARGETING. Without these the query returned approved rows in unspecified order,
   // which in practice meant the OLDEST rows in the table — drafts from long-finished
@@ -60,10 +62,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Outreach sending is disabled by the panic switch.' }, { status: 423 })
   }
 
-  const daily = await enforceDailySendLimit(ctx.admin, 50)
+  const daily = await enforceDailySendLimit(ctx.admin)
   if (!daily.ok) return NextResponse.json({ ok: false, error: 'Daily outreach send limit reached', sendLimit: daily }, { status: 429 })
-  const availableToday = Math.max(0, daily.limit - daily.count)
-  const batchLimit = Math.min(limit, availableToday)
+  // With no cap configured there is nothing to subtract from — the batch is bounded by
+  // the caller's own limit alone.
+  const availableToday = daily.unlimited ? limit : Math.max(0, daily.limit - daily.count)
+  const batchLimit = daily.unlimited ? limit : Math.min(limit, availableToday)
 
   // Fetch more than needed, because some approved rows may have already been sent
   // but still have stale status='approved'. We filter those out below.

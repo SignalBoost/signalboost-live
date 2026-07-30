@@ -163,10 +163,22 @@ test('Concierge preserves Primary denials and returns healthy Primary without wa
   assert.doesNotMatch(source, /Promise\.all\s*\(\s*\[\s*primaryPromise\s*,\s*backupPromise/)
 })
 
+test('Concierge queues owner multi-prospect campaigns before the long model transport', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
+  assert.match(source, /async function directProspectCampaign/)
+  assert.match(source, /parseProspectCampaignRequest\(input, language\)/)
+  assert.match(source, /if \(!access\?\.isOwner\) return null/)
+  assert.match(source, /createProspectCampaignJob\(/)
+  assert.match(source, /advanceProspectCampaigns\(\)/)
+  assert.match(source, /source: 'cos-prospect-campaign-queued'/)
+  assert.match(source, /const prospectCampaign = await directProspectCampaign\(body, input, language\)/)
+  assert.match(source, /if \(prospectCampaign\) return prospectCampaign/)
+})
+
 test('Concierge bounds long Primary work and returns verified partial research', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
-  assert.match(source, /const PRIMARY_TIMEOUT_MS = 195_000/)
-  assert.match(source, /const RESEARCH_LIFELINE_START_MS = 165_000/)
+  assert.match(source, /const PRIMARY_TIMEOUT_MS = 260_000/)
+  assert.match(source, /const RESEARCH_LIFELINE_START_MS = 235_000/)
   assert.match(source, /function boundedPrimary/)
   assert.match(source, /function createResearchLifeline/)
   assert.match(source, /buildBoundedResearchPartial/)

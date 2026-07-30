@@ -2,8 +2,16 @@ import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as supportPost } from '@/app/api/support/route'
 import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, type VerifiedResearchResult } from '@/lib/ai/cos/researchBudget'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { persistTurn } from '@/lib/ai/tools/conversationHistory'
+import { getAccess } from '@/lib/auth/access'
 import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
+import { advanceProspectCampaigns, createProspectCampaignJob } from '@/lib/outreach/prospectCampaign'
+import {
+  parseProspectCampaignRequest,
+  prospectCampaignQueuedReply,
+  prospectCampaignQueueError,
+} from '@/lib/outreach/prospectCampaignRequest'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,6 +52,96 @@ function latestUserText(body: any): string {
 function languageFrom(body: any): string {
   const value = String(body?.context?.language || 'en').toLowerCase()
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
+}
+
+function conversationIdFrom(body: any): string | null {
+  const value = String(body?.context?.conversationId || '')
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null
+}
+
+async function directProspectCampaign(
+  body: any,
+  input: string,
+  language: string,
+): Promise<NextResponse | null> {
+  const parsed = parseProspectCampaignRequest(input, language)
+  if (!parsed) return null
+
+  // Only the verified owner may create this durable business job. Everyone else
+  // falls through to the governed support route, which keeps its existing access
+  // controls and customer-facing behavior.
+  const access = await getAccess().catch(() => null)
+  if (!access?.isOwner) return null
+
+  try {
+    const started = await createProspectCampaignJob({
+      offer: parsed.offer,
+      targetCriteria: parsed.targetCriteria,
+      region: parsed.region,
+      requestedCount: parsed.requestedCount,
+      language: parsed.language,
+      createdBy: access.userId || null,
+    })
+
+    if (!started.ok || !started.job) {
+      return NextResponse.json({
+        reply: prospectCampaignQueueError(started.error || 'unknown queue error', language),
+        source: 'cos-prospect-campaign-queue-error',
+        background_job: false,
+        execution_allowed: false,
+        external_action_taken: false,
+      })
+    }
+
+    const reply = prospectCampaignQueuedReply({
+      jobId: started.job.id,
+      requestedCount: started.job.requested_count,
+      region: started.job.region,
+      language,
+    })
+    const conversationId = conversationIdFrom(body)
+
+    // Kick the worker immediately after the response so the first prospects do
+    // not have to wait for the next two-minute cron tick. The cron remains the
+    // durable retry path. Persisting the turn is also best-effort and cannot delay
+    // the acknowledgement that the job was safely queued.
+    after(async () => {
+      const tasks: Promise<unknown>[] = [advanceProspectCampaigns()]
+      if (access.userId && conversationId) {
+        tasks.push(persistTurn({
+          conversationId,
+          userId: access.userId,
+          userMessage: input,
+          assistantReply: reply,
+        }))
+      }
+      await Promise.allSettled(tasks)
+    })
+
+    return NextResponse.json({
+      reply,
+      source: 'cos-prospect-campaign-queued',
+      background_job: true,
+      job_id: started.job.id,
+      requested_count: started.job.requested_count,
+      region: started.job.region,
+      status: started.job.status,
+      execution_allowed: false,
+      external_action_taken: false,
+      approval_required_before_send: true,
+    })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'unknown queue error'
+    return NextResponse.json({
+      reply: prospectCampaignQueueError(detail, language),
+      source: 'cos-prospect-campaign-queue-error',
+      background_job: false,
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
 }
 
 async function responseSnapshot(response: Response): Promise<{ reply: string; source: string }> {
@@ -129,6 +227,14 @@ export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
+
+  // Multi-company outreach is a durable job, not a four-minute chat response.
+  // Dispatch it before any web-search lifeline, model call, backup comparison, or
+  // long HTTP transport can fail. This is the exact class of request that used to
+  // end as “Sorry, I could not answer that right now.”
+  const prospectCampaign = await directProspectCampaign(body, input, language)
+  if (prospectCampaign) return prospectCampaign
+
   const researchPlan = planResearchTask(input)
   const researchLifeline = createResearchLifeline(researchPlan)
 

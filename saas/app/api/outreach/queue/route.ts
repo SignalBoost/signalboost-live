@@ -1,3 +1,4 @@
+// saas/app/api/outreach/queue/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
@@ -146,7 +147,7 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
-    const limit = await enforceDailySendLimit(ctx.admin, 50)
+    const limit = await enforceDailySendLimit(ctx.admin)
     if (!limit.ok) {
       return NextResponse.json({
         ok: true,

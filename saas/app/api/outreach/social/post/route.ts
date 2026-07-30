@@ -1,3 +1,4 @@
+// saas/app/api/outreach/social/post/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { publishSocialPost, SOCIAL_CONNECTORS, SocialPlatform } from '@/lib/outreach/social-connectors'
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   if (!outreachId) return NextResponse.json({ error: 'outreach_id is required' }, { status: 400 })
   if (await isOutreachSendingDisabled(ctx.admin)) return NextResponse.json({ error: 'Outreach sending is disabled by the panic switch.' }, { status: 423 })
 
-  const limit = await enforceDailySendLimit(ctx.admin, 50)
+  const limit = await enforceDailySendLimit(ctx.admin)
   if (!limit.ok) return NextResponse.json({ error: 'Daily outreach send limit reached', sendLimit: limit }, { status: 429 })
 
   const { data: outreach, error } = await ctx.admin.from('outreach_queue').select('*').eq('id', outreachId).single()

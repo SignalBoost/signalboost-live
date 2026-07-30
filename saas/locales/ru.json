@@ -649,7 +649,8 @@
     "credits": {
       "label": "кредиты",
       "unlimited": "Безлимитно"
-    }
+    },
+    "outreachApprovals": "Одобрение аутрича"
   },
   "credits": {
     "usage": {

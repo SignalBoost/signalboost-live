@@ -137,6 +137,7 @@ const GROUPS: NavGroup[] = [
       { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: uiText('generatedUi.u_3cbf6d117f4dc1b5'), href: '/hub', requiresOwner: true },
       { icon: '🔐', labelKey: 'nav.vault', fallbackLabel: uiText('generatedUi.u_e7ccb35263c6b8a0'), href: '/vault', requiresOwner: true },
       { icon: '🧠', labelKey: 'nav.cosHub', fallbackLabel: uiText('generatedUi.u_a4a4f4e10a389fd8'), href: '/hub/cos', requiresOwner: true },
+      { icon: '✅', labelKey: 'nav.outreachApprovals', fallbackLabel: uiText('nav.outreachApprovals'), href: '/dashboard/hub/outreach-approvals', requiresOwner: true },
       { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: uiText('generatedUi.u_6cda524ff713f2b8'), href: '/admin/onboarding', requiresOwner: true },
       { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiText('generatedUi.u_4f794af09d6d3e3c'), href: '/dashboard/supervisor/ha', requiresOwner: true },
       { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiText('generatedUi.u_68cb08a39a30554a'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },

@@ -649,7 +649,8 @@
     "credits": {
       "label": "kredyty",
       "unlimited": "Bez limitu"
-    }
+    },
+    "outreachApprovals": "Zatwierdzenia outreach"
   },
   "credits": {
     "usage": {

@@ -649,7 +649,8 @@
     "credits": {
       "label": "kredyty",
       "unlimited": "Bez limitu"
-    }
+    },
+    "outreachApprovals": "Zatwierdzenia outreach"
   },
   "credits": {
     "usage": {
@@ -4040,5 +4041,32 @@
     "resultsTitle": "Co przygotowuje SignalBoost",
     "generateResults": "Generuj wyniki",
     "viewLanding": "Zobacz stronę docelową"
+  },
+  "outreachApprovals": {
+    "title": "Zatwierdzenia outreach",
+    "subtitle": "Sprawdź dokładne działania dostawcy przygotowane przez COS. Nic nie zostanie wykonane, dopóki nie zatwierdzisz i nie scalisz.",
+    "refresh": "Odśwież",
+    "loading": "Wczytywanie zatwierdzeń…",
+    "empty": "Brak oczekujących zatwierdzeń.",
+    "loadError": "Nie udało się wczytać zatwierdzeń.",
+    "mergeError": "Nie udało się scalić zatwierdzenia.",
+    "closeError": "Nie udało się zamknąć zatwierdzenia.",
+    "risk": "ryzyko",
+    "steps": "Zaplanowane kroki",
+    "provider": "Dostawca",
+    "template": "Szablon",
+    "payload": "Dane żądania",
+    "merge": "Zatwierdź / Scal",
+    "merging": "Scalanie…",
+    "close": "Zamknij",
+    "closing": "Zamykanie…",
+    "confirmTitle": "To uruchamia na żywo wymienione działania dostawcy. Potwierdź, że sprawdziłeś każde dane żądania.",
+    "confirm": "Potwierdź scalenie na żywo",
+    "cancel": "Anuluj",
+    "risks": {
+      "low": "Niskie",
+      "medium": "Średnie",
+      "high": "Wysokie"
+    }
   }
 }

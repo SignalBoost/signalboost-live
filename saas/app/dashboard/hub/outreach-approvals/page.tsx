@@ -39,7 +39,7 @@ export default function OutreachApprovalsPage() {
   const load = useCallback(async () => {
     setError(''); setLoading(true)
     try {
-      const response = await fetch('/api/hub/infra-pr', { cache: 'no-store' })
+      const response = await fetch('/api/hub/infra-pr', { cache: 'no-store', credentials: 'include' })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error(data.error)
       setPrs((Array.isArray(data.prs) ? data.prs : []).filter((pr: InfrastructurePr) => pr.status === 'open' || pr.status === 'merging'))
@@ -51,7 +51,12 @@ export default function OutreachApprovalsPage() {
   async function mutate(pr: InfrastructurePr, action: 'merge' | 'close') {
     setBusy(current => ({ ...current, [pr.id]: action })); setError('')
     try {
-      const response = await fetch(`/api/hub/infra-pr/${pr.id}${action === 'merge' ? '/merge' : ''}`, { method: action === 'merge' ? 'POST' : 'DELETE' })
+      // Item actions live under /api/infra-pr/[id] (GET/DELETE) and
+      // /api/infra-pr/[id]/merge (POST) — the RBAC-gated engine routes.
+      // /api/hub/infra-pr is the LIST endpoint only and has no [id] handlers,
+      // so pointing merge/close at it returned 404 and the cockpit could
+      // display approvals but never act on them.
+      const response = await fetch(`/api/infra-pr/${pr.id}${action === 'merge' ? '/merge' : ''}`, { method: action === 'merge' ? 'POST' : 'DELETE', credentials: 'include' })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error(data.error)
       setConfirming(null); await load()

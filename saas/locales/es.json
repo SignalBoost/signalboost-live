@@ -3374,7 +3374,10 @@
     "u_caa79af4db67695c": "duración",
     "u_dcb3eeed0f2b911b": "subtítulos",
     "u_dffa16af9340e30f": "exporta registros desde el lienzo en tiempo real.",
-    "u_1f6fa6f69d185e60": " mín."
+    "u_1f6fa6f69d185e60": " mín.",
+    "u_dfca6272ec004413": "Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.",
+    "u_dd8433ee354c3e99": "Esta tarea superó el límite de la solicitud y COS no pudo terminarla en un turno. No se envió nada ni se realizó ninguna acción externa. Los trabajos grandes (investigar varias empresas y luego redactar a cada una) deben dividirse: pide una empresa a la vez o ejecútalo desde la consola de prospección.",
+    "u_cae7d57bc067a514": "Detener"
   },
   "lab": {
     "somethingWrong": "Algo salió mal",

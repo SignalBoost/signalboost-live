@@ -45,7 +45,7 @@ export async function sendEmail(opts: {
 }) {
   try {
     const resend = getResendClient()
-    if (!resend) return { ok: false, error: 'RESEND_API_KEY is not configured' }
+    if (!resend) return { ok: false as const, mode: 'unavailable' as const, error: 'RESEND_API_KEY is not configured' }
 
     const { data, error } = await resend.emails.send({
       from: SENDERS[opts.from],
@@ -54,9 +54,13 @@ export async function sendEmail(opts: {
       html: opts.html,
       replyTo: opts.replyTo || fallbackReplyTo(),
     })
-    if (error) return { ok: false, error: error.message }
-    return { ok: true, id: data?.id }
+    if (error) return { ok: false as const, mode: 'resend' as const, error: error.message }
+
+    // The admin console distinguishes a real provider send from manual_record_only
+    // by providerResult.mode. Older code returned only { ok, id }, so successful
+    // Resend sends were mislabeled as "recorded only" even though Resend accepted them.
+    return { ok: true as const, mode: 'resend' as const, id: data?.id }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'send failed' }
+    return { ok: false as const, mode: 'resend' as const, error: err instanceof Error ? err.message : 'send failed' }
   }
 }

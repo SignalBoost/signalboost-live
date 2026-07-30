@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { sendEmail } from '@/lib/email'
+import { markOutreachSent } from '@/lib/outreach/markSent'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,9 +32,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Outreach sending is disabled by the panic switch.' }, { status: 423 })
   }
 
-  const limit = await enforceDailySendLimit(ctx.admin, 50)
-  if (!limit.ok) return NextResponse.json({ error: 'Daily outreach send limit reached', sendLimit: limit }, { status: 429 })
-
   const { data: outreach, error } = await ctx.admin
     .from('outreach_queue')
     .select('*')
@@ -41,10 +39,35 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error || !outreach) return NextResponse.json({ error: error?.message || 'Outreach not found' }, { status: 404 })
+
+  // A real send may already exist even when schema drift left outreach_queue.status
+  // stuck at approved. Reconcile instead of sending the same email twice.
+  const { data: priorSend } = await ctx.admin
+    .from('outreach_sends')
+    .select('id,sent_at,metadata')
+    .eq('outreach_id', outreachId)
+    .order('sent_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (priorSend) {
+    const queueReconcile = await markOutreachSent(ctx.admin, outreachId, priorSend.sent_at || new Date().toISOString())
+    return NextResponse.json({
+      ok: true,
+      alreadySent: true,
+      sentAt: priorSend.sent_at,
+      providerResult: priorSend.metadata?.providerResult || { mode: 'resend', id: priorSend.metadata?.resendId },
+      queueReconcile,
+    })
+  }
+
   if (outreach.status !== 'approved') return NextResponse.json({ error: 'Outreach must be approved before sending.' }, { status: 409 })
 
   const safe = assertSafeOutreachMessage(String(outreach.outreach_message || ''))
   if (!safe.ok) return NextResponse.json({ error: safe.reason }, { status: 400 })
+
+  const limit = await enforceDailySendLimit(ctx.admin, 50)
+  if (!limit.ok) return NextResponse.json({ error: 'Daily outreach send limit reached', sendLimit: limit }, { status: 429 })
 
   let providerResult: Record<string, unknown> = { mode: 'manual_record_only' }
   if (channel === 'email' && toEmail) {
@@ -54,7 +77,7 @@ export async function POST(req: NextRequest) {
       subject: draftedSubject(outreach) || `Useful SignalBoost growth preview for ${outreach.business_name}`,
       html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${String(outreach.outreach_message).replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))}</div>`,
     })
-    if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed' }, { status: 502 })
+    if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed', providerResult: sent }, { status: 502 })
     providerResult = sent
   }
 
@@ -66,17 +89,27 @@ export async function POST(req: NextRequest) {
     sent_at: sentAt,
     metadata: { providerResult, toEmail: toEmail || null },
   })
-  if (sendError) return NextResponse.json({ error: sendError.message }, { status: 500 })
+  if (sendError) return NextResponse.json({ error: sendError.message, providerResult }, { status: 500 })
 
-  await ctx.admin.from('outreach_queue').update({ status: 'sent', sent_at: sentAt }).eq('id', outreachId)
+  const queueReconcile = await markOutreachSent(ctx.admin, outreachId, sentAt)
+
   await auditAdminAction({
     admin: ctx.admin,
     actorId: ctx.user.id,
     action: 'outreach.send',
     targetType: 'outreach_queue',
     targetId: outreachId,
-    metadata: { channel, providerResult },
+    metadata: { channel, providerResult, queueReconcile },
   })
 
-  return NextResponse.json({ ok: true, sentAt, sendLimit: { ...limit, count: limit.count + 1 }, providerResult })
+  // A provider-accepted email is still a real send even if queue status reconciliation
+  // needed the schema-drift fallback. Return the reconciliation detail instead of
+  // silently pretending the status update succeeded.
+  return NextResponse.json({
+    ok: true,
+    sentAt,
+    sendLimit: { ...limit, count: limit.count + 1 },
+    providerResult,
+    queueReconcile,
+  })
 }

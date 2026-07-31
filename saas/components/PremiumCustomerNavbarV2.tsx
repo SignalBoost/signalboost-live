@@ -49,6 +49,7 @@ const GROUPS: NavGroup[] = [
       { icon: '📈', labelKey: 'nav.marketingSales', fallbackLabel: uiText('generatedUi.u_dcba31525bd63b56'), href: '/dashboard/sales' },
       { icon: '🧭', labelKey: 'nav.marketingSetup', fallbackLabel: uiText('generatedUi.u_115d07a265435234'), href: '/onboarding' },
       { icon: '📧', labelKey: 'nav.emailOutreach', fallbackLabel: uiText('generatedUi.u_fb03f7ab12994d23'), href: '/dashboard/outreach' },
+      { icon: '🤝', labelKey: 'nav.contacts', fallbackLabel: uiText('nav.contacts'), href: '/dashboard/outreach/contacts' },
       { icon: '📣', labelKey: 'nav.campaignConsole', fallbackLabel: uiText('generatedUi.u_5a6c6aa4a802b400'), href: '/dashboard/cosa' },
       { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: uiText('generatedUi.u_36d4f0c2fcf34e05'), href: '/dashboard/cosa/video-pipeline' },
       { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: uiText('generatedUi.u_ba2f8d68f462717f'), href: '/dashboard/marketing/press-print' },

@@ -27,7 +27,21 @@ const TABLE = 'prospect_campaign_jobs'
 const MAX_REQUESTED = 25
 const MAX_CANDIDATES = 12
 const MAX_UNITS_PER_TICK = 3
-const TICK_BUDGET_MS = 45_000
+// Sits inside the route's 300s ceiling with room to spare for the final write.
+const TICK_BUDGET_MS = 240_000
+// A single company = one model call + an email hunt across up to nine pages at 8s
+// each. Left unbounded that is ~70s for ONE company, which is why the loop's
+// "is there time to start?" check was not enough on its own: it could pass with 20s
+// left and then run for a minute. Each unit is now individually capped.
+const PER_COMPANY_TIMEOUT_MS = 70_000
+
+function withTimeout<T>(work: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
+  return new Promise<T>(resolve => {
+    const timer = setTimeout(() => resolve(onTimeout()), ms)
+    work.then(value => { clearTimeout(timer); resolve(value) })
+        .catch(() => { clearTimeout(timer); resolve(onTimeout()) })
+  })
+}
 
 // Never prospect ourselves, and never burn a slot on a directory or aggregator page:
 // those pass a naive "looks like a company site" check and waste a whole tick.
@@ -462,14 +476,14 @@ export async function advanceProspectCampaigns(): Promise<{
     processed < candidates.length &&
     drafted < job.requested_count &&
     units < MAX_UNITS_PER_TICK &&
-    remainingMs() > 15_000
+    remainingMs() > PER_COMPANY_TIMEOUT_MS + 15_000
   ) {
     const candidate = candidates[processed]
     processed += 1
     units += 1
 
     try {
-      const message = await draftMessageFor(job, candidate)
+      const message = await withTimeout(draftMessageFor(job, candidate), 45_000, () => '')
       if (!message || message.length < 40) {
         skipped += 1
         results.push({ name: candidate.name, url: candidate.url, outcome: 'skipped', detail: 'Draft came back empty or too short.', at: new Date().toISOString() })
@@ -478,12 +492,11 @@ export async function advanceProspectCampaigns(): Promise<{
 
       // Reused unchanged: finds a REAL published email or skips, localizes to the
       // target's region, appends the compliance footer, inserts as 'pending'.
-      const created = await createOutreachDraft({
-        businessName: candidate.name,
-        businessUrl: candidate.url,
-        message,
-        senderKey: 'saasSales',
-      })
+      const created = await withTimeout(
+        createOutreachDraft({ businessName: candidate.name, businessUrl: candidate.url, message, senderKey: 'saasSales' }),
+        PER_COMPANY_TIMEOUT_MS - 45_000,
+        () => ({ ok: false, skipped: true, error: 'Timed out while looking for a published email.' } as any),
+      )
 
       if (created.ok) {
         drafted += 1

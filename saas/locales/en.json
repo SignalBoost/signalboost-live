@@ -650,7 +650,8 @@
       "label": "credits",
       "unlimited": "Unlimited"
     },
-    "outreachApprovals": "Outreach approvals"
+    "outreachApprovals": "Outreach approvals",
+    "contacts": "Contacts (draft review)"
   },
   "credits": {
     "usage": {
@@ -3377,7 +3378,21 @@
     "u_1f6fa6f69d185e60": " min",
     "u_dfca6272ec004413": "Request stopped. Nothing was sent and no external action was taken.",
     "u_dd8433ee354c3e99": "This task ran past the request limit, so COS could not finish it in one turn. Nothing was sent and no external action was taken. Large jobs (research several companies, then draft to each) need to be split — ask for one company at a time, or run it from the Outreach console.",
-    "u_cae7d57bc067a514": "Stop"
+    "u_cae7d57bc067a514": "Stop",
+    "u_3e43ac1f41f78189": "DEFERRED",
+    "u_a18420fbf2cd5aff": "Multi-AI Project Consultation Workspace",
+    "u_e5541868cbeb9c12": "One shared project room where OpenAI, Anthropic, Gemini and other selected AI providers can review the same project context, answer side by side, critique selected responses and help prepare one saved decision.",
+    "u_4ba544e3e9f5102d": "Why this idea exists",
+    "u_e5fbbfecc0691fe7": "During project development, the owner often consults several AI systems and manually carries context and recommendations between separate services. This workspace would organize that real internal workflow in one place.",
+    "u_c6915b58ed251d92": "Possible first version",
+    "u_4e6ee4c0cd3cc706": "Shared project context and files",
+    "u_990089ee759098d2": "Send one question to selected providers",
+    "u_6691238233f294fb": "Side-by-side responses",
+    "u_44812d789cd925cf": "Ask one provider to critique another response",
+    "u_a652291fa265ee80": "Create and save a combined recommendation",
+    "u_d0a6f7e8f25a9f85": "Display provider, model, usage, cost and audit history",
+    "u_3f7639b491e6946b": "Current decision",
+    "u_9bf481bfff002a15": "Do not treat this as an active build or a proven commercial product. Revisit it later as an internal SignalBoost productivity tool, then decide whether broader usage justifies productization."
   },
   "lab": {
     "license": {

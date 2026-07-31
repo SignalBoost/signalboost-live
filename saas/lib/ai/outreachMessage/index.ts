@@ -1,3 +1,4 @@
+// saas/lib/ai/outreachMessage/index.ts
 import { callModel } from '@/lib/ai/modelRouter'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import type { OutreachAssets } from '@/lib/outreach/types'
@@ -63,6 +64,13 @@ export async function generateOutreachMessage(args: {
   assets: Omit<OutreachAssets, 'outreach_message'>
   language?: string
   category?: OutreachCategory
+  // What is actually being sold. When absent this generator pitches the SignalBoost
+  // platform itself, which is its original purpose. When present it pitches THAT offer
+  // instead and returns an email only — no LinkedIn or social variants. Without this,
+  // manual discovery could produce exactly one kind of email regardless of the campaign
+  // it was started for: asking it to sell an incident-remediation product still yielded
+  // the affiliate-mall and site-builder preview.
+  offer?: string
 }): Promise<string> {
   const analysis = args.assets.analyzer_summary
   const businessName = analysis?.business_name || ''
@@ -70,8 +78,27 @@ export async function generateOutreachMessage(args: {
   const language = args.language || 'en'
 
   const fallback = fallbackSet(businessName, category)
+  const offer = String(args.offer || '').replace(/\s+/g, ' ').trim().slice(0, 2_000)
 
-  const prompt = `You write outreach for SignalBoost. Produce THREE messages introducing SignalBoost to a prospect, grounded ONLY in the factual platform context below. Do not invent features beyond it.
+  const offerPrompt = `You write B2B outreach on behalf of SignalBoost. Produce ONE email introducing the specific offer below to a prospect.
+
+WHAT IS BEING SOLD (this is the ONLY thing to pitch — do not mention SignalBoost's other products, the affiliate mall, the website builder, review tools, media studios, or any preview that was prepared):
+${offer}
+
+Tone: professional, specific, value-first. No hard sell, no guarantees of results, no claim of private or inside data access — only public information was reviewed. Open with the operational problem this specific company plausibly has, then introduce the offer as the answer. Name ONLY the recipient company; never name another company. One clear call to action. 120-220 words.
+
+Write in this language: ${language}
+
+Business analysis (public info): ${JSON.stringify(analysis)}
+Predicted needs: ${JSON.stringify(args.assets.predictive_needs)}
+
+Return ONLY valid JSON, no markdown, in exactly this shape:
+{
+  "email_subject": string,
+  "email": string
+}`
+
+  const platformPrompt = `You write outreach for SignalBoost. Produce THREE messages introducing SignalBoost to a prospect, grounded ONLY in the factual platform context below. Do not invent features beyond it.
 
 ${PLATFORM_CONTEXT}
 
@@ -94,6 +121,7 @@ Return ONLY valid JSON, no markdown, in exactly this shape:
   "social_dm": string
 }`
 
+  const prompt = offer ? offerPrompt : platformPrompt
   const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1400 })
 
   // Parse the model's JSON; fall back to the kit-based default set on any failure.
@@ -120,6 +148,12 @@ Return ONLY valid JSON, no markdown, in exactly this shape:
   // If it blocks, fall back to the safe kit default for the email body only.
   const safe = assertSafeOutreachMessage(set.email)
   const emailBody = safe.ok ? set.email : fallback.email
+
+  // The pipeline stores a single string. Return a combined, structured text block
+  // containing all three messages so nothing is lost and the UI can show them.
+  // Offer mode is a single outbound email — the LinkedIn and social variants belong to
+  // the platform pitch and only confuse a campaign selling something else.
+  if (offer) return [`SUBJECT: ${set.email_subject}`, ``, emailBody].join('\n')
 
   // The pipeline stores a single string. Return a combined, structured text block
   // containing all three messages so nothing is lost and the UI can show them.

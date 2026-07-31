@@ -650,7 +650,8 @@
       "label": "créditos",
       "unlimited": "Ilimitado"
     },
-    "outreachApprovals": "Aprobaciones de prospección"
+    "outreachApprovals": "Aprobaciones de prospección",
+    "contacts": "Contactos (revisión de borradores)"
   },
   "credits": {
     "usage": {
@@ -3377,7 +3378,21 @@
     "u_1f6fa6f69d185e60": " mín.",
     "u_dfca6272ec004413": "Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.",
     "u_dd8433ee354c3e99": "Esta tarea superó el límite de la solicitud y COS no pudo terminarla en un turno. No se envió nada ni se realizó ninguna acción externa. Los trabajos grandes (investigar varias empresas y luego redactar a cada una) deben dividirse: pide una empresa a la vez o ejecútalo desde la consola de prospección.",
-    "u_cae7d57bc067a514": "Detener"
+    "u_cae7d57bc067a514": "Detener",
+    "u_3e43ac1f41f78189": "APLAZADO",
+    "u_a18420fbf2cd5aff": "Espacio de consulta de proyectos multi-IA",
+    "u_e5541868cbeb9c12": "Una sala de proyecto compartida donde OpenAI, Anthropic, Gemini y otros proveedores de IA seleccionados pueden revisar el mismo contexto del proyecto, responder en paralelo, criticar respuestas seleccionadas y ayudar a preparar una decisión guardada.",
+    "u_4ba544e3e9f5102d": "Por qué existe esta idea",
+    "u_e5fbbfecc0691fe7": "Durante el desarrollo del proyecto, el propietario suele consultar varios sistemas de IA y trasladar manualmente el contexto y las recomendaciones entre servicios separados. Este espacio organizaría ese flujo de trabajo interno real en un solo lugar.",
+    "u_c6915b58ed251d92": "Posible primera versión",
+    "u_4e6ee4c0cd3cc706": "Contexto y archivos compartidos del proyecto",
+    "u_990089ee759098d2": "Enviar una pregunta a los proveedores seleccionados",
+    "u_6691238233f294fb": "Respuestas en paralelo",
+    "u_44812d789cd925cf": "Pedir a un proveedor que critique la respuesta de otro",
+    "u_a652291fa265ee80": "Crear y guardar una recomendación combinada",
+    "u_d0a6f7e8f25a9f85": "Mostrar proveedor, modelo, uso, costo e historial de auditoría",
+    "u_3f7639b491e6946b": "Decisión actual",
+    "u_9bf481bfff002a15": "No trates esto como un desarrollo activo ni como un producto comercial probado. Revísalo más adelante como herramienta interna de productividad de SignalBoost y luego decide si un uso más amplio justifica su productización."
   },
   "lab": {
     "somethingWrong": "Algo salió mal",

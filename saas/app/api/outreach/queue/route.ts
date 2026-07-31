@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
+import { applyOutreachSignature } from '@/lib/outreach/signature'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
@@ -49,7 +50,16 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const normalized = (data || []).map(withChannel)
+  // The stored draft is NOT what gets emailed: the team signature and the platform
+  // link are applied at send time so that rows approved before those rules existed are
+  // covered too. That left the console showing something different from the outbound
+  // message, with no way to check the footer before approving. Each row now carries
+  // `outbound_message` — the exact text the send route will build — computed with the
+  // same function, so the preview and the email cannot drift apart.
+  const normalized = (data || []).map((row: any) => ({
+    ...withChannel(row),
+    outbound_message: applyOutreachSignature(String(row.outreach_message || ''), row.sender_key || 'saasSales'),
+  }))
   const outreach = channel ? normalized.filter((row: any) => row.outreach_channel === channel || row.channel === channel) : normalized
   const sendLimit = await enforceDailySendLimit(ctx.admin)
   return NextResponse.json({ outreach, sendLimit })

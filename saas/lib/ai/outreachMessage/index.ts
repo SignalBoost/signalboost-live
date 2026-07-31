@@ -153,20 +153,14 @@ Return ONLY valid JSON, no markdown, in exactly this shape:
   // containing all three messages so nothing is lost and the UI can show them.
   // Offer mode is a single outbound email — the LinkedIn and social variants belong to
   // the platform pitch and only confuse a campaign selling something else.
-  if (offer) return [`SUBJECT: ${set.email_subject}`, ``, emailBody].join('\n')
-
-  // The pipeline stores a single string. Return a combined, structured text block
-  // containing all three messages so nothing is lost and the UI can show them.
-  return [
-    `SUBJECT: ${set.email_subject}`,
-    ``,
-    `--- EMAIL ---`,
-    emailBody,
-    ``,
-    `--- LINKEDIN ---`,
-    set.linkedin,
-    ``,
-    `--- SOCIAL DM ---`,
-    set.social_dm,
-  ].join('\n')
+  //
+  // This is now the ONLY shape returned. The generator still drafts the LinkedIn and
+  // social-DM variants — the model produces them in one pass and they cost nothing
+  // extra — but they are no longer written into the draft body. Nothing in the system
+  // ever sends a LinkedIn message or a DM, so those sections were dead text sitting
+  // inside an email draft: they padded the queue preview, leaked into the approval
+  // digest, and were mistaken for something the platform intended to send. An outreach
+  // draft is an email. If the other channels are ever wanted, they belong in their own
+  // fields, not concatenated into this one.
+  return [`SUBJECT: ${set.email_subject}`, ``, emailBody].join('\n')
 }

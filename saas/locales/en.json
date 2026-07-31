@@ -3392,7 +3392,13 @@
     "u_a652291fa265ee80": "Create and save a combined recommendation",
     "u_d0a6f7e8f25a9f85": "Display provider, model, usage, cost and audit history",
     "u_3f7639b491e6946b": "Current decision",
-    "u_9bf481bfff002a15": "Do not treat this as an active build or a proven commercial product. Revisit it later as an internal SignalBoost productivity tool, then decide whether broader usage justifies productization."
+    "u_9bf481bfff002a15": "Do not treat this as an active build or a proven commercial product. Revisit it later as an internal SignalBoost productivity tool, then decide whether broader usage justifies productization.",
+    "u_76f29e11f9ae1412": "What are you selling? (leave empty for the SignalBoost platform preview)",
+    "u_bf00f2d6ac053df7": "e.g. Self-Healing Supervisor — buyer-hosted incident supervision with human-approved remediation and signed SIEM audit evidence",
+    "u_eb39a9b59ea7c14b": "Active campaign",
+    "u_54b5d3195dc6949f": "None — SignalBoost platform preview",
+    "u_08c9dd87e8f29cbf": "Custom (type it below)",
+    "u_9d6b41c549e48d71": "The draft uses this campaign brief, the same one the background worker uses."
   },
   "lab": {
     "license": {

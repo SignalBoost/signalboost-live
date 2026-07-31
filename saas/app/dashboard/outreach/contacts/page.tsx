@@ -18,6 +18,9 @@ type Lead = {
   source_platform?: string
   status?: Status
   outreach_message?: string
+  // What the send route will actually email — the draft plus the team signature and
+  // the platform link. Falls back to the raw draft for any row the API predates.
+  outbound_message?: string
   contact_email?: string | null
   created_at?: string
 }
@@ -224,7 +227,7 @@ export default function OutreachContactsPage() {
 
               {lead.outreach_message ? (
                 <div>
-                  <p className="sb-body" style={expandedId === lead.id ? { whiteSpace: 'pre-wrap' } : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{lead.outreach_message}</p>
+                  <p className="sb-body" style={expandedId === lead.id ? { whiteSpace: 'pre-wrap' } : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{lead.outbound_message || lead.outreach_message}</p>
                   <button type="button" onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)} style={{ background: 'none', border: 0, color: '#7dd3fc', cursor: 'pointer' }}>{expandedId === lead.id ? copy.hide : copy.show}</button>
                 </div>
               ) : null}

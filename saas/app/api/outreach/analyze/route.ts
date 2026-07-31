@@ -1,3 +1,4 @@
+// saas/app/api/outreach/analyze/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, enforceRouteRateLimit, auditAdminAction } from '@/lib/outreach/security'
 import { generateOutreachAssets } from '@/lib/outreach/pipeline'
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
   const sourcePlatform = body?.source_platform ? String(body.source_platform).trim() : 'manual'
   const language = body?.language ? String(body.language).trim() : 'en'
   const publicText = body?.public_text ? String(body.public_text) : undefined
+  const offer = body?.offer ? String(body.offer).trim() : undefined
 
   const rawCategory = body?.category ? String(body.category).trim().toLowerCase() : 'company'
   const category: OutreachCategory = (VALID_CATEGORIES as string[]).includes(rawCategory)
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
     : 'company'
 
   if (!sourceUrl) return NextResponse.json({ error: 'business_url is required' }, { status: 400 })
-  const assets = await generateOutreachAssets({ sourceUrl, businessName, sourcePlatform, language, publicText, category })
+  const assets = await generateOutreachAssets({ sourceUrl, businessName, sourcePlatform, language, publicText, category, offer })
   const { data, error } = await ctx.admin
     .from('outreach_queue')
     .insert({
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
     action: 'outreach.analyze_and_queue',
     targetType: 'outreach_queue',
     targetId: data.id,
-    metadata: { sourcePlatform, businessName: data.business_name, category },
+    metadata: { sourcePlatform, businessName: data.business_name, category, offer: offer || null },
   })
   return NextResponse.json({ ok: true, outreach: data })
 }

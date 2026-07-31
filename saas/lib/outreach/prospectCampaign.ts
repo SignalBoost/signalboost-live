@@ -21,6 +21,7 @@ import { createClient } from '@supabase/supabase-js'
 import { callModel } from '@/lib/ai/modelRouter'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { createOutreachDraft } from '@/lib/ai/growthPlans'
+import { discoverGithubOrgs } from '@/lib/outreach/sources/github'
 
 const TABLE = 'prospect_campaign_jobs'
 const MAX_REQUESTED = 25
@@ -309,6 +310,31 @@ async function runDiscovery(
       if (signal === 'match') matched.push(candidate)
       else if (signal === 'unknown') unknown.push(candidate)
       else elsewhere.push(candidate)
+    }
+  }
+
+  // SECOND SOURCE: GitHub organizations. Web search finds companies that market
+  // themselves well; GitHub finds companies that demonstrably operate infrastructure,
+  // which is a different and often better-qualified set for this product. It also
+  // covers countries where the local web results are thin. Failures here are ignored —
+  // it supplements the search, it does not gate it.
+  if (matched.length < MAX_CANDIDATES) {
+    const profile = profileFor(job.region)
+    const locations = profile ? Array.from(new Set([profile.searchName, ...profile.names])) : [normalizeRegion(job.region)]
+    const github = await discoverGithubOrgs({ locations, limit: MAX_CANDIDATES })
+    if (github.ok) {
+      for (const candidate of github.candidates) {
+        const host = hostOf(candidate.url)
+        if (!host || seen.has(host)) continue
+        seen.add(host)
+        const signal = regionSignal(candidate, job)
+        // GitHub already filtered by the org's own stated location, so an entry with no
+        // other country signal is treated as in-region rather than unknown.
+        if (signal === 'other') elsewhere.push(candidate)
+        else matched.push(candidate)
+      }
+    } else if (!matched.length && github.error) {
+      lastError = lastError || github.error
     }
   }
 

@@ -650,7 +650,8 @@
       "label": "créditos",
       "unlimited": "Ilimitado"
     },
-    "outreachApprovals": "Aprovações de prospecção"
+    "outreachApprovals": "Aprovações de prospecção",
+    "contacts": "Contatos (revisão de rascunhos)"
   },
   "credits": {
     "usage": {
@@ -3377,7 +3378,21 @@
     "u_1f6fa6f69d185e60": " min",
     "u_dfca6272ec004413": "Solicitação interrompida. Nada foi enviado e nenhuma ação externa foi realizada.",
     "u_dd8433ee354c3e99": "Esta tarefa ultrapassou o limite da solicitação e o COS não conseguiu concluí-la em um turno. Nada foi enviado e nenhuma ação externa foi realizada. Trabalhos grandes (pesquisar várias empresas e depois redigir para cada uma) precisam ser divididos: peça uma empresa por vez ou execute pelo console de prospecção.",
-    "u_cae7d57bc067a514": "Parar"
+    "u_cae7d57bc067a514": "Parar",
+    "u_3e43ac1f41f78189": "ADIADO",
+    "u_a18420fbf2cd5aff": "Espaço de consulta de projetos multi-IA",
+    "u_e5541868cbeb9c12": "Uma sala de projeto compartilhada onde OpenAI, Anthropic, Gemini e outros provedores de IA selecionados podem revisar o mesmo contexto do projeto, responder lado a lado, criticar respostas selecionadas e ajudar a preparar uma decisão salva.",
+    "u_4ba544e3e9f5102d": "Por que esta ideia existe",
+    "u_e5fbbfecc0691fe7": "Durante o desenvolvimento do projeto, o proprietário costuma consultar vários sistemas de IA e transferir manualmente contexto e recomendações entre serviços separados. Este espaço organizaria esse fluxo de trabalho interno real em um só lugar.",
+    "u_c6915b58ed251d92": "Possível primeira versão",
+    "u_4e6ee4c0cd3cc706": "Contexto e arquivos compartilhados do projeto",
+    "u_990089ee759098d2": "Enviar uma pergunta aos provedores selecionados",
+    "u_6691238233f294fb": "Respostas lado a lado",
+    "u_44812d789cd925cf": "Pedir a um provedor que critique a resposta de outro",
+    "u_a652291fa265ee80": "Criar e salvar uma recomendação combinada",
+    "u_d0a6f7e8f25a9f85": "Exibir provedor, modelo, uso, custo e histórico de auditoria",
+    "u_3f7639b491e6946b": "Decisão atual",
+    "u_9bf481bfff002a15": "Não trate isto como um desenvolvimento ativo nem como um produto comercial comprovado. Revisite-o mais tarde como ferramenta interna de produtividade da SignalBoost e então decida se um uso mais amplo justifica a produtização."
   },
   "lab": {
     "somethingWrong": "Algo deu errado",

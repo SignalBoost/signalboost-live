@@ -3392,7 +3392,13 @@
     "u_a652291fa265ee80": "Crear y guardar una recomendación combinada",
     "u_d0a6f7e8f25a9f85": "Mostrar proveedor, modelo, uso, costo e historial de auditoría",
     "u_3f7639b491e6946b": "Decisión actual",
-    "u_9bf481bfff002a15": "No trates esto como un desarrollo activo ni como un producto comercial probado. Revísalo más adelante como herramienta interna de productividad de SignalBoost y luego decide si un uso más amplio justifica su productización."
+    "u_9bf481bfff002a15": "No trates esto como un desarrollo activo ni como un producto comercial probado. Revísalo más adelante como herramienta interna de productividad de SignalBoost y luego decide si un uso más amplio justifica su productización.",
+    "u_76f29e11f9ae1412": "¿Qué estás vendiendo? (vacío = vista previa de la plataforma SignalBoost)",
+    "u_bf00f2d6ac053df7": "p. ej. Self-Healing Supervisor — supervisión de incidentes alojada por el cliente con remediación aprobada por humanos y evidencia de auditoría firmada para el SIEM",
+    "u_eb39a9b59ea7c14b": "Campaña activa",
+    "u_54b5d3195dc6949f": "Ninguna — vista previa de la plataforma SignalBoost",
+    "u_08c9dd87e8f29cbf": "Personalizado (escríbelo abajo)",
+    "u_9d6b41c549e48d71": "El borrador usa el brief de esta campaña, el mismo que usa el worker en segundo plano."
   },
   "lab": {
     "somethingWrong": "Algo salió mal",

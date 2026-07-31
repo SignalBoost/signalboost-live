@@ -220,6 +220,49 @@ export async function createOutreachDraft(params: {
       }
     }
 
+    // DEDUPE BY HOST. gartsolutions.com was queued twice under two different names
+    // ("Gart Solutions" and "Garts") because nothing checked whether the company was
+    // already in the queue. A second draft to the same company is at best a wasted
+    // slot and at worst a second cold email to a recipient who already got one.
+    const db0 = supabaseAdmin()
+    let host = ''
+    try { host = new URL(businessUrl).hostname.replace(/^www\./i, '').toLowerCase() } catch { host = '' }
+    if (host) {
+      const { data: dupes } = await db0
+        .from(OUTREACH_TABLE)
+        .select('id,business_url,status')
+        .neq('status', 'rejected')
+        .ilike('business_url', `%${host}%`)
+        .limit(5)
+      const clash = (dupes || []).find(row => {
+        try { return new URL(String(row.business_url || '')).hostname.replace(/^www\./i, '').toLowerCase() === host } catch { return false }
+      })
+      if (clash) {
+        return {
+          ok: false,
+          skipped: true,
+          error: `${businessName} (${host}) is already in the outreach queue as ${clash.id} with status ${clash.status} — not queued again.`,
+        }
+      }
+    }
+
+    // AGGREGATOR / LISTICLE REJECTION. The background worker already refuses these,
+    // but this path is COS choosing a target itself from a search result — and it
+    // queued "Top DevOps Consulting Companies" (obsium.io) three times. A directory
+    // page is a list OF providers, not a provider, so the email lands on whoever runs
+    // the list rather than on a prospect.
+    const AGGREGATOR_TITLE = /\b(top\s*\d+|best\s+\d+|\d+\s+best|comparison|database|directory|ranking|list of|guide to|companies\b.*\b(list|ranking))\b/i
+    const AGGREGATOR_HOST = ['directory', 'directories', 'companies', 'firms', 'providers', 'database', 'ranking', 'listing', 'toplist', 'compare', 'reviews']
+    let aggHost = ''
+    try { aggHost = new URL(businessUrl).hostname.replace(/^www\./i, '').toLowerCase() } catch { aggHost = '' }
+    if (AGGREGATOR_TITLE.test(businessName) || AGGREGATOR_HOST.some(hint => aggHost.includes(hint))) {
+      return {
+        ok: false,
+        skipped: true,
+        error: `"${businessName}" (${businessUrl}) looks like a directory or ranking page, not a company — not queued. Give the prospect's own website instead.`,
+      }
+    }
+
     // COS's per-message sender choice (sales vs marketing, etc.), validated.
     const senderKey = VALID_SENDER_KEYS.includes(String(params.senderKey || '')) ? String(params.senderKey) : null
 

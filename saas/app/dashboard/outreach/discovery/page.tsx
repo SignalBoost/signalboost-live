@@ -1,7 +1,8 @@
+// saas/app/dashboard/outreach/discovery/page.tsx
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
@@ -12,6 +13,8 @@ type DiscoveryCopy = {
   eyebrow: string; title: string; subtitle: string; urlLabel: string; nameLabel: string
   sourceLabel: string; categoryLabel: string; notesLabel: string; urlPlaceholder: string
   namePlaceholder: string; notesPlaceholder: string; missingUrl: string; analyzeError: string
+  offerLabel: string; offerPlaceholder: string
+  campaignLabel: string; campaignNone: string; campaignCustom: string; campaignHint: string
   genericError: string; analyzing: string; analyzeButton: string; viewContacts: string
   leadQueued: string; newLead: string; draftFirstTouch: string; reviewContacts: string
   openEngine: string; generateDeck: string; generatingDeck: string; deckError: string
@@ -27,6 +30,8 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlPlaceholder: uiText('generatedUi.u_100680ad546ce6a5'), namePlaceholder: uiText('generatedUi.u_0879a2680a28956d'),
     notesPlaceholder: uiText('generatedUi.u_474f51f3ea4e5a09'),
     missingUrl: uiText('generatedUi.u_a677bab43f023ada'),
+    campaignLabel: uiText('generatedUi.u_eb39a9b59ea7c14b'), campaignNone: uiText('generatedUi.u_54b5d3195dc6949f'), campaignCustom: uiText('generatedUi.u_08c9dd87e8f29cbf'), campaignHint: uiText('generatedUi.u_9d6b41c549e48d71'),
+    offerLabel: uiText('generatedUi.u_76f29e11f9ae1412'), offerPlaceholder: uiText('generatedUi.u_bf00f2d6ac053df7'),
     analyzeError: uiText('generatedUi.u_bd97a28105b09f69'), genericError: uiText('generatedUi.u_3ccd9d6586ef9143'),
     analyzing: uiText('generatedUi.u_89b633adede66a05'), analyzeButton: uiText('generatedUi.u_336933b3829fa0ba'), viewContacts: uiText('generatedUi.u_537651bc1ab0a1f3'),
     leadQueued: uiText('generatedUi.u_5f6b7a665b469a51'), newLead: uiText('generatedUi.u_fa865e07adc96fa0'), draftFirstTouch: uiText('generatedUi.u_e0a9aaad5ad30d23'),
@@ -43,6 +48,8 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlPlaceholder: 'https://ejemplo.com', namePlaceholder: 'ej.: Luna Travel',
     notesPlaceholder: 'Pega una bio, reseñas o cualquier cosa que describa lo que hacen.',
     missingUrl: 'Agrega una URL o enlace de perfil del negocio para analizar.',
+    campaignLabel: 'Campaña activa', campaignNone: 'Ninguna — vista previa de la plataforma SignalBoost', campaignCustom: 'Personalizado (escríbelo abajo)', campaignHint: 'El borrador usa el brief de esta campaña, el mismo que usa el worker en segundo plano.',
+    offerLabel: '¿Qué estás vendiendo? (vacío = vista previa de la plataforma SignalBoost)', offerPlaceholder: 'p. ej. Self-Healing Supervisor — supervisión de incidentes alojada por el cliente con remediación aprobada por humanos',
     analyzeError: 'No se pudo analizar este lead.', genericError: 'Algo salió mal. Inténtalo de nuevo.',
     analyzing: 'Analizando…', analyzeButton: 'Analizar y poner lead en cola', viewContacts: 'Ver cola de contactos',
     leadQueued: 'Lead en cola', newLead: 'Nuevo lead', draftFirstTouch: 'Primer contacto en borrador',
@@ -59,6 +66,8 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlPlaceholder: 'https://exemplo.com', namePlaceholder: 'ex.: Luna Travel',
     notesPlaceholder: 'Cole uma bio, avaliações ou qualquer coisa que descreva o que eles fazem.',
     missingUrl: 'Adicione uma URL ou link de perfil do negócio para analisar.',
+    campaignLabel: 'Campanha ativa', campaignNone: 'Nenhuma — prévia da plataforma SignalBoost', campaignCustom: 'Personalizado (digite abaixo)', campaignHint: 'O rascunho usa o brief desta campanha, o mesmo que o worker em segundo plano usa.',
+    offerLabel: 'O que você está vendendo? (vazio = prévia da plataforma SignalBoost)', offerPlaceholder: 'ex.: Self-Healing Supervisor — supervisão de incidentes hospedada pelo cliente com remediação aprovada por humanos',
     analyzeError: 'Não foi possível analisar este lead.', genericError: 'Algo deu errado. Tente novamente.',
     analyzing: 'Analisando…', analyzeButton: 'Analisar e colocar lead na fila', viewContacts: 'Ver fila de contatos',
     leadQueued: 'Lead na fila', newLead: 'Novo lead', draftFirstTouch: 'Primeiro contato em rascunho',
@@ -75,6 +84,8 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlPlaceholder: 'https://przyklad.com', namePlaceholder: 'np. Luna Travel',
     notesPlaceholder: 'Wklej bio, opinie albo opis tego, czym się zajmują.',
     missingUrl: 'Dodaj URL firmy lub link do profilu, aby przeanalizować.',
+    campaignLabel: 'Aktywna kampania', campaignNone: 'Brak — podgląd platformy SignalBoost', campaignCustom: 'Własne (wpisz poniżej)', campaignHint: 'Wersja robocza korzysta z briefu tej kampanii — tego samego, którego używa worker.',
+    offerLabel: 'Co sprzedajesz? (puste = podgląd platformy SignalBoost)', offerPlaceholder: 'np. Self-Healing Supervisor — nadzór nad incydentami hostowany u klienta z remediacją zatwierdzaną przez człowieka',
     analyzeError: 'Nie można przeanalizować tego leada.', genericError: 'Coś poszło nie tak. Spróbuj ponownie.',
     analyzing: 'Analizowanie…', analyzeButton: 'Analizuj i dodaj lead', viewContacts: 'Zobacz kolejkę kontaktów',
     leadQueued: 'Lead dodany', newLead: 'Nowy lead', draftFirstTouch: 'Szkic pierwszego kontaktu',
@@ -91,6 +102,8 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlPlaceholder: 'https://example.com', namePlaceholder: 'например: Luna Travel',
     notesPlaceholder: 'Вставьте био, отзывы или описание того, чем они занимаются.',
     missingUrl: 'Добавьте URL компании или ссылку на профиль для анализа.',
+    campaignLabel: 'Активная кампания', campaignNone: 'Нет — превью платформы SignalBoost', campaignCustom: 'Своё (введите ниже)', campaignHint: 'Черновик использует бриф этой кампании — тот же, что и фоновый worker.',
+    offerLabel: 'Что вы продаёте? (пусто — превью платформы SignalBoost)', offerPlaceholder: 'напр. Self-Healing Supervisor — контроль инцидентов в среде покупателя с ремедиацией по одобрению человека',
     analyzeError: 'Не удалось проанализировать этот lead.', genericError: 'Что-то пошло не так. Попробуйте снова.',
     analyzing: 'Анализ…', analyzeButton: 'Анализировать и добавить lead', viewContacts: 'Посмотреть очередь контактов',
     leadQueued: 'Lead добавлен', newLead: 'Новый lead', draftFirstTouch: 'Черновик первого контакта',
@@ -110,11 +123,47 @@ export default function OutreachDiscoveryPage() {
   const [platform, setPlatform]         = useState('manual')
   const [category, setCategory]         = useState('company')
   const [publicText, setPublicText]     = useState('')
+  const [offer, setOffer]               = useState('')
+  type CampaignOption = { id: string; offer: string; target_criteria: string; region: string | null; language: string; status: string; drafts_created: number; requested_count: number }
+  const [campaigns, setCampaigns]       = useState<CampaignOption[]>([])
+  const [campaignId, setCampaignId]     = useState('')
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
   const [result, setResult]             = useState<any>(null)
   const [deckLoading, setDeckLoading]   = useState(false)
   const [deckError, setDeckError]       = useState('')
+
+  // Pull the campaign briefs so this screen knows what is being sold right now,
+  // instead of making the operator retype it for every lead.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/outreach/campaigns', { cache: 'no-store', credentials: 'include' })
+        if (!res.ok) return
+        const data = await res.json()
+        const list: CampaignOption[] = Array.isArray(data?.campaigns) ? data.campaigns : []
+        if (cancelled || !list.length) return
+        setCampaigns(list)
+        // Default to the most recent campaign: if one is running, that is almost always
+        // what a manual lead belongs to.
+        const newest = list[0]
+        setCampaignId(newest.id)
+        setOffer(newest.offer || '')
+      } catch {
+        // Campaign context is a convenience, never a blocker for manual analysis.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  function selectCampaign(id: string) {
+    setCampaignId(id)
+    if (!id) { setOffer(''); return }
+    if (id === 'custom') return
+    const found = campaigns.find(item => item.id === id)
+    if (found) setOffer(found.offer || '')
+  }
 
   async function analyze() {
     setError(''); setResult(null); setDeckError('')
@@ -125,7 +174,7 @@ export default function OutreachDiscoveryPage() {
     try {
       const res = await fetch('/api/outreach/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ business_url: url, business_name: businessName.trim() || undefined, source_platform: platform, category, language: lang, public_text: publicText.trim() || undefined }),
+        body: JSON.stringify({ business_url: url, business_name: businessName.trim() || undefined, source_platform: platform, category, language: lang, public_text: publicText.trim() || undefined, offer: offer.trim() || undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data?.error || copy.analyzeError); return }
@@ -191,6 +240,25 @@ export default function OutreachDiscoveryPage() {
               {CATEGORIES.map(item => <option key={item} value={item}>{copy.categories[item] || item}</option>)}
             </select>
           </div>
+        </div>
+        {campaigns.length ? (
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-campaign">{copy.campaignLabel}</label>
+            <select id="biz-campaign" className="sb-input" value={campaignId} onChange={e => selectCampaign(e.target.value)} style={{ padding: '11px 14px', borderRadius: 12, fontSize: 14 }}>
+              {campaigns.map(item => (
+                <option key={item.id} value={item.id}>
+                  {`${item.region || '—'} · ${item.language} · ${item.drafts_created}/${item.requested_count} · ${item.offer.slice(0, 60)}`}
+                </option>
+              ))}
+              <option value="custom">{copy.campaignCustom}</option>
+              <option value="">{copy.campaignNone}</option>
+            </select>
+            <span className="sb-caption" style={{ fontSize: 11, opacity: 0.75 }}>{copy.campaignHint}</span>
+          </div>
+        ) : null}
+        <div style={{ display: 'grid', gap: 6 }}>
+          <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-offer">{copy.offerLabel}</label>
+          <textarea id="biz-offer" className="sb-input" value={offer} onChange={e => setOffer(e.target.value)} rows={3} placeholder={copy.offerPlaceholder} style={{ padding: '11px 14px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.6 }} />
         </div>
         <div style={{ display: 'grid', gap: 6 }}>
           <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-text">{copy.notesLabel}</label>

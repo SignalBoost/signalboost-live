@@ -38,7 +38,36 @@ export function assertSafeOutreachMessage(message: string): { ok: boolean; reaso
   const placeholder = findTemplatePlaceholder(message)
   if (placeholder) return { ok: false, reason: `Message contains an unfilled template placeholder: ${placeholder}` }
 
+  // PROMPT ECHO. On 2026-07-30 a queue row appeared whose entire body was the owner's
+  // own instruction to COS ("You are my AI Chief of Staff… Run an email outreach
+  // campaign… Find 10."). A model handed the prompt straight through as the message and
+  // nothing looked. An outbound sales email never addresses an AI or asks it to find N
+  // companies, so these phrasings are safe to refuse outright.
+  const echo = findPromptEcho(message)
+  if (echo) return { ok: false, reason: `Message looks like an instruction to the assistant, not an outbound email: ${echo}` }
+
   return { ok: true }
+}
+
+const PROMPT_ECHO_PATTERNS: RegExp[] = [
+  /\byou are (?:my|an|the)\s+(?:ai\b|assistant\b|chief of staff\b)/i,
+  /\bchief of staff\b/i,
+  /\brun an (?:email )?outreach campaign\b/i,
+  /\bfind \d{1,3}\b[^.]{0,80}\b(?:companies|prospects|leads|targets|accounts)\b/i,
+  /\bfind \d{1,3}\.\s*$/i,
+  /\bthe email should be (?:in|written)\b/i,
+  /\bwrite (?:the|an) email in \w+\b/i,
+  /\b(?:target|targets):\s/i,
+  /\bstart in (?:the )?[A-Z][a-z]+\.\s*(?:find|encontr|busca)\b/i,
+]
+
+export function findPromptEcho(message: string): string | null {
+  const text = String(message || '')
+  for (const pattern of PROMPT_ECHO_PATTERNS) {
+    const match = text.match(pattern)
+    if (match) return match[0].slice(0, 60)
+  }
+  return null
 }
 
 const PLACEHOLDER_PATTERNS: RegExp[] = [

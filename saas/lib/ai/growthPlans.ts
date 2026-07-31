@@ -220,10 +220,10 @@ export async function createOutreachDraft(params: {
       }
     }
 
-    // DEDUPE BY HOST. gartsolutions.com was queued twice under two different names
-    // ("Gart Solutions" and "Garts") because nothing checked whether the company was
-    // already in the queue. A second draft to the same company is at best a wasted
-    // slot and at worst a second cold email to a recipient who already got one.
+    // DEDUPE BY HOST. The same company was being queued more than once under slightly
+    // different display names, because nothing checked whether it was already in the
+    // queue. A second draft to the same company is at best a wasted slot and at worst
+    // a second cold email to a recipient who already received one.
     const db0 = supabaseAdmin()
     let host = ''
     try { host = new URL(businessUrl).hostname.replace(/^www\./i, '').toLowerCase() } catch { host = '' }
@@ -247,10 +247,10 @@ export async function createOutreachDraft(params: {
     }
 
     // AGGREGATOR / LISTICLE REJECTION. The background worker already refuses these,
-    // but this path is COS choosing a target itself from a search result — and it
-    // queued "Top DevOps Consulting Companies" (obsium.io) three times. A directory
-    // page is a list OF providers, not a provider, so the email lands on whoever runs
-    // the list rather than on a prospect.
+    // but this path is COS choosing a target itself from a search result, and a
+    // "Top N providers" listing page was repeatedly queued as if it were a company.
+    // A directory page is a list OF providers, not a provider, so the email lands on
+    // whoever runs the list rather than on a prospect.
     const AGGREGATOR_TITLE = /\b(top\s*\d+|best\s+\d+|\d+\s+best|comparison|database|directory|ranking|list of|guide to|companies\b.*\b(list|ranking))\b/i
     const AGGREGATOR_HOST = ['directory', 'directories', 'companies', 'firms', 'providers', 'database', 'ranking', 'listing', 'toplist', 'compare', 'reviews']
     let aggHost = ''

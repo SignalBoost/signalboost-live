@@ -43,18 +43,33 @@ export default function OutreachContactsPage() {
   const [page, setPage] = useState(0)
   const pageSize = 3
 
+  // A request with no deadline can hang indefinitely — a dropped connection or a
+  // suspended tab leaves the promise unsettled, `finally` never runs, and the screen
+  // sits on "Loading contacts…" forever with no error and no way out. This one was
+  // observed stuck for three hours. Thirty seconds is far longer than the query needs.
+  const LOAD_TIMEOUT_MS = 30_000
+
   async function load() {
     setLoading(true)
     setError('')
+    const controller = new AbortController()
+    const deadline = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS)
     try {
-      const response = await fetch('/api/outreach/queue?limit=100', { cache: 'no-store' })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data?.error || copy.loadError)
+      const response = await fetch('/api/outreach/queue?limit=100', { cache: 'no-store', credentials: 'include', signal: controller.signal })
+      // A gateway error or a crash returns HTML, not JSON. Parsing it blindly threw a
+      // syntax error that told the operator nothing about what actually failed.
+      const raw = await response.text()
+      let data: any = null
+      try { data = JSON.parse(raw) } catch { data = null }
+      if (!response.ok) throw new Error(data?.error || `${copy.loadError} [${response.status}]`)
+      if (!data) throw new Error(`${copy.loadError} [${response.status}]`)
       setLeads(Array.isArray(data?.outreach) ? data.outreach : [])
     } catch (reason: any) {
-      setError(reason?.message || copy.loadError)
+      const timedOut = reason?.name === 'AbortError'
+      setError(timedOut ? `${copy.loadError} [timeout]` : (reason?.message || copy.loadError))
       setLeads([])
     } finally {
+      clearTimeout(deadline)
       setLoading(false)
     }
   }
@@ -173,7 +188,12 @@ export default function OutreachContactsPage() {
 
       {notice ? <div className="sb-ai-feedback" style={{ marginBottom: 14 }}><strong>{notice}</strong></div> : null}
       {loading ? <p className="sb-body">{copy.loading}</p> : null}
-      {error ? <p role="alert" className="sb-caption" style={{ color: '#fca5a5' }}>{error}</p> : null}
+      {error ? (
+        <p role="alert" className="sb-caption" style={{ color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span>{error}</span>
+          <button type="button" className="sb-button-secondary" onClick={() => { void load() }} style={{ padding: '4px 12px', fontSize: 12 }}>{copy.retry}</button>
+        </p>
+      ) : null}
       {!loading && !error && !visible.length ? (
         <div className="sb-empty">
           <p className="sb-body">{copy.empty}</p>

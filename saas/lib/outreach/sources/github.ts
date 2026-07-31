@@ -84,11 +84,17 @@ function normalizeSite(blog: string | null): string {
   }
 }
 
+// Every request carries its own deadline. This module runs inside a serverless
+// function with a 60-second ceiling: one slow GitHub response with no timeout is
+// enough to 504 the whole worker tick, and in production it did — every tick for a
+// day, which is why queued campaigns never moved.
+const PER_REQUEST_TIMEOUT_MS = 8_000
+
 async function githubFetch(path: string, token: string): Promise<any | null> {
   try {
     const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
     if (token) headers.Authorization = `Bearer ${token}`
-    const res = await fetch(`${GITHUB_API}${path}`, { headers })
+    const res = await fetch(`${GITHUB_API}${path}`, { headers, signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS) })
     if (!res.ok) return null
     return await res.json()
   } catch {
@@ -113,7 +119,14 @@ export async function discoverGithubOrgs(input: {
   locations: string[]
   keywords?: string[]
   limit?: number
+  // Hard wall-clock budget for the WHOLE discovery, in ms. The caller runs inside a
+  // 60-second function; whatever has been found when the budget runs out is returned
+  // rather than letting the function be killed with nothing saved.
+  budgetMs?: number
 }): Promise<{ ok: boolean; candidates: GithubOrgCandidate[]; error?: string; examined: number }> {
+  const startedAt = Date.now()
+  const budget = Math.max(5_000, Math.min(input.budgetMs ?? 20_000, 40_000))
+  const outOfTime = () => Date.now() - startedAt > budget
   // Token preference, most-appropriate first. GITHUB_WRITE_TOKEN is accepted as a last
   // resort so discovery works on an existing setup without new configuration, but it is
   // the wrong credential for this job: discovery only ever reads public data, while that
@@ -131,9 +144,15 @@ export async function discoverGithubOrgs(input: {
   const keywords = (input.keywords && input.keywords.length ? input.keywords : ['devops', 'kubernetes', 'cloud', 'sre']).slice(0, 4)
   const limit = Math.max(1, Math.min(input.limit || 12, 30))
 
+  // Locations × keywords multiplies fast (3 × 4 = 12 searches before any org lookup).
+  // Four searches is plenty to fill the candidate pool; the rest of the budget belongs
+  // to the per-org qualification below, which is the expensive part.
+  const MAX_SEARCHES = 4
   const logins = new Set<string>()
+  let searches = 0
   for (const query of searchQueries(locations, keywords)) {
-    if (logins.size >= limit * 4) break
+    if (searches >= MAX_SEARCHES || logins.size >= limit * 3 || outOfTime()) break
+    searches += 1
     const data = await githubFetch(`/search/users?q=${encodeURIComponent(query)}&per_page=${SEARCH_PAGE_SIZE}`, token)
     for (const item of data?.items || []) {
       if (typeof item?.login === 'string') logins.add(item.login)
@@ -155,8 +174,12 @@ export async function discoverGithubOrgs(input: {
   const seenHosts = new Set<string>()
   let examined = 0
 
+  // Two API calls per org. Fifteen orgs ≈ thirty requests worst case — comfortably
+  // inside the budget even when GitHub is slow, and enough to yield a full candidate
+  // set given the hit rate observed in testing (~1 in 3 passes qualification).
+  const MAX_ORGS_EXAMINED = 15
   for (const login of logins) {
-    if (candidates.length >= limit) break
+    if (candidates.length >= limit || examined >= MAX_ORGS_EXAMINED || outOfTime()) break
     examined += 1
 
     const org = await githubFetch(`/orgs/${encodeURIComponent(login)}`, token)

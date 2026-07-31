@@ -650,7 +650,8 @@
       "label": "kredyty",
       "unlimited": "Bez limitu"
     },
-    "outreachApprovals": "Zatwierdzenia outreach"
+    "outreachApprovals": "Zatwierdzenia outreach",
+    "contacts": "Kontakty (przegląd wersji roboczych)"
   },
   "credits": {
     "usage": {
@@ -3377,7 +3378,21 @@
     "u_1f6fa6f69d185e60": " min",
     "u_dfca6272ec004413": "Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.",
     "u_dd8433ee354c3e99": "To zadanie przekroczyło limit żądania i COS nie mógł go dokończyć w jednej turze. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej. Duże zadania (zbadanie kilku firm, a potem napisanie do każdej) trzeba dzielić: poproś o jedną firmę naraz lub uruchom to z konsoli outreach.",
-    "u_cae7d57bc067a514": "Zatrzymaj"
+    "u_cae7d57bc067a514": "Zatrzymaj",
+    "u_3e43ac1f41f78189": "ODROCZONE",
+    "u_a18420fbf2cd5aff": "Przestrzeń konsultacji projektowych multi-AI",
+    "u_e5541868cbeb9c12": "Wspólny pokój projektowy, w którym OpenAI, Anthropic, Gemini i inni wybrani dostawcy AI mogą przeglądać ten sam kontekst projektu, odpowiadać obok siebie, krytykować wybrane odpowiedzi i pomóc przygotować jedną zapisaną decyzję.",
+    "u_4ba544e3e9f5102d": "Dlaczego ten pomysł istnieje",
+    "u_e5fbbfecc0691fe7": "Podczas prac nad projektem właściciel często konsultuje kilka systemów AI i ręcznie przenosi kontekst oraz rekomendacje między osobnymi usługami. Ta przestrzeń uporządkowałaby ten rzeczywisty wewnętrzny przepływ pracy w jednym miejscu.",
+    "u_c6915b58ed251d92": "Możliwa pierwsza wersja",
+    "u_4e6ee4c0cd3cc706": "Wspólny kontekst projektu i pliki",
+    "u_990089ee759098d2": "Wyślij jedno pytanie do wybranych dostawców",
+    "u_6691238233f294fb": "Odpowiedzi obok siebie",
+    "u_44812d789cd925cf": "Poproś jednego dostawcę o krytykę odpowiedzi innego",
+    "u_a652291fa265ee80": "Utwórz i zapisz połączoną rekomendację",
+    "u_d0a6f7e8f25a9f85": "Pokaż dostawcę, model, użycie, koszt i historię audytu",
+    "u_3f7639b491e6946b": "Bieżąca decyzja",
+    "u_9bf481bfff002a15": "Nie traktuj tego jako aktywnej realizacji ani sprawdzonego produktu komercyjnego. Wróć do tego później jako do wewnętrznego narzędzia produktywności SignalBoost, a potem zdecyduj, czy szersze użycie uzasadnia produktyzację."
   },
   "lab": {
     "somethingWrong": "Coś poszło nie tak",

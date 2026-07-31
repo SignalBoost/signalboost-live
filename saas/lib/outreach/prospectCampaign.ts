@@ -168,14 +168,92 @@ export async function cancelProspectCampaignJob(
 
 // ── Discovery ────────────────────────────────────────────────────────────────
 
-function searchQueryFor(job: ProspectCampaignJob): string {
-  return clean(`${job.target_criteria} ${job.region || ''} company website`, 380)
+// ── Discovery targeting ──────────────────────────────────────────────────────
+//
+// The first Brazil campaign drafted flawless Portuguese and then sent it to US
+// directory sites. Two reasons, both here:
+//   1. The query was the ENTIRE target_criteria (250+ chars of English) with the raw
+//      region glued on — "…small infra teams the Brazil company website". Search
+//      engines effectively ignore a tail that long, so the country never weighed on
+//      the result set and the English phrasing pulled English-language pages.
+//   2. Nothing checked afterwards whether a result was even in the requested country,
+//      and aggregator/listicle pages ("Top 30 Managed IT Providers", "MSP Database")
+//      look exactly like company sites to a naive filter.
+//
+// So: short queries written in the target's own language, and a region check on the
+// way back out.
+
+type CountryProfile = { names: string[]; tld: string; searchName: string; terms: string[] }
+
+const COUNTRY_PROFILES: Record<string, CountryProfile> = {
+  br: { names: ['brazil', 'brasil'], tld: '.br', searchName: 'Brasil', terms: ['serviços gerenciados de nuvem', 'consultoria DevOps SRE', 'provedor de serviços gerenciados AWS Azure'] },
+  pt: { names: ['portugal'], tld: '.pt', searchName: 'Portugal', terms: ['serviços geridos de cloud', 'consultoria DevOps SRE', 'prestador de serviços geridos AWS Azure'] },
+  mx: { names: ['mexico', 'méxico'], tld: '.mx', searchName: 'México', terms: ['servicios administrados de nube', 'consultoría DevOps SRE', 'proveedor de servicios administrados AWS Azure'] },
+  ar: { names: ['argentina'], tld: '.ar', searchName: 'Argentina', terms: ['servicios administrados de nube', 'consultoría DevOps SRE', 'proveedor de servicios administrados AWS Azure'] },
+  co: { names: ['colombia'], tld: '.co', searchName: 'Colombia', terms: ['servicios administrados de nube', 'consultoría DevOps SRE', 'proveedor de servicios administrados AWS Azure'] },
+  cl: { names: ['chile'], tld: '.cl', searchName: 'Chile', terms: ['servicios administrados de nube', 'consultoría DevOps SRE', 'proveedor de servicios administrados AWS Azure'] },
+  es: { names: ['spain', 'españa'], tld: '.es', searchName: 'España', terms: ['servicios gestionados de nube', 'consultoría DevOps SRE', 'proveedor de servicios gestionados AWS Azure'] },
+  pl: { names: ['poland', 'polska'], tld: '.pl', searchName: 'Polska', terms: ['zarządzane usługi chmurowe', 'konsulting DevOps SRE', 'dostawca usług zarządzanych AWS Azure'] },
+  ru: { names: ['russia', 'россия'], tld: '.ru', searchName: 'Россия', terms: ['управляемые облачные услуги', 'DevOps SRE консалтинг', 'поставщик управляемых услуг AWS Azure'] },
+  uk: { names: ['united kingdom', 'britain', 'england'], tld: '.uk', searchName: 'United Kingdom', terms: ['managed cloud services provider', 'DevOps SRE consultancy', 'managed service provider AWS Azure'] },
+  us: { names: ['united states', 'usa', 'america'], tld: '.us', searchName: 'United States', terms: ['managed cloud services provider', 'DevOps SRE consultancy', 'managed service provider AWS Azure'] },
+}
+
+// "Start in the Brazil." parses to region "the Brazil" — harmless in prose, useless
+// in a search query. Strip the article before anything reads it.
+function normalizeRegion(region: string | null): string {
+  return String(region || '').replace(/^\s*(the|el|la|o|a)\s+/i, '').replace(/[.,;]+$/, '').trim()
+}
+
+function profileFor(region: string | null): CountryProfile | null {
+  const normalized = normalizeRegion(region).toLowerCase()
+  if (!normalized) return null
+  for (const profile of Object.values(COUNTRY_PROFILES)) {
+    if (profile.names.some(name => normalized === name || normalized.includes(name))) return profile
+  }
+  return null
+}
+
+// A handful of short, high-signal queries beat one long one. Each stays well under the
+// length where a search backend starts discarding terms.
+function searchQueriesFor(job: ProspectCampaignJob): string[] {
+  const region = normalizeRegion(job.region)
+  const profile = profileFor(job.region)
+  const place = profile?.searchName || region
+
+  if (profile) {
+    return profile.terms.slice(0, 3).map(term => clean(`${term} ${place}`, 120))
+  }
+
+  // No profile for this region: fall back to the first couple of criteria phrases,
+  // still short, still with the place name attached.
+  const phrases = job.target_criteria
+    .split(/[,;\u2014\u2013]/)
+    .map(part => clean(part, 60))
+    .filter(part => part.length > 8)
+    .slice(0, 3)
+  const base = phrases.length ? phrases : [clean(job.target_criteria, 60)]
+  return base.map(phrase => clean(place ? `${phrase} ${place}` : phrase, 120))
+}
+
+// Directory, ranking and listicle pages. These are the pages that got drafted to on
+// the first Brazil run — they are lists OF providers, not providers.
+const AGGREGATOR_HOST_HINTS = [
+  'directory', 'directories', 'companies', 'firms', 'providers', 'database', 'ranking',
+  'rankings', 'toplist', 'top-', 'best-', 'listing', 'listings', 'compare', 'reviews',
+]
+const AGGREGATOR_TITLE_HINTS = /\b(top\s*\d+|best\s+\d+|\d+\s+best|comparison|independent comparison|database|directory|ranking|list of|guide to)\b/i
+
+function looksLikeAggregator(host: string, title: string): boolean {
+  if (AGGREGATOR_HOST_HINTS.some(hint => host.includes(hint))) return true
+  return AGGREGATOR_TITLE_HINTS.test(title)
 }
 
 function candidateFrom(result: { title: string; url: string; snippet: string }): ProspectCandidate | null {
   const host = hostOf(result.url)
   if (!host) return null
   if (EXCLUDED_HOST_FRAGMENTS.some(fragment => host === fragment || host.endsWith(`.${fragment}`))) return null
+  if (looksLikeAggregator(host, String(result.title || ''))) return null
   // Prefer the company's root site over a deep blog/article URL: the email finder and
   // the analyzer both work far better against a homepage.
   const url = `https://${host}`
@@ -183,25 +261,66 @@ function candidateFrom(result: { title: string; url: string; snippet: string }):
   return { name, url, snippet: clean(result.snippet, 400) }
 }
 
+// Three-way, not boolean. A .com company with no country signal is UNKNOWN, not
+// foreign — treating unknown as a miss would starve any campaign aimed at a country
+// whose businesses mostly use .com. Only a different country's ccTLD is a positive
+// miss. Confirmed matches are used first, unknowns next, confirmed-elsewhere last.
+type RegionSignal = 'match' | 'unknown' | 'other'
+
+function regionSignal(candidate: ProspectCandidate, job: ProspectCampaignJob): RegionSignal {
+  const region = normalizeRegion(job.region)
+  if (!region) return 'match'
+  const host = hostOf(candidate.url)
+  const profile = profileFor(job.region)
+  const hay = `${candidate.name} ${candidate.snippet}`.toLowerCase()
+
+  if (profile && (host.endsWith(profile.tld) || host.includes(`${profile.tld}.`))) return 'match'
+  const names = profile ? profile.names : [region.toLowerCase()]
+  if (names.some(name => hay.includes(name))) return 'match'
+
+  for (const other of Object.values(COUNTRY_PROFILES)) {
+    if (profile && other.tld === profile.tld) continue
+    if (host.endsWith(other.tld)) return 'other'
+  }
+  return 'unknown'
+}
+
 async function runDiscovery(
   job: ProspectCampaignJob,
-): Promise<{ ok: boolean; candidates: ProspectCandidate[]; error?: string }> {
-  const search = await getExternalInfo(searchQueryFor(job), MAX_CANDIDATES)
-  if (!search.ok) return { ok: false, candidates: [], error: search.error || 'Search returned no results.' }
-
+): Promise<{ ok: boolean; candidates: ProspectCandidate[]; error?: string; note?: string }> {
   const seen = new Set<string>()
-  const candidates: ProspectCandidate[] = []
-  for (const result of search.results) {
-    const candidate = candidateFrom(result)
-    if (!candidate) continue
-    const host = hostOf(candidate.url)
-    if (seen.has(host)) continue
-    seen.add(host)
-    candidates.push(candidate)
+  const matched: ProspectCandidate[] = []
+  const unknown: ProspectCandidate[] = []
+  const elsewhere: ProspectCandidate[] = []
+  let lastError = ''
+
+  for (const query of searchQueriesFor(job)) {
+    if (matched.length >= MAX_CANDIDATES) break
+    const search = await getExternalInfo(query, MAX_CANDIDATES)
+    if (!search.ok) { lastError = search.error || 'Search returned no results.'; continue }
+
+    for (const result of search.results) {
+      const candidate = candidateFrom(result)
+      if (!candidate) continue
+      const host = hostOf(candidate.url)
+      if (seen.has(host)) continue
+      seen.add(host)
+      const signal = regionSignal(candidate, job)
+      if (signal === 'match') matched.push(candidate)
+      else if (signal === 'unknown') unknown.push(candidate)
+      else elsewhere.push(candidate)
+    }
   }
 
-  if (!candidates.length) return { ok: false, candidates: [], error: 'No usable company sites in the search results.' }
-  return { ok: true, candidates }
+  const ordered = [...matched, ...unknown, ...elsewhere].slice(0, MAX_CANDIDATES)
+  if (!ordered.length) return { ok: false, candidates: [], error: lastError || 'No usable company sites in the search results.' }
+
+  // Record it when the country search produced nothing confirmed, so a campaign never
+  // quietly becomes a different campaign than the one that was asked for.
+  const note = matched.length
+    ? undefined
+    : `No result confirmed in region "${normalizeRegion(job.region)}"; proceeding with unconfirmed results.`
+  return { ok: true, candidates: ordered, note }
 }
 
 // ── Drafting ─────────────────────────────────────────────────────────────────
@@ -218,6 +337,7 @@ async function draftMessageFor(
   const systemPrompt = [
     'You write short, specific, honest B2B outreach emails that a founder would be comfortable sending under their own name.',
     'Open with the problem this specific company plausibly has, based only on what the brief says about them — never invent facts, customers, metrics, funding, headcount, or a prior conversation.',
+    'Name ONLY the recipient company. Never mention any other company by name: if the notes below happen to list other firms, they are neighbours in a search result, not context about the recipient, and naming them makes the email obviously mass-produced.',
     'Then introduce the offer as the answer. No hype, no guarantees of revenue, rankings, or results.',
     'One clear call to action at the end.',
     'HARD LIMIT: between 400 and 1,400 characters total. Plain text only, no markdown, no subject line, no signature block.',
@@ -285,7 +405,7 @@ export async function advanceProspectCampaigns(): Promise<{
     const { data: updated, error: updateError } = await db.from(TABLE).update({
       status: 'running',
       candidates: discovery.candidates,
-      last_error: null,
+      last_error: discovery.note || null,
       updated_at: new Date().toISOString(),
     }).eq('id', job.id).select('*').single()
 

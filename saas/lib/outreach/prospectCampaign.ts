@@ -288,7 +288,15 @@ function regionSignal(candidate: ProspectCandidate, job: ProspectCampaignJob): R
 
 async function runDiscovery(
   job: ProspectCampaignJob,
+  // Wall-clock budget for discovery as a whole. Discovery previously had NO time
+  // bound while the drafting loop did — so a tick could spend its entire 60-second
+  // function ceiling here, get killed by the platform, and save nothing. Every
+  // queued campaign then stayed queued forever, which is exactly what happened in
+  // production for a full day of ticks.
+  budgetMs: number,
 ): Promise<{ ok: boolean; candidates: ProspectCandidate[]; error?: string; note?: string }> {
+  const startedAt = Date.now()
+  const timeLeft = () => budgetMs - (Date.now() - startedAt)
   const seen = new Set<string>()
   const matched: ProspectCandidate[] = []
   const unknown: ProspectCandidate[] = []
@@ -296,7 +304,7 @@ async function runDiscovery(
   let lastError = ''
 
   for (const query of searchQueriesFor(job)) {
-    if (matched.length >= MAX_CANDIDATES) break
+    if (matched.length >= MAX_CANDIDATES || timeLeft() < 8_000) break
     const search = await getExternalInfo(query, MAX_CANDIDATES)
     if (!search.ok) { lastError = search.error || 'Search returned no results.'; continue }
 
@@ -318,10 +326,10 @@ async function runDiscovery(
   // which is a different and often better-qualified set for this product. It also
   // covers countries where the local web results are thin. Failures here are ignored —
   // it supplements the search, it does not gate it.
-  if (matched.length < MAX_CANDIDATES) {
+  if (matched.length < MAX_CANDIDATES && timeLeft() > 10_000) {
     const profile = profileFor(job.region)
     const locations = profile ? Array.from(new Set([profile.searchName, ...profile.names])) : [normalizeRegion(job.region)]
-    const github = await discoverGithubOrgs({ locations, limit: MAX_CANDIDATES })
+    const github = await discoverGithubOrgs({ locations, limit: MAX_CANDIDATES, budgetMs: timeLeft() - 3_000 })
     if (github.ok) {
       for (const candidate of github.candidates) {
         const host = hostOf(candidate.url)
@@ -418,7 +426,9 @@ export async function advanceProspectCampaigns(): Promise<{
 
   // Phase 1 — discovery. One search, then the job has a candidate list to chew through.
   if (job.status === 'queued' || !Array.isArray(job.candidates) || !job.candidates.length) {
-    const discovery = await runDiscovery(job)
+    // Leave at least 10s of the tick for saving results and, when possible, a first
+    // draft. Discovery that fills the whole tick starves the write that persists it.
+    const discovery = await runDiscovery(job, Math.max(10_000, remainingMs() - 10_000))
     if (!discovery.ok) {
       await db.from(TABLE).update({
         status: 'failed',

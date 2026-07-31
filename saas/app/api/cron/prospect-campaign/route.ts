@@ -12,7 +12,12 @@ import { advanceProspectCampaigns } from '@/lib/outreach/prospectCampaign'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+// 60 seconds was never enough for this work and every tick 504'd on it for two days.
+// One company costs a model call plus up to nine page fetches to find a published
+// email; three companies plus discovery cannot fit in a minute. Other routes in this
+// app already run at 300 (see app/api/concierge), so the platform allows it — the
+// internal budget below still stops well short of the ceiling.
+export const maxDuration = 300
 
 function isAuthorizedCron(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET

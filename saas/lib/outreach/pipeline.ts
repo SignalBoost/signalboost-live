@@ -18,6 +18,9 @@ export async function generateOutreachAssets(args: {
   language?: string
   publicText?: string
   category?: OutreachCategory
+  // What is being sold. Absent = the original SignalBoost platform preview.
+  // Present = pitch that offer instead, and return an email only.
+  offer?: string
 }): Promise<OutreachAssets> {
   const extracted = args.publicText
     ? { url: args.sourceUrl, text: args.publicText }
@@ -73,6 +76,7 @@ export async function generateOutreachAssets(args: {
     },
     language: messageLanguage,
     category: args.category,
+    offer: args.offer,
   })
 
   return { ...messageAssets, outreach_message }

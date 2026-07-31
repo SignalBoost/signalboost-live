@@ -114,7 +114,17 @@ export async function discoverGithubOrgs(input: {
   keywords?: string[]
   limit?: number
 }): Promise<{ ok: boolean; candidates: GithubOrgCandidate[]; error?: string; examined: number }> {
-  const token = String(process.env.GITHUB_TOKEN || process.env.GITHUB_DISCOVERY_TOKEN || '').trim()
+  // Token preference, most-appropriate first. GITHUB_WRITE_TOKEN is accepted as a last
+  // resort so discovery works on an existing setup without new configuration, but it is
+  // the wrong credential for this job: discovery only ever reads public data, while that
+  // token can write to repositories. A separate scope-free read token is the better
+  // arrangement — set GITHUB_TOKEN and this stops reaching for the write one.
+  const token = String(
+    process.env.GITHUB_TOKEN
+    || process.env.GITHUB_DISCOVERY_TOKEN
+    || process.env.GITHUB_WRITE_TOKEN
+    || '',
+  ).trim()
   const locations = input.locations.filter(Boolean).slice(0, 3)
   if (!locations.length) return { ok: false, candidates: [], examined: 0, error: 'No location supplied for GitHub discovery.' }
 

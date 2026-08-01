@@ -86,6 +86,44 @@ export interface RunnerPort {
 }
 // WHO THE AI WORKS FOR comes from the shared kernel (CompanyProfilePort): the engine never
 // assumes an employer, it asks the host. Same contract in every portable.
+// ── DISCOVERY. Finding publications is the one job the portable could never do for
+//    itself: free_submission requires an editor address to be SUPPLIED, and the
+//    media-database adapter verifies a contact it is given rather than searching for
+//    one. A buyer with no way to find outlets therefore had a working dispatcher and
+//    nothing to dispatch to.
+//
+//    It is a PORT, not a built-in, because there is no single right source: one buyer
+//    has a Cision or Muck Rack subscription, another has a web-search key, another has
+//    a curated in-house list. The host supplies whichever it has; the engine never
+//    knows which. Omitted = discovery simply unavailable, reported honestly, and every
+//    other capability still works with targets supplied by hand.
+export interface PublicationLead {
+  publication: string
+  contact: string                    // an editorial email, or a submission form URL
+  method: 'email' | 'online_form'
+  sourceUrl?: string
+  targetType?: MediaTargetType
+}
+
+export interface DiscoveryQuery {
+  region: string                     // country in plain words, e.g. 'United States', 'Brasil'
+  targetType?: MediaTargetType       // narrows to trade press, print newspapers, etc.
+  topic?: string                     // subject matter the outlet must plausibly cover
+  limit?: number
+  paid?: boolean                     // true = advertising desks; default false = editorial only
+}
+
+export interface DiscoveryResult {
+  ok: boolean
+  leads: PublicationLead[]
+  examined?: number
+  error?: string
+}
+
+export interface DiscoveryPort {
+  findPublications(query: DiscoveryQuery): Promise<DiscoveryResult>
+}
+
 export interface PortBundle {
   ai: AiPort
   email: EmailPort
@@ -94,6 +132,7 @@ export interface PortBundle {
   runner?: RunnerPort                // config-driven execution for paid providers (universal runner)
   company?: CompanyProfilePort       // the employer whose facts the AI may state
   audit?: PortableAuditSink          // buyer SIEM/audit export (SOC2/ISO27001); omitted = no audit
+  discovery?: DiscoveryPort          // finds publications; omitted = targets must be supplied by hand
   config?: Record<string, string>    // the buyer's connected credentials for this provider
 }
 

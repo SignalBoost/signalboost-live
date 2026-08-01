@@ -13,9 +13,10 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 import { resolvePressProviderKey } from '@/lib/agency/pressProviderConnect'
 import { resolveCompanyFacts } from '@/lib/portable/companyIdentity'
 import { buildFactualPreamble, type CompanyFacts } from '@/press-media-core'
+import { discoverPublishers } from '@/lib/marketing/publisherDiscovery'
 import type { CompanyProfilePort } from '@/press-media-core'
 import type {
-  AiPort, EmailPort, OwnerNotifyPort, PortBundle, RunnerPort, RunnerResult, RunnerProviderConfig,
+  AiPort, DiscoveryPort, EmailPort, OwnerNotifyPort, PortBundle, RunnerPort, RunnerResult, RunnerProviderConfig,
   CampaignBrief, GenerateSpec, MediaCampaign, DispatchState, ProofResult,
 } from '@/press-media-core'
 
@@ -250,6 +251,43 @@ export function createRunnerPort(): RunnerPort {
   }
 }
 
+// ── DISCOVERY: this host's answer to "which publications?" ──
+// SignalBoost supplies its own regional publisher search, so the platform needs no
+// third-party subscription to find free press. A BUYER hosting this portable supplies
+// their own instead — a media database they already pay for, a search key, or a
+// curated list — by passing a different DiscoveryPort. The portable never knows which.
+function createDiscoveryPort(): DiscoveryPort {
+  return {
+    async findPublications(query) {
+      try {
+        const result = await discoverPublishers({
+          brief: query.topic || '',
+          // The platform search speaks in channels; the portable speaks in target types.
+          channel: query.targetType === 'trade_press' ? 'trade_press'
+            : query.targetType === 'newspaper_print' || query.targetType === 'magazine_print' ? 'print'
+            : 'digital_press',
+          region: query.region,
+          limit: query.limit,
+        })
+        if (!result.ok) return { ok: false, leads: [], examined: result.examined, error: result.error }
+        return {
+          ok: true,
+          examined: result.examined,
+          leads: result.publishers.map(publisher => ({
+            publication: String(publisher.publicationName || ''),
+            contact: String(publisher.editorContact || ''),
+            method: publisher.method === 'online_form' ? 'online_form' as const : 'email' as const,
+            sourceUrl: publisher.sourceUrl,
+            targetType: query.targetType,
+          })),
+        }
+      } catch (error: any) {
+        return { ok: false, leads: [], error: String(error?.message || error || 'discovery failed') }
+      }
+    },
+  }
+}
+
 // ── Bundle the real Ports (optionally with a provider's connected credentials) ──
 export function createHostPorts(config?: Record<string, string>): PortBundle {
   return {
@@ -258,6 +296,7 @@ export function createHostPorts(config?: Record<string, string>): PortBundle {
     notify: createOwnerNotifyPort(),
     runner: createRunnerPort(),
     company: createCompanyProfilePort(),
+    discovery: createDiscoveryPort(),
     config,
   }
 }

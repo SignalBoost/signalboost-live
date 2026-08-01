@@ -1,3 +1,4 @@
+// saas/app/api/outreach/social/onboarding/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { allSocialOnboardingGuides, getSocialOnboardingGuide } from '@/lib/outreach/social-onboarding-guide'
@@ -18,6 +19,7 @@ type CapabilityPlatform = {
 const PLATFORM_TO_PROVIDER: Record<string, string> = {
   youtube_channels: 'youtube',
   linkedin_company: 'linkedin',
+  linkedin_member: 'linkedin',
   tiktok: 'tiktok',
   reddit: 'reddit',
   instagram_business: 'instagram',
@@ -37,7 +39,7 @@ function tokenStatus(row: any) {
   return { connected: true, accountRef: row.account_ref || null, accountName: row.account_name || null, expiresAt, expired }
 }
 function needsAccountRef(platform: string) {
-  return ['linkedin_company', 'facebook_pages', 'instagram_business', 'reddit'].includes(platform)
+  return ['linkedin_company', 'linkedin_member', 'facebook_pages', 'instagram_business', 'reddit'].includes(platform)
 }
 function nextHumanAction(guide: any, cap?: CapabilityPlatform | null) {
   if (!cap) return 'Start by creating the business account/page and developer app, then add credentials to Vercel.'

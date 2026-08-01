@@ -186,11 +186,28 @@ async function localizeMessage(message: string, lang: string): Promise<string> {
   } catch { return message }
 }
 
+// Same rule the send routes apply, so a supplied address must clear exactly the bar a
+// discovered one does: real shape, and not a role box that no human reads.
+function cleanEmail(value: unknown): string | null {
+  const email = String(value || '').trim().toLowerCase()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null
+  const local = email.split('@')[0]
+  if (['test', 'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'privacy', 'legal', 'abuse', 'security'].includes(local)) return null
+  return email
+}
+
 export async function createOutreachDraft(params: {
   businessName: string
   businessUrl: string
   message: string
   senderKey?: string
+  // A publicly listed business address the CALLER already verified — from a researched
+  // prospect list, a CRM export, or a media database. Without this the finder crawls the
+  // site and skips the company when it finds nothing, discarding an address a human had
+  // already confirmed. It is still validated by cleanEmail, so a junk or role-blocked
+  // address is refused exactly as a discovered one would be; supplying it only skips the
+  // crawl, it never lowers the bar.
+  contactEmail?: string
 }): Promise<{ ok: boolean; outreachId?: string; skipped?: boolean; contactEmail?: string; error?: string }> {
   try {
     const businessName = String(params.businessName || '').trim().slice(0, 200)
@@ -210,13 +227,17 @@ export async function createOutreachDraft(params: {
       return { ok: false, error: `Message rejected by outreach guardrails: ${safe.reason}` }
     }
 
-    // Find a REAL published email on the target's site. No email => SKIP.
-    const found = await findContactEmail(businessUrl)
+    // A caller-supplied address is used when it passes the same quality gate as a
+    // discovered one; otherwise fall back to crawling the site. No email => SKIP.
+    const supplied = cleanEmail(String(params.contactEmail || ''))
+    const found = supplied ? { email: supplied } : await findContactEmail(businessUrl)
     if (!found.email) {
       return {
         ok: false,
         skipped: true,
-        error: `No published contact email found for ${businessName} (${businessUrl}) — skipped, not queued. COS does not invent addresses.`,
+        error: params.contactEmail
+          ? `The address supplied for ${businessName} (${params.contactEmail}) is not a usable business contact — skipped, not queued.`
+          : `No published contact email found for ${businessName} (${businessUrl}) — skipped, not queued. COS does not invent addresses.`,
       }
     }
 

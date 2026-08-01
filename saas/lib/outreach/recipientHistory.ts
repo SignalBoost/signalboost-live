@@ -11,11 +11,24 @@
 //
 // This closes it on the only key that matters to the recipient — the address itself.
 //
-// The rule is asymmetric on purpose. An AUTOMATIC send (the batch runner) must never
-// contact an address twice: nobody is watching, and a repeat is exactly the mistake
-// that gets a domain marked as spam. A HUMAN send is allowed to repeat, because a
-// person deciding to follow up deliberately is legitimate — but only after being shown
-// what was sent before and confirming, never silently.
+// SCOPED TO THE PRODUCT, NOT THE ADDRESS. The first version of this guard refused any
+// second email to an address that had ever been contacted. That stops the real mistake
+// — pitching the same product twice — but also stops a legitimate one: pitching a
+// DIFFERENT product to a company already contacted about something else. A prospect
+// list is an asset used across several products over time, so burning an address after
+// one campaign is the wrong trade. Two rows collide only when the address AND the
+// product_key match.
+//
+// A null product_key means "unlabelled". Unlabelled rows are compared against other
+// unlabelled rows, keeping the old strict behaviour for anything created before this
+// existed — the safe direction, since an unlabelled row can still be sent by hand with
+// the override but will never silently re-contact anyone.
+//
+// The rule is also asymmetric on purpose. An AUTOMATIC send (the batch runner) must
+// never re-contact for the same product: nobody is watching, and a repeat is exactly
+// the mistake that gets a domain marked as spam. A HUMAN send is allowed to repeat,
+// because a person deciding to follow up deliberately is legitimate — but only after
+// being shown what was sent before and confirming, never silently.
 
 type AnyClient = { from: (table: string) => any }
 
@@ -24,6 +37,17 @@ export type RecipientHistory = {
   lastSentAt: string | null
   businessName: string | null
   outreachId: string | null
+  productKey: string | null
+}
+
+/** Slug an offer or product name into a stable comparison key. */
+export function productKeyOf(value: string | null | undefined): string | null {
+  const slug = String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+  return slug || null
 }
 
 export function normalizeAddress(email: string | null | undefined): string {
@@ -45,21 +69,27 @@ export async function getRecipientHistory(
   admin: AnyClient,
   email: string | null | undefined,
   excludeOutreachId?: string,
+  productKey?: string | null,
 ): Promise<RecipientHistory> {
   const address = normalizeAddress(email)
-  const empty: RecipientHistory = { contacted: false, lastSentAt: null, businessName: null, outreachId: null }
+  const empty: RecipientHistory = { contacted: false, lastSentAt: null, businessName: null, outreachId: null, productKey: null }
   if (!address) return empty
+
+  const wanted = productKeyOf(productKey)
 
   // Every queue row that carries this address. ilike, because addresses have been
   // stored with varying case over the life of the table.
   const { data: rows } = await admin
     .from('outreach_queue')
-    .select('id,business_name,contact_email')
+    .select('id,business_name,contact_email,product_key')
     .ilike('contact_email', address)
     .limit(50)
 
   const ids = (rows || [])
     .filter((row: any) => normalizeAddress(row.contact_email) === address)
+    // Only rows about the SAME product count as a duplicate. Unlabelled rows match
+    // other unlabelled rows, never a labelled one.
+    .filter((row: any) => productKeyOf(row.product_key) === wanted)
     .map((row: any) => row.id)
     .filter((id: string) => id !== excludeOutreachId)
 
@@ -81,6 +111,7 @@ export async function getRecipientHistory(
     lastSentAt: send.sent_at || null,
     businessName: source?.business_name || null,
     outreachId: send.outreach_id || null,
+    productKey: wanted,
   }
 }
 
@@ -88,5 +119,6 @@ export async function getRecipientHistory(
 export function duplicateReason(history: RecipientHistory, address: string): string {
   const when = history.lastSentAt ? new Date(history.lastSentAt).toISOString().slice(0, 10) : 'earlier'
   const who = history.businessName ? ` as ${history.businessName}` : ''
-  return `${address} was already contacted${who} on ${when}. Not sent again automatically.`
+  const about = history.productKey ? ` about ${history.productKey.replace(/-/g, ' ')}` : ''
+  return `${address} was already contacted${who}${about} on ${when}. Not sent again automatically for the same product — a different product is allowed.`
 }

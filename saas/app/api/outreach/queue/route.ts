@@ -159,7 +159,7 @@ export async function PATCH(req: NextRequest) {
     // force:true is the deliberate follow-up, offered in the console only after the
     // refusal has been shown.
     if (body?.force !== true) {
-      const history = await getRecipientHistory(ctx.admin, toEmail, id)
+      const history = await getRecipientHistory(ctx.admin, toEmail, id, data.product_key)
       if (history.contacted) {
         return NextResponse.json({
           ok: true,

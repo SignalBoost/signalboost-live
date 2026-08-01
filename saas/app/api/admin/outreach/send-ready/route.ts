@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
   // but still have stale status='approved'. We filter those out below.
   let query = ctx.admin
     .from('outreach_queue')
-    .select('id,business_id,business_name,business_url,contact_email,outreach_message,status,sender_key,source_platform,created_at')
+    .select('id,business_id,business_name,business_url,contact_email,outreach_message,status,sender_key,source_platform,product_key,created_at')
     .eq('status', 'approved')
     .not('contact_email', 'is', null)
 
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
     // address that has already been contacted is skipped outright with no override.
     // A deliberate follow-up is a human decision made per row in the console.
     const address = normalizeAddress(row.contact_email)
-    const history = await getRecipientHistory(ctx.admin, address, row.id)
+    const history = await getRecipientHistory(ctx.admin, address, row.id, row.product_key)
     if (history.contacted) {
       skippedCount++
       duplicateSkipped++

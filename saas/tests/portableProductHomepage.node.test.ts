@@ -17,7 +17,7 @@ test('homepage renders public products from the registry selector without PORTAB
   // provider-hub joined the public catalog and sorts first. This list is deliberately exact:
   // it pins what the marketing surface shows buyers, so adding a portable to the homepage is a
   // decision someone has to make here rather than a side effect of writing a manifest.
-  assert.deepEqual(ids, ['provider-hub', 'campaign-studio', 'integrations-hub', 'video-maker', 'control-center', 'marketing-sales', 'social-outreach-connector', 'press-media', 'portable-ai-chief-of-staff', 'browser-agent-ecosystem', 'agent-operations-platform', 'self-healing-supervisor'])
+  assert.deepEqual(ids, ['provider-hub', 'campaign-studio', 'integrations-hub', 'video-maker', 'control-center', 'marketing-sales', 'press-media', 'portable-ai-chief-of-staff', 'browser-agent-ecosystem', 'agent-operations-platform', 'self-healing-supervisor'])
   assert.ok(ids.includes('agent-operations-platform')); assert.ok(!homepage.includes('Durable Agent Runtime')); assert.ok(ids.includes('browser-agent-ecosystem'))
 })
 

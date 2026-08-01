@@ -24,6 +24,10 @@ type PressLocale = {
   techWords: string[]
   submitWords: string[]
   contactPrefixes: string[]
+  // Paid-placement vocabulary: what an outlet calls its advertising page in ITS OWN
+  // language. Without this the paid query went out in Portuguese for every country,
+  // so a US or Polish rate-card search returned nothing usable.
+  adWords: string[]
 }
 
 const PRESS_LOCALES: Record<string, PressLocale> = {
@@ -33,6 +37,7 @@ const PRESS_LOCALES: Record<string, PressLocale> = {
     techWords: ['tecnologia', 'TI', 'negócios'],
     submitWords: ['contato redação editor email', 'enviar pauta editor', 'fale conosco redação'],
     contactPrefixes: ['redacao', 'redação', 'pauta', 'noticias', 'jornalismo', 'imprensa'],
+    adWords: ['anunciar publicidade media kit contato', 'tabela de preços anúncio'],
   },
   pt: {
     searchName: 'Portugal',
@@ -40,16 +45,17 @@ const PRESS_LOCALES: Record<string, PressLocale> = {
     techWords: ['tecnologia', 'TI', 'negócios'],
     submitWords: ['contacto redação editor email', 'enviar notícia editor'],
     contactPrefixes: ['redacao', 'redação', 'noticias', 'jornalismo', 'imprensa'],
+    adWords: ['anunciar publicidade media kit contacto', 'tabela de preços anúncio'],
   },
-  mx: { searchName: 'México', publicationWords: ['periódico', 'revista', 'diario', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo', 'enviar nota editor'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa', 'periodismo'] },
-  ar: { searchName: 'Argentina', publicationWords: ['diario', 'revista', 'periódico', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo', 'enviar nota editor'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'] },
-  co: { searchName: 'Colombia', publicationWords: ['diario', 'revista', 'periódico', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'] },
-  cl: { searchName: 'Chile', publicationWords: ['diario', 'revista', 'periódico', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'] },
-  es: { searchName: 'España', publicationWords: ['periódico', 'revista', 'diario', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'] },
-  pl: { searchName: 'Polska', publicationWords: ['gazeta', 'czasopismo', 'portal informacyjny', 'dziennik'], techWords: ['technologia', 'IT', 'biznes'], submitWords: ['kontakt redakcja e-mail', 'zgłoś temat redakcja'], contactPrefixes: ['redakcja', 'newsroom', 'kontakt'] },
-  ru: { searchName: 'Россия', publicationWords: ['газета', 'журнал', 'новостной портал', 'издание'], techWords: ['технологии', 'ИТ', 'бизнес'], submitWords: ['контакты редакция email', 'прислать новость редакция'], contactPrefixes: ['redakciya', 'redaktor', 'news', 'press'] },
-  uk: { searchName: 'United Kingdom', publicationWords: ['newspaper', 'magazine', 'news site'], techWords: ['technology', 'IT', 'business'], submitWords: ['contact editor email', 'submit news editor'], contactPrefixes: ['editor', 'newsdesk', 'newsroom'] },
-  us: { searchName: 'United States', publicationWords: ['newspaper', 'magazine', 'trade publication'], techWords: ['technology', 'IT', 'business'], submitWords: ['submit news editor email', 'contact editor'], contactPrefixes: ['editor', 'newsroom', 'newsdesk'] },
+  mx: { searchName: 'México', publicationWords: ['periódico', 'revista', 'diario', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo', 'enviar nota editor'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa', 'periodismo'], adWords: ['anunciar publicidad media kit contacto', 'tarifas publicidad'], },
+  ar: { searchName: 'Argentina', publicationWords: ['diario', 'revista', 'periódico', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo', 'enviar nota editor'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'], adWords: ['anunciar publicidad media kit contacto', 'tarifas publicidad'], },
+  co: { searchName: 'Colombia', publicationWords: ['diario', 'revista', 'periódico', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'], adWords: ['anunciar publicidad media kit contacto', 'tarifas publicidad'], },
+  cl: { searchName: 'Chile', publicationWords: ['diario', 'revista', 'periódico', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'], adWords: ['anunciar publicidad media kit contacto', 'tarifas publicidad'], },
+  es: { searchName: 'España', publicationWords: ['periódico', 'revista', 'diario', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'], adWords: ['anunciar publicidad media kit contacto', 'tarifas publicidad'], },
+  pl: { searchName: 'Polska', publicationWords: ['gazeta', 'czasopismo', 'portal informacyjny', 'dziennik'], techWords: ['technologia', 'IT', 'biznes'], submitWords: ['kontakt redakcja e-mail', 'zgłoś temat redakcja'], contactPrefixes: ['redakcja', 'newsroom', 'kontakt'], adWords: ['reklama media kit kontakt', 'cennik reklamy'], },
+  ru: { searchName: 'Россия', publicationWords: ['газета', 'журнал', 'новостной портал', 'издание'], techWords: ['технологии', 'ИТ', 'бизнес'], submitWords: ['контакты редакция email', 'прислать новость редакция'], contactPrefixes: ['redakciya', 'redaktor', 'news', 'press'], adWords: ['реклама медиакит контакты', 'прайс реклама'], },
+  uk: { searchName: 'United Kingdom', publicationWords: ['newspaper', 'magazine', 'news site'], techWords: ['technology', 'IT', 'business'], submitWords: ['contact editor email', 'submit news editor'], contactPrefixes: ['editor', 'newsdesk', 'newsroom'], adWords: ['advertise media kit contact', 'advertising rate card'], },
+  us: { searchName: 'United States', publicationWords: ['newspaper', 'magazine', 'trade publication'], techWords: ['technology', 'IT', 'business'], submitWords: ['submit news editor email', 'contact editor'], contactPrefixes: ['editor', 'newsroom', 'newsdesk'], adWords: ['advertise with us media kit contact', 'advertising rate card'], },
 }
 
 function normalizeRegion(region?: string | null): string {
@@ -122,7 +128,7 @@ function queriesFor(args: PublisherDiscoveryArgs) {
       free.push(clean(`${kind} ${locale.techWords[0]} ${place} ${locale.submitWords[0]}`, 140))
     }
     free.push(clean(`${kinds[0]} ${place} ${locale.submitWords[1] || locale.submitWords[0]}`, 140))
-    const paidQueries = [clean(`${kinds[0]} ${place} publicidade media kit contato`, 140)]
+    const paidQueries = locale.adWords.map(words => clean(`${kinds[0]} ${place} ${words}`, 140))
     return paid ? [...free, ...paidQueries] : free
   }
 

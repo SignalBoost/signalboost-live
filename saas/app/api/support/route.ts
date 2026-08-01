@@ -514,7 +514,7 @@ const TOOL_CREATE_OUTREACH_DRAFT: ChatTool = {
   type: 'function',
   function: {
     name: 'createOutreachDraft',
-    description: 'Create one outreach draft (ready-to-send message to a specific business) in the outreach pipeline, as part of executing an APPROVED growth plan. The draft enters as pending and still requires final approval and sending in the Outreach dashboard. Requires the target business name AND its website URL.',
+    description: 'Create one outreach draft (ready-to-send message to a specific business) in the outreach pipeline, as part of executing an APPROVED growth plan. The draft enters as pending and still requires final approval and sending in the Outreach dashboard. Requires the target business name AND its website URL. A company already in the outreach queue is REJECTED as a duplicate — never re-submit a company that a previous call reported as already queued, and never submit a directory, ranking or "Top N providers" listing page: those are lists of providers, not a prospect. If several submissions come back rejected, report that plainly to the owner instead of retrying the same targets.',
     parameters: {
       type: 'object',
       properties: {

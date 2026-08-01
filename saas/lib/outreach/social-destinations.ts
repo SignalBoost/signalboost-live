@@ -94,6 +94,19 @@ async function linkedinOrganizations(accessToken: string): Promise<SocialDestina
   }).filter(Boolean) as SocialDestination[]
 }
 
+// The member's own profile, resolved from the OIDC userinfo endpoint. This is why the
+// member connector requests openid/profile: without it there is no way to learn the
+// person URN, and the buyer would have to paste an internal LinkedIn id by hand.
+async function linkedinMember(accessToken: string): Promise<SocialDestination[]> {
+  const res = await fetch('https://api.linkedin.com/v2/userinfo', { headers: { Authorization: `Bearer ${accessToken}` } })
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(data?.message || `linkedin_member_discovery_failed_${res.status}`)
+  const sub = String(data?.sub || '').trim()
+  if (!sub) return []
+  const name = [data?.given_name, data?.family_name].filter(Boolean).join(' ').trim() || data?.name || null
+  return [{ platform: 'linkedin_member' as const, accountRef: sub, accountName: name, kind: 'linkedin_person', metadata: { raw: data } }]
+}
+
 export async function discoverSocialDestinations(platform: SocialPlatform, accessToken: string): Promise<{ ok: boolean; mode: string; destinations: SocialDestination[]; error?: string }> {
   try {
     const destinations = platform === 'youtube_channels' ? await googleYouTube(accessToken)
@@ -103,6 +116,7 @@ export async function discoverSocialDestinations(platform: SocialPlatform, acces
       : platform === 'reddit' ? await redditIdentity(accessToken)
       : platform === 'tiktok' ? await tiktokMe(accessToken)
       : platform === 'linkedin_company' ? await linkedinOrganizations(accessToken)
+      : platform === 'linkedin_member' ? await linkedinMember(accessToken)
       : []
     return { ok: true, mode: 'live_provider_discovery', destinations: unique(destinations) }
   } catch (err: any) {

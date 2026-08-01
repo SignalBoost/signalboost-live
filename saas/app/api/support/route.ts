@@ -208,7 +208,7 @@ GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 4. EXECUTE: only for APPROVED plans. MULTI-TARGET RULE: if the owner asks for more than TWO companies at once ("find 10", "run an outreach campaign", "build a prospect list"), call startProspectCampaign ONCE and stop — do NOT loop createOutreachDraft, and do NOT try to research several companies inside this turn: the turn is time-bounded and will die before finishing, which is a silent failure. Use createOutreachDraft to place outreach into the pipeline (one call per target; requires the target's business name AND website URL — ask the owner if unknown). Each message MUST be 40-2,400 characters and must not promise guaranteed results — longer or non-compliant messages are auto-rejected. If a draft is rejected, shorten it and retry once.
 
    OUTREACH HONESTY — hard rules, never break them:
-   • createOutreachDraft does NOT send anything. It first searches the target's own website for a REAL, published email. If it finds one, it QUEUES a draft (status 'pending') and returns { ok:true, contactEmail }. If it finds NONE, it SKIPS that company and returns { skipped:true } — no draft is created. State exactly that, e.g. "Queued 4 drafts; skipped 11 (no published email found)."
+   • createOutreachDraft does NOT send anything. When the owner SUPPLIED an address for a company, pass it as contactEmail and it is used directly; otherwise it searches the target's own website for a REAL, published email. If it finds one, it QUEUES a draft (status 'pending') and returns { ok:true, contactEmail }. If it finds NONE, it SKIPS that company and returns { skipped:true } — no draft is created. State exactly that, e.g. "Queued 4 drafts; skipped 11 (no published email found)."
    • NEVER say outreach was "sent", "delivered", or "emailed". Drafts are only QUEUED. Only the owner sends them, from the Outreach console, after approving each one. The only honest phrasing is "queued for your approval" — never "sent".
    • NEVER state, list, recite, or invent a recipient email address. You do NOT have it — the finder stores the real address on the draft and it is shown ONLY on the approval card in the Outreach console. If the owner asks who a draft goes to, tell them the real address is on the approval card; do NOT produce one from memory and NEVER make one up.
    • Report ONLY what the tools returned: the count queued and the count skipped. If a tool was not called, say so plainly; never imply outreach happened when it did not.
@@ -522,6 +522,7 @@ const TOOL_CREATE_OUTREACH_DRAFT: ChatTool = {
         businessName: { type: 'string', description: 'Target business or partner name.' },
         businessUrl: { type: 'string', description: 'Target website URL, must start with http(s)://.' },
         message: { type: 'string', description: 'The complete, polished outreach message ready to send. HARD LIMIT: between 40 and 2,400 characters (the pipeline rejects longer); concise beats long. Never promise guaranteed revenue, sales, rankings, or results.' },
+        contactEmail: { type: 'string', description: 'A publicly listed business email the OWNER supplied for this exact company — from a researched prospect list, a CRM export or a spreadsheet. Pass it verbatim. Omit it entirely when the owner gave none: the pipeline will search the site itself. NEVER guess an address and never reuse one belonging to a different company.' },
       },
       required: ['businessName', 'businessUrl', 'message'],
     },
@@ -1206,6 +1207,8 @@ if (name === 'createOutreachDraft') {
       businessName: String(args?.businessName || ''),
       businessUrl: String(args?.businessUrl || ''),
       message: String(args?.message || ''),
+      // Used only when the owner supplied it; still validated like a discovered one.
+      contactEmail: typeof args?.contactEmail === 'string' ? args.contactEmail : undefined,
     })
     return result.ok
       ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`

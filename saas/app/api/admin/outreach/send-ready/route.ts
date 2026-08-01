@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     const address = normalizeAddress(row.contact_email)
     const history = await getRecipientHistory(ctx.admin, address, row.id)
     if (history.contacted) {
-      skipped++
+      skippedCount++
       duplicateSkipped++
       results.push({ id: row.id, business: row.business_name, ok: false, skipped: true, reason: duplicateReason(history, address) })
       continue

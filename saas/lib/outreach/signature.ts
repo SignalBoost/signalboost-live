@@ -28,6 +28,15 @@ export function outreachLink(): string {
   return /^https?:\/\//i.test(configured) ? configured.replace(/\/+$/, '') : `https://${configured.replace(/^\/+|\/+$/g, '')}`
 }
 
+// The address a recipient should write to. Mirrors the desk the mail is sent from, so a
+// reply and a copied address land in the same monitored inbox. Buyers override it with
+// OUTREACH_CONTACT_EMAIL and nothing SignalBoost-specific applies to them.
+export function outreachContactAddress(senderKey?: string | null): string {
+  const configured = String(process.env.OUTREACH_CONTACT_EMAIL || '').trim()
+  if (configured) return configured
+  return senderKey === 'saasMarketing' ? 'saasmarketing@signalboostapp.com' : 'saassales@signalboostapp.com'
+}
+
 export function outreachTeamName(senderKey?: string | null): string {
   return senderKey === 'saasMarketing' ? 'The SignalBoost Marketing Team' : 'The SignalBoost Sales Team'
 }
@@ -70,17 +79,41 @@ export function applyOutreachSignature(message: string, senderKey?: string | nul
     .replace(/<\s*(your\s+name|name|sender|signature)\s*>/gi, team)
     .trimEnd()
 
-  // 3. Ensure the team signature is present exactly once, at the end.
-  if (!body.toLowerCase().includes(team.toLowerCase())) {
-    body = `${body}\n\n— ${team}`
-  }
-
-  // 4. Ensure the platform link is present exactly once. Compared on the bare host so a
-  //    message that already links the site in prose does not get a second copy.
+  // 3-5. Build the closing block and put it AT THE BOTTOM, always.
+  //
+  //    The previous version only asked whether each part appeared ANYWHERE in the body.
+  //    That is not the same requirement. A model that wrote "— The SignalBoost Sales
+  //    Team" in the middle of a paragraph satisfied the check, so no closing block was
+  //    added and the email ended on a call to action with no sign-off. Likewise a draft
+  //    ending in a deep link (…/website-optimizer) contains the host, so the default
+  //    site link was skipped.
+  //
+  //    So: strip any copy of these lines that the model already produced, then append
+  //    the block once, in a fixed order, as the last thing in the message. Still
+  //    idempotent — running it twice strips what the first pass added and re-appends
+  //    the identical block.
+  const contact = outreachContactAddress(senderKey)
   const host = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
-  if (!body.toLowerCase().includes(host)) {
-    body = `${body}\n${link}`
+
+  const lines = body.split('\n')
+  while (lines.length) {
+    const tail = lines[lines.length - 1].trim()
+    const isSignature = tail === `— ${team}` || tail === `- ${team}` || tail === team
+    const isContact = contact ? tail.toLowerCase() === contact.toLowerCase() : false
+    // A trailing bare link to the site — but never a deep link, which is the model's
+    // own call to action and belongs in the body it was written for.
+    const isBareLink = new RegExp(`^https?://(www\\.)?${host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`, 'i').test(tail)
+    if (!tail || isSignature || isContact || isBareLink) { lines.pop(); continue }
+    break
   }
+  body = lines.join('\n').trimEnd()
+
+  // An inline sign-off left at the very end of the last sentence, e.g. "…how it works:
+  // <url> — The SignalBoost Sales Team". Removed so the block below is the real close.
+  body = body.replace(new RegExp(`[\\s—-]*${team.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), '').trimEnd()
+
+  const closing = [`— ${team}`, contact, link].filter(Boolean).join('\n')
+  body = `${body}\n\n${closing}`
 
   return body
 }

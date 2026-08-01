@@ -29,9 +29,6 @@ const declared = Object.freeze<Record<string, Omit<PortableArchitectureEntry, 'p
   'video-maker': { coreBoundary: 'saas/render-core', hostBoundary: 'saas/render-host', state: 'complete', blockers: Object.freeze([]) },
   'control-center': { coreBoundary: 'saas/console-core', hostBoundary: 'saas/console-host', state: 'complete', blockers: Object.freeze([]) },
   'marketing-sales': { coreBoundary: 'saas/marketing-sales-core', hostBoundary: 'saas/marketing-sales-host', state: 'complete', blockers: Object.freeze([]) },
-  // The core is the connector layer itself, proven closed by scripts/build-social-portable.mjs:
-  // the boundary is machine-checked on every change rather than declared here and hoped for.
-  'social-outreach-connector': { coreBoundary: 'saas/lib/outreach/social-portable.ts', hostBoundary: 'SocialSecretsResolver + host-supplied datastore client', state: 'complete', blockers: Object.freeze([]) },
   'press-media': { coreBoundary: 'saas/press-media-core', hostBoundary: 'saas/press-media-host', state: 'complete', blockers: Object.freeze([]) },
   'portable-ai-chief-of-staff': { coreBoundary: 'saas/lib/cos', hostBoundary: 'saas/lib/cos/host.ts', state: 'complete', blockers: Object.freeze([]) },
   'browser-agent-ecosystem': { coreBoundary: 'saas/lib/portable-browser', hostBoundary: 'PortableBrowserRuntimeCoordinator + buyer-injected ports', state: 'complete', blockers: Object.freeze([]) },

@@ -63,6 +63,19 @@ export function getSocialSecret(name: string): string | undefined {
   }
 }
 
+// ── The same seam, named for the whole outreach layer ────────────────────────
+//
+// This file was written for the social connectors, but the requirement is identical
+// for email outreach: an API key or a contact address is host configuration, and a
+// buyer keeps those in their vault. Rather than invent a second resolver with the same
+// shape — two seams a buyer has to discover and wire separately — the email side reads
+// through this one under names that describe what it actually is.
+//
+// One resolver for the portable. Install it once and every outbound path follows.
+export const getOutreachSecret = getSocialSecret
+export const setOutreachSecretsResolver = setSocialSecretsResolver
+export type OutreachSecretsResolver = SocialSecretsResolver
+
 /**
  * The credential names for a platform, in the connector's uniform convention.
  * Exposed so a host can pre-load exactly the values it needs, and so the readiness

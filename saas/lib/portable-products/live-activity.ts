@@ -87,6 +87,16 @@ export const PORTABLE_ACTIVITY_SOURCES: Readonly<Record<string, readonly Portabl
     { table: 'video_jobs', timestampColumn: 'created_at', meaning: 'video render and export jobs' },
     { table: 'video_storage', timestampColumn: 'created_at', meaning: 'video artifacts stored' },
   ]),
+  'social-outreach-connector': Object.freeze([
+    // Real publishing state, not a placeholder. A connected account is a completed OAuth
+    // handshake against the platform; a destination is a page, channel or profile the
+    // provider itself returned; a setting is a publish-mode choice the owner made. All
+    // three are written only by the connector, so the count on the card is the count of
+    // work this portable actually did.
+    { table: 'outreach_social_tokens', timestampColumn: 'created_at', meaning: 'platform accounts connected' },
+    { table: 'outreach_social_destinations', timestampColumn: 'created_at', meaning: 'publishing destinations discovered' },
+    { table: 'outreach_social_settings', timestampColumn: 'created_at', meaning: 'publish modes chosen' },
+  ]),
   'marketing-sales': Object.freeze([
     { table: 'ms_campaigns', timestampColumn: 'created_at', meaning: 'marketing and sales campaigns created' },
     { table: 'ms_drafts', timestampColumn: 'created_at', meaning: 'campaign drafts created' },

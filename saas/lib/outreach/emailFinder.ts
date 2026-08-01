@@ -1,4 +1,5 @@
 // saas/lib/outreach/emailFinder.ts
+import { getOutreachSecret } from './social-secrets.ts'
 //
 // Find a REAL, published contact email for a business by reading its own website.
 // It never guesses or fabricates: it only returns an address that actually appears
@@ -131,7 +132,7 @@ export async function findContactEmail(businessUrl: string): Promise<ContactEmai
 // Apollo.io /people/match — returns the best on-domain contact email for a given
 // company domain, or null when Apollo has no record. Requires APOLLO_API_KEY env var.
 async function apolloLookup(domain: string): Promise<string | null> {
-  const key = process.env.APOLLO_API_KEY
+  const key = getOutreachSecret('APOLLO_API_KEY')
   if (!key || !domain) return null
   try {
     const res = await fetch('https://api.apollo.io/api/v1/people/match', {

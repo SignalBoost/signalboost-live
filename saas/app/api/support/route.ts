@@ -523,6 +523,7 @@ const TOOL_CREATE_OUTREACH_DRAFT: ChatTool = {
         businessUrl: { type: 'string', description: 'Target website URL, must start with http(s)://.' },
         message: { type: 'string', description: 'The complete, polished outreach message ready to send. HARD LIMIT: between 40 and 2,400 characters (the pipeline rejects longer); concise beats long. Never promise guaranteed revenue, sales, rankings, or results.' },
         contactEmail: { type: 'string', description: 'A publicly listed business email the OWNER supplied for this exact company — from a researched prospect list, a CRM export or a spreadsheet. Pass it verbatim. Omit it entirely when the owner gave none: the pipeline will search the site itself. NEVER guess an address and never reuse one belonging to a different company.' },
+        productKey: { type: 'string', description: 'The product or offer this email is about, e.g. "Self-Healing Supervisor". Duplicate protection is scoped to it: the same company may be contacted again for a DIFFERENT product, never twice for the same one. Always pass it when the owner named what is being sold.' },
       },
       required: ['businessName', 'businessUrl', 'message'],
     },
@@ -1209,6 +1210,7 @@ if (name === 'createOutreachDraft') {
       message: String(args?.message || ''),
       // Used only when the owner supplied it; still validated like a discovered one.
       contactEmail: typeof args?.contactEmail === 'string' ? args.contactEmail : undefined,
+      productKey: typeof args?.productKey === 'string' ? args.productKey : undefined,
     })
     return result.ok
       ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`

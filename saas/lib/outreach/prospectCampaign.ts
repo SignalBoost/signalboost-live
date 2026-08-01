@@ -21,6 +21,7 @@ import { createClient } from '@supabase/supabase-js'
 import { callModel } from '@/lib/ai/modelRouter'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { createOutreachDraft } from '@/lib/ai/growthPlans'
+import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import { discoverGithubOrgs } from '@/lib/outreach/sources/github'
 
 const TABLE = 'prospect_campaign_jobs'
@@ -305,14 +306,17 @@ function regionSignal(candidate: ProspectCandidate, job: ProspectCampaignJob): R
 // each one burns a slot, and createOutreachDraft rejects it as a duplicate at the very
 // end — so a 10-draft campaign quietly returns 2. Filtering at selection time means the
 // slots go to companies that have never been contacted.
-async function knownHosts(db: ReturnType<typeof admin>): Promise<Set<string>> {
+async function knownHosts(db: ReturnType<typeof admin>, wantedProduct: string | null): Promise<Set<string>> {
   const known = new Set<string>()
   if (!db) return known
   const { data } = await db
     .from('outreach_queue')
-    .select('business_url')
+    .select('business_url,product_key')
     .limit(2_000)
   for (const row of data || []) {
+    // Only exclude companies already approached about THIS product. A company contacted
+    // about something else is still a valid prospect for this campaign.
+    if (productKeyOf(String((row as any)?.product_key || '')) !== wantedProduct) continue
     const host = hostOf(String(row?.business_url || ''))
     if (host) known.add(host)
   }
@@ -332,7 +336,7 @@ async function runDiscovery(
   const timeLeft = () => budgetMs - (Date.now() - startedAt)
   // Seed the seen-set with every company already in the queue, so previously contacted
   // firms are skipped exactly like within-run duplicates.
-  const seen = await knownHosts(admin())
+  const seen = await knownHosts(admin(), productKeyOf(job.offer))
   const matched: ProspectCandidate[] = []
   const unknown: ProspectCandidate[] = []
   const elsewhere: ProspectCandidate[] = []
@@ -514,7 +518,10 @@ export async function advanceProspectCampaigns(): Promise<{
       // Reused unchanged: finds a REAL published email or skips, localizes to the
       // target's region, appends the compliance footer, inserts as 'pending'.
       const created = await withTimeout(
-        createOutreachDraft({ businessName: candidate.name, businessUrl: candidate.url, message, senderKey: 'saasSales' }),
+        // The campaign's offer is the product key, so duplicate protection is scoped to
+        // THIS product: the same company can be approached again in a later campaign
+        // selling something else, but never twice for this one.
+        createOutreachDraft({ businessName: candidate.name, businessUrl: candidate.url, message, senderKey: 'saasSales', productKey: job.offer }),
         PER_COMPANY_TIMEOUT_MS - 45_000,
         () => ({ ok: false, skipped: true, error: 'Timed out while looking for a published email.' } as any),
       )

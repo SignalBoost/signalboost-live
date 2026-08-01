@@ -25,7 +25,13 @@ import type {
 // record — so mail goes out as a named person at the company that employs this AI, not from a
 // hardcoded seller address. A buyer sets RESEND_FROM_EMAIL / PRESS_REPLY_TO and their identity
 // applies everywhere, with no code change.
-const FROM = process.env.RESEND_FROM_EMAIL || 'SignalBoost Press <press@signalboostapp.com>'
+// The default must be an address Resend has actually verified for this domain. The
+// previous 'press@signalboostapp.com' is not one of the platform's verified sender
+// identities (see saas/lib/email.ts SENDERS), so a send from it would be rejected
+// outright. saaspartners@ is verified and is the desk the owner chose for press: a
+// publication is a partner relationship, not a sales prospect and not brand marketing.
+// A buyer overrides it with RESEND_FROM_EMAIL.
+const FROM = process.env.RESEND_FROM_EMAIL || 'SignalBoost Partners <saaspartners@signalboostapp.com>'
 
 function addressOf(value: string): string {
   const match = String(value || '').match(/<([^>]+)>/)
@@ -49,8 +55,41 @@ function senderFrom(facts: CompanyFacts | null): string {
 function replyToAddress(): string | undefined {
   const explicit = String(process.env.PRESS_REPLY_TO || '').trim()
   if (explicit) return explicit
+  // Fall back to the PARTNERS desk before the owner's personal inbox: an editor's reply
+  // is the start of a relationship, and that mailbox is already monitored.
+  const partners = addressOf(String(process.env.PRESS_CONTACT_EMAIL || process.env.PARTNERS_REPLY_TO || PRESS_CONTACT_FALLBACK))
+  if (partners) return partners
   const owner = ownerEmail()
   return owner || undefined
+}
+
+// The address the sales outreach sends from, and therefore the one already monitored for
+// replies. A buyer overrides it with OUTREACH_REPLY_TO; nothing here is SignalBoost-only
+// beyond this default, which only applies on this host.
+// Press replies go to the PARTNERS desk. The verified identities separate the desks
+// deliberately — saassales@ is cold sales, saasmarketing@ is outbound brand, and
+// saaspartners@ is the inbound relationship desk. An editor writing back wants a
+// conversation, not a sales sequence, so that is where the reply belongs.
+const PRESS_CONTACT_FALLBACK = 'saaspartners@signalboostapp.com'
+
+// MEDIA CONTACT BLOCK.
+//
+// A press release without a contact is unusable: an editor who wants a detail, an image
+// or an interview has nowhere to write, and replying to the sending address is a guess
+// they will not make. Conventional releases end with one, so this appends it when the
+// copy does not already carry the address.
+function mediaContactBlock(facts: CompanyFacts | null, reply: string | undefined, html: string): string {
+  if (!reply) return ''
+  if (html.toLowerCase().includes(reply.toLowerCase())) return ''
+  const brand = String(facts?.brandName || facts?.legalName || '').trim()
+  const site = String(facts?.website || '').trim()
+  const lines = [
+    `<strong>Media contact</strong>`,
+    brand ? `${String(brand).replace(/</g, '&lt;')}` : '',
+    `<a href="mailto:${reply}">${reply}</a>`,
+    site ? `<a href="${String(site).replace(/"/g, '')}">${String(site).replace(/</g, '&lt;')}</a>` : '',
+  ].filter(Boolean)
+  return `<p style="margin-top:20px;color:#444;font-size:14px">${lines.join('<br/>')}</p>`
 }
 
 // A signature identifying the sender as someone at the company. If the company record names no
@@ -140,7 +179,7 @@ export function createEmailPort(): EmailPort {
           to: input.to,
           bcc: ownerEmail() || undefined,
           subject: input.subject,
-          html: `${input.html}${signatureBlock(facts)}`,
+          html: `${input.html}${mediaContactBlock(facts, reply, input.html)}${signatureBlock(facts)}`,
         }
         if (reply) { payload.replyTo = reply; payload.reply_to = reply }
         await resend.emails.send(payload)

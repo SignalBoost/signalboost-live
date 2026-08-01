@@ -300,6 +300,25 @@ function regionSignal(candidate: ProspectCandidate, job: ProspectCampaignJob): R
   return 'unknown'
 }
 
+// Companies already in the outreach queue are excluded BEFORE they take a candidate
+// slot. Without this, discovery re-finds the same firms every campaign in a market,
+// each one burns a slot, and createOutreachDraft rejects it as a duplicate at the very
+// end — so a 10-draft campaign quietly returns 2. Filtering at selection time means the
+// slots go to companies that have never been contacted.
+async function knownHosts(db: ReturnType<typeof admin>): Promise<Set<string>> {
+  const known = new Set<string>()
+  if (!db) return known
+  const { data } = await db
+    .from('outreach_queue')
+    .select('business_url')
+    .limit(2_000)
+  for (const row of data || []) {
+    const host = hostOf(String(row?.business_url || ''))
+    if (host) known.add(host)
+  }
+  return known
+}
+
 async function runDiscovery(
   job: ProspectCampaignJob,
   // Wall-clock budget for discovery as a whole. Discovery previously had NO time
@@ -311,7 +330,9 @@ async function runDiscovery(
 ): Promise<{ ok: boolean; candidates: ProspectCandidate[]; error?: string; note?: string }> {
   const startedAt = Date.now()
   const timeLeft = () => budgetMs - (Date.now() - startedAt)
-  const seen = new Set<string>()
+  // Seed the seen-set with every company already in the queue, so previously contacted
+  // firms are skipped exactly like within-run duplicates.
+  const seen = await knownHosts(admin())
   const matched: ProspectCandidate[] = []
   const unknown: ProspectCandidate[] = []
   const elsewhere: ProspectCandidate[] = []

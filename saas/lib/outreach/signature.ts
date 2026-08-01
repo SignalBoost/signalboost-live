@@ -1,4 +1,5 @@
 // saas/lib/outreach/signature.ts
+import { getOutreachSecret } from './social-secrets.ts'
 //
 // THE SIGNATURE CHOKEPOINT.
 //
@@ -23,7 +24,7 @@ const DEFAULT_SAAS_LINK = 'https://saas.signalboostapp.com'
 // white-space:pre-wrap div with no anchor tags, and every mail client auto-links a
 // bare https:// URL — so this is the form that actually stays clickable.
 export function outreachLink(): string {
-  const configured = String(process.env.NEXT_PUBLIC_SAAS_URL || process.env.SAAS_PUBLIC_URL || '').trim()
+  const configured = String(getOutreachSecret('NEXT_PUBLIC_SAAS_URL') || getOutreachSecret('SAAS_PUBLIC_URL') || '').trim()
   if (!configured) return DEFAULT_SAAS_LINK
   return /^https?:\/\//i.test(configured) ? configured.replace(/\/+$/, '') : `https://${configured.replace(/^\/+|\/+$/g, '')}`
 }
@@ -32,7 +33,7 @@ export function outreachLink(): string {
 // reply and a copied address land in the same monitored inbox. Buyers override it with
 // OUTREACH_CONTACT_EMAIL and nothing SignalBoost-specific applies to them.
 export function outreachContactAddress(senderKey?: string | null): string {
-  const configured = String(process.env.OUTREACH_CONTACT_EMAIL || '').trim()
+  const configured = String(getOutreachSecret('OUTREACH_CONTACT_EMAIL') || '').trim()
   if (configured) return configured
   return senderKey === 'saasMarketing' ? 'saasmarketing@signalboostapp.com' : 'saassales@signalboostapp.com'
 }

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { applyOutreachSignature } from '@/lib/outreach/signature'
+import { getRecipientHistory, duplicateReason, normalizeAddress } from '@/lib/outreach/recipientHistory'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
@@ -108,6 +109,18 @@ export async function GET(req: NextRequest) {
 
   for (const row of rows || []) {
     // Second duplicate guard immediately before send.
+    // The batch runner is the AUTOMATIC path: nobody is watching it choose, so an
+    // address that has already been contacted is skipped outright with no override.
+    // A deliberate follow-up is a human decision made per row in the console.
+    const address = normalizeAddress(row.contact_email)
+    const history = await getRecipientHistory(ctx.admin, address, row.id)
+    if (history.contacted) {
+      skipped++
+      duplicateSkipped++
+      results.push({ id: row.id, business: row.business_name, ok: false, skipped: true, reason: duplicateReason(history, address) })
+      continue
+    }
+
     if (await alreadySent(ctx.admin, row.id)) {
       skippedCount++
       duplicateSkipped++

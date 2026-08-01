@@ -79,6 +79,10 @@
       "agentOperations": {
         "name": "Agent Operations Platform",
         "desc": "Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."
+      },
+      "socialOutreach": {
+        "name": "Social Outreach Connector",
+        "desc": "Publish to seven platforms on your own accounts and credentials."
       }
     },
     "portableMaturity": {
@@ -166,6 +170,10 @@
       "agentOperations": {
         "name": "Plataforma de Operaciones de Agentes",
         "desc": "Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."
+      },
+      "socialOutreach": {
+        "name": "Conector de Difusión Social",
+        "desc": "Publica en siete plataformas con tus propias cuentas y credenciales."
       }
     },
     "portableMaturity": {
@@ -253,6 +261,10 @@
       "agentOperations": {
         "name": "Plataforma de Operações de Agentes",
         "desc": "Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."
+      },
+      "socialOutreach": {
+        "name": "Conector de Publicação Social",
+        "desc": "Publique em sete plataformas com suas próprias contas e credenciais."
       }
     },
     "portableMaturity": {
@@ -340,6 +352,10 @@
       "agentOperations": {
         "name": "Platforma Operacji Agentów",
         "desc": "Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."
+      },
+      "socialOutreach": {
+        "name": "Konektor Social Outreach",
+        "desc": "Publikuj na siedmiu platformach na własnych kontach i danych dostępowych."
       }
     },
     "portableMaturity": {
@@ -427,6 +443,10 @@
       "agentOperations": {
         "name": "Платформа операций агентов",
         "desc": "Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."
+      },
+      "socialOutreach": {
+        "name": "Коннектор социальных публикаций",
+        "desc": "Публикация на семи платформах с вашими аккаунтами и учётными данными."
       }
     },
     "portableMaturity": {

@@ -7,7 +7,7 @@ import { applyOutreachLink } from '@/lib/outreach/signature'
 
 export const dynamic = 'force-dynamic'
 
-const NEEDS_ACCOUNT_REF = new Set<SocialPlatform>(['linkedin_company', 'facebook_pages', 'instagram_business', 'reddit'])
+const NEEDS_ACCOUNT_REF = new Set<SocialPlatform>(['linkedin_company', 'linkedin_member', 'facebook_pages', 'instagram_business', 'reddit'])
 const NEEDS_VIDEO = new Set<SocialPlatform>(['tiktok', 'youtube_channels'])
 const NEEDS_MEDIA = new Set<SocialPlatform>(['instagram_business'])
 

@@ -15,6 +15,7 @@ import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConv
 import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner'
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { createProspectCampaignJob, getProspectCampaignJob, listProspectCampaignJobs, summarizeProspectCampaign } from '@/lib/outreach/prospectCampaign'
+import { discoverPublishers } from '@/lib/marketing/publisherDiscovery'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { createPressCampaignFromAgent } from '@/lib/ai/tools/pressCampaign'
@@ -554,6 +555,26 @@ const TOOL_LIST_MY_OUTREACH: ChatTool = {
 // draft to each" can never complete inline — it is 2+ model round trips per company.
 // These two tools hand the work to the background worker instead: the turn returns a
 // job id immediately and the cron drafts across many short invocations.
+// COS had no way to FIND a publication — only to pitch one it was already given an
+// address for. So a press brief either stalled or drifted into the sales tool. This
+// closes the loop: the same regional publisher search the platform uses, exposed to COS.
+const TOOL_FIND_PUBLICATIONS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'findPublications',
+    description: 'Find real publications — IT magazines, trade journals, online and print newspapers — in a given country, each with a verified editorial contact taken from the outlet\'s own site. Call this BEFORE proposePressCampaign whenever the owner asks for press or media coverage and has not supplied the contacts. It searches in the country\'s own language. It contacts nobody and queues nothing. Directory pages, listicles and PR-distribution sites are excluded automatically. If it returns nothing, report that plainly — never substitute a company, a directory or an invented address.',
+    parameters: {
+      type: 'object',
+      properties: {
+        region: { type: 'string', description: 'Country in plain words, e.g. "United States", "Brazil", "Poland".' },
+        channel: { type: 'string', description: '"trade_press" for IT magazines and trade journals, "print" for newspapers, "digital_press" for online news sites. Default digital_press.' },
+        topic: { type: 'string', description: 'What the outlet must plausibly cover, e.g. "DevOps, SRE, cloud operations".' },
+        limit: { type: 'number', description: 'How many publications to return. 1-20, default 10.' },
+      },
+      required: ['region'],
+    },
+  },
+}
 const TOOL_START_PROSPECT_CAMPAIGN: ChatTool = {
   type: 'function',
   function: {
@@ -723,6 +744,7 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
   TOOL_CREATE_OUTREACH_DRAFT,
+  TOOL_FIND_PUBLICATIONS,
   TOOL_START_PROSPECT_CAMPAIGN,
   TOOL_PROSPECT_CAMPAIGN_STATUS,
   TOOL_PROPOSE_INFRA_PR,
@@ -1188,6 +1210,24 @@ if (name === 'createOutreachDraft') {
     return result.ok
       ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`
       : `Outreach draft failed: ${result.error ?? 'unknown error'}.`
+  }
+if (name === 'findPublications') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const region = String(args?.region || '').trim()
+    if (!region) return 'findPublications needs a region, e.g. "United States".'
+    const found = await discoverPublishers({
+      brief: String(args?.topic || ''),
+      channel: String(args?.channel || 'digital_press'),
+      region,
+      limit: Math.max(1, Math.min(Number(args?.limit) || 10, 20)),
+      budgetMs: 90_000,
+    })
+    if (!found.ok) return `No publications found in ${region}: ${found.error ?? 'search returned nothing usable'}. Report this to the owner — do NOT substitute companies or invent contacts.`
+    return [
+      `${found.publishers.length} publications found in ${region} (examined ${found.examined}). Each contact below came from the outlet's own site — use them verbatim and never alter or invent one:`,
+      ...found.publishers.map(p => `- ${p.publicationName} | ${p.method === 'online_form' ? 'form' : 'email'}: ${p.editorContact} | source: ${p.sourceUrl}`),
+    ].join('\n')
   }
 if (name === 'startProspectCampaign') {
     let args: any = {}
@@ -1686,11 +1726,26 @@ ${ev.summary}`
     // and startProspectCampaign never got a chance — the turn then spent its whole
     // budget trying to research ten companies inline and died at the limit. A
     // request naming a COUNT of companies is a background job, not a campaign row.
+    // PRESS vs SALES. A press request and a sales request use the SAME words — "run an
+    // outreach campaign", "find 20" — but they belong to completely different pipelines:
+    // press goes to proposePressCampaign → press_campaigns → the cockpit at
+    // /dashboard/marketing/press-providers, sales goes to the prospect worker →
+    // outreach_queue → Contacts. The prospect forcer below sets a HARD tool_choice, so
+    // without this check a press brief was forced into the sales tool and the press path
+    // became unreachable — which is exactly what happened: publications were searched for
+    // as if they were companies, and a magazine shop and a tutorial site were queued.
+    const PRESS_CONTEXT = /\b(press|publication|publications|publisher|publishers|magazine|magazines|newspaper|newspapers|journal|journalist|journalists|editor|editors|editorial|newsroom|media outreach|trade press|podcast|newsletter|press release|imprensa|jornal|revista|redação|prensa|periódico|revista|redacción|prasa|gazeta|redakcja|пресса|газета|журнал|редакция)\b/i
+    const isPressRequest = PRESS_CONTEXT.test(latestUserMessage)
+
     const PROSPECT_COUNT = /\b(?:find|get|build|list|source|research|encontr\w*|busca\w*|znajd\w*|найд\w*)\D{0,24}(\d{1,3})\b|\b(\d{1,3})\s*(?:companies|company|prospects?|leads?|targets?|accounts?|empresas?|firmas?|firmy|компани\w*)/i
     const PROSPECT_CONTEXT = /(outreach|prospect|cold email|email campaign|campaign|sell|sales|lead gen|prospec\w*|sprzeda\w*|аутрич|продаж)/i
     const prospectMatch = latestUserMessage.match(PROSPECT_COUNT)
     const prospectCount = prospectMatch ? Number(prospectMatch[1] || prospectMatch[2] || 0) : 0
-    const forceProspect = isOwner && !forceAction && prospectCount >= 3 && prospectCount <= 100 && PROSPECT_CONTEXT.test(latestUserMessage)
+    const forceProspect = isOwner && !forceAction && !isPressRequest && prospectCount >= 3 && prospectCount <= 100 && PROSPECT_CONTEXT.test(latestUserMessage)
+    if (isPressRequest && isOwner) {
+      systemContent += `\n\nOWNER PRESS REQUEST: this is a PRESS/MEDIA request, not a sales prospecting request. Do NOT call startProspectCampaign or createOutreachDraft — those target companies and would queue publications into the sales pipeline. Use findPublications first to get real outlets with verified editorial contacts for the region the owner named, then call proposePressCampaign ONCE PER publication you intend to pitch, using the contact findPublications returned. NEVER invent an editor address, a publication, a product name, a quote or a statistic; if no verified contact was found for an outlet, skip it and say so. Each proposePressCampaign call creates a DRAFT for owner approval at /dashboard/marketing/press-providers — nothing is sent. Report which publications you queued and which you skipped and why.`
+    }
+
     if (forceProspect) {
       systemContent += `\n\nOWNER MULTI-PROSPECT REQUEST: the owner asked for ${prospectCount} target companies in this message. You MUST call startProspectCampaign now, exactly once. Put the owner's description of what is being sold into offer (keep their wording and detail), their description of who to target — including geography and any disqualifiers — into targetCriteria, and set requestedCount to ${prospectCount}. Do NOT call createOutreachDraft, do NOT call proposeMarketingCampaign, and do NOT try to research or name any company yourself: this turn is time-bounded and researching companies inline will kill it before it answers. After the tool returns, report the job id, say plainly that discovery and drafting run in the background over the next several minutes, that NOTHING has been sent and no company has been contacted, and that drafts appear in the Outreach console for approval.`
     }

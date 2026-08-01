@@ -1,5 +1,6 @@
+// saas/lib/portable-products/product-registry.ts
 import type { PortableProductManifest } from './manifestTypes.ts'
-import { portableProductManifests, providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest, marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest, browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest } from './manifests/index.ts'
+import { portableProductManifests, providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest, marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest, browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest, socialOutreachConnectorManifest } from './manifests/index.ts'
 import { validatePortableProductManifests } from './manifestValidation.ts'
 import type { PortableProductDescriptor } from './product-types.ts'
 import { validatePortableProductRegistry } from './product-validation.ts'
@@ -17,6 +18,9 @@ export const portableProductRegistry = Object.freeze([
   product(videoMakerManifest, { localizationKey: 'render', glyph: '◍', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 30 }),
   product(controlCenterManifest, { localizationKey: 'console', glyph: '◈', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 40 }),
   product(marketingSalesManifest, { localizationKey: 'marketingSales', glyph: '◎', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 50 }),
+  // Sits immediately after Marketing + Sales on purpose: it is the connector that ships
+  // inside that product and is also sold alone, so the two cards read as a pair.
+  product(socialOutreachConnectorManifest, { localizationKey: 'socialOutreach', glyph: '➤', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 55, route: '/dashboard/outreach/social' }),
   product(pressMediaManifest, { localizationKey: 'press', glyph: '◉', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 60 }),
   product(portableChiefOfStaffManifest, { localizationKey: 'chiefOfStaff', glyph: '❖', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 70, route: '/dashboard/cos-mining' }),
   product(browserAgentEcosystemManifest, { localizationKey: 'browserAgents', glyph: '◇', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 80 }),

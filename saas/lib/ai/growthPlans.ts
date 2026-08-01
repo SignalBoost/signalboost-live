@@ -10,6 +10,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { findContactEmail } from '@/lib/outreach/emailFinder'
+import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import Anthropic from '@anthropic-ai/sdk'
 import { pickOutreachLanguage } from '@/lib/outreach/regionLanguage'
 
@@ -208,6 +209,9 @@ export async function createOutreachDraft(params: {
   // address is refused exactly as a discovered one would be; supplying it only skips the
   // crawl, it never lowers the bar.
   contactEmail?: string
+  // What is being sold. Duplicate protection is scoped to this, so the same company can
+  // be approached again for a DIFFERENT product but never twice for the same one.
+  productKey?: string
 }): Promise<{ ok: boolean; outreachId?: string; skipped?: boolean; contactEmail?: string; error?: string }> {
   try {
     const businessName = String(params.businessName || '').trim().slice(0, 200)
@@ -251,18 +255,21 @@ export async function createOutreachDraft(params: {
     if (host) {
       const { data: dupes } = await db0
         .from(OUTREACH_TABLE)
-        .select('id,business_url,status')
+        .select('id,business_url,status,product_key')
         .neq('status', 'rejected')
         .ilike('business_url', `%${host}%`)
         .limit(5)
+      const wantedProduct = productKeyOf(params.productKey)
       const clash = (dupes || []).find(row => {
+        // Same company AND same product. A different product is a legitimate new pitch.
+        if (productKeyOf((row as any).product_key) !== wantedProduct) return false
         try { return new URL(String(row.business_url || '')).hostname.replace(/^www\./i, '').toLowerCase() === host } catch { return false }
       })
       if (clash) {
         return {
           ok: false,
           skipped: true,
-          error: `${businessName} (${host}) is already in the outreach queue as ${clash.id} with status ${clash.status} — not queued again.`,
+          error: `${businessName} (${host}) is already in the outreach queue for this product as ${clash.id} with status ${clash.status} — not queued again. A different product is allowed.`,
         }
       }
     }
@@ -302,6 +309,7 @@ export async function createOutreachDraft(params: {
         business_name: businessName,
         business_url: businessUrl,
         contact_email: found.email,
+        product_key: productKeyOf(params.productKey),
         sender_key: senderKey,
         outreach_message: localizedMessage + outreachComplianceFooter(senderKey),
         status: 'pending',

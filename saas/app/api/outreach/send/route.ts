@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   const recipientAddress = normalizeAddress(outreach.contact_email)
   const force = body?.force === true
   if (!force) {
-    const history = await getRecipientHistory(ctx.admin, recipientAddress, outreachId)
+    const history = await getRecipientHistory(ctx.admin, recipientAddress, outreachId, outreach.product_key)
     if (history.contacted) {
       return NextResponse.json({
         error: duplicateReason(history, recipientAddress),

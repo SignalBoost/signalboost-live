@@ -9,6 +9,7 @@ export { createPrWireAdapter } from './adapters/pr-wire.ts'
 export { createAdPlatformAdapter } from './adapters/ad-platform.ts'
 export { createDirectIoAdapter } from './adapters/direct-io.ts'
 export { createMediaDatabaseAdapter, verifyTargetAgainstDatabase } from './adapters/media-database.ts'
+export { findPublications, leadToTarget } from './discovery.ts'
 export { runPressAcceptance } from './acceptance-harness.ts'
 export type { PressAcceptanceOptions, PressAcceptanceResult, PressCheck, PressCheckId } from './acceptance-harness.ts'
 

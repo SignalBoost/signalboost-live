@@ -1,4 +1,5 @@
 // saas/lib/outreach/social-connectors.ts
+import { getSocialSecret, socialCredentialNames } from './social-secrets.ts'
 // Multi-platform social publishing adapter registry.
 // Honest by construction: a post is reported as published only when the platform
 // returns a genuine provider id. Missing tokens, destination refs, media, or API
@@ -58,8 +59,11 @@ type Adapter = {
 }
 
 function creds(platform: SocialPlatform): { id?: string; secret?: string } {
-  const P = platform.toUpperCase()
-  return { id: process.env[`SOCIAL_${P}_CLIENT_ID`], secret: process.env[`SOCIAL_${P}_CLIENT_SECRET`] }
+  // Read through the host's resolver, not process.env directly. Default behaviour is
+  // identical (the default resolver IS process.env); a buyer installs their vault once
+  // and every connector follows without an edit here. See ./social-secrets.ts.
+  const names = socialCredentialNames(platform)
+  return { id: getSocialSecret(names.clientId), secret: getSocialSecret(names.clientSecret) }
 }
 
 function uploadMimeForVideoUrl(url: string, responseContentType: string | null): string {
@@ -298,7 +302,7 @@ export const SOCIAL_CONNECTORS: Record<SocialPlatform, { label: string; authUrl:
 
 export function buildOAuthUrl(platform: SocialPlatform, redirectUri: string, state: string) {
   const a = ADAPTERS[platform]
-  const params = new URLSearchParams({ client_id: process.env[`SOCIAL_${platform.toUpperCase()}_CLIENT_ID`] || 'configure-client-id', redirect_uri: redirectUri, response_type: 'code', scope: a.scopes.join(' '), state, access_type: 'offline', prompt: 'consent' })
+  const params = new URLSearchParams({ client_id: getSocialSecret(socialCredentialNames(platform).clientId) || 'configure-client-id', redirect_uri: redirectUri, response_type: 'code', scope: a.scopes.join(' '), state, access_type: 'offline', prompt: 'consent' })
   return `${a.authUrl}?${params.toString()}`
 }
 

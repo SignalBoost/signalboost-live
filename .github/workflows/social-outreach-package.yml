@@ -11,7 +11,7 @@
 # So the boundary is checked on every change to the layer, and a violation fails the
 # run. The tarball is a by-product of the check passing.
 
-name: Social Outreach portable
+name: Outreach portables
 
 on:
   push:
@@ -19,14 +19,14 @@ on:
     paths:
       - 'saas/lib/outreach/social-*.ts'
       - 'saas/lib/outreach/publish-mode.ts'
-      - 'saas/scripts/build-social-portable.mjs'
+      - 'saas/scripts/build-*-portable.mjs'
       - 'docs/portables/social-outreach-integration-guide.md'
       - '.github/workflows/social-outreach-package.yml'
   pull_request:
     paths:
       - 'saas/lib/outreach/social-*.ts'
       - 'saas/lib/outreach/publish-mode.ts'
-      - 'saas/scripts/build-social-portable.mjs'
+      - 'saas/scripts/build-*-portable.mjs'
       - 'docs/portables/social-outreach-integration-guide.md'
       - '.github/workflows/social-outreach-package.yml'
   workflow_dispatch:
@@ -47,16 +47,26 @@ jobs:
 
       # Boundary first and on its own, so a failure reads as "the layer stopped being
       # portable" rather than being buried inside a build log.
-      - name: Verify the portable boundary
+      # Both boundaries first and on their own. Marketing + Sales CONTAINS the Social
+      # Outreach Connector, so a host import added anywhere in the shared files breaks
+      # both products — checking them separately names which one, and proves the
+      # smaller product has not drifted from the half of the larger one it is meant to be.
+      - name: Verify the Social Outreach Connector boundary
         run: node scripts/build-social-portable.mjs --check
 
-      - name: Build the release tarball
+      - name: Verify the Marketing + Sales boundary
+        run: node scripts/build-marketing-sales-portable.mjs --check
+
+      - name: Build Social Outreach Connector
         run: node scripts/build-social-portable.mjs
 
-      - name: Upload the artifact
+      - name: Build Marketing + Sales
+        run: node scripts/build-marketing-sales-portable.mjs
+
+      - name: Upload the artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: social-outreach-connector-${{ github.sha }}
+          name: outreach-portables-${{ github.sha }}
           path: saas/dist/portable/*.tgz
           if-no-files-found: error
           retention-days: 30

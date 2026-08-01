@@ -10,6 +10,15 @@ export type SocialPlatform =
   | 'facebook_pages'
   | 'instagram_business'
   | 'linkedin_company'
+  // Posting from a PERSON'S own profile. Deliberately a separate connector rather than
+  // a flag on linkedin_company: it needs a different OAuth scope (w_member_social vs
+  // w_organization_social), a different author URN (urn:li:person vs urn:li:organization),
+  // and — the reason it matters commercially — a completely different approval path.
+  // Share on LinkedIn with w_member_social is free and self-serve; company-page posting
+  // requires Community Management approval, a registered business and a verified Page,
+  // which a startup buyer does not have on day one. Two cards on the cockpit, two honest
+  // answers about what each requires.
+  | 'linkedin_member'
   | 'twitter_x'
   | 'youtube_channels'
   | 'tiktok'
@@ -112,9 +121,9 @@ async function publishFacebookVideo(p: SocialPostPayload, token: string): Promis
   return { id: String(d.id), url: `https://www.facebook.com/${d.id}` }
 }
 
-async function publishLinkedInVideo(p: SocialPostPayload, token: string): Promise<RawPost> {
+async function publishLinkedInVideo(p: SocialPostPayload, token: string, ownerUrn?: string): Promise<RawPost> {
   if (!p.videoUrl) throw new Error('linkedin_video_requires_video')
-  const owner = `urn:li:organization:${p.accountRef}`
+  const owner = ownerUrn || `urn:li:organization:${p.accountRef}`
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     'LinkedIn-Version': '202401',
@@ -187,6 +196,23 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
       })
       const id = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
       if (!res.ok || !id) { const e = await res.json().catch(() => ({})); throw new Error(e?.message || `linkedin_publish_failed_${res.status}`) }
+      return { id, url: `https://www.linkedin.com/feed/update/${id}` }
+    },
+    permalink: (id) => `https://www.linkedin.com/feed/update/${id}`,
+  },
+  linkedin_member: {
+    label: 'LinkedIn Profile', authUrl: 'https://www.linkedin.com/oauth/v2/authorization', tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+    // openid/profile are what identify the member so the author URN can be resolved
+    // without a second approval; w_member_social is the free self-serve posting scope.
+    scopes: ['openid', 'profile', 'w_member_social'], needsAccountRef: true, content: 'text',
+    publish: async (p, token) => {
+      const res = await fetch('https://api.linkedin.com/rest/posts', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'LinkedIn-Version': '202401', 'X-Restli-Protocol-Version': '2.0.0' },
+        body: JSON.stringify({ author: `urn:li:person:${p.accountRef}`, commentary: p.text, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false }),
+      })
+      const id = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
+      if (!res.ok || !id) { const e = await res.json().catch(() => ({})); throw new Error(e?.message || `linkedin_member_publish_failed_${res.status}`) }
       return { id, url: `https://www.linkedin.com/feed/update/${id}` }
     },
     permalink: (id) => `https://www.linkedin.com/feed/update/${id}`,
@@ -293,6 +319,7 @@ const PLATFORM_MODES: Record<SocialPlatform, { availableModes: PublishMode[]; de
   tiktok: { availableModes: ['native'], defaultMode: 'native' },
   instagram_business: { availableModes: ['native'], defaultMode: 'native' },
   linkedin_company: { availableModes: ['link', 'native'], defaultMode: 'link' },
+  linkedin_member: { availableModes: ['link', 'native'], defaultMode: 'link' },
   facebook_pages: { availableModes: ['link', 'native'], defaultMode: 'link' },
   twitter_x: { availableModes: ['link'], defaultMode: 'link' },
   reddit: { availableModes: ['link'], defaultMode: 'link' },
@@ -301,6 +328,7 @@ const PLATFORM_MODES: Record<SocialPlatform, { availableModes: PublishMode[]; de
 const NATIVE_PUBLISHERS: Partial<Record<SocialPlatform, (p: SocialPostPayload, accessToken: string) => Promise<RawPost>>> = {
   facebook_pages: publishFacebookVideo,
   linkedin_company: publishLinkedInVideo,
+  linkedin_member: (p, token) => publishLinkedInVideo(p, token, `urn:li:person:${p.accountRef}`),
 }
 
 export function platformAvailableModes(platform: SocialPlatform): PublishMode[] { return PLATFORM_MODES[platform]?.availableModes || ['link'] }

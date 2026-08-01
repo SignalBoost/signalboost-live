@@ -1,0 +1,62 @@
+# .github/workflows/social-outreach-package.yml
+#
+# Social Outreach Connector boundary guard and release path.
+#
+# The point of this workflow is the FIRST step, not the artifact. The connector layer
+# is portable today — eight files, no host imports, no dependencies — but nothing in
+# normal development stops someone adding `@/utils/supabase/server` to a connector to
+# fix something quickly. That single line would silently end the portability claim, and
+# nobody would find out until a buyer's install failed.
+#
+# So the boundary is checked on every change to the layer, and a violation fails the
+# run. The tarball is a by-product of the check passing.
+
+name: Social Outreach portable
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/outreach/social-*.ts'
+      - 'saas/lib/outreach/publish-mode.ts'
+      - 'saas/scripts/build-social-portable.mjs'
+      - 'docs/portables/social-outreach-integration-guide.md'
+      - '.github/workflows/social-outreach-package.yml'
+  pull_request:
+    paths:
+      - 'saas/lib/outreach/social-*.ts'
+      - 'saas/lib/outreach/publish-mode.ts'
+      - 'saas/scripts/build-social-portable.mjs'
+      - 'docs/portables/social-outreach-integration-guide.md'
+      - '.github/workflows/social-outreach-package.yml'
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Boundary first and on its own, so a failure reads as "the layer stopped being
+      # portable" rather than being buried inside a build log.
+      - name: Verify the portable boundary
+        run: node scripts/build-social-portable.mjs --check
+
+      - name: Build the release tarball
+        run: node scripts/build-social-portable.mjs
+
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: social-outreach-connector-${{ github.sha }}
+          path: saas/dist/portable/*.tgz
+          if-no-files-found: error
+          retention-days: 30

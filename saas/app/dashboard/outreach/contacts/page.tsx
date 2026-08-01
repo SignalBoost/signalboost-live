@@ -25,8 +25,8 @@ type Lead = {
   created_at?: string
 }
 
-const FILTERS: Filter[] = ['all', 'pending', 'approved', 'sent', 'rejected']
-const COLORS: Record<Status, string> = { pending: '#fde68a', approved: '#86efac', sent: '#7dd3fc', rejected: '#fca5a5' }
+const FILTERS: Filter[] = ['all', 'pending', 'approved', 'sent', 'rejected', 'archived']
+const COLORS: Record<Status, string> = { pending: '#fde68a', approved: '#86efac', sent: '#7dd3fc', rejected: '#fca5a5', archived: '#9ca3af' }
 
 function fill(template: string, values: Record<string, number>) {
   return Object.entries(values).reduce((text, [key, value]) => text.replace(`{${key}}`, String(value)), template)
@@ -40,6 +40,7 @@ export default function OutreachContactsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [duplicateId, setDuplicateId] = useState('')
   const [busyId, setBusyId] = useState('')
   const [batchBusy, setBatchBusy] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -51,6 +52,23 @@ export default function OutreachContactsPage() {
   // sits on "Loading contacts…" forever with no error and no way out. This one was
   // observed stuck for three hours. Thirty seconds is far longer than the query needs.
   const LOAD_TIMEOUT_MS = 30_000
+
+  async function remove(id: string) {
+    if (!window.confirm(copy.deleteConfirm)) return
+    setBusyId(id)
+    setError('')
+    setNotice('')
+    try {
+      const response = await fetch(`/api/outreach/queue?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.sent ? copy.deleteSentBlocked : (data?.error || copy.updateError))
+      await load()
+    } catch (reason: any) {
+      setError(reason?.message || copy.updateError)
+    } finally {
+      setBusyId('')
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -104,7 +122,7 @@ export default function OutreachContactsPage() {
     setPage(current => (current > pages - 1 ? Math.max(0, pages - 1) : current))
   }, [pages])
 
-  async function decide(id: string, status: 'approved' | 'rejected') {
+  async function decide(id: string, status: 'approved' | 'rejected' | 'archived', force = false) {
     setBusyId(id)
     setError('')
     setNotice('')
@@ -112,12 +130,16 @@ export default function OutreachContactsPage() {
       const response = await fetch('/api/outreach/queue', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, force }),
       })
       const data = await response.json()
       if (!response.ok || !data?.outreach) throw new Error(data?.error || copy.updateError)
 
-      if (status === 'rejected') setNotice(copy.rejectedNotice)
+      // A duplicate-recipient refusal is not a failure to report as an error: it is the
+      // guard working. Offer the deliberate override instead.
+      if (data?.release?.duplicateRecipient) { setDuplicateId(id); setNotice(data.release.error || copy.duplicateRecipient) }
+      else if (status === 'archived') setNotice(copy.archived)
+      else if (status === 'rejected') setNotice(copy.rejectedNotice)
       else if (data?.release?.ok && data?.release?.alreadySent) setNotice(copy.alreadySent)
       else if (data?.release?.ok) setNotice(copy.sentNotice)
       else setNotice(`${copy.notSent}${data?.release?.error ? ` ${data.release.error}` : ''}`)
@@ -235,6 +257,11 @@ export default function OutreachContactsPage() {
               <div className="sb-cta-row" style={{ marginTop: 10 }}>
                 <button type="button" className="sb-button-primary" disabled={busy || status === 'sent' || !lead.contact_email} onClick={() => void decide(lead.id, 'approved')}>{status === 'sent' ? copy.sent : status === 'approved' ? copy.sendApproved : copy.approveSend}</button>
                 <button type="button" className="sb-button-secondary" disabled={busy || status === 'sent' || status === 'rejected'} onClick={() => void decide(lead.id, 'rejected')}>{status === 'rejected' ? copy.rejected : copy.reject}</button>
+                {duplicateId === lead.id ? (
+                  <button type="button" className="sb-button-primary" disabled={busy} onClick={() => { setDuplicateId(''); void decide(lead.id, 'approved', true) }}>{copy.sendAnyway}</button>
+                ) : null}
+                <button type="button" className="sb-button-secondary" disabled={busy || status === 'archived'} onClick={() => void decide(lead.id, 'archived')}>{status === 'archived' ? copy.archived : copy.archive}</button>
+                <button type="button" className="sb-button-secondary" disabled={busy || status === 'sent'} onClick={() => void remove(lead.id)} style={{ color: '#fca5a5' }}>{copy.deleteLabel}</button>
                 <Link className="sb-button-secondary" href="/dashboard/outreach/outreach">{copy.openEngine}</Link>
               </div>
             </article>

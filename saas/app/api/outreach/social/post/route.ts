@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { publishSocialPost, SOCIAL_CONNECTORS, SocialPlatform } from '@/lib/outreach/social-connectors'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
+import { applyOutreachLink } from '@/lib/outreach/signature'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,9 @@ export async function POST(req: NextRequest) {
 
   const result = await publishSocialPost({
     platform,
-    text: String(body?.text || outreach.outreach_message || ''),
+    // Same rule as email: every outreach carries the platform link. Social posts get
+    // the link only — no signature block, which would not fit a short-form post.
+    text: applyOutreachLink(String(body?.text || outreach.outreach_message || '')),
     title: body?.title ? String(body.title) : String(outreach.business_name || 'Outreach'),
     imageUrl,
     videoUrl,

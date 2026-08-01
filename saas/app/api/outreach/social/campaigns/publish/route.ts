@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
+import { applyOutreachLink } from '@/lib/outreach/signature'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,7 +96,8 @@ export async function POST(req: NextRequest) {
 
     const result = await publishSocialPost({
       platform,
-      text: String(post.post_text || ''),
+      // Every outreach carries the platform link, campaign posts included.
+      text: applyOutreachLink(String(post.post_text || '')),
       title: post.title ? String(post.title) : campaign.name,
       imageUrl: post.image_url || undefined,
       videoUrl: post.video_url || undefined,

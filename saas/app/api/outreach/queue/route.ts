@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { applyOutreachSignature } from '@/lib/outreach/signature'
+import { getRecipientHistory, duplicateReason } from '@/lib/outreach/recipientHistory'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
@@ -76,7 +77,10 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
   const status = body?.status ? String(body.status) : undefined
-  if (status && !['pending', 'approved', 'rejected'].includes(status)) {
+  // 'archived' hides a row from the console without destroying it — the send history
+  // in outreach_sends stays intact, and an archived row is still counted by the
+  // address-level duplicate guard so it can never be contacted again by accident.
+  if (status && !['pending', 'approved', 'rejected', 'archived'].includes(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
@@ -96,7 +100,7 @@ export async function PATCH(req: NextRequest) {
     patch.approved_by = ctx.user.id
     patch.approved_at = new Date().toISOString()
   }
-  if (status === 'rejected') {
+  if (status === 'rejected' || status === 'archived') {
     patch.approved_by = null
     patch.approved_at = null
   }
@@ -147,6 +151,29 @@ export async function PATCH(req: NextRequest) {
         outreach: withChannel(data),
         release: { ok: false, reason: 'missing_or_low_quality_contact_email', error: 'Approved, but no valid published recipient email is available. Nothing was sent.' },
       })
+    }
+
+    // ADDRESS-LEVEL duplicate guard. This route has its OWN send path — the console's
+    // Approve & Send button never touches /api/outreach/send — so the guard has to be
+    // repeated here or the main human path would be the one place without it.
+    // force:true is the deliberate follow-up, offered in the console only after the
+    // refusal has been shown.
+    if (body?.force !== true) {
+      const history = await getRecipientHistory(ctx.admin, toEmail, id)
+      if (history.contacted) {
+        return NextResponse.json({
+          ok: true,
+          outreach: withChannel(data),
+          release: {
+            ok: false,
+            reason: 'duplicate_recipient',
+            duplicateRecipient: true,
+            error: duplicateReason(history, toEmail),
+            lastSentAt: history.lastSentAt,
+            previousBusiness: history.businessName,
+          },
+        })
+      }
     }
 
     if (await isOutreachSendingDisabled(ctx.admin)) {
@@ -233,4 +260,51 @@ export async function PATCH(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, outreach: withChannel(data), release: null })
+}
+
+// Permanent removal. Archiving is the safe default and what the console offers first;
+// this exists for rows that should never have been created at all — a prompt captured
+// as an email body, a directory page, a test row. It refuses to delete anything that
+// was actually sent: outreach_sends is the audit trail of what left the building, and
+// a queue row that was emailed must remain explainable.
+export async function DELETE(req: NextRequest) {
+  const ctx = await requireAdmin()
+  if (ctx instanceof NextResponse) return ctx
+
+  const id = String(req.nextUrl.searchParams.get('id') || '').trim()
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+
+  const { data: row } = await ctx.admin
+    .from('outreach_queue')
+    .select('id,status,business_name')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!row) return NextResponse.json({ error: 'Outreach not found' }, { status: 404 })
+
+  const { data: sent } = await ctx.admin
+    .from('outreach_sends')
+    .select('id')
+    .eq('outreach_id', id)
+    .limit(1)
+
+  if ((sent || []).length || row.status === 'sent') {
+    return NextResponse.json({
+      error: 'This message was already sent, so its record cannot be deleted. Archive it instead.',
+      sent: true,
+    }, { status: 409 })
+  }
+
+  const { error } = await ctx.admin.from('outreach_queue').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await auditAdminAction({
+    admin: ctx.admin,
+    actorId: ctx.user.id,
+    action: 'outreach.delete',
+    targetType: 'outreach_queue',
+    targetId: id,
+    metadata: { business: row.business_name, previousStatus: row.status },
+  })
+  return NextResponse.json({ ok: true, deleted: id })
 }

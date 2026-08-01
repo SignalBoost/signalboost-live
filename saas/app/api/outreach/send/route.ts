@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { applyOutreachSignature } from '@/lib/outreach/signature'
+import { getRecipientHistory, duplicateReason, normalizeAddress } from '@/lib/outreach/recipientHistory'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
@@ -67,6 +68,24 @@ export async function POST(req: NextRequest) {
   // Signature and platform link are enforced here, not left to the draft: this covers
   // rows written by every pipeline, including ones approved before the rule existed.
   const outboundMessage = applyOutreachSignature(String(outreach.outreach_message || ''), outreach.sender_key || 'saasSales')
+
+  // ADDRESS-LEVEL duplicate guard. The per-row check above only knows about THIS row;
+  // this one asks whether the person has already been emailed at all. A human may
+  // override with force:true — that is the deliberate follow-up case — but never by
+  // accident, and the response names exactly what was sent before.
+  const recipientAddress = normalizeAddress(outreach.contact_email)
+  const force = body?.force === true
+  if (!force) {
+    const history = await getRecipientHistory(ctx.admin, recipientAddress, outreachId)
+    if (history.contacted) {
+      return NextResponse.json({
+        error: duplicateReason(history, recipientAddress),
+        duplicateRecipient: true,
+        lastSentAt: history.lastSentAt,
+        previousBusiness: history.businessName,
+      }, { status: 409 })
+    }
+  }
 
   const safe = assertSafeOutreachMessage(outboundMessage)
   if (!safe.ok) return NextResponse.json({ error: safe.reason }, { status: 400 })

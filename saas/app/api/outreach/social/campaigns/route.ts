@@ -1,3 +1,4 @@
+// saas/app/api/outreach/social/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
@@ -18,6 +19,7 @@ const PLATFORM_LIMITS: Partial<Record<SocialPlatform, number>> = {
   twitter_x: 260,
   reddit: 4000,
   linkedin_company: 2800,
+  linkedin_member: 2800,
   facebook_pages: 5000,
   instagram_business: 2200,
   tiktok: 2200,
@@ -44,6 +46,7 @@ function defaultPostText(args: { platform: SocialPlatform; objective: string; ta
   const url = cleanText(args.targetUrl, 'https://www.saas.signalboostapp.com', 220)
   const platformIntro: Record<string, string> = {
     linkedin_company: `For ${audience}: ${base}`,
+    linkedin_member: `For ${audience}: ${base}`,
     reddit: `${base}\n\nQuestion for ${audience}: what part of campaign execution takes the most manual time today?`,
     twitter_x: `${base}`,
     facebook_pages: `${base}`,

@@ -1,3 +1,4 @@
+// saas/lib/outreach/social-onboarding-guide.ts
 import { type SocialPlatform } from './social-connectors.ts'
 
 export type SocialOnboardingProviderId = 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin' | 'reddit' | 'twitter_x'
@@ -94,6 +95,21 @@ const GUIDES: SocialOnboardingGuide[] = [
       { id: 'connect', title: 'Authorize TikTok access', detail: 'Connect through SignalBoost, sign in to TikTok, and approve the requested scopes.', owner: 'business_user', automatedBySignalBoost: false },
       { id: 'identity', title: 'Store connected identity', detail: 'SignalBoost can save the connected account reference and display name after OAuth succeeds.', owner: 'signalboost', automatedBySignalBoost: true },
       { id: 'health', title: 'Maintain connection health', detail: 'SignalBoost can monitor token status, scopes, and provider errors within approved API limits.', owner: 'signalboost', automatedBySignalBoost: true },
+    ],
+  },
+  {
+    providerId: 'linkedin',
+    platform: 'linkedin_member',
+    label: 'LinkedIn Profile',
+    businessAccountName: 'No business account required — posts from the connecting person\'s own profile',
+    developerPortal: 'https://www.linkedin.com/developers/apps',
+    callbackUrl: CALLBACK_URL,
+    envVars: ['SOCIAL_LINKEDIN_MEMBER_CLIENT_ID', 'SOCIAL_LINKEDIN_MEMBER_CLIENT_SECRET'],
+    steps: [
+      { id: 'developer-app', title: 'Create a LinkedIn app', detail: 'Create an app and add the Share on LinkedIn and Sign In with LinkedIn products. Both are self-serve — no company verification and no partner review.', owner: 'business_user', automatedBySignalBoost: false },
+      { id: 'redirect-uri', title: 'Register the OAuth callback', detail: `Add ${CALLBACK_URL} as an authorized redirect URL.`, owner: 'business_user', automatedBySignalBoost: false },
+      { id: 'credentials', title: 'Copy credentials into Vercel', detail: 'Copy the client ID and client secret into the LinkedIn Profile environment variables.', owner: 'business_user', automatedBySignalBoost: false },
+      { id: 'connect', title: 'Authorize LinkedIn access', detail: 'Connect through SignalBoost and approve posting on your own behalf. The profile is discovered automatically — nothing to paste.', owner: 'business_user', automatedBySignalBoost: false },
     ],
   },
   {

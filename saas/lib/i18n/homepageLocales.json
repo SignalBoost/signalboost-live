@@ -54,7 +54,7 @@
       },
       "marketingSales": {
         "name": "Marketing + Sales",
-        "desc": "Marketing and sales work in one tool."
+        "desc": "Campaigns, outreach and publishing to seven social platforms — on your own accounts."
       },
       "chiefOfStaff": {
         "name": "Portable AI Chief of Staff",
@@ -79,10 +79,6 @@
       "agentOperations": {
         "name": "Agent Operations Platform",
         "desc": "Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."
-      },
-      "socialOutreach": {
-        "name": "Social Outreach Connector",
-        "desc": "Publish to seven platforms on your own accounts and credentials."
       }
     },
     "portableMaturity": {
@@ -145,7 +141,7 @@
       },
       "marketingSales": {
         "name": "Marketing + Ventas",
-        "desc": "Marketing y ventas en una sola herramienta."
+        "desc": "Campañas, prospección y publicación en siete plataformas sociales, con tus propias cuentas."
       },
       "chiefOfStaff": {
         "name": "Jefe de Gabinete de IA Portátil",
@@ -170,10 +166,6 @@
       "agentOperations": {
         "name": "Plataforma de Operaciones de Agentes",
         "desc": "Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."
-      },
-      "socialOutreach": {
-        "name": "Conector de Difusión Social",
-        "desc": "Publica en siete plataformas con tus propias cuentas y credenciales."
       }
     },
     "portableMaturity": {
@@ -236,7 +228,7 @@
       },
       "marketingSales": {
         "name": "Marketing + Vendas",
-        "desc": "Marketing e vendas em uma só ferramenta."
+        "desc": "Campanhas, prospecção e publicação em sete plataformas sociais, com suas próprias contas."
       },
       "chiefOfStaff": {
         "name": "Chefe de Gabinete de IA Portátil",
@@ -261,10 +253,6 @@
       "agentOperations": {
         "name": "Plataforma de Operações de Agentes",
         "desc": "Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."
-      },
-      "socialOutreach": {
-        "name": "Conector de Publicação Social",
-        "desc": "Publique em sete plataformas com suas próprias contas e credenciais."
       }
     },
     "portableMaturity": {
@@ -327,7 +315,7 @@
       },
       "marketingSales": {
         "name": "Marketing + Sprzedaż",
-        "desc": "Marketing i sprzedaż w jednym narzędziu."
+        "desc": "Kampanie, outreach i publikacja na siedmiu platformach społecznościowych — na własnych kontach."
       },
       "chiefOfStaff": {
         "name": "Przenośny Szef Sztabu AI",
@@ -352,10 +340,6 @@
       "agentOperations": {
         "name": "Platforma Operacji Agentów",
         "desc": "Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."
-      },
-      "socialOutreach": {
-        "name": "Konektor Social Outreach",
-        "desc": "Publikuj na siedmiu platformach na własnych kontach i danych dostępowych."
       }
     },
     "portableMaturity": {
@@ -418,7 +402,7 @@
       },
       "marketingSales": {
         "name": "Маркетинг + Продажи",
-        "desc": "Маркетинг и продажи в одном инструменте."
+        "desc": "Кампании, аутрич и публикация на семи социальных платформах — в ваших аккаунтах."
       },
       "chiefOfStaff": {
         "name": "Портативный ИИ-руководитель аппарата",
@@ -443,10 +427,6 @@
       "agentOperations": {
         "name": "Платформа операций агентов",
         "desc": "Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."
-      },
-      "socialOutreach": {
-        "name": "Коннектор социальных публикаций",
-        "desc": "Публикация на семи платформах с вашими аккаунтами и учётными данными."
       }
     },
     "portableMaturity": {

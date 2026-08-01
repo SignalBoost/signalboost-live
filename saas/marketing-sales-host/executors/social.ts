@@ -18,6 +18,7 @@ import type { PublishResult } from '@/marketing-sales-core/executors/types'
 const ID_BY_PLATFORM: Partial<Record<SocialPlatform, string>> = {
   youtube_channels: 'youtube',
   linkedin_company: 'linkedin',
+  linkedin_member: 'linkedin',
   facebook_pages: 'facebook',
   instagram_business: 'instagram',
   twitter_x: 'twitter',
@@ -30,6 +31,7 @@ const PLATFORM_HOME: Record<SocialPlatform, string> = {
   youtube_channels: 'https://www.youtube.com/',
   twitter_x: 'https://x.com/',
   linkedin_company: 'https://www.linkedin.com/',
+  linkedin_member: 'https://www.linkedin.com/',
   facebook_pages: 'https://www.facebook.com/',
   instagram_business: 'https://www.instagram.com/',
   tiktok: 'https://www.tiktok.com/',

@@ -37,6 +37,22 @@ export function outreachTeamName(senderKey?: string | null): string {
 // than leaving "Best regards," dangling above the injected signature.
 const DANGLING_SIGNOFF = /(?:^|\n)\s*(best regards|kind regards|warm regards|regards|sincerely|best|thanks|thank you|cheers|atentamente|saludos|cordialmente|z powa[żz]aniem|pozdrawiam|с уважением)\s*,?\s*(?:\n+\s*(?:\[[^\]]{0,48}\]|\{\{[^}]{0,60}\}\}|<[^>]{0,48}>|your name|name|sender|signature)\s*)?\s*$/i
 
+// SOCIAL / SHORT-FORM VARIANT.
+//
+// The same rule as email — every outreach must carry the platform link — but a social
+// post or DM has no signature block and a hard character budget, so the full email
+// footer is wrong there. This appends only the link, and only when it is missing.
+//
+// Idempotent, like its email counterpart.
+export function applyOutreachLink(message: string): string {
+  const body = String(message || '').replace(/\r\n/g, '\n').trimEnd()
+  const link = outreachLink()
+  const host = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
+  if (!body) return link
+  if (body.toLowerCase().includes(host)) return body
+  return `${body}\n${link}`
+}
+
 export function applyOutreachSignature(message: string, senderKey?: string | null): string {
   const team = outreachTeamName(senderKey)
   const link = outreachLink()

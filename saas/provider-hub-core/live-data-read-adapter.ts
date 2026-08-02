@@ -98,6 +98,9 @@ export async function executeProviderLiveDataRead(
       etag: null,
       rateLimit: null,
       failureCode: 'transport_failure',
+      // The transport was invoked and threw. An attempt that fails is still an attempt, and the
+      // evidence for a failed read must not read as though no network was touched.
+      networkAccessPerformed: true,
     }))
   }
 
@@ -124,5 +127,6 @@ export async function executeProviderLiveDataRead(
       resetAt: headers['x-ratelimit-reset-at'] ?? null,
     },
     failureCode: successful ? null : 'provider_read_failed',
+    networkAccessPerformed: true,
   }))
 }

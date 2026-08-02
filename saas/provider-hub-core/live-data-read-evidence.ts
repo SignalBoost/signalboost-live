@@ -1,3 +1,20 @@
+//
+// EVIDENCE MUST NOT ASSERT WHAT NOBODY CHECKED.
+//
+// `networkAccessPerformed` was a hardcoded `false` on every record — including records produced
+// immediately after the adapter had invoked the buyer's transport and made a real GET. The field
+// read like a verified safety property and was in fact a constant, so a reviewer reading the
+// evidence for a completed live read was told no network access occurred. It is now supplied by
+// the caller that actually knows, defaults to false for direct construction, and is set true by
+// the adapter whenever the transport is invoked — including when that transport throws, because
+// an attempt that fails is still an attempt.
+//
+// The three siblings around it are true BY CONSTRUCTION and stay literal, which is the
+// distinction worth preserving: `providerMutationPerformed` is false because the adapter only
+// ever issues GET; `credentialsExposed` and `rawPayloadStored` are false because this record
+// holds an origin and a digest and has no field a payload or a secret could occupy. Those are
+// structural guarantees. Network access was never one.
+
 export const PROVIDER_LIVE_DATA_READ_EVIDENCE_SCHEMA_VERSION = 'provider-live-data-read-evidence-v1' as const
 
 export type ProviderLiveDataReadState = 'validated' | 'blocked'
@@ -22,7 +39,8 @@ export interface ProviderLiveDataReadEvidence {
   readonly rateLimit: Readonly<{ limit: number | null; remaining: number | null; resetAt: string | null }>
   readonly failureCode: string | null
   readonly blockers: readonly string[]
-  readonly networkAccessPerformed: false
+  /** True when a transport was actually invoked. Not a constant — see the header. */
+  readonly networkAccessPerformed: boolean
   readonly providerMutationPerformed: false
   readonly credentialsExposed: false
   readonly rawPayloadStored: false
@@ -45,7 +63,7 @@ function integer(value: unknown): number | null {
 
 export function createProviderLiveDataReadEvidence(input: Record<string, unknown>): ProviderLiveDataReadEvidence {
   const blockers = new Set<string>()
-  const allowed = new Set(['tenantId','environmentId','connectionId','providerId','capability','method','sourceOrigin','fetchedAt','observedAt','httpStatus','resultCount','dataSha256','etag','rateLimit','failureCode'])
+  const allowed = new Set(['tenantId','environmentId','connectionId','providerId','capability','method','sourceOrigin','fetchedAt','observedAt','httpStatus','resultCount','dataSha256','etag','rateLimit','failureCode','networkAccessPerformed'])
   for (const key of Object.keys(input)) if (!allowed.has(key)) blockers.add(`unknown-key:${key}`)
 
   const tenantId = text(input.tenantId)
@@ -102,6 +120,10 @@ export function createProviderLiveDataReadEvidence(input: Record<string, unknown
   if (limit !== null && remaining !== null && remaining > limit) blockers.add('rate-remaining-exceeds-limit')
   if (rawRate.resetAt != null && !resetAt) blockers.add('invalid-rate-reset-at')
 
+  // Absent means false: a caller constructing evidence by hand has performed no read, and the
+  // adapter — the only producer that has — states it explicitly.
+  const networkAccessPerformed = input.networkAccessPerformed === true
+
   const sorted = Object.freeze([...blockers].sort())
   return Object.freeze({
     schemaVersion: PROVIDER_LIVE_DATA_READ_EVIDENCE_SCHEMA_VERSION,
@@ -110,7 +132,7 @@ export function createProviderLiveDataReadEvidence(input: Record<string, unknown
     method: 'GET', sourceOrigin, fetchedAt: fetchedAt ?? '', observedAt: observedAt ?? '',
     freshnessSeconds, httpStatus: httpStatus ?? 0, resultCount: resultCount ?? 0,
     dataSha256, etag, rateLimit: Object.freeze({ limit, remaining, resetAt }), failureCode,
-    blockers: sorted, networkAccessPerformed: false, providerMutationPerformed: false,
+    blockers: sorted, networkAccessPerformed, providerMutationPerformed: false,
     credentialsExposed: false, rawPayloadStored: false,
   })
 }

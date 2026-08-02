@@ -35,6 +35,17 @@ type Platform = {
   setup: NetworkSetup | null
   missing: string[]
   arrangements: Arrangement[]
+  canConnect: boolean
+  connection: Connection | null
+}
+
+type Connection = {
+  platformId: string
+  accountRef: string | null
+  expiresAt: string | null
+  connectedBy: string | null
+  connectedAt: string | null
+  lastError: string | null
 }
 type Unavailable = { id: string; reason: string }
 type Ceiling = { platformId: string; accountRef: string; ceilingMinor: number; currency: string; display: string; setBy: string }
@@ -107,6 +118,18 @@ export default function AdsCockpit() {
 
   useEffect(() => { load() }, [])
 
+  // The OAuth callback sends the operator back here with its result in the query string.
+  // Read once and cleared from the URL, so a refresh does not replay an old outcome.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get('connected')
+    const failed = params.get('connect_failed')
+    if (connected) setMessage(`${uiText('generatedUi.u_ads_connectok')} — ${connected}`)
+    if (failed) setProblem(failed)
+    if (connected || failed) window.history.replaceState({}, '', window.location.pathname)
+  }, [])
+
   async function post(body: Record<string, unknown>) {
     setMessage(''); setProblem('')
     const res = await fetch('/api/ads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -141,6 +164,7 @@ export default function AdsCockpit() {
                 {platform.ready ? chip(uiText('generatedUi.u_ads_ready'), '#22c55e') : chip(uiText('generatedUi.u_ads_notready'), '#fb923c')}
               </div>
               <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, margin: '8px 0 0' }}>{platform.id}</p>
+              <ConnectionRow platform={platform} />
               <NetworkSetupPanel platform={platform} onStaged={load} />
             </div>
           ))}
@@ -229,6 +253,57 @@ export default function AdsCockpit() {
         )}
       </section>
     </main>
+  )
+}
+
+/**
+ * Connecting a network, and what the connection is worth.
+ *
+ * A token is not a setting — it expires. Meta and LinkedIn last about sixty days, Pinterest
+ * thirty, and TikTok, Snapchat and Reddit issue tokens measured in hours. So this shows the
+ * expiry beside the connection rather than a green tick, and says plainly that renewal is
+ * automatic: the useful question is not "is it connected" but "will it still be connected
+ * next week".
+ */
+function ConnectionRow({ platform }: { platform: Platform }) {
+  const connection = platform.connection
+
+  if (!platform.canConnect && !connection) {
+    // X and Microsoft do not speak OAuth 2. Saying so here is better than a button that
+    // opens an error page and teaches the buyer the integration is broken.
+    return <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, margin: '8px 0 0' }}>{uiText('generatedUi.u_ads_cannotconnect')}</p>
+  }
+
+  return (
+    <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+      {connection ? (
+        <div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {chip(uiText('generatedUi.u_ads_connected'), '#22c55e')}
+            {connection.expiresAt ? (
+              <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 10 }}>
+                {uiText('generatedUi.u_ads_expires')} {new Date(connection.expiresAt).toLocaleDateString()}
+              </span>
+            ) : null}
+          </div>
+          <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 10, margin: '4px 0 0' }}>{uiText('generatedUi.u_ads_autorenew')}</p>
+          {connection.lastError ? (
+            <p style={{ color: '#fca5a5', fontSize: 10, margin: '4px 0 0' }}>
+              {uiText('generatedUi.u_ads_lasterror')}: {connection.lastError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {platform.canConnect ? (
+        <button
+          style={connection ? { ...ghost, padding: '6px 10px', fontSize: 11 } : button}
+          onClick={() => { window.location.href = `/api/ads/oauth?platform=${encodeURIComponent(platform.id)}` }}
+        >
+          {connection ? uiText('generatedUi.u_ads_reconnect') : uiText('generatedUi.u_ads_connect')}
+        </button>
+      ) : null}
+    </div>
   )
 }
 

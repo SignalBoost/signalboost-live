@@ -34,6 +34,7 @@ type Platform = {
   ready: boolean
   setup: NetworkSetup | null
   missing: string[]
+  arrangements: Arrangement[]
 }
 type Unavailable = { id: string; reason: string }
 type Ceiling = { platformId: string; accountRef: string; ceilingMinor: number; currency: string; display: string; setBy: string }
@@ -56,7 +57,19 @@ type Campaign = {
   lastReconciledAt: string | null
   reconcileError: string | null
 }
-type Snapshot = { platforms: Platform[]; unavailable: Unavailable[]; ceilings: Ceiling[]; campaigns: Campaign[] }
+type Arrangement = { id: string; label: string; description: string; eligibility: string; watches: string[] }
+type DiscoveredAccount = { accountRef: string; name: string; currency: string | null; timezone: string | null; status: string | null; billingMode: string | null; label: string }
+type Health = {
+  platformId: string; accountRef: string; billingMode: string; currency: string | null
+  invoiceDueAt: string | null; cardLast4: string | null; cardExpiresOn: string | null
+  balanceMinor: number | null; creditLimitMinor: number | null; creditUsedMinor: number | null
+  paymentState: string; billingSource: string
+}
+type AttentionItem = { id: string; severity: 'critical' | 'warning' | 'info'; kind: string; subject: string; message: string }
+type Snapshot = {
+  platforms: Platform[]; unavailable: Unavailable[]; ceilings: Ceiling[]; campaigns: Campaign[]
+  health: Health[]; attention: AttentionItem[]
+}
 
 const panel: React.CSSProperties = { background: 'rgba(15,23,42,.86)', border: '1px solid rgba(148,163,184,.18)', borderRadius: 18, padding: 18 }
 const button: React.CSSProperties = { border: 'none', background: '#ffc300', color: '#020617', borderRadius: 12, padding: '9px 12px', fontWeight: 900, cursor: 'pointer' }
@@ -143,6 +156,25 @@ export default function AdsCockpit() {
         ) : null}
       </section>
 
+      {(data?.attention || []).length ? (
+        <section style={panel}>
+          <h2 style={{ color: '#fff', margin: 0, fontSize: 16 }}>{uiText('generatedUi.u_ads_attention')}</h2>
+          <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
+            {(data?.attention || []).map(item => (
+              <div key={item.id} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                <span style={{ color: item.severity === 'critical' ? '#f87171' : item.severity === 'warning' ? '#fb923c' : 'rgba(255,255,255,.4)', fontWeight: 900, fontSize: 12 }}>
+                  {item.severity === 'critical' ? '!!' : item.severity === 'warning' ? '!' : '·'}
+                </span>
+                <p style={{ color: 'rgba(255,255,255,.8)', fontSize: 12, margin: 0 }}>
+                  <strong style={{ color: '#fff' }}>{item.subject}</strong> — {item.message}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <BillingPanel platforms={data?.platforms || []} health={data?.health || []} onSubmit={post} />
       <CeilingPanel platforms={data?.platforms || []} ceilings={data?.ceilings || []} onSubmit={post} />
       <StartPanel platforms={readyPlatforms} onSubmit={post} />
 
@@ -303,6 +335,258 @@ function NetworkSetupPanel({ platform, onStaged }: { platform: Platform; onStage
   )
 }
 
+/**
+ * The ad account is PICKED, never typed.
+ *
+ * A wrong account reference spends against someone else's budget and reports someone else's
+ * numbers, and the network already knows the right one — so this asks it rather than asking
+ * a person. The currency travels with the selection for the same reason: it is the other
+ * field where a typo is a hundredfold error.
+ *
+ * A manual entry is still possible, because some networks publish no account list and a
+ * buyer must not be blocked by that. It is the fallback, not the default.
+ */
+function AccountPicker({ platformId, value, onPick }: {
+  platformId: string
+  value: string
+  onPick: (account: { accountRef: string; currency: string | null } | null) => void
+}) {
+  const [accounts, setAccounts] = useState<DiscoveredAccount[]>([])
+  const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState('')
+  const [problem, setProblem] = useState('')
+  const [manual, setManual] = useState(false)
+
+  useEffect(() => { setAccounts([]); setProblem(''); setFilter(''); setManual(false) }, [platformId])
+
+  async function load() {
+    if (!platformId) return
+    setLoading(true); setProblem('')
+    try {
+      const res = await fetch('/api/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'discover_accounts', platformId }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || `${res.status}`)
+      setAccounts(json.accounts || [])
+    } catch (error: any) {
+      // Shown rather than swallowed: an empty dropdown and a refused request look identical
+      // and mean opposite things.
+      setProblem(String(error?.message || error))
+    }
+    setLoading(false)
+  }
+
+  const shown = useMemo(() => {
+    const needle = filter.trim().toLowerCase()
+    if (!needle) return accounts
+    return accounts.filter(account => account.label.toLowerCase().includes(needle))
+  }, [accounts, filter])
+
+  if (manual) {
+    return (
+      <div>
+        <span style={label}>{uiText('generatedUi.u_ads_account')}</span>
+        <input style={input} value={value} onChange={event => onPick({ accountRef: event.target.value, currency: null })} placeholder={uiText('generatedUi.u_ads_accounthint')} />
+        <button style={{ ...ghost, marginTop: 6, padding: '5px 9px', fontSize: 11 }} onClick={() => setManual(false)}>{uiText('generatedUi.u_ads_pickinstead')}</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <span style={label}>{uiText('generatedUi.u_ads_account')}</span>
+      {accounts.length === 0 ? (
+        <div style={{ display: 'grid', gap: 6 }}>
+          <button style={{ ...ghost, opacity: platformId && !loading ? 1 : .5 }} disabled={!platformId || loading} onClick={load}>
+            {loading ? uiText('generatedUi.u_ads_loadingaccounts') : uiText('generatedUi.u_ads_loadaccounts')}
+          </button>
+          {problem ? <p style={{ color: '#fca5a5', fontSize: 11, margin: 0 }}>{problem}</p> : null}
+          <button style={{ ...ghost, padding: '5px 9px', fontSize: 11 }} onClick={() => setManual(true)}>{uiText('generatedUi.u_ads_entermanually')}</button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 6 }}>
+          <input style={input} value={filter} onChange={event => setFilter(event.target.value)} placeholder={uiText('generatedUi.u_ads_filteraccounts')} />
+          <div style={{ maxHeight: 168, overflowY: 'auto', display: 'grid', gap: 4 }}>
+            {shown.map(account => (
+              <button
+                key={account.accountRef}
+                style={{
+                  ...ghost,
+                  textAlign: 'left',
+                  fontSize: 11,
+                  borderColor: value === account.accountRef ? '#ffc300' : 'rgba(255,255,255,.18)',
+                }}
+                onClick={() => onPick({ accountRef: account.accountRef, currency: account.currency })}
+              >
+                {account.label}
+              </button>
+            ))}
+            {shown.length === 0 ? <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, margin: 0 }}>{uiText('generatedUi.u_ads_nomatch')}</p> : null}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * How each ad account pays.
+ *
+ * The options come from the network rather than from a shared list, because offering a buyer
+ * an arrangement their network does not have is the same class of error as a free-text box.
+ * A buyer who already advertises somewhere is not asked to describe their setup — they pick
+ * the account, and the arrangement follows.
+ */
+function BillingPanel({ platforms, health, onSubmit }: {
+  platforms: Platform[]
+  health: Health[]
+  onSubmit: (body: Record<string, unknown>) => Promise<boolean>
+}) {
+  const [platformId, setPlatformId] = useState('')
+  const [accountRef, setAccountRef] = useState('')
+  const [currency, setCurrency] = useState('')
+  const [mode, setMode] = useState('')
+  const [invoiceDueAt, setInvoiceDueAt] = useState('')
+  const [cardLast4, setCardLast4] = useState('')
+  const [cardExpiresOn, setCardExpiresOn] = useState('')
+  const [balance, setBalance] = useState('')
+  const [error, setError] = useState('')
+
+  const platform = platforms.find(item => item.id === platformId) || null
+  const arrangements = platform?.arrangements || []
+  const chosen = arrangements.find(item => item.id === mode) || null
+  const ready = Boolean(platformId && accountRef.trim() && mode)
+
+  function convert(value: string) {
+    return toMinorUnits(value.trim(), 'major', currency || 'USD') as { ok: boolean; minor?: number; reason?: string }
+  }
+
+  async function submit() {
+    setError('')
+    let balanceMinor: number | undefined
+    if (balance.trim()) {
+      const converted = convert(balance)
+      if (converted.ok !== true) { setError(String(converted.reason)); return }
+      balanceMinor = converted.minor
+    }
+    const done = await onSubmit({
+      action: 'set_billing',
+      platformId,
+      accountRef: accountRef.trim(),
+      billingMode: mode,
+      currency: currency || undefined,
+      invoiceDueAt: invoiceDueAt || undefined,
+      cardLast4: cardLast4.trim() || undefined,
+      cardExpiresOn: cardExpiresOn || undefined,
+      balanceMinor,
+    })
+    if (done) { setInvoiceDueAt(''); setCardLast4(''); setCardExpiresOn(''); setBalance('') }
+  }
+
+  return (
+    <section style={panel}>
+      <h2 style={{ color: '#fff', margin: 0, fontSize: 16 }}>{uiText('generatedUi.u_ads_billing')}</h2>
+      <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, margin: '6px 0 14px' }}>{uiText('generatedUi.u_ads_billingnote')}</p>
+
+      {health.length ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          {health.map(row => (
+            <span key={`${row.platformId}:${row.accountRef}`} style={{ border: '1px solid rgba(148,163,184,.25)', borderRadius: 12, padding: '6px 10px', fontSize: 11, color: 'rgba(255,255,255,.8)' }}>
+              {row.platformId} · {row.accountRef} · <strong style={{ color: row.billingMode === 'unknown' ? '#fb923c' : '#ffc300' }}>{row.billingMode}</strong>
+              {row.currency ? ` · ${row.currency}` : ''}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        <div>
+          <span style={label}>{uiText('generatedUi.u_ads_network')}</span>
+          <select style={input} value={platformId} onChange={event => { setPlatformId(event.target.value); setAccountRef(''); setCurrency(''); setMode('') }}>
+            <option value="">{uiText('generatedUi.u_ads_choose')}</option>
+            {platforms.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </div>
+
+        <AccountPicker
+          platformId={platformId}
+          value={accountRef}
+          onPick={account => {
+            setAccountRef(account?.accountRef || '')
+            // The network's own currency wins over anything a person would have chosen.
+            if (account?.currency) setCurrency(account.currency)
+          }}
+        />
+
+        <div>
+          <span style={label}>{uiText('generatedUi.u_ads_arrangement')}</span>
+          <select style={input} value={mode} onChange={event => setMode(event.target.value)} disabled={!platformId}>
+            <option value="">{uiText('generatedUi.u_ads_choose')}</option>
+            {arrangements.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <span style={label}>{uiText('generatedUi.u_ads_currency')}</span>
+          {currency ? (
+            <div>
+              <p style={{ color: '#fff', fontSize: 13, margin: '6px 0 0', fontWeight: 800 }}>{currency}</p>
+              <p style={{ color: '#86efac', fontSize: 10, margin: '2px 0 0' }}>{uiText('generatedUi.u_ads_currencyfromnetwork')}</p>
+            </div>
+          ) : (
+            <select style={input} value={currency} onChange={event => setCurrency(event.target.value)}>
+              <option value="">{uiText('generatedUi.u_ads_choose')}</option>
+              {CURRENCIES.map(code => <option key={code} value={code}>{code}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {chosen ? (
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', marginTop: 12, paddingTop: 12 }}>
+          <p style={{ color: 'rgba(255,255,255,.75)', fontSize: 12, margin: 0 }}>{chosen.description}</p>
+          <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, margin: '4px 0 0' }}>{chosen.eligibility}</p>
+
+          {/* Only the fields this arrangement can actually fail on. */}
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', marginTop: 10 }}>
+            {mode === 'invoiced' ? (
+              <div>
+                <span style={label}>{uiText('generatedUi.u_ads_invoiceduelabel')}</span>
+                <input style={input} type="date" value={invoiceDueAt} onChange={event => setInvoiceDueAt(event.target.value)} />
+              </div>
+            ) : null}
+            {mode === 'card' ? (
+              <div>
+                <span style={label}>{uiText('generatedUi.u_ads_cardlast4')}</span>
+                <input style={input} value={cardLast4} maxLength={4} onChange={event => setCardLast4(event.target.value)} placeholder="4242" />
+              </div>
+            ) : null}
+            {mode === 'card' ? (
+              <div>
+                <span style={label}>{uiText('generatedUi.u_ads_cardexpiry')}</span>
+                <input style={input} type="date" value={cardExpiresOn} onChange={event => setCardExpiresOn(event.target.value)} />
+              </div>
+            ) : null}
+            {mode === 'prepaid' ? (
+              <div>
+                <span style={label}>{uiText('generatedUi.u_ads_balancelabel')}</span>
+                <input style={input} value={balance} onChange={event => setBalance(event.target.value)} placeholder={uiText('generatedUi.u_ads_amounthint')} />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {error ? <p style={{ color: '#fca5a5', fontSize: 12, margin: '10px 0 0' }}>{error}</p> : null}
+      <button style={{ ...button, marginTop: 12, opacity: ready ? 1 : .5 }} disabled={!ready} onClick={submit}>{uiText('generatedUi.u_ads_savebilling')}</button>
+    </section>
+  )
+}
+
 function CeilingPanel({ platforms, ceilings, onSubmit }: {
   platforms: Platform[]
   ceilings: Ceiling[]
@@ -350,10 +634,11 @@ function CeilingPanel({ platforms, ceilings, onSubmit }: {
             {platforms.map(platform => <option key={platform.id} value={platform.id}>{platform.label}</option>)}
           </select>
         </div>
-        <div>
-          <span style={label}>{uiText('generatedUi.u_ads_account')}</span>
-          <input style={input} value={accountRef} onChange={event => setAccountRef(event.target.value)} placeholder={uiText('generatedUi.u_ads_accounthint')} />
-        </div>
+        <AccountPicker
+          platformId={platformId}
+          value={accountRef}
+          onPick={account => { setAccountRef(account?.accountRef || ''); if (account?.currency) setCurrency(account.currency) }}
+        />
         <div>
           <span style={label}>{uiText('generatedUi.u_ads_ceilingamount')}</span>
           <input style={input} value={amount} onChange={event => setAmount(event.target.value)} placeholder={uiText('generatedUi.u_ads_amounthint')} />
@@ -454,10 +739,11 @@ function StartPanel({ platforms, onSubmit }: {
                 {platforms.map(platform => <option key={platform.id} value={platform.id}>{platform.label}</option>)}
               </select>
             </div>
-            <div>
-              <span style={label}>{uiText('generatedUi.u_ads_account')}</span>
-              <input style={input} value={accountRef} onChange={event => setAccountRef(event.target.value)} placeholder={uiText('generatedUi.u_ads_accounthint')} />
-            </div>
+            <AccountPicker
+              platformId={platformId}
+              value={accountRef}
+              onPick={account => { setAccountRef(account?.accountRef || ''); if (account?.currency) setCurrency(account.currency) }}
+            />
             <div>
               <span style={label}>{uiText('generatedUi.u_ads_campaignname')}</span>
               <input style={input} value={name} onChange={event => setName(event.target.value)} />

@@ -108,6 +108,17 @@ export {
   type SocialAdNetworkOptions,
 } from '../ads/ads-social-networks.ts'
 
+// Google Ads, plus the two networks that cannot be reached by declaration alone: Microsoft
+// Advertising speaks SOAP, and Amazon's spend is only readable from an asynchronous report.
+// Both are declared against an endpoint the buyer runs, or not at all.
+export {
+  declareGoogleAndMarketplaceNetworks,
+  declareGoogleAds,
+  declareMicrosoftAds,
+  declareAmazonAds,
+  type NetworkOptions,
+} from '../ads/ads-google-and-marketplace.ts'
+
 // Money handling, exported because a buyer integrating their own ad network needs the same
 // conversion the declarations use. It knows that a minor unit is not always a hundredth —
 // yen has none, Kuwaiti dinar has three — and that four of the social networks report spend

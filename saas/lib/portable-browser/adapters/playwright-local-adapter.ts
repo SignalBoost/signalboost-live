@@ -136,7 +136,12 @@ export const playwrightLocalAdapterStatus = Object.freeze({
   notImplemented: false,
   requiredPorts: Object.freeze(['playwright_local_launcher']),
   productionEnabled: false,
-  executionBoundary: 'sandbox_loopback_only' as const,
+  // CORRECTED. This said 'sandbox_loopback_only', which stopped being true when the origin
+  // posture changed to buyer-declared allowlists. A buyer reading the old value would have
+  // concluded the adapter can only drive localhost — which would make the portable useless
+  // to them — while the code has been accepting their production origins all along. Metadata
+  // that outlives the behaviour it describes is the same defect as a hardcoded status field.
+  executionBoundary: 'buyer_declared_origins' as const,
 })
 
 export const playwrightLocalAdapterFactory: PlaywrightLocalAdapterFactory = Object.freeze({

@@ -51,16 +51,25 @@ for it before promising a launch date.
 | Platform | Developer app | Business entity required | Review |
 | --- | --- | --- | --- |
 | YouTube | Google Cloud project | no — any Google account | consent screen must be **In production**, or refresh tokens expire after 7 days |
-| LinkedIn Profile | LinkedIn app | **no** | none — Share on LinkedIn and Sign In with LinkedIn are self-serve |
+| LinkedIn Profile | LinkedIn app | a LinkedIn **Page** to hold the app — unverified is fine | none — Share on LinkedIn and Sign In with LinkedIn are self-serve |
 | LinkedIn Company | LinkedIn app | yes — registered company and a verified Page | Community Management API review |
 | Facebook / Instagram | Meta app | a Page or Business account (free to create) | app review for publishing permissions |
 | TikTok | TikTok developer app | no | content posting audit |
 | Twitter/X | X developer account | no | paid API tier |
 | Reddit | Reddit app | no | none |
 
-**Start with LinkedIn Profile and YouTube.** Both can be live the same day. The others
-unlock as their approvals land, and the layer treats each independently — an unapproved
-platform simply reports "not configured" and the rest keep working.
+**Start with YouTube.** It needs only a Google account and can be live the same day.
+
+**LinkedIn Profile is next easiest, but not instant.** Every LinkedIn app must be attached
+to a Page, even one that only posts to a personal profile, and LinkedIn will not let an
+unestablished personal profile create a Page — it reports needing roughly five
+connections, an account older than seven days, and an email address on the company's own
+domain. The Page does **not** need to be verified, and the two required products enable
+immediately. That is the real advantage over company-page posting, which needs a verified
+Page plus Community Management review measured in weeks.
+
+The others unlock as their approvals land, and the layer treats each independently — an
+unapproved platform simply reports "not configured" and the rest keep working.
 
 ## 4. Interfaces you implement
 

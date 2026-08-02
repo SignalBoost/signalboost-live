@@ -6,7 +6,8 @@
 // configuration, resolves their credential from their vault per launch, enforces the origin
 // allowlist, and delegates the vendor call to the transport THEY implement — the same shape
 // browserbase and steel already use. See remote-adapter-kit.ts for the rules, including why
-// approved origins are still sandbox-only across every adapter in this directory.
+// approved origins are declared by the BUYER: the allowlist must be non-empty, every entry an
+// exact origin, and nothing outside it is reachable.
 
 import { createRemoteBrowserSessionFactory, describeRemoteAdapter } from './remote-adapter-kit.ts'
 import type {

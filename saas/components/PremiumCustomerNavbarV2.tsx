@@ -57,6 +57,7 @@ const GROUPS: NavGroup[] = [
       { icon: '📰', labelKey: 'nav.pressProviders', fallbackLabel: uiText('generatedUi.u_9d597b5a530fd867'), href: '/dashboard/marketing/press-providers' },
       { icon: '📢', labelKey: 'nav.promote', fallbackLabel: uiText('generatedUi.u_5834dab085442471'), href: '/dashboard/promote' },
       { icon: '🔗', labelKey: 'nav.socialConnections', fallbackLabel: uiText('generatedUi.u_819abac9f5ab2dd3'), href: '/dashboard/outreach/social' },
+      { icon: '💰', labelKey: 'nav.adsCockpit', fallbackLabel: uiText('generatedUi.u_ads_title'), href: '/dashboard/ads', requiresOwner: true },
       { icon: '🗃️', labelKey: 'nav.allCampaigns', fallbackLabel: uiText('generatedUi.u_350fd0c928342e75'), href: '/dashboard/campaigns' },
       { icon: '💡', labelKey: 'nav.opportunities', fallbackLabel: uiText('generatedUi.u_1e6e878c9dc923dd'), href: '/dashboard/opportunities' },
       { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: uiText('generatedUi.u_22a3534629d2dcf1'), href: '/dashboard/sales/pipeline' },

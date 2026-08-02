@@ -216,6 +216,14 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   })))
   const incidentById = new Map<string, VercelHealthRun>(incidentRuns.map(r => [r.runId, r]))
 
+  // Evidence age reported as AGES, not as a bare percentage. "Evidence freshness 23%" reads
+  // like a failing grade and answers nothing — 23% of what? Two timestamps and a policy state
+  // are what a person can act on; the score keeps its place behind them, with its working.
+  const agesSeconds = runs.map(r => Math.round((Date.now() - Date.parse(r.completedAt)) / 1000)).filter(Number.isFinite)
+  const evidenceAges = { newest: agesSeconds.length ? Math.min(...agesSeconds) : null, oldest: agesSeconds.length ? Math.max(...agesSeconds) : null }
+  const ago = (seconds: number | null) => (seconds === null ? '—' : seconds < 90 ? `${seconds}s` : seconds < 5400 ? `${Math.round(seconds / 60)}m` : `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`)
+  const evidenceAgeView = { newest: ago(evidenceAges.newest), oldest: ago(evidenceAges.oldest) }
+
   // ── DOES THE ASSESSMENT HOLD TOGETHER? ───────────────────────────────────────
   // Computed last, from the finished outputs of every other module, because its job is to
   // catch two of them disagreeing. Feeding it the raw inputs instead would let it agree with
@@ -231,6 +239,8 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     ledgerReconciles: ledger.reconciles,
     stabilityConsecutive: stability.consecutive,
     newestObservationContradicts: runs.length > 0 && failedRunIds.has(runs[0].runId),
+    newestEvidenceSeconds: evidenceAges.newest,
+    oldestEvidenceSeconds: evidenceAges.oldest,
     overdueSeconds: timing ? timing.overdueSeconds : 0,
     toleranceSeconds: timing ? timing.toleranceSeconds : 1,
     inputs: [runs.length, successful.length, missedWindows, blockedWork, activeWork.length, verificationFailed, auditGaps, expiredLeasesWithWork, providerBroken.length, snapshot.unmeasured.join(','), lastObservationAt],
@@ -253,13 +263,13 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
 
     {/* AUDIENCE 1 — OPERATIONS. Always visible, nothing collapsed. */}
-    <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} verification={verification} integrity={integrity} t={t} />
+    <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} verification={verification} integrity={integrity} evidenceAge={evidenceAgeView} t={t} />
 
     {/* Diagnostics collapse to one line. Eighteen green cards are not information. */}
     <Card title={t.systemDiagnostics}>
       <dl style={fields}><Field k={t.diagnosticsNominal} v={diagnosticSummary.nominal}/><Field k={t.diagnosticsNeedingAttention} v={diagnosticSummary.attention.length}/><Field k={t.operationalImpactLabel} v={diagnosticSummary.quiet ? t.impactNone : t.diagnosticsWorkingHours}/></dl>
       <p style={muted}>{diagnosticSummary.quiet ? (t.diagnosticsQuiet) : (t.diagnosticsAttention)}</p>
-      {diagnosticSummary.attention.length ? <details open style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => { const policy = recommendationPolicy(d.status); return <article key={d.subsystemId} style={mini}><h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3><dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.reasonLabel} v={d.explanation}/><Field k={t.evidence} v={d.evidence.join(' · ')}/><Field k={t.reasoningLabel} v={d.reasoning}/><Field k={t.ruleLabel} v={d.rule}/><Field k={t.changesWhen} v={d.changesWhen}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/><Field k={t.policyLabel} v={policy.policyLabel}/><Field k={t.priorityLabel} v={policy.priorityLabel}/><Field k={t.slaLabel} v={policy.slaLabel}/></dl><p style={muted}>{`${policy.rationale} ${t.defaultPolicyNote}`}</p></article> })}</details> : null}
+      {diagnosticSummary.attention.length ? <details open style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => { const policy = recommendationPolicy(d.status); return <article key={d.subsystemId} style={mini}><h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3><dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.reasonLabel} v={d.explanation}/><Field k={t.evidence} v={d.evidence.join(' · ')}/><Field k={t.reasoningLabel} v={d.reasoning}/><Field k={t.ruleLabel} v={d.ruleName}/><Field k={t.rulePurpose} v={d.rulePurpose}/><Field k={t.safetyRationale} v={d.ruleSafetyRationale}/><Field k={t.changesWhen} v={d.changesWhen}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/><Field k={t.policyLabel} v={policy.policyLabel}/><Field k={t.priorityLabel} v={policy.priorityLabel}/><Field k={t.slaLabel} v={policy.slaLabel}/></dl><p style={muted}>{`${policy.rationale} ${t.defaultPolicyNote}`}</p><details style={subcard}><summary>{t.inferenceChain}</summary><ol style={timeline}>{d.inferenceChain.map(step => <li key={step.step} style={mini}><strong>{(t as any)[`chain_${step.step}`] || step.step}</strong><p>{step.statement}</p></li>)}</ol></details></article> })}</details> : null}
     </Card>
 
     {/* Incidents, split. Twelve verified failures are evidence the Supervisor worked. */}

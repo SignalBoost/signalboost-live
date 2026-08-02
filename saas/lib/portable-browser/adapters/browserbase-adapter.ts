@@ -10,6 +10,16 @@ const BROWSERBASE_ADAPTER_ID = 'browserbase'
 const BROWSERBASE_API_URL = 'https://api.browserbase.com/v1/sessions'
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
+// A hostname a resolver could actually answer for. IPv6 in brackets, or DNS labels.
+//
+// THIS EXISTS BECAUSE THE ACCEPTANCE HARNESS CAUGHT IT. `new URL('https://*.example.com')`
+// parses cleanly and its `.origin` round-trips, so a wildcard entry passed every check above
+// and landed in the allowlist. Matching is exact, so it never widened access — it did the
+// opposite and quietly matched NOTHING, which is worse in the way that matters: a buyer who
+// writes a wildcard believes a whole domain is covered, and no request is ever approved
+// against it. Refusing the entry tells them at configuration time instead.
+const RESOLVABLE_HOST = /^(\[[0-9a-fA-F:.]+\]|[a-zA-Z0-9_](?:[a-zA-Z0-9_-]*[a-zA-Z0-9_])?(?:\.[a-zA-Z0-9_](?:[a-zA-Z0-9_-]*[a-zA-Z0-9_])?)*)$/
+
 export interface BrowserbaseCredentialBrokerPort {
   resolveBrowserbaseApiKey(scope: Readonly<{ projectId: string }>): Promise<string>
 }
@@ -65,6 +75,9 @@ function normalizeApprovedOrigin(value: string): string {
   }
   // Plaintext http is permitted ONLY for loopback, so a buyer can run locally without
   // weakening what a production origin has to be.
+  if (!RESOLVABLE_HOST.test(parsed.hostname)) {
+    throw new Error('browserbase_invalid_origin')
+  }
   if (parsed.protocol === 'http:' && !LOOPBACK_HOSTS.has(parsed.hostname)) {
     throw new Error('browserbase_insecure_origin_rejected')
   }

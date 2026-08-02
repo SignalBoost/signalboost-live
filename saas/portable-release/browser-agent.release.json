@@ -16,7 +16,7 @@
     "./testing": "payload/testing/index.ts"
   },
   "_minModules": "The buyer graph must reach the whole portable: the barrel, twenty-six adapters, the shared kit, the port definitions, the vendor catalog, the activity-sink catalog and the test doubles. A shorter walk means an adapter or a port stopped being reachable from an entry point, which is how a vendor silently leaves the product.",
-  "minModules": 100,
+  "minModules": 101,
   "_hostFallbacks": "Bare or aliased specifiers reached by the buyer graph but supplied by the buyer. Keep empty. This portable reached FOUR external things in July and every one of them was removed rather than declared: a Supabase SDK, two modules in lib/browser-runtime, and one type from lib/browser-provider.",
   "hostFallbacks": [],
   "namingPattern": "signalboost",
@@ -53,12 +53,14 @@
     "The release candidate validates packaging and integrity only; it is not evidence of buyer deployment acceptance.",
     "Twenty-six adapters are CONFIGURATION AND GOVERNANCE around a call the buyer implements. The vendor HTTP request itself is theirs, deliberately — inventing twenty-six vendor protocols we could not verify would be worse than asking for a transport.",
     "One catalog vendor of twenty-seven has no remote adapter: the Playwright/Puppeteer local-engine pair, already covered by the local adapter.",
-    "No acceptance harness yet. Every other finished portable here ships one, and this is the gap that keeps the release at -rc."
+    "execute_change is disabled for every vendor in this release."
   ],
   "acceptance": {
     "entry": "payload/index.ts",
-    "export": "buildPortableBrowserInstallationAcceptanceReport",
-    "how": "Import the entry point in a clean buyer environment, supply one adapter configuration with a real transport and a probe origin the buyer controls, and build the installation acceptance report. A full twelve-check harness on the pattern used by press-media and provider-hub is owed before 1.0.0.",
-    "guarantee": "The payload contains no credential, performs no provider mutation, refuses execute_change on every adapter, and reaches no network destination it chose itself."
+    "export": "runBrowserAcceptance",
+    "how": "Import the entry point in a clean buyer environment and call runBrowserAcceptance({ adapterId, buildSessionFactory, configuration, transport, credentialBroker, probeOrigin }) with the factory builder for whichever of the twenty-six vendors the buyer owns, their own transport and vault broker, and an https origin they control. Fourteen checks are reported independently; nine of them assert a REFUSAL. Pass an optional `activity` block to also prove records reach the destination they chose.",
+    "cli": "node scripts/run-browser-acceptance.mjs <ports-module> --adapter <id> --probe <https-origin>",
+    "guarantee": "The payload contains no credential and no vendor account, refuses execute_change on every adapter, reaches no network destination it chose itself, and passes every failure through a sanitizer that strips live credentials from error text.",
+    "evidence": "The returned browser-agent-acceptance/1 record is the acceptance artifact. Retain it; it names which properties held, against which vendor and which probe origin."
   }
 }

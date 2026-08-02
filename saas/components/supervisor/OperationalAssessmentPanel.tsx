@@ -15,7 +15,7 @@
 // Nothing here computes anything. Every judgement arrives as a prop from a pure module, so
 // the page and the modules cannot disagree.
 //
-// All visible copy goes through {t.key || 'Fallback'} expressions — literal JSX text is a
+// All visible copy goes through {t.key} expressions — literal JSX text is a
 // hardcoded-copy guard violation and would fail the build.
 
 import type { OperationalAssessment } from '@/lib/supervisor/operational-assessment'
@@ -42,57 +42,58 @@ export default function OperationalAssessmentPanel({
   execution: ExecutionModel
   t: Copy
 }) {
+  const likelihoodLabel: Record<string, string> = { low: t.likelihoodLow, medium: t.likelihoodMedium, high: t.likelihoodHigh }
   const tone =
     assessment.state === 'outage' ? '#ff5c7a' : assessment.state === 'service_degraded' ? '#ffd166' : '#38f2a4'
 
   return (
     <section style={panel}>
-      <p style={kicker}>{t.assessmentKicker || 'Verified operational assessment'}</p>
+      <p style={kicker}>{t.assessmentKicker}</p>
 
       {/* 1 + 2. State and impact, never merged into one number. */}
       <div style={headline}>
         <div>
-          <p style={muted}>{t.currentState || 'Current state'}</p>
+          <p style={muted}>{t.currentState}</p>
           <p style={{ ...big, color: tone }}>{assessment.stateLabel}</p>
           <p style={muted}>{assessment.stateMeaning}</p>
           <p style={small}>{assessment.stateReason}</p>
           <p style={badge}>
-            {assessment.stateVerified ? t.verified || 'Verified by check' : t.partlyVerified || 'Partly verified — see limits below'}
+            {assessment.stateVerified ? t.verifiedByCheck : t.partlyVerified}
           </p>
         </div>
         <div>
-          <p style={muted}>{t.businessImpact || 'Business impact'}</p>
+          <p style={muted}>{t.businessImpact}</p>
           <p style={{ ...big, color: assessment.impactAffected ? '#ffd166' : '#38f2a4' }}>
-            {assessment.impactAffected ? t.impactAffected || 'Affected' : t.impactNone || 'None'}
+            {assessment.impactAffected ? t.impactAffected : t.impactNone}
           </p>
           <p style={small}>{assessment.impact}</p>
         </div>
         <div>
-          <p style={muted}>{t.observationConfidence || 'Observation confidence'}</p>
+          <p style={muted}>{t.observationConfidence}</p>
           <p style={big}>{`${assessment.confidence}%`}</p>
           <p style={small}>{assessment.confidenceStatement}</p>
-          <p style={muted}>{t.confidenceMeaning || 'How far our own evidence can be trusted. Not a statement about the platform.'}</p>
+          <p style={muted}>{t.confidenceMeaning}</p>
         </div>
       </div>
 
       {/* 3. Action, and the paging decision, which state alone controls. */}
       <div style={row}>
         <div style={cell}>
-          <p style={muted}>{t.operatorAction || 'Operator action'}</p>
+          <p style={muted}>{t.operatorAction}</p>
           <p style={strong}>{assessment.operatorAction}</p>
         </div>
         <div style={cell}>
-          <p style={muted}>{t.pageOnCall || 'Page on-call'}</p>
+          <p style={muted}>{t.pageOnCall}</p>
           <p style={{ ...strong, color: assessment.pageOnCall ? '#ff5c7a' : '#38f2a4' }}>
-            {assessment.pageOnCall ? t.yes || 'Yes' : t.no || 'No'}
+            {assessment.pageOnCall ? t.yes : t.no}
           </p>
-          <p style={muted}>{t.pagingRule || 'Only a verified outage pages. Low confidence and forecasts never do.'}</p>
+          <p style={muted}>{t.pagingRule}</p>
         </div>
       </div>
 
       {/* 4. The basis, directly under the conclusion rather than scattered across cards. */}
       <div style={block}>
-        <p style={sectionTitle}>{t.assessmentBasis || 'Assessment basis'}</p>
+        <p style={sectionTitle}>{t.assessmentBasis}</p>
         <p style={muted}>{assessment.basisStatement}</p>
         <ul style={list}>
           {assessment.assessmentBasis.map(line => (
@@ -100,7 +101,7 @@ export default function OperationalAssessmentPanel({
               <span style={muted}>{line.label}</span>
               <span style={strong}>{line.value}</span>
               {line.polarity === 'limits' ? (
-                <span style={limitTag}>{t.limitsConclusion || 'limits this conclusion'}</span>
+                <span style={limitTag}>{t.limitsConclusion}</span>
               ) : null}
             </li>
           ))}
@@ -110,7 +111,7 @@ export default function OperationalAssessmentPanel({
 
       {/* 5. The forecast, fenced off from everything above it. */}
       <div style={forecastBlock}>
-        <p style={sectionTitle}>{t.riskForecast || 'Risk forecast'}</p>
+        <p style={sectionTitle}>{t.riskForecast}</p>
         <p style={strong}>{forecast.headline}</p>
         <p style={muted}>{forecast.disclaimer}</p>
         {forecast.forecasts.map(item => (
@@ -118,24 +119,24 @@ export default function OperationalAssessmentPanel({
             <p style={strong}>{item.observed}</p>
             <p style={small}>
               {item.trigger}
-              {t.thenSeparator || ', '}
+              {', '}
               {item.consequence}
             </p>
             <dl style={fields}>
               <div>
-                <dt style={muted}>{t.likelihood || 'Likelihood'}</dt>
-                <dd style={dd}>{item.likelihood}</dd>
+                <dt style={muted}>{t.likelihood}</dt>
+                <dd style={dd}>{likelihoodLabel[item.likelihood]}</dd>
               </div>
               <div>
-                <dt style={muted}>{t.horizon || 'Horizon'}</dt>
+                <dt style={muted}>{t.horizon}</dt>
                 <dd style={dd}>{item.horizon}</dd>
               </div>
               <div>
-                <dt style={muted}>{t.clearsWhen || 'Clears when'}</dt>
+                <dt style={muted}>{t.clearsWhen}</dt>
                 <dd style={dd}>{item.clearsWhen}</dd>
               </div>
               <div>
-                <dt style={muted}>{t.forecastBasis || 'Computed from'}</dt>
+                <dt style={muted}>{t.forecastBasis}</dt>
                 <dd style={dd}>{item.basis.join(' · ')}</dd>
               </div>
             </dl>
@@ -146,12 +147,12 @@ export default function OperationalAssessmentPanel({
       {/* 6. Confidence, decomposed. A percentage nobody can take apart is decoration. */}
       {assessment.confidenceReasons.length ? (
         <details style={subcard}>
-          <summary>{`${t.confidenceLedger || 'Why confidence is not 100%'} · ${assessment.confidenceReasons.length}`}</summary>
+          <summary>{`${t.confidenceLedger} · ${assessment.confidenceReasons.length}`}</summary>
           {assessment.confidenceReasons.map(reason => (
             <article key={reason.code} style={mini}>
               <p style={strong}>{`${reason.label} · −${reason.penalty}`}</p>
               <p style={small}>{reason.why}</p>
-              <p style={muted}>{`${t.restoredBy || 'Restored by'}${t.labelSeparator || ': '}${reason.remedy}`}</p>
+              <p style={muted}>{`${t.restoredBy}: ${reason.remedy}`}</p>
             </article>
           ))}
         </details>
@@ -159,26 +160,26 @@ export default function OperationalAssessmentPanel({
 
       {/* 7. Execution model, replacing "Leader: None". */}
       <div style={block}>
-        <p style={sectionTitle}>{t.executionModel || 'Execution model'}</p>
+        <p style={sectionTitle}>{t.executionModel}</p>
         <dl style={fields}>
           <div>
-            <dt style={muted}>{t.model || 'Model'}</dt>
+            <dt style={muted}>{t.model}</dt>
             <dd style={dd}>{execution.model}</dd>
           </div>
           <div>
-            <dt style={muted}>{t.currentRuntimeState || 'Current state'}</dt>
+            <dt style={muted}>{t.currentRuntimeState}</dt>
             <dd style={dd}>{execution.currentState}</dd>
           </div>
           <div>
-            <dt style={muted}>{t.nextObservation || 'Next observation'}</dt>
+            <dt style={muted}>{t.nextObservation}</dt>
             <dd style={dd}>{execution.nextObservation}</dd>
           </div>
           <div>
-            <dt style={muted}>{t.lastCompleted || 'Last completed'}</dt>
+            <dt style={muted}>{t.lastCompleted}</dt>
             <dd style={dd}>{execution.lastCompleted}</dd>
           </div>
           <div>
-            <dt style={muted}>{t.lastResult || 'Last result'}</dt>
+            <dt style={muted}>{t.lastResult}</dt>
             <dd style={dd}>{execution.lastResult}</dd>
           </div>
         </dl>

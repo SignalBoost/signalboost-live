@@ -1,5 +1,6 @@
 // saas/lib/outreach/social-connectors.ts
 import { getSocialSecret, socialCredentialNames } from './social-secrets.ts'
+import { getCustomPlatform, listCustomPlatforms, publishViaCustomPlatform } from './social-custom-platform.ts'
 // Multi-platform social publishing adapter registry.
 // Honest by construction: a post is reported as published only when the platform
 // returns a genuine provider id. Missing tokens, destination refs, media, or API
@@ -301,13 +302,14 @@ export const SOCIAL_CONNECTORS: Record<SocialPlatform, { label: string; authUrl:
 ) as Record<SocialPlatform, { label: string; authUrl: string; scopes: string[]; rateLimit: string }>
 
 export function buildOAuthUrl(platform: SocialPlatform, redirectUri: string, state: string) {
-  const a = ADAPTERS[platform]
+  const a = adapterFor(platform)
+  if (!a) throw new Error(`unknown_social_platform_${platform}`)
   const params = new URLSearchParams({ client_id: getSocialSecret(socialCredentialNames(platform).clientId) || 'configure-client-id', redirect_uri: redirectUri, response_type: 'code', scope: a.scopes.join(' '), state, access_type: 'offline', prompt: 'consent' })
   return `${a.authUrl}?${params.toString()}`
 }
 
-export function platformContentKind(platform: SocialPlatform): ContentKind { return ADAPTERS[platform]?.content || 'text' }
-export function platformNeedsAccountRef(platform: SocialPlatform): boolean { return ADAPTERS[platform]?.needsAccountRef === true }
+export function platformContentKind(platform: SocialPlatform): ContentKind { return adapterFor(platform)?.content || 'text' }
+export function platformNeedsAccountRef(platform: SocialPlatform): boolean { return adapterFor(platform)?.needsAccountRef === true }
 
 function failed(mode: string) { return { ok: false, providerPostId: '', liveUrl: null as string | null, metrics: NO_METRICS, mode } }
 
@@ -335,13 +337,47 @@ const NATIVE_PUBLISHERS: Partial<Record<SocialPlatform, (p: SocialPostPayload, a
   linkedin_member: (p, token) => publishLinkedInVideo(p, token, `urn:li:person:${p.accountRef}`),
 }
 
+// ── Declared platforms ───────────────────────────────────────────────────────
+//
+// A buyer can declare any OAuth+REST platform at runtime (see ./social-custom-platform.ts).
+// Every lookup below goes through adapterFor(), so a declared platform behaves exactly
+// like a built-in one — same publish path, same confirmation rule, same gate — without
+// this file knowing it exists.
+function adapterFor(platform: SocialPlatform): Adapter | null {
+  const builtIn = ADAPTERS[platform]
+  if (builtIn) return builtIn
+
+  const declared = getCustomPlatform(String(platform))
+  if (!declared) return null
+
+  return {
+    label: declared.label,
+    authUrl: declared.authUrl,
+    tokenUrl: declared.tokenUrl,
+    scopes: declared.scopes,
+    needsAccountRef: declared.needsAccountRef === true,
+    content: (declared.content || 'text') as ContentKind,
+    publish: async (payload, accessToken) => {
+      const result = await publishViaCustomPlatform(declared, payload, accessToken)
+      return { id: result.id, url: result.url }
+    },
+    permalink: (id) => (declared.permalinkTemplate ? declared.permalinkTemplate.replace(/\{id\}/g, id) : null),
+  }
+}
+
+/** Every platform available to publish to: the built-ins plus whatever the host declared. */
+export function availableSocialPlatforms(): string[] {
+  return [...Object.keys(ADAPTERS), ...listCustomPlatforms().map(item => item.id)]
+}
+
+// A declared platform publishes through its own body template, so it has one mode.
 export function platformAvailableModes(platform: SocialPlatform): PublishMode[] { return PLATFORM_MODES[platform]?.availableModes || ['link'] }
 export function platformDefaultMode(platform: SocialPlatform): PublishMode { return PLATFORM_MODES[platform]?.defaultMode || 'link' }
 export function platformSupportsNativeVideo(platform: SocialPlatform): boolean { return platformAvailableModes(platform).includes('native') }
 
 export async function publishSocialPost(payload: SocialPostPayload): Promise<{ ok: boolean; providerPostId: string; liveUrl: string | null; metrics: SocialEngagementMetrics; mode: string }> {
   if (!payload.text.trim() && !payload.imageUrl && !payload.videoUrl) throw new Error('Social post requires text, image, or video content.')
-  const adapter = ADAPTERS[payload.platform]
+  const adapter = adapterFor(payload.platform)
   if (!adapter) return failed('unsupported_social_platform')
   const hasCreds = !!payload.accessToken || !!payload.refreshToken
   if (!hasCreds) return failed('oauth_credentials_not_configured')

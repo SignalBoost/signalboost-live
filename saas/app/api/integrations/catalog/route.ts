@@ -7,12 +7,17 @@ import { requireAdmin } from '@/lib/outreach/security'
 import { listProviders, supportsCapability, tasksFor } from '@/lib/integrations/registry'
 import { listConnectedProviderIds } from '@/lib/integrations/connections'
 import '@/lib/integrations/catalog' // side-effect: registers all providers
+import { loadDeclaredProviders } from '@/lib/integrations/declared-providers'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
+
+  // Declarations live in a table and this process may be cold — load them before the
+  // registry is read, or a buyer's own provider would vanish between requests.
+  await loadDeclaredProviders(ctx.admin)
 
   const orgId = 'signalboost' // owner org; a multi-tenant host resolves this per actor
   const connected = new Set(await listConnectedProviderIds(ctx.admin, orgId))

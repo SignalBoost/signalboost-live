@@ -61,6 +61,71 @@ const sendgridMktg: IntegrationProvider = {
   capabilities: ['list_sync', 'campaign_create', 'email_analytics'],
 }
 
+// ── Marketing automation the buyer already owns ───────────────────────────────
+//
+// A buyer arrives with a marketing stack, not an empty one. These are the platforms
+// that stack is usually built on, so they are declared here rather than left for the
+// buyer to describe — the point of a catalog is that the common cases are already named.
+//
+// Descriptor-only for now, deliberately: each carries its real auth kind, endpoints and
+// documentation so a buyer can connect it, and the capabilities it genuinely supports.
+// An implementation is added when a buyer actually uses one, rather than writing
+// eighteen speculative clients and maintaining them all.
+//
+// NOT LISTED, and worth stating because the question comes up: marketing AGENCIES —
+// Ogilvy, WPP, Publicis, Deloitte Digital, Havas and the rest — are service firms, not
+// software. They expose no API and cannot be integrated with. They are potential buyers
+// of this portable, not connections inside it.
+const brevo: IntegrationProvider = {
+  id: 'brevo', label: 'Brevo', category: 'email_marketing', auth: 'api_key',
+  docsUrl: 'https://developers.brevo.com/reference/getting-started-1',
+  capabilities: ['list_sync', 'campaign_create', 'automation_trigger', 'email_analytics'],
+}
+const activecampaign: IntegrationProvider = {
+  id: 'activecampaign', label: 'ActiveCampaign', category: 'email_marketing', auth: 'api_key',
+  docsUrl: 'https://developers.activecampaign.com/reference/overview',
+  capabilities: ['list_sync', 'campaign_create', 'automation_trigger', 'email_analytics'],
+}
+const constantcontact: IntegrationProvider = {
+  id: 'constantcontact', label: 'Constant Contact', category: 'email_marketing', auth: 'oauth2',
+  authUrl: 'https://authz.constantcontact.com/oauth2/default/v1/authorize',
+  tokenUrl: 'https://authz.constantcontact.com/oauth2/default/v1/token',
+  docsUrl: 'https://developer.constantcontact.com/api_guide/index.html',
+  capabilities: ['list_sync', 'campaign_create', 'email_analytics'],
+}
+const klaviyo: IntegrationProvider = {
+  id: 'klaviyo', label: 'Klaviyo', category: 'email_marketing', auth: 'api_key',
+  docsUrl: 'https://developers.klaviyo.com/en/reference/api_overview',
+  capabilities: ['list_sync', 'campaign_create', 'automation_trigger', 'email_analytics'],
+}
+const omnisend: IntegrationProvider = {
+  id: 'omnisend', label: 'Omnisend', category: 'email_marketing', auth: 'api_key',
+  docsUrl: 'https://api-docs.omnisend.com/reference/intro',
+  capabilities: ['list_sync', 'campaign_create', 'automation_trigger'],
+}
+const drip: IntegrationProvider = {
+  id: 'drip', label: 'Drip', category: 'email_marketing', auth: 'api_key',
+  docsUrl: 'https://developer.drip.com/',
+  capabilities: ['list_sync', 'campaign_create', 'automation_trigger'],
+}
+const pipedrive: IntegrationProvider = {
+  id: 'pipedrive', label: 'Pipedrive', category: 'crm', auth: 'oauth2',
+  authUrl: 'https://oauth.pipedrive.com/oauth/authorize', tokenUrl: 'https://oauth.pipedrive.com/oauth/token',
+  docsUrl: 'https://developers.pipedrive.com/docs/api/v1',
+  capabilities: ['contact_sync', 'deal_sync', 'activity_log'],
+}
+const zohocrm: IntegrationProvider = {
+  id: 'zoho_crm', label: 'Zoho CRM', category: 'crm', auth: 'oauth2',
+  authUrl: 'https://accounts.zoho.com/oauth/v2/auth', tokenUrl: 'https://accounts.zoho.com/oauth/v2/token',
+  docsUrl: 'https://www.zoho.com/crm/developer/docs/api/v6/',
+  capabilities: ['contact_sync', 'deal_sync', 'activity_log'],
+}
+const freshsales: IntegrationProvider = {
+  id: 'freshsales', label: 'Freshsales', category: 'crm', auth: 'api_key',
+  docsUrl: 'https://developers.freshworks.com/crm/api/',
+  capabilities: ['contact_sync', 'deal_sync', 'activity_log'],
+}
+
 // ── Messaging + sales chat ────────────────────────────────────────────────────
 const intercom: IntegrationProvider = {
   id: 'intercom', label: 'Intercom', category: 'messaging', auth: 'oauth2',
@@ -116,6 +181,8 @@ const lemonsqueezy: IntegrationProvider = { id: 'lemonsqueezy', label: 'Lemon Sq
 export const SALES_CATALOG: IntegrationProvider[] = [
   hubspot, salesforce,
   mailchimp, sendgridMktg,
+  brevo, activecampaign, constantcontact, klaviyo, omnisend, drip,
+  pipedrive, zohocrm, freshsales,
   intercom, drift, zendesk,
   segment, hightouch, rudderstack,
   apollo, zoominfo, clay,

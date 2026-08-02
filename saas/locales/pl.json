@@ -3535,7 +3535,15 @@
     "u_ads_loadingaccounts": "Pytanie do sieci…",
     "u_ads_nomatch": "Żadne konto nie pasuje.",
     "u_ads_pickinstead": "Wybierz zamiast tego z sieci",
-    "u_ads_savebilling": "Zapisz formę rozliczenia"
+    "u_ads_savebilling": "Zapisz formę rozliczenia",
+    "u_ads_autorenew": "Odnawiana automatycznie, zanim wygaśnie. Na kilka dni wcześniej dostaniesz informację, jeśli odnowienie się nie powiedzie.",
+    "u_ads_cannotconnect": "Ta sieć nie łączy się w ten sposób — dociera się do niej przez punkt końcowy, który dla niej prowadzisz.",
+    "u_ads_connect": "Połącz tę sieć",
+    "u_ads_connected": "Połączona",
+    "u_ads_connectok": "Sieć połączona",
+    "u_ads_expires": "wygasa",
+    "u_ads_lasterror": "Ostatnie odnowienie nie powiodło się",
+    "u_ads_reconnect": "Połącz ponownie"
   },
   "lab": {
     "somethingWrong": "Coś poszło nie tak",

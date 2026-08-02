@@ -88,10 +88,16 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     : verified.state === 'degraded' ? (t.stateDegraded || 'Attention required')
     : verified.state === 'unknown' ? (t.stateUnknown || 'Unverified — investigation required')
     : (t.stateOperational || 'Operational')
-  const topFinding = verified.findings.find(f => f.severity === 'critical')
-    || verified.findings.find(f => f.severity === 'high')
-    || verified.findings.find(f => f.severity === 'unverified')
-    || verified.findings[0]
+  // THE HEADLINE AND THE EXPLANATION MUST DESCRIBE THE SAME FINDING. This previously fell
+  // through to findings[0] once critical, high and unverified were exhausted, so a WARNING
+  // could set the headline to "Attention required" while the card explained an unrelated
+  // informational condition — an operator reading "attention required" above "no impact, the
+  // lease expired normally" learns to distrust both lines. Warning now sits in the chain, and
+  // the order matches the severity order exactly.
+  const severityRank: Record<string, number> = { critical: 0, high: 1, unverified: 2, warning: 3, informational: 4 }
+  const topFinding = [...verified.findings].sort(
+    (a, b) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9),
+  )[0]
   // FAIL CLOSED, exactly as saas/proxy.ts does. It admits traffic only on `=== true`; a missing
   // table, a missing row or an RLS denial all mean blocked. Reading `!== false` here made an
   // unreadable row render as "AI AUTONOMY ACTIVE" while the middleware 503'd every webhook.

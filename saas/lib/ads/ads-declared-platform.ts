@@ -350,7 +350,15 @@ export function declareAdPlatform(config: DeclaredAdPlatform): void {
 
       const spent: Money = { amount, currency }
       const status = config.spendStatusPath ? String(readPath(res.json, config.spendStatusPath) ?? 'unknown') : 'unknown'
-      return { platformCampaignId, spent, reportedAt: new Date().toISOString(), status }
+      return {
+        platformCampaignId,
+        spent,
+        reportedAt: new Date().toISOString(),
+        status,
+        // Kept verbatim. If this network is ever found to have been declared with the wrong
+        // units, the stored raw value is what proves it.
+        raw: { amount: String(rawAmount), units: config.spendUnits },
+      }
     },
 
     async pauseCampaign(platformCampaignId: string, accessToken: string, accountRef?: string) {

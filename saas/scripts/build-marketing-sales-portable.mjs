@@ -41,7 +41,15 @@ const ENTRY = 'lib/outreach/marketing-sales-portable.ts'
 // Everything reachable from the entry point must live inside this directory. The check
 // is a prefix test on the resolved path, so a `../../utils/...` escape is caught even
 // though it is written as a relative import.
-const LAYER_DIR = 'lib/outreach'
+// The portable spans TWO directories: the outreach layer and the ads layer. Paid
+// placement is marketing, so it belongs to this product rather than beside it — but it
+// keeps its own folder because its risk profile is different and mixing spend code into
+// the publishing files would blur that.
+//
+// Everything reachable from the barrel must live in one of these. A reach outside both
+// is still a boundary violation, so widening the layer does not weaken the check.
+const LAYER_DIRS = ['lib/outreach', 'lib/ads']
+const LAYER_DIR = LAYER_DIRS[0] // where packaged paths are rooted
 const PACKAGE_NAME = '@signalboost/marketing-sales'
 const PACKAGE_VERSION = '1.0.0-rc.1'
 const BUILD_ROOT = path.join(APP_ROOT, 'dist', 'marketing-sales-build')
@@ -101,7 +109,7 @@ function walk() {
   const entryPath = path.join(APP_ROOT, ENTRY)
   if (!fs.existsSync(entryPath)) fail(`entry point ${ENTRY} does not exist`)
 
-  const layerRoot = path.join(APP_ROOT, LAYER_DIR)
+  const layerRoots = LAYER_DIRS.map(dir => path.join(APP_ROOT, dir))
   const seen = new Set()
   const queue = [entryPath]
   const violations = []
@@ -134,8 +142,8 @@ function walk() {
         continue
       }
 
-      if (!resolved.startsWith(layerRoot + path.sep)) {
-        violations.push(`${relative} imports '${specifier}' which resolves outside ${LAYER_DIR} (${normalize(path.relative(APP_ROOT, resolved))})`)
+      if (!layerRoots.some(root => resolved.startsWith(root + path.sep))) {
+        violations.push(`${relative} imports '${specifier}' which resolves outside ${LAYER_DIRS.join(' and ')} (${normalize(path.relative(APP_ROOT, resolved))})`)
         continue
       }
 
@@ -154,7 +162,7 @@ if (violations.length) {
   fail(`${violations.length} boundary violation(s). The layer is not portable as written.`)
 }
 
-console.log(`Boundary holds: ${files.length} files reachable from ${ENTRY}, zero host imports, zero dependencies.`)
+console.log(`Boundary holds: ${files.length} files reachable from ${ENTRY} across ${LAYER_DIRS.join(' + ')}, zero host imports, zero dependencies.`)
 for (const file of files) console.log(`  ${normalize(path.relative(APP_ROOT, file))}`)
 
 if (checkOnly) process.exit(0)
@@ -164,7 +172,9 @@ fs.rmSync(BUILD_ROOT, { recursive: true, force: true })
 fs.mkdirSync(path.join(PACKAGE_ROOT, 'src'), { recursive: true })
 
 for (const file of files) {
-  const relative = path.relative(path.join(APP_ROOT, LAYER_DIR), file)
+  // Preserve which layer a file came from, so src/outreach/... and src/ads/... stay
+  // distinguishable in the installed package.
+  const relative = path.relative(APP_ROOT, file).replace(/^lib[\\/]/, '')
   const target = path.join(PACKAGE_ROOT, 'src', relative)
   fs.mkdirSync(path.dirname(target), { recursive: true })
   fs.copyFileSync(file, target)
@@ -181,8 +191,8 @@ const manifest = {
   version: PACKAGE_VERSION,
   type: 'module',
   description: 'Email outreach and social publishing in one portable engine, running inside the buyer\'s own environment on their own credentials.',
-  main: 'src/marketing-sales-portable.ts',
-  types: 'src/marketing-sales-portable.ts',
+  main: 'src/outreach/marketing-sales-portable.ts',
+  types: 'src/outreach/marketing-sales-portable.ts',
   files: ['src', '*.md'],
   // Deliberately empty and deliberately asserted. A buyer's security review asks what
   // transitive packages arrive with this; the honest answer is none.
@@ -195,7 +205,7 @@ fs.writeFileSync(path.join(PACKAGE_ROOT, 'package.json'), `${JSON.stringify(mani
 // that was built, without trusting the channel it arrived through.
 const digest = files
   .map(file => {
-    const relative = normalize(path.relative(path.join(APP_ROOT, LAYER_DIR), file))
+    const relative = normalize(path.relative(APP_ROOT, file).replace(/^lib[\\/]/, ''))
     const hash = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
     return `${hash}  src/${relative}`
   })
@@ -213,7 +223,7 @@ const proving = fs.mkdtempSync(path.join(os.tmpdir(), 'marketing-sales-portable-
 fs.writeFileSync(path.join(proving, 'package.json'), JSON.stringify({ name: 'proving-ground', private: true, type: 'module' }, null, 2))
 run('npm', ['install', tarball, '--no-audit', '--no-fund'], { cwd: proving })
 
-const installedEntry = path.join(proving, 'node_modules', ...PACKAGE_NAME.split('/'), 'src', 'marketing-sales-portable.ts')
+const installedEntry = path.join(proving, 'node_modules', ...PACKAGE_NAME.split('/'), 'src', 'outreach', 'marketing-sales-portable.ts')
 if (!fs.existsSync(installedEntry)) fail('installed package does not contain its entry point')
 
 const installedManifest = JSON.parse(fs.readFileSync(path.join(proving, 'node_modules', ...PACKAGE_NAME.split('/'), 'package.json'), 'utf8'))

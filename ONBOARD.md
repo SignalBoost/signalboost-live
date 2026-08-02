@@ -728,3 +728,170 @@ The completed PRs solve generated report/document language switching. Section 9 
 mandatory plan for eliminating the rest of the hardcoded user-facing English in UI, APIs,
 metadata, notifications, emails, exports, accessibility copy, public pages and portable runtime
 surfaces.
+
+---
+
+## 15. Outreach — architecture, chokepoints, and the defects that shaped them
+
+Every rule below exists because the alternative reached a real company.
+
+### 15.1 Four independent paths can send
+
+They share helpers but not control flow, and this is the most common source of "we fixed
+that already" being wrong.
+
+| Path | Entry point |
+| --- | --- |
+| Console Approve & Send | `PATCH /api/outreach/queue` — carries its own complete send implementation |
+| Single send | `/api/outreach/send` |
+| Batch send | `/api/admin/outreach/send-ready` |
+| Background drafting | `lib/outreach/prospectCampaign.ts` via `/api/cron/prospect-campaign` |
+
+A guard added to one protects none of the others. Verify each separately.
+
+### 15.2 Enforcement happens at send time
+
+Draft-time rules leave every already-approved row untouched — and those are the rows about
+to go out.
+
+- `applyOutreachSignature` — strips a dangling sign-off, then appends the closing block at
+  the bottom, always: team name, contact address, platform link. Idempotent.
+- `assertSafeOutreachMessage` — refuses guaranteed results, implied private-data access,
+  unfilled placeholders, and bodies that read as an instruction to the assistant.
+- Address-level duplicate protection, **scoped to the product** (§15.4).
+
+A "must be present" rule and a "must be in position X" rule are different requirements. A
+contains-check silently satisfies the first while failing the second — that is how emails
+ended with a call to action and no signature.
+
+### 15.3 Selection is part of safety
+
+`send-ready` once had no `ORDER BY`. Postgres returned oldest-first in practice, so a batch
+sent a DevOps pitch to prospects from a finished campaign. A batch send is irreversible, so
+"whatever the database returned" is not an acceptable selection rule. Ordering is now
+newest-first with `ids=`, `sinceHours=` and `source=` to narrow a run, and dry runs return
+enough of the payload to judge it.
+
+### 15.4 Duplicates are scoped to the product, not the address
+
+`outreach_queue.product_key` holds a slug of what is being sold. Two rows collide only when
+the address **and** the product match, so a prospect list stays reusable across products —
+burning an address after one campaign is the wrong trade. Null means unlabelled, and
+unlabelled rows compare only against each other.
+
+Scoped at every layer: discovery excludes companies already approached **about this
+product**, draft creation allows a second draft under a different product, and all three
+senders compare product rather than address.
+
+### 15.5 Discovery
+
+Region and language are properties of the target, never of the operator's UI. A US prospect
+receives English while the console displays Portuguese, and that is correct.
+
+- `pickOutreachLanguage` decides from the target's own URL and name, requiring repeated
+  evidence before letting scraped body text choose. One place name in page text is not
+  evidence — that rule exists because a US company mentioning Latin American markets was
+  emailed in Spanish.
+- `COUNTRY_PROFILES` carries, per country, the local search name, ccTLD and vertical terms
+  **in that country's language**. Queries stay under 120 characters.
+- Directory and ranking pages are rejected. They are lists *of* providers, not providers.
+
+### 15.6 Timeouts
+
+`/api/cron/prospect-campaign` 504'd on every invocation for two days: `maxDuration` was 60
+while one company costs a model call plus up to nine page fetches. The route is now 300, the
+tick budget 240s, and **every awaited call in the hot path has its own ceiling**. Bounding
+one loop inside a serverless function is not enough.
+
+Any fetch without a deadline is a latent forever-spinner. The Contacts page hung for three
+hours on a request that never settled, because `finally` only runs when a promise resolves.
+
+### 15.7 Approval is pull-only, plus a digest
+
+Nothing alerts on pending drafts by design. `/api/cron/outreach-digest` emails the owner the
+newest pending rows daily — the drafts themselves, not a count, because a count still
+requires opening the console. It sends nothing when the count is zero.
+
+---
+
+## 16. Portables — the plug-and-play doctrine
+
+### 16.1 Bring your own, everywhere
+
+The owner's standing requirement: a buyer is never told which platforms, providers or
+networks they may use. Three surfaces now implement it identically.
+
+| Surface | Ships | Buyer declares |
+| --- | --- | --- |
+| Social publishing | 8 connectors | any platform — `outreach_social_custom_platforms` |
+| Integrations | 27 providers | any tool — `integration_custom_providers` |
+| Paid ads | Meta | any network — `declareAdPlatform` |
+
+A declaration is data: where to authorize, what the request looks like, where the answer
+appears. It runs the identical path as a built-in — same confirmation rule, same approval
+gate, same credential resolver. **Buyers can add reach, never authority.**
+
+Each surface refuses the declaration it cannot make safe. Social refuses one that cannot
+confirm a post. Integrations refuse one that would overwrite an implemented provider with a
+descriptor. Ads refuse one that cannot report spend or be paused.
+
+### 16.2 The boundary is proven, not claimed
+
+`scripts/build-social-portable.mjs` and `build-marketing-sales-portable.mjs` walk the import
+graph from a public barrel and refuse to build on any host alias, any third-party package,
+or any path outside the layer. Then they pack, install into a clean directory, and confirm
+the installed manifest declares no dependencies.
+
+Both run in CI on every change to the layer. The guard is tested by breaking it deliberately:
+a host import added to a connector fails the check by name. A guard that stays green when you
+violate what it guards is measuring nothing.
+
+Two artifacts from one codebase — Social Outreach Connector (9 files) inside Marketing +
+Sales (14). Sold as one product; buildable as two.
+
+### 16.3 Paid ads are a different class of risk
+
+A failed post costs nothing. A wrong ad spends the buyer's budget at machine speed and the
+money does not come back. So `lib/ads/` is built around the spend:
+
+- **No spend without a cap**, checked before any provider is contacted. Money is integer
+  minor units; a fractional cent is refused rather than rounded, because it means someone
+  did floating-point arithmetic on money upstream.
+- **The spend approval is separate from the content approval.** Approving wording is not
+  approving a budget, and the two are often different people.
+- **Reconcile against the provider.** Platforms overdeliver and convert currency. What was
+  spent is whatever they report, never our own arithmetic.
+- A cap in a different currency from the account ceiling is **refused, not converted** — an
+  exchange rate applied here would be a guess about real money.
+- `spendUnits` must be declared `minor` or `major`. Guessing is a hundredfold error.
+- Meta campaigns are created **PAUSED**: the campaign exists, the cap is registered, and a
+  human turns it on, so a mistake in the create request costs nothing.
+
+`startAdCampaign` has no parameter that skips the gate. A supported way to spend without a
+cap would be a supported way to defeat the product.
+
+### 16.4 Distinctions the UI refuses to blur
+
+- A capability is **implemented** (a function exists) or **declared** (claimed, nobody wrote
+  it). Both are shown, coloured differently. A buyer discovering at run time that a listed
+  capability was a promise is the failure this product is sold against.
+- Marketing **agencies** — Ogilvy, WPP, Publicis — are not integrations. They have no APIs.
+  They are potential buyers.
+- Platform approval is the **buyer's** burden, not ours, and the buyer documents say so per
+  platform rather than implying they are equal.
+
+### 16.5 Delivery hazards, all observed repeatedly
+
+- **New files slip most often** — they must be created rather than pasted over. Say "new
+  file" explicitly.
+- **Never ship a pair of files whose names differ only by a suffix.** `x.ts` and `x-store.ts`
+  have been cross-pasted twice, losing the real content of both. Consolidate or rename.
+- **Locale JSONs go one per message**, with expected byte size and first visible string. A
+  slot swap has happened twice; the completeness guard reporting exactly *100% identical to
+  English* is the signature.
+- **Verify every file of a batch after a green**, not just the one you suspect. A batch that
+  is internally consistent still fails in the half-applied state.
+- An error naming a path that does not match the repo layout means a misplaced paste, not a
+  code fault.
+- `esbuild` and strip-types checks pass on undefined variables. Only a real `tsc` catches
+  them. Run one before any multi-file delivery.

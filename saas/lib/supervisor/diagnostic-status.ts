@@ -73,24 +73,33 @@ export type DiagnosticAssessment = {
   rulePurpose: string
   /** Why this rule is allowed to be this relaxed — the safety argument behind the threshold. */
   ruleSafetyRationale: string
+  /** What it costs if this rule is ignored. */
+  ruleFailureMode: string
   /** REASONING: why this status and not the neighbouring one. */
   reasoning: string
   /** CONDITIONS: what would move it to a different status. */
   changesWhen: string
   /** The same conclusion as an ordered, machine-readable chain, for audit export. */
   inferenceChain: InferenceStep[]
+  /** How sure we are of the INFERENCE, as distinct from the evidence behind it. */
+  reasoningConfidence: ReasoningConfidence
 }
 
 /**
  * One link in the reasoning, with a STABLE key.
  *
  * The prose fields above are for a person reading the console. This is the same conclusion in
- * a shape an audit tool can walk without parsing English: observation → rule → evidence →
- * conclusion → recommendation, always those five, always in that order, always present even
- * when a step is empty. An auditor asking "show me how you reached this" gets a structure
- * rather than a paragraph.
+ * a shape an audit tool can walk without parsing English: observation → evidence → rule →
+ * reasoning → conclusion → recommendation, always those six, always in that order, always
+ * present even when a step is empty. An auditor asking "show me how you reached this" gets a
+ * structure rather than a paragraph.
+ *
+ * EVIDENCE COMES BEFORE THE RULE, and reasoning is its own link rather than being folded into
+ * the conclusion. That ordering is the claim the product makes about itself: the evidence was
+ * gathered first and the rule was applied to it, not selected to fit a conclusion already
+ * reached.
  */
-export type InferenceStepKey = 'observation' | 'rule' | 'evidence' | 'conclusion' | 'recommendation'
+export type InferenceStepKey = 'observation' | 'evidence' | 'rule' | 'reasoning' | 'conclusion' | 'recommendation'
 
 export type InferenceStep = {
   step: InferenceStepKey
@@ -258,6 +267,9 @@ export type RuleMeta = {
   name: string
   purpose: string
   safetyRationale: string
+  /** What goes wrong if the rule is ignored. The purpose says what it prevents; this says
+   *  what it costs, which is the sentence that lets an operations manager schedule it. */
+  failureMode: string
 }
 
 const RULE_META: Record<string, RuleMeta> = {
@@ -265,61 +277,73 @@ const RULE_META: Record<string, RuleMeta> = {
     name: 'Lease cleanup policy',
     purpose: 'Prevent accumulation of completed leases.',
     safetyRationale: 'A completed lease holds nothing. It becomes operational only when live work is waiting on it, and that condition is checked separately.',
+    failureMode: 'If completed leases are never cleared, the lease table grows without bound and reconciliation passes take progressively longer.',
   },
   expired_leases: {
     name: 'Expired lease reclaim policy',
     purpose: 'Return expired leases to the pool so their work can be reclaimed.',
     safetyRationale: 'Expiry alone strands nothing. The discriminator is whether the work attached to the lease is still live, not how many leases have expired.',
+    failureMode: 'If expired leases are never reclaimed, the work attached to them eventually has no owner and stops progressing.',
   },
   reconciliation_backlog: {
     name: 'Reconciliation backlog policy',
     purpose: 'Keep the reconciliation queue short enough to run inline rather than in a maintenance window.',
     safetyRationale: 'A backlog of finished records costs time, never continuity. Treating it as urgent spends the operator’s attention on housekeeping.',
+    failureMode: 'If reconciliation never runs, completed records accumulate until the pass no longer fits inside a maintenance window.',
   },
   stale_work: {
     name: 'Stalled work policy',
     purpose: 'Detect work that has stopped progressing without failing.',
     safetyRationale: 'A stalled item is not yet a blocked item, but it is the state a blocked item passes through, so it is worth a person during the working day.',
+    failureMode: 'If stalled work is never examined, an item that has quietly failed is indistinguishable from one still in progress.',
   },
   supervisor: {
     name: 'Supervisor presence policy',
     purpose: 'Confirm at least one runtime is available to pick up work.',
     safetyRationale: 'A serverless runtime is idle between executions by design. Absence of activity is not absence of capability, and only a runtime that is both idle and late is worth reporting.',
+    failureMode: 'If no runtime is available, arriving work is accepted and never picked up — the queue looks healthy while nothing moves.',
   },
   observation_schedule: {
     name: 'Observation cadence policy',
     purpose: 'Confirm observations arrive at the cadence the policy declares.',
     safetyRationale: 'One missed window resolves itself at the next run. Escalating on the first miss trains operators to ignore the second.',
+    failureMode: 'If the cadence is never enforced, new incidents remain undiscovered until the next successful observation, however long that takes.',
   },
   missed_heartbeats: {
     name: 'Heartbeat freshness policy',
     purpose: 'Detect a runtime that has stopped writing heartbeats while work is expected of it.',
     safetyRationale: 'Heartbeat age is meaningful only against the execution model. For a scheduled runtime, an aging heartbeat between runs is the expected reading.',
+    failureMode: 'If a genuinely dead runtime is not detected, its leases are never released and the work it held stays stranded.',
   },
   bpal_registry: {
     name: 'Browser provider registration policy',
     purpose: 'Ensure every registered provider passes its integrity check before work is routed to it.',
     safetyRationale: 'A failed registration causes execution to be refused, not attempted incorrectly. The failure mode is safe, which is why this is not urgent.',
+    failureMode: 'If an invalid registration is left in place, every request routed to that provider is refused, and the capability is silently unavailable.',
   },
   provider_registration: {
     name: 'Provider registration policy',
     purpose: 'Ensure provider registrations are valid before anything depends on them.',
     safetyRationale: 'An invalid registration removes a capability. It does not corrupt work already in flight.',
+    failureMode: 'If a broken registration is left in place, work that depends on that provider fails at dispatch rather than at configuration time.',
   },
   audit_failures: {
     name: 'Audit completeness policy',
     purpose: 'Ensure every run leaves a terminal record that can be replayed later.',
     safetyRationale: 'An audit gap costs what can be PROVEN about a window, not what happened in it. It is an evidence problem and belongs to the compliance calendar.',
+    failureMode: 'If audit gaps are never investigated, outcomes in that window cannot be replayed or proven — the evidence is gone, not delayed.',
   },
   queue_depth: {
     name: 'Queue depth policy',
     purpose: 'Detect a queue growing faster than it drains.',
     safetyRationale: 'Depth alone is not a fault — a queue exists to absorb bursts. The signal worth acting on is a depth that only ever rises.',
+    failureMode: 'If a growing queue is never addressed, latency rises until work ages past the point where completing it is still useful.',
   },
   default_threshold: {
     name: 'Default threshold policy',
     purpose: 'Classify a subsystem that has no rule of its own, using score thresholds only.',
     safetyRationale: 'A generic threshold cannot know what the measurement means, so it never invents a judgement from a missing metric and never claims operational impact.',
+    failureMode: 'If a subsystem is left without a rule of its own, it can only ever be judged by a generic threshold that does not know what the measurement means.',
   },
 }
 
@@ -347,6 +371,74 @@ const CHANGES_WHEN: Record<DiagnosticStatus, string> = {
   not_measured: 'Clears as soon as the source reports a metric.',
 }
 
+/**
+ * HOW SURE ARE WE OF THE REASONING ITSELF?
+ *
+ * Every other confidence figure in this product is about the evidence. This one is about the
+ * inference: did a rule written for THIS subsystem match, was a measurement actually present,
+ * does the execution model account for the reading, and does anything in the inputs conflict
+ * with the conclusion. A generic threshold applied to a missing metric can produce a perfectly
+ * confident-looking card, and an operator deserves to know that the reasoning behind it is
+ * thin.
+ *
+ * A single conflicting factor drops this to low regardless of how many supporting ones there
+ * are. Conflicting evidence is not outweighed by agreement elsewhere — it means one of the two
+ * readings is wrong, and averaging them would hide exactly the contradiction worth surfacing.
+ */
+export type ReasoningConfidenceLevel = 'high' | 'moderate' | 'low'
+
+export type ReasoningFactor = {
+  supports: boolean
+  statement: string
+}
+
+export type ReasoningConfidence = {
+  level: ReasoningConfidenceLevel
+  label: string
+  factors: ReasoningFactor[]
+}
+
+const REASONING_CONFIDENCE_LABELS: Record<ReasoningConfidenceLevel, string> = {
+  high: 'High',
+  moderate: 'Moderate',
+  low: 'Low',
+}
+
+function assessReasoningConfidence(
+  named: boolean,
+  metric: number | null,
+  status: DiagnosticStatus,
+  operationalImpact: OperationalImpact,
+  context: DiagnosticContext,
+): ReasoningConfidence {
+  const factors: ReasoningFactor[] = []
+
+  factors.push(named
+    ? { supports: true, statement: 'A rule written for this subsystem matched exactly.' }
+    : { supports: false, statement: 'No rule is defined for this subsystem, so generic score thresholds were applied.' })
+
+  factors.push(metric === null || metric === undefined
+    ? { supports: false, statement: 'No measurement was reported, so the classification rests on a score alone.' }
+    : { supports: true, statement: 'A measurement was reported and used directly.' })
+
+  // The conflict check: a diagnostic claiming no impact while work is demonstrably blocked.
+  const blocked = Number(context.blockedWork || 0)
+  factors.push(blocked > 0 && operationalImpact === 'none'
+    ? { supports: false, statement: `${blocked} work item(s) are blocked while this diagnostic reports no operational impact.` }
+    : { supports: true, statement: 'Nothing in the inputs conflicts with this conclusion.' })
+
+  if (status === 'expected_transient' && context.runtimeIdleByDesign) {
+    factors.push({ supports: true, statement: 'The execution model predicts exactly this reading.' })
+  }
+  if (status === 'observation_delayed' && context.observationWindowMissed) {
+    factors.push({ supports: true, statement: 'The missed window is confirmed by the observation policy, not inferred from silence.' })
+  }
+
+  const conflicts = factors.filter(factor => !factor.supports).length
+  const level: ReasoningConfidenceLevel = conflicts === 0 ? 'high' : conflicts === 1 ? 'moderate' : 'low'
+  return { level, label: REASONING_CONFIDENCE_LABELS[level], factors }
+}
+
 const IMPACT_STATEMENT: Record<OperationalImpact, string> = {
   none: 'No operational impact.',
   possible: 'Could affect operations if left unattended.',
@@ -371,6 +463,7 @@ export function assessDiagnostic(
   const meta = RULE_META[ruleKey] || RULE_META.default_threshold
   const status = rule.classify(score, metric, context)
   const operationalImpact = rule.impact(status, context)
+  const reasoningConfidence = assessReasoningConfidence(named, metric, status, operationalImpact, context)
   const evidence: string[] = [
     metric === null || metric === undefined ? 'no metric reported' : `measured value ${metric}`,
     `score ${score}`,
@@ -392,15 +485,18 @@ export function assessDiagnostic(
     ruleName: meta.name,
     rulePurpose: meta.purpose,
     ruleSafetyRationale: meta.safetyRationale,
+    ruleFailureMode: meta.failureMode,
     reasoning: REASONING[status],
     changesWhen: CHANGES_WHEN[status],
     inferenceChain: [
       { step: 'observation', statement: rule.explain(metric, context) },
-      { step: 'rule', statement: `${meta.name} — ${meta.purpose}` },
       { step: 'evidence', statement: evidence.join(' · ') },
-      { step: 'conclusion', statement: `${DIAGNOSTIC_LABELS[status]} — ${REASONING[status]}` },
+      { step: 'rule', statement: `${meta.name} — ${meta.purpose}` },
+      { step: 'reasoning', statement: REASONING[status] },
+      { step: 'conclusion', statement: DIAGNOSTIC_LABELS[status] },
       { step: 'recommendation', statement: rule.recommend(status, metric) || 'None. Nothing is owed.' },
     ],
+    reasoningConfidence,
   }
 }
 

@@ -35,6 +35,8 @@ import { discoverAdAccounts, billingArrangementsFor, accountPickerLabel } from '
 import { collectAdsAttention } from '@/lib/ads/ads-attention'
 import { formatMinor } from '@/lib/ads/ads-money'
 import { adsTokenName, adNetworkSetupView, missingAdNetworkVars } from '@/lib/ads/ads-network-setup'
+import { getValidAdsToken, listAdsConnections } from '@/lib/ads/ads-token-store'
+import { supportsAdsOAuth } from '@/lib/ads/ads-oauth'
 import {
   recordCampaignIntent,
   markCampaignCreated,
@@ -59,8 +61,22 @@ function tokenName(platformId: string): string {
   return adsTokenName(platformId)
 }
 
-function tokenFor(platformId: string): string {
+/** The environment variable, which is now only a fallback for a network with no connection. */
+function envTokenFor(platformId: string): string {
   return String(process.env[tokenName(platformId)] || '')
+}
+
+/**
+ * A token that is valid right now.
+ *
+ * Goes through the store, which renews before expiry and refuses rather than handing back
+ * something stale. Flattened rather than narrowed: the repo's tsconfig is not strict, and
+ * narrowing a discriminated union on `.ok` has already broken one build.
+ */
+async function resolveToken(admin: any, platformId: string): Promise<{ ok: boolean; accessToken?: string; reason?: string }> {
+  return (await getValidAdsToken(admin, platformId, envTokenFor(platformId))) as {
+    ok: boolean; accessToken?: string; reason?: string
+  }
 }
 
 /**
@@ -132,7 +148,11 @@ export async function GET() {
     // Stated plainly: a platform is declared but unusable until its token exists, and the
     // operator is told the exact variable name rather than left to guess it.
     tokenVariable: tokenName(adapter.id),
-    ready: Boolean(tokenFor(adapter.id)),
+    // Connected wins over an environment variable: a connection can be renewed and a
+    // variable cannot, so if both exist the variable is the older arrangement.
+    ready: connected.has(adapter.id) || Boolean(envTokenFor(adapter.id)),
+    canConnect: supportsAdsOAuth(adapter.id),
+    connection: connected.get(adapter.id) || null,
     // Every variable this network needs, whether each is present, and what the buyer still
     // has to obtain from the network itself. Values are never included — the console shows
     // that a secret is set, never what it is.
@@ -144,11 +164,13 @@ export async function GET() {
     arrangements: billingArrangementsFor(adapter.id),
   }))
 
-  const [positions, ceilings, health] = await Promise.all([
+  const [positions, ceilings, health, connections] = await Promise.all([
     listCampaignPositions(ctx.admin),
     listAccountCeilings(ctx.admin),
     listAccountHealth(ctx.admin),
+    listAdsConnections(ctx.admin),
   ])
+  const connected = new Map(connections.map(item => [item.platformId, item]))
 
   const campaignViews = positions.map((row: any) => ({
     id: row.id,
@@ -239,15 +261,15 @@ export async function POST(req: NextRequest) {
  */
 async function discoverAccounts(ctx: any, body: any) {
   const platformId = String(body?.platformId || '').trim()
-  const token = tokenFor(platformId)
-  if (!token) {
+  const resolved = await resolveToken(ctx.admin, platformId)
+  if (resolved.ok !== true) {
     return NextResponse.json(
-      { error: `Connect ${platformId} first — an account list needs a working access token. Set ${tokenName(platformId)}.` },
+      { error: `${resolved.reason} An account list needs a working connection.` },
       { status: 400 },
     )
   }
 
-  const result = await discoverAdAccounts(platformId, token)
+  const result = await discoverAdAccounts(platformId, String(resolved.accessToken))
   // A refusal, never an empty list: "no accounts" and "we could not ask" look identical in a
   // dropdown and mean opposite things.
   if (result.ok !== true) return NextResponse.json({ error: (result as any).reason }, { status: 502 })
@@ -345,13 +367,9 @@ async function startCampaign(ctx: any, body: any) {
     )
   }
 
-  const token = tokenFor(platformId)
-  if (!token) {
-    return NextResponse.json(
-      { error: `No access token for ${platformId}. Set ${tokenName(platformId)} in the environment.` },
-      { status: 400 },
-    )
-  }
+  const resolved = await resolveToken(ctx.admin, platformId)
+  if (resolved.ok !== true) return NextResponse.json({ error: resolved.reason }, { status: 400 })
+  const token = String(resolved.accessToken)
 
   // The ledger row is written BEFORE the provider is contacted, so a create whose response
   // is lost still leaves a record that this account was asked to spend.
@@ -424,8 +442,9 @@ async function reconcile(ctx: any, body: any) {
   if (!row) return NextResponse.json({ error: 'Unknown campaign.' }, { status: 404 })
   if (!row.campaign_ref) return NextResponse.json({ error: 'This campaign has no provider id, so its spend cannot be read. Check the ad account directly.' }, { status: 400 })
 
-  const token = tokenFor(row.platform_id)
-  if (!token) return NextResponse.json({ error: `Set ${tokenName(row.platform_id)} in the environment.` }, { status: 400 })
+  const resolved = await resolveToken(ctx.admin, row.platform_id)
+  if (resolved.ok !== true) return NextResponse.json({ error: resolved.reason }, { status: 400 })
+  const token = String(resolved.accessToken)
 
   const cap: AdSpendCap = {
     campaignMax: { amount: Number(row.campaign_max_minor), currency: String(row.currency) },
@@ -456,8 +475,9 @@ async function pause(ctx: any, body: any) {
   if (!row) return NextResponse.json({ error: 'Unknown campaign.' }, { status: 404 })
   if (!row.campaign_ref) return NextResponse.json({ error: 'This campaign has no provider id, so it cannot be paused from here. Stop it in the ad account.' }, { status: 400 })
 
-  const token = tokenFor(row.platform_id)
-  if (!token) return NextResponse.json({ error: `Set ${tokenName(row.platform_id)} in the environment.` }, { status: 400 })
+  const resolved = await resolveToken(ctx.admin, row.platform_id)
+  if (resolved.ok !== true) return NextResponse.json({ error: resolved.reason }, { status: 400 })
+  const token = String(resolved.accessToken)
 
   const result = await pauseAdCampaign(row.platform_id, String(row.campaign_ref), token, String(row.account_ref))
 

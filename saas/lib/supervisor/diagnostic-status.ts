@@ -29,6 +29,10 @@
 export type DiagnosticStatus =
   | 'nominal'             // within its normal range
   | 'expected_transient'  // outside the range, and that is normal for this design
+  | 'observation_delayed' // an owed observation has not happened; says what occurred, not that
+                          // the runtime is unwell — an active instance that missed a window is
+                          // late, and calling it "70% healthy" describes nothing an operator
+                          // can act on
   | 'cleanup_pending'     // housekeeping owed; nothing is waiting on it
   | 'maintenance_required' // needs a person, during business hours
   | 'capability_reduced'  // something works less well or not at all, without blocking work
@@ -52,6 +56,7 @@ export type DiagnosticAssessment = {
 export const DIAGNOSTIC_LABELS: Record<DiagnosticStatus, string> = {
   nominal: 'Nominal',
   expected_transient: 'Expected transient',
+  observation_delayed: 'Observation schedule delayed',
   cleanup_pending: 'Cleanup pending',
   maintenance_required: 'Maintenance required',
   capability_reduced: 'Capability reduced',
@@ -62,6 +67,8 @@ export type DiagnosticContext = {
   blockedWork?: number
   /** True when the runtime is legitimately idle between scheduled executions. */
   runtimeIdleByDesign?: boolean
+  /** True when an owed observation window passed without a run. */
+  observationWindowMissed?: boolean
 }
 
 type Rule = {
@@ -105,21 +112,36 @@ const RULES: Record<string, Rule> = {
     recommend: (status, metric) => (status === 'nominal' ? '' : `Check why ${count(metric)} item(s) have stalled.`),
   },
   supervisor: {
-    explain: (metric, context) => context.runtimeIdleByDesign
-      ? 'The runtime is idle between scheduled executions.'
-      : `${count(metric)} active supervisor instance(s).`,
+    explain: (metric, context) => context.observationWindowMissed
+      ? `${count(metric)} active supervisor instance(s); an owed observation window passed without a run.`
+      : context.runtimeIdleByDesign
+        ? 'The runtime is idle between scheduled executions.'
+        : `${count(metric)} active supervisor instance(s).`,
     classify: (score, metric, context) => {
+      // An instance that is present but late is DELAYED, not unhealthy. The old label said
+      // "supervisor: warning 70%" beside evidence reading "1 active instance", which asked
+      // the operator to reconcile two lines that never disagreed.
+      if (context.observationWindowMissed && count(metric) > 0) return 'observation_delayed'
       if (context.runtimeIdleByDesign) return 'expected_transient'
       return score >= 90 ? 'nominal' : count(metric) === 0 ? 'maintenance_required' : 'capability_reduced'
     },
     impact: status => (status === 'maintenance_required' ? 'possible' : 'none'),
     recommend: status => (status === 'maintenance_required' ? 'Start a supervisor instance — nothing will be picked up without one.' : ''),
   },
+  observation_schedule: {
+    explain: (metric, context) => context.observationWindowMissed
+      ? 'An owed observation window passed without a run.'
+      : 'Observations are arriving on their declared cadence.',
+    classify: (score, metric, context) => (context.observationWindowMissed ? 'observation_delayed' : 'nominal'),
+    impact: () => 'none',
+    recommend: status => (status === 'nominal' ? '' : 'Wait for the next window before escalating. If it is missed too, the schedule itself has stopped.'),
+  },
   missed_heartbeats: {
     explain: (metric, context) => context.runtimeIdleByDesign
       ? 'Heartbeat ages between scheduled runs, which is expected for this execution model.'
       : `${count(metric)} instance(s) have a stale heartbeat.`,
     classify: (score, metric, context) => {
+      if (context.observationWindowMissed && count(metric) > 0) return 'observation_delayed'
       if (context.runtimeIdleByDesign) return 'expected_transient'
       return count(metric) === 0 ? 'nominal' : 'maintenance_required'
     },
@@ -206,9 +228,10 @@ export type DiagnosticSummary = {
 const ORDER: Record<DiagnosticStatus, number> = {
   maintenance_required: 0,
   capability_reduced: 1,
-  cleanup_pending: 2,
-  expected_transient: 3,
-  nominal: 4,
+  observation_delayed: 2,
+  cleanup_pending: 3,
+  expected_transient: 4,
+  nominal: 5,
 }
 
 export function summariseDiagnostics(assessments: DiagnosticAssessment[]): DiagnosticSummary {

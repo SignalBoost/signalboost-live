@@ -6,6 +6,7 @@ import { createBrowserProviderDiagnosticsSnapshot } from '@/lib/browser-provider
 import { getAccess } from '@/lib/auth/access'
 import { loadLanguage } from '@/lib/i18n/loadLanguage'
 import { createPlatformHealthSnapshot } from '@/lib/supervisor/platform-health'
+import { anomaliesFromPlatformAlerts, classifyPlatformState, parseScheduledInstances } from '@/lib/supervisor/health-severity'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
 import GlobalAiKillSwitch from '@/components/supervisor/GlobalAiKillSwitch'
@@ -36,6 +37,54 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     readTable(db, 'supervisor_instances').catch(() => []), readTable(db, 'supervisor_work_items').catch(() => []), readTable(db, 'supervisor_leases').catch(() => []), readTable(db, 'vercel_observation_triggers').catch(() => []),
   ])
   const health = createPlatformHealthSnapshot({ runs, instances, workItems, leases, triggers, ciState: 'unknown', localizationComplete: true })
+  // THE HEADLINE IS A VERIFIED CLAIM, NOT A RULE FIRING. The snapshot above scores subsystems
+  // and raises anomalies; it does not know whether anything is actually broken. Severity is
+  // decided by checking impact — is work stranded, has a runtime missed its own schedule, is
+  // the monitoring data even trustworthy — because an operator woken at 3am by "critical"
+  // must be able to trust that the word was earned.
+  const scheduledInstances = parseScheduledInstances(process.env.SUPERVISOR_SCHEDULED_INSTANCES)
+  const verified = classifyPlatformState({
+    anomalies: anomaliesFromPlatformAlerts(health.alerts as any),
+    instances: instances.map(i => {
+      const id = String(i.instance_id || i.instanceId || '')
+      const interval = scheduledInstances[id]
+      return {
+        instanceId: id,
+        status: String(i.status ?? ''),
+        // Declared through SUPERVISOR_SCHEDULED_INSTANCES. Undeclared means continuous, which
+        // is the stricter reading — a runtime nobody declared still gets reported when quiet.
+        liveness: interval ? ('scheduled' as const) : ('continuous' as const),
+        scheduleIntervalSeconds: interval || null,
+        lastHeartbeatAt: i.heartbeat_at || i.heartbeatAt || null,
+        lastCompletedAt: i.updated_at || i.updatedAt || null,
+      }
+    }),
+    work: workItems.map(w => ({
+      workItemId: String(w.work_item_id || w.workItemId || w.id || ''),
+      state: String(w.state ?? ''),
+      ownedByLeaseId: w.lease_id || w.leaseId || null,
+      updatedAt: w.updated_at || w.updatedAt || null,
+    })),
+    leases: leases.map(l => ({
+      leaseId: String(l.lease_id || l.leaseId || l.id || ''),
+      workItemId: l.work_item_id || l.workItemId || null,
+      status: String(l.status ?? ''),
+      expiresAt: l.expires_at || l.expiresAt || null,
+      heartbeatAt: l.heartbeat_at || l.heartbeatAt || null,
+    })),
+    observedAt: health.capturedAt,
+    // If the snapshot failed its own verification, nothing derived from it is asserted.
+    monitoringTrustworthy: health.verification.status === 'verified',
+    monitoringReasons: health.verification.reasons,
+  })
+  const stateLabel = verified.state === 'incident' ? (t.stateIncident || 'Incident — verified impact')
+    : verified.state === 'degraded' ? (t.stateDegraded || 'Attention required')
+    : verified.state === 'unknown' ? (t.stateUnknown || 'Unverified — investigation required')
+    : (t.stateOperational || 'Operational')
+  const topFinding = verified.findings.find(f => f.severity === 'critical')
+    || verified.findings.find(f => f.severity === 'high')
+    || verified.findings.find(f => f.severity === 'unverified')
+    || verified.findings[0]
   // FAIL CLOSED, exactly as saas/proxy.ts does. It admits traffic only on `=== true`; a missing
   // table, a missing row or an RLS denial all mean blocked. Reading `!== false` here made an
   // unreadable row render as "AI AUTONOMY ACTIVE" while the middleware 503'd every webhook.
@@ -63,7 +112,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     <section style={hero}><p style={kicker}>{t.kicker}</p><h1 style={{ margin:'6px 0' }}>{t.title}</h1><p style={muted}>{t.subtitle}</p><p style={notice}>{t.readOnly}</p></section>
     <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
     <div style={grid2}>
-      <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={`${health.status} · ${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
+      <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={stateLabel}/><Field k={t.impact || 'Impact'} v={topFinding ? topFinding.impact : (t.noImpact || 'No impact detected.')}/><Field k={t.requiredAction || 'Required action'} v={topFinding ? topFinding.requiredAction : (t.noActionRequired || 'None.')}/><Field k={t.pagesOnCall || 'Wakes on-call'} v={verified.pageOutOfHours ? (t.yes || 'Yes') : (t.no || 'No')}/><Field k={t.healthScore || 'Health score'} v={`${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
       <Card title={t.healthMetrics}><dl style={fields}><Field k={t.totalObservations} v={runs.length}/><Field k={t.successfulObservations} v={successful.length}/><Field k={t.verificationSuccess} v={verificationSuccess}/><Field k={t.avgObservationDuration} v={avg(durations)}/><Field k={t.avgVerificationDuration} v={avg(durations)}/><Field k={t.providerAvailability} v={providers.map(p => `${p.providerId}: ${p.health.state}`).join(' · ')}/><Field k={t.queueDepth} v={activeWork.length}/></dl></Card>
     </div>
 

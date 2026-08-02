@@ -5,7 +5,8 @@
 //
 //   1. What is true now?          Current state, from verified impact.
 //   2. Is anyone affected?        Business impact, stated separately.
-//   3. How fresh is this?         The assessment's own timestamp — not the observation's.
+//   3. How fresh, and has it held?  The assessment's own verification state, timestamp, and
+//                                 how many consecutive observations have not contradicted it.
 //   4. What must I do?            Operator action, and whether this pages.
 //   5. What is that based on?     The assessment basis, including what limits it.
 //   6. What might happen?         Risk forecast — exposure and decision point, not prophecy.
@@ -29,6 +30,15 @@
 import type { OperationalAssessment } from '@/lib/supervisor/operational-assessment'
 import type { ForecastSet } from '@/lib/supervisor/risk-forecast'
 
+export type AssessmentVerification = {
+  /** Verified / Partly verified. A state, not a sentence. */
+  state: string
+  /** When this assessment was computed. */
+  lastAt: string
+  /** "at least 50 observations · 4h 12m", composed by the page from the stability module. */
+  unchangedAcross: string
+}
+
 export type ExecutionModel = {
   model: string
   currentState: string
@@ -48,15 +58,16 @@ export default function OperationalAssessmentPanel({
   assessment,
   forecast,
   execution,
-  assessedAt,
+  verification,
   t,
 }: {
   assessment: OperationalAssessment
   forecast: ForecastSet
   execution: ExecutionModel
-  /** When THIS assessment was computed. Operators ask how fresh the conclusion is, not when
-   *  the last observation ran — those differ whenever an observation is owed. */
-  assessedAt: string
+  /** Freshness and continuity of THIS assessment. Operators ask how fresh the conclusion is
+   *  and whether it has held — not when the last observation ran. Those differ whenever an
+   *  observation is owed. */
+  verification: AssessmentVerification
   t: Copy
 }) {
   const exposureLabel: Record<string, string> = { low: t.exposureLow, medium: t.exposureMedium, high: t.exposureHigh }
@@ -74,9 +85,23 @@ export default function OperationalAssessmentPanel({
           <p style={{ ...big, color: tone }}>{assessment.stateLabel}</p>
           <p style={muted}>{assessment.stateMeaning}</p>
           <p style={small}>{assessment.stateReason}</p>
-          <p style={badge}>{assessment.stateVerified ? t.verifiedByCheck : t.partlyVerified}</p>
-          {/* 3. Freshness of the CONCLUSION. */}
-          <p style={muted}>{`${t.confidenceLabel}: ${assessment.confidence}% · ${t.lastVerified}: ${assessedAt}`}</p>
+          {/* 3. Verification and freshness of the CONCLUSION, as labelled fields. "Verified by
+              check" was a sentence about our process; an operator wants a state and a time. */}
+          <dl style={fields}>
+            <div>
+              <dt style={muted}>{t.assessmentVerification}</dt>
+              <dd style={dd}>{verification.state}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.lastVerification}</dt>
+              <dd style={dd}>{verification.lastAt}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.unchangedAcross}</dt>
+              <dd style={dd}>{verification.unchangedAcross}</dd>
+            </div>
+          </dl>
+          <p style={muted}>{t.stabilityNote}</p>
         </div>
         <div>
           <p style={muted}>{t.businessImpact}</p>
@@ -242,7 +267,6 @@ const list = { listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid
 const listItem = { display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' as const }
 const ledgerItem = { borderLeft: '2px solid rgba(255,209,102,.5)', paddingLeft: 10 }
 const limitTag = { border: '1px solid rgba(255,209,102,.5)', color: '#ffd166', borderRadius: 999, padding: '2px 8px', fontSize: 12 }
-const badge = { display: 'inline-block', border: '1px solid rgba(56,242,164,.4)', color: '#b8ffdd', borderRadius: 999, padding: '2px 10px', margin: '6px 0 0', fontSize: 12 }
 const big = { margin: '4px 0', fontSize: 30, fontWeight: 800 }
 const strong = { margin: '4px 0', fontWeight: 700 }
 const small = { margin: '4px 0', color: 'rgba(255,255,255,.82)' }

@@ -32,6 +32,7 @@ import {
 import { declareSocialAdNetworks } from '@/lib/ads/ads-social-networks'
 import { declareGoogleAndMarketplaceNetworks } from '@/lib/ads/ads-google-and-marketplace'
 import { formatMinor } from '@/lib/ads/ads-money'
+import { adsTokenName, adNetworkSetupView, missingAdNetworkVars } from '@/lib/ads/ads-network-setup'
 import {
   recordCampaignIntent,
   markCampaignCreated,
@@ -48,9 +49,10 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-/** ADS_META_ACCESS_TOKEN, ADS_LINKEDIN_ACCESS_TOKEN, and so on. */
+// The variable names live in lib/ads/ads-network-setup.ts, so the cockpit, this route and
+// the connect-via-PR path all read one list instead of three copies that can drift.
 function tokenName(platformId: string): string {
-  return `ADS_${String(platformId).replace(/_ads$/, '').toUpperCase()}_ACCESS_TOKEN`
+  return adsTokenName(platformId)
 }
 
 function tokenFor(platformId: string): string {
@@ -127,6 +129,11 @@ export async function GET() {
     // operator is told the exact variable name rather than left to guess it.
     tokenVariable: tokenName(adapter.id),
     ready: Boolean(tokenFor(adapter.id)),
+    // Every variable this network needs, whether each is present, and what the buyer still
+    // has to obtain from the network itself. Values are never included — the console shows
+    // that a secret is set, never what it is.
+    setup: adNetworkSetupView(adapter.id),
+    missing: missingAdNetworkVars(adapter.id),
   }))
 
   const [positions, ceilings] = await Promise.all([

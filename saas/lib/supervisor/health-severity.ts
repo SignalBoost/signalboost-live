@@ -50,6 +50,12 @@ export type InstanceFact = {
   liveness?: LivenessKind
   /** For a scheduled instance: how often it is supposed to run, in seconds. */
   scheduleIntervalSeconds?: number | null
+  /**
+   * Intervals of grace before late becomes absent. Supplied from the observation policy so
+   * cadence and liveness are derived from ONE number; a separately configured grace period
+   * is how the two drifted apart before.
+   */
+  stalenessMultiplier?: number | null
   lastHeartbeatAt?: string | null
   lastCompletedAt?: string | null
 }
@@ -135,7 +141,7 @@ export type PlatformStateReport = {
   checkedAt: string
 }
 
-const STALE_MULTIPLIER = 2.5 // a scheduled run may be late; two and a half intervals is absent
+const DEFAULT_STALE_MULTIPLIER = 2.5 // a scheduled run may be late once; used only when policy is silent
 const CONTINUOUS_HEARTBEAT_GRACE_MS = 90_000
 const TERMINAL_WORK = new Set(['completed', 'failed', 'rejected', 'cancelled', 'archived'])
 
@@ -181,7 +187,8 @@ function instanceAbsent(instance: InstanceFact, now: Date): { absent: boolean; d
     if (!interval) {
       return { absent: false, detail: 'Scheduled instance with no declared interval — cannot judge absence.', expected: false }
     }
-    const window = interval * STALE_MULTIPLIER
+    const multiplier = Number(instance.stalenessMultiplier || 0) > 0 ? Number(instance.stalenessMultiplier) : DEFAULT_STALE_MULTIPLIER
+    const window = interval * multiplier
     if (beat > window) {
       return {
         absent: true,
@@ -460,4 +467,57 @@ export function classifyPlatformState(input: SeverityInput): PlatformStateReport
     pageOutOfHours: findings.some(item => item.pageOutOfHours),
     checkedAt,
   }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feeding this from the existing platform-health snapshot
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Only the alerts that previously forced the word "critical" are re-classified here.
+ * Everything else keeps the treatment it already had, so this file changes what a serious
+ * claim requires rather than churning the whole console.
+ */
+const ALERT_TO_ANOMALY: Record<string, AnomalyKind> = {
+  stale_lease: 'expired_lease',
+  missing_heartbeat: 'stale_heartbeat',
+  audit_persistence_failure: 'audit_incomplete',
+  broken_bpal_registration: 'provider_registration_broken',
+}
+
+export function anomaliesFromPlatformAlerts(alerts: Array<{ type: string; severity?: string; subsystemId?: string; evidence?: string[] }>): Anomaly[] {
+  const out: Anomaly[] = []
+  for (const raw of alerts || []) {
+    const kind = ALERT_TO_ANOMALY[String(raw.type)]
+    if (!kind) continue
+    out.push({
+      kind,
+      subject: (raw.evidence && raw.evidence[0]) || String(raw.subsystemId || raw.type),
+      evidence: raw.evidence || [],
+    })
+  }
+  return out
+}
+
+/**
+ * Which instances are scheduled rather than continuously running, DECLARED by configuration.
+ *
+ * Format: "vercel-observation-cron:900,other-job:3600" — instance id, then its interval in
+ * seconds. Anything not listed is treated as continuous, which is the stricter reading: an
+ * undeclared runtime that goes quiet is still reported.
+ *
+ * Deliberately a declaration rather than a guess. Inferring "this looks like a cron" from an
+ * instance name would be the same class of error as the fixed timeout it replaces — a rule
+ * that is right until it silently is not, on a runtime nobody remembered to name carefully.
+ */
+export function parseScheduledInstances(value: string | null | undefined): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const entry of String(value || '').split(',')) {
+    const [id, seconds] = entry.split(':')
+    const name = String(id || '').trim()
+    const interval = Number(String(seconds || '').trim())
+    if (name && Number.isFinite(interval) && interval > 0) out[name] = interval
+  }
+  return out
 }

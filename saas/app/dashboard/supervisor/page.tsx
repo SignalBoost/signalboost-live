@@ -32,6 +32,8 @@ import { assessDiagnostic, summariseDiagnostics, splitIncidents } from '@/lib/su
 import { buildOperationalAssessment } from '@/lib/supervisor/operational-assessment'
 import { buildRiskForecast } from '@/lib/supervisor/risk-forecast'
 import { assessStability } from '@/lib/supervisor/assessment-stability'
+import { buildAssessmentIntegrity } from '@/lib/supervisor/assessment-integrity'
+import { recommendationPolicy } from '@/lib/supervisor/recommendation-policy'
 import { absenceWindowSeconds, listObservationPolicies, observationTiming } from '@/lib/supervisor/observation-policy'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
@@ -214,6 +216,26 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   })))
   const incidentById = new Map<string, VercelHealthRun>(incidentRuns.map(r => [r.runId, r]))
 
+  // ── DOES THE ASSESSMENT HOLD TOGETHER? ───────────────────────────────────────
+  // Computed last, from the finished outputs of every other module, because its job is to
+  // catch two of them disagreeing. Feeding it the raw inputs instead would let it agree with
+  // a wrong conclusion for the same reason the conclusion was wrong.
+  const integrity = buildAssessmentIntegrity({
+    measuredDomains: snapshot.domains.length - snapshot.unmeasured.length,
+    totalDomains: snapshot.domains.length,
+    operationalState: assessment.state,
+    blockedWork,
+    confidence: assessment.confidence,
+    limitingBasisLines: assessment.assessmentBasis.filter(line => line.polarity === 'limits').length,
+    diagnosticsWithConfirmedImpact: diagnostics.filter(d => d.operationalImpact === 'confirmed').length,
+    ledgerReconciles: ledger.reconciles,
+    stabilityConsecutive: stability.consecutive,
+    newestObservationContradicts: runs.length > 0 && failedRunIds.has(runs[0].runId),
+    overdueSeconds: timing ? timing.overdueSeconds : 0,
+    toleranceSeconds: timing ? timing.toleranceSeconds : 1,
+    inputs: [runs.length, successful.length, missedWindows, blockedWork, activeWork.length, verificationFailed, auditGaps, expiredLeasesWithWork, providerBroken.length, snapshot.unmeasured.join(','), lastObservationAt],
+  })
+
   // ── FAIL CLOSED, exactly as saas/proxy.ts does ────────────────────────────────
   const { data: systemStatus, error: systemStatusError } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()
   const killSwitchState: 'active' | 'engaged' | 'unavailable' = systemStatusError || !systemStatus ? 'unavailable' : systemStatus.ai_autonomous_execution_enabled === true ? 'active' : 'engaged'
@@ -231,13 +253,13 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
 
     {/* AUDIENCE 1 — OPERATIONS. Always visible, nothing collapsed. */}
-    <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} verification={verification} t={t} />
+    <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} verification={verification} integrity={integrity} t={t} />
 
     {/* Diagnostics collapse to one line. Eighteen green cards are not information. */}
     <Card title={t.systemDiagnostics}>
       <dl style={fields}><Field k={t.diagnosticsNominal} v={diagnosticSummary.nominal}/><Field k={t.diagnosticsNeedingAttention} v={diagnosticSummary.attention.length}/><Field k={t.operationalImpactLabel} v={diagnosticSummary.quiet ? t.impactNone : t.diagnosticsWorkingHours}/></dl>
       <p style={muted}>{diagnosticSummary.quiet ? (t.diagnosticsQuiet) : (t.diagnosticsAttention)}</p>
-      {diagnosticSummary.attention.length ? <details open style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => <article key={d.subsystemId} style={mini}><h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3><dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.explanation} v={d.explanation}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/></dl></article>)}</details> : null}
+      {diagnosticSummary.attention.length ? <details open style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => { const policy = recommendationPolicy(d.status); return <article key={d.subsystemId} style={mini}><h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3><dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.reasonLabel} v={d.explanation}/><Field k={t.evidence} v={d.evidence.join(' · ')}/><Field k={t.reasoningLabel} v={d.reasoning}/><Field k={t.ruleLabel} v={d.rule}/><Field k={t.changesWhen} v={d.changesWhen}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/><Field k={t.policyLabel} v={policy.policyLabel}/><Field k={t.priorityLabel} v={policy.priorityLabel}/><Field k={t.slaLabel} v={policy.slaLabel}/></dl><p style={muted}>{`${policy.rationale} ${t.defaultPolicyNote}`}</p></article> })}</details> : null}
     </Card>
 
     {/* Incidents, split. Twelve verified failures are evidence the Supervisor worked. */}

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { SOCIAL_CONNECTORS, platformContentKind, platformNeedsAccountRef, type SocialPlatform } from '@/lib/outreach/social-connectors'
-import { loadCustomPlatforms } from '@/lib/outreach/social-custom-platform-store'
+import { loadCustomPlatforms } from '@/lib/outreach/platform-declarations'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +28,7 @@ export async function GET() {
   if (ctx instanceof NextResponse) return ctx
 
   // Declared platforms live in a table, and this process may be cold — hydrate the
-  // registry before anything looks a platform up. See social-custom-platform-store.ts.
+  // registry before anything looks a platform up. See platform-declarations.ts.
   await loadCustomPlatforms(ctx.admin)
 
   const tokenRes = await ctx.admin.from('outreach_social_tokens').select('platform, account_ref, account_name, scopes, expires_at').eq('user_id', ctx.user.id)

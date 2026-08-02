@@ -26,6 +26,14 @@
 // Like the social side, a platform is DATA: Meta, Google Ads, LinkedIn Ads, TikTok
 // Business, Reddit Ads, Microsoft Advertising and anything else a buyer uses. Each is
 // their own account, their own approval, their own money.
+//
+// WHY fetchSpend AND pauseCampaign TAKE AN OPTIONAL accountRef. The social ad networks do
+// not address a campaign the way Meta does. LinkedIn reports spend per sponsored account,
+// TikTok requires advertiser_id on every report and status call, and Reddit, Pinterest and
+// Snapchat all put the ad account in the path. Without the account reference those three
+// operations cannot be addressed at all — so it is threaded through here rather than
+// smuggled inside the campaign id, which would corrupt the identifier the ledger stores.
+// It stays OPTIONAL: Meta and any single-account network ignore it.
 
 export type AdPlatformId = string
 
@@ -75,9 +83,9 @@ export type AdPlatformAdapter = {
   currencies?: string[]
   createCampaign(request: AdCampaignRequest, accessToken: string): Promise<{ platformCampaignId: string; status: string }>
   /** Read real spend back. Required — a platform we cannot reconcile is one we cannot use. */
-  fetchSpend(platformCampaignId: string, accessToken: string): Promise<AdSpendReport>
+  fetchSpend(platformCampaignId: string, accessToken: string, accountRef?: string): Promise<AdSpendReport>
   /** Stop a campaign immediately. Required, for the same reason. */
-  pauseCampaign(platformCampaignId: string, accessToken: string): Promise<{ ok: boolean; status: string }>
+  pauseCampaign(platformCampaignId: string, accessToken: string, accountRef?: string): Promise<{ ok: boolean; status: string }>
 }
 
 const adapters = new Map<AdPlatformId, AdPlatformAdapter>()
@@ -99,6 +107,7 @@ export function registerAdPlatform(adapter: AdPlatformAdapter): void {
 
 export function listAdPlatforms(): AdPlatformAdapter[] { return [...adapters.values()] }
 export function getAdPlatform(id: AdPlatformId): AdPlatformAdapter | null { return adapters.get(id) || null }
+export function unregisterAdPlatform(id: AdPlatformId): void { adapters.delete(id) }
 
 // ── The gate ─────────────────────────────────────────────────────────────────
 
@@ -198,15 +207,39 @@ export async function reconcileAdSpend(
   platformCampaignId: string,
   cap: AdSpendCap,
   accessToken: string,
+  accountRef?: string,
 ): Promise<{ ok: boolean; report?: AdSpendReport; overCap?: boolean; error?: string }> {
   const adapter = getAdPlatform(platform)
   if (!adapter) return { ok: false, error: `Unknown ad platform "${platform}".` }
   try {
-    const report = await adapter.fetchSpend(platformCampaignId, accessToken)
+    const report = await adapter.fetchSpend(platformCampaignId, accessToken, accountRef)
     const sameCurrency = report?.spent?.currency === cap.campaignMax.currency
     const overCap = sameCurrency && report.spent.amount > cap.campaignMax.amount
     return { ok: true, report, overCap }
   } catch (error: any) {
     return { ok: false, error: String(error?.message || error || 'spend_fetch_failed') }
+  }
+}
+
+/**
+ * Stop a campaign.
+ *
+ * A failure here is returned, never swallowed. The operator has to know that the campaign
+ * may still be spending so they can stop it in the ad account by hand — silence would be
+ * read as success, and this is the one call where being wrong costs money per minute.
+ */
+export async function pauseAdCampaign(
+  platform: AdPlatformId,
+  platformCampaignId: string,
+  accessToken: string,
+  accountRef?: string,
+): Promise<{ ok: boolean; status: string }> {
+  const adapter = getAdPlatform(platform)
+  if (!adapter) return { ok: false, status: `unknown_platform_${platform}` }
+  try {
+    const result = await adapter.pauseCampaign(platformCampaignId, accessToken, accountRef)
+    return { ok: result?.ok === true, status: String(result?.status || (result?.ok ? 'paused' : 'pause_failed')) }
+  } catch (error: any) {
+    return { ok: false, status: String(error?.message || error || 'pause_failed') }
   }
 }

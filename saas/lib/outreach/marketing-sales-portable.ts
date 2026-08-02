@@ -57,6 +57,41 @@ export {
 // guessing — the rule that keeps this from becoming a spam tool.
 export { findContactEmail, type ContactEmailResult } from './emailFinder.ts'
 
+// ── Paid placement ───────────────────────────────────────────────────────────
+//
+// Paid advertising is marketing, so it ships in this product rather than beside it. It
+// keeps its own folder because its risk profile is different: publishing a post that
+// fails costs nothing, while a wrong ad spends the buyer's budget at machine speed and
+// the money does not come back.
+//
+// Hence a separate gate. A campaign needs a cap and a SPEND approver — distinct from
+// whoever approved the copy — and actual spend is read back from the provider rather
+// than assumed. startAdCampaign has no parameter that bypasses any of that.
+export {
+  registerAdPlatform,
+  listAdPlatforms,
+  getAdPlatform,
+  checkSpendGate,
+  startAdCampaign,
+  reconcileAdSpend,
+  isValidMoney,
+  type Money,
+  type AdSpendCap,
+  type AdCampaignRequest,
+  type AdCampaignResult,
+  type AdSpendReport,
+  type AdPlatformAdapter,
+  type SpendGateContext,
+} from '../ads/ads-connector.ts'
+
+// Bring your own ad network — Google Ads, LinkedIn Ads, TikTok Business, or anything
+// regional — plus Meta shipped as a declaration rather than hand-written code.
+export {
+  declareAdPlatform,
+  declareMetaAds,
+  type DeclaredAdPlatform,
+} from '../ads/ads-declared-platform.ts'
+
 // ── Language ─────────────────────────────────────────────────────────────────
 // Which language to write in, decided from the TARGET's identity, never from the
 // operator's interface language. A US prospect gets English while the console is in

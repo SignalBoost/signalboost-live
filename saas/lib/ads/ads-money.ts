@@ -24,12 +24,31 @@
 // spend is the only rounding error that can hurt the buyer, so it is the one we refuse to
 // make. A tenth of a cent of overstatement per reconciliation is not a real cost; a
 // systematically low spend figure against a cap is.
+//
+// TYPE NOTE, LEARNED THE HARD WAY ON THIS FILE. The public result type is a discriminated
+// union, because that is the right shape for a buyer compiling under `strict`. But this
+// repo's tsconfig is NOT strict, and without strictNullChecks TypeScript does not narrow a
+// union by the truthiness of its boolean discriminant — `if (!result.ok) throw
+// new Error(result.reason)` fails to compile with "Property 'reason' does not exist".
+// So nothing inside this file narrows anything: all internal work happens on one flat shape,
+// and the union is constructed only at the moment of return. Any future edit here should
+// keep that arrangement rather than reintroduce narrowing that compiles on a strict machine
+// and fails in CI.
 
 export type SpendUnits = 'minor' | 'major' | 'micro';
 
-export type MoneyResult =
-  | { ok: true; minor: number; currency: string; roundedUp: boolean }
-  | { ok: false; reason: string };
+export type MoneySuccess = { ok: true; minor: number; currency: string; roundedUp: boolean };
+export type MoneyFailure = { ok: false; reason: string };
+export type MoneyResult = MoneySuccess | MoneyFailure;
+
+// The flat internal shape. Never exported — see the type note above.
+interface Conversion {
+  ok: boolean;
+  minor: number;
+  currency: string;
+  roundedUp: boolean;
+  reason: string;
+}
 
 // Currencies whose minor unit is not one hundredth. Everything absent from this table is
 // treated as two decimal places, which is correct for the large majority.
@@ -66,47 +85,11 @@ export function currencyExponent(currency: string): number {
  * that inference is the failure mode.
  */
 export function toMinorUnits(raw: string | number, units: SpendUnits, currency: string): MoneyResult {
-  const code = normaliseCurrency(currency);
-  if (!code) {
-    return { ok: false, reason: `Currency "${currency}" is not a three-letter ISO 4217 code. Refusing to convert money against an unknown currency.` };
+  const result = convert(raw, units, currency);
+  if (result.ok) {
+    return { ok: true, minor: result.minor, currency: result.currency, roundedUp: result.roundedUp };
   }
-
-  const text = typeof raw === 'number' ? numberToPlainString(raw) : String(raw ?? '').trim();
-  if (!text) {
-    return { ok: false, reason: 'Provider reported an empty spend value. An empty figure is not zero — it means the report could not be read.' };
-  }
-  if (/e/i.test(text)) {
-    return { ok: false, reason: `Provider reported "${text}" in exponent form. Refusing to interpret it — a spend value written as an exponent has already been through a float.` };
-  }
-
-  const cleaned = stripThousandsSeparators(text);
-  if (cleaned === null) {
-    return { ok: false, reason: `Provider reported "${text}", which is not a plain decimal number. It may be localised or carry a currency symbol; the declaration should point at a raw numeric field.` };
-  }
-  if (cleaned.startsWith('-')) {
-    return { ok: false, reason: `Provider reported negative spend ("${text}"). Refunds and adjustments are not spend and must not be netted off a cap silently.` };
-  }
-
-  const exponent = currencyExponent(code);
-
-  // Micro is simply a major amount with the decimal point six places from the right, so it
-  // reuses the major path rather than getting its own arithmetic to be wrong in.
-  let decimalText: string;
-  if (units === 'micro') {
-    if (cleaned.includes('.')) {
-      return { ok: false, reason: `Provider reported fractional micro units ("${text}"). Micro units are already a millionth; a fraction of one means the value was computed, not reported.` };
-    }
-    decimalText = insertDecimalFromRight(cleaned, 6);
-  } else if (units === 'major') {
-    decimalText = cleaned;
-  } else {
-    if (cleaned.includes('.')) {
-      return { ok: false, reason: `Provider reported a fractional minor unit ("${text}"). A fractional cent means someone did floating-point maths on money upstream.` };
-    }
-    return finish(cleaned, false, code);
-  }
-
-  return shiftToMinor(decimalText, exponent, code, text);
+  return { ok: false, reason: result.reason };
 }
 
 /**
@@ -114,7 +97,7 @@ export function toMinorUnits(raw: string | number, units: SpendUnits, currency: 
  * rather than be handled. The message is the same either way.
  */
 export function assertMinorUnits(raw: string | number, units: SpendUnits, currency: string): number {
-  const result = toMinorUnits(raw, units, currency);
+  const result = convert(raw, units, currency);
   if (!result.ok) throw new Error(result.reason);
   return result.minor;
 }
@@ -124,7 +107,8 @@ export function assertMinorUnits(raw: string | number, units: SpendUnits, curren
  * compare or accumulate works in minor units.
  */
 export function formatMinor(minor: number, currency: string): string {
-  const code = normaliseCurrency(currency) || currency.toUpperCase();
+  const normalised = normaliseCurrency(currency);
+  const code = normalised || String(currency == null ? '' : currency).toUpperCase();
   const exponent = currencyExponent(code);
   if (!Number.isFinite(minor)) return `— ${code}`;
   const negative = minor < 0;
@@ -144,13 +128,62 @@ export function isOverCap(reportedMinor: number, capMinor: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Internals — string arithmetic only.
+// Internals — string arithmetic only, and no narrowing.
 // ---------------------------------------------------------------------------
 
-function shiftToMinor(decimalText: string, exponent: number, code: string, original: string): MoneyResult {
-  const [wholePart, fractionPart = ''] = decimalText.split('.');
+function convert(raw: string | number, units: SpendUnits, currency: string): Conversion {
+  const code = normaliseCurrency(currency);
+  if (!code) {
+    return fail(`Currency "${currency}" is not a three-letter ISO 4217 code. Refusing to convert money against an unknown currency.`);
+  }
+
+  const text = typeof raw === 'number'
+    ? numberToPlainString(raw)
+    : String(raw == null ? '' : raw).trim();
+
+  if (!text) {
+    return fail('Provider reported an empty spend value. An empty figure is not zero — it means the report could not be read.');
+  }
+  if (/^-?\d+(\.\d+)?[eE][-+]?\d+$/.test(text)) {
+    return fail(`Provider reported "${text}" in exponent form. Refusing to interpret it — a spend value written as an exponent has already been through a float.`);
+  }
+
+  const cleaned = stripThousandsSeparators(text);
+  if (cleaned === null) {
+    return fail(`Provider reported "${text}", which is not a plain decimal number. It may be localised or carry a currency symbol; the declaration should point at a raw numeric field.`);
+  }
+  if (cleaned.charAt(0) === '-') {
+    return fail(`Provider reported negative spend ("${text}"). Refunds and adjustments are not spend and must not be netted off a cap silently.`);
+  }
+
+  const exponent = currencyExponent(code);
+
+  if (units === 'minor') {
+    if (cleaned.indexOf('.') !== -1) {
+      return fail(`Provider reported a fractional minor unit ("${text}"). A fractional cent means someone did floating-point maths on money upstream.`);
+    }
+    return finish(cleaned, false, code);
+  }
+
+  // Micro is simply a major amount with the decimal point six places from the right, so it
+  // reuses the major path rather than getting its own arithmetic to be wrong in.
+  let decimalText = cleaned;
+  if (units === 'micro') {
+    if (cleaned.indexOf('.') !== -1) {
+      return fail(`Provider reported fractional micro units ("${text}"). Micro units are already a millionth; a fraction of one means the value was computed, not reported.`);
+    }
+    decimalText = insertDecimalFromRight(cleaned, 6);
+  }
+
+  return shiftToMinor(decimalText, exponent, code, text);
+}
+
+function shiftToMinor(decimalText: string, exponent: number, code: string, original: string): Conversion {
+  const parts = decimalText.split('.');
+  const wholePart = parts[0] || '';
+  const fractionPart = parts.length > 1 ? parts[1] : '';
   if (!/^\d*$/.test(wholePart) || !/^\d*$/.test(fractionPart)) {
-    return { ok: false, reason: `Provider reported "${original}", which is not a plain decimal number.` };
+    return fail(`Provider reported "${original}", which is not a plain decimal number.`);
   }
 
   const kept = fractionPart.slice(0, exponent).padEnd(exponent, '0');
@@ -159,25 +192,34 @@ function shiftToMinor(decimalText: string, exponent: number, code: string, origi
   // than truncate — see the rounding note in the file header.
   const roundUp = /[1-9]/.test(discarded);
 
-  const combined = stripLeadingZeros(`${wholePart}${kept}`);
-  return finish(combined, roundUp, code);
+  return finish(`${wholePart}${kept}`, roundUp, code);
 }
 
-function finish(digits: string, roundUp: boolean, code: string): MoneyResult {
+function finish(digits: string, roundUp: boolean, code: string): Conversion {
   const trimmed = stripLeadingZeros(digits);
   if (trimmed.length > MAX_SAFE_DIGITS) {
-    return { ok: false, reason: `Spend value has ${trimmed.length} digits, beyond the range that can be held exactly. Refusing rather than reporting an approximate amount of money.` };
+    return fail(`Spend value has ${trimmed.length} digits, beyond the range that can be held exactly. Refusing rather than reporting an approximate amount of money.`);
   }
   const value = Number(trimmed);
   if (!Number.isSafeInteger(value)) {
-    return { ok: false, reason: 'Spend value could not be represented exactly as an integer number of minor units.' };
+    return fail('Spend value could not be represented exactly as an integer number of minor units.');
   }
-  return { ok: true, minor: roundUp ? value + 1 : value, currency: code, roundedUp: roundUp };
+  return {
+    ok: true,
+    minor: roundUp ? value + 1 : value,
+    currency: code,
+    roundedUp: roundUp,
+    reason: '',
+  };
 }
 
-function normaliseCurrency(currency: string): string | null {
-  const code = String(currency ?? '').trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(code) ? code : null;
+function fail(reason: string): Conversion {
+  return { ok: false, minor: 0, currency: '', roundedUp: false, reason };
+}
+
+function normaliseCurrency(currency: string): string {
+  const code = String(currency == null ? '' : currency).trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : '';
 }
 
 function stripThousandsSeparators(text: string): string | null {

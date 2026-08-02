@@ -825,7 +825,7 @@ networks they may use. Three surfaces now implement it identically.
 | --- | --- | --- |
 | Social publishing | 8 connectors | any platform — `outreach_social_custom_platforms` |
 | Integrations | 27 providers | any tool — `integration_custom_providers` |
-| Paid ads | Meta | any network — `declareAdPlatform` |
+| Paid ads *(inside Marketing + Sales)* | Meta | any network — `declareAdPlatform` |
 
 A declaration is data: where to authorize, what the request looks like, where the answer
 appears. It runs the identical path as a built-in — same confirmation rule, same approval
@@ -847,7 +847,9 @@ a host import added to a connector fails the check by name. A guard that stays g
 violate what it guards is measuring nothing.
 
 Two artifacts from one codebase — Social Outreach Connector (9 files) inside Marketing +
-Sales (14). Sold as one product; buildable as two.
+Sales (16, spanning `lib/outreach` and `lib/ads`). Sold as one product; buildable as two.
+Paid placement lives in its own folder because its risk profile differs, not because it is a
+different product: advertising is marketing.
 
 ### 16.3 Paid ads are a different class of risk
 

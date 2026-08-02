@@ -27,13 +27,14 @@
 //
 //   REPRODUCIBILITY       Could someone else derive this same conclusion? Split deliberately in
 //                         two, because the honest answer today is half yes: every module is
-//                         pure, so the same inputs always produce the same conclusion — but we
-//                         DO NOT RETAIN THE INPUTS, so an auditor asking "what did you conclude
-//                         at 03:00 and on what evidence" cannot check. Reporting a flat "Yes"
-//                         would be exactly the overstatement this product exists to avoid. So it
-//                         is reported as a LEVEL with a reason and a roadmap — partial today,
-//                         full when evidence snapshots are retained. A limitation with a named
-//                         path out of it is a capability statement; one without is an excuse.
+//                         pure, so the same inputs always produce the same conclusion — the
+//                         remaining question is whether the INPUTS were written down. When the
+//                         assessment ledger has them, an auditor asking "what did you conclude
+//                         at 03:00 and on what evidence" can check, and this reports FULL. When
+//                         it does not, it reports PARTIAL with the reason and the path out.
+//                         Whether the ledger holds them is a fact the caller supplies; this
+//                         module never assumes it, because assuming would turn the one honest
+//                         field on the page into the same overclaim it was written to avoid.
 //
 // A CONTRADICTION IS NEVER SMOOTHED OVER. It is reported as a failure of the assessment, and
 // it deliberately does not change the operational state — an internal inconsistency is a
@@ -130,6 +131,10 @@ export type IntegrityInput = {
   newestEvidenceSeconds: number | null
   /** Age of the oldest piece still counted toward this assessment. */
   oldestEvidenceSeconds: number | null
+
+  /** True when this conclusion's inputs were written to the assessment ledger. Supplied by
+   *  the caller from the actual write result — never assumed, never defaulted to true. */
+  inputsRetained?: boolean
 
   /** Anything that identifies the inputs. Order-independent; hashed, never displayed raw. */
   inputs: Array<string | number | boolean | null>
@@ -229,12 +234,16 @@ export function buildAssessmentIntegrity(input: IntegrityInput): AssessmentInteg
   }
 
   // ── Reproducibility, as a level with a way out ─────────────────────────────
-  const inputsRetained = false
+  const inputsRetained = input.inputsRetained === true
   const reproducibility: Reproducibility = {
     level: inputsRetained ? 'full' : 'partial',
     levelLabel: inputsRetained ? 'Full' : 'Partial',
-    reason: inputsRetained ? '' : 'Observation inputs are not yet retained, so this assessment cannot be re-derived later from a stored record.',
-    roadmap: 'Full replay becomes available when evidence snapshots are retained alongside each assessment. The fingerprint beside this line is what a stored snapshot would be matched against.',
+    reason: inputsRetained
+      ? ''
+      : 'The inputs behind this conclusion are not in the assessment ledger, so it cannot be re-derived later from a stored record.',
+    roadmap: inputsRetained
+      ? 'The stored inputs and this fingerprint are what a replay is checked against. Feeding them back through the same module version must produce this same conclusion.'
+      : 'Full replay becomes available once the inputs are recorded in the assessment ledger. The fingerprint beside this line is what a stored record would be matched against.',
     digest: digest(input.inputs),
     deterministic: true,
     inputsRetained,

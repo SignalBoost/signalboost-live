@@ -17,7 +17,7 @@ import {
   upsertCustomPlatform,
   deleteCustomPlatform,
   loadCustomPlatforms,
-} from '@/lib/outreach/social-custom-platform-store'
+} from '@/lib/outreach/platform-declarations'
 import { socialCredentialNames } from '@/lib/outreach/social-secrets'
 import type { CustomPlatformConfig } from '@/lib/outreach/social-custom-platform'
 

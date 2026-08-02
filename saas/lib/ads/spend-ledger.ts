@@ -239,6 +239,8 @@ export type AccountHealthInput = {
   tokenSource?: string | null
   /** 'network' when read from the platform, 'declared' when a person entered it. */
   billingSource?: string | null
+  lastCheckedAt?: string | null
+  checkError?: string | null
   note?: string | null
   updatedBy?: string | null
 }
@@ -330,6 +332,8 @@ export async function upsertAccountHealth(admin: AnyClient, input: AccountHealth
   put('token_expires_at', input.tokenExpiresAt)
   put('token_source', input.tokenSource)
   put('billing_source', input.billingSource)
+  put('last_checked_at', input.lastCheckedAt)
+  put('check_error', input.checkError)
   put('note', input.note)
   put('updated_by', input.updatedBy)
 

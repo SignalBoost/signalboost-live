@@ -3519,7 +3519,23 @@
     "u_ads_staging": "Staging…",
     "u_ads_varmissing": "missing",
     "u_ads_varoptional": "optional",
-    "u_ads_varset": "set"
+    "u_ads_varset": "set",
+    "u_ads_arrangement": "Payment arrangement",
+    "u_ads_attention": "Needs your attention",
+    "u_ads_balancelabel": "Prepaid balance",
+    "u_ads_billing": "How each account pays",
+    "u_ads_billingnote": "The arrangement decides what can be watched. A credit line runs out, a card expires, a prepaid balance empties — each stops delivery in its own way, and none of them tells you first.",
+    "u_ads_cardexpiry": "Card expires",
+    "u_ads_cardlast4": "Card, last four digits",
+    "u_ads_currencyfromnetwork": "Read from the account, not chosen",
+    "u_ads_entermanually": "This network publishes no list — enter the reference",
+    "u_ads_filteraccounts": "Type to narrow the list",
+    "u_ads_invoiceduelabel": "Invoice due",
+    "u_ads_loadaccounts": "Load my ad accounts from the network",
+    "u_ads_loadingaccounts": "Asking the network…",
+    "u_ads_nomatch": "No account matches that.",
+    "u_ads_pickinstead": "Pick from the network instead",
+    "u_ads_savebilling": "Save the arrangement"
   },
   "lab": {
     "license": {

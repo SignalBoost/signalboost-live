@@ -162,3 +162,84 @@ export function livenessFromPolicies(policies: ObservationPolicy[]): Record<stri
   }
   return out
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Where the observation actually stands
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// "Next observation: Due now" printed beside "Missed scheduled observations: 1" is a
+// contradiction on the face of it. Both lines were true and neither was useful, because
+// "due" answers a scheduler's question — should I run — and an operator is asking a
+// different one: am I inside tolerance, and how long until this escalates?
+//
+// THREE STATES, FROM THE SAME TWO NUMBERS THE POLICY ALREADY DECLARES.
+//
+//   on_schedule  Elapsed is under the interval. Nothing is owed yet.
+//   overdue      A run is owed and has not happened, but the runtime is still inside its
+//                absence window. This is the state that used to read "Due now" and be
+//                mistaken for "on time".
+//   absent       Elapsed has passed interval × staleness multiplier. The runtime is no
+//                longer merely late; it has stopped being observed.
+//
+// TOLERANCE IS THE SPAN BETWEEN DUE AND ABSENT, and escalation is the moment it ends. Both
+// are derived from the declared cadence, so the console cannot state a tolerance the
+// scheduler does not actually honour.
+
+export type ObservationState = 'on_schedule' | 'overdue' | 'absent'
+
+export type ObservationTiming = {
+  state: ObservationState
+  /** Seconds since the last completed observation. */
+  elapsedSeconds: number
+  intervalSeconds: number
+  /** How long a run may be owed before the runtime is called absent. */
+  toleranceSeconds: number
+  /** Seconds past the point the run became due. Zero when on schedule. */
+  overdueSeconds: number
+  /** Seconds until absent. Zero once that threshold has passed. */
+  escalatesInSeconds: number
+  /** True when this runtime has stopped being observed, not merely run late. */
+  windowMissed: boolean
+  policy: ObservationPolicy
+}
+
+/**
+ * Where the observation stands, in the terms an operator asks about.
+ *
+ * A never-observed or unreadable timestamp is reported as ABSENT rather than on schedule.
+ * The failure of the opposite default is the one that hides a runtime that never started.
+ */
+export function observationTiming(
+  policy: ObservationPolicy,
+  lastRunAt: string | null | undefined,
+  now = new Date(),
+): ObservationTiming {
+  const absence = absenceWindowSeconds(policy)
+  const tolerance = Math.max(0, absence - policy.intervalSeconds)
+  const parsed = Date.parse(lastRunAt || '')
+  if (!Number.isFinite(parsed)) {
+    return {
+      state: 'absent',
+      elapsedSeconds: 0,
+      intervalSeconds: policy.intervalSeconds,
+      toleranceSeconds: tolerance,
+      overdueSeconds: 0,
+      escalatesInSeconds: 0,
+      windowMissed: true,
+      policy,
+    }
+  }
+  const elapsed = Math.max(0, Math.round((now.getTime() - parsed) / 1000))
+  const state: ObservationState =
+    elapsed >= absence ? 'absent' : elapsed >= policy.intervalSeconds ? 'overdue' : 'on_schedule'
+  return {
+    state,
+    elapsedSeconds: elapsed,
+    intervalSeconds: policy.intervalSeconds,
+    toleranceSeconds: tolerance,
+    overdueSeconds: Math.max(0, elapsed - policy.intervalSeconds),
+    escalatesInSeconds: Math.max(0, absence - elapsed),
+    windowMissed: state === 'absent',
+    policy,
+  }
+}

@@ -163,7 +163,18 @@
       "engageGlobalKillSwitch": "🛑 ENGAGE GLOBAL KILL SWITCH",
       "restoreAiAutonomy": "✅ RESTORE AI AUTONOMY",
       "updatingAiStatus": "Updating global AI status…",
-      "aiStatusUpdateFailed": "Could not update the global AI status."
+      "aiStatusUpdateFailed": "Could not update the global AI status.",
+      "stateOperational": "Operational",
+      "stateDegraded": "Attention required",
+      "stateIncident": "Incident — verified impact",
+      "stateUnknown": "Unverified — investigation required",
+      "impact": "Impact",
+      "noImpact": "No impact detected.",
+      "requiredAction": "Required action",
+      "noActionRequired": "None.",
+      "pagesOnCall": "Wakes on-call",
+      "yes": "Yes",
+      "no": "No"
     },
     "missionReviewUi": {
       "kicker": "Mission 002 manual reviews",
@@ -394,7 +405,18 @@
       "engageGlobalKillSwitch": "🛑 ACTIVAR INTERRUPTOR GLOBAL",
       "restoreAiAutonomy": "✅ RESTAURAR AUTONOMÍA DE IA",
       "updatingAiStatus": "Actualizando el estado global de IA…",
-      "aiStatusUpdateFailed": "No se pudo actualizar el estado global de IA."
+      "aiStatusUpdateFailed": "No se pudo actualizar el estado global de IA.",
+      "stateOperational": "Operativo",
+      "stateDegraded": "Requiere atención",
+      "stateIncident": "Incidente: impacto verificado",
+      "stateUnknown": "Sin verificar: requiere investigación",
+      "impact": "Impacto",
+      "noImpact": "No se detecta impacto.",
+      "requiredAction": "Acción requerida",
+      "noActionRequired": "Ninguna.",
+      "pagesOnCall": "Despierta al equipo de guardia",
+      "yes": "Sí",
+      "no": "No"
     },
     "missionReviewUi": {
       "kicker": "Revisiones manuales de la Misión 002",
@@ -625,7 +647,18 @@
       "engageGlobalKillSwitch": "🛑 ATIVAR INTERRUPTOR GLOBAL",
       "restoreAiAutonomy": "✅ RESTAURAR AUTONOMIA DE IA",
       "updatingAiStatus": "Atualizando o estado global da IA…",
-      "aiStatusUpdateFailed": "Não foi possível atualizar o estado global da IA."
+      "aiStatusUpdateFailed": "Não foi possível atualizar o estado global da IA.",
+      "stateOperational": "Operacional",
+      "stateDegraded": "Requer atenção",
+      "stateIncident": "Incidente — impacto verificado",
+      "stateUnknown": "Não verificado — requer investigação",
+      "impact": "Impacto",
+      "noImpact": "Nenhum impacto detetado.",
+      "requiredAction": "Ação necessária",
+      "noActionRequired": "Nenhuma.",
+      "pagesOnCall": "Acorda a equipa de piquete",
+      "yes": "Sim",
+      "no": "Não"
     },
     "missionReviewUi": {
       "kicker": "Revisões manuais da Missão 002",
@@ -856,7 +889,18 @@
       "engageGlobalKillSwitch": "🛑 WŁĄCZ GLOBALNY WYŁĄCZNIK",
       "restoreAiAutonomy": "✅ PRZYWRÓĆ AUTONOMIĘ AI",
       "updatingAiStatus": "Aktualizowanie globalnego stanu AI…",
-      "aiStatusUpdateFailed": "Nie udało się zaktualizować globalnego stanu AI."
+      "aiStatusUpdateFailed": "Nie udało się zaktualizować globalnego stanu AI.",
+      "stateOperational": "Sprawny",
+      "stateDegraded": "Wymaga uwagi",
+      "stateIncident": "Incydent — potwierdzony wpływ",
+      "stateUnknown": "Niezweryfikowane — wymaga zbadania",
+      "impact": "Wpływ",
+      "noImpact": "Nie wykryto wpływu.",
+      "requiredAction": "Wymagane działanie",
+      "noActionRequired": "Brak.",
+      "pagesOnCall": "Budzi dyżurnego",
+      "yes": "Tak",
+      "no": "Nie"
     },
     "missionReviewUi": {
       "kicker": "Ręczne przeglądy Misji 002",
@@ -1087,7 +1131,18 @@
       "engageGlobalKillSwitch": "🛑 ВКЛЮЧИТЬ ГЛОБАЛЬНЫЙ ВЫКЛЮЧАТЕЛЬ",
       "restoreAiAutonomy": "✅ ВОССТАНОВИТЬ АВТОНОМНОСТЬ ИИ",
       "updatingAiStatus": "Обновление глобального статуса ИИ…",
-      "aiStatusUpdateFailed": "Не удалось обновить глобальный статус ИИ."
+      "aiStatusUpdateFailed": "Не удалось обновить глобальный статус ИИ.",
+      "stateOperational": "Работает штатно",
+      "stateDegraded": "Требует внимания",
+      "stateIncident": "Инцидент — подтверждённое воздействие",
+      "stateUnknown": "Не подтверждено — требуется расследование",
+      "impact": "Воздействие",
+      "noImpact": "Воздействие не обнаружено.",
+      "requiredAction": "Требуемое действие",
+      "noActionRequired": "Не требуется.",
+      "pagesOnCall": "Поднимает дежурного",
+      "yes": "Да",
+      "no": "Нет"
     },
     "missionReviewUi": {
       "kicker": "Ручные проверки Mission 002",

@@ -59,9 +59,12 @@ function normalizeApprovedOrigin(value: string): string {
   } catch {
     throw new Error('browserbase_invalid_origin')
   }
+  // An exact origin only: no path, query, fragment, or embedded credentials.
   if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
     throw new Error('browserbase_invalid_origin')
   }
+  // Plaintext http is permitted ONLY for loopback, so a buyer can run locally without
+  // weakening what a production origin has to be.
   if (parsed.protocol === 'http:' && !LOOPBACK_HOSTS.has(parsed.hostname)) {
     throw new Error('browserbase_insecure_origin_rejected')
   }

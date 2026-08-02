@@ -1,22 +1,2 @@
-// saas/lib/portable-browser/testing/index.ts
-//
-// TEST DOUBLES A BUYER CAN BUILD AGAINST BEFORE THEY OWN ANY OF THE REAL THINGS.
-//
-// Shipped as a second entry point rather than folded into the main barrel, so a buyer imports
-// them deliberately and nothing in a production bundle reaches them by accident.
-//
-// They exist because the honest alternative is worse. Wiring this portable means implementing a
-// session port, an approval port, a policy port, an evidence sink and a telemetry sink before
-// anything can run at all — and a buyer who has to write five stubs before the first green test
-// will write them badly, or write them permissive. The deny-all ports in particular are the
-// SAFE default to start from: a policy that refuses everything makes the first thing a buyer
-// does explicitly allow something, rather than discover later that nothing was ever refused.
-
-export * from './deny-all-browser-approval-port.ts'
-export * from './deny-all-browser-policy-port.ts'
-export * from './fake-browser-session-port.ts'
-export * from './fake-browser-web-data-port.ts'
-export * from './fake-human-control-port.ts'
-export * from './in-memory-browser-evidence-port.ts'
-export * from './in-memory-browser-telemetry-port.ts'
-export * from './scripted-browser-agent-loop.ts'
+// saas/lib/portable-browser/index.ts
+export * from './browser-runtime-types.ts'; export * from './browser-runtime-result.ts'; export * from './browser-runtime-errors.ts'; export * from './browser-session-port.ts'; export * from './browser-agent-loop-port.ts'; export * from './browser-credential-port.ts'; export * from './browser-policy-port.ts'; export * from './browser-approval-port.ts'; export * from './browser-evidence-port.ts'; export * from './browser-telemetry-port.ts'; export * from './browser-web-data-port.ts'; export * from './browser-human-control-port.ts'; export * from './browser-scheduler-port.ts'; export * from './browser-activity-port.ts'; export * from './browser-task-contracts.ts'; export * from './browser-profile-portability.ts'; export * from './browser-error-sanitizer.ts'; export * from './browser-activity-sinks.ts'; export * from './browser-activity-supabase.ts'; export * from './browser-portable-manifest.ts'; export * from './browser-adapter-descriptor.ts'; export * from './browser-adapter-registry.ts'; export * from './browser-compatibility.ts'; export * from './browser-runtime-coordinator.ts'; export * from './browser-runtime-factory.ts'; export * from './browser-provider-binding.ts'; export * from './browser-host-capabilities.ts'; export * from './browser-session-lifecycle-manager.ts'; export * from './browser-buyer-configuration.ts'; export * from './browser-buyer-readiness.ts'; export * from './browser-health-readiness.ts'; export * from './browser-startup-preflight.ts'; export * from './browser-deployment-package-manifest.ts'; export * from './browser-installation-acceptance.ts'; export * from './browser-buyer-release-attestation.ts'; export * from './browser-deployment-bundle-index.ts'; export * from './browser-deployment-bundle-verifier.ts'; export * from './commercial-portability.ts'; export * from './catalog/index.ts'; export * from './adapters/browserbase-adapter.ts'; export * from './adapters/browserless-adapter.ts'; export * from './adapters/steel-adapter.ts'; export * from './adapters/playwright-local-adapter.ts'; export * from './adapters/browserstack-adapter.ts'; export * from './adapters/lambdatest-adapter.ts'; export * from './adapters/sauce-labs-adapter.ts'; export * from './adapters/uipath-adapter.ts'; export * from './adapters/automation-anywhere-adapter.ts'; export * from './adapters/remote-adapter-kit.ts'; export * from './adapters/hyperbrowser-adapter.ts'; export * from './adapters/firecrawl-adapter.ts'; export * from './adapters/notte-adapter.ts'; export * from './adapters/stagehand-adapter.ts'; export * from './adapters/browser-use-adapter.ts'; export * from './adapters/aws-agentcore-browser-adapter.ts'; export * from './adapters/azure-playwright-adapter.ts'; export * from './adapters/power-automate-adapter.ts'; export * from './adapters/custom-adapter.ts'; export * from './adapters/apify-adapter.ts'; export * from './adapters/bright-data-adapter.ts'; export * from './adapters/oxylabs-adapter.ts'; export * from './adapters/skyvern-adapter.ts'; export * from './adapters/agent-browser-adapter.ts'; export * from './adapters/playwright-mcp-adapter.ts'; export * from './adapters/selenium-grid-adapter.ts'; export * from './adapters/private-browser-fleet-adapter.ts'

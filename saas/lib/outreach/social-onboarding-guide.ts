@@ -101,12 +101,18 @@ const GUIDES: SocialOnboardingGuide[] = [
     providerId: 'linkedin',
     platform: 'linkedin_member',
     label: 'LinkedIn Profile',
-    businessAccountName: 'No business account required — posts from the connecting person\'s own profile',
+    businessAccountName: 'Posts from the connecting person\'s own profile. A LinkedIn Page is still required to HOLD the app — it does not need to be verified.',
     developerPortal: 'https://www.linkedin.com/developers/apps',
     callbackUrl: CALLBACK_URL,
     envVars: ['SOCIAL_LINKEDIN_MEMBER_CLIENT_ID', 'SOCIAL_LINKEDIN_MEMBER_CLIENT_SECRET'],
     steps: [
-      { id: 'developer-app', title: 'Create a LinkedIn app', detail: 'Create an app and add the Share on LinkedIn and Sign In with LinkedIn products. Both are self-serve — no company verification and no partner review.', owner: 'business_user', automatedBySignalBoost: false },
+      // Corrected after hitting this in practice: LinkedIn will not create an app without
+      // a Page attached, and it will not let a thin personal profile create a Page. The
+      // advantage over company-page posting is real but narrower than "no setup" — no
+      // Page VERIFICATION and no Community Management review, which is what the company
+      // path demands and what takes weeks.
+      { id: 'linkedin-page', title: 'Have a LinkedIn Page to attach the app to', detail: 'Every LinkedIn app must be associated with a Page, even one that only posts to a personal profile. The Page does NOT need to be verified. Creating a Page requires the personal profile to be established — LinkedIn reports a minimum of around five connections, an account older than seven days, and an email address on the company\'s own domain (free providers are rejected).', owner: 'business_user', automatedBySignalBoost: false },
+      { id: 'developer-app', title: 'Create a LinkedIn app', detail: 'Create an app against that Page and add the Share on LinkedIn and Sign In with LinkedIn products. Both enable immediately — no Page verification and no partner review, unlike company-page posting.', owner: 'business_user', automatedBySignalBoost: false },
       { id: 'redirect-uri', title: 'Register the OAuth callback', detail: `Add ${CALLBACK_URL} as an authorized redirect URL.`, owner: 'business_user', automatedBySignalBoost: false },
       { id: 'credentials', title: 'Copy credentials into Vercel', detail: 'Copy the client ID and client secret into the LinkedIn Profile environment variables.', owner: 'business_user', automatedBySignalBoost: false },
       { id: 'connect', title: 'Authorize LinkedIn access', detail: 'Connect through SignalBoost and approve posting on your own behalf. The profile is discovered automatically — nothing to paste.', owner: 'business_user', automatedBySignalBoost: false },

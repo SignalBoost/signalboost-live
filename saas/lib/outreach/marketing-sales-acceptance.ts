@@ -101,9 +101,22 @@ export type MarketingSalesAcceptanceOptions = {
   spendApprovedBy: string
 }
 
-/** The failure reason from a money conversion, without asking the caller to narrow a union. */
-function reasonOf(result: { ok: boolean; reason?: string }): string {
-  return result.ok ? '' : String(result.reason || 'unknown')
+/**
+ * Flatten a discriminated-union result into a plain shape.
+ *
+ * Deliberately does NOT rely on control-flow narrowing. Narrowing a union by its discriminant
+ * is correct TypeScript and it typechecked locally, but it failed in the repo build — so every
+ * union field here is read through a structural cast instead. A harness that cannot compile in
+ * the buyer's toolchain is worth nothing, and the compile that matters is theirs, not mine.
+ */
+function flatten(result: unknown): { ok: boolean; minor: number; roundedUp: boolean; reason: string } {
+  const value = (result || {}) as { ok?: unknown; minor?: unknown; roundedUp?: unknown; reason?: unknown }
+  return {
+    ok: value.ok === true,
+    minor: typeof value.minor === 'number' ? value.minor : Number.NaN,
+    roundedUp: value.roundedUp === true,
+    reason: typeof value.reason === 'string' ? value.reason : '',
+  }
 }
 
 function check(id: MarketingSalesCheckId, passed: boolean, statement: string, detail: string): MarketingSalesCheck {
@@ -222,16 +235,16 @@ export async function runMarketingSalesAcceptance(options: MarketingSalesAccepta
   ))
 
   // ── 7-10. The arithmetic, before any money moves ───────────────────────────
-  const micro = toMinorUnits('1000000', 'micro', 'USD')
+  const micro = flatten(toMinorUnits('1000000', 'micro', 'USD'))
   checks.push(check(
     'micro_units_converted_correctly',
-    micro.ok === true && micro.minor === 100,
+    micro.ok && micro.minor === 100,
     'One million micros is one major unit — 100 minor units in a two-decimal currency, not one million.',
-    micro.ok ? `1000000 micro USD → ${micro.minor} minor units.` : `Conversion failed: ${reasonOf(micro)}`,
+    micro.ok ? `1000000 micro USD → ${micro.minor} minor units.` : `Conversion failed: ${micro.reason || 'unknown'}`,
   ))
 
-  const yen = toMinorUnits('1000', 'major', 'JPY')
-  const dinar = toMinorUnits('1', 'major', 'KWD')
+  const yen = flatten(toMinorUnits('1000', 'major', 'JPY'))
+  const dinar = flatten(toMinorUnits('1', 'major', 'KWD'))
   checks.push(check(
     'currency_exponent_respected',
     currencyExponent('JPY') === 0 && currencyExponent('KWD') === 3 && yen.ok && yen.minor === 1000 && dinar.ok && dinar.minor === 1000,
@@ -239,12 +252,12 @@ export async function runMarketingSalesAcceptance(options: MarketingSalesAccepta
     `JPY exponent ${currencyExponent('JPY')}, KWD exponent ${currencyExponent('KWD')}; 1000 JPY → ${yen.ok ? yen.minor : 'error'}, 1 KWD → ${dinar.ok ? dinar.minor : 'error'} minor.`,
   ))
 
-  const fraction = toMinorUnits('0.001', 'major', 'USD')
+  const fraction = flatten(toMinorUnits('0.001', 'major', 'USD'))
   checks.push(check(
     'spend_rounds_up',
-    fraction.ok === true && fraction.minor === 1 && fraction.roundedUp === true,
+    fraction.ok && fraction.minor === 1 && fraction.roundedUp,
     'A fractional minor unit rounds UP, because understating spend against a cap is the only rounding error that can hurt a buyer.',
-    fraction.ok ? `0.001 USD → ${fraction.minor} minor, roundedUp=${fraction.roundedUp}.` : `Conversion failed: ${reasonOf(fraction)}`,
+    fraction.ok ? `0.001 USD → ${fraction.minor} minor, roundedUp=${fraction.roundedUp}.` : `Conversion failed: ${fraction.reason || 'unknown'}`,
   ))
 
   checks.push(check(
@@ -278,17 +291,23 @@ export async function runMarketingSalesAcceptance(options: MarketingSalesAccepta
   // ── 12-14. ONE real campaign on the buyer's account ────────────────────────
   let campaignCreated: string | null = null
   try {
-    const started = await startAdCampaign(goodRequest, options.accessToken)
-    if (started.ok) {
-      campaignCreated = started.platformCampaignId
+    const startedRaw = await startAdCampaign(goodRequest, options.accessToken)
+    // Same reason as `flatten` above: read every field structurally rather than through
+    // narrowing, so this compiles under any toolchain a buyer points at it.
+    const started = startedRaw as { ok?: boolean; platformCampaignId?: string; status?: string; reason?: string }
+    // Hoisted to plain locals so nothing below depends on narrowing an optional property.
+    const campaignId = String(started.platformCampaignId || '')
+    const campaignStatus = String(started.status || 'unknown')
+    if (started.ok === true && campaignId) {
+      campaignCreated = campaignId
       checks.push(check(
         'buyer_adapter_created_campaign',
         true,
         'A valid campaign is created through the buyer adapter, on the buyer account.',
-        `Campaign ${started.platformCampaignId} created with status "${started.status}" and cap ${capMinor} ${currency}. DELETE THIS CAMPAIGN when you are done with it.`,
+        `Campaign ${campaignId} created with status "${campaignStatus}" and cap ${capMinor} ${currency}. DELETE THIS CAMPAIGN when you are done with it.`,
       ))
 
-      const reconciled = await reconcileAdSpend(platform, started.platformCampaignId, goodRequest.cap, options.accessToken, options.accountRef)
+      const reconciled = await reconcileAdSpend(platform, campaignId, goodRequest.cap, options.accessToken, options.accountRef)
       const report = (reconciled as { report?: { spent?: { amount?: number; currency?: string }; raw?: unknown } })?.report
       checks.push(check(
         'spend_read_from_provider',
@@ -299,7 +318,7 @@ export async function runMarketingSalesAcceptance(options: MarketingSalesAccepta
           : 'The adapter returned no spend report.',
       ))
 
-      const paused = await pauseAdCampaign(platform, started.platformCampaignId, options.accessToken, options.accountRef)
+      const paused = await pauseAdCampaign(platform, campaignId, options.accessToken, options.accountRef)
       const stopped = Boolean((paused as { ok?: boolean })?.ok)
       checks.push(check(
         'campaign_stopped',
@@ -309,7 +328,7 @@ export async function runMarketingSalesAcceptance(options: MarketingSalesAccepta
       ))
     } else {
       for (const id of ['buyer_adapter_created_campaign', 'spend_read_from_provider', 'campaign_stopped'] as MarketingSalesCheckId[]) {
-        checks.push(check(id, false, 'Depends on one real campaign through the buyer adapter.', `The campaign was refused: ${started.reason}`))
+        checks.push(check(id, false, 'Depends on one real campaign through the buyer adapter.', `The campaign was refused: ${started.reason || 'no reason given'}`))
       }
     }
   } catch (error) {

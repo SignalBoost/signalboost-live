@@ -3535,7 +3535,15 @@
     "u_ads_loadingaccounts": "Asking the network…",
     "u_ads_nomatch": "No account matches that.",
     "u_ads_pickinstead": "Pick from the network instead",
-    "u_ads_savebilling": "Save the arrangement"
+    "u_ads_savebilling": "Save the arrangement",
+    "u_ads_autorenew": "Renewed automatically before it lapses. You are told days ahead if renewal ever fails.",
+    "u_ads_cannotconnect": "This network does not connect this way — it is reached through the endpoint you run for it.",
+    "u_ads_connect": "Connect this network",
+    "u_ads_connected": "Connected",
+    "u_ads_connectok": "Network connected",
+    "u_ads_expires": "expires",
+    "u_ads_lasterror": "Last renewal failed",
+    "u_ads_reconnect": "Reconnect"
   },
   "lab": {
     "license": {

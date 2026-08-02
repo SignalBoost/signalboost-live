@@ -34,6 +34,8 @@ import { buildRiskForecast } from '@/lib/supervisor/risk-forecast'
 import { assessStability } from '@/lib/supervisor/assessment-stability'
 import { buildAssessmentIntegrity } from '@/lib/supervisor/assessment-integrity'
 import { recommendationPolicy } from '@/lib/supervisor/recommendation-policy'
+import { assessContinuity, buildAssessmentRecord, MODULE_VERSION } from '@/lib/supervisor/assessment-record'
+import { listAssessments, recordAssessmentIfChanged } from '@/lib/supervisor/assessment-ledger'
 import { absenceWindowSeconds, listObservationPolicies, observationTiming } from '@/lib/supervisor/observation-policy'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
@@ -185,12 +187,22 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const failedRunIds = new Set(failedRuns.map(r => r.runId))
   const stability = assessStability(runs.map(r => ({ at: r.completedAt, contradicts: failedRunIds.has(r.runId) })))
   const hm = (seconds: number) => (seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m` : `${Math.round(seconds / 60)}m`)
-  const unchangedAcross = !stability.measured
+  // ── CONTINUITY NOW COMES FROM STORED CONCLUSIONS WHERE THERE ARE ANY ─────────
+  // The observation streak could only ever answer "has any run contradicted us". The ledger
+  // answers the question an operator was actually asking — when did the state last change —
+  // so it is preferred whenever it holds history, and the observation streak remains the
+  // fallback for a ledger that is empty or unreachable.
+  const ledgerHistory = await listAssessments(db)
+  const continuity = assessContinuity(ledgerHistory.records, assessment.state)
+  const observationStreak = !stability.measured
     ? t.notMeasured
     : stability.consecutive === 0
       ? t.contradictedByLastObservation
       // "at least" because at this point the limit is RETENTION, not stability.
       : `${stability.windowExhausted ? `${t.atLeast} ` : ''}${stability.consecutive} ${t.observationsUnit} · ${hm(stability.durationSeconds)}`
+  const unchangedAcross = ledgerHistory.available && continuity.measured && continuity.consecutive > 0
+    ? `${continuity.windowExhausted ? `${t.atLeast} ` : ''}${continuity.consecutive} ${t.assessmentsUnit} · ${hm(continuity.durationSeconds)}`
+    : observationStreak
   // The assessment's own timestamp. It differs from the last observation whenever a run is
   // owed, and an operator asking "how fresh is this conclusion" is asking for this one.
   const assessedAt = new Date()
@@ -228,7 +240,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   // Computed last, from the finished outputs of every other module, because its job is to
   // catch two of them disagreeing. Feeding it the raw inputs instead would let it agree with
   // a wrong conclusion for the same reason the conclusion was wrong.
-  const integrity = buildAssessmentIntegrity({
+  const integrityInput = {
     measuredDomains: snapshot.domains.length - snapshot.unmeasured.length,
     totalDomains: snapshot.domains.length,
     operationalState: assessment.state,
@@ -244,7 +256,63 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     overdueSeconds: timing ? timing.overdueSeconds : 0,
     toleranceSeconds: timing ? timing.toleranceSeconds : 1,
     inputs: [runs.length, successful.length, missedWindows, blockedWork, activeWork.length, verificationFailed, auditGaps, expiredLeasesWithWork, providerBroken.length, snapshot.unmeasured.join(','), lastObservationAt],
+  }
+  // Computed twice, deliberately. The first pass produces the fingerprint and the contradiction
+  // count that the ledger row is built from; the second reports whether that row was actually
+  // stored. `inputsRetained` is never assumed — the page asserts full reproducibility only on
+  // the evidence of a write it can see.
+  const integrityDraft = buildAssessmentIntegrity(integrityInput)
+
+  // ── THE ASSESSMENT LEDGER ────────────────────────────────────────────────────
+  // Every figure the modules consumed, verbatim, beside what was concluded from it. Written
+  // only when the fingerprint differs from the newest stored row, so the ledger records
+  // changes rather than page views.
+  const inputsSnapshot = {
+    observationsExpected: successful.length + missedWindows,
+    observationsCompleted: successful.length,
+    blockedWork,
+    queueDepth: activeWork.length,
+    confirmedServiceFailures: failedRuns.length,
+    reducedCapabilities: providerBroken.map(p => p.providerId),
+    verificationAttempted: runs.length,
+    verificationFailed,
+    auditGaps,
+    unmeasuredDomains: snapshot.unmeasured,
+    unverifiableLiveness: unverifiableRuntimes,
+    expiredLeasesWithWork,
+    reconciliationBacklog: expiredLeases.length,
+    missedObservationWindows: missedWindows,
+    observationIntervalSeconds: leadPolicy ? leadPolicy.intervalSeconds : null,
+    overdueSeconds: timing ? timing.overdueSeconds : 0,
+    toleranceSeconds: timing ? timing.toleranceSeconds : 0,
+    lastObservationAt,
+    newestEvidenceSeconds: evidenceAges.newest,
+    oldestEvidenceSeconds: evidenceAges.oldest,
+  }
+  const assessmentRecord = buildAssessmentRecord({
+    state: assessment.state,
+    impactAffected: assessment.impactAffected,
+    confidence: assessment.confidence,
+    pageOnCall: assessment.pageOnCall,
+    stateReason: assessment.stateReason,
+    impact: assessment.impact,
+    basis: assessment.assessmentBasis,
+    confidenceReasons: assessment.confidenceReasons.map(r => ({ code: r.code, label: r.label, penalty: r.penalty })),
+    forecasts: forecast.forecasts.map(f => ({ code: f.code, observed: f.observed, trigger: f.trigger, consequence: f.consequence, exposure: f.exposure })),
+    contradictions: integrityDraft.contradictions.map(c => ({ code: c.code, statement: c.statement })),
+    evidenceAgeState: integrityDraft.evidenceAge.stateLabel,
+    diagnosticsNominal: diagnosticSummary.nominal,
+    diagnosticsAttention: diagnosticSummary.attention.length,
+    score: ledger.score,
+    inputs: inputsSnapshot,
+    inputDigest: integrityDraft.reproducibility.digest,
   })
+  const ledgerWrite = await recordAssessmentIfChanged(db, assessmentRecord)
+  // Retained means a row with THIS fingerprint exists — either one we just wrote, or the
+  // identical newest row that made writing unnecessary. A failed or unreachable ledger leaves
+  // it false, and the console reports Partial rather than claiming a record it does not have.
+  const inputsRetained = ledgerWrite.recorded || (!ledgerWrite.unavailable && ledgerHistory.records[0]?.inputDigest === assessmentRecord.inputDigest)
+  const integrity = buildAssessmentIntegrity({ ...integrityInput, inputsRetained })
 
   // ── FAIL CLOSED, exactly as saas/proxy.ts does ────────────────────────────────
   const { data: systemStatus, error: systemStatusError } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()
@@ -328,6 +396,11 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
       </Card>
       <div style={grid2}>
         <Card title={t.verification}><dl style={fields}><Field k={t.verified} v={pct(countRuns(filteredRuns,r=>r.verification.status==='verified'))}/><Field k={t.partiallyVerified} v={pct(countRuns(filteredRuns,r=>r.verification.status==='partially_verified'))}/><Field k={t.unverifiable} v={pct(countRuns(filteredRuns,r=>r.verification.status==='unverifiable'))}/><Field k={t.failed} v={pct(countRuns(filteredRuns,r=>r.verification.status==='failed'))}/><Field k={t.rejected} v={pct(countRuns(filteredRuns,r=>r.verification.status==='rejected'))}/><Field k={t.verificationStatus} v={health.verification.status}/><Field k={t.lastAudit} v={fmt(lastAudit)}/></dl></Card>
+        <Card title={t.assessmentLedger}>
+          <dl style={fields}><Field k={t.ledgerStatus} v={ledgerHistory.available ? (ledgerHistory.records.length ? `${ledgerHistory.records.length}` : t.noLedgerHistory) : t.ledgerUnavailable}/><Field k={t.thisAssessment} v={ledgerWrite.recorded ? t.ledgerRecorded : (ledgerWrite.reason || t.ledgerRecorded)}/><Field k={t.moduleVersion} v={MODULE_VERSION}/><Field k={t.stateSince} v={continuity.sinceAt || t.notMeasured}/><Field k={t.previousState} v={continuity.previousState || t.notMeasured}/></dl>
+          <p style={muted}>{t.ledgerNote}</p>
+          {ledgerHistory.records.length ? <div style={tableWrap}><table style={table}><thead><tr>{[t.recordedAt,t.currentState,t.confidenceLabel,t.conflictingSignals,t.inputDigest,t.moduleVersion].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{ledgerHistory.records.slice(0,12).map(rec => <tr key={`${rec.recordedAt}-${rec.inputDigest}`}><td>{rec.recordedAt}</td><td>{rec.operationalState}</td><td>{`${rec.confidence}%`}</td><td>{rec.contradictions}</td><td>{rec.inputDigest}</td><td>{rec.moduleVersion}</td></tr>)}</tbody></table></div> : null}
+        </Card>
         <Card title={t.observationPolicy}><dl style={fields}>{enabledPolicies.map(p => <Field key={p.instanceId} k={p.instanceId} v={`${p.intervalSeconds}s · ${t.absenceWindow} ${absenceWindowSeconds(p)}s · ${p.source}`}/>)}<Field k={t.policyRationale} v={leadPolicy?.rationale || t.none}/></dl></Card>
       </div>
       <Card title={t.auditTimeline}>{runs.length === 0 ? <p style={muted}>{t.noData}</p> : <ol style={timeline}>{runs.slice(0,10).map(r => <li key={r.runId} style={mini}><strong>{r.runId}</strong><div>{[t.observation,mapAudit(r,'observation'),t.thinker,mapAudit(r,'thinker'),t.policy,mapAudit(r,'policy'),t.bpal,mapAudit(r,'bpal'),t.verification,r.verification.checkedAt,t.persistence,r.completedAt,t.completion,r.completedAt].map((x,i)=><span key={i} style={i%2?muted:pill}>{x || '—'}</span>)}</div></li>)}</ol>}</Card>

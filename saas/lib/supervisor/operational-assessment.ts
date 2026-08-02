@@ -1,28 +1,40 @@
 // saas/lib/supervisor/operational-assessment.ts
 //
-// TWO MEASUREMENTS, NOT ONE NUMBER.
+// FOUR ANSWERS, KEPT APART.
 //
-// A single "health" figure has been forcing two unrelated facts through one channel, and the
-// console has been contradicting itself as a result: "no work is blocked yet" printed beside
-// "supervisor 70%" and "health 93%". Those are not degrees of the same thing.
+// A single "health" figure was forcing unrelated facts through one channel, and the console
+// contradicted itself as a result: "no work is blocked" printed beside "supervisor 70%" and
+// "health 93%". Those are not degrees of the same thing. This file produces three of the four
+// answers the console gives; the fourth lives in risk-forecast.ts.
 //
-//   OPERATIONAL STATE       Is the business affected? Answered only from VERIFIED impact —
-//                           blocked work, confirmed service failure, reduced capability.
-//                           This is what an operator acts on at 3am.
+//   CURRENT STATE       Is the business affected RIGHT NOW? Answered only from VERIFIED
+//                       impact — blocked work, confirmed service failure, reduced capability.
+//                       This is what an operator acts on at 3am.
 //
-//   OBSERVATION CONFIDENCE  How much do we trust what we just said? Answered from the
-//                           completeness and freshness of our own evidence — observations
-//                           owed and not taken, liveness we could not establish, domains we
-//                           do not measure.
+//   CURRENT IMPACT      Stated separately and in plain words, because "Operational" answers
+//                       a different question from "is anything affected".
+//
+//   ASSESSMENT BASIS    The facts the conclusion rests on, INCLUDING the ones that limit it.
+//                       An operator should never have to hunt through subsystem cards to find
+//                       out why the top of the page says what it says.
+//
+//   OBSERVATION         How much do we trust what we just said? Answered from the
+//   CONFIDENCE          completeness and freshness of our own evidence — observations owed
+//                       and not taken, liveness we could not establish, domains we do not
+//                       measure.
+//
+// WHAT CHANGED HERE, AND WHY IT MATTERS MORE THAN IT LOOKS.
+//
+// There used to be a fourth state, `operational_risk`, carrying a line like "the runtime has
+// missed its schedule, so new work would not be picked up". That sentence is a FORECAST. It
+// describes a future that has not happened, under a condition that may not hold. Printing it
+// as current state is what made the console say "attention required" above "nothing is
+// blocked". The state enum now has three values, all of them describing the present, and
+// every forecast has moved to risk-forecast.ts where it is labelled as one.
 //
 // A bank can be fully OPERATIONAL while confidence sits at 93% because one scheduled
 // observation was missed. The reverse also holds and matters more: confidence can be 100%
-// precisely BECAUSE every observation agrees the platform is in an outage. Collapsing the two
-// into one percentage makes both unreadable.
-//
-// WHAT THIS FIXES CONCRETELY. A missed heartbeat used to lower "health", which reads as the
-// platform being less well. It does not make the platform less well. It makes us less sure —
-// and the honest response is to say so, not to imply a degradation nobody has verified.
+// precisely BECAUSE every observation agrees the platform is in an outage.
 //
 // CONFIDENCE IS A LEDGER, LIKE THE SCORE. Every point deducted names its cause and what would
 // restore it. A confidence figure nobody can decompose is the same decoration the health
@@ -30,11 +42,10 @@
 //
 // PURE, NO IMPORTS.
 
-export type OperationalState = 'operational' | 'operational_risk' | 'service_degraded' | 'outage'
+export type OperationalState = 'operational' | 'service_degraded' | 'outage'
 
 export const OPERATIONAL_STATE_LABELS: Record<OperationalState, string> = {
   operational: 'Operational',
-  operational_risk: 'Operational — risk identified',
   service_degraded: 'Service degraded',
   outage: 'Outage',
 }
@@ -42,7 +53,6 @@ export const OPERATIONAL_STATE_LABELS: Record<OperationalState, string> = {
 /** What each state means for the person reading it, in one line. */
 export const OPERATIONAL_STATE_MEANINGS: Record<OperationalState, string> = {
   operational: 'The business is operating. Nothing is blocked.',
-  operational_risk: 'The business is operating. A condition exists that would block work if it continues.',
   service_degraded: 'Something is working less well or not at all, and work is still flowing.',
   outage: 'Work is blocked. Service continuity is affected.',
 }
@@ -57,6 +67,20 @@ export type ConfidenceReason = {
   remedy: string
 }
 
+/**
+ * A fact the assessment rests on.
+ *
+ * `polarity` is the part that earns its place: a basis that lists only the reassuring figures
+ * is a sales page. "1 missed scheduled observation" belongs in the same block as "50
+ * successful observations", marked as what it is — something that limits the conclusion
+ * rather than supporting it.
+ */
+export type BasisLine = {
+  label: string
+  value: string
+  polarity: 'supports' | 'limits'
+}
+
 export type EvidenceLine = { label: string; value: string }
 
 export type OperationalAssessment = {
@@ -65,17 +89,30 @@ export type OperationalAssessment = {
   stateMeaning: string
   /** Why this state and not another, in the operator's terms. */
   stateReason: string
+  /** True when the state was reached from checks that all ran. */
+  stateVerified: boolean
+
+  /** Answered separately from the state, in words an operations manager uses. */
+  impact: string
+  impactAffected: boolean
+
+  /** Everything the conclusion rests on, supporting and limiting, in one block. */
+  assessmentBasis: BasisLine[]
+  /** The lead-in sentence for that block. */
+  basisStatement: string
 
   /** 0–100. How far our evidence can be trusted — NOT how well the platform is running. */
   confidence: number
   confidenceReasons: ConfidenceReason[]
   confidenceStatement: string
 
-  /** The facts the state rests on. Shown so the assessment can be checked, not believed. */
+  /** The supporting subset of the basis, kept for callers that want only verified facts. */
   verifiedBy: EvidenceLine[]
 
   operatorAction: string
   pageOnCall: boolean
+  /** Why this page is showing what it is showing, in one sentence. */
+  whyAmISeeingThis: string
 }
 
 export type AssessmentInput = {
@@ -85,8 +122,6 @@ export type AssessmentInput = {
   confirmedServiceFailures?: number
   /** Things that work less well without blocking anything — a refused provider, say. */
   reducedCapabilities?: string[]
-  /** Conditions that would block work if they persist. Risk, not degradation. */
-  riskConditions?: string[]
 
   // ── Evidence quality ───────────────────────────────────────────────────────
   observationsExpected?: number
@@ -101,6 +136,8 @@ export type AssessmentInput = {
   auditGaps?: number
 
   queueDepth?: number
+  /** Number of forecast conditions, for the "why am I seeing this" line only. Never for state. */
+  riskForecastCount?: number
 }
 
 // The cost of each kind of missing evidence. Stated here rather than scattered, because a
@@ -193,14 +230,15 @@ export function assessObservationConfidence(input: AssessmentInput): { confidenc
 /**
  * The operational state, from verified impact only.
  *
- * Nothing about evidence quality reaches this function. A platform we can barely see is not
- * thereby degraded — it is a platform we are less sure about, which is the other measurement.
+ * Nothing about evidence quality reaches this function, and nothing about the future does
+ * either. A platform we can barely see is not thereby degraded — it is a platform we are less
+ * sure about. A platform that MIGHT stop collecting work tomorrow is not degraded today.
+ * Those are the other two axes.
  */
 export function assessOperationalState(input: AssessmentInput): { state: OperationalState; reason: string } {
   const blocked = Number(input.blockedWork || 0)
   const failures = Number(input.confirmedServiceFailures || 0)
   const reduced = input.reducedCapabilities || []
-  const risks = input.riskConditions || []
 
   if (blocked > 0 || failures > 0) {
     return {
@@ -216,25 +254,93 @@ export function assessOperationalState(input: AssessmentInput): { state: Operati
       reason: `Reduced capability: ${reduced.join(', ')}. Work is still flowing.`,
     }
   }
-  if (risks.length) {
-    return {
-      state: 'operational_risk',
-      reason: `${risks.join('; ')}. Nothing is blocked.`,
-    }
-  }
   return { state: 'operational', reason: 'No blocked work, no confirmed service failure, no reduced capability.' }
 }
 
+/** Business impact in the words an operations manager would use, stated separately from state. */
+export function assessImpact(input: AssessmentInput): { impact: string; affected: boolean } {
+  const blocked = Number(input.blockedWork || 0)
+  const failures = Number(input.confirmedServiceFailures || 0)
+  const reduced = input.reducedCapabilities || []
+  if (blocked > 0) return { impact: `${blocked} work item(s) are not progressing.`, affected: true }
+  if (failures > 0) return { impact: `${failures} confirmed service failure(s).`, affected: true }
+  if (reduced.length) return { impact: `Reduced capability, work still flowing: ${reduced.join(', ')}.`, affected: true }
+  return { impact: 'None. No work is blocked and no service failure is confirmed.', affected: false }
+}
+
 /**
- * The whole assessment: what is happening, how sure we are, and what the operator does.
+ * Everything the conclusion rests on, in one block, including what limits it.
+ *
+ * This exists because the honest complaint about the old page was that an operator could read
+ * "Attention required" and have no way to find out what was wrong without opening cards. The
+ * answer belongs directly under the headline.
+ */
+export function buildAssessmentBasis(input: AssessmentInput): BasisLine[] {
+  const lines: BasisLine[] = []
+  const completed = Number(input.observationsCompleted || 0)
+  const expected = Number(input.observationsExpected || 0)
+  const missed = Math.max(0, expected - completed)
+  const attempted = Number(input.verificationAttempted || 0)
+  const failed = Number(input.verificationFailed || 0)
+
+  lines.push({
+    label: 'Successful observations',
+    value: String(completed),
+    polarity: 'supports',
+  })
+  lines.push({
+    label: 'Verification',
+    value: attempted > 0 ? `${Math.round(((attempted - failed) / attempted) * 100)}% of ${attempted}` : 'none attempted',
+    polarity: attempted > 0 && failed === 0 ? 'supports' : 'limits',
+  })
+  // Blocked work is always a SUPPORTING fact, whichever way it reads. `limits` marks evidence
+  // we do not have, not news we do not like — a measured 3 supports an outage conclusion just
+  // as firmly as a measured 0 supports an operational one.
+  lines.push({
+    label: 'Blocked work',
+    value: String(Number(input.blockedWork || 0)),
+    polarity: 'supports',
+  })
+  lines.push({
+    label: 'Active queue items',
+    value: String(Number(input.queueDepth || 0)),
+    polarity: 'supports',
+  })
+  if (missed > 0) {
+    lines.push({
+      label: 'Missed scheduled observations',
+      value: String(missed),
+      polarity: 'limits',
+    })
+  }
+  const unverifiable = input.unverifiableLiveness || []
+  if (unverifiable.length) {
+    lines.push({ label: 'Runtimes we cannot judge', value: unverifiable.join(', '), polarity: 'limits' })
+  }
+  const unmeasured = input.unmeasuredDomains || []
+  if (unmeasured.length) {
+    lines.push({ label: 'Unmeasured domains', value: unmeasured.join(', '), polarity: 'limits' })
+  }
+  const gaps = Number(input.auditGaps || 0)
+  if (gaps > 0) {
+    lines.push({ label: 'Runs with no durable record', value: String(gaps), polarity: 'limits' })
+  }
+  return lines
+}
+
+/**
+ * The whole assessment: what is happening, whether it affects anyone, what it rests on, how
+ * sure we are, and what the operator does.
  *
  * PAGING IS DECIDED BY STATE ALONE. Low confidence never wakes anyone — being unsure at 3am
  * is not an emergency, and a system that pages on its own blind spots teaches people to
- * silence it.
+ * silence it. Neither does a forecast: something that has not happened has not happened.
  */
 export function buildOperationalAssessment(input: AssessmentInput): OperationalAssessment {
   const { state, reason } = assessOperationalState(input)
   const { confidence, reasons } = assessObservationConfidence(input)
+  const { impact, affected } = assessImpact(input)
+  const assessmentBasis = buildAssessmentBasis(input)
 
   const pageOnCall = state === 'outage'
   const operatorAction =
@@ -242,24 +348,11 @@ export function buildOperationalAssessment(input: AssessmentInput): OperationalA
       ? 'Free the blocked work, or approve failover. This is the one state that justifies waking someone.'
       : state === 'service_degraded'
         ? 'Restore the reduced capability during working hours. Work is still flowing.'
-        : state === 'operational_risk'
-          ? 'Watch it. Escalate only if the condition persists past the next observation.'
-          : 'None. Continue monitoring.'
+        : 'None. Continue monitoring.'
 
-  const verifiedBy: EvidenceLine[] = [
-    { label: 'Blocked work', value: String(Number(input.blockedWork || 0)) },
-    { label: 'Queue depth', value: String(Number(input.queueDepth || 0)) },
-    {
-      label: 'Observations',
-      value: `${Number(input.observationsCompleted || 0)} of ${Number(input.observationsExpected || 0)} owed`,
-    },
-    {
-      label: 'Verification',
-      value: Number(input.verificationAttempted || 0) > 0
-        ? `${Math.round(((Number(input.verificationAttempted) - Number(input.verificationFailed || 0)) / Number(input.verificationAttempted)) * 100)}% of ${input.verificationAttempted}`
-        : 'none attempted',
-    },
-  ]
+  const verifiedBy: EvidenceLine[] = assessmentBasis
+    .filter(line => line.polarity === 'supports')
+    .map(line => ({ label: line.label, value: line.value }))
 
   const confidenceStatement =
     confidence >= 100
@@ -268,17 +361,38 @@ export function buildOperationalAssessment(input: AssessmentInput): OperationalA
         ? `Reduced by one condition: ${reasons[0].label.toLowerCase()}.`
         : `Reduced by ${reasons.length} conditions, listed below. None of them is a statement about the platform.`
 
+  const limits = assessmentBasis.filter(line => line.polarity === 'limits').length
+  const basisStatement = limits === 0
+    ? 'This assessment is based on the following verified facts.'
+    : `This assessment is based on the following facts. ${limits} of them limit what can be concluded and are marked.`
+
+  const forecasts = Number(input.riskForecastCount || 0)
+  const whyAmISeeingThis =
+    state === 'outage'
+      ? 'Work is blocked and that was confirmed by check, so this page is showing an outage and has paged on-call.'
+      : state === 'service_degraded'
+        ? 'A capability is confirmed reduced while work continues to flow, so this page is showing degradation without paging anyone.'
+        : forecasts > 0
+          ? `Every impact check passed, so the state is Operational. ${forecasts} risk condition(s) are listed separately below — they describe what may happen, not what is happening.`
+          : 'Every impact check passed and nothing is forecast, so there is nothing here for an operator to act on.'
+
   return {
     state,
     stateLabel: OPERATIONAL_STATE_LABELS[state],
     stateMeaning: OPERATIONAL_STATE_MEANINGS[state],
     stateReason: reason,
+    stateVerified: (input.unverifiableLiveness || []).length === 0,
+    impact,
+    impactAffected: affected,
+    assessmentBasis,
+    basisStatement,
     confidence,
     confidenceReasons: reasons,
     confidenceStatement,
     verifiedBy,
     operatorAction,
     pageOnCall,
+    whyAmISeeingThis,
   }
 }
 

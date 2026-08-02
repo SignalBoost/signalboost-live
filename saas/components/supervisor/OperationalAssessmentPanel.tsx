@@ -1,5 +1,11 @@
 // saas/components/supervisor/OperationalAssessmentPanel.tsx
 //
+// SCOPE FIRST, THEN THE VERDICT. "Operational" reads to a non-specialist as "everything is
+// fine", and this assessment covers operational continuity and nothing else — not security
+// posture, not compliance, not business outcomes. The boundary is printed above the state
+// rather than left in documentation, because the misreading happens during an incident and
+// documentation is not what anyone opens then.
+//
 // TWO LAYERS, NOT ONE.
 //
 // The transparency was becoming its own problem. Rule identifiers, input fingerprints,
@@ -80,24 +86,31 @@ export default function OperationalAssessmentPanel({
 
   return (
     <section style={panel}>
-      <p style={kicker}>{t.assessmentKicker}</p>
+      {/* THE PAGE'S IDENTITY LEADS. "Verified operational assessment" is what this product
+          claims to be, and it was set smaller than the field labels beneath it — the reader
+          met a status before they met the thing producing it. */}
+      <h2 style={identity}>{t.assessmentKicker}</h2>
+      {/* SCOPE, STATED BEFORE THE VERDICT. "Operational" invites a reader to conclude that
+          everything is fine. It means one thing here, and the boundary belongs next to the
+          word rather than in documentation nobody opens during an incident. */}
+      <p style={scopeLine}>{t.assessmentScope}</p>
 
       {/* ── THE DEFAULT VIEW. Five answers, nothing else. ─────────────────── */}
       <div style={headline}>
         <div>
-          <p style={muted}>{t.currentState}</p>
+          <p style={fieldLabel}>{t.currentState}</p>
           <p style={{ ...big, color: tone }}>{assessment.stateLabel}</p>
           <p style={muted}>{assessment.stateMeaning}</p>
         </div>
         <div>
-          <p style={muted}>{t.businessImpact}</p>
+          <p style={fieldLabel}>{t.businessImpact}</p>
           <p style={{ ...big, color: assessment.impactAffected ? '#ffd166' : '#38f2a4' }}>
             {assessment.impactAffected ? t.impactAffected : t.impactNone}
           </p>
           <p style={small}>{assessment.impact}</p>
         </div>
         <div>
-          <p style={muted}>{t.observationConfidence}</p>
+          <p style={fieldLabel}>{t.observationConfidence}</p>
           <p style={big}>{`${assessment.confidence}%`}</p>
           <p style={muted}>{t.confidenceMeaning}</p>
         </div>
@@ -354,5 +367,7 @@ const strong = { margin: '4px 0', fontWeight: 700 }
 const small = { margin: '4px 0', color: 'rgba(255,255,255,.82)' }
 const muted = { margin: '2px 0', color: 'rgba(255,255,255,.68)' }
 const sectionTitle = { margin: 0, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1, fontSize: 12, color: '#1af0ff' }
-const kicker = { color: '#1af0ff', fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1, margin: 0 }
+const identity = { margin: 0, fontSize: 24, fontWeight: 800, color: '#eafcff', letterSpacing: 0.2 }
+const scopeLine = { margin: '6px 0 0', color: 'rgba(255,255,255,.7)', maxWidth: 760 }
+const fieldLabel = { margin: '2px 0', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' as const, color: 'rgba(255,255,255,.6)', fontWeight: 700 }
 const summaryText = { fontWeight: 800, cursor: 'pointer' as const, color: '#1af0ff' }

@@ -38,9 +38,17 @@
 // PURE, AND NO IMPORTS. Classification is a decision, not an action: this file computes and
 // returns, and the host decides what to display and who to wake.
 
+import { evaluateLiveness, type TriggerSource } from './liveness-models.ts'
+
 export type HealthSeverity = 'informational' | 'warning' | 'high' | 'critical' | 'unverified'
 
-/** How an instance is supposed to be alive. Declared, never guessed from a timeout. */
+/**
+ * How an instance is supposed to be alive. Declared, never guessed from a timeout.
+ *
+ * Kept for the two original values; `triggerSource` on the fact below is the fuller model and
+ * takes precedence when present. Elapsed time is only evidence for something that pulls — a
+ * consumer, a receiver and a controller each need their own question asked.
+ */
 export type LivenessKind = 'continuous' | 'scheduled'
 
 export type InstanceFact = {
@@ -48,8 +56,20 @@ export type InstanceFact = {
   status: string
   /** Declared by the runtime itself. Defaults to continuous, which is the stricter reading. */
   liveness?: LivenessKind
+  /**
+   * The declared trigger model. When absent it is derived from `liveness`, so existing
+   * callers keep working — but a buyer running a queue consumer or a webhook receiver must
+   * declare it, or their runtime is judged by a question that does not apply to it.
+   */
+  triggerSource?: TriggerSource | null
   /** For a scheduled instance: how often it is supposed to run, in seconds. */
   scheduleIntervalSeconds?: number | null
+  /** Queue consumers: when the consumer last POLLED, and how far behind it is. */
+  lastPollAt?: string | null
+  consumerLagSeconds?: number | null
+  maxConsumerLagSeconds?: number | null
+  /** Webhook receivers: whether the receiver answers. Undefined is not "healthy". */
+  receiverReachable?: boolean | null
   /**
    * Intervals of grace before late becomes absent. Supplied from the observation policy so
    * cadence and liveness are derived from ONE number; a separately configured grace period
@@ -178,35 +198,31 @@ function blockedWork(input: SeverityInput): WorkFact[] {
  * same elapsed time means opposite things in the two cases, which is precisely why the old
  * single threshold called a healthy cron dead.
  */
-function instanceAbsent(instance: InstanceFact, now: Date): { absent: boolean; detail: string; expected: boolean } {
-  const liveness: LivenessKind = instance.liveness === 'scheduled' ? 'scheduled' : 'continuous'
-  const beat = ageMs(now, instance.lastHeartbeatAt || instance.lastCompletedAt)
+function instanceAbsent(instance: InstanceFact, now: Date): { absent: boolean; detail: string; expected: boolean; unverifiable: boolean; question: string } {
+  const source: TriggerSource = instance.triggerSource
+    ? instance.triggerSource
+    : instance.liveness === 'scheduled' ? 'scheduled' : 'continuous'
 
-  if (liveness === 'scheduled') {
-    const interval = Number(instance.scheduleIntervalSeconds || 0) * 1000
-    if (!interval) {
-      return { absent: false, detail: 'Scheduled instance with no declared interval — cannot judge absence.', expected: false }
-    }
-    const multiplier = Number(instance.stalenessMultiplier || 0) > 0 ? Number(instance.stalenessMultiplier) : DEFAULT_STALE_MULTIPLIER
-    const window = interval * multiplier
-    if (beat > window) {
-      return {
-        absent: true,
-        detail: `Last run ${Math.round(beat / 60000)}m ago against a ${Math.round(interval / 60000)}m schedule — the run window was missed.`,
-        expected: false,
-      }
-    }
-    return {
-      absent: false,
-      detail: `Last run ${Math.round(beat / 60000)}m ago against a ${Math.round(interval / 60000)}m schedule — within the expected window.`,
-      expected: true,
-    }
-  }
+  const result = evaluateLiveness({
+    instanceId: instance.instanceId,
+    triggerSource: source,
+    stalenessMultiplier: instance.stalenessMultiplier,
+    intervalSeconds: instance.scheduleIntervalSeconds,
+    lastRunAt: instance.lastCompletedAt || instance.lastHeartbeatAt,
+    lastHeartbeatAt: instance.lastHeartbeatAt,
+    lastPollAt: instance.lastPollAt,
+    consumerLagSeconds: instance.consumerLagSeconds,
+    maxConsumerLagSeconds: instance.maxConsumerLagSeconds,
+    receiverReachable: instance.receiverReachable,
+  }, now)
 
-  if (beat > CONTINUOUS_HEARTBEAT_GRACE_MS) {
-    return { absent: true, detail: `No heartbeat for ${Math.round(beat / 1000)}s from a continuously-running instance.`, expected: false }
+  return {
+    absent: result.absent,
+    expected: result.expected,
+    unverifiable: result.unverifiable,
+    detail: result.detail,
+    question: result.question,
   }
-  return { absent: false, detail: 'Heartbeat is current.', expected: false }
 }
 
 /**
@@ -255,17 +271,40 @@ function classify(anomaly: Anomaly, input: SeverityInput, now: Date): Classified
     const liveness: LivenessKind = instance?.liveness === 'scheduled' ? 'scheduled' : 'continuous'
     const absence = instance
       ? instanceAbsent(instance, now)
-      : { absent: true, detail: 'No instance record found at all.', expected: false }
+      : {
+          absent: true,
+          detail: 'No instance record found at all.',
+          expected: false,
+          unverifiable: false,
+          question: 'Is there a runtime record for this subject?',
+        }
 
     checks.push(check('liveness_model', 'How is this runtime supposed to be alive?', 'pass',
-      liveness === 'scheduled'
-        ? 'Declared scheduled — it is not expected to hold a lease or beat between runs.'
-        : 'Declared continuous — it is expected to beat constantly.'))
-    checks.push(check('absence', 'Has the runtime actually missed its expected liveness?',
-      absence.absent ? 'fail' : 'pass', absence.detail))
+      `Declared ${instance?.triggerSource || liveness}.`))
+    checks.push(check('absence', absence.question,
+      absence.unverifiable ? 'unknown' : absence.absent ? 'fail' : 'pass', absence.detail))
     checks.push(check('blocked_work', 'Is any live work blocked with no owner?',
       blocked.length ? 'fail' : 'pass',
       blocked.length ? `${blocked.length} live work item(s) have no active lease.` : 'No live work item is without an owner.'))
+
+    // The model could not be answered — no poll time for a consumer, no probe for a
+    // receiver. Reported as unverified, never as healthy: an unprobed receiver quiet for a
+    // week looks exactly like one that has been down for a week.
+    if (absence.unverifiable) {
+      return {
+        ...base,
+        affected: blocked.map(item => item.workItemId),
+        severity: blocked.length ? 'high' : 'unverified',
+        impactVerified: blocked.length > 0,
+        impact: blocked.length
+          ? `${blocked.length} work item(s) have no owner, and the runtime's liveness could not be established.`
+          : 'Liveness could not be established for this trigger model — the evidence it needs was not supplied.',
+        checks,
+        confidence: 'low',
+        requiredAction: `Supply what this model needs before trusting its state: ${absence.detail}`,
+        pageOutOfHours: false,
+      }
+    }
 
     // Expected, and nothing waiting: this is the system working. It is recorded and it is
     // not an alarm.

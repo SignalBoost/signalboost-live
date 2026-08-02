@@ -34,6 +34,11 @@ function requireNonEmptyString(value: unknown, errorCode: string): string {
   return value
 }
 
+// ORIGIN POLICY. The buyer declares the origins this session may visit and NOTHING else is
+// reachable. The allowlist must be non-empty, each entry must be an exact origin, and every
+// origin on a launch request must already be in it. Plaintext http is confined to loopback.
+// This adapter is meant to drive a buyer's real application, so the allowlist is the cage —
+// not an artificial restriction to localhost.
 function normalizeApprovedOrigin(value: string): string {
   let parsed: URL
   try {
@@ -41,9 +46,12 @@ function normalizeApprovedOrigin(value: string): string {
   } catch {
     throw new Error('browserless_invalid_origin')
   }
+  // An exact origin only: no path, query, fragment, or embedded credentials.
   if (parsed.origin !== value || !/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
     throw new Error('browserless_invalid_origin')
   }
+  // Plaintext http is permitted ONLY for loopback, so a buyer can run locally without
+  // weakening what a production origin has to be.
   if (parsed.protocol === 'http:' && !LOOPBACK_HOSTS.has(parsed.hostname)) {
     throw new Error('browserless_insecure_origin_rejected')
   }

@@ -67,14 +67,16 @@ Social platforms gate their posting APIs behind business verification and app re
 | Platform | Business entity required | Approval |
 | --- | --- | --- |
 | YouTube | no — any Google account | consent screen in production |
-| LinkedIn Profile | **no** | none — self-serve products |
+| LinkedIn Profile | a Page to hold the app — **unverified is fine** | none — self-serve products |
 | LinkedIn Company | yes — registered company, verified Page | Community Management review |
 | Facebook / Instagram | a Page or Business account | app review |
 | TikTok | no | content posting audit |
 | Twitter/X | no | paid API tier |
 | Reddit | no | none |
 
-So the connector ships **both LinkedIn paths**: posting from a person's own profile, which is free and self-serve, and posting from a company page, which is not. A five-person startup connects LinkedIn and YouTube the same afternoon. An enterprise adds the rest as their approvals land, and each platform is independent — an unapproved one reports "not configured" while the others keep working.
+So the connector ships **both LinkedIn paths**: posting from a person's own profile, and posting from a company page. The difference is what each demands of you. Personal-profile posting needs a LinkedIn Page to hold the app — unverified, and created in minutes if the personal profile is established — and both required products enable immediately. Company-page posting needs that Page **verified** plus Community Management review, measured in weeks.
+
+YouTube is the genuinely same-day one: any Google account, no entity, no review. Each platform is independent — an unapproved one reports "not configured" while the others keep working, so a buyer starts publishing on day one and widens as approvals land.
 
 ## 6. What you implement
 

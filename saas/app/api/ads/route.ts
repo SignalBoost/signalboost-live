@@ -30,6 +30,7 @@ import {
   type AdSpendCap,
 } from '@/lib/ads/ads-connector'
 import { declareSocialAdNetworks } from '@/lib/ads/ads-social-networks'
+import { declareGoogleAndMarketplaceNetworks } from '@/lib/ads/ads-google-and-marketplace'
 import { formatMinor } from '@/lib/ads/ads-money'
 import {
   recordCampaignIntent,
@@ -70,12 +71,46 @@ function hydrateAdPlatforms(): { declared: string[]; skipped: Array<{ id: string
   const xProxy = String(process.env.ADS_X_SIGNING_PROXY_URL || '').trim()
   const xFunding = String(process.env.ADS_X_FUNDING_INSTRUMENT_ID || '').trim()
 
-  return declareSocialAdNetworks({
-    currency: String(process.env.ADS_CURRENCY || 'USD').toUpperCase(),
-    lookbackDays: Number(process.env.ADS_REPORT_LOOKBACK_DAYS || 90) || 90,
+  const currency = String(process.env.ADS_CURRENCY || 'USD').toUpperCase()
+  const lookbackDays = Number(process.env.ADS_REPORT_LOOKBACK_DAYS || 90) || 90
+
+  const social = declareSocialAdNetworks({
+    currency,
+    lookbackDays,
     linkedIn: linkedInGroup ? { campaignGroupUrn: linkedInGroup } : undefined,
     x: xProxy && xFunding ? { signingProxyBaseUrl: xProxy, fundingInstrumentId: xFunding } : undefined,
   })
+
+  // Google Ads, and the two networks that need an endpoint the buyer runs — Microsoft
+  // because its API is SOAP, Amazon because its spend can only be read from an
+  // asynchronous report. Each is declared only when its prerequisites are present.
+  const googleToken = String(process.env.ADS_GOOGLE_DEVELOPER_TOKEN || '').trim()
+  const googleBudget = String(process.env.ADS_GOOGLE_CAMPAIGN_BUDGET || '').trim()
+  const microsoftBridge = String(process.env.ADS_MICROSOFT_BRIDGE_URL || '').trim()
+  const amazonReporting = String(process.env.ADS_AMAZON_REPORTING_URL || '').trim()
+  const amazonClientId = String(process.env.ADS_AMAZON_CLIENT_ID || '').trim()
+  const amazonProfileId = String(process.env.ADS_AMAZON_PROFILE_ID || '').trim()
+
+  const others = declareGoogleAndMarketplaceNetworks({
+    currency,
+    lookbackDays,
+    google: googleToken && googleBudget
+      ? {
+          developerToken: googleToken,
+          campaignBudgetResourceName: googleBudget,
+          loginCustomerId: String(process.env.ADS_GOOGLE_LOGIN_CUSTOMER_ID || '').trim() || undefined,
+        }
+      : undefined,
+    microsoft: microsoftBridge ? { bridgeBaseUrl: microsoftBridge } : undefined,
+    amazon: amazonReporting && amazonClientId && amazonProfileId
+      ? { reportingBaseUrl: amazonReporting, clientId: amazonClientId, profileId: amazonProfileId }
+      : undefined,
+  })
+
+  return {
+    declared: [...social.declared, ...others.declared],
+    skipped: [...social.skipped, ...others.skipped],
+  }
 }
 
 export async function GET() {

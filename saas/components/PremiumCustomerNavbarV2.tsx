@@ -79,6 +79,7 @@ const GROUPS: NavGroup[] = [
       { icon: '🤖', labelKey: 'nav.concierge', fallbackLabel: uiText('generatedUi.u_6fd6628dffd218e9'), href: '/dashboard/assistant' },
       { icon: '💬', labelKey: 'nav.feedback', fallbackLabel: uiText('generatedUi.u_aac77df347205252'), href: '/dashboard/feedback' },
       { icon: '🔌', labelKey: 'nav.integrations', fallbackLabel: uiText('generatedUi.u_090512d93fcc3c0d'), href: '/integrations' },
+      { icon: '🧰', labelKey: 'nav.integrationCatalog', fallbackLabel: uiText('generatedUi.u_int_navlabel'), href: '/dashboard/integrations' },
       { icon: '📋', labelKey: 'nav.infrastructure', fallbackLabel: uiText('generatedUi.u_ed227cdaeb4a7009'), href: '/dashboard/infrastructure' },
       { icon: '👥', labelKey: 'nav.team', fallbackLabel: uiText('generatedUi.u_5985039f106df054'), href: '/dashboard/team' },
       { icon: '📊', labelKey: 'nav.operationsDashboard', fallbackLabel: uiText('generatedUi.u_d6027e4da26e9e17'), href: '/dashboard/operations' },

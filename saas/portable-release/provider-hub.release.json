@@ -13,8 +13,8 @@
   "buyerEntryPoints": {
     ".": "payload/index.ts"
   },
-  "_minModules": "The Provider Hub buyer graph starts at the bounded core index and must include its local read adapter and evidence modules. A shorter graph means the portable boundary is incomplete.",
-  "minModules": 3,
+  "_minModules": "The Provider Hub buyer graph starts at the bounded core index and must include its local read adapter, evidence module and acceptance harness. A shorter graph means the portable boundary is incomplete or the harness stopped being reachable from the barrel.",
+  "minModules": 4,
   "_hostFallbacks": "Bare or aliased specifiers reached by the buyer graph but supplied by the buyer. Keep empty unless the release gate reports a concrete dependency.",
   "hostFallbacks": [],
   "namingPattern": "signalboost",
@@ -63,9 +63,10 @@
   ],
   "acceptance": {
     "entry": "payload/index.ts",
-    "export": "createProviderConnectionMetadata",
-    "how": "Import the entry point in a clean buyer environment, create redacted connection metadata, and exercise live-data reads only through buyer-supplied test doubles before production wiring.",
-    "guarantee": "The payload contains no credentials and performs no provider mutation, deployment, or automatic production action.",
-    "evidence": "Keep the independently verified manifest, SHA-256 results, clean extraction result, and buyer test record."
+    "export": "runProviderHubAcceptance",
+    "how": "Import the entry point in a clean buyer environment and call runProviderHubAcceptance({ transport, digest, probeUrl }) with the buyer's own transport and digest ports and an https URL the buyer controls. Twelve checks are reported independently; the harness refuses to run without a probe URL rather than substituting a destination of its own.",
+    "cli": "node scripts/run-provider-hub-acceptance.mjs <ports-module> --probe <https-url>",
+    "guarantee": "The payload contains no credentials and performs no provider mutation, deployment, or automatic production action. Production-mode reads are refused by the adapter and asserted by the first check.",
+    "evidence": "The returned provider-hub-acceptance/1 record is the acceptance artifact. Retain it; it names which properties held and against which probe origin."
   }
 }

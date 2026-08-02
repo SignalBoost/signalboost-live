@@ -11,17 +11,18 @@
 // So there are two artifacts from one codebase:
 //
 //   social-portable.ts          → Social Outreach Connector (publishing only)
-//   marketing-sales-portable.ts → Marketing + Sales (email outreach + publishing)
+//   marketing-sales-portable.ts → Marketing + Sales (email outreach + publishing + paid)
 //
 // This barrel re-exports the whole social surface and adds the email side. The packager
 // (saas/scripts/build-marketing-sales-portable.mjs) walks the graph from here and fails
 // on any host import, so this file is the boundary as well as the API.
 //
 // WHAT IS DELIBERATELY NOT HERE: the campaign lifecycle shell in marketing-sales-core,
-// the prospect discovery worker, and every API route. Those are host concerns — the
-// shell needs a scheduler, the worker needs a job table, and routes need the host's
-// authentication. A buyer wires their own; the portable supplies the behaviour those
-// things orchestrate, which is the part that is hard to write and easy to get wrong.
+// the prospect discovery worker, the spend ledger store, and every API route. Those are
+// host concerns — the shell needs a scheduler, the worker needs a job table, the ledger
+// needs a database and routes need the host's authentication. A buyer wires their own;
+// the portable supplies the behaviour those things orchestrate, which is the part that is
+// hard to write and easy to get wrong.
 
 // ── Social publishing ────────────────────────────────────────────────────────
 // The entire Social Outreach Connector, unchanged. A buyer who later buys only the
@@ -69,11 +70,13 @@ export { findContactEmail, type ContactEmailResult } from './emailFinder.ts'
 // than assumed. startAdCampaign has no parameter that bypasses any of that.
 export {
   registerAdPlatform,
+  unregisterAdPlatform,
   listAdPlatforms,
   getAdPlatform,
   checkSpendGate,
   startAdCampaign,
   reconcileAdSpend,
+  pauseAdCampaign,
   isValidMoney,
   type Money,
   type AdSpendCap,
@@ -84,13 +87,40 @@ export {
   type SpendGateContext,
 } from '../ads/ads-connector.ts'
 
-// Bring your own ad network — Google Ads, LinkedIn Ads, TikTok Business, or anything
+// Bring your own ad network — Google Ads, Microsoft Advertising, Amazon Ads, or anything
 // regional — plus Meta shipped as a declaration rather than hand-written code.
 export {
   declareAdPlatform,
   declareMetaAds,
   type DeclaredAdPlatform,
 } from '../ads/ads-declared-platform.ts'
+
+// The paid counterpart of the eight organic connectors: the same social platforms, bought
+// rather than posted. Every one creates campaigns PAUSED, so a human turns them on.
+export {
+  declareSocialAdNetworks,
+  declareLinkedInAds,
+  declareTikTokAds,
+  declareRedditAds,
+  declarePinterestAds,
+  declareSnapchatAds,
+  declareXAds,
+  type SocialAdNetworkOptions,
+} from '../ads/ads-social-networks.ts'
+
+// Money handling, exported because a buyer integrating their own ad network needs the same
+// conversion the declarations use. It knows that a minor unit is not always a hundredth —
+// yen has none, Kuwaiti dinar has three — and that four of the social networks report spend
+// in millionths. Getting either wrong is not a rounding difference.
+export {
+  toMinorUnits,
+  assertMinorUnits,
+  formatMinor,
+  currencyExponent,
+  isOverCap,
+  type SpendUnits,
+  type MoneyResult,
+} from '../ads/ads-money.ts'
 
 // ── Language ─────────────────────────────────────────────────────────────────
 // Which language to write in, decided from the TARGET's identity, never from the

@@ -11,7 +11,9 @@
 //   5. What is that based on?     The assessment basis, including what limits it.
 //   6. What might happen?         Risk forecast — exposure and decision point, not prophecy.
 //   7. How sure are we, exactly?  The confidence ledger, open, arithmetic visible.
-//   8. How does this thing run?   Execution model and where the observation actually stands.
+//   8. Does the assessment hold?  Assessment integrity — independent signals, contradictions
+//                                 between our own outputs, freshness, and reproducibility.
+//   9. How does this thing run?   Execution model and where the observation actually stands.
 //
 // TWO THINGS THIS VERSION DELIBERATELY DOES NOT SAY.
 //
@@ -29,6 +31,7 @@
 
 import type { OperationalAssessment } from '@/lib/supervisor/operational-assessment'
 import type { ForecastSet } from '@/lib/supervisor/risk-forecast'
+import type { AssessmentIntegrity } from '@/lib/supervisor/assessment-integrity'
 
 export type AssessmentVerification = {
   /** Verified / Partly verified. A state, not a sentence. */
@@ -59,11 +62,14 @@ export default function OperationalAssessmentPanel({
   forecast,
   execution,
   verification,
+  integrity,
   t,
 }: {
   assessment: OperationalAssessment
   forecast: ForecastSet
   execution: ExecutionModel
+  /** Whether the assessment holds together — answered before a buyer thinks to ask. */
+  integrity: AssessmentIntegrity
   /** Freshness and continuity of THIS assessment. Operators ask how fresh the conclusion is
    *  and whether it has held — not when the last observation ran. Those differ whenever an
    *  observation is owed. */
@@ -212,7 +218,43 @@ export default function OperationalAssessmentPanel({
         </ul>
       </div>
 
-      {/* 8. Execution model and where the observation stands, replacing "Leader: None". */}
+      {/* 8. Integrity. This block is capable of saying the console is wrong, and says so in the
+          same place it would otherwise be reassuring. */}
+      <div style={integrity.contradictions.length ? alarmBlock : block}>
+        <p style={sectionTitle}>{t.assessmentIntegrity}</p>
+        <dl style={fields}>
+          <div>
+            <dt style={muted}>{t.independentSignals}</dt>
+            <dd style={dd}>{integrity.signalsLabel}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.conflictingSignals}</dt>
+            <dd style={dd}>{String(integrity.conflictingSignals)}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.evidenceFreshness}</dt>
+            <dd style={dd}>{`${integrity.evidenceFreshness}%`}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.assessmentReproducible}</dt>
+            <dd style={dd}>{integrity.inputsRetained ? t.yes : t.reproducibleInPrinciple}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.inputDigest}</dt>
+            <dd style={dd}>{integrity.inputDigest}</dd>
+          </div>
+        </dl>
+        <p style={small}>{integrity.statement}</p>
+        <p style={muted}>{integrity.reproducibilityStatement}</p>
+        {integrity.contradictions.map(item => (
+          <article key={item.code} style={mini}>
+            <p style={strong}>{item.statement}</p>
+            <p style={small}>{item.remedy}</p>
+          </article>
+        ))}
+      </div>
+
+      {/* 9. Execution model and where the observation stands, replacing "Leader: None". */}
       <div style={block}>
         <p style={sectionTitle}>{t.executionModel}</p>
         <dl style={fields}>
@@ -259,6 +301,7 @@ const headline = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax
 const row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 18 }
 const cell = { border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14 }
 const block = { marginTop: 18, border: '1px solid rgba(255,255,255,.1)', borderRadius: 16, padding: 16 }
+const alarmBlock = { marginTop: 18, border: '1px solid rgba(255,92,122,.6)', borderRadius: 16, padding: 16, background: 'rgba(255,92,122,.08)' }
 const forecastBlock = { marginTop: 18, border: '1px dashed rgba(255,209,102,.45)', borderRadius: 16, padding: 16, background: 'rgba(255,209,102,.05)' }
 const mini = { border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: 12, marginTop: 10 }
 const fields = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginTop: 8 }

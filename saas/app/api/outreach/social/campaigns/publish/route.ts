@@ -4,7 +4,7 @@ import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendin
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { applyOutreachLink } from '@/lib/outreach/signature'
-import { loadCustomPlatforms } from '@/lib/outreach/social-custom-platform-store'
+import { loadCustomPlatforms } from '@/lib/outreach/platform-declarations'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx
 
   // Declared platforms live in a table, and this process may be cold — hydrate the
-  // registry before anything looks a platform up. See social-custom-platform-store.ts.
+  // registry before anything looks a platform up. See platform-declarations.ts.
   await loadCustomPlatforms(ctx.admin)
 
   let body: any

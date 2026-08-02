@@ -303,7 +303,7 @@ export async function runBrowserAcceptance(options: BrowserAcceptanceOptions): P
   let activitySinkId: string | null = null
   if (options.activity?.sinkId) {
     const built = createBrowserActivitySink(options.activity.sinkId, options.activity.config ?? {}, options.activity.primitives ?? {})
-    if (!built.ok) {
+    if ('reason' in built) {
       checks.push(check('activity_recorded_to_buyer_destination', false, 'Activity reaches the destination you chose.', built.reason))
     } else {
       activitySinkId = built.sinkId

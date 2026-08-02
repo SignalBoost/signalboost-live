@@ -1,0 +1,64 @@
+{
+  "_path": "saas/portable-release/browser-agent.release.json",
+  "id": "browser-agent",
+  "name": "Browser Agent Ecosystem",
+  "packageName": "@portable/browser-agent",
+  "version": "1.0.0-rc.1",
+  "license": "SEE LICENSE IN LICENSE",
+  "description": "Bring-your-own browser stack. Twenty-six vendor adapters over one audited path, a declared activity-destination catalog, buyer-declared origin allowlists, and read-only execution. The buyer supplies the browser vendor account, the transport, the credential vault, and the destination their activity records go to.",
+  "payloadRoot": "lib/portable-browser",
+  "entryPoints": [
+    "lib/portable-browser/index.ts",
+    "lib/portable-browser/testing/index.ts"
+  ],
+  "buyerEntryPoints": {
+    ".": "payload/index.ts",
+    "./testing": "payload/testing/index.ts"
+  },
+  "_minModules": "The buyer graph must reach the whole portable: the barrel, twenty-six adapters, the shared kit, the port definitions, the vendor catalog, the activity-sink catalog and the test doubles. A shorter walk means an adapter or a port stopped being reachable from an entry point, which is how a vendor silently leaves the product.",
+  "minModules": 100,
+  "_hostFallbacks": "Bare or aliased specifiers reached by the buyer graph but supplied by the buyer. Keep empty. This portable reached FOUR external things in July and every one of them was removed rather than declared: a Supabase SDK, two modules in lib/browser-runtime, and one type from lib/browser-provider.",
+  "hostFallbacks": [],
+  "namingPattern": "signalboost",
+  "knownNamingExceptions": [],
+  "releaseNotes": "portable-release/browser-agent.RELEASE-NOTES.md",
+  "buyerMustSupply": [
+    "A browser vendor account, or a grid, fleet or engine they run themselves — twenty-six adapters are pre-staged; none of the accounts are.",
+    "RemoteAdapterTransport — performs the vendor call. The buyer holds the account, so the vendor request is theirs by design.",
+    "RemoteAdapterCredentialBroker — resolves a credential from their vault per launch. Optional for the three vendors whose catalog contract says a credential is not required.",
+    "Approved origins — a non-empty allowlist of exact origins. Nothing outside it is reachable.",
+    "An activity destination — one of eleven pre-staged, or their own declaration. Requires their http.send or sql.execute primitive.",
+    "Approval, policy, evidence, telemetry, scheduler and human-control ports, per their own governance."
+  ],
+  "notIncluded": [
+    "Any browser vendor account, subscription or credential.",
+    "A browser engine, a driver, an HTTP client or a database driver. The payload has no runtime dependency at all.",
+    "execute_change execution. Every adapter refuses it; this release observes and prepares only.",
+    "A hosted database, vault, network transport or SIEM.",
+    "Playwright and Puppeteer as REMOTE adapters — they are local engines, served by the local adapter rather than the remote kit."
+  ],
+  "supportedPlatforms": [
+    "Node.js 20 LTS and 22 LTS",
+    "TypeScript 5.x",
+    "Buyer-selected vendor, vault, network and persistence implementations",
+    "Linux and macOS build hosts; no native modules"
+  ],
+  "upgradeCompatibility": {
+    "previousVersions": [],
+    "policy": "Within 1.x the buyer-facing interfaces are additive only. New vendor adapters are additions, never a break.",
+    "ledgerSchema": "The payload owns no datastore schema. Activity destinations write into the buyer's own table or endpoint.",
+    "rollback": "The payload holds no state and can be replaced by restoring the previous verified archive."
+  },
+  "knownLimitations": [
+    "The release candidate validates packaging and integrity only; it is not evidence of buyer deployment acceptance.",
+    "Twenty-six adapters are CONFIGURATION AND GOVERNANCE around a call the buyer implements. The vendor HTTP request itself is theirs, deliberately — inventing twenty-six vendor protocols we could not verify would be worse than asking for a transport.",
+    "One catalog vendor of twenty-seven has no remote adapter: the Playwright/Puppeteer local-engine pair, already covered by the local adapter.",
+    "No acceptance harness yet. Every other finished portable here ships one, and this is the gap that keeps the release at -rc."
+  ],
+  "acceptance": {
+    "entry": "payload/index.ts",
+    "export": "buildPortableBrowserInstallationAcceptanceReport",
+    "how": "Import the entry point in a clean buyer environment, supply one adapter configuration with a real transport and a probe origin the buyer controls, and build the installation acceptance report. A full twelve-check harness on the pattern used by press-media and provider-hub is owed before 1.0.0.",
+    "guarantee": "The payload contains no credential, performs no provider mutation, refuses execute_change on every adapter, and reaches no network destination it chose itself."
+  }
+}

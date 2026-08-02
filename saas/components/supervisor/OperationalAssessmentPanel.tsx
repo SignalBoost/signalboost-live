@@ -1,28 +1,27 @@
 // saas/components/supervisor/OperationalAssessmentPanel.tsx
 //
-// THE OPERATIONS VIEW. One audience, one question each, in the order an operations manager
-// asks them:
+// TWO LAYERS, NOT ONE.
 //
-//   1. What is true now?          Current state, from verified impact.
-//   2. Is anyone affected?        Business impact, stated separately.
-//   3. How fresh, and has it held?  The assessment's own verification state, timestamp, and
-//                                 how many consecutive observations have not contradicted it.
-//   4. What must I do?            Operator action, and whether this pages.
-//   5. What is that based on?     The assessment basis, including what limits it.
-//   6. What might happen?         Risk forecast — exposure and decision point, not prophecy.
-//   7. How sure are we, exactly?  The confidence ledger, open, arithmetic visible.
-//   8. Does the assessment hold?  Assessment integrity — independent signals, contradictions
-//                                 between our own outputs, freshness, and reproducibility.
-//   9. How does this thing run?   Execution model and where the observation actually stands.
+// The transparency was becoming its own problem. Rule identifiers, input fingerprints,
+// independent-signal counts and reproducibility levels are exactly what makes this product
+// defensible — and none of them is what an operator needs in the first four seconds. A page
+// that shows everything at once has decided nothing, and hands the triage back to the reader.
 //
-// TWO THINGS THIS VERSION DELIBERATELY DOES NOT SAY.
+// So the default view answers five questions and stops:
 //
-//   "Likelihood" — that is a claim about probability and we have no probability model. What
-//   we can measure is EXPOSURE: how much is at stake and how fast it would arrive.
+//   What is true now?      Operational state.
+//   Is anyone affected?    Business impact.
+//   Do I need to act?      Operator action, and whether this pages.
+//   How sure are we?       Confidence, as one number.
+//   What might change?     The risk headline, one line.
 //
-//   "Due now" on its own — a scheduler's word that read as "on time" beside a missed window.
-//   The execution block now states where the observation stands, its tolerance, and when it
-//   escalates, so the operator never has to reconcile two lines that sounded contradictory.
+// EVERYTHING ELSE MOVES BEHIND "EXPLAIN THIS ASSESSMENT" — the basis, the confidence ledger,
+// the forecast detail, assessment integrity, the execution model. Nothing is removed and
+// nothing is summarised away: the disclosure holds the complete reasoning chain, so the answer
+// to "why do you believe that?" is one click and never a different screen.
+//
+// This is the arrangement the whole rebuild was heading toward. A conclusion an operator can
+// act on immediately, and a full justification behind it for the moment somebody challenges it.
 //
 // Nothing here computes anything. Every judgement arrives as a prop from a pure module, so
 // the page and the modules cannot disagree.
@@ -33,26 +32,27 @@ import type { OperationalAssessment } from '@/lib/supervisor/operational-assessm
 import type { ForecastSet } from '@/lib/supervisor/risk-forecast'
 import type { AssessmentIntegrity } from '@/lib/supervisor/assessment-integrity'
 
-export type AssessmentVerification = {
-  /** Verified / Partly verified. A state, not a sentence. */
-  state: string
-  /** When this assessment was computed. */
-  lastAt: string
-  /** "at least 50 observations · 4h 12m", composed by the page from the stability module. */
-  unchangedAcross: string
-}
-
 export type ExecutionModel = {
   model: string
   currentState: string
-  /** Localised label for the observation state: on schedule, overdue, absent. */
   observationState: string
-  /** "4m past due" / "—". Composed by the page from the policy, never invented here. */
   overdueBy: string
   tolerance: string
   escalatesIn: string
   lastCompleted: string
   lastResult: string
+}
+
+export type AssessmentVerification = {
+  state: string
+  lastAt: string
+  unchangedAcross: string
+}
+
+export type EvidenceAgeView = {
+  /** "32s" / "17m" / "2h 5m", composed by the page. */
+  newest: string
+  oldest: string
 }
 
 type Copy = Record<string, string>
@@ -63,17 +63,15 @@ export default function OperationalAssessmentPanel({
   execution,
   verification,
   integrity,
+  evidenceAge,
   t,
 }: {
   assessment: OperationalAssessment
   forecast: ForecastSet
   execution: ExecutionModel
-  /** Whether the assessment holds together — answered before a buyer thinks to ask. */
-  integrity: AssessmentIntegrity
-  /** Freshness and continuity of THIS assessment. Operators ask how fresh the conclusion is
-   *  and whether it has held — not when the last observation ran. Those differ whenever an
-   *  observation is owed. */
   verification: AssessmentVerification
+  integrity: AssessmentIntegrity
+  evidenceAge: EvidenceAgeView
   t: Copy
 }) {
   const exposureLabel: Record<string, string> = { low: t.exposureLow, medium: t.exposureMedium, high: t.exposureHigh }
@@ -84,15 +82,68 @@ export default function OperationalAssessmentPanel({
     <section style={panel}>
       <p style={kicker}>{t.assessmentKicker}</p>
 
-      {/* 1 + 2. State and impact, never merged into one number. */}
+      {/* ── THE DEFAULT VIEW. Five answers, nothing else. ─────────────────── */}
       <div style={headline}>
         <div>
           <p style={muted}>{t.currentState}</p>
           <p style={{ ...big, color: tone }}>{assessment.stateLabel}</p>
           <p style={muted}>{assessment.stateMeaning}</p>
+        </div>
+        <div>
+          <p style={muted}>{t.businessImpact}</p>
+          <p style={{ ...big, color: assessment.impactAffected ? '#ffd166' : '#38f2a4' }}>
+            {assessment.impactAffected ? t.impactAffected : t.impactNone}
+          </p>
+          <p style={small}>{assessment.impact}</p>
+        </div>
+        <div>
+          <p style={muted}>{t.observationConfidence}</p>
+          <p style={big}>{`${assessment.confidence}%`}</p>
+          <p style={muted}>{t.confidenceMeaning}</p>
+        </div>
+      </div>
+
+      <div style={row}>
+        <div style={cell}>
+          <p style={muted}>{t.operatorAction}</p>
+          <p style={strong}>{assessment.operatorAction}</p>
+        </div>
+        <div style={cell}>
+          <p style={muted}>{t.pageOnCall}</p>
+          <p style={{ ...strong, color: assessment.pageOnCall ? '#ff5c7a' : '#38f2a4' }}>
+            {assessment.pageOnCall ? t.yes : t.no}
+          </p>
+        </div>
+        <div style={cell}>
+          <p style={muted}>{t.riskForecast}</p>
+          <p style={strong}>{forecast.headline}</p>
+        </div>
+      </div>
+
+      {/* An integrity failure is the one thing that cannot wait behind a disclosure: it means
+          the five answers above may themselves be wrong. */}
+      {integrity.contradictions.length ? (
+        <div style={alarmBlock}>
+          <p style={sectionTitle}>{t.assessmentIntegrity}</p>
+          <p style={strong}>{integrity.statement}</p>
+          {integrity.contradictions.map(item => (
+            <article key={item.code} style={mini}>
+              <p style={strong}>{item.statement}</p>
+              <p style={small}>{item.remedy}</p>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {/* ── EVERYTHING ELSE. One click, and the complete reasoning chain. ──── */}
+      <details style={explainBlock}>
+        <summary style={summaryText}>{t.explainThisAssessment}</summary>
+
+        {/* Why this state, and how fresh the conclusion is. */}
+        <div style={block}>
+          <p style={sectionTitle}>{t.conclusion}</p>
           <p style={small}>{assessment.stateReason}</p>
-          {/* 3. Verification and freshness of the CONCLUSION, as labelled fields. "Verified by
-              check" was a sentence about our process; an operator wants a state and a time. */}
+          <p style={small}>{assessment.whyAmISeeingThis}</p>
           <dl style={fields}>
             <div>
               <dt style={muted}>{t.assessmentVerification}</dt>
@@ -108,201 +159,189 @@ export default function OperationalAssessmentPanel({
             </div>
           </dl>
           <p style={muted}>{t.stabilityNote}</p>
-        </div>
-        <div>
-          <p style={muted}>{t.businessImpact}</p>
-          <p style={{ ...big, color: assessment.impactAffected ? '#ffd166' : '#38f2a4' }}>
-            {assessment.impactAffected ? t.impactAffected : t.impactNone}
-          </p>
-          <p style={small}>{assessment.impact}</p>
-        </div>
-        <div>
-          <p style={muted}>{t.observationConfidence}</p>
-          <p style={big}>{`${assessment.confidence}%`}</p>
-          <p style={small}>{assessment.confidenceStatement}</p>
-          <p style={muted}>{t.confidenceMeaning}</p>
-        </div>
-      </div>
-
-      {/* 4. Action, and the paging decision, which state alone controls. */}
-      <div style={row}>
-        <div style={cell}>
-          <p style={muted}>{t.operatorAction}</p>
-          <p style={strong}>{assessment.operatorAction}</p>
-        </div>
-        <div style={cell}>
-          <p style={muted}>{t.pageOnCall}</p>
-          <p style={{ ...strong, color: assessment.pageOnCall ? '#ff5c7a' : '#38f2a4' }}>
-            {assessment.pageOnCall ? t.yes : t.no}
-          </p>
           <p style={muted}>{t.pagingRule}</p>
         </div>
-      </div>
 
-      {/* 5. The basis, directly under the conclusion rather than scattered across cards. */}
-      <div style={block}>
-        <p style={sectionTitle}>{t.assessmentBasis}</p>
-        <p style={muted}>{assessment.basisStatement}</p>
-        <ul style={list}>
-          {assessment.assessmentBasis.map(line => (
-            <li key={`${line.label}-${line.value}`} style={listItem}>
-              <span style={muted}>{line.label}</span>
-              <span style={strong}>{line.value}</span>
-              {line.polarity === 'limits' ? <span style={limitTag}>{t.limitsConclusion}</span> : null}
-            </li>
+        {/* The basis. */}
+        <div style={block}>
+          <p style={sectionTitle}>{t.assessmentBasis}</p>
+          <p style={muted}>{assessment.basisStatement}</p>
+          <ul style={list}>
+            {assessment.assessmentBasis.map(line => (
+              <li key={`${line.label}-${line.value}`} style={listItem}>
+                <span style={muted}>{line.label}</span>
+                <span style={strong}>{line.value}</span>
+                {line.polarity === 'limits' ? <span style={limitTag}>{t.limitsConclusion}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* The forecast, in full. */}
+        <div style={forecastBlock}>
+          <p style={sectionTitle}>{t.riskForecast}</p>
+          <p style={strong}>{forecast.headline}</p>
+          <p style={muted}>{forecast.disclaimer}</p>
+          {forecast.forecasts.map(item => (
+            <article key={item.code} style={mini}>
+              <p style={strong}>{item.observed}</p>
+              <p style={small}>
+                {item.trigger}
+                {', '}
+                {item.consequence}
+              </p>
+              <dl style={fields}>
+                <div>
+                  <dt style={muted}>{t.exposure}</dt>
+                  <dd style={dd}>{exposureLabel[item.exposure]}</dd>
+                </div>
+                <div>
+                  <dt style={muted}>{t.decisionPoint}</dt>
+                  <dd style={dd}>{item.decisionPoint}</dd>
+                </div>
+                <div>
+                  <dt style={muted}>{t.clearsWhen}</dt>
+                  <dd style={dd}>{item.clearsWhen}</dd>
+                </div>
+                <div>
+                  <dt style={muted}>{t.forecastBasis}</dt>
+                  <dd style={dd}>{item.basis.join(' · ')}</dd>
+                </div>
+              </dl>
+            </article>
           ))}
-        </ul>
-        <p style={small}>{assessment.whyAmISeeingThis}</p>
-      </div>
+        </div>
 
-      {/* 6. The forecast, fenced off from everything above it. */}
-      <div style={forecastBlock}>
-        <p style={sectionTitle}>{t.riskForecast}</p>
-        <p style={strong}>{forecast.headline}</p>
-        <p style={muted}>{forecast.disclaimer}</p>
-        {forecast.forecasts.map(item => (
-          <article key={item.code} style={mini}>
-            <p style={strong}>{item.observed}</p>
-            <p style={small}>
-              {item.trigger}
-              {', '}
-              {item.consequence}
-            </p>
-            <dl style={fields}>
-              <div>
-                <dt style={muted}>{t.exposure}</dt>
-                <dd style={dd}>{exposureLabel[item.exposure]}</dd>
-              </div>
-              <div>
-                <dt style={muted}>{t.decisionPoint}</dt>
-                <dd style={dd}>{item.decisionPoint}</dd>
-              </div>
-              <div>
-                <dt style={muted}>{t.clearsWhen}</dt>
-                <dd style={dd}>{item.clearsWhen}</dd>
-              </div>
-              <div>
-                <dt style={muted}>{t.forecastBasis}</dt>
-                <dd style={dd}>{item.basis.join(' · ')}</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
-      </div>
-
-      {/* 7. The confidence ledger, OPEN. A percentage folded behind a disclosure triangle is
-          still asking to be believed; one that shows 100 minus its reasons can be audited. */}
-      <div style={block}>
-        <p style={sectionTitle}>{t.confidenceLedger}</p>
-        <ul style={list}>
-          <li style={listItem}>
-            <span style={muted}>{t.startingConfidence}</span>
-            <span style={strong}>{'100'}</span>
-          </li>
-          {assessment.confidenceReasons.map(reason => (
-            <li key={reason.code} style={ledgerItem}>
-              <p style={strong}>{`−${reason.penalty} · ${reason.label}`}</p>
-              <p style={small}>{reason.why}</p>
-              <p style={muted}>{`${t.restoredBy}: ${reason.remedy}`}</p>
-            </li>
-          ))}
-          {assessment.confidenceReasons.length === 0 ? (
+        {/* The confidence ledger, arithmetic visible. */}
+        <div style={block}>
+          <p style={sectionTitle}>{t.confidenceLedger}</p>
+          <p style={small}>{assessment.confidenceStatement}</p>
+          <ul style={list}>
             <li style={listItem}>
-              <span style={small}>{t.noConfidenceDeductions}</span>
+              <span style={muted}>{t.startingConfidence}</span>
+              <span style={strong}>{'100'}</span>
             </li>
-          ) : null}
-          <li style={listItem}>
-            <span style={muted}>{t.finalConfidence}</span>
-            <span style={strong}>{`${assessment.confidence}%`}</span>
-          </li>
-        </ul>
-      </div>
+            {assessment.confidenceReasons.map(reason => (
+              <li key={reason.code} style={ledgerItem}>
+                <p style={strong}>{`−${reason.penalty} · ${reason.label}`}</p>
+                <p style={small}>{reason.why}</p>
+                <p style={muted}>{`${t.restoredBy}: ${reason.remedy}`}</p>
+              </li>
+            ))}
+            {assessment.confidenceReasons.length === 0 ? (
+              <li style={listItem}>
+                <span style={small}>{t.noConfidenceDeductions}</span>
+              </li>
+            ) : null}
+            <li style={listItem}>
+              <span style={muted}>{t.finalConfidence}</span>
+              <span style={strong}>{`${assessment.confidence}%`}</span>
+            </li>
+          </ul>
+        </div>
 
-      {/* 8. Integrity. This block is capable of saying the console is wrong, and says so in the
-          same place it would otherwise be reassuring. */}
-      <div style={integrity.contradictions.length ? alarmBlock : block}>
-        <p style={sectionTitle}>{t.assessmentIntegrity}</p>
-        <dl style={fields}>
-          <div>
-            <dt style={muted}>{t.independentSignals}</dt>
-            <dd style={dd}>{integrity.signalsLabel}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.conflictingSignals}</dt>
-            <dd style={dd}>{String(integrity.conflictingSignals)}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.evidenceFreshness}</dt>
-            <dd style={dd}>{`${integrity.evidenceFreshness}%`}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.assessmentReproducible}</dt>
-            <dd style={dd}>{integrity.inputsRetained ? t.yes : t.reproducibleInPrinciple}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.inputDigest}</dt>
-            <dd style={dd}>{integrity.inputDigest}</dd>
-          </div>
-        </dl>
-        <p style={small}>{integrity.statement}</p>
-        <p style={muted}>{integrity.reproducibilityStatement}</p>
-        {integrity.contradictions.map(item => (
-          <article key={item.code} style={mini}>
-            <p style={strong}>{item.statement}</p>
-            <p style={small}>{item.remedy}</p>
-          </article>
-        ))}
-      </div>
+        {/* Integrity: does the assessment hold together, and could someone else redo it. */}
+        <div style={block}>
+          <p style={sectionTitle}>{t.assessmentIntegrity}</p>
+          <dl style={fields}>
+            <div>
+              <dt style={muted}>{t.independentSignals}</dt>
+              <dd style={dd}>{integrity.signalsLabel}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.conflictingSignals}</dt>
+              <dd style={dd}>{String(integrity.conflictingSignals)}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.newestEvidence}</dt>
+              <dd style={dd}>{evidenceAge.newest}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.oldestEvidence}</dt>
+              <dd style={dd}>{evidenceAge.oldest}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.evidenceAgeState}</dt>
+              <dd style={dd}>{integrity.evidenceAge.stateLabel}</dd>
+            </div>
+          </dl>
+          <p style={small}>{integrity.statement}</p>
+          <details style={subcard}>
+            <summary>{`${t.freshnessScore} · ${integrity.evidenceAge.score}%`}</summary>
+            <ul style={list}>
+              {integrity.evidenceAge.scoreBasis.map(line => (
+                <li key={line} style={listItem}>
+                  <span style={small}>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+          <dl style={fields}>
+            <div>
+              <dt style={muted}>{t.assessmentReproducibility}</dt>
+              <dd style={dd}>{integrity.reproducibility.levelLabel}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.inputDigest}</dt>
+              <dd style={dd}>{integrity.reproducibility.digest}</dd>
+            </div>
+          </dl>
+          {integrity.reproducibility.reason ? <p style={small}>{integrity.reproducibility.reason}</p> : null}
+          <p style={muted}>{integrity.reproducibility.roadmap}</p>
+        </div>
 
-      {/* 9. Execution model and where the observation stands, replacing "Leader: None". */}
-      <div style={block}>
-        <p style={sectionTitle}>{t.executionModel}</p>
-        <dl style={fields}>
-          <div>
-            <dt style={muted}>{t.model}</dt>
-            <dd style={dd}>{execution.model}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.currentRuntimeState}</dt>
-            <dd style={dd}>{execution.currentState}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.observationStateLabel}</dt>
-            <dd style={dd}>{execution.observationState}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.overdueBy}</dt>
-            <dd style={dd}>{execution.overdueBy}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.tolerance}</dt>
-            <dd style={dd}>{execution.tolerance}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.escalatesIn}</dt>
-            <dd style={dd}>{execution.escalatesIn}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.lastCompleted}</dt>
-            <dd style={dd}>{execution.lastCompleted}</dd>
-          </div>
-          <div>
-            <dt style={muted}>{t.lastResult}</dt>
-            <dd style={dd}>{execution.lastResult}</dd>
-          </div>
-        </dl>
-      </div>
+        {/* How the thing runs, and where the observation stands. */}
+        <div style={block}>
+          <p style={sectionTitle}>{t.executionModel}</p>
+          <dl style={fields}>
+            <div>
+              <dt style={muted}>{t.model}</dt>
+              <dd style={dd}>{execution.model}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.currentRuntimeState}</dt>
+              <dd style={dd}>{execution.currentState}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.observationStateLabel}</dt>
+              <dd style={dd}>{execution.observationState}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.overdueBy}</dt>
+              <dd style={dd}>{execution.overdueBy}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.tolerance}</dt>
+              <dd style={dd}>{execution.tolerance}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.escalatesIn}</dt>
+              <dd style={dd}>{execution.escalatesIn}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.lastCompleted}</dt>
+              <dd style={dd}>{execution.lastCompleted}</dd>
+            </div>
+            <div>
+              <dt style={muted}>{t.lastResult}</dt>
+              <dd style={dd}>{execution.lastResult}</dd>
+            </div>
+          </dl>
+        </div>
+      </details>
     </section>
   )
 }
 
 const panel = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 20, background: 'rgba(255,255,255,.055)', marginBottom: 18 }
 const headline = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 8 }
-const row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18, marginTop: 18 }
+const row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 18, marginTop: 18 }
 const cell = { border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14 }
 const block = { marginTop: 18, border: '1px solid rgba(255,255,255,.1)', borderRadius: 16, padding: 16 }
+const explainBlock = { marginTop: 18, border: '1px solid rgba(26,240,255,.28)', borderRadius: 16, padding: 16, background: 'rgba(26,240,255,.05)' }
 const alarmBlock = { marginTop: 18, border: '1px solid rgba(255,92,122,.6)', borderRadius: 16, padding: 16, background: 'rgba(255,92,122,.08)' }
 const forecastBlock = { marginTop: 18, border: '1px dashed rgba(255,209,102,.45)', borderRadius: 16, padding: 16, background: 'rgba(255,209,102,.05)' }
+const subcard = { border: '1px solid rgba(26,240,255,.2)', borderRadius: 14, padding: 12, background: 'rgba(26,240,255,.06)', marginTop: 12 }
 const mini = { border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: 12, marginTop: 10 }
 const fields = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginTop: 8 }
 const dd = { margin: 0, wordBreak: 'break-word' as const }
@@ -316,3 +355,4 @@ const small = { margin: '4px 0', color: 'rgba(255,255,255,.82)' }
 const muted = { margin: '2px 0', color: 'rgba(255,255,255,.68)' }
 const sectionTitle = { margin: 0, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1, fontSize: 12, color: '#1af0ff' }
 const kicker = { color: '#1af0ff', fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1, margin: 0 }
+const summaryText = { fontWeight: 800, cursor: 'pointer' as const, color: '#1af0ff' }

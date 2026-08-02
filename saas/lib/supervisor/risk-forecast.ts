@@ -30,14 +30,20 @@
 //   3. EVERY FORECAST NAMES WHAT WOULD CLEAR IT. A prediction nobody can discharge stays on
 //      the screen forever and becomes wallpaper.
 //
-// Likelihood is stated as a word, not a percentage. We do not have the sample size for a
-// number, and a fabricated percentage next to a real one is worse than no number at all.
+//   4. WE SAY EXPOSURE, NOT LIKELIHOOD. Likelihood is a claim about probability, and we have
+//      no probability model — nobody here has measured how often 100 expired leases go on to
+//      strand work. What we can measure is EXPOSURE: how much is at stake and how quickly it
+//      would arrive. Printing "Likelihood: High" from a count would be the same unearned
+//      confidence the word "critical" used to carry.
+//
+// And the horizon is named DECISION POINT, because an operator does not ask "when will this
+// happen" — they ask "when do I have to decide".
 //
 // PURE, NO IMPORTS.
 
-export type ForecastLikelihood = 'low' | 'medium' | 'high'
+export type ExposureLevel = 'low' | 'medium' | 'high'
 
-export const LIKELIHOOD_LABELS: Record<ForecastLikelihood, string> = {
+export const EXPOSURE_LABELS: Record<ExposureLevel, string> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
@@ -51,9 +57,10 @@ export type RiskForecast = {
   trigger: string
   /** Future tense, conditional. Never printed without its trigger. */
   consequence: string
-  /** When it would become true, in the operator's terms. */
-  horizon: string
-  likelihood: ForecastLikelihood
+  /** When the operator has to decide, not when the consequence lands. */
+  decisionPoint: string
+  /** How much is at stake and how fast, from measured counts. NOT a probability. */
+  exposure: ExposureLevel
   /** The observation or action that discharges this forecast. */
   clearsWhen: string
   /** The raw figures the forecast was computed from, so it can be checked. */
@@ -67,8 +74,8 @@ export type ForecastSet = {
   /** Stated on the card so nobody reads a forecast as an incident. */
   disclaimer: string
   any: boolean
-  /** The strongest likelihood present, or null when there is nothing to forecast. */
-  highest: ForecastLikelihood | null
+  /** The strongest exposure present, or null when there is nothing to forecast. */
+  highest: ExposureLevel | null
 }
 
 export type ForecastInput = {
@@ -104,7 +111,7 @@ const MINUTES = (seconds: number): string => {
   return `${Math.round(minutes / 60)} hours`
 }
 
-const RANK: Record<ForecastLikelihood, number> = { high: 0, medium: 1, low: 2 }
+const RANK: Record<ExposureLevel, number> = { high: 0, medium: 1, low: 2 }
 
 /**
  * Turn observed conditions into conditional statements about the future.
@@ -131,9 +138,10 @@ export function buildRiskForecast(input: ForecastInput): ForecastSet {
         : `${missed} owed observation windows passed without a run.`,
       trigger: 'If the next scheduled observation also does not run',
       consequence: 'new work arriving would not be collected until an observation completes.',
-      horizon: interval > 0 ? `Next window in about ${MINUTES(interval)}.` : 'At the next scheduled window.',
-      // One miss is a scheduler hiccup and usually self-corrects. Two is a pattern.
-      likelihood: missed >= 2 ? 'high' : 'medium',
+      decisionPoint: interval > 0 ? `Next window in about ${MINUTES(interval)}.` : 'At the next scheduled window.',
+      // One miss is a scheduler hiccup and usually self-corrects. Two is a pattern, and the
+      // exposure grows because the window in which arriving work sits uncollected doubles.
+      exposure: missed >= 2 ? 'high' : 'medium',
       clearsWhen: 'The next observation completes. No operator action is required before then.',
       basis: [
         `${missed} missed window(s)`,
@@ -153,8 +161,8 @@ export function buildRiskForecast(input: ForecastInput): ForecastSet {
       observed: `${expired} expired lease(s) still hold work items.`,
       trigger: 'If reconciliation does not reclaim them',
       consequence: 'that work would become unowned and stop progressing.',
-      horizon: 'At the next reconciliation pass.',
-      likelihood: expired > 5 ? 'high' : 'medium',
+      decisionPoint: 'At the next reconciliation pass.',
+      exposure: expired > 5 ? 'high' : 'medium',
       clearsWhen: 'Reconciliation reclaims the leases, or they are released manually.',
       basis: [`${expired} expired lease(s) with work`, `${blocked} blocked item(s) now`],
     })
@@ -170,8 +178,8 @@ export function buildRiskForecast(input: ForecastInput): ForecastSet {
       observed: `Liveness cannot be established for ${unverifiable.join(', ')}.`,
       trigger: 'If one of these runtimes has in fact stopped',
       consequence: 'the failure would not be detected by this console.',
-      horizon: 'Already possible. There is no window that reveals it.',
-      likelihood: queue > 0 ? 'high' : 'medium',
+      decisionPoint: 'Already possible. There is no window that reveals it.',
+      exposure: queue > 0 ? 'high' : 'medium',
       clearsWhen: 'Supply the evidence its trigger model requires — a poll time, a reachability probe, a heartbeat.',
       basis: [`${unverifiable.length} runtime(s) unverifiable`, `${queue} item(s) waiting`],
     })
@@ -185,8 +193,8 @@ export function buildRiskForecast(input: ForecastInput): ForecastSet {
       observed: `${invalid} provider registration(s) failed their integrity check.`,
       trigger: 'If work is routed to one of them',
       consequence: 'that work would be refused rather than executed.',
-      horizon: 'On the next dispatch to an affected provider.',
-      likelihood: 'medium',
+      decisionPoint: 'On the next dispatch to an affected provider.',
+      exposure: 'medium',
       clearsWhen: 'The registration passes its integrity check again.',
       basis: [`${invalid} invalid registration(s)`],
     })
@@ -201,23 +209,23 @@ export function buildRiskForecast(input: ForecastInput): ForecastSet {
       observed: `${backlog} finished record(s) are awaiting reconciliation.`,
       trigger: 'If the backlog keeps growing',
       consequence: 'reconciliation will eventually need a maintenance window rather than running inline.',
-      horizon: 'Days, not hours.',
-      likelihood: 'low',
+      decisionPoint: 'Days, not hours.',
+      exposure: 'low',
       clearsWhen: 'A reconciliation pass clears the finished records.',
       basis: [`${backlog} finished record(s)`, 'no work is stranded by these'],
     })
   }
 
-  forecasts.sort((a, b) => RANK[a.likelihood] - RANK[b.likelihood])
-  const highest = forecasts.length ? forecasts[0].likelihood : null
+  forecasts.sort((a, b) => RANK[a.exposure] - RANK[b.exposure])
+  const highest = forecasts.length ? forecasts[0].exposure : null
 
   return {
     forecasts,
     headline: forecasts.length === 0
       ? 'No risk conditions identified.'
       : forecasts.length === 1
-        ? `1 risk condition · ${LIKELIHOOD_LABELS[highest as ForecastLikelihood].toLowerCase()} likelihood`
-        : `${forecasts.length} risk conditions · highest ${LIKELIHOOD_LABELS[highest as ForecastLikelihood].toLowerCase()}`,
+        ? `1 risk condition · ${EXPOSURE_LABELS[highest as ExposureLevel].toLowerCase()} exposure`
+        : `${forecasts.length} risk conditions · highest exposure ${EXPOSURE_LABELS[highest as ExposureLevel].toLowerCase()}`,
     disclaimer: forecasts.length === 0
       ? 'Nothing observed suggests a future problem.'
       : 'These are conditional statements about what may happen. None of them is happening now, and none of them pages anyone.',

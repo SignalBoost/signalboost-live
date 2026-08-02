@@ -24,7 +24,17 @@ import { toMinorUnits, formatMinor } from '@/lib/ads/ads-money'
 // converted to integer minor units before it leaves the browser. The conversion is the same
 // one the declarations use, so it knows a yen has no minor unit and a dinar has three.
 
-type Platform = { id: string; label: string; currencies: string[]; tokenVariable: string; ready: boolean }
+type SetupVar = { key: string; label: string; required: boolean; secret: boolean; hint: string | null; present: boolean }
+type NetworkSetup = { id: string; label: string; prerequisite: string; vars: SetupVar[] }
+type Platform = {
+  id: string
+  label: string
+  currencies: string[]
+  tokenVariable: string
+  ready: boolean
+  setup: NetworkSetup | null
+  missing: string[]
+}
 type Unavailable = { id: string; reason: string }
 type Ceiling = { platformId: string; accountRef: string; ceilingMinor: number; currency: string; display: string; setBy: string }
 type Campaign = {
@@ -118,11 +128,7 @@ export default function AdsCockpit() {
                 {platform.ready ? chip(uiText('generatedUi.u_ads_ready'), '#22c55e') : chip(uiText('generatedUi.u_ads_notready'), '#fb923c')}
               </div>
               <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, margin: '8px 0 0' }}>{platform.id}</p>
-              {platform.ready ? null : (
-                <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 11, margin: '6px 0 0' }}>
-                  {uiText('generatedUi.u_ads_settoken')} <code style={{ color: '#1af0ff' }}>{platform.tokenVariable}</code>
-                </p>
-              )}
+              <NetworkSetupPanel platform={platform} onStaged={load} />
             </div>
           ))}
         </div>
@@ -191,6 +197,109 @@ export default function AdsCockpit() {
         )}
       </section>
     </main>
+  )
+}
+
+function NetworkSetupPanel({ platform, onStaged }: { platform: Platform; onStaged: () => void }) {
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [staging, setStaging] = useState(false)
+  const [note, setNote] = useState('')
+  const [failure, setFailure] = useState('')
+
+  const setup = platform.setup
+  if (!setup) return null
+
+  const outstanding = setup.vars.filter(item => item.required && !item.present)
+  const filled = outstanding.every(item => String(values[item.key] || '').trim())
+
+  async function stage() {
+    setStaging(true); setNote(''); setFailure('')
+    try {
+      const res = await fetch('/api/ads/connect-via-pr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ network: platform.id, values }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || `${res.status}`)
+      setValues({})
+      setNote(String(json.next || ''))
+      onStaged()
+    } catch (error: any) {
+      setFailure(String(error?.message || error))
+    }
+    setStaging(false)
+  }
+
+  return (
+    <details style={{ marginTop: 10 }}>
+      <summary style={{ color: '#1af0ff', cursor: 'pointer', fontSize: 12, fontWeight: 850 }}>{uiText('generatedUi.u_ads_methods')}</summary>
+      <div style={{ display: 'grid', gap: 12, marginTop: 10 }}>
+
+        {/* What the network itself demands. No path here can supply it. */}
+        <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 11, margin: 0 }}>
+          <strong style={{ color: 'rgba(255,255,255,.8)' }}>{uiText('generatedUi.u_ads_prerequisite')}</strong> {setup.prerequisite}
+        </p>
+
+        {/* Path 1 — the operator does it. First-class, always available, no AI dependence. */}
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>{uiText('generatedUi.u_ads_manualtitle')}</p>
+          <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: '0 0 8px' }}>{uiText('generatedUi.u_ads_manualnote')}</p>
+          <div style={{ display: 'grid', gap: 4 }}>
+            {setup.vars.map(item => (
+              <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
+                <code style={{ color: item.present ? 'rgba(255,255,255,.6)' : '#1af0ff' }}>{item.key}</code>
+                <span style={{ color: item.present ? '#22c55e' : item.required ? '#fb923c' : 'rgba(255,255,255,.4)' }}>
+                  {item.present ? uiText('generatedUi.u_ads_varset') : item.required ? uiText('generatedUi.u_ads_varmissing') : uiText('generatedUi.u_ads_varoptional')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Path 2 — staged as an infrastructure PR the owner reviews and merges. */}
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>{uiText('generatedUi.u_ads_prtitle')}</p>
+          <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: '0 0 8px' }}>{uiText('generatedUi.u_ads_prnote')}</p>
+
+          {outstanding.length === 0 ? (
+            <p style={{ color: '#86efac', fontSize: 11, margin: 0 }}>{uiText('generatedUi.u_ads_allset')}</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {outstanding.map(item => (
+                <div key={item.key}>
+                  <span style={label}>{item.label}</span>
+                  <input
+                    style={input}
+                    // A value that grants spending power is never echoed back into the page.
+                    type={item.secret ? 'password' : 'text'}
+                    value={values[item.key] || ''}
+                    onChange={event => setValues({ ...values, [item.key]: event.target.value })}
+                    placeholder={item.key}
+                  />
+                  {item.hint ? <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 10, margin: '3px 0 0' }}>{item.hint}</p> : null}
+                </div>
+              ))}
+              <button style={{ ...ghost, opacity: filled && !staging ? 1 : .5 }} disabled={!filled || staging} onClick={stage}>
+                {staging ? uiText('generatedUi.u_ads_staging') : uiText('generatedUi.u_ads_stage')}
+              </button>
+            </div>
+          )}
+
+          {note ? <p style={{ color: '#86efac', fontSize: 11, margin: '8px 0 0' }}>{note} <a href="/dashboard/infrastructure" style={{ color: '#1af0ff' }}>{uiText('generatedUi.u_ads_reviewpr')}</a></p> : null}
+          {failure ? <p style={{ color: '#fca5a5', fontSize: 11, margin: '8px 0 0' }}>{failure}</p> : null}
+        </div>
+
+        {/* Path 3 — the assisted co-pilot. Honest about not being wired yet. */}
+        <div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 10 }}>
+          <p style={{ color: '#fff', fontSize: 12, fontWeight: 850, margin: '0 0 4px' }}>
+            {uiText('generatedUi.u_ads_agenttitle')} <span style={{ color: '#ffc300', fontWeight: 700 }}>{uiText('generatedUi.u_ads_agentsoon')}</span>
+          </p>
+          <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 11, margin: 0 }}>{uiText('generatedUi.u_ads_agentnote')}</p>
+        </div>
+      </div>
+    </details>
   )
 }
 

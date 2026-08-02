@@ -1,31 +1,34 @@
 // saas/lib/supervisor/health-ledger.ts
 //
-// WHERE THE MISSING POINTS WENT.
+// WHERE THE MISSING POINTS WENT — AND ONLY THE ONES THAT REPRESENT REALITY.
 //
-// A score with no explanation is not usable in operations. "93%" prompts exactly one
-// question — what is wrong with the other seven — and if the console cannot answer it, the
-// number is decoration. Worse, it is unauditable: asked why the platform was at 93 on a
-// given night, the only honest answer today is "because the formula said so", which is not
-// something a CISO, an auditor or an on-call engineer can act on.
+// A score with no explanation is decoration: "93%" prompts one question, and a console that
+// cannot answer what is wrong with the other seven has not said anything. So the score is a
+// CONSEQUENCE here, reconstructed as a ledger where every point lost carries its cause, its
+// evidence, its operational impact, a confidence and a recommendation.
 //
-// So the score stops being a primary output and becomes a CONSEQUENCE. This file reconstructs
-// it as a ledger: start at 100, and every point lost carries its cause, its evidence, its
-// operational impact, a confidence level and a recommendation. Every deduction answers the
-// same five questions the rest of the Supervisor answers — what happened, what it proves,
-// what it costs, how sure we are, and what to do.
+// WHAT CHANGED IN THIS VERSION, AND WHY IT MATTERS. The first ledger mixed two different
+// things in one list: real operational deductions, and points lost to quirks of the scoring
+// formula, the latter marked "expected". That was the wrong shape. Nobody accountable wants
+// to be told "we always lose seven points because the formula double-counts" — they want the
+// formula fixed. A transparency layer that makes a flawed algorithm comfortable to live with
+// will keep it alive forever.
 //
-// THE LEDGER RECONCILES EXACTLY. Deductions are derived from the same component scores the
-// existing snapshot averages, so the total always reproduces the number the rest of the
-// system computes. A ledger that explained a different score would be a second opinion
-// pretending to be an explanation.
+// So there are now two separate outputs:
 //
-// A DEDUCTION CAN BE EXPECTED. A scheduled runtime idle between runs costs points under the
-// current formula, and that is the formula being wrong rather than the platform being
-// unwell. Those deductions are marked `expected: true` with a recommendation of no action,
-// so an operator can see at a glance that the shortfall is arithmetic rather than a fault.
+//   OPERATIONAL DEDUCTIONS  things that are true about the platform. These affect the score.
+//   FORMULA DIAGNOSTICS     engineering notes about the measurement itself. These affect
+//                           NOTHING, sit in their own section, and each carries what would
+//                           remove it — the intent is to delete them, not to live beside them.
 //
-// PURE, NO IMPORTS. It explains; it does not fetch, and it does not decide severity — that
-// belongs to health-severity.ts, which asks whether anything is actually broken.
+// The domain model in health-domains.ts is the other half of that fix: eight domains, each
+// measured once, no overlaps. The goal state is a ledger reading "100. No deductions." on a
+// healthy platform, with an empty diagnostics list.
+//
+// It explains; it does not fetch, and it does not decide severity — health-severity.ts asks
+// whether anything is actually broken.
+
+import type { DomainAssessment, DomainSnapshot } from './health-domains.ts'
 
 export type HealthDeduction = {
   code: string
@@ -37,226 +40,146 @@ export type HealthDeduction = {
   impact: string
   confidence: 'high' | 'medium' | 'low'
   recommendation: string
-  /** True when this deduction is normal for the declared execution model. */
-  expected: boolean
+}
+
+export type FormulaDiagnostic = {
+  code: string
+  note: string
+  /** What would remove it. A diagnostic with no fix is a complaint. */
+  remedy: string
 }
 
 export type HealthMetric = { label: string; value: string; meaning: string }
 
 export type HealthLedger = {
   startScore: number
+  /** Only things that are true about the platform. */
   deductions: HealthDeduction[]
-  /** Reproduces the snapshot's own score. */
-  score: number
+  /** Notes about the measurement. Deliberately excluded from the arithmetic. */
+  diagnostics: FormulaDiagnostic[]
+  /** Reproduces the domain snapshot's score, or null when nothing could be measured. */
+  score: number | null
   /** False would mean the explanation and the number disagree, which must never ship. */
   reconciles: boolean
-  /** The figures an operator actually reads, instead of one opaque percentage. */
+  /** How much of the picture the score represents. */
+  coverage: string
+  unmeasured: Array<{ label: string; why: string }>
   metrics: HealthMetric[]
-  /** Honest notes about the formula itself, where it has a known weakness. */
-  formulaNotes: string[]
 }
 
-export type ComponentScores = {
-  availability: number
-  reliability: number
-  verificationRate: number
-  auditSuccess: number
-  schedulerSuccess: number
-  webhookSuccess: number
-  supervisorHealth: number
-  providerHealth: number
-  queueHealth: number
+const IMPACT: Record<string, string> = {
+  execution: 'Work was dispatched and did not run, so remediation did not happen.',
+  observation: 'Owed observations did not happen, so a fault could exist unseen.',
+  verification: 'An outcome was not independently confirmed, so a repair may be reported without proof.',
+  audit: 'No service impact. The evidence trail is incomplete, which is a compliance problem rather than an outage.',
+  persistence: 'Durable writes failed, so recent state may not survive a restart.',
+  coordination: 'Work may sit unclaimed, or held by a runtime that has gone.',
+  provider_connectivity: 'A provider cannot be reached, or cannot reach us, so its events are lost rather than queued.',
+  business_impact: 'Work is blocked. This is the domain that decides whether there is an outage.',
+}
+
+const RECOMMENDATION: Record<string, string> = {
+  execution: 'Inspect the failing dispatches before approving further remediation.',
+  observation: 'Check why the scheduled runs are not firing. A run that never fires is invisible to elapsed-time checks.',
+  verification: 'Treat unconfirmed outcomes as unproven, not as successes.',
+  audit: 'Investigate audit persistence before the next compliance review. Not an out-of-hours matter.',
+  persistence: 'Check the durable store before trusting any recent state.',
+  coordination: 'Reconcile expired leases so their work can be reclaimed.',
+  provider_connectivity: 'Correct the registration or the receiver. Refusal is the safe behaviour, not the fault.',
+  business_impact: 'Free the blocked work — this is the only line here that justifies waking someone.',
+}
+
+const CONFIDENCE: Record<string, 'high' | 'medium' | 'low'> = {
+  business_impact: 'high',
+  audit: 'high',
+  coordination: 'medium',
+  provider_connectivity: 'medium',
 }
 
 export type LedgerContext = {
-  components: ComponentScores
-  /** Subsystem metrics, used as the evidence line for each deduction. */
-  subsystems?: Array<{ id: string; score: number; metric: number | null; summary: string }>
-  /** True when the runtime being scored is scheduled and legitimately idle right now. */
-  runtimeIdleByDesign?: boolean
-  totalObservations?: number
-  blockedWork?: number
-  queueDepth?: number
+  snapshot: DomainSnapshot
 }
 
-type Explanation = {
-  label: string
-  why: (context: LedgerContext, score: number) => string
-  impact: (context: LedgerContext, score: number) => string
-  recommendation: (context: LedgerContext, score: number) => string
-  expected?: (context: LedgerContext) => boolean
-  evidenceSubsystems: string[]
-  confidence?: 'high' | 'medium' | 'low'
-}
-
-const EXPLANATIONS: Record<keyof ComponentScores, Explanation> = {
-  availability: {
-    label: 'Supervisor availability',
-    evidenceSubsystems: ['supervisor', 'missed_heartbeats'],
-    why: context => context.runtimeIdleByDesign
-      ? 'The runtime is idle between scheduled executions, which the current formula scores as reduced availability.'
-      : 'A supervisor instance is missing or its heartbeat is stale.',
-    impact: context => context.runtimeIdleByDesign
-      ? 'None. An idle scheduled runtime is the expected steady state between runs.'
-      : 'New work would not be picked up while no instance is beating.',
-    recommendation: context => context.runtimeIdleByDesign
-      ? 'No action. This deduction reflects the scoring formula, not the platform.'
-      : 'Confirm the runtime is running and its heartbeat is being written.',
-    expected: context => context.runtimeIdleByDesign === true,
-  },
-  supervisorHealth: {
-    label: 'Supervisor fleet health',
-    evidenceSubsystems: ['supervisor', 'missed_heartbeats'],
-    why: context => context.runtimeIdleByDesign
-      ? 'Same idle runtime, scored a second time — the formula counts the supervisor score in two of its nine components.'
-      : 'The supervisor fleet has no healthy instance, or one has a stale heartbeat.',
-    impact: context => context.runtimeIdleByDesign
-      ? 'None. Counted twice, so an idle scheduled runtime costs roughly seven points on its own.'
-      : 'Remediation cannot be dispatched without a healthy instance.',
-    recommendation: context => context.runtimeIdleByDesign
-      ? 'No action. Worth fixing in the formula rather than in the platform.'
-      : 'Restore a healthy supervisor instance.',
-    expected: context => context.runtimeIdleByDesign === true,
-  },
-  reliability: {
-    label: 'Reliability (composite)',
-    evidenceSubsystems: ['verification_failures', 'audit_failures', 'scheduler', 'webhook_processing'],
-    why: () => 'The average of verification, audit, scheduler and webhook success — each of which is ALSO scored separately below.',
-    impact: () => 'None of its own. This line restates the four rates beneath it.',
-    recommendation: () => 'Read the four rates below rather than this line.',
-    confidence: 'medium',
-  },
-  verificationRate: {
-    label: 'Verification success',
-    evidenceSubsystems: ['verification_failures', 'verification_latency'],
-    why: () => 'Observation runs that failed to read or verify.',
-    impact: () => 'A failed verification means an incident may be missed, or a repair reported as done without proof.',
-    recommendation: () => 'Inspect the failing runs; a persistent failure is a genuine gap in evidence.',
-  },
-  auditSuccess: {
-    label: 'Audit completeness',
-    evidenceSubsystems: ['audit_failures', 'audit_latency', 'persistence_latency'],
-    why: () => 'Runs with no terminal audit event, so their outcome was never durably recorded.',
-    impact: () => 'No service impact. The evidence trail is incomplete, which is a compliance problem rather than an outage.',
-    recommendation: () => 'Investigate audit persistence before the next compliance review. Not an out-of-hours matter.',
-  },
-  schedulerSuccess: {
-    label: 'Scheduler success',
-    evidenceSubsystems: ['scheduler'],
-    why: () => 'Scheduled triggers that failed.',
-    impact: () => 'Observations may not be firing on their declared cadence.',
-    recommendation: () => 'Check the scheduler; a run that never fires is invisible to elapsed-time checks.',
-  },
-  webhookSuccess: {
-    label: 'Webhook processing',
-    evidenceSubsystems: ['webhook_processing'],
-    why: () => 'Inbound webhook deliveries that failed to process.',
-    impact: () => 'Events pushed by a provider may have been dropped rather than queued.',
-    recommendation: () => 'Check the receiver and replay if the provider supports it.',
-  },
-  providerHealth: {
-    label: 'Provider registration',
-    evidenceSubsystems: ['bpal_registry', 'provider_registration'],
-    why: () => 'A registered provider violates its declared limits, or publishes no capabilities.',
-    impact: () => 'Execution against that provider stays refused until it validates, so nothing runs on it.',
-    recommendation: () => 'Correct the registration. Refusal is the safe behaviour, not the fault.',
-  },
-  queueHealth: {
-    label: 'Queue depth',
-    evidenceSubsystems: ['queue_depth', 'active_work', 'stale_work'],
-    why: context => `${context.queueDepth ?? 0} active work item(s) — the formula deducts above 25 and again above 100.`,
-    impact: () => 'A growing queue delays remediation without stopping it.',
-    recommendation: () => 'Watch the trend. A queue that only grows is a capacity problem, not an incident.',
-  },
-}
-
-const COMPONENT_ORDER: Array<keyof ComponentScores> = [
-  'availability', 'supervisorHealth', 'reliability', 'verificationRate',
-  'auditSuccess', 'schedulerSuccess', 'webhookSuccess', 'providerHealth', 'queueHealth',
-]
-
-function evidenceFor(context: LedgerContext, ids: string[]): string[] {
-  const out: string[] = []
-  for (const id of ids) {
-    const subsystem = (context.subsystems || []).find(item => item.id === id)
-    if (!subsystem) continue
-    const metric = subsystem.metric === null || subsystem.metric === undefined ? '' : ` (${subsystem.metric})`
-    out.push(`${id}: ${subsystem.score}%${metric} — ${subsystem.summary}`)
+function deductionFor(domain: DomainAssessment, share: number): HealthDeduction | null {
+  if (!domain.measured || domain.score === null || domain.score >= 100) return null
+  return {
+    code: domain.id,
+    label: domain.label,
+    // Each measured domain is one equal share of the score, so the ledger sums back exactly.
+    points: ((100 - Number(domain.score)) * share) / 100,
+    why: domain.finding || `${domain.label} scored ${domain.score}.`,
+    evidence: domain.evidence,
+    impact: IMPACT[domain.id] || 'Impact not characterised for this domain.',
+    confidence: CONFIDENCE[domain.id] || 'high',
+    recommendation: RECOMMENDATION[domain.id] || 'Investigate before the next review.',
   }
-  return out
 }
 
 /**
- * Rebuild the score as a list of justified deductions.
+ * Rebuild the score as justified deductions, with measurement complaints kept out of it.
  *
- * The arithmetic is the snapshot's own: each component is one ninth of the total, so a
- * component at 70 costs (100 − 70) ÷ 9 points. That is why the ledger always sums back to the
- * number the rest of the system reports.
+ * The arithmetic is the domain snapshot's own — each measured domain is an equal share — so
+ * the ledger always reproduces the number the rest of the system reports. A ledger explaining
+ * a different score would be a second opinion pretending to be an explanation.
  */
 export function buildHealthLedger(context: LedgerContext): HealthLedger {
-  const components = context.components
-  const count = COMPONENT_ORDER.length
-  const deductions: HealthDeduction[] = []
+  const snapshot = context.snapshot
+  const measured = snapshot.domains.filter(domain => domain.measured)
+  const share = measured.length ? 100 / measured.length : 0
 
-  for (const key of COMPONENT_ORDER) {
-    const score = Number(components[key])
-    if (!Number.isFinite(score) || score >= 100) continue
-    const explanation = EXPLANATIONS[key]
-    const points = (100 - score) / count
-    deductions.push({
-      code: key,
-      label: explanation.label,
-      points,
-      why: explanation.why(context, score),
-      evidence: evidenceFor(context, explanation.evidenceSubsystems),
-      impact: explanation.impact(context, score),
-      confidence: explanation.confidence || 'high',
-      recommendation: explanation.recommendation(context, score),
-      expected: explanation.expected ? explanation.expected(context) === true : false,
-    })
+  const deductions: HealthDeduction[] = []
+  for (const domain of measured) {
+    const deduction = deductionFor(domain, share)
+    if (deduction) deductions.push(deduction)
   }
 
   const lost = deductions.reduce((total, item) => total + item.points, 0)
-  const score = Math.round(100 - lost)
-  const snapshotScore = Math.round(
-    COMPONENT_ORDER.reduce((total, key) => total + Number(components[key] || 0), 0) / count,
-  )
+  const score = measured.length ? Math.round(100 - lost) : null
 
-  const formulaNotes: string[] = []
-  if (deductions.some(item => item.code === 'reliability')) {
-    // Surfaced rather than hidden. An operator comparing the lines will notice the overlap,
-    // and a product that noticed it first is more credible than one that explains it after.
-    formulaNotes.push('Verification, audit, scheduler and webhook success are each counted twice — once on their own and once inside Reliability. The score below is reproduced faithfully, but the formula overweights those four.')
+  // Notes about the measurement, never about the platform. Each carries what would remove it,
+  // because the point is to delete these over time rather than to live beside them.
+  const diagnostics: FormulaDiagnostic[] = []
+  if (snapshot.unmeasured.length) {
+    diagnostics.push({
+      code: 'partial_coverage',
+      note: `${snapshot.coverage}. The score describes only what was measured, and an unmeasured domain is not evidence of health.`,
+      remedy: 'Collect the missing signals so every domain is measured on its own evidence.',
+    })
   }
-  if (deductions.some(item => item.code === 'availability') && deductions.some(item => item.code === 'supervisorHealth')) {
-    formulaNotes.push('Supervisor health is counted twice, as Availability and again on its own. An idle scheduled runtime therefore costs about seven points for one condition.')
+  if (snapshot.unmeasured.indexOf('persistence') !== -1) {
+    diagnostics.push({
+      code: 'persistence_unmeasured',
+      note: 'Persistence has no independent signal. It is deliberately not inferred from audit completeness — that would be one measurement counted twice, which is the flaw this model was rebuilt to remove.',
+      remedy: 'Record durable-write outcomes and feed them in, or leave the domain honestly unmeasured.',
+    })
   }
 
   return {
     startScore: 100,
     deductions,
+    diagnostics,
     score,
-    // If these ever disagree the explanation is wrong, and an explanation that does not match
-    // the number is worse than no explanation.
-    reconciles: score === snapshotScore,
-    metrics: [
-      { label: 'Verification success', value: `${Math.round(components.verificationRate)}%`, meaning: 'Observations that read and verified successfully.' },
-      { label: 'Audit completeness', value: `${Math.round(components.auditSuccess)}%`, meaning: 'Runs whose outcome was durably recorded.' },
-      { label: 'Scheduler success', value: `${Math.round(components.schedulerSuccess)}%`, meaning: 'Scheduled triggers that fired and processed.' },
-      { label: 'Observations', value: String(context.totalObservations ?? 0), meaning: 'Runs in the current window.' },
-      { label: 'Blocked work', value: String(context.blockedWork ?? 0), meaning: 'Live work items with no owner. This is the number that decides an outage.' },
-    ],
-    formulaNotes,
+    // If these disagree the explanation is wrong, and a wrong explanation is worse than none.
+    reconciles: score === snapshot.score,
+    coverage: snapshot.coverage,
+    unmeasured: snapshot.domains
+      .filter(domain => !domain.measured)
+      .map(domain => ({ label: domain.label, why: domain.evidence[0] || 'No signal.' })),
+    metrics: measured.map(domain => ({
+      label: domain.label,
+      value: `${domain.score}%`,
+      meaning: domain.question,
+    })),
   }
 }
 
-/** "−3 Supervisor availability" — display rounding only; the ledger sums exactly. */
+/** "−12 Coordination" — display rounding only; the ledger sums exactly. */
 export function formatDeduction(deduction: HealthDeduction): string {
   const points = deduction.points >= 1 ? Math.round(deduction.points) : Number(deduction.points.toFixed(1))
   return `−${points} ${deduction.label}`
 }
 
-/** True when every point lost is accounted for by a condition that is normal. */
-export function allDeductionsExpected(ledger: HealthLedger): boolean {
-  return ledger.deductions.length > 0 && ledger.deductions.every(item => item.expected || item.code === 'reliability')
+/** The headline a healthy platform should produce: a full score and nothing to explain. */
+export function isClean(ledger: HealthLedger): boolean {
+  return ledger.deductions.length === 0 && ledger.score === 100
 }

@@ -172,7 +172,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     status: String(r.verification.status || ''),
     completedAt: r.completedAt,
   })))
-  const incidentById = new Map(incidentRuns.map(r => [r.runId, r]))
+  const incidentById = new Map<string, VercelHealthRun>(incidentRuns.map(r => [r.runId, r]))
 
   // ── FAIL CLOSED, exactly as saas/proxy.ts does ────────────────────────────────
   const { data: systemStatus, error: systemStatusError } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()

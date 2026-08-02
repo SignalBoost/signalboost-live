@@ -4,11 +4,9 @@ import { portableProductManifests, providerHubManifest, campaignStudioManifest, 
 import { validatePortableProductManifests } from './manifestValidation.ts'
 import type { PortableProductDescriptor } from './product-types.ts'
 import { validatePortableProductRegistry } from './product-validation.ts'
-
 function product(manifest: PortableProductManifest, descriptor: Omit<PortableProductDescriptor, 'manifest'>): PortableProductDescriptor {
   return Object.freeze({ manifest, ...descriptor })
 }
-
 validatePortableProductManifests(portableProductManifests)
 /** Canonical presentation catalog. Product metadata lives only in the referenced manifests. */
 export const portableProductRegistry = Object.freeze([
@@ -17,12 +15,11 @@ export const portableProductRegistry = Object.freeze([
   product(integrationsHubManifest, { localizationKey: 'integrations', glyph: '⛓', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 20 }),
   product(videoMakerManifest, { localizationKey: 'render', glyph: '◍', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 30 }),
   product(controlCenterManifest, { localizationKey: 'console', glyph: '◈', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 40 }),
-  product(marketingSalesManifest, { localizationKey: 'marketingSales', glyph: '◎', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 50 }),
+  product(marketingSalesManifest, { localizationKey: 'marketingSales', glyph: '◎', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 50, route: '/dashboard/marketing-sales/console' }),
   product(pressMediaManifest, { localizationKey: 'press', glyph: '◉', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 60 }),
   product(portableChiefOfStaffManifest, { localizationKey: 'chiefOfStaff', glyph: '❖', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 70, route: '/dashboard/cos-mining' }),
   product(browserAgentEcosystemManifest, { localizationKey: 'browserAgents', glyph: '◇', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 80 }),
   product(agentOperationsPlatformManifest, { localizationKey: 'agentOperations', glyph: '⌁', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 90, route: '/dashboard/portable-products' }),
   product(selfHealingSupervisorManifest, { localizationKey: 'selfHealing', glyph: '⟲', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 100, route: '/dashboard/supervisor' }),
 ])
-
 validatePortableProductRegistry(portableProductRegistry)

@@ -24,8 +24,16 @@
 //
 // NO SIDE EFFECTS BEYOND THE FETCH, AND NO HOST IMPORTS, so this stays inside the portable
 // boundary and a buyer gets the same discovery in their own deployment.
+//
+// READING ACCOUNT HEALTH LIVES HERE TOO, deliberately in the same file rather than in a
+// second one with a near-identical name. Both ask a network for facts about an ad account —
+// which accounts exist, and what state one of them is in — and a pair of files called
+// ads-account-discovery and ads-account-health is exactly the kind of near-twin that has
+// been cross-pasted twice in this repo.
 
 /** What a network told us about one ad account the credentials can reach. */
+import { assertMinorUnits, type SpendUnits } from './ads-money.ts'
+
 export type DiscoveredAdAccount = {
   /** The network's own identifier — what every later call is addressed by. */
   accountRef: string
@@ -376,4 +384,222 @@ export function accountPickerLabel(account: DiscoveredAdAccount): string {
   if (account.currency) parts.push(account.currency)
   if (account.status) parts.push(account.status)
   return parts.join(' · ')
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reading account health from the network
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// WHY ONLY THREE NETWORKS. Meta, Google and TikTok publish the account's financial state:
+// what it has spent, what it is allowed to spend, what is left. The others do not, and
+// guessing at an endpoint would produce a figure that looks authoritative and is not — which
+// is worse than the honest alternative of a person typing what they know and it being
+// marked as declared rather than read.
+
+
+export type AccountHealthRead = {
+  ok: boolean
+  /** False when the network publishes nothing to read. Not an error — just not available. */
+  supported: boolean
+  reason: string
+  health: {
+    billingMode: 'card' | 'prepaid' | 'invoiced' | null
+    currency: string | null
+    creditLimitMinor: number | null
+    creditUsedMinor: number | null
+    balanceMinor: number | null
+    paymentState: 'ok' | 'limit_reached' | 'past_due' | 'declined' | 'suspended' | 'unknown'
+  } | null
+}
+
+function unsupported(networkId: string): AccountHealthRead {
+  return {
+    ok: false,
+    supported: false,
+    reason: `${networkId} does not publish an account balance or credit endpoint. Record the arrangement by hand — it will be marked as declared rather than read.`,
+    health: null,
+  }
+}
+
+function healthFailure(reason: string): AccountHealthRead {
+  return { ok: false, supported: true, reason, health: null }
+}
+
+function money(raw: unknown, units: SpendUnits, currency: string | null): number | null {
+  if (raw === null || raw === undefined || raw === '' || !currency) return null
+  try {
+    return assertMinorUnits(raw as any, units, currency)
+  } catch {
+    // A figure we cannot convert exactly is not written at all. A wrong number here would be
+    // compared against a cap.
+    return null
+  }
+}
+
+// Meta's own vocabulary for how an account pays, translated once.
+const META_FUNDING: Record<string, 'card' | 'prepaid' | 'invoiced'> = {
+  CREDIT_CARD: 'card',
+  PAYPAL: 'card',
+  DIRECT_DEBIT: 'card',
+  EXTENDED_CREDIT: 'invoiced',
+  INVOICE: 'invoiced',
+  PREPAID: 'prepaid',
+  AVAILABLE_FUNDS: 'prepaid',
+  FACEBOOK_WALLET: 'prepaid',
+}
+
+// account_status, as Meta numbers it. 3 is unsettled — the account owes money and delivery
+// is at risk while every campaign still reports normally.
+const META_STATUS: Record<string, 'ok' | 'past_due' | 'suspended' | 'unknown'> = {
+  '1': 'ok',
+  '2': 'suspended',
+  '3': 'past_due',
+  '9': 'past_due',
+  '100': 'suspended',
+  '101': 'suspended',
+}
+
+/**
+ * Ask a network what state an ad account is in.
+ *
+ * `currencyHint` comes from the account the operator already picked, because two of these
+ * endpoints report amounts without saying which currency they are in — and a minor unit is
+ * not always a hundredth.
+ */
+export async function readAdAccountHealth(
+  networkId: string,
+  accessToken: string,
+  accountRef: string,
+  currencyHint?: string | null,
+): Promise<AccountHealthRead> {
+  const id = String(networkId)
+  if (!String(accessToken || '').trim()) return healthFailure('No working connection for this network.')
+  if (!String(accountRef || '').trim()) return healthFailure('An ad account is required.')
+
+  if (id === 'meta_ads') {
+    const url = `https://graph.facebook.com/v21.0/act_${encodeURIComponent(accountRef)}` +
+      '?fields=currency,balance,spend_cap,amount_spent,account_status,funding_source_details'
+    const res = await fetchJson(url, { Authorization: `Bearer ${accessToken}` })
+    if (!res.ok) return healthFailure(res.reason)
+
+    const payload: any = res.payload
+    const currency = payload?.currency ? String(payload.currency).toUpperCase() : (currencyHint || null)
+    const fundingType = payload?.funding_source_details?.type ? String(payload.funding_source_details.type).toUpperCase() : ''
+    const limit = money(payload?.spend_cap, 'minor', currency)
+    const used = money(payload?.amount_spent, 'minor', currency)
+
+    return {
+      ok: true,
+      supported: true,
+      reason: '',
+      health: {
+        billingMode: META_FUNDING[fundingType] || null,
+        currency,
+        // Meta's spend cap is an account-level limit rather than a credit line, but it fails
+        // the same way — delivery stops at it — so it is watched in the same place.
+        creditLimitMinor: limit && limit > 0 ? limit : null,
+        creditUsedMinor: limit && limit > 0 ? used : null,
+        balanceMinor: money(payload?.balance, 'minor', currency),
+        paymentState: META_STATUS[String(payload?.account_status ?? '')] || 'unknown',
+      },
+    }
+  }
+
+  if (id === 'tiktok_ads') {
+    const url = 'https://business-api.tiktok.com/open_api/v1.3/advertiser/info/' +
+      `?advertiser_ids=%5B%22${encodeURIComponent(accountRef)}%22%5D`
+    const res = await fetchJson(url, { 'Access-Token': accessToken })
+    if (!res.ok) return healthFailure(res.reason)
+
+    const entry: any = (res.payload as any)?.data?.list?.[0]
+    if (!entry) return healthFailure('TikTok answered without that advertiser.')
+    const currency = entry?.currency ? String(entry.currency).toUpperCase() : (currencyHint || null)
+
+    return {
+      ok: true,
+      supported: true,
+      reason: '',
+      health: {
+        // TikTok's common arrangement is a deposit drawn down, and the balance is what it
+        // reports. A credit line shows as a balance too, so the mode is left alone unless
+        // the operator has set it.
+        billingMode: null,
+        currency,
+        creditLimitMinor: null,
+        creditUsedMinor: null,
+        balanceMinor: money(entry?.balance, 'major', currency),
+        paymentState: String(entry?.status || '').toUpperCase() === 'STATUS_DISABLE' ? 'suspended' : 'ok',
+      },
+    }
+  }
+
+  if (id === 'google_ads') {
+    // Google reports the account budget rather than a balance, in micros, and it is the
+    // closest thing it has to "how much of what was approved is gone".
+    const url = `https://googleads.googleapis.com/v17/customers/${encodeURIComponent(accountRef)}/googleAds:search`
+    const res = await fetchJson(
+      url,
+      { Authorization: `Bearer ${accessToken}` },
+      {
+        method: 'POST',
+        body: {
+          query:
+            'SELECT account_budget.amount_served_micros, account_budget.approved_spending_limit_micros, ' +
+            'account_budget.status, customer.currency_code FROM account_budget LIMIT 1',
+        },
+      },
+    )
+    if (!res.ok) return healthFailure(res.reason)
+
+    const row: any = (res.payload as any)?.results?.[0]
+    if (!row) return healthFailure('Google returned no account budget for that customer.')
+    const currency = row?.customer?.currencyCode ? String(row.customer.currencyCode).toUpperCase() : (currencyHint || null)
+    const limit = money(row?.accountBudget?.approvedSpendingLimitMicros, 'micro', currency)
+
+    return {
+      ok: true,
+      supported: true,
+      reason: '',
+      health: {
+        billingMode: 'invoiced',
+        currency,
+        creditLimitMinor: limit,
+        creditUsedMinor: money(row?.accountBudget?.amountServedMicros, 'micro', currency),
+        balanceMinor: null,
+        paymentState: String(row?.accountBudget?.status || '').toUpperCase() === 'APPROVED' ? 'ok' : 'unknown',
+      },
+    }
+  }
+
+  return unsupported(id)
+}
+
+export function supportsHealthRead(networkId: string): boolean {
+  return ['meta_ads', 'tiktok_ads', 'google_ads'].indexOf(String(networkId)) !== -1
+}
+
+async function fetchJson(
+  url: string,
+  headers: Record<string, string>,
+  options: { method?: 'GET' | 'POST'; body?: unknown } = {},
+): Promise<{ ok: boolean; payload: unknown; reason: string }> {
+  try {
+    const sent: Record<string, string> = { ...headers }
+    const init: RequestInit = { method: options.method || 'GET', headers: sent }
+    if (options.body !== undefined && (options.method || 'GET') !== 'GET') {
+      sent['Content-Type'] = 'application/json'
+      init.body = JSON.stringify(options.body)
+    }
+    const res = await fetch(url, init)
+    const raw = await res.text()
+    if (!res.ok) return { ok: false, payload: null, reason: `${res.status}: ${raw.slice(0, 160)}` }
+    try {
+      return { ok: true, payload: JSON.parse(raw), reason: '' }
+    } catch {
+      return { ok: false, payload: null, reason: 'the response was not JSON.' }
+    }
+  } catch (error: any) {
+    return { ok: false, payload: null, reason: String(error?.message || error) }
+  }
 }

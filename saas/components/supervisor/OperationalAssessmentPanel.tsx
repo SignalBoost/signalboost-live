@@ -5,18 +5,26 @@
 //
 //   1. What is true now?          Current state, from verified impact.
 //   2. Is anyone affected?        Business impact, stated separately.
-//   3. What must I do?            Operator action, and whether this pages.
-//   4. What is that based on?     The assessment basis, including what limits it.
-//   5. What might happen?         Risk forecast — clearly marked as conditional.
-//   6. How sure are we?           Observation confidence, as a decomposable ledger.
-//   7. How does this thing run?   Execution model, because "Leader: None" is the expected
-//                                 steady state of a serverless runtime and reads as a fault.
+//   3. How fresh is this?         The assessment's own timestamp — not the observation's.
+//   4. What must I do?            Operator action, and whether this pages.
+//   5. What is that based on?     The assessment basis, including what limits it.
+//   6. What might happen?         Risk forecast — exposure and decision point, not prophecy.
+//   7. How sure are we, exactly?  The confidence ledger, open, arithmetic visible.
+//   8. How does this thing run?   Execution model and where the observation actually stands.
+//
+// TWO THINGS THIS VERSION DELIBERATELY DOES NOT SAY.
+//
+//   "Likelihood" — that is a claim about probability and we have no probability model. What
+//   we can measure is EXPOSURE: how much is at stake and how fast it would arrive.
+//
+//   "Due now" on its own — a scheduler's word that read as "on time" beside a missed window.
+//   The execution block now states where the observation stands, its tolerance, and when it
+//   escalates, so the operator never has to reconcile two lines that sounded contradictory.
 //
 // Nothing here computes anything. Every judgement arrives as a prop from a pure module, so
 // the page and the modules cannot disagree.
 //
-// All visible copy goes through {t.key} expressions — literal JSX text is a
-// hardcoded-copy guard violation and would fail the build.
+// All visible copy goes through locale keys — an inline English fallback is a build failure.
 
 import type { OperationalAssessment } from '@/lib/supervisor/operational-assessment'
 import type { ForecastSet } from '@/lib/supervisor/risk-forecast'
@@ -24,7 +32,12 @@ import type { ForecastSet } from '@/lib/supervisor/risk-forecast'
 export type ExecutionModel = {
   model: string
   currentState: string
-  nextObservation: string
+  /** Localised label for the observation state: on schedule, overdue, absent. */
+  observationState: string
+  /** "4m past due" / "—". Composed by the page from the policy, never invented here. */
+  overdueBy: string
+  tolerance: string
+  escalatesIn: string
   lastCompleted: string
   lastResult: string
 }
@@ -35,14 +48,18 @@ export default function OperationalAssessmentPanel({
   assessment,
   forecast,
   execution,
+  assessedAt,
   t,
 }: {
   assessment: OperationalAssessment
   forecast: ForecastSet
   execution: ExecutionModel
+  /** When THIS assessment was computed. Operators ask how fresh the conclusion is, not when
+   *  the last observation ran — those differ whenever an observation is owed. */
+  assessedAt: string
   t: Copy
 }) {
-  const likelihoodLabel: Record<string, string> = { low: t.likelihoodLow, medium: t.likelihoodMedium, high: t.likelihoodHigh }
+  const exposureLabel: Record<string, string> = { low: t.exposureLow, medium: t.exposureMedium, high: t.exposureHigh }
   const tone =
     assessment.state === 'outage' ? '#ff5c7a' : assessment.state === 'service_degraded' ? '#ffd166' : '#38f2a4'
 
@@ -57,9 +74,9 @@ export default function OperationalAssessmentPanel({
           <p style={{ ...big, color: tone }}>{assessment.stateLabel}</p>
           <p style={muted}>{assessment.stateMeaning}</p>
           <p style={small}>{assessment.stateReason}</p>
-          <p style={badge}>
-            {assessment.stateVerified ? t.verifiedByCheck : t.partlyVerified}
-          </p>
+          <p style={badge}>{assessment.stateVerified ? t.verifiedByCheck : t.partlyVerified}</p>
+          {/* 3. Freshness of the CONCLUSION. */}
+          <p style={muted}>{`${t.confidenceLabel}: ${assessment.confidence}% · ${t.lastVerified}: ${assessedAt}`}</p>
         </div>
         <div>
           <p style={muted}>{t.businessImpact}</p>
@@ -76,7 +93,7 @@ export default function OperationalAssessmentPanel({
         </div>
       </div>
 
-      {/* 3. Action, and the paging decision, which state alone controls. */}
+      {/* 4. Action, and the paging decision, which state alone controls. */}
       <div style={row}>
         <div style={cell}>
           <p style={muted}>{t.operatorAction}</p>
@@ -91,7 +108,7 @@ export default function OperationalAssessmentPanel({
         </div>
       </div>
 
-      {/* 4. The basis, directly under the conclusion rather than scattered across cards. */}
+      {/* 5. The basis, directly under the conclusion rather than scattered across cards. */}
       <div style={block}>
         <p style={sectionTitle}>{t.assessmentBasis}</p>
         <p style={muted}>{assessment.basisStatement}</p>
@@ -100,16 +117,14 @@ export default function OperationalAssessmentPanel({
             <li key={`${line.label}-${line.value}`} style={listItem}>
               <span style={muted}>{line.label}</span>
               <span style={strong}>{line.value}</span>
-              {line.polarity === 'limits' ? (
-                <span style={limitTag}>{t.limitsConclusion}</span>
-              ) : null}
+              {line.polarity === 'limits' ? <span style={limitTag}>{t.limitsConclusion}</span> : null}
             </li>
           ))}
         </ul>
         <p style={small}>{assessment.whyAmISeeingThis}</p>
       </div>
 
-      {/* 5. The forecast, fenced off from everything above it. */}
+      {/* 6. The forecast, fenced off from everything above it. */}
       <div style={forecastBlock}>
         <p style={sectionTitle}>{t.riskForecast}</p>
         <p style={strong}>{forecast.headline}</p>
@@ -124,12 +139,12 @@ export default function OperationalAssessmentPanel({
             </p>
             <dl style={fields}>
               <div>
-                <dt style={muted}>{t.likelihood}</dt>
-                <dd style={dd}>{likelihoodLabel[item.likelihood]}</dd>
+                <dt style={muted}>{t.exposure}</dt>
+                <dd style={dd}>{exposureLabel[item.exposure]}</dd>
               </div>
               <div>
-                <dt style={muted}>{t.horizon}</dt>
-                <dd style={dd}>{item.horizon}</dd>
+                <dt style={muted}>{t.decisionPoint}</dt>
+                <dd style={dd}>{item.decisionPoint}</dd>
               </div>
               <div>
                 <dt style={muted}>{t.clearsWhen}</dt>
@@ -144,21 +159,35 @@ export default function OperationalAssessmentPanel({
         ))}
       </div>
 
-      {/* 6. Confidence, decomposed. A percentage nobody can take apart is decoration. */}
-      {assessment.confidenceReasons.length ? (
-        <details style={subcard}>
-          <summary>{`${t.confidenceLedger} · ${assessment.confidenceReasons.length}`}</summary>
+      {/* 7. The confidence ledger, OPEN. A percentage folded behind a disclosure triangle is
+          still asking to be believed; one that shows 100 minus its reasons can be audited. */}
+      <div style={block}>
+        <p style={sectionTitle}>{t.confidenceLedger}</p>
+        <ul style={list}>
+          <li style={listItem}>
+            <span style={muted}>{t.startingConfidence}</span>
+            <span style={strong}>{'100'}</span>
+          </li>
           {assessment.confidenceReasons.map(reason => (
-            <article key={reason.code} style={mini}>
-              <p style={strong}>{`${reason.label} · −${reason.penalty}`}</p>
+            <li key={reason.code} style={ledgerItem}>
+              <p style={strong}>{`−${reason.penalty} · ${reason.label}`}</p>
               <p style={small}>{reason.why}</p>
               <p style={muted}>{`${t.restoredBy}: ${reason.remedy}`}</p>
-            </article>
+            </li>
           ))}
-        </details>
-      ) : null}
+          {assessment.confidenceReasons.length === 0 ? (
+            <li style={listItem}>
+              <span style={small}>{t.noConfidenceDeductions}</span>
+            </li>
+          ) : null}
+          <li style={listItem}>
+            <span style={muted}>{t.finalConfidence}</span>
+            <span style={strong}>{`${assessment.confidence}%`}</span>
+          </li>
+        </ul>
+      </div>
 
-      {/* 7. Execution model, replacing "Leader: None". */}
+      {/* 8. Execution model and where the observation stands, replacing "Leader: None". */}
       <div style={block}>
         <p style={sectionTitle}>{t.executionModel}</p>
         <dl style={fields}>
@@ -171,8 +200,20 @@ export default function OperationalAssessmentPanel({
             <dd style={dd}>{execution.currentState}</dd>
           </div>
           <div>
-            <dt style={muted}>{t.nextObservation}</dt>
-            <dd style={dd}>{execution.nextObservation}</dd>
+            <dt style={muted}>{t.observationStateLabel}</dt>
+            <dd style={dd}>{execution.observationState}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.overdueBy}</dt>
+            <dd style={dd}>{execution.overdueBy}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.tolerance}</dt>
+            <dd style={dd}>{execution.tolerance}</dd>
+          </div>
+          <div>
+            <dt style={muted}>{t.escalatesIn}</dt>
+            <dd style={dd}>{execution.escalatesIn}</dd>
           </div>
           <div>
             <dt style={muted}>{t.lastCompleted}</dt>
@@ -194,12 +235,12 @@ const row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260p
 const cell = { border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14 }
 const block = { marginTop: 18, border: '1px solid rgba(255,255,255,.1)', borderRadius: 16, padding: 16 }
 const forecastBlock = { marginTop: 18, border: '1px dashed rgba(255,209,102,.45)', borderRadius: 16, padding: 16, background: 'rgba(255,209,102,.05)' }
-const subcard = { border: '1px solid rgba(26,240,255,.2)', borderRadius: 14, padding: 12, background: 'rgba(26,240,255,.06)', marginTop: 16 }
 const mini = { border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: 12, marginTop: 10 }
 const fields = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginTop: 8 }
 const dd = { margin: 0, wordBreak: 'break-word' as const }
 const list = { listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 8 }
 const listItem = { display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' as const }
+const ledgerItem = { borderLeft: '2px solid rgba(255,209,102,.5)', paddingLeft: 10 }
 const limitTag = { border: '1px solid rgba(255,209,102,.5)', color: '#ffd166', borderRadius: 999, padding: '2px 8px', fontSize: 12 }
 const badge = { display: 'inline-block', border: '1px solid rgba(56,242,164,.4)', color: '#b8ffdd', borderRadius: 999, padding: '2px 10px', margin: '6px 0 0', fontSize: 12 }
 const big = { margin: '4px 0', fontSize: 30, fontWeight: 800 }

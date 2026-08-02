@@ -1,3 +1,4 @@
+// saas/app/dashboard/outreach/social/page.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
@@ -156,6 +157,132 @@ function PlatformCard({ platform, onSaved }: { platform: Platform; onSaved: () =
   </article>
 }
 
+// ── Declare a platform ───────────────────────────────────────────────────────
+//
+// The eight built-in connectors are conveniences, not the limit. A platform is a
+// declaration — where to authorize, what the publish request looks like, where the post
+// id comes back — so an operator adds Threads, Bluesky, Mastodon, Telegram or anything
+// else without a code change, a release, or asking us.
+//
+// The form asks for the minimum that makes a platform publishable and confirmable. It
+// deliberately does NOT ask for the client id and secret: those belong in the
+// environment or the buyer's vault, and the response tells the operator exactly which
+// two variables to set next.
+function DeclarePlatformPanel({ onChanged }: { onChanged: () => void | Promise<void> }) {
+  const empty = {
+    id: '', label: '', authUrl: '', tokenUrl: '', scopes: '',
+    publishUrl: '', method: 'POST', bodyKind: 'json',
+    bodyTemplate: '{\n  "text": "{text}"\n}',
+    idPath: '', idHeader: '', urlPath: '', permalinkTemplate: '',
+    content: 'text', needsAccountRef: false,
+  }
+  const [form, setForm] = useState(empty)
+  const [declared, setDeclared] = useState<any[]>([])
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const field: React.CSSProperties = { background: 'rgba(2,6,23,.8)', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, color: '#fff', padding: 10, fontSize: 13, width: '100%' }
+  const labelStyle: React.CSSProperties = { color: 'rgba(255,255,255,.62)', fontSize: 11, fontWeight: 800, display: 'block', marginBottom: 4 }
+
+  async function loadDeclared() {
+    try {
+      const res = await fetch('/api/outreach/social/platforms', { cache: 'no-store', credentials: 'include' })
+      const json = await res.json().catch(() => ({}))
+      setDeclared(Array.isArray(json?.platforms) ? json.platforms : [])
+    } catch { /* the built-ins still work without this list */ }
+  }
+
+  useEffect(() => { loadDeclared() }, [])
+
+  async function submit() {
+    setBusy(true); setNote('')
+    try {
+      const res = await fetch('/api/outreach/social/platforms', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ ...form, scopes: form.scopes }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not declare this platform.')
+      setNote(json.next || `${form.id} declared.`)
+      setForm(empty)
+      await loadDeclared()
+      onChanged()
+    } catch (err: any) { setNote(err?.message || 'Could not declare this platform.') }
+    finally { setBusy(false) }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm(`Remove the declared platform "${id}"?`)) return
+    setBusy(true); setNote('')
+    try {
+      const res = await fetch(`/api/outreach/social/platforms?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not remove this platform.')
+      await loadDeclared(); onChanged()
+    } catch (err: any) { setNote(err?.message || 'Could not remove this platform.') }
+    finally { setBusy(false) }
+  }
+
+  const ready = form.id.trim() && form.label.trim() && form.authUrl.trim() && form.publishUrl.trim()
+    && (form.idPath.trim() || form.idHeader.trim() || form.urlPath.trim())
+
+  return <section style={panel}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+      <div>
+        <h2 style={{ color: '#fff', margin: 0 }}>{uiText('generatedUi.u_ca169ad9a39d8b2c')}</h2>
+        <p style={{ color: 'rgba(255,255,255,.6)', margin: '6px 0 0', fontSize: 13, lineHeight: 1.6 }}> {uiText('generatedUi.u_e13bbfa1cbfd78f0')} </p>
+      </div>
+      <button style={ghost} onClick={() => setOpen(!open)}>{open ? uiText('generatedUi.u_7d9eb7acb13e2462') : uiText('generatedUi.u_1bda0ea94f93d03c')}</button>
+    </div>
+
+    {declared.length ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+      {declared.map(item => <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid rgba(34,197,94,.4)', background: 'rgba(34,197,94,.12)', color: '#22c55e', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>
+        {item.label} · {item.id}
+        <button onClick={() => remove(item.id)} disabled={busy} style={{ border: 'none', background: 'transparent', color: '#fca5a5', cursor: 'pointer', fontWeight: 900 }}>×</button>
+      </span>)}
+    </div> : null}
+
+    {open ? <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_4d855ad31368b940')}</label><input style={field} value={form.id} onChange={e => setForm({ ...form, id: e.target.value })} placeholder={uiText('generatedUi.u_41a37f5b02ea6532')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_2b7f6a84de917e38')}</label><input style={field} value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder={uiText('generatedUi.u_4ed485c714011860')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_6a1a03c4daab4ccf')}</label><input style={field} value={form.authUrl} onChange={e => setForm({ ...form, authUrl: e.target.value })} placeholder={uiText('generatedUi.u_419c4bfda5ea7c40')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_804b52f6a75c7ab7')}</label><input style={field} value={form.tokenUrl} onChange={e => setForm({ ...form, tokenUrl: e.target.value })} placeholder={uiText('generatedUi.u_0e87d26a0be2b4d5')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_44832b6ad20b5f69')}</label><input style={field} value={form.scopes} onChange={e => setForm({ ...form, scopes: e.target.value })} placeholder={uiText('generatedUi.u_2eb67117eab3a411')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_4207937c19df071a')}</label><input style={field} value={form.publishUrl} onChange={e => setForm({ ...form, publishUrl: e.target.value })} placeholder={uiText('generatedUi.u_730cd708e1c60f41')} /></div>
+      </div>
+
+      <div>
+        <label style={labelStyle}>{uiText('generatedUi.u_fdfdfab3d30bd134')} {uiText('generatedUi.u_ada0db1bcc3bb7d1')}, {uiText('generatedUi.u_123953875dfc180b')}, {uiText('generatedUi.u_7f6d1e5dc420403e')}, {uiText('generatedUi.u_8cbe16eae44f4e5f')} {uiText('generatedUi.u_c22e579dba452e17')}</label>
+        <textarea style={{ ...field, minHeight: 96, fontFamily: 'ui-monospace, monospace' }} value={form.bodyTemplate} onChange={e => setForm({ ...form, bodyTemplate: e.target.value })} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_04b161225a1508f6')}</label><input style={field} value={form.idPath} onChange={e => setForm({ ...form, idPath: e.target.value })} placeholder={uiText('generatedUi.u_cbd3a38cc39d8f59')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_6a7c5d51b88b4baa')}</label><input style={field} value={form.idHeader} onChange={e => setForm({ ...form, idHeader: e.target.value })} placeholder={uiText('generatedUi.u_a53a51e5bda57fcd')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_86e730a874e657da')}</label><input style={field} value={form.urlPath} onChange={e => setForm({ ...form, urlPath: e.target.value })} placeholder={uiText('generatedUi.u_b5da913936112526')} /></div>
+        <div><label style={labelStyle}>{uiText('generatedUi.u_5b7d9943d7fd77a9')}</label><input style={field} value={form.permalinkTemplate} onChange={e => setForm({ ...form, permalinkTemplate: e.target.value })} placeholder={uiText('generatedUi.u_6cecc5f8bb0f9a66')} /></div>
+      </div>
+
+      <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 12, margin: 0, lineHeight: 1.6 }}> {uiText('generatedUi.u_8c70f65de43a511b')} </p>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ color: 'rgba(255,255,255,.7)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input type="checkbox" checked={form.needsAccountRef} onChange={e => setForm({ ...form, needsAccountRef: e.target.checked })} /> {uiText('generatedUi.u_9a61e3f8777ab974')} </label>
+        <select style={{ ...field, width: 'auto' }} value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}>
+          <option value="text">{uiText('generatedUi.u_ce7e98cf46a40f10')}</option>
+          <option value="video">{uiText('generatedUi.u_5cd402084b8e6dd0')}</option>
+          <option value="media">{uiText('generatedUi.u_e6440cdaa1aa4cc4')}</option>
+        </select>
+        <button style={button} disabled={busy || !ready} onClick={submit}>{busy ? uiText('generatedUi.u_23e39291d6135814') : uiText('generatedUi.u_105820a9b1614cb1')}</button>
+      </div>
+    </div> : null}
+
+    {note ? <p style={{ color: goodMessage(note) || /Set SOCIAL_/.test(note) ? '#22c55e' : '#fb923c', margin: '12px 0 0', fontSize: 12, lineHeight: 1.6 }}>{note}</p> : null}
+  </section>
+}
+
 export default function EnterpriseSocialOutreachPage() {
   const [data, setData] = useState<Capabilities | null>(null)
   const [loading, setLoading] = useState(true)
@@ -205,6 +332,7 @@ export default function EnterpriseSocialOutreachPage() {
 
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_9f1f18a8f01992f6')} /></h2><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>{Object.entries(data?.rules || {}).map(([key, value]) => chip(`${key}: ${value ? 'yes' : 'no'}`, value ? '#22c55e' : '#fb923c'))}</div></section>
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>{platforms.map(platform => <PlatformCard key={platform.platform} platform={platform} onSaved={load} />)}{!loading && !platforms.length ? <div style={panel}><p style={{ color: '#fff' }}>{message || uiText('generatedUi.u_625459f2edcdf1ea')}</p></div> : null}</section>
+    <DeclarePlatformPanel onChanged={load} />
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}><LocalizedText fallback={uiText('generatedUi.u_fc9d7b8617a87ec1')} /></h2><p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>{uiText('generatedUi.u_4ab6cc4f4cf32b2c')}{ready.map(p => p.label).join(', ') || uiText('generatedUi.u_140bedbf9c3f6d56')}{uiText('generatedUi.u_cbde47e3c4bbca3d')}</p></section>
   </main>
 }

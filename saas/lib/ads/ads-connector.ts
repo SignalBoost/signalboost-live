@@ -74,6 +74,13 @@ export type AdSpendReport = {
   spent: Money
   reportedAt: string
   status: string
+  /**
+   * Exactly what the provider returned, before conversion, with the units it was declared
+   * in. Carried so the ledger can store it beside the converted figure: if a network is
+   * ever declared with the wrong units, this is the evidence that settles it afterwards
+   * instead of an argument about whose arithmetic was right.
+   */
+  raw?: { amount: string; units: string }
 }
 
 export type AdPlatformAdapter = {

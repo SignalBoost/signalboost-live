@@ -24,6 +24,12 @@
 // cleanup pending. The same hundred leases with work still attached would be an operational
 // matter — and the discriminator is not the count, it is whether anything is stranded.
 //
+// EVERY CONCLUSION MUST BE CHALLENGEABLE. Adopted as a standing rule for this product: an
+// operator must be able to take any statement the Supervisor makes and see four things — the
+// EVIDENCE it used, the REASONING it applied, the RULE that produced it, and the CONDITIONS
+// under which it would change. A conclusion that cannot answer those four is an opinion with
+// a stylesheet. Every assessment returned here carries all four.
+//
 // PURE, NO IMPORTS.
 
 export type DiagnosticStatus =
@@ -36,6 +42,10 @@ export type DiagnosticStatus =
   | 'cleanup_pending'     // housekeeping owed; nothing is waiting on it
   | 'maintenance_required' // needs a person, during business hours
   | 'capability_reduced'  // something works less well or not at all, without blocking work
+  | 'not_measured'        // no metric was reported at all. NOT a synonym for fine: the old
+                          // default rule scored a missing measurement as "capability reduced,
+                          // no metric reported", which invented a judgement out of an absence.
+                          // An unmeasured subsystem is not evidence of health
 
 export type OperationalImpact = 'none' | 'possible' | 'confirmed'
 
@@ -51,6 +61,16 @@ export type DiagnosticAssessment = {
   impactStatement: string
   /** Empty when nothing is owed. */
   recommendation: string
+
+  // ── The four questions every conclusion must answer ────────────────────────
+  /** EVIDENCE: the measurements this classification actually saw. */
+  evidence: string[]
+  /** RULE: which named rule produced it, so two subsystems cannot be judged by one number. */
+  rule: string
+  /** REASONING: why this status and not the neighbouring one. */
+  reasoning: string
+  /** CONDITIONS: what would move it to a different status. */
+  changesWhen: string
 }
 
 export const DIAGNOSTIC_LABELS: Record<DiagnosticStatus, string> = {
@@ -60,6 +80,7 @@ export const DIAGNOSTIC_LABELS: Record<DiagnosticStatus, string> = {
   cleanup_pending: 'Cleanup pending',
   maintenance_required: 'Maintenance required',
   capability_reduced: 'Capability reduced',
+  not_measured: 'Not measured',
 }
 
 export type DiagnosticContext = {
@@ -174,11 +195,54 @@ const RULES: Record<string, Rule> = {
   },
 }
 
+// A subsystem with no rule of its own gets thresholds — but NEVER a judgement invented from a
+// missing measurement. "Capability reduced · No metric reported" was the console asserting
+// degradation on the strength of an absence, which is the same error as scoring an unmeasured
+// domain. Absence now reports as absence.
 const DEFAULT_RULE: Rule = {
-  explain: metric => (metric === null || metric === undefined ? 'No metric reported.' : `Metric: ${metric}.`),
-  classify: score => (score >= 90 ? 'nominal' : score >= 70 ? 'capability_reduced' : 'maintenance_required'),
+  explain: metric =>
+    metric === null || metric === undefined
+      ? 'No metric was reported for this subsystem in the current observation period.'
+      : `Measured value: ${metric}.`,
+  classify: (score, metric) =>
+    metric === null || metric === undefined
+      ? 'not_measured'
+      : score >= 90
+        ? 'nominal'
+        : score >= 70
+          ? 'capability_reduced'
+          : 'maintenance_required',
   impact: () => 'none',
-  recommend: status => (status === 'nominal' ? '' : 'Review during business hours.'),
+  recommend: status =>
+    status === 'nominal'
+      ? ''
+      : status === 'not_measured'
+        ? 'Confirm the source reports a metric. An unreported measurement is not evidence of health.'
+        : 'Review during business hours.',
+}
+
+// Why this status rather than the one next to it. Derived from the status so that every rule
+// answers the question the same way and none of them can quietly skip it.
+const REASONING: Record<DiagnosticStatus, string> = {
+  nominal: 'The measurement is inside its normal range and nothing is owed.',
+  expected_transient: 'The measurement is outside its normal range, and the execution model predicts exactly this. It is not a fault.',
+  observation_delayed: 'An owed observation did not run. The runtime is late, which is a different fact from the runtime being unwell.',
+  cleanup_pending: 'Housekeeping is owed and nothing live is waiting on it. That is what separates cleanup from maintenance.',
+  maintenance_required: 'The condition needs a person, and it does not threaten service continuity while it waits.',
+  capability_reduced: 'A measured capability is below threshold while work continues to flow.',
+  not_measured: 'No metric arrived, so no judgement is available. This is a gap in evidence, not a finding about the subsystem.',
+}
+
+// What would move this to a different status. A conclusion nobody can discharge stays on the
+// screen forever and becomes wallpaper.
+const CHANGES_WHEN: Record<DiagnosticStatus, string> = {
+  nominal: 'Changes if the measurement leaves its normal range.',
+  expected_transient: 'Changes if the runtime stays in this state while work is waiting on it.',
+  observation_delayed: 'Clears at the next completed observation. Escalates if that window is missed too.',
+  cleanup_pending: 'Clears when the finished records are reconciled. Becomes maintenance if live work starts waiting on them.',
+  maintenance_required: 'Clears when the condition is corrected and the next measurement confirms it.',
+  capability_reduced: 'Clears when the measurement returns above its threshold.',
+  not_measured: 'Clears as soon as the source reports a metric.',
 }
 
 const IMPACT_STATEMENT: Record<OperationalImpact, string> = {
@@ -199,9 +263,17 @@ export function assessDiagnostic(
   metric: number | null,
   context: DiagnosticContext = {},
 ): DiagnosticAssessment {
-  const rule = RULES[subsystemId] || DEFAULT_RULE
+  const named = Object.prototype.hasOwnProperty.call(RULES, subsystemId)
+  const rule = named ? RULES[subsystemId] : DEFAULT_RULE
   const status = rule.classify(score, metric, context)
   const operationalImpact = rule.impact(status, context)
+  const evidence: string[] = [
+    metric === null || metric === undefined ? 'no metric reported' : `measured value ${metric}`,
+    `score ${score}`,
+  ]
+  if (context.blockedWork !== undefined) evidence.push(`${Number(context.blockedWork || 0)} blocked work item(s)`)
+  if (context.runtimeIdleByDesign) evidence.push('runtime idle between scheduled executions')
+  if (context.observationWindowMissed) evidence.push('an owed observation window passed without a run')
   return {
     subsystemId,
     status,
@@ -211,6 +283,10 @@ export function assessDiagnostic(
     operationalImpact,
     impactStatement: IMPACT_STATEMENT[operationalImpact],
     recommendation: rule.recommend(status, metric),
+    evidence,
+    rule: named ? subsystemId : 'default_threshold',
+    reasoning: REASONING[status],
+    changesWhen: CHANGES_WHEN[status],
   }
 }
 
@@ -231,7 +307,8 @@ const ORDER: Record<DiagnosticStatus, number> = {
   observation_delayed: 2,
   cleanup_pending: 3,
   expected_transient: 4,
-  nominal: 5,
+  not_measured: 5,
+  nominal: 6,
 }
 
 export function summariseDiagnostics(assessments: DiagnosticAssessment[]): DiagnosticSummary {

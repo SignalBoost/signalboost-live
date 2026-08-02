@@ -3503,7 +3503,23 @@
     "u_ads_start": "Start a campaign",
     "u_ads_startnote": "Only networks with an access token can be chosen. The campaign is created paused on every network.",
     "u_ads_title": "Paid advertising",
-    "u_ads_unavailable": "Networks that could not be declared"
+    "u_ads_unavailable": "Networks that could not be declared",
+    "u_ads_agentnote": "An assisted co-pilot for the steps that happen on the network's own site. It pauses for you at login, two-factor and anything final — those stay human by design.",
+    "u_ads_agentsoon": "premium, not wired yet",
+    "u_ads_agenttitle": "Browser agent",
+    "u_ads_allset": "Everything this network needs is already set.",
+    "u_ads_manualnote": "Set these variables wherever you keep your configuration. Always available, and it depends on nothing else.",
+    "u_ads_manualtitle": "Do it yourself",
+    "u_ads_methods": "Connection method — three ways, your choice",
+    "u_ads_prerequisite": "You still supply:",
+    "u_ads_prnote": "Enter the values here and they are staged for review. Nothing is applied until you merge, and the PR records who set credentials that can spend money.",
+    "u_ads_prtitle": "Stage it as an infrastructure PR",
+    "u_ads_reviewpr": "Review and merge it",
+    "u_ads_stage": "Stage the PR",
+    "u_ads_staging": "Staging…",
+    "u_ads_varmissing": "missing",
+    "u_ads_varoptional": "optional",
+    "u_ads_varset": "set"
   },
   "lab": {
     "license": {

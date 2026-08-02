@@ -1,84 +1,167 @@
-<!-- docs/portables/buyer-package/social-outreach-presentation.md -->
+<!-- docs/portables/buyer-package/marketing-sales-presentation.md -->
 
-# Social Outreach Connector — Buyer Evaluation
+# Marketing + Sales — Buyer Evaluation
 
-**Publish approved content to seven social platforms from your own infrastructure, using your own developer applications, your own accounts and your own credentials.**
+**Find prospects, write to them in their language, publish to eight social platforms and buy
+paid placement on ten ad networks — all from your own infrastructure, on your own accounts,
+with your own credentials and your own money under your own caps.**
 
 *Prepared by SignalBoost · technical evaluation material · not an offer or production commitment*
 
-> **Before sending this document, fill in:** [SET price], [SET pilot length], [SET pilot fee], and the contact line in section 10.
+> **Before sending this document, fill in:** [SET price], [SET pilot length], [SET pilot fee],
+> and the contact line in section 11.
 
 ---
 
 ## 1. The problem
 
-Most social publishing tools are services. Your content, your access tokens and your posting schedule live on a vendor's servers, and every post routes through infrastructure you neither run nor audit. For a regulated buyer, or any buyer whose brand voice is the asset, that is a standing exception on a security review.
+Marketing tooling arrives in three pieces that never quite meet. An outreach tool holds your
+prospect list. A publishing tool holds your tokens. An ads dashboard holds your budget. Each
+is a service, so your prospects, your access tokens and your spending authority all live on
+servers you neither run nor audit — and the seams between them are where a campaign quietly
+goes wrong.
 
-The alternative is usually worse: engineers wiring seven platform APIs by hand, each with its own OAuth dance, its own upload protocol and its own idea of what "published" means.
+Building it yourself is worse. Every social platform has its own OAuth dance, its own upload
+protocol and its own idea of what "published" means. Every ad network has its own currency
+units, its own approval regime, and its own way of telling you what you spent — if it tells
+you at all.
 
-This connector answers one question with evidence:
+This portable answers one question with evidence:
 
-> Can a team publish to every platform that matters, from their own environment, without a vendor holding their tokens or their content?
+> Can a team run outreach, publishing and paid placement from their own environment, with a
+> human approving every message and a cap on every dollar, without a vendor holding any of it?
 
 ## 2. What it is
 
-A publishing layer that installs into your stack. Roughly 900 lines across eight files, **zero third-party dependencies**, and no network calls except to the platform you connected.
+One installable package, **zero third-party dependencies**, no network calls except to the
+platform or network you connected.
 
 ```text
-your approved content
-→ your credentials, resolved from your vault
-→ your OAuth token, stored in your database
-→ the platform's own API
-→ a real permalink, or an honest failure
-→ your audit trail
+a prospect found on their own published site
+→ a message drafted in their language
+→ a human approval, always
+→ your email provider, your social accounts, your ad accounts
+→ what the platform actually confirmed
+→ your audit trail and your spend ledger
 ```
 
 The vendor operates nothing in that path and receives nothing from it.
 
-## 3. The rule the design turns on
+**The Social Outreach Connector is included.** It is a named capability of this product, not a
+second purchase — the same publishing engine, sold separately only for buyers who already have
+a system upstream deciding what to publish.
 
-**A post is reported as published only when the platform confirms it.**
+## 3. The three rules the design turns on
 
-There is no optimistic success anywhere in the layer. If a provider returns no id and no URL, the result is a failure carrying the provider's own reason. Nothing downstream — no notification, no dashboard, no report — can claim a post exists that does not.
+**A message never sends without a named human approving it.** There is no parameter that skips
+the gate, because a supported way to skip it would be a supported way to defeat the product.
 
-That sounds obvious until you audit tools that queue a post, return success, and let you discover three days later that an expired token silently dropped a week of content.
+**A post is reported as published only when the platform confirms it.** No optimistic success
+anywhere. If a provider returns no id and no URL, the result is a failure carrying the
+provider's own reason — nothing downstream can claim a post that does not exist.
 
-## 4. The seven connectors
+**No ad spends without a cap and a named spend approver, and both are recorded.** Approving
+copy is not approving a budget, and the person who does one is usually not the person who does
+the other.
 
-| Platform | Content | Publish modes |
-| --- | --- | --- |
-| YouTube Channels | video | native |
-| TikTok | video | native |
-| Instagram Business | Reels | native |
-| LinkedIn Profile | text, video | link, native |
-| LinkedIn Company | text, video | link, native |
-| Facebook Pages | text, video | link, native |
-| Twitter/X | text | link |
-| Reddit | text | link |
+## 4. Email outreach
 
-**Link mode** posts a caption and a URL. **Native mode** uploads the media into the post itself. Where both exist the choice is yours, changeable at any time, and **a native failure falls back to a link post automatically** — a publish never dead-ends because an upload failed.
+Regional discovery across eleven countries, searching in the target's own language. Drafting
+in five languages, chosen from the target rather than from your interface — a US prospect gets
+English while your console is in Portuguese, and that is correct.
 
-## 5. Every buyer can publish on day one
+The decision that matters most is a refusal: **it finds published addresses only.** Where no
+published address exists it records the prospect and skips it. It does not construct
+`firstname.lastname@company.com` and hope. That single choice is most of the difference
+between this and a scraper.
 
-This is the part most vendors leave you to discover after signing.
+Duplicate protection is scoped to the *product*, not the address, so the same company can be
+approached about a different offer but never twice about the same one. A prospect list is an
+asset you reuse; burning an address after one campaign is the wrong trade.
 
-Social platforms gate their posting APIs behind business verification and app review, not follower counts — and the requirements differ sharply:
+Every approved message passes through one chokepoint that attaches the signature, the physical
+address and the unsubscribe link. There is no second send path.
 
-| Platform | Business entity required | Approval |
+## 5. Social publishing
+
+Eight connectors — YouTube, TikTok, Instagram, LinkedIn Profile, LinkedIn Company, Facebook,
+X, Reddit — with OAuth, token refresh, destination discovery, and link or native publishing
+with automatic fallback when a platform refuses the native form.
+
+**Plus any platform you declare.** A platform is data, not code: describe where to authorize,
+what the publish request looks like and where the post id appears, and it publishes through
+the identical path as a built-in one — same confirmation rule, same approval gate. Threads,
+Bluesky, Mastodon, Telegram, VK, whatever your market actually uses, with no adapter, no
+release and no vendor involvement.
+
+A declaration is refused if it cannot describe how to read the post id back. You can add
+reach. You cannot add authority.
+
+### Approvals differ sharply, and you should know before you sign
+
+| Platform | Business entity | Approval |
 | --- | --- | --- |
 | YouTube | no — any Google account | consent screen in production |
-| LinkedIn Profile | a Page to hold the app — **unverified is fine** | none — self-serve products |
-| LinkedIn Company | yes — registered company, verified Page | Community Management review |
+| LinkedIn Profile | a Page to hold the app — unverified is fine | none — self-serve products |
+| LinkedIn Company | registered company, verified Page | Community Management review |
 | Facebook / Instagram | a Page or Business account | app review |
 | TikTok | no | content posting audit |
-| Twitter/X | no | paid API tier |
+| X | no | paid API tier |
 | Reddit | no | none |
 
-So the connector ships **both LinkedIn paths**: posting from a person's own profile, and posting from a company page. The difference is what each demands of you. Personal-profile posting needs a LinkedIn Page to hold the app — unverified, and created in minutes if the personal profile is established — and both required products enable immediately. Company-page posting needs that Page **verified** plus Community Management review, measured in weeks.
+YouTube is the genuinely same-day one. Each platform is independent: an unapproved one reports
+"not configured" while the others keep working, so you publish on day one and widen as
+approvals land.
 
-YouTube is the genuinely same-day one: any Google account, no entity, no review. Each platform is independent — an unapproved one reports "not configured" while the others keep working, so a buyer starts publishing on day one and widens as approvals land.
+## 6. Paid advertising
 
-## 6. What you implement
+The same platforms, bought rather than posted, plus the search and marketplace networks.
+
+**Every campaign is created paused, on every network.** The campaign exists, the cap is
+registered against it, and a person turns it on. A mistake in a create request therefore costs
+nothing.
+
+| Network | Spend reported in | Beyond an ad account, you supply |
+| --- | --- | --- |
+| Meta | major | `ads_management`, business verification, app review |
+| LinkedIn Ads | major | partner-gated access, a campaign group |
+| TikTok Business | major | a Business Center advertiser account |
+| Reddit Ads | micro | ads account with API access |
+| Pinterest Ads | micro | standard access after review |
+| Snapchat Ads | micro | an organisation-scoped app |
+| X Ads | micro | an OAuth 1.0a signing endpoint you run |
+| Google Ads | micro | developer token, a budget resource created first |
+| Microsoft Advertising | major | a SOAP bridge you run |
+| Amazon Ads | major | a reporting endpoint you run |
+
+Units are declared per network and never inferred, because the error is not a rounding
+difference. Reading micro as major understates spend a millionfold — and it fails in the
+direction where you believe you have spent nothing while the network bills in full. The
+conversion also knows that a "minor unit" is not always a hundredth: yen has none, Kuwaiti
+dinar has three.
+
+Three of the ten need a small endpoint on your side, and we state it here rather than during a
+pilot: **X** because its API requires request signing a declaration cannot perform,
+**Microsoft** because its API is SOAP, and **Amazon** because its spend can only be read from
+an asynchronous report job. The engine refuses to register any network whose spend it cannot
+read, and that rule was not bent for a large network — a campaign whose spend you cannot see
+is precisely what a cap exists to prevent.
+
+Any other network is a declaration, refused unless it can describe how to read spend *and* how
+to pause.
+
+### The ledger
+
+A campaign row cannot exist without a cap and both approvers — the row **is** the
+authorisation. It is written before the network is contacted, so a create whose response is
+lost still leaves a record that the account was asked to spend. Spend observations are
+append-only and keep the network's raw figure beside the converted one, so a units error is
+provable afterwards instead of arguable.
+
+Reconciliation reads the network. Platforms overdeliver; when the reported figure passes the
+cap, the row says so rather than averaging it away.
+
+## 7. What you implement
 
 One interface, and it is the one your security team will ask about.
 
@@ -86,56 +169,77 @@ One interface, and it is the one your security team will ask about.
 setSocialSecretsResolver((name) => yourVault.get(name))
 ```
 
-Your OAuth client ids and secrets are read through a resolver you install, so they live in AWS Secrets Manager, Azure Key Vault, HashiCorp Vault or your own service — not in deployment environment variables. Install nothing and it reads `process.env`, which is the right choice for a trial.
+Credentials are read through a resolver you install, so they live in AWS Secrets Manager,
+Azure Key Vault, HashiCorp Vault or your own service. Install nothing and it reads
+`process.env`, which is the right choice for a trial. Ad network tokens are read from the
+environment and never accepted from a request.
 
-Everything else is already injected. Every function that touches state takes your database client as its first argument; the layer opens no connection of its own and ships DDL for the three tables it needs.
+Everything else is injected. Every function that touches state takes your database client as
+its first argument; the layer opens no connection of its own and ships the DDL for the tables
+it needs.
 
-## 7. The portability claim, verified rather than asserted
+## 8. The portability claim, verified rather than asserted
 
-Run one command:
+The packager walks the import graph from the public entry point and **fails** if any reachable
+file imports a host path, escapes the layer's directories, or pulls in a third-party package.
+It then packs a tarball, installs it into a clean directory, and confirms the installed
+manifest declares no dependencies.
 
-```bash
-node scripts/build-social-portable.mjs --check
-```
+The same check runs in CI on every change. If a future edit reaches for host infrastructure
+the build breaks instead of shipping something that only works on the vendor's deployment.
 
-It walks the import graph from the public entry point and **fails** if any reachable file imports a host path, escapes the layer's directory, or pulls in a third-party package. Then the build packs a tarball, installs it into a clean directory, and confirms the installed manifest declares no dependencies.
+We test that guard by breaking it deliberately: a host import added to a connector fails the
+check by name. A boundary check that stays green when you violate the boundary is measuring
+nothing.
 
-The same check runs in CI on every change to the layer. If a future edit reaches for host infrastructure, the build breaks instead of shipping something that only works on the vendor's deployment.
-
-We test that guard by breaking it deliberately: a host import added to a connector fails the check by name. A boundary check that stays green when you violate the boundary is measuring nothing.
-
-## 8. What it does not do
+## 9. What it does not do
 
 Stated plainly, because a buyer who discovers these after signing is a buyer who was misled.
 
-- **It does not schedule.** Give it an approved post and it publishes. Timing belongs to your queue.
-- **It does not obtain platform approvals.** Reviews, audits and paid tiers are between you and each platform.
-- **It does not guarantee reach, engagement or monetization.** No API sets those.
-- **It does not post without a destination** where the platform requires one. It refuses rather than choosing for you.
-- **It does not generate content.** It publishes what you approved.
-- **LinkedIn native video is the least-proven path.** It is a three-call chunked upload, it defaults to link mode, and failure falls back to a link post. Prove it on one real post before relying on it.
+- **It does not schedule.** Give it an approved message or post and it goes. Timing belongs to
+  your queue.
+- **It does not generate content.** It drafts outreach copy; it does not write your campaign.
+- **It does not guess an email address.** No published address, no send.
+- **It does not start ad campaigns.** Every one is created paused.
+- **It does not fund anything.** The ad account, the permissions and the money are yours.
+- **It does not obtain platform or network approvals.** Reviews, audits, paid tiers and
+  partner gates are between you and each platform.
+- **It does not guarantee reach, engagement or conversion.** No API sets those.
+- **It never reports a post as published without confirmation**, which occasionally means it
+  reports less than a competitor would.
 
-## 9. Editions and commercials
+## 10. Editions and commercials
 
 | | Standard | Enterprise |
 | --- | --- | --- |
-| Connectors | all seven platforms | all seven platforms |
+| Email outreach | included | included |
+| Social publishing | eight platforms, plus any you declare | same |
+| Paid advertising | ten networks, plus any you declare | same |
 | Credential resolver | environment variables | your vault |
 | Deployment | one environment | per production environment |
 | Support | business hours | see support terms |
 | Price | [SET price] | [SET price] |
 
-**Pilot:** [SET pilot length] at [SET pilot fee], covering installation into one environment, two platforms connected end to end, and a working publish from your own infrastructure.
+**Pilot:** [SET pilot length] at [SET pilot fee], covering installation into one environment,
+two social platforms connected end to end, one ad network reconciled against its own account,
+and a real approved message sent from your infrastructure.
 
-## 10. Next steps
+## 11. Next steps
 
-1. Read the integration guide — it names every interface, table and platform requirement.
-2. Run the boundary check against the source. It takes seconds and proves the claim in section 7.
-3. Install the tarball in a scratch environment and connect LinkedIn Profile and YouTube — both are same-day.
-4. Publish one real post and confirm the permalink.
+1. Read the integration guide — it names every interface, table, environment variable and
+   platform requirement.
+2. Run the boundary check against the source. It takes seconds and proves the claim in
+   section 8.
+3. Install the tarball in a scratch environment and connect YouTube — same-day, any Google
+   account.
+4. Send one approved message and publish one real post; confirm the permalink.
+5. Set a ceiling on one ad account, create one capped campaign, and reconcile it against the
+   network's own reported spend. That comparison is the single check most worth doing before
+   you raise a ceiling.
 
 Contact: [SET name, title, email]
 
 ---
 
-*Supplied with this document: the integration guide, the built tarball with per-file checksums, and the DDL for the three required tables.*
+*Supplied with this document: the integration guide, the built tarball with per-file
+checksums, and the DDL for the required tables.*

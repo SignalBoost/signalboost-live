@@ -1,7 +1,18 @@
 // saas/lib/portable-browser/browser-error-sanitizer.ts
 //
-// Moved in from lib/browser-runtime/ so every shipped adapter remains self-contained inside
-// the portable package. The host path now re-exports this module.
+// Moved in from lib/browser-runtime/ for the same reason as browser-task-contracts.ts: all four
+// shipped adapters call it on every failure path, and it was outside the folder the packager
+// copies.
+//
+// It is also the single most important function in the adapter path to have inside the
+// boundary. It is what stops a provider's error text carrying a live credential into a log —
+// exact in-memory secrets, bearer tokens, private keys, URL credentials, sensitive query
+// parameters and stack frames all removed, output bounded. Shipping adapters without it would
+// have meant shipping the leak.
+//
+// Named browser-error-sanitizer rather than browser-runtime-sanitizer deliberately: this folder
+// already has browser-runtime-errors.ts, and two files a character apart is how the wrong one
+// gets edited.
 
 const REDACTED = '[redacted]'
 const MAX_ERROR_LENGTH = 600

@@ -67,10 +67,34 @@ export type DiagnosticAssessment = {
   evidence: string[]
   /** RULE: which named rule produced it, so two subsystems cannot be judged by one number. */
   rule: string
+  /** The rule under a name an operator recognises, rather than a table key. */
+  ruleName: string
+  /** What the rule is FOR. An identifier tells you which code ran; a purpose tells you why. */
+  rulePurpose: string
+  /** Why this rule is allowed to be this relaxed — the safety argument behind the threshold. */
+  ruleSafetyRationale: string
   /** REASONING: why this status and not the neighbouring one. */
   reasoning: string
   /** CONDITIONS: what would move it to a different status. */
   changesWhen: string
+  /** The same conclusion as an ordered, machine-readable chain, for audit export. */
+  inferenceChain: InferenceStep[]
+}
+
+/**
+ * One link in the reasoning, with a STABLE key.
+ *
+ * The prose fields above are for a person reading the console. This is the same conclusion in
+ * a shape an audit tool can walk without parsing English: observation → rule → evidence →
+ * conclusion → recommendation, always those five, always in that order, always present even
+ * when a step is empty. An auditor asking "show me how you reached this" gets a structure
+ * rather than a paragraph.
+ */
+export type InferenceStepKey = 'observation' | 'rule' | 'evidence' | 'conclusion' | 'recommendation'
+
+export type InferenceStep = {
+  step: InferenceStepKey
+  statement: string
 }
 
 export const DIAGNOSTIC_LABELS: Record<DiagnosticStatus, string> = {
@@ -221,6 +245,84 @@ const DEFAULT_RULE: Rule = {
         : 'Review during business hours.',
 }
 
+/**
+ * What each rule is for, and why it is allowed to be as relaxed as it is.
+ *
+ * "Rule applied: lease" tells an operator which code ran and nothing else. The purpose says
+ * what the rule is trying to prevent; the safety rationale is the argument for why this
+ * particular condition does not need to be treated as urgent. That second field is the one an
+ * auditor reads — it is where a threshold stops being a number somebody picked and becomes a
+ * position the product is prepared to defend.
+ */
+export type RuleMeta = {
+  name: string
+  purpose: string
+  safetyRationale: string
+}
+
+const RULE_META: Record<string, RuleMeta> = {
+  lease: {
+    name: 'Lease cleanup policy',
+    purpose: 'Prevent accumulation of completed leases.',
+    safetyRationale: 'A completed lease holds nothing. It becomes operational only when live work is waiting on it, and that condition is checked separately.',
+  },
+  expired_leases: {
+    name: 'Expired lease reclaim policy',
+    purpose: 'Return expired leases to the pool so their work can be reclaimed.',
+    safetyRationale: 'Expiry alone strands nothing. The discriminator is whether the work attached to the lease is still live, not how many leases have expired.',
+  },
+  reconciliation_backlog: {
+    name: 'Reconciliation backlog policy',
+    purpose: 'Keep the reconciliation queue short enough to run inline rather than in a maintenance window.',
+    safetyRationale: 'A backlog of finished records costs time, never continuity. Treating it as urgent spends the operator’s attention on housekeeping.',
+  },
+  stale_work: {
+    name: 'Stalled work policy',
+    purpose: 'Detect work that has stopped progressing without failing.',
+    safetyRationale: 'A stalled item is not yet a blocked item, but it is the state a blocked item passes through, so it is worth a person during the working day.',
+  },
+  supervisor: {
+    name: 'Supervisor presence policy',
+    purpose: 'Confirm at least one runtime is available to pick up work.',
+    safetyRationale: 'A serverless runtime is idle between executions by design. Absence of activity is not absence of capability, and only a runtime that is both idle and late is worth reporting.',
+  },
+  observation_schedule: {
+    name: 'Observation cadence policy',
+    purpose: 'Confirm observations arrive at the cadence the policy declares.',
+    safetyRationale: 'One missed window resolves itself at the next run. Escalating on the first miss trains operators to ignore the second.',
+  },
+  missed_heartbeats: {
+    name: 'Heartbeat freshness policy',
+    purpose: 'Detect a runtime that has stopped writing heartbeats while work is expected of it.',
+    safetyRationale: 'Heartbeat age is meaningful only against the execution model. For a scheduled runtime, an aging heartbeat between runs is the expected reading.',
+  },
+  bpal_registry: {
+    name: 'Browser provider registration policy',
+    purpose: 'Ensure every registered provider passes its integrity check before work is routed to it.',
+    safetyRationale: 'A failed registration causes execution to be refused, not attempted incorrectly. The failure mode is safe, which is why this is not urgent.',
+  },
+  provider_registration: {
+    name: 'Provider registration policy',
+    purpose: 'Ensure provider registrations are valid before anything depends on them.',
+    safetyRationale: 'An invalid registration removes a capability. It does not corrupt work already in flight.',
+  },
+  audit_failures: {
+    name: 'Audit completeness policy',
+    purpose: 'Ensure every run leaves a terminal record that can be replayed later.',
+    safetyRationale: 'An audit gap costs what can be PROVEN about a window, not what happened in it. It is an evidence problem and belongs to the compliance calendar.',
+  },
+  queue_depth: {
+    name: 'Queue depth policy',
+    purpose: 'Detect a queue growing faster than it drains.',
+    safetyRationale: 'Depth alone is not a fault — a queue exists to absorb bursts. The signal worth acting on is a depth that only ever rises.',
+  },
+  default_threshold: {
+    name: 'Default threshold policy',
+    purpose: 'Classify a subsystem that has no rule of its own, using score thresholds only.',
+    safetyRationale: 'A generic threshold cannot know what the measurement means, so it never invents a judgement from a missing metric and never claims operational impact.',
+  },
+}
+
 // Why this status rather than the one next to it. Derived from the status so that every rule
 // answers the question the same way and none of them can quietly skip it.
 const REASONING: Record<DiagnosticStatus, string> = {
@@ -265,6 +367,8 @@ export function assessDiagnostic(
 ): DiagnosticAssessment {
   const named = Object.prototype.hasOwnProperty.call(RULES, subsystemId)
   const rule = named ? RULES[subsystemId] : DEFAULT_RULE
+  const ruleKey = named ? subsystemId : 'default_threshold'
+  const meta = RULE_META[ruleKey] || RULE_META.default_threshold
   const status = rule.classify(score, metric, context)
   const operationalImpact = rule.impact(status, context)
   const evidence: string[] = [
@@ -284,9 +388,19 @@ export function assessDiagnostic(
     impactStatement: IMPACT_STATEMENT[operationalImpact],
     recommendation: rule.recommend(status, metric),
     evidence,
-    rule: named ? subsystemId : 'default_threshold',
+    rule: ruleKey,
+    ruleName: meta.name,
+    rulePurpose: meta.purpose,
+    ruleSafetyRationale: meta.safetyRationale,
     reasoning: REASONING[status],
     changesWhen: CHANGES_WHEN[status],
+    inferenceChain: [
+      { step: 'observation', statement: rule.explain(metric, context) },
+      { step: 'rule', statement: `${meta.name} — ${meta.purpose}` },
+      { step: 'evidence', statement: evidence.join(' · ') },
+      { step: 'conclusion', statement: `${DIAGNOSTIC_LABELS[status]} — ${REASONING[status]}` },
+      { step: 'recommendation', statement: rule.recommend(status, metric) || 'None. Nothing is owed.' },
+    ],
   }
 }
 

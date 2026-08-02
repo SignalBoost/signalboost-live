@@ -74,4 +74,20 @@ export {
 } from './social-onboarding-guide.ts'
 
 // ── Content shape ────────────────────────────────────────────────────────────
+// ── Declared platforms ───────────────────────────────────────────────────────
+// Bring your own platform: a buyer registers any OAuth+REST platform as data, with no
+// code change and no release. Exported because it is the answer to "do you support X?"
+// for every X we do not ship an adapter for.
+export {
+  registerCustomPlatform,
+  unregisterCustomPlatform,
+  listCustomPlatforms,
+  getCustomPlatform,
+  isCustomPlatform,
+  type CustomPlatformConfig,
+  type CustomPlatformBody,
+} from './social-custom-platform.ts'
+
+export { availableSocialPlatforms } from './social-connectors.ts'
+
 export * from './social-schema.ts'

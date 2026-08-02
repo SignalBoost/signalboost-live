@@ -31,6 +31,7 @@ import { buildHealthLedger } from '@/lib/supervisor/health-ledger'
 import { assessDiagnostic, summariseDiagnostics, splitIncidents } from '@/lib/supervisor/diagnostic-status'
 import { buildOperationalAssessment } from '@/lib/supervisor/operational-assessment'
 import { buildRiskForecast } from '@/lib/supervisor/risk-forecast'
+import { assessStability } from '@/lib/supervisor/assessment-stability'
 import { absenceWindowSeconds, listObservationPolicies, observationTiming } from '@/lib/supervisor/observation-policy'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
@@ -174,9 +175,28 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     lastCompleted: fmt(lastObservationAt),
     lastResult: latest ? `${latest.status} · ${latest.verification.status}` : (t.none),
   }
+  // ── HAS THIS CONCLUSION HELD? ────────────────────────────────────────────────
+  // `contradicts` uses the SAME predicate as confirmedServiceFailures above. If the streak
+  // were computed from a looser or stricter test, the page could show "Operational, unchanged
+  // across 50 observations" while the state was reached from a different reading of the same
+  // runs — the exact class of self-contradiction this rebuild exists to remove.
+  const failedRunIds = new Set(failedRuns.map(r => r.runId))
+  const stability = assessStability(runs.map(r => ({ at: r.completedAt, contradicts: failedRunIds.has(r.runId) })))
+  const hm = (seconds: number) => (seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m` : `${Math.round(seconds / 60)}m`)
+  const unchangedAcross = !stability.measured
+    ? t.notMeasured
+    : stability.consecutive === 0
+      ? t.contradictedByLastObservation
+      // "at least" because at this point the limit is RETENTION, not stability.
+      : `${stability.windowExhausted ? `${t.atLeast} ` : ''}${stability.consecutive} ${t.observationsUnit} · ${hm(stability.durationSeconds)}`
   // The assessment's own timestamp. It differs from the last observation whenever a run is
   // owed, and an operator asking "how fresh is this conclusion" is asking for this one.
-  const assessedAt = new Date().toISOString()
+  const assessedAt = new Date()
+  const verification = {
+    state: assessment.stateVerified ? t.verifiedState : t.partlyVerifiedState,
+    lastAt: `${assessedAt.toISOString().slice(11, 16)} UTC`,
+    unchangedAcross,
+  }
 
   // ── DIAGNOSTICS: A SECOND VOCABULARY, DELIBERATELY WITHOUT THE WORD "CRITICAL" ─
   const diagnostics = health.subsystems.map(s => assessDiagnostic(s.id, s.score, s.metric ?? null, {
@@ -211,20 +231,20 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
 
     {/* AUDIENCE 1 — OPERATIONS. Always visible, nothing collapsed. */}
-    <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} assessedAt={assessedAt} t={t} />
+    <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} verification={verification} t={t} />
 
     {/* Diagnostics collapse to one line. Eighteen green cards are not information. */}
     <Card title={t.systemDiagnostics}>
-      <p style={strongText}>{diagnosticSummary.headline}</p>
+      <dl style={fields}><Field k={t.diagnosticsNominal} v={diagnosticSummary.nominal}/><Field k={t.diagnosticsNeedingAttention} v={diagnosticSummary.attention.length}/><Field k={t.operationalImpactLabel} v={diagnosticSummary.quiet ? t.impactNone : t.diagnosticsWorkingHours}/></dl>
       <p style={muted}>{diagnosticSummary.quiet ? (t.diagnosticsQuiet) : (t.diagnosticsAttention)}</p>
-      {diagnosticSummary.attention.length ? <details style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => <article key={d.subsystemId} style={mini}><h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3><dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.explanation} v={d.explanation}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/></dl></article>)}</details> : null}
+      {diagnosticSummary.attention.length ? <details open style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => <article key={d.subsystemId} style={mini}><h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3><dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.explanation} v={d.explanation}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/></dl></article>)}</details> : null}
     </Card>
 
     {/* Incidents, split. Twelve verified failures are evidence the Supervisor worked. */}
     <div style={grid2}>
       <Card title={t.incidentQueue}>
-        <details open style={subcard}><summary>{incidents.activeLabel}</summary>{incidents.active.length ? incidents.active.map(rec => { const r = incidentById.get(rec.runId); return <article key={rec.runId} style={mini}><h3>{`${r?.incident?.provider} · ${r?.incident?.incidentId}`}</h3><dl style={fields}><Field k={t.severityLabel} v={rec.severity}/><Field k={t.verification} v={rec.status}/><Field k={t.evidence} v={r?.evidence.map(e=>e.summary).join(' | ')}/></dl></article> }) : <p style={muted}>{t.noOperationalIncidents}</p>}</details>
-        <details style={subcard}><summary>{incidents.historicalLabel}</summary><p style={muted}>{t.recordedIncidentsMeaning}</p>{incidents.historical.map(rec => { const r = incidentById.get(rec.runId); return <article key={rec.runId} style={mini}><h3>{`${r?.incident?.provider} · ${r?.incident?.incidentId}`}</h3><dl style={fields}><Field k={t.severityLabel} v={rec.severity}/><Field k={t.verification} v={rec.status}/><Field k={t.auditTimeline} v={r?.auditEvents.map(e=>e.eventType).join(' → ')}/><Field k={t.metadata} v={JSON.stringify({ project:r?.projectId, environment:r?.environment, deployment:r?.governance?.deploymentId || r?.incident?.affectedResource || null })}/></dl></article> })}</details>
+        <details open style={subcard}><summary>{`${t.operationalIncidentsLabel} · ${incidents.active.length}`}</summary>{incidents.active.length ? incidents.active.map(rec => { const r = incidentById.get(rec.runId); return <article key={rec.runId} style={mini}><h3>{`${r?.incident?.provider} · ${r?.incident?.incidentId}`}</h3><dl style={fields}><Field k={t.severityLabel} v={rec.severity}/><Field k={t.verification} v={rec.status}/><Field k={t.evidence} v={r?.evidence.map(e=>e.summary).join(' | ')}/></dl></article> }) : <p style={muted}>{t.noOperationalIncidents}</p>}</details>
+        <details style={subcard}><summary>{`${t.recordedIncidentsLabel} · ${incidents.historical.length}`}</summary><p style={muted}>{t.recordedIncidentsMeaning}</p>{incidents.historical.map(rec => { const r = incidentById.get(rec.runId); return <article key={rec.runId} style={mini}><h3>{`${r?.incident?.provider} · ${r?.incident?.incidentId}`}</h3><dl style={fields}><Field k={t.severityLabel} v={rec.severity}/><Field k={t.verification} v={rec.status}/><Field k={t.auditTimeline} v={r?.auditEvents.map(e=>e.eventType).join(' → ')}/><Field k={t.metadata} v={JSON.stringify({ project:r?.projectId, environment:r?.environment, deployment:r?.governance?.deploymentId || r?.incident?.affectedResource || null })}/></dl></article> })}</details>
       </Card>
       <Card title={t.activeWork}><div style={tableWrap}><table style={table}><thead><tr>{[t.workId,t.provider,t.project,t.environment,t.triggerSource,t.assignedSupervisor,t.leaseStatus,t.fence,t.currentStage,t.verificationStage,t.age,t.duration,t.status].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{activeWork.map(w => { const lease = leases.find(l => l.work_item_id === w.work_item_id && l.status === 'active'); const run = runs.find(r => r.governance?.workItemId === w.work_item_id); const trigger = triggers.find(tr => tr.work_item_id === w.work_item_id); return <tr key={w.work_item_id}><td>{w.work_item_id}</td><td>{w.provider}</td><td>{w.project_id || '—'}</td><td>{w.environment}</td><td>{trigger?.trigger_source || '—'}</td><td>{lease ? `${lease.owner_instance_id}/${lease.owner_runtime_id}` : '—'}</td><td>{lease?.status || '—'}</td><td>{lease?.fencing_token ?? '—'}</td><td>{w.state}</td><td>{run?.verification.status || '—'}</td><td>{age(w.created_at)}</td><td>{ms(w.created_at, run?.completedAt)}</td><td>{w.state}</td></tr> })}</tbody></table></div></Card>
     </div>

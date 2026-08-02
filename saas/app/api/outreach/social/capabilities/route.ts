@@ -1,6 +1,8 @@
+// saas/app/api/outreach/social/capabilities/route.ts
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { SOCIAL_CONNECTORS, platformContentKind, platformNeedsAccountRef, type SocialPlatform } from '@/lib/outreach/social-connectors'
+import { loadCustomPlatforms } from '@/lib/outreach/social-custom-platform-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +26,10 @@ function safeDestination(row: any) {
 export async function GET() {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
+
+  // Declared platforms live in a table, and this process may be cold — hydrate the
+  // registry before anything looks a platform up. See social-custom-platform-store.ts.
+  await loadCustomPlatforms(ctx.admin)
 
   const tokenRes = await ctx.admin.from('outreach_social_tokens').select('platform, account_ref, account_name, scopes, expires_at').eq('user_id', ctx.user.id)
   const destinationRes = await ctx.admin.from('outreach_social_destinations').select('platform, account_ref, account_name, kind, access_token, discovered_at').eq('user_id', ctx.user.id)

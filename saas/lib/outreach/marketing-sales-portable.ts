@@ -133,6 +133,20 @@ export {
   type MoneyResult,
 } from '../ads/ads-money.ts'
 
+// ── Acceptance ───────────────────────────────────────────────────────────────
+// Proves the portable works against the BUYER'S adapter and ad account rather than ours:
+// six checks hand the spend gate a request it must refuse, four prove the money arithmetic
+// before anything moves, and one real campaign is created paused, reconciled, and stopped —
+// because being able to stop a campaign is the capability nobody tests until 2am.
+export {
+  runMarketingSalesAcceptance,
+  MARKETING_SALES_ACCEPTANCE_SCHEMA,
+  type MarketingSalesAcceptanceOptions,
+  type MarketingSalesAcceptanceResult,
+  type MarketingSalesCheck,
+  type MarketingSalesCheckId,
+} from './marketing-sales-acceptance.ts'
+
 // ── Language ─────────────────────────────────────────────────────────────────
 // Which language to write in, decided from the TARGET's identity, never from the
 // operator's interface language. A US prospect gets English while the console is in

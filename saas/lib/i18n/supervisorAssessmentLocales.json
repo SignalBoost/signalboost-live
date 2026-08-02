@@ -8,6 +8,7 @@
     "assessmentIntegrity": "Assessment integrity",
     "assessmentKicker": "Verified operational assessment",
     "assessmentReproducibility": "Assessment reproducibility",
+    "assessmentScope": "Scope: operational continuity only. Security posture, compliance and business outcomes are assessed separately and are not covered by this conclusion.",
     "assessmentScore": "Assessment score",
     "assessmentVerification": "Assessment verification",
     "atLeast": "at least",
@@ -23,6 +24,7 @@
     "changesWhen": "Changes when",
     "clearsWhen": "Clears when",
     "conclusion": "Conclusion",
+    "confidenceInThisFinding": "Confidence in this finding",
     "confidenceLabel": "Confidence",
     "confidenceLedger": "Why confidence is not 100%",
     "confidenceMeaning": "How far our own evidence can be trusted. Not a statement about the platform.",
@@ -49,7 +51,6 @@
     "executionModelValue": "Scheduled observation, serverless. No persistent leader by design.",
     "expectedResolution": "Expected resolution",
     "explainThisAssessment": "Explain this assessment",
-    "explainThisFinding": "Explain this finding",
     "exposure": "Exposure",
     "exposureHigh": "High",
     "exposureLow": "Low",
@@ -97,7 +98,6 @@
     "policySource": "Policy source",
     "priorityLabel": "Priority",
     "reasonLabel": "Reason",
-    "reasoningConfidence": "Reasoning confidence",
     "reasoningLabel": "Reasoning",
     "recommendation": "Recommendation",
     "reconciles": "Reconciles with the domain model",
@@ -121,7 +121,8 @@
     "unchangedAcross": "Unchanged across",
     "unmeasuredDomains": "Unmeasured domains",
     "verifiedState": "Verified",
-    "why": "Why"
+    "why": "Why",
+    "whyThisConclusion": "Why this conclusion?"
   },
   "es": {
     "absenceWindow": "ventana de ausencia",
@@ -130,6 +131,7 @@
     "assessmentIntegrity": "Integridad de la evaluación",
     "assessmentKicker": "Evaluación operativa verificada",
     "assessmentReproducibility": "Reproducibilidad de la evaluación",
+    "assessmentScope": "Alcance: únicamente la continuidad operativa. La postura de seguridad, el cumplimiento normativo y los resultados de negocio se evalúan por separado y no están cubiertos por esta conclusión.",
     "assessmentScore": "Puntuación de la evaluación",
     "assessmentVerification": "Verificación de la evaluación",
     "atLeast": "al menos",
@@ -145,6 +147,7 @@
     "changesWhen": "Cambia cuando",
     "clearsWhen": "Se resuelve cuando",
     "conclusion": "Conclusión",
+    "confidenceInThisFinding": "Confianza en este hallazgo",
     "confidenceLabel": "Confianza",
     "confidenceLedger": "Por qué la confianza no es del 100%",
     "confidenceMeaning": "Hasta qué punto se puede confiar en nuestra propia evidencia. No es una afirmación sobre la plataforma.",
@@ -171,7 +174,6 @@
     "executionModelValue": "Observación programada, sin servidor. Sin líder persistente por diseño.",
     "expectedResolution": "Resolución prevista",
     "explainThisAssessment": "Explicar esta evaluación",
-    "explainThisFinding": "Explicar este hallazgo",
     "exposure": "Exposición",
     "exposureHigh": "Alta",
     "exposureLow": "Baja",
@@ -219,7 +221,6 @@
     "policySource": "Origen de la política",
     "priorityLabel": "Prioridad",
     "reasonLabel": "Motivo",
-    "reasoningConfidence": "Confianza en el razonamiento",
     "reasoningLabel": "Razonamiento",
     "recommendation": "Recomendación",
     "reconciles": "Cuadra con el modelo de dominios",
@@ -243,7 +244,8 @@
     "unchangedAcross": "Sin cambios durante",
     "unmeasuredDomains": "Dominios no medidos",
     "verifiedState": "Verificada",
-    "why": "Por qué"
+    "why": "Por qué",
+    "whyThisConclusion": "¿Por qué esta conclusión?"
   },
   "pt": {
     "absenceWindow": "janela de ausência",
@@ -252,6 +254,7 @@
     "assessmentIntegrity": "Integridade da avaliação",
     "assessmentKicker": "Avaliação operacional verificada",
     "assessmentReproducibility": "Reprodutibilidade da avaliação",
+    "assessmentScope": "Escopo: apenas a continuidade operacional. Postura de segurança, conformidade e resultados de negócio são avaliados separadamente e não estão cobertos por esta conclusão.",
     "assessmentScore": "Pontuação da avaliação",
     "assessmentVerification": "Verificação da avaliação",
     "atLeast": "pelo menos",
@@ -267,6 +270,7 @@
     "changesWhen": "Muda quando",
     "clearsWhen": "Encerra quando",
     "conclusion": "Conclusão",
+    "confidenceInThisFinding": "Confiança neste achado",
     "confidenceLabel": "Confiança",
     "confidenceLedger": "Por que a confiança não é 100%",
     "confidenceMeaning": "O quanto nossa própria evidência pode ser confiável. Não é uma afirmação sobre a plataforma.",
@@ -293,7 +297,6 @@
     "executionModelValue": "Observação agendada, serverless. Sem líder persistente por design.",
     "expectedResolution": "Resolução prevista",
     "explainThisAssessment": "Explicar esta avaliação",
-    "explainThisFinding": "Explicar este achado",
     "exposure": "Exposição",
     "exposureHigh": "Alta",
     "exposureLow": "Baixa",
@@ -341,7 +344,6 @@
     "policySource": "Origem da política",
     "priorityLabel": "Prioridade",
     "reasonLabel": "Motivo",
-    "reasoningConfidence": "Confiança no raciocínio",
     "reasoningLabel": "Raciocínio",
     "recommendation": "Recomendação",
     "reconciles": "Concilia com o modelo de domínios",
@@ -365,7 +367,8 @@
     "unchangedAcross": "Sem alteração ao longo de",
     "unmeasuredDomains": "Domínios não medidos",
     "verifiedState": "Verificada",
-    "why": "Por quê"
+    "why": "Por quê",
+    "whyThisConclusion": "Por que esta conclusão?"
   },
   "pl": {
     "absenceWindow": "okno nieobecności",
@@ -374,6 +377,7 @@
     "assessmentIntegrity": "Integralność oceny",
     "assessmentKicker": "Zweryfikowana ocena operacyjna",
     "assessmentReproducibility": "Odtwarzalność oceny",
+    "assessmentScope": "Zakres: wyłącznie ciągłość operacyjna. Stan bezpieczeństwa, zgodność i wyniki biznesowe są oceniane osobno i nie są objęte tym wnioskiem.",
     "assessmentScore": "Wynik oceny",
     "assessmentVerification": "Weryfikacja oceny",
     "atLeast": "co najmniej",
@@ -389,6 +393,7 @@
     "changesWhen": "Zmienia się, gdy",
     "clearsWhen": "Ustaje, gdy",
     "conclusion": "Wniosek",
+    "confidenceInThisFinding": "Pewność tego ustalenia",
     "confidenceLabel": "Pewność",
     "confidenceLedger": "Dlaczego pewność nie wynosi 100%",
     "confidenceMeaning": "Na ile można ufać naszym własnym dowodom. To nie jest stwierdzenie o platformie.",
@@ -415,7 +420,6 @@
     "executionModelValue": "Zaplanowana obserwacja, serverless. Z założenia bez trwałego lidera.",
     "expectedResolution": "Oczekiwane rozwiązanie",
     "explainThisAssessment": "Wyjaśnij tę ocenę",
-    "explainThisFinding": "Wyjaśnij to ustalenie",
     "exposure": "Ekspozycja",
     "exposureHigh": "Wysoka",
     "exposureLow": "Niska",
@@ -463,7 +467,6 @@
     "policySource": "Źródło polityki",
     "priorityLabel": "Priorytet",
     "reasonLabel": "Powód",
-    "reasoningConfidence": "Pewność wnioskowania",
     "reasoningLabel": "Uzasadnienie",
     "recommendation": "Zalecenie",
     "reconciles": "Zgadza się z modelem domen",
@@ -487,7 +490,8 @@
     "unchangedAcross": "Bez zmian przez",
     "unmeasuredDomains": "Domeny niezmierzone",
     "verifiedState": "Zweryfikowana",
-    "why": "Dlaczego"
+    "why": "Dlaczego",
+    "whyThisConclusion": "Dlaczego taki wniosek?"
   },
   "ru": {
     "absenceWindow": "окно отсутствия",
@@ -496,6 +500,7 @@
     "assessmentIntegrity": "Целостность оценки",
     "assessmentKicker": "Подтверждённая операционная оценка",
     "assessmentReproducibility": "Воспроизводимость оценки",
+    "assessmentScope": "Область: только операционная непрерывность. Состояние безопасности, соответствие требованиям и бизнес-результаты оцениваются отдельно и этим выводом не охватываются.",
     "assessmentScore": "Оценка по итогам",
     "assessmentVerification": "Проверка оценки",
     "atLeast": "не менее",
@@ -511,6 +516,7 @@
     "changesWhen": "Изменится, когда",
     "clearsWhen": "Снимается, когда",
     "conclusion": "Вывод",
+    "confidenceInThisFinding": "Уверенность в этом заключении",
     "confidenceLabel": "Уверенность",
     "confidenceLedger": "Почему уверенность не 100%",
     "confidenceMeaning": "Насколько можно доверять нашим собственным данным. Это не утверждение о платформе.",
@@ -537,7 +543,6 @@
     "executionModelValue": "Наблюдение по расписанию, serverless. Постоянного лидера нет по замыслу.",
     "expectedResolution": "Ожидаемое разрешение",
     "explainThisAssessment": "Объяснить эту оценку",
-    "explainThisFinding": "Объяснить это заключение",
     "exposure": "Подверженность риску",
     "exposureHigh": "Высокая",
     "exposureLow": "Низкая",
@@ -585,7 +590,6 @@
     "policySource": "Источник политики",
     "priorityLabel": "Приоритет",
     "reasonLabel": "Причина",
-    "reasoningConfidence": "Уверенность в рассуждении",
     "reasoningLabel": "Обоснование",
     "recommendation": "Рекомендация",
     "reconciles": "Сходится с доменной моделью",
@@ -609,6 +613,7 @@
     "unchangedAcross": "Без изменений на протяжении",
     "unmeasuredDomains": "Неизмеренные домены",
     "verifiedState": "Подтверждена",
-    "why": "Почему"
+    "why": "Почему",
+    "whyThisConclusion": "Почему такой вывод?"
   }
 }

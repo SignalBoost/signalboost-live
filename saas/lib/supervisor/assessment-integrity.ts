@@ -17,16 +17,23 @@
 //                         assumed — the whole rebuild started because the console printed
 //                         "Operational" above "critical" and nothing noticed.
 //
-//   EVIDENCE FRESHNESS    How current the evidence is against the cadence the policy declares,
-//                         not against a wall clock we chose.
+//   EVIDENCE AGE          How current the evidence is, against the cadence the policy declares
+//                         rather than a wall clock we chose. STATED AS AGES AND A STATE, not as
+//                         a bare percentage: "Evidence freshness 23%" reads like a failing grade
+//                         and answers nothing — 23% of what? The score still exists, because the
+//                         arithmetic should be inspectable, but it sits behind the two figures a
+//                         person can actually act on: how old is the newest evidence, and how old
+//                         is the oldest.
 //
 //   REPRODUCIBILITY       Could someone else derive this same conclusion? Split deliberately in
 //                         two, because the honest answer today is half yes: every module is
 //                         pure, so the same inputs always produce the same conclusion — but we
 //                         DO NOT RETAIN THE INPUTS, so an auditor asking "what did you conclude
 //                         at 03:00 and on what evidence" cannot check. Reporting a flat "Yes"
-//                         would be exactly the overstatement this product exists to avoid. The
-//                         digest below is what makes it verifiable once assessments are stored.
+//                         would be exactly the overstatement this product exists to avoid. So it
+//                         is reported as a LEVEL with a reason and a roadmap — partial today,
+//                         full when evidence snapshots are retained. A limitation with a named
+//                         path out of it is a capability statement; one without is an excuse.
 //
 // A CONTRADICTION IS NEVER SMOOTHED OVER. It is reported as a failure of the assessment, and
 // it deliberately does not change the operational state — an internal inconsistency is a
@@ -42,6 +49,44 @@ export type Contradiction = {
   remedy: string
 }
 
+export type FreshnessState = 'within_policy' | 'aging' | 'outside_policy' | 'not_measured'
+
+export const FRESHNESS_LABELS: Record<FreshnessState, string> = {
+  within_policy: 'Within declared policy',
+  aging: 'Aging — still within tolerance',
+  outside_policy: 'Outside declared policy',
+  not_measured: 'No evidence recorded',
+}
+
+export type EvidenceAge = {
+  state: FreshnessState
+  stateLabel: string
+  /** Age of the most recent piece of evidence, in seconds. Null when there is none. */
+  newestSeconds: number | null
+  /** Age of the oldest piece still counted toward this assessment. */
+  oldestSeconds: number | null
+  /** Kept because the arithmetic should be inspectable — but never the headline. */
+  score: number
+  /** Every figure the score was computed from, so the expansion can show its working. */
+  scoreBasis: string[]
+}
+
+export type ReproducibilityLevel = 'none' | 'partial' | 'full'
+
+export type Reproducibility = {
+  level: ReproducibilityLevel
+  levelLabel: string
+  /** Why it is not full. Empty when it is. */
+  reason: string
+  /** What would make it full. A limitation with no named path out of it is an excuse. */
+  roadmap: string
+  /** Short stable fingerprint of the exact inputs this conclusion was derived from. */
+  digest: string
+  /** Same inputs always give the same conclusion — true because the modules are pure. */
+  deterministic: boolean
+  inputsRetained: boolean
+}
+
 export type AssessmentIntegrity = {
   independentSignals: number
   totalSignals: number
@@ -50,16 +95,8 @@ export type AssessmentIntegrity = {
   contradictions: Contradiction[]
   conflictingSignals: number
 
-  /** 0–100 against the declared cadence. 100 when observation is on schedule. */
-  evidenceFreshness: number
-
-  /** Same inputs always give the same conclusion — true because the modules are pure. */
-  deterministic: boolean
-  /** Whether those inputs were written down. False today. */
-  inputsRetained: boolean
-  /** Short stable fingerprint of the exact inputs this conclusion was derived from. */
-  inputDigest: string
-  reproducibilityStatement: string
+  evidenceAge: EvidenceAge
+  reproducibility: Reproducibility
 
   /** True only when every measure above holds. */
   intact: boolean
@@ -88,6 +125,11 @@ export type IntegrityInput = {
   // ── Freshness, against the declared cadence ────────────────────────────────
   overdueSeconds: number
   toleranceSeconds: number
+
+  /** Age of the newest piece of evidence, in seconds. Null when there is none at all. */
+  newestEvidenceSeconds: number | null
+  /** Age of the oldest piece still counted toward this assessment. */
+  oldestEvidenceSeconds: number | null
 
   /** Anything that identifies the inputs. Order-independent; hashed, never displayed raw. */
   inputs: Array<string | number | boolean | null>
@@ -157,20 +199,52 @@ export function buildAssessmentIntegrity(input: IntegrityInput): AssessmentInteg
     })
   }
 
+  // ── Evidence age, expressed the way a person reads it ──────────────────────
   const tolerance = Math.max(1, input.toleranceSeconds)
-  const evidenceFreshness = Math.max(0, Math.min(100, Math.round(100 * (1 - Math.max(0, input.overdueSeconds) / tolerance))))
+  const overdue = Math.max(0, input.overdueSeconds)
+  const score = Math.max(0, Math.min(100, Math.round(100 * (1 - overdue / tolerance))))
+  const freshnessState: FreshnessState =
+    input.newestEvidenceSeconds === null || input.newestEvidenceSeconds === undefined
+      ? 'not_measured'
+      : overdue === 0
+        ? 'within_policy'
+        : overdue >= tolerance
+          ? 'outside_policy'
+          : 'aging'
+  const evidenceAge: EvidenceAge = {
+    state: freshnessState,
+    stateLabel: FRESHNESS_LABELS[freshnessState],
+    newestSeconds: input.newestEvidenceSeconds ?? null,
+    oldestSeconds: input.oldestEvidenceSeconds ?? null,
+    score,
+    // The working, so the number can be checked rather than believed.
+    scoreBasis: [
+      input.newestEvidenceSeconds === null || input.newestEvidenceSeconds === undefined
+        ? 'no evidence recorded'
+        : `newest evidence ${input.newestEvidenceSeconds}s old`,
+      `overdue by ${overdue}s`,
+      `tolerance ${tolerance}s`,
+      'score = 100 × (1 − overdue ÷ tolerance)',
+    ],
+  }
 
-  const inputDigest = digest(input.inputs)
-  const deterministic = true
+  // ── Reproducibility, as a level with a way out ─────────────────────────────
   const inputsRetained = false
-  const reproducibilityStatement = inputsRetained
-    ? 'Reproducible. The inputs behind this conclusion are retained and it can be derived again from them.'
-    : 'Reproducible in principle, not yet from a record. The modules are pure, so the same inputs always give this same conclusion — but the inputs are not retained, so nobody can re-derive this assessment later. Storing them is what would make this a full yes.'
+  const reproducibility: Reproducibility = {
+    level: inputsRetained ? 'full' : 'partial',
+    levelLabel: inputsRetained ? 'Full' : 'Partial',
+    reason: inputsRetained ? '' : 'Observation inputs are not yet retained, so this assessment cannot be re-derived later from a stored record.',
+    roadmap: 'Full replay becomes available when evidence snapshots are retained alongside each assessment. The fingerprint beside this line is what a stored snapshot would be matched against.',
+    digest: digest(input.inputs),
+    deterministic: true,
+    inputsRetained,
+  }
 
   const intact =
     contradictions.length === 0 &&
     input.measuredDomains > 0 &&
-    evidenceFreshness > 0
+    freshnessState !== 'outside_policy' &&
+    freshnessState !== 'not_measured'
 
   return {
     independentSignals: input.measuredDomains,
@@ -178,11 +252,8 @@ export function buildAssessmentIntegrity(input: IntegrityInput): AssessmentInteg
     signalsLabel: `${input.measuredDomains} of ${input.totalDomains}`,
     contradictions,
     conflictingSignals: contradictions.length,
-    evidenceFreshness,
-    deterministic,
-    inputsRetained,
-    inputDigest,
-    reproducibilityStatement,
+    evidenceAge,
+    reproducibility,
     intact,
     statement:
       contradictions.length === 0

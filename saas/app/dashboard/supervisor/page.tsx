@@ -6,7 +6,8 @@ import { createBrowserProviderDiagnosticsSnapshot } from '@/lib/browser-provider
 import { getAccess } from '@/lib/auth/access'
 import { loadLanguage } from '@/lib/i18n/loadLanguage'
 import { createPlatformHealthSnapshot } from '@/lib/supervisor/platform-health'
-import { anomaliesFromPlatformAlerts, classifyPlatformState, parseScheduledInstances } from '@/lib/supervisor/health-severity'
+import { anomaliesFromPlatformAlerts, classifyPlatformState } from '@/lib/supervisor/health-severity'
+import { listObservationPolicies, livenessFromPolicies } from '@/lib/supervisor/observation-policy'
 import { SupabaseVercelHealthStore, type VercelHealthRun } from '@/lib/supervisor/providers/vercel'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
 import GlobalAiKillSwitch from '@/components/supervisor/GlobalAiKillSwitch'
@@ -42,19 +43,25 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   // decided by checking impact — is work stranded, has a runtime missed its own schedule, is
   // the monitoring data even trustworthy — because an operator woken at 3am by "critical"
   // must be able to trust that the word was earned.
-  const scheduledInstances = parseScheduledInstances(process.env.SUPERVISOR_SCHEDULED_INSTANCES)
+  // Cadence comes from the policy the scheduler itself obeys, so "late" here and "due" there
+  // are the same number. Reading it from a second place — an env var, a constant — is what
+  // let the console report healthy while a runtime had actually stopped.
+  const observationPolicies = await listObservationPolicies(db)
+  const scheduledInstances = livenessFromPolicies(observationPolicies)
   const verified = classifyPlatformState({
     anomalies: anomaliesFromPlatformAlerts(health.alerts as any),
     instances: instances.map(i => {
       const id = String(i.instance_id || i.instanceId || '')
-      const interval = scheduledInstances[id]
+      const policy = scheduledInstances[id]
       return {
         instanceId: id,
         status: String(i.status ?? ''),
-        // Declared through SUPERVISOR_SCHEDULED_INSTANCES. Undeclared means continuous, which
-        // is the stricter reading — a runtime nobody declared still gets reported when quiet.
-        liveness: interval ? ('scheduled' as const) : ('continuous' as const),
-        scheduleIntervalSeconds: interval || null,
+        // A runtime with an observation policy is scheduled. Without one it is treated as
+        // continuous, the stricter reading — a runtime nobody configured still gets reported
+        // when it goes quiet.
+        liveness: policy ? ('scheduled' as const) : ('continuous' as const),
+        scheduleIntervalSeconds: policy ? policy.intervalSeconds : null,
+        stalenessMultiplier: policy ? policy.stalenessMultiplier : null,
         lastHeartbeatAt: i.heartbeat_at || i.heartbeatAt || null,
         lastCompletedAt: i.updated_at || i.updatedAt || null,
       }
@@ -77,7 +84,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     monitoringTrustworthy: health.verification.status === 'verified',
     monitoringReasons: health.verification.reasons,
   })
-  const stateLabel = verified.state === 'incident' ? (t.stateIncident || 'Incident — verified impact')
+  const verifiedStateLabel = verified.state === 'incident' ? (t.stateIncident || 'Incident — verified impact')
     : verified.state === 'degraded' ? (t.stateDegraded || 'Attention required')
     : verified.state === 'unknown' ? (t.stateUnknown || 'Unverified — investigation required')
     : (t.stateOperational || 'Operational')
@@ -112,7 +119,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     <section style={hero}><p style={kicker}>{t.kicker}</p><h1 style={{ margin:'6px 0' }}>{t.title}</h1><p style={muted}>{t.subtitle}</p><p style={notice}>{t.readOnly}</p></section>
     <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
     <div style={grid2}>
-      <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={stateLabel}/><Field k={t.impact || 'Impact'} v={topFinding ? topFinding.impact : (t.noImpact || 'No impact detected.')}/><Field k={t.requiredAction || 'Required action'} v={topFinding ? topFinding.requiredAction : (t.noActionRequired || 'None.')}/><Field k={t.pagesOnCall || 'Wakes on-call'} v={verified.pageOutOfHours ? (t.yes || 'Yes') : (t.no || 'No')}/><Field k={t.healthScore || 'Health score'} v={`${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
+      <Card title={t.platformHealth}><dl style={fields}><Field k={t.overallState} v={verifiedStateLabel}/><Field k={t.impact || 'Impact'} v={topFinding ? topFinding.impact : (t.noImpact || 'No impact detected.')}/><Field k={t.requiredAction || 'Required action'} v={topFinding ? topFinding.requiredAction : (t.noActionRequired || 'None.')}/><Field k={t.pagesOnCall || 'Wakes on-call'} v={verified.pageOutOfHours ? (t.yes || 'Yes') : (t.no || 'No')}/><Field k={t.healthScore || 'Health score'} v={`${health.score}%`}/><Field k={t.lastObservation} v={fmt(latest?.completedAt)}/><Field k={t.lastVerification} v={fmt(latest?.verification.checkedAt)}/><Field k={t.lastAudit} v={fmt(lastAudit)}/><Field k={t.uptime} v={activeInstances.map(i => `${i.instance_id || i.instanceId}: ${age(i.started_at || i.startedAt)}`).join(' · ') || t.none}/><Field k={t.activeInstances} v={activeInstances.length}/><Field k={t.leader} v={leases.find(l => l.status === 'active') ? `${leases.find(l => l.status === 'active')?.owner_instance_id} / ${leases.find(l => l.status === 'active')?.owner_runtime_id}` : t.none}/></dl></Card>
       <Card title={t.healthMetrics}><dl style={fields}><Field k={t.totalObservations} v={runs.length}/><Field k={t.successfulObservations} v={successful.length}/><Field k={t.verificationSuccess} v={verificationSuccess}/><Field k={t.avgObservationDuration} v={avg(durations)}/><Field k={t.avgVerificationDuration} v={avg(durations)}/><Field k={t.providerAvailability} v={providers.map(p => `${p.providerId}: ${p.health.state}`).join(' · ')}/><Field k={t.queueDepth} v={activeWork.length}/></dl></Card>
     </div>
 

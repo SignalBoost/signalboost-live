@@ -31,7 +31,7 @@ import {
 } from '@/lib/ads/ads-connector'
 import { declareSocialAdNetworks } from '@/lib/ads/ads-social-networks'
 import { declareGoogleAndMarketplaceNetworks } from '@/lib/ads/ads-google-and-marketplace'
-import { discoverAdAccounts, billingArrangementsFor, accountPickerLabel } from '@/lib/ads/ads-account-discovery'
+import { discoverAdAccounts, billingArrangementsFor, accountPickerLabel, readAdAccountHealth, supportsHealthRead } from '@/lib/ads/ads-account-discovery'
 import { collectAdsAttention } from '@/lib/ads/ads-attention'
 import { formatMinor } from '@/lib/ads/ads-money'
 import { adsTokenName, adNetworkSetupView, missingAdNetworkVars } from '@/lib/ads/ads-network-setup'
@@ -237,6 +237,7 @@ export async function POST(req: NextRequest) {
   hydrateAdPlatforms()
 
   if (action === 'discover_accounts') return discoverAccounts(ctx, body)
+  if (action === 'refresh_health') return refreshHealth(ctx, body)
   if (action === 'set_billing') return setBilling(ctx, body)
   if (action === 'set_ceiling') return setCeiling(ctx, body)
   if (action === 'start') return startCampaign(ctx, body)
@@ -244,9 +245,75 @@ export async function POST(req: NextRequest) {
   if (action === 'pause') return pause(ctx, body)
 
   return NextResponse.json(
-    { error: "action must be one of 'discover_accounts', 'set_billing', 'set_ceiling', 'start', 'reconcile' or 'pause'." },
+    { error: "action must be one of 'discover_accounts', 'refresh_health', 'set_billing', 'set_ceiling', 'start', 'reconcile' or 'pause'." },
     { status: 400 },
   )
+}
+
+
+/**
+ * Ask the network what state an ad account is in, and record it as READ rather than declared.
+ *
+ * Only Meta, TikTok and Google publish this. For the rest the call returns "not supported",
+ * which is not an error — it is the honest reason a person still has to type the invoice
+ * date, and why that entry stays marked as declared.
+ */
+async function refreshAccountHealth(ctx: any, platformId: string, accountRef: string, currencyHint?: string | null) {
+  if (!supportsHealthRead(platformId)) return { attempted: false, ok: false, reason: 'not supported' }
+
+  const resolved = await resolveToken(ctx.admin, platformId)
+  if (resolved.ok !== true) return { attempted: true, ok: false, reason: String(resolved.reason) }
+
+  const read = (await readAdAccountHealth(platformId, String(resolved.accessToken), accountRef, currencyHint)) as {
+    ok: boolean; supported: boolean; reason: string; health: any
+  }
+
+  if (read.ok !== true) {
+    // Recorded rather than swallowed. A stale row with no error beside it reads as a healthy
+    // account, which is the failure this whole surface exists to avoid.
+    await upsertAccountHealth(ctx.admin, {
+      platformId,
+      accountRef,
+      lastCheckedAt: new Date().toISOString(),
+      checkError: String(read.reason).slice(0, 400),
+    })
+    return { attempted: true, ok: false, reason: read.reason }
+  }
+
+  const health = read.health || {}
+  await upsertAccountHealth(ctx.admin, {
+    platformId,
+    accountRef,
+    // Only what the network actually returned. A null here leaves whatever a person recorded
+    // in place rather than blanking it.
+    billingMode: health.billingMode || undefined,
+    currency: health.currency || undefined,
+    creditLimitMinor: health.creditLimitMinor === null ? undefined : health.creditLimitMinor,
+    creditUsedMinor: health.creditUsedMinor === null ? undefined : health.creditUsedMinor,
+    balanceMinor: health.balanceMinor === null ? undefined : health.balanceMinor,
+    paymentState: health.paymentState || undefined,
+    billingSource: 'network',
+    lastCheckedAt: new Date().toISOString(),
+    checkError: null,
+  })
+  return { attempted: true, ok: true, reason: '' }
+}
+
+async function refreshHealth(ctx: any, body: any) {
+  const platformId = String(body?.platformId || '').trim()
+  const accountRef = String(body?.accountRef || '').trim()
+  if (!platformId || !accountRef) return NextResponse.json({ error: 'A network and an ad account are both required.' }, { status: 400 })
+
+  const result = await refreshAccountHealth(ctx, platformId, accountRef, body?.currency ? String(body.currency) : null)
+  if (!result.attempted) {
+    return NextResponse.json({
+      ok: true,
+      supported: false,
+      note: `${platformId} does not publish an account balance or credit endpoint. Record the arrangement by hand — it stays marked as declared, which is the honest label.`,
+    })
+  }
+  if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 502 })
+  return NextResponse.json({ ok: true, supported: true })
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -457,6 +524,11 @@ async function reconcile(ctx: any, body: any) {
   }
 
   await recordSpendObservation(ctx.admin, ledgerId, result.report, cap)
+
+  // Reading spend answers "what did this campaign cost". It cannot answer "will this account
+  // keep delivering", so the account's own state is refreshed in the same pass — best effort,
+  // because a health endpoint being down must not fail a reconciliation that worked.
+  await refreshAccountHealth(ctx, row.platform_id, String(row.account_ref), String(row.currency))
 
   return NextResponse.json({
     ok: true,

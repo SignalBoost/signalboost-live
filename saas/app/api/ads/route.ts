@@ -31,6 +31,8 @@ import {
 } from '@/lib/ads/ads-connector'
 import { declareSocialAdNetworks } from '@/lib/ads/ads-social-networks'
 import { declareGoogleAndMarketplaceNetworks } from '@/lib/ads/ads-google-and-marketplace'
+import { discoverAdAccounts, billingArrangementsFor, accountPickerLabel } from '@/lib/ads/ads-account-discovery'
+import { collectAdsAttention } from '@/lib/ads/ads-attention'
 import { formatMinor } from '@/lib/ads/ads-money'
 import { adsTokenName, adNetworkSetupView, missingAdNetworkVars } from '@/lib/ads/ads-network-setup'
 import {
@@ -45,6 +47,8 @@ import {
   setAccountCeiling,
   spendGateContextFor,
   getCampaignRow,
+  listAccountHealth,
+  upsertAccountHealth,
 } from '@/lib/ads/spend-ledger'
 
 export const dynamic = 'force-dynamic'
@@ -134,15 +138,40 @@ export async function GET() {
     // that a secret is set, never what it is.
     setup: adNetworkSetupView(adapter.id),
     missing: missingAdNetworkVars(adapter.id),
+    // The arrangements THIS network actually offers. Offering a buyer an option their
+    // network does not have is the same class of error as a free-text box, only slower to
+    // discover.
+    arrangements: billingArrangementsFor(adapter.id),
   }))
 
-  const [positions, ceilings] = await Promise.all([
+  const [positions, ceilings, health] = await Promise.all([
     listCampaignPositions(ctx.admin),
     listAccountCeilings(ctx.admin),
+    listAccountHealth(ctx.admin),
   ])
+
+  const campaignViews = positions.map((row: any) => ({
+    id: row.id,
+    platformId: row.platform_id,
+    accountRef: row.account_ref,
+    name: row.name,
+    status: row.status,
+    currency: row.currency,
+    capMinor: Number(row.campaign_max_minor),
+    spentMinor: Number(row.reported_spend_minor),
+    overCap: row.over_cap === true,
+    lastReconciledAt: row.last_reconciled_at,
+    reconcileError: row.reconcile_error,
+  }))
 
   return NextResponse.json({
     platforms,
+    // One row per ad account: the arrangement it is on and the dates that decide whether it
+    // keeps delivering.
+    health,
+    // What should reach a person before it bites — token expiry, credit line, invoice, card,
+    // prepaid balance, stale spend. Computed here so every surface agrees on the wording.
+    attention: collectAdsAttention({ health, campaigns: campaignViews }),
     // Networks that could not be declared, and why. An empty list here is the healthy case.
     unavailable: hydration.skipped,
     ceilings: ceilings.map((row: any) => ({
@@ -185,18 +214,95 @@ export async function POST(req: NextRequest) {
   const action = String(body?.action || '').trim()
   hydrateAdPlatforms()
 
+  if (action === 'discover_accounts') return discoverAccounts(ctx, body)
+  if (action === 'set_billing') return setBilling(ctx, body)
   if (action === 'set_ceiling') return setCeiling(ctx, body)
   if (action === 'start') return startCampaign(ctx, body)
   if (action === 'reconcile') return reconcile(ctx, body)
   if (action === 'pause') return pause(ctx, body)
 
   return NextResponse.json(
-    { error: "action must be one of 'set_ceiling', 'start', 'reconcile' or 'pause'." },
+    { error: "action must be one of 'discover_accounts', 'set_billing', 'set_ceiling', 'start', 'reconcile' or 'pause'." },
     { status: 400 },
   )
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
+
+/**
+ * Ask the network which ad accounts these credentials can reach.
+ *
+ * This is what turns the two most dangerous fields in the setup — the account reference and
+ * the currency — from things a person types into things they pick. A wrong account reference
+ * spends against someone else's budget; a wrong currency is a hundredfold error. Both are
+ * values the network already knows, so asking for them was the defect.
+ */
+async function discoverAccounts(ctx: any, body: any) {
+  const platformId = String(body?.platformId || '').trim()
+  const token = tokenFor(platformId)
+  if (!token) {
+    return NextResponse.json(
+      { error: `Connect ${platformId} first — an account list needs a working access token. Set ${tokenName(platformId)}.` },
+      { status: 400 },
+    )
+  }
+
+  const result = await discoverAdAccounts(platformId, token)
+  // A refusal, never an empty list: "no accounts" and "we could not ask" look identical in a
+  // dropdown and mean opposite things.
+  if (result.ok !== true) return NextResponse.json({ error: (result as any).reason }, { status: 502 })
+
+  const accounts = (result as any).accounts as any[]
+  return NextResponse.json({
+    ok: true,
+    platformId,
+    accounts: accounts.map(account => ({ ...account, label: accountPickerLabel(account) })),
+    arrangements: billingArrangementsFor(platformId),
+  })
+}
+
+/**
+ * Record how an ad account pays.
+ *
+ * Marked 'declared' rather than 'network' unless the value came from discovery, because a
+ * notice that implies we read a due date from the platform when a person typed it is worse
+ * than no notice at all — the operator stops checking.
+ */
+async function setBilling(ctx: any, body: any) {
+  const toMinor = (value: unknown) => {
+    if (value === undefined || value === null || value === '') return undefined
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined
+  }
+
+  const result = await upsertAccountHealth(ctx.admin, {
+    platformId: String(body?.platformId || '').trim(),
+    accountRef: String(body?.accountRef || '').trim(),
+    billingMode: body?.billingMode ? String(body.billingMode) : undefined,
+    currency: body?.currency ? String(body.currency) : undefined,
+    creditLimitMinor: toMinor(body?.creditLimitMinor),
+    creditUsedMinor: toMinor(body?.creditUsedMinor),
+    invoiceDueAt: body?.invoiceDueAt ? String(body.invoiceDueAt) : undefined,
+    cardLast4: body?.cardLast4 ? String(body.cardLast4) : undefined,
+    cardExpiresOn: body?.cardExpiresOn ? String(body.cardExpiresOn) : undefined,
+    balanceMinor: toMinor(body?.balanceMinor),
+    billingSource: body?.fromNetwork === true ? 'network' : 'declared',
+    updatedBy: String(ctx.user?.email || ctx.user?.id || 'unknown'),
+  })
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
+
+  await auditAdminAction({
+    admin: ctx.admin,
+    actorId: String(ctx.user?.id || ''),
+    action: 'ads.billing.set',
+    targetType: 'ad_account',
+    targetId: `${body?.platformId}:${body?.accountRef}`,
+    metadata: { billingMode: body?.billingMode || null, currency: body?.currency || null },
+  })
+
+  return NextResponse.json({ ok: true })
+}
+
 
 async function setCeiling(ctx: any, body: any) {
   const result = await setAccountCeiling(ctx.admin, {

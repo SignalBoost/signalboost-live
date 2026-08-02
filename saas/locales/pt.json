@@ -3535,7 +3535,15 @@
     "u_ads_loadingaccounts": "A consultar a rede…",
     "u_ads_nomatch": "Nenhuma conta corresponde a isso.",
     "u_ads_pickinstead": "Escolhe antes a partir da rede",
-    "u_ads_savebilling": "Guardar a modalidade"
+    "u_ads_savebilling": "Guardar a modalidade",
+    "u_ads_autorenew": "Renovada automaticamente antes de caducar. És avisado com dias de antecedência se a renovação alguma vez falhar.",
+    "u_ads_cannotconnect": "Esta rede não se liga desta forma — é alcançada através do endpoint que executas para ela.",
+    "u_ads_connect": "Ligar esta rede",
+    "u_ads_connected": "Ligada",
+    "u_ads_connectok": "Rede ligada",
+    "u_ads_expires": "expira a",
+    "u_ads_lasterror": "A última renovação falhou",
+    "u_ads_reconnect": "Voltar a ligar"
   },
   "lab": {
     "somethingWrong": "Algo deu errado",

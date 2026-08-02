@@ -4,6 +4,7 @@ import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendin
 import { publishSocialPost, SOCIAL_CONNECTORS, SocialPlatform } from '@/lib/outreach/social-connectors'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { applyOutreachLink } from '@/lib/outreach/signature'
+import { loadCustomPlatforms } from '@/lib/outreach/social-custom-platform-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,10 @@ const NEEDS_MEDIA = new Set<SocialPlatform>(['instagram_business'])
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
+
+  // Declared platforms live in a table, and this process may be cold — hydrate the
+  // registry before anything looks a platform up. See social-custom-platform-store.ts.
+  await loadCustomPlatforms(ctx.admin)
 
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }

@@ -15,7 +15,7 @@ import type {
   RemoteAdapterDefinition,
   RemoteAdapterTransport,
 } from './remote-adapter-kit.ts'
-import type { BrowserSessionFactory } from '../../browser-runtime/contracts.ts'
+import type { BrowserSessionFactory } from '../browser-task-contracts.ts'
 
 export const SAUCE_LABS_ADAPTER_ID = 'sauce-labs'
 

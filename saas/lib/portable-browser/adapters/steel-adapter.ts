@@ -3,8 +3,8 @@ import type {
   BrowserSessionFactory,
   BrowserSessionLaunchRequest,
   BrowserSessionPort,
-} from '../../browser-runtime/contracts.ts'
-import { sanitizeBrowserRuntimeError } from '../../browser-runtime/error-sanitizer.ts'
+} from '../browser-task-contracts.ts'
+import { sanitizeBrowserRuntimeError } from '../browser-error-sanitizer.ts'
 
 const STEEL_ADAPTER_ID = 'steel'
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])

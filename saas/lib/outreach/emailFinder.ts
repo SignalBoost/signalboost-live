@@ -44,12 +44,33 @@ const ROLE_BLOCKED_LOCALS = new Set([
   'legal', 'abuse', 'security', 'infosec', 'soc', 'psirt',
   // Desks staffed for a different purpose entirely; a sales pitch is noise in them.
   'careers', 'jobs', 'recruiting', 'recruitment', 'hr', 'unsubscribe', 'webmaster',
+  // Audience inboxes. A real draft went to inforcommunity@infor.com — the address a
+  // company publishes for its user forum, read by community managers who route nothing
+  // to a buyer. These are not gatekeepers to get past; they are the wrong building.
+  // press@ and media@ are deliberately ABSENT: those are the correct targets for the
+  // Press & Media portable, and blocking them here would break a different product.
+  'community', 'forum', 'events', 'newsletter', 'subscribe', 'subscriptions',
+  'feedback', 'membership', 'investors', 'ir', 'training', 'academy',
 ])
 
 function isRoleBlocked(email: string): boolean {
-  const local = email.split('@')[0].trim().toLowerCase()
+  const [rawLocal, rawDomain = ''] = email.split('@')
   // Strip a plus-tag so privacy+web@ is caught alongside privacy@.
-  return ROLE_BLOCKED_LOCALS.has(local.split('+')[0])
+  const local = rawLocal.trim().toLowerCase().split('+')[0]
+  if (ROLE_BLOCKED_LOCALS.has(local)) return true
+
+  // BRAND-PREFIXED ROLE ADDRESSES. Large companies namespace their inboxes with their own
+  // name: inforcommunity@infor.com is the one that got through and reached a user forum.
+  // Whole-local matching missed it, and switching to a substring test would have blocked
+  // securityservices@ — a real desk — so the domain arbitrates instead. Only when the
+  // local part BEGINS with the company's own name is the remainder tested, which keeps the
+  // false-positive surface tiny: a company must be prefixing its own brand for this to fire.
+  const root = rawDomain.trim().toLowerCase().replace(/^www\./, '').split('.')[0]
+  if (root && local.startsWith(root) && local.length > root.length) {
+    const remainder = local.slice(root.length).replace(/^[-_.]+/, '')
+    if (ROLE_BLOCKED_LOCALS.has(remainder)) return true
+  }
+  return false
 }
 
 const isEmail = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)

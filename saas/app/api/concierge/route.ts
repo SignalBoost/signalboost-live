@@ -1,3 +1,4 @@
+// saas/app/api/concierge/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as supportPost } from '@/app/api/support/route'
 import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, type VerifiedResearchResult } from '@/lib/ai/cos/researchBudget'
@@ -8,6 +9,7 @@ import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
 import { advanceProspectCampaigns, createProspectCampaignJob } from '@/lib/outreach/prospectCampaign'
 import {
+  campaignBriefMiss,
   parseProspectCampaignRequest,
   prospectCampaignQueuedReply,
   prospectCampaignQueueError,
@@ -67,7 +69,30 @@ async function directProspectCampaign(
   language: string,
 ): Promise<NextResponse | null> {
   const parsed = parseProspectCampaignRequest(input, language)
-  if (!parsed) return null
+
+  // THE SILENT FALL-THROUGH WAS THE WORST PART OF THIS.
+  //
+  // When parsing failed this returned null and the brief went to the ordinary assistant,
+  // which answered it as a question — thoughtfully, at length, and about nothing that was
+  // asked. No job, no id, and NOTHING saying the campaign had not started. The operator
+  // discovered it by going to look for drafts that did not exist.
+  //
+  // A message that was never campaign-shaped still falls through silently, which is correct:
+  // an ordinary question deserves an ordinary answer. Only a NEAR MISS is reported, and the
+  // report names the missing piece.
+  if (!parsed) {
+    const miss = campaignBriefMiss(input)
+    if (!miss) return null
+    const nearMissAccess = await getAccess().catch(() => null)
+    if (!nearMissAccess?.isOwner) return null
+    return NextResponse.json({
+      reply: miss,
+      source: 'cos-prospect-campaign-not-recognised',
+      background_job: false,
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
 
   // Only the verified owner may create this durable business job. Everyone else
   // falls through to the governed support route, which keeps its existing access

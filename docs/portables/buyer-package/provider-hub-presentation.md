@@ -1,6 +1,6 @@
 <!-- docs/portables/buyer-package/provider-hub-presentation.md -->
 
-# Provider Hub — Buyer Evaluation
+# Provider Connection Hub Software — Buyer Evaluation
 
 **Release:** `1.0.0-rc.1` design-partner evaluation
 **Package:** `@portable/provider-hub`

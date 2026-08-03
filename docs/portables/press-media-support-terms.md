@@ -1,6 +1,6 @@
 <!-- docs/portables/press-media-support-terms.md -->
 
-# Press & Media — proposed support framework
+# Press & Media Engine Software — proposed support framework
 
 **Status: commercial draft for counsel and capacity review. Not an SLA, not incorporated into any agreement, and not ready to sign.**
 

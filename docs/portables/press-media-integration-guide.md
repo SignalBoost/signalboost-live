@@ -1,5 +1,5 @@
 <!-- docs/portables/press-media-integration-guide.md -->
-# Press & Media — Enterprise Integration Guide
+# Press & Media Engine Software — Enterprise Integration Guide
 
 **Release:** `1.0.0-rc.1` design-partner evaluation
 **Package:** `@portable/press-media`

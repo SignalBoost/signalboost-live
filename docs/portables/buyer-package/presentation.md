@@ -1,6 +1,6 @@
 <!-- docs/portables/buyer-package/presentation.md -->
 
-# Self-Healing Supervisor — Design-Partner Evaluation
+# Self-Healing Supervisor Software — Design-Partner Evaluation
 
 **Buyer-hosted incident supervision with explicit capability validation, named-human approval, signed continuation, and audit evidence.**
 
@@ -12,7 +12,7 @@
 
 Automated remediation becomes dangerous when an AI-generated description, an unfamiliar provider action, or a broad approval can reach production systems without a precise technical boundary.
 
-The Self-Healing Supervisor evaluation is designed to answer one question with evidence:
+The Self-Healing Supervisor Software evaluation is designed to answer one question with evidence:
 
 > Can a buyer keep routine reversible actions bounded while forcing every unknown or consequential action through a named-human, exact-scope approval path?
 

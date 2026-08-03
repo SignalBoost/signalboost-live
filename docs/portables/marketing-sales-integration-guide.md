@@ -1,6 +1,6 @@
 <!-- docs/portables/marketing-sales-integration-guide.md -->
 
-# Marketing + Sales — Integration Guide
+# Marketing + Sales Engine Software — Integration Guide
 
 For the engineer installing this portable into your own stack. It assumes you have the
 tarball and nothing else.

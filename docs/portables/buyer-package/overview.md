@@ -1,6 +1,6 @@
 <!-- docs/portables/buyer-package/overview.md -->
 
-# Self-Healing Supervisor — Design-Partner Evaluation
+# Self-Healing Supervisor Software — Design-Partner Evaluation
 
 **Buyer-hosted incident supervision with explicit capability controls, named-human approval, signed continuation, and audit evidence.**
 
@@ -83,4 +83,4 @@ Because the buyer receives source, licence enforcement is contractual rather tha
 
 ## Accurate commercial positioning
 
-> Self-Healing Supervisor Design-Partner Evaluation — buyer-hosted incident intake, diagnosis, explicit capability validation, approval routing, signed exact-scope continuation, bounded buyer-runner execution, read-only verification, and audit evidence. Production use remains subject to buyer acceptance and a separate signed agreement.
+> Self-Healing Supervisor Software Design-Partner Evaluation — buyer-hosted incident intake, diagnosis, explicit capability validation, approval routing, signed exact-scope continuation, bounded buyer-runner execution, read-only verification, and audit evidence. Production use remains subject to buyer acceptance and a separate signed agreement.

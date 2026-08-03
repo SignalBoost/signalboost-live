@@ -1,5 +1,5 @@
 <!-- docs/portables/provider-hub-integration-guide.md -->
-# Provider Hub — Enterprise Integration Guide
+# Provider Connection Hub Software — Enterprise Integration Guide
 
 **Release:** `1.0.0-rc.1` design-partner evaluation
 **Package:** `@portable/provider-hub`

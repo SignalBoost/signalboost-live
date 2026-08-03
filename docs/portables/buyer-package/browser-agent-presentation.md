@@ -1,6 +1,6 @@
 <!-- docs/portables/buyer-package/browser-agent-presentation.md -->
 
-# Browser Agent Ecosystem — Buyer Evaluation
+# Browser Automation Governor Software — Buyer Evaluation
 
 **Release:** `1.0.0-rc.1` design-partner evaluation
 **Package:** `@portable/browser-agent`

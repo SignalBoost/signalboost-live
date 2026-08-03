@@ -247,8 +247,13 @@ export default function OutreachContactsPage() {
         offset += data.examined
       }
 
+      // Show the first unrewritten row's reason whenever ANY row was skipped or failed —
+      // not only when every row was. The previous condition hid the reason the moment a
+      // single row succeeded, which is exactly the case that needs explaining: 2 rewritten
+      // and 22 skipped looks like partial success and is actually a diagnosis waiting to
+      // be read. A count without a cause is what made this take five attempts.
       const summary = fill(copy.refreshDone, { refreshed, skipped, failed })
-      setNotice(!refreshed && firstProblem ? `${summary} — ${firstProblem}` : summary)
+      setNotice(firstProblem && (skipped || failed) ? `${summary} — ${firstProblem}` : summary)
       await load()
     } catch (reason: any) {
       setError(reason?.message || copy.updateError)

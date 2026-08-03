@@ -1,6 +1,6 @@
 <!-- docs/portables/provider-hub-operations-runbook.md -->
 
-# Provider Hub — operations runbook
+# Provider Connection Hub Software — operations runbook
 
 Written for the team that will install this and be on the hook for it. Every step
 is something you can do from the archive you were given; where a step depends on

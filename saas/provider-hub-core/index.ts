@@ -1,3 +1,4 @@
+// saas/provider-hub-core/index.ts
 export { executeProviderLiveDataRead } from './live-data-read-adapter.ts'
 export type {
   ProviderLiveDataDigestPort,
@@ -8,6 +9,15 @@ export type {
   ProviderLiveDataTransportResponse,
 } from './live-data-read-adapter.ts'
 export { PROVIDER_LIVE_DATA_READ_EVIDENCE_SCHEMA_VERSION, createProviderLiveDataReadEvidence } from './live-data-read-evidence.ts'
+// ── Real transport, shipped rather than specified ────────────────────────────
+// Both ports a buyer used to have to implement themselves. createHttpsReadTransport performs
+// the read — refusing a cross-origin redirect, because that is where a credential in an
+// Authorization header gets handed to somebody else — and createSha256DigestPort hashes with
+// the runtime's own SHA-256 so two records of the same payload cannot disagree.
+export { createHttpsReadTransport, createSha256DigestPort } from './transports/https-read.ts'
+export type { HttpsReadAuth, HttpsReadOptions } from './transports/https-read.ts'
+export type { ProviderLiveDataProductionAuthorization } from './live-data-read-adapter.ts'
+
 export { PROVIDER_HUB_ACCEPTANCE_SCHEMA, runProviderHubAcceptance } from './acceptance-harness.ts'
 export type { ProviderHubAcceptanceOptions, ProviderHubAcceptanceResult, ProviderHubCheck, ProviderHubCheckId } from './acceptance-harness.ts'
 export type { ProviderLiveDataReadEvidence, ProviderLiveDataReadState } from './live-data-read-evidence.ts'

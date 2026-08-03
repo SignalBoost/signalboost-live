@@ -30,6 +30,16 @@
 // brand to a different one, and will not report success for a call it did not make. Every
 // refusal names the missing thing.
 //
+// MEDIA DATABASES GET THE SAME THREE-WAY TREATMENT, with one honest difference: NONE of them
+// publishes an open developer API. Prowly states plainly that it has none; Cision, Meltwater
+// and Muck Rack expose theirs only under an enterprise contract. So there is no built-in tier
+// here and there should not be one — a buyer whose contract includes API access DECLARES it,
+// and a buyer whose does not is told at configuration time rather than at verification time.
+//
+// That asymmetry is worth understanding before selling this: the wire side SENDS and now works
+// out of the box; the database side only VERIFIES a contact the buyer already has, and verifies
+// nothing at all unless they own a subscription with API access.
+//
 // PURE OF HOST CONCERNS: `fetch` and `FormData` are global in Node 18+, so there is no
 // dependency, no SDK, no environment read and no import outside this portable.
 
@@ -71,6 +81,31 @@ export type DeclaredWireRecipe = {
   currency?: string
 }
 
+/**
+ * A media database reachable by one documented REST call.
+ *
+ * `found` is the only field that matters to the adapter: it refuses to dispatch to a contact the
+ * database does not confirm. So the recipe says where in the vendor's response that answer
+ * lives, rather than assuming every vendor spells it the same way.
+ */
+export type DeclaredDatabaseRecipe = {
+  brand: string
+  verifyUrl: string
+  auth: 'bearer' | 'api-key-header' | 'basic'
+  authHeader?: string
+  credential: string
+  username?: string
+  /** What this vendor calls the contact and publication fields on the way in. */
+  fieldMap?: { contact?: string; publication?: string; beat?: string }
+  /** Where the yes/no lives in the response. Defaults to `found`, then `verified`. */
+  foundField?: string
+  /** GET with query parameters instead of a POST body. Some databases only offer lookup. */
+  method?: 'GET' | 'POST'
+  staticFields?: Record<string, unknown>
+  priceCents?: number
+  currency?: string
+}
+
 export type PressRunnerConfig = {
   /** Business Wire, implemented in full. */
   businessWire?: BusinessWireConfig & { priceCents?: number; currency?: string }
@@ -83,6 +118,15 @@ export type PressRunnerConfig = {
   delegatedWires?: Array<{ brand: string; bridgeUrl?: string; note?: string }>
   /** Which brand `pr_wire` uses when several are configured. Defaults to the only one. */
   preferredWire?: string
+  /** Media databases reachable by one REST call, declared rather than coded. */
+  declaredDatabases?: DeclaredDatabaseRecipe[]
+  /**
+   * Databases the buyer owns but cannot reach programmatically — the common case, because
+   * none of the major vendors publishes an open API. Named so the refusal is informative.
+   */
+  delegatedDatabases?: Array<{ brand: string; note?: string }>
+  /** Which database `media_database` uses when several are configured. */
+  preferredDatabase?: string
 }
 
 function result(ok: boolean, status: number, outputs: Record<string, unknown>, extra: Partial<RunnerResult> = {}): RunnerResult {
@@ -93,7 +137,7 @@ function refuse(error: string): RunnerResult {
   return { ok: false, status: 0, outputs: {}, error }
 }
 
-function authHeaders(recipe: DeclaredWireRecipe): Record<string, string> {
+function authHeaders(recipe: { auth: 'bearer' | 'api-key-header' | 'basic'; credential: string; username?: string; authHeader?: string }): Record<string, string> {
   if (recipe.auth === 'bearer') return { authorization: `Bearer ${recipe.credential}` }
   if (recipe.auth === 'basic') {
     const pair = `${recipe.username ?? ''}:${recipe.credential}`
@@ -151,6 +195,44 @@ async function runDeclaredWire(recipe: DeclaredWireRecipe, action: string, varia
   }
 }
 
+async function runDeclaredDatabase(recipe: DeclaredDatabaseRecipe, action: string, variables: Record<string, unknown>): Promise<RunnerResult> {
+  if (action !== 'verify_contact') return refuse(`${recipe.brand} does not support the action "${action}".`)
+  const map = recipe.fieldMap || {}
+  const fields: Record<string, unknown> = {
+    ...(recipe.staticFields || {}),
+    [map.contact || 'contact']: variables.contact ?? '',
+    [map.publication || 'publication']: variables.publication ?? '',
+  }
+  if (variables.beat) fields[map.beat || 'beat'] = variables.beat
+
+  try {
+    let response: Response
+    if ((recipe.method || 'POST') === 'GET') {
+      const url = new URL(recipe.verifyUrl)
+      for (const [key, value] of Object.entries(fields)) url.searchParams.set(key, String(value ?? ''))
+      response = await fetch(url.toString(), { headers: authHeaders(recipe) })
+    } else {
+      response = await fetch(recipe.verifyUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...authHeaders(recipe) },
+        body: JSON.stringify(fields),
+      })
+    }
+    const body = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    if (!response.ok) return result(false, response.status, body ?? {}, { error: `${recipe.brand} returned HTTP ${response.status}.` })
+    // The answer is read from where the buyer said it lives. A missing field is treated as NOT
+    // FOUND rather than as found — the adapter refuses to dispatch on an unverified contact,
+    // and defaulting the other way would turn a parsing miss into a send.
+    const key = recipe.foundField || ''
+    const found = key
+      ? Boolean(body[key])
+      : Boolean(body.found ?? body.verified ?? false)
+    return result(true, response.status, { ...body, found }, {})
+  } catch (error) {
+    return refuse(`Could not reach ${recipe.brand}: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 /**
  * Build a runner from credentials.
  *
@@ -187,6 +269,13 @@ export function createPressRunner(config: PressRunnerConfig): RunnerPort {
 
   return {
     async loadConfig(providerId: string): Promise<RunnerProviderConfig | null> {
+      if (providerId === 'media_database') {
+        const preferred = config.preferredDatabase?.toLowerCase()
+        const recipes = config.declaredDatabases || []
+        const recipe = preferred ? recipes.find(entry => entry.brand.toLowerCase() === preferred) : recipes[0]
+        if (!recipe) return { connected: false, priceCents: 0, currency: 'USD' }
+        return { connected: Boolean(recipe.verifyUrl && recipe.credential), priceCents: recipe.priceCents ?? 0, currency: recipe.currency || 'USD' }
+      }
       if (providerId !== 'pr_wire') return null
       const chosen = chooseWire()
       if (chosen.kind === 'none') return { connected: false, priceCents: 0, currency: 'USD' }
@@ -205,8 +294,20 @@ export function createPressRunner(config: PressRunnerConfig): RunnerPort {
     },
 
     async run(providerId: string, action: string, variables: Record<string, unknown>): Promise<RunnerResult> {
+      if (providerId === 'media_database') {
+        const preferred = config.preferredDatabase?.toLowerCase()
+        const recipes = config.declaredDatabases || []
+        const recipe = preferred ? recipes.find(entry => entry.brand.toLowerCase() === preferred) : recipes[0]
+        if (recipe) return runDeclaredDatabase(recipe, action, variables)
+        const gated = (config.delegatedDatabases || []).find(entry => !preferred || entry.brand.toLowerCase() === preferred)
+        if (gated) {
+          return refuse(gated.note || `${gated.brand} does not expose an API on your plan, so a contact cannot be verified automatically. Verify it in their interface, or supply targets you have already checked.`)
+        }
+        return refuse('No media database is configured. None of the major vendors publishes an open API, so this needs a subscription whose contract includes API access — declare it, or supply contacts you have verified yourself.')
+      }
+
       if (providerId !== 'pr_wire') {
-        return refuse(`This runner handles pr_wire only; "${providerId}" was requested. Configure a runner for that provider or leave it unconfigured — an unconfigured provider is reported, never simulated.`)
+        return refuse(`This runner handles pr_wire and media_database; "${providerId}" was requested. Configure a runner for that provider or leave it unconfigured — an unconfigured provider is reported, never simulated.`)
       }
 
       const chosen = chooseWire()
@@ -243,6 +344,7 @@ export function createPressRunner(config: PressRunnerConfig): RunnerPort {
  */
 export function describePressRunner(config: PressRunnerConfig): {
   wires: Array<{ brand: string; reachable: boolean; how: string }>
+  databases: Array<{ brand: string; reachable: boolean; how: string }>
   ready: boolean
 } {
   const wires: Array<{ brand: string; reachable: boolean; how: string }> = []
@@ -266,5 +368,19 @@ export function describePressRunner(config: PressRunnerConfig): {
       how: entry.bridgeUrl ? 'Reached through an endpoint you run.' : entry.note || 'No public API. Submit through the vendor portal.',
     })
   }
-  return { wires, ready: wires.some(wire => wire.reachable) }
+  const databases: Array<{ brand: string; reachable: boolean; how: string }> = []
+  for (const recipe of config.declaredDatabases || []) {
+    databases.push({ brand: recipe.brand, reachable: Boolean(recipe.verifyUrl && recipe.credential), how: 'Declared REST endpoint.' })
+  }
+  for (const entry of config.delegatedDatabases || []) {
+    databases.push({ brand: entry.brand, reachable: false, how: entry.note || 'No API on this plan. Verify contacts in the vendor interface.' })
+  }
+
+  return {
+    wires,
+    databases,
+    // Ready means a release can actually be SENT. Contact verification is a safeguard on top of
+    // that, not a precondition for it — a buyer with a verified list of their own is ready.
+    ready: wires.some(wire => wire.reachable),
+  }
 }

@@ -1,3 +1,4 @@
+// saas/lib/supervisor/executors/index.ts
 export * from './executor-types.ts'
 export * from './errors.ts'
 export * from './executor-registry.ts'
@@ -11,3 +12,4 @@ export * from './portable-browser-executor.ts'
 export * from './manual-executor.ts'
 export * from './owner-notifier.ts'
 export * from './create-supervisor-dispatcher.ts'
+export * from './rollback-coordinator.ts'

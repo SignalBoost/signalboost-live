@@ -1,6 +1,6 @@
 <!-- docs/portables/press-media-security-and-data-handling.md -->
 
-# Press & Media — security and data handling
+# Press & Media Engine Software — security and data handling
 
 Written for a security reviewer filling in a vendor questionnaire. Every claim
 here is checkable against the archive you were given; where something has not

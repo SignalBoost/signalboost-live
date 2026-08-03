@@ -16,7 +16,18 @@ export { findPublications, leadToTarget } from './discovery.ts'
 // credentials and returns a working runner: Business Wire built in, any other wire with a REST
 // endpoint declared rather than coded, and brands with no public API named honestly instead of
 // failing at send time.
-export { createPressRunner, describePressRunner } from './runners/index.ts'
+export { createPressRunner, describePressRunner, checkWireConnection } from './runners/index.ts'
+// Pre-staged vendor profiles: the popular wires and media databases staged down to the one or
+// two values only the buyer's own contract can supply.
+export {
+  listWireProfiles,
+  getWireProfile,
+  fillWireProfile,
+  listDatabaseProfiles,
+  getDatabaseProfile,
+  fillDatabaseProfile,
+} from './runners/wire-profiles.ts'
+export type { WireProfile, DatabaseProfile, WireAuthScheme, WireProfileSecrets, ProfileFillResult } from './runners/wire-profiles.ts'
 export type { PressRunnerConfig, DeclaredWireRecipe, DeclaredDatabaseRecipe } from './runners/index.ts'
 export {
   submitBusinessWireRelease,

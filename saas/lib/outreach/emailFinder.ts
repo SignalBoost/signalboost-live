@@ -25,6 +25,33 @@ const REJECT = [
   'mailer-daemon', 'postmaster', 'sentry.io', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.css', '.js',
 ]
 
+// INBOXES THAT MUST NEVER RECEIVE COLD SALES, matched on the WHOLE local part rather
+// than as a substring, so a real desk like `sales@` or `securityservices@` is untouched.
+//
+// A real campaign addressed a draft to privacy@ — the inbox a company publishes so
+// people can exercise data rights, staffed by whoever answers regulators. A cold sales
+// pitch landing there is the single most reliable way to convert a prospect into a
+// complaint, and under GDPR it is an unforced error.
+//
+// The rule already existed. It was applied ONLY to addresses a human SUPPLIED, and the
+// comment above it in growthPlans.ts claimed a supplied address "must clear exactly the
+// bar a discovered one does" — which was backwards: the discovered path cleared no bar
+// at all. This is where discovery gets the same bar, at the point addresses are found.
+const ROLE_BLOCKED_LOCALS = new Set([
+  'test', 'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'postmaster', 'mailer-daemon',
+  // Data protection, legal and security desks — obligation inboxes, not commercial ones.
+  'privacy', 'dataprotection', 'data-protection', 'dpo', 'gdpr', 'compliance',
+  'legal', 'abuse', 'security', 'infosec', 'soc', 'psirt',
+  // Desks staffed for a different purpose entirely; a sales pitch is noise in them.
+  'careers', 'jobs', 'recruiting', 'recruitment', 'hr', 'unsubscribe', 'webmaster',
+])
+
+function isRoleBlocked(email: string): boolean {
+  const local = email.split('@')[0].trim().toLowerCase()
+  // Strip a plus-tag so privacy+web@ is caught alongside privacy@.
+  return ROLE_BLOCKED_LOCALS.has(local.split('+')[0])
+}
+
 const isEmail = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)
 
 function originOf(raw: string): string | null {
@@ -72,6 +99,7 @@ function extractEmails(html: string): string[] {
 function looksReal(email: string): boolean {
   if (!isEmail(email) || email.length > 100) return false
   if (REJECT.some(bad => email.includes(bad))) return false
+  if (isRoleBlocked(email)) return false
   return true
 }
 

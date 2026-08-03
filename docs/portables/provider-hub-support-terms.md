@@ -1,6 +1,6 @@
 <!-- docs/portables/provider-hub-support-terms.md -->
 
-# Provider Hub — proposed support framework
+# Provider Connection Hub Software — proposed support framework
 
 **Status: commercial draft for counsel and capacity review. Not an SLA, not incorporated into any agreement, and not ready to sign.**
 

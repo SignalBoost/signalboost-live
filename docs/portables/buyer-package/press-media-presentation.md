@@ -20,9 +20,11 @@ That is why generative tools have not displaced the PR agency. The output is flu
 
 ## 2. What it is
 
-Press outreach as **injectable behaviour** that runs inside your environment: a provider registry, five adapter shapes, a discovery layer, and a factual-discipline kernel that constrains what generated copy is permitted to assert.
+Press outreach as **injectable behaviour** that runs inside your environment: a provider registry, five adapter shapes, a discovery layer, a factual-discipline kernel that constrains what generated copy is permitted to assert — and a **working transport, so it sends**.
 
-You supply the model, the mail transport, the notification path, the provider accounts, and the record of who your company actually is. The portable supplies the behaviour and the discipline.
+**Two paths send today with credentials alone.** Free editorial submission goes out through your own mail transport. Business Wire goes out through a shipped integration built against their published API: you enter your Connect login, your source key, and pick your account and circuit from your own account. No code.
+
+You supply the model, the mail transport, the notification path, the provider accounts, and the record of who your company actually is. The portable supplies the behaviour, the discipline, and the sending.
 
 It holds no credential of ours, runs on no infrastructure of ours, and calls nothing of ours. The graph walk that builds each release reports **zero** host imports on the buyer surface — verified by the packager, which refuses to produce an archive if the boundary leaks.
 
@@ -53,26 +55,29 @@ Two properties worth noting for a communications team:
 
 Regional coverage is native-language rather than translated: Brazilian *jornal* and *revista*, Mexican *periódico*, Polish *gazeta*, Russian *газета* are recognised as publications with their own editorial address conventions, not filtered out because they do not look English.
 
-## 5. Providers: categories, not integrations
+## 5. What actually sends, and what does not
 
-| Adapter | Covers |
+Stated as a table rather than a claim, because this is the question that decides whether you can use it next week.
+
+| | Status |
 | --- | --- |
-| Free submission | editorial submission by email or web form |
-| PR wire | Business Wire, PR Newswire, EIN Presswire, GlobeNewswire, PRWeb |
-| Media database | Cision, Muck Rack, Meltwater, Prowly, Agility PR |
-| Ad platform | paid placement |
-| Direct | a publication you already have a relationship with |
+| **Free editorial submission** | **Works.** Goes out through your own mail transport. |
+| **Business Wire** | **Works on credentials alone.** Shipped integration against their published API. |
+| Other wires — PR Newswire, GlobeNewswire, PRWeb | You fill in a form: endpoint, auth style, field names. No code. |
+| EIN Presswire | **No developer API exists.** Named as delegated, so you know at setup rather than at send time. Submit through their portal, or point us at an endpoint you run. |
+| Media databases — Cision, Muck Rack, Meltwater, Prowly | Verification only, and only if your contract includes API access. None of them publishes an open API. |
 
-An adapter never hand-rolls an HTTP call and never touches a credential. It names a registered action and your host executes it with your provider configuration and your secret store.
+**Two fields are picked from your own account, never typed:** which account the release is billed to, and which circuit it goes out on. A typed account posts under the wrong entity; a typed circuit buys the wrong reach at the wrong price. Neither mistake is visible until after the release is out, so we read both live and let a person choose.
 
-**Adding a wire brand is a registry row, not a code change.** The answer to "which vendors do you support?" is: whichever you already pay for.
+**One honest asymmetry.** The wire side sends. The database side only *verifies* a contact you already have — and verification is a safeguard on top of sending, never a precondition for it. If you have your own checked list, you are ready today.
 
-If your PR licence sits with your agency rather than with you — common at this size — that is expected. Free submission is a first-class adapter, not a fallback.
+If your PR licence sits with your agency rather than with you — common at this size — that is expected, and it is why free submission is a first-class path rather than a fallback.
 
 ## 6. What you implement
 
 | Boundary | What you supply |
 | --- | --- |
+| Wire transport | **nothing for Business Wire** — credentials only. A form for other wires. |
 | AI | your model and your key |
 | Email | your transport |
 | Notification | how your owner is told, at submission and again at publication |
@@ -102,7 +107,8 @@ The result is a signed, JSON-serialisable record. Keep it: it is your acceptance
 
 ## 9. What it does not do
 
-- It does not include any press, wire, media-database or advertising account.
+- It does not include any press, wire, media-database or advertising **account**. The Business Wire transport is shipped; the contract and the invoice are yours.
+- It does not send through wires that publish no API. EIN Presswire is named rather than pretended.
 - It does not include an AI provider, a mail transport, or a datastore.
 - It does not guarantee coverage. No system can. It puts an accurate, factually constrained pitch in front of the right desk.
 - It does not decide who to contact. It proposes; a person approves.

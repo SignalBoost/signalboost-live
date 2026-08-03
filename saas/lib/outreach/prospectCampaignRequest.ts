@@ -1,3 +1,4 @@
+// saas/lib/outreach/prospectCampaignRequest.ts
 // Deterministic recognition for owner requests that should become a durable
 // background prospect-campaign job instead of one long chat/model request.
 
@@ -92,7 +93,11 @@ export function parseProspectCampaignRequest(
     offer,
     targetCriteria,
     region: extractRegion(input),
-    requestedCount: Math.min(rawCount, 25),
+    // NO SILENT CAP. This clamped every request to 25, so "find 30 companies" became a
+    // 25-company job and nothing said so — the operator watched a campaign work towards a
+    // number they had never asked for. The worker applies its own sanity bound and RECORDS
+    // it when it applies, which is the difference between a limit and a lie.
+    requestedCount: rawCount,
     language: normalizeLanguage(language),
   }
 }

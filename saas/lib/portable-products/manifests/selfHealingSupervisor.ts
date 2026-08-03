@@ -22,19 +22,21 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
   // Production browser execution is additionally gated behind productionBrowserExecutionEnabled;
   // without that flag the policy routes to human approval instead.
   executionModes: Object.freeze([
-    'automated-api-execution-against-your-registered-capabilities',
+    'automatic-unattended-repair-of-steps-that-are-not-financial-destructive-or-credential',
+    'signed-approval-required-only-for-money-deletion-or-credential-changes',
+    'you-authorise-each-incident-plan-once-then-its-safe-steps-run-unattended',
     'automatic-failover-from-api-to-browser-or-to-a-human',
     'browser-tasks-prepared-under-approval-for-your-own-browser-runtime-to-run',
     'manual-operator-control-available-at-any-step',
   ]),
-  shortDescription: 'Self-healing software: executes approved repairs against the capabilities you register, verifies the result, and records the evidence and reasoning behind every conclusion.',
+  shortDescription: 'Self-healing software: repairs failures automatically within the capabilities you register, stopping for a signed approval only on financial, destructive or credential changes.',
   // WHAT THIS SENTENCE DELIBERATELY DOES NOT SAY: reversible. RepairPlan declares
   // rollbackSteps and the fingerprinting hashes them, but no code executes them — the
   // verifier runs the plan's verificationSteps and nothing runs a rollback. A first
   // draft of this line claimed repairs were "reversible if the verification fails" and
   // it was checked against the executors before shipping, which is the only reason the
   // claim did not reach a buyer. Rollback sits in futureFeatures until it runs.
-  longDescription: 'A governed self-healing supervisor. It detects a failure, diagnoses the cause with the evidence and the reasoning recorded, then repairs it by executing bounded steps that are approved before they run and verified after. Execution is default-deny: a step runs only when it matches a capability the buyer has explicitly registered and carries a signed approval, so the supervisor can never act outside the authority it was given.',
+  longDescription: 'A governed self-healing supervisor. It detects a failure, diagnoses the cause with the evidence and reasoning recorded, then repairs it. Repair steps that match a capability you have registered and are not financial, destructive or credential changes execute unattended — no one is paged and no one waits. Steps that touch money, delete or disable something, or alter a key, permission or role stop for a signed approval every time, and a step matching no registered capability is treated as destructive and stops as well. The boundary is the point: automation is what makes it useful at three in the morning, and the carve-out is what makes it acceptable to a risk committee.',
   category: 'infrastructure',
   status: 'live',
   maturity: 'production',
@@ -44,7 +46,16 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
   requiredCapabilities: Object.freeze(['failure-detection', 'repair-proposals', 'approved-repair-execution', 'post-repair-verification']),
   optionalCapabilities: Object.freeze(['approval-gates']),
   dependencies: Object.freeze(['supervisor-policy']),
-  exclusions: Object.freeze(['autonomous-production-repair']),
+  // 'autonomous-production-repair' USED TO BE LISTED HERE AND IT WAS WRONG — misleading in
+  // the costly direction. It implied nothing runs without a human, so outreach drafts told
+  // prospects the product never repairs on its own, which is the opposite of the design and
+  // throws away the reason to buy. api-executor.ts gates on `if (verdict.dangerous)`: a
+  // non-dangerous step matching a registered capability falls straight through to the runner
+  // and executes. The real, permanent exclusions are the two below.
+  exclusions: Object.freeze([
+    'unapproved-financial-destructive-or-credential-changes',
+    'execution-outside-your-registered-capability-list',
+  ]),
   architectureReferences: Object.freeze(['supervisor', 'policy-engine', 'durable-coordination']),
   documentationReferences: Object.freeze(['docs/portables/self-healing-integration-guide.md']),
   futureFeatures: Object.freeze(['operator-catalog', 'automated-rollback-execution']),

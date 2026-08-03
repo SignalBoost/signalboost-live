@@ -27,6 +27,10 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
     'you-authorise-each-incident-plan-once-then-its-safe-steps-run-unattended',
     'automatic-failover-from-api-to-browser-or-to-a-human',
     'browser-tasks-prepared-under-approval-for-your-own-browser-runtime-to-run',
+    'a-clean-state-checkpoint-is-captured-before-any-repair-changes-anything',
+    'atomic-restore-of-the-whole-execution-context-when-a-repair-does-not-verify',
+    'repairs-that-cannot-be-checkpointed-are-blocked-before-they-start-not-after',
+    'a-person-is-called-whenever-an-undo-would-be-unsafe-or-does-not-restore',
     'manual-operator-control-available-at-any-step',
   ]),
   shortDescription: 'Self-healing software: repairs failures automatically within the capabilities you register, stopping for a signed approval only on financial, destructive or credential changes.',
@@ -43,7 +47,7 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
   publicVisible: true,
   licensingAvailable: true,
   targetAudience: Object.freeze(['platform operators', 'reliability teams']),
-  requiredCapabilities: Object.freeze(['failure-detection', 'repair-proposals', 'approved-repair-execution', 'post-repair-verification']),
+  requiredCapabilities: Object.freeze(['failure-detection', 'repair-proposals', 'approved-repair-execution', 'post-repair-verification', 'automatic-rollback-on-failed-verification', 'transactional-execution-boundaries', 'point-in-time-state-restore']),
   optionalCapabilities: Object.freeze(['approval-gates']),
   dependencies: Object.freeze(['supervisor-policy']),
   // 'autonomous-production-repair' USED TO BE LISTED HERE AND IT WAS WRONG — misleading in
@@ -54,10 +58,11 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
   // and executes. The real, permanent exclusions are the two below.
   exclusions: Object.freeze([
     'unapproved-financial-destructive-or-credential-changes',
+    'automatic-reversal-of-effects-already-observed-outside-your-systems',
     'execution-outside-your-registered-capability-list',
   ]),
   architectureReferences: Object.freeze(['supervisor', 'policy-engine', 'durable-coordination']),
   documentationReferences: Object.freeze(['docs/portables/self-healing-integration-guide.md']),
-  futureFeatures: Object.freeze(['operator-catalog', 'automated-rollback-execution']),
+  futureFeatures: Object.freeze(['operator-catalog']),
   supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
 })

@@ -1,6 +1,6 @@
 <!-- docs/portables/buyer-package/press-media-presentation.md -->
 
-# Press & Media — Buyer Evaluation
+# Press & Media Engine Software — Buyer Evaluation
 
 **Release:** `1.0.0-rc.1` design-partner evaluation
 **Package:** `@portable/press-media`

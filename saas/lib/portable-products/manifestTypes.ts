@@ -22,6 +22,21 @@ export interface PortableProductManifest {
    * it is declared here once and read everywhere, exactly like displayName.
    */
   readonly categoryLabel?: string
+  /**
+   * HOW THE WORK GETS DONE — the execution channels this product actually supports,
+   * in the buyer's vocabulary. OPTIONAL, and only declared once each channel has been
+   * verified in the code rather than assumed from a directory name.
+   *
+   * It exists because outreach drafts described these products as though a human ran
+   * every step. The opposite is true and it is a primary reason to buy: the work is
+   * automated, with a human able to take control at any point. That is a product fact,
+   * so it is declared here rather than retyped into each campaign brief.
+   *
+   * Each entry must be honest about its LIMIT as well as its capability — see the
+   * Supervisor's browser entry, which says "prepares" rather than "runs" because the
+   * shipped adapter emits a dry-run package for the buyer's own runtime to execute.
+   */
+  readonly executionModes?: readonly string[]
   readonly category: PortableProductCategory
   readonly status: PortableProductStatus
   readonly maturity: PortableProductMaturity

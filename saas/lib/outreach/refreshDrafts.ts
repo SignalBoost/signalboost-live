@@ -55,6 +55,8 @@ export interface RefreshOutcome {
 export interface RefreshReport {
   ok: boolean
   dryRun: boolean
+  /** Pending rows still awaiting a rewrite after this pass. The caller loops until zero. */
+  remaining: number
   examined: number
   refreshed: number
   skipped: number
@@ -77,14 +79,39 @@ function admin() {
 // means skip — a campaign selling something the manifests do not describe gets no rewrite
 // rather than a rewrite against the closest-looking product.
 
+// ONE ROW IS ONE MODEL CALL, AND THAT IS THE WHOLE DESIGN CONSTRAINT.
+//
+// The first version took a limit of 100 and worked through it one row at a time. A
+// hundred sequential model calls is fifteen minutes of work inside a function that gets
+// a few, so the platform killed it and returned a plain-text error page — which the
+// browser then tried to parse as JSON, producing "Unexpected token 'A'". Nothing had
+// been written, and nothing said so.
+//
+// So the work is bounded twice: rows run in CONCURRENT batches, and the pass stops on a
+// TIME BUDGET well inside the function's own ceiling, reporting what is left. The caller
+// loops. A refresh of any size now completes as a series of small, honest passes rather
+// than one request that dies at the end.
+const CONCURRENCY = 6
+const TIME_BUDGET_MS = 45_000
+
 export async function refreshPendingDrafts(options: {
   dryRun?: boolean
   limit?: number
   productKey?: string | null
+  /**
+   * How many pending rows to skip. A rewritten row STAYS pending — that is the point, it
+   * still needs approving — so progress cannot be measured by status. The caller pages
+   * with an offset over a stable oldest-first ordering instead, which also means a row
+   * that failed twice is not retried forever ahead of rows never attempted.
+   */
+  offset?: number
 } = {}): Promise<RefreshReport> {
+  const startedAt = Date.now()
+  const remainingMs = () => TIME_BUDGET_MS - (Date.now() - startedAt)
   const dryRun = options.dryRun !== false
-  const limit = Math.max(1, Math.min(options.limit ?? 200, 500))
-  const empty: RefreshReport = { ok: false, dryRun, examined: 0, refreshed: 0, skipped: 0, failed: 0, outcomes: [] }
+  const limit = Math.max(1, Math.min(options.limit ?? 24, 60))
+  const offset = Math.max(0, options.offset ?? 0)
+  const empty: RefreshReport = { ok: false, dryRun, remaining: 0, examined: 0, refreshed: 0, skipped: 0, failed: 0, outcomes: [] }
 
   const db = admin()
   if (!db) return { ...empty, error: 'Supabase service credentials are not configured.' }
@@ -93,7 +120,7 @@ export async function refreshPendingDrafts(options: {
     .select('id,business_name,business_url,contact_email,product_key,sender_key,outreach_message')
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
   if (options.productKey) query = query.eq('product_key', productKeyOf(options.productKey))
 
   const { data: rows, error } = await query
@@ -101,7 +128,7 @@ export async function refreshPendingDrafts(options: {
 
   const outcomes: RefreshOutcome[] = []
 
-  for (const row of rows || []) {
+  async function refreshRow(row: any): Promise<void> {
     const base = {
       outreachId: row.id as string,
       businessName: String(row.business_name || ''),
@@ -131,11 +158,11 @@ export async function refreshPendingDrafts(options: {
 
     if (!manifests.length) {
       outcomes.push({ ...base, status: 'skipped', reason: `Nothing identifies a product for this row — product_key is "${row.product_key || '(none)'}" and the existing message names no known product.` })
-      continue
+      return
     }
     if (!row.business_url) {
       outcomes.push({ ...base, status: 'skipped', reason: 'Row has no business_url, so the message cannot be localized to the recipient.' })
-      continue
+      return
     }
 
     try {
@@ -162,7 +189,7 @@ export async function refreshPendingDrafts(options: {
       const drafted = await draftMessageFor(job, candidate)
       if (!drafted || drafted.length < 40) {
         outcomes.push({ ...base, status: 'failed', reason: 'The regenerated message came back empty or too short; the existing draft was left untouched.' })
-        continue
+        return
       }
 
       const finished = await finishOutreachBody({
@@ -174,7 +201,7 @@ export async function refreshPendingDrafts(options: {
 
       if (dryRun) {
         outcomes.push({ ...base, status: 'refreshed', reason: `Dry run using: ${manifests.map(item => item.displayName).join(' + ')}. Nothing was written.`, previousMessage: String(row.outreach_message || ''), newMessage: finished })
-        continue
+        return
       }
 
       const { error: writeError } = await db.from(TABLE)
@@ -186,7 +213,7 @@ export async function refreshPendingDrafts(options: {
 
       if (writeError) {
         outcomes.push({ ...base, status: 'failed', reason: writeError.message })
-        continue
+        return
       }
       outcomes.push({ ...base, status: 'refreshed', reason: `Rewritten using: ${manifests.map(item => item.displayName).join(' + ')}.`, previousMessage: String(row.outreach_message || ''), newMessage: finished })
     } catch (err: any) {
@@ -194,9 +221,28 @@ export async function refreshPendingDrafts(options: {
     }
   }
 
+  // Concurrent batches, stopped by the time budget rather than by the platform.
+  const queue = [...(rows || [])]
+  while (queue.length && remainingMs() > 8_000) {
+    const batch = queue.splice(0, CONCURRENCY)
+    // refreshRow never throws — a failed row is recorded as an outcome, so one bad row
+    // cannot discard the work of the five running beside it.
+    await Promise.all(batch.map(row => refreshRow(row)))
+  }
+
+  // Total pending, so the caller knows how much of the queue is left after this page.
+  const { count: totalPending } = await db.from(TABLE)
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending')
+
+  // Rows this pass did not get to (time budget) plus everything past this page.
+  const reached = outcomes.length
+  const remaining = Math.max(0, (totalPending || 0) - (offset + reached))
+
   return {
     ok: true,
     dryRun,
+    remaining,
     examined: outcomes.length,
     refreshed: outcomes.filter(item => item.status === 'refreshed').length,
     skipped: outcomes.filter(item => item.status === 'skipped').length,

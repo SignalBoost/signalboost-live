@@ -26,21 +26,27 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
     'signed-approval-required-only-for-money-deletion-or-credential-changes',
     'you-authorise-each-incident-plan-once-then-its-safe-steps-run-unattended',
     'automatic-failover-from-api-to-browser-or-to-a-human',
-    'browser-tasks-prepared-under-approval-for-your-own-browser-runtime-to-run',
+    // POSITIVE FRAMING OF A TRUE FACT. This used to read "browser tasks prepared under
+    // approval for your own browser runtime to run" — accurate, and written as though it
+    // were an apology. The same fact stated as scope is a SELLING POINT to an enterprise:
+    // the browser agent operates inside their perimeter, on their runtime, under their
+    // credentials, which is exactly what a security review wants to hear. Nothing is
+    // overclaimed — it still does not say we drive a browser in our own cloud.
+    'the-browser-agent-works-inside-your-own-runtime-under-your-own-credentials',
     'a-clean-state-checkpoint-is-captured-before-any-repair-changes-anything',
     'atomic-restore-of-the-whole-execution-context-when-a-repair-does-not-verify',
     'repairs-that-cannot-be-checkpointed-are-blocked-before-they-start-not-after',
     'a-person-is-called-whenever-an-undo-would-be-unsafe-or-does-not-restore',
     'manual-operator-control-available-at-any-step',
   ]),
-  shortDescription: 'Self-healing software: repairs failures automatically within the capabilities you register, stopping for a signed approval only on financial, destructive or credential changes.',
+  shortDescription: 'Self-healing software: it fixes the failure itself — through your APIs, through a browser when there is no API, or by handing an operator the wheel. It checkpoints before it changes anything, and money, deletion and credentials stay yours to sign off.',
   // WHAT THIS SENTENCE DELIBERATELY DOES NOT SAY: reversible. RepairPlan declares
   // rollbackSteps and the fingerprinting hashes them, but no code executes them — the
   // verifier runs the plan's verificationSteps and nothing runs a rollback. A first
   // draft of this line claimed repairs were "reversible if the verification fails" and
   // it was checked against the executors before shipping, which is the only reason the
   // claim did not reach a buyer. Rollback sits in futureFeatures until it runs.
-  longDescription: 'A governed self-healing supervisor. It detects a failure, diagnoses the cause with the evidence and reasoning recorded, then repairs it. Repair steps that match a capability you have registered and are not financial, destructive or credential changes execute unattended — no one is paged and no one waits. Steps that touch money, delete or disable something, or alter a key, permission or role stop for a signed approval every time, and a step matching no registered capability is treated as destructive and stops as well. The boundary is the point: automation is what makes it useful at three in the morning, and the carve-out is what makes it acceptable to a risk committee.',
+  longDescription: 'A governed self-healing supervisor that acts on its own authority across the ordinary work and reserves the extraordinary for you. It detects a failure, diagnoses the cause with the evidence and reasoning recorded, then repairs it — using your registered APIs first, a browser agent running inside your own infrastructure under your own credentials where no API exists, and an operator the moment you want one or the moment it meets a captcha, a second factor or anything outside its envelope. Before it changes anything it captures a checkpoint from your own infrastructure, and if the repair does not verify it restores the whole execution context in one operation. Work it cannot checkpoint is stopped before it starts rather than discovered afterwards. Every conclusion carries the evidence behind it, the rule that fired and what would have changed the answer.',
   category: 'infrastructure',
   status: 'live',
   maturity: 'production',

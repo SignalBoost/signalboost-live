@@ -620,6 +620,13 @@ function offerProfileFor(offer: string): string {
     matched.longDescription ? `In more detail: ${matched.longDescription}` : '',
     matched.requiredCapabilities.length ? `Core capabilities, all of which are real and shipped: ${readable(matched.requiredCapabilities)}` : '',
     matched.optionalCapabilities.length ? `Also available: ${readable(matched.optionalCapabilities)}` : '',
+    // HOW THE WORK GETS DONE. A real draft described these products as though a human
+    // performed every step, when the automation IS the reason to buy — and the fact that
+    // a person can seize control at any point is what makes the automation acceptable to
+    // an enterprise. Both halves have to be said, so both are listed here.
+    matched.executionModes?.length
+      ? `How the work is executed — this is a HEADLINE selling point, not a footnote, so say it: ${readable(matched.executionModes)}. State both halves: the work runs automatically, AND a person can take control at any point. Do not describe the product as something an operator drives by hand.`
+      : '',
     matched.exclusions.length ? `WHAT IT DELIBERATELY DOES NOT DO — never claim any of these: ${readable(matched.exclusions)}` : '',
     matched.targetAudience.length ? `Who it is for: ${readable(matched.targetAudience)}` : '',
   ]
@@ -638,6 +645,8 @@ async function draftMessageFor(
     'Name ONLY the recipient company. Never mention any other company by name: if the notes below happen to list other firms, they are neighbours in a search result, not context about the recipient, and naming them makes the email obviously mass-produced.',
     'Then introduce the offer as the answer. No hype, no guarantees of revenue, rankings, or results.',
     'STATE WHAT THE PRODUCT ACTUALLY DOES, including its headline capability. A description that covers only part of what the product does — for instance saying it detects a problem while omitting that it also repairs it — is a failed email, because the strongest reason to reply has been left out.',
+    'If the fact sheet lists execution modes, the email MUST convey that the product runs automatically and that a human can take over at any point. Automation is why a buyer is interested and human control is why their risk team allows it; an email that implies manual operation throws both away.',
+    'Repeat the fact sheet wording for any limit it states. Where a mode says the product PREPARES something rather than RUNS it, keep that distinction exactly — never upgrade prepares into runs.',
     'When a product fact sheet appears below, it is authoritative: everything it lists is real and shipped, so use it rather than inferring capability from the offer line. Never claim anything it lists as excluded.',
     'One clear call to action at the end.',
     'HARD LIMIT: between 400 and 1,400 characters total. Plain text only, no markdown, no subject line, no signature block.',

@@ -23,6 +23,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { createOutreachDraft } from '@/lib/ai/growthPlans'
 import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import { discoverGithubOrgs } from '@/lib/outreach/sources/github'
+import { portableProductManifests } from '@/lib/portable-products/manifests'
 
 const TABLE = 'prospect_campaign_jobs'
 // A SANITY BOUND, NOT A PRODUCT LIMIT. This was 25 and it silently rewrote every larger
@@ -538,16 +539,60 @@ const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian',
 }
 
+// ── What the product actually does ───────────────────────────────────────────
+//
+// A real campaign pitched the Self-Healing Supervisor as software that DETECTS and
+// EXPLAINS incidents and never once said it REPAIRS them — which is the reason anyone
+// would buy it. Nothing was hallucinated; the model simply had nothing but the free-text
+// offer line from the brief, and it wrote what that line contained.
+//
+// The capability set is already declared, precisely, in the product manifest that the
+// registry and the buyer documents both read. Retyping it into every campaign brief and
+// hoping the model infers the rest is how the headline feature goes missing. So the
+// manifest is resolved here and handed to the drafter as fact.
+//
+// The EXCLUSIONS travel with it, and that is the half that matters most: the Supervisor
+// manifest excludes 'autonomous-production-repair', so telling the model what the product
+// does is also telling it exactly where the claim stops. Capability without its boundary
+// is how honest software acquires a dishonest pitch.
+
+function offerProfileFor(offer: string): string {
+  const needle = clean(offer, 400).toLowerCase()
+  if (!needle) return ''
+
+  const matched = portableProductManifests.find(manifest => {
+    const name = manifest.displayName.toLowerCase()
+    const id = manifest.productId.toLowerCase().replace(/-/g, ' ')
+    return needle.includes(name) || needle.includes(id) || name.includes(needle) || id.includes(needle)
+  })
+  if (!matched) return ''
+
+  const readable = (values: readonly string[]) => values.map(v => v.replace(/[-_]/g, ' ')).join(', ')
+  const lines = [
+    `Product: ${matched.displayName}`,
+    `What it does: ${matched.shortDescription}`,
+    matched.longDescription ? `In more detail: ${matched.longDescription}` : '',
+    matched.requiredCapabilities.length ? `Core capabilities, all of which are real and shipped: ${readable(matched.requiredCapabilities)}` : '',
+    matched.optionalCapabilities.length ? `Also available: ${readable(matched.optionalCapabilities)}` : '',
+    matched.exclusions.length ? `WHAT IT DELIBERATELY DOES NOT DO — never claim any of these: ${readable(matched.exclusions)}` : '',
+    matched.targetAudience.length ? `Who it is for: ${readable(matched.targetAudience)}` : '',
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
 async function draftMessageFor(
   job: ProspectCampaignJob,
   candidate: ProspectCandidate,
 ): Promise<string> {
   const languageName = LANGUAGE_NAMES[job.language] || 'English'
+  const profile = offerProfileFor(job.offer)
   const systemPrompt = [
     'You write short, specific, honest B2B outreach emails that a founder would be comfortable sending under their own name.',
     'Open with the problem this specific company plausibly has, based only on what the brief says about them — never invent facts, customers, metrics, funding, headcount, or a prior conversation.',
     'Name ONLY the recipient company. Never mention any other company by name: if the notes below happen to list other firms, they are neighbours in a search result, not context about the recipient, and naming them makes the email obviously mass-produced.',
     'Then introduce the offer as the answer. No hype, no guarantees of revenue, rankings, or results.',
+    'STATE WHAT THE PRODUCT ACTUALLY DOES, including its headline capability. A description that covers only part of what the product does — for instance saying it detects a problem while omitting that it also repairs it — is a failed email, because the strongest reason to reply has been left out.',
+    'When a product fact sheet appears below, it is authoritative: everything it lists is real and shipped, so use it rather than inferring capability from the offer line. Never claim anything it lists as excluded.',
     'One clear call to action at the end.',
     'HARD LIMIT: between 400 and 1,400 characters total. Plain text only, no markdown, no subject line, no signature block.',
     `Write in ${languageName}.`,
@@ -562,6 +607,8 @@ async function draftMessageFor(
     `Who we are targeting and why: ${job.target_criteria}`,
     '',
     `What we are offering: ${job.offer}`,
+    profile ? '' : '',
+    profile ? `PRODUCT FACT SHEET — authoritative, use it:\n${profile}` : '',
     '',
     'Write the outreach message now.',
   ].filter(Boolean).join('\n')

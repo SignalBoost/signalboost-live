@@ -113,6 +113,33 @@ export function applyOutreachSignature(message: string, senderKey?: string | nul
   // <url> — The SignalBoost Sales Team". Removed so the block below is the real close.
   body = body.replace(new RegExp(`[\\s—-]*${team.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), '').trimEnd()
 
+  // AND ANY SIGN-OFF LEFT STRANDED IN THE MIDDLE. The tail-walk above only reaches the
+  // end of the message, so a team line with anything beneath it survived — which is
+  // exactly what the draft-time compliance footer produced: an unsubscribe sentence sat
+  // below the team name, the walk stopped at the sentence, and real recipients received
+  // "— The SignalBoost Sales Team" twice.
+  //
+  // Only a line that is ENTIRELY the sign-off is removed, optionally preceded by a lone
+  // em-dash separator. A sentence that merely mentions the team by name is left alone,
+  // and the block appended below remains the single close. This also repairs rows
+  // already sitting in the queue, which were drafted before the footer was corrected.
+  body = body
+    .split('\n')
+    .filter((line, index, lines) => {
+      const trimmed = line.trim()
+      const isSignOff = trimmed === team || trimmed === `— ${team}` || trimmed === `- ${team}`
+      if (isSignOff) return false
+      // A separator em-dash whose only purpose was to introduce that sign-off.
+      if ((trimmed === '—' || trimmed === '-') && lines[index + 1]) {
+        const next = lines[index + 1].trim()
+        if (next === team || next === `— ${team}` || next === `- ${team}`) return false
+      }
+      return true
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd()
+
   const closing = [`— ${team}`, contact, link].filter(Boolean).join('\n')
   body = `${body}\n\n${closing}`
 

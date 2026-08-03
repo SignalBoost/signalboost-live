@@ -1,14 +1,27 @@
+// saas/lib/supervisor/orchestrator.ts
 import { incidentSchema, isPlainSerializable, type SerializableValue, type SupervisorIncident } from './incident-schema.ts'
 import { repairPlanSchema, type RepairPlan } from './repair-plan-schema.ts'
 import type { AuditEvent, AuditSink, ExecutionContext, ExecutionResult, Executor, PolicyContext, PolicyDecision, PolicyEngine, SupervisorMode, Thinker, VerificationResult, Verifier } from './execution-contracts.ts'
 import type { ExecutorKind, SupervisorDispatcher } from './executors/index.ts'
+import type { RollbackCoordinator, RollbackOutcome } from './executors/rollback-coordinator.ts'
 
 export type SupervisorOrchestrationResult =
   | { status: 'blocked'; policy?: PolicyDecision; reason: string }
   | { status: 'approval_required'; policy: PolicyDecision; reason: string }
-  | { status: 'completed' | 'unresolved' | 'failed'; policy?: PolicyDecision; execution?: ExecutionResult; verification?: VerificationResult; reason: string }
+  // 'rolled_back' is its own status and not a flavour of 'completed'. The incident was
+  // NOT repaired; the system was returned to where it started. A dashboard that counts a
+  // rollback as a success stops showing anyone that repairs are failing.
+  | { status: 'completed' | 'unresolved' | 'failed' | 'rolled_back'; policy?: PolicyDecision; execution?: ExecutionResult; verification?: VerificationResult; rollback?: RollbackOutcome; reason: string }
 
-export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: PolicyEngine; executor: Executor; verifier: Verifier; audit: AuditSink; mode: SupervisorMode; policyContext?: PolicyContext; executionContext: ExecutionContext; dispatcher?: SupervisorDispatcher; requestedExecutorKind?: ExecutorKind | ((input: { plan: RepairPlan; policy: PolicyDecision }) => ExecutorKind); dispatchIdFactory?: (input: { incident: SupervisorIncident; plan: RepairPlan; policy: PolicyDecision }) => string }
+export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: PolicyEngine; executor: Executor; verifier: Verifier; audit: AuditSink; mode: SupervisorMode; policyContext?: PolicyContext; executionContext: ExecutionContext; dispatcher?: SupervisorDispatcher; requestedExecutorKind?: ExecutorKind | ((input: { plan: RepairPlan; policy: PolicyDecision }) => ExecutorKind); dispatchIdFactory?: (input: { incident: SupervisorIncident; plan: RepairPlan; policy: PolicyDecision }) => string;
+  /**
+   * OPTIONAL BY DESIGN. Without it the orchestrator behaves exactly as before: a failed
+   * verification returns unresolved and a person picks it up. Supplying it closes the
+   * loop — the plan's own undo steps run, under the coordinator's own refusals. Made
+   * optional rather than required so that adding rollback cannot change the behaviour of
+   * any deployment that has not opted in.
+   */
+  rollbackCoordinator?: RollbackCoordinator }
 
 const schemaVersion = 'supervisor-audit-v1'
 let eventCounter = 0
@@ -93,7 +106,35 @@ export class SupervisorOrchestrator {
       await this.audit(incident, 'verification_started', {})
       const verification = await this.deps.verifier.verify({ incident, plan, execution })
       await this.audit(incident, 'verification_completed', { status: verification.status, summary: verification.summary })
-      if (execution.status !== 'completed' || verification.status !== 'verified') return { status: 'unresolved', policy, execution, verification, reason: 'Execution or verification did not complete successfully.' }
+      if (execution.status !== 'completed' || verification.status !== 'verified') {
+        // THE LOOP CLOSES HERE. The repair ran and the system is still not right, which
+        // is the moment the plan's undo steps exist for. The coordinator decides whether
+        // undoing is safe; this function only decides to ask. Everything it does is
+        // audited, including a refusal, because "we chose not to undo" is a fact an
+        // incident review will want as much as "we undid it".
+        if (this.deps.rollbackCoordinator) {
+          await this.audit(incident, 'rollback_started', { verificationStatus: verification.status })
+          const rollback: RollbackOutcome = await this.deps.rollbackCoordinator.rollback({
+            incident, plan, execution, verification,
+            dispatchId: typeof execution.metadata?.dispatchId === 'string' ? execution.metadata.dispatchId : undefined,
+          })
+          await this.audit(incident, 'rollback_completed', {
+            status: rollback.status,
+            reason: rollback.reason,
+            executedStepIds: rollback.executedStepIds,
+            reverification: rollback.reverification,
+            handoffCode: rollback.handoff?.code ?? '',
+          })
+          // 'restored' is NOT 'completed'. The incident was not repaired — the system was
+          // put back. Reporting a rollback as a successful repair would hide the failure
+          // that caused it from every dashboard downstream.
+          if (rollback.status === 'restored') {
+            return { status: 'rolled_back', policy, execution, verification, rollback, reason: rollback.reason }
+          }
+          return { status: 'unresolved', policy, execution, verification, rollback, reason: rollback.reason }
+        }
+        return { status: 'unresolved', policy, execution, verification, reason: 'Execution or verification did not complete successfully.' }
+      }
       return { status: 'completed', policy, execution, verification, reason: 'Repair execution verified.' }
     } catch (error) {
       if (incident) {

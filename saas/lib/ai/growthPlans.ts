@@ -22,10 +22,18 @@ const OUTREACH_TABLE = 'outreach_queue'
 // plain opt-out. COS writes only the body; this footer is appended in code so it
 // is guaranteed on every draft no matter what the model produced. Set the address
 // once in Vercel as OUTREACH_PHYSICAL_ADDRESS.
-function outreachComplianceFooter(senderKey: string | null): string {
+function outreachComplianceFooter(_senderKey: string | null): string {
   const addr = String(process.env.OUTREACH_PHYSICAL_ADDRESS || '').trim()
-  const team = senderKey === 'saasMarketing' ? 'The SignalBoost Marketing Team' : 'The SignalBoost Sales Team'
-  const out = ['', '—', team]
+  // THE TEAM NAME USED TO BE WRITTEN HERE TOO, AND IT PRODUCED TWO SIGN-OFFS IN EVERY
+  // REAL EMAIL. This footer is added at DRAFT time; applyOutreachSignature adds the
+  // closing block at SEND time and guarantees the team line, the contact address and
+  // the link are the last thing in the message. Its de-duplication walks the message
+  // from the END, so it stopped at the unsubscribe sentence and never saw the team
+  // line sitting above it — the recipient got "— The SignalBoost Sales Team" twice.
+  //
+  // Only what the send-time block does NOT provide belongs here: the physical mailing
+  // address CAN-SPAM requires, and the opt-out. One writer per line, no overlap.
+  const out: string[] = ['']
   if (addr) out.push(addr)
   out.push('Not a fit? Reply "unsubscribe" and we will not contact you again.')
   return out.join('\n')

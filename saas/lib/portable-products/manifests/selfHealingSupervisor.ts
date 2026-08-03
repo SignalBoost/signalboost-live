@@ -10,6 +10,23 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
   // that alerts. What they do not own is software that fixes the fault and can show its
   // work afterwards, so that is what these sentences now say first.
   categoryLabel: 'self-healing software',
+  // THE THREE CHANNELS ARE REAL AND THEY ARE A SELLING POINT. execution-policy/ selects
+  // between them per step: ExecutionChannel is 'api' | 'browser' | 'manual' | 'none' and
+  // ExecutionMode is 'api_only' | 'smart_failover' | 'browser_on_demand'. A human can take
+  // over at any step — that is not a fallback, it is a mode the operator can choose.
+  //
+  // THE BROWSER ENTRY SAYS "PREPARES", NOT "RUNS", AND THE WORD IS LOAD-BEARING.
+  // portable-browser-executor.ts emits a fingerprinted dry-run package and rejects any
+  // dispatch asking for more, with its own message: the buyer package creates browser
+  // dry-run evidence only, and a separately reviewed buyer runtime performs the execution.
+  // Production browser execution is additionally gated behind productionBrowserExecutionEnabled;
+  // without that flag the policy routes to human approval instead.
+  executionModes: Object.freeze([
+    'automated-api-execution-against-your-registered-capabilities',
+    'automatic-failover-from-api-to-browser-or-to-a-human',
+    'browser-tasks-prepared-under-approval-for-your-own-browser-runtime-to-run',
+    'manual-operator-control-available-at-any-step',
+  ]),
   shortDescription: 'Self-healing software: executes approved repairs against the capabilities you register, verifies the result, and records the evidence and reasoning behind every conclusion.',
   // WHAT THIS SENTENCE DELIBERATELY DOES NOT SAY: reversible. RepairPlan declares
   // rollbackSteps and the fingerprinting hashes them, but no code executes them — the

@@ -1,5 +1,5 @@
 <!-- docs/portables/browser-agent-integration-guide.md -->
-# Browser Agent Ecosystem — Enterprise Integration Guide
+# Browser Automation Governor Software — Enterprise Integration Guide
 
 **Release:** `1.0.0-rc.1` design-partner evaluation
 **Package:** `@portable/browser-agent`

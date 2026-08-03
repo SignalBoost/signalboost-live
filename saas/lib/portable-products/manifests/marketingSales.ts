@@ -3,7 +3,7 @@ import type { PortableProductManifest } from '../manifestTypes.ts'
 
 export const marketingSalesManifest: PortableProductManifest = Object.freeze({
   productId: 'marketing-sales',
-  displayName: 'Marketing + Sales',
+  displayName: 'Marketing + Sales Engine Software',
   shortDescription: 'Marketing, sales and social publishing in one portable engine.',
   // The Social Outreach Connector is a CAPABILITY of this product, not a product beside
   // it. It ships inside and is never sold apart from it, so it is named here rather than

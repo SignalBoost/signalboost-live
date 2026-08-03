@@ -12,7 +12,7 @@ import type { PortableProductManifest } from '../manifestTypes.ts'
 
 export const socialOutreachConnectorManifest: PortableProductManifest = Object.freeze({
   productId: 'social-outreach-connector',
-  displayName: 'Social Outreach Connector',
+  displayName: 'Social Outreach Connector Software',
   shortDescription: 'Publish approved content to seven platforms on your own credentials.',
   longDescription:
     'A buyer-hosted publishing layer for YouTube, TikTok, Instagram, LinkedIn (company page or personal profile), Facebook, X and Reddit. It runs inside the buyer\'s own environment using their developer applications and their accounts, and reports a post as published only when the platform confirms it. Included in Marketing + Sales and also licensed on its own.',

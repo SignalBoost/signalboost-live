@@ -59,6 +59,7 @@ import type { ExecutionResult, VerificationResult, Verifier } from '../execution
 import type { ApiCapabilityRegistry } from './api-capability-registry.ts'
 import { emptyApiCapabilityRegistry } from './api-capability-registry.ts'
 import { classifyStep, dangerCategoryOf } from './api-danger-policy.ts'
+import type { StateSnapshotPort, StateSnapshotRef } from './state-snapshot-port.ts'
 
 export const rollbackSchemaVersion = 'supervisor-rollback-result-v1'
 
@@ -91,6 +92,9 @@ export interface RollbackOutcome {
   incidentId: string
   dispatchId?: string
   status: RollbackStatus
+  /** How the system was recovered. 'snapshot_restore' is the path we want every buyer on. */
+  mechanism: 'snapshot_restore' | 'step_undo' | 'none'
+  restoredSnapshotIds: string[]
   reason: string
   executedStepIds: string[]
   skippedStepIds: string[]
@@ -112,7 +116,18 @@ export interface RollbackStepRunner {
 }
 
 export interface RollbackCoordinatorOptions {
+  /**
+   * The step-by-step undo path. It is now the FALLBACK, used only for scopes no snapshot
+   * covers. Kept because a buyer whose provider has no checkpoint mechanism still needs
+   * something better than nothing — but a plan restored from a snapshot never reaches it.
+   */
   runner: RollbackStepRunner
+  /**
+   * THE PRIMARY RECOVERY MECHANISM. When snapshots were captured before execution, a
+   * failed verification restores the execution context to them as one operation, and the
+   * platform never reasons about how to reverse an individual step.
+   */
+  snapshotPort?: StateSnapshotPort
   registry?: ApiCapabilityRegistry
   /** Optional but strongly recommended: without it the undo is never checked. */
   verifier?: Verifier
@@ -129,6 +144,12 @@ export interface RollbackInput {
   dispatchId?: string
   /** True when an undo has already been attempted for this dispatch. See refusal 5. */
   rollbackAlreadyAttempted?: boolean
+  /**
+   * Snapshots captured BEFORE execution began, one per covered scope. Their presence is
+   * what makes this a transaction rather than a sequence: recovery restores these and the
+   * per-step path is never entered.
+   */
+  snapshots?: readonly StateSnapshotRef[]
 }
 
 export interface RollbackCoordinator {
@@ -162,6 +183,9 @@ export function createRollbackCoordinator(options: RollbackCoordinatorOptions): 
       const executed: string[] = []
       const skipped: string[] = []
 
+      let mechanism: RollbackOutcome['mechanism'] = 'none'
+      const restored: string[] = []
+
       const finish = (
         status: RollbackStatus,
         reason: string,
@@ -172,6 +196,8 @@ export function createRollbackCoordinator(options: RollbackCoordinatorOptions): 
         incidentId: input.incident?.incidentId ?? 'unknown',
         dispatchId: input.dispatchId,
         status,
+        mechanism,
+        restoredSnapshotIds: restored,
         reason,
         executedStepIds: executed,
         skippedStepIds: skipped,
@@ -211,6 +237,39 @@ export function createRollbackCoordinator(options: RollbackCoordinatorOptions): 
         // successful rollback would be a lie of convenience.
         if (!input.execution.executedStepIds?.length) {
           return finish('not_attempted', 'No repair steps executed, so nothing required reversing.', 'not_run')
+        }
+
+        // ── PRIMARY PATH: ATOMIC STATE RESTORE ──────────────────────────────
+        // If the execution was bounded by snapshots, recovery is a restore, not a reversal.
+        // Nothing below this block runs in that case: the platform does not guess how to
+        // undo step four when it can put the whole context back to before step one.
+        const snapshots = (input.snapshots || []).filter(item => item && item.restorable)
+        if (options.snapshotPort && snapshots.length) {
+          mechanism = 'snapshot_restore'
+          for (const snapshot of snapshots) {
+            if (snapshot.expiresAt && Date.parse(snapshot.expiresAt) <= now().getTime()) {
+              note(snapshot.snapshotId, 'refused', `Snapshot for ${snapshot.scope} expired at ${snapshot.expiresAt}.`)
+              return handOff('snapshot_expired', `The ${snapshot.scope} snapshot expired before it could be restored, so the state it protected is no longer recoverable automatically.`)
+            }
+            let outcome
+            try {
+              outcome = await withTimeout(() => options.snapshotPort!.restore(snapshot), stepTimeoutMs, `restore of ${snapshot.scope}`)
+            } catch (error) {
+              note(snapshot.snapshotId, 'failed', error instanceof Error ? error.message : 'Restore threw.')
+              return handOff('snapshot_restore_failed', `Restoring the ${snapshot.scope} snapshot did not complete. The system may be partially restored and needs a person.`)
+            }
+            if (!outcome.ok) {
+              note(snapshot.snapshotId, 'failed', outcome.error || 'Restore reported failure.')
+              // Deliberately no attempt at the per-step path afterwards. A failed restore
+              // means the state is not what either mechanism believes it is, and layering
+              // a guessed undo on top of that is how a recoverable incident becomes a
+              // forensic one.
+              return handOff('snapshot_restore_failed', `Restoring the ${snapshot.scope} snapshot failed: ${outcome.error || 'no reason given'}. A person must take over.`)
+            }
+            restored.push(snapshot.snapshotId)
+            note(snapshot.snapshotId, 'executed', `Restored ${snapshot.scope} from snapshot captured at ${snapshot.capturedAt}.`)
+          }
+          return await confirmRecovery('The repair did not verify, so the execution context was restored to its pre-repair snapshot.')
         }
 
         const rollbackSteps = Array.isArray(input.plan.rollbackSteps) ? input.plan.rollbackSteps : []
@@ -305,11 +364,26 @@ export function createRollbackCoordinator(options: RollbackCoordinatorOptions): 
           note(step.stepId, 'executed', ran.summary, ran.data)
         }
 
-        // ── The obligation: an unchecked undo is a hope ──────────────────────
+        mechanism = 'step_undo'
+        return await confirmRecovery('The repair did not verify, the plan\'s undo steps ran, and the restored state verified.')
+      } catch (error) {
+        // The final safety net. This module must never throw into an incident path —
+        // an exception escaping here would leave the caller with no outcome at all,
+        // which is indistinguishable from the undo having silently worked.
+        return handOff(
+          'rollback_coordinator_error',
+          `The rollback coordinator failed closed: ${error instanceof Error ? error.message : 'unknown error'}.`,
+        )
+      }
+
+      // ── The obligation: recovery is not complete until it is CHECKED ───────
+      // Shared by both mechanisms on purpose. A snapshot restore that reports success is
+      // still only a claim by the infrastructure; an unverified recovery is a hope.
+      async function confirmRecovery(successReason: string): Promise<RollbackOutcome> {
         if (!options.verifier) {
           return handOff(
-            'rollback_unverified',
-            'Every undo step ran, but no verifier was configured, so there is no evidence the system was actually restored. Treating an unchecked undo as success is how a silent outage starts.',
+            'recovery_unverified',
+            'Recovery ran, but no verifier was configured, so there is no evidence the system was actually restored. Treating an unchecked recovery as success is how a silent outage starts.',
           )
         }
 
@@ -319,44 +393,36 @@ export function createRollbackCoordinator(options: RollbackCoordinatorOptions): 
             () => options.verifier!.verify({
               incident: input.incident,
               plan: input.plan,
-              // The re-check is told what the ROLLBACK did, not what the repair did:
-              // it is verifying the restored state, not the change that failed.
+              // The re-check is told what the RECOVERY did, not what the repair did: it is
+              // verifying the restored state, not the change that failed.
               execution: {
                 status: 'completed',
-                executedStepIds: executed,
+                executedStepIds: mechanism === 'snapshot_restore' ? restored : executed,
                 startedAt: attemptedAt,
                 finishedAt: now().toISOString(),
-                summary: `Rollback executed ${executed.length} undo step(s).`,
-                metadata: { phase: 'rollback', planId: input.plan.planId },
+                summary: mechanism === 'snapshot_restore'
+                  ? `Restored ${restored.length} snapshot(s).`
+                  : `Rollback executed ${executed.length} undo step(s).`,
+                metadata: { phase: 'rollback', mechanism, planId: input.plan.planId },
               },
             }),
             stepTimeoutMs,
-            'rollback verification',
+            'recovery verification',
           )
         } catch (error) {
           return handOff(
-            'rollback_verification_unavailable',
-            `The undo ran but could not be verified: ${error instanceof Error ? error.message : 'verification failed to answer'}.`,
+            'recovery_verification_unavailable',
+            `Recovery ran but could not be verified: ${error instanceof Error ? error.message : 'verification failed to answer'}.`,
             'unresolved',
           )
         }
 
-        if (recheck.status === 'verified') {
-          return finish('restored', 'The repair did not verify, the plan\'s undo steps ran, and the restored state verified.', 'verified')
-        }
+        if (recheck.status === 'verified') return finish('restored', successReason, 'verified')
 
         return handOff(
-          'rollback_did_not_restore',
-          `The undo steps ran but the system still does not verify: ${recheck.summary}. A person is needed.`,
+          'recovery_did_not_restore',
+          `Recovery ran but the system still does not verify: ${recheck.summary}. A person is needed.`,
           recheck.status === 'failed' ? 'failed' : 'unresolved',
-        )
-      } catch (error) {
-        // The final safety net. This module must never throw into an incident path —
-        // an exception escaping here would leave the caller with no outcome at all,
-        // which is indistinguishable from the undo having silently worked.
-        return handOff(
-          'rollback_coordinator_error',
-          `The rollback coordinator failed closed: ${error instanceof Error ? error.message : 'unknown error'}.`,
         )
       }
     },

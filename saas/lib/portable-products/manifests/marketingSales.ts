@@ -5,6 +5,17 @@ export const marketingSalesManifest: PortableProductManifest = Object.freeze({
   productId: 'marketing-sales',
   displayName: 'Marketing + Sales Engine Software',
   shortDescription: 'Marketing, sales and social publishing in one portable engine.',
+  categoryLabel: 'marketing and sales automation software',
+  // Publishing runs through the seven real platform connectors in lib/outreach/social-connectors,
+  // driven by the buyer's OWN app credentials and OAuth. Nothing leaves the system without an
+  // owner approving the draft, and that approval step is the human control — deliberately not
+  // removable. NO BROWSER CHANNEL IS CLAIMED HERE: these connectors are API-only, and the
+  // Supervisor's browser channel does not extend to them.
+  executionModes: Object.freeze([
+    'automated-publishing-through-your-own-connected-platform-accounts',
+    'owner-approval-required-before-anything-is-sent-or-published',
+    'manual-control-of-every-draft-before-and-after-generation',
+  ]),
   // The Social Outreach Connector is a CAPABILITY of this product, not a product beside
   // it. It ships inside and is never sold apart from it, so it is named here rather than
   // registered as its own catalog entry — a buyer scanning the homepage should see one

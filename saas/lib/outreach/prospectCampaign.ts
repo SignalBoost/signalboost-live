@@ -43,7 +43,23 @@ const MAX_CANDIDATES_PER_ROUND = 60
 function candidateTargetFor(requested: number): number {
   return Math.min(MAX_CANDIDATES_PER_ROUND, Math.max(MIN_CANDIDATES, requested * 3))
 }
-const MAX_UNITS_PER_TICK = 3
+// THROUGHPUT. Every one of these is buyer-tunable through the environment, because a
+// Fortune-500 buyer's rate limits are not ours: one arrives with an enterprise model
+// contract and a paid enrichment plan and wants forty at a time, another is on a starter
+// key and wants four. A hardcoded 3 was a guess about someone else's infrastructure.
+//
+// The work is entirely I/O — a model round trip and a handful of page fetches — so the
+// companies in a batch are independent and run TOGETHER. Sequentially, three companies
+// used about 90 seconds of a 240-second tick and the rest of the tick was thrown away.
+function envInt(name: string, fallback: number, min: number, max: number): number {
+  const raw = Number(process.env[name])
+  if (!Number.isFinite(raw) || raw <= 0) return fallback
+  return Math.max(min, Math.min(max, Math.floor(raw)))
+}
+// How many companies are worked on at the same instant.
+const CONCURRENCY = envInt('OUTREACH_CAMPAIGN_CONCURRENCY', 8, 1, 40)
+// How many companies one tick may examine in total, across all its batches.
+const MAX_UNITS_PER_TICK = envInt('OUTREACH_CAMPAIGN_UNITS_PER_TICK', 60, 1, 400)
 // The most companies a single campaign will examine across all its rounds. Without a
 // ceiling, "go round again" is an unbounded loop against a paid search backend — but a flat
 // ceiling is the same mistake as a flat request cap, so it scales with what was asked for.
@@ -554,6 +570,50 @@ async function draftMessageFor(
   return clean(String(raw || '').replace(/```/g, ''), 2_300)
 }
 
+// ── One company, start to finish ─────────────────────────────────────────────
+//
+// Pulled out of the drafting loop so a batch of companies can be run concurrently.
+// It never throws: a batch is resolved with Promise.all and one company's failure must
+// not discard the work of the others sharing its batch.
+
+type UnitOutcome = { drafted: boolean; result: ProspectResult; error?: string }
+
+async function runOneCompany(
+  job: ProspectCampaignJob,
+  candidate: ProspectCandidate,
+): Promise<UnitOutcome> {
+  const at = () => new Date().toISOString()
+  try {
+    const message = await withTimeout(draftMessageFor(job, candidate), 45_000, () => '')
+    if (!message || message.length < 40) {
+      return { drafted: false, result: { name: candidate.name, url: candidate.url, outcome: 'skipped', detail: 'Draft came back empty or too short.', at: at() } }
+    }
+
+    // Reused unchanged: finds a REAL published email or skips, localizes to the
+    // target's region, appends the compliance footer, inserts as 'pending'.
+    const created = await withTimeout(
+      // The campaign's offer is the product key, so duplicate protection is scoped to
+      // THIS product: the same company can be approached again in a later campaign
+      // selling something else, but never twice for this one.
+      createOutreachDraft({ businessName: candidate.name, businessUrl: candidate.url, message, senderKey: 'saasSales', productKey: job.offer }),
+      PER_COMPANY_TIMEOUT_MS - 45_000,
+      () => ({ ok: false, skipped: true, error: 'Timed out while looking for a published email.' } as any),
+    )
+
+    if (created.ok) {
+      return { drafted: true, result: { name: candidate.name, url: candidate.url, outcome: 'drafted', detail: created.contactEmail || '', at: at() } }
+    }
+    if (created.skipped) {
+      return { drafted: false, result: { name: candidate.name, url: candidate.url, outcome: 'skipped', detail: 'No published contact email found.', at: at() } }
+    }
+    const error = created.error || 'Draft rejected.'
+    return { drafted: false, error, result: { name: candidate.name, url: candidate.url, outcome: 'error', detail: error, at: at() } }
+  } catch (err: any) {
+    const error = String(err?.message || err || 'Unknown error while drafting.')
+    return { drafted: false, error, result: { name: candidate.name, url: candidate.url, outcome: 'error', detail: error, at: at() } }
+  }
+}
+
 // ── Advance (one worker tick) ────────────────────────────────────────────────
 
 export async function advanceProspectCampaigns(): Promise<{
@@ -643,6 +703,9 @@ export async function advanceProspectCampaigns(): Promise<{
   let skipped = job.skipped
   let lastError: string | null = job.last_error
 
+  // Companies are worked in BATCHES that run concurrently. The batch is sized by what
+  // is left to do as well as by the pool, so a campaign needing two more drafts does not
+  // open eight connections to get them.
   while (
     queue.length > 0 &&
     drafted < job.requested_count &&
@@ -650,44 +713,31 @@ export async function advanceProspectCampaigns(): Promise<{
     units < MAX_UNITS_PER_TICK &&
     remainingMs() > PER_COMPANY_TIMEOUT_MS + 15_000
   ) {
-    const candidate = queue.shift() as ProspectCandidate
-    processed += 1
-    units += 1
+    const stillNeeded = job.requested_count - drafted
+    const room = Math.max(1, Math.min(
+      CONCURRENCY,
+      queue.length,
+      MAX_UNITS_PER_TICK - units,
+      ceiling - processed,
+      // Roughly half of any list has no published address, so ask for about twice
+      // what is still needed. This bounds the overshoot: a campaign for 30 can finish
+      // a batch at 31 or 32 drafts, never at 60.
+      stillNeeded * 2,
+    ))
 
-    try {
-      const message = await withTimeout(draftMessageFor(job, candidate), 45_000, () => '')
-      if (!message || message.length < 40) {
-        skipped += 1
-        results.push({ name: candidate.name, url: candidate.url, outcome: 'skipped', detail: 'Draft came back empty or too short.', at: new Date().toISOString() })
-        continue
-      }
+    const batch = queue.splice(0, room)
+    processed += batch.length
+    units += batch.length
 
-      // Reused unchanged: finds a REAL published email or skips, localizes to the
-      // target's region, appends the compliance footer, inserts as 'pending'.
-      const created = await withTimeout(
-        // The campaign's offer is the product key, so duplicate protection is scoped to
-        // THIS product: the same company can be approached again in a later campaign
-        // selling something else, but never twice for this one.
-        createOutreachDraft({ businessName: candidate.name, businessUrl: candidate.url, message, senderKey: 'saasSales', productKey: job.offer }),
-        PER_COMPANY_TIMEOUT_MS - 45_000,
-        () => ({ ok: false, skipped: true, error: 'Timed out while looking for a published email.' } as any),
-      )
+    // Promise.all is safe here because runOneCompany never rejects — one company's
+    // failure is returned as an outcome, so it cannot discard its batch-mates' work.
+    const outcomes = await Promise.all(batch.map(candidate => runOneCompany(job, candidate)))
 
-      if (created.ok) {
-        drafted += 1
-        results.push({ name: candidate.name, url: candidate.url, outcome: 'drafted', detail: created.contactEmail || '', at: new Date().toISOString() })
-      } else if (created.skipped) {
-        skipped += 1
-        results.push({ name: candidate.name, url: candidate.url, outcome: 'skipped', detail: 'No published contact email found.', at: new Date().toISOString() })
-      } else {
-        skipped += 1
-        lastError = created.error || 'Draft rejected.'
-        results.push({ name: candidate.name, url: candidate.url, outcome: 'error', detail: lastError, at: new Date().toISOString() })
-      }
-    } catch (err: any) {
-      skipped += 1
-      lastError = String(err?.message || err || 'Unknown error while drafting.')
-      results.push({ name: candidate.name, url: candidate.url, outcome: 'error', detail: lastError, at: new Date().toISOString() })
+    for (const outcome of outcomes) {
+      results.push(outcome.result)
+      if (outcome.drafted) drafted += 1
+      else skipped += 1
+      if (outcome.error) lastError = outcome.error
     }
   }
 

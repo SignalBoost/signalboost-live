@@ -188,8 +188,16 @@ export function planTransactionBoundary(
       })
       continue
     }
-    const capability = capabilities.find(item => item.scope === scope && item.provider === plan.targetProvider)
-      || capabilities.find(item => item.scope === scope)
+    // SELECTION MUST MATCH createCompositeSnapshotPort's ROUTING, or the plan is
+    // classified against one mechanism and captured from another. A buyer registering
+    // both an RDS point-in-time recovery and a SQL savepoint for `database` gets the
+    // savepoint from the router; if this picked whichever appeared first in the array,
+    // registration ORDER would silently decide whether repairs run unattended.
+    // Exact provider match wins, then any atomic mechanism, then whatever exists.
+    const forScope = capabilities.filter(item => item.scope === scope)
+    const capability = forScope.find(item => item.provider === plan.targetProvider)
+      ?? forScope.find(item => item.atomicRestore)
+      ?? forScope[0]
     if (!capability) {
       requirements.push({ scope, stepIds, covered: false, atomic: false, reason: `No snapshot capability is registered for ${scope}.` })
       continue

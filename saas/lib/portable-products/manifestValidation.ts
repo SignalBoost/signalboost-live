@@ -1,3 +1,4 @@
+// saas/lib/portable-products/manifestValidation.ts
 import type { PortableProductManifest, PortableProductMaturity } from './manifestTypes.ts'
 import type { PortableProductCategory, PortableProductStatus } from './product-types.ts'
 
@@ -37,6 +38,8 @@ export function validatePortableProductManifests(manifests: readonly PortablePro
     validateString(manifest.displayName, 'displayName')
     validateString(manifest.shortDescription, 'shortDescription')
     validateString(manifest.longDescription, 'longDescription')
+    // Optional, but held to the same bar as any other buyer-visible string when present.
+    if (manifest.categoryLabel !== undefined) validateString(manifest.categoryLabel, 'categoryLabel')
     if (!categories.has(manifest.category)) fail('invalid category')
     if (!statuses.has(manifest.status)) fail('invalid status')
     if (!maturities.has(manifest.maturity)) fail('invalid maturity')

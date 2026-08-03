@@ -387,6 +387,44 @@ function looksLikeAggregator(host: string, title: string): boolean {
   return DATED_ARTICLE.test(title)
 }
 
+// THE NAME HAS TO BE THE COMPANY, NOT THE PAGE'S SUBJECT.
+//
+// This took the first segment of the page title and trusted it. For goinfinite.net the
+// title opened with "DevOps Consulting", so a real draft addressed a firm called
+// "DevOps Consulting" and offered to install software "in a non-production environment
+// of DevOps Consulting". The recipient reads a service category where their own name
+// should be, which is worse than a plain mail-merge failure — it says nobody looked.
+//
+// A company's name almost always echoes its domain, so the domain arbitrates. Title
+// segments are tried in order and the first one that echoes the domain root wins; when
+// none does, the domain root itself is used, which is at least always true.
+function companyNameFrom(title: string, host: string): string {
+  const root = host.split('.')[0] || host
+  // Diacritics are stripped before comparing, or "Login Logística" fails to match
+  // loginlogistica.com.br and a company with a perfectly good name on its own page
+  // gets addressed by its bare domain instead.
+  const squash = (value: string) =>
+    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const rootKey = squash(root)
+
+  const segments = String(title || '').split(/[|\u2013\u2014\u00b7:]|\s-\s/)
+  for (const segment of segments) {
+    const candidate = clean(segment, 160)
+    if (!candidate) continue
+    const key = squash(candidate)
+    if (!key) continue
+    // Either direction counts: "Infinite Ltd" for goinfinite.net, or a domain that
+    // spells the name out in full.
+    if (key.includes(rootKey) || rootKey.includes(key)) return candidate
+  }
+
+  // Nothing in the title refers to this company, so use its own domain rather than the
+  // page's topic. Hyphens and underscores become spaces; capitalisation is left to the
+  // first letter only, since forcing title case mangles names like "goCardless".
+  const readable = root.replace(/[-_]+/g, ' ').trim()
+  return readable ? readable.charAt(0).toUpperCase() + readable.slice(1) : host
+}
+
 function candidateFrom(result: { title: string; url: string; snippet: string }): ProspectCandidate | null {
   const host = hostOf(result.url)
   if (!host) return null
@@ -395,8 +433,7 @@ function candidateFrom(result: { title: string; url: string; snippet: string }):
   // Prefer the company's root site over a deep blog/article URL: the email finder and
   // the analyzer both work far better against a homepage.
   const url = `https://${host}`
-  const name = clean(result.title.split(/[|\u2013\u2014-]/)[0], 160) || host
-  return { name, url, snippet: clean(result.snippet, 400) }
+  return { name: companyNameFrom(String(result.title || ''), host), url, snippet: clean(result.snippet, 400) }
 }
 
 // Three-way, not boolean. A .com company with no country signal is UNKNOWN, not
@@ -570,6 +607,15 @@ function offerProfileFor(offer: string): string {
   const readable = (values: readonly string[]) => values.map(v => v.replace(/[-_]/g, ' ')).join(', ')
   const lines = [
     `Product: ${matched.displayName}`,
+    // THE MODEL KEPT INVENTING A CATEGORY FOR THE PRODUCT. Two real drafts called the
+    // Supervisor "a monitoring software" and "a supervision software" — nouns that
+    // appear nowhere in the manifest. The damage is commercial, not cosmetic: monitoring
+    // is a crowded commodity category the buyer already pays someone for, so the pitch
+    // files a product that DIAGNOSES AND REPAIRS under a heading where it looks like a
+    // more expensive Nagios. The manifest names the product; nothing else may.
+    matched.categoryLabel
+      ? `Category — use THIS phrase and no other when the email needs to say what kind of software this is: "${matched.categoryLabel}". Do NOT substitute your own label. Specifically never call it monitoring software, a monitoring platform, an observability tool or a supervision system: those are commodity categories the recipient already buys from someone else, and filing this product under one of them throws away the reason to reply.`
+      : `Call it by this exact name and do NOT invent a category label for it. If a category noun is needed, use the description below verbatim rather than summarising it into one.`,
     `What it does: ${matched.shortDescription}`,
     matched.longDescription ? `In more detail: ${matched.longDescription}` : '',
     matched.requiredCapabilities.length ? `Core capabilities, all of which are real and shipped: ${readable(matched.requiredCapabilities)}` : '',

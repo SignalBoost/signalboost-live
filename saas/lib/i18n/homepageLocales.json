@@ -5,7 +5,7 @@
     "title": "One place for every growth task.",
     "languagesAria": "Available in five languages",
     "publicModules": "Public tools",
-    "portableEngines": "Portable tools — license the tools behind SignalBoost",
+    "portableEngines": "Enterprise software — license the software behind SignalBoost",
     "license": "License",
     "campaignStudio": "Campaign Studio",
     "live": "Live",
@@ -33,51 +33,51 @@
     },
     "portables": {
       "providerHub": {
-        "name": "Provider Hub",
+        "name": "Provider Connection Hub Software",
         "desc": "Bring your own AI and business accounts, connected through one governed workspace."
       },
       "campaign": {
-        "name": "Campaign Studio",
+        "name": "Campaign Studio Software",
         "desc": "One short request becomes a finished campaign."
       },
       "integrations": {
-        "name": "Integrations Hub",
+        "name": "Integrations Hub Software",
         "desc": "Safe links for sales tools, websites, payments, calendars, AI tools, and APIs."
       },
       "render": {
-        "name": "Video Maker",
+        "name": "Video Maker Software",
         "desc": "Voice and branded video with safe prepaid use."
       },
       "console": {
-        "name": "Control Center",
+        "name": "Control Center Software",
         "desc": "Keys, webhooks, logs, releases, and activity checks."
       },
       "marketingSales": {
-        "name": "Marketing + Sales",
+        "name": "Marketing + Sales Engine Software",
         "desc": "Campaigns, outreach and publishing to seven social platforms — on your own accounts."
       },
       "chiefOfStaff": {
-        "name": "Portable AI Chief of Staff",
+        "name": "AI Chief of Staff Software",
         "desc": "Plans and carries out only approved work through buyer-supplied ports."
       },
       "browser": {
-        "name": "Browser Tool",
+        "name": "Browser Tool Software",
         "desc": "Safe browser work with clear limits and checks."
       },
       "press": {
-        "name": "Press & Media",
+        "name": "Press & Media Engine Software",
         "desc": "Reach verified editors and paid wires from one governed engine."
       },
       "selfHealing": {
-        "name": "Self-Healing Supervisor",
+        "name": "Self-Healing Supervisor Software",
         "desc": "Detects its own failures, diagnoses them, and repairs within limits you approve."
       },
       "browserAgents": {
-        "name": "Browser Agent Ecosystem",
+        "name": "Browser Automation Governor Software",
         "desc": "Plug-and-play ports pre-staged for managed, self-hosted, and future browser-agent stacks."
       },
       "agentOperations": {
-        "name": "Agent Operations Platform",
+        "name": "Agent Operations Platform Software",
         "desc": "Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."
       }
     },
@@ -92,7 +92,7 @@
     "title": "Un solo lugar para cada tarea de crecimiento.",
     "languagesAria": "Disponible en cinco idiomas",
     "publicModules": "Herramientas públicas",
-    "portableEngines": "Herramientas portátiles — usa las herramientas de SignalBoost con licencia",
+    "portableEngines": "Software empresarial — licencia el software que impulsa SignalBoost",
     "license": "Licencia",
     "campaignStudio": "Estudio de Campañas",
     "live": "Activo",
@@ -120,51 +120,51 @@
     },
     "portables": {
       "providerHub": {
-        "name": "Centro de Proveedores",
+        "name": "Software de Centro de Conexión de Proveedores",
         "desc": "Usa tus propias cuentas de IA y de negocio, conectadas en un espacio de trabajo con gobernanza."
       },
       "campaign": {
-        "name": "Estudio de Campañas",
+        "name": "Software de Estudio de Campañas",
         "desc": "Una solicitud corta se convierte en una campaña terminada."
       },
       "integrations": {
-        "name": "Centro de Integraciones",
+        "name": "Software de Centro de Integraciones",
         "desc": "Conexiones seguras para ventas, sitios web, pagos, calendarios, IA y APIs."
       },
       "render": {
-        "name": "Creador de Video",
+        "name": "Software de Creación de Video",
         "desc": "Voz y video con marca y uso prepago seguro."
       },
       "console": {
-        "name": "Centro de Control",
+        "name": "Software de Centro de Control",
         "desc": "Claves, webhooks, registros, versiones y controles de actividad."
       },
       "marketingSales": {
-        "name": "Marketing + Ventas",
+        "name": "Software de Motor de Marketing + Ventas",
         "desc": "Campañas, prospección y publicación en siete plataformas sociales, con tus propias cuentas."
       },
       "chiefOfStaff": {
-        "name": "Jefe de Gabinete de IA Portátil",
+        "name": "Software de Jefe de Gabinete de IA",
         "desc": "Planifica y realiza solo el trabajo aprobado mediante puertos proporcionados por el comprador."
       },
       "browser": {
-        "name": "Herramienta de Navegador",
+        "name": "Software de Herramienta de Navegador",
         "desc": "Trabajo seguro en el navegador con límites y controles claros."
       },
       "press": {
-        "name": "Prensa y Medios",
+        "name": "Software de Motor de Prensa y Medios",
         "desc": "Llega a editores verificados y cables de pago desde un solo motor supervisado."
       },
       "selfHealing": {
-        "name": "Supervisor Autorreparable",
+        "name": "Software de Supervisor Autorreparable",
         "desc": "Detecta sus propios fallos, los diagnostica y repara dentro de los límites que apruebes."
       },
       "browserAgents": {
-        "name": "Ecosistema de Agentes de Navegador",
+        "name": "Software de Gobernanza de Automatización de Navegador",
         "desc": "Puertos listos para usar para pilas de agentes de navegador administradas, autoalojadas y futuras."
       },
       "agentOperations": {
-        "name": "Plataforma de Operaciones de Agentes",
+        "name": "Software de Plataforma de Operaciones de Agentes",
         "desc": "Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."
       }
     },
@@ -179,7 +179,7 @@
     "title": "Um só lugar para cada tarefa de crescimento.",
     "languagesAria": "Disponível em cinco idiomas",
     "publicModules": "Ferramentas públicas",
-    "portableEngines": "Ferramentas portáteis — licencie as ferramentas da SignalBoost",
+    "portableEngines": "Software empresarial — licencie o software por trás da SignalBoost",
     "license": "Licença",
     "campaignStudio": "Estúdio de Campanhas",
     "live": "Ativo",
@@ -207,51 +207,51 @@
     },
     "portables": {
       "providerHub": {
-        "name": "Central de Fornecedores",
+        "name": "Software de Central de Conexão de Fornecedores",
         "desc": "Use as suas próprias contas de IA e de negócio, ligadas num espaço de trabalho com governação."
       },
       "campaign": {
-        "name": "Estúdio de Campanhas",
+        "name": "Software de Estúdio de Campanhas",
         "desc": "Um pedido curto vira uma campanha pronta."
       },
       "integrations": {
-        "name": "Central de Integrações",
+        "name": "Software de Central de Integrações",
         "desc": "Conexões seguras para vendas, sites, pagamentos, calendários, IA e APIs."
       },
       "render": {
-        "name": "Criador de Vídeo",
+        "name": "Software de Criação de Vídeo",
         "desc": "Voz e vídeo com marca e uso pré-pago seguro."
       },
       "console": {
-        "name": "Central de Controle",
+        "name": "Software de Central de Controle",
         "desc": "Chaves, webhooks, registros, versões e controles de atividade."
       },
       "marketingSales": {
-        "name": "Marketing + Vendas",
+        "name": "Software de Motor de Marketing + Vendas",
         "desc": "Campanhas, prospecção e publicação em sete plataformas sociais, com suas próprias contas."
       },
       "chiefOfStaff": {
-        "name": "Chefe de Gabinete de IA Portátil",
+        "name": "Software de Chefe de Gabinete de IA",
         "desc": "Planeja e executa apenas o trabalho aprovado por meio de portas fornecidas pelo comprador."
       },
       "browser": {
-        "name": "Ferramenta de Navegador",
+        "name": "Software de Ferramenta de Navegador",
         "desc": "Trabalho seguro no navegador com limites e controles claros."
       },
       "press": {
-        "name": "Imprensa e Mídia",
+        "name": "Software de Motor de Imprensa e Mídia",
         "desc": "Alcance editores verificados e wires pagos a partir de um único motor governado."
       },
       "selfHealing": {
-        "name": "Supervisor Auto-Reparável",
+        "name": "Software de Supervisor Auto-Reparável",
         "desc": "Detecta as próprias falhas, diagnostica e repara dentro dos limites que você aprovar."
       },
       "browserAgents": {
-        "name": "Ecossistema de Agentes de Navegador",
+        "name": "Software de Governança de Automação de Navegador",
         "desc": "Portas prontas para uso para pilhas de agentes de navegador gerenciadas, auto-hospedadas e futuras."
       },
       "agentOperations": {
-        "name": "Plataforma de Operações de Agentes",
+        "name": "Software de Plataforma de Operações de Agentes",
         "desc": "Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."
       }
     },
@@ -266,7 +266,7 @@
     "title": "Jedno miejsce do każdej pracy nad rozwojem.",
     "languagesAria": "Dostępne w pięciu językach",
     "publicModules": "Narzędzia publiczne",
-    "portableEngines": "Narzędzia przenośne — licencjonuj narzędzia SignalBoost",
+    "portableEngines": "Oprogramowanie dla firm — licencjonuj oprogramowanie stojące za SignalBoost",
     "license": "Licencja",
     "campaignStudio": "Studio Kampanii",
     "live": "Działa",
@@ -294,51 +294,51 @@
     },
     "portables": {
       "providerHub": {
-        "name": "Centrum Dostawców",
+        "name": "Oprogramowanie Centrum Połączeń z Dostawcami",
         "desc": "Podłącz własne konta AI i biznesowe w jednym nadzorowanym środowisku pracy."
       },
       "campaign": {
-        "name": "Studio Kampanii",
+        "name": "Oprogramowanie Studia Kampanii",
         "desc": "Krótka prośba staje się gotową kampanią."
       },
       "integrations": {
-        "name": "Centrum Integracji",
+        "name": "Oprogramowanie Centrum Integracji",
         "desc": "Bezpieczne połączenia dla sprzedaży, stron, płatności, kalendarzy, AI i API."
       },
       "render": {
-        "name": "Twórca Wideo",
+        "name": "Oprogramowanie do Tworzenia Wideo",
         "desc": "Głos i film z marką oraz bezpiecznym limitem przedpłaty."
       },
       "console": {
-        "name": "Centrum Sterowania",
+        "name": "Oprogramowanie Centrum Sterowania",
         "desc": "Klucze, webhooki, logi, wydania i kontrola działań."
       },
       "marketingSales": {
-        "name": "Marketing + Sprzedaż",
+        "name": "Oprogramowanie Silnika Marketingu + Sprzedaży",
         "desc": "Kampanie, outreach i publikacja na siedmiu platformach społecznościowych — na własnych kontach."
       },
       "chiefOfStaff": {
-        "name": "Przenośny Szef Sztabu AI",
+        "name": "Oprogramowanie Szefa Sztabu AI",
         "desc": "Planuje i wykonuje wyłącznie zatwierdzone zadania przez porty dostarczone przez nabywcę."
       },
       "browser": {
-        "name": "Narzędzie Przeglądarki",
+        "name": "Oprogramowanie Narzędzia Przeglądarki",
         "desc": "Bezpieczna praca w przeglądarce z jasnymi limitami i kontrolą."
       },
       "press": {
-        "name": "Prasa i Media",
+        "name": "Oprogramowanie Silnika Prasy i Mediów",
         "desc": "Docieraj do zweryfikowanych redaktorów i płatnych wire'ów z jednego nadzorowanego silnika."
       },
       "selfHealing": {
-        "name": "Samonaprawiający się nadzorca",
+        "name": "Oprogramowanie Samonaprawiającego się Nadzorcy",
         "desc": "Wykrywa własne awarie, diagnozuje je i naprawia w granicach, które zatwierdzisz."
       },
       "browserAgents": {
-        "name": "Ekosystem Agentów Przeglądarkowych",
+        "name": "Oprogramowanie Nadzoru Automatyzacji Przeglądarki",
         "desc": "Gotowe do użycia porty dla zarządzanych, samodzielnie hostowanych i przyszłych stosów agentów przeglądarkowych."
       },
       "agentOperations": {
-        "name": "Platforma Operacji Agentów",
+        "name": "Oprogramowanie Platformy Operacji Agentów",
         "desc": "Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."
       }
     },
@@ -353,7 +353,7 @@
     "title": "Одно место для всех задач роста.",
     "languagesAria": "Доступно на пяти языках",
     "publicModules": "Открытые инструменты",
-    "portableEngines": "Переносимые инструменты — лицензируйте инструменты SignalBoost",
+    "portableEngines": "Корпоративное программное обеспечение — лицензируйте ПО, на котором работает SignalBoost",
     "license": "Лицензия",
     "campaignStudio": "Студия Кампаний",
     "live": "Работает",
@@ -381,51 +381,51 @@
     },
     "portables": {
       "providerHub": {
-        "name": "Центр провайдеров",
+        "name": "Программное обеспечение центра подключения провайдеров",
         "desc": "Подключите собственные аккаунты ИИ и бизнес-сервисов в одном управляемом рабочем пространстве."
       },
       "campaign": {
-        "name": "Студия Кампаний",
+        "name": "Программное обеспечение студии кампаний",
         "desc": "Короткий запрос становится готовой кампанией."
       },
       "integrations": {
-        "name": "Центр Интеграций",
+        "name": "Программное обеспечение центра интеграций",
         "desc": "Безопасные связи для продаж, сайтов, платежей, календарей, ИИ и API."
       },
       "render": {
-        "name": "Создание Видео",
+        "name": "Программное обеспечение для создания видео",
         "desc": "Голос и фирменное видео с безопасной предоплатой."
       },
       "console": {
-        "name": "Центр Управления",
+        "name": "Программное обеспечение центра управления",
         "desc": "Ключи, вебхуки, журналы, выпуски и проверка действий."
       },
       "marketingSales": {
-        "name": "Маркетинг + Продажи",
+        "name": "Программное обеспечение системы маркетинга и продаж",
         "desc": "Кампании, аутрич и публикация на семи социальных платформах — в ваших аккаунтах."
       },
       "chiefOfStaff": {
-        "name": "Портативный ИИ-руководитель аппарата",
+        "name": "Программное обеспечение ИИ-руководителя аппарата",
         "desc": "Планирует и выполняет только одобренную работу через порты, предоставленные покупателем."
       },
       "browser": {
-        "name": "Инструмент Браузера",
+        "name": "Программное обеспечение браузерного инструмента",
         "desc": "Безопасная работа в браузере с ясными пределами и проверками."
       },
       "press": {
-        "name": "Пресса и медиа",
+        "name": "Программное обеспечение системы прессы и медиа",
         "desc": "Выход на проверенных редакторов и платные ленты из одного управляемого движка."
       },
       "selfHealing": {
-        "name": "Самовосстанавливающийся супервизор",
+        "name": "Программное обеспечение самовосстанавливающегося супервизора",
         "desc": "Обнаруживает сбои, ставит диагноз и устраняет их в пределах, которые вы одобрили."
       },
       "browserAgents": {
-        "name": "Экосистема браузерных агентов",
+        "name": "Программное обеспечение управления браузерной автоматизацией",
         "desc": "Готовые к подключению порты для управляемых, самостоятельно размещаемых и будущих стеков браузерных агентов."
       },
       "agentOperations": {
-        "name": "Платформа операций агентов",
+        "name": "Программное обеспечение платформы операций агентов",
         "desc": "Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."
       }
     },

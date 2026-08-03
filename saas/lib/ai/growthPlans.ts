@@ -22,6 +22,21 @@ const OUTREACH_TABLE = 'outreach_queue'
 // plain opt-out. COS writes only the body; this footer is appended in code so it
 // is guaranteed on every draft no matter what the model produced. Set the address
 // once in Vercel as OUTREACH_PHYSICAL_ADDRESS.
+/**
+ * Finishes a raw drafted body exactly as createOutreachDraft does: localized to the
+ * target's language, then the compliance footer. Used by the refresh path so an updated
+ * draft is indistinguishable from a freshly created one.
+ */
+export async function finishOutreachBody(input: { message: string; businessUrl: string; businessName?: string; senderKey: string | null }): Promise<string> {
+  // Same argument shape the create path uses (line ~187). Passing the bare URL compiled
+  // as `any` in this non-strict repo and would have silently selected the wrong language
+  // for every refreshed draft — caught by re-running tsc with the path alias RESOLVING,
+  // which the first check did not do.
+  const targetLang = pickOutreachLanguage({ url: input.businessUrl, name: input.businessName || '', text: input.message })
+  const localized = targetLang === 'en' ? input.message : await localizeMessage(input.message, targetLang)
+  return localized + outreachComplianceFooter(input.senderKey)
+}
+
 function outreachComplianceFooter(_senderKey: string | null): string {
   const addr = String(process.env.OUTREACH_PHYSICAL_ADDRESS || '').trim()
   // THE TEAM NAME USED TO BE WRITTEN HERE TOO, AND IT PRODUCED TWO SIGN-OFFS IN EVERY
@@ -178,7 +193,9 @@ async function detectTargetLanguage(businessUrl: string, businessName: string): 
 
 // Translate the COS-written message into the target's native language. Falls back to the
 // original English on any failure — never blocks a draft, never fabricates.
-async function localizeMessage(message: string, lang: string): Promise<string> {
+// Exported for the draft-refresh path: a refreshed message must be localized and
+// footered by the SAME code that finishes a new draft, or the two diverge silently.
+export async function localizeMessage(message: string, lang: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   const name = LANG_NAMES[lang]
   if (!apiKey || !name) return message

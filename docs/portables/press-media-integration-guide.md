@@ -5,7 +5,9 @@
 **Package:** `@portable/press-media`
 **Payload:** three roots — `press-media-core` (the portable), `portable-kernel` (company identity and factual discipline), `portable-audit` (the SIEM event shape). All three ship together; the core reaches the other two by relative path.
 
-The portable runs inside the buyer's environment. It supplies bounded product behaviour — provider registry, five adapter shapes, and the factual-discipline kernel. The buyer supplies AI, email, notification, HTTP, execution, company identity, audit transport, publication discovery, and every provider account.
+The portable runs inside the buyer's environment. It supplies bounded product behaviour — provider registry, five adapter shapes, the factual-discipline kernel, and **a working transport for Business Wire**. The buyer supplies AI, email, notification, company identity, audit transport, publication discovery, and every provider account.
+
+**Sending works out of the box.** Free editorial submission goes through the buyer's mail transport; Business Wire goes through a shipped integration that needs credentials and nothing else. Other wires are declared rather than coded.
 
 Nothing in the archive contains or requires a build-platform account, and the graph walk that produces the release reports **zero** host fallbacks: the buyer surface has no bare or aliased imports at all. Everything it needs arrives through ports.
 
@@ -42,13 +44,45 @@ Two subpath entries exist for the shared layers: `@portable/press-media/kernel` 
 | `email` | yes | `send({ to, subject, html })` through the buyer's transport |
 | `notify` | yes | `notifyOwner(stage, campaign, proof?)` — two-stage: submitted/scheduled now, published when the provider confirms |
 | `http` | for API adapters | `fetchJson(url, init?)` |
-| `runner` | for paid providers | `run(providerId, action, variables)` and `loadConfig(providerId)` against the buyer's provider registry and secret store |
+| `runner` | **shipped** | `createPressRunner(config)` returns a working one. Supply your own only if you prefer to route paid providers through your existing execution layer |
 | `company` | strongly recommended | `CompanyProfilePort` — whose facts the AI is permitted to state |
 | `audit` | for SOC 2 / ISO 27001 | `PortableAuditSink` — omitted means no audit trail |
 | `discovery` | optional | `findPublications(query)` — omitted means targets must be supplied by hand |
 | `config` | per provider | the buyer's connected credentials for that provider |
 
 An omitted optional port is reported honestly and never simulated. Discovery in particular refuses with a message naming what to connect rather than returning an empty list that reads like "no publications exist".
+
+## 2a. The shipped runner — credentials, not code
+
+```ts
+import { createPressRunner, describePressRunner } from '@portable/press-media'
+
+const runner = createPressRunner({
+  businessWire: {
+    email: 'press@yourcompany.com',      // your Connect login
+    password: process.env.BW_PASSWORD,   // from your vault, not from a file
+    sourceKey: 'ABCD-EFGH-…',            // issued by your Business Wire account rep
+    accountId: 1010376,                  // chosen from list_accounts, never typed
+    savedDistributionId: 2,              // chosen from list_distributions, never typed
+    contactEmail: 'press@yourcompany.com',
+    contactPhone: '+1-555-0100',
+  },
+})
+```
+
+Three ways a wire is reached, in the order to try them:
+
+| | |
+| --- | --- |
+| **Built in** | Business Wire, implemented against their published Connect 5 API. Credentials only. |
+| **Declared** | Any wire with a documented REST endpoint. You supply the URL, the auth style and where the fields go. No code, and no release needed to add a brand. |
+| **Delegated** | A wire with **no public API** — EIN Presswire publishes none; releases go through their portal or their account team. Name it here and you are told at configuration time, or point it at an endpoint you run that does the last hop. |
+
+**Two fields are read live from your account and must never be typed.** `accountId` decides which entity the release is billed and attributed to; `savedDistributionId` decides which circuit it goes out on, and therefore its reach and its cost. Call `list_accounts` and `list_distributions` and let a person pick. A typed value is wrong silently, and the error is only visible after the release is out.
+
+`describePressRunner(config)` answers "is this actually wired up?" without sending anything — it lists every wire and database, whether each is reachable, and how.
+
+**Media databases work the same way, with one honest difference:** there is no built-in tier, because none of the major vendors publishes an open developer API. Prowly states it has none; Cision, Meltwater and Muck Rack expose theirs only under enterprise contract. A buyer whose contract includes API access declares it; a buyer whose does not is told at configuration time. Verification is a safeguard on top of sending, never a precondition for it.
 
 ## 3. Providers are categories, not vendor SDKs
 
@@ -62,7 +96,7 @@ The portable ships **five adapter shapes**, not integrations:
 | `ad_platform` | paid placement | insertion-order cost model |
 | `direct_io` | a publication the buyer already has a relationship with | |
 
-**An adapter never hand-rolls HTTP and never touches a credential.** It names a registered action — `submit_release`, `fetch_report`, `verify_contact` — and the host runs it through the runner port with the buyer's provider configuration and secret resolution.
+**An adapter never hand-rolls HTTP and never touches a credential.** It names a registered action — `submit_release`, `fetch_report`, `verify_contact` — and the runner performs it. That separation is why Business Wire could be implemented without touching a single adapter, and why the next wire can be added without touching one either.
 
 The practical consequence for procurement: **adding a wire brand is a registry row, not code.** The answer to "which vendors do you support?" is "whichever you already pay for."
 
@@ -124,7 +158,7 @@ Two safety properties:
 - It sends **one real email** to a `selfAddress` the buyer controls, and **refuses to run without one.** It never reads a target from a media database. The send is real because a stubbed transport proves nothing about whether the buyer's mail actually leaves.
 - Delivery is recorded only **after** the buyer's `EmailPort` resolves. Recording first and delivering second produces a green record for mail that never left, which is a failure this project has seen and pinned with a test.
 
-A CLI runner is included for pipelines:
+On this platform the run has a button: **`/dashboard/press-media/acceptance`** — one click, eleven results, the evidence record in a copy box. A CLI runner is included for buyer pipelines:
 
 ```
 node scripts/run-press-acceptance.mjs <ports-module> --self <address>
@@ -134,7 +168,8 @@ Exit 0 only when every check passes. It supplies no default ports — a default 
 
 ## 8. What is not included
 
-- Any press, wire, media-database or advertising account. The portable knows the shape of those providers; the relationship is the buyer's.
+- Any press, wire, media-database or advertising **account**. The Business Wire transport is shipped; the account, the contract and the invoice are the buyer's.
+- A transport for wires that publish **no developer API** — EIN Presswire among them. Named as delegated so it is known at configuration time rather than at send time.
 - An AI provider or model. Generation happens through the buyer's `AiPort`.
 - An email transport. The payload composes; the buyer's `EmailPort` delivers.
 - A datastore. Campaign persistence belongs to the buyer's host layer.

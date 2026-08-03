@@ -1,6 +1,6 @@
 <!-- docs/portables/provider-hub-security-and-data-handling.md -->
 
-# Provider Hub — security and data handling
+# Provider Connection Hub Software — security and data handling
 
 Written for a security reviewer filling in a vendor questionnaire. Every claim is
 checkable against the archive you were given; where something has not been done,

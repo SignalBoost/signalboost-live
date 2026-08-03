@@ -87,6 +87,7 @@ const GROUPS: NavGroup[] = [
       { icon: '🧰', labelKey: 'nav.integrationCatalog', fallbackLabel: uiText('generatedUi.u_int_navlabel'), href: '/dashboard/integrations' },
       { icon: '📋', labelKey: 'nav.infrastructure', fallbackLabel: uiText('generatedUi.u_ed227cdaeb4a7009'), href: '/dashboard/infrastructure' },
       { icon: '👥', labelKey: 'nav.team', fallbackLabel: uiText('generatedUi.u_5985039f106df054'), href: '/dashboard/team' },
+      { icon: '⚙️', labelKey: 'nav.settings', fallbackLabel: uiText('generatedUi.u_74a883a037bc227f'), href: '/dashboard/settings' },
       { icon: '📊', labelKey: 'nav.operationsDashboard', fallbackLabel: uiText('generatedUi.u_d6027e4da26e9e17'), href: '/dashboard/operations' },
       { icon: '🧩', labelKey: 'nav.enterpriseIntegrations', fallbackLabel: uiText('generatedUi.u_78f6bc201cc6de7e'), href: '/enterprise-integration-builder' },
     ],
@@ -142,13 +143,46 @@ const GROUPS: NavGroup[] = [
     items: [
       { icon: '🤖', labelKey: 'nav.cosAssistant', fallbackLabel: uiText('generatedUi.u_f7186e7e576a60ad'), href: '/dashboard/assistant', requiresOwner: true },
       { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: uiText('generatedUi.u_4943e64e40762052'), href: '/admin', requiresOwner: true },
+
+      // ── SELF-HEALING SUPERVISOR, IN THE ORDER THE PRODUCT IS OPERATED ──────────
+      //
+      // These eleven entries were previously three, scattered through this group at
+      // positions 3, 8 and 9, and the other EIGHT pages could not be reached by any
+      // sequence of clicks anywhere in the platform — including the demo screen built
+      // for prospects to watch and the approval queue where a repair is authorised.
+      // A buyer evaluating self-healing software could not get to the screen where the
+      // healing is approved, which is the one screen the category is named after.
+      //
+      // They are now one contiguous block in WORKFLOW ORDER: connect what it watches,
+      // see what it sees, decide, review what ran, then the operator surfaces. The
+      // order is the answer to "where do I go next" — a reader who follows the list
+      // downward is following the product's own sequence.
+      //
+      // Labels are COMPOSED FROM EXISTING locale keys for the reason documented below
+      // on the acceptance entries: `fallbackLabel` is checked by validate:i18n-locale-keys,
+      // so a plain English string here fails the guard, and new generatedUi keys would
+      // mean editing five locale files of ~2,800 keys each.
       { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: uiText('generatedUi.u_67524288ec825ae4'), href: '/dashboard/supervisor', requiresOwner: true },
+      { icon: '🔌', labelKey: 'nav.supervisorProviders', fallbackLabel: `${uiText('generatedUi.u_9de790933254b865')} — ${uiText('generatedUi.u_2a93e812bc1ecd33')}`, href: '/dashboard/supervisor/providers', requiresOwner: true },
+      { icon: '▲', labelKey: 'nav.supervisorVercelHealth', fallbackLabel: `${uiText('generatedUi.u_68edc75c015e2e10')} — ${uiText('generatedUi.u_55898449eb74fb2e')}`, href: '/dashboard/supervisor/vercel-health', requiresOwner: true },
+      { icon: '🧾', labelKey: 'nav.supervisorApprovals', fallbackLabel: uiText('generatedUi.u_07d606f7b8490c2b'), href: '/dashboard/supervisor/approvals', requiresOwner: true },
+      { icon: '📜', labelKey: 'nav.supervisorExecutions', fallbackLabel: uiText('generatedUi.u_212a54cf3072409e'), href: '/dashboard/supervisor/executions', requiresOwner: true },
+      { icon: '🔍', labelKey: 'nav.supervisorMissionReviews', fallbackLabel: uiText('generatedUi.u_b500898ae38ccf02'), href: '/dashboard/supervisor/missions/reviews', requiresOwner: true },
+      { icon: '🧬', labelKey: 'nav.supervisorProtocolCapabilities', fallbackLabel: uiText('generatedUi.u_c38c6df0902b4c66'), href: '/dashboard/supervisor/protocol-capabilities', requiresOwner: true },
+      { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiText('generatedUi.u_4f794af09d6d3e3c'), href: '/dashboard/supervisor/ha', requiresOwner: true },
+      { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiText('generatedUi.u_68cb08a39a30554a'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },
+      // The prospect-facing pair. The operator runs the first on a screen share; the
+      // second is the read-only record a prospect opens later with no account at all.
+      { icon: '🎬', labelKey: 'nav.supervisorDemo', fallbackLabel: `${uiText('generatedUi.u_9de790933254b865')} — ${uiText('generatedUi.u_75c419ef704f82fe')}`, href: '/dashboard/supervisor/demo', requiresOwner: true },
+      { icon: '🔗', labelKey: 'nav.supervisorPublicDemo', fallbackLabel: `${uiText('generatedUi.u_75c419ef704f82fe')} — ${uiText('generatedUi.u_14269d3cc697c30f')}`, href: '/demo/supervisor', requiresOwner: true },
+      // Mints licence credentials, so it is owner-only and sits last, away from the
+      // demo entries — a prospect watching a screen share must never see this screen.
+      { icon: '🔑', labelKey: 'nav.supervisorLicense', fallbackLabel: `${uiText('generatedUi.u_9de790933254b865')} — ${uiText('generatedUi.u_f3ec8e880a46c8a6')}`, href: '/dashboard/supervisor/license', requiresOwner: true },
+      // ── end Supervisor block ───────────────────────────────────────────────────
       { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: uiText('generatedUi.u_3cbf6d117f4dc1b5'), href: '/hub', requiresOwner: true },
       { icon: '🔐', labelKey: 'nav.vault', fallbackLabel: uiText('generatedUi.u_e7ccb35263c6b8a0'), href: '/vault', requiresOwner: true },
       { icon: '🧠', labelKey: 'nav.cosHub', fallbackLabel: uiText('generatedUi.u_a4a4f4e10a389fd8'), href: '/hub/cos', requiresOwner: true },
       { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: uiText('generatedUi.u_6cda524ff713f2b8'), href: '/admin/onboarding', requiresOwner: true },
-      { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiText('generatedUi.u_4f794af09d6d3e3c'), href: '/dashboard/supervisor/ha', requiresOwner: true },
-      { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiText('generatedUi.u_68cb08a39a30554a'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },
       // Acceptance runs for the other two portables that produce their evidence on THIS
       // deployment. They existed as pages with no way to reach them, which is the same defect
       // as an acceptance harness reachable only from a CLI: the run is available in principle
@@ -165,6 +199,7 @@ const GROUPS: NavGroup[] = [
       { icon: '📰', labelKey: 'nav.pressAcceptance', fallbackLabel: `${uiText('generatedUi.u_85c253de08e70759')} — ${uiText('generatedUi.u_96385fbce0625bd2')}`, href: '/dashboard/press-media/acceptance', requiresOwner: true },
       { icon: '🧩', labelKey: 'nav.providerHubAcceptance', fallbackLabel: `${uiText('generatedUi.u_a082185bfb56e8e0')} — ${uiText('generatedUi.u_96385fbce0625bd2')}`, href: '/dashboard/provider-hub/acceptance', requiresOwner: true },
       { icon: '🧩', labelKey: 'nav.providerHubStatus', fallbackLabel: uiText('generatedUi.u_9a955057059a488c'), href: '/dashboard/provider-hub', requiresOwner: true },
+      { icon: '📚', labelKey: 'nav.portableCatalog', fallbackLabel: uiText('generatedUi.u_44a4613ddb65eac0'), href: '/dashboard/portable-products', requiresOwner: true },
       { icon: '📦', labelKey: 'nav.portableReadiness', fallbackLabel: uiText('generatedUi.u_627f029b2aaae158'), href: '/dashboard/portable-products/readiness', requiresOwner: true },
       { icon: '📊', labelKey: 'nav.adminOverview', fallbackLabel: uiText('generatedUi.u_9ccfc43a0487068a'), href: '/admin/overview', requiresOwner: true },
       { icon: '💰', labelKey: 'nav.adminRevenue', fallbackLabel: uiText('generatedUi.u_8e2318e66508c35e'), href: '/admin/revenue', requiresOwner: true },

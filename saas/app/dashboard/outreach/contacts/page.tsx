@@ -43,6 +43,7 @@ export default function OutreachContactsPage() {
   const [duplicateId, setDuplicateId] = useState('')
   const [busyId, setBusyId] = useState('')
   const [batchBusy, setBatchBusy] = useState(false)
+  const [refreshBusy, setRefreshBusy] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   // WHY A PER-ROW MESSAGE EXISTS AT ALL. Every failure used to be reported in one banner at
   // the TOP of the page. Acting on a row below the fold — and the list paginates at three, so
@@ -179,6 +180,46 @@ export default function OutreachContactsPage() {
     }
   }
 
+  // Rewrite every pending draft against the CURRENT product manifests.
+  //
+  // This exists as a button because the capability shipped as an API route and therefore
+  // did not exist at all for the person who needs it: the queue sat full of drafts written
+  // before the product descriptions were corrected, and the only way to fix them was a
+  // request nobody was going to hand-craft. A feature that requires a terminal is not a
+  // feature here.
+  //
+  // Recipients, addresses and row ids are untouched — only the message body is rewritten,
+  // and only for rows still 'pending'. Anything already approved keeps the copy that was
+  // actually approved.
+  async function refreshDrafts() {
+    if (!counts.pending) {
+      setNotice(copy.noPendingToRefresh)
+      return
+    }
+    if (!window.confirm(fill(copy.refreshConfirm, { count: counts.pending }))) return
+
+    setRefreshBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const response = await fetch('/api/outreach/refresh-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        credentials: 'include',
+        body: JSON.stringify({ apply: true, limit: 100 }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data?.ok) throw new Error(data?.error || copy.updateError)
+      setNotice(fill(copy.refreshDone, { refreshed: data.refreshed || 0, skipped: data.skipped || 0, failed: data.failed || 0 }))
+      await load()
+    } catch (reason: any) {
+      setError(reason?.message || copy.updateError)
+    } finally {
+      setRefreshBusy(false)
+    }
+  }
+
   async function sendBatch() {
     if (!counts.approved) {
       setNotice(copy.noBatch)
@@ -223,6 +264,7 @@ export default function OutreachContactsPage() {
             </div>
             <div className="sb-cta-row">
               <button type="button" className="sb-button-primary" disabled={batchBusy || !counts.approved} onClick={() => void sendBatch()}>{batchBusy ? copy.batching : copy.batch}</button>
+              <button type="button" className="sb-button-secondary" disabled={refreshBusy || !counts.pending} onClick={() => void refreshDrafts()}>{refreshBusy ? copy.refreshing : copy.refresh}</button>
               <Link className="sb-button-secondary" href="/admin/outreach/delivery">📬 {copy.delivery}</Link>
               <Link className="sb-button-primary" href="/dashboard/outreach/discovery">{copy.discover}</Link>
             </div>

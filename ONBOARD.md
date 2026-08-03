@@ -9,15 +9,25 @@ buyer package, localization, or the supervisor database.
 
 ## 1. The one-line state
 
-The Self-Healing Supervisor detects, diagnoses and evidences real production incidents
-unattended; it installs as a zero-dependency npm package; it produces human-readable output in
-English, Spanish, Portuguese, Polish and Russian; and a prospect can receive a redacted record
-of a real incident through a link that needs no account.
+**Five portables now do real work with credentials alone.** Marketing + Sales spends and
+publishes across ten ad networks and seven social platforms; the Self-Healing Supervisor
+detects, diagnoses and evidences production incidents unattended and explains every conclusion
+it reaches; Press & Media writes, constrains and **sends** — free editorial through the buyer's
+mail transport and Business Wire through a shipped integration; Provider Hub performs bounded
+live reads with a shipped transport, production enabled under a named authorisation; and the
+Browser Agent Ecosystem governs sessions across twenty-six vendors, four of which work on
+credentials alone through a shipped W3C WebDriver transport.
 
-The buyer evaluation package is now committed and merged. The next cross-cutting engineering
-priority is to finish repository-wide localization so no user-facing English remains hardcoded
-in executable UI, server responses, notifications, metadata, templates, or generated-content
-surfaces.
+Each installs as a zero-dependency package whose boundary is proven by a graph walk rather than
+asserted, and produces output in English, Spanish, Portuguese, Polish and Russian.
+
+**The measure that matters is whether a portable can run a real transaction end to end**, not
+whether it is packaged and documented. See §16.5. Two portables are waiting on a single owner
+action each — the acceptance click in §11 — before their versions drop `-rc`.
+
+The standing cross-cutting priority is unchanged: finish repository-wide localization so no
+user-facing English remains hardcoded in executable UI, server responses, notifications,
+metadata, templates, or generated-content surfaces.
 
 ---
 
@@ -312,6 +322,20 @@ noted:
 | `self-healing-support-terms.md` | Support and procurement commitments |
 | `self-healing-pilot-agreement.md` | Counsel draft; still requires legal-entity review |
 
+**Four further portables now carry their own package**, each following the same five-document
+shape — integration guide, presentation, operations runbook, support terms, security and
+data-handling statement:
+
+| Portable | Documents | State |
+| --- | --- | --- |
+| Press & Media | `press-media-*` and `buyer-package/press-media-presentation.md` | complete; `[SET]` prices outstanding |
+| Marketing + Sales | `marketing-sales-integration-guide.md`, `buyer-package/marketing-sales-presentation.md` | complete; `[SET]` prices outstanding |
+| Provider Hub | `provider-hub-*` and `buyer-package/provider-hub-presentation.md` | complete; `[SET]` prices outstanding |
+| Browser Agent Ecosystem | `browser-agent-integration-guide.md`, `buyer-package/browser-agent-presentation.md` | guide and presentation done; three procurement documents outstanding |
+
+Every presentation carries the same `[SET]` placeholders — two prices, pilot length, pilot fee,
+contact line — and none should be sent before they are filled.
+
 The first buyer contact should remain bounded. Do not send every internal or legal document when
 the presentation and a suitable redacted evidence link are sufficient for the first discussion.
 
@@ -519,15 +543,25 @@ The localization project is complete only when all of these are true:
 
 ## 11. Open owner and product decisions
 
-1. Mint and install the demonstration licence so the first buyer impression is not an expected
+1. **Run two acceptance clicks.** `/dashboard/press-media/acceptance` and
+   `/dashboard/provider-hub/acceptance`. Each is one button; press sends one real email to the
+   owner address, provider hub performs one real read against this deployment. A green result IS
+   the acceptance record — keep the JSON. Nothing else stands between those two portables and a
+   version without `-rc`.
+2. **Fill the `[SET]` values** in every buyer presentation: two prices, pilot length, pilot fee,
+   contact line. A presentation cannot be sent until they are filled.
+3. Mint and install the demonstration licence so the first buyer impression is not an expected
    unlicensed refusal.
-2. Decide whether `signalboost-live` should remain public because source, buyer documentation,
+4. Decide whether `signalboost-live` should remain public because source, buyer documentation,
    packaging, and licensing implementation are world-readable.
-3. Complete legal-entity details and counsel review for the pilot agreement.
-4. Publish a clean production incident record after the next safe cancelled deployment.
-5. Move the master evaluation plan from `docs/portables/portables/` to `docs/portables/` and
+5. Complete legal-entity details and counsel review for the pilot agreement.
+6. Publish a clean production incident record after the next safe cancelled deployment.
+7. Move the master evaluation plan from `docs/portables/portables/` to `docs/portables/` and
    update all references.
-6. Execute the localization phases in section 9 until the repository has zero hardcoded
+8. **Ask a wire or media-database vendor for API documentation as a prospective integration
+   partner.** They give it to partners. With PR Newswire's or Cision's specification in hand,
+   those brands become credentials-only exactly as Business Wire is — see §16.5.
+9. Execute the localization phases in section 9 until the repository has zero hardcoded
    user-facing English across all defined surfaces.
 
 ---
@@ -851,6 +885,17 @@ Sales (16, spanning `lib/outreach` and `lib/ads`). Sold as one product; buildabl
 Paid placement lives in its own folder because its risk profile differs, not because it is a
 different product: advertising is marketing.
 
+**There are three packaging paths, and knowing which applies avoids a wasted hour:**
+
+| Portable | Built by |
+| --- | --- |
+| Press & Media, Provider Hub, Browser Agent | `scripts/package-portable.mjs <spec>` with a spec in `portable-release/` |
+| Self-Healing Supervisor | `scripts/build-portable.mjs` — its own path, deliberately. Do **not** create a spec for it |
+| Marketing + Sales | `scripts/build-marketing-sales-portable.mjs` — its own path |
+
+Every path walks the real import graph from the declared entry points and refuses to ship on a
+host alias, a third-party package, or a path outside the layer.
+
 ### 16.3 Paid ads are a different class of risk
 
 A failed post costs nothing. A wrong ad spends the buyer's budget at machine speed and the
@@ -882,7 +927,59 @@ cap would be a supported way to defeat the product.
 - Platform approval is the **buyer's** burden, not ours, and the buyer documents say so per
   platform rather than implying they are equal.
 
-### 16.5 Delivery hazards, all observed repeatedly
+### 16.5 Transports are shipped, not specified
+
+The correction that reshaped this section, in the owner's words: *"Complete means complete,
+functionality, ready to sell. I do not care about documentation if the engine is not ready. You
+mark as complete, but in fact they are placeholder."*
+
+He was right. Three portables had shipped the safety rails — validation, credential handling,
+approval gates, evidence — and left the actual vendor call to a port the BUYER implements. A
+customer opening `browserstack-adapter.ts` found no BrowserStack call in it. That is a
+specification, not a product.
+
+**The rule now: a portable is not sellable until a buyer can run a real transaction with
+credentials alone.** Packaging, boundary proofs, acceptance harnesses and buyer documents are
+necessary and prove nothing about whether the thing works.
+
+What that produced:
+
+| Portable | Shipped transport | Still buyer-supplied |
+| --- | --- | --- |
+| Press & Media | Business Wire in full; PR Newswire, GlobeNewswire, PRWeb, Accesswire pre-staged down to an endpoint the buyer pastes | wires with no public API (EIN Presswire), media databases without API access on their plan |
+| Browser Agent | W3C WebDriver — covers BrowserStack, Sauce Labs, LambdaTest and any Selenium Grid from ONE implementation | the other twenty-two vendors, whose protocols are partner-gated |
+| Provider Hub | HTTPS read transport and SHA-256 digest | providers requiring request signing (SigV4, OAuth 1.0a) |
+
+**Three rules learned building them, and they generalise:**
+
+- **Implement the protocol, not the vendor.** Four browser vendors fell out of one WebDriver
+  implementation. Four wires fell out of one OAuth 2.0 client-credentials implementation. A
+  published standard can be implemented correctly without any vendor's private documentation.
+- **Never guess an endpoint.** A blank the buyer fills from their own contract is honest; a
+  plausible-looking address that 404s fails in front of them at the moment they publish. Where a
+  vendor keeps its documentation behind a contract, stage everything except the one line only
+  they can supply.
+- **Name the vendors that have no API at all.** EIN Presswire and Prowly publish none. Saying so
+  at configuration time is a feature; discovering it at send time is a defect.
+
+### 16.6 Every portable needs a button, not just a script
+
+Acceptance harnesses were reachable only from a CLI, and the owner works through a browser. Two
+portables sat at `-rc` for want of a click target rather than for want of code — and in one case
+the owner-gated route recorded as delivered had never actually landed on `main`.
+
+Every portable that must produce acceptance evidence on this deployment needs **both**: a CLI
+runner for a buyer's pipeline, and an owner-gated route with a one-click page here. The pattern
+is settled — `/dashboard/supervisor/acceptance`, `/dashboard/press-media/acceptance`,
+`/dashboard/provider-hub/acceptance` — treat a 409 as a real answer, render every check, and put
+the evidence JSON in a copyable box.
+
+**One i18n trap on those pages:** the supervisor page uses `generatedUi.u_<hash>` keys, and
+inventing new ones fails the completeness guard unless all five locale files gain them — and
+those files are too large to re-paste safely. Use `auditUiText(lang, 'English')` instead. It is a
+call expression, so the hardcoded-copy guard does not flag it, and it adds no locale churn.
+
+### 16.7 Delivery hazards, all observed repeatedly
 
 - **New files slip most often** — they must be created rather than pasted over. Say "new
   file" explicitly.
@@ -897,3 +994,16 @@ cap would be a supported way to defeat the product.
   code fault.
 - `esbuild` and strip-types checks pass on undefined variables. Only a real `tsc` catches
   them. Run one before any multi-file delivery.
+- **A green build proves compilation, not that the intended version of each file landed.** Diff
+  every delivered file against `raw.githubusercontent.com/.../main/<path>` afterwards. Files
+  have landed as earlier drafts, and whole files recorded as delivered have turned out to be
+  404 — three on Press & Media alone.
+- **When a rebuild fails with the SAME line numbers as the previous one, the file did not land.**
+  Do not re-debug the code.
+- **Two files with the same basename in one batch will be swapped.** `index.ts` and
+  `testing/index.ts` were. Give the delivered copies distinct names.
+- **Do not depend on TypeScript narrowing in portable code.** A discriminated union that compiles
+  locally has failed under the repo's toolchain more than once. Return a flat record from an
+  internal helper instead.
+- **Never describe a file as delivered before it exists.** Said once about two files that had not
+  been written; the owner had to point it out.

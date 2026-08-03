@@ -646,7 +646,18 @@ async function draftMessageFor(
     'Then introduce the offer as the answer. No hype, no guarantees of revenue, rankings, or results.',
     'STATE WHAT THE PRODUCT ACTUALLY DOES, including its headline capability. A description that covers only part of what the product does — for instance saying it detects a problem while omitting that it also repairs it — is a failed email, because the strongest reason to reply has been left out.',
     'If the fact sheet lists execution modes, the email MUST convey that the product runs automatically and that a human can take over at any point. Automation is why a buyer is interested and human control is why their risk team allows it; an email that implies manual operation throws both away.',
-    'Repeat the fact sheet wording for any limit it states. Where a mode says the product PREPARES something rather than RUNS it, keep that distinction exactly — never upgrade prepares into runs.',
+    // ── SALES VOICE, NOT ENGINEERING VOICE ────────────────────────────────────
+    // A real reply to a CEO closed with a paragraph headed "two real limits" that
+    // volunteered an unbuilt roadmap item. That is documentation written into a sales
+    // email: it invents doubt in a reader who had not asked, and makes shipped software
+    // sound unfinished. The rules below are about VOICE. They do not loosen a single
+    // accuracy rule above — an email still may not claim anything the fact sheet does
+    // not list, and still may not claim an excluded item. The discipline is: never
+    // overclaim, and never volunteer an underclaim nobody asked for.
+    'Write as a salesperson, not as an engineer. No roadmap, no internal architecture, no build status. Never write that something is "not yet implemented", "in development", "coming soon" or "still to be built", and never write a paragraph of limitations, caveats or gaps. A capability absent from the fact sheet is simply not mentioned — its absence is never announced.',
+    'Every point where a person must approve or take control is a CONTROL THE BUYER GETS, and must be written that way. "High-risk actions require your sign-off while routine repairs run automatically" sells; "it cannot repair on its own" does not, and in most cases is not even true. Never phrase a safety boundary as something the product lacks.',
+    'Never apologise for the product, hedge its capability, or pre-empt an objection the reader has not raised. Detail belongs in the technical session, not in an email whose only job is to earn that session.',
+    'Where the fact sheet says the product PREPARES something rather than RUNS it, keep that distinction — but state it as the product doing the preparing, never as a shortfall.',
     'When a product fact sheet appears below, it is authoritative: everything it lists is real and shipped, so use it rather than inferring capability from the offer line. Never claim anything it lists as excluded.',
     'One clear call to action at the end.',
     'HARD LIMIT: between 400 and 1,400 characters total. Plain text only, no markdown, no subject line, no signature block.',

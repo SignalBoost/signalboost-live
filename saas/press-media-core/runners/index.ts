@@ -40,6 +40,16 @@
 // out of the box; the database side only VERIFIES a contact the buyer already has, and verifies
 // nothing at all unless they own a subscription with API access.
 //
+// OAUTH 2.0 CLIENT CREDENTIALS IS SUPPORTED, and that matters more than it sounds. The
+// enterprise wires — PR Newswire, GlobeNewswire — authenticate this way, and it is a PUBLISHED
+// STANDARD, so it can be implemented correctly without ever seeing their private documentation.
+// The consequence: for those brands the only thing left that we cannot know is the endpoint
+// itself, which the buyer already has in their onboarding pack. See wire-profiles.ts, which
+// pre-stages every popular brand down to that one blank.
+//
+// The token is fetched once and reused until shortly before it expires. A token refreshed on
+// every call would be correct and would also rate-limit a buyer out of their own account.
+//
 // PURE OF HOST CONCERNS: `fetch` and `FormData` are global in Node 18+, so there is no
 // dependency, no SDK, no environment read and no import outside this portable.
 
@@ -65,14 +75,18 @@ export type DeclaredWireRecipe = {
   submitUrl: string
   /** Optional status endpoint. `{ref}` is substituted. Omit and proof stays honestly pending. */
   reportUrl?: string
-  /** How the credential is presented. */
-  auth: 'bearer' | 'api-key-header' | 'basic'
+  /** How the credential is presented. `oauth2` is the enterprise wires' scheme. */
+  auth: 'oauth2' | 'bearer' | 'api-key-header' | 'basic'
   /** Header name for api-key-header. Defaults to `x-api-key`. */
   authHeader?: string
   /** The credential itself, supplied by the buyer. Never read from the environment. */
   credential: string
   /** For basic auth. */
   username?: string
+  /** OAuth token endpoint, client id and optional scope, for auth: 'oauth2'. */
+  tokenUrl?: string
+  clientId?: string
+  scope?: string
   /** What this vendor calls the headline, body and reference fields. */
   fieldMap?: { headline?: string; body?: string; reference?: string; language?: string }
   /** Anything else this vendor always requires — account id, circuit code, and so on. */
@@ -91,10 +105,14 @@ export type DeclaredWireRecipe = {
 export type DeclaredDatabaseRecipe = {
   brand: string
   verifyUrl: string
-  auth: 'bearer' | 'api-key-header' | 'basic'
+  auth: 'oauth2' | 'bearer' | 'api-key-header' | 'basic'
   authHeader?: string
   credential: string
   username?: string
+  /** OAuth token endpoint and client id, for auth: 'oauth2'. */
+  tokenUrl?: string
+  clientId?: string
+  scope?: string
   /** What this vendor calls the contact and publication fields on the way in. */
   fieldMap?: { contact?: string; publication?: string; beat?: string }
   /** Where the yes/no lives in the response. Defaults to `found`, then `verified`. */
@@ -137,14 +155,97 @@ function refuse(error: string): RunnerResult {
   return { ok: false, status: 0, outputs: {}, error }
 }
 
-function authHeaders(recipe: { auth: 'bearer' | 'api-key-header' | 'basic'; credential: string; username?: string; authHeader?: string }): Record<string, string> {
-  if (recipe.auth === 'bearer') return { authorization: `Bearer ${recipe.credential}` }
+type AuthShape = {
+  auth: 'oauth2' | 'bearer' | 'api-key-header' | 'basic'
+  credential: string
+  username?: string
+  authHeader?: string
+  tokenUrl?: string
+  clientId?: string
+  scope?: string
+}
+
+/**
+ * Cached access tokens, keyed by token endpoint plus client id.
+ *
+ * Held in module scope on purpose: a runner rebuilt per request would otherwise fetch a fresh
+ * token on every send, which is correct and would also rate-limit a buyer out of their own
+ * account during a busy release day.
+ */
+const TOKEN_CACHE = new Map<string, { token: string; expiresAt: number }>()
+
+/** Refresh this far before the stated expiry, so a token cannot lapse mid-request. */
+const TOKEN_SAFETY_MS = 60_000
+
+/**
+ * Short fingerprint of a secret, for use in the cache key.
+ *
+ * THE CACHE KEY MUST INCLUDE THE CREDENTIAL, and a test caught this the hard way: keyed on the
+ * token endpoint and client id alone, a WRONG secret reused the token a correct one had just
+ * fetched — so a connection check reported "credential accepted" for credentials that would
+ * fail. Rotating a secret would have had the same effect in reverse: the old token kept working
+ * until it expired, hiding a rotation that had not taken effect.
+ *
+ * Fingerprinted rather than stored: FNV-1a, not a security hash and not used as one — it exists
+ * so the secret itself never sits in a Map key that might be dumped while debugging.
+ */
+function secretFingerprint(value: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(16)
+}
+
+async function oauthToken(recipe: AuthShape): Promise<{ token: string; error: string }> {
+  const tokenUrl = String(recipe.tokenUrl || '')
+  const clientId = String(recipe.clientId || '')
+  if (!tokenUrl || !clientId) return { token: '', error: 'This wire is configured for OAuth but has no token endpoint or client id.' }
+
+  const key = `${tokenUrl}|${clientId}|${secretFingerprint(recipe.credential)}`
+  const cached = TOKEN_CACHE.get(key)
+  if (cached && cached.expiresAt > Date.now() + TOKEN_SAFETY_MS) return { token: cached.token, error: '' }
+
+  const body = new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: recipe.credential })
+  if (recipe.scope) body.set('scope', recipe.scope)
+
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+    if (!response.ok) {
+      // Deliberately does not echo the body: a failed token response frequently repeats the
+      // client id, and this message travels into logs.
+      return { token: '', error: `The token endpoint rejected these credentials (HTTP ${response.status}).` }
+    }
+    const payload = (await response.json().catch(() => ({}))) as { access_token?: string; expires_in?: number }
+    const token = String(payload.access_token || '')
+    if (!token) return { token: '', error: 'The token endpoint returned no access_token.' }
+    const lifetimeMs = (Number(payload.expires_in) > 0 ? Number(payload.expires_in) : 3600) * 1000
+    TOKEN_CACHE.set(key, { token, expiresAt: Date.now() + lifetimeMs })
+    return { token, error: '' }
+  } catch (error) {
+    return { token: '', error: `Could not reach the token endpoint: ${error instanceof Error ? error.message : String(error)}` }
+  }
+}
+
+/** Flat result rather than a union — the repo's toolchain does not always narrow one. */
+async function authHeadersFor(recipe: AuthShape): Promise<{ headers: Record<string, string>; error: string }> {
+  if (recipe.auth === 'oauth2') {
+    const acquired = await oauthToken(recipe)
+    if (!acquired.token) return { headers: {}, error: acquired.error }
+    return { headers: { authorization: `Bearer ${acquired.token}` }, error: '' }
+  }
+  if (recipe.auth === 'bearer') return { headers: { authorization: `Bearer ${recipe.credential}` }, error: '' }
   if (recipe.auth === 'basic') {
     const pair = `${recipe.username ?? ''}:${recipe.credential}`
     // btoa is global in Node 16+; kept over a Buffer import so the payload stays runtime-neutral.
-    return { authorization: `Basic ${btoa(pair)}` }
+    return { headers: { authorization: `Basic ${btoa(pair)}` }, error: '' }
   }
-  return { [recipe.authHeader || 'x-api-key']: recipe.credential }
+  return { headers: { [recipe.authHeader || 'x-api-key']: recipe.credential }, error: '' }
 }
 
 async function runDeclaredWire(recipe: DeclaredWireRecipe, action: string, variables: Record<string, unknown>): Promise<RunnerResult> {
@@ -157,8 +258,10 @@ async function runDeclaredWire(recipe: DeclaredWireRecipe, action: string, varia
       })
     }
     const url = recipe.reportUrl.replace('{ref}', encodeURIComponent(String(variables.ref ?? '')))
+    const auth = await authHeadersFor(recipe)
+    if (auth.error) return refuse(`${recipe.brand}: ${auth.error}`)
     try {
-      const response = await fetch(url, { headers: authHeaders(recipe) })
+      const response = await fetch(url, { headers: auth.headers })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) return result(false, response.status, {}, { error: `${recipe.brand} returned HTTP ${response.status}.` })
       return result(true, response.status, (body as Record<string, unknown>) ?? {})
@@ -178,10 +281,13 @@ async function runDeclaredWire(recipe: DeclaredWireRecipe, action: string, varia
   }
   if (variables.language) payload[map.language || 'language'] = variables.language
 
+  const auth = await authHeadersFor(recipe)
+  if (auth.error) return refuse(`${recipe.brand}: ${auth.error}`)
+
   try {
     const response = await fetch(recipe.submitUrl, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...authHeaders(recipe) },
+      headers: { 'content-type': 'application/json', ...auth.headers },
       body: JSON.stringify(payload),
     })
     const body = (await response.json().catch(() => ({}))) as Record<string, unknown>
@@ -205,16 +311,19 @@ async function runDeclaredDatabase(recipe: DeclaredDatabaseRecipe, action: strin
   }
   if (variables.beat) fields[map.beat || 'beat'] = variables.beat
 
+  const auth = await authHeadersFor(recipe)
+  if (auth.error) return refuse(`${recipe.brand}: ${auth.error}`)
+
   try {
     let response: Response
     if ((recipe.method || 'POST') === 'GET') {
       const url = new URL(recipe.verifyUrl)
       for (const [key, value] of Object.entries(fields)) url.searchParams.set(key, String(value ?? ''))
-      response = await fetch(url.toString(), { headers: authHeaders(recipe) })
+      response = await fetch(url.toString(), { headers: auth.headers })
     } else {
       response = await fetch(recipe.verifyUrl, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...authHeaders(recipe) },
+        headers: { 'content-type': 'application/json', ...auth.headers },
         body: JSON.stringify(fields),
       })
     }
@@ -382,5 +491,59 @@ export function describePressRunner(config: PressRunnerConfig): {
     // Ready means a release can actually be SENT. Contact verification is a safeguard on top of
     // that, not a precondition for it — a buyer with a verified list of their own is ready.
     ready: wires.some(wire => wire.reachable),
+  }
+}
+
+/**
+ * Check that a declared wire is reachable and its credential accepted, without publishing.
+ *
+ * Deliberately modest about what it proves. For an OAuth brand it acquires a token, which is a
+ * real answer: the endpoint resolved and the client id and secret were accepted. For the others
+ * it can only confirm the configuration is complete, because the sole way to test an API-key
+ * wire is to send it something — and sending a test release to a wire is publishing it.
+ *
+ * It never submits. A "connected" result means the door opens, not that the submission will be
+ * accepted, and it says so rather than implying more.
+ */
+export async function checkWireConnection(config: PressRunnerConfig, brand?: string): Promise<{
+  brand: string
+  reachable: boolean
+  proven: 'credential_accepted' | 'configuration_complete' | 'not_configured'
+  detail: string
+}> {
+  const wanted = String(brand || config.preferredWire || '').toLowerCase()
+  const recipes = config.declaredWires || []
+  const recipe = wanted ? recipes.find(entry => entry.brand.toLowerCase() === wanted) : recipes[0]
+
+  if (!recipe) {
+    if (config.businessWire?.email && config.businessWire?.password) {
+      const complete = Boolean(config.businessWire.sourceKey && config.businessWire.accountId && config.businessWire.savedDistributionId)
+      return {
+        brand: 'Business Wire',
+        reachable: complete,
+        proven: complete ? 'configuration_complete' : 'not_configured',
+        detail: complete
+          ? 'Credentials, source key, account and distribution are all set. Business Wire is reached by logging in at submission time.'
+          : 'Business Wire needs a source key, an account and a saved distribution before a release can be sent.',
+      }
+    }
+    return { brand: wanted || '(none)', reachable: false, proven: 'not_configured', detail: 'No wire is configured under that name.' }
+  }
+
+  if (recipe.auth === 'oauth2') {
+    const acquired = await oauthToken(recipe)
+    return acquired.token
+      ? { brand: recipe.brand, reachable: true, proven: 'credential_accepted', detail: 'The token endpoint accepted these credentials. A submission has not been attempted.' }
+      : { brand: recipe.brand, reachable: false, proven: 'not_configured', detail: acquired.error }
+  }
+
+  const complete = Boolean(recipe.submitUrl && recipe.credential)
+  return {
+    brand: recipe.brand,
+    reachable: complete,
+    proven: complete ? 'configuration_complete' : 'not_configured',
+    detail: complete
+      ? 'Endpoint and credential are set. This scheme cannot be tested without sending a release, so nothing was sent.'
+      : 'This wire is missing its endpoint or its credential.',
   }
 }

@@ -145,6 +145,21 @@ const GROUPS: NavGroup[] = [
       { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: uiText('generatedUi.u_6cda524ff713f2b8'), href: '/admin/onboarding', requiresOwner: true },
       { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiText('generatedUi.u_4f794af09d6d3e3c'), href: '/dashboard/supervisor/ha', requiresOwner: true },
       { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiText('generatedUi.u_68cb08a39a30554a'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },
+      // Acceptance runs for the other two portables that produce their evidence on THIS
+      // deployment. They existed as pages with no way to reach them, which is the same defect
+      // as an acceptance harness reachable only from a CLI: the run is available in principle
+      // and unavailable in practice. Placed beside the supervisor's so all three sit together.
+      //
+      // Their labels are COMPOSED FROM EXISTING locale keys — "Press media" / "Provider Hub"
+      // plus "Run acceptance" — rather than from new generatedUi keys. Two reasons, and the
+      // first is a guard: `fallbackLabel` is a checked property, so a plain English string here
+      // fails validate:i18n-locale-keys (it did, before this comment existed). The second is
+      // that adding new generatedUi keys means editing five locale files of ~2,800 keys each,
+      // and a slot swap there has cost real time twice. Composition translates today in all
+      // five languages, and the declared labelKeys let a future locale entry override the
+      // composed label with a hand-written one.
+      { icon: '📰', labelKey: 'nav.pressAcceptance', fallbackLabel: `${uiText('generatedUi.u_85c253de08e70759')} — ${uiText('generatedUi.u_96385fbce0625bd2')}`, href: '/dashboard/press-media/acceptance', requiresOwner: true },
+      { icon: '🧩', labelKey: 'nav.providerHubAcceptance', fallbackLabel: `${uiText('generatedUi.u_a082185bfb56e8e0')} — ${uiText('generatedUi.u_96385fbce0625bd2')}`, href: '/dashboard/provider-hub/acceptance', requiresOwner: true },
       { icon: '🧩', labelKey: 'nav.providerHubStatus', fallbackLabel: uiText('generatedUi.u_9a955057059a488c'), href: '/dashboard/provider-hub', requiresOwner: true },
       { icon: '📦', labelKey: 'nav.portableReadiness', fallbackLabel: uiText('generatedUi.u_627f029b2aaae158'), href: '/dashboard/portable-products/readiness', requiresOwner: true },
       { icon: '📊', labelKey: 'nav.adminOverview', fallbackLabel: uiText('generatedUi.u_9ccfc43a0487068a'), href: '/admin/overview', requiresOwner: true },

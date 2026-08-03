@@ -1,33 +1,32 @@
 {
   "_path": "saas/portable-release/press-media.release.json",
-
   "id": "press-media",
   "name": "Press & Media",
   "packageName": "@portable/press-media",
   "version": "1.0.0-rc.1",
   "license": "SEE LICENSE IN LICENSE",
   "description": "Press and media outreach as injectable behaviour: a provider registry, five adapter shapes (free submission, PR wire, media database, ad platform, direct I/O), and the factual-discipline kernel that stops generated copy inventing products, people, quotes or statistics. The buyer supplies AI, email, notification and HTTP through ports, and brings their own provider accounts.",
-
   "_payloadRoot": "Three roots. press-media-core is the portable; portable-kernel carries company identity and factual discipline; portable-audit carries the SIEM event shape. The core reaches both by relative path, so all three must ship or a buyer's extraction has broken imports.",
-  "payloadRoot": ["press-media-core", "portable-kernel", "portable-audit"],
-
-  "entryPoints": ["press-media-core/index.ts"],
+  "payloadRoot": [
+    "press-media-core",
+    "portable-kernel",
+    "portable-audit"
+  ],
+  "entryPoints": [
+    "press-media-core/index.ts"
+  ],
   "buyerEntryPoints": {
     ".": "payload/press-media-core/index.ts",
     "./kernel": "payload/portable-kernel/index.ts",
     "./audit": "payload/portable-audit/index.ts"
   },
-
-  "_minModules": "Walked on 2026-07-26: 15 modules — 9 core, 3 kernel, 3 audit. A materially shorter walk means an entry point moved or an adapter stopped being reachable from the barrel.",
-  "minModules": 13,
-
+  "_minModules": "The buyer graph now also includes the shipped runner and its Business Wire transport. A shorter walk means the runner stopped being reachable from the barrel, which would silently return the portable to the state where a buyer had to implement RunnerPort themselves.",
+  "minModules": 15,
   "_hostFallbacks": "Empty, and verified empty by a real graph walk: this portable's buyer surface has NO bare or aliased imports at all. Everything it needs arrives through ports. If the gate ever reports one, something host-coupled was added to the core.",
   "hostFallbacks": [],
-
   "namingPattern": "signalboost",
   "_knownNamingExceptions": "Empty and verified empty. Keep it that way — the build platform's name must not reach a buyer's records.",
   "knownNamingExceptions": [],
-
   "includeFiles": [
     {
       "from": "../docs/portables/press-media-portable-design.md",
@@ -35,26 +34,25 @@
     }
   ],
   "releaseNotes": "portable-release/press-media.RELEASE-NOTES.md",
-
   "buyerMustSupply": [
     "AiPort — generates campaign creative. The buyer's model, the buyer's key, the buyer's spend. The payload contains no provider SDK.",
     "EmailPort — sends a release to a recipient. Display name and signature come from the company record, so a buyer's outreach never arrives under another company's name.",
     "OwnerNotifyPort — tells a human what the engine did or wants approved.",
     "HttpPort — optional. Required only by adapters that call a provider API directly.",
-    "RunnerPort — optional. Config-driven execution for paid providers; without it, paid adapters have no transport.",
+    "RunnerPort — NO LONGER THE BUYER’S TO WRITE. createPressRunner(config) ships a working one: Business Wire implemented against their published Connect 5 API, any other wire declared as a REST recipe, and brands with no public API named rather than pretended. Supply credentials, not code. A buyer may still substitute their own RunnerPort if they prefer.",
+    "Business Wire Connect credentials, a source key, an account and a saved distribution — chosen from the live lists the runner reads, never typed.",
     "CompanyProfilePort — optional but strongly recommended. It is how the engine knows whose company it is writing for; without it, generated copy carries visible [PLACEHOLDER] markers instead of invented facts.",
     "Provider accounts and credentials — PR wire, media database or ad platform accounts are the buyer's, billed to the buyer."
   ],
-
   "notIncluded": [
-    "Any press, wire, media-database or advertising account. The portable knows the shape of those providers; the relationship is the buyer's.",
-    "An AI provider or model. Generation happens through the buyer's AiPort.",
-    "An email transport. The payload composes; the buyer's EmailPort delivers.",
-    "A datastore. Campaign persistence belongs to the buyer's host layer.",
+    "Any press, wire, media-database or advertising ACCOUNT. The transport is now shipped; the relationship and the invoice are the buyer’s.",
+    "An AI provider or model. Generation happens through the buyer’s AiPort.",
+    "An email transport. The payload composes; the buyer’s EmailPort delivers.",
+    "A datastore. Campaign persistence belongs to the buyer’s host layer.",
     "Any credential. Nothing in the archive contains or requires a build-platform account.",
-    "Scheduling, retries or queueing. The buyer's host decides when the engine runs."
+    "Scheduling, retries or queueing. The buyer’s host decides when the engine runs.",
+    "A transport for wires that publish NO developer API — EIN Presswire among them. Those are named in the runner as delegated, so a buyer learns it at configuration time rather than at send time."
   ],
-
   "supportedPlatforms": [
     "Node.js 20 LTS and 22 LTS",
     "TypeScript 5.x, non-strict and strict both compile",
@@ -63,21 +61,18 @@
     "Any SIEM accepting ECS-JSON or CEF, via the bundled audit module",
     "No native modules, no runtime dependencies of any kind"
   ],
-
   "upgradeCompatibility": {
     "previousVersions": [],
     "policy": "Within 1.x the port interfaces (AiPort, EmailPort, OwnerNotifyPort, HttpPort, RunnerPort, CompanyProfilePort) change additively only. A new required member on any of them is a major version. New adapters and new exports are minor.",
     "adapterRegistry": "Adapters are registered at runtime by the host. A buyer's own adapter implementing MediaProviderAdapter continues to work across minor versions.",
     "rollback": "The payload holds no state. Rolling back is restoring the previous archive and repointing imports."
   },
-
   "knownLimitations": [
     "Factual discipline is enforced by prompt construction and by visible [PLACEHOLDER] markers, not by a post-generation checker. A buyer should still review copy before it reaches a journalist.",
     "Paid adapters (PR wire, media database, ad platform) require a RunnerPort; without one they can describe what they need but cannot dispatch.",
     "Proof collection is provider-shaped and asynchronous. A dispatch returning 'submitted' is not evidence of publication.",
     "Seats and execution limits in a licence are contract terms, not enforced controls."
   ],
-
   "acceptance": {
     "entry": "payload/press-media-core/acceptance-harness.ts",
     "export": "runPressAcceptance",

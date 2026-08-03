@@ -29,7 +29,7 @@ import type { IncidentSource, IncidentSourceHealth, RawIncidentDelivery } from '
 // — the runtime is handed something that CAN run an incident, it does not reach into
 // the orchestrator's module to find out how.
 export interface IncidentRunOutcome {
-  status: 'completed' | 'unresolved' | 'failed' | 'blocked' | 'approval_required'
+  status: 'completed' | 'unresolved' | 'failed' | 'blocked' | 'approval_required' | 'rolled_back'
   reason: string
 }
 

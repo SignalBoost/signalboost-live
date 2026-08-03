@@ -454,6 +454,13 @@ async function runDiscovery(
     const host = hostOf(String((previous as ProspectResult)?.url || ''))
     if (host) seen.add(host)
   }
+  // And so are candidates still WAITING in the queue: discovery now appends to the
+  // queue rather than replacing it, so a fresh round must not re-find a company that
+  // is already lined up.
+  for (const waiting of Array.isArray(job.candidates) ? job.candidates : []) {
+    const host = hostOf(String((waiting as ProspectCandidate)?.url || ''))
+    if (host) seen.add(host)
+  }
 
   for (const query of searchQueriesFor(job)) {
     if (matched.length >= target || timeLeft() < 8_000) break
@@ -576,23 +583,46 @@ export async function advanceProspectCampaigns(): Promise<{
   let job = claimed[0] as ProspectCampaignJob
   let units = 0
 
-  // Phase 1 — discovery. One search, then the job has a candidate list to chew through.
-  if (job.status === 'queued' || !Array.isArray(job.candidates) || !job.candidates.length) {
+  // Phase 1 — discovery. Runs when the job is new OR when the waiting queue is empty
+  // and the campaign still owes drafts. Discovery APPENDS to the queue; it never
+  // replaces it. The previous design cleared the array to force a fresh round, which
+  // collided with the drafting loop below: `processed` is a CUMULATIVE counter, and the
+  // loop was using it as an INDEX into the array. After one cleared round the counter
+  // pointed past the end of every fresh list, so the worker discovered forever and
+  // drafted nothing — and, because the oldest unfinished job is always claimed first,
+  // that one wedged campaign starved every campaign created after it. The queue below
+  // is consumed from the front, so the index is always zero and the counter can never
+  // collide with it again.
+  const ceiling = examinedCeilingFor(job.requested_count)
+  const queueEmpty = !Array.isArray(job.candidates) || !job.candidates.length
+  const owesDrafts = job.drafts_created < job.requested_count
+  if ((job.status === 'queued' || queueEmpty) && owesDrafts && job.processed < ceiling) {
     // Leave at least 10s of the tick for saving results and, when possible, a first
     // draft. Discovery that fills the whole tick starves the write that persists it.
     const discovery = await runDiscovery(job, Math.max(10_000, remainingMs() - 10_000))
     if (!discovery.ok) {
+      // A brand-new campaign that cannot discover anything has failed. A campaign that
+      // already made progress and can find nothing FURTHER is finished short of its
+      // target — mark it completed with the honest count, never leave it wedged.
+      const hasProgress = job.processed > 0 || job.drafts_created > 0
+      const closingStatus: ProspectCampaignStatus = hasProgress ? 'completed' : 'failed'
+      const closingNote = hasProgress
+        ? `Stopped at ${job.drafts_created} of ${job.requested_count}. ${job.processed} companies examined, ${job.skipped} skipped — no further companies found (${discovery.error || 'discovery exhausted'}).`
+        : discovery.error || 'Discovery failed.'
       await db.from(TABLE).update({
-        status: 'failed',
-        last_error: discovery.error || 'Discovery failed.',
+        status: closingStatus,
+        last_error: closingNote,
         updated_at: new Date().toISOString(),
       }).eq('id', job.id)
-      return { ok: false, jobId: job.id, status: 'failed', units: 0, error: discovery.error }
+      return { ok: closingStatus === 'completed', jobId: job.id, status: closingStatus, units: 0, error: discovery.error }
     }
+
+    const existing = Array.isArray(job.candidates) ? job.candidates : []
+    const merged = [...existing, ...discovery.candidates]
 
     const { data: updated, error: updateError } = await db.from(TABLE).update({
       status: 'running',
-      candidates: discovery.candidates,
+      candidates: merged,
       last_error: discovery.note || null,
       updated_at: new Date().toISOString(),
     }).eq('id', job.id).select('*').single()
@@ -602,8 +632,11 @@ export async function advanceProspectCampaigns(): Promise<{
     units += 1
   }
 
-  // Phase 2 — draft one company per unit, a few units per tick, always inside the budget.
-  const candidates = Array.isArray(job.candidates) ? job.candidates : []
+  // Phase 2 — draft one company per unit, a few units per tick, always inside the
+  // budget. The queue is consumed FROM THE FRONT: each unit takes candidates[0] and the
+  // save at the end stores what remains. `processed` is only ever a counter now — it
+  // gates the examined ceiling and the sector-query rotation, and nothing indexes with it.
+  const queue: ProspectCandidate[] = Array.isArray(job.candidates) ? [...job.candidates] : []
   const results: ProspectResult[] = Array.isArray(job.results) ? [...job.results] : []
   let processed = job.processed
   let drafted = job.drafts_created
@@ -611,12 +644,13 @@ export async function advanceProspectCampaigns(): Promise<{
   let lastError: string | null = job.last_error
 
   while (
-    processed < candidates.length &&
+    queue.length > 0 &&
     drafted < job.requested_count &&
+    processed < ceiling &&
     units < MAX_UNITS_PER_TICK &&
     remainingMs() > PER_COMPANY_TIMEOUT_MS + 15_000
   ) {
-    const candidate = candidates[processed]
+    const candidate = queue.shift() as ProspectCandidate
     processed += 1
     units += 1
 
@@ -657,21 +691,21 @@ export async function advanceProspectCampaigns(): Promise<{
     }
   }
 
-  // A CAMPAIGN THAT RUNS OUT OF CANDIDATES IS NOT FINISHED — IT IS OUT OF CANDIDATES.
-  //
-  // This previously reported 'completed' the moment the candidate list was exhausted, even
-  // at 5 drafts of 25. The number the operator asked for was silently abandoned and the
-  // screen said the work was done. Now an exhausted list with the target unmet CLEARS the
-  // candidates, which sends the next tick back through discovery on a different set of
-  // sector queries.
+  // WHEN IS A CAMPAIGN FINISHED? Three honest ends and one deliberate continuation:
+  //   met      — it drafted what was asked for.
+  //   ceiling  — it examined 6x the target and stops with the shortfall named, so a thin
+  //              market cannot become an unbounded loop against a paid search backend.
+  //   stalled  — the queue is empty and the last two dozen companies in a row produced
+  //              not one draft: something systematic (crawler blocked, addresses
+  //              unpublished market-wide), and another round would burn ticks repeating it.
+  //   otherwise, an empty queue with the target unmet simply leaves the job 'running';
+  //   the NEXT tick's Phase 1 appends a fresh round on rotated sector queries. That
+  //   replaces the old clear-the-array trick with a version that cannot wedge.
   const targetMet = drafted >= job.requested_count
-  const candidatesExhausted = processed >= candidates.length
-  // A round that examined companies and produced nothing at all has hit something
-  // systematic — an empty search backend, a blocked crawler — and going round again would
-  // burn ticks repeating it. Stop and say so instead.
-  const roundProducedNothing = candidatesExhausted && drafted === job.drafts_created && processed > job.processed
-  const goAgain = candidatesExhausted && !targetMet && !roundProducedNothing && processed < examinedCeilingFor(job.requested_count)
-  const finished = targetMet || (candidatesExhausted && !goAgain)
+  const ceilingHit = processed >= ceiling
+  const recent = results.slice(-24)
+  const stalled = queue.length === 0 && recent.length >= 24 && !recent.some(r => r.outcome === 'drafted')
+  const finished = targetMet || ceilingHit || (queue.length === 0 && stalled)
   const status: ProspectCampaignStatus = finished ? 'completed' : 'running'
 
   const shortfallNote = finished && !targetMet
@@ -682,8 +716,9 @@ export async function advanceProspectCampaigns(): Promise<{
     status,
     results: results.slice(-60),
     processed,
-    // Clearing the candidate list is what sends the next tick back to discovery.
-    candidates: goAgain ? [] : candidates,
+    // What remains of the queue, after this tick consumed from the front. An empty
+    // queue on an unfinished job is the signal the next tick reads to run discovery.
+    candidates: queue,
     drafts_created: drafted,
     skipped,
     last_error: shortfallNote,
@@ -700,7 +735,7 @@ export function summarizeProspectCampaign(job: ProspectCampaignJob): string {
     `Status: ${job.status}.`,
     `${job.drafts_created} of ${target} drafts queued`,
     job.skipped ? `${job.skipped} skipped` : '',
-    `${job.processed} companies examined of ${Array.isArray(job.candidates) ? job.candidates.length : 0} found`,
+    `${job.processed} companies examined, ${Array.isArray(job.candidates) ? job.candidates.length : 0} waiting in the queue`,
     job.last_error ? `Last error: ${job.last_error}` : '',
   ].filter(Boolean)
   return parts.join('. ').replace(/\.\./g, '.')

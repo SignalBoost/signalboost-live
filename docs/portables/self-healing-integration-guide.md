@@ -1,5 +1,5 @@
 <!-- docs/portables/self-healing-integration-guide.md -->
-# Self-Healing Supervisor — Enterprise Integration Guide
+# Self-Healing Supervisor Software — Enterprise Integration Guide
 
 **Release:** `1.0.0-rc.2` design-partner evaluation  
 **Public package:** `@signalboost/self-healing-supervisor`

@@ -3,9 +3,12 @@
 // Cron (see saas/vercel.json). The preferred authentication is CRON_SECRET. When that
 // optional variable is not configured, accept only Vercel's documented cron user-agent.
 //
-// One tick claims the oldest unfinished job, runs discovery if it has no candidate list
-// yet, then drafts for up to three companies inside a 45-second internal budget. It
-// never sends: every draft lands in outreach_queue as 'pending' for owner approval.
+// One tick claims the oldest unfinished job, tops up its candidate queue when that queue
+// has run dry, then works through companies in CONCURRENT BATCHES inside a 240-second
+// internal budget. Batch width and the per-tick ceiling are set by
+// OUTREACH_CAMPAIGN_CONCURRENCY and OUTREACH_CAMPAIGN_UNITS_PER_TICK so a buyer can
+// match the worker to their own model and enrichment rate limits. It never sends: every
+// draft lands in outreach_queue as 'pending' for owner approval.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { advanceProspectCampaigns } from '@/lib/outreach/prospectCampaign'

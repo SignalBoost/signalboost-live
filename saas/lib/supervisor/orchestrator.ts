@@ -4,14 +4,16 @@ import { repairPlanSchema, type RepairPlan } from './repair-plan-schema.ts'
 import type { AuditEvent, AuditSink, ExecutionContext, ExecutionResult, Executor, PolicyContext, PolicyDecision, PolicyEngine, SupervisorMode, Thinker, VerificationResult, Verifier } from './execution-contracts.ts'
 import type { ExecutorKind, SupervisorDispatcher } from './executors/index.ts'
 import type { RollbackCoordinator, RollbackOutcome } from './executors/rollback-coordinator.ts'
+import type { StateSnapshotPort, StateSnapshotRef, TransactionBoundaryPlan } from './executors/state-snapshot-port.ts'
+import { planTransactionBoundary } from './executors/state-snapshot-port.ts'
 
 export type SupervisorOrchestrationResult =
-  | { status: 'blocked'; policy?: PolicyDecision; reason: string }
+  | { status: 'blocked'; policy?: PolicyDecision; boundary?: TransactionBoundaryPlan; reason: string }
   | { status: 'approval_required'; policy: PolicyDecision; reason: string }
   // 'rolled_back' is its own status and not a flavour of 'completed'. The incident was
   // NOT repaired; the system was returned to where it started. A dashboard that counts a
   // rollback as a success stops showing anyone that repairs are failing.
-  | { status: 'completed' | 'unresolved' | 'failed' | 'rolled_back'; policy?: PolicyDecision; execution?: ExecutionResult; verification?: VerificationResult; rollback?: RollbackOutcome; reason: string }
+  | { status: 'completed' | 'unresolved' | 'failed' | 'rolled_back'; policy?: PolicyDecision; execution?: ExecutionResult; verification?: VerificationResult; rollback?: RollbackOutcome; boundary?: TransactionBoundaryPlan; reason: string }
 
 export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: PolicyEngine; executor: Executor; verifier: Verifier; audit: AuditSink; mode: SupervisorMode; policyContext?: PolicyContext; executionContext: ExecutionContext; dispatcher?: SupervisorDispatcher; requestedExecutorKind?: ExecutorKind | ((input: { plan: RepairPlan; policy: PolicyDecision }) => ExecutorKind); dispatchIdFactory?: (input: { incident: SupervisorIncident; plan: RepairPlan; policy: PolicyDecision }) => string;
   /**
@@ -21,7 +23,16 @@ export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: Po
    * optional rather than required so that adding rollback cannot change the behaviour of
    * any deployment that has not opted in.
    */
-  rollbackCoordinator?: RollbackCoordinator }
+  rollbackCoordinator?: RollbackCoordinator;
+  /** The buyer's checkpoint mechanism. Supplying it turns each repair into a transaction. */
+  snapshotPort?: StateSnapshotPort;
+  /**
+   * When true, a plan the boundary planner classifies UNBOUNDED is blocked before it runs
+   * rather than executed and hoped over. This is the setting an enterprise turns on: it
+   * converts "we will try to undo it" into "we do not start what we cannot finish".
+   * Default false so enabling snapshots never silently changes existing behaviour.
+   */
+  requireBoundedExecution?: boolean }
 
 const schemaVersion = 'supervisor-audit-v1'
 let eventCounter = 0
@@ -100,6 +111,33 @@ export class SupervisorOrchestrator {
       } else {
         execution = await this.deps.executor.execute({ incident, plan, policy, approvedStepIds: [...policy.approvedStepIds], context: this.deps.executionContext })
       }
+      // ── TRANSACTIONAL BOUNDARY, ESTABLISHED BEFORE ANYTHING CHANGES ───────
+      // The checkpoint has to exist before the repair, not after it fails. Capturing on
+      // failure is capturing the broken state.
+      let boundary: TransactionBoundaryPlan | undefined
+      const snapshots: StateSnapshotRef[] = []
+      if (this.deps.snapshotPort) {
+        const capabilities = await this.deps.snapshotPort.capabilities()
+        boundary = planTransactionBoundary(plan, capabilities)
+        await this.audit(incident, 'boundary_evaluated', { classification: boundary.classification, summary: boundary.summary, uncoveredScopes: boundary.uncoveredScopes })
+
+        if (boundary.classification === 'unbounded' && this.deps.requireBoundedExecution) {
+          return { status: 'blocked', policy, boundary, reason: `Execution blocked: ${boundary.summary}` }
+        }
+
+        for (const scope of boundary.scopesToCapture) {
+          const captured = await this.deps.snapshotPort.capture({ scope, provider: plan.targetProvider, environment: plan.targetEnvironment, reason: `pre-repair checkpoint for ${plan.planId}` })
+          if (!captured.ok || !captured.snapshot) {
+            // A checkpoint that cannot be taken is not a warning. Proceeding would mean
+            // running a change we have already discovered we cannot reverse.
+            await this.audit(incident, 'snapshot_capture_failed', { scope, error: captured.error ?? 'unknown' })
+            return { status: 'blocked', policy, boundary, reason: `Could not capture the ${scope} checkpoint before repairing, so the repair was not started: ${captured.error ?? 'no reason given'}` }
+          }
+          snapshots.push(captured.snapshot)
+        }
+        if (snapshots.length) await this.audit(incident, 'snapshot_captured', { snapshotIds: snapshots.map(item => item.snapshotId), scopes: snapshots.map(item => item.scope) })
+      }
+
       const approved = new Set(policy.approvedStepIds)
       if (execution.executedStepIds.some(stepId => !approved.has(stepId))) throw new Error('Executor reported steps outside approved scope')
       await this.audit(incident, 'execution_completed', { status: execution.status, executedStepIds: execution.executedStepIds })
@@ -115,7 +153,7 @@ export class SupervisorOrchestrator {
         if (this.deps.rollbackCoordinator) {
           await this.audit(incident, 'rollback_started', { verificationStatus: verification.status })
           const rollback: RollbackOutcome = await this.deps.rollbackCoordinator.rollback({
-            incident, plan, execution, verification,
+            incident, plan, execution, verification, snapshots,
             dispatchId: typeof execution.metadata?.dispatchId === 'string' ? execution.metadata.dispatchId : undefined,
           })
           await this.audit(incident, 'rollback_completed', {
@@ -129,9 +167,9 @@ export class SupervisorOrchestrator {
           // put back. Reporting a rollback as a successful repair would hide the failure
           // that caused it from every dashboard downstream.
           if (rollback.status === 'restored') {
-            return { status: 'rolled_back', policy, execution, verification, rollback, reason: rollback.reason }
+            return { status: 'rolled_back', policy, execution, verification, rollback, boundary, reason: rollback.reason }
           }
-          return { status: 'unresolved', policy, execution, verification, rollback, reason: rollback.reason }
+          return { status: 'unresolved', policy, execution, verification, rollback, boundary, reason: rollback.reason }
         }
         return { status: 'unresolved', policy, execution, verification, reason: 'Execution or verification did not complete successfully.' }
       }

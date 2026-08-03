@@ -63,6 +63,10 @@ const GROUPS: NavGroup[] = [
       { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: uiText('generatedUi.u_22a3534629d2dcf1'), href: '/dashboard/sales/pipeline' },
       { icon: '📨', labelKey: 'nav.myOutreach', fallbackLabel: uiText('generatedUi.u_04c411dc1ee0d29f'), href: '/dashboard/my-outreach' },
       { icon: '📇', labelKey: 'nav.admOutreachConsole', fallbackLabel: uiText('navExtra.admOutreachConsole'), href: '/admin/outreach', requiresOwner: true },
+      // Background campaigns had no entry anywhere. A campaign was started from chat, a job id
+      // was handed back, and the only way to see what the worker did was to know a URL nobody
+      // had been told. Same defect as an acceptance page with no link to it.
+      { icon: '🛰️', labelKey: 'nav.backgroundCampaigns', fallbackLabel: `${uiText('generatedUi.u_350fd0c928342e75')} — ${uiText('generatedUi.u_5a6c6aa4a802b400')}`, href: '/dashboard/outreach/campaigns', requiresOwner: true },
       { icon: '🛡️', labelKey: 'nav.outreachApprovals', fallbackLabel: uiText('outreachApprovals.title'), href: '/dashboard/hub/outreach-approvals', requiresOwner: true },
       { icon: '⛏️', labelKey: 'nav.cosMining', fallbackLabel: uiText('generatedUi.u_e595ed3d019ad2a5'), href: '/dashboard/cos-mining' },
       { icon: '🖥️', labelKey: 'nav.marketingConsole', fallbackLabel: uiText('generatedUi.u_c14b309b4fa21c68'), href: '/dashboard/marketing-sales/console' },

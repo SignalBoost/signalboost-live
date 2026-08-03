@@ -23,7 +23,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { createOutreachDraft } from '@/lib/ai/growthPlans'
 import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import { discoverGithubOrgs } from '@/lib/outreach/sources/github'
-import { portableProductManifests } from '@/lib/portable-products/manifests'
+import { manifestsForOffer } from '@/lib/portable-products/matchManifests'
 
 const TABLE = 'prospect_campaign_jobs'
 // A SANITY BOUND, NOT A PRODUCT LIMIT. This was 25 and it silently rewrote every larger
@@ -597,12 +597,15 @@ function offerProfileFor(offer: string): string {
   const needle = clean(offer, 400).toLowerCase()
   if (!needle) return ''
 
-  const matched = portableProductManifests.find(manifest => {
-    const name = manifest.displayName.toLowerCase()
-    const id = manifest.productId.toLowerCase().replace(/-/g, ' ')
-    return needle.includes(name) || needle.includes(id) || name.includes(needle) || id.includes(needle)
-  })
-  if (!matched) return ''
+  // ALL of them. A campaign selling two products used to get the first one's fact sheet
+  // and nothing about the second, so half the pitch was written from the offer line alone
+  // — which is the exact gap that produced the monitoring emails.
+  const matches = manifestsForOffer(needle)
+  if (!matches.length) return ''
+  return matches.map(matched => renderProductFacts(matched)).join('\n\n')
+}
+
+function renderProductFacts(matched: ReturnType<typeof manifestsForOffer>[number]): string {
 
   const readable = (values: readonly string[]) => values.map(v => v.replace(/[-_]/g, ' ')).join(', ')
   const lines = [

@@ -17,7 +17,7 @@ export { findPublications, leadToTarget } from './discovery.ts'
 // endpoint declared rather than coded, and brands with no public API named honestly instead of
 // failing at send time.
 export { createPressRunner, describePressRunner } from './runners/index.ts'
-export type { PressRunnerConfig, DeclaredWireRecipe } from './runners/index.ts'
+export type { PressRunnerConfig, DeclaredWireRecipe, DeclaredDatabaseRecipe } from './runners/index.ts'
 export {
   submitBusinessWireRelease,
   listBusinessWireAccounts,

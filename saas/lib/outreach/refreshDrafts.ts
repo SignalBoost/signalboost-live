@@ -34,7 +34,7 @@
 //   · Write anything at all in dryRun mode, which is the default.
 
 import { createClient } from '@supabase/supabase-js'
-import { portableProductManifests } from '@/lib/portable-products/manifests'
+import { manifestsForOffer } from '@/lib/portable-products/matchManifests'
 import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import { draftMessageFor } from '@/lib/outreach/prospectCampaign'
 import { finishOutreachBody } from '@/lib/ai/growthPlans'
@@ -70,18 +70,12 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-/**
- * product_key is a slug of whatever offer text the campaign was given, so it is matched
- * back against each manifest's displayName and productId slugified the same way. An
- * unmatched key means this row is selling something the manifests do not describe — the
- * honest response is to skip it, not to pick the closest-looking product.
- */
-function manifestForProductKey(productKey: string | null) {
-  const wanted = productKeyOf(productKey)
-  if (!wanted) return undefined
-  return portableProductManifests.find(manifest =>
-    productKeyOf(manifest.displayName) === wanted || productKeyOf(manifest.productId) === wanted)
-}
+// Matching lives in lib/portable-products/matchManifests so the campaign worker and this
+// refresh agree on what an offer refers to. The first version compared slugs exactly and
+// therefore skipped EVERY row in a real queue: those campaigns sell two products, so the
+// product_key was a combined slug matching no single manifest. An unmatched key still
+// means skip — a campaign selling something the manifests do not describe gets no rewrite
+// rather than a rewrite against the closest-looking product.
 
 export async function refreshPendingDrafts(options: {
   dryRun?: boolean
@@ -115,8 +109,8 @@ export async function refreshPendingDrafts(options: {
       productKey: (row.product_key as string) || null,
     }
 
-    const manifest = manifestForProductKey(row.product_key)
-    if (!manifest) {
+    const manifests = manifestsForOffer(row.product_key)
+    if (!manifests.length) {
       outcomes.push({ ...base, status: 'skipped', reason: `No product manifest matches product_key "${row.product_key || '(none)'}", so there are no current facts to rewrite it with.` })
       continue
     }
@@ -132,10 +126,13 @@ export async function refreshPendingDrafts(options: {
       // the prompt. targetAudience stands in for the original brief's targeting line: the
       // brief is not stored on the row, and the manifest's own audience is a truthful
       // substitute rather than an invented one.
+      // Every product this row sells, so a two-product campaign is rewritten as a
+      // two-product email rather than losing one of them.
+      const audience = Array.from(new Set(manifests.flatMap(item => item.targetAudience)))
       const job: any = {
-        offer: manifest.displayName,
-        target_criteria: manifest.targetAudience.length
-          ? manifest.targetAudience.map(entry => entry.replace(/[-_]/g, ' ')).join(', ')
+        offer: manifests.map(item => item.displayName).join(' and '),
+        target_criteria: audience.length
+          ? audience.map(entry => entry.replace(/[-_]/g, ' ')).join(', ')
           : 'companies that would benefit from this product',
         language: 'en',
         region: '',

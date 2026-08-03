@@ -17,17 +17,25 @@ import { refreshPendingDrafts } from '@/lib/outreach/refreshDrafts'
 export const runtime = 'nodejs'
 // Regenerating drafts is one model call per row, so the ceiling is generous and the
 // caller is expected to page with `limit` rather than rewrite hundreds in one request.
-export const maxDuration = 300
+export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
-  const limit = Number(req.nextUrl.searchParams.get('limit') || 20)
+  const limit = Number(req.nextUrl.searchParams.get('limit') || 5)
+  const offset = Number(req.nextUrl.searchParams.get('offset') || 0)
   const productKey = req.nextUrl.searchParams.get('productKey')
 
-  const report = await refreshPendingDrafts({ dryRun: true, limit, productKey })
-  return NextResponse.json(report, { status: report.ok ? 200 : 500 })
+  try {
+    const report = await refreshPendingDrafts({ dryRun: true, limit, offset, productKey })
+    return NextResponse.json(report, { status: report.ok ? 200 : 500 })
+  } catch (error: any) {
+    // Always JSON. An exception escaping here becomes the platform's plain-text error
+    // page, and the browser reports it as "Unexpected token 'A'" — which tells the person
+    // nothing about what went wrong.
+    return NextResponse.json({ ok: false, error: String(error?.message || error) }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -46,11 +54,20 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
-  const report = await refreshPendingDrafts({
-    dryRun: false,
-    limit: Number(body.limit || 50),
-    productKey: body.productKey ?? null,
-  })
+  let report
+  try {
+    report = await refreshPendingDrafts({
+      dryRun: false,
+      // Small on purpose. One row is one model call; a large page cannot finish inside a
+      // serverless function, and a request that dies mid-way writes some rows and reports
+      // none of them. The caller pages instead.
+      limit: Number(body.limit || 12),
+      offset: Number(body.offset || 0),
+      productKey: body.productKey ?? null,
+    })
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: String(error?.message || error) }, { status: 500 })
+  }
 
   await auditAdminAction({
     admin: ctx.admin,

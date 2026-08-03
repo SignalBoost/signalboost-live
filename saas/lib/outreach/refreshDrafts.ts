@@ -109,9 +109,28 @@ export async function refreshPendingDrafts(options: {
       productKey: (row.product_key as string) || null,
     }
 
-    const manifests = manifestsForOffer(row.product_key)
+    // THE KEY IS NOT THE ONLY EVIDENCE OF WHAT THIS DRAFT SELLS.
+    //
+    // product_key is a slug of whatever offer text a person typed months ago, and a
+    // refresh that depends on it alone fails silently whenever that text did not name the
+    // products the way the manifests do — which is exactly what happened on a real queue:
+    // the drafts were regenerated, the wording changed, and the pitch stayed identical
+    // because no fact sheet ever reached the prompt.
+    //
+    // The EXISTING MESSAGE names the products in plain language — "a Self-Healing
+    // Supervisor", "a Marketing and Sales Engine" — because an earlier draft wrote them
+    // out. So both are read and the results unioned: the key when it works, the message
+    // when it does not. A draft that names a product IS evidence of what the campaign
+    // sells, and ignoring it to honour a slug was the wrong kind of strictness.
+    const fromKey = manifestsForOffer(row.product_key)
+    const fromMessage = manifestsForOffer(String(row.outreach_message || '').slice(0, 4000))
+    const manifests = [...fromKey]
+    for (const candidate of fromMessage) {
+      if (!manifests.some(item => item.productId === candidate.productId)) manifests.push(candidate)
+    }
+
     if (!manifests.length) {
-      outcomes.push({ ...base, status: 'skipped', reason: `No product manifest matches product_key "${row.product_key || '(none)'}", so there are no current facts to rewrite it with.` })
+      outcomes.push({ ...base, status: 'skipped', reason: `Nothing identifies a product for this row — product_key is "${row.product_key || '(none)'}" and the existing message names no known product.` })
       continue
     }
     if (!row.business_url) {
@@ -154,7 +173,7 @@ export async function refreshPendingDrafts(options: {
       })
 
       if (dryRun) {
-        outcomes.push({ ...base, status: 'refreshed', reason: 'Dry run — nothing was written.', previousMessage: String(row.outreach_message || ''), newMessage: finished })
+        outcomes.push({ ...base, status: 'refreshed', reason: `Dry run using: ${manifests.map(item => item.displayName).join(' + ')}. Nothing was written.`, previousMessage: String(row.outreach_message || ''), newMessage: finished })
         continue
       }
 
@@ -169,7 +188,7 @@ export async function refreshPendingDrafts(options: {
         outcomes.push({ ...base, status: 'failed', reason: writeError.message })
         continue
       }
-      outcomes.push({ ...base, status: 'refreshed', reason: 'Rewritten with the current product facts.', previousMessage: String(row.outreach_message || ''), newMessage: finished })
+      outcomes.push({ ...base, status: 'refreshed', reason: `Rewritten using: ${manifests.map(item => item.displayName).join(' + ')}.`, previousMessage: String(row.outreach_message || ''), newMessage: finished })
     } catch (err: any) {
       outcomes.push({ ...base, status: 'failed', reason: String(err?.message || err || 'Unknown error while regenerating.') })
     }

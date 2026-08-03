@@ -42,6 +42,23 @@ function deepText(value: unknown, output: string[]): void {
   }
 }
 
+/**
+ * The step's danger category INDEPENDENT of whether it is registered or approved.
+ *
+ * classifyStep() only reports a category when its verdict is dangerous, which is correct
+ * for the approval gate — a registered, auto-executable capability is not dangerous in
+ * that sense. It is the wrong signal for a caller asking a different question: "is this
+ * the KIND of action that must never be reversed automatically?" A rollback step matching
+ * a routine_reversible capability came back with no category at all, so a refund and a key
+ * rotation both sailed through an undo veto that was reading verdict.category. Found by
+ * testing the rollback coordinator, not by reading it.
+ *
+ * Registration says who may run something. This says what it IS.
+ */
+export function dangerCategoryOf(step: RepairStep, provider: string): DangerCategory {
+  return categoryFor(step, provider)
+}
+
 function categoryFor(step: RepairStep, provider: string): DangerCategory {
   const parts: string[] = [step.action, step.description || '', provider || '']
   deepText(step.parameters || {}, parts)

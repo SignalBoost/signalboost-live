@@ -10,6 +10,22 @@ export { createAdPlatformAdapter } from './adapters/ad-platform.ts'
 export { createDirectIoAdapter } from './adapters/direct-io.ts'
 export { createMediaDatabaseAdapter, verifyTargetAgainstDatabase } from './adapters/media-database.ts'
 export { findPublications, leadToTarget } from './discovery.ts'
+// ── Real transport, shipped rather than specified ────────────────────────────
+// Before this, every paid provider ended at a RunnerPort the BUYER had to implement, which
+// meant the customer wrote the Business Wire client themselves. createPressRunner takes
+// credentials and returns a working runner: Business Wire built in, any other wire with a REST
+// endpoint declared rather than coded, and brands with no public API named honestly instead of
+// failing at send time.
+export { createPressRunner, describePressRunner } from './runners/index.ts'
+export type { PressRunnerConfig, DeclaredWireRecipe } from './runners/index.ts'
+export {
+  submitBusinessWireRelease,
+  listBusinessWireAccounts,
+  listBusinessWireDistributions,
+  fetchBusinessWireReport,
+} from './runners/businesswire.ts'
+export type { BusinessWireConfig, BusinessWireSubmission } from './runners/businesswire.ts'
+
 export { runPressAcceptance } from './acceptance-harness.ts'
 export type { PressAcceptanceOptions, PressAcceptanceResult, PressCheck, PressCheckId } from './acceptance-harness.ts'
 

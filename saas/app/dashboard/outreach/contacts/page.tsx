@@ -211,7 +211,12 @@ export default function OutreachContactsPage() {
       })
       const data = await response.json()
       if (!response.ok || !data?.ok) throw new Error(data?.error || copy.updateError)
-      setNotice(fill(copy.refreshDone, { refreshed: data.refreshed || 0, skipped: data.skipped || 0, failed: data.failed || 0 }))
+      // When nothing was rewritten, the count alone is indistinguishable from a silent
+      // failure — which is precisely how the first run looked. The route's own reason for
+      // the first unrewritten row is appended so the cause is on screen, not in a log.
+      const firstProblem = (data.outcomes || []).find((item: any) => item?.status !== 'refreshed')
+      const summary = fill(copy.refreshDone, { refreshed: data.refreshed || 0, skipped: data.skipped || 0, failed: data.failed || 0 })
+      setNotice(!data.refreshed && firstProblem?.reason ? `${summary} — ${firstProblem.reason}` : summary)
       await load()
     } catch (reason: any) {
       setError(reason?.message || copy.updateError)

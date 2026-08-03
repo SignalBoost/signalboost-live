@@ -13,7 +13,7 @@ export interface PolicyDecision { outcome: PolicyOutcome; reason: string; evalua
 export interface ExecutionResult { status: 'completed' | 'failed' | 'partial'; executedStepIds: string[]; startedAt: string; finishedAt: string; summary: string; metadata?: Record<string, SerializableValue> }
 export interface VerificationResult { status: 'verified' | 'failed' | 'unresolved'; verifiedAt: string; summary: string; errors: string[]; metadata?: Record<string, SerializableValue> }
 
-export type AuditEventType = 'incident_received' | 'thinker_started' | 'plan_generated' | 'plan_rejected' | 'policy_evaluated' | 'execution_blocked' | 'approval_required' | 'execution_started' | 'execution_completed' | 'verification_started' | 'verification_completed' | 'rollback_started' | 'rollback_completed' | 'orchestration_failed'
+export type AuditEventType = 'incident_received' | 'thinker_started' | 'plan_generated' | 'plan_rejected' | 'policy_evaluated' | 'execution_blocked' | 'approval_required' | 'execution_started' | 'execution_completed' | 'verification_started' | 'verification_completed' | 'boundary_evaluated' | 'snapshot_captured' | 'snapshot_capture_failed' | 'rollback_started' | 'rollback_completed' | 'orchestration_failed'
 export interface AuditEvent { eventId: string; incidentId: string; eventType: AuditEventType; occurredAt: string; payload: Record<string, SerializableValue>; schemaVersion: string }
 
 export interface Observer { observe(context: ProviderObservationContext): Promise<SupervisorIncident[]> | SupervisorIncident[] }

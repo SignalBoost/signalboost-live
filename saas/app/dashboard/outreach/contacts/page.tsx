@@ -201,22 +201,54 @@ export default function OutreachContactsPage() {
     setRefreshBusy(true)
     setError('')
     setNotice('')
+
+    let refreshed = 0
+    let skipped = 0
+    let failed = 0
+    let offset = 0
+    let firstProblem = ''
+
     try {
-      const response = await fetch('/api/outreach/refresh-drafts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        credentials: 'include',
-        body: JSON.stringify({ apply: true, limit: 100 }),
-      })
-      const data = await response.json()
-      if (!response.ok || !data?.ok) throw new Error(data?.error || copy.updateError)
-      // When nothing was rewritten, the count alone is indistinguishable from a silent
-      // failure — which is precisely how the first run looked. The route's own reason for
-      // the first unrewritten row is appended so the cause is on screen, not in a log.
-      const firstProblem = (data.outcomes || []).find((item: any) => item?.status !== 'refreshed')
-      const summary = fill(copy.refreshDone, { refreshed: data.refreshed || 0, skipped: data.skipped || 0, failed: data.failed || 0 })
-      setNotice(!data.refreshed && firstProblem?.reason ? `${summary} — ${firstProblem.reason}` : summary)
+      // PAGED, BECAUSE ONE ROW IS ONE MODEL CALL. Asking the server for the whole queue in
+      // one request killed the function and returned a plain-text error page, which arrived
+      // here as "Unexpected token 'A'". Small pages finish; the loop does the rest.
+      for (let pass = 0; pass < 40; pass += 1) {
+        const response = await fetch('/api/outreach/refresh-drafts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          credentials: 'include',
+          body: JSON.stringify({ apply: true, limit: 12, offset }),
+        })
+
+        // Read as text first: a failing serverless function answers with HTML or plain
+        // text, and calling .json() on that throws a parser error that hides the real one.
+        const raw = await response.text()
+        let data: any
+        try {
+          data = JSON.parse(raw)
+        } catch {
+          throw new Error(raw.slice(0, 200) || copy.updateError)
+        }
+        if (!response.ok || !data?.ok) throw new Error(data?.error || copy.updateError)
+
+        refreshed += data.refreshed || 0
+        skipped += data.skipped || 0
+        failed += data.failed || 0
+        if (!firstProblem) {
+          const problem = (data.outcomes || []).find((item: any) => item?.status !== 'refreshed')
+          if (problem?.reason) firstProblem = problem.reason
+        }
+
+        setNotice(fill(copy.refreshDone, { refreshed, skipped, failed }))
+
+        // A pass that examined nothing means the page is past the end of the queue.
+        if (!data.examined || !data.remaining) break
+        offset += data.examined
+      }
+
+      const summary = fill(copy.refreshDone, { refreshed, skipped, failed })
+      setNotice(!refreshed && firstProblem ? `${summary} — ${firstProblem}` : summary)
       await load()
     } catch (reason: any) {
       setError(reason?.message || copy.updateError)

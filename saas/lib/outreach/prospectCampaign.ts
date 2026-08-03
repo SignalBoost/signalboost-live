@@ -633,7 +633,10 @@ function offerProfileFor(offer: string): string {
   return lines.filter(Boolean).join('\n')
 }
 
-async function draftMessageFor(
+// EXPORTED so the draft-refresh path reuses this exact function. If refreshing had its
+// own copy of the prompt, the two would drift and a refreshed draft would stop matching
+// what new campaigns produce — which is the whole reason a refresh exists.
+export async function draftMessageFor(
   job: ProspectCampaignJob,
   candidate: ProspectCandidate,
 ): Promise<string> {

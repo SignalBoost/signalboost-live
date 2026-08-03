@@ -101,21 +101,44 @@ export async function findContactEmail(businessUrl: string): Promise<ContactEmai
   if (!origin) return { email: null, source: null, candidates: [] }
   const domain = domainOf(origin)
 
-  const paths = ['', '/contact', '/contact-us', '/contacts', '/about', '/about-us', '/support', '/company', '/team']
+  // WHY THIS IS IN WAVES AND NOT A LOOP.
+  //
+  // These nine pages used to be fetched one after another at 8 seconds each — up to 72
+  // seconds to look at one company. The caller caps this work at 25 seconds, so in
+  // practice the hunt was killed after about three pages and the last five paths were
+  // never read at all. A company that publishes its address on /about or /team was
+  // therefore reported as "no published contact email" when the address was sitting
+  // right there. The sequential fetch was costing BOTH time and prospects.
+  //
+  // The pages are independent, so they are fetched together. Wave one holds the paths
+  // that carry an address most of the time; wave two only runs when wave one found
+  // nothing on-domain, so the common case costs one round trip rather than nine.
+  const WAVES = [
+    ['', '/contact', '/contact-us', '/contacts'],
+    ['/about', '/about-us', '/support', '/company', '/team'],
+  ]
+
   const all = new Set<string>()
   let source: string | null = null
 
-  for (const p of paths) {
-    const html = await fetchText(origin + p)
-    if (!html) continue
-    const found = extractEmails(html).filter(looksReal)
-    if (found.length) {
-      if (!source) source = origin + p
-      for (const e of found) all.add(e)
-      // Stop early once we have a confident on-domain address.
-      const top = rank(Array.from(all), domain)[0]
-      if (top && (top.endsWith('@' + domain) || top.endsWith('.' + domain))) break
+  for (const wave of WAVES) {
+    const pages = await Promise.all(
+      wave.map(async path => ({ url: origin + path, html: await fetchText(origin + path) })),
+    )
+
+    // Applied in the wave's declared order, not in whatever order the network
+    // happened to answer, so `source` stays deterministic for the same site.
+    for (const page of pages) {
+      if (!page.html) continue
+      const found = extractEmails(page.html).filter(looksReal)
+      if (!found.length) continue
+      if (!source) source = page.url
+      for (const email of found) all.add(email)
     }
+
+    // An on-domain address is a confident answer: stop and skip the next wave.
+    const best = rank(Array.from(all), domain)[0]
+    if (best) return { email: best, source, candidates: rank(Array.from(all), domain).slice(0, 5) }
   }
 
   const ranked = rank(Array.from(all), domain)

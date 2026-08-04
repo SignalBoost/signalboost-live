@@ -191,4 +191,173 @@ async function detectTargetLanguage(businessUrl: string, businessName: string): 
   return pickOutreachLanguage({ url: businessUrl, name: businessName, text })
 }
 
-// Translate the COS-written message into the target's native
+// Translate the COS-written message into the target's native language. Falls back to the
+// original English on any failure — never blocks a draft, never fabricates.
+// Exported for the draft-refresh path: a refreshed message must be localized and
+// footered by the SAME code that finishes a new draft, or the two diverge silently.
+export async function localizeMessage(message: string, lang: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  const name = LANG_NAMES[lang]
+  if (!apiKey || !name) return message
+  try {
+    const client = new Anthropic({ apiKey })
+    const resp = await client.messages.create({
+      model: process.env.MARKETING_SALES_MODEL || 'claude-sonnet-4-6',
+      max_tokens: 1200,
+      system: `Translate the user's outreach email into natural, native ${name}. Preserve meaning, tone, names, links, and line breaks. Do not add or remove content. Output ONLY the translation with no preamble.`,
+      messages: [{ role: 'user', content: message }],
+    })
+    const out = resp.content.map((b: any) => (b?.type === 'text' ? b.text : '')).join('').trim()
+    return out || message
+  } catch { return message }
+}
+
+// Same rule the send routes apply, so a supplied address must clear exactly the bar a
+// discovered one does: real shape, and not a role box that no human reads.
+function cleanEmail(value: unknown): string | null {
+  const email = String(value || '').trim().toLowerCase()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null
+  const local = email.split('@')[0]
+  if (['test', 'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'privacy', 'legal', 'abuse', 'security'].includes(local)) return null
+  return email
+}
+
+export async function createOutreachDraft(params: {
+  businessName: string
+  businessUrl: string
+  message: string
+  senderKey?: string
+  // A publicly listed business address the CALLER already verified — from a researched
+  // prospect list, a CRM export, or a media database. Without this the finder crawls the
+  // site and skips the company when it finds nothing, discarding an address a human had
+  // already confirmed. It is still validated by cleanEmail, so a junk or role-blocked
+  // address is refused exactly as a discovered one would be; supplying it only skips the
+  // crawl, it never lowers the bar.
+  contactEmail?: string
+  // What is being sold. Duplicate protection is scoped to this, so the same company can
+  // be approached again for a DIFFERENT product but never twice for the same one.
+  productKey?: string
+  // WHICH RUN PRODUCED THIS ROW. Optional, because drafts are also created one at a time
+  // by a person, and those genuinely have no job behind them.
+  //
+  // Until this existed, a queue row carried no link to the campaign that created it. The
+  // only way to answer "what did that job put in my queue" was to read the job's results
+  // and match business_url hosts back — a reconstruction, and one that silently misses a
+  // row whose URL was normalised differently or matches a domain two candidates share.
+  // A misrouted campaign then could not be undone as a unit, which is the first thing a
+  // buyer's data-governance review asks of anything that writes contact records.
+  campaignJobId?: string | null
+}): Promise<{ ok: boolean; outreachId?: string; skipped?: boolean; contactEmail?: string; error?: string }> {
+  try {
+    const businessName = String(params.businessName || '').trim().slice(0, 200)
+    const businessUrl = String(params.businessUrl || '').trim().slice(0, 500)
+    const message = String(params.message || '').trim()
+
+    if (!businessName || !message) {
+      return { ok: false, error: 'businessName and message are required.' }
+    }
+    if (!businessUrl || !/^https?:\/\//i.test(businessUrl)) {
+      return { ok: false, error: 'businessUrl is required and must start with http(s):// — ask the owner for the target\'s website if unknown.' }
+    }
+
+    // Same safety gate the rest of the outreach system uses.
+    const safe = assertSafeOutreachMessage(message)
+    if (!safe.ok) {
+      return { ok: false, error: `Message rejected by outreach guardrails: ${safe.reason}` }
+    }
+
+    // A caller-supplied address is used when it passes the same quality gate as a
+    // discovered one; otherwise fall back to crawling the site. No email => SKIP.
+    const supplied = cleanEmail(String(params.contactEmail || ''))
+    const found = supplied ? { email: supplied } : await findContactEmail(businessUrl)
+    if (!found.email) {
+      return {
+        ok: false,
+        skipped: true,
+        error: params.contactEmail
+          ? `The address supplied for ${businessName} (${params.contactEmail}) is not a usable business contact — skipped, not queued.`
+          : `No published contact email found for ${businessName} (${businessUrl}) — skipped, not queued. COS does not invent addresses.`,
+      }
+    }
+
+    // DEDUPE BY HOST. The same company was being queued more than once under slightly
+    // different display names, because nothing checked whether it was already in the
+    // queue. A second draft to the same company is at best a wasted slot and at worst
+    // a second cold email to a recipient who already received one.
+    const db0 = supabaseAdmin()
+    let host = ''
+    try { host = new URL(businessUrl).hostname.replace(/^www\./i, '').toLowerCase() } catch { host = '' }
+    if (host) {
+      const { data: dupes } = await db0
+        .from(OUTREACH_TABLE)
+        .select('id,business_url,status,product_key')
+        .neq('status', 'rejected')
+        .ilike('business_url', `%${host}%`)
+        .limit(5)
+      const wantedProduct = productKeyOf(params.productKey)
+      const clash = (dupes || []).find(row => {
+        // Same company AND same product. A different product is a legitimate new pitch.
+        if (productKeyOf((row as any).product_key) !== wantedProduct) return false
+        try { return new URL(String(row.business_url || '')).hostname.replace(/^www\./i, '').toLowerCase() === host } catch { return false }
+      })
+      if (clash) {
+        return {
+          ok: false,
+          skipped: true,
+          error: `${businessName} (${host}) is already in the outreach queue for this product as ${clash.id} with status ${clash.status} — not queued again. A different product is allowed.`,
+        }
+      }
+    }
+
+    // AGGREGATOR / LISTICLE REJECTION. The background worker already refuses these,
+    // but this path is COS choosing a target itself from a search result, and a
+    // "Top N providers" listing page was repeatedly queued as if it were a company.
+    // A directory page is a list OF providers, not a provider, so the email lands on
+    // whoever runs the list rather than on a prospect.
+    const AGGREGATOR_TITLE = /\b(top\s*\d+|best\s+\d+|\d+\s+best|comparison|database|directory|ranking|list of|guide to|companies\b.*\b(list|ranking))\b/i
+    const AGGREGATOR_HOST = ['directory', 'directories', 'companies', 'firms', 'providers', 'database', 'ranking', 'listing', 'toplist', 'compare', 'reviews']
+    let aggHost = ''
+    try { aggHost = new URL(businessUrl).hostname.replace(/^www\./i, '').toLowerCase() } catch { aggHost = '' }
+    if (AGGREGATOR_TITLE.test(businessName) || AGGREGATOR_HOST.some(hint => aggHost.includes(hint))) {
+      return {
+        ok: false,
+        skipped: true,
+        error: `"${businessName}" (${businessUrl}) looks like a directory or ranking page, not a company — not queued. Give the prospect's own website instead.`,
+      }
+    }
+
+    // COS's per-message sender choice (sales vs marketing, etc.), validated.
+    const senderKey = VALID_SENDER_KEYS.includes(String(params.senderKey || '')) ? String(params.senderKey) : null
+
+    // Standing directive enforced in code: localize the outbound message to the target's
+    // region (Brazil→pt, Spanish-speaking LATAM→es, Poland→pl, Russia→ru; else English).
+    // The COS writes English; this guaranteed chokepoint makes the prompt irrelevant.
+    const targetLang = await detectTargetLanguage(businessUrl, businessName)
+    const localizedMessage = targetLang === 'en' ? message : await localizeMessage(message, targetLang)
+
+    const db = supabaseAdmin()
+    const { data, error } = await db
+      .from(OUTREACH_TABLE)
+      .insert({
+        business_id: null,
+        source_platform: 'strategist',
+        business_name: businessName,
+        business_url: businessUrl,
+        contact_email: found.email,
+        product_key: productKeyOf(params.productKey),
+        // Null for a hand-made draft, a job id for a campaign-made one. Both are honest;
+        // an invented placeholder would not be.
+        campaign_job_id: params.campaignJobId || null,
+        sender_key: senderKey,
+        outreach_message: localizedMessage + outreachComplianceFooter(senderKey),
+        status: 'pending',
+      })
+      .select('id')
+      .single()
+
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, outreachId: data.id, contactEmail: found.email }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error creating outreach draft' }
+  }
+}

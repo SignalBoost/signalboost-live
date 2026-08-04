@@ -240,6 +240,33 @@ async function main() {
   }
 
   writeFileSync(resultPath, JSON.stringify(result, null, 2))
+
+  // POST THE RESULT BACK, IF THERE IS SOMEWHERE TO POST IT.
+  //
+  // The artifact is the durable copy and is written first, above — deliberately, because a
+  // callback that fails must never mean the evidence was lost. This is the convenience
+  // path: it puts the result on the incident's ledger row without anyone downloading a zip.
+  //
+  // A failed callback is reported and does NOT fail the run. The browser work already
+  // happened; exiting non-zero because a webhook was unreachable would tell whoever reads
+  // the Actions tab that the repair failed when it did not.
+  const callbackUrl = process.env.BROWSER_HOST_CALLBACK_URL
+  const callbackSecret = process.env.BROWSER_HOST_CALLBACK_SECRET
+  if (callbackUrl && callbackSecret) {
+    try {
+      const response = await fetch(callbackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${callbackSecret}` },
+        body: JSON.stringify(result),
+      })
+      console.log(response.ok ? 'callback=accepted' : `callback=rejected http=${response.status} ${(await response.text().catch(() => '')).slice(0, 200)}`)
+    } catch (error) {
+      console.log(`callback=unreachable ${error.message}`)
+    }
+  } else {
+    console.log('callback=not-configured (result is in the uploaded artifact)')
+  }
+
   console.log(`status=${status} executed=${executed.length} skipped=${skipped.length}`)
   if (stopReason) console.log(stopReason)
   if (status === 'failed') process.exit(1)

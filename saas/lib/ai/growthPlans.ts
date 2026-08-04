@@ -14,6 +14,7 @@ import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import Anthropic from '@anthropic-ai/sdk'
 import { pickOutreachLanguage } from '@/lib/outreach/regionLanguage'
 import { classifyPublicationTarget, publicationSkipReason } from '@/lib/outreach/publicationTargets'
+import { classifyTargetName } from '@/lib/outreach/targetNameQuality'
 
 const PLANS_TABLE = 'growth_plans'
 const OUTREACH_TABLE = 'outreach_queue'
@@ -296,6 +297,16 @@ export async function createOutreachDraft(params: {
       return { ok: false, skipped: true, error: publicationSkipReason(businessName, publicationVerdict) }
     }
 
+    // IS THIS A COMPANY, OR THE TITLE OF A PAGE? Discovery scrapes a page title into
+    // business_name, and the copy is then written TO that title. Live rows already sent include
+    // "Brazil's Fintech Revolution" (an article, delivered to an investment firm's press desk)
+    // and "The 20 Health Tech Leaders In Latin America You Should Know". The aggregator check
+    // below only recognises "top 10" and "best 5" shapes and missed every one of them.
+    const nameVerdict = classifyTargetName({ businessName, businessUrl })
+    if (nameVerdict.looksLikePageTitle) {
+      return { ok: false, skipped: true, error: nameVerdict.reason }
+    }
+
     // DEDUPE BY HOST. The same company was being queued more than once under slightly
     // different display names, because nothing checked whether it was already in the
     // queue. A second draft to the same company is at best a wasted slot and at worst
@@ -306,10 +317,10 @@ export async function createOutreachDraft(params: {
     if (host) {
       const { data: dupes } = await db0
         .from(OUTREACH_TABLE)
-        .select('id,business_url,status,product_key')
+        .select('id,business_url,status,product_key,created_at')
         .neq('status', 'rejected')
         .ilike('business_url', `%${host}%`)
-        .limit(5)
+        .limit(25)
       const wantedProduct = productKeyOf(params.productKey)
       const clash = (dupes || []).find(row => {
         // Same company AND same product. A different product is a legitimate new pitch.
@@ -321,6 +332,38 @@ export async function createOutreachDraft(params: {
           ok: false,
           skipped: true,
           error: `${businessName} (${host}) is already in the outreach queue for this product as ${clash.id} with status ${clash.status} — not queued again. A different product is allowed.`,
+        }
+      }
+
+      // "A DIFFERENT PRODUCT IS ALLOWED" HAD NO CEILING, AND ONE ADDRESS RECEIVED FOUR COLD
+      // EMAILS. kastmedia.com sits in the live queue six times — four sent, two pending —
+      // because every new product re-queued a company already contacted. The per-product rule
+      // is right in principle and was the whole rule in practice.
+      //
+      // Two limits, both about the RECIPIENT rather than about our campaigns. A company hears
+      // from us at most twice in total, and never twice inside a month. Frequency is what the
+      // person on the other end experiences; which product each message happened to be about
+      // is an internal detail they neither see nor care about.
+      const sameHost = (dupes || []).filter(row => {
+        try { return new URL(String(row.business_url || '')).hostname.replace(/^www\./i, '').toLowerCase() === host } catch { return false }
+      })
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const recent = sameHost.find(row => {
+        const at = Date.parse(String((row as any).created_at || ''))
+        return Number.isFinite(at) && at >= cutoff
+      })
+      if (recent) {
+        return {
+          ok: false,
+          skipped: true,
+          error: `${businessName} (${host}) was already contacted within the last 30 days as ${recent.id} — not queued again. A company hears from us at most once a month, whatever the product.`,
+        }
+      }
+      if (sameHost.length >= 2) {
+        return {
+          ok: false,
+          skipped: true,
+          error: `${businessName} (${host}) already has ${sameHost.length} outreach records — not queued again. Two approaches is the ceiling per company; a third reads as pestering rather than persistence.`,
         }
       }
     }

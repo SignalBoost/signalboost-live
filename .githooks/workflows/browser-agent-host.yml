@@ -2,33 +2,41 @@
 #
 # THE EXECUTION HOST.
 #
-# Chromium cannot run inside a Vercel serverless function, so the browser channel has
-# always stopped one step short of acting. This workflow is the missing step: a place
-# where a real browser exists, for as long as one task takes, and not a second longer.
+# Chromium cannot run inside a Vercel serverless function, so the browser channel stops one
+# step short of acting. This workflow is that step: a place where a real browser exists for
+# as long as one task takes, and not a second longer.
+#
+# NOTE ON PLACEMENT: this file lives at the REPOSITORY ROOT under .github/workflows/, not
+# under saas/. GitHub only reads workflows from the root. An earlier delivery of this file
+# was committed into the wrong path and the host silently did not exist — dispatches would
+# have gone to a workflow GitHub never saw.
 #
 # WHY GITHUB ACTIONS RATHER THAN A BROWSER VENDOR. This platform is a test rig, not the
-# product. A buyer runs this on the infrastructure they already pay for — Browserbase,
+# product. A buyer runs this on infrastructure they already pay for — Browserbase,
 # BrowserStack, Sauce Labs, their own Selenium grid — and the portable already carries
 # adapters for all of them. What was missing was a way to prove the loop closes without
-# buying any of that first. Actions costs nothing on this repo, runs Playwright natively,
-# and leaves a retained log per run, which is the same audit trail an enterprise would
-# demand. It is deliberately the cheapest host that is still honest.
+# buying any of that first. Actions costs nothing here, runs Playwright natively, and
+# retains a log per run, which is the same audit trail an enterprise would demand.
 #
-# THIS WORKFLOW IS NOT THE PRODUCT AND MUST NEVER BECOME A DEPENDENCY OF IT. It is one
-# reference host among many. Nothing in saas/lib/portable-browser imports anything from
-# here; the direction of dependency is host → portable, never the reverse. A buyer who
-# reads this file should see an example they could replace in an afternoon.
+# THIS WORKFLOW IS NOT THE PRODUCT AND MUST NEVER BECOME A DEPENDENCY OF IT. Nothing in
+# saas/lib/portable-browser imports anything from here; the direction is host → portable,
+# never the reverse. A buyer reading this file should see an example they could replace in
+# an afternoon.
 #
-# WHAT IT REFUSES TO DO. It runs one package, whose fingerprint it recomputes before
-# touching a browser; it visits only the origin that package declares; it executes only
-# the six step kinds the task contract allows; and it stops dead at any checkpoint step
-# rather than deciding on its own that approval was implied. Secrets are resolved from
-# repository secrets by reference name — a package that carries a literal credential is
-# rejected before Chromium starts.
+# WHAT IT REFUSES TO DO — all enforced by the runner, listed here so a reviewer sees them
+# without opening another file. It runs one package whose fingerprint it recomputes before
+# touching a browser; it visits only the origin that package declares; it executes only the
+# six step kinds the task contract allows; and it stops dead at any checkpoint rather than
+# deciding approval was implied. Secrets are resolved from repository secrets by reference
+# name — a package carrying a literal credential is rejected before Chromium starts.
 
 name: Browser agent host
 
 on:
+  # Sent by POST /api/supervisor/browser-dispatch. This is the normal path.
+  repository_dispatch:
+    types: [browser-agent-package]
+  # Manual paste, kept for debugging and for running a package without the app.
   workflow_dispatch:
     inputs:
       package:
@@ -41,8 +49,6 @@ on:
         default: 'false'
         type: choice
         options: ['false', 'true']
-  repository_dispatch:
-    types: [browser-agent-package]
 
 permissions:
   contents: read
@@ -76,13 +82,11 @@ jobs:
         env:
           PACKAGE_JSON: ${{ github.event.inputs.package || toJSON(github.event.client_payload.package) }}
         run: |
-          printf '%s' "$PACKAGE_JSON" > package.json.tmp
-          mv package.json.tmp browser-package.json
+          printf '%s' "$PACKAGE_JSON" > browser-package.json
           node -e "JSON.parse(require('fs').readFileSync('browser-package.json','utf8'))" \
             || { echo 'Package is not valid JSON.'; exit 1; }
 
       - name: Execute package
-        id: execute
         working-directory: saas
         env:
           BROWSER_PACKAGE_PATH: ${{ github.workspace }}/browser-package.json
@@ -90,9 +94,14 @@ jobs:
           BROWSER_EVIDENCE_DIR: ${{ github.workspace }}/browser-evidence
           BROWSER_ALLOW_CHECKPOINTS: ${{ github.event.inputs.allow_checkpoints || 'false' }}
           # Every value the package may reference, by name. A step asking for a reference
-          # that is not listed here fails the step — it never falls back to a blank value,
-          # because typing an empty password into a live form is its own kind of damage.
+          # not listed here fails the step — it never falls back to a blank value, because
+          # typing an empty password into a live form is its own kind of damage.
           BROWSER_VALUE_REFS: ${{ secrets.BROWSER_VALUE_REFS }}
+          # Where the result is posted when the run finishes. Optional: without them the
+          # evidence still lands as an artifact, so a missing callback loses convenience
+          # rather than the record.
+          BROWSER_HOST_CALLBACK_URL: ${{ secrets.BROWSER_HOST_CALLBACK_URL }}
+          BROWSER_HOST_CALLBACK_SECRET: ${{ secrets.BROWSER_HOST_CALLBACK_SECRET }}
         run: node scripts/browser-agent-host/run-package.mjs
 
       # Uploaded whether the run passed or failed: a failed repair is the case you most

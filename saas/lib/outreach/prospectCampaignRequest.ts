@@ -1,6 +1,21 @@
 // saas/lib/outreach/prospectCampaignRequest.ts
 // Deterministic recognition for owner requests that should become a durable
 // background prospect-campaign job instead of one long chat/model request.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// THIS FILE DOES NOT DECIDE WHICH PIPELINE A BRIEF BELONGS TO. campaignIntent DOES.
+//
+// It used to decide, by asking only "is this prospect-shaped?" — a question with no way to
+// answer "no, it is press". A press brief that forbade sales prospecting three times was
+// executed as a sales campaign, because the forbidding sentences were the only place the
+// words "outreach campaign" appeared and this file read them as a request.
+//
+// The concierge route calls parseProspectCampaignRequest DIRECTLY, before any model runs,
+// and returns immediately if it parses. So the guard cannot live in a route: whichever
+// route is bypassed is the one where the guard was. It lives here, at the parser, which is
+// the last thing every path goes through.
+
+import { classifyCampaignIntent, campaignIntentAllows } from '@/lib/outreach/campaignIntent'
 
 export type ParsedProspectCampaignRequest = {
   offer: string
@@ -120,6 +135,14 @@ export function parseProspectCampaignRequest(
   language = 'en',
 ): ParsedProspectCampaignRequest | null {
   const input = clean(text, 8_000)
+
+  // THE INTENT GATE COMES FIRST AND IT IS ABSOLUTE. Everything below only refines a brief
+  // the classifier has already confirmed is a SALES PROSPECTING brief with sales
+  // prospecting not forbidden anywhere in it. A press, advertising or social brief, an
+  // ambiguous one, or one asking for a count of publications never reaches this parser's
+  // own patterns — which is the point, because those patterns cannot tell the difference.
+  if (!campaignIntentAllows(classifyCampaignIntent(input), 'prospect')) return null
+
   if (!input || CAMPAIGN_NEGATION.test(input)) return null
   if (!CAMPAIGN_INTENT.test(input) && !SECONDARY_INTENT.test(input) && !looksLikeBrief(input)) return null
 
@@ -192,6 +215,17 @@ export function prospectCampaignQueueError(error: string, language: string): str
 export function campaignBriefMiss(text: string): string | null {
   const input = clean(text, 8_000)
   if (!input) return null
+
+  // THE CLASSIFIER ANSWERS BEFORE THIS FUNCTION GUESSES.
+  //
+  // A refusal is reported verbatim: it already names the real cause, which is the thing
+  // the operator needs. And a brief belonging to ANOTHER pipeline returns null so it can
+  // be handled by that pipeline — reporting a sales-shaped miss at a press brief is how
+  // the operator was previously told to add "Find 30 companies" to a request for thirty
+  // publications, and then followed that advice.
+  const intent = classifyCampaignIntent(input)
+  if (intent.decision === 'refuse') return intent.reason
+  if (intent.pipeline && intent.pipeline !== 'prospect') return null
 
   // Not campaign-shaped: say nothing, answer it as the question it is.
   if (!looksLikeBrief(input) && !CAMPAIGN_INTENT.test(input) && !SECONDARY_INTENT.test(input)) return null

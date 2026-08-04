@@ -221,7 +221,6 @@ function cleanEmail(value: unknown): string | null {
   if (['test', 'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'privacy', 'legal', 'abuse', 'security'].includes(local)) return null
   return email
 }
-
 export async function createOutreachDraft(params: {
   businessName: string
   businessUrl: string

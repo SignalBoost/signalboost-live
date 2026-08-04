@@ -6,6 +6,8 @@ import type { ExecutorKind, SupervisorDispatcher } from './executors/index.ts'
 import type { RollbackCoordinator, RollbackOutcome } from './executors/rollback-coordinator.ts'
 import type { StateSnapshotPort, StateSnapshotRef, TransactionBoundaryPlan } from './executors/state-snapshot-port.ts'
 import { planTransactionBoundary } from './executors/state-snapshot-port.ts'
+import type { EnvelopeInvocation, RepairClass } from '../portable/repair-envelope.ts'
+import { evaluateRepairEnvelope } from '../portable/repair-envelope.ts'
 
 export type SupervisorOrchestrationResult =
   | { status: 'blocked'; policy?: PolicyDecision; boundary?: TransactionBoundaryPlan; reason: string }
@@ -32,7 +34,15 @@ export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: Po
    * converts "we will try to undo it" into "we do not start what we cannot finish".
    * Default false so enabling snapshots never silently changes existing behaviour.
    */
-  requireBoundedExecution?: boolean }
+  requireBoundedExecution?: boolean;
+  /**
+   * Repair classes the buyer has pre-authorised. Absent or empty means every plan waits
+   * for a person exactly as before — the envelope can only REMOVE a human from repairs
+   * already permitted by policy, never add authority.
+   */
+  repairClasses?: readonly RepairClass[];
+  /** Prior admissions, so a class's budget can be counted. Read from the caller's ledger. */
+  recentEnvelopeInvocations?: readonly EnvelopeInvocation[] }
 
 const schemaVersion = 'supervisor-audit-v1'
 let eventCounter = 0
@@ -68,7 +78,8 @@ export class SupervisorOrchestrator {
         await this.audit(incident, 'plan_rejected', { reason: 'incident_id_mismatch', planIncidentId: plan.incidentId })
         return { status: 'failed', reason: 'Repair plan incidentId does not match the incident.' }
       }
-      const policy = await this.deps.policyEngine.evaluate({ incident, plan, mode: this.deps.mode, context: this.deps.policyContext ?? {} })
+      // let, not const: the envelope may promote approval_required to approved below.
+      let policy = await this.deps.policyEngine.evaluate({ incident, plan, mode: this.deps.mode, context: this.deps.policyContext ?? {} })
       await this.audit(incident, 'policy_evaluated', { outcome: policy.outcome, reason: policy.reason, approvedStepIds: policy.approvedStepIds })
       const stepIds = new Set(plan.steps.map(step => step.stepId))
       if (policy.approvedStepIds.some(stepId => !stepIds.has(stepId))) {
@@ -80,8 +91,41 @@ export class SupervisorOrchestrator {
         return { status: 'blocked', policy, reason: policy.reason }
       }
       if (policy.outcome === 'approval_required') {
-        await this.audit(incident, 'approval_required', { reason: policy.reason })
-        return { status: 'approval_required', policy, reason: policy.reason }
+        // THE ENVELOPE IS CONSULTED ONLY HERE — at the moment a human would otherwise be
+        // woken. It cannot reach a blocked plan, and when it refuses, the code below runs
+        // unchanged, so a deployment with no classes configured behaves exactly as it did
+        // before this existed.
+        //
+        // The boundary is computed FIRST, further down, in the ordinary flow — so it is
+        // recomputed here rather than reused. That is deliberate: admitting a repair
+        // depends on reversibility, and reversibility must be established before the
+        // decision to skip the human, not after.
+        const envelopeClasses = this.deps.repairClasses || []
+        if (envelopeClasses.length && this.deps.snapshotPort) {
+          const capabilities = await this.deps.snapshotPort.capabilities()
+          const admission = evaluateRepairEnvelope({
+            plan,
+            policy,
+            boundary: planTransactionBoundary(plan, capabilities),
+            classes: envelopeClasses,
+            recentInvocations: this.deps.recentEnvelopeInvocations,
+          })
+          await this.audit(incident, admission.admitted ? 'envelope_admitted' : 'envelope_refused', {
+            classId: admission.classId ?? '',
+            reasons: admission.reasons,
+          })
+          if (admission.admitted) {
+            // Falls through to the normal approved path below. Nothing else changes: the
+            // same step scope, the same checkpoint, the same verification and the same
+            // rollback. The ONLY difference is that nobody was woken up to say yes.
+            policy = { ...policy, outcome: 'approved', reason: `Pre-authorised: ${admission.reasons[0]}` }
+          }
+        }
+
+        if (policy.outcome === 'approval_required') {
+          await this.audit(incident, 'approval_required', { reason: policy.reason })
+          return { status: 'approval_required', policy, reason: policy.reason }
+        }
       }
       if (policy.approvedStepIds.length === 0) {
         await this.audit(incident, 'orchestration_failed', { reason: 'empty_approved_step_scope' })

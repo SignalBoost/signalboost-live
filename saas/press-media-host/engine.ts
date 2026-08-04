@@ -13,6 +13,7 @@
 // URL); real targets only (the adapter's validateTarget decides); nothing is published
 // silently — the owner records the real link later via recordPublishedUrl.
 import { findPlaceholders } from '@/press-media-core'
+import { withMediaContact } from './media-contact'
 import type {
   MediaProviderRegistry, PortBundle, CampaignBrief, MediaTarget, MediaCampaign,
   MediaTargetType, DispatchState, CostEstimate,
@@ -125,7 +126,6 @@ function campaignFromRow(row: PressCampaign, providerId: string): MediaCampaign 
     brief: { goal: row.headline || '', ctaUrl: row.cta_url || undefined },
   }
 }
-
 // ── runCampaign: generate → validate → cost → gate → persist → (dispatch if cleared) ──
 export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs): Promise<RunCampaignResult> {
   const providerId = args.providerId || 'free_submission'
@@ -139,7 +139,14 @@ export async function runCampaign(ctx: PressMediaContext, args: RunCampaignArgs)
   // 2) Copy. Manual is a FIRST-CLASS choice, not a fallback: if the owner supplied their own
   //    text the AI is never called. Otherwise generate through the injected AiPort.
   const manual = String(args.manualCopy || '').trim()
-  const creative = manual || (await adapter.generate(args.brief, ctx.ports).then((g) => (g?.creative || '').trim()).catch(() => ''))
+  const generated = manual || (await adapter.generate(args.brief, ctx.ports).then((g) => (g?.creative || '').trim()).catch(() => ''))
+
+  //    THE MEDIA CONTACT BLOCK IS ADDED HERE, NOT ASKED FOR IN A PROMPT. Every provider's
+  //    copy — generated or owner-supplied — passes through this one line, so an editor can
+  //    always reach a person. withMediaContact appends nothing when the address is already
+  //    in the copy, which is what stops the duplicate sign-off the outreach footer once
+  //    shipped to real recipients.
+  const creative = withMediaContact(generated)
 
   // 3) Cost + SPEND GATE. Free (0) bypasses; paid requires explicit owner budget approval.
   const preliminary: MediaCampaign = { id: '', providerId, target: args.target, creative, brief: args.brief }

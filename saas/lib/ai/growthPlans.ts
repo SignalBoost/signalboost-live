@@ -13,6 +13,7 @@ import { findContactEmail } from '@/lib/outreach/emailFinder'
 import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import Anthropic from '@anthropic-ai/sdk'
 import { pickOutreachLanguage } from '@/lib/outreach/regionLanguage'
+import { classifyPublicationTarget, publicationSkipReason } from '@/lib/outreach/publicationTargets'
 
 const PLANS_TABLE = 'growth_plans'
 const OUTREACH_TABLE = 'outreach_queue'
@@ -277,6 +278,22 @@ export async function createOutreachDraft(params: {
           ? `The address supplied for ${businessName} (${params.contactEmail}) is not a usable business contact — skipped, not queued.`
           : `No published contact email found for ${businessName} (${businessUrl}) — skipped, not queued. COS does not invent addresses.`,
       }
+    }
+
+    // PUBLICATIONS DO NOT BELONG IN THIS PIPELINE. Checked AFTER the address is resolved,
+    // because the strongest signal is the inbox the mail would actually land in: a message to
+    // editor@, letters@, news@ or guest@ reaches a desk that decides what to publish, never a
+    // desk that buys software.
+    //
+    // This is not a quality filter, it is a routing rule. Business Insider was queued here as a
+    // prospect and an editorial address at another company was already SENT to — the copy read
+    // as a press pitch, signed by the sales desk, with an unsubscribe footer. A press pitch that
+    // arrives as cold sales spends a relationship with an outlet you wanted covering the launch,
+    // and unlike a bad draft it cannot be recalled. So the sales path refuses outright and says
+    // where the target belongs instead of quietly dropping it.
+    const publicationVerdict = classifyPublicationTarget({ businessName, businessUrl, contactEmail: found.email })
+    if (publicationVerdict.isPublication) {
+      return { ok: false, skipped: true, error: publicationSkipReason(businessName, publicationVerdict) }
     }
 
     // DEDUPE BY HOST. The same company was being queued more than once under slightly

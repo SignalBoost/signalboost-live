@@ -20,6 +20,7 @@ export const marketingSalesManifest: PortableProductManifest = Object.freeze({
     'campaigns-are-generated-and-published-automatically-across-your-connected-accounts',
     'spend-and-publishing-are-read-back-from-the-provider-so-reported-results-are-measured-not-estimated',
     'you-set-the-caps-and-the-approver-and-nothing-goes-out-without-them',
+    'enterprise-guard-mode-runs-bulk-changes-in-checkpointed-batches-so-a-failure-affects-one-batch-not-the-job',
     'manual-control-of-every-draft-before-and-after-generation',
   ]),
   // The Social Outreach Connector is a CAPABILITY of this product, not a product beside
@@ -35,9 +36,17 @@ export const marketingSalesManifest: PortableProductManifest = Object.freeze({
   targetAudience: Object.freeze(['sales teams', 'marketing teams']),
   requiredCapabilities: Object.freeze(['marketing-workflows', 'sales-workflows', 'social-publishing']),
   // Paid placement is part of this product, with its own spend gate — see lib/ads.
-  optionalCapabilities: Object.freeze(['approval-gates', 'native-video-upload', 'oauth-connections', 'paid-advertising-placement', 'spend-approval-gate']),
+  // 'enterprise-guard-mode' is OPTIONAL, not required, and that is the product decision:
+  // a marketing team wants five thousand leads updated in one pass, a bank wants a bounded
+  // blast radius. Forcing either architecture on the other loses that customer.
+  optionalCapabilities: Object.freeze(['approval-gates', 'enterprise-guard-mode', 'native-video-upload', 'oauth-connections', 'paid-advertising-placement', 'spend-approval-gate']),
   dependencies: Object.freeze(['configured-workflow-host']),
-  exclusions: Object.freeze(['guaranteed-business-outcomes', 'guaranteed-reach-or-engagement', 'platform-approval-on-behalf-of-buyer', 'content-scheduling']),
+  // 'transactional-rollback…' is here because Enterprise Guard Mode is the exact feature a
+  // document would overstate. Batching bounds the BLAST RADIUS; it does not make a change
+  // made in someone else's CRM reversible, because writing a captured value back cannot
+  // see the edit a salesperson made in between. Listing it stops every downstream surface
+  // from upgrading "at most 250 records affected" into "100% reversible".
+  exclusions: Object.freeze(['guaranteed-business-outcomes', 'guaranteed-reach-or-engagement', 'platform-approval-on-behalf-of-buyer', 'content-scheduling', 'transactional-rollback-of-changes-made-in-someone-elses-system']),
   architectureReferences: Object.freeze(['marketing-sales-core', 'marketing-sales-host', 'lib/outreach/marketing-sales-portable', 'lib/ads/ads-connector', 'scripts/build-marketing-sales-portable']),
   documentationReferences: Object.freeze(['saas/docs/marketing-sales-module-design.md', 'docs/portables/social-outreach-integration-guide.md', 'docs/portables/buyer-package/social-outreach-presentation.md']),
   futureFeatures: Object.freeze(['catalog-templates']),

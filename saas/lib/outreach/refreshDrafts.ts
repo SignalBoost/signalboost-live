@@ -32,12 +32,39 @@
 //   · Discard the old body. It is returned in the report before the write, so a bad
 //     refresh can be reasoned about rather than mourned.
 //   · Write anything at all in dryRun mode, which is the default.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// GUARDED MODE — THE TRANSACTIONAL BOUNDARY, ADDED AUG 2026
+//
+// Everything above describes a system that could explain a bad refresh and not undo one.
+// The previous bodies existed only inside the HTTP response, so once the tab closed the
+// old copy was gone. That is the gap guarded mode closes: previous bodies are captured to
+// a checkpoint store BEFORE anything is written, in chunks, and a chunk that fails is
+// written back.
+//
+// GENERATE FIRST, THEN WRITE. The model calls now happen in a phase of their own and touch
+// nothing. Only rows that produced a usable new body enter the write phase. This matters
+// for more than tidiness: a chunk in guarded mode must be able to fail as a unit, and a
+// chunk containing rows that were never going to be written cannot.
+//
+// THE HONEST NAME FOR THE RECOVERY IS COMPENSATING, NOT ATOMIC. Writing a previous value
+// back is not time travel — if a person edited a draft between capture and write-back,
+// restoring the old body overwrites their newer one, and this system cannot see edits it
+// did not make. What guarded mode buys is a BOUNDED BLAST RADIUS and the exact ids. Do not
+// let any surface downstream upgrade that into "fully reversible".
 
 import { createClient } from '@supabase/supabase-js'
 import { manifestsForOffer } from '@/lib/portable-products/matchManifests'
 import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import { draftMessageFor } from '@/lib/outreach/prospectCampaign'
 import { finishOutreachBody } from '@/lib/ai/growthPlans'
+import {
+  executeGuardedBulk,
+  type BulkExecutionMode,
+  type BulkRecordState,
+} from '@/lib/portable/guarded-bulk-execution'
+import { resolveGuardMode, type GuardModeSettingReader } from '@/lib/portable/guard-mode'
+import { createDraftCheckpointStore, DRAFT_BODY_COLUMN } from '@/lib/outreach/draftCheckpointStore'
 
 const TABLE = 'outreach_queue'
 
@@ -63,6 +90,19 @@ export interface RefreshReport {
   failed: number
   outcomes: RefreshOutcome[]
   error?: string
+
+  // ── Guarded-mode reporting. Optional so existing callers are unaffected. ──
+  /** Which mode this pass actually ran in, and why. Present whenever a write was attempted. */
+  mode?: BulkExecutionMode
+  modeReason?: string
+  /** 'compensating' in guarded mode, 'none' in standard. Never 'atomic'. */
+  reversibility?: 'compensating' | 'none'
+  /** Groups the checkpoints of this run, so the whole run can be written back by one id. */
+  checkpointJobId?: string
+  /** Drafts changed and then written back after their chunk failed. */
+  rolledBackRecordIds?: string[]
+  /** Drafts a person must look at. This is the list that matters when something breaks. */
+  needsReconciliationRecordIds?: string[]
 }
 
 function admin() {
@@ -94,6 +134,22 @@ function admin() {
 const CONCURRENCY = 6
 const TIME_BUDGET_MS = 45_000
 
+// A CHUNK IS THE BLAST RADIUS, SO IT IS SIZED FOR THIS OPERATION AND NOT FOR THE MODULE.
+//
+// guarded-bulk-execution defaults to 250 because most bulk work is cheap field updates. A
+// page here is at most 60 rows and each one cost a model call, so 250 would make the whole
+// page a single chunk and the sentence a buyer hears would be "at most 60 drafts affected".
+// Six keeps it to "at most six", matches the generation concurrency, and costs nothing:
+// the writes are fast, the expensive phase already happened.
+const GUARDED_CHUNK = 6
+
+interface PreparedRow {
+  base: Pick<RefreshOutcome, 'outreachId' | 'businessName' | 'contactEmail' | 'productKey'>
+  previousMessage: string
+  newMessage: string
+  manifestLabel: string
+}
+
 export async function refreshPendingDrafts(options: {
   dryRun?: boolean
   limit?: number
@@ -105,6 +161,15 @@ export async function refreshPendingDrafts(options: {
    * that failed twice is not retried forever ahead of rows never attempted.
    */
   offset?: number
+  /**
+   * Force a mode for this run. Omit to use the buyer's saved setting, which itself
+   * defaults to 'standard' — guarded execution is opt-in, never imposed.
+   */
+  mode?: BulkExecutionMode | null
+  /** The buyer's saved guard-mode setting, injected. Omit and the default applies. */
+  guardModeSettings?: GuardModeSettingReader
+  /** Groups this run's checkpoints. Generated when not supplied. */
+  jobId?: string
 } = {}): Promise<RefreshReport> {
   const startedAt = Date.now()
   const remainingMs = () => TIME_BUDGET_MS - (Date.now() - startedAt)
@@ -127,8 +192,10 @@ export async function refreshPendingDrafts(options: {
   if (error) return { ...empty, error: error.message }
 
   const outcomes: RefreshOutcome[] = []
+  const prepared: PreparedRow[] = []
 
-  async function refreshRow(row: any): Promise<void> {
+  // ── PHASE ONE: generate. Nothing here writes to outreach_queue. ──
+  async function prepareRow(row: any): Promise<void> {
     const base = {
       outreachId: row.id as string,
       businessName: String(row.business_name || ''),
@@ -199,23 +266,12 @@ export async function refreshPendingDrafts(options: {
         senderKey: (row.sender_key as string) || 'saasSales',
       })
 
-      if (dryRun) {
-        outcomes.push({ ...base, status: 'refreshed', reason: `Dry run using: ${manifests.map(item => item.displayName).join(' + ')}. Nothing was written.`, previousMessage: String(row.outreach_message || ''), newMessage: finished })
-        return
-      }
-
-      const { error: writeError } = await db.from(TABLE)
-        .update({ outreach_message: finished })
-        // Re-asserting status here is deliberate: if a person approved this row while the
-        // refresh was running, the update finds nothing and their approved copy survives.
-        .eq('id', row.id)
-        .eq('status', 'pending')
-
-      if (writeError) {
-        outcomes.push({ ...base, status: 'failed', reason: writeError.message })
-        return
-      }
-      outcomes.push({ ...base, status: 'refreshed', reason: `Rewritten using: ${manifests.map(item => item.displayName).join(' + ')}.`, previousMessage: String(row.outreach_message || ''), newMessage: finished })
+      prepared.push({
+        base,
+        previousMessage: String(row.outreach_message || ''),
+        newMessage: finished,
+        manifestLabel: manifests.map(item => item.displayName).join(' + '),
+      })
     } catch (err: any) {
       outcomes.push({ ...base, status: 'failed', reason: String(err?.message || err || 'Unknown error while regenerating.') })
     }
@@ -225,28 +281,193 @@ export async function refreshPendingDrafts(options: {
   const queue = [...(rows || [])]
   while (queue.length && remainingMs() > 8_000) {
     const batch = queue.splice(0, CONCURRENCY)
-    // refreshRow never throws — a failed row is recorded as an outcome, so one bad row
+    // prepareRow never throws — a failed row is recorded as an outcome, so one bad row
     // cannot discard the work of the five running beside it.
-    await Promise.all(batch.map(row => refreshRow(row)))
+    await Promise.all(batch.map(row => prepareRow(row)))
   }
 
-  // Total pending, so the caller knows how much of the queue is left after this page.
-  const { count: totalPending } = await db.from(TABLE)
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'pending')
+  const reached = outcomes.length + prepared.length
 
-  // Rows this pass did not get to (time budget) plus everything past this page.
-  const reached = outcomes.length
-  const remaining = Math.max(0, (totalPending || 0) - (offset + reached))
-
-  return {
+  const finish = (extra: Partial<RefreshReport> = {}): RefreshReport => ({
     ok: true,
     dryRun,
-    remaining,
+    remaining: 0,
     examined: outcomes.length,
     refreshed: outcomes.filter(item => item.status === 'refreshed').length,
     skipped: outcomes.filter(item => item.status === 'skipped').length,
     failed: outcomes.filter(item => item.status === 'failed').length,
     outcomes,
+    ...extra,
+  })
+
+  const countRemaining = async () => {
+    const { count: totalPending } = await db.from(TABLE)
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+    // Rows this pass did not get to (time budget) plus everything past this page.
+    return Math.max(0, (totalPending || 0) - (offset + reached))
   }
+
+  // ── DRY RUN: report what would have been written, write nothing. ──
+  if (dryRun) {
+    for (const item of prepared) {
+      outcomes.push({
+        ...item.base,
+        status: 'refreshed',
+        reason: `Dry run using: ${item.manifestLabel}. Nothing was written.`,
+        previousMessage: item.previousMessage,
+        newMessage: item.newMessage,
+      })
+    }
+    return finish({ remaining: await countRemaining(), mode: 'standard', reversibility: 'none' })
+  }
+
+  // ── PHASE TWO: write, under whichever boundary the buyer asked for. ──
+  const jobId = options.jobId || `draft-refresh-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const checkpointStore = createDraftCheckpointStore(db, jobId)
+
+  const resolution = await resolveGuardMode({
+    hasCheckpointStore: true,
+    scope: { operation: 'draft-refresh' },
+    settingReader: options.guardModeSettings,
+    runOverride: options.mode ?? null,
+  })
+
+  if (resolution.refused) {
+    // Nothing was written. Every prepared row is reported so the operator sees the cost of
+    // the refusal, not just the refusal.
+    for (const item of prepared) {
+      outcomes.push({ ...item.base, status: 'skipped', reason: resolution.reason })
+    }
+    return { ...finish({ remaining: await countRemaining(), mode: resolution.mode, modeReason: resolution.reason }), ok: false, error: resolution.reason }
+  }
+
+  // Re-asserting status='pending' on every write is deliberate: if a person approved a row
+  // while the refresh was running, the update finds nothing and their approved copy
+  // survives. It is not treated as a failure — nobody did anything wrong.
+  const writeBody = async (recordId: string, body: string): Promise<string | null> => {
+    const { error: writeError } = await db.from(TABLE)
+      .update({ [DRAFT_BODY_COLUMN]: body })
+      .eq('id', recordId)
+      .eq('status', 'pending')
+    return writeError ? writeError.message : null
+  }
+
+  if (resolution.mode === 'standard') {
+    for (const item of prepared) {
+      const failure = await writeBody(item.base.outreachId, item.newMessage)
+      if (failure) {
+        outcomes.push({ ...item.base, status: 'failed', reason: failure })
+        continue
+      }
+      outcomes.push({
+        ...item.base,
+        status: 'refreshed',
+        // Standard mode's own failure wording says plainly that nothing was checkpointed.
+        reason: `Rewritten using: ${item.manifestLabel}. No checkpoint was taken, so this rewrite cannot be undone by this system.`,
+        previousMessage: item.previousMessage,
+        newMessage: item.newMessage,
+      })
+    }
+    return finish({
+      remaining: await countRemaining(),
+      mode: 'standard',
+      modeReason: resolution.reason,
+      reversibility: 'none',
+    })
+  }
+
+  // ── GUARDED ──
+  const records: BulkRecordState[] = prepared.map(item => ({
+    recordId: item.base.outreachId,
+    fields: { [DRAFT_BODY_COLUMN]: item.newMessage },
+  }))
+
+  const result = await executeGuardedBulk({
+    mode: 'guarded',
+    records,
+    chunkSize: GUARDED_CHUNK,
+    jobId,
+    checkpointStore,
+
+    // Read the CURRENT body from the database rather than reusing the one fetched at the
+    // top of this pass. Minutes of model calls happened in between, and the value worth
+    // keeping is the one that exists immediately before the write.
+    async captureState(recordIds) {
+      const { data, error: readError } = await db.from(TABLE)
+        .select(`id,${DRAFT_BODY_COLUMN}`)
+        .in('id', [...recordIds])
+      if (readError) throw new Error(`Previous drafts could not be read for checkpointing: ${readError.message}`)
+      return (data || []).map((row: any) => ({
+        recordId: String(row.id),
+        fields: { [DRAFT_BODY_COLUMN]: String(row[DRAFT_BODY_COLUMN] ?? '') },
+      }))
+    },
+
+    async applyChange(chunk) {
+      const failedRecordIds: string[] = []
+      const details: string[] = []
+      for (const record of chunk) {
+        const body = record.fields?.[DRAFT_BODY_COLUMN]
+        const failure = await writeBody(record.recordId, typeof body === 'string' ? body : '')
+        if (failure) {
+          failedRecordIds.push(record.recordId)
+          details.push(`${record.recordId}: ${failure}`)
+        }
+      }
+      return { failedRecordIds, detail: details.join('; ') }
+    },
+
+    async restoreState(chunk) {
+      const failedRecordIds: string[] = []
+      const details: string[] = []
+      for (const record of chunk) {
+        const body = record.fields?.[DRAFT_BODY_COLUMN]
+        const failure = await writeBody(record.recordId, typeof body === 'string' ? body : '')
+        if (failure) {
+          failedRecordIds.push(record.recordId)
+          details.push(`${record.recordId}: ${failure}`)
+        }
+      }
+      return { failedRecordIds, detail: details.join('; ') }
+    },
+  })
+
+  const applied = new Set(result.appliedRecordIds)
+  const rolledBack = new Set(result.rolledBackRecordIds)
+  const needsPerson = new Set(result.needsReconciliationRecordIds)
+
+  for (const item of prepared) {
+    const id = item.base.outreachId
+    if (needsPerson.has(id)) {
+      outcomes.push({ ...item.base, status: 'failed', reason: `This draft needs a person: its chunk failed and the previous body could not be written back. ${result.summary}` })
+      continue
+    }
+    if (rolledBack.has(id)) {
+      outcomes.push({ ...item.base, status: 'skipped', reason: `Rewritten and then written back because its chunk failed. It should hold its previous body. ${result.summary}` })
+      continue
+    }
+    if (applied.has(id)) {
+      outcomes.push({
+        ...item.base,
+        status: 'refreshed',
+        reason: `Rewritten using: ${item.manifestLabel}. Previous body checkpointed under job ${jobId}.`,
+        previousMessage: item.previousMessage,
+        newMessage: item.newMessage,
+      })
+      continue
+    }
+    outcomes.push({ ...item.base, status: 'skipped', reason: `Not attempted — the run halted before this chunk. ${result.summary}` })
+  }
+
+  return finish({
+    remaining: await countRemaining(),
+    ok: result.status !== 'failed',
+    mode: 'guarded',
+    modeReason: resolution.reason,
+    reversibility: result.reversibility,
+    checkpointJobId: jobId,
+    rolledBackRecordIds: result.rolledBackRecordIds,
+    needsReconciliationRecordIds: result.needsReconciliationRecordIds,
+  })
 }

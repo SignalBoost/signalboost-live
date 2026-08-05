@@ -5,11 +5,22 @@ import Link from 'next/link'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { uiText } from '@/lib/i18n/uiText'
+import { approvalKindLabel, isApprovalKind } from '@/portable-kernel'
 
 type Campaign = { id: string; title?: string; objective?: string; status?: string; metadata?: Record<string, any> }
 type Decision = 'ok' | 'no' | 'staff' | 'submitted' | 'published'
 const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press'] as const
 const channelLabels: Record<string, string> = { 'online-newspapers': "Digital newspaper", 'print-newspapers': "Print newspaper", 'trade-press': "IT magazine / trade press" }
+// EVERY APPROVAL SHOWS WHICH PIPELINE IT BELONGS TO, ITS REFERENCE, AND ITS DATES.
+// Before this, an approval card carried a title and a status and nothing that tied it to a
+// product — so a press record, a video record and a social draft were told apart by reading
+// them. The reference is quotable (PP-20260805-K7Q4M), the kind names the owning portable, and
+// the two dates answer two different questions: when it entered the queue, and when it was
+// decided. Records created before approval identities existed show what they have and say
+// plainly what they lack, rather than showing a blank where a reference should be.
+function approvalRef(campaign: Campaign) { return String(campaign.metadata?.approval_ref || '') }
+function approvalKind(campaign: Campaign) { const raw = campaign.metadata?.approval_kind; return isApprovalKind(raw) ? approvalKindLabel(raw) : '' }
+function shortDate(value: unknown) { const raw = String(value || '').trim(); if (!raw) return ''; const parsed = new Date(raw); return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10) }
 function channel(campaign: Campaign) { return String(campaign.metadata?.outreach_channel || campaign.metadata?.media_channel || '') }
 function review(campaign: Campaign) { return String(campaign.metadata?.press_print_review || 'PENDING').toUpperCase() }
 function stage(campaign: Campaign) { return String(campaign.metadata?.press_print_execution_stage || campaign.metadata?.press_print_execution?.stage || 'not_started') }
@@ -18,8 +29,34 @@ function Action({ id, decision, children, primary = false }: { id: string; decis
 export default function PressPrintMediaPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
+  // GENERATING A RELEASE IS AN ACTION, NOT A DECISION, so it is a fetch rather than one of the
+  // decision forms above: it changes what the record CONTAINS, and the owner still has to read
+  // the result and decide afterwards. The route re-runs admission on the stored record first,
+  // so a record that should never have been admitted cannot acquire a release here and become
+  // approvable — the refusal is shown in place, with its reason.
+  const [generatingId, setGeneratingId] = useState('')
+  const [generateMessage, setGenerateMessage] = useState<Record<string, string>>({})
   const { t } = useTranslation()
   useEffect(() => { let live = true; (async () => { try { const res = await fetch('/api/marketing/press-print', { cache: 'no-store' }); const json = await res.json(); if (live) setCampaigns((Array.isArray(json.campaigns) ? json.campaigns : []).filter((row: Campaign) => PRESS_PRINT_CHANNELS.includes(channel(row) as any))) } finally { if (live) setLoading(false) } })(); return () => { live = false } }, [])
+  async function generateRelease(campaignId: string) {
+    setGeneratingId(campaignId)
+    setGenerateMessage((previous) => ({ ...previous, [campaignId]: '' }))
+    try {
+      const res = await fetch('/api/marketing/press-print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'generate_release', id: campaignId }) })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.ok) {
+        const reasons: string[] = Array.isArray(json?.refusals) && json.refusals.length ? json.refusals : [String(json?.error || 'The release could not be written.')]
+        setGenerateMessage((previous) => ({ ...previous, [campaignId]: reasons.join(' ') }))
+        return
+      }
+      // Patch the row in place so the release and the Approve button appear without a reload.
+      setCampaigns((previous) => previous.map((row) => row.id === campaignId ? { ...row, metadata: { ...(row.metadata || {}), press_release_body: String(json.release || ''), press_release_status: String(json.releaseStatus || 'generated') } } : row))
+    } catch (error) {
+      setGenerateMessage((previous) => ({ ...previous, [campaignId]: error instanceof Error ? error.message : 'The release could not be written.' }))
+    } finally {
+      setGeneratingId('')
+    }
+  }
   return <main style={shell}>
     <section style={hero}><p className="sb-eyebrow">{uiText('generatedUi.u_dcba31525bd63b56')}</p><h1 style={h1}><LocalizedText fallback={uiText('generatedUi.u_ba2f8d68f462717f')} /></h1><p style={body}>{t('marketingSales.pressPrint.description', "Automated Press & Print only accepts free, real newspaper/magazine/publication targets unless the user explicitly asks for paid advertising. The target must include a publisher/editor email or a real submit-news/contact form.")}</p><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><Link href="/dashboard/marketing/press-print/direct" className="sb-button-primary">{t('marketingSales.pressPrint.startStaffLedCampaign', "Start staff-led campaign")}</Link></div></section>
     {loading ? <p className="sb-body">{uiText('generatedUi.u_ba3bbbe10d8bef66')}</p> : null}
@@ -34,19 +71,21 @@ export default function PressPrintMediaPage() {
       const paidRequested = Boolean(paidClaimed && paidRequestedBy && paidRequestedAt);
       const paidUnverified = paidClaimed && !paidRequested;
       // THE BOX BELOW WAS LABELLED "FULL DRAFT" AND IT IS NOT A DRAFT. campaign.objective is the
-      // BRIEF — the instruction sent to COS, plus the CTA, audience and safety rule. For this path
-      // press-print/route.ts sets work_items[0].output.draft = objective, so there is no separate
-      // release body at all: these records never went through the press-media engine that actually
-      // generates copy (runCampaign → adapter.generate → press_campaigns.content_body).
+      // BRIEF — the instruction the campaign was assembled from, plus the CTA, audience and safety
+      // rule. Calling a brief a draft is the same defect this cockpit keeps producing: a surface
+      // asserting something about content that is not true of it. So the brief is named a brief.
       //
-      // Calling a brief a draft is the same defect this cockpit keeps producing: a surface asserting
-      // something about content that is not true of it. So the brief is named a brief, the release is
-      // shown only when one exists, and its absence is stated rather than disguised.
+      // press-print/route.ts now writes metadata.press_release_body through the same AI port the
+      // Press & Media portable uses. Before that it wrote nothing — across the whole repo history
+      // this key was read here and in the decision route and produced by NOTHING, so hasRelease was
+      // permanently false and Approve could never appear on any record. Records created before that
+      // fix still have no release; the button below writes one for them, and the route re-checks
+      // admission first so a record that should never have been admitted cannot become approvable.
       const briefText = String(campaign.objective || '');
       const releaseBody = String(campaign.metadata?.press_release_body || campaign.metadata?.content_body || campaign.metadata?.press_print_execution?.release_body || '').trim();
       const hasRelease = releaseBody.length > 0;
       return <section key={campaign.id} style={card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><p className="sb-eyebrow">{channelLabels[channel(campaign)] || uiText('generatedUi.u_85c253de08e70759')}</p><h2 style={h2}>{String(campaign.title || "Press campaign").slice(0, 120)}</h2><p style={{ ...body, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'hidden' }}>{String(campaign.objective || "Campaign prepared inside Marketing + Sales.").slice(0, 300)}{String(campaign.objective || '').length > 300 ? '…' : ''}</p></div><strong style={pill}>{currentReview} · {labelStage(currentStage)}</strong></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><p className="sb-eyebrow">{channelLabels[channel(campaign)] || uiText('generatedUi.u_85c253de08e70759')}</p><h2 style={h2}>{String(campaign.title || "Press campaign").slice(0, 120)}</h2><p style={{ ...body, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'hidden' }}>{String(campaign.objective || "Campaign prepared inside Marketing + Sales.").slice(0, 300)}{String(campaign.objective || '').length > 300 ? '…' : ''}</p><div style={identityRow}>{approvalRef(campaign) ? <span style={identityChip}>{approvalRef(campaign)}</span> : <span style={identityChipMuted}>{t('marketingSales.pressPrint.noRef', "No approval reference — created before references existed")}</span>}{approvalKind(campaign) ? <span style={identityChip}>{approvalKind(campaign)}</span> : null}{shortDate(campaign.metadata?.approval_requested_at) ? <span style={identityChip}>{t('marketingSales.pressPrint.requested', "Requested")} {shortDate(campaign.metadata?.approval_requested_at)}</span> : null}{shortDate(campaign.metadata?.approval_decided_at) ? <span style={identityChip}>{t('marketingSales.pressPrint.decided', "Decided")} {shortDate(campaign.metadata?.approval_decided_at)}</span> : null}</div></div><strong style={pill}>{currentReview} · {labelStage(currentStage)}</strong></div>
       {/* THE WHOLE DRAFT, BEFORE THE APPROVE BUTTON. Approving copy you cannot read is not an
           approval gate, it is a button. The card above truncates at 300 characters and clips at
           120px, so every campaign here was approved or rejected on its first two sentences. This
@@ -55,7 +94,7 @@ export default function PressPrintMediaPage() {
       {briefText ? <details open={!approved && !completed} style={draftBox}><summary style={draftSummary}>{t('marketingSales.pressPrint.brief', "Campaign brief — what COS was asked to prepare")}</summary><p style={draftBody}>{briefText}</p></details> : null}
       {hasRelease
         ? <details open={!approved && !completed} style={draftBox}><summary style={draftSummary}>{t('marketingSales.pressPrint.release', "Press release — read every line before approving")}</summary><p style={draftBody}>{releaseBody}</p></details>
-        : <div style={warnBox}><h3 style={h3}>{t('marketingSales.pressPrint.noReleaseTitle', "No press release has been written for this campaign")}</h3><p style={body}>{t('marketingSales.pressPrint.noReleaseBody', "Only the brief above exists. Approving would send the brief itself — including any notes pasted into it — to the publisher. Approval is withheld until a release is generated and you have read it.")}</p></div>}
+        : <div style={warnBox}><h3 style={h3}>{t('marketingSales.pressPrint.noReleaseTitle', "No press release has been written for this campaign")}</h3><p style={body}>{t('marketingSales.pressPrint.noReleaseBody', "Only the brief above exists. Approving would send the brief itself — including any notes pasted into it — to the publisher. Approval is withheld until a release is generated and you have read it.")}</p>{!completed ? <div style={{ marginTop: 12 }}><button type="button" onClick={() => generateRelease(campaign.id)} disabled={generatingId === campaign.id} style={primaryButton}>{generatingId === campaign.id ? t('marketingSales.pressPrint.generating', "Writing the release…") : t('marketingSales.pressPrint.generateRelease', "Generate release")}</button></div> : null}{generateMessage[campaign.id] ? <p style={{ ...body, marginTop: 10, color: '#fecaca' }}>{generateMessage[campaign.id]}</p> : null}</div>}
       <div style={targetBox}><h3 style={h3}>{paidRequested ? uiText('generatedUi.u_646f4403d6cb817a') : uiText('generatedUi.u_18238f7c9ad4b122')}</h3>{hasPublisherTarget ? <p style={body}>{uiText('generatedUi.u_a830b3f1a9dca539')}<strong>{publisher}</strong><br /><LocalizedText fallback={uiText('generatedUi.u_48708414bf63393e')} /><strong>{publisherEmail ? uiText('generatedUi.u_8c99309070b1681c') : paidRequested ? uiText('generatedUi.u_6e1e38f5115a6bd8') : uiText('generatedUi.u_ad314c1be14c24f4')}</strong><br />{uiText('generatedUi.u_890d34fffcde315c')}{publisherEmail || publisherForm}{sourceUrl ? <><br />{uiText('generatedUi.u_8b3d3d068d6ce833')}{sourceUrl}</> : null}{paidRequested ? <><br /><strong>{uiText('generatedUi.u_ee327964a14f18f5')}</strong>{uiText('generatedUi.u_1782911d66f12dbe')}</> : null}</p> : <p style={body}><LocalizedText fallback={uiText('generatedUi.u_51d4658bdbb5b25d')} /></p>}</div>
       {paidUnverified ? <div style={warnBox}><h3 style={h3}>{t('marketingSales.pressPrint.paidUnverifiedTitle', "This campaign claims you asked for paid advertising")}</h3><p style={body}>{t('marketingSales.pressPrint.paidUnverifiedBody', "It is marked as a paid/advertising target, but no record exists of who requested paid placement or when. An authorization that cannot be traced to a person is not an authorization, so approval is withheld here. Reject it, or use Needs staff help to record the request properly.")}</p></div> : null}
       {!approved && !completed ? <div style={actions}>{(paidUnverified || !hasRelease) ? null : <Action id={campaign.id} decision="ok" primary>{uiText('generatedUi.u_6007acbe30b2cd98')}</Action>}<Action id={campaign.id} decision="no">{uiText('generatedUi.u_ab604a360777735f')}</Action><Action id={campaign.id} decision="staff"><LocalizedText fallback={uiText('generatedUi.u_9939e76315d42e7a')} /></Action></div> : null}
@@ -84,3 +123,6 @@ const input: CSSProperties = { width: '100%', borderRadius: 10, border: '1px sol
 const primaryButton: CSSProperties = { border: 'none', background: '#ffc300', color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' }
 const secondaryButton: CSSProperties = { border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 850, cursor: 'pointer' }
 const link: CSSProperties = { color: '#67e8f9', fontWeight: 850, textDecoration: 'underline' }
+const identityRow: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }
+const identityChip: CSSProperties = { color: 'rgba(255,255,255,.82)', border: '1px solid rgba(255,255,255,.16)', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 800, letterSpacing: '.02em' }
+const identityChipMuted: CSSProperties = { color: 'rgba(255,255,255,.50)', border: '1px dashed rgba(255,255,255,.18)', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 700 }

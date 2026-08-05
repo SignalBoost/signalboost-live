@@ -18,6 +18,8 @@ import {
   type AuditReportTranslationPayload,
 } from '@/lib/audit/reportTranslation'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { parseRepoUrl, listRepoTree } from '@/lib/audit/repoTarget'
+import { verifyFindings, summarizeFreshness, actionableFindings, type VerifiedFinding } from '@/lib/audit/findingFreshness'
 import { localizeKnownFindingText, normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
 
 export const runtime = 'nodejs'
@@ -26,6 +28,69 @@ export const maxDuration = 300
 
 const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
 const HEARTBEAT_KIND = 'audit_remediation_heartbeat'
+
+// Mirrors the runner's default target so a run recorded from a bare path prefix
+// (rather than a full GitHub URL) can still be re-read. Kept in sync by name, not
+// by import, because runner.ts holds it privately.
+const AUDIT_REPO = process.env.AUDIT_GITHUB_REPO || 'SignalBoost/signalboost-live'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FRESHNESS: a stored finding is a claim about a file at a moment, and this route
+// is where that claim is read back — sometimes weeks later. On 5 Aug 2026 a report
+// served from here listed phrases that had been localized away on 27 Jul; nothing
+// on screen distinguished "still broken" from "fixed last week", and the owner was
+// about to spend a day on findings that no longer existed.
+//
+// So each finding is re-checked against the CURRENT source before it is returned,
+// and the ones that no longer reproduce are moved out of `findings` into
+// `staleFindings` — visible if you want them, out of the fix queue by default.
+//
+// IT FAILS OPEN, DELIBERATELY. If the repo or branch cannot be resolved, or if the
+// pass comes back mostly unreadable (a rate limit, a renamed default branch), the
+// ORIGINAL list is returned untouched with freshnessError set. Hiding a real
+// finding because a network call failed is far worse than showing a stale one:
+// the first loses work silently, the second is merely noise the operator can see.
+const STALE_MAX_FILES = 120
+const UNREADABLE_ABORT_RATIO = 0.5
+
+interface FreshnessPass {
+  findings: any[]
+  stale: VerifiedFinding[]
+  summary: ReturnType<typeof summarizeFreshness> | null
+  error: string
+}
+
+async function runFreshnessPass(prefix: string, findings: any[]): Promise<FreshnessPass> {
+  const untouched = (error: string): FreshnessPass => ({ findings, stale: [], summary: null, error })
+  if (!findings.length) return { findings, stale: [], summary: null, error: '' }
+
+  try {
+    const parsed = parseRepoUrl(prefix)
+    const repo = parsed?.repo || AUDIT_REPO
+    let branch = parsed?.branch || ''
+    if (!branch) {
+      const tree = await listRepoTree(repo)
+      if (!tree.ok) return untouched(`Could not resolve the repository to re-check against: ${tree.error || repo}.`)
+      branch = tree.branch
+    }
+    if (!repo || !branch) return untouched('Could not resolve the repository and branch to re-check against.')
+
+    const verified = await verifyFindings(repo, branch, findings as any, { maxFiles: STALE_MAX_FILES })
+    const missing = verified.filter(v => v.freshness === 'file-missing').length
+    if (verified.length && missing / verified.length > UNREADABLE_ABORT_RATIO) {
+      return untouched('Most files could not be read while re-checking — showing the recorded findings unfiltered.')
+    }
+
+    return {
+      findings: actionableFindings(verified),
+      stale: verified.filter(v => v.freshness === 'stale'),
+      summary: summarizeFreshness(verified),
+      error: '',
+    }
+  } catch (error) {
+    return untouched(error instanceof Error ? error.message : 'Re-check failed — showing the recorded findings unfiltered.')
+  }
+}
 
 type RemediationWithHeartbeat = ApprovedRunRemediationResult & {
   lifecycleStatus?: string
@@ -120,7 +185,6 @@ function splitAuditPayloads(rows: any[], targetLang: string) {
   if (scan?.lang) availableLanguages.add(normalizeReportLang(scan.lang))
   return { scan, remediation, remediationUpdatedAt, translation, availableLanguages }
 }
-
 async function createCachedTranslation(params: {
   admin: any
   runId: string
@@ -255,7 +319,10 @@ export async function GET(req: NextRequest) {
       if (payloads.translation) payloads.availableLanguages.add(lang)
     }
 
-    const findings = applyTranslation(sourceFindings, payloads.translation, sourceLang, lang)
+    const translated = applyTranslation(sourceFindings, payloads.translation, sourceLang, lang)
+    // Re-check against the repository as it is NOW, before any of this is shown.
+    const fresh = await runFreshnessPass(String(run.data.prefix || payloads.scan?.prefix || ''), translated)
+    const findings = fresh.findings
     const persistedHeartbeatAt = typeof heartbeatRow.data?.created_at === 'string'
       ? heartbeatRow.data.created_at
       : ''
@@ -273,6 +340,12 @@ export async function GET(req: NextRequest) {
       reportLanguage: lang,
       sourceLanguage: sourceLang,
       availableLanguages: Array.from(payloads.availableLanguages).sort(),
+      // Findings that no longer reproduce are returned separately rather than
+      // deleted: the run's own record stays intact and an operator can still see
+      // what was fixed since it ran.
+      staleFindings: fresh.stale,
+      freshness: fresh.summary,
+      freshnessError: fresh.error,
       // For approved runs, the recovery call is the freshest lifecycle state.
       // Older durable logs remain the fallback for already-remediated history.
       remediation,

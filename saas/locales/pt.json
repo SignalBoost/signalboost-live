@@ -3543,7 +3543,8 @@
     "u_ads_connectok": "Rede ligada",
     "u_ads_expires": "expira a",
     "u_ads_lasterror": "A última renovação falhou",
-    "u_ads_reconnect": "Voltar a ligar"
+    "u_ads_reconnect": "Voltar a ligar",
+    "u_pressdrafts_navlabel": "Rascunhos de imprensa"
   },
   "lab": {
     "somethingWrong": "Algo deu errado",

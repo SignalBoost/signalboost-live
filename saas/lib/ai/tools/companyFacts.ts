@@ -43,6 +43,11 @@ export interface CompanyFactsInput {
   approvedQuote?: string
   permittedClaims?: string   // newline-separated
   forbiddenClaims?: string   // newline-separated
+  datelineCity?: string
+  mediaContactName?: string
+  mediaContactTitle?: string
+  mediaContactEmail?: string
+  mediaContactPhone?: string
 }
 
 export interface CompanyFactsResult {
@@ -81,6 +86,8 @@ export async function readCompanyFacts(): Promise<{ ok: boolean; text: string; e
     push('Approved quote', row.approved_quote)
     push('Permitted claims', row.permitted_claims)
     push('Forbidden claims', row.forbidden_claims)
+    push('Dateline city', row.dateline_city)
+    push('Media contact', [row.media_contact_name, row.media_contact_title, row.media_contact_email, row.media_contact_phone].map((v: unknown) => str(v)).filter(Boolean).join(', '))
 
     const missing = missingFields(row)
     return {
@@ -108,6 +115,8 @@ function missingFields(row: any): string[] {
     ['approved quote', row?.approved_quote],
     ['permitted claims', row?.permitted_claims],
     ['forbidden claims', row?.forbidden_claims],
+    ['dateline city', row?.dateline_city],
+    ['media contact email', row?.media_contact_email],
   ]
   return want.filter(([, v]) => !str(v)).map(([label]) => label)
 }
@@ -149,6 +158,11 @@ export async function saveCompanyFacts(input: CompanyFactsInput): Promise<Compan
     set('approved_quote', input.approvedQuote, current.approved_quote)
     set('permitted_claims', input.permittedClaims, current.permitted_claims)
     set('forbidden_claims', input.forbiddenClaims, current.forbidden_claims)
+    set('dateline_city', input.datelineCity, current.dateline_city)
+    set('media_contact_name', input.mediaContactName, current.media_contact_name)
+    set('media_contact_title', input.mediaContactTitle, current.media_contact_title)
+    set('media_contact_email', input.mediaContactEmail, current.media_contact_email)
+    set('media_contact_phone', input.mediaContactPhone, current.media_contact_phone)
 
     if (!str(next.brand_name) && !str(next.legal_name)) {
       return { ok: false, error: 'A brand name or a legal name is required — the generator cannot name the company otherwise.' }

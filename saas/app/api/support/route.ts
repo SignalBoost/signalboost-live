@@ -20,6 +20,7 @@ import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCust
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { createPressCampaignFromAgent } from '@/lib/ai/tools/pressCampaign'
 import { readCompanyFacts, saveCompanyFacts } from '@/lib/ai/tools/companyFacts'
+import { listPressCampaignJobs, cancelPressCampaignJob, describePressCampaignJob } from '@/lib/outreach/pressCampaign'
 import { runAudit } from '@/lib/audit/runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { findNextUntranslatedComponent, formatSweepForAI } from '@/lib/ai/tools/i18nSweep'
@@ -561,6 +562,34 @@ const TOOL_LIST_MY_OUTREACH: ChatTool = {
 // job id immediately and the cron drafts across many short invocations.
 // COS had no way to FIND a publication — only to pitch one it was already given an
 // address for. So a press brief either stalled or drifted into the sales tool. This
+// PRESS JOB VISIBILITY AND A STOP BUTTON.
+//
+// A background job the owner can start but cannot see or stop is worse than no job at all:
+// the only way to halt a runaway campaign was for me to hand him raw SQL, which is exactly
+// the manual escape hatch this platform exists to remove. Sales has had a status tool since
+// July; press had neither half.
+const TOOL_PRESS_CAMPAIGN_STATUS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'getPressCampaignStatus',
+    description: 'Read the press campaign jobs — status, how many drafts are queued of how many requested, and which outlets were skipped and why. Call this whenever the owner asks how a press campaign is going. Takes no arguments; returns the most recent jobs.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_CANCEL_PRESS_CAMPAIGN: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'cancelPressCampaign',
+    description: 'Stop a running press campaign job. The worker halts on its next tick. Drafts already queued are NOT deleted — they stay in the cockpit for the owner to approve or reject, because a draft is a record of work that was really done. Call this when the owner asks to stop, cancel or kill a press campaign. If he does not name a job id, call getPressCampaignStatus first and confirm which one he means rather than guessing.',
+    parameters: {
+      type: 'object',
+      properties: { jobId: { type: 'string', description: 'The job id to cancel.' } },
+      required: ['jobId'],
+    },
+  },
+}
+
 // THE COMPANY FACTS RECORD, now writable by COS rather than only by a human in a form.
 // It is the allow-list the press generator may state; empty fields become visible
 // [PLACEHOLDER]s. The derivable fields come from the company's own site and the product
@@ -789,6 +818,8 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_FIND_PUBLICATIONS,
   TOOL_GET_COMPANY_FACTS,
   TOOL_SET_COMPANY_FACTS,
+  TOOL_PRESS_CAMPAIGN_STATUS,
+  TOOL_CANCEL_PRESS_CAMPAIGN,
   TOOL_START_PROSPECT_CAMPAIGN,
   TOOL_PROSPECT_CAMPAIGN_STATUS,
   TOOL_PROPOSE_INFRA_PR,
@@ -1257,6 +1288,21 @@ if (name === 'createOutreachDraft') {
     return result.ok
       ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`
       : `Outreach draft failed: ${result.error ?? 'unknown error'}.`
+  }
+if (name === 'getPressCampaignStatus') {
+    const result = await listPressCampaignJobs(5)
+    if (!result.ok) return `Could not read the press campaign jobs: ${result.error || 'unknown error'}.`
+    if (!result.jobs.length) return 'There are no press campaign jobs.'
+    return result.jobs.map(describePressCampaignJob).join('\n\n')
+  }
+if (name === 'cancelPressCampaign') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const jobId = String(args?.jobId || '').trim()
+    if (!jobId) return 'A job id is required. Call getPressCampaignStatus and confirm with the owner which job to stop.'
+    const result = await cancelPressCampaignJob(jobId)
+    if (!result.ok) return `The press campaign was NOT cancelled: ${result.error || 'unknown error'}.`
+    return `Press campaign job ${jobId} cancelled — the worker stops on its next tick. Drafts already queued remain in the cockpit at /dashboard/marketing/press-providers for you to approve or reject; nothing was deleted and nothing was sent.`
   }
 if (name === 'getCompanyFacts') {
     const result = await readCompanyFacts()

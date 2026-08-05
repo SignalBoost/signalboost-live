@@ -107,10 +107,19 @@ function clean(value: unknown, max: number): string {
 export function announcementFrom(brief: string): string {
   const text = String(brief || '')
   const promote = text.match(/(?:will\s+)?promote[sd]?\s*:?\s*([\s\S]{0,400})/i)
-  const products = promote
-    ? promote[1]
-        .split(/\n|\d+\.\s+/)
-        .map(l => l.replace(/^[\s*\-•]+/, '').trim())
+  // HIS BRIEF ARRIVES AS ONE LINE. Pasted into the chat widget the newlines are gone, so
+  // "1. Self-Healing Supervisor 2. SignalBoost AI Marketing and Sales Software Use your
+  // existing knowledge…" splits into two items, the second of which carries the whole rest
+  // of the instruction, runs past the length filter and is DROPPED — which is why a
+  // two-product campaign announced one product. Cut the capture at the first instruction
+  // word before splitting, so the run-on tail never joins the last product.
+  const promoted = promote
+    ? promote[1].split(/\b(?:use your|clearly explain|emphas|explain\b|which industries|why the)/i)[0]
+    : ''
+  const products = promoted
+    ? promoted
+        .split(/\n|\d+\.\s+|\s+and\s+(?=[A-Z])/)
+        .map(l => l.replace(/^[\s*\-•]+/, '').replace(/[.,;]+$/, '').trim())
         .filter(l => l && l.length < 120 && !/^(use|clearly|emphas|explain|which|why|how|what)/i.test(l))
         .slice(0, 6)
     : []

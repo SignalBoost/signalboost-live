@@ -13,6 +13,7 @@
 // form, one governed path behind it. Never a parallel dispatcher.
 import { getPressMediaHost } from '@/press-media-host'
 import { checkPressAdmission } from '@/lib/marketing/pressCampaignAdmission'
+import { resolveCompanyFacts } from '@/lib/portable/companyIdentity'
 import type { MediaTargetType } from '@/press-media-core'
 
 const TARGETS: MediaTargetType[] = ['digital_press', 'newspaper_print', 'magazine_print', 'trade_press', 'broadcast']
@@ -69,6 +70,31 @@ export async function createPressCampaignFromAgent(input: CosPressCampaignInput)
   // Putting it in the two callers and not the callee is the same mistake in a different shape:
   // the next caller inherits the hole. Every route into press drafting runs through this
   // function, so this is the only place the rule cannot be routed around.
+  // THE GOAL IS COPY TOO, AND NOTHING WAS CHECKING IT.
+  //
+  // Forbidden claims and the product allow-list are enforced on the generated RELEASE, and
+  // the release came back clean. But the GOAL is written by the agent before generation, it
+  // is stored as the campaign headline, and it is what the owner reads on the approval card
+  // — and one arrived saying "Announce SignalBoost's AI-powered SaaS platform and shopping
+  // mall", naming the exact thing the owner had put on the forbidden list an hour earlier.
+  // A rule that governs the body and not the brief governs half the artifact.
+  //
+  // It refuses rather than silently rewrites: the goal came from an instruction, and quietly
+  // editing an owner's instruction is worse than telling him it cannot be used.
+  const facts = await resolveCompanyFacts().catch(() => null)
+  const goalText = `${goal} ${manualCopy}`.toLowerCase()
+  const forbiddenHit = (facts?.forbiddenClaims || []).find((claim) => {
+    const words = String(claim || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3)
+    return words.length > 0 && words.every((w) => goalText.includes(w))
+  })
+  if (forbiddenHit) {
+    return {
+      ok: false,
+      reason: 'goal_states_forbidden_claim',
+      error: `The campaign goal states something on the forbidden-claims list ("${forbiddenHit}"). The goal becomes the campaign headline and shapes the release, so it is refused rather than rewritten. Restate the goal without it.`,
+    }
+  }
+
   const admission = checkPressAdmission({
     publicationName: str(input.publicationName),
     publicationUrl: submitFormUrl,
@@ -125,7 +151,7 @@ export async function createPressCampaignFromAgent(input: CosPressCampaignInput)
 export const proposePressCampaignTool = {
   name: 'proposePressCampaign',
   description:
-    'Prepare a press campaign and place it in the owner approval queue at /dashboard/marketing/press-providers. ' +
+    'Prepare a press campaign and place it in the owner approval queue at /dashboard/marketing/press-drafts. ' +
     'Fill every field you can from what the owner told you. NEVER invent an editor email, publication, product name, ' +
     'quote or statistic — if a real verified contact is not known, say so instead of calling this tool. ' +
     'This never sends anything: it creates a draft the owner must approve.',

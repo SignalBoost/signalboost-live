@@ -1795,6 +1795,11 @@ ${ev.summary}`
     const firedTools = new Set<string>()
     // Set only when findPublications returned at least one real outlet this turn.
     let pressOutletsFound = false
+    // What the search actually said, verbatim, when it did NOT return outlets. The owner
+    // has now received four consecutive replies that looked like a finished campaign and
+    // queued nothing; the failure has to become visible in the reply itself rather than
+    // being something he discovers by opening an empty cockpit.
+    let pressSearchNote = ''
 
     while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 10 && remainingMs() > 12_000) {
       toolRounds++
@@ -1814,8 +1819,9 @@ ${ev.summary}`
         // invent a publication and an editor address, the precise harm the whole press
         // path is built to prevent. So the forcer below is gated on a real result, and
         // the shape checked is the one findPublications itself emits on success.
-        if (String(block.name || '') === 'findPublications' && /^\d+ publications found/.test(String(result || ''))) {
-          pressOutletsFound = true
+        if (String(block.name || '') === 'findPublications') {
+          if (/^\d+ publications found/.test(String(result || ''))) pressOutletsFound = true
+          else pressSearchNote = String(result || '').slice(0, 400)
         }
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
       }
@@ -1928,6 +1934,32 @@ ${ev.summary}`
     // ── Post-generation confabulation guard: a non-owner reply that claims a
     // completed owner action no tool performed is replaced with an honest
     // can't-do message. Owner replies pass through untouched. ──
+    // PRESS HONESTY BACKSTOP.
+    //
+    // Both forcers can fire and the turn can still end with nothing queued — the search
+    // can come back empty, or be called without a region, or the model can be handed
+    // outlets and still write prose. In every one of those cases the reply reads like a
+    // finished campaign, and the only way the owner learns otherwise is by opening the
+    // cockpit and finding it empty. That is the failure this whole thread has been: not
+    // that the work failed, but that the failure was silent.
+    //
+    // So when a press request produced no proposePressCampaign call, the reply says so in
+    // its own first line, and quotes what the search actually returned. It does not
+    // fabricate a reason and it does not delete the model's text — the brief is often
+    // still useful; it just stops being presented as a queued campaign.
+    if (forcePress && !firedTools.has('proposePressCampaign')) {
+      const why = !firedTools.has('findPublications')
+        ? 'the publication search never ran'
+        : pressSearchNote
+          ? `the publication search returned: ${pressSearchNote}`
+          : 'the publication search returned no usable outlets'
+      reply = [
+        `NO PRESS CAMPAIGNS WERE QUEUED — ${why}. Nothing below is a draft, nothing is scheduled, and no editor has been contacted. Check /dashboard/marketing/press-providers: it will be empty for this request. Everything that follows is background material only, and any publication or contact named in it came from the model's memory, not from a verified search.`,
+        '',
+        reply,
+      ].join('\n')
+    }
+
     reply = guardConfabulatedAction(reply, isOwner, firedTools, languageCode)
 
     // ── Persist this exchange to conversation history (logged-in users) ───

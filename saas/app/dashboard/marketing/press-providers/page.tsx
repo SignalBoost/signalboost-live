@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { outreachContactsCopyFor } from '@/lib/i18n/outreachReleaseCopy'
 import PressProviderConnectForm from './PressProviderConnectForm.tsx'
 import PressCompanyProfileForm from './PressCompanyProfileForm.tsx'
 import { uiText } from '@/lib/i18n/uiText'
@@ -393,6 +394,19 @@ export default function PressMediaProviderCockpit() {
   }
 
   useEffect(() => { load() }, [])
+  // THE SAME QUEUE SHAPE AS THE CONTACTS PAGE, on purpose.
+  //
+  // The owner's verdict on this screen was "it is not a friendly place to go, kind like the
+  // others" — and he was right that the others are better, because Contacts and the Video
+  // Pipeline both open with counts, filter tabs, and the work itself. This page opened with
+  // five provider-connection forms he configures once and never touches again, and buried
+  // thirty drafts at the bottom in one undifferentiated wall.
+  //
+  // The labels come from the CONTACTS copy module rather than new strings: same words, same
+  // five languages, already translated — and the consistency IS the fix. An operator should
+  // not have to learn a second vocabulary to approve a press release after approving an email.
+  const queueCopy = outreachContactsCopyFor(lang)
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'sent' | 'rejected'>('pending')
   const providers = data?.providers || []
   // WHAT NEEDS A DECISION COMES FIRST, and the settled records sink. The list arrived in
   // creation order, so two campaigns awaiting approval sat underneath twenty-eight
@@ -404,6 +418,22 @@ export default function PressMediaProviderCockpit() {
     () => [...(data?.campaigns || [])].sort((a, b) => (RANK[a.status] ?? 5) - (RANK[b.status] ?? 5)),
     [data],
   )
+  // One bucket per tab. 'submitted' and 'scheduled' are handed-to-provider states, which to
+  // the person approving is the same fact as approved: the decision is made and it left.
+  const bucketOf = (status: string) => status === 'pending_owner_review' ? 'pending'
+    : status === 'rejected' ? 'rejected'
+    : status === 'published' ? 'sent'
+    : 'approved'
+  const counts = useMemo(() => {
+    const base = { all: campaigns.length, pending: 0, approved: 0, sent: 0, rejected: 0 } as Record<string, number>
+    for (const c of campaigns) base[bucketOf(c.status)] += 1
+    return base
+  }, [campaigns])
+  const visible = useMemo(
+    () => filter === 'all' ? campaigns : campaigns.filter((c) => bucketOf(c.status) === filter),
+    [campaigns, filter],
+  )
+  const TABS: Array<'all' | 'pending' | 'approved' | 'sent' | 'rejected'> = ['pending', 'approved', 'sent', 'rejected', 'all']
   const liveNames = useMemo(
     () => providers.filter((p) => p.live).map((p) => (t.p[p.id]?.label || p.label)),
     [providers, t],
@@ -431,15 +461,28 @@ export default function PressMediaProviderCockpit() {
       <div style={panel}>{chip(t.recent, '#94a3b8')}<h2 style={{ color: '#fff', margin: '8px 0 0' }}>{campaigns.length}</h2></div>
     </section>
 
+    {campaigns.length ? <section style={{ display: 'grid', gap: 12 }}>
+      <h2 style={{ color: '#fff', margin: 0 }}>{t.recentTitle}</h2>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {TABS.map((key) => <button
+          key={key}
+          type="button"
+          onClick={() => setFilter(key)}
+          style={filter === key ? { ...button, padding: '7px 14px' } : { ...ghost, padding: '7px 14px' }}
+        >{queueCopy[key]} · {counts[key]}</button>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 12 }}>{visible.map((c) => <CampaignRow key={c.id} campaign={c} onChanged={load} t={t} />)}</div>
+      {/* An empty view is a state, not a blank. It says which view is empty rather than
+          leaving the owner to wonder whether the page failed to load. */}
+      {!visible.length ? <div style={panel}><p style={{ color: 'rgba(255,255,255,.7)', margin: 0 }}>{queueCopy.empty}</p></div> : null}
+    </section> : null}
+
+    {/* Provider connection forms are SETUP — filled once, then never again. They were the
+        first thing on the page and the approval queue was the last. Reversed. */}
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>
       {providers.map((p) => <ProviderCard key={p.id} provider={p} onRan={load} t={t} />)}
       {!loading && !providers.length ? <div style={panel}><p style={{ color: '#fff' }}>{note?.text || t.noData}</p></div> : null}
     </section>
-
-    {campaigns.length ? <section style={{ display: 'grid', gap: 12 }}>
-      <h2 style={{ color: '#fff', margin: 0 }}>{t.recentTitle}</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 12 }}>{campaigns.map((c) => <CampaignRow key={c.id} campaign={c} onChanged={load} t={t} />)}</div>
-    </section> : null}
 
     <section style={panel}><h2 style={{ color: '#fff', margin: 0 }}>{t.opNote}</h2><p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>{t.liveList}: {liveNames.join(', ') || t.none}. {t.opText}</p></section>
   </main>

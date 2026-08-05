@@ -54,6 +54,10 @@ const GROUPS: NavGroup[] = [
       { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: uiText('generatedUi.u_36d4f0c2fcf34e05'), href: '/dashboard/cosa/video-pipeline' },
       { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: uiText('generatedUi.u_ba2f8d68f462717f'), href: '/dashboard/marketing/press-print' },
       { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: uiText('generatedUi.u_8dc7472b90ff7180'), href: '/dashboard/marketing/press-outreach' },
+      // The DRAFT QUEUE sits above the cockpit deliberately. Approving drafts is the daily
+      // job; connecting providers is setup you finish once. A menu should be ordered by how
+      // often an entry is needed, not by how the features were built.
+      { icon: '📝', labelKey: 'nav.pressDrafts', fallbackLabel: uiText('generatedUi.u_pressdrafts_navlabel'), href: '/dashboard/marketing/press-drafts' },
       { icon: '📰', labelKey: 'nav.pressProviders', fallbackLabel: uiText('generatedUi.u_9d597b5a530fd867'), href: '/dashboard/marketing/press-providers' },
       { icon: '📢', labelKey: 'nav.promote', fallbackLabel: uiText('generatedUi.u_5834dab085442471'), href: '/dashboard/promote' },
       { icon: '🔗', labelKey: 'nav.socialConnections', fallbackLabel: uiText('generatedUi.u_819abac9f5ab2dd3'), href: '/dashboard/outreach/social' },

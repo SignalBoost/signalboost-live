@@ -12,6 +12,7 @@
 // The same function is the correct entry point for the Browser Agent: a third way to fill the
 // form, one governed path behind it. Never a parallel dispatcher.
 import { getPressMediaHost } from '@/press-media-host'
+import { checkPressAdmission } from '@/lib/marketing/pressCampaignAdmission'
 import type { MediaTargetType } from '@/press-media-core'
 
 const TARGETS: MediaTargetType[] = ['digital_press', 'newspaper_print', 'magazine_print', 'trade_press', 'broadcast']
@@ -57,6 +58,31 @@ export async function createPressCampaignFromAgent(input: CosPressCampaignInput)
 
   const requested = str(input.mediaTargetType) as MediaTargetType
   const mediaTargetType: MediaTargetType = TARGETS.includes(requested) ? requested : 'digital_press'
+
+  // THE ADMISSION GATE BELONGS HERE, at the one chokepoint every path shares.
+  //
+  // It was living in the cockpit route and, later, in the background worker — so a draft
+  // created through THIS function by the COS tool skipped it entirely. That is how a wikiHow
+  // stylesheet URL, a political party's press address and three newspaper letters-to-the-editor
+  // inboxes reached the owner's approval queue looking exactly like real press targets.
+  //
+  // Putting it in the two callers and not the callee is the same mistake in a different shape:
+  // the next caller inherits the hole. Every route into press drafting runs through this
+  // function, so this is the only place the rule cannot be routed around.
+  const admission = checkPressAdmission({
+    publicationName: str(input.publicationName),
+    publicationUrl: submitFormUrl,
+    editorEmail,
+    submissionFormUrl: submitFormUrl,
+    articleNotes: goal || manualCopy,
+  })
+  if (!admission.admitted) {
+    return {
+      ok: false,
+      reason: admission.refusals[0] || 'refused by the press admission rules',
+      error: admission.refusals.join(' '),
+    }
+  }
 
   try {
     const host = getPressMediaHost()

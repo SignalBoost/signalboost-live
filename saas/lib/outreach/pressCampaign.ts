@@ -461,7 +461,7 @@ export function describePressCampaignJob(job: PressCampaignJob): string {
     `Press campaign job ${job.id} — ${job.status}.`,
     `${job.drafts_created} of ${job.requested_count} drafts queued`,
     job.skipped ? `, ${job.skipped} outlets skipped` : '',
-    '. Nothing has been sent; every draft waits for approval at /dashboard/marketing/press-providers.',
+    '. Nothing has been sent; every draft waits for approval at /dashboard/marketing/press-drafts.',
   ]
   const skippedLines = (job.results || [])
     .filter(r => !r.queued)
@@ -516,6 +516,11 @@ export function parsePressCampaignRequest(input: string, language = 'en'): Press
   }
 }
 
+// THE ADDRESS COS GIVES MUST BE THE ADDRESS THE OWNER USES. Two surfaces read the same
+// press_campaigns rows: the COCKPIT (/press-providers) which is provider setup plus a queue,
+// and the DRAFT QUEUE (/press-drafts) which is only the drafts. He asked for the second and
+// it is what the navbar now points at, so every message that names a place names that one.
+// Sending someone to the page where the work is buried is the same defect as burying it.
 /** The reply the owner sees the moment the job is queued. */
 export function pressCampaignQueuedReply(args: {
   jobId: string
@@ -529,7 +534,7 @@ export function pressCampaignQueuedReply(args: {
       ? `This brief is ALREADY RUNNING — job ${args.jobId}, target ${args.requestedCount} publications${args.region ? ` in ${args.region}` : ''}. No second campaign was started.`
       : `Press campaign job QUEUED — id ${args.jobId}, target ${args.requestedCount} publications${args.region ? ` in ${args.region}` : ''}.`,
     '',
-    'The worker searches for outlets with a verified editorial contact taken from the outlet\'s own site, then writes one release per outlet. Drafts appear a few at a time over the next several minutes at /dashboard/marketing/press-providers.',
+    'The worker searches for outlets with a verified editorial contact taken from the outlet\'s own site, then writes one release per outlet. Drafts appear a few at a time over the next several minutes at /dashboard/marketing/press-drafts.',
     '',
     'NOTHING HAS BEEN SENT and no editor has been contacted. Every draft waits for your approval. Outlets without a verifiable contact are skipped and named in the job rather than filled in with a guess.',
     args.capNote ? `\n${args.capNote}` : '',

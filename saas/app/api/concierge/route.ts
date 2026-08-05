@@ -9,6 +9,12 @@ import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
 import { advanceProspectCampaigns, createProspectCampaignJob } from '@/lib/outreach/prospectCampaign'
 import {
+  advancePressCampaigns,
+  createPressCampaignJob,
+  parsePressCampaignRequest,
+  pressCampaignQueuedReply,
+} from '@/lib/outreach/pressCampaign'
+import {
   campaignBriefMiss,
   parseProspectCampaignRequest,
   prospectCampaignQueuedReply,
@@ -206,6 +212,83 @@ function boundedPrimary(req: NextRequest): Promise<{ response: Response | null; 
   })
 }
 
+async function directPressCampaign(
+  body: any,
+  input: string,
+  language: string,
+): Promise<NextResponse | null> {
+  const parsed = parsePressCampaignRequest(input, language)
+  // Not a multi-outlet press brief — an ordinary question deserves an ordinary answer,
+  // and a single-outlet pitch still fits comfortably in one turn.
+  if (!parsed) return null
+
+  // Only the verified owner may create this durable business job. Everyone else falls
+  // through to the governed support route with its existing access controls.
+  const access = await getAccess().catch(() => null)
+  if (!access?.isOwner) return null
+
+  try {
+    const started = await createPressCampaignJob({
+      goal: parsed.goal,
+      region: parsed.region,
+      language: parsed.language,
+      requestedCount: parsed.requestedCount,
+      createdBy: access.userId || null,
+    })
+
+    if (!started.ok || !started.job) {
+      return NextResponse.json({
+        reply: `The press campaign could not be queued: ${started.error || 'unknown queue error'}. Nothing was started and no editor was contacted.`,
+        source: 'cos-press-campaign-queue-error',
+        background_job: false,
+        execution_allowed: false,
+        external_action_taken: false,
+      })
+    }
+
+    const reply = pressCampaignQueuedReply({
+      jobId: started.job.id,
+      requestedCount: started.job.requested_count,
+      region: started.job.region,
+      capNote: started.capNote,
+    })
+    const conversationId = conversationIdFrom(body)
+
+    // Kick the worker straight after the response so the first drafts do not wait for
+    // the next cron tick. The cron remains the durable retry path; persisting the turn
+    // is best-effort and must never delay the acknowledgement that the job is safe.
+    after(async () => {
+      const tasks: Promise<unknown>[] = [advancePressCampaigns()]
+      if (access.userId && conversationId) {
+        tasks.push(persistTurn({
+          conversationId,
+          userId: access.userId,
+          userMessage: input,
+          assistantReply: reply,
+        }).then(() => undefined).catch(() => undefined))
+      }
+      await Promise.allSettled(tasks)
+    })
+
+    return NextResponse.json({
+      reply,
+      source: 'cos-press-campaign-queued',
+      background_job: true,
+      job_id: started.job.id,
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  } catch (error) {
+    return NextResponse.json({
+      reply: `The press campaign could not be queued: ${error instanceof Error ? error.message : 'unexpected error'}. Nothing was started and no editor was contacted.`,
+      source: 'cos-press-campaign-queue-error',
+      background_job: false,
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
+}
+
 type ResearchLifeline = {
   cancel: () => void
   results: () => Promise<VerifiedResearchResult[]>
@@ -259,6 +342,15 @@ export async function POST(req: NextRequest) {
   // end as “Sorry, I could not answer that right now.”
   const prospectCampaign = await directProspectCampaign(body, input, language)
   if (prospectCampaign) return prospectCampaign
+
+  // A MULTI-OUTLET PRESS CAMPAIGN IS THE SAME SHAPE OF WORK, and for five rounds it
+  // was attempted in the turn anyway. "Find thirty publications and prepare a campaign
+  // for each" is a live crawl plus thirty AI-written releases; the bounded limit is 260
+  // seconds. It never fitted, so the owner kept receiving a polished document, a
+  // “reply continue” message, and an empty cockpit. Dispatched here for the same reason
+  // and in the same place as sales: before anything that can time out.
+  const pressCampaign = await directPressCampaign(body, input, language)
+  if (pressCampaign) return pressCampaign
 
   const researchPlan = planResearchTask(input)
   const researchLifeline = createResearchLifeline(researchPlan)

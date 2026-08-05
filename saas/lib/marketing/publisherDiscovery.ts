@@ -133,6 +133,62 @@ function queriesFor(args: PublisherDiscoveryArgs) {
   }
 
   const base = channel.includes('trade') ? 'technology business magazine publication' : channel.includes('print') ? 'local print newspaper' : 'local newspaper publication'
+
+  // A NAMED SECTOR NARROWS THE QUERY, IT DOES NOT REPLACE IT. Each sector gets its own
+  // "<sector> publication submit editorial contact" search — a DevOps query and a
+  // cybersecurity query surface different outlets, deliberately, because the owner asked
+  // for both. The generic queries still run after, as a fallback if a sector search comes
+  // up short, never as the only attempt when a brief was this specific about what it wanted.
+  const sectors = sectorsFrom(args.brief)
+  if (sectors.length) {
+    const sectorQueries = sectors.map(word => clean(`${word} publication submit editorial contact write for us`, 140))
+    const paidSectorQueries = paid ? sectors.map(word => clean(`${word} magazine advertise media kit contact`, 140)) : []
+    return [...sectorQueries, ...paidSectorQueries, ...genericQueries(channel, base, paid)]
+  }
+
+  return genericQueries(channel, base, paid)
+}
+
+// SECTOR EXTRACTION — read what the brief actually asked for.
+//
+// A campaign brief like "IT and technology magazines. Cloud, SaaS, DevOps, SRE, MSP, and
+// cybersecurity publications. Marketing and sales publications. Trade journals." was, until
+// this, entirely discarded. Without a named country, discovery collapsed every brief to one
+// query — "technology business magazine publication submit news editor email" — and that
+// query does not distinguish a DevOps campaign from a marketing campaign from a fintech one.
+// It searches for "press" in general, and general press includes lifestyle magazines,
+// consumer complaint sites, and every SEO-farmed directory that ranks for the word.
+//
+// The brief already names the sectors. This reads them out instead of throwing them away.
+// Ordered by BREADTH, not by where it sits in a typical brief — the cap below keeps only
+// the first few matches, so a brief naming DevOps, SRE, MSP, cybersecurity, cloud and SaaS
+// in that order must not let three near-synonyms (DevOps/SRE/MSP all name adjacent ops
+// roles) crowd out cybersecurity and SaaS entirely. One query per DISTINCT sector family.
+const SECTORS: Array<{ match: RegExp; queryWords: string[] }> = [
+  { match: /cybersecurity|infosec|information security/i, queryWords: ['cybersecurity'] },
+  { match: /\bSaaS\b|software.as.a.service/i, queryWords: ['SaaS'] },
+  { match: /\bcloud\b/i, queryWords: ['cloud computing'] },
+  { match: /\bdevops\b/i, queryWords: ['DevOps'] },
+  { match: /marketing (?:and|&) sales|sales publication/i, queryWords: ['marketing and sales'] },
+  { match: /\bMSP\b|managed service provider/i, queryWords: ['MSP'] },
+  { match: /\bSRE\b|site reliability/i, queryWords: ['SRE'] },
+  { match: /trade journal/i, queryWords: ['trade journal'] },
+  { match: /industry newsletter/i, queryWords: ['industry newsletter'] },
+  { match: /IT (?:and|&) technology|tech(?:nology)? magazine/i, queryWords: ['IT and technology'] },
+]
+
+/** Sector phrases named in the brief, in the order they were named — capped so a long brief
+ *  produces a bounded number of searches rather than one per matched word. */
+function sectorsFrom(brief: string): string[] {
+  const text = String(brief || '')
+  const found: string[] = []
+  for (const sector of SECTORS) {
+    if (sector.match.test(text)) found.push(...sector.queryWords)
+  }
+  return [...new Set(found)].slice(0, 5)
+}
+
+function genericQueries(channel: string, base: string, paid: boolean): string[] {
   const freeQueries = [`${base} submit news editor email`, `${base} news tips editor email`, `${base} submit story contact editor`, `${base} letters to the editor email`]
   const paidQueries = [`${base} advertise contact email`, `${base} media kit advertising contact`]
   return paid ? [...freeQueries, ...paidQueries] : freeQueries

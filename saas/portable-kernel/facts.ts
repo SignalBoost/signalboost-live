@@ -11,7 +11,7 @@ export const FACTUAL_DISCIPLINE = [
   'FACTUAL DISCIPLINE — these rules override every other instruction:',
   '1. Never invent a product name, brand name, company name, person, job title, quote, statistic, price, customer count, award, partnership, or date. If a fact was not supplied, you may not state it.',
   '2. When a fact is required by the format but was not supplied, write a visible placeholder in square brackets — [PRODUCT NAME], [SPOKESPERSON NAME], [DATE], [METRIC] — and continue. A visible gap is correct; an invented detail is a failure.',
-  '3. Use only the approved quote, verbatim, if one was supplied. If none was supplied, do not write a quote at all — not even an attributed placeholder sentence.',
+  '3. Use only the approved quote, verbatim, if one was supplied. If none was supplied, OMIT the quote paragraph entirely — no quotation marks, no [SPOKESPERSON QUOTE] placeholder, no attributed sentence. Rule 2\'s placeholder mechanism does not apply to quotes: an empty quote is not a missing fact, it is a fact (there is no quote).',
   '4. Do not state results, performance, or comparative claims ("the leading", "the first", "reduces costs by") unless that exact claim appears in the permitted claims.',
   '5. Prefer omitting a sentence over guessing its content. A shorter, entirely true text is the goal.',
 ].join('\n')
@@ -25,9 +25,23 @@ export function renderCompanyFacts(facts?: CompanyFacts | null): string {
   push('Legal name', facts.legalName)
   push('Brand name', facts.brandName)
   push('Website', facts.website)
-  if (facts.products?.length) lines.push(`- Product names you may use (and ONLY these): ${facts.products.join(', ')}`)
+  // One product per line. A products entry may carry a description after an em-dash
+  // ("Self-Healing Supervisor Software — monitors operations, snapshots state before
+  // acting, gates risky operations behind sign-off"), and that description is then the
+  // ONLY thing the model may say the product does. Joining with commas destroyed exactly
+  // this structure, which left the model knowing the names and inventing the capabilities
+  // — a release once told editors the Supervisor "corrects AI-generated content", a
+  // product that does not exist.
+  if (facts.products?.length) {
+    lines.push('- Product names you may use (and ONLY these). Where a line carries a description after the dash, that description is the complete statement of what the product does — state nothing beyond it:')
+    for (const product of facts.products) lines.push(`    · ${product}`)
+  }
   push('Boilerplate (use verbatim as the About paragraph)', facts.boilerplate)
+  push('Dateline city (press releases open "CITY, DATE —" with this city)', facts.datelineCity)
   if (facts.spokespersonName) push('Spokesperson', `${facts.spokespersonName}${facts.spokespersonTitle ? `, ${facts.spokespersonTitle}` : ''}`)
+  if (facts.mediaContactName || facts.mediaContactEmail) {
+    push('Media contact (for the Media Contact block)', [facts.mediaContactName, facts.mediaContactTitle, facts.mediaContactEmail, facts.mediaContactPhone].filter(Boolean).join(', '))
+  }
   push('Approved quote (use verbatim or not at all)', facts.approvedQuote)
   if (facts.permittedClaims?.length) lines.push(`- Permitted claims (only these may be stated): ${facts.permittedClaims.join(' | ')}`)
   if (facts.forbiddenClaims?.length) lines.push(`- Forbidden claims (never state): ${facts.forbiddenClaims.join(' | ')}`)

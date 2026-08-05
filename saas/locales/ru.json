@@ -3543,7 +3543,8 @@
     "u_ads_connectok": "Сеть подключена",
     "u_ads_expires": "истекает",
     "u_ads_lasterror": "Последнее обновление не удалось",
-    "u_ads_reconnect": "Переподключить"
+    "u_ads_reconnect": "Переподключить",
+    "u_pressdrafts_navlabel": "Черновики для прессы"
   },
   "lab": {
     "somethingWrong": "Что-то пошло не так",

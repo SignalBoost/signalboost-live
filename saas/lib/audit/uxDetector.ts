@@ -14,6 +14,34 @@
 // detect blank / un-hydrated screens (that needs a headless browser — separate
 // infra). Dead-click detection is deliberately conservative (only unambiguous
 // no-op handlers) to avoid false positives.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// AUG 5 2026 — IT WAS SCANNING CODE THAT IS NOT DEPLOYED.
+//
+// A monorepo can hold more than one app/ tree. This one holds two: a live
+// saas/app + saas/components (348 UI files, the tree Vercel builds) and an
+// orphaned root-level app/ + components/ (36 files, last touched in July and
+// deployed nowhere). UI_DIR matched `(^|/)(app|components)/`, which is true of
+// BOTH, so every scan reported the dead tree alongside the live one — the same
+// page appearing twice under two paths, half the findings about code no user can
+// reach. An operator reading that report cannot tell which half matters, and the
+// rational response to a report that is half noise is to stop reading it.
+//
+// So the detector now RESOLVES ONE APP ROOT and scans only that, using signals in
+// this order:
+//   1. vercel.json — the deploy root. Vercel reads it from the project's Root
+//      Directory, so the directory containing it is by definition what ships.
+//   2. package.json — a real workspace rather than a stray folder.
+//   3. UI file count — the tiebreak when a repo has neither marker.
+//
+// The skipped root is REPORTED, not silently dropped: skippedRoots comes back on
+// the result so the run can say "36 files under app/ were not scanned because
+// saas/ is the deployed root". Silently narrowing a scan is how a scanner starts
+// lying by omission; this narrows it and says so.
+//
+// This is also the right behaviour for a BUYER's repo, which is the point of the
+// audit: their monorepo may hold an app, a marketing site and an abandoned
+// prototype, and only one of them is in production.
 
 import { readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
 import type { AuditFinding, Severity } from '@/lib/audit/runner'
@@ -59,6 +87,63 @@ export function i18nRawStringPhrases(content: string): string[] {
     if (m.index === rx.lastIndex) rx.lastIndex++ // guard against zero-width
   }
   return [...out]
+}
+
+// ---------------------------------------------------------------------------
+// APP ROOT RESOLUTION
+// ---------------------------------------------------------------------------
+
+/** The directory prefix a UI path sits under: 'saas/app/x.tsx' → 'saas/', 'app/x.tsx' → ''. */
+function rootOf(path: string): string {
+  const m = path.match(/^(.*?)(?:app|components)\//)
+  return m ? m[1] : ''
+}
+
+export interface AppRootChoice {
+  /** The prefix that will be scanned ('' means the repository root). */
+  root: string
+  /** Prefixes deliberately NOT scanned, with the file count each would have contributed. */
+  skipped: Array<{ root: string; files: number }>
+  /** Which signal decided it, for the run log. */
+  reason: 'vercel.json' | 'package.json' | 'file-count' | 'single-root'
+}
+
+/**
+ * Choose the ONE app root to scan.
+ *
+ * `allFiles` is the whole repo tree, so the markers (vercel.json / package.json)
+ * are looked up in it directly — no extra network reads.
+ */
+export function resolveAppRoot(allFiles: string[]): AppRootChoice {
+  const counts = new Map<string, number>()
+  for (const f of allFiles) {
+    if (!UI_FILE.test(f) || !UI_DIR.test(f)) continue
+    const r = rootOf(f)
+    counts.set(r, (counts.get(r) || 0) + 1)
+  }
+  const roots = [...counts.keys()]
+  if (roots.length <= 1) {
+    return { root: roots[0] ?? '', skipped: [], reason: 'single-root' }
+  }
+
+  const has = (root: string, name: string) => allFiles.includes(`${root}${name}`)
+  let chosen = ''
+  let reason: AppRootChoice['reason'] = 'file-count'
+
+  const deployRoots = roots.filter(r => has(r, 'vercel.json'))
+  const pkgRoots = roots.filter(r => has(r, 'package.json'))
+  const byCount = (list: string[]) => [...list].sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0))[0]
+
+  if (deployRoots.length) { chosen = byCount(deployRoots); reason = 'vercel.json' }
+  else if (pkgRoots.length) { chosen = byCount(pkgRoots); reason = 'package.json' }
+  else { chosen = byCount(roots); reason = 'file-count' }
+
+  const skipped = roots
+    .filter(r => r !== chosen)
+    .map(r => ({ root: r || '<repo root>', files: counts.get(r) || 0 }))
+    .sort((a, b) => b.files - a.files)
+
+  return { root: chosen, skipped, reason }
 }
 
 interface Rule {
@@ -192,10 +277,18 @@ function scanContent(path: string, content: string): AuditFinding[] {
 export async function runUxDetector(
   target: RepoTarget,
   allFiles: string[],
-  opts?: { maxFiles?: number },
+  opts?: { maxFiles?: number; onRootChoice?: (choice: AppRootChoice) => void },
 ): Promise<AuditFinding[]> {
   const cap = Math.max(1, opts?.maxFiles ?? MAX_UX_FILES)
-  const uiFiles = allFiles.filter(f => UI_FILE.test(f) && UI_DIR.test(f)).slice(0, cap)
+
+  // ONE app root, chosen from the repo's own deploy markers. Without this the scan
+  // reports orphaned trees as though they were live — see the header note.
+  const choice = resolveAppRoot(allFiles)
+  if (opts?.onRootChoice) opts.onRootChoice(choice)
+
+  const uiFiles = allFiles
+    .filter(f => UI_FILE.test(f) && UI_DIR.test(f) && rootOf(f) === choice.root)
+    .slice(0, cap)
 
   const perFile = await mapPool(uiFiles, CONCURRENCY, async (path) => {
     const file = await readRepoFileFrom(target.repo, target.branch, path)

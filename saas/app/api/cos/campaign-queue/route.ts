@@ -5,6 +5,7 @@ import { buildDefaultMarketingRecommendation } from '@/lib/cos/recommendation/en
 import type { CosChannel, CosDepartment, CosPriority, CosRecommendation } from '@/lib/cos/recommendation/types'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
 import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-core'
+import { assertApprovalKindIn, type ApprovalKind } from '@/portable-kernel'
 import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 import { startSiteVideo } from '@/lib/operator/video'
 import { computeCampaignContentHash, withApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
@@ -187,7 +188,6 @@ function secondaryChannelsFromDirective(text: string) {
   if (lower.includes('blog') || lower.includes('seo')) channels.push('blog')
   return channels.length ? Array.from(new Set(channels)) : ['youtube', 'tiktok', 'linkedin']
 }
-
 function requestFromAutonomousDirective(input: unknown) {
   if (typeof input !== 'string') return null
   const directive = input.replace(/\s+/g, ' ').trim().slice(0, 1_200)
@@ -369,7 +369,6 @@ async function mirrorCosaCampaignToOutreachQueue(admin: any, campaign: any, outr
   if (error) return { mirrored: false, error: error.message }
   return { mirrored: true, outreach_id: data?.id || null, drafted_by: draft.drafted_by, subject: draft.subject }
 }
-
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -416,6 +415,24 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, campaign: cleanDestination(data), render, outreachPipeline })
 }
 
+// THE KINDS THIS ROUTE OWNS. It is not the whole of cos_campaign_queue: press records merely
+// share the table, and approving one here would hand it to the social/video publisher while
+// skipping every check the press cockpit performs — the release check, the paid-claim check and
+// the publisher-target check. One approval surface acting on another's records is one pipeline
+// wearing two names.
+const OWNED_APPROVAL_KINDS: ApprovalKind[] = ['video_campaign', 'social_publishing']
+const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press']
+
+// Legacy rows carry no kind. The route may vouch for one ONLY on evidence that it is not a
+// press record — the press channel markers and the press intake's own source tag. Absent
+// evidence is not consent: a row that looks like neither is refused rather than assumed.
+function routeVouchesForLegacyRow(row: any): boolean {
+  const metadata = (row?.metadata as any) || {}
+  if (String(metadata.source || '') === 'press_print_staff_led_campaign') return false
+  if (PRESS_PRINT_CHANNELS.indexOf(String(metadata.outreach_channel || metadata.media_channel || '')) !== -1) return false
+  return true
+}
+
 export async function PATCH(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -429,6 +446,9 @@ export async function PATCH(req: NextRequest) {
   if (status === 'approved') {
     const { data: existing } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', idValue).single()
     approvalRow = existing
+    // PIPELINE GUARD, before any of this route's own checks and before anything is written.
+    const kindCheck = assertApprovalKindIn(OWNED_APPROVAL_KINDS, (existing?.metadata as any)?.approval_kind, routeVouchesForLegacyRow(existing))
+    if (!kindCheck.ok) return NextResponse.json({ ok: false, error: kindCheck.error, home: kindCheck.home }, { status: 409 })
     const isVideoChannel = ['youtube', 'short_video'].includes(String(existing?.channel || ''))
     const vv: any = (existing?.metadata as any)?.video || {}
     if (isVideoChannel && (vv.branded !== true || !vv.voicedUrl)) return NextResponse.json({ ok: false, error: 'Approval blocked: preview required. The final branded video (SignalBoostAi + www.saas.signalboostapp.com burned in) is not ready yet — it must be previewable on the dashboard before this campaign can be approved.' }, { status: 409 })

@@ -24,6 +24,16 @@ export interface CompanyFacts {
   approvedQuote?: string
   permittedClaims?: string[]
   forbiddenClaims?: string[]
+  // Dateline city for press releases ("AUSTIN, TX —"). The DATE half of a dateline is never
+  // stored: the host supplies the generation date at call time, because a stored date is a
+  // stale date the first time it is read.
+  datelineCity?: string
+  // The media-contact block an editor replies to. Distinct from the spokesperson: the
+  // spokesperson is quoted IN the story, the media contact ANSWERS QUESTIONS about it.
+  mediaContactName?: string
+  mediaContactTitle?: string
+  mediaContactEmail?: string
+  mediaContactPhone?: string
 }
 
 // WHO THE AI WORKS FOR. A portable never assumes an employer — it asks the host. On the seller's

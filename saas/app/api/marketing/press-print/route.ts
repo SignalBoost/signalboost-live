@@ -34,6 +34,7 @@ import { requireAdmin } from '@/lib/outreach/security'
 import { sendPressPrintPreviewEmail } from '@/lib/marketing/pressPrintEmail'
 import { checkPressAdmission } from '@/lib/marketing/pressCampaignAdmission'
 import { createAiPort } from '@/press-media-host'
+import { mintApprovalIdentity } from '@/portable-kernel'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,6 +137,10 @@ function buildPressQueueRow(args: { f: PressFields; brief: string; release: Rele
   const { f, brief, release, now } = args
   const recommendationId = id('rec_press_print')
   const submissionTarget = f.editorEmail || f.submissionFormUrl
+  // APPROVAL IDENTITY, minted once and carried for the record's life: which pipeline it belongs
+  // to, a reference the owner can quote, and the date it entered the queue. The kind is what the
+  // decision route checks before it will act, so a record without one cannot be approved here.
+  const approval = mintApprovalIdentity('press_print', now)
   return {
     recommendation_id: recommendationId,
     department: 'marketing',
@@ -166,6 +171,11 @@ function buildPressQueueRow(args: { f: PressFields; brief: string; release: Rele
     approval_required: true,
     metadata: {
       source: 'press_print_staff_led_campaign',
+      approval_kind: approval.kind,
+      approval_ref: approval.ref,
+      approval_requested_at: approval.requestedAt,
+      approval_decided_at: null,
+      approval_decision: null,
       // Staff-led, never paid. A paid mode is only ever authorized by a recorded person, and
       // no route may write one on a person's behalf.
       automation_mode: 'manual_staff_led',
@@ -191,97 +201,4 @@ function buildPressQueueRow(args: { f: PressFields; brief: string; release: Rele
     },
     created_at: now, updated_at: now,
   }
-}
-export async function GET() {
-  const ctx = await requireAdmin()
-  if (ctx instanceof NextResponse) return ctx
-  const { data, error } = await ctx.admin.from('cos_campaign_queue').select('id,title,objective,status,metadata,created_at').order('created_at', { ascending: false }).limit(100)
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  const campaigns = (data || []).filter((row: any) => isPressPrintChannel(channelFromMetadata(row.metadata)))
-  return NextResponse.json({ ok: true, campaigns })
-}
-
-// ── Write a release onto an existing record, without re-keying the campaign ───
-async function handleGenerateRelease(ctx: any, campaignId: string) {
-  const { data: existing, error: readError } = await ctx.admin.from('cos_campaign_queue').select('id,title,objective,metadata').eq('id', campaignId).single()
-  if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 })
-  const meta = (existing?.metadata as any) || {}
-  const channel = channelFromMetadata(meta)
-  if (!isPressPrintChannel(channel)) return NextResponse.json({ ok: false, error: 'This campaign is not a Press & Print record.' }, { status: 400 })
-
-  const f: PressFields = {
-    channel,
-    publicationName: str(meta.publisher_name || meta.publication_name),
-    publicationUrl: str(meta.publisher_discovery_source_url),
-    editorEmail: str(meta.publisher_email),
-    submissionFormUrl: str(meta.publisher_submission_form_url),
-    headline: str(meta.headline || existing?.title),
-    articleNotes: str(meta.article_notes),
-    ctaUrl: str(meta.cta_url) || 'https://saas.signalboostapp.com',
-    audience: str(meta.audience) || DEFAULT_AUDIENCE,
-    language: 'en',
-  }
-  // ADMISSION AGAIN, ON THE STORED RECORD. Records created before intake control exists — the
-  // letter-writing guide, the blog post, the ones whose notes are a pasted audit report — must
-  // not be able to acquire a release now and become approvable.
-  const admission = checkPressAdmission({
-    publicationName: f.publicationName, publicationUrl: f.publicationUrl,
-    editorEmail: f.editorEmail, submissionFormUrl: f.submissionFormUrl,
-    articleNotes: f.articleNotes || str(existing?.objective),
-  })
-  if (!admission.admitted) return NextResponse.json({ ok: false, error: admission.summary, refusals: admission.refusals, codes: admission.codes }, { status: 400 })
-
-  const release = await generateRelease(f)
-  const now = new Date().toISOString()
-  const metadata = { ...meta, press_release_body: release.body || null, press_release_status: release.status, press_release_generated_at: release.body ? now : null }
-  const { error } = await ctx.admin.from('cos_campaign_queue').update({ metadata, updated_at: now }).eq('id', campaignId)
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  if (!release.body) return NextResponse.json({ ok: false, error: `No release was written. ${release.status}`, releaseStatus: release.status }, { status: 502 })
-  return NextResponse.json({ ok: true, campaignId, releaseStatus: release.status, release: release.body })
-}
-
-export async function POST(req: NextRequest) {
-  const ctx = await requireAdmin()
-  if (ctx instanceof NextResponse) return ctx
-  const body = await req.json().catch(() => ({}))
-
-  if (str(body?.action) === 'generate_release') {
-    const campaignId = str(body?.id)
-    if (!campaignId) return NextResponse.json({ ok: false, error: 'A campaign id is required.' }, { status: 400 })
-    return handleGenerateRelease(ctx, campaignId)
-  }
-
-  const request = body?.request || {}
-  const outreachChannel = str(request.outreach_channel || request.media_channel)
-  if (!isPressPrintChannel(outreachChannel)) return NextResponse.json({ ok: false, error: 'Unsupported press or print media channel.' }, { status: 400 })
-  const f = readFields(request, outreachChannel)
-  if (!f.headline) return NextResponse.json({ ok: false, error: 'A headline / campaign title is required — it becomes the subject line an editor sees.', refusals: ['A headline / campaign title is required — it becomes the subject line an editor sees.'] }, { status: 400 })
-
-  // ADMISSION CONTROL, on named fields. Refusal returns every reason so the operator can correct
-  // the input and retry: a gate, not a wall.
-  const admission = checkPressAdmission({
-    publicationName: f.publicationName, publicationUrl: f.publicationUrl,
-    editorEmail: f.editorEmail, submissionFormUrl: f.submissionFormUrl,
-    articleNotes: f.articleNotes,
-  })
-  if (!admission.admitted) return NextResponse.json({ ok: false, error: admission.summary, refusals: admission.refusals, codes: admission.codes }, { status: 400 })
-
-  const brief = buildBrief(f)
-  const release = await generateRelease(f)
-  const now = new Date().toISOString()
-  const row = buildPressQueueRow({ f, brief, release, now })
-  const { data, error } = await ctx.admin.from('cos_campaign_queue').insert(row).select('id,title,objective,status,metadata,created_at').single()
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-
-  // The owner preview shows the RELEASE when one exists. Previewing the brief was how a brief
-  // came to be approved as though it were copy.
-  const previewEmail = await sendPressPrintPreviewEmail({
-    campaignId: data.id, title: data.title || f.headline,
-    objective: release.body || brief, channel: outreachChannel,
-    contact: [f.publicationName, f.editorEmail || f.submissionFormUrl].filter(Boolean).join(' — '),
-  })
-  if (previewEmail.ok) await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...((data.metadata as any) || {}), owner_preview_email_sent_at: new Date().toISOString(), owner_preview_email_status: 'sent' } }).eq('id', data.id)
-  else if (previewEmail.skipped || previewEmail.error) await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...((data.metadata as any) || {}), owner_preview_email_status: previewEmail.reason || previewEmail.error || 'not_sent' } }).eq('id', data.id)
-
-  return NextResponse.json({ ok: true, campaign: data, previewEmail, releaseStatus: release.status, releaseGenerated: Boolean(release.body) })
 }

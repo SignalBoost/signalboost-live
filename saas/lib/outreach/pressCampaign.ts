@@ -79,6 +79,10 @@ export type PressCampaignJob = {
   audience: string | null
   cta_url: string | null
   requested_count: number
+  // The owner's ORIGINAL words, kept for SEARCHING. `goal` is the announcement a release is
+  // written around; this is the brief an outlet search is run against. They are different
+  // jobs and they need different text — see createPressCampaignJob.
+  search_brief: string | null
   candidates: PressCandidate[]
   results: PressJobResult[]
   processed: number
@@ -200,6 +204,18 @@ export async function createPressCampaignJob(input: {
       created_by: input.createdBy || null,
       status: 'queued',
       goal: announcement,
+      // WHY BOTH ARE STORED, and it cost two empty jobs to learn.
+      //
+      // announcementFrom() correctly reduced "Research and identify 30 real publications
+      // including online newspapers, IT and technology magazines, cloud, SaaS, DevOps, SRE,
+      // MSP and cybersecurity publications… promote 1. Self-Healing Supervisor 2. …" down to
+      // "Announce Self-Healing Supervisor and SignalBoost AI Marketing and Sales Software to
+      // the press." That is the right ANNOUNCEMENT — and a terrible SEARCH QUERY. Every word
+      // that told the finder which trade press to look for was in the part that got stripped,
+      // so discovery went looking for "press" in general and came back with letters-to-the-
+      // editor guides, which the admission gate then correctly refused. Two jobs in a row
+      // queued nothing while every layer behaved exactly as designed.
+      search_brief: goal,
       region: input.region ? clean(input.region, 200) : null,
       channel: clean(input.channel, 60) || 'digital_press',
       language,
@@ -280,7 +296,9 @@ async function runDiscovery(
 ): Promise<{ ok: boolean; candidates: PressCandidate[]; examined: number; error?: string }> {
   const remaining = Math.max(1, job.requested_count - job.drafts_created)
   const found = await discoverPublishers({
-    brief: job.goal,
+    // The owner's own words, which name the sectors. Falls back to the announcement only for
+    // jobs created before this column existed.
+    brief: job.search_brief || job.goal,
     channel: job.channel,
     region: job.region,
     // discoverPublishers caps itself at 20; ask only for what is still owed.

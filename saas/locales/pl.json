@@ -3543,7 +3543,8 @@
     "u_ads_connectok": "Sieć połączona",
     "u_ads_expires": "wygasa",
     "u_ads_lasterror": "Ostatnie odnowienie nie powiodło się",
-    "u_ads_reconnect": "Połącz ponownie"
+    "u_ads_reconnect": "Połącz ponownie",
+    "u_pressdrafts_navlabel": "Szkice prasowe"
   },
   "lab": {
     "somethingWrong": "Coś poszło nie tak",

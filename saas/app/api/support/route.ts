@@ -473,7 +473,7 @@ const TOOL_PROPOSE_PRESS_CAMPAIGN: ChatTool = {
   type: 'function',
   function: {
     name: 'proposePressCampaign',
-    description: 'Prepare a press campaign and place it in the owner approval queue at /dashboard/marketing/press-providers. Fill every field you can from what the owner told you. NEVER invent an editor email, publication, product name, quote, or statistic — if a real verified contact is not known, say so instead of calling this tool. This never sends anything: it creates a draft the owner must approve.',
+    description: 'Prepare a press campaign and place it in the owner approval queue at /dashboard/marketing/press-drafts. Fill every field you can from what the owner told you. NEVER invent an editor email, publication, product name, quote, or statistic — if a real verified contact is not known, say so instead of calling this tool. This never sends anything: it creates a draft the owner must approve.',
     parameters: {
       type: 'object',
       properties: {
@@ -1257,7 +1257,7 @@ if (name === 'proposePressCampaign') {
     const result = await createPressCampaignFromAgent(args)
     if (!result.ok) return `Press campaign NOT created: ${result.error || result.reason || 'unknown error'}. Nothing was queued and nothing was sent.`
     const gaps = result.placeholders?.length ? ` Unfilled facts the draft refused to invent: ${result.placeholders.join(' ')}.` : ''
-    return `Press campaign draft queued for owner approval (id ${result.campaignId}, provider ${result.provider}, status ${result.status}). Nothing has been sent — approve it at /dashboard/marketing/press-providers.${gaps}`
+    return `Press campaign draft queued for owner approval (id ${result.campaignId}, provider ${result.provider}, status ${result.status}). Nothing has been sent — approve it at /dashboard/marketing/press-drafts.${gaps}`
   }
 if (name === 'updateGrowthPlanStatus') {
     let planId = ''
@@ -1307,7 +1307,7 @@ if (name === 'cancelPressCampaign') {
     if (!jobId) return 'A job id is required. Call getPressCampaignStatus and confirm with the owner which job to stop.'
     const result = await cancelPressCampaignJob(jobId)
     if (!result.ok) return `The press campaign was NOT cancelled: ${result.error || 'unknown error'}.`
-    return `Press campaign job ${jobId} cancelled — the worker stops on its next tick. Drafts already queued remain in the cockpit at /dashboard/marketing/press-providers for you to approve or reject; nothing was deleted and nothing was sent.`
+    return `Press campaign job ${jobId} cancelled — the worker stops on its next tick. Drafts already queued remain in the cockpit at /dashboard/marketing/press-drafts for you to approve or reject; nothing was deleted and nothing was sent.`
   }
 if (name === 'getCompanyFacts') {
     const result = await readCompanyFacts()
@@ -1842,7 +1842,7 @@ ${ev.summary}`
     // PRESS vs SALES. A press request and a sales request use the SAME words — "run an
     // outreach campaign", "find 20" — but they belong to completely different pipelines:
     // press goes to proposePressCampaign → press_campaigns → the cockpit at
-    // /dashboard/marketing/press-providers, sales goes to the prospect worker →
+    // /dashboard/marketing/press-drafts, sales goes to the prospect worker →
     // outreach_queue → Contacts. The prospect forcer below sets a HARD tool_choice, so
     // without this check a press brief was forced into the sales tool and the press path
     // became unreachable — which is exactly what happened: publications were searched for
@@ -1880,7 +1880,7 @@ ${ev.summary}`
     const forcePress = isOwner && !forceAction && isPressRequest && PRESS_ACTION.test(latestUserMessage)
 
     if (isPressRequest && isOwner) {
-      systemContent += `\n\nOWNER PRESS REQUEST: this is a PRESS/MEDIA request, not a sales prospecting request. Do NOT call startProspectCampaign or createOutreachDraft — those target companies and would queue publications into the sales pipeline. Use findPublications first to get real outlets with verified editorial contacts for the region the owner named, then call proposePressCampaign ONCE PER publication you intend to pitch, using the contact findPublications returned. NEVER invent an editor address, a publication, a product name, a quote or a statistic; if no verified contact was found for an outlet, skip it and say so. Each proposePressCampaign call creates a DRAFT for owner approval at /dashboard/marketing/press-providers — nothing is sent. Report which publications you queued and which you skipped and why. Do NOT paginate this and do NOT ask the owner to say \"continue\" — one request authorizes the whole job. A reply that describes publications in prose and contains NO campaign id from proposePressCampaign is a failure — the owner asked for queued drafts, not a document.`
+      systemContent += `\n\nOWNER PRESS REQUEST: this is a PRESS/MEDIA request, not a sales prospecting request. Do NOT call startProspectCampaign or createOutreachDraft — those target companies and would queue publications into the sales pipeline. Use findPublications first to get real outlets with verified editorial contacts for the region the owner named, then call proposePressCampaign ONCE PER publication you intend to pitch, using the contact findPublications returned. NEVER invent an editor address, a publication, a product name, a quote or a statistic; if no verified contact was found for an outlet, skip it and say so. Each proposePressCampaign call creates a DRAFT for owner approval at /dashboard/marketing/press-drafts — nothing is sent. Report which publications you queued and which you skipped and why. Do NOT paginate this and do NOT ask the owner to say \"continue\" — one request authorizes the whole job. A reply that describes publications in prose and contains NO campaign id from proposePressCampaign is a failure — the owner asked for queued drafts, not a document.`
     }
 
     if (forceProspect) {
@@ -2062,7 +2062,7 @@ ${ev.summary}`
           ? `the publication search returned: ${pressSearchNote}`
           : 'the publication search returned no usable outlets'
       reply = [
-        `NO PRESS CAMPAIGNS WERE QUEUED — ${why}. Nothing below is a draft, nothing is scheduled, and no editor has been contacted. Check /dashboard/marketing/press-providers: it will be empty for this request. Everything that follows is background material only, and any publication or contact named in it came from the model's memory, not from a verified search.`,
+        `NO PRESS CAMPAIGNS WERE QUEUED — ${why}. Nothing below is a draft, nothing is scheduled, and no editor has been contacted. Check /dashboard/marketing/press-drafts: it will be empty for this request. Everything that follows is background material only, and any publication or contact named in it came from the model's memory, not from a verified search.`,
         '',
         reply,
       ].join('\n')

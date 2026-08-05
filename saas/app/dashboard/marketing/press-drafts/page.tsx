@@ -131,7 +131,11 @@ function DraftCard({ campaign, onChanged, labels }: { campaign: Campaign; onChan
 
       {open ? (
         <div style={{ display: 'grid', gap: 8 }}>
-          <textarea value={copy} onChange={(e) => setCopy(e.target.value)} rows={14} className="sb-input" style={{ resize: 'vertical', fontSize: 13, lineHeight: 1.55 }} />
+          {/* The release reads like a document, not a form field crammed into a card: full
+              width, generous line height, and tall enough that an owner can judge the whole
+              piece without scrolling a letterbox. This mirrors the email outreach queue,
+              which is the surface the owner already trusts. */}
+          <textarea value={copy} onChange={(e) => setCopy(e.target.value)} rows={22} className="sb-input" style={{ resize: 'vertical', fontSize: 14, lineHeight: 1.65, width: '100%', maxWidth: 'none', padding: '16px 18px' }} />
           <div className="sb-cta-row">
             <button type="button" className="sb-button-secondary" disabled={busy || !copy.trim()} onClick={() => void act('save_copy')}>{busy ? labels.working : labels.saveCopy}</button>
           </div>

@@ -105,7 +105,7 @@ export async function createPressCampaignJob(input: {
   ctaUrl?: string | null
   requestedCount?: number
   createdBy?: string | null
-}): Promise<{ ok: boolean; job?: PressCampaignJob; error?: string; capNote?: string }> {
+}): Promise<{ ok: boolean; job?: PressCampaignJob; error?: string; capNote?: string; duplicateOf?: boolean }> {
   const db = admin()
   if (!db) return { ok: false, error: 'Supabase service role is not configured.' }
 
@@ -121,6 +121,35 @@ export async function createPressCampaignJob(input: {
     : undefined
 
   const language = LANGS.includes(String(input.language)) ? String(input.language) : 'en'
+
+  // ONE LIVE JOB PER BRIEF.
+  //
+  // The owner re-sent the same 30-publication request while the first job was still
+  // working and got a second job id. Both would have searched the same outlets and
+  // drafted the same releases, so the cockpit would fill with pairs — and the only way
+  // to tell an accidental duplicate from a deliberate second push is to ask, which is
+  // exactly what he should not have to do. A repeat of a brief that is already running
+  // returns THE RUNNING JOB rather than starting a rival to it.
+  //
+  // Deliberate re-runs are still possible: finish or cancel the first, and the same
+  // brief starts fresh. Nothing here blocks a genuinely different campaign — the match
+  // is on the brief text, not on "a press job exists".
+  try {
+    const { data: live } = await db
+      .from(TABLE)
+      .select('*')
+      .in('status', ['queued', 'discovering', 'running'])
+      .order('created_at', { ascending: true })
+    const duplicate = (live || []).find((row: any) => clean(row?.goal, 2_000) === goal)
+    if (duplicate) {
+      return {
+        ok: true,
+        job: duplicate as PressCampaignJob,
+        duplicateOf: true,
+        capNote: `This brief is already running as job ${duplicate.id} (${duplicate.drafts_created || 0} of ${duplicate.requested_count} drafts queued so far). Reusing it rather than starting a second campaign against the same outlets.`,
+      }
+    }
+  } catch { /* the guard is best-effort; a read failure must never block a real job */ }
 
   const { data, error } = await db
     .from(TABLE)
@@ -425,9 +454,12 @@ export function pressCampaignQueuedReply(args: {
   requestedCount: number
   region: string | null
   capNote?: string
+  duplicateOf?: boolean
 }): string {
   return [
-    `Press campaign job QUEUED — id ${args.jobId}, target ${args.requestedCount} publications${args.region ? ` in ${args.region}` : ''}.`,
+    args.duplicateOf
+      ? `This brief is ALREADY RUNNING — job ${args.jobId}, target ${args.requestedCount} publications${args.region ? ` in ${args.region}` : ''}. No second campaign was started.`
+      : `Press campaign job QUEUED — id ${args.jobId}, target ${args.requestedCount} publications${args.region ? ` in ${args.region}` : ''}.`,
     '',
     'The worker searches for outlets with a verified editorial contact taken from the outlet\'s own site, then writes one release per outlet. Drafts appear a few at a time over the next several minutes at /dashboard/marketing/press-providers.',
     '',

@@ -61,7 +61,7 @@ export interface PressAdmissionResult {
   /** One entry per rule that refused, in the operator's words. Empty when admitted. */
   refusals: string[]
   /** Stable codes for logs, SIEM ingestion and support triage. */
-  codes: Array
+  codes: Array<
     | 'PRESS_TARGET_NOT_A_PUBLICATION'
     | 'PRESS_TARGET_IS_A_PAGE_TITLE'
     | 'PRESS_NO_SUBMISSION_TARGET'

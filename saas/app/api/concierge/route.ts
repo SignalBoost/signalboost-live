@@ -251,6 +251,7 @@ async function directPressCampaign(
       requestedCount: started.job.requested_count,
       region: started.job.region,
       capNote: started.capNote,
+      duplicateOf: started.duplicateOf,
     })
     const conversationId = conversationIdFrom(body)
 

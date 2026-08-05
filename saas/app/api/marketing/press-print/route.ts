@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { sendPressPrintPreviewEmail } from '@/lib/marketing/pressPrintEmail'
+import { checkPressAdmission } from '@/lib/marketing/pressCampaignAdmission'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,28 @@ export async function POST(req: NextRequest) {
   const objective = String(request.objective || '').trim()
   const audience = String(request.audience || 'Publication editors, readers, and business technology buyers reached through the selected press media channel.').trim()
   const signal = String(request.signal || '').trim()
+
+  // ADMISSION CONTROL. Everything else in the press workflow is a gate at the EXIT — the
+  // cockpit hides Approve when there is no release, the decision route refuses to submit.
+  // Those are correct and they left the queue filling with records that were never
+  // admissible: a Unitarian congregation's guide about writing letters to the editor, a
+  // Square blog post (approved and marked published), a record titled "Submission
+  // Information", and three whose article notes were a pasted i18n audit report.
+  //
+  // Nine records had to be closed by hand because nothing checked them on the way IN. This
+  // refuses with 400 and every reason, so the operator can correct the input and retry —
+  // a gate, not a wall.
+  const admission = checkPressAdmission({
+    publicationName: String(request.publication || request.publication_name || request.publisher_name || '').trim(),
+    publicationUrl: String(request.publication_url || request.publisher_url || '').trim(),
+    editorEmail: String(request.contact || request.editor_email || request.publisher_email || signal || '').trim(),
+    submissionFormUrl: String(request.submission_form_url || request.publisher_submission_form_url || '').trim(),
+    articleNotes: String(request.article_notes || objective || '').trim(),
+  })
+  if (!admission.admitted) {
+    return NextResponse.json({ ok: false, error: admission.summary, refusals: admission.refusals, codes: admission.codes }, { status: 400 })
+  }
+
   const row = buildPressQueueRow({ title, objective, outreachChannel: outreachChannel as PressPrintChannel, audience, signal, now })
   const { data, error } = await ctx.admin.from('cos_campaign_queue').insert(row).select('id,title,objective,status,metadata,created_at').single()
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })

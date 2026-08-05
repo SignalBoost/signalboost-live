@@ -1676,7 +1676,7 @@ ${ev.summary}`
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
     // while time remains, so a recoverable blip never hard-freezes the assistant.
-    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect') => {
+    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect' | 'press') => {
       let lastErr: any = null
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -1688,7 +1688,7 @@ ${ev.summary}`
               system: cachedSystem(systemContent) as any, // ephemeral prompt cache: caches the tools+system prefix across the multi-turn tool loop
               messages: convo as any,
               tools: anthropicTools as any,
-              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'press' ? { type: 'tool', name: 'findPublications' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
           // Meter every model call (owner Chief of Staff vs external Concierge),
@@ -1747,8 +1747,32 @@ ${ev.summary}`
     const prospectMatch = latestUserMessage.match(PROSPECT_COUNT)
     const prospectCount = prospectMatch ? Number(prospectMatch[1] || prospectMatch[2] || 0) : 0
     const forceProspect = isOwner && !forceAction && !isPressRequest && prospectCount >= 3 && prospectCount <= 100 && PROSPECT_CONTEXT.test(latestUserMessage)
+    // PRESS NEEDED A FORCER TOO — this was the actual defect.
+    //
+    // Sales gets a hard tool_choice. Marketing campaigns get a hard tool_choice. Press got a
+    // paragraph of prompt text and tool_choice 'auto', which is a REQUEST, not a guarantee. The
+    // comment above this block already states the lesson for the campaign path — "replying with
+    // campaign copy in prose and never inserting a row is exactly the silent failure this
+    // prevents" — and press was the one pipeline still exposed to it.
+    //
+    // Measured on the owner's real message ("Research and identify 30 real publications…"):
+    // isPressRequest true, forceProspect false (press excluded), forceCampaign false (no verb in
+    // CAMPAIGN_VERB), so tool_choice resolved to 'auto'. The model wrote a strategy document,
+    // queued nothing, and reported no campaign ids — three times in a row. Nothing was broken in
+    // proposePressCampaign or findPublications; they were simply never called.
+    //
+    // The forced tool is findPublications, not proposePressCampaign, because it is the FIRST
+    // required call and the one that makes the rest honest: it returns real outlets with contacts
+    // taken from their own sites, so the proposePressCampaign calls that follow in the tool loop
+    // cannot be built on remembered addresses.
+    //
+    // It is gated on an ACTION word, not on press vocabulary alone. "Where do I approve press
+    // drafts?" mentions press and must stay a conversation; "research 30 publications" is work.
+    const PRESS_ACTION = /\b(research|identify|find|list|queue|pitch|prepare|prepar\w*|create|draft|launch|start|run|build|contact|reach out|submit|encontr\w*|criar?|montar?|znajd\w*|przygotu\w*|найд\w*|подготов\w*)\b/i
+    const forcePress = isOwner && !forceAction && isPressRequest && PRESS_ACTION.test(latestUserMessage)
+
     if (isPressRequest && isOwner) {
-      systemContent += `\n\nOWNER PRESS REQUEST: this is a PRESS/MEDIA request, not a sales prospecting request. Do NOT call startProspectCampaign or createOutreachDraft — those target companies and would queue publications into the sales pipeline. Use findPublications first to get real outlets with verified editorial contacts for the region the owner named, then call proposePressCampaign ONCE PER publication you intend to pitch, using the contact findPublications returned. NEVER invent an editor address, a publication, a product name, a quote or a statistic; if no verified contact was found for an outlet, skip it and say so. Each proposePressCampaign call creates a DRAFT for owner approval at /dashboard/marketing/press-providers — nothing is sent. Report which publications you queued and which you skipped and why.`
+      systemContent += `\n\nOWNER PRESS REQUEST: this is a PRESS/MEDIA request, not a sales prospecting request. Do NOT call startProspectCampaign or createOutreachDraft — those target companies and would queue publications into the sales pipeline. Use findPublications first to get real outlets with verified editorial contacts for the region the owner named, then call proposePressCampaign ONCE PER publication you intend to pitch, using the contact findPublications returned. NEVER invent an editor address, a publication, a product name, a quote or a statistic; if no verified contact was found for an outlet, skip it and say so. Each proposePressCampaign call creates a DRAFT for owner approval at /dashboard/marketing/press-providers — nothing is sent. Report which publications you queued and which you skipped and why. A reply that describes publications in prose and contains NO campaign id from proposePressCampaign is a failure — the owner asked for queued drafts, not a document.`
     }
 
     if (forceProspect) {
@@ -1757,12 +1781,12 @@ ${ev.summary}`
 
     const CAMPAIGN_VERB = /(cri(e|ar)|fa(ç|c)a|fazer|gerar?|lan(ç|c)ar|lance|create|make|generate|launch|start|produz|prepare|montar?|stw(ó|o)rz|utw(ó|o)rz|созда|запусти)/i
     const CAMPAIGN_NOUN = /(campanha|campaign|kampani|кампани|v(í|i)deo|video|wideo|видео|reels?|shorts?|tiktok)/i
-    const forceCampaign = isOwner && !forceAction && !forceProspect && CAMPAIGN_VERB.test(latestUserMessage) && CAMPAIGN_NOUN.test(latestUserMessage)
+    const forceCampaign = isOwner && !forceAction && !forceProspect && !forcePress && CAMPAIGN_VERB.test(latestUserMessage) && CAMPAIGN_NOUN.test(latestUserMessage)
     if (forceCampaign) {
       systemContent += '\n\nOWNER CAMPAIGN REQUEST: the owner asked for a campaign/video in this message. You MUST call proposeMarketingCampaign now. Pass the owner\'s FULL message verbatim as sourceMaterial, and extract goal, audience, channel, offer, and language from it. Do NOT answer a campaign request with campaign copy in prose: a reply that describes a campaign but contains no campaign id from the tool is a failure.'
     }
 
-    let msg        = await callModel(forceProspect ? 'prospect' : forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
+    let msg        = await callModel(forcePress ? 'press' : forceProspect ? 'prospect' : forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
     let toolRounds = 0
     let timedOut   = msg === null
 

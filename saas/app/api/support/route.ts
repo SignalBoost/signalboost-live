@@ -19,6 +19,7 @@ import { discoverPublishers } from '@/lib/marketing/publisherDiscovery'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { createPressCampaignFromAgent } from '@/lib/ai/tools/pressCampaign'
+import { readCompanyFacts, saveCompanyFacts } from '@/lib/ai/tools/companyFacts'
 import { runAudit } from '@/lib/audit/runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { findNextUntranslatedComponent, formatSweepForAI } from '@/lib/ai/tools/i18nSweep'
@@ -560,6 +561,44 @@ const TOOL_LIST_MY_OUTREACH: ChatTool = {
 // job id immediately and the cron drafts across many short invocations.
 // COS had no way to FIND a publication — only to pitch one it was already given an
 // address for. So a press brief either stalled or drifted into the sales tool. This
+// THE COMPANY FACTS RECORD, now writable by COS rather than only by a human in a form.
+// It is the allow-list the press generator may state; empty fields become visible
+// [PLACEHOLDER]s. The derivable fields come from the company's own site and the product
+// catalog — never from what the model remembers. The quote never does: it is a person
+// saying words, so it is drafted, shown, and saved only once the owner has said yes.
+const TOOL_GET_COMPANY_FACTS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'getCompanyFacts',
+    description: 'Read the company facts record — the ONLY company details a generated press release is permitted to state. Call this before writing or queueing press work so you know which fields are filled and which will come out as a visible [PLACEHOLDER]. Takes no arguments.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_SET_COMPANY_FACTS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'setCompanyFacts',
+    description: 'Write the company facts record. Only the fields you supply change; anything omitted keeps its current value. DERIVE the derivable fields from FIRST-PARTY SOURCES — read the company website with getExternalInfo, and take product names from the product catalog already in your context — never from what you remember about the company. The approved quote and the spokesperson are NOT derivable: a quote is a person saying words, so you may DRAFT one and show it, but show the owner the exact values and get his yes in this conversation before calling this tool. A quote with no spokesperson name is refused.',
+    parameters: {
+      type: 'object',
+      properties: {
+        legalName: { type: 'string', description: 'Registered legal name.' },
+        brandName: { type: 'string', description: 'Brand name used in copy.' },
+        website: { type: 'string', description: 'Primary website URL.' },
+        products: { type: 'string', description: 'Product names, one per line. ONLY these names may appear in a release.' },
+        boilerplate: { type: 'string', description: 'The About paragraph, used verbatim.' },
+        spokespersonName: { type: 'string', description: 'The person a quote is attributed to.' },
+        spokespersonTitle: { type: 'string', description: 'Their job title.' },
+        approvedQuote: { type: 'string', description: 'Used verbatim or not at all. Requires spokespersonName.' },
+        permittedClaims: { type: 'string', description: 'One per line. An ALLOW-LIST: any result, performance or comparative claim not listed here may not be stated.' },
+        forbiddenClaims: { type: 'string', description: 'One per line. Never stated, whatever else is true.' },
+      },
+      required: [],
+    },
+  },
+}
+
 // closes the loop: the same regional publisher search the platform uses, exposed to COS.
 const TOOL_FIND_PUBLICATIONS: ChatTool = {
   type: 'function',
@@ -748,6 +787,8 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_LIST_PLANS,
   TOOL_CREATE_OUTREACH_DRAFT,
   TOOL_FIND_PUBLICATIONS,
+  TOOL_GET_COMPANY_FACTS,
+  TOOL_SET_COMPANY_FACTS,
   TOOL_START_PROSPECT_CAMPAIGN,
   TOOL_PROSPECT_CAMPAIGN_STATUS,
   TOOL_PROPOSE_INFRA_PR,
@@ -1216,6 +1257,21 @@ if (name === 'createOutreachDraft') {
     return result.ok
       ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`
       : `Outreach draft failed: ${result.error ?? 'unknown error'}.`
+  }
+if (name === 'getCompanyFacts') {
+    const result = await readCompanyFacts()
+    if (!result.ok) return `Could not read the company facts: ${result.error || 'unknown error'}.`
+    return result.text
+  }
+if (name === 'setCompanyFacts') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await saveCompanyFacts(args)
+    if (!result.ok) return `Company facts NOT saved: ${result.error || 'unknown error'}. Nothing was changed.`
+    const parts = [`Company facts saved (${(result.saved || []).join(', ') || 'no fields'}).`]
+    if (result.missing?.length) parts.push(`Still missing, and these will appear as [PLACEHOLDER] in a release: ${result.missing.join(', ')}.`)
+    for (const warning of result.warnings || []) parts.push(warning)
+    return parts.join(' ')
   }
 if (name === 'findPublications') {
     let args: any = {}

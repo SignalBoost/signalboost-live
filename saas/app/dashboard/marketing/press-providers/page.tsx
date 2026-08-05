@@ -336,11 +336,18 @@ function CampaignRow({ campaign, onChanged, t }: { campaign: Campaign; onChanged
     finally { setBusy(false) }
   }
 
-  return <div style={{ ...panel, borderColor: `${color}44` }}>
+  const settled = campaign.status === 'rejected' || campaign.status === 'published'
+  return <div style={{ ...panel, borderColor: `${color}44`, opacity: settled ? 0.55 : 1 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
       <div>
-        <h4 style={{ color: '#fff', margin: 0, fontSize: 14 }}>{campaign.headline || campaign.publication_name || campaign.media_target_type}</h4>
-        <p style={{ color: 'rgba(255,255,255,.55)', margin: '4px 0 0', fontSize: 11 }}>{campaign.media_target_type} · {campaign.editor_contact || campaign.publication_contact || t.noContact}{campaign.source ? ` · ${campaign.source}` : ''}</p>
+        {/* THE PUBLICATION IS THE HEADING. It was the goal sentence, so thirty cards all
+            opened "Announce Self-Healing Supervisor and SignalBoost AI Marketing & Sales
+            Software — two AI-native platforms that…" and truncated mid-word, leaving the
+            one fact that distinguishes them — WHICH OUTLET — buried in grey small print.
+            An approval queue is scanned, not read: the decision is per publication. */}
+        <h4 style={{ color: '#fff', margin: 0, fontSize: 14 }}>{campaign.publication_name || campaign.editor_contact || campaign.media_target_type}</h4>
+        <p style={{ color: 'rgba(255,255,255,.55)', margin: '4px 0 0', fontSize: 11 }}>{campaign.media_target_type} · {campaign.editor_contact || campaign.publication_contact || t.noContact}</p>
+        {campaign.headline ? <p style={{ color: 'rgba(255,255,255,.42)', margin: '4px 0 0', fontSize: 11, lineHeight: 1.45 }}>{campaign.headline}</p> : null}
       </div>
       {chip(campaign.status.replace(/_/g, ' '), color)}
     </div>
@@ -350,7 +357,10 @@ function CampaignRow({ campaign, onChanged, t }: { campaign: Campaign; onChanged
         <button style={ghost} onClick={() => setReviewing((v) => !v)}>{reviewing ? t.close : t.reviewDraft}</button>
         <button style={button} disabled={busy} onClick={() => act('dispatch')}>{busy ? t.working : t.approve}</button>
       </> : null}
-      {campaign.published_url ? <a href={campaign.published_url} target="_blank" rel="noreferrer" style={{ ...ghost, textDecoration: 'none' }}>{t.openLink}</a> : <>
+      {/* A rejected campaign can never acquire a published URL, so offering the field on one
+          is an invitation to do something impossible. Thirty rejected cards each carrying a
+          text box and a button is most of why this page read as noise rather than a queue. */}
+      {campaign.published_url ? <a href={campaign.published_url} target="_blank" rel="noreferrer" style={{ ...ghost, textDecoration: 'none' }}>{t.openLink}</a> : campaign.status === 'rejected' ? null : <>
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t.recordUrl} style={{ ...field, width: 260 }} />
         <button style={ghost} disabled={busy || !/^https?:\/\//i.test(url)} onClick={() => act('record_url')}>{busy ? t.working : t.record}</button>
       </>}
@@ -384,7 +394,16 @@ export default function PressMediaProviderCockpit() {
 
   useEffect(() => { load() }, [])
   const providers = data?.providers || []
-  const campaigns = data?.campaigns || []
+  // WHAT NEEDS A DECISION COMES FIRST, and the settled records sink. The list arrived in
+  // creation order, so two campaigns awaiting approval sat underneath twenty-eight
+  // rejected ones — the owner's actual work was below the fold on his own approval queue.
+  // Sorting rather than hiding: a rejected record stays visible and auditable, it simply
+  // stops competing with a decision.
+  const RANK: Record<string, number> = { pending_owner_review: 0, approved: 1, submitted: 2, scheduled: 2, published: 3, rejected: 9 }
+  const campaigns = useMemo(
+    () => [...(data?.campaigns || [])].sort((a, b) => (RANK[a.status] ?? 5) - (RANK[b.status] ?? 5)),
+    [data],
+  )
   const liveNames = useMemo(
     () => providers.filter((p) => p.live).map((p) => (t.p[p.id]?.label || p.label)),
     [providers, t],

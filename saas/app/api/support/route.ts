@@ -1676,7 +1676,7 @@ ${ev.summary}`
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
     // while time remains, so a recoverable blip never hard-freezes the assistant.
-    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect' | 'press') => {
+    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect' | 'press' | 'pressQueue') => {
       let lastErr: any = null
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -1688,7 +1688,7 @@ ${ev.summary}`
               system: cachedSystem(systemContent) as any, // ephemeral prompt cache: caches the tools+system prefix across the multi-turn tool loop
               messages: convo as any,
               tools: anthropicTools as any,
-              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'press' ? { type: 'tool', name: 'findPublications' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'press' ? { type: 'tool', name: 'findPublications' } : choiceMode === 'pressQueue' ? { type: 'tool', name: 'proposePressCampaign' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
           // Meter every model call (owner Chief of Staff vs external Concierge),
@@ -1793,6 +1793,8 @@ ${ev.summary}`
     // Names of tools that ACTUALLY executed this turn. The post-generation guard
     // below uses this to catch a reply that claims an owner action no tool performed.
     const firedTools = new Set<string>()
+    // Set only when findPublications returned at least one real outlet this turn.
+    let pressOutletsFound = false
 
     while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 10 && remainingMs() > 12_000) {
       toolRounds++
@@ -1807,11 +1809,31 @@ ${ev.summary}`
         firedTools.add(String(block.name || ''))
         // runTool expects a JSON string; Anthropic gives input as an object.
         const result = await runTool(block.name || '', JSON.stringify(block.input ?? {}), userId, conversationId, isPrivileged, isOwner)
+        // Did the search actually return outlets? Forcing the queueing tool when it did
+        // NOT would order the model to queue something that does not exist — i.e. to
+        // invent a publication and an editor address, the precise harm the whole press
+        // path is built to prevent. So the forcer below is gated on a real result, and
+        // the shape checked is the one findPublications itself emits on success.
+        if (String(block.name || '') === 'findPublications' && /^\d+ publications found/.test(String(result || ''))) {
+          pressOutletsFound = true
+        }
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
       }
       convo.push({ role: 'user', content: toolResults })
 
-      const next = await callModel('auto')
+      // SECOND HALF OF THE PRESS FORCER. Forcing findPublications guarantees the SEARCH;
+      // it does not guarantee the QUEUEING. Left on 'auto', the model reliably took the
+      // outlets it had just been handed and wrote them up as a document — which is the
+      // same silent failure one step later, and it is what the owner kept receiving.
+      //
+      // So once the search has returned real outlets and nothing has been queued yet, the
+      // next call is hard-forced to proposePressCampaign. Only until it fires once: after
+      // that, firedTools carries it and the loop returns to 'auto', so the model queues the
+      // remaining outlets and writes its own skip report rather than being driven per row.
+      //
+      // Gated on pressOutletsFound, never on forcePress alone — see the note above.
+      const forcePressQueue = forcePress && pressOutletsFound && !firedTools.has('proposePressCampaign')
+      const next = await callModel(forcePressQueue ? 'pressQueue' : 'auto')
       if (next === null) { timedOut = true; break }
       msg = next
     }

@@ -74,7 +74,15 @@ function DraftCard({ campaign, onChanged, labels }: { campaign: Campaign; onChan
     [campaign.content_body],
   )
 
-  async function act(action: 'dispatch' | 'record_url' | 'save_copy') {
+  // THE FIELD NAMES ARE THE API'S, NOT MINE.
+  //
+  // This page shipped sending camelCase — campaignId, publishedUrl, contentBody — and an
+  // action called 'save_copy'. The route reads campaign_id, published_url and copy, and its
+  // edit action is called 'update_copy'. So every button on this page returned
+  // campaign_id_required and the owner saw a click that did nothing. A contract is whatever
+  // the receiver actually reads; writing plausible names and assuming is how a page looks
+  // finished and does nothing at all.
+  async function act(action: 'dispatch' | 'record_url' | 'update_copy') {
     setBusy(true); setNote(null)
     try {
       const res = await fetch('/api/agency/press-media', {
@@ -83,9 +91,9 @@ function DraftCard({ campaign, onChanged, labels }: { campaign: Campaign; onChan
         credentials: 'include',
         body: JSON.stringify({
           action,
-          campaignId: campaign.id,
-          ...(action === 'record_url' ? { publishedUrl: url } : {}),
-          ...(action === 'save_copy' ? { contentBody: copy } : {}),
+          campaign_id: campaign.id,
+          ...(action === 'record_url' ? { published_url: url } : {}),
+          ...(action === 'update_copy' ? { copy } : {}),
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -137,12 +145,14 @@ function DraftCard({ campaign, onChanged, labels }: { campaign: Campaign; onChan
               which is the surface the owner already trusts. */}
           <textarea value={copy} onChange={(e) => setCopy(e.target.value)} rows={22} className="sb-input" style={{ resize: 'vertical', fontSize: 14, lineHeight: 1.65, width: '100%', maxWidth: 'none', padding: '16px 18px' }} />
           <div className="sb-cta-row">
-            <button type="button" className="sb-button-secondary" disabled={busy || !copy.trim()} onClick={() => void act('save_copy')}>{busy ? labels.working : labels.saveCopy}</button>
+            <button type="button" className="sb-button-secondary" disabled={busy || !copy.trim()} onClick={() => void act('update_copy')}>{busy ? labels.working : labels.saveCopy}</button>
           </div>
         </div>
       ) : null}
 
-      {note ? <p className="sb-caption" style={{ color: note.ok ? '#22c55e' : '#fca5a5', margin: 0 }}>{note.text}</p> : null}
+      {/* A failed dispatch has to be as visible as a successful one. Small grey-red text
+          under a card is how "I clicked approve and nothing happened" happens. */}
+      {note ? <p role="status" className="sb-body" style={{ color: note.ok ? '#22c55e' : '#fca5a5', margin: 0, fontWeight: 750 }}>{note.text}</p> : null}
     </article>
   )
 }

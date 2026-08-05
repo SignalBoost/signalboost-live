@@ -3543,7 +3543,8 @@
     "u_ads_connectok": "Network connected",
     "u_ads_expires": "expires",
     "u_ads_lasterror": "Last renewal failed",
-    "u_ads_reconnect": "Reconnect"
+    "u_ads_reconnect": "Reconnect",
+    "u_pressdrafts_navlabel": "Press Drafts"
   },
   "lab": {
     "license": {

@@ -3543,7 +3543,8 @@
     "u_ads_connectok": "Red conectada",
     "u_ads_expires": "caduca el",
     "u_ads_lasterror": "La última renovación falló",
-    "u_ads_reconnect": "Volver a conectar"
+    "u_ads_reconnect": "Volver a conectar",
+    "u_pressdrafts_navlabel": "Borradores de prensa"
   },
   "lab": {
     "somethingWrong": "Algo salió mal",

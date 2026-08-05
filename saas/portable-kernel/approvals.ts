@@ -152,18 +152,40 @@ export function assertApprovalKind(
   recordKind: unknown,
   legacyFallback?: boolean,
 ): ApprovalKindCheck {
+  return assertApprovalKindIn([expected], recordKind, legacyFallback)
+}
+
+/**
+ * The same gate for a surface that legitimately owns MORE THAN ONE kind.
+ *
+ * The COSA campaign queue is the case that forced this: one route approves video campaigns and
+ * social drafts, both of which are genuinely its own, while press records merely happen to sit
+ * in the same table. Declaring a single kind there would be a lie; declaring none is how that
+ * route came to approve press campaigns and hand them to the social publisher, skipping the
+ * press cockpit's release check, paid-claim check and publisher-target check entirely.
+ *
+ * `expected` must list every kind the surface owns. Anything else is refused and pointed home.
+ */
+export function assertApprovalKindIn(
+  expected: ApprovalKind[],
+  recordKind: unknown,
+  legacyFallback?: boolean,
+): ApprovalKindCheck {
+  const owned = expected.length ? expected : []
+  const owns = (kind: ApprovalKind) => owned.indexOf(kind) !== -1
+  const ownedLabels = owned.map(approvalKindLabel).join(' or ') || 'this'
   if (isApprovalKind(recordKind)) {
-    if (recordKind === expected) return { ok: true }
+    if (owns(recordKind)) return { ok: true }
     return {
       ok: false,
-      error: `This record belongs to the ${approvalKindLabel(recordKind)} approval pipeline, not ${approvalKindLabel(expected)}. Approving it here would apply one product's rules to another product's record. Review it at ${approvalKindHome(recordKind)}.`,
+      error: `This record belongs to the ${approvalKindLabel(recordKind)} approval pipeline, not ${ownedLabels}. Approving it here would apply one product's rules to another product's record, and skip the checks the owning pipeline performs. Review it at ${approvalKindHome(recordKind)}.`,
       home: approvalKindHome(recordKind),
     }
   }
   if (legacyFallback === true) return { ok: true }
   return {
     ok: false,
-    error: `This record does not declare which approval pipeline it belongs to, and nothing else identifies it as ${approvalKindLabel(expected)}. It cannot be approved here. Records created before approval kinds existed must be re-created, or rejected.`,
-    home: approvalKindHome(expected),
+    error: `This record does not declare which approval pipeline it belongs to, and nothing else identifies it as ${ownedLabels}. It cannot be approved here. Records created before approval kinds existed must be re-created, or rejected.`,
+    home: owned.length ? approvalKindHome(owned[0]) : undefined,
   }
 }

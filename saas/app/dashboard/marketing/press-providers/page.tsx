@@ -471,7 +471,13 @@ export default function PressMediaProviderCockpit() {
           style={filter === key ? { ...button, padding: '7px 14px' } : { ...ghost, padding: '7px 14px' }}
         >{queueCopy[key]} · {counts[key]}</button>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 12 }}>{visible.map((c) => <CampaignRow key={c.id} campaign={c} onChanged={load} t={t} />)}</div>
+      {/* ONE COLUMN, FULL WIDTH — the same shape as the email outreach queue. The owner's
+          words on the card grid: "inside a little card is NOT the way." He is right for a
+          reason worth writing down: a press release is a DOCUMENT, and a decision about a
+          document needs the document readable. Three-abreast cards gave each draft a third
+          of the screen and made thirty of them a wall; one row per draft makes the queue a
+          list you walk down, exactly like the surface he already approves email from. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>{visible.map((c) => <CampaignRow key={c.id} campaign={c} onChanged={load} t={t} />)}</div>
       {/* An empty view is a state, not a blank. It says which view is empty rather than
           leaving the owner to wonder whether the page failed to load. */}
       {!visible.length ? <div style={panel}><p style={{ color: 'rgba(255,255,255,.7)', margin: 0 }}>{queueCopy.empty}</p></div> : null}

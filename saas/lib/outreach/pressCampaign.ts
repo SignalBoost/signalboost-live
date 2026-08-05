@@ -33,6 +33,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { discoverPublishers } from '@/lib/marketing/publisherDiscovery'
 import { createPressCampaignFromAgent } from '@/lib/ai/tools/pressCampaign'
+import { checkPressAdmission } from '@/lib/marketing/pressCampaignAdmission'
 
 const TABLE = 'press_campaign_jobs'
 
@@ -57,6 +58,11 @@ export type PressCandidate = {
 
 export type PressJobResult = {
   publicationName: string
+  // The contact is recorded so the de-dupe key is the SAME on both sides. It was the name
+  // on results and the address on candidates, so an outlet already drafted never matched a
+  // freshly discovered one and every discovery round re-added the whole list — which is why
+  // the cockpit showed the same address four and five times over.
+  editorContact?: string
   queued: boolean
   campaignId?: string
   reason?: string
@@ -94,6 +100,28 @@ function clean(value: unknown, max: number): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
+// The owner's message is a WORK ORDER; a release announces a PRODUCT. Pull the second out
+// of the first. "The campaign will promote: 1. X 2. Y" is the shape he uses, and it is the
+// shape any brief takes once the research instructions are stripped. When nothing can be
+// extracted the whole text is kept — a slightly wordy goal is recoverable, a wrong one is not.
+export function announcementFrom(brief: string): string {
+  const text = String(brief || '')
+  const promote = text.match(/(?:will\s+)?promote[sd]?\s*:?\s*([\s\S]{0,400})/i)
+  const products = promote
+    ? promote[1]
+        .split(/\n|\d+\.\s+/)
+        .map(l => l.replace(/^[\s*\-•]+/, '').trim())
+        .filter(l => l && l.length < 120 && !/^(use|clearly|emphas|explain|which|why|how|what)/i.test(l))
+        .slice(0, 6)
+    : []
+  if (products.length) {
+    return clean(`Announce ${products.join(' and ')} to the press.`, 400)
+  }
+  // Strip an obvious research instruction opening, keep the rest.
+  const stripped = text.replace(/^[\s\S]{0,200}?\b(?:research|identify|find|list)\b[^.\n]*[.\n]/i, '').trim()
+  return clean(stripped || text, 600)
+}
+
 // ── Create ───────────────────────────────────────────────────────────────────
 
 export async function createPressCampaignJob(input: {
@@ -111,6 +139,12 @@ export async function createPressCampaignJob(input: {
 
   const goal = clean(input.goal, 2_000)
   if (!goal) return { ok: false, error: 'A goal is required — what should the release announce?' }
+  // The RELEASE goal is not the OWNER'S INSTRUCTION. He typed "Research and identify 30 real
+  // publications…", and that sentence became the announcement every release was written
+  // around and the title on every card in the cockpit. An instruction to go and find outlets
+  // is not a thing to announce to an editor. announcementFrom() keeps what the campaign is
+  // PROMOTING and discards the research framing; the full brief is still stored on the job.
+  const announcement = announcementFrom(goal)
 
   const asked = Math.max(1, Number(input.requestedCount) || 10)
   const requested = Math.min(asked, MAX_REQUESTED)
@@ -156,7 +190,7 @@ export async function createPressCampaignJob(input: {
     .insert({
       created_by: input.createdBy || null,
       status: 'queued',
-      goal,
+      goal: announcement,
       region: input.region ? clean(input.region, 200) : null,
       channel: clean(input.channel, 60) || 'digital_press',
       language,
@@ -248,8 +282,11 @@ async function runDiscovery(
     return { ok: false, candidates: [], examined: found.examined || 0, error: found.error || 'search returned nothing usable' }
   }
 
-  const seen = new Set((job.candidates || []).map(c => c.editorContact.toLowerCase()))
-  for (const r of job.results || []) seen.add(String(r.publicationName || '').toLowerCase())
+  const seen = new Set((job.candidates || []).map(c => String(c.editorContact || '').toLowerCase()))
+  for (const r of job.results || []) {
+    const contact = String(r.editorContact || '').toLowerCase()
+    if (contact) seen.add(contact)
+  }
 
   const candidates: PressCandidate[] = []
   for (const p of found.publishers || []) {
@@ -264,6 +301,26 @@ async function runDiscovery(
 }
 
 async function draftOne(job: PressCampaignJob, candidate: PressCandidate): Promise<PressJobResult> {
+  // THE SAME ADMISSION GATE THE COCKPIT FORM RUNS. Without it this path admitted a wikiHow
+  // stylesheet URL, an advocacy organisation's press address and three newspaper
+  // letters-to-the-editor inboxes as though they were technology press. Discovery finding an
+  // address is not the same as that address being a publication that takes this story.
+  const admission = checkPressAdmission({
+    publicationName: candidate.publicationName,
+    publicationUrl: candidate.sourceUrl,
+    editorEmail: candidate.method === 'email' ? candidate.editorContact : '',
+    submissionFormUrl: candidate.method === 'online_form' ? candidate.editorContact : '',
+    articleNotes: job.goal,
+  })
+  if (!admission.admitted) {
+    return {
+      publicationName: candidate.publicationName,
+      editorContact: candidate.editorContact,
+      queued: false,
+      reason: admission.refusals[0] || 'refused by the press admission rules',
+    }
+  }
+
   try {
     const result = await createPressCampaignFromAgent({
       goal: job.goal,
@@ -278,15 +335,17 @@ async function draftOne(job: PressCampaignJob, candidate: PressCandidate): Promi
     if (!result.ok) {
       return {
         publicationName: candidate.publicationName,
+        editorContact: candidate.editorContact,
         queued: false,
         reason: result.error || result.reason || 'the press engine refused this target',
       }
     }
-    return { publicationName: candidate.publicationName, queued: true, campaignId: result.campaignId }
+    return { publicationName: candidate.publicationName, editorContact: candidate.editorContact, queued: true, campaignId: result.campaignId }
   } catch (error) {
     // A thrown draft is one outlet skipped with a reason, never a dead job.
     return {
       publicationName: candidate.publicationName,
+      editorContact: candidate.editorContact,
       queued: false,
       reason: error instanceof Error ? error.message : 'drafting threw',
     }

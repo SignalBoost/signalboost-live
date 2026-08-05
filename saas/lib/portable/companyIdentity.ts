@@ -69,6 +69,11 @@ export async function resolveUserCompanyFacts(userId: string): Promise<CompanyFa
       approvedQuote: row.approved_quote || undefined,
       permittedClaims: splitLines(row.permitted_claims),
       forbiddenClaims: splitLines(row.forbidden_claims),
+      datelineCity: row.dateline_city || undefined,
+      mediaContactName: row.media_contact_name || undefined,
+      mediaContactTitle: row.media_contact_title || undefined,
+      mediaContactEmail: row.media_contact_email || undefined,
+      mediaContactPhone: row.media_contact_phone || undefined,
     }
   } catch {
     return null
@@ -139,6 +144,11 @@ export async function resolveCompanyFacts(options?: { force?: boolean }): Promis
     approvedQuote: override?.approved_quote || undefined,
     permittedClaims: permitted.length ? permitted : namesFrom(org?.value_propositions),
     forbiddenClaims: splitLines(override?.forbidden_claims),
+    datelineCity: override?.dateline_city || undefined,
+    mediaContactName: override?.media_contact_name || undefined,
+    mediaContactTitle: override?.media_contact_title || undefined,
+    mediaContactEmail: override?.media_contact_email || undefined,
+    mediaContactPhone: override?.media_contact_phone || undefined,
   }
 
   cached = { at: Date.now(), facts }

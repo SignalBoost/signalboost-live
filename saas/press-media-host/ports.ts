@@ -145,11 +145,19 @@ export function createAiPort(): AiPort {
         'Return only the finished copy — no preamble, no notes, no markdown code fences.',
       ].filter(Boolean).join('\n')
 
+      // THE DATE IS SUPPLIED, NEVER PLACEHOLDERED. [DATE] appeared in every draft because
+      // the model had no way to know when the release would exist — but the host does: it is
+      // now. Same for the Media Contact block: the engine appends the real one after
+      // generation (see withMediaContact), so the model writing its own produced two stacked
+      // contact blocks, one of them all placeholders, on every release that reached the owner.
+      const today = new Date().toLocaleDateString(brief.language === 'es' ? 'es-ES' : brief.language === 'pt' ? 'pt-BR' : brief.language === 'pl' ? 'pl-PL' : brief.language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
       const prompt = [
         `Goal: ${brief.goal}`,
         brief.audience ? `Audience: ${brief.audience}` : '',
         brief.ctaUrl ? `Call-to-action URL: ${brief.ctaUrl}` : '',
         brief.language ? `Write in this language: ${brief.language}` : '',
+        spec.format === 'press_release' ? `Today's date for the dateline: ${today}. Use it — never write [DATE].` : '',
+        spec.format === 'press_release' ? 'Do NOT write a Media Contact section, a signature, or any contact block — the system appends the real one after you finish. End the release at the ### mark.' : '',
       ].filter(Boolean).join('\n')
 
       const maxTokens = spec.maxChars ? Math.min(4096, Math.ceil(spec.maxChars / 2) + 400) : 2048

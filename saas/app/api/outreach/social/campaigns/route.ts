@@ -1,6 +1,7 @@
 // saas/app/api/outreach/social/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
+import { mintApprovalIdentity } from '@/portable-kernel'
 import { SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 
 export const dynamic = 'force-dynamic'
@@ -110,6 +111,11 @@ export async function POST(req: NextRequest) {
   const language = cleanText(body?.language, 'en', 12)
   const autoApprove = body?.auto_approve === true || body?.autoApprove === true
 
+  // APPROVAL IDENTITY, minted at creation: an ID number the owner can quote, the owning
+  // pipeline's name, and the date the campaign entered the approval queue. approved_at stays
+  // the DECIDED date — two different questions, recorded separately.
+  const approval = mintApprovalIdentity('social_publishing')
+
   const { data: campaign, error } = await ctx.admin.from('outreach_social_campaigns').insert({
     owner_id: ctx.user.id,
     name,
@@ -121,7 +127,7 @@ export async function POST(req: NextRequest) {
     status: autoApprove ? 'approved' : 'pending_approval',
     approved_by: autoApprove ? ctx.user.id : null,
     approved_at: autoApprove ? new Date().toISOString() : null,
-    metadata: { source: 'social_campaign_api', requestedPlatforms: platforms, autoApprove },
+    metadata: { source: 'social_campaign_api', requestedPlatforms: platforms, autoApprove, approval_kind: approval.kind, approval_ref: approval.ref, approval_requested_at: approval.requestedAt },
   }).select('*').single()
 
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Could not create campaign' }, { status: 500 })

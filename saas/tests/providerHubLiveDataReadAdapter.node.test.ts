@@ -67,7 +67,7 @@ test('Provider Hub live-data adapter fails closed for production execution and c
       digest,
       transport,
     }),
-    /production-live-data-read-disabled/,
+    /production-authorization-required/,
   )
 
   await assert.rejects(

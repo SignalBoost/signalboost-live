@@ -10,9 +10,9 @@ import {
   PROSPECT_PROVIDER_HEALTH_STATES,
   assertNoSecretMaterial,
   normalizeProspectIntelligenceLanguage,
-} from '../lib/prospect-intelligence/contracts'
-import { PROSPECT_INTELLIGENCE_COPY } from '../lib/prospect-intelligence/copy'
-import { validateProspectProviderManifest } from '../lib/prospect-intelligence/provider-manifest'
+} from '../lib/prospect-intelligence/contracts.ts'
+import { PROSPECT_INTELLIGENCE_COPY } from '../lib/prospect-intelligence/copy.ts'
+import { validateProspectProviderManifest } from '../lib/prospect-intelligence/provider-manifest.ts'
 
 test('prospect intelligence supports exactly the five platform languages', () => {
   assert.deepEqual(PROSPECT_INTELLIGENCE_LANGUAGES, ['en', 'es', 'pt', 'pl', 'ru'])

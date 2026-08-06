@@ -3,7 +3,7 @@
 import {
   PROSPECT_PROVIDER_CAPABILITIES,
   type ProspectProviderCapability,
-} from './contracts'
+} from './contracts.ts'
 
 export type ProspectProviderAuthentication = Readonly<{
   type: 'api_key' | 'oauth2' | 'basic' | 'bearer' | 'custom_header' | 'none'

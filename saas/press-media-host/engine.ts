@@ -13,7 +13,7 @@
 // URL); real targets only (the adapter's validateTarget decides); nothing is published
 // silently — the owner records the real link later via recordPublishedUrl.
 import { findPlaceholders } from '@/press-media-core'
-import { withMediaContact } from './media-contact'
+import { withMediaContact } from './media-contact.ts'
 import type {
   MediaProviderRegistry, PortBundle, CampaignBrief, MediaTarget, MediaCampaign,
   MediaTargetType, DispatchState, CostEstimate,

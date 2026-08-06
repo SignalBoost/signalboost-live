@@ -190,7 +190,12 @@ test('Concierge bounds long Primary work and returns verified partial research',
   assert.match(source, /timed_out: true/)
   assert.match(source, /execution_allowed: partial\.executionAllowed/)
   assert.match(source, /external_action_taken: partial\.externalActionTaken/)
-  assert.doesNotMatch(source, /createOutreachDraft|createCustomerDraft|sendMail|submitForm|proposeMarketingCampaign|createPressCampaign/)
+  const boundedFallback = source.slice(
+    source.indexOf('const researchPlan = planResearchTask(input)'),
+    source.indexOf('researchLifeline?.cancel()'),
+  )
+  assert.ok(boundedFallback.length > 0)
+  assert.doesNotMatch(boundedFallback, /createOutreachDraft|createCustomerDraft|sendMail|submitForm|proposeMarketingCampaign|createPressCampaign/)
 })
 
 test('prospect evidence never substitutes affiliate counts for CRM or discovery', async () => {

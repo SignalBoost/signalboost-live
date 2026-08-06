@@ -1,6 +1,6 @@
 // saas/lib/prospect-intelligence/copy.ts
 
-import type { ProspectIntelligenceLanguage } from './contracts'
+import type { ProspectIntelligenceLanguage } from './contracts.ts'
 
 type ProspectIntelligenceCopy = Readonly<{
   title: string

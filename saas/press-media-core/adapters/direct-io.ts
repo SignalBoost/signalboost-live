@@ -87,9 +87,9 @@ export function createDirectIoAdapter(): MediaProviderAdapter {
         subject: `Insertion order request — ${String(publication)} (ref ${campaign.id})`,
         html,
       })
-      if (!sent.ok) return { state: 'failed', ref: '', detail: 'Could not send the insertion-order request.' }
+      if (!sent.ok) return { state: 'failed', ref: '', detail: sent.error ? `Could not send the insertion-order request: ${sent.error}` : 'Could not send the insertion-order request.' }
       await ports.notify.notifyOwner('submitted', campaign).catch(() => {})
-      return { state: 'submitted', ref: `io:${campaign.id}`, detail: 'Insertion-order request sent to the ad-sales desk.' }
+      return { state: 'submitted', ref: sent.id || `io:${campaign.id}`, detail: 'Insertion-order request sent to the ad-sales desk.' }
     },
 
     // A tearsheet is a physical/scanned artifact that arrives weeks later — there is nothing to

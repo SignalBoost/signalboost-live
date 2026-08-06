@@ -1,3 +1,4 @@
+// saas/lib/agency/pressOutreach.ts
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
@@ -212,6 +213,8 @@ export type EditorDispatchResult = {
   skipped: boolean
   reason?: string
   sent_to?: string
+  /** Provider message id. This is the durable evidence that the email actually left. */
+  ref?: string
 }
 
 export async function dispatchPressReleaseToEditor(campaign: PressCampaign): Promise<EditorDispatchResult> {
@@ -235,14 +238,24 @@ export async function dispatchPressReleaseToEditor(campaign: PressCampaign): Pro
   ].filter(Boolean).join('\n')
 
   try {
-    await resend.emails.send({
+    // THE SDK REPORTS A REJECTED SEND IN THE RESPONSE, NOT BY THROWING.
+    // Only catching throws meant an unverified sending domain, a rejected recipient or a
+    // rate limit all came back as ok:true — a campaign recorded as dispatched while no
+    // editor ever received anything. This is the same defect already fixed in EmailPort;
+    // it survived here because the fix was applied to one caller instead of every sender.
+    const response: any = await resend.emails.send({
       from,
       to: editorEmail,
       bcc: ownerEmail || undefined,
       subject,
       text: body,
     })
-    return { ok: true, skipped: false, sent_to: editorEmail }
+    if (response?.error) {
+      const detail = response.error?.message || response.error?.name || 'send_rejected'
+      return { ok: false, skipped: false, reason: String(detail) }
+    }
+    const ref = String(response?.data?.id || response?.id || '')
+    return { ok: true, skipped: false, sent_to: editorEmail, ref: ref || undefined }
   } catch (error: any) {
     return { ok: false, skipped: false, reason: error?.message || 'send_failed' }
   }

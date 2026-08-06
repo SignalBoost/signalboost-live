@@ -65,7 +65,11 @@ export interface AiPort {
   generate(brief: CampaignBrief, spec: GenerateSpec): Promise<{ creative: string }>
 }
 export interface EmailPort {
-  send(input: { to: string; subject: string; html: string }): Promise<{ ok: boolean }>
+  // `id` is the transport's own message identifier and is the ONLY verifiable evidence
+  // that a message left. Adapters use it as the dispatch ref so a buyer can reconcile a
+  // campaign against their own mail provider later; a ref we invent proves nothing.
+  // `error` carries the transport's reason so a failure can say WHY rather than just fail.
+  send(input: { to: string; subject: string; html: string }): Promise<{ ok: boolean; id?: string; error?: string }>
 }
 export interface OwnerNotifyPort {
   // Two-stage notify: 'submitted'/'scheduled' now, 'published' once the provider confirms.

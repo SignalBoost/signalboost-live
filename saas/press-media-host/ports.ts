@@ -170,9 +170,12 @@ export function createAiPort(): AiPort {
 // ── EmailPort: send through Resend (editor submission, etc.), BCC the owner ──
 export function createEmailPort(): EmailPort {
   return {
-    async send(input: { to: string; subject: string; html: string }): Promise<{ ok: boolean }> {
+    // The return type is deliberately NOT re-declared here — it is inherited from EmailPort
+    // in press-media-core. A local annotation narrower than the interface silently discards
+    // fields the contract promises, which is exactly what hid the transport's error and id.
+    async send(input: { to: string; subject: string; html: string }) {
       const resend = resendClient()
-      if (!resend) return { ok: false }
+      if (!resend) return { ok: false, error: 'email_transport_unavailable' }
       try {
         // Outreach is sent ON BEHALF OF the company that employs this AI: named sender,
         // working reply-to, and a signature — the difference between a pitch a journalist
@@ -190,10 +193,20 @@ export function createEmailPort(): EmailPort {
           html: `${input.html}${mediaContactBlock(facts, reply, input.html)}${signatureBlock(facts)}`,
         }
         if (reply) { payload.replyTo = reply; payload.reply_to = reply }
-        await resend.emails.send(payload)
-        return { ok: true }
-      } catch {
-        return { ok: false }
+        // THE TRANSPORT REPORTS A REJECTED SEND IN THE RESPONSE, NOT BY THROWING.
+        // `await send(); return { ok: true }` meant an unverified sending domain, a
+        // rejected recipient or a rate limit all came back as SUCCESS — and this is the
+        // port the free-submission adapter reads to decide state:'submitted', which the
+        // queue then shows as Sent. So the single most load-bearing boolean in the whole
+        // press path was the one that could not fail.
+        const response: any = await resend.emails.send(payload)
+        if (response?.error) {
+          const detail = response.error?.message || response.error?.name || 'send_rejected'
+          return { ok: false, error: String(detail) }
+        }
+        return { ok: true, id: String(response?.data?.id || response?.id || '') || undefined }
+      } catch (error: any) {
+        return { ok: false, error: error?.message || 'send_failed' }
       }
     },
   }

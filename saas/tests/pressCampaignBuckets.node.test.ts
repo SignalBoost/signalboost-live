@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pressCampaignBucketOf } from '@/lib/marketing/pressCampaignBuckets'
+import { pressCampaignBucketOf } from '../lib/marketing/pressCampaignBuckets.ts'
 
 test('submitted and scheduled campaigns are sent, not merely approved', () => {
   assert.equal(pressCampaignBucketOf({ status: 'approved', dispatch_state: 'submitted' }), 'sent')

@@ -26,6 +26,6 @@ test('Mission 001 platform health monitor raises deterministic self-diagnostic a
 test('Supervisor Operations Center exposes platform self-diagnostics without controls', () => {
   const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/page.tsx', import.meta.url), 'utf8'))
   assert.match(page, /createPlatformHealthSnapshot/)
-  for (const label of ['subsystemHealth','trendGraphs','recentAlerts','recentRecoveries','currentWarnings','healthHistory']) assert.match(page, new RegExp(label))
+  for (const label of ['systemDiagnostics','subsystemMeasurements','incidentQueue','activeWork','engineeringView','auditView']) assert.match(page, new RegExp(label))
   assert.doesNotMatch(page, /<form|<button|repair|redeploy|BrowserRuntime|Playwright/i)
 })

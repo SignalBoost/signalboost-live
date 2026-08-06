@@ -49,6 +49,9 @@ test('marketing and sales uses its portable department schema', () => {
     'ms_publish_results',
     'ms_metrics',
     'ms_audit',
+    'outreach_social_tokens',
+    'outreach_social_destinations',
+    'outreach_social_settings',
   ])
 })
 
@@ -57,7 +60,10 @@ test('the browser activity table stays redacted and row-level secured', () => {
   assert.match(sql, /create table if not exists public\.portable_browser_activity/)
   assert.match(sql, /enable row level security/)
   assert.doesNotMatch(sqlColumnsOnly(sql), /url|credential|screenshot|prompt|page_content|evidence\s+(text|jsonb)/i)
-  assert.match(adapter(), /from\('portable_browser_activity'\)\.insert/)
+  const adapterSource = adapter()
+  assert.match(adapterSource, /createBrowserActivitySink/)
+  assert.match(adapterSource, /'supabase'/)
+  assert.doesNotMatch(adapterSource, /process\.env|createClient|@supabase\/supabase-js/)
 })
 
 test('a table plus an adapter is NOT a live source while nothing calls the adapter', () => {

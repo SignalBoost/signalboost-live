@@ -26,7 +26,7 @@
 // unobserved change between page views is not recorded, and that limitation is real and worth
 // stating rather than papering over.
 
-import type { AssessmentRecord, StoredAssessment } from './assessment-record'
+import type { AssessmentRecord, StoredAssessment } from './assessment-record.ts'
 
 type AnyClient = { from: (table: string) => any }
 

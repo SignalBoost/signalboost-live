@@ -167,7 +167,7 @@ export async function dispatchPressProofEmail(campaign: PressCampaign, ownerEmai
   const resend = new Resend(resendKey)
   const from = process.env.RESEND_FROM_EMAIL || 'SignalBoost Press <press@signalboostapp.com>'
   const pending = campaign.status === 'pending_owner_review'
-  await resend.emails.send({
+  const proofResponse: any = await resend.emails.send({
     from,
     to,
     subject: pending ? `Owner approval required: ${campaign.headline || campaign.media_target_type}` : `Press outreach published: ${campaign.headline || campaign.media_target_type}`,
@@ -184,7 +184,14 @@ export async function dispatchPressProofEmail(campaign: PressCampaign, ownerEmai
       pending ? 'Nothing is published until the owner approves it, unless the owner created it manually.' : '',
     ].filter(Boolean).join('\n'),
   })
-  return { ok: true, skipped: false }
+  // Same response-shaped rejection as every other sender here. This one is the OWNER's
+  // copy: reporting ok:true when it was rejected means the owner is told a notification
+  // went out and then never sees it, with nothing recording why.
+  if (proofResponse?.error) {
+    const detail = proofResponse.error?.message || proofResponse.error?.name || 'send_rejected'
+    return { ok: false, skipped: false, reason: String(detail) }
+  }
+  return { ok: true, skipped: false, ref: String(proofResponse?.data?.id || proofResponse?.id || '') || undefined }
 }
 
 export async function runLocalPressDistributionWorker(campaign: PressCampaign, ownerEmail?: string) {

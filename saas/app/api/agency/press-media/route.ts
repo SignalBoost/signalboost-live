@@ -78,9 +78,18 @@ export async function GET() {
     const live = providers.filter((p) => p.live).length
 
     let campaigns: any[] = []
+    let campaignTotal: number | null = null
     try {
       const supabase = getPressAdminClient()
-      const { data } = await supabase.from('press_campaigns').select('*').order('updated_at', { ascending: false }).limit(30)
+      // A 30-DRAFT RUN FILLED THIS ENTIRELY. The cap was invisible: the queue simply ended,
+      // with no indication that older campaigns existed below it, so a second run pushed the
+      // first out of sight and the owner had no way to know. 300 covers the largest run the
+      // job path will produce (MAX_REQUESTED 40) many times over, and the count below tells
+      // the UI when it is looking at a truncated list rather than the whole queue.
+      const { count: totalCount } = await supabase
+        .from('press_campaigns').select('id', { count: 'exact', head: true })
+      campaignTotal = typeof totalCount === 'number' ? totalCount : null
+      const { data } = await supabase.from('press_campaigns').select('*').order('updated_at', { ascending: false }).limit(300)
       campaigns = data || []
     } catch { /* campaigns are optional context for the cockpit */ }
 
@@ -93,7 +102,15 @@ export async function GET() {
       profile = (Array.isArray(data) ? data[0] : null) || null
     } catch { /* profile is optional context */ }
 
-    return NextResponse.json({ ok: true, providers, summary: { total: providers.length, live, coming: providers.length - live }, campaigns, profile })
+    return NextResponse.json({
+      ok: true,
+      providers,
+      summary: { total: providers.length, live, coming: providers.length - live },
+      campaigns,
+      campaign_total: campaignTotal ?? campaigns.length,
+      campaigns_truncated: campaignTotal != null && campaignTotal > campaigns.length,
+      profile,
+    })
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || 'capabilities_failed' }, { status: 500 })
   }

@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { featureText } from '@/lib/i18n/featureCopy'
 import { uiText } from '@/lib/i18n/uiText'
 import { outreachContactsCopyFor } from '@/lib/i18n/outreachReleaseCopy'
 import {
@@ -37,14 +38,6 @@ type Note = { ok: boolean; text: string } | null
 type Bucket = PressCampaignBucket
 
 const TABS: Bucket[] = ['pending', 'approved', 'sent', 'published', 'rejected', 'all']
-
-const PUBLISHED_LABELS: Record<string, string> = {
-  en: 'Published',
-  es: 'Publicado',
-  pt: 'Publicado',
-  pl: 'Opublikowane',
-  ru: 'Опубликовано',
-}
 
 const STATUS_COLOR: Record<Exclude<Bucket, 'all'>, string> = {
   pending: '#fde68a',
@@ -232,7 +225,7 @@ function DraftCard({ campaign, onChanged, labels }: { campaign: Campaign; onChan
 export default function PressDraftsPage() {
   const { lang } = useI18n()
   const queue = outreachContactsCopyFor(lang)
-  const publishedLabel = PUBLISHED_LABELS[lang] || PUBLISHED_LABELS.en
+  const publishedLabel = featureText(lang, 'project.status.published', '')
   const labels = {
     ...queue,
     statuses: { ...queue.statuses, published: publishedLabel },

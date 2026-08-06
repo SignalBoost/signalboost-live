@@ -64,9 +64,11 @@ export function createFreeSubmissionAdapter(): MediaProviderAdapter {
         subject,
         html: `<pre style="font-family:inherit;white-space:pre-wrap">${escapeHtml(campaign.creative)}</pre>`,
       })
-      if (!sent.ok) return { state: 'failed', ref: '', detail: 'Editor email failed to send.' }
+      if (!sent.ok) return { state: 'failed', ref: '', detail: sent.error ? `Editor email failed to send: ${sent.error}` : 'Editor email failed to send.' }
       await ports.notify.notifyOwner('submitted', campaign).catch(() => {})
-      return { state: 'submitted', ref: `free:${campaign.id}`, detail: `Submitted to ${email}` }
+      // Prefer the transport's own message id: `free:<campaign id>` was derived from data we
+      // already had, so it could be produced whether or not anything was ever sent.
+      return { state: 'submitted', ref: sent.id || `free:${campaign.id}`, detail: `Submitted to ${email}` }
     },
 
     async fetchProof() {

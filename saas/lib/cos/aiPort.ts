@@ -1,9 +1,9 @@
 // saas/lib/cos/aiPort.ts
 // Injected model-access seam for the COS text generators. The engine asks THIS port to produce
 // text — it never imports a provider SDK, an endpoint, or an API key. On SignalBoost's own
-// deployment createPlatformAiPort() routes to the platform model router (Claude↔OpenAI fallback).
-// A Fortune-500 buyer supplies an adapter over THEIR model provider (Azure OpenAI, Bedrock, a
-// private gateway) with keys from THEIR vault, and the generators never change.
+// deployment createPlatformAiPort() routes through the platform model router. A buyer can use
+// createLocalApplianceAiPort() to force private on-device inference with cloud fallback disabled
+// unless explicitly enabled in environment policy.
 import { callModel } from '@/lib/ai/modelRouter'
 
 export interface CosAiPort {
@@ -11,11 +11,24 @@ export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number }): Promise<string>
 }
 
-// ── SignalBoost's own adapter (the host implementation) ──
-export function createPlatformAiPort(): CosAiPort {
-  return { generate: (input) => callModel(input) }
+function requireText(result: string | null, provider: string): string {
+  if (!result) throw new Error(`${provider} AI provider returned no text`)
+  return result
 }
 
+// ── SignalBoost's own adapter (the host implementation) ──
+export function createPlatformAiPort(): CosAiPort {
+  return { generate: async (input) => requireText(await callModel(input), 'platform') }
+}
+
+// ── Private appliance adapter ─────────────────────────────────────────────────
+// This is an explicit local-only selection. The shared router itself enforces whether an
+// administrator has opted into any cloud fallback via LOCAL_AI_ALLOW_CLOUD_FALLBACK=true.
+export function createLocalApplianceAiPort(): CosAiPort {
+  return {
+    generate: async (input) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+  }
+}
 
 // ── Image generation — same seam, one method ──
 // A buyer swaps the image model (their DALL·E-compatible endpoint, a private diffusion service)

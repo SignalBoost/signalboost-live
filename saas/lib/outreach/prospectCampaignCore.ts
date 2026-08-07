@@ -738,7 +738,7 @@ async function runOneCompany(
 
 // ── Advance (one worker tick) ────────────────────────────────────────────────
 
-export async function advanceProspectCampaigns(): Promise<{
+export async function advanceProspectCampaigns(jobId?: string): Promise<{
   ok: boolean
   jobId?: string
   status?: ProspectCampaignStatus
@@ -751,13 +751,19 @@ export async function advanceProspectCampaigns(): Promise<{
   const startedAt = Date.now()
   const remainingMs = () => TICK_BUDGET_MS - (Date.now() - startedAt)
 
-  // Oldest unfinished job first, so a queued campaign cannot starve behind a newer one.
-  const { data: claimed, error: claimError } = await db
+  // COS may target the job it just created. Cron calls without a job id use fair
+  // least-recently-advanced scheduling, so one wedged or long-running campaign cannot
+  // monopolize every tick and starve every campaign created after it.
+  let claim = db
     .from(TABLE)
     .select('*')
     .in('status', ['queued', 'discovering', 'running'])
-    .order('created_at', { ascending: true })
-    .limit(1)
+
+  claim = jobId
+    ? claim.eq('id', jobId)
+    : claim.order('updated_at', { ascending: true }).order('created_at', { ascending: true })
+
+  const { data: claimed, error: claimError } = await claim.limit(1)
 
   if (claimError) return { ok: false, units: 0, error: claimError.message }
   if (!claimed || !claimed.length) return { ok: true, units: 0 }

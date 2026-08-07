@@ -1,10 +1,13 @@
 // saas/lib/ai/modelRouter.ts
-// Routes model calls to Claude or OpenAI with automatic fallback.
+// Routes model calls to Claude, OpenAI, or a private OpenAI-compatible local endpoint.
 
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { callLocalModel } from './local-inference'
+
+export type ModelProvider = 'claude' | 'openai' | 'local'
 
 export interface ModelCallArgs {
-  modelPreference?: 'claude' | 'openai'
+  modelPreference?: ModelProvider
   prompt:           string
   maxTokens?:       number
   systemPrompt?:    string
@@ -92,9 +95,32 @@ async function callOpenAI(args: ModelCallArgs): Promise<string | null> {
   }
 }
 
+// ── Private local inference ───────────────────────────────────────────────────
+
+async function callLocal(args: ModelCallArgs): Promise<string | null> {
+  const result = await callLocalModel(args)
+  if (result) return result
+
+  // Privacy is fail-closed by default. An appliance never sends prompts off-device
+  // unless the buyer explicitly opts into cloud fallback.
+  if (process.env.LOCAL_AI_ALLOW_CLOUD_FALLBACK !== 'true') {
+    console.error('modelRouter: local inference failed and cloud fallback is disabled')
+    return null
+  }
+
+  const fallback = process.env.LOCAL_AI_CLOUD_FALLBACK_PROVIDER === 'openai' ? 'openai' : 'claude'
+  console.warn(`modelRouter: local inference failed — explicit cloud fallback to ${fallback}`)
+  return fallback === 'openai' ? callOpenAI(args) : callClaude(args)
+}
+
+function providerFromEnvironment(): ModelProvider | undefined {
+  const value = process.env.AI_MODEL_PROVIDER?.trim().toLowerCase()
+  return value === 'local' || value === 'openai' || value === 'claude' ? value : undefined
+}
+
 async function logAiTask(args: {
   taskType: string
-  provider: string
+  provider: ModelProvider
   status: 'success' | 'error' | 'fallback'
   durationMs: number
   fallbackUsed?: boolean
@@ -103,10 +129,15 @@ async function logAiTask(args: {
 }) {
   try {
     const admin = getAdminSupabase()
+    const model = args.provider === 'openai'
+      ? 'gpt-4o-mini'
+      : args.provider === 'claude'
+        ? 'claude-sonnet-4-6'
+        : (process.env.LOCAL_AI_MODEL || 'local-model')
     await admin.from('ai_task_log').insert({
       task_type: args.taskType,
       provider: args.provider,
-      model: args.provider === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-4-6',
+      model,
       status: args.status,
       duration_ms: args.durationMs,
       fallback_used: !!args.fallbackUsed,
@@ -121,7 +152,7 @@ async function logAiTask(args: {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function callModel(args: ModelCallArgs): Promise<string | null> {
-  const preference = args.modelPreference ?? 'claude'
+  const preference = args.modelPreference ?? providerFromEnvironment() ?? 'claude'
   const startedAt = Date.now()
 
   console.log('modelRouter: calling', preference, {
@@ -129,7 +160,12 @@ export async function callModel(args: ModelCallArgs): Promise<string | null> {
     promptLength: args.prompt.length,
   })
 
-  const result = preference === 'openai' ? await callOpenAI(args) : await callClaude(args)
+  const result = preference === 'local'
+    ? await callLocal(args)
+    : preference === 'openai'
+      ? await callOpenAI(args)
+      : await callClaude(args)
+
   await logAiTask({
     taskType: args.systemPrompt ? 'system_prompt_call' : 'model_call',
     provider: preference,

@@ -30,13 +30,11 @@ export class SecurityAgent implements SecurityAgentPort {
     }
 
     const productionMutation = input.plan.targetEnvironment === 'production' && mutating.length > 0
-    const riskAssessment: SecurityAssessment['riskAssessment'] = input.freezeWindow && productionMutation
-      ? 'critical'
-      : productionMutation
-        ? 'high'
-        : mutating.length > 0
-          ? 'medium'
-          : 'low'
+    const riskAssessment: SecurityAssessment['riskAssessment'] = productionMutation
+      ? 'high'
+      : mutating.length > 0
+        ? 'medium'
+        : 'low'
 
     const recommendedApprovalsCount = input.freezeWindow && productionMutation ? 2 : productionMutation || protectedSteps.length > 0 ? 1 : 0
     const recommendedRoles = recommendedApprovalsCount === 2

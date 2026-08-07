@@ -83,9 +83,11 @@ test('low-confidence diagnosis cannot reach planning', async () => {
 
 test('security review recommends dual roles during a production freeze window without granting authority', async () => {
   const result = await createMultiAgentReasoningEngine({ now, strategies: [strategy], apiCapabilityRegistry: capabilities, freezeWindow: true }).synthesize(incident())
-  assert.equal(result.trace.securityAssessment.riskAssessment, 'critical')
+  assert.equal(result.trace.securityAssessment.riskAssessment, 'high')
   assert.equal(result.trace.securityAssessment.recommendedApprovalsCount, 2)
   assert.deepEqual(result.trace.securityAssessment.recommendedRoles, ['ON_CALL_LEAD', 'SECURITY_OFFICER'])
+  assert.equal(result.plan.approvalRequirements?.requiredApprovalsCount, 2)
+  assert.deepEqual(result.plan.approvalRequirements?.requiredRoles, ['ON_CALL_LEAD', 'SECURITY_OFFICER'])
   assert.ok(result.trace.securityAssessment.findings.some(item => item.code === 'FREEZE_WINDOW_MUTATION'))
 })
 

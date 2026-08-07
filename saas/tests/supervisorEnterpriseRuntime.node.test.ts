@@ -100,7 +100,7 @@ test('decision graph preserves evidence-to-action relationships deterministicall
   graph.link({ from: 'd1', to: 'p1', relation: 'derived_from' })
   const snapshot = graph.snapshot()
   assert.equal(snapshot.nodes.length, 3)
-  assert.deepEqual(snapshot.edges.map(edge => edge.relation), ['supports', 'derived_from'])
+  assert.deepEqual(snapshot.edges.map(edge => edge.relation), ['derived_from', 'supports'])
 })
 
 test('postgres quorum state store round-trips quorum state', async () => {

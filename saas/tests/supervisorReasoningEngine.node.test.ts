@@ -51,7 +51,7 @@ const mutationStrategy = (withRollback = true): RemediationStrategy => ({
       stepId: 'strategy-rollback-service',
       action: 'api_request',
       description: `Restore the pre-repair state for ${task.affectedResource}`,
-      protectedAction: true,
+      protectedAction: false,
       parameters: { method: 'POST', operation: 'restore_snapshot', target: task.affectedResource },
       expectedResult: 'pre-repair state restored',
     }],
@@ -73,27 +73,43 @@ test('produces a schema-valid deterministic read-only plan when no remediation s
 
 test('task rewriting preserves case-sensitive identifiers and deployment names', () => {
   const synthesis = createReasoningEngine({ now }).synthesize(incident())
-
   assert.equal(synthesis.trace.task.affectedResource, 'Service/CheckoutAPI')
   assert.equal(synthesis.trace.task.assumedState.deploymentId, 'ReleaseCandidate-42')
   assert.ok(synthesis.trace.task.canonicalGoal.includes('CheckoutAPI'))
   assert.ok(synthesis.trace.task.canonicalGoal.includes('ReleaseCandidate-42'))
 })
 
+test('reasoning operator copy is localized while machine identifiers stay stable', () => {
+  const plan = createReasoningEngine({ now, locale: 'pt-BR' }).proposeRepairPlan(incident({ errorMessage: 'p99 latency above 2 seconds' }))
+  assert.match(plan.diagnosis, /incidente|falha/i)
+  assert.match(plan.steps[0]?.description ?? '', /Confirmar|Inspecionar/)
+  assert.equal(plan.steps[0]?.stepId, 'reason-confirm-latency')
+  assert.equal(plan.targetProvider, 'generic-cloud')
+})
+
 test('registered mutation strategy is risk-elevated, protected, verified, and rollback-equipped', () => {
   const plan = createReasoningEngine({ now, strategies: [mutationStrategy()] }).proposeRepairPlan(incident())
-
   assert.equal(plan.riskLevel, 'high')
   assert.equal(plan.requiresBrowser, false)
   assert.ok(plan.steps.some(step => step.action === 'api_request' && step.protectedAction))
   assert.equal(plan.verificationSteps[0]?.stepId, 'strategy-verify-service')
   assert.equal(plan.rollbackSteps?.[0]?.stepId, 'strategy-rollback-service')
+  assert.equal(plan.rollbackSteps?.[0]?.protectedAction, false)
   repairPlanSchema.parse(JSON.parse(JSON.stringify(plan)))
 })
 
 test('mutation strategy without rollback fails closed before a RepairPlan is emitted', () => {
   const engine = createReasoningEngine({ now, strategies: [mutationStrategy(false)] })
   assert.throws(() => engine.proposeRepairPlan(incident()), /mutation without rollback steps/)
+})
+
+test('read-only no-op rollback does not satisfy the rollback requirement', () => {
+  const unsafe: RemediationStrategy = {
+    ...mutationStrategy(false),
+    strategyId: 'noop-rollback',
+    buildRollbackSteps: () => [{ stepId: 'noop', action: 'read', description: 'read only', protectedAction: false, parameters: {} }],
+  }
+  assert.throws(() => createReasoningEngine({ now, strategies: [unsafe] }).proposeRepairPlan(incident()), /without a mutating undo step/)
 })
 
 test('multiple matching remediation strategies fail closed instead of choosing authority by array accident', () => {
@@ -107,9 +123,33 @@ test('strategy cannot smuggle approval decisions or unprotected mutation into a 
     strategyId: 'unsafe',
     matches: () => true,
     buildSteps: () => [{ stepId: 'unsafe-delete', action: 'api_request', description: 'change service', protectedAction: false, parameters: { method: 'POST' } }],
-    buildRollbackSteps: () => [{ stepId: 'undo', action: 'read', description: 'noop', protectedAction: false, parameters: {} }],
+    buildRollbackSteps: () => [{ stepId: 'undo', action: 'api_request', description: 'undo', protectedAction: false, parameters: { method: 'POST' } }],
   }
   assert.throws(() => createReasoningEngine({ now, strategies: [unsafe] }).proposeRepairPlan(incident()), /protectedAction=true/)
+})
+
+test('browser strategy must provide a target origin', () => {
+  const browser: RemediationStrategy = {
+    strategyId: 'browser-repair',
+    matches: () => true,
+    buildSteps: () => [{ stepId: 'open', action: 'navigate', description: 'Open provider console', protectedAction: true, parameters: { path: '/service' } }],
+    buildRollbackSteps: () => [{ stepId: 'undo-browser', action: 'click', description: 'Restore previous selection', protectedAction: false, parameters: { selector: '#restore' } }],
+  }
+  assert.throws(() => createReasoningEngine({ now, strategies: [browser] }).proposeRepairPlan(incident()), /did not provide targetOrigin/)
+})
+
+test('browser strategy can produce a schema-valid plan with an explicit target origin', () => {
+  const browser: RemediationStrategy = {
+    strategyId: 'browser-repair',
+    matches: () => true,
+    resolveTargetOrigin: () => 'https://console.example.test',
+    buildSteps: () => [{ stepId: 'open', action: 'navigate', description: 'Open provider console', protectedAction: true, parameters: { path: '/service' } }],
+    buildRollbackSteps: () => [{ stepId: 'undo-browser', action: 'click', description: 'Restore previous selection', protectedAction: false, parameters: { selector: '#restore' } }],
+  }
+  const plan = createReasoningEngine({ now, strategies: [browser] }).proposeRepairPlan(incident())
+  assert.equal(plan.requiresBrowser, true)
+  assert.equal(plan.targetOrigin, 'https://console.example.test')
+  repairPlanSchema.parse(JSON.parse(JSON.stringify(plan)))
 })
 
 test('END TO END: read-only reasoning plan runs through the real policy and orchestrator', async () => {
@@ -131,7 +171,6 @@ test('END TO END: read-only reasoning plan runs through the real policy and orch
   })
 
   const outcome = await orchestrator.run(incident({ errorMessage: 'p99 latency above 2 seconds' }))
-
   assert.equal(outcome.status, 'completed')
   assert.equal(outcome.policy?.outcome, 'approved')
   assert.ok(executed.length >= 2)
@@ -157,7 +196,6 @@ test('END TO END: production mutation from reasoning engine still requires human
   })
 
   const outcome = await orchestrator.run(incident())
-
   assert.equal(outcome.status, 'approval_required')
   assert.match(outcome.reason, /Production modifications require approval/)
   assert.equal(executorCalled, false)

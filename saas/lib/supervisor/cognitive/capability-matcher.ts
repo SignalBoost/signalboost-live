@@ -5,6 +5,7 @@ import type { CapabilityAdmission } from './types.ts'
 
 const readOnlyActions = new Set<RepairStep['action']>(['read', 'verify', 'screenshot', 'stop'])
 const browserActions = new Set<RepairStep['action']>(['navigate', 'click', 'fill', 'select'])
+type Phase = CapabilityAdmission['phase']
 
 export class CapabilityMatcher {
   private readonly apiRegistry: ApiCapabilityRegistry
@@ -16,6 +17,7 @@ export class CapabilityMatcher {
   admit(plan: RepairPlan): CapabilityAdmission[] {
     const admissions: CapabilityAdmission[] = []
     for (const step of plan.steps) admissions.push(this.admitStep(step, plan, 'repair'))
+    for (const step of plan.verificationSteps) admissions.push(this.admitStep(step, plan, 'verification'))
     for (const step of plan.rollbackSteps ?? []) admissions.push(this.admitStep(step, plan, 'rollback'))
     return admissions
   }
@@ -29,11 +31,14 @@ export class CapabilityMatcher {
       if (admission.phase === 'rollback' && admission.executor === 'api' && admission.riskClass !== 'routine_reversible') {
         throw new Error(`Rollback step ${admission.stepId} is not registered as routine_reversible`)
       }
+      if (admission.phase === 'verification' && admission.approvalRequired) {
+        throw new Error(`Verification step ${admission.stepId} is not admissible without additional authority`)
+      }
     }
     return admissions
   }
 
-  private admitStep(step: RepairStep, plan: RepairPlan, phase: 'repair' | 'rollback'): CapabilityAdmission {
+  private admitStep(step: RepairStep, plan: RepairPlan, phase: Phase): CapabilityAdmission {
     if (readOnlyActions.has(step.action)) {
       return { stepId: step.stepId, phase, executor: 'read_only', known: true, autoExecutable: true, approvalRequired: false, riskClass: 'read_only', reason: 'Read-only step requires no mutating capability.' }
     }

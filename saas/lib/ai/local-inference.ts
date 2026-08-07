@@ -14,10 +14,14 @@ export interface LocalInferenceConfig {
 
 function normalizeBaseUrl(value: string): string {
   const url = new URL(value)
-  const allowedHosts = new Set(['127.0.0.1', 'localhost', '::1', 'ai-brain'])
+  const allowedHosts = new Set(['127.0.0.1', 'localhost', '::1', '[::1]', 'ai-brain'])
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Local AI endpoint must use http or https')
   if (!allowedHosts.has(url.hostname)) throw new Error(`Local AI endpoint host is not allowed: ${url.hostname}`)
   return url.toString().replace(/\/$/, '')
+}
+
+function authHeaders(apiKey?: string): Record<string, string> {
+  return apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {}
 }
 
 export function localInferenceConfigFromEnv(): LocalInferenceConfig {
@@ -37,7 +41,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+        ...authHeaders(config.apiKey),
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -70,7 +74,7 @@ export async function checkLocalInferenceHealth(config = localInferenceConfigFro
   const timeout = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 5000))
   try {
     const response = await fetch(`${config.baseUrl}/models`, {
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : undefined,
+      headers: authHeaders(config.apiKey),
       signal: controller.signal,
     })
     if (!response.ok) return { ok: false, model: config.model, error: `HTTP ${response.status}` }

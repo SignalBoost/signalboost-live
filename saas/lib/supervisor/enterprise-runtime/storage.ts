@@ -68,6 +68,23 @@ export class PostgresQuorumStateStore implements QuorumStateStore {
 
 export interface PersistentMerkleAppendResult { leafHash: string; merkleRoot: string; leafIndex: number }
 
+function frontierRoot(nodes: Array<{ level: number; node_hash: string }>): string {
+  if (nodes.length === 0) return hash('EMPTY_SUPERVISOR_AUDIT_LEDGER')
+  const ordered = [...nodes].sort((a, b) => a.level - b.level)
+  let currentHash = ordered[0].node_hash
+  let currentLevel = ordered[0].level
+  for (let index = 1; index < ordered.length; index += 1) {
+    const node = ordered[index]
+    while (currentLevel < node.level) {
+      currentHash = hash(currentHash + currentHash)
+      currentLevel += 1
+    }
+    currentHash = hash(node.node_hash + currentHash)
+    currentLevel += 1
+  }
+  return currentHash
+}
+
 /** Incremental Merkle accumulator. Each append touches O(log n) frontier rows instead of replaying all leaves. */
 export class PostgresMerkleAuditStore {
   constructor(private readonly db: SqlClient) {}
@@ -75,6 +92,7 @@ export class PostgresMerkleAuditStore {
   async append(event: Readonly<AuditEvent>): Promise<PersistentMerkleAppendResult> {
     await this.db.query('BEGIN')
     try {
+      await this.db.query("SELECT pg_advisory_xact_lock(hashtext('supervisor_merkle_frontier'))")
       const countResult = await this.db.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM supervisor_audit_events')
       const leafIndex = Number(countResult.rows[0]?.count ?? '0')
       const leafHash = hash(canonicalJson(event))
@@ -99,10 +117,8 @@ export class PostgresMerkleAuditStore {
         [level, carry, leafIndex + 1],
       )
 
-      const frontierRows = await this.db.query<{ level: number; node_hash: string }>('SELECT level, node_hash FROM supervisor_merkle_frontier ORDER BY level DESC')
-      let root = ''
-      for (const node of frontierRows.rows) root = root ? hash(node.node_hash + root) : node.node_hash
-      if (!root) root = hash('EMPTY_SUPERVISOR_AUDIT_LEDGER')
+      const frontierRows = await this.db.query<{ level: number; node_hash: string }>('SELECT level, node_hash FROM supervisor_merkle_frontier ORDER BY level ASC')
+      const root = frontierRoot(frontierRows.rows)
 
       await this.db.query(
         `INSERT INTO supervisor_audit_events(event_id, incident_id, event_type, occurred_at, payload, schema_version, leaf_hash, merkle_root_at_append)

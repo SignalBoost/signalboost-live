@@ -96,10 +96,9 @@ export class SupervisorOrchestrator {
         // unchanged, so a deployment with no classes configured behaves exactly as it did
         // before this existed.
         //
-        // The boundary is computed FIRST, further down, in the ordinary flow — so it is
-        // recomputed here rather than reused. That is deliberate: admitting a repair
-        // depends on reversibility, and reversibility must be established before the
-        // decision to skip the human, not after.
+        // Reversibility is evaluated here before any human can be skipped. The same
+        // boundary is recomputed again immediately before execution and the actual
+        // checkpoint is captured there, before any dispatcher/executor call can mutate.
         const envelopeClasses = this.deps.repairClasses || []
         if (envelopeClasses.length && this.deps.snapshotPort) {
           const capabilities = await this.deps.snapshotPort.capabilities()
@@ -131,6 +130,33 @@ export class SupervisorOrchestrator {
         await this.audit(incident, 'orchestration_failed', { reason: 'empty_approved_step_scope' })
         return { status: 'failed', policy, reason: 'Approved execution must include explicit step scope.' }
       }
+
+      // ── TRANSACTIONAL BOUNDARY, ESTABLISHED BEFORE ANYTHING CHANGES ───────
+      // This block MUST remain before execution_started and before every dispatcher/
+      // executor call. A checkpoint captured after execution is the mutated state and
+      // cannot satisfy the product's rollback guarantee.
+      let boundary: TransactionBoundaryPlan | undefined
+      const snapshots: StateSnapshotRef[] = []
+      if (this.deps.snapshotPort) {
+        const capabilities = await this.deps.snapshotPort.capabilities()
+        boundary = planTransactionBoundary(plan, capabilities)
+        await this.audit(incident, 'boundary_evaluated', { classification: boundary.classification, summary: boundary.summary, uncoveredScopes: boundary.uncoveredScopes })
+
+        if (boundary.classification === 'unbounded' && this.deps.requireBoundedExecution) {
+          return { status: 'blocked', policy, boundary, reason: `Execution blocked: ${boundary.summary}` }
+        }
+
+        for (const scope of boundary.scopesToCapture) {
+          const captured = await this.deps.snapshotPort.capture({ scope, provider: plan.targetProvider, environment: plan.targetEnvironment, reason: `pre-repair checkpoint for ${plan.planId}` })
+          if (!captured.ok || !captured.snapshot) {
+            await this.audit(incident, 'snapshot_capture_failed', { scope, error: captured.error ?? 'unknown' })
+            return { status: 'blocked', policy, boundary, reason: `Could not capture the ${scope} checkpoint before repairing, so the repair was not started: ${captured.error ?? 'no reason given'}` }
+          }
+          snapshots.push(captured.snapshot)
+        }
+        if (snapshots.length) await this.audit(incident, 'snapshot_captured', { snapshotIds: snapshots.map(item => item.snapshotId), scopes: snapshots.map(item => item.scope) })
+      }
+
       await this.audit(incident, 'execution_started', { approvedStepIds: policy.approvedStepIds })
       let execution: ExecutionResult
       if (this.deps.dispatcher) {
@@ -154,32 +180,6 @@ export class SupervisorOrchestrator {
         }
       } else {
         execution = await this.deps.executor.execute({ incident, plan, policy, approvedStepIds: [...policy.approvedStepIds], context: this.deps.executionContext })
-      }
-      // ── TRANSACTIONAL BOUNDARY, ESTABLISHED BEFORE ANYTHING CHANGES ───────
-      // The checkpoint has to exist before the repair, not after it fails. Capturing on
-      // failure is capturing the broken state.
-      let boundary: TransactionBoundaryPlan | undefined
-      const snapshots: StateSnapshotRef[] = []
-      if (this.deps.snapshotPort) {
-        const capabilities = await this.deps.snapshotPort.capabilities()
-        boundary = planTransactionBoundary(plan, capabilities)
-        await this.audit(incident, 'boundary_evaluated', { classification: boundary.classification, summary: boundary.summary, uncoveredScopes: boundary.uncoveredScopes })
-
-        if (boundary.classification === 'unbounded' && this.deps.requireBoundedExecution) {
-          return { status: 'blocked', policy, boundary, reason: `Execution blocked: ${boundary.summary}` }
-        }
-
-        for (const scope of boundary.scopesToCapture) {
-          const captured = await this.deps.snapshotPort.capture({ scope, provider: plan.targetProvider, environment: plan.targetEnvironment, reason: `pre-repair checkpoint for ${plan.planId}` })
-          if (!captured.ok || !captured.snapshot) {
-            // A checkpoint that cannot be taken is not a warning. Proceeding would mean
-            // running a change we have already discovered we cannot reverse.
-            await this.audit(incident, 'snapshot_capture_failed', { scope, error: captured.error ?? 'unknown' })
-            return { status: 'blocked', policy, boundary, reason: `Could not capture the ${scope} checkpoint before repairing, so the repair was not started: ${captured.error ?? 'no reason given'}` }
-          }
-          snapshots.push(captured.snapshot)
-        }
-        if (snapshots.length) await this.audit(incident, 'snapshot_captured', { snapshotIds: snapshots.map(item => item.snapshotId), scopes: snapshots.map(item => item.scope) })
       }
 
       const approved = new Set(policy.approvedStepIds)

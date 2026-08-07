@@ -1,0 +1,77 @@
+services:
+  ai-brain-vllm:
+    profiles: ["vllm"]
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
+    runtime: nvidia
+    ipc: host
+    restart: unless-stopped
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    volumes:
+      - ${LOCAL_AI_MODEL_ROOT:-/opt/signalboost/models}:/models:ro
+    ports:
+      - "127.0.0.1:${LOCAL_AI_HOST_PORT:-8000}:8000"
+    command:
+      - --model
+      - ${LOCAL_AI_MODEL_PATH}
+      - --served-model-name
+      - ${LOCAL_AI_MODEL_NAME}
+      - --api-key
+      - ${LOCAL_AI_API_KEY}
+      - --tensor-parallel-size
+      - ${LOCAL_AI_TENSOR_PARALLEL_SIZE:-1}
+      - --max-model-len
+      - ${LOCAL_AI_MAX_MODEL_LEN:-32768}
+      - --gpu-memory-utilization
+      - ${LOCAL_AI_GPU_MEMORY_UTILIZATION:-0.90}
+      - --generation-config
+      - vllm
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/v1/models',headers={'Authorization':'Bearer ${LOCAL_AI_API_KEY}'}); urllib.request.urlopen(r,timeout=5).read()\""]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 120s
+    networks:
+      local-ai:
+        aliases: ["ai-brain"]
+
+  ai-brain-llamacpp:
+    profiles: ["llamacpp"]
+    image: ${LLAMACPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda}
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ${LOCAL_AI_MODEL_ROOT:-/opt/signalboost/models}:/models:ro
+    ports:
+      - "127.0.0.1:${LOCAL_AI_HOST_PORT:-8000}:8080"
+    command:
+      - -m
+      - ${LOCAL_AI_GGUF_PATH}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --alias
+      - ${LOCAL_AI_MODEL_NAME}
+      - --api-key
+      - ${LOCAL_AI_API_KEY}
+      - -ngl
+      - ${LOCAL_AI_GPU_LAYERS:-999}
+      - -c
+      - ${LOCAL_AI_MAX_MODEL_LEN:-32768}
+    networks:
+      local-ai:
+        aliases: ["ai-brain"]
+
+networks:
+  local-ai:
+    internal: true

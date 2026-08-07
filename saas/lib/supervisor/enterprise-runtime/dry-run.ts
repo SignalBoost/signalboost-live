@@ -23,10 +23,8 @@ export class DryRunEngine {
     if (!planning.allowed) return { passedSimulation: false, predictedMetrics: {}, errors: [planning.reason] }
 
     const snapshot = await provider.snapshots.checkpoint(target)
-    let executionSucceeded = false
     try {
       const execution = await provider.mutations.execute(target, request.params)
-      executionSucceeded = execution.success
       if (!execution.success) return { passedSimulation: false, predictedMetrics: {}, errors: ['Shadow execution returned failure'], snapshotId: snapshot.snapshotId }
       const verification = await provider.verification.verify(target)
       return {
@@ -37,7 +35,7 @@ export class DryRunEngine {
       }
     } finally {
       const rollback = await provider.rollback.rollback(snapshot)
-      if (!rollback.restored && executionSucceeded) throw new Error('Dry-run environment could not be restored after simulated mutation')
+      if (!rollback.restored) throw new Error('Dry-run environment could not be restored after simulated mutation')
     }
   }
 }

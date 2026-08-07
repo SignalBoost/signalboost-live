@@ -1,40 +1,10 @@
 // saas/lib/outreach/prospectCampaign.ts
 //
-// Compatibility surface for the durable prospect campaign worker.
+// Direct compatibility surface for the proven durable prospect campaign worker.
 //
-// The worker in prospectCampaignCore.ts is the last-known-good implementation that ran
-// the complete COS -> discovery -> draft-for-approval workflow. Keep this public module
-// intentionally thin so existing callers (Concierge, cron, campaign jobs) invoke that
-// worker directly without a second campaign-intent decision after COS has already parsed
-// and admitted the request.
-//
-// Campaign routing still happens before this module at the Concierge/support boundary.
-// This file only restores the worker contract that was in production before PR #928.
+// COS/Concierge already parses and admits a prospect campaign before it reaches this
+// module. Keep this boundary as a pure re-export so queue creation, worker advancement,
+// discovery, and pending-draft generation use the exact implementation in
+// prospectCampaignCore.ts with no second runtime wrapper or intent decision.
 
-import * as core from './prospectCampaignCore'
-
-export type {
-  ProspectCampaignStatus,
-  ProspectCandidate,
-  ProspectResult,
-  ProspectCampaignJob,
-} from './prospectCampaignCore'
-
-export {
-  getProspectCampaignJob,
-  listProspectCampaignJobs,
-  cancelProspectCampaignJob,
-  draftMessageFor,
-  advanceProspectCampaigns,
-  summarizeProspectCampaign,
-} from './prospectCampaignCore'
-
-type CoreInput = Parameters<typeof core.createProspectCampaignJob>[0]
-export type CreateProspectCampaignInput = CoreInput & { brief?: string | null }
-
-export async function createProspectCampaignJob(
-  input: CreateProspectCampaignInput,
-): ReturnType<typeof core.createProspectCampaignJob> {
-  const { brief: _brief, ...coreInput } = input
-  return core.createProspectCampaignJob(coreInput)
-}
+export * from './prospectCampaignCore'

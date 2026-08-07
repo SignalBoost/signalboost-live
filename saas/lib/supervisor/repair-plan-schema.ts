@@ -13,6 +13,12 @@ export interface RepairStep {
   expectedResult?: string
 }
 
+export interface ApprovalRequirements {
+  requiredApprovalsCount: number
+  requiredRoles: string[]
+  rationale?: string
+}
+
 export interface RepairPlan {
   planId: string
   incidentId: string
@@ -23,6 +29,7 @@ export interface RepairPlan {
   targetProvider: string
   targetEnvironment: (typeof supervisorEnvironments)[number]
   targetOrigin?: string
+  approvalRequirements?: ApprovalRequirements
   steps: RepairStep[]
   verificationSteps: RepairStep[]
   rollbackSteps?: RepairStep[]
@@ -42,6 +49,28 @@ function assertDate(value: unknown, path: string): string {
   const result = assertString(value, path)
   if (Number.isNaN(Date.parse(result))) throw new SupervisorValidationError(`${path} must be a valid date string`)
   return result
+}
+function assertApprovalRequirements(candidate: unknown): ApprovalRequirements {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || Object.getPrototypeOf(candidate) !== Object.prototype) {
+    throw new SupervisorValidationError('approvalRequirements must be a plain object')
+  }
+  const input = candidate as Record<string, unknown>
+  const count = input.requiredApprovalsCount
+  if (!Number.isInteger(count) || (count as number) < 0 || (count as number) > 10) {
+    throw new SupervisorValidationError('approvalRequirements.requiredApprovalsCount must be an integer from 0 through 10')
+  }
+  if (!Array.isArray(input.requiredRoles) || input.requiredRoles.some(role => typeof role !== 'string' || role.trim() === '')) {
+    throw new SupervisorValidationError('approvalRequirements.requiredRoles must be an array of non-empty strings')
+  }
+  const requiredRoles = [...new Set((input.requiredRoles as string[]).map(role => role.trim()))]
+  if ((count as number) < requiredRoles.length) {
+    throw new SupervisorValidationError('approvalRequirements.requiredApprovalsCount cannot be lower than the number of mandatory roles')
+  }
+  return {
+    requiredApprovalsCount: count as number,
+    requiredRoles,
+    ...(input.rationale === undefined ? {} : { rationale: assertString(input.rationale, 'approvalRequirements.rationale') }),
+  }
 }
 function assertStep(candidate: unknown, path: string): RepairStep {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || Object.getPrototypeOf(candidate) !== Object.prototype) throw new SupervisorValidationError(`${path} must be a plain object`)
@@ -93,6 +122,7 @@ export const repairPlanSchema = {
       targetProvider: assertString(input.targetProvider, 'targetProvider'),
       targetEnvironment: input.targetEnvironment as RepairPlan['targetEnvironment'],
       targetOrigin: input.targetOrigin === undefined ? undefined : assertString(input.targetOrigin, 'targetOrigin'),
+      approvalRequirements: input.approvalRequirements === undefined ? undefined : assertApprovalRequirements(input.approvalRequirements),
       steps: steps.map((step, index) => assertStep(step, `steps[${index}]`)),
       verificationSteps: verificationSteps.map((step, index) => assertStep(step, `verificationSteps[${index}]`)),
       rollbackSteps: input.rollbackSteps === undefined ? undefined : (input.rollbackSteps as unknown[]).map((step, index) => assertStep(step, `rollbackSteps[${index}]`)),

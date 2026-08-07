@@ -134,12 +134,11 @@ async function directProspectCampaign(
     })
     const conversationId = conversationIdFrom(body)
 
-    // Kick the worker immediately after the response so the first prospects do
-    // not have to wait for the next two-minute cron tick. The cron remains the
-    // durable retry path. Persisting the turn is also best-effort and cannot delay
-    // the acknowledgement that the job was safely queued.
+    // Kick the exact job immediately after the response so a previously stuck campaign
+    // can never steal this campaign's first worker tick. Cron remains the durable retry
+    // path and uses fair scheduling across all unfinished campaigns.
     after(async () => {
-      const tasks: Promise<unknown>[] = [advanceProspectCampaigns()]
+      const tasks: Promise<unknown>[] = [advanceProspectCampaigns(started.job.id)]
       if (access.userId && conversationId) {
         tasks.push(persistTurn({
           conversationId,

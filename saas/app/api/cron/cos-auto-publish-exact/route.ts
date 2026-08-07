@@ -134,6 +134,8 @@ function eligible(campaign: any): boolean {
   if (!language) return false
   if (alreadyPublished(campaign, language)) return false
   if (!exactFinalVideo(campaign, language)) return false
+  // Quota backoff is campaign-specific. One campaign's quota marker must not
+  // prevent other approved videos from publishing.
   if (quotaRetryWindowActive(campaign)) return false
 
   return minutesSince(campaign?.metadata?.autoPublishExact?.lastAttemptAt) >= RETRY_MINUTES
@@ -236,29 +238,16 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
-  const activeQuotaBlock = (data || [])
-    .map(quotaBlockedUntil)
-    .filter((value): value is string => Boolean(value))
-    .sort()[0] || null
-
-  if (activeQuotaBlock) {
-    const publicationEmail = await publicationEmailSummary(req)
-    return NextResponse.json({
-      ok: true,
-      scanned: data?.length || 0,
-      eligible: 0,
-      published: 0,
-      quotaBlockedUntil: activeQuotaBlock,
-      results: [],
-      publicationEmail,
-    })
-  }
-
+  // Evaluate quota backoff per campaign. Previously, one active quota marker
+  // caused an early return that stopped every approved video in the queue.
   const targets = (data || []).filter(eligible).slice(0, LIMIT)
   const results: Array<PublishAttemptResult & { campaign: string; title: string }> = []
   for (const campaign of targets) {
     const result = await publishOne(sb, campaign)
     results.push({ campaign: String(campaign.id), title: String(campaign.title || ''), ...result })
+    // A real provider-wide quota response can stop this run to avoid repeated
+    // rejected requests, while later cron runs still evaluate each campaign
+    // independently instead of globally freezing the queue.
     if (!result.ok && result.quotaBlockedUntil) break
   }
 
@@ -270,6 +259,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     scanned: data?.length || 0,
     eligible: targets.length,
+    quotaBlocked: (data || []).filter(quotaRetryWindowActive).length,
     published: results.filter(result => result.ok).length,
     results,
     publicationEmail,

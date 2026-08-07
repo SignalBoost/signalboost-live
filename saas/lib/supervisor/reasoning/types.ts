@@ -51,6 +51,7 @@ export interface RemediationStrategy {
   buildSteps(input: { incident: SupervisorIncident; task: RewrittenTask }): RepairStep[]
   buildVerificationSteps?(input: { incident: SupervisorIncident; task: RewrittenTask }): RepairStep[]
   buildRollbackSteps?(input: { incident: SupervisorIncident; task: RewrittenTask }): RepairStep[]
+  resolveTargetOrigin?(input: { incident: SupervisorIncident; task: RewrittenTask }): string | undefined
 }
 
 export interface ReasoningTrace {

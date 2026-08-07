@@ -1,4 +1,5 @@
 import type { SupervisorIncident } from '../incident-schema.ts'
+import { reasoningCopy } from './reasoning-copy.ts'
 import type { ReasoningIncidentShape, RewrittenTask } from './types.ts'
 
 const SHAPES: Array<[ReasoningIncidentShape, RegExp]> = [
@@ -21,16 +22,17 @@ export function classifyReasoningIncident(incident: SupervisorIncident): Reasoni
 }
 
 export class TaskRewriter {
-  rewrite(incident: SupervisorIncident): RewrittenTask {
+  rewrite(incident: SupervisorIncident, locale?: string | null): RewrittenTask {
     const affectedResource = incident.affectedResource ?? incident.provider
     const shape = classifyReasoningIncident(incident)
     const canonicalMessage = normalizeText(incident.errorMessage)
+    const copy = reasoningCopy(locale)
 
     return {
       incidentId: incident.incidentId,
       provider: incident.provider,
       environment: incident.environment,
-      canonicalGoal: `Diagnose and safely remediate the reported ${shape.replace('_', ' ')} incident affecting ${affectedResource}: ${canonicalMessage}`,
+      canonicalGoal: copy.goal(shape.replace('_', ' '), affectedResource, canonicalMessage),
       affectedResource,
       shape,
       scopeBoundaries: [affectedResource, incident.provider, incident.environment],

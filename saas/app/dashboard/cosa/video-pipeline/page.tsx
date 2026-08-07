@@ -1,3 +1,4 @@
+// saas/app/dashboard/cosa/video-pipeline/page.tsx
 'use client'
 
 import { LocalizedText } from '@/components/i18n/LocalizedText'
@@ -40,6 +41,15 @@ function deriveState(campaign: any): { state: CardState; step: number; note: str
   const voiced = voiceVerified || (Array.isArray(video?.voicedLangs) && video.voicedLangs.length > 0)
 
   if (campaign?.approved_at && PUBLISHED_STATUSES.has(status)) return { state: 'published', step: 3, note: uiText('generatedUi.u_081c2bedad4e180d') }
+  // APPROVED USED TO WIN UNCONDITIONALLY, which made "APPROVED — PUBLISHING" a terminal
+  // display state: once approved_at was set this function returned before any failure
+  // check could run, so a publish leg that was refused every ten minutes for eighteen
+  // days ("Token has been expired or revoked") looked identical to one that was working.
+  // The publish record now outranks the optimistic label.
+  const publish = campaign?.publish || null
+  if (campaign?.approved_at && publish?.ok === false && publish?.error) {
+    return { state: 'problem', step: 3, note: String(publish.error).slice(0, 160) }
+  }
   if (campaign?.approved_at) return { state: 'approved', step: 3, note: uiText('generatedUi.u_7a4003bb3ab68de0') }
   if (silentFallback) return { state: 'working', step: 2, note: uiText('generatedUi.u_68021493edfb374c') }
   if (finalReady) return { state: 'ready', step: 3, note: uiText('generatedUi.u_2d87483cc595f92d') }
@@ -244,7 +254,7 @@ export default function CosaVideoPipelinePage() {
               {!archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'archive')} disabled={busyId === campaign.id} style={ghost}>{uiText('generatedUi.u_66f4804ee23ddc09')}</button>}
               {archived[campaign.id] && <button onClick={() => archiveAction(campaign.id, 'restore')} disabled={busyId === campaign.id} style={primary}>{uiText('generatedUi.u_a76e13b9839270eb')}</button>}
             </div>
-            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={uiText('generatedUi.u_890ab358a55d7fce')} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, campaignStatus: campaign.status, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned }, null, 2)}</pre></details>
+            <details style={{ marginTop: 12 }}><summary style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, cursor: 'pointer' }}><LocalizedText fallback={uiText('generatedUi.u_890ab358a55d7fce')} /></summary><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.6)', fontSize: 11 }}>{JSON.stringify({ campaignId: campaign.id, requestId: video.requestId, stage: video.stage, campaignStatus: campaign.status, eligibility: campaign.eligibility, voiceStatus: video.voiceStatus, voiceEngine: video.voiceEngine, audioTrack: video.audioTrack, captionsBurned: video.captionsBurned, publish: campaign.publish || null }, null, 2)}</pre></details>
           </article>
         })}
       </div>

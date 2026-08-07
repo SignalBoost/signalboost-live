@@ -10,7 +10,14 @@ export class QuorumAwarePolicyEngine implements PolicyEngine {
     const decision = await this.base.evaluate(input)
     if (decision.outcome !== 'approval_required') return decision
 
-    const quorum = await this.quorum.evaluate({ incident: input.incident, plan: input.plan, policy: decision })
+    const scopedDecision: PolicyDecision = {
+      ...decision,
+      approvedStepIds: decision.approvedStepIds.length > 0
+        ? [...decision.approvedStepIds]
+        : input.plan.steps.map(step => step.stepId),
+    }
+
+    const quorum = await this.quorum.evaluate({ incident: input.incident, plan: input.plan, policy: scopedDecision })
     if (!quorum.satisfied) {
       return {
         ...decision,
@@ -19,7 +26,7 @@ export class QuorumAwarePolicyEngine implements PolicyEngine {
     }
 
     return {
-      ...decision,
+      ...scopedDecision,
       outcome: 'approved',
       reason: `${decision.reason} Quorum approval satisfied by ${quorum.approverIds?.length ?? 0} authorized approver(s).`,
     }

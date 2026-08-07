@@ -17,6 +17,22 @@ console; provider keys are needed only for the providers you actually use.
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key. Used server-side by the PR engine, the credential vault, and the hub-user/role lookup. Never exposed to the browser. |
 | `VAULT_MASTER_KEY` | Master key the credential vault uses to encrypt stored provider keys at rest. Generate a strong random value and keep it stable. |
 
+## Private local AI appliance (optional)
+
+Use these when the buyer wants text inference to remain on the physical appliance. The local endpoint is OpenAI-compatible and can be backed by vLLM or llama.cpp. Cloud fallback is disabled unless explicitly opted into.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `AI_MODEL_PROVIDER=local` | For local inference | Selects the local model router path. |
+| `LOCAL_AI_BASE_URL` | For local inference | Internal OpenAI-compatible endpoint; appliance default is `http://127.0.0.1:8000/v1`. |
+| `LOCAL_AI_MODEL` | For local inference | Served model alias, e.g. `signalboost-local-brain`. |
+| `LOCAL_AI_API_KEY` | Recommended | Per-appliance bearer secret for the internal inference server. |
+| `LOCAL_AI_TIMEOUT_MS` | Optional | Request timeout; defaults to 120000 ms and is bounded by the backend. |
+| `LOCAL_AI_ALLOW_CLOUD_FALLBACK` | Optional | Must be exactly `true` to allow a failed local request to leave the appliance. Default behavior is fail-closed/no cloud fallback. |
+| `LOCAL_AI_CLOUD_FALLBACK_PROVIDER` | Optional | `claude` or `openai` when explicit cloud fallback is enabled. |
+
+The factory/deployment scripts under `appliance/local-ai/` provision model files, quantize GGUF when desired, and run the inference service bound to loopback/internal networking.
+
 ## PR Cockpit
 
 | Variable | Required | Purpose |
@@ -58,6 +74,7 @@ Each provider's actions are inert until its key is present.
 
 | Provider | Variables |
 | --- | --- |
+| Local open-model inference | `AI_MODEL_PROVIDER`, `LOCAL_AI_BASE_URL`, `LOCAL_AI_MODEL`, `LOCAL_AI_API_KEY` |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |

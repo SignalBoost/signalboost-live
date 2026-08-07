@@ -1,43 +1,7 @@
 import type { RepairStep } from '../repair-plan-schema.ts'
 import type { SupervisorIncident } from '../incident-schema.ts'
+import { reasoningCopy } from './reasoning-copy.ts'
 import type { RemediationStrategy, RewrittenTask } from './types.ts'
-
-const DIAGNOSTIC_QUESTIONS: Record<RewrittenTask['shape'], Array<[string, string]>> = {
-  availability: [
-    ['confirm-current-health', 'Confirm the affected resource is still unavailable'],
-    ['inspect-dependencies', 'Inspect immediate dependency health'],
-    ['inspect-recent-change', 'Inspect the most recent deployment or configuration change'],
-  ],
-  deployment: [
-    ['inspect-deployment', 'Inspect the current deployment or rollout state'],
-    ['inspect-failure-evidence', 'Inspect the first failing build or rollout evidence'],
-    ['compare-previous', 'Compare against the previously healthy revision'],
-  ],
-  saturation: [
-    ['confirm-saturation', 'Confirm the constrained resource is still saturated'],
-    ['inspect-trend', 'Inspect recent utilization trend'],
-    ['identify-consumer', 'Identify the largest workload or tenant consumer'],
-  ],
-  latency: [
-    ['confirm-latency', 'Confirm the reported latency is still elevated'],
-    ['locate-slow-path', 'Locate the slow endpoint or operation'],
-    ['inspect-dependencies', 'Inspect downstream dependency latency'],
-  ],
-  errors: [
-    ['confirm-error-rate', 'Confirm the reported error rate is still elevated'],
-    ['sample-errors', 'Inspect representative failures for the dominant error'],
-    ['inspect-recent-change', 'Inspect the most recent deployment or configuration change'],
-  ],
-  data_freshness: [
-    ['confirm-freshness', 'Confirm the data is still stale'],
-    ['inspect-producer', 'Inspect the producer or scheduled job health'],
-    ['inspect-queue', 'Inspect queue depth and oldest-message age'],
-  ],
-  unclassified: [
-    ['inspect-resource', 'Inspect the current state of the affected resource'],
-    ['inspect-events', 'Inspect recent events around the incident time'],
-  ],
-}
 
 const readStep = (id: string, description: string, task: RewrittenTask): RepairStep => ({
   stepId: `reason-${id}`,
@@ -65,8 +29,9 @@ function assertStrategyStepsSafe(steps: RepairStep[], strategyId: string): void 
 }
 
 export class StepDecomposer {
-  decompose(input: { incident: SupervisorIncident; task: RewrittenTask; strategy?: RemediationStrategy }): RepairStep[] {
-    const diagnostics = DIAGNOSTIC_QUESTIONS[input.task.shape].map(([id, description]) => readStep(id, description, input.task))
+  decompose(input: { incident: SupervisorIncident; task: RewrittenTask; strategy?: RemediationStrategy; locale?: string | null }): RepairStep[] {
+    const diagnostics = reasoningCopy(input.locale).questions[input.task.shape]
+      .map(([id, description]) => readStep(id, description, input.task))
     if (!input.strategy) return diagnostics
 
     const remediation = input.strategy.buildSteps({ incident: input.incident, task: input.task })

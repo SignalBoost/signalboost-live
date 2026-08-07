@@ -24,7 +24,7 @@ export interface CognitiveContext {
 
 export interface CapabilityAdmission {
   stepId: string
-  phase: 'repair' | 'rollback'
+  phase: 'repair' | 'verification' | 'rollback'
   executor: 'api' | 'browser' | 'read_only'
   known: boolean
   autoExecutable: boolean

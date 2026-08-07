@@ -1,3 +1,4 @@
+// saas/app/api/cos/video-pipeline-xray/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
@@ -107,10 +108,45 @@ function underlyingIssue(v: any): string {
   if (unb.length) return `voiced [${unb.join(',')}], banner not burned`
   return `stage=${String(v.status || 'unknown')}`
 }
+// THE PUBLISH LEG'S OWN RECORD. Every auto-publish attempt writes its outcome to
+// metadata.autoPublishExact — error, timestamp, live URL. For eighteen days that record
+// said "Token has been expired or revoked" every ten minutes while the card said
+// "Publishing is continuing automatically", because nothing between the row and the
+// screen ever read it. This function is that missing read.
+function publishAttempt(c: any): { ok: boolean | null; error: string | null; lastAttemptAt: string | null; liveUrl: string | null; quotaBlockedUntil: string | null } | null {
+  const a = c?.metadata?.autoPublishExact
+  if (!a || typeof a !== 'object') return null
+  return {
+    ok: typeof a.ok === 'boolean' ? a.ok : null,
+    error: a.error ? String(a.error).slice(0, 200) : null,
+    lastAttemptAt: a.lastAttemptAt || null,
+    liveUrl: a.liveUrl || null,
+    quotaBlockedUntil: a.quotaBlockedUntil || c?.metadata?.youtubeQuota?.blockedUntil || null,
+  }
+}
+
 function eligibility(c: any, job?: any): string {
   const v = c?.metadata?.video
   const created = c.created_at ? Date.parse(c.created_at) : 0
   if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff'
+  // APPROVED CAMPAIGNS HAVE A LIFE AFTER APPROVAL, and until now this function ended its
+  // reasoning at the approve button — rendering states only, nothing about publishing. An
+  // approved campaign whose every publish attempt was being refused reported nothing.
+  if (c.approved_at && String(c.status || '') === 'approved') {
+    const attempt = publishAttempt(c)
+    if (attempt?.liveUrl) return `PUBLISHED: live at ${attempt.liveUrl}`
+    if (attempt?.quotaBlockedUntil && Date.parse(attempt.quotaBlockedUntil) > Date.now()) {
+      return `PUBLISH WAITING: YouTube quota exhausted — retries resume after ${attempt.quotaBlockedUntil}.`
+    }
+    if (attempt && attempt.ok === false && attempt.error) {
+      const err = attempt.error
+      const tokenDead = /expired|revoked|invalid_grant|unauthorized/i.test(err)
+      return tokenDead
+        ? `PUBLISH FAILING: ${err} — the YouTube connection is dead. Reconnect the Google account (and move the OAuth app to Production in Google Cloud Console so the token stops expiring every 7 days). Retrying every 10 min; last attempt ${attempt.lastAttemptAt || 'unknown'}.`
+        : `PUBLISH FAILING: ${err} — retrying every 10 min; last attempt ${attempt.lastAttemptAt || 'unknown'}.`
+    }
+    if (!attempt) return 'PUBLISH PENDING: approved — waiting for the first auto-publish attempt (runs every 10 min).'
+  }
   if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
   if (!isVideoChannel(c) && looksLikeVideoRequest(c) && !v) return `STUCK: video request was routed as ${String(c.channel || 'unknown')} instead of youtube/short_video. Press "Kick missing renders" to rescue it, move it into the video pipeline, and start rendering.`
   if (!v) return 'STAGE 0: waiting for auto-render start'
@@ -225,7 +261,7 @@ export async function GET(req: NextRequest) {
     const baseUrl = v?.url ? String(v.url) : null
     const anyPreviewUrl = previewUrl(c, v)
     const misrouted = !isVideoChannel(c) && looksLikeVideoRequest(c)
-    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, intendedChannel: misrouted ? inferredVideoChannel(c) : c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, misrouted, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null, renderJob: v?.requestId ? (jobById[String(v.requestId)] || null) : null } : null, eligibility: eligibility(c, v?.requestId ? jobById[String(v.requestId)] : undefined) }
+    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, intendedChannel: misrouted ? inferredVideoChannel(c) : c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, misrouted, publish: publishAttempt(c), video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null, renderJob: v?.requestId ? (jobById[String(v.requestId)] || null) : null } : null, eligibility: eligibility(c, v?.requestId ? jobById[String(v.requestId)] : undefined) }
   })
   return NextResponse.json({ ok: true, now: new Date().toISOString(), backlogCutoff: BACKLOG_CUTOFF, env, actions, campaigns })
 }

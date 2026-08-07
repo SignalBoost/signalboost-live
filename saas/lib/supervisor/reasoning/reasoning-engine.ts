@@ -14,6 +14,7 @@ export const REASONING_PLAN_SCHEMA_VERSION = 'supervisor-reasoning-plan-v1'
 export interface ReasoningEngineOptions {
   now?: () => Date
   strategies?: readonly RemediationStrategy[]
+  locale?: string | null
 }
 
 const safeId = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80) || 'unknown'
@@ -29,6 +30,7 @@ function selectStrategy(incident: SupervisorIncident, task: ReturnType<TaskRewri
 export class ReasoningEngine implements Thinker {
   private readonly now: () => Date
   private readonly strategies: readonly RemediationStrategy[]
+  private readonly locale?: string | null
   private readonly rewriter = new TaskRewriter()
   private readonly decomposer = new StepDecomposer()
   private readonly predictor = new FailurePredictor()
@@ -39,18 +41,26 @@ export class ReasoningEngine implements Thinker {
   constructor(options: ReasoningEngineOptions = {}) {
     this.now = options.now ?? (() => new Date())
     this.strategies = [...(options.strategies ?? [])]
+    this.locale = options.locale
   }
 
   synthesize(incident: SupervisorIncident): ReasoningSynthesis {
-    const task = this.rewriter.rewrite(incident)
+    const task = this.rewriter.rewrite(incident, this.locale)
     const strategy = selectStrategy(incident, task, this.strategies)
-    const steps = this.decomposer.decompose({ incident, task, strategy })
+    const steps = this.decomposer.decompose({ incident, task, strategy, locale: this.locale })
     const risk = this.predictor.predict({ incident, task, steps })
-    const planning = this.planning.decide({ task, risk, strategyId: strategy?.strategyId })
-    const verificationSteps = this.verification.build({ incident, task, steps, strategy })
+    const planning = this.planning.decide({ task, risk, strategyId: strategy?.strategyId, locale: this.locale })
+    const verificationSteps = this.verification.build({ incident, task, steps, strategy, locale: this.locale })
     const fallback = this.fallbacks.build({ incident, task, risk, strategy })
 
     if (fallback.failClosedReason) throw new Error(fallback.failClosedReason)
+
+    const targetOrigin = planning.requiresBrowser
+      ? strategy?.resolveTargetOrigin?.({ incident, task })
+      : undefined
+    if (planning.requiresBrowser && !targetOrigin) {
+      throw new Error(`Registered remediation strategy ${strategy?.strategyId ?? 'unknown'} requires browser execution but did not provide targetOrigin.`)
+    }
 
     const plan: RepairPlan = {
       planId: `reason-${safeId(incident.incidentId)}`,
@@ -61,6 +71,7 @@ export class ReasoningEngine implements Thinker {
       riskLevel: planning.riskLevel,
       targetProvider: incident.provider,
       targetEnvironment: incident.environment,
+      ...(targetOrigin ? { targetOrigin } : {}),
       steps,
       verificationSteps,
       ...(fallback.rollbackSteps.length ? { rollbackSteps: fallback.rollbackSteps } : {}),

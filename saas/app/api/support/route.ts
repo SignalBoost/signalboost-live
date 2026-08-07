@@ -84,7 +84,6 @@ export async function POST(req: NextRequest) {
         const prospect = parseProspectCampaignRequest(text, lang)
         if (prospect) {
           const started = await createProspectCampaignJob({
-            brief: text,
             offer: prospect.offer,
             targetCriteria: prospect.targetCriteria,
             region: prospect.region,

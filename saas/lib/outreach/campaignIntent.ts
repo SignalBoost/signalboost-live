@@ -39,7 +39,7 @@
 // A brief with no campaign signal at all is NOT a refusal — it is an ordinary message and
 // must be answered as one.
 
-export type CampaignPipeline = 'prospect' | 'press' | 'ads' | 'social'
+export type CampaignPipeline = 'prospect' | 'press' | 'ads' | 'social' | 'video'
 
 export type CountSubject = 'companies' | 'publications' | 'unspecified'
 
@@ -76,12 +76,19 @@ export interface CampaignIntentResult {
 
 const PIPELINE_TERMS: Record<CampaignPipeline, RegExp> = {
   prospect:
-    /\b(?:prospect\w*|prospec\w*|cold ?email\w*|lead ?gen\w*|sales campaign|sales outreach|outreach campaign|email outreach|outreach email\w*|potential (?:buyers?|customers?|clients?)|prospective customers?|campanha de prospec[çc][aã]o|campa[ñn]a de prospecci[oó]n|kampani\w* prospect\w*|sprzeda\w*|аутрич|продаж|потенциальн\w+ клиент\w*)\b/i,
+    /\b(?:prospect\w*|prospec\w*|cold ?email\w*|lead ?gen\w*|sales campaign|sales outreach|(?<!press )(?<!media )(?<!publicity )outreach campaign|email outreach|outreach email\w*|potential (?:buyers?|customers?|clients?)|prospective customers?|campanha de prospec[çc][aã]o|campa[ñn]a de prospecci[oó]n|kampani\w* prospect\w*|sprzeda\w*|аутрич|продаж|потенциальн\w+ клиент\w*)\b/i,
   press:
     /\b(?:press|publicity|publication|publications|publisher|publishers|magazine|magazines|newspaper|newspapers|journal|journals|journalist|journalists|editor|editors|editorial|newsroom|media outreach|trade press|trade journal|press release|newsletter|imprensa|jornal|revista|reda[çc][aã]o|prensa|peri[oó]dico|redacci[oó]n|prasa|gazeta|redakcja|пресса|газета|журнал|редакция)\b/i,
   ads: /\b(?:advertis\w*|sponsored (?:article|content|post)|paid media|paid placement|insertion order|ad campaign|ppc|publicidade|publicidad|reklam\w*|реклам\w*)\b/i,
   social:
     /\b(?:social media|linkedin|instagram|facebook|tiktok|youtube|twitter|social post\w*|redes sociais|redes sociales|media spo[łl]eczno\w*|соцсет\w*)\b/i,
+  // VIDEO IS A PRODUCTION PIPELINE, NOT A CHANNEL. It renders, voices, brands and only
+  // then publishes — which is why it could not be folded into `social`: the work, the
+  // failure modes and the approval gate are entirely different from posting text.
+  // It was missing entirely, so a video brief was claimed by whichever text parser
+  // matched first, and both of those run before any model call.
+  video:
+    /\b(?:video campaign|video ad\w*|promo(?:tional)? video|explainer video|short video|video studio|(?:make|create|produce|generate|render)s? (?:a |an |the )?(?:new )?videos?|videos? (?:campaign|production|series)|v[íi]deo|wideo|видео|cosa)\b/i,
 }
 
 /**
@@ -149,6 +156,7 @@ const PIPELINE_LABEL: Record<CampaignPipeline, string> = {
   press: 'press and media',
   ads: 'paid advertising',
   social: 'social media',
+  video: 'video production',
 }
 
 /**
@@ -188,6 +196,13 @@ export function classifyCampaignIntent(text: string): CampaignIntentResult {
   // A pipeline forbidden anywhere is forbidden everywhere in this message. Saying "not a
   // sales campaign" once and using the word "sales" later does not re-authorise it.
   for (const pipeline of prohibited) signalled.delete(pipeline)
+
+  // A VIDEO CAMPAIGN NAMES ITS DESTINATION AND THAT IS NOT A SECOND CAMPAIGN.
+  // `social` matches youtube/tiktok/instagram, which are exactly where finished video is
+  // published — so "make a video campaign and post it to YouTube" signalled both and would
+  // have been refused as asking for two things at once. Video subsumes the channel; the
+  // reverse is not true, so a plain social brief still classifies as social.
+  if (signalled.has('video')) signalled.delete('social')
 
   const count = countIn(allowedClauses.join('. ')) || countIn(input)
   const live = [...signalled]
@@ -236,6 +251,17 @@ export function classifyCampaignIntent(text: string): CampaignIntentResult {
       decision: 'refuse',
       code: 'INTENT_AMBIGUOUS',
       reason: `Nothing was started. This reads as sales prospecting but asks for ${count.value} ${count.noun}, which are not companies. Publications are pitched through the press pipeline, never emailed as sales prospects.`,
+    }
+  }
+  if (pipeline === 'video' && count?.subject === 'publications') {
+    return {
+      ...base,
+      prohibited: forbidden,
+      signalled: live,
+      count,
+      decision: 'refuse',
+      code: 'INTENT_AMBIGUOUS',
+      reason: `Nothing was started. This reads as a video request but asks for ${count.value} ${count.noun}. Video campaigns produce videos; publications are pitched through the press pipeline.`,
     }
   }
   if (pipeline === 'press' && count?.subject === 'companies') {

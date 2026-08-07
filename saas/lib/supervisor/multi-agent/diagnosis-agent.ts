@@ -22,7 +22,7 @@ export class DiagnosisAgent implements DiagnosisAgentPort {
     const category = categoryFor(input.incident, input.context)
     const evidenceIds = input.context.evidence.map(item => item.evidenceId)
     const evidenceCount = evidenceIds.length
-    const confidenceScore = category === 'unclassified' ? Math.min(55, 25 + evidenceCount * 5) : Math.min(92, 60 + evidenceCount * 4)
+    const confidenceScore = category === 'unclassified' ? Math.min(55, 25 + evidenceCount * 5) : Math.min(92, 72 + evidenceCount * 4)
     const explanation = category === 'unclassified'
       ? 'Available evidence does not support a known incident category with sufficient specificity.'
       : `Available evidence is most consistent with a ${category.replace('_', ' ')} incident affecting ${input.context.affectedResource}.`

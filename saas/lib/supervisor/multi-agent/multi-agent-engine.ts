@@ -79,6 +79,15 @@ export class MultiAgentReasoningEngine implements Thinker {
     const verificationSteps = proposedPlan.verificationSteps.map(proposedToRepairStep)
     const rollbackSteps = proposedPlan.rollbackSteps.map(proposedToRepairStep)
     const requiresBrowser = [...steps, ...verificationSteps].some(step => ['navigate', 'click', 'fill', 'select', 'screenshot'].includes(step.action))
+    const approvalRequirements = securityAssessment.recommendedApprovalsCount > 0
+      ? {
+          requiredApprovalsCount: securityAssessment.recommendedApprovalsCount,
+          requiredRoles: [...securityAssessment.recommendedRoles],
+          rationale: securityAssessment.freezeWindow
+            ? 'Security review recommends enhanced quorum because the plan mutates production during a declared freeze window.'
+            : 'Security review recommends human quorum for protected or production mutation.',
+        }
+      : undefined
 
     const candidate: RepairPlan = {
       planId: proposedPlan.planId,
@@ -90,6 +99,7 @@ export class MultiAgentReasoningEngine implements Thinker {
       targetProvider: proposedPlan.targetProvider,
       targetEnvironment: proposedPlan.targetEnvironment,
       ...(proposedPlan.targetOrigin ? { targetOrigin: proposedPlan.targetOrigin } : {}),
+      ...(approvalRequirements ? { approvalRequirements } : {}),
       steps,
       verificationSteps,
       ...(rollbackSteps.length ? { rollbackSteps } : {}),

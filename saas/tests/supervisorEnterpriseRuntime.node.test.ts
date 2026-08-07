@@ -10,6 +10,7 @@ import {
   type SqlClient,
   type EnterpriseProviderDescriptor,
 } from '../lib/supervisor/enterprise-runtime/index.ts'
+import { MerkleAuditLedger } from '../lib/supervisor/kernel/merkle-audit-ledger.ts'
 import type { AuditEvent } from '../lib/supervisor/execution-contracts.ts'
 import type { QuorumState } from '../lib/supervisor/kernel/quorum-approval.ts'
 
@@ -47,7 +48,7 @@ class MemorySqlClient implements SqlClient {
       return { rows: [] }
     }
     if (sql.startsWith('SELECT level, node_hash FROM supervisor_merkle_frontier')) {
-      const rows = [...this.frontier.entries()].sort((a, b) => b[0] - a[0]).map(([level, node_hash]) => ({ level, node_hash }))
+      const rows = [...this.frontier.entries()].sort((a, b) => a[0] - b[0]).map(([level, node_hash]) => ({ level, node_hash }))
       return { rows: rows as Row[] }
     }
     if (sql.startsWith('INSERT INTO supervisor_audit_events')) {
@@ -118,14 +119,17 @@ test('postgres quorum state store round-trips quorum state', async () => {
   assert.equal(await store.get('q1'), undefined)
 })
 
-test('persistent Merkle store updates a logarithmic frontier rather than rereading all leaves', async () => {
+test('persistent Merkle frontier matches the canonical in-memory ledger including odd leaves', async () => {
   const db = new MemorySqlClient()
   const store = new PostgresMerkleAuditStore(db)
+  const reference = new MerkleAuditLedger()
   const event = (id: string): AuditEvent => ({ eventId: id, incidentId: 'i1', eventType: 'incident_received', occurredAt: '2026-08-07T12:00:00Z', payload: {}, schemaVersion: 'v1' })
-  const first = await store.append(event('e1'))
-  const second = await store.append(event('e2'))
-  assert.equal(first.leafIndex, 0)
-  assert.equal(second.leafIndex, 1)
-  assert.notEqual(first.merkleRoot, second.merkleRoot)
+  let persistentRoot = ''
+  for (const id of ['e1', 'e2', 'e3']) {
+    persistentRoot = (await store.append(event(id))).merkleRoot
+    await reference.append(event(id))
+  }
+  assert.equal(persistentRoot, reference.rootHash())
   assert.equal(db.calls.some(call => call.sql.includes('SELECT leaf_hash FROM supervisor_audit_events')), false)
+  assert.equal(db.calls.some(call => call.sql.includes('pg_advisory_xact_lock')), true)
 })

@@ -4,23 +4,7 @@ import type { PortableProductManifest } from '../manifestTypes.ts'
 export const selfHealingSupervisorManifest: PortableProductManifest = Object.freeze({
   productId: 'self-healing-supervisor',
   displayName: 'Self-Healing Supervisor',
-  // THE HEADLINE IS THE REPAIR, NOT THE DETECTION. Both descriptions used to lead with
-  // detecting and diagnosing, and every surface reading them wrote about a product that
-  // watches things. Detection is the commodity half — the buyer already owns something
-  // that alerts. What they do not own is software that fixes the fault and can show its
-  // work afterwards, so that is what these sentences now say first.
   categoryLabel: 'self-healing software',
-  // THE THREE CHANNELS ARE REAL AND THEY ARE A SELLING POINT. execution-policy/ selects
-  // between them per step: ExecutionChannel is 'api' | 'browser' | 'manual' | 'none' and
-  // ExecutionMode is 'api_only' | 'smart_failover' | 'browser_on_demand'. A human can take
-  // over at any step — that is not a fallback, it is a mode the operator can choose.
-  //
-  // THE BROWSER ENTRY SAYS "PREPARES", NOT "RUNS", AND THE WORD IS LOAD-BEARING.
-  // portable-browser-executor.ts emits a fingerprinted dry-run package and rejects any
-  // dispatch asking for more, with its own message: the buyer package creates browser
-  // dry-run evidence only, and a separately reviewed buyer runtime performs the execution.
-  // Production browser execution is additionally gated behind productionBrowserExecutionEnabled;
-  // without that flag the policy routes to human approval instead.
   executionModes: Object.freeze([
     'automatic-unattended-repair-of-steps-that-are-not-financial-destructive-or-credential',
     'signed-approval-required-only-for-money-deletion-or-credential-changes',
@@ -33,12 +17,9 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
     'a-person-is-called-whenever-an-undo-would-be-unsafe-or-does-not-restore',
     'manual-operator-control-available-at-any-step',
   ]),
-  shortDescription: 'Self-healing software: an AI-driven operations system with the COS AI brain that fixes failures itself through pre-integrated provider/API connectors, through a browser when there is no API, or by handing an operator the wheel. It is buyer-hosted, keeps consequential actions under human approval, and records the evidence, reasoning and actions in an audit trail.',
-  // THIS DESCRIPTION IS ALSO THE PRODUCT-SPECIFIC OUTREACH BRIEF. ProspectCampaignCore
-  // injects the manifest into every COS-generated draft, including refreshed pending drafts.
-  // Keep these instructions HERE, not in a global outreach prompt: every SignalBoost product
-  // gets its own campaign rules and another product must never inherit Supervisor messaging.
-  longDescription: 'A governed, buyer-hosted, AI-driven self-healing operations system whose COS AI brain detects a failure, diagnoses the cause from evidence, chooses a permitted recovery path, and repairs it. It uses pre-integrated providers, connectors and registered APIs first; when no API exists, the browser agent works inside the buyer own runtime under the buyer own credentials; an operator can take control at any point. Before changing anything it captures a checkpoint from the buyer infrastructure, verifies the repair afterwards, and restores the execution context when verification fails. Money, deletion and credential changes remain reserved for explicit human approval. Every conclusion and action carries the evidence behind it, the rule that fired, the reasoning, the action taken and what would have changed the answer, creating an auditable operational trail. OUTREACH REQUIREMENT FOR THIS PRODUCT ONLY: every Self-Healing Supervisor email must communicate the relevant combination of these mandatory concepts: AI-driven operations, self-healing, COS AI brain, buyer-hosted architecture, human approval for consequential actions, audit trail, pre-integrated providers/connectors, and concrete operational benefits. Do not dump them as a feature list; adapt them to the recipient and lead with the business problem. Audience weighting for MSPs, managed cloud providers and DevOps/SRE consultancies: self-healing and lower MTTR are highest priority, cloud operations next, browser automation supporting. Audience weighting for banks and financial institutions: governance, auditability and buyer-hosted control are highest priority, with human approval explained as buyer control. Audience weighting for healthcare organizations: compliance-oriented controls, availability and governance are highest priority, with self-healing supporting continuity. These audience weights change emphasis only; they never authorize claims outside this manifest. COS prepares the personalized email as a pending draft for owner review and approval; the campaign does not send merely because the draft was generated.',
+  shortDescription: 'Self-healing software: an AI-driven operations system with the COS AI brain that fixes failures through pre-integrated provider/API connectors, a browser when no API exists, or an operator. It is buyer-hosted, keeps consequential actions under human approval, and records evidence, reasoning and actions in an audit trail.',
+  // Product-specific COS outreach guidance belongs here so other products keep their own rules.
+  longDescription: 'A governed, buyer-hosted, AI-driven self-healing operations system whose COS AI brain detects failures, diagnoses causes from evidence and repairs them through registered APIs, pre-integrated providers/connectors, a browser agent inside the buyer runtime, or an operator. It checkpoints before changes, verifies repairs, restores the execution context when verification fails, and records evidence, reasoning, rules and actions for audit. Money, deletion and credential changes require explicit human approval. SELF-HEALING SUPERVISOR OUTREACH ONLY: every COS draft must communicate the relevant combination of AI-driven operations, self-healing, COS AI brain, buyer-hosted architecture, human approval, audit trail, pre-integrated providers/connectors and concrete operational benefits. Adapt emphasis to the recipient rather than listing features. MSP/cloud/DevOps: prioritize self-healing and lower MTTR, then cloud operations, with browser automation supporting. Banks/financial institutions: prioritize governance, auditability and buyer-hosted control; present human approval as buyer control. Healthcare: prioritize compliance-oriented controls, availability and governance, with self-healing supporting continuity. These weights change emphasis only and never authorize claims outside this manifest. COS creates a personalized pending draft for owner review and approval; drafting does not itself send.',
   category: 'infrastructure',
   status: 'live',
   maturity: 'production',

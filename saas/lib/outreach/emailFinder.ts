@@ -25,46 +25,20 @@ const REJECT = [
   'mailer-daemon', 'postmaster', 'sentry.io', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.css', '.js',
 ]
 
-// INBOXES THAT MUST NEVER RECEIVE COLD SALES, matched on the WHOLE local part rather
-// than as a substring, so a real desk like `sales@` or `securityservices@` is untouched.
-//
-// A real campaign addressed a draft to privacy@ — the inbox a company publishes so
-// people can exercise data rights, staffed by whoever answers regulators. A cold sales
-// pitch landing there is the single most reliable way to convert a prospect into a
-// complaint, and under GDPR it is an unforced error.
-//
-// The rule already existed. It was applied ONLY to addresses a human SUPPLIED, and the
-// comment above it in growthPlans.ts claimed a supplied address "must clear exactly the
-// bar a discovered one does" — which was backwards: the discovered path cleared no bar
-// at all. This is where discovery gets the same bar, at the point addresses are found.
 const ROLE_BLOCKED_LOCALS = new Set([
   'test', 'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'postmaster', 'mailer-daemon',
-  // Data protection, legal and security desks — obligation inboxes, not commercial ones.
   'privacy', 'dataprotection', 'data-protection', 'dpo', 'gdpr', 'compliance',
   'legal', 'abuse', 'security', 'infosec', 'soc', 'psirt',
-  // Desks staffed for a different purpose entirely; a sales pitch is noise in them.
   'careers', 'jobs', 'recruiting', 'recruitment', 'hr', 'unsubscribe', 'webmaster',
-  // Audience inboxes. A real draft went to inforcommunity@infor.com — the address a
-  // company publishes for its user forum, read by community managers who route nothing
-  // to a buyer. These are not gatekeepers to get past; they are the wrong building.
-  // press@ and media@ are deliberately ABSENT: those are the correct targets for the
-  // Press & Media portable, and blocking them here would break a different product.
   'community', 'forum', 'events', 'newsletter', 'subscribe', 'subscriptions',
   'feedback', 'membership', 'investors', 'ir', 'training', 'academy',
 ])
 
 function isRoleBlocked(email: string): boolean {
   const [rawLocal, rawDomain = ''] = email.split('@')
-  // Strip a plus-tag so privacy+web@ is caught alongside privacy@.
   const local = rawLocal.trim().toLowerCase().split('+')[0]
   if (ROLE_BLOCKED_LOCALS.has(local)) return true
 
-  // BRAND-PREFIXED ROLE ADDRESSES. Large companies namespace their inboxes with their own
-  // name: inforcommunity@infor.com is the one that got through and reached a user forum.
-  // Whole-local matching missed it, and switching to a substring test would have blocked
-  // securityservices@ — a real desk — so the domain arbitrates instead. Only when the
-  // local part BEGINS with the company's own name is the remainder tested, which keeps the
-  // false-positive surface tiny: a company must be prefixing its own brand for this to fire.
   const root = rawDomain.trim().toLowerCase().replace(/^www\./, '').split('.')[0]
   if (root && local.startsWith(root) && local.length > root.length) {
     const remainder = local.slice(root.length).replace(/^[-_.]+/, '')
@@ -87,21 +61,31 @@ function domainOf(origin: string): string {
   try { return new URL(origin).hostname.replace(/^www\./i, '').toLowerCase() } catch { return '' }
 }
 
-async function fetchText(url: string, ms = 8000): Promise<string> {
+type FetchTextResult = {
+  html: string
+  status: number | null
+  timedOut: boolean
+}
+
+async function fetchText(url: string, ms = 6000): Promise<FetchTextResult> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
   try {
     const res = await fetch(url, {
       signal: ctrl.signal,
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SignalBoostBot/1.0; +https://saas.signalboostapp.com)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SignalBoostBot/1.0; +https://saas.signalboostapp.com)',
+        'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
+      },
     })
-    if (!res.ok) return ''
+    if (!res.ok) return { html: '', status: res.status, timedOut: false }
     const ct = (res.headers.get('content-type') || '').toLowerCase()
-    if (ct && !ct.includes('html') && !ct.includes('text')) return ''
-    return (await res.text()).slice(0, 600000)
-  } catch {
-    return ''
+    if (ct && !ct.includes('html') && !ct.includes('text')) return { html: '', status: res.status, timedOut: false }
+    return { html: (await res.text()).slice(0, 600000), status: res.status, timedOut: false }
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')
+    return { html: '', status: null, timedOut }
   } finally {
     clearTimeout(timer)
   }
@@ -132,14 +116,31 @@ function rank(emails: string[], domain: string): string[] {
     const pref = PREFERRED.findIndex(p => local === p || local.startsWith(p))
     return (onDomain(e) ? 0 : 1000) + (pref === -1 ? 100 : pref)
   }
-  // ONLY the business's own domain. An off-domain hit (a different company the
-  // regex caught, or a third party) is NEVER returned — emailing the wrong
-  // company is worse than skipping. No on-domain address => caller SKIPS.
   const onDom = clean.filter(onDomain)
   return onDom.sort((a, b) => score(a) - score(b))
 }
 
-export type ContactEmailResult = { email: string | null; source: string | null; candidates: string[] }
+export type ContactEmailResult = {
+  email: string | null
+  source: string | null
+  candidates: string[]
+  diagnostic?: string | null
+}
+
+// Low concurrency is deliberate. The Aug 3 implementation fired 4-5 requests at the
+// same corporate host simultaneously. Many WAFs interpret that as scraping and answer
+// with 403/429 or simply stall. Those failures were then collapsed to an empty string,
+// which made the campaign incorrectly report "No published contact email found."
+// Two requests at a time keeps the speed gain without looking like a burst crawler.
+async function fetchPaths(origin: string, paths: string[], concurrency = 2): Promise<Array<{ url: string; result: FetchTextResult }>> {
+  const output: Array<{ url: string; result: FetchTextResult }> = []
+  for (let i = 0; i < paths.length; i += concurrency) {
+    const chunk = paths.slice(i, i + concurrency)
+    const rows = await Promise.all(chunk.map(async path => ({ url: origin + path, result: await fetchText(origin + path) })))
+    output.push(...rows)
+  }
+  return output
+}
 
 /**
  * Read a business's site and return its best real, published contact email — or
@@ -147,58 +148,54 @@ export type ContactEmailResult = { email: string | null; source: string | null; 
  */
 export async function findContactEmail(businessUrl: string): Promise<ContactEmailResult> {
   const origin = originOf(businessUrl)
-  if (!origin) return { email: null, source: null, candidates: [] }
+  if (!origin) return { email: null, source: null, candidates: [], diagnostic: 'invalid_url' }
   const domain = domainOf(origin)
 
-  // WHY THIS IS IN WAVES AND NOT A LOOP.
-  //
-  // These nine pages used to be fetched one after another at 8 seconds each — up to 72
-  // seconds to look at one company. The caller caps this work at 25 seconds, so in
-  // practice the hunt was killed after about three pages and the last five paths were
-  // never read at all. A company that publishes its address on /about or /team was
-  // therefore reported as "no published contact email" when the address was sitting
-  // right there. The sequential fetch was costing BOTH time and prospects.
-  //
-  // The pages are independent, so they are fetched together. Wave one holds the paths
-  // that carry an address most of the time; wave two only runs when wave one found
-  // nothing on-domain, so the common case costs one round trip rather than nine.
+  // Start with the most common routes, but include localized commercial/contact pages.
+  // These are still deterministic same-origin reads; no address is guessed.
   const WAVES = [
-    ['', '/contact', '/contact-us', '/contacts'],
-    ['/about', '/about-us', '/support', '/company', '/team'],
+    ['', '/contact', '/contact-us', '/contacts', '/contato', '/fale-conosco'],
+    ['/about', '/about-us', '/support', '/company', '/team', '/empresa', '/quem-somos', '/comercial', '/vendas', '/parcerias'],
   ]
 
   const all = new Set<string>()
   let source: string | null = null
+  let sawSuccessfulPage = false
+  let blockedCount = 0
+  let timeoutCount = 0
 
   for (const wave of WAVES) {
-    const pages = await Promise.all(
-      wave.map(async path => ({ url: origin + path, html: await fetchText(origin + path) })),
-    )
+    const pages = await fetchPaths(origin, wave, 2)
 
-    // Applied in the wave's declared order, not in whatever order the network
-    // happened to answer, so `source` stays deterministic for the same site.
     for (const page of pages) {
-      if (!page.html) continue
-      const found = extractEmails(page.html).filter(looksReal)
+      if (page.result.status === 403 || page.result.status === 429) blockedCount += 1
+      if (page.result.timedOut) timeoutCount += 1
+      if (page.result.status && page.result.status >= 200 && page.result.status < 400) sawSuccessfulPage = true
+      if (!page.result.html) continue
+
+      const found = extractEmails(page.result.html).filter(looksReal)
       if (!found.length) continue
       if (!source) source = page.url
       for (const email of found) all.add(email)
     }
 
-    // An on-domain address is a confident answer: stop and skip the next wave.
-    const best = rank(Array.from(all), domain)[0]
-    if (best) return { email: best, source, candidates: rank(Array.from(all), domain).slice(0, 5) }
+    const ranked = rank(Array.from(all), domain)
+    if (ranked.length) return { email: ranked[0], source, candidates: ranked.slice(0, 5), diagnostic: null }
   }
 
   const ranked = rank(Array.from(all), domain)
-  if (ranked.length) return { email: ranked[0], source, candidates: ranked.slice(0, 5) }
+  if (ranked.length) return { email: ranked[0], source, candidates: ranked.slice(0, 5), diagnostic: null }
 
-  // Fallback: Apollo.io people/match enrichment — resolves many company-email-first
-  // businesses that hide behind contact forms. Same honesty rule: on-domain only.
   const apolloEmail = await apolloLookup(domain)
-  if (apolloEmail) return { email: apolloEmail, source: 'apollo_enrichment', candidates: [apolloEmail] }
+  if (apolloEmail) return { email: apolloEmail, source: 'apollo_enrichment', candidates: [apolloEmail], diagnostic: null }
 
-  return { email: null, source: null, candidates: [] }
+  let diagnostic = 'no_published_email'
+  if (!sawSuccessfulPage && blockedCount > 0) diagnostic = `site_blocked:${blockedCount}`
+  else if (!sawSuccessfulPage && timeoutCount > 0) diagnostic = `site_timeout:${timeoutCount}`
+  else if (blockedCount > 0) diagnostic = `partial_site_block:${blockedCount}`
+  else if (timeoutCount > 0) diagnostic = `partial_site_timeout:${timeoutCount}`
+
+  return { email: null, source: null, candidates: [], diagnostic }
 }
 
 // Apollo.io /people/match — returns the best on-domain contact email for a given
@@ -211,13 +208,13 @@ async function apolloLookup(domain: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
       body: JSON.stringify({ api_key: key, organization_domain: domain }),
+      signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) return null
     const d: any = await res.json().catch(() => null)
     const email: string = d?.person?.email || d?.person?.personal_emails?.[0] || ''
     if (!email || !looksReal(email)) return null
     const eDomain = email.split('@')[1] || ''
-    // Strict: only return an address whose domain matches the target.
     if (eDomain !== domain && !eDomain.endsWith('.' + domain)) return null
     return email.toLowerCase()
   } catch { return null }

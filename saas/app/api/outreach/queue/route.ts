@@ -6,6 +6,8 @@ import { applyOutreachSignature } from '@/lib/outreach/signature'
 import { getRecipientHistory, duplicateReason } from '@/lib/outreach/recipientHistory'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
+import { reportLangFromCookie } from '@/lib/i18n/reportLanguage'
+import { localizeOutreachMessages } from '@/lib/outreach/localeOutreach'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,12 +42,11 @@ export async function GET(req: NextRequest) {
 
   const status = req.nextUrl.searchParams.get('status')
   const channel = req.nextUrl.searchParams.get('channel')
+  const locale = reportLangFromCookie(req.headers.get('cookie'))
 
   // LIVE DATA: do not let a client-side display preference redefine the size of the
-  // database. The Contacts page historically requested ?limit=100 and this route then
-  // enforced Math.min(100, ...), so "ALL" could never show more than 100 even when the
-  // table contained more rows. Read the queue in database pages instead. The batching is
-  // only transport protection; there is no product-visible record ceiling here.
+  // database. Read the whole queue in database pages. The batching is transport
+  // protection only; there is no product-visible record ceiling here.
   const PAGE_SIZE = 1000
   const rows: any[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -64,19 +65,37 @@ export async function GET(req: NextRequest) {
     if (page.length < PAGE_SIZE) break
   }
 
-  // The stored draft is NOT what gets emailed: the team signature and the platform
-  // link are applied at send time so that rows approved before those rules existed are
-  // covered too. That left the console showing something different from the outbound
-  // message, with no way to check the footer before approving. Each row now carries
-  // `outbound_message` — the exact text the send route will build — computed with the
-  // same function, so the preview and the email cannot drift apart.
-  const normalized = rows.map((row: any) => ({
-    ...withChannel(row),
-    outbound_message: applyOutreachSignature(String(row.outreach_message || ''), row.sender_key || 'saasSales'),
-  }))
+  // PENDING DRAFTS ARE DISPLAY COPIES, SO THE USER'S CURRENT LOCALE WINS AT THE MOMENT
+  // THEY ARE REVIEWED. The stored source remains untouched until the user approves it.
+  // This means switching English -> Polish -> Spanish changes the pending preview on the
+  // spot without permanently rewriting hundreds of records merely because the UI changed.
+  const pending = rows
+    .filter((row: any) => (row.status || 'pending') === 'pending' && String(row.outreach_message || '').trim())
+    .map((row: any) => ({ id: String(row.id), text: String(row.outreach_message || '') }))
+  const localizedPending = await localizeOutreachMessages(pending, locale)
+
+  const normalized = rows.map((row: any) => {
+    const source = String(row.outreach_message || '')
+    const isPending = (row.status || 'pending') === 'pending'
+    const body = isPending ? (localizedPending.messages.get(String(row.id)) || source) : source
+    return {
+      ...withChannel(row),
+      // Returning the localized copy here makes every Contacts renderer path consistent,
+      // including older UI builds that fall back to outreach_message.
+      outreach_message: body,
+      outbound_message: applyOutreachSignature(body, row.sender_key || 'saasSales', isPending ? locale : undefined),
+    }
+  })
+
   const outreach = channel ? normalized.filter((row: any) => row.outreach_channel === channel || row.channel === channel) : normalized
   const sendLimit = await enforceDailySendLimit(ctx.admin)
-  return NextResponse.json({ outreach, total: outreach.length, sendLimit })
+  return NextResponse.json({
+    outreach,
+    total: outreach.length,
+    locale,
+    localizationFailed: localizedPending.failed,
+    sendLimit,
+  })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -89,10 +108,8 @@ export async function PATCH(req: NextRequest) {
   const id = String(body?.id || '').trim()
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
+  const locale = reportLangFromCookie(req.headers.get('cookie'))
   const status = body?.status ? String(body.status) : undefined
-  // 'archived' hides a row from the console without destroying it — the send history
-  // in outreach_sends stays intact, and an archived row is still counted by the
-  // address-level duplicate guard so it can never be contacted again by accident.
   if (status && !['pending', 'approved', 'rejected', 'archived'].includes(status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
@@ -133,12 +150,11 @@ export async function PATCH(req: NextRequest) {
     action: status ? `outreach.${status}` : 'outreach.edit',
     targetType: 'outreach_queue',
     targetId: id,
-    metadata: { fields: Object.keys(patch), releaseRequested: status === 'approved' && body?.release !== false },
+    metadata: { fields: Object.keys(patch), releaseRequested: status === 'approved' && body?.release !== false, locale },
   })
 
   // Original owner workflow: the human Approve click is the release gate. AI can
   // prepare a PENDING draft, but the email is not sent until this explicit approval.
-  // Callers can still pass release:false when they intentionally need approval-only.
   if (status === 'approved' && body?.release !== false) {
     const { data: priorSend } = await ctx.admin
       .from('outreach_sends')
@@ -166,11 +182,6 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
-    // ADDRESS-LEVEL duplicate guard. This route has its OWN send path — the console's
-    // Approve & Send button never touches /api/outreach/send — so the guard has to be
-    // repeated here or the main human path would be the one place without it.
-    // force:true is the deliberate follow-up, offered in the console only after the
-    // refusal has been shown.
     if (body?.force !== true) {
       const history = await getRecipientHistory(ctx.admin, toEmail, id, data.product_key)
       if (history.contacted) {
@@ -206,7 +217,19 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
-    const safe = assertSafeOutreachMessage(String(data.outreach_message || ''))
+    // THE SELECTED LOCALE IS AUTHORITATIVE AT RELEASE TIME. Translate the body and subject
+    // together, then persist the localized body so the sent record remains an honest record
+    // of what actually left the system. A later UI language change never rewrites history.
+    const sourceSubject = draftedSubject(data) || `Useful SignalBoost growth preview for ${data.business_name}`
+    const localized = await localizeOutreachMessages([
+      { id: 'body', text: String(data.outreach_message || '') },
+      { id: 'subject', text: sourceSubject },
+    ], locale)
+    const localizedBody = localized.messages.get('body') || String(data.outreach_message || '')
+    const localizedSubject = localized.messages.get('subject') || sourceSubject
+    const outboundMessage = applyOutreachSignature(localizedBody, data.sender_key || 'saasSales', locale)
+
+    const safe = assertSafeOutreachMessage(outboundMessage)
     if (!safe.ok) {
       return NextResponse.json({
         ok: true,
@@ -215,11 +238,26 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
+    if (localizedBody !== String(data.outreach_message || '')) {
+      const { error: localizedSaveError } = await ctx.admin
+        .from('outreach_queue')
+        .update({ outreach_message: localizedBody })
+        .eq('id', id)
+      if (localizedSaveError) {
+        return NextResponse.json({
+          ok: true,
+          outreach: withChannel(data),
+          release: { ok: false, reason: 'localization_save_failed', error: localizedSaveError.message },
+        })
+      }
+      data.outreach_message = localizedBody
+    }
+
     const sent = await sendEmail({
       from: 'saasSales',
       to: toEmail,
-      subject: draftedSubject(data) || `Useful SignalBoost growth preview for ${data.business_name}`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${escapeHtml(String(data.outreach_message || ''))}</div>`,
+      subject: localizedSubject,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${escapeHtml(outboundMessage)}</div>`,
     })
 
     if (!sent.ok) {
@@ -236,7 +274,7 @@ export async function PATCH(req: NextRequest) {
       business_id: data.business_id,
       channel: 'email',
       sent_at: sentAt,
-      metadata: { providerResult: sent, toEmail },
+      metadata: { providerResult: sent, toEmail, locale, localized: localized.failed.length === 0 },
     })
 
     if (sendLogError) {
@@ -246,7 +284,7 @@ export async function PATCH(req: NextRequest) {
         action: 'outreach.provider_sent_log_failed',
         targetType: 'outreach_queue',
         targetId: id,
-        metadata: { providerResult: sent, toEmail, error: sendLogError.message },
+        metadata: { providerResult: sent, toEmail, locale, error: sendLogError.message },
       })
       return NextResponse.json({
         ok: true,
@@ -262,13 +300,13 @@ export async function PATCH(req: NextRequest) {
       action: 'outreach.approved_and_sent',
       targetType: 'outreach_queue',
       targetId: id,
-      metadata: { providerResult: sent, toEmail, queueReconcile },
+      metadata: { providerResult: sent, toEmail, locale, queueReconcile },
     })
 
     return NextResponse.json({
       ok: true,
-      outreach: withChannel({ ...data, status: 'sent' }),
-      release: { ok: true, sentAt, providerResult: sent, queueReconcile },
+      outreach: withChannel({ ...data, status: 'sent', outreach_message: localizedBody }),
+      release: { ok: true, sentAt, providerResult: sent, locale, queueReconcile },
     })
   }
 

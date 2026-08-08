@@ -24,13 +24,13 @@ function monitoringTick() {
     decision: {
       decisionId: 'd-read',
       objective: '',
-      priority: 'medium',
+      priority: 'medium' as const,
       rationale: 'More evidence is required.',
       evidenceIds: ['file:a.ts'],
       shouldAct: false,
       confidence: 0.9,
     },
-    status: 'monitoring',
+    status: 'monitoring' as const,
     summary: 'Read one file; mission is not yet resolved.',
   }
 }
@@ -49,7 +49,7 @@ function successfulActionTick() {
     decision: {
       decisionId: 'd-fix',
       objective: 'Fix the defect.',
-      priority: 'high',
+      priority: 'high' as const,
       rationale: 'Grounded defect found.',
       evidenceIds: ['e:broken'],
       shouldAct: true,
@@ -59,8 +59,8 @@ function successfulActionTick() {
       runId: 'run-fix',
       portableId: 'portable-1',
       objective: 'Fix the defect.',
-      status: 'completed',
-      stopReason: 'goal_satisfied',
+      status: 'completed' as const,
+      stopReason: 'goal_satisfied' as const,
       summary: 'Patch applied and verified.',
       cycles: [{
         cycle: 1,
@@ -71,13 +71,13 @@ function successfulActionTick() {
           evidenceIds: ['e:broken'],
           stateFingerprint: 'broken',
         },
-        results: [{ actionId: 'a1', status: 'completed', summary: 'patch', evidenceIds: ['e:patch'] }],
-        verification: { status: 'verified', goalSatisfied: true, summary: 'healthy', evidenceIds: ['e:healthy'] },
+        results: [{ actionId: 'a1', status: 'completed' as const, summary: 'patch', evidenceIds: ['e:patch'] }],
+        verification: { status: 'verified' as const, goalSatisfied: true, summary: 'healthy', evidenceIds: ['e:healthy'] },
         startedAt: new Date().toISOString(),
         finishedAt: new Date().toISOString(),
       }],
     },
-    status: 'acted',
+    status: 'acted' as const,
     summary: 'Patch applied and verified.',
   }
 }
@@ -111,6 +111,7 @@ test('portable-specific checkpoints prevent premature completion', () => {
   assert.equal(deterministicCompletionSatisfied(next), false)
   next = setMissionCheckpoint(next, 'deployment_healthy', true)
   assert.equal(deterministicCompletionSatisfied(next), true)
+  assert.equal(next.status, 'COMPLETED')
 })
 
 test('mission stops itself after bounded re-entrant budget', () => {

@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { CosLeadershipState } from './leaderRuntime.ts'
-import type { CosLiveTickStateStore } from './liveRuntime.ts'
+import type { CosLivePersistentState, CosLiveTickStateStore } from './liveRuntime.ts'
 
 const TABLE = 'cos_autonomy_state'
 
@@ -13,10 +12,18 @@ export function createSupabaseCosLiveTickStateStore(): CosLiveTickStateStore {
     async load(missionId) {
       const { data, error } = await db().from(TABLE).select('state').eq('mission_id', missionId).maybeSingle()
       if (error) throw new Error(`cos_autonomy_state_load_failed:${error.message}`)
-      return data?.state as CosLeadershipState | undefined
+      return data?.state as CosLivePersistentState | undefined
     },
     async save(missionId, state) {
-      const { error } = await db().from(TABLE).upsert({ mission_id: missionId, state, updated_at: new Date().toISOString() }, { onConflict: 'mission_id' })
+      const { error } = await db().from(TABLE).upsert({
+        mission_id: missionId,
+        state,
+        status: state.lifecycle.status,
+        iteration: state.lifecycle.iteration,
+        blocked_reason: state.lifecycle.blockedReason ?? null,
+        completed_at: state.lifecycle.completedAt ?? null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'mission_id' })
       if (error) throw new Error(`cos_autonomy_state_save_failed:${error.message}`)
     },
   }

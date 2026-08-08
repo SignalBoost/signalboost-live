@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import GeneratedContentLocalizer from '@/components/i18n/GeneratedContentLocalizer'
+import UtilityContextLocalizer from '@/components/i18n/UtilityContextLocalizer'
 import AssistantHistoryLayoutPatch from '@/components/AssistantHistoryLayoutPatch'
 
 const SUPPORTED_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
@@ -47,6 +48,7 @@ export default function LanguageSuggestion() {
   return (
     <>
       <GeneratedContentLocalizer />
+      <UtilityContextLocalizer />
       <AssistantHistoryLayoutPatch />
       <AutoLanguageInitializer />
     </>

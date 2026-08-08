@@ -40,16 +40,29 @@ export async function GET(req: NextRequest) {
 
   const status = req.nextUrl.searchParams.get('status')
   const channel = req.nextUrl.searchParams.get('channel')
-  const limit = Math.min(100, Number(req.nextUrl.searchParams.get('limit') || 50))
-  let query = ctx.admin
-    .from('outreach_queue')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit)
 
-  if (status) query = query.eq('status', status)
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // LIVE DATA: do not let a client-side display preference redefine the size of the
+  // database. The Contacts page historically requested ?limit=100 and this route then
+  // enforced Math.min(100, ...), so "ALL" could never show more than 100 even when the
+  // table contained more rows. Read the queue in database pages instead. The batching is
+  // only transport protection; there is no product-visible record ceiling here.
+  const PAGE_SIZE = 1000
+  const rows: any[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = ctx.admin
+      .from('outreach_queue')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (status) query = query.eq('status', status)
+    const { data, error } = await query
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const page = data || []
+    rows.push(...page)
+    if (page.length < PAGE_SIZE) break
+  }
 
   // The stored draft is NOT what gets emailed: the team signature and the platform
   // link are applied at send time so that rows approved before those rules existed are
@@ -57,13 +70,13 @@ export async function GET(req: NextRequest) {
   // message, with no way to check the footer before approving. Each row now carries
   // `outbound_message` — the exact text the send route will build — computed with the
   // same function, so the preview and the email cannot drift apart.
-  const normalized = (data || []).map((row: any) => ({
+  const normalized = rows.map((row: any) => ({
     ...withChannel(row),
     outbound_message: applyOutreachSignature(String(row.outreach_message || ''), row.sender_key || 'saasSales'),
   }))
   const outreach = channel ? normalized.filter((row: any) => row.outreach_channel === channel || row.channel === channel) : normalized
   const sendLimit = await enforceDailySendLimit(ctx.admin)
-  return NextResponse.json({ outreach, sendLimit })
+  return NextResponse.json({ outreach, total: outreach.length, sendLimit })
 }
 
 export async function PATCH(req: NextRequest) {

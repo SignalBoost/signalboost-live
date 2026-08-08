@@ -74,6 +74,13 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values.filter(Boolean))]
 }
 
+function appendHistory(
+  history: readonly CosMissionLifecycleEvent[],
+  event: CosMissionLifecycleEvent,
+): readonly CosMissionLifecycleEvent[] {
+  return [...history, event].slice(-100)
+}
+
 export function createMissionLifecycleState(
   mission: CosMission,
   options: CosMissionLifecycleOptions = {},
@@ -127,31 +134,33 @@ export function setMissionCheckpoint(
   const key = String(checkpoint || '').trim()
   if (!key || isTerminalMissionStatus(state.status)) return state
   const now = new Date().toISOString()
+  const checkpointEvent: CosMissionLifecycleEvent = {
+    at: now,
+    iteration: state.iteration,
+    status: state.status,
+    kind: 'checkpoint',
+    summary: summary || `${key}=${satisfied}`,
+  }
   let next: CosMissionLifecycleState = {
     ...state,
     checkpoints: { ...state.checkpoints, [key]: satisfied },
-    history: [...state.history, {
-      at: now,
-      iteration: state.iteration,
-      status: state.status,
-      kind: 'checkpoint',
-      summary: summary || `${key}=${satisfied}`,
-    }].slice(-100),
+    history: appendHistory(state.history, checkpointEvent),
     updatedAt: now,
   }
   if (deterministicCompletionSatisfied(next)) {
+    const completeEvent: CosMissionLifecycleEvent = {
+      at: now,
+      iteration: next.iteration,
+      status: 'COMPLETED',
+      kind: 'complete',
+      summary: 'All required deterministic completion criteria are satisfied.',
+    }
     next = {
       ...next,
       status: 'COMPLETED',
       completedAt: now,
       lastSummary: summary || 'All required deterministic completion checkpoints are satisfied.',
-      history: [...next.history, {
-        at: now,
-        iteration: next.iteration,
-        status: 'COMPLETED',
-        kind: 'complete',
-        summary: 'All required deterministic completion criteria are satisfied.',
-      }].slice(-100),
+      history: appendHistory(next.history, completeEvent),
     }
   }
   return next
@@ -214,6 +223,13 @@ export function applyMissionTick(
       : `Mission reached ${previous.maxConsecutiveFailures} consecutive failed/no-progress ticks.`
   }
 
+  const tickEvent: CosMissionLifecycleEvent = {
+    at: now,
+    iteration,
+    status,
+    kind: blockedReason ? 'block' : 'tick',
+    summary: result.summary,
+  }
   let next: CosMissionLifecycleState = {
     ...previous,
     status,
@@ -224,28 +240,23 @@ export function applyMissionTick(
     lastSummary: result.summary,
     blockedReason,
     updatedAt: now,
-    history: [...previous.history, {
-      at: now,
-      iteration,
-      status,
-      kind: blockedReason ? 'block' : 'tick',
-      summary: result.summary,
-    }].slice(-100),
+    history: appendHistory(previous.history, tickEvent),
   }
 
   if (!blockedReason && deterministicCompletionSatisfied(next)) {
+    const completeEvent: CosMissionLifecycleEvent = {
+      at: now,
+      iteration,
+      status: 'COMPLETED',
+      kind: 'complete',
+      summary: 'All required deterministic completion criteria are satisfied.',
+    }
     next = {
       ...next,
       status: 'COMPLETED',
       completedAt: now,
       lastSummary: `Mission completed by deterministic gate. ${result.summary}`,
-      history: [...next.history, {
-        at: now,
-        iteration,
-        status: 'COMPLETED',
-        kind: 'complete',
-        summary: 'All required deterministic completion criteria are satisfied.',
-      }].slice(-100),
+      history: appendHistory(next.history, completeEvent),
     }
   }
 

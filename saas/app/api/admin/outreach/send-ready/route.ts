@@ -1,12 +1,6 @@
 // saas/app/api/admin/outreach/send-ready/route.ts
 // Owner/admin-gated batch sender for approved outreach drafts that already have
 // a real contact_email. Dry-run by default; append ?send=1 for real sends.
-//
-// Safety guarantees:
-// - never selects rows that already have an outreach_sends record
-// - checks again per row before sending to reduce duplicate/race risk
-// - records the Resend provider id in outreach_sends
-// - marks the outreach_queue row as sent with a schema-tolerant fallback
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
@@ -15,6 +9,8 @@ import { applyOutreachSignature } from '@/lib/outreach/signature'
 import { getRecipientHistory, duplicateReason, normalizeAddress } from '@/lib/outreach/recipientHistory'
 import { sendEmail } from '@/lib/email'
 import { markOutreachSent } from '@/lib/outreach/markSent'
+import { reportLangFromCookie } from '@/lib/i18n/reportLanguage'
+import { localizeOutreachMessages } from '@/lib/outreach/localeOutreach'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -45,14 +41,9 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url)
   const send = url.searchParams.get('send') === '1'
-  // Per-call batch ceiling. Raised from 10 now that the rolling daily cap is off by
-  // default; a single call is still bounded so one mistyped URL cannot drain the queue.
+  const locale = reportLangFromCookie(req.headers.get('cookie'))
   const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '5', 10), 1), 50)
 
-  // TARGETING. Without these the query returned approved rows in unspecified order,
-  // which in practice meant the OLDEST rows in the table — drafts from long-finished
-  // campaigns aimed at entirely different businesses. A batch send is irreversible, so
-  // "whatever the database returned first" is the wrong selection rule.
   const ids = String(url.searchParams.get('ids') || '')
     .split(',').map(value => value.trim()).filter(Boolean).slice(0, 50)
   const sinceHours = Math.max(0, Math.min(parseInt(url.searchParams.get('sinceHours') || '0', 10) || 0, 24 * 90))
@@ -65,13 +56,9 @@ export async function GET(req: NextRequest) {
 
   const daily = await enforceDailySendLimit(ctx.admin)
   if (!daily.ok) return NextResponse.json({ ok: false, error: 'Daily outreach send limit reached', sendLimit: daily }, { status: 429 })
-  // With no cap configured there is nothing to subtract from — the batch is bounded by
-  // the caller's own limit alone.
   const availableToday = daily.unlimited ? limit : Math.max(0, daily.limit - daily.count)
   const batchLimit = daily.unlimited ? limit : Math.min(limit, availableToday)
 
-  // Fetch more than needed, because some approved rows may have already been sent
-  // but still have stale status='approved'. We filter those out below.
   let query = ctx.admin
     .from('outreach_queue')
     .select('id,business_id,business_name,business_url,contact_email,outreach_message,status,sender_key,source_platform,product_key,created_at')
@@ -102,16 +89,20 @@ export async function GET(req: NextRequest) {
     .filter((row: any) => !previouslySent.has(row.id))
     .slice(0, batchLimit)
 
+  // One shared locale pass for the selected batch. The language chosen by the user now
+  // governs both dry-run preview and real send. No region or language is hardcoded here.
+  const localizationInput = rows.flatMap((row: any) => [
+    { id: `body:${row.id}`, text: String(row.outreach_message || '') },
+    { id: `subject:${row.id}`, text: `Useful SignalBoost growth preview for ${row.business_name}` },
+  ])
+  const localized = await localizeOutreachMessages(localizationInput, locale)
+
   const results: any[] = []
   let sentCount = 0
   let skippedCount = 0
   let duplicateSkipped = 0
 
   for (const row of rows || []) {
-    // Second duplicate guard immediately before send.
-    // The batch runner is the AUTOMATIC path: nobody is watching it choose, so an
-    // address that has already been contacted is skipped outright with no override.
-    // A deliberate follow-up is a human decision made per row in the console.
     const address = normalizeAddress(row.contact_email)
     const history = await getRecipientHistory(ctx.admin, address, row.id, row.product_key)
     if (history.contacted) {
@@ -135,7 +126,9 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    const message = applyOutreachSignature(String(row.outreach_message || ''), row.sender_key || 'saasSales')
+    const localizedBody = localized.messages.get(`body:${row.id}`) || String(row.outreach_message || '')
+    const localizedSubject = localized.messages.get(`subject:${row.id}`) || `Useful SignalBoost growth preview for ${row.business_name}`
+    const message = applyOutreachSignature(localizedBody, row.sender_key || 'saasSales', locale)
     const safe = assertSafeOutreachMessage(message)
     if (!safe.ok) {
       skippedCount++
@@ -144,14 +137,38 @@ export async function GET(req: NextRequest) {
     }
 
     if (!send) {
-      results.push({ id: row.id, business: row.business_name, businessUrl: row.business_url, source: row.source_platform, createdAt: row.created_at, ok: true, dryRun: true, toEmail, messagePreview: message.slice(0, 220), messageTail: message.slice(-140) })
+      results.push({
+        id: row.id,
+        business: row.business_name,
+        businessUrl: row.business_url,
+        source: row.source_platform,
+        createdAt: row.created_at,
+        ok: true,
+        dryRun: true,
+        toEmail,
+        locale,
+        messagePreview: message.slice(0, 220),
+        messageTail: message.slice(-140),
+      })
       continue
+    }
+
+    if (localizedBody !== String(row.outreach_message || '')) {
+      const { error: localizedSaveError } = await ctx.admin
+        .from('outreach_queue')
+        .update({ outreach_message: localizedBody })
+        .eq('id', row.id)
+        .eq('status', 'approved')
+      if (localizedSaveError) {
+        results.push({ id: row.id, business: row.business_name, ok: false, toEmail, error: localizedSaveError.message })
+        continue
+      }
     }
 
     const sent = await sendEmail({
       from: 'saasSales',
       to: toEmail,
-      subject: `Useful SignalBoost growth preview for ${row.business_name}`,
+      subject: localizedSubject,
       html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${escapeHtml(message)}</div>`,
     })
 
@@ -166,7 +183,7 @@ export async function GET(req: NextRequest) {
       business_id: row.business_id,
       channel: 'email',
       sent_at: sentAt,
-      metadata: { providerResult: sent, toEmail },
+      metadata: { providerResult: sent, toEmail, locale, localized: !localized.failed.includes(`body:${row.id}`) },
     })
 
     if (insertError) {
@@ -182,7 +199,7 @@ export async function GET(req: NextRequest) {
       action: 'outreach.batch_send_ready',
       targetType: 'outreach_queue',
       targetId: row.id,
-      metadata: { channel: 'email', providerResult: sent, toEmail, queueReconcile },
+      metadata: { channel: 'email', providerResult: sent, toEmail, locale, queueReconcile },
     })
 
     sentCount++
@@ -193,6 +210,7 @@ export async function GET(req: NextRequest) {
       sent: true,
       sentAt,
       toEmail,
+      locale,
       providerResult: sent,
       statusUpdated: queueReconcile.ok,
       statusOnlyFallback: queueReconcile.usedStatusOnlyFallback,
@@ -204,6 +222,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     mode: send ? 'sent' : 'dry_run',
+    locale,
     requestedLimit: limit,
     availableToday,
     candidateRows: candidates?.length || 0,
@@ -212,6 +231,7 @@ export async function GET(req: NextRequest) {
     sent: sentCount,
     skipped: skippedCount,
     duplicateSkipped,
+    localizationFailed: localized.failed,
     sendLimit: { ...daily, countAfter: daily.count + sentCount },
     selection: { ids: ids.length ? ids : null, sinceHours: sinceHours || null, source: source || null, order: oldestFirst ? 'oldest_first' : 'newest_first' },
     hint: send ? 'Real send attempted. Check outreachSendsRows and Resend Emails.' : 'Dry run only. Append &send=1 to send this batch.',

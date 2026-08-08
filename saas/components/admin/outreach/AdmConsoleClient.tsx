@@ -287,12 +287,12 @@ export default function AdmConsoleClient() {
                 </div>
                 {selected.status === 'pending' && (
                   <p className="mt-2 text-xs" style={{ color: '#f59e0b' }}>
-                    {uiText('generatedUi.u_approve_first_hint', 'Approve this draft first, then use the Send button to release it.')}
+                    {uiText('generatedUi.u_hint_approve_first', 'Approve this draft first, then use the Send button to release it.')}
                   </p>
                 )}
                 {selected.status === 'sent' && (
                   <p className="mt-2 text-xs" style={{ color: '#1af0ff' }}>
-                    {uiText('generatedUi.u_already_sent_hint', '✅ This draft has already been sent.')}
+                    {uiText('generatedUi.u_hint_already_sent', 'This draft has already been sent.')}
                   </p>
                 )}
               </div>

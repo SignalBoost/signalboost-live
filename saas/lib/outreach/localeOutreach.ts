@@ -26,9 +26,21 @@ export async function localizeOutreachMessages(
     return { locale: targetLanguage, messages, failed }
   }
 
+  // Queue GET historically passed every pending row here before returning any data.
+  // That turned a database read into many serial AI calls and made Contacts time out.
+  // Release-time localization uses explicit body:/subject: ids (or the single "message"
+  // id), so raw-id batches larger than two are display previews and must stay off the
+  // blocking server path. GeneratedContentLocalizer translates the rendered rows instead.
+  const bulkDisplayPreview = clean.length > 2 && clean.every(row =>
+    row.id !== 'message' && !row.id.startsWith('body:') && !row.id.startsWith('subject:'),
+  )
+  if (bulkDisplayPreview) {
+    for (const row of clean) messages.set(row.id, row.text)
+    return { locale: targetLanguage, messages, failed }
+  }
+
   // Keep each translation request comfortably below the shared engine's segment/character
-  // ceilings. A Contacts page can contain hundreds of historical rows, but only active
-  // pending/approved drafts should ever be handed to this function.
+  // ceilings. Release-time batches contain only the messages that are actually being sent.
   let batch: LocalizableOutreach[] = []
   let chars = 0
 

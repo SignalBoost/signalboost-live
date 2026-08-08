@@ -58,6 +58,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/cos-autonomy",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/cos-auto-publish-exact",
       "schedule": "*/10 * * * *"
     },

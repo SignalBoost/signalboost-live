@@ -20,6 +20,17 @@ import { getOutreachSecret } from './social-secrets.ts'
 
 const DEFAULT_SAAS_LINK = 'https://saas.signalboostapp.com'
 
+type OutreachLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+
+function normalizeLocale(value?: string | null): OutreachLocale {
+  const lang = String(value || '').toLowerCase()
+  if (lang.startsWith('es')) return 'es'
+  if (lang.startsWith('pt')) return 'pt'
+  if (lang.startsWith('pl')) return 'pl'
+  if (lang.startsWith('ru')) return 'ru'
+  return 'en'
+}
+
 // A bare URL on its own line. The send routes render the body inside a
 // white-space:pre-wrap div with no anchor tags, and every mail client auto-links a
 // bare https:// URL — so this is the form that actually stays clickable.
@@ -38,8 +49,17 @@ export function outreachContactAddress(senderKey?: string | null): string {
   return senderKey === 'saasMarketing' ? 'saasmarketing@signalboostapp.com' : 'saassales@signalboostapp.com'
 }
 
-export function outreachTeamName(senderKey?: string | null): string {
-  return senderKey === 'saasMarketing' ? 'The SignalBoost Marketing Team' : 'The SignalBoost Sales Team'
+export function outreachTeamName(senderKey?: string | null, locale?: string | null): string {
+  const lang = normalizeLocale(locale)
+  const marketing = senderKey === 'saasMarketing'
+  const names: Record<OutreachLocale, { sales: string; marketing: string }> = {
+    en: { sales: 'The SignalBoost Sales Team', marketing: 'The SignalBoost Marketing Team' },
+    es: { sales: 'El equipo de ventas de SignalBoost', marketing: 'El equipo de marketing de SignalBoost' },
+    pt: { sales: 'A equipe de vendas da SignalBoost', marketing: 'A equipe de marketing da SignalBoost' },
+    pl: { sales: 'Zespół sprzedaży SignalBoost', marketing: 'Zespół marketingu SignalBoost' },
+    ru: { sales: 'Команда продаж SignalBoost', marketing: 'Команда маркетинга SignalBoost' },
+  }
+  return marketing ? names[lang].marketing : names[lang].sales
 }
 
 // Sign-offs a model tends to produce with a placeholder or an empty name after them.
@@ -63,8 +83,8 @@ export function applyOutreachLink(message: string): string {
   return `${body}\n${link}`
 }
 
-export function applyOutreachSignature(message: string, senderKey?: string | null): string {
-  const team = outreachTeamName(senderKey)
+export function applyOutreachSignature(message: string, senderKey?: string | null, locale?: string | null): string {
+  const team = outreachTeamName(senderKey, locale)
   const link = outreachLink()
   let body = String(message || '').replace(/\r\n/g, '\n').trimEnd()
 
@@ -80,60 +100,41 @@ export function applyOutreachSignature(message: string, senderKey?: string | nul
     .replace(/<\s*(your\s+name|name|sender|signature)\s*>/gi, team)
     .trimEnd()
 
-  // 3-5. Build the closing block and put it AT THE BOTTOM, always.
-  //
-  //    The previous version only asked whether each part appeared ANYWHERE in the body.
-  //    That is not the same requirement. A model that wrote "— The SignalBoost Sales
-  //    Team" in the middle of a paragraph satisfied the check, so no closing block was
-  //    added and the email ended on a call to action with no sign-off. Likewise a draft
-  //    ending in a deep link (…/website-optimizer) contains the host, so the default
-  //    site link was skipped.
-  //
-  //    So: strip any copy of these lines that the model already produced, then append
-  //    the block once, in a fixed order, as the last thing in the message. Still
-  //    idempotent — running it twice strips what the first pass added and re-appends
-  //    the identical block.
   const contact = outreachContactAddress(senderKey)
   const host = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
+
+  const allTeamNames = [
+    'The SignalBoost Sales Team', 'The SignalBoost Marketing Team',
+    'El equipo de ventas de SignalBoost', 'El equipo de marketing de SignalBoost',
+    'A equipe de vendas da SignalBoost', 'A equipe de marketing da SignalBoost',
+    'Zespół sprzedaży SignalBoost', 'Zespół marketingu SignalBoost',
+    'Команда продаж SignalBoost', 'Команда маркетинга SignalBoost',
+  ]
+
+  const isKnownTeamLine = (value: string) => {
+    const trimmed = value.trim().replace(/^[—-]\s*/, '')
+    return allTeamNames.some(name => trimmed.toLowerCase() === name.toLowerCase())
+  }
 
   const lines = body.split('\n')
   while (lines.length) {
     const tail = lines[lines.length - 1].trim()
-    const isSignature = tail === `— ${team}` || tail === `- ${team}` || tail === team
+    const isSignature = isKnownTeamLine(tail)
     const isContact = contact ? tail.toLowerCase() === contact.toLowerCase() : false
-    // A trailing bare link to the site — but never a deep link, which is the model's
-    // own call to action and belongs in the body it was written for.
     const isBareLink = new RegExp(`^https?://(www\\.)?${host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`, 'i').test(tail)
     if (!tail || isSignature || isContact || isBareLink) { lines.pop(); continue }
     break
   }
   body = lines.join('\n').trimEnd()
 
-  // An inline sign-off left at the very end of the last sentence, e.g. "…how it works:
-  // <url> — The SignalBoost Sales Team". Removed so the block below is the real close.
-  body = body.replace(new RegExp(`[\\s—-]*${team.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), '').trimEnd()
-
-  // AND ANY SIGN-OFF LEFT STRANDED IN THE MIDDLE. The tail-walk above only reaches the
-  // end of the message, so a team line with anything beneath it survived — which is
-  // exactly what the draft-time compliance footer produced: an unsubscribe sentence sat
-  // below the team name, the walk stopped at the sentence, and real recipients received
-  // "— The SignalBoost Sales Team" twice.
-  //
-  // Only a line that is ENTIRELY the sign-off is removed, optionally preceded by a lone
-  // em-dash separator. A sentence that merely mentions the team by name is left alone,
-  // and the block appended below remains the single close. This also repairs rows
-  // already sitting in the queue, which were drafted before the footer was corrected.
+  // Remove any translated or English team sign-off already stranded elsewhere in the
+  // message so switching locale cannot leave two different-language signatures behind.
   body = body
     .split('\n')
     .filter((line, index, lines) => {
       const trimmed = line.trim()
-      const isSignOff = trimmed === team || trimmed === `— ${team}` || trimmed === `- ${team}`
-      if (isSignOff) return false
-      // A separator em-dash whose only purpose was to introduce that sign-off.
-      if ((trimmed === '—' || trimmed === '-') && lines[index + 1]) {
-        const next = lines[index + 1].trim()
-        if (next === team || next === `— ${team}` || next === `- ${team}`) return false
-      }
+      if (isKnownTeamLine(trimmed)) return false
+      if ((trimmed === '—' || trimmed === '-') && lines[index + 1] && isKnownTeamLine(lines[index + 1])) return false
       return true
     })
     .join('\n')
@@ -141,7 +142,5 @@ export function applyOutreachSignature(message: string, senderKey?: string | nul
     .trimEnd()
 
   const closing = [`— ${team}`, contact, link].filter(Boolean).join('\n')
-  body = `${body}\n\n${closing}`
-
-  return body
+  return `${body}\n\n${closing}`
 }

@@ -14,11 +14,8 @@ export type CosMissionLifecycleStatus =
   | 'FAILED_UNRECOVERABLE'
 
 export interface CosMissionCompletionPolicy {
-  /** Universal deterministic gate: at least one portable verification must say goalSatisfied=true. */
   requireVerifiedGoal?: boolean
-  /** Require grounded evidence before completion. */
   requireEvidence?: boolean
-  /** Portable/tool-specific deterministic checkpoints, e.g. tests_passed, pr_created, deployment_healthy. */
   requiredCheckpoints?: readonly string[]
 }
 
@@ -111,6 +108,16 @@ export function createMissionLifecycleState(
   }
 }
 
+export function deterministicCompletionSatisfied(state: CosMissionLifecycleState): boolean {
+  const policy = state.completionPolicy
+  if (policy.requireVerifiedGoal !== false && state.checkpoints.goal_verified !== true) return false
+  if (policy.requireEvidence !== false && state.evidenceIds.length === 0) return false
+  for (const checkpoint of policy.requiredCheckpoints ?? []) {
+    if (state.checkpoints[checkpoint] !== true) return false
+  }
+  return true
+}
+
 export function setMissionCheckpoint(
   state: CosMissionLifecycleState,
   checkpoint: string,
@@ -118,9 +125,9 @@ export function setMissionCheckpoint(
   summary?: string,
 ): CosMissionLifecycleState {
   const key = String(checkpoint || '').trim()
-  if (!key) return state
+  if (!key || isTerminalMissionStatus(state.status)) return state
   const now = new Date().toISOString()
-  return {
+  let next: CosMissionLifecycleState = {
     ...state,
     checkpoints: { ...state.checkpoints, [key]: satisfied },
     history: [...state.history, {
@@ -132,16 +139,22 @@ export function setMissionCheckpoint(
     }].slice(-100),
     updatedAt: now,
   }
-}
-
-export function deterministicCompletionSatisfied(state: CosMissionLifecycleState): boolean {
-  const policy = state.completionPolicy
-  if (policy.requireVerifiedGoal !== false && state.checkpoints.goal_verified !== true) return false
-  if (policy.requireEvidence !== false && state.evidenceIds.length === 0) return false
-  for (const checkpoint of policy.requiredCheckpoints ?? []) {
-    if (state.checkpoints[checkpoint] !== true) return false
+  if (deterministicCompletionSatisfied(next)) {
+    next = {
+      ...next,
+      status: 'COMPLETED',
+      completedAt: now,
+      lastSummary: summary || 'All required deterministic completion checkpoints are satisfied.',
+      history: [...next.history, {
+        at: now,
+        iteration: next.iteration,
+        status: 'COMPLETED',
+        kind: 'complete',
+        summary: 'All required deterministic completion criteria are satisfied.',
+      }].slice(-100),
+    }
   }
-  return true
+  return next
 }
 
 function statusForActiveTick(result: CosLeadershipTickResult): CosMissionLifecycleStatus {
@@ -150,10 +163,6 @@ function statusForActiveTick(result: CosLeadershipTickResult): CosMissionLifecyc
   return 'DIAGNOSING'
 }
 
-/**
- * Deterministic gatekeeper. Model prose can never mark a mission complete.
- * Only concrete runtime results/checkpoints can transition it to COMPLETED.
- */
 export function applyMissionTick(
   previous: CosMissionLifecycleState,
   result: CosLeadershipTickResult,
@@ -172,17 +181,11 @@ export function applyMissionTick(
     ]) ?? []),
   ])
 
-  let checkpoints: Record<string, boolean> = { ...previous.checkpoints }
+  const checkpoints: Record<string, boolean> = { ...previous.checkpoints }
   if (result.observed.evidenceIds.length > 0) checkpoints.observation_grounded = true
-  if (result.actionRun?.cycles.some(cycle => cycle.results?.some(item => item.status === 'completed'))) {
-    checkpoints.action_completed = true
-  }
-  if (result.actionRun?.cycles.some(cycle => cycle.verification?.status === 'verified')) {
-    checkpoints.verification_passed = true
-  }
-  if (result.actionRun?.cycles.some(cycle => cycle.verification?.goalSatisfied === true)) {
-    checkpoints.goal_verified = true
-  }
+  if (result.actionRun?.cycles.some(cycle => cycle.results?.some(item => item.status === 'completed'))) checkpoints.action_completed = true
+  if (result.actionRun?.cycles.some(cycle => cycle.verification?.status === 'verified')) checkpoints.verification_passed = true
+  if (result.actionRun?.cycles.some(cycle => cycle.verification?.goalSatisfied === true)) checkpoints.goal_verified = true
 
   let status = statusForActiveTick(result)
   let blockedReason: string | undefined

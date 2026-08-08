@@ -31,9 +31,7 @@ function canonicalHost(hostname: string): string {
 }
 
 function sameBusinessHost(a: string, b: string): boolean {
-  const x = canonicalHost(a)
-  const y = canonicalHost(b)
-  return x === y
+  return canonicalHost(a) === canonicalHost(b)
 }
 
 function looksReal(email: string): boolean {
@@ -147,7 +145,7 @@ export type ContactEmailResult = {
 
 export async function findContactEmail(businessUrl: string): Promise<ContactEmailResult> {
   const input = normalizeInput(businessUrl)
-  if (!input) return { email: null, source: null, candidates: [], diagnostic: 'invalid_url' }
+  if (!input) throw new Error(`email_discovery_invalid_url:${businessUrl}`)
 
   const targetDomain = canonicalHost(input.hostname)
   const allEmails = new Set<string>()
@@ -191,12 +189,7 @@ export async function findContactEmail(businessUrl: string): Promise<ContactEmai
   }
 
   if (!activeRoot) {
-    return {
-      email: null,
-      source: null,
-      candidates: [],
-      diagnostic: `site_unreachable:${failures.slice(0, 4).join('|')}`,
-    }
+    throw new Error(`email_discovery_site_unreachable:${businessUrl}:${failures.slice(0, 4).join('|')}`)
   }
 
   // Follow the site's REAL contact/about/support links, then fill gaps with common routes.
@@ -237,14 +230,9 @@ export async function findContactEmail(businessUrl: string): Promise<ContactEmai
   const apolloEmail = await apolloLookup(targetDomain)
   if (apolloEmail) return { email: apolloEmail, source: 'apollo_enrichment', candidates: [apolloEmail], diagnostic: null }
 
-  return {
-    email: null,
-    source: null,
-    candidates: [],
-    diagnostic: successfulPages > 0
-      ? `no_published_email:pages=${successfulPages}`
-      : `site_unreachable:${failures.slice(0, 4).join('|')}`,
-  }
+  throw new Error(
+    `email_discovery_no_email:${businessUrl}:pages=${successfulPages}:emails_seen=${allEmails.size}:failures=${failures.slice(0, 4).join('|')}`,
+  )
 }
 
 async function apolloLookup(domain: string): Promise<string | null> {

@@ -1,12 +1,16 @@
 // saas/lib/ai/tools/repoReader.ts
 // Read-only codebase access for the Chief of Staff ("eyes, not hands").
-// Lists and reads files from the PUBLIC GitHub repo so the AI can answer
-// questions about the real code instead of guessing. Physically read-only:
-// only GET requests to public endpoints; no token, no write capability.
+// Lists and reads files from the SignalBoost GitHub repository so the AI can
+// answer questions about the real code instead of guessing.
 //
-// Optional env var GITHUB_TOKEN (a fine-grained read-only PAT) raises GitHub
-// API rate limits for the tree listing; file reads use raw.githubusercontent
-// and need no token at all.
+// PRIVATE-REPO SUPPORT:
+// - GITHUB_TOKEN is preferred and only needs Contents: read.
+// - GITHUB_WRITE_TOKEN is accepted as a fallback because the existing COS writer
+//   already requires Contents: read/write and therefore can also perform GETs.
+// - Reads use GitHub's authenticated Contents API. We no longer rely on
+//   raw.githubusercontent.com for private files, which returns 404 when unauthenticated.
+//
+// This module remains physically read-only: every GitHub call made here is GET-only.
 
 const REPO = 'SignalBoost/signalboost-live'
 const BRANCH = 'main'
@@ -17,30 +21,42 @@ type TreeEntry = { path: string; type: string; size?: number }
 
 let treeCache: { at: number; entries: TreeEntry[] } | null = null
 
+function githubReadToken(): string {
+  return String(process.env.GITHUB_TOKEN || process.env.GITHUB_WRITE_TOKEN || '').trim()
+}
+
+function githubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'signalboost-chief-of-staff',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = githubReadToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
+function decodeGithubContent(value: unknown): string {
+  if (typeof value !== 'string' || !value) return ''
+  return Buffer.from(value.replace(/\n/g, ''), 'base64').toString('utf8')
+}
+
 // ── List repository files (full tree, optionally filtered by prefix) ──────────
 export async function listRepoFiles(
   prefix?: string,
 ): Promise<{ ok: boolean; files: string[]; error?: string }> {
   try {
     if (!treeCache || Date.now() - treeCache.at > TREE_CACHE_MS) {
-      const headers: Record<string, string> = {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'signalboost-chief-of-staff',
-      }
-      if (process.env.GITHUB_TOKEN) {
-        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
-      }
-
       const res = await fetch(
         `https://api.github.com/repos/${REPO}/git/trees/${BRANCH}?recursive=1`,
-        { headers, cache: 'no-store' },
+        { headers: githubHeaders(), cache: 'no-store' },
       )
 
       if (!res.ok) {
         return {
           ok: false,
           files: [],
-          error: `GitHub tree request failed (${res.status}). ${res.status === 403 ? 'Rate limit — add a read-only GITHUB_TOKEN env var to raise it.' : ''}`,
+          error: `GitHub tree request failed (${res.status}). ${res.status === 401 || res.status === 404 ? 'The repository is private or the read token is missing/invalid. Configure GITHUB_TOKEN with Contents: read (or GITHUB_WRITE_TOKEN).' : res.status === 403 ? 'GitHub denied the request or rate-limited it. Verify token permissions.' : ''}`,
         }
       }
 
@@ -66,7 +82,7 @@ export async function listRepoFiles(
   }
 }
 
-// ── Read one file from the repo ─────────────────────────────────────────────────
+// ── Read one file from the repo ───────────────────────────────────────────────
 export async function readRepoFile(
   path: string,
 ): Promise<{ ok: boolean; content: string; truncated: boolean; error?: string }> {
@@ -76,19 +92,41 @@ export async function readRepoFile(
       return { ok: false, content: '', truncated: false, error: 'Invalid path.' }
     }
 
+    const encodedPath = clean.split('/').map(part => encodeURIComponent(part)).join('/')
     const res = await fetch(
-      `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${encodeURI(clean)}`,
-      { cache: 'no-store' },
+      `https://api.github.com/repos/${REPO}/contents/${encodedPath}?ref=${encodeURIComponent(BRANCH)}`,
+      { headers: githubHeaders(), cache: 'no-store' },
     )
 
     if (res.status === 404) {
-      return { ok: false, content: '', truncated: false, error: `File not found: ${clean}. Use listRepoFiles to find the correct path.` }
+      const authHint = githubReadToken()
+        ? 'The path does not exist on main, or the configured GitHub token cannot read this private repository.'
+        : 'The repository is private and no GitHub read credential is configured. Add GITHUB_TOKEN with Contents: read (or GITHUB_WRITE_TOKEN).'
+      return { ok: false, content: '', truncated: false, error: `File not found or inaccessible: ${clean}. ${authHint} Use listRepoFiles to confirm the exact path.` }
+    }
+    if (res.status === 401 || res.status === 403) {
+      return {
+        ok: false,
+        content: '',
+        truncated: false,
+        error: `GitHub denied repository read (${res.status}). Verify GITHUB_TOKEN has Contents: read access to ${REPO}, or configure GITHUB_WRITE_TOKEN.`,
+      }
     }
     if (!res.ok) {
-      return { ok: false, content: '', truncated: false, error: `Fetch failed (${res.status}).` }
+      return { ok: false, content: '', truncated: false, error: `GitHub contents request failed (${res.status}).` }
     }
 
-    const text = await res.text()
+    const data = await res.json()
+    if (!data || data.type !== 'file' || data.encoding !== 'base64' || typeof data.content !== 'string') {
+      return {
+        ok: false,
+        content: '',
+        truncated: false,
+        error: `GitHub did not return file content for ${clean}. The path may refer to a directory, submodule, or unsupported object.`,
+      }
+    }
+
+    const text = decodeGithubContent(data.content)
     const truncated = text.length > MAX_FILE_CHARS
     return {
       ok: true,
@@ -100,7 +138,7 @@ export async function readRepoFile(
   }
 }
 
-// ── Formatting for tool results ─────────────────────────────────────────────────
+// ── Formatting for tool results ───────────────────────────────────────────────
 export function formatFileListForAI(prefix: string | undefined, files: string[]): string {
   if (!files.length) {
     return `No files found${prefix ? ` under "${prefix}"` : ''}. Try a different prefix or list without one.`

@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react'
@@ -226,13 +227,14 @@ export function I18nProvider({
   const [isReady, setIsReady] =
     useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const initialLang = persistLanguage(getInitialLanguage())
 
     if (initialLang !== lang) {
       setLangState(initialLang)
     }
-    // Run once after hydration so server and first client render both use English.
+    // Sync the persisted language cookie before child data-fetch effects run so
+    // server-rendered/generated content uses the same locale as the visible UI.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

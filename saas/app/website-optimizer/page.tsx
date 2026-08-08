@@ -10,7 +10,7 @@ type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
 type Finding = { code: string; category: 'performance' | 'seo' | 'accessibility' | 'security' | 'conversion'; severity: 'high' | 'medium' | 'low'; value?: string | number | boolean }
 
 type Copy = {
-  back: string; badge: string; title: string; subtitle: string; urlLabel: string; placeholder: string; scan: string; scanning: string; hint: string; trySample: string; missingUrl: string; scanFailed: string; ready: string; begin: string; score: string; loadTime: string; findings: string; high: string; medium: string; low: string; pageChecked: string; topFindings: string; noFindings: string; metrics: string; html: string; titleLength: string; descriptionLength: string; scripts: string; stylesheets: string; images: string; missingAlt: string; h1: string; lazyImages: string; requestTitle: string; requestBody: string; requestCta: string; safeNote: string; detailLabel: string; fixLabel: string; genericFinding: string; genericDetail: (category: string, value?: string | number | boolean) => string; fixes: Record<string, string>; categories: Record<string, string>; severities: Record<string, string>
+  back: string; badge: string; title: string; subtitle: string; urlLabel: string; placeholder: string; scan: string; scanning: string; hint: string; trySample: string; missingUrl: string; scanFailed: string; ready: string; begin: string; score: string; loadTime: string; findings: string; high: string; medium: string; low: string; pageChecked: string; topFindings: string; noFindings: string; metrics: string; html: string; titleLength: string; descriptionLength: string; scripts: string; stylesheets: string; images: string; missingAlt: string; h1: string; lazyImages: string; requestTitle: string; requestBody: string; requestCta: string; safeNote: string; detailLabel: string; fixLabel: string; genericFinding: string; genericDetail: (category: string, value?: string | number | boolean) => string; issueCopy: Record<string, { title: string; detail: (value?: string | number | boolean) => string }>; fixes: Record<string, string>; categories: Record<string, string>; severities: Record<string, string>
 }
 
 const COPY: Record<Lang, Copy> = {
@@ -64,12 +64,15 @@ export default function WebsiteOptimizerPage() {
   const metrics = data?.metrics || {}
   const target = String(data?.finalUrl || data?.target || url || '')
   const headlineRows = useMemo(() => ([
-    [copy.score, summary?.score ?? '—'], [copy.loadTime, summary ? formatMs(summary.loadMs) : '—'], [copy.findings, summary?.findings ?? '—'], [copy.high, summary?.high ?? '—'],
+    [copy.score, summary?.score ?? '—'],
+    [copy.loadTime, summary ? formatMs(summary.loadMs) : '—'],
+    [copy.findings, summary?.findings ?? '—'],
+    [copy.high, summary?.high ?? '—'],
+    [copy.medium, summary?.medium ?? '—'],
+    [copy.low, summary?.low ?? '—'],
   ]), [copy, summary])
   const reportRows = useMemo(() => ([
     [copy.html, summary ? formatBytes(summary.htmlBytes) : '—'],
-    [copy.medium, summary?.medium ?? '—'],
-    [copy.low, summary?.low ?? '—'],
     [copy.titleLength, metrics.titleLength ?? '—'],
     [copy.descriptionLength, metrics.descriptionLength ?? '—'],
     [copy.scripts, metrics.scriptCount ?? '—'],
@@ -113,11 +116,12 @@ export default function WebsiteOptimizerPage() {
             <h3 className="mb-4 mt-6 text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.topFindings}</h3>
             {findings.length === 0 ? <p className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-emerald-100">{copy.noFindings}</p> : <div className="grid gap-4">{findings.map((finding, index) => {
               const category = copy.categories[finding.category] || finding.category
+              const issue = copy.issueCopy[finding.code]
               return <article key={`${finding.code}-${index}`} className="rounded-2xl border border-white/10 bg-slate-950/50 p-5">
                 <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2.5 py-1 text-xs font-black uppercase ${SEVERITY_STYLES[finding.severity] || SEVERITY_STYLES.low}`}>{copy.severities[finding.severity] || finding.severity}</span><span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-300">{category}</span></div>
-                <h4 className="mt-3 text-lg font-black">{copy.genericFinding}</h4>
+                <h4 className="mt-3 text-lg font-black">{issue?.title || copy.genericFinding}</h4>
                 <p className="mt-3 text-xs font-black uppercase tracking-[0.14em] text-slate-500">{copy.detailLabel}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-300">{copy.genericDetail(category, finding.value)}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-300">{issue ? issue.detail(finding.value) : copy.genericDetail(category, finding.value)}</p>
                 <p className="mt-3 text-xs font-black uppercase tracking-[0.14em] text-cyan-200">{copy.fixLabel}</p>
                 <p className="mt-1 text-sm font-semibold leading-6 text-cyan-100">{copy.fixes[finding.category]}</p>
               </article>

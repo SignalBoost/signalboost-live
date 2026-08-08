@@ -1,6 +1,6 @@
 // saas/lib/outreach/regionLanguage.ts
 // Region -> communication language, per the standing outreach directive:
-//   Brazil -> Portuguese (pt), Spanish-speaking Latin America -> Spanish (es),
+//   Brazil/Portugal -> Portuguese (pt), Spanish-speaking markets -> Spanish (es),
 //   Poland -> Polish (pl), Russia -> Russian (ru), everywhere else -> English (en).
 // Detection is deterministic and leans on the target's OWN site content (script +
 // country signals), so a generically-named firm is still classified by the language
@@ -50,15 +50,16 @@ export function pickOutreachLanguage(input: { url?: string | null; name?: string
   if (hasTld(url, '.pl') || /\bpoland\b|polska|polskie|warsaw|warszawa|krak[oó]w|wroc[lł]aw|gda[nń]sk|pozna[nń]/.test(identityHay)) return 'pl'
   if (countOf(text, /[ąćęłńśźż]/gi) >= 8) return 'pl'
 
-  // --- Brazil: .br, country keywords, or sustained Portuguese markers ---
-  if (hasTld(url, '.br') || /\bbrazil\b|brasil|s[ãa]o paulo|rio de janeiro|belo horizonte/.test(identityHay)) return 'pt'
-  const ptMarkers = countOf(allRaw, /\b(advocacia|advogad[oa]s?|serviços|você|não|obrigad[oa]|escritório|direito|cnpj)\b/gi) + countOf(allRaw, /[ãõ]/g)
+  // --- Portuguese: Brazil/Portugal ccTLDs, country keywords, or sustained markers ---
+  if (hasTld(url, '.br') || hasTld(url, '.pt') || /\bbrazil\b|brasil|\bportugal\b|lisboa|lisbon|porto|s[ãa]o paulo|rio de janeiro|belo horizonte/.test(identityHay)) return 'pt'
+  const ptMarkers = countOf(allRaw, /\b(advocacia|advogad[oa]s?|serviços|você|não|obrigad[oa]|escritório|direito|cnpj|empresa|contacto)\b/gi) + countOf(allRaw, /[ãõ]/g)
   if (ptMarkers >= 3 && !/[ñ¿¡]/.test(allRaw)) return 'pt'
 
-  // --- Spanish-speaking LATAM: ccTLDs, or country names IN THE IDENTITY only ---
+  // --- Spanish: Spain first, then Spanish-speaking LATAM ---
+  if (hasTld(url, '.es') || /\bspain\b|españa|madrid|barcelona|valencia|sevilla/.test(identityHay)) return 'es'
   if (LATAM_TLDS.some(t => hasTld(url, t))) return 'es'
   if (namedIn(identityHay, LATAM_NAMES)) return 'es'
-  const esMarkers = countOf(allRaw, /[ñ¿¡]/g) + countOf(allRaw, /\b(abogad[oa]s?|servicios|gracias|despacho jurídico)\b/gi)
+  const esMarkers = countOf(allRaw, /[ñ¿¡]/g) + countOf(allRaw, /\b(abogad[oa]s?|servicios|gracias|despacho jurídico|empresa|contacto)\b/gi)
   if (esMarkers >= 3) return 'es'
   // A country named only in body text is weak on its own — it needs Spanish prose with it.
   if (namedIn(bodyHay, LATAM_NAMES) && esMarkers >= 1) return 'es'

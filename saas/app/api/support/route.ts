@@ -20,6 +20,7 @@ import {
   createOwnerEngineeringMission,
   engineeringMissionQueuedReply,
   isOwnerEngineeringRequest,
+  listActiveOwnerEngineeringMissions,
 } from '@/lib/ai/cos/engineeringMission'
 
 export { guardConfabulatedAction } from './routeCore'
@@ -49,6 +50,24 @@ function routedReply(reply: string, source: string) {
   })
 }
 
+function asksEngineeringStatus(text: string): boolean {
+  return /\b(status|progress|how(?:'s| is)|where are we|what happened|still working|audit status)\b/i.test(text)
+    && /\b(fix|repair|engineering|repo|repository|audit|bug|pipeline|platform|mission)\b/i.test(text)
+}
+
+function engineeringStatusReply(mission: any): string {
+  const state = mission.state || {}
+  const trace = Array.isArray(state.trace) ? state.trace.slice(-3) : []
+  const recent = trace.length
+    ? trace.map((item: any) => `- ${item.action}: ${item.summary}`).join('\n')
+    : '- No tool action has completed yet.'
+  const commit = state.lastCommit
+    ? `\nBranch: ${state.lastCommit.branch}\nPR: ${state.lastCommit.prUrl || 'not created yet'}\nCommit: ${state.lastCommit.sha || 'none'}`
+    : `\nBranch: ${state.branch || 'not assigned'}\nNo commit has been created yet.`
+  const blocked = state.blockedReason ? `\nBlock: ${state.blockedReason}` : ''
+  return `COS engineering mission ${mission.id}\nStatus: ${mission.status}\nIteration: ${state.iteration || 0}/${state.maxIterations || '?'}${commit}${blocked}\nRecent grounded work:\n${recent}\nCOS continues automatically while the mission remains active; you do not need to say “continue”.`
+}
+
 export async function POST(req: NextRequest) {
   try {
     const copy = req.clone()
@@ -58,6 +77,12 @@ export async function POST(req: NextRequest) {
     if (text) {
       const access = await getAccess().catch(() => null)
       if (access?.isOwner) {
+        if (asksEngineeringStatus(text)) {
+          const active = await listActiveOwnerEngineeringMissions(20)
+          const mission = active.find(item => !access.userId || item.user_id === access.userId) || active[0]
+          if (mission) return routedReply(engineeringStatusReply(mission), 'cos-engineering-mission-status')
+        }
+
         // ENGINEERING FIRST. A sentence such as "the outreach campaign is not working,
         // fix it" contains campaign vocabulary but is a software-repair mission, not a
         // request to launch a new campaign. Durable engineering intent therefore wins

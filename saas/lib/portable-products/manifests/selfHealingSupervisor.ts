@@ -26,12 +26,6 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
     'signed-approval-required-only-for-money-deletion-or-credential-changes',
     'you-authorise-each-incident-plan-once-then-its-safe-steps-run-unattended',
     'automatic-failover-from-api-to-browser-or-to-a-human',
-    // POSITIVE FRAMING OF A TRUE FACT. This used to read "browser tasks prepared under
-    // approval for your own browser runtime to run" — accurate, and written as though it
-    // were an apology. The same fact stated as scope is a SELLING POINT to an enterprise:
-    // the browser agent operates inside their perimeter, on their runtime, under their
-    // credentials, which is exactly what a security review wants to hear. Nothing is
-    // overclaimed — it still does not say we drive a browser in our own cloud.
     'the-browser-agent-works-inside-your-own-runtime-under-your-own-credentials',
     'a-clean-state-checkpoint-is-captured-before-any-repair-changes-anything',
     'atomic-restore-of-the-whole-execution-context-when-a-repair-does-not-verify',
@@ -39,29 +33,44 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
     'a-person-is-called-whenever-an-undo-would-be-unsafe-or-does-not-restore',
     'manual-operator-control-available-at-any-step',
   ]),
-  shortDescription: 'Self-healing software: it fixes the failure itself — through your APIs, through a browser when there is no API, or by handing an operator the wheel. It checkpoints before it changes anything, and money, deletion and credentials stay yours to sign off.',
-  // WHAT THIS SENTENCE DELIBERATELY DOES NOT SAY: reversible. RepairPlan declares
-  // rollbackSteps and the fingerprinting hashes them, but no code executes them — the
-  // verifier runs the plan's verificationSteps and nothing runs a rollback. A first
-  // draft of this line claimed repairs were "reversible if the verification fails" and
-  // it was checked against the executors before shipping, which is the only reason the
-  // claim did not reach a buyer. Rollback sits in futureFeatures until it runs.
-  longDescription: 'A governed self-healing supervisor that acts on its own authority across the ordinary work and reserves the extraordinary for you. It detects a failure, diagnoses the cause with the evidence and reasoning recorded, then repairs it — using your registered APIs first, a browser agent running inside your own infrastructure under your own credentials where no API exists, and an operator the moment you want one or the moment it meets a captcha, a second factor or anything outside its envelope. Before it changes anything it captures a checkpoint from your own infrastructure, and if the repair does not verify it restores the whole execution context in one operation. Work it cannot checkpoint is stopped before it starts rather than discovered afterwards. Every conclusion carries the evidence behind it, the rule that fired and what would have changed the answer.',
+  shortDescription: 'Self-healing software: an AI-driven operations system with the COS AI brain that fixes failures itself through pre-integrated provider/API connectors, through a browser when there is no API, or by handing an operator the wheel. It is buyer-hosted, keeps consequential actions under human approval, and records the evidence, reasoning and actions in an audit trail.',
+  // THIS DESCRIPTION IS ALSO THE PRODUCT-SPECIFIC OUTREACH BRIEF. ProspectCampaignCore
+  // injects the manifest into every COS-generated draft, including refreshed pending drafts.
+  // Keep these instructions HERE, not in a global outreach prompt: every SignalBoost product
+  // gets its own campaign rules and another product must never inherit Supervisor messaging.
+  longDescription: 'A governed, buyer-hosted, AI-driven self-healing operations system whose COS AI brain detects a failure, diagnoses the cause from evidence, chooses a permitted recovery path, and repairs it. It uses pre-integrated providers, connectors and registered APIs first; when no API exists, the browser agent works inside the buyer own runtime under the buyer own credentials; an operator can take control at any point. Before changing anything it captures a checkpoint from the buyer infrastructure, verifies the repair afterwards, and restores the execution context when verification fails. Money, deletion and credential changes remain reserved for explicit human approval. Every conclusion and action carries the evidence behind it, the rule that fired, the reasoning, the action taken and what would have changed the answer, creating an auditable operational trail. OUTREACH REQUIREMENT FOR THIS PRODUCT ONLY: every Self-Healing Supervisor email must communicate the relevant combination of these mandatory concepts: AI-driven operations, self-healing, COS AI brain, buyer-hosted architecture, human approval for consequential actions, audit trail, pre-integrated providers/connectors, and concrete operational benefits. Do not dump them as a feature list; adapt them to the recipient and lead with the business problem. Audience weighting for MSPs, managed cloud providers and DevOps/SRE consultancies: self-healing and lower MTTR are highest priority, cloud operations next, browser automation supporting. Audience weighting for banks and financial institutions: governance, auditability and buyer-hosted control are highest priority, with human approval explained as buyer control. Audience weighting for healthcare organizations: compliance-oriented controls, availability and governance are highest priority, with self-healing supporting continuity. These audience weights change emphasis only; they never authorize claims outside this manifest. COS prepares the personalized email as a pending draft for owner review and approval; the campaign does not send merely because the draft was generated.',
   category: 'infrastructure',
   status: 'live',
   maturity: 'production',
   publicVisible: true,
   licensingAvailable: true,
-  targetAudience: Object.freeze(['platform operators', 'reliability teams']),
-  requiredCapabilities: Object.freeze(['failure-detection', 'repair-proposals', 'approved-repair-execution', 'post-repair-verification', 'automatic-rollback-on-failed-verification', 'transactional-execution-boundaries', 'point-in-time-state-restore']),
+  targetAudience: Object.freeze([
+    'managed service providers',
+    'managed cloud providers',
+    'DevOps and SRE consultancies',
+    'platform operators',
+    'reliability teams',
+    'banks and financial institutions',
+    'healthcare organizations',
+  ]),
+  requiredCapabilities: Object.freeze([
+    'ai-driven-operations',
+    'self-healing',
+    'cos-ai-reasoning',
+    'buyer-hosted-operation',
+    'failure-detection',
+    'repair-proposals',
+    'approved-repair-execution',
+    'human-approval-for-consequential-actions',
+    'post-repair-verification',
+    'automatic-rollback-on-failed-verification',
+    'transactional-execution-boundaries',
+    'point-in-time-state-restore',
+    'auditable-evidence-and-reasoning',
+    'pre-integrated-provider-and-api-connectors',
+  ]),
   optionalCapabilities: Object.freeze(['approval-gates']),
   dependencies: Object.freeze(['supervisor-policy']),
-  // 'autonomous-production-repair' USED TO BE LISTED HERE AND IT WAS WRONG — misleading in
-  // the costly direction. It implied nothing runs without a human, so outreach drafts told
-  // prospects the product never repairs on its own, which is the opposite of the design and
-  // throws away the reason to buy. api-executor.ts gates on `if (verdict.dangerous)`: a
-  // non-dangerous step matching a registered capability falls straight through to the runner
-  // and executes. The real, permanent exclusions are the two below.
   exclusions: Object.freeze([
     'unapproved-financial-destructive-or-credential-changes',
     'automatic-reversal-of-effects-already-observed-outside-your-systems',

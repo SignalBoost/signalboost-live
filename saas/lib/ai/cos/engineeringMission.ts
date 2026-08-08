@@ -3,6 +3,7 @@ import { callModel } from '@/lib/ai/modelRouter'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch } from '@/lib/ai/tools/repoWriter'
 import { runAudit } from '@/lib/audit/runner'
+import { verifyEngineeringCommit } from './engineeringVerification'
 
 const TABLE = 'cos_autonomy_state'
 const PREFIX = 'owner-engineering:'
@@ -243,43 +244,19 @@ async function chooseAction(row: EngineeringMissionRow): Promise<BrainAction | n
       'You are COS autonomous senior infrastructure/software engineer.',
       'Own the mission until it is verifiably resolved; do not behave like a consultant.',
       'Return exactly one JSON action and no prose.',
-      'Never invent a file path, file content, tool result, commit, PR, or CI result.',
+      'Never invent a file path, file content, tool result, commit, PR, check result, or CI result.',
       'Investigate from repository evidence. Read an existing file before committing it.',
+      'If verification failed, use the exact failure evidence in recentToolEvidence to repair the same mission.',
       'Use audit when broad evidence is useful, but do not repeatedly audit the same scope.',
       'Commit only complete files to the fixed ai/* branch; never main.',
       'If more than one file is required, commit all of them to the same branch before verify.',
       'Only choose verify when you believe the code change is complete. Deterministic code, not you, decides mission completion.',
+      'A commit or pull request is never proof that a fix works.',
       'Do not choose wait merely to end the turn; wait only for a real external pending state.',
     ].join(' '),
     prompt,
     maxTokens: 14000,
   }))
-}
-
-async function combinedCommitStatus(sha: string): Promise<{ state: 'success' | 'pending' | 'failure' | 'error'; summary: string }> {
-  const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN
-  if (!token) return { state: 'error', summary: 'GitHub token is not configured for commit verification.' }
-  try {
-    const res = await fetch(`https://api.github.com/repos/SignalBoost/signalboost-live/commits/${encodeURIComponent(sha)}/status`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'signalboost-cos-engineering',
-      },
-      cache: 'no-store',
-    })
-    if (!res.ok) return { state: 'error', summary: `GitHub commit status request failed (${res.status}).` }
-    const data = await res.json()
-    const status = String(data?.state || 'pending')
-    const statuses = Array.isArray(data?.statuses) ? data.statuses : []
-    const detail = statuses.map((s: any) => `${s.context || 'check'}=${s.state || 'unknown'}`).join(', ')
-    if (status === 'success') return { state: 'success', summary: detail || 'GitHub reports commit status success.' }
-    if (status === 'failure' || status === 'error') return { state: 'failure', summary: detail || `GitHub reports ${status}.` }
-    return { state: 'pending', summary: detail || 'Commit checks are still pending or no final status has been posted yet.' }
-  } catch (error) {
-    return { state: 'error', summary: error instanceof Error ? error.message : 'Commit verification failed.' }
-  }
 }
 
 export async function processOwnerEngineeringMissionTick(input: {
@@ -360,7 +337,7 @@ export async function processOwnerEngineeringMissionTick(input: {
         state = appendTrace({ ...state, stage: result.ok ? 'PATCHING' : 'DIAGNOSING' }, {
           action: `commit:${path}`,
           ok: result.ok,
-          summary: result.ok ? `Committed ${path} to ${result.branch}; PR ${result.prNumber || 'created/reused'}.` : result.error,
+          summary: result.ok ? `Committed ${path} to ${result.branch}; PR ${result.prNumber || 'created/reused'}. Verification is still required.` : result.error,
           output: result.ok ? `commit=${result.commitSha}\nbranch=${result.branch}\npr=${result.prUrl}` : result.error,
         })
         if (result.ok) {
@@ -368,7 +345,15 @@ export async function processOwnerEngineeringMissionTick(input: {
             ...state,
             consecutiveFailures: 0,
             lastCommit: { sha: result.commitSha, branch: result.branch, path: result.path, prUrl: result.prUrl, prNumber: result.prNumber },
-            checkpoints: { ...state.checkpoints, patch_created: true, pr_created: Boolean(result.prUrl || result.prNumber) },
+            checkpoints: {
+              patch_created: true,
+              pr_created: Boolean(result.prUrl || result.prNumber),
+              typecheck_passed: false,
+              unit_tests_passed: false,
+              production_build_passed: false,
+              i18n_validation_passed: false,
+              deployment_check_passed: false,
+            },
           }
         } else {
           state.consecutiveFailures += 1
@@ -380,22 +365,51 @@ export async function processOwnerEngineeringMissionTick(input: {
           action: 'verify', ok: false, summary: 'Verification refused: no successful mission commit exists yet.',
         })
       } else {
-        const verified = await combinedCommitStatus(state.lastCommit.sha)
-        state = appendTrace({ ...state, stage: 'VERIFYING' }, { action: 'verify', ok: verified.state === 'success', summary: verified.summary })
-        if (verified.state === 'success' && state.checkpoints.pr_created) {
+        const verified = await verifyEngineeringCommit(state.lastCommit.sha)
+        state = appendTrace({
+          ...state,
+          stage: 'VERIFYING',
+          checkpoints: { ...state.checkpoints, ...verified.checkpoints },
+        }, {
+          action: 'verify',
+          ok: verified.state === 'success',
+          summary: verified.summary,
+          output: verified.evidence,
+        })
+
+        const hardGatesPassed = [
+          state.checkpoints.pr_created,
+          verified.checkpoints.typecheck_passed,
+          verified.checkpoints.unit_tests_passed,
+          verified.checkpoints.production_build_passed,
+          verified.checkpoints.i18n_validation_passed,
+          verified.checkpoints.deployment_check_passed,
+        ].every(Boolean)
+
+        if (verified.state === 'success' && hardGatesPassed) {
           const now = new Date().toISOString()
           state = {
             ...state,
             stage: 'COMPLETED',
             consecutiveFailures: 0,
-            checkpoints: { ...state.checkpoints, ci_verified: true },
+            checkpoints: { ...state.checkpoints, ...verified.checkpoints, ci_verified: true },
             completedAt: now,
             updatedAt: now,
           }
         } else if (verified.state === 'failure') {
-          state = { ...state, stage: 'DIAGNOSING', consecutiveFailures: state.consecutiveFailures + 1 }
+          state = {
+            ...state,
+            stage: 'DIAGNOSING',
+            consecutiveFailures: 0,
+            checkpoints: { ...state.checkpoints, ...verified.checkpoints, ci_verified: false },
+          }
         } else if (verified.state === 'error' && /token is not configured/i.test(verified.summary)) {
           state = { ...state, stage: 'BLOCKED_MISSING_CREDENTIAL', blockedReason: verified.summary }
+        } else {
+          // Pending/missing checks are an external state, not mission completion and not
+          // an engineering failure. Persist VERIFYING and let the next cron tick re-check.
+          row = await saveMission(row, state)
+          break
         }
       }
     } else if (action.type === 'wait') {

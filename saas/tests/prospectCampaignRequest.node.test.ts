@@ -14,11 +14,34 @@ Target: cloud-focused MSPs, DevOps/SRE consultancies, managed cloud-service prov
   assert.ok(parsed)
   assert.equal(parsed.requestedCount, 10)
   assert.equal(parsed.region, 'the United States')
+  assert.equal(parsed.language, 'en')
   assert.match(parsed.offer, /^the Self-Healing Supervisor/)
   assert.match(parsed.offer, /signed audit evidence/)
   assert.match(parsed.targetCriteria, /^cloud-focused MSPs/)
   assert.match(parsed.targetCriteria, /no competing automated-remediation product/)
   assert.doesNotMatch(parsed.targetCriteria, /Find 10|Start in/)
+})
+
+test('campaign brief language overrides the dashboard language', () => {
+  const parsed = parseProspectCampaignRequest(`Run an email outreach campaign to sell SignalBoost.
+Target: cloud consultancies and MSPs.
+Region: Poland — Language: Polish — Find 10 companies.`, 'en')
+  assert.ok(parsed)
+  assert.equal(parsed.region, 'Poland')
+  assert.equal(parsed.language, 'pl')
+})
+
+test('natural email-language instruction is honored', () => {
+  const parsed = parseProspectCampaignRequest('Run an email outreach campaign to sell SignalBoost. Target: cloud MSPs. The emails should be in Russian. Region: Russia. Find 10 companies.', 'en')
+  assert.ok(parsed)
+  assert.equal(parsed.language, 'ru')
+})
+
+test('target market supplies the language when a brief omits it', () => {
+  const brazil = parseProspectCampaignRequest('Run an email outreach campaign to sell SignalBoost. Target: cloud MSPs. Region: Brazil. Find 10 companies.', 'en')
+  const mexico = parseProspectCampaignRequest('Run an email outreach campaign to sell SignalBoost. Target: cloud MSPs. Region: Mexico. Find 10 companies.', 'en')
+  assert.equal(brazil?.language, 'pt')
+  assert.equal(mexico?.language, 'es')
 })
 
 test('does not turn a read-only prospect list into an outreach campaign', () => {
@@ -37,10 +60,10 @@ test('an explicit instruction not to create the campaign is respected', () => {
   assert.equal(parsed, null)
 })
 
-test('requested campaign size is capped to the worker limit', () => {
+test('parser preserves requested campaign size; worker owns the sanity bound', () => {
   const parsed = parseProspectCampaignRequest('Build an outreach campaign to sell SignalBoost. Target: cloud consultancies. Find 100 companies.', 'en')
   assert.ok(parsed)
-  assert.equal(parsed.requestedCount, 25)
+  assert.equal(parsed.requestedCount, 100)
 })
 
 test('queue replies are explicit that no external action occurred', () => {

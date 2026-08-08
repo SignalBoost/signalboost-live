@@ -22,6 +22,7 @@ import {
   isOwnerEngineeringRequest,
   listActiveOwnerEngineeringMissions,
 } from '@/lib/ai/cos/engineeringMission'
+import { ensureCosMissionStore } from '@/lib/ai/cos/autonomy/missionStoreBootstrap'
 
 export { guardConfabulatedAction } from './routeCore'
 export const maxDuration = 300
@@ -43,11 +44,7 @@ function languageCode(body: any): string {
 }
 
 function routedReply(reply: string, source: string) {
-  return NextResponse.json({
-    reply,
-    telemetry: { source },
-    source,
-  })
+  return NextResponse.json({ reply, telemetry: { source }, source })
 }
 
 function asksEngineeringStatus(text: string): boolean {
@@ -77,28 +74,35 @@ export async function POST(req: NextRequest) {
     if (text) {
       const access = await getAccess().catch(() => null)
       if (access?.isOwner) {
-        if (asksEngineeringStatus(text)) {
-          const active = await listActiveOwnerEngineeringMissions(20)
-          const mission = active.find(item => !access.userId || item.user_id === access.userId) || active[0]
-          if (mission) return routedReply(engineeringStatusReply(mission), 'cos-engineering-mission-status')
-        }
+        const engineeringIntent = isOwnerEngineeringRequest(text)
+        const statusIntent = asksEngineeringStatus(text)
 
-        // ENGINEERING FIRST. A sentence such as "the outreach campaign is not working,
-        // fix it" contains campaign vocabulary but is a software-repair mission, not a
-        // request to launch a new campaign. Durable engineering intent therefore wins
-        // over press/prospect routing whenever the owner is describing a broken system.
-        if (isOwnerEngineeringRequest(text)) {
-          const started = await createOwnerEngineeringMission({
-            objective: text,
-            userId: access.userId || null,
-          })
-          if (!started.ok || !started.mission) {
-            return routedReply(
-              `COS could not start the engineering mission: ${started.error || 'unknown error'}. No code was changed.`,
-              'cos-engineering-mission-router',
-            )
+        if (engineeringIntent || statusIntent) {
+          // Persistence is part of COS itself. A missing mission table is therefore a
+          // recoverable COS infrastructure fault, not a reason to abandon the owner's
+          // mission. Bootstrap/verify it before touching the mission queue.
+          const store = await ensureCosMissionStore()
+          if (!store.ok) {
+            // Do not falsely claim the engineering task ran. Fall through to the existing
+            // grounded COS executor so it can continue diagnosing the infrastructure
+            // dependency in this request instead of terminating at the router boundary.
+            console.error('COS mission-store recovery unavailable:', store.error)
+          } else {
+            if (statusIntent) {
+              const active = await listActiveOwnerEngineeringMissions(20)
+              const mission = active.find(item => !access.userId || item.user_id === access.userId) || active[0]
+              if (mission) return routedReply(engineeringStatusReply(mission), 'cos-engineering-mission-status')
+            }
+
+            if (engineeringIntent) {
+              const started = await createOwnerEngineeringMission({ objective: text, userId: access.userId || null })
+              if (started.ok && started.mission) {
+                const repairNote = store.repaired ? ' COS repaired its mission persistence automatically before starting.' : ''
+                return routedReply(`${engineeringMissionQueuedReply(started.mission)}${repairNote}`, 'cos-engineering-mission-router')
+              }
+              console.error('COS engineering mission creation failed after store verification:', started.error)
+            }
           }
-          return routedReply(engineeringMissionQueuedReply(started.mission), 'cos-engineering-mission-router')
         }
 
         const lang = languageCode(body)
@@ -147,11 +151,13 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-  } catch {
-    // Routing is additive and fail-open: a router problem must never break the existing
-    // support/COSA handler. Delegate below exactly as before.
+  } catch (error) {
+    console.error('support durable-intent router failed:', error)
   }
 
+  // The durable layer is additive. If it cannot establish persistence, do not terminate
+  // the owner's engineering request here; give the existing grounded executor a chance to
+  // continue and diagnose/recover rather than saying "No code was changed".
   const core = await import('./routeCore')
   return core.POST(req)
 }

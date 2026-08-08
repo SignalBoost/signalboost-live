@@ -82,6 +82,59 @@ function normalizeLanguage(value: string): ParsedProspectCampaignRequest['langua
     : 'en'
 }
 
+// The language of the DASHBOARD is not the language of the recipient. Before this
+// existed, parseProspectCampaignRequest simply stored the caller's UI language and
+// ignored lines such as "Language: Polish" or "The email should be in Spanish". Brazil
+// happened to look correct because the later website-language detector often rescued
+// Portuguese; Spanish, Polish and Russian did not. The campaign brief is authoritative.
+function languageCodeFromText(value: string): ParsedProspectCampaignRequest['language'] | null {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  if (/\b(?:english|ingles|angielski|английск(?:ий|ом)|en)\b/i.test(normalized)) return 'en'
+  if (/\b(?:spanish|espanol|español|hiszpanski|испанск(?:ий|ом)|es)\b/i.test(normalized)) return 'es'
+  if (/\b(?:portuguese|portugues|português|brazilian portuguese|portugues brasileiro|pt-br|pt)\b/i.test(normalized)) return 'pt'
+  if (/\b(?:polish|polski|polsku|польск(?:ий|ом)|pl)\b/i.test(normalized)) return 'pl'
+  if (/\b(?:russian|rosyjski|rosyjsku|русск(?:ий|ом)|ru)\b/i.test(normalized)) return 'ru'
+  return null
+}
+
+function languageFromRegion(region: string | null): ParsedProspectCampaignRequest['language'] | null {
+  const value = String(region || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  if (/\b(?:brazil|brasil|portugal)\b/.test(value)) return 'pt'
+  if (/\b(?:mexico|spain|espana|argentina|colombia|chile|peru|ecuador|uruguay|paraguay|venezuela|costa rica|panama)\b/.test(value)) return 'es'
+  if (/\b(?:poland|polska)\b/.test(value)) return 'pl'
+  if (/\b(?:russia|россия)\b/.test(value)) return 'ru'
+  return null
+}
+
+function extractRequestedLanguage(
+  text: string,
+  fallback: string,
+  region: string | null,
+): ParsedProspectCampaignRequest['language'] {
+  // Structured briefs: "Language: Polish", "Idioma: Español", "Język: polski".
+  const labelled = text.match(/\b(?:language|idioma|j[eę]zyk|язык)\s*:\s*([^\n.;|—–]{1,50})/i)
+  const labelledCode = labelled?.[1] ? languageCodeFromText(labelled[1]) : null
+  if (labelledCode) return labelledCode
+
+  // Natural requests: "the email should be in Portuguese", "write the drafts in Polish".
+  const natural = text.match(/\b(?:email|emails|draft|drafts|message|messages|copy|outreach|correo|correos|wiadomo(?:ść|ści)|черновик\w*|письм\w*)\b[^\n.!?]{0,80}\b(?:in|em|en|po|на)\s+([^\n,.;!?—–]{2,40})/i)
+  const naturalCode = natural?.[1] ? languageCodeFromText(natural[1]) : null
+  if (naturalCode) return naturalCode
+
+  // When the brief names a market but omits a language, use that market's ordinary
+  // outreach language for the regions SignalBoost explicitly supports. The caller/UI
+  // language is only the final fallback, never a substitute for the recipient's market.
+  return languageFromRegion(region) || normalizeLanguage(fallback)
+}
+
 /**
  * A brief writes its settings on one line: "Region: USA - Language: English - Find 30
  * companies". Reading to the end of the line captured all of it as the region, and a region
@@ -158,16 +211,21 @@ export function parseProspectCampaignRequest(
   const targetCriteria = removeOperationalTail(afterTarget)
   if (!offer || !targetCriteria) return null
 
+  const region = extractRegion(input)
+
   return {
     offer,
     targetCriteria,
-    region: extractRegion(input),
+    region,
     // NO SILENT CAP. This clamped every request to 25, so "find 30 companies" became a
     // 25-company job and nothing said so — the operator watched a campaign work towards a
     // number they had never asked for. The worker applies its own sanity bound and RECORDS
     // it when it applies, which is the difference between a limit and a lie.
     requestedCount: rawCount,
-    language: normalizeLanguage(language),
+    // Recipient language comes from the brief first, then the target market. The dashboard
+    // language is only a fallback. This prevents Polish/Russian/Spanish campaigns from
+    // silently becoming English jobs.
+    language: extractRequestedLanguage(input, language, region),
   }
 }
 

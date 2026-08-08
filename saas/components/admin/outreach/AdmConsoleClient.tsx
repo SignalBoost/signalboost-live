@@ -78,12 +78,14 @@ export default function AdmConsoleClient() {
     }, {})
   }, [data])
 
+  // Approve sets status only (release:false). The separate Send button triggers the actual email.
+  // This separates the two-step workflow: Approve = owner has reviewed it; Send = owner releases it.
   async function patchOutreach(id: string, status: string) {
     setBusy(true)
     const res = await fetch('/api/outreach/queue', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({ id, status, release: false }),
     })
     const json = await res.json()
     setMessage(res.ok ? `Outreach ${status}.` : json.error || "Update failed")
@@ -94,16 +96,36 @@ export default function AdmConsoleClient() {
   async function sendSelected() {
     if (!selected) return
     setBusy(true)
-    const res = await fetch('/api/outreach/send', {
-      method: 'POST',
+    // Use the queue PATCH with release:true — this goes through the full guard stack
+    // (duplicate check, panic switch, daily limit, guardrails, audit log) before sending.
+    const res = await fetch('/api/outreach/queue', {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outreach_id: selected.id, channel: sendEmail ? 'email' : 'manual', to_email: sendEmail || undefined }),
+      body: JSON.stringify({
+        id: selected.id,
+        status: 'approved',
+        release: true,
+        ...(sendEmail ? { contact_email_override: sendEmail } : {}),
+      }),
     })
     const json = await res.json()
     if (res.ok) {
-      const mode = String(json?.providerResult?.mode || '')
-      const reallyEmailed = mode !== '' && mode !== 'manual_record_only'
-      setMessage(reallyEmailed ? `✅ Email sent (${mode}).` : "⚠️ Recorded only — no email was sent.")
+      const release = json?.release
+      if (release?.ok) {
+        setMessage(`✅ Email sent at ${release.sentAt || 'unknown time'}.`)
+      } else if (release?.reason === 'duplicate_recipient') {
+        setMessage(`⚠️ Duplicate recipient — ${release.error}`)
+      } else if (release?.reason === 'panic_switch') {
+        setMessage('⚠️ Outreach sending is disabled by the panic switch. Nothing was sent.')
+      } else if (release?.reason === 'daily_limit') {
+        setMessage('⚠️ Daily send limit reached. Nothing was sent.')
+      } else if (release?.reason === 'guardrail') {
+        setMessage(`⚠️ Message blocked by guardrail: ${release.error}`)
+      } else if (release?.reason === 'missing_or_low_quality_contact_email') {
+        setMessage('⚠️ No valid recipient email on this draft. Nothing was sent.')
+      } else {
+        setMessage(release?.error || "Send failed — check logs.")
+      }
     } else {
       setMessage(json.error || "Send failed")
     }
@@ -252,8 +274,22 @@ export default function AdmConsoleClient() {
                   <p className="mt-3 text-sm text-white/70">{selected.analyzer_summary?.hmi_summary}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button disabled={busy || selected.status === 'approved'} onClick={() => patchOutreach(selected.id, 'approved')} className="sb-button-primary" style={{ border: 'none', opacity: busy || selected.status === 'approved' ? 0.5 : 1 }}>{uiText('generatedUi.u_6007acbe30b2cd98')}</button>
-                  <button disabled={busy || selected.status === 'rejected'} onClick={() => patchOutreach(selected.id, 'rejected')} className="rounded-full border-0 bg-red-600 px-4 py-2 text-sm font-bold text-white" style={{ opacity: busy || selected.status === 'rejected' ? 0.5 : 1 }}>{uiText('generatedUi.u_ab604a360777735f')}</button>
+                  <button
+                    disabled={busy || selected.status === 'approved' || selected.status === 'sent'}
+                    onClick={() => patchOutreach(selected.id, 'approved')}
+                    className="sb-button-primary"
+                    style={{ border: 'none', opacity: busy || selected.status === 'approved' || selected.status === 'sent' ? 0.5 : 1 }}
+                  >
+                    {uiText('generatedUi.u_6007acbe30b2cd98')}
+                  </button>
+                  <button
+                    disabled={busy || selected.status === 'rejected' || selected.status === 'sent'}
+                    onClick={() => patchOutreach(selected.id, 'rejected')}
+                    className="rounded-full border-0 bg-red-600 px-4 py-2 text-sm font-bold text-white"
+                    style={{ opacity: busy || selected.status === 'rejected' || selected.status === 'sent' ? 0.5 : 1 }}
+                  >
+                    {uiText('generatedUi.u_ab604a360777735f')}
+                  </button>
                 </div>
               </div>
 
@@ -275,9 +311,31 @@ export default function AdmConsoleClient() {
                 <h4 className="m-0 font-semibold text-white"><LocalizedText fallback={uiText('generatedUi.u_d20b73953a498154')} /></h4>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/70">{selected.outreach_message}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder={uiText('generatedUi.u_9e24adb947416462')} className="sb-input min-w-[180px] flex-1 rounded-xl px-3 py-2.5 text-sm" />
-                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}><LocalizedText fallback={uiText('generatedUi.u_b6185804241b3112')} /></button>
+                  <input
+                    value={sendEmail}
+                    onChange={e => setSendEmail(e.target.value)}
+                    placeholder={uiText('generatedUi.u_9e24adb947416462')}
+                    className="sb-input min-w-[180px] flex-1 rounded-xl px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    disabled={busy || selected.status !== 'approved'}
+                    onClick={sendSelected}
+                    className="sb-button-secondary"
+                    style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}
+                  >
+                    <LocalizedText fallback={uiText('generatedUi.u_b6185804241b3112')} />
+                  </button>
                 </div>
+                {selected.status === 'pending' && (
+                  <p className="mt-2 text-xs" style={{ color: '#f59e0b' }}>
+                    Approve this draft first, then use the Send button to release it.
+                  </p>
+                )}
+                {selected.status === 'sent' && (
+                  <p className="mt-2 text-xs" style={{ color: '#1af0ff' }}>
+                    ✅ This draft has already been sent.
+                  </p>
+                )}
               </div>
             </div>
           ) : (

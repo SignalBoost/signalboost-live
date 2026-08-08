@@ -1,8 +1,7 @@
-// Campaign-routing boundary for the support API.
+// Durable-intent routing boundary for the support API.
 //
-// The existing support handler is preserved unchanged in routeCore.ts. This wrapper only
-// intercepts clear owner requests for durable 3+ target press/prospect jobs; everything
-// else — including COSA/video generation — is delegated to the existing handler.
+// Long-running owner work is promoted into background jobs BEFORE the bounded chat
+// handler sees it. This prevents an HTTP turn ending from becoming a mission stop.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
@@ -17,6 +16,11 @@ import {
   parsePressCampaignRequest,
   pressCampaignQueuedReply,
 } from '@/lib/outreach/pressCampaign'
+import {
+  createOwnerEngineeringMission,
+  engineeringMissionQueuedReply,
+  isOwnerEngineeringRequest,
+} from '@/lib/ai/cos/engineeringMission'
 
 export { guardConfabulatedAction } from './routeCore'
 export const maxDuration = 300
@@ -37,11 +41,11 @@ function languageCode(body: any): string {
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
 }
 
-function routedReply(reply: string) {
+function routedReply(reply: string, source: string) {
   return NextResponse.json({
     reply,
-    telemetry: { source: 'campaign-intent-router' },
-    source: 'campaign-intent-router',
+    telemetry: { source },
+    source,
   })
 }
 
@@ -54,11 +58,26 @@ export async function POST(req: NextRequest) {
     if (text) {
       const access = await getAccess().catch(() => null)
       if (access?.isOwner) {
+        // ENGINEERING FIRST. A sentence such as "the outreach campaign is not working,
+        // fix it" contains campaign vocabulary but is a software-repair mission, not a
+        // request to launch a new campaign. Durable engineering intent therefore wins
+        // over press/prospect routing whenever the owner is describing a broken system.
+        if (isOwnerEngineeringRequest(text)) {
+          const started = await createOwnerEngineeringMission({
+            objective: text,
+            userId: access.userId || null,
+          })
+          if (!started.ok || !started.mission) {
+            return routedReply(
+              `COS could not start the engineering mission: ${started.error || 'unknown error'}. No code was changed.`,
+              'cos-engineering-mission-router',
+            )
+          }
+          return routedReply(engineeringMissionQueuedReply(started.mission), 'cos-engineering-mission-router')
+        }
+
         const lang = languageCode(body)
 
-        // PRESS FIRST: both deterministic parsers are guarded by campaignIntent, so this
-        // order cannot turn a sales brief into press. It only gives bulk press its own
-        // durable worker instead of forcing publications through the sales queue.
         const press = parsePressCampaignRequest(text, lang)
         if (press) {
           const started = await createPressCampaignJob({
@@ -70,7 +89,7 @@ export async function POST(req: NextRequest) {
             createdBy: access.userId || null,
           })
           if (!started.ok || !started.job) {
-            return routedReply(`Press campaign could not be started: ${started.error || 'unknown error'}. Nothing was sent and no publication was contacted.`)
+            return routedReply(`Press campaign could not be started: ${started.error || 'unknown error'}. Nothing was sent and no publication was contacted.`, 'campaign-intent-router')
           }
           return routedReply(pressCampaignQueuedReply({
             jobId: started.job.id,
@@ -78,7 +97,7 @@ export async function POST(req: NextRequest) {
             region: started.job.region,
             capNote: started.capNote,
             duplicateOf: started.duplicateOf,
-          }))
+          }), 'campaign-intent-router')
         }
 
         const prospect = parseProspectCampaignRequest(text, lang)
@@ -92,14 +111,14 @@ export async function POST(req: NextRequest) {
             createdBy: access.userId || null,
           })
           if (!started.ok || !started.job) {
-            return routedReply(prospectCampaignQueueError(started.error || 'unknown error', prospect.language))
+            return routedReply(prospectCampaignQueueError(started.error || 'unknown error', prospect.language), 'campaign-intent-router')
           }
           return routedReply(prospectCampaignQueuedReply({
             jobId: started.job.id,
             requestedCount: started.job.requested_count,
             region: started.job.region,
             language: started.job.language,
-          }))
+          }), 'campaign-intent-router')
         }
       }
     }

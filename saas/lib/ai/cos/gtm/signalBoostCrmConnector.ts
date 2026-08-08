@@ -45,7 +45,7 @@ export class SignalBoostCrmConnector implements ICosCrmConnector {
 
     const { data: rows, error } = await db
       .from('outreach_queue')
-      .select('id,business_name,website_url,contact_name,contact_email,product_key,status,created_at,updated_at,sent_at')
+      .select('id,business_name,business_url,contact_email,product_key,status,created_at,updated_at,sent_at')
       .ilike('contact_email', address)
       .order('created_at', { ascending: true })
       .limit(100)
@@ -83,7 +83,7 @@ export class SignalBoostCrmConnector implements ICosCrmConnector {
 
     const latest = rows[rows.length - 1] as any
     let companyDomain: string | null = null
-    try { companyDomain = latest.website_url ? new URL(latest.website_url).hostname.replace(/^www\./i, '') : null } catch {}
+    try { companyDomain = latest.business_url ? new URL(latest.business_url).hostname.replace(/^www\./i, '') : null } catch {}
 
     return {
       provider: this.provider,
@@ -91,7 +91,7 @@ export class SignalBoostCrmConnector implements ICosCrmConnector {
       externalId: latest.id || null,
       companyName: latest.business_name || companyDomain || address,
       companyDomain,
-      contactName: latest.contact_name || null,
+      contactName: null,
       email: address,
       touches: [...touchesByProduct.values()],
       updatedAt: latest.updated_at || latest.created_at || new Date().toISOString(),
@@ -115,7 +115,7 @@ export class SignalBoostCrmConnector implements ICosCrmConnector {
 
     const { data: rows, error } = await db
       .from('outreach_queue')
-      .select('id,product_key,status')
+      .select('id,product_key,status,created_at')
       .ilike('contact_email', address)
       .order('created_at', { ascending: false })
       .limit(100)

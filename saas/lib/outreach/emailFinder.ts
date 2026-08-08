@@ -6,6 +6,10 @@ import { getOutreachSecret } from './social-secrets.ts'
 // on the company's pages (mailto: links or visible text). When a company publishes
 // no email — many use contact forms instead — it returns null, and the caller must
 // SKIP that company rather than invent an address.
+//
+// This file intentionally restores the exact discovery behavior from immediately
+// before the Aug 3 regression. New filtering/crawl changes should be reintroduced
+// only after this baseline is verified against known published addresses.
 
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi
 const PREFERRED = ['sales', 'hello', 'contact', 'hi', 'info', 'team', 'partnerships', 'partner', 'support', 'admin', 'office']
@@ -73,7 +77,8 @@ function rank(emails: string[], domain: string): string[] {
     const pref = PREFERRED.findIndex(p => local === p || local.startsWith(p))
     return (onDomain(e) ? 0 : 1000) + (pref === -1 ? 100 : pref)
   }
-  return clean.filter(onDomain).sort((a, b) => score(a) - score(b))
+  const onDom = clean.filter(onDomain)
+  return onDom.sort((a, b) => score(a) - score(b))
 }
 
 export type ContactEmailResult = {
@@ -88,25 +93,29 @@ export async function findContactEmail(businessUrl: string): Promise<ContactEmai
   if (!origin) return { email: null, source: null, candidates: [], diagnostic: 'invalid_url' }
   const domain = domainOf(origin)
 
-  // Restore the proven pre-Aug-3 behavior: one request at a time, stopping as soon
-  // as a confident on-domain address is found. Localized routes are retained after
-  // the original paths so the known-working order is unchanged.
-  const paths = [
-    '', '/contact', '/contact-us', '/contacts', '/about', '/about-us', '/support', '/company', '/team',
-    '/contato', '/fale-conosco', '/empresa', '/quem-somos', '/comercial', '/vendas', '/parcerias',
+  const WAVES = [
+    ['', '/contact', '/contact-us', '/contacts'],
+    ['/about', '/about-us', '/support', '/company', '/team'],
   ]
+
   const all = new Set<string>()
   let source: string | null = null
 
-  for (const p of paths) {
-    const html = await fetchText(origin + p)
-    if (!html) continue
-    const found = extractEmails(html).filter(looksReal)
-    if (!found.length) continue
-    if (!source) source = origin + p
-    for (const e of found) all.add(e)
-    const top = rank(Array.from(all), domain)[0]
-    if (top) break
+  for (const wave of WAVES) {
+    const pages = await Promise.all(
+      wave.map(async path => ({ url: origin + path, html: await fetchText(origin + path) })),
+    )
+
+    for (const page of pages) {
+      if (!page.html) continue
+      const found = extractEmails(page.html).filter(looksReal)
+      if (!found.length) continue
+      if (!source) source = page.url
+      for (const email of found) all.add(email)
+    }
+
+    const best = rank(Array.from(all), domain)[0]
+    if (best) return { email: best, source, candidates: rank(Array.from(all), domain).slice(0, 5), diagnostic: null }
   }
 
   const ranked = rank(Array.from(all), domain)
@@ -126,7 +135,6 @@ async function apolloLookup(domain: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
       body: JSON.stringify({ api_key: key, organization_domain: domain }),
-      signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) return null
     const d: any = await res.json().catch(() => null)

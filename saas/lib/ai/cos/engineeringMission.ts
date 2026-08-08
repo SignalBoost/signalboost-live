@@ -4,7 +4,8 @@ import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch } from '@/lib/ai/tools/repoWriter'
 import { runAudit } from '@/lib/audit/runner'
 
-const TABLE = 'cos_owner_engineering_missions'
+const TABLE = 'cos_autonomy_state'
+const PREFIX = 'owner-engineering:'
 const DEFAULT_MAX_ITERATIONS = 20
 const MAX_TRACE = 40
 const MAX_TOOL_OUTPUT = 45_000
@@ -38,6 +39,9 @@ interface CommitEvidence {
 
 interface EngineeringState {
   schemaVersion: 'cos-owner-engineering-v1'
+  missionId: string
+  userId: string | null
+  objective: string
   stage: EngineeringStatus
   iteration: number
   maxIterations: number
@@ -86,10 +90,13 @@ function branchFor(id: string): string {
   return `ai/cos-mission-${id.replace(/[^a-z0-9-]/gi, '').slice(0, 18).toLowerCase()}`
 }
 
-function initialState(id: string): EngineeringState {
+function initialState(id: string, objective: string, userId: string | null): EngineeringState {
   const now = new Date().toISOString()
   return {
     schemaVersion: 'cos-owner-engineering-v1',
+    missionId: id,
+    userId,
+    objective,
     stage: 'QUEUED',
     iteration: 0,
     maxIterations: DEFAULT_MAX_ITERATIONS,
@@ -103,13 +110,27 @@ function initialState(id: string): EngineeringState {
   }
 }
 
+function fromStored(missionId: string, state: EngineeringState, updatedAt?: string): EngineeringMissionRow {
+  const id = missionId.startsWith(PREFIX) ? missionId.slice(PREFIX.length) : missionId
+  return {
+    id,
+    user_id: state.userId || null,
+    objective: state.objective,
+    status: state.stage,
+    state,
+    created_at: state.createdAt,
+    updated_at: updatedAt || state.updatedAt,
+  }
+}
+
 export function isOwnerEngineeringRequest(text: string): boolean {
   const s = String(text || '').trim()
   if (!s) return false
   const action = /\b(fix|repair|debug|patch|resolve|correct|implement|change|refactor|scan\s+(?:the\s+)?repo|audit\s+(?:the\s+)?repo)\b/i
   const broken = /\b(not\s+working|broken|failing|fails|failure|bug|error)\b/i
-  const technical = /\b(repo|repository|code|platform|app|website|api|route|typescript|next\.?js|vercel|supabase|deployment|build|pipeline|outreach|email|dashboard|cos)\b/i
-  return technical.test(s) && (action.test(s) || broken.test(s))
+  const strongTechnical = /\b(repo|repository|code|platform|app|website|api|route|typescript|next\.?js|vercel|supabase|deployment|build|pipeline|dashboard|cos)\b/i
+  const featureContext = /\b(outreach|email|campaign|video|audio|browser|supervisor)\b/i
+  return (strongTechnical.test(s) && (action.test(s) || broken.test(s))) || (broken.test(s) && featureContext.test(s))
 }
 
 export async function createOwnerEngineeringMission(input: {
@@ -121,55 +142,51 @@ export async function createOwnerEngineeringMission(input: {
   const objective = clean(input.objective, 8000)
   if (!objective) return { ok: false, error: 'objective is required' }
 
-  // Idempotency: do not create duplicate active missions for the exact same owner objective.
-  const existing = await db
-    .from(TABLE)
-    .select('*')
-    .eq('objective', objective)
-    .in('status', ['QUEUED', 'DIAGNOSING', 'PATCHING', 'VERIFYING'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (existing.data) return { ok: true, mission: existing.data as EngineeringMissionRow }
+  const active = await listActiveOwnerEngineeringMissions(20)
+  const duplicate = active.find(item => item.objective === objective && (!input.userId || item.user_id === input.userId))
+  if (duplicate) return { ok: true, mission: duplicate }
 
   const id = crypto.randomUUID()
-  const state = initialState(id)
-  const { data, error } = await db.from(TABLE).insert({
-    id,
-    user_id: input.userId || null,
-    objective,
-    status: state.stage,
-    state,
-  }).select('*').single()
-  if (error || !data) return { ok: false, error: error?.message || 'mission insert failed' }
-  return { ok: true, mission: data as EngineeringMissionRow }
+  const state = initialState(id, objective, input.userId || null)
+  const missionId = `${PREFIX}${id}`
+  const { error } = await db.from(TABLE).upsert({ mission_id: missionId, state, updated_at: state.updatedAt }, { onConflict: 'mission_id' })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, mission: fromStored(missionId, state) }
 }
 
 export async function listActiveOwnerEngineeringMissions(limit = 5): Promise<EngineeringMissionRow[]> {
   const db = admin()
   if (!db) return []
-  const { data } = await db.from(TABLE)
-    .select('*')
-    .in('status', ['QUEUED', 'DIAGNOSING', 'PATCHING', 'VERIFYING'])
+  const { data, error } = await db.from(TABLE)
+    .select('mission_id,state,updated_at')
+    .like('mission_id', `${PREFIX}%`)
     .order('updated_at', { ascending: true })
-    .limit(Math.max(1, Math.min(limit, 20)))
-  return (data || []) as EngineeringMissionRow[]
+    .limit(50)
+  if (error) return []
+  return (data || [])
+    .map((item: any) => item?.state?.schemaVersion === 'cos-owner-engineering-v1' ? fromStored(String(item.mission_id), item.state as EngineeringState, item.updated_at) : null)
+    .filter((item): item is EngineeringMissionRow => Boolean(item && ['QUEUED', 'DIAGNOSING', 'PATCHING', 'VERIFYING'].includes(item.status)))
+    .slice(0, Math.max(1, Math.min(limit, 20)))
 }
 
 export async function getOwnerEngineeringMission(id: string): Promise<EngineeringMissionRow | null> {
   const db = admin()
   if (!db) return null
-  const { data } = await db.from(TABLE).select('*').eq('id', id).maybeSingle()
-  return data as EngineeringMissionRow | null
+  const missionId = id.startsWith(PREFIX) ? id : `${PREFIX}${id}`
+  const { data } = await db.from(TABLE).select('mission_id,state,updated_at').eq('mission_id', missionId).maybeSingle()
+  if (!data?.state || data.state.schemaVersion !== 'cos-owner-engineering-v1') return null
+  return fromStored(String(data.mission_id), data.state as EngineeringState, data.updated_at)
 }
 
 async function saveMission(row: EngineeringMissionRow, state: EngineeringState): Promise<EngineeringMissionRow> {
   const db = admin()
   if (!db) throw new Error('Supabase service role is not configured.')
   const now = new Date().toISOString()
-  const { data, error } = await db.from(TABLE).update({ status: state.stage, state: { ...state, updatedAt: now }, updated_at: now }).eq('id', row.id).select('*').single()
-  if (error || !data) throw new Error(error?.message || 'mission update failed')
-  return data as EngineeringMissionRow
+  const next = { ...state, updatedAt: now }
+  const missionId = `${PREFIX}${row.id}`
+  const { error } = await db.from(TABLE).upsert({ mission_id: missionId, state: next, updated_at: now }, { onConflict: 'mission_id' })
+  if (error) throw new Error(error.message || 'mission update failed')
+  return fromStored(missionId, next, now)
 }
 
 function appendTrace(state: EngineeringState, item: Omit<EngineeringTrace, 'at' | 'iteration'>): EngineeringState {
@@ -254,11 +271,11 @@ async function combinedCommitStatus(sha: string): Promise<{ state: 'success' | '
     })
     if (!res.ok) return { state: 'error', summary: `GitHub commit status request failed (${res.status}).` }
     const data = await res.json()
-    const state = String(data?.state || 'pending')
+    const status = String(data?.state || 'pending')
     const statuses = Array.isArray(data?.statuses) ? data.statuses : []
     const detail = statuses.map((s: any) => `${s.context || 'check'}=${s.state || 'unknown'}`).join(', ')
-    if (state === 'success') return { state: 'success', summary: detail || 'GitHub reports commit status success.' }
-    if (state === 'failure' || state === 'error') return { state: 'failure', summary: detail || `GitHub reports ${state}.` }
+    if (status === 'success') return { state: 'success', summary: detail || 'GitHub reports commit status success.' }
+    if (status === 'failure' || status === 'error') return { state: 'failure', summary: detail || `GitHub reports ${status}.` }
     return { state: 'pending', summary: detail || 'Commit checks are still pending or no final status has been posted yet.' }
   } catch (error) {
     return { state: 'error', summary: error instanceof Error ? error.message : 'Commit verification failed.' }

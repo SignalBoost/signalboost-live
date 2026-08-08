@@ -3,6 +3,7 @@ import {
   listActiveOwnerEngineeringMissions,
   processOwnerEngineeringMissionTick,
 } from '@/lib/ai/cos/engineeringMission'
+import { ensureCosMissionStore } from '@/lib/ai/cos/autonomy/missionStoreBootstrap'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,6 +16,17 @@ function authorized(req: NextRequest): boolean {
 
 async function run(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  // The worker owns its infrastructure dependency. If mission persistence disappeared or
+  // a deployment landed before its migration, repair it before looking for active work.
+  const store = await ensureCosMissionStore()
+  if (!store.ok) {
+    return NextResponse.json({
+      ok: false,
+      error: store.error || 'COS mission store unavailable after self-recovery attempt.',
+      recoveryAttempted: true,
+    }, { status: 503 })
+  }
 
   const startedAt = Date.now()
   const missions = await listActiveOwnerEngineeringMissions(4)
@@ -50,6 +62,7 @@ async function run(req: NextRequest) {
   return NextResponse.json({
     ok: results.every(item => item.ok),
     at: new Date().toISOString(),
+    missionStoreRepaired: store.repaired,
     activeFound: missions.length,
     processed: results.length,
     results,

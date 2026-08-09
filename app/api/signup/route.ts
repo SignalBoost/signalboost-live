@@ -10,7 +10,7 @@ interface SignupBody {
 
 function isValidEmail(email: unknown): email is string {
   if (typeof email !== "string") return false;
-  if (email.length > 254) return false;
+  if (email.length < 3 || email.length > 254) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
@@ -22,18 +22,18 @@ function isValidPassword(password: unknown): password is string {
 
 export async function POST(req: Request) {
   try {
-    // Guard against oversized bodies by reading as text first.
-    const raw = await req.text();
-    if (raw.length > MAX_BODY_LENGTH) {
+    const rawText = await req.text();
+
+    if (rawText.length > MAX_BODY_LENGTH) {
       return NextResponse.json(
         { success: false, error: "Request body too large" },
         { status: 400 }
       );
     }
 
-    let body: SignupBody;
+    let body: unknown;
     try {
-      body = JSON.parse(raw);
+      body = JSON.parse(rawText);
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid request body" },
@@ -48,39 +48,28 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, password } = body;
+    const { email, password } = body as SignupBody;
 
     if (!isValidEmail(email)) {
       return NextResponse.json(
-        { success: false, error: "A valid email address is required" },
+        { success: false, error: "Invalid or missing email address" },
         { status: 400 }
       );
     }
 
     if (!isValidPassword(password)) {
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Password must be between 8 and 128 characters"
-        },
+        { success: false, error: "Password must be between 8 and 128 characters" },
         { status: 400 }
       );
     }
-
-    // Only the normalised, non-sensitive fields are used beyond this point.
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // TODO: persist the new account using normalizedEmail and password.
-    void normalizedEmail;
 
     return NextResponse.json({
       success: true,
       message: "Signup API working"
     });
-  } catch {
-    // Log full details server-side only; return a generic message to the client.
-    console.error("Unexpected error in POST /api/signup");
+  } catch (err: unknown) {
+    console.error("Signup route unexpected error:", err);
     return NextResponse.json(
       { success: false, error: "An unexpected error occurred" },
       { status: 500 }

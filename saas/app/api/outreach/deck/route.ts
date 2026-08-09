@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON } from '@/lib/ai/validation'
 
 export const dynamic = 'force-dynamic'
+
+const ai = createPlatformAiPort()
 
 type DeckCategory = 'affiliate' | 'company' | 'media'
 type Slide = { title: string; bullets: string[] }
@@ -57,7 +59,8 @@ Return ONLY valid JSON, no markdown, in exactly this shape:
 { "slides": [ { "title": string, "bullets": string[] }, ... 6 items ] }
 Each slide: 3-5 short bullet points. Keep each bullet under 90 characters.`
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1800 })
+  let raw = ''
+  try { raw = await ai.generate({ modelPreference: 'claude', prompt, maxTokens: 1800 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   const slides: Slide[] = Array.isArray(parsed?.slides) ? parsed.slides : []
 
@@ -71,7 +74,6 @@ Each slide: 3-5 short bullet points. Keep each bullet under 90 characters.`
   return clean.length === 6 ? clean : fallbackSlides(name)
 }
 
-// ── Minimal PDF writer (no external library) ──────────────────────────────────
 function esc(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
 }
@@ -102,7 +104,6 @@ function wrap(text: string, max: number): string[] {
 }
 
 function byteLen(s: string): number {
-  // Latin-1: one byte per char (all chars are <= 0xFF after ascii()).
   return s.length
 }
 

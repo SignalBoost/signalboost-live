@@ -1,4 +1,4 @@
-// saas/lib/outreach/prospectCampaign.ts
+// saas/lib/outreach/prospectCampaignCore.ts
 //
 // BACKGROUND PROSPECT CAMPAIGNS — discovery and per-company drafting, done outside
 // the chat turn.
@@ -16,11 +16,22 @@
 // the message safety gate, the real-published-email requirement (no address is ever
 // invented; a company with no findable email is skipped, not guessed at), region
 // localization, and the compliance footer.
+//
+// SCREEN BEFORE YOU GENERATE. The three reasons a company gets skipped — a scraped
+// page title instead of a name, no published address, an editorial inbox — were all
+// evaluated AFTER the email had been written, so every skip had already been paid for
+// at model rates. The shortfall message this worker writes says it plainly: "most
+// without a published contact address". runOneCompany now runs the cheap gates first
+// and calls the model only for a company that can actually receive the result. A skip
+// costs one page fetch.
 
 import { createClient } from '@supabase/supabase-js'
 import { callModel } from '@/lib/ai/modelRouter'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { createOutreachDraft } from '@/lib/ai/growthPlans'
+import { findContactEmail } from '@/lib/outreach/emailFinder'
+import { classifyPublicationTarget, publicationSkipReason } from '@/lib/outreach/publicationTargets'
+import { classifyTargetName } from '@/lib/outreach/targetNameQuality'
 import { productKeyOf } from '@/lib/outreach/recipientHistory'
 import { discoverGithubOrgs } from '@/lib/outreach/sources/github'
 import { manifestsForOffer } from '@/lib/portable-products/matchManifests'
@@ -43,7 +54,14 @@ function examinedCeilingFor(requested: number): number {
   return Math.max(120, requested * 6)
 }
 const TICK_BUDGET_MS = 240_000
-const PER_COMPANY_TIMEOUT_MS = 70_000
+
+// The per-company budget is now the SUM of its three phases rather than one opaque
+// number, so a change to any phase is visible in the loop guard instead of silently
+// squeezing the phase after it.
+const SCREEN_TIMEOUT_MS = 20_000
+const DRAFT_TIMEOUT_MS = 45_000
+const QUEUE_TIMEOUT_MS = 25_000
+const PER_COMPANY_TIMEOUT_MS = SCREEN_TIMEOUT_MS + DRAFT_TIMEOUT_MS + QUEUE_TIMEOUT_MS
 
 function withTimeout<T>(work: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
   return new Promise<T>(resolve => {
@@ -195,7 +213,6 @@ export async function cancelProspectCampaignJob(
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
-
 type CountryProfile = { names: string[]; tld: string; searchName: string; terms: string[] }
 
 const COUNTRY_PROFILES: Record<string, CountryProfile> = {
@@ -426,7 +443,6 @@ async function runDiscovery(
     : `No result confirmed in region "${normalizeRegion(job.region)}"; proceeding with unconfirmed results.`
   return { ok: true, candidates: ordered, note }
 }
-
 const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian',
 }
@@ -506,21 +522,88 @@ export async function draftMessageFor(
 
 type UnitOutcome = { drafted: boolean; result: ProspectResult; error?: string }
 
+type ScreenOutcome =
+  | { pass: true; contactEmail: string }
+  | { pass: false; reason: string }
+
+// EVERY REASON TO SKIP A COMPANY, EVALUATED BEFORE THE MODEL IS CALLED.
+//
+// All three checks below already existed and all three ran AFTER the email had been
+// written — createOutreachDraft applies them, and it was invoked with a finished
+// message. So a company that was never eligible still cost a full generation, and the
+// worker's own shortfall line reports that most skips are the no-address case. The
+// checks are unchanged in substance; only their position moved.
+//
+// Order is cheapest-first. The name check is a pure function over strings. The address
+// crawl is one HTTP fetch. Only a company that survives both is worth a model call.
+// The publication check needs the resolved address — an editorial inbox is the strongest
+// signal that a target is an outlet — so it runs last, still ahead of the generation.
+async function screenCandidate(candidate: ProspectCandidate): Promise<ScreenOutcome> {
+  const nameVerdict = classifyTargetName({
+    businessName: candidate.name,
+    businessUrl: candidate.url,
+  })
+  if (nameVerdict.looksLikePageTitle) {
+    return { pass: false, reason: nameVerdict.reason }
+  }
+
+  const found = await findContactEmail(candidate.url)
+  if (!found.email) {
+    return {
+      pass: false,
+      reason: `No published contact email found for ${candidate.name} (${candidate.url}) — skipped before drafting, not queued. COS does not invent addresses.`,
+    }
+  }
+
+  const publicationVerdict = classifyPublicationTarget({
+    businessName: candidate.name,
+    businessUrl: candidate.url,
+    contactEmail: found.email,
+  })
+  if (publicationVerdict.isPublication) {
+    return { pass: false, reason: publicationSkipReason(candidate.name, publicationVerdict) }
+  }
+
+  return { pass: true, contactEmail: found.email }
+}
+
 async function runOneCompany(
   job: ProspectCampaignJob,
   candidate: ProspectCandidate,
 ): Promise<UnitOutcome> {
   const at = () => new Date().toISOString()
   try {
-    const message = await withTimeout(draftMessageFor(job, candidate), 45_000, () => '')
+    // Screen first. A failure here costs one page fetch instead of a generation.
+    const screen = await withTimeout(
+      screenCandidate(candidate),
+      SCREEN_TIMEOUT_MS,
+      () => ({ pass: false, reason: 'Timed out while looking for a published email.' } as ScreenOutcome),
+    )
+
+    if (!screen.pass) {
+      return { drafted: false, result: { name: candidate.name, url: candidate.url, outcome: 'skipped', detail: screen.reason, at: at() } }
+    }
+
+    const message = await withTimeout(draftMessageFor(job, candidate), DRAFT_TIMEOUT_MS, () => '')
     if (!message || message.length < 40) {
       return { drafted: false, result: { name: candidate.name, url: candidate.url, outcome: 'skipped', detail: 'Draft came back empty or too short.', at: at() } }
     }
 
+    // The address found during screening is passed through rather than re-discovered.
+    // createOutreachDraft still validates it with cleanEmail and still applies the dedupe
+    // ceilings and the aggregator check — supplying the address skips the second crawl,
+    // it does not skip a single guardrail.
     const created = await withTimeout(
-      createOutreachDraft({ businessName: candidate.name, businessUrl: candidate.url, message, senderKey: 'saasSales', productKey: job.offer }),
-      PER_COMPANY_TIMEOUT_MS - 45_000,
-      () => ({ ok: false, skipped: true, error: 'Timed out while looking for a published email.' } as any),
+      createOutreachDraft({
+        businessName: candidate.name,
+        businessUrl: candidate.url,
+        message,
+        contactEmail: screen.contactEmail,
+        senderKey: 'saasSales',
+        productKey: job.offer,
+      }),
+      QUEUE_TIMEOUT_MS,
+      () => ({ ok: false, skipped: true, error: 'Timed out while queueing the draft.' } as any),
     )
 
     if (created.ok) {
@@ -537,7 +620,6 @@ async function runOneCompany(
     return { drafted: false, error, result: { name: candidate.name, url: candidate.url, outcome: 'error', detail: error, at: at() } }
   }
 }
-
 export async function advanceProspectCampaigns(jobId?: string): Promise<{
   ok: boolean
   jobId?: string

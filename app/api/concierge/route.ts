@@ -226,11 +226,12 @@ async function resolveUsedMinutesWithTimeout(
   }
 }
 
-// Short-TTL per-user/month cache for the monthly usage figure. Without it, a
-// high-rate authenticated caller could force resolveUsedMinutes' paginated reads
-// on every POST. Cache keys include the UTC month start so values computed just
-// before a month boundary cannot leak into the next month.
-const USAGE_TTL_MS = 60_000
+// Per-user/month in-flight de-duplication for the monthly usage figure. We do
+// not persist completed usage totals across requests: video_jobs writes happen
+// outside this route, and serving an old low total could understate current
+// consumption in concierge quota guidance. Keeping only in-flight coalescing
+// prevents duplicate concurrent reads without introducing stale completed data.
+const USAGE_TTL_MS = 0
 const USAGE_LOOKUP_TIMEOUT_MS = 5_000
 // Hard cap on distinct cached users/months per instance.
 const USAGE_CACHE_MAX = 5000
@@ -259,7 +260,7 @@ async function resolveUsedMinutesCached(
   const monthStartIso = currentUtcMonthStart(now).toISOString()
   const monthEndMs = nextUtcMonthStart(now).getTime()
   const cacheKey = usageCacheKey(userId, monthStartIso)
-  const hit = usageCache.get(cacheKey)
+  const hit = USAGE_TTL_MS > 0 ? usageCache.get(cacheKey) : undefined
   if (hit && hit.expires > now) {
     // Touch: re-insert to mark most-recently-used (Map keeps insertion order).
     usageCache.delete(cacheKey)
@@ -278,11 +279,13 @@ async function resolveUsedMinutesCached(
   const pending = resolveUsedMinutesWithTimeout(supabase, userId, monthStartIso)
     .then(value => {
       const finishedAt = Date.now()
-      usageCache.set(cacheKey, {
-        value,
-        expires: Math.min(finishedAt + USAGE_TTL_MS, monthEndMs),
-      })
-      pruneUsageCache(finishedAt)
+      if (USAGE_TTL_MS > 0) {
+        usageCache.set(cacheKey, {
+          value,
+          expires: Math.min(finishedAt + USAGE_TTL_MS, monthEndMs),
+        })
+        pruneUsageCache(finishedAt)
+      }
       return value
     })
     .finally(() => {

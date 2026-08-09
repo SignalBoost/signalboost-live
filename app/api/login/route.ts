@@ -9,14 +9,14 @@ export async function POST(req: Request) {
       message: "Login API working"
     });
   } catch (err: unknown) {
-    console.error("Login API request failed", err);
+    console.error("Login API error", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof SyntaxError ? "Invalid request body" : "Internal server error"
+        error: "Invalid request body"
       },
-      { status: err instanceof SyntaxError ? 400 : 500 }
+      { status: 400 }
     );
   }
 }

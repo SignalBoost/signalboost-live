@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge'
 import type { KnowledgeFact, SemanticKnowledgeStore } from '../layers/knowledge/persistent'
 import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory'
-import type { LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning'
+import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning'
 import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization'
 
 let singleton: SupabaseClient | null | undefined
@@ -114,6 +114,34 @@ export class SupabaseLearningStore implements LearningStore {
   }
 }
 
+export class SupabaseContinuousLearningStore implements ContinuousLearningStore {
+  constructor(private readonly db: SupabaseClient) {}
+
+  async hasContent(contentHash: string): Promise<boolean> {
+    const { data, error } = await this.db.from('cos_continuous_learning').select('content_hash')
+      .eq('content_hash', contentHash).maybeSingle()
+    if (error) throw error
+    return Boolean(data)
+  }
+
+  async remember(candidate: LearningCandidate): Promise<void> {
+    const { error } = await this.db.from('cos_continuous_learning').insert({
+      content_hash: candidate.contentHash,
+      source_kind: candidate.sourceKind,
+      source_uri: candidate.sourceUri,
+      source_title: candidate.sourceTitle ?? null,
+      observed_at: candidate.observedAt,
+      subject: candidate.subject,
+      summary: candidate.summary,
+      facts: candidate.facts,
+      confidence: candidate.confidence,
+      license: candidate.license ?? null,
+      evidence: candidate.evidence,
+    })
+    if (error) throw error
+  }
+}
+
 export class SupabaseAIROIMetricsSink implements AIROIMetricsSink {
   constructor(private readonly db: SupabaseClient) {}
   async record(m: AIROIMetric): Promise<void> {
@@ -132,6 +160,7 @@ export function createSupabaseCOSStores(db = cosServiceDb()) {
     knowledge: new SupabaseKnowledgeStore(db),
     summaries: new SupabaseContextSummaryStore(db),
     learning: new SupabaseLearningStore(db),
+    continuousLearning: new SupabaseContinuousLearningStore(db),
     roi: new SupabaseAIROIMetricsSink(db),
   }
 }

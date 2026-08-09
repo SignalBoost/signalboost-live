@@ -20,14 +20,22 @@ export class ApprovedLearningSourceAdapter implements ContinuousLearningSourceAd
   }
 }
 
+function gapTerms(gap: KnowledgeGap): string[] {
+  return [gap.subject, gap.question, ...gap.evidence]
+    .flatMap((value) => value.toLowerCase().split(/[^\p{L}\p{N}]+/u))
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 3)
+}
+
 export function staticLearningSourceAdapter(
   kind: LearningSourceDocument['sourceKind'],
   documents: LearningSourceDocument[],
 ): ContinuousLearningSourceAdapter {
-  return new ApprovedLearningSourceAdapter(kind, async (gap) =>
-    documents.filter((document) => {
+  return new ApprovedLearningSourceAdapter(kind, async (gap) => {
+    const terms = gapTerms(gap)
+    return documents.filter((document) => {
       const haystack = `${document.subject} ${document.sourceTitle ?? ''} ${document.text}`.toLowerCase()
-      return gap.topics.some((topic) => haystack.includes(topic.toLowerCase()))
-    }),
-  )
+      return terms.some((term) => haystack.includes(term))
+    })
+  })
 }

@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
 
-const MAX_REQUEST_BODY_BYTES = 10 * 1024;
-const MAX_BUSINESS_NAME_LENGTH = 100;
-
-class RequestValidationError extends Error {
-  status: number;
-
-  constructor(message: string, status = 400) {
-    super(message);
-    this.status = status;
-  }
-}
+const MAX_REQUEST_BODY_LENGTH = 2048;
+const MAX_BUSINESS_NAME_LENGTH = 120;
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => {
@@ -21,7 +12,7 @@ function escapeHtml(value: string) {
         return "&lt;";
       case ">":
         return "&gt;";
-      case '"':
+      case "\"":
         return "&quot;";
       case "'":
         return "&#39;";
@@ -35,42 +26,36 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function validateBusinessNameBody(body: unknown) {
-  if (!isPlainObject(body) || Object.keys(body).length !== 1) {
-    throw new RequestValidationError("Invalid request body");
-  }
-
-  if (typeof body.businessName !== "string") {
-    throw new RequestValidationError("Invalid request body");
-  }
-
-  if (body.businessName.length > MAX_BUSINESS_NAME_LENGTH) {
-    throw new RequestValidationError("Invalid request body");
-  }
-
-  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(body.businessName)) {
-    throw new RequestValidationError("Invalid request body");
-  }
-
-  return body.businessName;
-}
-
 export async function POST(req: Request) {
   try {
-    const contentLength = req.headers.get("content-length");
+    const contentLengthHeader = req.headers.get("content-length");
+    const contentLength = contentLengthHeader === null ? null : Number(contentLengthHeader);
 
-    if (contentLength) {
-      const parsedContentLength = Number(contentLength);
-
-      if (Number.isFinite(parsedContentLength) && parsedContentLength > MAX_REQUEST_BODY_BYTES) {
-        throw new RequestValidationError("Request body too large", 413);
-      }
+    if (
+      contentLength !== null &&
+      (!Number.isFinite(contentLength) ||
+        contentLength < 0 ||
+        contentLength > MAX_REQUEST_BODY_LENGTH)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Request body is too large"
+        },
+        { status: 413 }
+      );
     }
 
     const rawBody = await req.text();
 
-    if (new TextEncoder().encode(rawBody).length > MAX_REQUEST_BODY_BYTES) {
-      throw new RequestValidationError("Request body too large", 413);
+    if (rawBody.length > MAX_REQUEST_BODY_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Request body is too large"
+        },
+        { status: 413 }
+      );
     }
 
     let body: unknown;
@@ -78,38 +63,48 @@ export async function POST(req: Request) {
     try {
       body = JSON.parse(rawBody);
     } catch {
-      throw new RequestValidationError("Invalid JSON request body");
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request body"
+        },
+        { status: 400 }
+      );
     }
 
-    const businessName = validateBusinessNameBody(body);
-    const heading = escapeHtml(businessName || "Generated Website");
+    if (
+      !isPlainObject(body) ||
+      !Object.keys(body).every((key) => key === "businessName") ||
+      typeof body.businessName !== "string" ||
+      body.businessName.length > MAX_BUSINESS_NAME_LENGTH
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request body"
+        },
+        { status: 400 }
+      );
+    }
+
+    const safeBusinessName = escapeHtml(body.businessName || "Generated Website");
 
     return NextResponse.json({
       success: true,
       html: `
         <section style="padding:40px;font-family:sans-serif">
-          <h1>${heading}</h1>
+          <h1>${safeBusinessName}</h1>
           <p>AI generated website preview.</p>
         </section>
       `
     });
   } catch (err: unknown) {
-    if (err instanceof RequestValidationError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: err.message
-        },
-        { status: err.status }
-      );
-    }
-
-    console.error("Failed to generate website", err);
+    console.error("Failed to generate website preview", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: "An unexpected error occurred"
+        error: "Internal server error"
       },
       { status: 500 }
     );

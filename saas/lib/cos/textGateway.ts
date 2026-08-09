@@ -4,6 +4,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage'
 
 export type CosTextGatewayInput = ModelCallArgs & {
   taskId?: string
+  cacheValidator?: (text: string) => boolean
 }
 
 type StoredText = { text?: string }
@@ -17,6 +18,15 @@ function cacheIdentity(input: CosTextGatewayInput) {
     modelPreference: input.modelPreference ?? null,
   })
   return createHash('sha256').update(stable).digest('hex')
+}
+
+function passesCacheValidation(input: CosTextGatewayInput, text: string): boolean {
+  if (!input.cacheValidator) return true
+  try {
+    return input.cacheValidator(text)
+  } catch {
+    return false
+  }
 }
 
 const inFlight = new Map<string, Promise<string | null>>()
@@ -40,7 +50,10 @@ export async function callCosText(input: CosTextGatewayInput): Promise<string | 
         const { data, error } = await db.from('cos_text_cache').select('response_data').eq('cache_key', key).maybeSingle()
         if (!error) {
           const stored = data?.response_data as StoredText | undefined
-          if (stored?.text) return stored.text
+          if (stored?.text) {
+            if (passesCacheValidation(input, stored.text)) return stored.text
+            await db.from('cos_text_cache').delete().eq('cache_key', key)
+          }
         }
       } catch {
         // Cache is an optimization. Provider execution must remain available.
@@ -48,7 +61,7 @@ export async function callCosText(input: CosTextGatewayInput): Promise<string | 
     }
 
     const text = await callModel(input)
-    if (text && db) {
+    if (text && db && passesCacheValidation(input, text)) {
       try {
         await db.from('cos_text_cache').upsert({
           cache_key: key,

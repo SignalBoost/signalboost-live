@@ -5,7 +5,13 @@ import { callModel, type ModelProvider } from '@/lib/ai/modelRouter'
 import { callCosText } from '@/lib/cos/textGateway'
 
 export interface CosAiPort {
-  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
+  generate(input: {
+    prompt: string
+    systemPrompt?: string
+    maxTokens?: number
+    modelPreference?: ModelProvider
+    cacheValidator?: (text: string) => boolean
+  }): Promise<string>
 }
 
 function requireText(result: string | null, provider: string): string {
@@ -23,7 +29,7 @@ export function createPlatformAiPort(): CosAiPort {
 // Private appliance remains explicitly local/fail-closed according to environment policy.
 export function createLocalApplianceAiPort(): CosAiPort {
   return {
-    generate: async (input) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+    generate: async ({ cacheValidator: _cacheValidator, ...input }) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
   }
 }
 

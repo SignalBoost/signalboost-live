@@ -4,7 +4,7 @@ import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 function getSafeRedirectPath(next: string | null): string {
   const defaultPath = '/dashboard'
   if (!next) return defaultPath
-  // Only allow relative paths that start with '/' but not '//'
+  // Only allow relative paths that start with '/' but not protocol-relative URLs ('//')
   if (next.startsWith('/') && !next.startsWith('//')) {
     return next
   }

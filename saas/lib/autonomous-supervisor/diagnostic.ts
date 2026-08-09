@@ -5,10 +5,12 @@ import {
   assertIncidentIdMatches,
   type SupervisorThinkerResponse,
 } from '@/lib/cos/supervisor-thinker-prompt'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 const METHODS = new Set(['api', 'code_change', 'cli', 'ui_agent', 'human_action', 'no_action'])
 const RISKS = new Set(['low', 'medium', 'high', 'critical'])
+const ai = createPlatformAiPort()
 
 function extractJson(text: string): unknown {
   const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim()
@@ -30,9 +32,7 @@ export function validateDiagnostic(value: unknown, incidentId: string): Diagnost
   for (const key of ['evidence', 'missing_information', 'risk_reasons', 'repair_plan', 'verification_plan', 'rollback_plan']) {
     if (!Array.isArray(v[key])) throw new Error(`Diagnostic ${key} must be an array`)
   }
-  if (v.repair_plan.some((step: any) => !step || !Number.isInteger(step.step) || typeof step.action !== 'string' || typeof step.requires_approval !== 'boolean')) {
-    throw new Error('Invalid repair_plan')
-  }
+  if (v.repair_plan.some((step: any) => !step || !Number.isInteger(step.step) || typeof step.action !== 'string' || typeof step.requires_approval !== 'boolean')) throw new Error('Invalid repair_plan')
   const result = v as SupervisorThinkerResponse
   assertIncidentIdMatches(incidentId, result)
   return result
@@ -62,12 +62,6 @@ function fallbackDiagnostic(incident: NormalizedIncidentPayload, reason: string)
   }
 }
 
-// ── THINKER PORT ─────────────────────────────────────────────────────────────
-// The supervisor's diagnosis must not be welded to one vendor. A "thinker" is any
-// model, agent, or service that can read an incident and return the diagnostic JSON.
-// Gemini is simply the first adapter; a buyer plugs in their own with one call to
-// registerDiagnosticThinker(). Validation, fallback and the response contract stay
-// provider-neutral, so swapping the thinker never weakens the governance.
 export interface DiagnosticThinker {
   id: string
   think(incident: NormalizedIncidentPayload, systemPrompt: string, responseSchema: unknown): Promise<string>
@@ -75,7 +69,6 @@ export interface DiagnosticThinker {
 
 const THINKERS = new Map<string, DiagnosticThinker>()
 
-/** Bring your own thinker: any model, agent, or endpoint that returns the diagnostic JSON. */
 export function registerDiagnosticThinker(thinker: DiagnosticThinker): void {
   if (!thinker?.id || typeof thinker.think !== 'function') throw new Error('A diagnostic thinker needs an id and a think() method')
   THINKERS.set(thinker.id, thinker)
@@ -85,7 +78,6 @@ export function listDiagnosticThinkers(): string[] {
   return Array.from(THINKERS.keys()).sort()
 }
 
-// Adapter 1 — Google Gemini (structured-output mode).
 export function createGeminiThinker(): DiagnosticThinker | null {
   const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY || process.env.GEMINI_API_KEY || ''
   if (!apiKey) return null
@@ -109,32 +101,23 @@ export function createGeminiThinker(): DiagnosticThinker | null {
   }
 }
 
-// Adapter 2 — the platform's own model router (Claude / OpenAI), so the supervisor
-// still thinks when no Gemini key exists. Uses keys the platform already has.
 export function createModelRouterThinker(): DiagnosticThinker | null {
   const preference = process.env.ANTHROPIC_API_KEY ? 'claude' : process.env.OPENAI_API_KEY ? 'openai' : ''
   if (!preference) return null
   return {
     id: preference,
     async think(incident, systemPrompt, responseSchema) {
-      const { callModel } = await import('@/lib/ai/modelRouter')
       const system = [
         systemPrompt,
         '',
         'Return ONLY raw JSON — no prose, no markdown fences — matching this schema exactly:',
         JSON.stringify(responseSchema),
       ].join('\n')
-      const text = await callModel({ prompt: JSON.stringify(incident), systemPrompt: system, maxTokens: 2000, modelPreference: preference as 'claude' | 'openai' })
-      return String(text || '')
+      return ai.generate({ prompt: JSON.stringify(incident), systemPrompt: system, maxTokens: 2000, modelPreference: preference as 'claude' | 'openai' })
     },
   }
 }
 
-/**
- * Pick the thinker: an explicitly registered one wins (BYO), then the provider named
- * by SUPERVISOR_THINKER_PROVIDER, then whatever credentials exist. Returns null only
- * when nothing at all is configured — in which case the caller degrades honestly.
- */
 export function resolveDiagnosticThinker(): DiagnosticThinker | null {
   const wanted = String(process.env.SUPERVISOR_THINKER_PROVIDER || '').trim().toLowerCase()
   if (wanted && THINKERS.has(wanted)) return THINKERS.get(wanted) as DiagnosticThinker
@@ -144,7 +127,6 @@ export function resolveDiagnosticThinker(): DiagnosticThinker | null {
   return createGeminiThinker() || createModelRouterThinker()
 }
 
-/** Provider-neutral diagnosis. Same validation and same honest fallback for every thinker. */
 export async function diagnoseIncident(
   incident: NormalizedIncidentPayload,
   thinker: DiagnosticThinker | null = resolveDiagnosticThinker(),
@@ -158,7 +140,6 @@ export async function diagnoseIncident(
   }
 }
 
-/** Back-compatible alias — existing callers keep working, now vendor-neutral underneath. */
 export async function diagnoseIncidentWithGemini(incident: NormalizedIncidentPayload): Promise<DiagnosticResult> {
   return diagnoseIncident(incident)
 }

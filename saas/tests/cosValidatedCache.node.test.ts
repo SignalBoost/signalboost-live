@@ -20,3 +20,15 @@ test('generated-content translation validates segment structure before COS cache
   assert.match(translation, /translatedRows\.length !== sourceSegments\.length/)
   assert.match(translation, /cacheValidator: \(text\) => isValidTranslationResponse\(text, segments\)/)
 })
+
+test('COS text gateway records live ROI for cache hits, in-flight reuse, and provider execution', async () => {
+  const gateway = await read('../lib/cos/textGateway.ts')
+
+  assert.match(gateway, /COS_BASELINE_TEXT_CALL_COST_USD/)
+  assert.match(gateway, /cos_ai_roi_metrics/)
+  assert.match(gateway, /'exact_cache'/)
+  assert.match(gateway, /'in_flight'/)
+  assert.match(gateway, /'reasoning'/)
+  assert.match(gateway, /estimated_cost_avoided_usd/)
+  assert.match(gateway, /provider_calls: source === 'reasoning' \? 1 : 0/)
+})

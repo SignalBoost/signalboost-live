@@ -32,3 +32,15 @@ test('COS text gateway records live ROI for cache hits, in-flight reuse, and pro
   assert.match(gateway, /estimated_cost_avoided_usd/)
   assert.match(gateway, /provider_calls: source === 'reasoning' \? 1 : 0/)
 })
+
+test('COS gateway reuses conservative near-duplicate requests before paid reasoning', async () => {
+  const gateway = await read('../lib/cos/textGateway.ts')
+
+  assert.match(gateway, /'semantic_cache'/)
+  assert.match(gateway, /nearDuplicateScore/)
+  assert.match(gateway, /score >= 0\.985/)
+  assert.match(gateway, /sameExecutionShape\(input, stored\)/)
+  assert.match(gateway, /passesCacheValidation\(input, stored\.text\)/)
+  assert.match(gateway, /\.limit\(40\)/)
+  assert.match(gateway, /prompt: input\.prompt/)
+})

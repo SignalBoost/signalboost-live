@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
-const MAX_CONTENT_LENGTH = 10 * 1024;
+const MAX_REQUEST_BODY_BYTES = 4096;
 const MAX_BUSINESS_NAME_LENGTH = 100;
+
+class BadRequestError extends Error {}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => {
@@ -26,108 +28,128 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function POST(req: Request) {
-  try {
-    const contentType = req.headers.get("content-type");
-    if (!contentType?.toLowerCase().includes("application/json")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Content-Type must be application/json"
-        },
-        { status: 415 }
-      );
+async function readRequestBody(req: Request) {
+  const contentLength = req.headers.get("content-length");
+
+  if (contentLength !== null) {
+    const parsedLength = Number(contentLength);
+
+    if (!Number.isFinite(parsedLength) || parsedLength > MAX_REQUEST_BODY_BYTES) {
+      throw new BadRequestError("Invalid request");
+    }
+  }
+
+  if (!req.body) {
+    return "";
+  }
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
     }
 
-    const contentLength = req.headers.get("content-length");
-    if (contentLength) {
-      const parsedLength = Number(contentLength);
-      if (!Number.isFinite(parsedLength) || parsedLength > MAX_CONTENT_LENGTH) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Request body is too large"
-          },
-          { status: 413 }
-        );
+    if (value) {
+      receivedBytes += value.byteLength;
+
+      if (receivedBytes > MAX_REQUEST_BODY_BYTES) {
+        await reader.cancel();
+        throw new BadRequestError("Invalid request");
       }
+
+      chunks.push(value);
+    }
+  }
+
+  const body = new Uint8Array(receivedBytes);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder().decode(body);
+}
+
+function validateBusinessName(body: unknown) {
+  if (!isPlainObject(body)) {
+    throw new BadRequestError("Invalid request");
+  }
+
+  const allowedKeys = new Set(["businessName"]);
+
+  for (const key of Object.keys(body)) {
+    if (!allowedKeys.has(key)) {
+      throw new BadRequestError("Invalid request");
+    }
+  }
+
+  const businessName = body.businessName;
+
+  if (businessName === undefined || businessName === null || businessName === "") {
+    return "Generated Website";
+  }
+
+  if (typeof businessName !== "string") {
+    throw new BadRequestError("Invalid request");
+  }
+
+  if (
+    businessName.length > MAX_BUSINESS_NAME_LENGTH ||
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(businessName)
+  ) {
+    throw new BadRequestError("Invalid request");
+  }
+
+  return businessName;
+}
+
+export async function POST(req: Request) {
+  try {
+    const contentType = req.headers.get("content-type") || "";
+
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new BadRequestError("Invalid request");
     }
 
     let body: unknown;
+
     try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid JSON body"
-        },
-        { status: 400 }
-      );
+      body = JSON.parse(await readRequestBody(req));
+    } catch (err) {
+      if (err instanceof BadRequestError) {
+        throw err;
+      }
+
+      throw new BadRequestError("Invalid request");
     }
 
-    if (!isPlainObject(body)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
-    }
-
-    const keys = Object.keys(body);
-    if (keys.length !== 1 || !keys.includes("businessName")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
-    }
-
-    if (typeof body.businessName !== "string") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "businessName must be a string"
-        },
-        { status: 400 }
-      );
-    }
-
-    const businessName = body.businessName.trim();
-    if (businessName.length === 0 || businessName.length > MAX_BUSINESS_NAME_LENGTH) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "businessName must be between 1 and 100 characters"
-        },
-        { status: 400 }
-      );
-    }
-
-    const escapedBusinessName = escapeHtml(businessName);
+    const businessName = escapeHtml(validateBusinessName(body));
 
     return NextResponse.json({
       success: true,
       html: `
         <section style="padding:40px;font-family:sans-serif">
-          <h1>${escapedBusinessName}</h1>
+          <h1>${businessName}</h1>
           <p>AI generated website preview.</p>
         </section>
       `
     });
-  } catch (err: unknown) {
+  } catch (err) {
     console.error("Failed to generate website", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: "Internal server error"
+        error: err instanceof BadRequestError ? "Invalid request" : "Unable to generate website"
       },
-      { status: 500 }
+      { status: err instanceof BadRequestError ? 400 : 500 }
     );
   }
 }

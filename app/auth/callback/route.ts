@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 
+function getSafeRedirectPath(next: string | null): string {
+  const defaultPath = '/dashboard'
+  if (!next) return defaultPath
+  // Only allow relative paths that start with '/' but not '//'
+  if (next.startsWith('/') && !next.startsWith('//')) {
+    return next
+  }
+  return defaultPath
+}
+
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url)
   const code = requestUrl.searchParams.get('code')
-  const nextParam = requestUrl.searchParams.get('next') || '/dashboard'
-
-  // Validate that `next` is a relative path (starts with '/' but not '//')
-  // to prevent open redirect via absolute or protocol-relative URLs.
-  const next =
-    nextParam.startsWith('/') && !nextParam.startsWith('//')
-      ? nextParam
-      : '/dashboard'
+  const next = getSafeRedirectPath(requestUrl.searchParams.get('next'))
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const MAX_BODY_BYTES = 10_240; // 10 KB
+const MAX_BODY_LENGTH = 10_000;
 
 interface SignupBody {
   email: string;
@@ -11,8 +11,8 @@ interface SignupBody {
 function isValidEmail(email: unknown): email is string {
   if (typeof email !== "string") return false;
   if (email.length < 3 || email.length > 254) return false;
-  // Basic RFC-compliant email pattern
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 }
 
 function isValidPassword(password: unknown): password is string {
@@ -22,9 +22,9 @@ function isValidPassword(password: unknown): password is string {
 }
 
 export async function POST(req: Request) {
-  // Reject oversized bodies before parsing
+  // Reject oversized bodies early
   const contentLength = req.headers.get("content-length");
-  if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_LENGTH) {
     return NextResponse.json(
       { success: false, error: "Request body too large" },
       { status: 413 }
@@ -33,7 +33,14 @@ export async function POST(req: Request) {
 
   let body: SignupBody;
   try {
-    body = await req.json();
+    const raw = await req.text();
+    if (raw.length > MAX_BODY_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: "Request body too large" },
+        { status: 413 }
+      );
+    }
+    body = JSON.parse(raw) as SignupBody;
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid request body" },
@@ -41,34 +48,39 @@ export async function POST(req: Request) {
     );
   }
 
-  // Validate required fields — reject unexpected extra fields by ignoring them
-  const { email, password } = body;
-
-  if (!isValidEmail(email)) {
-    return NextResponse.json(
-      { success: false, error: "A valid email address is required" },
-      { status: 400 }
-    );
-  }
-
-  if (!isValidPassword(password)) {
-    return NextResponse.json(
-      { success: false, error: "Password must be between 8 and 128 characters" },
-      { status: 400 }
-    );
-  }
-
   try {
-    // Placeholder for actual signup logic using only validated, safe fields
-    // e.g. await createUser({ email: email.toLowerCase().trim(), password });
+    // Validate required fields — allowlist only known fields
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
 
+    const { email, password } = body;
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { success: false, error: "A valid email address is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidPassword(password)) {
+      return NextResponse.json(
+        { success: false, error: "Password must be between 8 and 128 characters" },
+        { status: 400 }
+      );
+    }
+
+    // Only safe, non-sensitive data is returned — never echo back passwords or tokens
     return NextResponse.json({
       success: true,
-      message: "Signup received"
-      // Do not echo back any input fields, especially passwords
+      message: "Signup API working"
     });
   } catch {
-    console.error("Signup error");
+    // Log error server-side only; return generic message to client
+    console.error("Signup route unexpected error");
     return NextResponse.json(
       { success: false, error: "An unexpected error occurred" },
       { status: 500 }

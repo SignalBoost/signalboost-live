@@ -1,5 +1,6 @@
 import { ExactCacheLayer, createExactCacheKey } from './layers/exact-cache'
 import { KnowledgeLayer } from './layers/knowledge'
+import { LearningEngine } from './layers/learning'
 import { MemoryLayer, type ChatMessage, type CompressedMemorySnapshot } from './layers/memory'
 import { compressPromptContext, estimateAvoidedCost, type AIROIMetricsSink } from './layers/optimization'
 import { processReasoningLayer, type CanonicalToolDescription } from './layers/reasoning'
@@ -10,6 +11,7 @@ export type BusinessRule = (prompt: string) => BusinessRuleResult | Promise<Busi
 
 export type COSKernelDependencies<TGovernance> = {
   knowledge: KnowledgeLayer
+  learning?: LearningEngine
   memory: MemoryLayer
   selectCompute: ComputeSelector<TGovernance>
   executeProvider: Layer5Executor
@@ -28,6 +30,7 @@ export async function bootCOSKernel<TGovernance = unknown>(payload: {
   existingSnapshot?: CompressedMemorySnapshot
   availableTools: CanonicalToolDescription[]
   requestedModel: string
+  capability?: string
   policyVersion?: string | null
   knowledgeVersion?: string | null
 }, governanceState: TGovernance, dependencies: COSKernelDependencies<TGovernance>) {
@@ -62,17 +65,29 @@ export async function bootCOSKernel<TGovernance = unknown>(payload: {
   }
 
   const contextFingerprint = JSON.stringify(payload.rawHistory.slice(-2))
-  const executeKnowledgeMemoryReasoning = async () => {
+  const executeKnowledgeLearningMemoryReasoning = async () => {
     const semanticHit = await dependencies.knowledge.lookupSemanticCache(payload.taskId, payload.rawUserPrompt, contextFingerprint)
     if (semanticHit) {
       await recordROI('semantic_cache')
       return { status: 'completed' as const, data: semanticHit.responsePayload, governanceState, source: 'semantic_cache' as const, similarityScore: semanticHit.similarityScore }
     }
 
+    const capability = payload.capability ?? payload.taskId
+    const learnedStrategy = dependencies.learning
+      ? await dependencies.learning.recommend(payload.taskId, capability).catch((error) => {
+          dependencies.onTelemetryError?.(error)
+          return null
+        })
+      : null
+
     const optimizedMessages = await dependencies.memory.processMemoryLayer(payload.sessionId, payload.rawHistory, payload.existingSnapshot)
+    if (learnedStrategy) {
+      optimizedMessages.unshift({ role: 'system', content: `COS learned strategy for ${capability}: ${learnedStrategy.strategy}` })
+    }
     optimizedMessages.push({ role: 'user', content: payload.rawUserPrompt })
     const compressed = compressPromptContext(optimizedMessages)
 
+    const reasoningStartedAt = Date.now()
     const reasoningResult = await processReasoningLayer({
       taskId: payload.taskId,
       messages: compressed.messages,
@@ -83,11 +98,22 @@ export async function bootCOSKernel<TGovernance = unknown>(payload: {
     if (reasoningResult.status === 'completed') {
       await dependencies.knowledge.commitToMemory(payload.taskId, payload.rawUserPrompt, contextFingerprint, reasoningResult.data)
     }
+    if (dependencies.learning) {
+      await dependencies.learning.observe({
+        taskId: payload.taskId,
+        capability,
+        strategy: learnedStrategy?.strategy ?? payload.requestedModel,
+        succeeded: reasoningResult.status === 'completed' || reasoningResult.status === 'tool_executed',
+        latencyMs: Date.now() - reasoningStartedAt,
+        externalCostUsd: baselineCost,
+        reusable: reasoningResult.status === 'completed',
+      }).catch(dependencies.onTelemetryError)
+    }
     await recordROI('reasoning', compressed.charactersBefore, compressed.charactersAfter)
     return { ...reasoningResult, source: 'reasoning' as const }
   }
 
-  if (!dependencies.exactCache) return executeKnowledgeMemoryReasoning()
+  if (!dependencies.exactCache) return executeKnowledgeLearningMemoryReasoning()
 
   const exactKey = createExactCacheKey({
     taskId: payload.taskId,
@@ -96,7 +122,7 @@ export async function bootCOSKernel<TGovernance = unknown>(payload: {
     policyVersion: payload.policyVersion,
     knowledgeVersion: payload.knowledgeVersion,
   })
-  const exactResult = await dependencies.exactCache.execute(exactKey, executeKnowledgeMemoryReasoning)
+  const exactResult = await dependencies.exactCache.execute(exactKey, executeKnowledgeLearningMemoryReasoning)
   if (exactResult.source === 'executed') return exactResult.value
 
   await recordROI(exactResult.source)

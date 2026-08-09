@@ -8,13 +8,17 @@ export async function POST(req: Request) {
       success: true,
       message: "Login API working"
     });
-  } catch {
+  } catch (err) {
+    console.error("Login API error", err);
+
+    const isMalformedJson = err instanceof SyntaxError;
+
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid request body"
+        error: isMalformedJson ? "Invalid request body" : "Internal server error"
       },
-      { status: 400 }
+      { status: isMalformedJson ? 400 : 500 }
     );
   }
 }

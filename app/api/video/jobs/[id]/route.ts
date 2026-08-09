@@ -4,16 +4,28 @@ import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import type { JsonSafeVideoResponse } from '@/lib/video/types'
 
-const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const JOB_ID_PATTERN = /^[A-Za-z0-9_-]+$/
 const MAX_RESULT_FILE_BYTES = 1024 * 1024
+
+function isSafeJobId(id: string) {
+  return id.length > 0 && id.length <= 128 && JOB_ID_PATTERN.test(id)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function errorResponse(error: string, status: number) {
+  return NextResponse.json(
+    { ok: false, data: null, error, meta: { locale: 'en', generatedAt: new Date().toISOString() } },
+    { status },
+  )
+}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const generatedAt = new Date().toISOString()
 
-  if (!JOB_ID_PATTERN.test(id)) {
-    return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta: { locale: 'en', generatedAt } }, { status: 400 })
-  }
+  if (!isSafeJobId(id)) return errorResponse('Invalid job id', 400)
 
   let data: any = null
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -25,28 +37,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const queueDir = resolve(process.cwd(), '.video-queue')
     const resultPath = resolve(queueDir, `${id}.result.json`)
 
-    if (!resultPath.startsWith(`${queueDir}${sep}`)) {
-      return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta: { locale: 'en', generatedAt } }, { status: 400 })
-    }
+    if (!resultPath.startsWith(queueDir + sep)) return errorResponse('Invalid job id', 400)
 
     if (existsSync(resultPath)) {
       try {
         const stats = statSync(resultPath)
-        if (!stats.isFile() || stats.size > MAX_RESULT_FILE_BYTES) {
-          throw new Error('Invalid result file')
-        }
+        if (!stats.isFile() || stats.size > MAX_RESULT_FILE_BYTES) return errorResponse('Invalid video result', 500)
+
         const parsed = JSON.parse(readFileSync(resultPath, 'utf8'))
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('Invalid result payload')
-        }
+        if (!isRecord(parsed)) return errorResponse('Invalid video result', 500)
+
         data = parsed
       } catch {
-        return NextResponse.json({ ok: false, data: null, error: 'Unable to read video job result', meta: { locale: 'en', generatedAt } }, { status: 500 })
+        return errorResponse('Invalid video result', 500)
       }
     } else {
       data = { id, status: 'queued', result_url: null }
     }
   }
-  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: { locale: 'en', generatedAt } }
+  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: { locale: 'en', generatedAt: new Date().toISOString() } }
   return NextResponse.json(body)
 }

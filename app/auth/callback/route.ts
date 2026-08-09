@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 
 function getSafeRedirectPath(next: string | null): string {
-  const fallback = '/dashboard'
-  if (!next) return fallback
-  // Allow only relative paths that start with '/' but not '//'
+  const defaultPath = '/dashboard'
+  if (!next) return defaultPath
+  // Only allow relative paths that start with '/' but not '//'
   if (next.startsWith('/') && !next.startsWith('//')) {
     return next
   }
-  return fallback
+  return defaultPath
 }
 
 export async function GET(req: NextRequest) {

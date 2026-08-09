@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-const MAX_REQUEST_BODY_BYTES = 1024;
+const MAX_REQUEST_BODY_SIZE_BYTES = 1024;
 const MAX_BUSINESS_NAME_LENGTH = 100;
-const DEFAULT_BUSINESS_NAME = "Generated Website";
+const ALLOWED_BODY_KEYS = new Set(["businessName"]);
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => {
@@ -15,43 +15,92 @@ function escapeHtml(value: string) {
         return "&gt;";
       case '"':
         return "&quot;";
-      case "'":
-        return "&#39;";
       default:
-        return char;
+        return "&#39;";
     }
   });
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function readRequestBody(req: Request) {
+  const reader = req.body?.getReader();
+
+  if (!reader) {
+    return "";
+  }
+
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    if (!value) {
+      continue;
+    }
+
+    receivedBytes += value.byteLength;
+
+    if (receivedBytes > MAX_REQUEST_BODY_SIZE_BYTES) {
+      return null;
+    }
+
+    chunks.push(value);
+  }
+
+  const bodyBytes = new Uint8Array(receivedBytes);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    bodyBytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder().decode(bodyBytes);
+}
+
 export async function POST(req: Request) {
   try {
-    const contentLength = req.headers.get("content-length");
+    const contentLengthHeader = req.headers.get("content-length");
 
-    if (contentLength !== null) {
-      const parsedContentLength = Number(contentLength);
+    if (contentLengthHeader) {
+      const contentLength = Number(contentLengthHeader);
 
-      if (
-        !Number.isFinite(parsedContentLength) ||
-        parsedContentLength < 0 ||
-        parsedContentLength > MAX_REQUEST_BODY_BYTES
-      ) {
+      if (!Number.isInteger(contentLength) || contentLength < 0) {
         return NextResponse.json(
           {
             success: false,
-            error: "Request body is too large"
+            error: "Invalid request body"
+          },
+          { status: 400 }
+        );
+      }
+
+      if (contentLength > MAX_REQUEST_BODY_SIZE_BYTES) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request body too large"
           },
           { status: 413 }
         );
       }
     }
 
-    const rawBody = await req.text();
+    const rawBody = await readRequestBody(req);
 
-    if (new TextEncoder().encode(rawBody).length > MAX_REQUEST_BODY_BYTES) {
+    if (rawBody === null) {
       return NextResponse.json(
         {
           success: false,
-          error: "Request body is too large"
+          error: "Request body too large"
         },
         { status: 413 }
       );
@@ -65,13 +114,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid JSON request body"
+          error: "Invalid request body"
         },
         { status: 400 }
       );
     }
 
-    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    if (!isPlainObject(body)) {
       return NextResponse.json(
         {
           success: false,
@@ -81,9 +130,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const keys = Object.keys(body);
-
-    if (keys.some((key) => key !== "businessName")) {
+    if (Object.keys(body).some((key) => !ALLOWED_BODY_KEYS.has(key))) {
       return NextResponse.json(
         {
           success: false,
@@ -93,47 +140,49 @@ export async function POST(req: Request) {
       );
     }
 
-    const businessName = (body as { businessName?: unknown }).businessName;
+    const businessNameValue = body.businessName;
 
-    if (businessName !== undefined && typeof businessName !== "string") {
+    if (businessNameValue !== undefined && typeof businessNameValue !== "string") {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid businessName"
+          error: "Invalid request body"
         },
         { status: 400 }
       );
     }
 
     if (
-      businessName !== undefined &&
-      businessName.length > MAX_BUSINESS_NAME_LENGTH
+      businessNameValue !== undefined &&
+      businessNameValue.length > MAX_BUSINESS_NAME_LENGTH
     ) {
       return NextResponse.json(
         {
           success: false,
-          error: "businessName is too long"
+          error: "Invalid request body"
         },
         { status: 400 }
       );
     }
 
+    const businessName = businessNameValue || "Generated Website";
+
     return NextResponse.json({
       success: true,
       html: `
         <section style="padding:40px;font-family:sans-serif">
-          <h1>${escapeHtml(businessName || DEFAULT_BUSINESS_NAME)}</h1>
+          <h1>${escapeHtml(businessName)}</h1>
           <p>AI generated website preview.</p>
         </section>
       `
     });
-  } catch (err: unknown) {
-    console.error("Failed to generate website preview", err);
+  } catch (err) {
+    console.error("Failed to generate website", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: "Unable to generate website preview"
+        error: "Unable to generate website"
       },
       { status: 500 }
     );

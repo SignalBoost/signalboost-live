@@ -4,17 +4,29 @@ import type { JsonSafeVideoResponse, SupportedVideoLocale } from '@/lib/video/ty
 
 const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
 const MAX_CAPTION_TEXT_BYTES = 1024 * 1024
-const MAX_CAPTION_CUES = 5000
+const MAX_CUES = 5000
 
-type ClientErrorStatus = 400 | 413
+class ClientInputError extends Error {
+  status: number
+  code: string
 
-class CaptionInputError extends Error {
-  status: ClientErrorStatus
-
-  constructor(message: string, status: ClientErrorStatus = 400) {
+  constructor(status: number, code: string, message: string) {
     super(message)
-    this.name = 'CaptionInputError'
     this.status = status
+    this.code = code
+    Object.setPrototypeOf(this, new.target.prototype)
+  }
+}
+
+class PayloadTooLargeError extends ClientInputError {
+  constructor(message = 'Captions payload is too large') {
+    super(413, 'PAYLOAD_TOO_LARGE', message)
+  }
+}
+
+class BadRequestError extends ClientInputError {
+  constructor(message = 'Invalid captions input') {
+    super(400, 'INVALID_CAPTIONS', message)
   }
 }
 
@@ -23,61 +35,15 @@ function localeFromRequest(request: Request): SupportedVideoLocale {
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(requested) ? requested as SupportedVideoLocale : 'en'
 }
 
-function errorResponse(locale: SupportedVideoLocale, status: ClientErrorStatus, message: string) {
-  const body: JsonSafeVideoResponse<null> = {
-    ok: false,
-    data: null,
-    error: message,
-    meta: { locale, generatedAt: new Date().toISOString() },
-  }
-  return NextResponse.json(body, { status })
-}
-
-function isUtf8ByteLengthOverLimit(value: string, limit: number): boolean {
-  let bytes = 0
-
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i)
-
-    if (code < 0x80) {
-      bytes += 1
-    } else if (code < 0x800) {
-      bytes += 2
-    } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
-      const next = value.charCodeAt(i + 1)
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4
-        i += 1
-      } else {
-        bytes += 3
-      }
-    } else {
-      bytes += 3
-    }
-
-    if (bytes > limit) {
-      return true
-    }
-  }
-
-  return false
-}
-
-function assertCaptionTextSize(raw: string) {
-  if (isUtf8ByteLengthOverLimit(raw, MAX_CAPTION_TEXT_BYTES)) {
-    throw new CaptionInputError('Caption input is too large', 413)
-  }
-}
-
-async function readRequestBodyWithLimit(request: Request): Promise<Uint8Array> {
+async function readRequestBodyWithLimit(request: Request, limitBytes: number): Promise<Uint8Array> {
   const contentLengthHeader = request.headers.get('content-length')
   if (contentLengthHeader) {
     const contentLength = Number(contentLengthHeader)
     if (!Number.isFinite(contentLength) || contentLength < 0) {
-      throw new CaptionInputError('Invalid request body', 400)
+      throw new BadRequestError('Invalid request body')
     }
-    if (contentLength > MAX_REQUEST_BODY_BYTES) {
-      throw new CaptionInputError('Request body is too large', 413)
+    if (contentLength > limitBytes) {
+      throw new PayloadTooLargeError()
     }
   }
 
@@ -89,26 +55,34 @@ async function readRequestBodyWithLimit(request: Request): Promise<Uint8Array> {
   const chunks: Uint8Array[] = []
   let total = 0
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) {
-      break
-    }
-    if (!value) {
-      continue
-    }
-
-    total += value.byteLength
-    if (total > MAX_REQUEST_BODY_BYTES) {
-      try {
-        await reader.cancel()
-      } catch {
-        // Ignore cancellation errors after the request has already been rejected.
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
       }
-      throw new CaptionInputError('Request body is too large', 413)
-    }
+      if (!value) {
+        continue
+      }
 
-    chunks.push(value)
+      total += value.byteLength
+      if (total > limitBytes) {
+        try {
+          await reader.cancel()
+        } catch {
+          // Ignore cancellation errors while rejecting the oversized request.
+        }
+        throw new PayloadTooLargeError()
+      }
+      chunks.push(value)
+    }
+  } catch (error) {
+    if (error instanceof ClientInputError) {
+      throw error
+    }
+    throw new BadRequestError('Invalid request body')
+  } finally {
+    reader.releaseLock()
   }
 
   const body = new Uint8Array(total)
@@ -117,42 +91,45 @@ async function readRequestBodyWithLimit(request: Request): Promise<Uint8Array> {
     body.set(chunk, offset)
     offset += chunk.byteLength
   }
-
   return body
 }
 
 async function readLimitedFormData(request: Request): Promise<FormData> {
-  const body = await readRequestBodyWithLimit(request)
-  const headers = new Headers(request.headers)
-  headers.delete('content-length')
+  const body = await readRequestBodyWithLimit(request, MAX_REQUEST_BODY_BYTES)
+  const headers = new Headers()
+  const contentType = request.headers.get('content-type')
+  if (contentType) {
+    headers.set('content-type', contentType)
+  }
 
-  return new Request(request.url, {
-    method: request.method,
-    headers,
-    body,
-  }).formData()
+  try {
+    return await new Request(request.url, {
+      method: request.method,
+      headers,
+      body,
+    }).formData()
+  } catch {
+    throw new BadRequestError('Invalid form data')
+  }
 }
 
-async function rawCaptionTextFromFormData(formData: FormData): Promise<string> {
-  const file = formData.get('captions')
+function assertCaptionTextSize(raw: string) {
+  if (new TextEncoder().encode(raw).byteLength > MAX_CAPTION_TEXT_BYTES) {
+    throw new PayloadTooLargeError()
+  }
+}
 
+async function captionTextFromFormData(formData: FormData): Promise<string> {
+  const file = formData.get('captions')
   if (typeof file === 'string') {
     assertCaptionTextSize(file)
     return file
   }
-
   if (file instanceof File) {
     if (file.size > MAX_CAPTION_TEXT_BYTES) {
-      throw new CaptionInputError('Caption input is too large', 413)
+      throw new PayloadTooLargeError()
     }
-
-    let raw: string
-    try {
-      raw = await file.text()
-    } catch {
-      throw new CaptionInputError('Invalid caption input', 400)
-    }
-
+    const raw = await file.text()
     assertCaptionTextSize(raw)
     return raw
   }
@@ -162,23 +139,27 @@ async function rawCaptionTextFromFormData(formData: FormData): Promise<string> {
   return raw
 }
 
+function errorResponse(locale: SupportedVideoLocale, error: unknown) {
+  const clientError = error instanceof ClientInputError ? error : new BadRequestError()
+  console.warn('Caption upload rejected', error)
+
+  return NextResponse.json({
+    ok: false,
+    data: null,
+    error: { code: clientError.code, message: clientError.message },
+    meta: { locale, generatedAt: new Date().toISOString() },
+  }, { status: clientError.status })
+}
+
 export async function POST(request: Request) {
   const locale = localeFromRequest(request)
 
   try {
     const formData = await readLimitedFormData(request)
-    const raw = await rawCaptionTextFromFormData(formData)
-    let cues: ReturnType<typeof parseCaptionText>
-
-    try {
-      cues = parseCaptionText(raw)
-    } catch (error) {
-      console.error('Failed to parse caption input', error)
-      throw new CaptionInputError('Invalid caption input', 400)
-    }
-
-    if (cues.length > MAX_CAPTION_CUES) {
-      throw new CaptionInputError('Too many caption cues', 413)
+    const raw = await captionTextFromFormData(formData)
+    const cues = parseCaptionText(raw)
+    if (cues.length > MAX_CUES) {
+      throw new PayloadTooLargeError('Too many caption cues')
     }
 
     const body: JsonSafeVideoResponse<{ cues: typeof cues; cueCount: number }> = {
@@ -189,11 +170,6 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(body)
   } catch (error) {
-    if (error instanceof CaptionInputError) {
-      return errorResponse(locale, error.status, error.message)
-    }
-
-    console.error('Failed to process captions upload', error)
-    return errorResponse(locale, 400, 'Invalid captions upload')
+    return errorResponse(locale, error)
   }
 }

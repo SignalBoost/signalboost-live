@@ -8,11 +8,13 @@ export async function POST(req: Request) {
       success: true,
       message: "Login API working"
     });
-  } catch {
+  } catch (err: unknown) {
+    console.error("Login API error", err);
+
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid request body"
+        error: "Invalid request"
       },
       { status: 400 }
     );

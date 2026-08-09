@@ -1,6 +1,8 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON } from '@/lib/ai/validation'
 import type { BusinessAnalyzerSummary, ReviewStrategy } from '@/lib/outreach/types'
+
+const ai = createPlatformAiPort()
 
 export async function generateReviewStrategy(args: {
   analysis: BusinessAnalyzerSummary
@@ -22,7 +24,8 @@ export async function generateReviewStrategy(args: {
 Language: ${args.language || 'en'}
 Analysis: ${JSON.stringify(args.analysis)}`
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1200 })
+  let raw = ''
+  try { raw = await ai.generate({ modelPreference: 'claude', prompt, maxTokens: 1200 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   return {
     request_templates: Array.isArray(parsed?.request_templates) ? parsed.request_templates.map(String).slice(0, 5) : fallback.request_templates,

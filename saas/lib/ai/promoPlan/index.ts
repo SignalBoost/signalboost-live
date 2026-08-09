@@ -28,7 +28,7 @@ Analysis: ${JSON.stringify(args.analysis)}
 Predicted needs: ${JSON.stringify(args.predictiveNeeds)}`
 
   let raw = ''
-  try { raw = await ai.generate({ prompt, maxTokens: 1400 }) } catch {}
+  try { raw = await ai.generate({ modelPreference: 'openai', prompt, maxTokens: 1400 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   return {
     promotional_ideas: Array.isArray(parsed?.promotional_ideas) ? parsed.promotional_ideas.map(String).slice(0, 3) : fallback.promotional_ideas,

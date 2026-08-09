@@ -29,7 +29,7 @@ Language: ${args.language || 'en'}
 Analysis: ${JSON.stringify(args.analysis)}`
 
   let raw = ''
-  try { raw = await ai.generate({ prompt, maxTokens: 1800 }) } catch {}
+  try { raw = await ai.generate({ modelPreference: 'claude', prompt, maxTokens: 1800 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   return {
     brand_tone_summary: String(parsed?.brand_tone_summary || fallback.brand_tone_summary),

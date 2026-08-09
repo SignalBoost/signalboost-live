@@ -1,11 +1,30 @@
 // saas/lib/ai/modes.ts
 // Four AI modes — each builds a structured prompt and returns typed JSON.
 
-import { callModel } from './modelRouter.ts'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON, validateLocalItems, validateBusinessSite, validateCreativeWorld, validateGlobalKnowledge } from './validation.ts'
 import type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge } from './validation.ts'
 
 export type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge }
+
+const ai = createPlatformAiPort()
+
+function validLocalResponse(text: string): boolean {
+  const parsed = safeParseJSON(text)
+  return validateLocalItems(Array.isArray(parsed) ? parsed : parsed?.items ?? parsed?.teams ?? []).length > 0
+}
+
+function validBusinessResponse(text: string): boolean {
+  return Boolean(validateBusinessSite(safeParseJSON(text)))
+}
+
+function validCreativeResponse(text: string): boolean {
+  return Boolean(validateCreativeWorld(safeParseJSON(text)))
+}
+
+function validGlobalResponse(text: string): boolean {
+  return Boolean(validateGlobalKnowledge(safeParseJSON(text)))
+}
 
 // ── 2.1 Local Knowledge Mode ──────────────────────────────────────────────────
 
@@ -39,13 +58,17 @@ Each item must follow this schema exactly:
 All description text must be in ${args.language}.
 Return ONLY a valid JSON array. No explanations, no markdown, no comments.`
 
-  console.log('modes: runLocalKnowledgeMode — calling Claude', { category: args.category, count, language: args.language })
+  console.log('modes: runLocalKnowledgeMode — calling COS', { category: args.category, count, language: args.language })
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 4096 })
-  if (!raw) { console.error('modes: runLocalKnowledgeMode — Claude returned null'); return [] }
+  let raw = ''
+  try {
+    raw = await ai.generate({ modelPreference: 'claude', prompt, maxTokens: 4096, cacheValidator: validLocalResponse })
+  } catch {
+    return []
+  }
 
   const parsed = safeParseJSON(raw)
-  const items  = validateLocalItems(Array.isArray(parsed) ? parsed : parsed?.items ?? parsed?.teams ?? [])
+  const items = validateLocalItems(Array.isArray(parsed) ? parsed : parsed?.items ?? parsed?.teams ?? [])
 
   console.log('modes: runLocalKnowledgeMode — validated', { total: items.length })
   return items
@@ -104,13 +127,16 @@ Generate structured JSON for a one-page website with the following sections:
 All text must be in ${args.language}.
 Return ONLY valid JSON. No explanations, no markdown.`
 
-  console.log('modes: runBusinessMode — calling OpenAI', { language: args.language })
+  console.log('modes: runBusinessMode — calling COS', { language: args.language })
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 2048 })
-  if (!raw) { console.error('modes: runBusinessMode — model returned null'); return null }
+  let raw = ''
+  try {
+    raw = await ai.generate({ modelPreference: 'openai', prompt, maxTokens: 2048, cacheValidator: validBusinessResponse })
+  } catch {
+    return null
+  }
 
-  const parsed = safeParseJSON(raw)
-  return validateBusinessSite(parsed)
+  return validateBusinessSite(safeParseJSON(raw))
 }
 
 // ── 2.3 Creative Mode ─────────────────────────────────────────────────────────
@@ -152,13 +178,16 @@ Generate a JSON object with:
 All text must be in ${args.language}.
 Return ONLY valid JSON.`
 
-  console.log('modes: runCreativeMode — calling Claude', { language: args.language })
+  console.log('modes: runCreativeMode — calling COS', { language: args.language })
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 2048 })
-  if (!raw) { console.error('modes: runCreativeMode — model returned null'); return null }
+  let raw = ''
+  try {
+    raw = await ai.generate({ modelPreference: 'claude', prompt, maxTokens: 2048, cacheValidator: validCreativeResponse })
+  } catch {
+    return null
+  }
 
-  const parsed = safeParseJSON(raw)
-  return validateCreativeWorld(parsed)
+  return validateCreativeWorld(safeParseJSON(raw))
 }
 
 // ── 2.4 Global Knowledge Mode ─────────────────────────────────────────────────
@@ -183,11 +212,14 @@ Generate a JSON object with:
 All text must be in ${args.language}.
 Return ONLY valid JSON.`
 
-  console.log('modes: runGlobalKnowledgeMode — calling OpenAI', { language: args.language })
+  console.log('modes: runGlobalKnowledgeMode — calling COS', { language: args.language })
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 1024 })
-  if (!raw) { console.error('modes: runGlobalKnowledgeMode — model returned null'); return null }
+  let raw = ''
+  try {
+    raw = await ai.generate({ modelPreference: 'openai', prompt, maxTokens: 1024, cacheValidator: validGlobalResponse })
+  } catch {
+    return null
+  }
 
-  const parsed = safeParseJSON(raw)
-  return validateGlobalKnowledge(parsed)
+  return validateGlobalKnowledge(safeParseJSON(raw))
 }

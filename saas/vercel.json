@@ -71,7 +71,7 @@
     },
     {
       "path": "/api/cron/audit-approved-remediation",
-      "schedule": "*/10 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/vercel-observation",

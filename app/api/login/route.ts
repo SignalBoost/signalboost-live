@@ -2,20 +2,23 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    await req.json();
 
     return NextResponse.json({
       success: true,
-      message: "Login API working",
-      received: body
+      message: "Login API working"
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    console.error("Login API request failed", err);
+
+    const isMalformedJson = err instanceof SyntaxError;
+
     return NextResponse.json(
       {
         success: false,
-        error: err.message
+        error: isMalformedJson ? "Invalid request body" : "Unable to process login request"
       },
-      { status: 500 }
+      { status: isMalformedJson ? 400 : 500 }
     );
   }
 }

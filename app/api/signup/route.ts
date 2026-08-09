@@ -1,31 +1,36 @@
 import { NextResponse } from "next/server";
 
-const ALLOWED_FIELDS = ["email", "password", "name"] as const;
-type AllowedField = typeof ALLOWED_FIELDS[number];
+const MAX_BODY_BYTES = 10_240; // 10 KB
 
-const MAX_LENGTHS: Record<AllowedField, number> = {
-  email: 254,
-  password: 128,
-  name: 100,
-};
-
-function isString(v: unknown): v is string {
-  return typeof v === "string";
+interface SignupBody {
+  email: string;
+  password: string;
+  [key: string]: unknown;
 }
 
-function isValidEmail(email: string): boolean {
-  // Basic RFC-compatible email check
+function isValidEmail(email: unknown): email is string {
+  if (typeof email !== "string") return false;
+  if (email.length < 3 || email.length > 254) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function isValidPassword(password: string): boolean {
-  // Minimum 8 characters
-  return password.length >= 8;
+function isValidPassword(password: unknown): password is string {
+  if (typeof password !== "string") return false;
+  if (password.length < 8 || password.length > 128) return false;
+  return true;
 }
 
 export async function POST(req: Request) {
-  let body: unknown;
+  // Reject oversized bodies before parsing
+  const contentLength = req.headers.get("content-length");
+  if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { success: false, error: "Request body too large" },
+      { status: 413 }
+    );
+  }
 
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
@@ -42,86 +47,34 @@ export async function POST(req: Request) {
     );
   }
 
-  const raw = body as Record<string, unknown>;
+  const { email, password } = body as SignupBody;
 
-  // Reject unexpected fields
-  const extraFields = Object.keys(raw).filter(
-    (k) => !(ALLOWED_FIELDS as readonly string[]).includes(k)
-  );
-  if (extraFields.length > 0) {
+  if (!isValidEmail(email)) {
     return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 }
-    );
-  }
-
-  // Validate required fields presence and types
-  const { email, password, name } = raw as Partial<Record<AllowedField, unknown>>;
-
-  if (!isString(email) || email.trim() === "") {
-    return NextResponse.json(
-      { success: false, error: "A valid email is required" },
-      { status: 400 }
-    );
-  }
-
-  if (!isString(password) || password === "") {
-    return NextResponse.json(
-      { success: false, error: "A password is required" },
-      { status: 400 }
-    );
-  }
-
-  // Length checks
-  if (email.length > MAX_LENGTHS.email) {
-    return NextResponse.json(
-      { success: false, error: "Email address is too long" },
-      { status: 400 }
-    );
-  }
-
-  if (password.length > MAX_LENGTHS.password) {
-    return NextResponse.json(
-      { success: false, error: "Password is too long" },
-      { status: 400 }
-    );
-  }
-
-  if (name !== undefined) {
-    if (!isString(name) || name.length > MAX_LENGTHS.name) {
-      return NextResponse.json(
-        { success: false, error: "Name is invalid or too long" },
-        { status: 400 }
-      );
-    }
-  }
-
-  // Format checks
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!isValidEmail(normalizedEmail)) {
-    return NextResponse.json(
-      { success: false, error: "A valid email is required" },
+      { success: false, error: "A valid email address is required" },
       { status: 400 }
     );
   }
 
   if (!isValidPassword(password)) {
     return NextResponse.json(
-      { success: false, error: "Password must be at least 8 characters" },
+      { success: false, error: "Password must be between 8 and 128 characters" },
       { status: 400 }
     );
   }
 
+  // Only the allowlisted, validated fields are used going forward.
+  // Raw body is never echoed back to the client.
+  const normalizedEmail = email.trim().toLowerCase();
+
   try {
-    // Placeholder for actual signup logic
-    // Pass only validated, sanitized values — never echo raw input
+    // Placeholder for actual signup logic (e.g. database insert, email verification trigger)
+    // using normalizedEmail and password.
     void normalizedEmail;
-    void password;
-    void name;
 
     return NextResponse.json({
       success: true,
-      message: "Signup API working",
+      message: "Signup received"
     });
   } catch {
     console.error("Signup error");

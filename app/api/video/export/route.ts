@@ -8,137 +8,158 @@ import { assertCanExport, calculateVideoQuota } from '@/lib/video/subscription'
 import type { JsonSafeVideoResponse, SupportedVideoLocale, VideoExportPayload } from '@/lib/video/types'
 
 const queueDir = join(process.cwd(), '.video-queue')
-const MAX_BODY_BYTES = 2 * 1024 * 1024
-const MAX_STRING_LENGTH = 16 * 1024
-const MAX_ARRAY_LENGTH = 500
-const MAX_OBJECT_KEYS = 100
-const MAX_JSON_DEPTH = 10
-const MAX_DURATION_SECONDS = 24 * 60 * 60
-const MAX_USED_MINUTES = 10_000_000
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const supportedLocales = ['en','es','pt','pl','ru'] as const
+const maxRequestBytes = 1024 * 1024
+const maxQueuePayloadBytes = 1024 * 1024
+const maxStringLength = 64 * 1024
+const maxArrayItems = 5000
+const maxObjectKeys = 100
+const maxJsonDepth = 20
+const maxDurationSeconds = 24 * 60 * 60
+const maxUsedMinutes = 10 * 365 * 24 * 60
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-function locale(value: string | undefined): SupportedVideoLocale { return value && ['en','es','pt','pl','ru'].includes(value) ? value as SupportedVideoLocale : 'en' }
+function locale(value: unknown): SupportedVideoLocale { return typeof value === 'string' && (supportedLocales as readonly string[]).includes(value) ? value as SupportedVideoLocale : 'en' }
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) { return NextResponse.json(body, { status }) }
+function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value) }
+function isUuid(value: string) { return uuidRegex.test(value) }
 
-async function readRequestBody(request: Request): Promise<{ text: string } | { error: string, status: number }> {
+async function removeQueuedPayload(payloadPath: string) {
+  try {
+    await unlink(payloadPath)
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
+async function readJsonWithLimit(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; error: string; status: number }> {
   const contentLength = request.headers.get('content-length')
   if (contentLength) {
-    const size = Number(contentLength)
-    if (!Number.isFinite(size) || size < 0) return { error: 'Invalid content length', status: 400 }
-    if (size > MAX_BODY_BYTES) return { error: 'Request body too large', status: 413 }
+    const declaredLength = Number(contentLength)
+    if (Number.isFinite(declaredLength) && declaredLength > maxRequestBytes) {
+      return { ok: false, error: 'Request body too large', status: 413 }
+    }
   }
 
-  if (!request.body) return { text: '' }
+  if (!request.body) {
+    return { ok: false, error: 'Request body is required', status: 400 }
+  }
 
   const reader = request.body.getReader()
-  const chunks: Uint8Array[] = []
-  let received = 0
+  const decoder = new TextDecoder()
+  let totalBytes = 0
+  let text = ''
 
   try {
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       if (!value) continue
-      received += value.byteLength
-      if (received > MAX_BODY_BYTES) {
-        await reader.cancel().catch(() => undefined)
-        return { error: 'Request body too large', status: 413 }
+      totalBytes += value.byteLength
+      if (totalBytes > maxRequestBytes) {
+        await reader.cancel()
+        return { ok: false, error: 'Request body too large', status: 413 }
       }
-      chunks.push(value)
+      text += decoder.decode(value, { stream: true })
     }
+    text += decoder.decode()
   } catch {
-    return { error: 'Invalid request body', status: 400 }
+    return { ok: false, error: 'Failed to read request body', status: 400 }
   }
 
-  const body = new Uint8Array(received)
-  let offset = 0
-  for (const chunk of chunks) {
-    body.set(chunk, offset)
-    offset += chunk.byteLength
+  try {
+    return { ok: true, value: JSON.parse(text) }
+  } catch {
+    return { ok: false, error: 'Malformed JSON payload', status: 400 }
   }
-  return { text: new TextDecoder().decode(body) }
 }
 
-function validateJsonLimits(value: unknown, depth = 0): string | null {
-  if (depth > MAX_JSON_DEPTH) return 'Payload is too deeply nested'
+function validateJsonShape(value: unknown, depth = 0): string | null {
+  if (depth > maxJsonDepth) return 'Payload is too deeply nested'
   if (value === null) return null
 
-  if (typeof value === 'string') return value.length <= MAX_STRING_LENGTH ? null : 'Payload string is too large'
-  if (typeof value === 'number') return Number.isFinite(value) ? null : 'Payload contains an invalid number'
+  if (typeof value === 'string') {
+    return value.length > maxStringLength ? 'Payload string value is too long' : null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? null : 'Payload contains an invalid number'
+  }
+
   if (typeof value === 'boolean') return null
-  if (typeof value !== 'object') return 'Payload contains an unsupported value'
 
   if (Array.isArray(value)) {
-    if (value.length > MAX_ARRAY_LENGTH) return 'Payload array is too large'
+    if (value.length > maxArrayItems) return 'Payload array is too large'
     for (const item of value) {
-      const error = validateJsonLimits(item, depth + 1)
+      const error = validateJsonShape(item, depth + 1)
       if (error) return error
     }
     return null
   }
 
-  const entries = Object.entries(value as Record<string, unknown>)
-  if (entries.length > MAX_OBJECT_KEYS) return 'Payload object has too many fields'
-  for (const [key, item] of entries) {
-    if (key.length > 128) return 'Payload field name is too large'
-    const error = validateJsonLimits(item, depth + 1)
-    if (error) return error
+  if (isRecord(value)) {
+    const keys = Object.keys(value)
+    if (keys.length > maxObjectKeys) return 'Payload object has too many fields'
+    for (const key of keys) {
+      if (key.length > 256) return 'Payload field name is too long'
+      const error = validateJsonShape(value[key], depth + 1)
+      if (error) return error
+    }
+    return null
   }
-  return null
+
+  return 'Payload contains an unsupported value'
 }
 
-function validatePayload(value: unknown): { payload: VideoExportPayload } | { error: string } {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { error: 'Payload must be a JSON object' }
+function validateVideoExportPayload(value: unknown): { ok: true; payload: VideoExportPayload } | { ok: false; error: string } {
+  const shapeError = validateJsonShape(value)
+  if (shapeError) return { ok: false, error: shapeError }
+  if (!isRecord(value)) return { ok: false, error: 'Payload must be a JSON object' }
 
-  const limitError = validateJsonLimits(value)
-  if (limitError) return { error: limitError }
-
-  const payload = value as Record<string, unknown>
-
-  if (typeof payload.sourceUrl !== 'string' || payload.sourceUrl.trim().length === 0 || payload.sourceUrl.length > 4096) {
-    return { error: 'Invalid sourceUrl' }
-  }
-  if (payload.filename !== undefined && (typeof payload.filename !== 'string' || payload.filename.length > 255)) {
-    return { error: 'Invalid filename' }
-  }
-  if (payload.locale !== undefined && (typeof payload.locale !== 'string' || payload.locale.length > 16)) {
-    return { error: 'Invalid locale' }
-  }
-  if (typeof payload.tier !== 'string' || payload.tier.trim().length === 0 || payload.tier.length > 64) {
-    return { error: 'Invalid tier' }
-  }
-  if (payload.billingProvider !== undefined && (typeof payload.billingProvider !== 'string' || payload.billingProvider.length > 64)) {
-    return { error: 'Invalid billingProvider' }
-  }
-  if (typeof payload.usedMinutes !== 'number' || !Number.isFinite(payload.usedMinutes) || payload.usedMinutes < 0 || payload.usedMinutes > MAX_USED_MINUTES) {
-    return { error: 'Invalid usedMinutes' }
-  }
-  if (typeof payload.durationSec !== 'number' || !Number.isFinite(payload.durationSec) || payload.durationSec <= 0 || payload.durationSec > MAX_DURATION_SECONDS) {
-    return { error: 'Invalid durationSec' }
+  const durationSec = value.durationSec
+  if (typeof durationSec !== 'number' || !Number.isFinite(durationSec) || durationSec <= 0 || durationSec > maxDurationSeconds) {
+    return { ok: false, error: 'durationSec must be a positive bounded number' }
   }
 
-  return { payload: payload as VideoExportPayload }
-}
-
-async function parseExportPayload(request: Request): Promise<{ payload: VideoExportPayload } | { error: string, status: number }> {
-  const body = await readRequestBody(request)
-  if ('error' in body) return body
-  if (!body.text.trim()) return { error: 'Request body is required', status: 400 }
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(body.text)
-  } catch {
-    return { error: 'Malformed JSON', status: 400 }
+  const usedMinutes = value.usedMinutes
+  if (typeof usedMinutes !== 'number' || !Number.isFinite(usedMinutes) || usedMinutes < 0 || usedMinutes > maxUsedMinutes) {
+    return { ok: false, error: 'usedMinutes must be a non-negative bounded number' }
   }
 
-  const validated = validatePayload(parsed)
-  if ('error' in validated) return { error: validated.error, status: 400 }
-  return validated
+  const tier = value.tier
+  if (typeof tier !== 'string' || tier.length === 0 || tier.length > 64) {
+    return { ok: false, error: 'tier must be a valid string' }
+  }
+
+  if (value.billingProvider !== undefined && value.billingProvider !== null && value.billingProvider !== '') {
+    if (typeof value.billingProvider !== 'string' || value.billingProvider.length > 64) {
+      return { ok: false, error: 'billingProvider must be a valid string' }
+    }
+  }
+
+  if (value.locale !== undefined && value.locale !== null && value.locale !== '') {
+    if (typeof value.locale !== 'string' || value.locale.length > 16) {
+      return { ok: false, error: 'locale must be a valid string' }
+    }
+  }
+
+  if (value.sourceUrl !== undefined && value.sourceUrl !== null) {
+    if (typeof value.sourceUrl !== 'string' || value.sourceUrl.length > 4096) {
+      return { ok: false, error: 'sourceUrl must be a valid string' }
+    }
+  }
+
+  if (value.filename !== undefined && value.filename !== null) {
+    if (typeof value.filename !== 'string' || value.filename.length > 255) {
+      return { ok: false, error: 'filename must be a valid string' }
+    }
+  }
+
+  return { ok: true, payload: { ...value, durationSec, usedMinutes, tier } as VideoExportPayload }
 }
 
 async function resolveAccountId(supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>, userId: string) {
-  if (!UUID_PATTERN.test(userId)) return null
+  if (!isUuid(userId)) return null
 
   const { data } = await supabase
     .from('accounts')
@@ -155,24 +176,28 @@ export async function POST(request: Request) {
     return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 401)
   }
 
-  let supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>
-  try {
-    supabase = await createMarketingServerSupabase()
-  } catch {
-    return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 401)
-  }
-
+  const supabase = await createMarketingServerSupabase()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  if (authError || !user || !isUuid(user.id)) {
     return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 401)
   }
 
-  const parsed = await parseExportPayload(request)
-  if ('error' in parsed) {
-    return json({ ok: false, data: null, error: parsed.error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, parsed.status)
+  const accountId = await resolveAccountId(supabase, user.id)
+  if (!accountId) {
+    return json({ ok: false, data: null, error: 'Account access required', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 403)
   }
 
-  const payload = parsed.payload
+  const parsedBody = await readJsonWithLimit(request)
+  if (!parsedBody.ok) {
+    return json({ ok: false, data: null, error: parsedBody.error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, parsedBody.status)
+  }
+
+  const validatedPayload = validateVideoExportPayload(parsedBody.value)
+  if (!validatedPayload.ok) {
+    return json({ ok: false, data: null, error: validatedPayload.error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 400)
+  }
+
+  const payload = validatedPayload.payload
   const lang = locale(payload.locale)
   const quota = calculateVideoQuota(payload.tier, payload.usedMinutes + Math.ceil(payload.durationSec / 60), payload.billingProvider || 'stripe')
   const permission = assertCanExport(quota)
@@ -180,13 +205,27 @@ export async function POST(request: Request) {
     return json({ ok: false, data: null, error: permission.reason, meta: { locale: lang, generatedAt: new Date().toISOString() } }, 402)
   }
 
-  const jobId = randomUUID()
-  const accountId = await resolveAccountId(supabase, user.id)
-  const billingSession = await createOverageBillingSession({ jobId, quota, returnUrl: new URL('/dashboard/video', request.url).toString() })
+  const serializedPayload = JSON.stringify(payload)
+  if (Buffer.byteLength(serializedPayload, 'utf8') > maxQueuePayloadBytes) {
+    return json({ ok: false, data: null, error: 'Request body too large', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 413)
+  }
 
+  const jobId = randomUUID()
   await mkdir(queueDir, { recursive: true })
   const payloadPath = join(queueDir, `${jobId}.json`)
-  await writeFile(payloadPath, JSON.stringify(payload, null, 2), 'utf8')
+  try {
+    await writeFile(payloadPath, serializedPayload, 'utf8')
+  } catch {
+    return json({ ok: false, data: null, error: 'Failed to queue export job', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
+  }
+
+  let billingSession
+  try {
+    billingSession = await createOverageBillingSession({ jobId, quota, returnUrl: new URL('/dashboard/video', request.url).toString() })
+  } catch {
+    await removeQueuedPayload(payloadPath)
+    return json({ ok: false, data: null, error: 'Failed to create billing session', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
+  }
 
   const { error: jobInsertError } = await supabase.from('video_jobs').insert({
     id: jobId,
@@ -203,8 +242,8 @@ export async function POST(request: Request) {
   })
 
   if (jobInsertError) {
-    await unlink(payloadPath).catch(() => undefined)
-    return json({ ok: false, data: null, error: 'Failed to queue export job', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
+    await removeQueuedPayload(payloadPath)
+    return json({ ok: false, data: null, error: 'Failed to persist export job', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
   }
 
   if (quota.requiresOverageCharge) {
@@ -219,9 +258,8 @@ export async function POST(request: Request) {
     })
 
     if (overageInsertError) {
-      await unlink(payloadPath).catch(() => undefined)
-      await supabase.from('video_jobs').delete().eq('id', jobId)
-      return json({ ok: false, data: null, error: 'Failed to queue export job', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
+      await removeQueuedPayload(payloadPath)
+      return json({ ok: false, data: null, error: 'Failed to persist billing event', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
     }
   }
 

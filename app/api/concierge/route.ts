@@ -16,7 +16,7 @@ const MAX_QUERY = 2000
 // stream is consumed, so it holds even when Content-Length is missing/false.
 const MAX_BODY_BYTES = 16_000
 const ALLOWED_LOCALES = new Set(['en', 'es', 'pt', 'pl', 'ru'])
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ENTITLEMENT_NULL_END_GRACE_MS = 30 * 60_000
 
 // Rate limit via the shared limiter: distributed (Upstash) when configured,
@@ -221,15 +221,16 @@ async function resolveUsedMinutesWithTimeout(
   }
 }
 
-// Coalesce concurrent per-user/month usage lookups only while a DB read is in
-// flight. Completed values are not cached, because even a short completed-value
-// TTL can understate current monthly consumption after new export jobs are
-// written and produce stale quota/overage guidance.
+// Completed monthly usage values are intentionally not cached. Additional
+// video_jobs export rows can be written at any time; reusing a finished value
+// would temporarily understate consumption. We still coalesce concurrent
+// lookups for the same user/month so a burst of simultaneous requests shares one
+// database read, but every later request performs a fresh lookup.
 const USAGE_LOOKUP_TIMEOUT_MS = 5_000
 const USAGE_INFLIGHT_MAX = 500
 const usageInflight = new Map<string, Promise<number | null>>()
 
-async function resolveUsedMinutesCached(
+async function resolveUsedMinutesFresh(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
   userId: string,
 ): Promise<number | null> {
@@ -322,7 +323,7 @@ export async function POST(req: Request) {
   // (usageUnavailable) so the concierge gives neutral guidance instead of a
   // 0-used quota it didn't verify. Tier still degrades safely to least-privilege.
   const { tier, billingProvider } = await resolveEntitlements(supabase, user.id)
-  const usedMinutes = await resolveUsedMinutesCached(supabase, user.id)
+  const usedMinutes = await resolveUsedMinutesFresh(supabase, user.id)
 
   return NextResponse.json(
     answerSignalBoostConcierge(query, locale, {

@@ -16,7 +16,7 @@ const MAX_QUERY = 2000
 // stream is consumed, so it holds even when Content-Length is missing/false.
 const MAX_BODY_BYTES = 16_000
 const ALLOWED_LOCALES = new Set(['en', 'es', 'pt', 'pl', 'ru'])
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ENTITLEMENT_NULL_END_GRACE_MS = 30 * 60_000
 
 // Rate limit via the shared limiter: distributed (Upstash) when configured,
@@ -221,11 +221,10 @@ async function resolveUsedMinutesWithTimeout(
   }
 }
 
-// In-flight per-user/month de-duplication for the monthly usage figure. Completed
-// totals are not reused: video_jobs may be written between concierge requests,
-// and serving a cached low value would understate current consumption and soften
-// overage guidance. The key includes the UTC month start so concurrent requests
-// around a month boundary cannot share work across months.
+// Coalesce concurrent per-user/month usage lookups only while a DB read is in
+// flight. Completed values are not cached, because even a short completed-value
+// TTL can understate current monthly consumption after new export jobs are
+// written and produce stale quota/overage guidance.
 const USAGE_LOOKUP_TIMEOUT_MS = 5_000
 const USAGE_INFLIGHT_MAX = 500
 const usageInflight = new Map<string, Promise<number | null>>()

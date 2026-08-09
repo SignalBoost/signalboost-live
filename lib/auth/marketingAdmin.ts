@@ -18,7 +18,8 @@ export async function getMarketingAdmin() {
   if (!user) return { user: null, isAdmin: false as const }
 
   const email = String(user.email ?? '').trim().toLowerCase()
-  const isAdmin = Boolean(user.email_confirmed_at && email && ownerAllowlist().includes(email))
+  const isVerifiedEmail = Boolean(user.email_confirmed_at)
+  const isAdmin = Boolean(email && isVerifiedEmail && ownerAllowlist().includes(email))
 
   return { user, isAdmin }
 }

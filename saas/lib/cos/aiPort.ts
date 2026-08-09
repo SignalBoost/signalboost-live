@@ -1,13 +1,10 @@
 // saas/lib/cos/aiPort.ts
-// Injected model-access seam for the COS text generators. The engine asks THIS port to produce
-// text — it never imports a provider SDK, an endpoint, or an API key. On SignalBoost's own
-// deployment createPlatformAiPort() routes through the platform model router. A buyer can use
-// createLocalApplianceAiPort() to force private on-device inference with cloud fallback disabled
-// unless explicitly enabled in environment policy.
+// Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
+// existing Portables gain durable reuse and single-flight protection without owning provider logic.
 import { callModel } from '@/lib/ai/modelRouter'
+import { callCosText } from '@/lib/cos/textGateway'
 
 export interface CosAiPort {
-  // Return the model's text for a single prompt. May throw; callers decide how to fall back.
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number }): Promise<string>
 }
 
@@ -16,26 +13,20 @@ function requireText(result: string | null, provider: string): string {
   return result
 }
 
-// ── SignalBoost's own adapter (the host implementation) ──
+// SignalBoost host: all normal COS text generation enters the shared reuse gateway.
 export function createPlatformAiPort(): CosAiPort {
-  return { generate: async (input) => requireText(await callModel(input), 'platform') }
+  return {
+    generate: async (input) => requireText(await callCosText({ ...input, taskId: 'cos-portable-text' }), 'platform'),
+  }
 }
 
-// ── Private appliance adapter ─────────────────────────────────────────────────
-// This is an explicit local-only selection. The shared router itself enforces whether an
-// administrator has opted into any cloud fallback via LOCAL_AI_ALLOW_CLOUD_FALLBACK=true.
+// Private appliance remains explicitly local/fail-closed according to environment policy.
 export function createLocalApplianceAiPort(): CosAiPort {
   return {
     generate: async (input) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
   }
 }
 
-// ── Image generation — same seam, one method ──
-// A buyer swaps the image model (their DALL·E-compatible endpoint, a private diffusion service)
-// without the creative pipeline knowing the provider or holding a key.
-// Flat result (not a discriminated union): this repo's tsconfig is non-strict, where `!img.ok`
-// does not narrow a union — so a flat { ok; error? } shape keeps `error` safely accessible,
-// matching the store result types (DecisionResult, CampaignQueueStore.update, ObjectStorePort).
 export type CosImageResult = { ok: boolean; b64?: string; url?: string; error?: string }
 
 export interface CosImagePort {

@@ -26,7 +26,12 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
     })
     if (error) throw error
     const row = data?.[0]
-    return row ? { responsePayload: row.response_data, similarityScore: Number(row.similarity) } : null
+    return row ? {
+      taskId: options.taskId,
+      originalPrompt: String(row.prompt_text ?? ''),
+      responsePayload: row.response_data,
+      similarityScore: Number(row.similarity),
+    } : null
   }
 
   async save(record: KnowledgeRecord): Promise<void> {

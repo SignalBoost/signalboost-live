@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 
-function isSafeNextPath(next: string) {
-  return next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')
+function getSafeNextPath(next: string) {
+  if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
+    return '/dashboard'
+  }
+
+  return next
 }
 
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url)
   const code = requestUrl.searchParams.get('code')
-  const requestedNext = requestUrl.searchParams.get('next') || '/dashboard'
-  const next = isSafeNextPath(requestedNext) ? requestedNext : '/dashboard'
+  const next = getSafeNextPath(requestUrl.searchParams.get('next') || '/dashboard')
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    console.error('Marketing OAuth callback error: auth_failed')
+    console.error('Marketing OAuth callback error')
     return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
   }
 

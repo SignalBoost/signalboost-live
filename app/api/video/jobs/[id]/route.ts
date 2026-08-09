@@ -4,19 +4,30 @@ import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import type { JsonSafeVideoResponse } from '@/lib/video/types'
 
-const SAFE_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_RESULT_FILE_BYTES = 1024 * 1024
 const VIDEO_JOB_SELECT = 'id,status,result_url'
 
-function errorResponse(error: string, status: number) {
-  return NextResponse.json({ ok: false, data: null, error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, { status })
+function isPathInsideDirectory(baseDir: string, targetPath: string) {
+  const normalizedBaseDir = baseDir.endsWith(sep) ? baseDir : `${baseDir}${sep}`
+  return targetPath.startsWith(normalizedBaseDir)
+}
+
+function errorResponse(message: string, status: number) {
+  const body: JsonSafeVideoResponse<null> = {
+    ok: false,
+    data: null,
+    error: message,
+    meta: { locale: 'en', generatedAt: new Date().toISOString() },
+  }
+  return NextResponse.json(body, { status })
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  if (!SAFE_JOB_ID_PATTERN.test(id)) {
-    return errorResponse('Invalid job id', 400)
+  if (!JOB_ID_PATTERN.test(id)) {
+    return errorResponse('Invalid video job id', 400)
   }
 
   let data: any = null
@@ -29,14 +40,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const queueDir = resolve(process.cwd(), '.video-queue')
     const resultPath = resolve(queueDir, `${id}.result.json`)
 
-    if (!resultPath.startsWith(`${queueDir}${sep}`)) {
-      return errorResponse('Invalid job id', 400)
+    if (!isPathInsideDirectory(queueDir, resultPath)) {
+      return errorResponse('Invalid video job id', 400)
     }
 
     if (existsSync(resultPath)) {
       try {
-        const stats = statSync(resultPath)
-        if (!stats.isFile() || stats.size > MAX_RESULT_FILE_BYTES) {
+        const resultFile = statSync(resultPath)
+        if (!resultFile.isFile() || resultFile.size > MAX_RESULT_FILE_BYTES) {
           return errorResponse('Invalid video job result', 500)
         }
 

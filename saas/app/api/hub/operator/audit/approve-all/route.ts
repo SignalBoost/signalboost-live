@@ -1,8 +1,8 @@
 // One owner approval authorizes every safe fix in one immutable audit run.
-// Approval records consent only. The remediation controller creates one governed
-// PR, waits for protected checks, merges it, and only then marks findings fixed.
+// Approval records consent immediately. The governed remediation controller then
+// continues after the HTTP response so large approved runs do not time out the UI.
 
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { AUDIT_APPROVAL_SCHEMA_REPAIR_STATEMENTS } from '@/lib/audit/approvalSchemaRepair'
 import {
@@ -14,7 +14,9 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300
+// Governed remediation can process many files/model calls. Vercel Fluid Compute
+// may keep the post-response work alive up to this function duration.
+export const maxDuration = 800
 
 const REQUIRED_MIGRATIONS = [
   '20260719_audit_run_global_approval.sql',
@@ -56,20 +58,6 @@ async function installBaseApprovalSchema(admin: any): Promise<{ ok: boolean; fai
   return { ok: true, failedStep: null, error: '' }
 }
 
-function remediationError(remediation: Awaited<ReturnType<typeof runApprovedAuditRemediationWithRetry>>): string {
-  const first = remediation.skipped.find(item => item.reason)?.reason
-  return first || remediation.autoMergeError || 'The approved run could not complete its governed remediation workflow.'
-}
-
-function withActivity<T extends Record<string, any>>(remediation: T) {
-  const activityCheckedAt = String(remediation.activityHeartbeatAt || '')
-  return {
-    ...remediation,
-    activityCheckedAt,
-    lifecycleUpdatedAt: remediation.mergedAt || remediation.approvedAt || activityCheckedAt,
-  }
-}
-
 export async function POST(req: NextRequest) {
   const ctx = await getAccess()
   if (!ctx.isOwner || !ctx.userId) {
@@ -82,14 +70,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'A valid audit run id is required.' }, { status: 400 })
   }
 
+  const runId = body.runId
+  const actorUserId = ctx.userId
   const admin = getAdminSupabase()
   let repairAttempted = false
   let repairCompleted = false
   let repairFailedStep: number | null = null
 
   let approval = await admin.rpc('approve_audit_run_remediation_v2', {
-    p_run_id: body.runId,
-    p_approved_by: ctx.userId,
+    p_run_id: runId,
+    p_approved_by: actorUserId,
   })
 
   if (approval.error && isApprovalSchemaDrift(String(approval.error.message || ''))) {
@@ -105,8 +95,8 @@ export async function POST(req: NextRequest) {
 
     if (repairFailedStep === null) {
       approval = await admin.rpc('approve_audit_run_remediation_v2', {
-        p_run_id: body.runId,
-        p_approved_by: ctx.userId,
+        p_run_id: runId,
+        p_approved_by: actorUserId,
       })
     }
   }
@@ -141,40 +131,49 @@ export async function POST(req: NextRequest) {
     }, { status })
   }
 
-  const remediation = await runApprovedAuditRemediationWithRetry({
-    admin,
-    runId: body.runId,
-    actorUserId: ctx.userId,
+  // Do not hold the browser request open while a large approved run makes many
+  // model/GitHub calls. `after` is tied to this deployment invocation and keeps
+  // the governed workflow running after the approval response is sent.
+  after(async () => {
+    try {
+      await runApprovedAuditRemediationWithRetry({ admin, runId, actorUserId })
+    } catch (error) {
+      await admin.from('audit_logs').insert({
+        run_id: runId,
+        user_id: actorUserId,
+        payload: {
+          kind: 'audit_batch_remediation',
+          approval: 'final',
+          ok: false,
+          status: 'failed',
+          lifecycleStatus: 'failed',
+          autoMergeError: error instanceof Error ? error.message : 'Governed remediation worker failed.',
+          approvedAt: new Date().toISOString(),
+        },
+      })
+    }
   })
-  const remediationWithActivity = withActivity(remediation)
-
-  if (!remediation.ok) {
-    return NextResponse.json({
-      ok: false,
-      approved: true,
-      code: 'audit_remediation_failed',
-      error: `Approval was recorded, but the automated remediation system did not complete. ${remediationError(remediation)}`,
-      retryable: true,
-      remediation: remediationWithActivity,
-      repairCompleted,
-    }, { status: 502 })
-  }
-
-  const findingsApproved = Number(event?.findings_approved || remediation.findingsTotal || 0)
-  const findingsFixed = remediation.merged ? remediation.findingsApplied : 0
 
   return NextResponse.json({
     ok: true,
-    runId: body.runId,
+    runId,
     approved: true,
-    approvedBy: event?.approved_by || ctx.userId,
-    findingsApproved,
-    findingsFixed,
-    status: remediation.lifecycleStatus,
-    timestamp: event?.timestamp || remediation.approvedAt,
+    approvedBy: event?.approved_by || actorUserId,
+    findingsApproved: Number(event?.findings_approved || 0),
+    findingsFixed: 0,
+    status: 'preparing',
+    timestamp: event?.timestamp || new Date().toISOString(),
     alreadyApproved,
     repairCompleted,
-    remediation: remediationWithActivity,
+    remediation: {
+      kind: 'audit_batch_remediation',
+      approval: 'final',
+      ok: true,
+      runId,
+      status: 'preparing',
+      lifecycleStatus: 'preparing',
+      activityCheckedAt: new Date().toISOString(),
+    },
     rollback: { entryPoint: 'thin', available: true },
-  })
+  }, { status: 202 })
 }

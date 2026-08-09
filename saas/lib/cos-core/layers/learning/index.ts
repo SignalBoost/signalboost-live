@@ -114,9 +114,11 @@ export class ContinuousLearningDirector {
   ) {}
 
   prioritizeGaps(gaps: KnowledgeGap[]): KnowledgeGap[] {
+    const cap = Math.max(0, Math.floor(this.policy.maxCandidatesPerCycle))
     return [...gaps]
       .filter(gap => gap.question.trim() && gap.subject.trim())
       .sort((a, b) => this.gapScore(b) - this.gapScore(a))
+      .slice(0, cap)
   }
 
   private gapScore(gap: KnowledgeGap): number {

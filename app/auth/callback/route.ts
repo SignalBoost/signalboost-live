@@ -5,7 +5,7 @@ export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url)
   const code = requestUrl.searchParams.get('code')
   const nextParam = requestUrl.searchParams.get('next')
-  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\') ? nextParam : '/dashboard'
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/dashboard'
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))

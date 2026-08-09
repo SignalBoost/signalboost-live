@@ -5,9 +5,9 @@ import type { CookieOptionsWithName } from '@supabase/ssr'
 // being shared with signalboostapp.com marketing auth.
 export const saasSupabaseCookieOptions: CookieOptionsWithName = {
   path: '/',
-  sameSite: 'lax',
   httpOnly: true,
-  secure: process.env.NODE_ENV !== 'development',
+  sameSite: 'lax',
+  secure: true,
 }
 
 export const saasSupabaseRedirectUrl = 'https://saas.signalboostapp.com/auth/callback'

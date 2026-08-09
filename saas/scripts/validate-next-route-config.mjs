@@ -53,3 +53,7 @@ if (failures.length) {
 }
 
 console.log('Next.js route config guard passed.')
+
+// This script is already part of every prebuild. Chain the COS architectural guard here
+// so a Portable cannot reintroduce a raw provider boundary without failing the build.
+await import('./check-cos-blueprint.mjs')

@@ -1,7 +1,7 @@
 // saas/lib/cos/aiPort.ts
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
-import { callModel, type ModelProvider } from '@/lib/ai/modelRouter'
+import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
 import { callCosText } from '@/lib/cos/textGateway'
 
 export interface CosAiPort {
@@ -23,7 +23,7 @@ export function createPlatformAiPort(): CosAiPort {
 // Private appliance remains explicitly local/fail-closed according to environment policy.
 export function createLocalApplianceAiPort(): CosAiPort {
   return {
-    generate: async (input) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+    generate: async (input) => requireText(await callProviderModel({ ...input, modelPreference: 'local' }), 'local appliance'),
   }
 }
 

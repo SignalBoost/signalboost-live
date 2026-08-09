@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { callModel, type ModelCallArgs } from '@/lib/ai/modelRouter'
+import { callProviderModel, type ModelCallArgs } from '@/lib/ai/providerRouter'
 import { cosServiceDb } from '@/lib/cos-core/storage'
 
 export type CosTextGatewayInput = ModelCallArgs & {
@@ -22,11 +22,11 @@ function cacheIdentity(input: CosTextGatewayInput) {
 const inFlight = new Map<string, Promise<string | null>>()
 
 /**
- * Compatibility gateway for legacy COS text generators.
+ * Compatibility gateway for SignalBoost text generation.
  *
- * It gives existing Portables durable exact reuse and single-flight protection
- * immediately, while provider execution remains isolated behind modelRouter.
- * New capabilities should use cos-core directly.
+ * Durable exact reuse is checked before compute, and same-process duplicate requests
+ * share one in-flight promise. Raw provider execution is isolated behind providerRouter;
+ * feature routes and Portables never need provider credentials or provider APIs.
  */
 export async function callCosText(input: CosTextGatewayInput): Promise<string | null> {
   const key = cacheIdentity(input)
@@ -43,11 +43,11 @@ export async function callCosText(input: CosTextGatewayInput): Promise<string | 
           if (stored?.text) return stored.text
         }
       } catch {
-        // Cache is an optimization. Provider execution must remain available.
+        // Cache is an optimization. Governed compute remains available.
       }
     }
 
-    const text = await callModel(input)
+    const text = await callProviderModel(input)
     if (text && db) {
       try {
         await db.from('cos_text_cache').upsert({

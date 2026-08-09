@@ -8,120 +8,139 @@ import { assertCanExport, calculateVideoQuota } from '@/lib/video/subscription'
 import type { JsonSafeVideoResponse, SupportedVideoLocale, VideoExportPayload } from '@/lib/video/types'
 
 const queueDir = join(process.cwd(), '.video-queue')
-const MAX_REQUEST_BODY_BYTES = 256 * 1024
-const MAX_DURATION_SECONDS = 24 * 60 * 60
-const MAX_USED_MINUTES = 10_000_000
-const MAX_STRING_LENGTH = 32 * 1024
-const MAX_ARRAY_LENGTH = 500
-const MAX_OBJECT_KEYS = 100
-const MAX_JSON_DEPTH = 8
-const MAX_URL_LENGTH = 4096
-const MAX_FILENAME_LENGTH = 255
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const maxRequestBodyBytes = 1024 * 1024
+const maxDurationSeconds = 24 * 60 * 60
+const maxUsedMinutes = 10_000_000
+const maxStringLength = 64 * 1024
+const maxArrayItems = 1_000
+const maxObjectKeys = 100
+const maxJsonDepth = 8
+const allowedPayloadKeys = new Set(['sourceUrl', 'filename', 'locale', 'captions', 'durationSec', 'tier', 'usedMinutes', 'billingProvider'])
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function locale(value: string | undefined): SupportedVideoLocale { return value && ['en','es','pt','pl','ru'].includes(value) ? value as SupportedVideoLocale : 'en' }
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) { return NextResponse.json(body, { status }) }
-function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value) }
-function isUuid(value: string) { return UUID_PATTERN.test(value) }
 
-async function readJsonBody(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; status: number; error: string }> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function validateJsonLimits(value: unknown, depth = 0): string | null {
+  if (depth > maxJsonDepth) return 'Payload is too deeply nested'
+  if (typeof value === 'string') return value.length <= maxStringLength ? null : 'Payload contains a string that is too long'
+  if (value === null || typeof value === 'boolean' || typeof value === 'number') return null
+  if (Array.isArray(value)) {
+    if (value.length > maxArrayItems) return 'Payload contains too many array items'
+    for (const item of value) {
+      const error = validateJsonLimits(item, depth + 1)
+      if (error) return error
+    }
+    return null
+  }
+  if (isRecord(value)) {
+    const keys = Object.keys(value)
+    if (keys.length > maxObjectKeys) return 'Payload contains too many fields'
+    for (const key of keys) {
+      if (key.length > 128) return 'Payload contains a field name that is too long'
+      const error = validateJsonLimits(value[key], depth + 1)
+      if (error) return error
+    }
+    return null
+  }
+  return 'Payload contains an unsupported value'
+}
+
+async function readRequestBody(request: Request) {
   const contentLength = request.headers.get('content-length')
   if (contentLength) {
     const parsedLength = Number(contentLength)
-    if (Number.isFinite(parsedLength) && parsedLength > MAX_REQUEST_BODY_BYTES) {
-      return { ok: false, status: 413, error: 'Request body is too large' }
+    if (Number.isFinite(parsedLength) && parsedLength > maxRequestBodyBytes) {
+      return { ok: false as const, status: 413, error: 'Request body is too large' }
     }
   }
 
-  if (!request.body) return { ok: false, status: 400, error: 'Request body is required' }
+  if (!request.body) return { ok: true as const, body: '' }
 
   const reader = request.body.getReader()
-  const decoder = new TextDecoder()
+  const chunks: Uint8Array[] = []
   let received = 0
-  let body = ''
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
     received += value.byteLength
-    if (received > MAX_REQUEST_BODY_BYTES) {
-      await reader.cancel().catch(() => undefined)
-      return { ok: false, status: 413, error: 'Request body is too large' }
+    if (received > maxRequestBodyBytes) {
+      await reader.cancel()
+      return { ok: false as const, status: 413, error: 'Request body is too large' }
     }
-    body += decoder.decode(value, { stream: true })
+    chunks.push(value)
   }
-  body += decoder.decode()
 
+  const buffer = new Uint8Array(received)
+  let offset = 0
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return { ok: true as const, body: new TextDecoder().decode(buffer) }
+}
+
+async function parseVideoExportPayload(request: Request) {
+  const body = await readRequestBody(request)
+  if (!body.ok) return body
+  if (!body.body.trim()) return { ok: false as const, status: 400, error: 'Request body is required' }
+
+  let parsed: unknown
   try {
-    return { ok: true, value: JSON.parse(body) }
+    parsed = JSON.parse(body.body)
   } catch {
-    return { ok: false, status: 400, error: 'Malformed JSON body' }
+    return { ok: false as const, status: 400, error: 'Malformed JSON payload' }
   }
+
+  if (!isRecord(parsed)) return { ok: false as const, status: 400, error: 'Payload must be a JSON object' }
+
+  const unknownKeys = Object.keys(parsed).filter((key) => !allowedPayloadKeys.has(key))
+  if (unknownKeys.length) return { ok: false as const, status: 400, error: 'Payload contains unsupported fields' }
+
+  const limitError = validateJsonLimits(parsed)
+  if (limitError) return { ok: false as const, status: 400, error: limitError }
+
+  if (typeof parsed.sourceUrl !== 'string' || parsed.sourceUrl.length === 0 || parsed.sourceUrl.length > 8192) {
+    return { ok: false as const, status: 400, error: 'sourceUrl must be a non-empty string' }
+  }
+  if (typeof parsed.filename !== 'string' || parsed.filename.length === 0 || parsed.filename.length > 255) {
+    return { ok: false as const, status: 400, error: 'filename must be a non-empty string' }
+  }
+  if (parsed.locale !== undefined && (typeof parsed.locale !== 'string' || parsed.locale.length > 16)) {
+    return { ok: false as const, status: 400, error: 'locale must be a string' }
+  }
+  if (typeof parsed.tier !== 'string' || parsed.tier.length === 0 || parsed.tier.length > 64) {
+    return { ok: false as const, status: 400, error: 'tier must be a non-empty string' }
+  }
+  if (parsed.billingProvider !== undefined && (typeof parsed.billingProvider !== 'string' || parsed.billingProvider.length === 0 || parsed.billingProvider.length > 64)) {
+    return { ok: false as const, status: 400, error: 'billingProvider must be a non-empty string' }
+  }
+  if (typeof parsed.durationSec !== 'number' || !Number.isFinite(parsed.durationSec) || parsed.durationSec <= 0 || parsed.durationSec > maxDurationSeconds) {
+    return { ok: false as const, status: 400, error: 'durationSec must be a positive bounded number' }
+  }
+  if (typeof parsed.usedMinutes !== 'number' || !Number.isFinite(parsed.usedMinutes) || parsed.usedMinutes < 0 || parsed.usedMinutes > maxUsedMinutes) {
+    return { ok: false as const, status: 400, error: 'usedMinutes must be a non-negative bounded number' }
+  }
+
+  return { ok: true as const, payload: parsed as VideoExportPayload }
 }
 
-function validateJsonBounds(value: unknown, depth = 0): string | null {
-  if (depth > MAX_JSON_DEPTH) return 'Payload is too deeply nested'
-  if (typeof value === 'string' && value.length > MAX_STRING_LENGTH) return 'Payload contains a string that is too long'
-  if (Array.isArray(value)) {
-    if (value.length > MAX_ARRAY_LENGTH) return 'Payload contains too many array items'
-    for (const item of value) {
-      const error = validateJsonBounds(item, depth + 1)
-      if (error) return error
-    }
-  } else if (isRecord(value)) {
-    const keys = Object.keys(value)
-    if (keys.length > MAX_OBJECT_KEYS) return 'Payload contains too many fields'
-    for (const key of keys) {
-      const error = validateJsonBounds(value[key], depth + 1)
-      if (error) return error
-    }
+async function removeQueuedPayload(payloadPath: string) {
+  try {
+    await unlink(payloadPath)
+  } catch {
+    // Best-effort cleanup only.
   }
-  return null
-}
-
-function validatePayload(value: unknown): { ok: true; payload: VideoExportPayload } | { ok: false; error: string } {
-  if (!isRecord(value)) return { ok: false, error: 'Request body must be a JSON object' }
-
-  const boundsError = validateJsonBounds(value)
-  if (boundsError) return { ok: false, error: boundsError }
-
-  if (typeof value.durationSec !== 'number' || !Number.isFinite(value.durationSec) || value.durationSec <= 0 || value.durationSec > MAX_DURATION_SECONDS) {
-    return { ok: false, error: 'durationSec must be a positive bounded number' }
-  }
-
-  if (typeof value.usedMinutes !== 'number' || !Number.isFinite(value.usedMinutes) || value.usedMinutes < 0 || value.usedMinutes > MAX_USED_MINUTES) {
-    return { ok: false, error: 'usedMinutes must be a non-negative bounded number' }
-  }
-
-  if (typeof value.tier !== 'string' || value.tier.length === 0 || value.tier.length > 100) {
-    return { ok: false, error: 'tier must be a valid string' }
-  }
-
-  if (value.billingProvider !== undefined && (typeof value.billingProvider !== 'string' || value.billingProvider.length > 50)) {
-    return { ok: false, error: 'billingProvider must be a valid string' }
-  }
-
-  if (value.locale !== undefined && (typeof value.locale !== 'string' || value.locale.length > 16)) {
-    return { ok: false, error: 'locale must be a valid string' }
-  }
-
-  if (value.sourceUrl !== undefined && (typeof value.sourceUrl !== 'string' || value.sourceUrl.length > MAX_URL_LENGTH)) {
-    return { ok: false, error: 'sourceUrl must be a valid string' }
-  }
-
-  if (value.filename !== undefined && (typeof value.filename !== 'string' || value.filename.length > MAX_FILENAME_LENGTH)) {
-    return { ok: false, error: 'filename must be a valid string' }
-  }
-
-  return { ok: true, payload: value as VideoExportPayload }
-}
-
-async function cleanupQueueFile(path: string) {
-  await unlink(path).catch(() => undefined)
 }
 
 async function resolveAccountId(supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>, userId: string) {
-  if (!isUuid(userId)) return null
+  if (!uuidPattern.test(userId)) return null
 
   const { data } = await supabase
     .from('accounts')
@@ -134,27 +153,26 @@ async function resolveAccountId(supabase: Awaited<ReturnType<typeof createMarket
 }
 
 export async function POST(request: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 401)
+  const generatedAt = new Date().toISOString()
+  let supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>
+
+  try {
+    supabase = await createMarketingServerSupabase()
+  } catch {
+    return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt } }, 401)
   }
 
-  const supabase = await createMarketingServerSupabase()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 401)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return json({ ok: false, data: null, error: 'Authentication required', meta: { locale: 'en', generatedAt } }, 401)
   }
 
-  const parsedBody = await readJsonBody(request)
-  if (!parsedBody.ok) {
-    return json({ ok: false, data: null, error: parsedBody.error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, parsedBody.status)
+  const parsed = await parseVideoExportPayload(request)
+  if (!parsed.ok) {
+    return json({ ok: false, data: null, error: parsed.error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, parsed.status)
   }
 
-  const validatedPayload = validatePayload(parsedBody.value)
-  if (!validatedPayload.ok) {
-    return json({ ok: false, data: null, error: validatedPayload.error, meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 400)
-  }
-
-  const payload = validatedPayload.payload
+  const payload = parsed.payload
   const lang = locale(payload.locale)
   const quota = calculateVideoQuota(payload.tier, payload.usedMinutes + Math.ceil(payload.durationSec / 60), payload.billingProvider || 'stripe')
   const permission = assertCanExport(quota)
@@ -164,18 +182,16 @@ export async function POST(request: Request) {
 
   const accountId = await resolveAccountId(supabase, user.id)
   const jobId = randomUUID()
-
-  try {
-    await mkdir(queueDir, { recursive: true })
-  } catch {
-    return json({ ok: false, data: null, error: 'Unable to prepare export queue', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
-  }
-
+  await mkdir(queueDir, { recursive: true })
   const payloadPath = join(queueDir, `${jobId}.json`)
+  await writeFile(payloadPath, JSON.stringify(payload, null, 2), 'utf8')
+
+  let billingSession: Awaited<ReturnType<typeof createOverageBillingSession>>
   try {
-    await writeFile(payloadPath, JSON.stringify(payload), 'utf8')
+    billingSession = await createOverageBillingSession({ jobId, quota, returnUrl: new URL('/dashboard/video', request.url).toString() })
   } catch {
-    return json({ ok: false, data: null, error: 'Unable to write export queue payload', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
+    await removeQueuedPayload(payloadPath)
+    return json({ ok: false, data: null, error: 'Unable to create billing session', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 502)
   }
 
   const { error: jobInsertError } = await supabase.from('video_jobs').insert({
@@ -193,21 +209,12 @@ export async function POST(request: Request) {
   })
 
   if (jobInsertError) {
-    await cleanupQueueFile(payloadPath)
+    await removeQueuedPayload(payloadPath)
     return json({ ok: false, data: null, error: 'Unable to queue export job', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
   }
 
-  let billingSession
-  try {
-    billingSession = await createOverageBillingSession({ jobId, quota, returnUrl: new URL('/dashboard/video', request.url).toString() })
-  } catch {
-    await cleanupQueueFile(payloadPath)
-    await supabase.from('video_jobs').delete().eq('id', jobId)
-    return json({ ok: false, data: null, error: 'Unable to create billing session', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 502)
-  }
-
   if (quota.requiresOverageCharge) {
-    const { error: billingEventError } = await supabase.from('billing_overage_events').insert({
+    const { error: overageInsertError } = await supabase.from('billing_overage_events').insert({
       user_id: user.id,
       account_id: accountId,
       provider: quota.overageProvider,
@@ -217,10 +224,10 @@ export async function POST(request: Request) {
       metadata: { quota, gateway: quota.overageProvider, billingSession },
     })
 
-    if (billingEventError) {
-      await cleanupQueueFile(payloadPath)
+    if (overageInsertError) {
+      await removeQueuedPayload(payloadPath)
       await supabase.from('video_jobs').delete().eq('id', jobId)
-      return json({ ok: false, data: null, error: 'Unable to record billing event', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
+      return json({ ok: false, data: null, error: 'Unable to record overage billing event', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
     }
   }
 

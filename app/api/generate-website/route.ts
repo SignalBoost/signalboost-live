@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 
-const MAX_REQUEST_BODY_SIZE_BYTES = 1024;
+const MAX_REQUEST_BODY_BYTES = 1024;
 const MAX_BUSINESS_NAME_LENGTH = 100;
-const ALLOWED_BODY_KEYS = new Set(["businessName"]);
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
+  return value.replace(/[&<>"]/g, (character) => {
+    switch (character) {
       case "&":
         return "&amp;";
       case "<":
@@ -16,94 +15,47 @@ function escapeHtml(value: string) {
       case '"':
         return "&quot;";
       default:
-        return "&#39;";
+        return character;
     }
   });
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-async function readRequestBody(req: Request) {
-  const reader = req.body?.getReader();
-
-  if (!reader) {
-    return "";
-  }
-
-  const chunks: Uint8Array[] = [];
-  let receivedBytes = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-
-    if (done) {
-      break;
-    }
-
-    if (!value) {
-      continue;
-    }
-
-    receivedBytes += value.byteLength;
-
-    if (receivedBytes > MAX_REQUEST_BODY_SIZE_BYTES) {
-      return null;
-    }
-
-    chunks.push(value);
-  }
-
-  const bodyBytes = new Uint8Array(receivedBytes);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    bodyBytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  return new TextDecoder().decode(bodyBytes);
+function invalidRequest() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Invalid request body"
+    },
+    { status: 400 }
+  );
 }
 
 export async function POST(req: Request) {
   try {
-    const contentLengthHeader = req.headers.get("content-length");
+    const contentType = req.headers.get("content-type") || "";
 
-    if (contentLengthHeader) {
-      const contentLength = Number(contentLengthHeader);
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return invalidRequest();
+    }
 
-      if (!Number.isInteger(contentLength) || contentLength < 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Invalid request body"
-          },
-          { status: 400 }
-        );
-      }
+    const contentLength = req.headers.get("content-length");
 
-      if (contentLength > MAX_REQUEST_BODY_SIZE_BYTES) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Request body too large"
-          },
-          { status: 413 }
-        );
+    if (contentLength !== null) {
+      const parsedContentLength = Number(contentLength);
+
+      if (
+        !Number.isFinite(parsedContentLength) ||
+        parsedContentLength < 0 ||
+        parsedContentLength > MAX_REQUEST_BODY_BYTES
+      ) {
+        return invalidRequest();
       }
     }
 
-    const rawBody = await readRequestBody(req);
+    const rawBody = await req.text();
 
-    if (rawBody === null) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Request body too large"
-        },
-        { status: 413 }
-      );
+    if (new TextEncoder().encode(rawBody).length > MAX_REQUEST_BODY_BYTES) {
+      return invalidRequest();
     }
 
     let body: unknown;
@@ -111,61 +63,35 @@ export async function POST(req: Request) {
     try {
       body = JSON.parse(rawBody);
     } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
+      return invalidRequest();
     }
 
-    if (!isPlainObject(body)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return invalidRequest();
     }
 
-    if (Object.keys(body).some((key) => !ALLOWED_BODY_KEYS.has(key))) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
-    }
+    const payload = body as Record<string, unknown>;
+    const payloadKeys = Object.keys(payload);
 
-    const businessNameValue = body.businessName;
-
-    if (businessNameValue !== undefined && typeof businessNameValue !== "string") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
+    if (payloadKeys.some((key) => key !== "businessName")) {
+      return invalidRequest();
     }
 
     if (
-      businessNameValue !== undefined &&
-      businessNameValue.length > MAX_BUSINESS_NAME_LENGTH
+      payload.businessName !== undefined &&
+      typeof payload.businessName !== "string"
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
+      return invalidRequest();
     }
 
-    const businessName = businessNameValue || "Generated Website";
+    if (
+      typeof payload.businessName === "string" &&
+      payload.businessName.length > MAX_BUSINESS_NAME_LENGTH
+    ) {
+      return invalidRequest();
+    }
+
+    const businessName = payload.businessName || "Generated Website";
 
     return NextResponse.json({
       success: true,
@@ -177,12 +103,12 @@ export async function POST(req: Request) {
       `
     });
   } catch (err) {
-    console.error("Failed to generate website", err);
+    console.error("Failed to generate website preview", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: "Unable to generate website"
+        error: "Internal server error"
       },
       { status: 500 }
     );

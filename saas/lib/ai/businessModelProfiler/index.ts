@@ -1,4 +1,4 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { callCosText } from '@/lib/cos/textGateway'
 import { safeParseJSON } from '@/lib/ai/validation'
 import type { BusinessAnalyzerSummary, BusinessModelProfile } from '@/lib/outreach/types'
 
@@ -41,7 +41,7 @@ Return JSON:
 Language: ${args.language || 'en'}
 Analysis: ${JSON.stringify(args.analysis)}`
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 1400 })
+  const raw = await callCosText({ taskId: 'business-model-profile', modelPreference: 'openai', prompt, maxTokens: 1400 })
   const parsed = raw ? safeParseJSON(raw) : null
   const style = parsed?.management_style || {}
 

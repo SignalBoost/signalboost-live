@@ -60,8 +60,13 @@ export class ContinuousLearningCycle {
         const documents = await adapter.acquire(gap)
         result.documentsAcquired += documents.length
         for (const document of documents) {
+          if (document.sourceKind !== adapter.kind) {
+            this.recordDecision(result, { accepted: false, reason: 'source_not_allowed' })
+            continue
+          }
           const decision = await this.director.admit(this.toCandidate(document), result.externalCostUsd)
           this.recordDecision(result, decision)
+          if (!decision.accepted && decision.reason === 'budget_exhausted') return result
         }
       }
     }

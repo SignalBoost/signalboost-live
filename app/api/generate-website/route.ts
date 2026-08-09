@@ -2,25 +2,37 @@ import { NextResponse } from "next/server";
 
 const MAX_BUSINESS_NAME_LENGTH = 200;
 
-const HTML_ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  "\"": "&quot;",
-  "'": "&#39;"
-};
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function escapeHtml(value: string): string {
+  const replacements: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  };
+
+  return value.replace(/[&<>"']/g, (char) => replacements[char]);
+}
+
 export async function POST(req: Request) {
   try {
-    const body: unknown = await req.json();
+    let body: unknown;
+
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid JSON body"
+        },
+        { status: 400 }
+      );
+    }
 
     if (!isRecord(body)) {
       return NextResponse.json(
@@ -32,32 +44,29 @@ export async function POST(req: Request) {
       );
     }
 
-    const businessNameValue = body.businessName;
-    let businessName = "Generated Website";
+    const rawBusinessName = body.businessName;
 
-    if (businessNameValue != null) {
-      if (typeof businessNameValue !== "string") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Invalid request body"
-          },
-          { status: 400 }
-        );
-      }
-
-      if (businessNameValue.length > MAX_BUSINESS_NAME_LENGTH) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Invalid request body"
-          },
-          { status: 400 }
-        );
-      }
-
-      businessName = businessNameValue || businessName;
+    if (rawBusinessName !== undefined && typeof rawBusinessName !== "string") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid businessName"
+        },
+        { status: 400 }
+      );
     }
+
+    if (typeof rawBusinessName === "string" && rawBusinessName.length > MAX_BUSINESS_NAME_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "businessName is too long"
+        },
+        { status: 400 }
+      );
+    }
+
+    const businessName = rawBusinessName || "Generated Website";
 
     return NextResponse.json({
       success: true,

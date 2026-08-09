@@ -1,6 +1,8 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON } from '@/lib/ai/validation'
 import type { BusinessAnalyzerSummary, PredictiveNeeds, PromoPlan } from '@/lib/outreach/types'
+
+const ai = createPlatformAiPort()
 
 export async function generatePromoPlan(args: {
   analysis: BusinessAnalyzerSummary
@@ -25,7 +27,8 @@ Language: ${args.language || 'en'}
 Analysis: ${JSON.stringify(args.analysis)}
 Predicted needs: ${JSON.stringify(args.predictiveNeeds)}`
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 1400 })
+  let raw = ''
+  try { raw = await ai.generate({ prompt, maxTokens: 1400 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   return {
     promotional_ideas: Array.isArray(parsed?.promotional_ideas) ? parsed.promotional_ideas.map(String).slice(0, 3) : fallback.promotional_ideas,

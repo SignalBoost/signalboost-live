@@ -1,6 +1,8 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON } from '@/lib/ai/validation'
 import type { BusinessAnalyzerSummary, SocialPlan } from '@/lib/outreach/types'
+
+const ai = createPlatformAiPort()
 
 export async function generateSocialPlan(args: {
   analysis: BusinessAnalyzerSummary
@@ -26,7 +28,8 @@ Need exactly 7 calendar days and 10 post ideas.
 Language: ${args.language || 'en'}
 Analysis: ${JSON.stringify(args.analysis)}`
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1800 })
+  let raw = ''
+  try { raw = await ai.generate({ prompt, maxTokens: 1800 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   return {
     brand_tone_summary: String(parsed?.brand_tone_summary || fallback.brand_tone_summary),

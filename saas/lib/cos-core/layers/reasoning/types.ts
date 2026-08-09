@@ -10,7 +10,7 @@ export type JsonSchema = {
   [key: string]: unknown
 }
 
-export interface CanonicalToolDescription<TArgs = unknown, TResult = unknown> {
+export interface CanonicalToolDescription<TArgs = any, TResult = any> {
   name: string
   description: string
   parameters: JsonSchema

@@ -103,6 +103,14 @@ function translationPrompt(params: {
   ].join('\n')
 }
 
+function isValidTranslationResponse(raw: string, sourceSegments: GeneratedContentSegment[]): boolean {
+  const parsed = extractJsonObject(raw)
+  const translatedRows = normalizeGeneratedContentSegments(parsed?.segments)
+  if (translatedRows.length !== sourceSegments.length) return false
+  const translatedIds = new Set(translatedRows.map((row) => row.id))
+  return sourceSegments.every((segment) => translatedIds.has(segment.id))
+}
+
 export async function translateGeneratedContent(params: {
   segments: GeneratedContentSegment[]
   targetLanguage?: string | null
@@ -135,6 +143,7 @@ export async function translateGeneratedContent(params: {
       targetLanguage,
     }),
     maxTokens: 8_192,
+    cacheValidator: (text) => isValidTranslationResponse(text, segments),
   })
 
   const parsed = extractJsonObject(raw)

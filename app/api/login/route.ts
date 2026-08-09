@@ -9,14 +9,12 @@ export async function POST(req: Request) {
       message: "Login API working"
     });
   } catch (err: unknown) {
-    console.error("Login API request failed", err);
-
     const isMalformedJson = err instanceof SyntaxError;
 
     return NextResponse.json(
       {
         success: false,
-        error: isMalformedJson ? "Invalid request body" : "Unable to process login request"
+        error: isMalformedJson ? "Invalid request body" : "An unexpected error occurred"
       },
       { status: isMalformedJson ? 400 : 500 }
     );

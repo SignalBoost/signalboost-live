@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const MAX_BODY_BYTES = 16 * 1024; // 16 KB
+const MAX_BODY_BYTES = 10_240; // 10 KB
 
 interface SignupBody {
   email: string;
@@ -17,81 +17,58 @@ function isValidEmail(email: unknown): email is string {
 
 function isValidPassword(password: unknown): password is string {
   if (typeof password !== "string") return false;
-  // At least 8 characters, max 128
-  return password.length >= 8 && password.length <= 128;
+  if (password.length < 8 || password.length > 128) return false;
+  return true;
 }
 
 export async function POST(req: Request) {
+  // Reject oversized bodies before parsing
+  const contentLength = req.headers.get("content-length");
+  if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { success: false, error: "Request body too large" },
+      { status: 413 }
+    );
+  }
+
+  let body: SignupBody;
   try {
-    // Enforce a maximum body size before parsing
-    const contentLength = req.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
-      return NextResponse.json(
-        { success: false, error: "Request body too large" },
-        { status: 413 }
-      );
-    }
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid request body" },
+      { status: 400 }
+    );
+  }
 
-    let body: SignupBody;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid request body" },
-        { status: 400 }
-      );
-    }
+  // Validate required fields — reject unexpected extra fields by ignoring them
+  const { email, password } = body;
 
-    // Allowlist validation — reject unexpected or missing fields
-    const allowedKeys = new Set(["email", "password"]);
-    const bodyKeys = Object.keys(body);
-    for (const key of bodyKeys) {
-      if (!allowedKeys.has(key)) {
-        return NextResponse.json(
-          { success: false, error: "Invalid request body" },
-          { status: 400 }
-        );
-      }
-    }
+  if (!isValidEmail(email)) {
+    return NextResponse.json(
+      { success: false, error: "A valid email address is required" },
+      { status: 400 }
+    );
+  }
 
-    // Required field presence
-    if (!Object.prototype.hasOwnProperty.call(body, "email") ||
-        !Object.prototype.hasOwnProperty.call(body, "password")) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields: email, password" },
-        { status: 400 }
-      );
-    }
+  if (!isValidPassword(password)) {
+    return NextResponse.json(
+      { success: false, error: "Password must be between 8 and 128 characters" },
+      { status: 400 }
+    );
+  }
 
-    // Type, format, and length validation
-    if (!isValidEmail(body.email)) {
-      return NextResponse.json(
-        { success: false, error: "Invalid email address" },
-        { status: 400 }
-      );
-    }
+  try {
+    // Placeholder for actual signup logic using only validated, safe fields
+    // e.g. await createUser({ email: email.toLowerCase().trim(), password });
 
-    if (!isValidPassword(body.password)) {
-      return NextResponse.json(
-        { success: false, error: "Password must be between 8 and 128 characters" },
-        { status: 400 }
-      );
-    }
-
-    // Normalize email (lowercase)
-    const normalizedEmail = body.email.trim().toLowerCase();
-
-    // TODO: pass normalizedEmail (and hashed password) to signup logic here
-    void normalizedEmail;
-
-    // Return only non-sensitive confirmation — never echo input
     return NextResponse.json({
       success: true,
       message: "Signup received"
+      // Do not echo back any input fields, especially passwords
     });
   } catch {
-    // Log server-side detail without exposing it to the client
-    console.error("Unexpected error in POST /api/signup");
+    console.error("Signup error");
     return NextResponse.json(
       { success: false, error: "An unexpected error occurred" },
       { status: 500 }

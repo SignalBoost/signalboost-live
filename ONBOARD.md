@@ -3,7 +3,7 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.0
+**Version:** 1.1
 
 ---
 
@@ -508,6 +508,183 @@ Everything learned becomes reusable.
 
 ---
 
+# Continuous Learning
+
+COS MUST learn proactively as well as reactively.
+
+It should not wait for a Portable to ask the same expensive question repeatedly before improving itself.
+
+COS has three learning channels.
+
+## Work Experience
+
+Every completed Portable task can teach COS.
+
+Outcomes, successful strategies, failures, buyer responses, campaign performance, incident patterns and reusable decisions should improve future behavior.
+
+## Engineering Experience
+
+COS should learn from SignalBoost's own engineering history.
+
+Examples
+
+- successful fixes
+- failed builds
+- before-and-after code
+- verified commits
+- incident diagnoses
+- regression tests
+- architecture patterns
+
+A verified solution should become reusable engineering intelligence rather than being rediscovered later.
+
+## Independent Study
+
+COS may periodically study approved high-quality sources when doing so closes a real knowledge gap or is expected to reduce future external-AI cost.
+
+Approved source classes may include
+
+- official documentation
+- research papers
+- public datasets
+- approved public websites
+- repositories with suitable access and licensing
+- educational video transcripts
+- regulatory publications
+
+COS does NOT blindly ingest the internet.
+
+---
+
+# Continuous Learning Execution Order
+
+Proactive learning follows this sequence.
+
+```
+Knowledge Gap
+
+↓
+
+Expected Reuse / ROI
+
+↓
+
+Source Policy
+
+↓
+
+Acquire
+
+↓
+
+Verify
+
+↓
+
+Deduplicate
+
+↓
+
+Confidence + Provenance
+
+↓
+
+Extract Reusable Facts / Procedures
+
+↓
+
+Knowledge Store
+
+↓
+
+Revalidation Schedule
+
+↓
+
+Telemetry
+```
+
+A duplicate or already-known source stops before expensive processing.
+
+A low-confidence discovery does not silently become trusted knowledge.
+
+---
+
+# Continuous Learning Governance
+
+Every learned item must retain
+
+- source
+- source type
+- acquisition date
+- content identity or hash
+- confidence
+- supporting evidence
+- applicable scope
+- freshness or revalidation requirements where relevant
+- licensing or usage restrictions where relevant
+
+Contradictory information must be preserved as a contradiction until it is resolved; COS must not overwrite a trusted fact merely because a newer source says something different.
+
+Learning budgets are mandatory.
+
+Continuous Learning MUST NOT become an uncontrolled background AI bill.
+
+Before external acquisition COS asks
+
+- Is this a real knowledge gap?
+- Is the answer already in Knowledge, Memory or Cache?
+- How many future tasks can reuse it?
+- What external cost can it avoid?
+- Is the source approved?
+- Can deterministic extraction solve it without AI?
+
+The default learning action is no action when expected reuse does not justify cost.
+
+---
+
+# Experiential Learning Loop
+
+For executable engineering or operational knowledge, COS should prefer verified experience.
+
+```
+Observe
+
+↓
+
+Build / Plan
+
+↓
+
+Execute in Governed Environment
+
+↓
+
+Test
+
+↓
+
+Diagnose Failure
+
+↓
+
+Correct
+
+↓
+
+Verify
+
+↓
+
+Remember Successful Pattern
+```
+
+Failed experiments are evidence, not reusable truth.
+
+Only verified outcomes should graduate into trusted procedures.
+
+---
+
 # Telemetry
 
 Every execution records
@@ -525,6 +702,18 @@ Every execution records
 - duplicate request
 - retry count
 - loop depth
+
+Continuous Learning additionally records
+
+- knowledge gap
+- source type
+- source identity
+- acquisition cost
+- duplicate rejection
+- confidence
+- knowledge accepted or rejected
+- expected reuse
+- avoided future cost when measurable
 
 Nothing is anonymous.
 
@@ -583,6 +772,10 @@ is one that automatically benefits every Portable.
 The best architecture
 
 is one where providers can be replaced without changing application code.
+
+The best learning cycle
+
+is one that creates verified reusable knowledge for less than the future work it prevents.
 
 SignalBoost does not build AI applications.
 

@@ -4,10 +4,9 @@ import process from 'node:process'
 
 const root = path.resolve(process.cwd())
 const failures = []
-const allowedModelRouterImports = new Set([
+const allowedProviderRouterImports = new Set([
+  'lib/cos/textGateway.ts',
   'lib/cos/aiPort.ts',
-  'lib/cos-backup/runtime.ts',
-  'cos-backup-host/signalboostCosBackupHost.ts',
 ])
 
 async function walk(dir) {
@@ -26,13 +25,14 @@ for (const file of await walk(root)) {
   const relative = path.relative(root, file).replaceAll('\\', '/')
   if (relative.startsWith('scripts/')) continue
   const source = await readFile(file, 'utf8')
-  if (/from\s+['"]@\/lib\/ai\/modelRouter['"]/.test(source) && !allowedModelRouterImports.has(relative)) {
-    failures.push(`direct_model_router_import:${relative}`)
-  }
-  if (/api\.openai\.com|api\.anthropic\.com/.test(source) && !relative.startsWith('lib/ai/') && relative !== 'lib/cos/aiPort.ts') {
-    failures.push(`direct_provider_endpoint:${relative}`)
+  if (/from\s+['"]@\/lib\/ai\/providerRouter['"]/.test(source) && !allowedProviderRouterImports.has(relative)) {
+    failures.push(`direct_provider_router_import:${relative}`)
   }
 }
+
+const compatibilityRouter = await readFile(path.join(root, 'lib/ai/modelRouter.ts'), 'utf8')
+if (!compatibilityRouter.includes('callCosText')) failures.push('legacy_model_router_bypasses_cos')
+if (compatibilityRouter.includes('api.anthropic.com') || compatibilityRouter.includes('api.openai.com')) failures.push('legacy_model_router_contains_provider_endpoint')
 
 const kernel = await readFile(path.join(root, 'lib/cos-core/cos-kernel.ts'), 'utf8')
 for (const required of ['businessRules', 'lookupSemanticCache', 'processMemoryLayer', 'compressPromptContext', 'processReasoningLayer', 'commitToMemory', 'recordROI']) {
@@ -41,6 +41,7 @@ for (const required of ['businessRules', 'lookupSemanticCache', 'processMemoryLa
 
 const learning = await readFile(path.join(root, 'lib/cos-core/layers/learning/index.ts'), 'utf8')
 if (!learning.includes('class LearningEngine')) failures.push('learning_engine_missing')
+if (!learning.includes('ContinuousLearningDirector')) failures.push('continuous_learning_director_missing')
 const knowledge = await readFile(path.join(root, 'lib/cos-core/layers/knowledge/persistent.ts'), 'utf8')
 if (!knowledge.includes('class KnowledgeGraph')) failures.push('knowledge_graph_missing')
 

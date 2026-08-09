@@ -3,12 +3,11 @@
 // Task-aware model router for the Portable AI Auditor.
 //
 // Routing policy:
-//   • Audit / Compliance tasks  → OpenAI (gpt-4o) FIRST, fall back to Anthropic (claude-sonnet-4-6)
-//   • General / Writing / Chat   → Anthropic (claude-sonnet-4-6) FIRST, fall back to OpenAI (gpt-4o)
+//   • All tasks → OpenAI FIRST, fall back to Anthropic (claude-sonnet-4-6)
 //
-// Each task tries its preferred provider; on ANY failure (error, rate-limit,
-// timeout, empty output) it gracefully falls back to the other provider so an
-// audit never dies just because one vendor hiccuped.
+// Each task tries OpenAI first; on ANY failure (error, rate-limit,
+// timeout, empty output) it gracefully falls back to Anthropic so an
+// audit never dies just because one vendor hiccupped.
 //
 // Env required: OPENAI_API_KEY, ANTHROPIC_API_KEY
 
@@ -94,17 +93,12 @@ export type RouteInput = {
 }
 
 /**
- * Route a request to the correct primary provider for its task, with automatic
- * cross-provider fallback. Audit tasks favor OpenAI's strict compliance
- * reasoning; general tasks favor Anthropic. Either way, both providers are
- * tried before giving up.
+ * Route a request through OpenAI first with automatic Anthropic fallback.
  */
 export async function routeAndRun(input: RouteInput): Promise<RouteResult> {
   const temperature = typeof input.temperature === 'number' ? input.temperature : (input.task === 'audit' ? 0 : 0.4)
 
-  // Order of providers to try, by task.
-  const order: Provider[] = input.task === 'audit' ? ['openai', 'anthropic'] : ['anthropic', 'openai']
-
+  const order: Provider[] = ['openai', 'anthropic']
   const attempts: RouteResult['attempts'] = []
 
   for (const provider of order) {
@@ -118,7 +112,6 @@ export async function routeAndRun(input: RouteInput): Promise<RouteResult> {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'Unknown provider error'
       attempts.push({ provider, model, ok: false, error })
-      // fall through to the next provider in the order
     }
   }
 

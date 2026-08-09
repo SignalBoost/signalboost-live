@@ -22,7 +22,7 @@ const orch = createOrchestrator(createSignalBoostAiPortabilityHost(), {
   ],
   routing: {
     defaultPolicy: 'auto',
-    defaultFallback: ['anthropic', 'openai'],
+    defaultFallback: ['openai', 'anthropic'],
   },
 });
 

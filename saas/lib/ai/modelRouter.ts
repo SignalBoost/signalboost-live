@@ -108,7 +108,7 @@ async function callLocal(args: ModelCallArgs): Promise<string | null> {
     return null
   }
 
-  const fallback = process.env.LOCAL_AI_CLOUD_FALLBACK_PROVIDER === 'openai' ? 'openai' : 'claude'
+  const fallback = process.env.LOCAL_AI_CLOUD_FALLBACK_PROVIDER === 'claude' ? 'claude' : 'openai'
   console.warn(`modelRouter: local inference failed — explicit cloud fallback to ${fallback}`)
   return fallback === 'openai' ? callOpenAI(args) : callClaude(args)
 }
@@ -152,7 +152,7 @@ async function logAiTask(args: {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function callModel(args: ModelCallArgs): Promise<string | null> {
-  const preference = args.modelPreference ?? providerFromEnvironment() ?? 'claude'
+  const preference = args.modelPreference ?? providerFromEnvironment() ?? 'openai'
   const startedAt = Date.now()
 
   console.log('modelRouter: calling', preference, {

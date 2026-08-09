@@ -4,14 +4,15 @@ import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import type { JsonSafeVideoResponse } from '@/lib/video/types'
 
-const VIDEO_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_RESULT_FILE_BYTES = 1024 * 1024
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!VIDEO_JOB_ID_PATTERN.test(id)) {
-    const body: JsonSafeVideoResponse<null> = { ok: false, data: null, error: 'Invalid video job id', meta: { locale: 'en', generatedAt: new Date().toISOString() } }
-    return NextResponse.json(body, { status: 400 })
+  const generatedAt = new Date().toISOString()
+
+  if (!JOB_ID_PATTERN.test(id)) {
+    return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta: { locale: 'en', generatedAt } }, { status: 400 })
   }
 
   let data: any = null
@@ -25,8 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const resultPath = resolve(queueDir, `${id}.result.json`)
 
     if (!resultPath.startsWith(`${queueDir}${sep}`)) {
-      const body: JsonSafeVideoResponse<null> = { ok: false, data: null, error: 'Invalid video job id', meta: { locale: 'en', generatedAt: new Date().toISOString() } }
-      return NextResponse.json(body, { status: 400 })
+      return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta: { locale: 'en', generatedAt } }, { status: 400 })
     }
 
     if (existsSync(resultPath)) {
@@ -37,17 +37,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         }
         const parsed = JSON.parse(readFileSync(resultPath, 'utf8'))
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('Invalid result file')
+          throw new Error('Invalid result payload')
         }
         data = parsed
       } catch {
-        const body: JsonSafeVideoResponse<null> = { ok: false, data: null, error: 'Invalid video job result', meta: { locale: 'en', generatedAt: new Date().toISOString() } }
-        return NextResponse.json(body, { status: 500 })
+        return NextResponse.json({ ok: false, data: null, error: 'Unable to read video job result', meta: { locale: 'en', generatedAt } }, { status: 500 })
       }
     } else {
       data = { id, status: 'queued', result_url: null }
     }
   }
-  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: { locale: 'en', generatedAt: new Date().toISOString() } }
+  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: { locale: 'en', generatedAt } }
   return NextResponse.json(body)
 }

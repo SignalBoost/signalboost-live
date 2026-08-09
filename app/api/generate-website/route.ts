@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 
 const MAX_REQUEST_BODY_BYTES = 4096;
 const MAX_BUSINESS_NAME_LENGTH = 100;
+const DEFAULT_BUSINESS_NAME = "Generated Website";
 
-class BadRequestError extends Error {}
+class RequestError extends Error {
+  status: number;
+  clientMessage: string;
+
+  constructor(clientMessage: string, status: number) {
+    super(clientMessage);
+    this.name = "RequestError";
+    this.status = status;
+    this.clientMessage = clientMessage;
+  }
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => {
@@ -28,19 +39,23 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function readRequestBody(req: Request) {
-  const contentLength = req.headers.get("content-length");
+async function parseJsonBody(req: Request): Promise<unknown> {
+  const contentLengthHeader = req.headers.get("content-length");
 
-  if (contentLength !== null) {
-    const parsedLength = Number(contentLength);
+  if (contentLengthHeader !== null) {
+    const contentLength = Number(contentLengthHeader);
 
-    if (!Number.isFinite(parsedLength) || parsedLength > MAX_REQUEST_BODY_BYTES) {
-      throw new BadRequestError("Invalid request");
+    if (!Number.isInteger(contentLength) || contentLength < 0) {
+      throw new RequestError("Invalid request body.", 400);
+    }
+
+    if (contentLength > MAX_REQUEST_BODY_BYTES) {
+      throw new RequestError("Request body is too large.", 413);
     }
   }
 
   if (!req.body) {
-    return "";
+    throw new RequestError("Invalid request body.", 400);
   }
 
   const reader = req.body.getReader();
@@ -59,52 +74,47 @@ async function readRequestBody(req: Request) {
 
       if (receivedBytes > MAX_REQUEST_BODY_BYTES) {
         await reader.cancel();
-        throw new BadRequestError("Invalid request");
+        throw new RequestError("Request body is too large.", 413);
       }
 
       chunks.push(value);
     }
   }
 
-  const body = new Uint8Array(receivedBytes);
+  const bodyBytes = new Uint8Array(receivedBytes);
   let offset = 0;
 
   for (const chunk of chunks) {
-    body.set(chunk, offset);
+    bodyBytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
 
-  return new TextDecoder().decode(body);
+  try {
+    return JSON.parse(new TextDecoder().decode(bodyBytes));
+  } catch {
+    throw new RequestError("Invalid request body.", 400);
+  }
 }
 
-function validateBusinessName(body: unknown) {
+function validateBusinessNameBody(body: unknown): string {
   if (!isPlainObject(body)) {
-    throw new BadRequestError("Invalid request");
+    throw new RequestError("Invalid request body.", 400);
   }
 
-  const allowedKeys = new Set(["businessName"]);
+  const keys = Object.keys(body);
 
-  for (const key of Object.keys(body)) {
-    if (!allowedKeys.has(key)) {
-      throw new BadRequestError("Invalid request");
-    }
+  if (keys.length !== 1 || keys[0] !== "businessName") {
+    throw new RequestError("Invalid request body.", 400);
   }
 
   const businessName = body.businessName;
 
-  if (businessName === undefined || businessName === null || businessName === "") {
-    return "Generated Website";
-  }
-
-  if (typeof businessName !== "string") {
-    throw new BadRequestError("Invalid request");
-  }
-
   if (
+    typeof businessName !== "string" ||
     businessName.length > MAX_BUSINESS_NAME_LENGTH ||
-    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(businessName)
+    /[\u0000-\u001F\u007F]/.test(businessName)
   ) {
-    throw new BadRequestError("Invalid request");
+    throw new RequestError("Invalid businessName.", 400);
   }
 
   return businessName;
@@ -112,44 +122,38 @@ function validateBusinessName(body: unknown) {
 
 export async function POST(req: Request) {
   try {
-    const contentType = req.headers.get("content-type") || "";
-
-    if (!contentType.toLowerCase().includes("application/json")) {
-      throw new BadRequestError("Invalid request");
-    }
-
-    let body: unknown;
-
-    try {
-      body = JSON.parse(await readRequestBody(req));
-    } catch (err) {
-      if (err instanceof BadRequestError) {
-        throw err;
-      }
-
-      throw new BadRequestError("Invalid request");
-    }
-
-    const businessName = escapeHtml(validateBusinessName(body));
+    const body = await parseJsonBody(req);
+    const businessName = validateBusinessNameBody(body);
+    const escapedBusinessName = escapeHtml(businessName || DEFAULT_BUSINESS_NAME);
 
     return NextResponse.json({
       success: true,
       html: `
         <section style="padding:40px;font-family:sans-serif">
-          <h1>${businessName}</h1>
+          <h1>${escapedBusinessName}</h1>
           <p>AI generated website preview.</p>
         </section>
       `
     });
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof RequestError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: err.clientMessage
+        },
+        { status: err.status }
+      );
+    }
+
     console.error("Failed to generate website", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof BadRequestError ? "Invalid request" : "Unable to generate website"
+        error: "Unable to generate website."
       },
-      { status: err instanceof BadRequestError ? 400 : 500 }
+      { status: 500 }
     );
   }
 }

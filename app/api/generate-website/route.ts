@@ -1,21 +1,28 @@
 import { NextResponse } from "next/server";
 
-const MAX_BUSINESS_NAME_LENGTH = 120;
+const MAX_BUSINESS_NAME_LENGTH = 100;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function escapeHtml(value: string) {
-  const htmlEscapes: Record<string, string> = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  };
-
-  return value.replace(/[&<>"']/g, (character) => htmlEscapes[character]);
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return char;
+    }
+  });
 }
 
 export async function POST(req: Request) {
@@ -32,22 +39,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const rawBusinessName = body.businessName;
-
-    if (rawBusinessName !== undefined && typeof rawBusinessName !== "string") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid businessName"
-        },
-        { status: 400 }
-      );
-    }
+    const businessNameValue = body.businessName;
 
     if (
-      typeof rawBusinessName === "string" &&
-      (rawBusinessName.length > MAX_BUSINESS_NAME_LENGTH ||
-        /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(rawBusinessName))
+      businessNameValue !== undefined &&
+      (typeof businessNameValue !== "string" ||
+        businessNameValue.length > MAX_BUSINESS_NAME_LENGTH)
     ) {
       return NextResponse.json(
         {
@@ -58,7 +55,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const businessName = rawBusinessName || "Generated Website";
+    const businessName = businessNameValue || "Generated Website";
 
     return NextResponse.json({
       success: true,
@@ -75,9 +72,9 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof SyntaxError ? "Invalid JSON request body" : "Failed to generate website"
+        error: "Failed to generate website"
       },
-      { status: err instanceof SyntaxError ? 400 : 500 }
+      { status: 500 }
     );
   }
 }

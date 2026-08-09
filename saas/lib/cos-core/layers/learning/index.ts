@@ -38,6 +38,9 @@ export type ContinuousLearningSourceKind =
   | 'engineering_history'
   | 'official_documentation'
   | 'research_paper'
+  | 'scientific_journal'
+  | 'library_material'
+  | 'news_article'
   | 'public_dataset'
   | 'video_transcript'
   | 'approved_public_web'
@@ -89,6 +92,9 @@ export const DEFAULT_CONTINUOUS_LEARNING_POLICY: ContinuousLearningPolicy = {
     'engineering_history',
     'official_documentation',
     'research_paper',
+    'scientific_journal',
+    'library_material',
+    'news_article',
     'public_dataset',
     'video_transcript',
     'approved_public_web',
@@ -103,9 +109,10 @@ export const DEFAULT_CONTINUOUS_LEARNING_POLICY: ContinuousLearningPolicy = {
  * Governs proactive COS education.
  *
  * Acquisition is intentionally injected rather than performed here. A source adapter may
- * read approved documentation, repositories, datasets, papers or transcripts, but this
- * director decides whether the result is trustworthy and reusable enough to become COS
- * knowledge. Duplicate content is rejected before storage and no provider is called here.
+ * read approved documentation, repositories, datasets, papers, library material, news or
+ * transcripts, but this director decides whether the result is trustworthy and reusable
+ * enough to become COS knowledge. Duplicate content is rejected before storage and no
+ * provider is called here.
  */
 export class ContinuousLearningDirector {
   constructor(

@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     await req.json();
+
+    return NextResponse.json({
+      success: true,
+      message: "Signup API working"
+    });
   } catch {
     return NextResponse.json(
       {
@@ -12,9 +17,4 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-
-  return NextResponse.json({
-    success: true,
-    message: "Signup API working"
-  });
 }

@@ -6,12 +6,8 @@ export async function GET(req: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const rawNext = requestUrl.searchParams.get('next') || '/dashboard'
 
-  // Only allow relative paths that start with '/' but not '//'
-  // (protocol-relative URLs like //attacker.example would be treated as absolute)
-  const next =
-    rawNext.startsWith('/') && !rawNext.startsWith('//')
-      ? rawNext
-      : '/dashboard'
+  // Only allow relative paths that do not start with '//' (protocol-relative URLs)
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard'
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))

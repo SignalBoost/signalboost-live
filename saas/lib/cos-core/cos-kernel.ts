@@ -1,3 +1,4 @@
+import { ExactCacheLayer, createExactCacheKey } from './layers/exact-cache'
 import { KnowledgeLayer } from './layers/knowledge'
 import { MemoryLayer, type ChatMessage, type CompressedMemorySnapshot } from './layers/memory'
 import {
@@ -15,6 +16,7 @@ export type COSKernelDependencies<TGovernance> = {
   selectCompute: ComputeSelector<TGovernance>
   executeProvider: Layer5Executor
   businessRules?: BusinessRule[]
+  exactCache?: ExactCacheLayer
 }
 
 export async function bootCOSKernel<TGovernance = unknown>(
@@ -26,6 +28,8 @@ export async function bootCOSKernel<TGovernance = unknown>(
     existingSnapshot?: CompressedMemorySnapshot
     availableTools: CanonicalToolDescription[]
     requestedModel: string
+    policyVersion?: string | null
+    knowledgeVersion?: string | null
   },
   governanceState: TGovernance,
   dependencies: COSKernelDependencies<TGovernance>,
@@ -38,57 +42,78 @@ export async function bootCOSKernel<TGovernance = unknown>(
     }
   }
 
-  // Layer 2: tenant/task-scoped semantic knowledge before any model call.
   const contextFingerprint = JSON.stringify(payload.rawHistory.slice(-2))
-  const cacheHit = await dependencies.knowledge.lookupSemanticCache(
-    payload.taskId,
-    payload.rawUserPrompt,
-    contextFingerprint,
-  )
-  if (cacheHit) {
-    return {
-      status: 'completed' as const,
-      data: cacheHit.responsePayload,
-      governanceState,
-      source: 'semantic_cache' as const,
-      similarityScore: cacheHit.similarityScore,
-    }
-  }
 
-  // Layer 3: bound the history sent to reasoning/provider infrastructure.
-  const optimizedMessages = await dependencies.memory.processMemoryLayer(
-    payload.sessionId,
-    payload.rawHistory,
-    payload.existingSnapshot,
-  )
-  optimizedMessages.push({ role: 'user', content: payload.rawUserPrompt })
-
-  // Layers 4/5: vendor-neutral reasoning followed by the selected provider.
-  const reasoningResult = await processReasoningLayer(
-    {
-      taskId: payload.taskId,
-      messages: optimizedMessages,
-      availableTools: payload.availableTools,
-      requestedModel: payload.requestedModel,
-    },
-    governanceState,
-    {
-      selectCompute: dependencies.selectCompute,
-      executeProvider: dependencies.executeProvider,
-    },
-  )
-
-  // Only final, successfully resolved responses become reusable knowledge.
-  if (reasoningResult.status === 'completed') {
-    await dependencies.knowledge.commitToMemory(
+  const executeKnowledgeMemoryReasoning = async () => {
+    // Exact cache wraps this whole pipeline, so identical concurrent work does
+    // not even repeat embedding/vector lookup before provider execution.
+    const semanticHit = await dependencies.knowledge.lookupSemanticCache(
       payload.taskId,
       payload.rawUserPrompt,
       contextFingerprint,
-      reasoningResult.data,
     )
+    if (semanticHit) {
+      return {
+        status: 'completed' as const,
+        data: semanticHit.responsePayload,
+        governanceState,
+        source: 'semantic_cache' as const,
+        similarityScore: semanticHit.similarityScore,
+      }
+    }
+
+    const optimizedMessages = await dependencies.memory.processMemoryLayer(
+      payload.sessionId,
+      payload.rawHistory,
+      payload.existingSnapshot,
+    )
+    optimizedMessages.push({ role: 'user', content: payload.rawUserPrompt })
+
+    const reasoningResult = await processReasoningLayer(
+      {
+        taskId: payload.taskId,
+        messages: optimizedMessages,
+        availableTools: payload.availableTools,
+        requestedModel: payload.requestedModel,
+      },
+      governanceState,
+      {
+        selectCompute: dependencies.selectCompute,
+        executeProvider: dependencies.executeProvider,
+      },
+    )
+
+    if (reasoningResult.status === 'completed') {
+      await dependencies.knowledge.commitToMemory(
+        payload.taskId,
+        payload.rawUserPrompt,
+        contextFingerprint,
+        reasoningResult.data,
+      )
+    }
+
+    return { ...reasoningResult, source: 'reasoning' as const }
   }
 
-  return { ...reasoningResult, source: 'reasoning' as const }
+  if (!dependencies.exactCache) return executeKnowledgeMemoryReasoning()
+
+  // Layer 2a: cheapest reusable answer. Provider/model names are deliberately
+  // excluded: COS owns knowledge identity and providers remain replaceable.
+  const exactKey = createExactCacheKey({
+    taskId: payload.taskId,
+    prompt: payload.rawUserPrompt,
+    contextFingerprint,
+    policyVersion: payload.policyVersion,
+    knowledgeVersion: payload.knowledgeVersion,
+  })
+
+  const exactResult = await dependencies.exactCache.execute(exactKey, executeKnowledgeMemoryReasoning)
+  if (exactResult.source === 'executed') return exactResult.value
+
+  return {
+    ...exactResult.value,
+    source: exactResult.source,
+  }
 }
 
 export const pingBusinessRule: BusinessRule = (prompt) =>

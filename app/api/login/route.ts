@@ -8,9 +8,7 @@ export async function POST(req: Request) {
       success: true,
       message: "Login API working"
     });
-  } catch (err) {
-    console.error("Login API error", err);
-
+  } catch {
     return NextResponse.json(
       {
         success: false,

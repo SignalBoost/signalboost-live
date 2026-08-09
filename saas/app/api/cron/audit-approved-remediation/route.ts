@@ -2,9 +2,9 @@
 // governed remediation PR. This never approves a run; durable approval must
 // already exist in Supabase.
 //
-// IMPORTANT: once a run has produced a remediation branch/PR, cron must stop
-// touching it. Re-running the same approved run can create no-op Git commits,
-// which in turn trigger unnecessary Vercel preview deployments indefinitely.
+// SAFETY: scheduled recovery is disabled by default. It may be re-enabled only
+// with AUDIT_APPROVED_REMEDIATION_CRON_ENABLED=true after durable run-level
+// idempotency is available independently of audit log payload shape.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
@@ -18,11 +18,6 @@ function hasProducedRemediation(rows: any[]): boolean {
   return (rows || []).some((row) => {
     const payload = row?.payload
     if (!payload || payload.kind !== 'audit_batch_remediation') return false
-
-    // A branch, PR, or commit-worthy file change means this approved run has
-    // already been handed off to GitHub. Cron recovery is not allowed to keep
-    // replaying it. Partial remediation can be resumed explicitly by the
-    // governed recovery path rather than every scheduled cron invocation.
     return Boolean(
       payload.branch ||
       payload.prUrl ||
@@ -33,6 +28,14 @@ function hasProducedRemediation(rows: any[]): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  if (process.env.AUDIT_APPROVED_REMEDIATION_CRON_ENABLED !== 'true') {
+    return NextResponse.json({
+      ok: true,
+      recovered: false,
+      reason: 'Audit approved remediation cron is disabled by default.',
+    })
+  }
+
   const secret = process.env.CRON_SECRET
   const authorization = req.headers.get('authorization') || ''
   if (!secret || authorization !== `Bearer ${secret}`) {
@@ -51,9 +54,6 @@ export async function GET(req: NextRequest) {
   if (latest.error) return NextResponse.json({ ok: false, error: latest.error.message }, { status: 500 })
   if (!latest.data?.id) return NextResponse.json({ ok: true, recovered: false, reason: 'No approved audit run found.' })
 
-  // Idempotency guard: do not replay an approved run after it has already
-  // produced GitHub remediation work. This is the circuit breaker that stops
-  // repeated identical commits and Vercel preview builds.
   const priorLogs = await admin
     .from('audit_logs')
     .select('payload')

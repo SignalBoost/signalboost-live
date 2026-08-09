@@ -1,0 +1,22 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+
+const read = async (path: string) => readFile(new URL(path, import.meta.url), 'utf8')
+
+test('COS text gateway validates durable hits and provider output before caching', async () => {
+  const gateway = await read('../lib/cos/textGateway.ts')
+
+  assert.match(gateway, /cacheValidator/)
+  assert.match(gateway, /passesCacheValidation\(input, stored\.text\)/)
+  assert.match(gateway, /delete\(\)\.eq\('cache_key', key\)/)
+  assert.match(gateway, /text && db && passesCacheValidation\(input, text\)/)
+})
+
+test('generated-content translation validates segment structure before COS caches it', async () => {
+  const translation = await read('../lib/i18n/contentTranslation.ts')
+
+  assert.match(translation, /isValidTranslationResponse/)
+  assert.match(translation, /translatedRows\.length !== sourceSegments\.length/)
+  assert.match(translation, /cacheValidator: \(text\) => isValidTranslationResponse\(text, segments\)/)
+})

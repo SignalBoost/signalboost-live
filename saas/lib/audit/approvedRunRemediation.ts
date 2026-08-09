@@ -1,9 +1,12 @@
-// Apply an already owner-approved audit run through one governed GitHub PR.
-// The current deterministic engine handles exact i18n raw-text findings only;
-// unsupported findings are reported instead of guessed or marked as repaired.
+// saas/lib/audit/approvedRunRemediation.ts
+// Apply one durably owner-approved audit run through a governed GitHub PR.
+// Exact i18n raw-text findings use deterministic edits. Other code/security
+// findings use the isolated audit model, but are still constrained to the
+// audited file, validated before commit, and never write directly to main.
 
 import { commitFileToBranch, findBadImports, preservedFraction } from '@/lib/ai/tools/repoWriter'
 import { readRepoFile } from '@/lib/ai/tools/repoReader'
+import { callAuditModel } from '@/lib/audit/modelRouter'
 import { listRepoTree, parseRepoUrl, readRepoFileFrom } from '@/lib/audit/repoTarget'
 import { i18nRawStringPhrases } from '@/lib/audit/uxDetector'
 
@@ -11,6 +14,7 @@ const REPO = 'SignalBoost/signalboost-live'
 const BASE_BRANCH = 'main'
 const MAX_FINDINGS = 300
 const MAX_FILES = 60
+const MIN_PRESERVED_FRACTION = 0.5
 
 export type ApprovedRunRemediationResult = {
   kind: 'audit_batch_remediation'
@@ -64,7 +68,7 @@ function rawTextFromFinding(finding: AuditFinding): string {
   return quoted?.[1]?.trim() || ''
 }
 
-function isSupportedFinding(finding: AuditFinding): boolean {
+function isDeterministicFinding(finding: AuditFinding): boolean {
   return finding.category.toLowerCase() === 'i18n-raw-string' && Boolean(rawTextFromFinding(finding))
 }
 
@@ -72,65 +76,78 @@ function rawJsxTextPattern(text: string): RegExp {
   return new RegExp(`>\\s*${escapeRegExp(text)}\\s*<`, 'g')
 }
 
-function rawJsxTextPresent(content: string, text: string): boolean {
-  return rawJsxTextPattern(text).test(content)
-}
-
-// The authoritative "is this still a raw string?" test — asks the SAME i18n rule
-// that generated the finding whether it still flags the phrase in the file. This
-// is stronger than the exact >text< substring check: it stays true through
-// whitespace / adjacent-character drift, so a finding is only ever treated as
-// resolved when the detector agrees it is gone. That is what stops the loop where
-// a run reported "fixed" yet the next scan re-flagged the same text.
 function detectorFlagsPhrase(content: string, phrase: string): boolean {
-  if (!phrase) return false
-  return i18nRawStringPhrases(content).includes(phrase)
+  return Boolean(phrase) && i18nRawStringPhrases(content).includes(phrase)
 }
 
-function localizedImportFor(file: string): string {
-  return "import { LocalizedText } from '@/components/i18n/LocalizedText'"
-}
-
-function ensureLocalizedImport(file: string, content: string): string {
-  if (/import\s*\{\s*LocalizedText\s*\}\s*from\s*['"]@\/components\/i18n\/LocalizedText['"]/.test(content)) {
-    return content
-  }
-
-  const importLine = localizedImportFor(file)
+function ensureLocalizedImport(content: string): string {
+  if (/import\s*\{\s*LocalizedText\s*\}\s*from\s*['"]@\/components\/i18n\/LocalizedText['"]/.test(content)) return content
+  const importLine = "import { LocalizedText } from '@/components/i18n/LocalizedText'"
   const directive = content.match(/^(['"]use client['"];?\s*\n)/)
-  if (directive) {
-    const prefix = directive[1]
-    const rest = content.slice(prefix.length).replace(/^\n/, '')
-    return `${prefix}\n${importLine}\n\n${rest}`
-  }
-  return `${importLine}\n\n${content}`
+  if (!directive) return `${importLine}\n\n${content}`
+  const prefix = directive[1]
+  const rest = content.slice(prefix.length).replace(/^\n/, '')
+  return `${prefix}\n${importLine}\n\n${rest}`
 }
 
-function applyFinding(content: string, finding: AuditFinding): { content: string; applied: boolean; alreadyResolved: boolean; reason: string } {
-  if (!isSupportedFinding(finding)) {
-    return { content, applied: false, alreadyResolved: false, reason: 'Only exact i18n raw-text findings are supported by deterministic remediation.' }
-  }
-
+function applyDeterministicFinding(content: string, finding: AuditFinding) {
   const text = rawTextFromFinding(finding)
-
-  // "Resolved" must mean the detector no longer flags this phrase — not merely
-  // that an exact >text< substring is absent. The old exact-only check silently
-  // marked findings resolved whenever the on-disk text drifted from the stored
-  // phrase, so they were reported fixed while the next scan re-flagged them.
   if (!detectorFlagsPhrase(content, text)) {
     return { content, applied: false, alreadyResolved: true, reason: 'The i18n detector no longer flags this text on main.' }
   }
-
-  // The detector still flags it, but the exact JSX node could not be located for a
-  // safe deterministic replacement. Do NOT claim it resolved — leave it visible so
-  // the run reports partial ("completed with exceptions") instead of a false fix.
-  if (!rawJsxTextPresent(content, text)) {
+  const pattern = rawJsxTextPattern(text)
+  if (!pattern.test(content)) {
     return { content, applied: false, alreadyResolved: false, reason: 'Raw text is still flagged but could not be matched for a safe automatic fix.' }
   }
-
-  const replacement = `><LocalizedText fallback={${JSON.stringify(text)}} /><`
-  const next = content.replace(rawJsxTextPattern(text), replacement)
+  const next = ensureLocalizedImport(content.replace(rawJsxTextPattern(text), `><LocalizedText fallback={${JSON.stringify(text)}} /><`))
   return { content: next, applied: next !== content, alreadyResolved: false, reason: next === content ? 'The exact JSX node could not be replaced safely.' : '' }
+}
+
+function stripFences(value: string): string {
+  const trimmed = String(value || '').trim()
+  const fenced = trimmed.match(/```(?:typescript|tsx|ts|javascript|jsx|js)?\s*\n([\s\S]*?)```/i)
+  const body = fenced ? fenced[1] : trimmed
+  return body.endsWith('\n') ? body : `${body}\n`
+}
+
+function findingPrompt(file: string, content: string, findings: AuditFinding[]): string {
+  const findingText = findings.map((finding, index) => [
+    `${index + 1}. [${finding.severity}] ${finding.title}`,
+    `Category: ${finding.category}`,
+    finding.line ? `Reported line: ${finding.line}` : '',
+    `Problem: ${finding.detail}`,
+    `Recommendation: ${finding.recommendation}`,
+  ].filter(Boolean).join('\n')).join('\n\n')
+
+  return [
+    `Repair ONLY this repository file: ${file}`,
+    '',
+    'The owner has already approved remediation of the audit findings below.',
+    'Return the COMPLETE replacement file and nothing else. Do not use markdown fences.',
+    'Preserve existing behavior unless a finding requires changing it.',
+    'Do not add dependencies, weaken authentication/authorization, disable checks, add mocks, expose secrets, or edit unrelated code.',
+    'Prefer fail-closed security behavior. Preserve public endpoints only when the finding/recommendation permits public access.',
+    'If a recommendation requires trusted server-side state that is not available in this file, make the safest bounded improvement possible without inventing infrastructure.',
+    '',
+    'AUDIT FINDINGS',
+    findingText,
+    '',
+    'CURRENT FILE',
+    content,
+  ].join('\n')
+}
+
+async function applyModelFindings(file: string, content: string, findings: AuditFinding[]): Promise<{ content: string; applied: number; reason: string }> {
+  if (!findings.length) return { content, applied: 0, reason: '' }
+  const response = await callAuditModel({
+    prompt: findingPrompt(file, content, findings),
+    systemPrompt: 'You are the governed remediation stage of a security audit. Produce only the complete replacement source file requested. Make minimal, production-safe changes that address the supplied findings. Never bypass security controls or approval gates.',
+    maxTokens: 16384,
+  })
+  if (!response) return { content, applied: 0, reason: 'The audit remediation model returned no source.' }
+  const proposed = stripFences(response)
+  if (!proposed.trim() || proposed === content) return { content, applied: 0, reason: 'The audit remediation model produced no applicable change.' }
+  return { content: proposed, applied: findings.length, reason: '' }
 }
 
 function parseDependencies(content: string): Set<string> {
@@ -142,7 +159,7 @@ function parseDependencies(content: string): Set<string> {
   }
 }
 
-async function dependencySets(): Promise<{ root: Set<string>; saas: Set<string> }> {
+async function dependencySets() {
   const [root, saas] = await Promise.all([readRepoFile('package.json'), readRepoFile('saas/package.json')])
   return {
     root: root.ok && root.content ? parseDependencies(root.content) : new Set<string>(),
@@ -171,24 +188,14 @@ function normalizeFindings(rows: any[]): AuditFinding[] {
 
 function groupByFile(findings: AuditFinding[]): Map<string, AuditFinding[]> {
   const grouped = new Map<string, AuditFinding[]>()
-  for (const finding of findings) {
-    const list = grouped.get(finding.file) || []
-    list.push(finding)
-    grouped.set(finding.file, list)
-  }
+  for (const finding of findings) grouped.set(finding.file, [...(grouped.get(finding.file) || []), finding])
   return grouped
 }
 
 function existingRemediation(rows: any[]): ApprovedRunRemediationResult | null {
   for (const row of rows || []) {
     const payload = row?.payload
-    if (
-      payload?.kind === 'audit_batch_remediation' &&
-      payload?.approval === 'final' &&
-      payload?.ok === true &&
-      payload?.status !== 'partial' &&
-      payload?.lifecycleStatus !== 'partial'
-    ) {
+    if (payload?.kind === 'audit_batch_remediation' && payload?.approval === 'final' && payload?.ok === true && payload?.status !== 'partial' && payload?.lifecycleStatus !== 'partial') {
       return payload as ApprovedRunRemediationResult
     }
   }
@@ -214,59 +221,17 @@ async function github(path: string, init?: RequestInit): Promise<{ ok: boolean; 
       cache: 'no-store',
     })
     const data = await response.json().catch(() => ({}))
-    if (!response.ok) return { ok: false, data, error: String(data?.message || `GitHub HTTP ${response.status}`) }
-    return { ok: true, data, error: '' }
+    return response.ok ? { ok: true, data, error: '' } : { ok: false, data, error: String(data?.message || `GitHub HTTP ${response.status}`) }
   } catch (error) {
     return { ok: false, data: null, error: error instanceof Error ? error.message : 'GitHub request failed.' }
   }
 }
 
 async function updatePullRequest(prNumber: number, title: string, body: string) {
-  return github(`/repos/${REPO}/pulls/${prNumber}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ title, body }),
-  })
+  return github(`/repos/${REPO}/pulls/${prNumber}`, { method: 'PATCH', body: JSON.stringify({ title, body }) })
 }
 
-async function queueAutoMerge(prNumber: number): Promise<{ queued: boolean; error: string }> {
-  const token = githubToken()
-  if (!token) return { queued: false, error: 'GITHUB_WRITE_TOKEN is not configured.' }
-  const pr = await github(`/repos/${REPO}/pulls/${prNumber}`)
-  const nodeId = pr.ok ? String(pr.data?.node_id || '') : ''
-  if (!nodeId) return { queued: false, error: pr.error || 'Could not resolve the pull request node id.' }
-
-  try {
-    const response = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `mutation EnableAuditAutoMerge($pullRequestId: ID!) {
-          enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) {
-            pullRequest { number autoMergeRequest { enabledAt } }
-          }
-        }`,
-        variables: { pullRequestId: nodeId },
-      }),
-      cache: 'no-store',
-    })
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok || Array.isArray(data?.errors)) {
-      const error = Array.isArray(data?.errors)
-        ? data.errors.map((entry: any) => String(entry?.message || '')).filter(Boolean).join(' | ')
-        : `GitHub GraphQL HTTP ${response.status}`
-      return { queued: false, error: error || 'Automatic merge could not be enabled.' }
-    }
-    return { queued: true, error: '' }
-  } catch (error) {
-    return { queued: false, error: error instanceof Error ? error.message : 'Automatic merge could not be enabled.' }
-  }
-}
-
-export async function runApprovedAuditRemediation(params: {
-  admin: any
-  runId: string
-  actorUserId: string
-}): Promise<ApprovedRunRemediationResult> {
+export async function runApprovedAuditRemediation(params: { admin: any; runId: string; actorUserId: string }): Promise<ApprovedRunRemediationResult> {
   const { admin, runId, actorUserId } = params
   const empty: ApprovedRunRemediationResult = {
     kind: 'audit_batch_remediation', ok: false, approval: 'final', runId, status: 'failed', branch: '', prUrl: '', prNumber: 0,
@@ -289,12 +254,8 @@ export async function runApprovedAuditRemediation(params: {
   }
 
   const parsed = parseRepoUrl(String(runResult.data.prefix || ''))
-  if (parsed && parsed.repo.toLowerCase() !== REPO.toLowerCase()) {
-    return { ...empty, skipped: [{ file: '(target)', findingCount: 0, reason: `Automatic writes are connected only to ${REPO}.` }] }
-  }
-  if (parsed?.branch && parsed.branch !== BASE_BRANCH) {
-    return { ...empty, skipped: [{ file: '(target)', findingCount: 0, reason: `Automatic remediation supports only ${BASE_BRANCH}.` }] }
-  }
+  if (parsed && parsed.repo.toLowerCase() !== REPO.toLowerCase()) return { ...empty, skipped: [{ file: '(target)', findingCount: 0, reason: `Automatic writes are connected only to ${REPO}.` }] }
+  if (parsed?.branch && parsed.branch !== BASE_BRANCH) return { ...empty, skipped: [{ file: '(target)', findingCount: 0, reason: `Automatic remediation supports only ${BASE_BRANCH}.` }] }
 
   const findingsResult = await admin.from('audit_findings').select('id,file,severity,category,title,detail,recommendation,line').eq('run_id', runId)
   if (findingsResult.error) return { ...empty, skipped: [{ file: '(findings)', findingCount: 0, reason: findingsResult.error.message }] }
@@ -302,9 +263,7 @@ export async function runApprovedAuditRemediation(params: {
   const grouped = groupByFile(findings)
   empty.findingsTotal = findings.length
   if (!findings.length || !grouped.size) return { ...empty, skipped: [{ file: '(findings)', findingCount: 0, reason: 'This run has no actionable findings.' }] }
-  if (findings.length > MAX_FINDINGS || grouped.size > MAX_FILES) {
-    return { ...empty, skipped: [{ file: '(scope)', findingCount: findings.length, reason: `Batch exceeds ${MAX_FINDINGS} findings or ${MAX_FILES} files.` }] }
-  }
+  if (findings.length > MAX_FINDINGS || grouped.size > MAX_FILES) return { ...empty, skipped: [{ file: '(scope)', findingCount: findings.length, reason: `Batch exceeds ${MAX_FINDINGS} findings or ${MAX_FILES} files.` }] }
 
   const tree = await listRepoTree(REPO, BASE_BRANCH)
   if (!tree.ok) return { ...empty, skipped: [{ file: '(repository)', findingCount: findings.length, reason: tree.error || 'Could not read repository tree.' }] }
@@ -328,44 +287,49 @@ export async function runApprovedAuditRemediation(params: {
     let proposed = current.content
     let applied = 0
     let resolvedInFile = 0
-    const unsupported: string[] = []
-    for (const finding of fileFindings) {
-      const result = applyFinding(proposed, finding)
+    const deterministic = fileFindings.filter(isDeterministicFinding)
+    const modelFindings = fileFindings.filter(finding => !isDeterministicFinding(finding))
+
+    for (const finding of deterministic) {
+      const result = applyDeterministicFinding(proposed, finding)
       proposed = result.content
       if (result.applied) applied += 1
       else if (result.alreadyResolved) resolvedInFile += 1
-      else unsupported.push(result.reason)
+      else skipped.push({ file, findingCount: 1, reason: result.reason })
+    }
+
+    if (modelFindings.length) {
+      const model = await applyModelFindings(file, proposed, modelFindings)
+      proposed = model.content
+      applied += model.applied
+      if (!model.applied) skipped.push({ file, findingCount: modelFindings.length, reason: model.reason || 'Security remediation produced no safe change.' })
     }
 
     if (applied === 0) {
       alreadyResolved += resolvedInFile
-      skipped.push({ file, findingCount: fileFindings.length - resolvedInFile, reason: unsupported[0] || 'All findings are already resolved.' })
+      if (resolvedInFile === fileFindings.length) skipped.push({ file, findingCount: 0, reason: 'All findings are already resolved.' })
       continue
     }
 
-    proposed = ensureLocalizedImport(file, proposed)
     const badImports = findBadImports(proposed, file, paths, file.startsWith('saas/') ? deps.saas : deps.root)
     const kept = preservedFraction(current.content, proposed)
-    const unresolved = fileFindings.filter(isSupportedFinding).filter(finding => detectorFlagsPhrase(proposed, rawTextFromFinding(finding)))
-    if (badImports.length || kept < 0.5 || unresolved.length) {
+    const unresolvedI18n = deterministic.filter(finding => detectorFlagsPhrase(proposed, rawTextFromFinding(finding)))
+    if (badImports.length || kept < MIN_PRESERVED_FRACTION || unresolvedI18n.length) {
       skipped.push({
         file,
         findingCount: fileFindings.length,
-        reason: badImports.length ? `Invalid imports: ${badImports.join(', ')}.` : kept < 0.5 ? 'The generated edit changed too much of the file.' : 'One or more raw strings remained after repair.',
+        reason: badImports.length ? `Invalid imports: ${badImports.join(', ')}.` : kept < MIN_PRESERVED_FRACTION ? 'The generated edit changed too much of the file.' : 'One or more raw strings remained after repair.',
       })
       continue
     }
 
     alreadyResolved += resolvedInFile
-    if (unsupported.length) skipped.push({ file, findingCount: unsupported.length, reason: unsupported[0] })
     generated.push({ file, content: proposed.endsWith('\n') ? proposed : `${proposed}\n`, applied, alreadyResolved: resolvedInFile })
   }
 
   if (!generated.length) {
     const allResolved = alreadyResolved === findings.length
-    const payload: ApprovedRunRemediationResult = {
-      ...empty, ok: allResolved, status: allResolved ? 'already_resolved' : 'failed', findingsAlreadyResolved: alreadyResolved, skipped,
-    }
+    const payload: ApprovedRunRemediationResult = { ...empty, ok: allResolved, status: allResolved ? 'already_resolved' : 'failed', findingsAlreadyResolved: alreadyResolved, skipped }
     await admin.from('audit_logs').insert({ run_id: runId, user_id: actorUserId, payload })
     return payload
   }
@@ -376,12 +340,7 @@ export async function runApprovedAuditRemediation(params: {
   let prUrl = ''
   let branchName = branch
   for (const file of generated) {
-    const commit = await commitFileToBranch({
-      branch,
-      path: file.file,
-      content: file.content,
-      message: `AI audit remediation: approved run ${runId.slice(0, 8)}`,
-    })
+    const commit = await commitFileToBranch({ branch, path: file.file, content: file.content, message: `AI audit remediation: approved run ${runId.slice(0, 8)}` })
     if (!commit.ok) {
       skipped.push({ file: file.file, findingCount: file.applied, reason: commit.error || 'Commit was refused.' })
       continue
@@ -393,9 +352,7 @@ export async function runApprovedAuditRemediation(params: {
   }
 
   if (!committed.length || !prNumber || !prUrl) {
-    const payload: ApprovedRunRemediationResult = {
-      ...empty, branch: branchName, findingsAlreadyResolved: alreadyResolved, skipped,
-    }
+    const payload: ApprovedRunRemediationResult = { ...empty, branch: branchName, findingsAlreadyResolved: alreadyResolved, skipped }
     await admin.from('audit_logs').insert({ run_id: runId, user_id: actorUserId, payload })
     return payload
   }
@@ -411,15 +368,15 @@ export async function runApprovedAuditRemediation(params: {
     `- Files changed: **${changedFiles.length}**`,
     `- Findings skipped by safety rules: **${skipped.reduce((sum, item) => sum + item.findingCount, 0)}**`, '',
     '### Changed files', ...changedFiles.map(file => `- \`${file}\``), '',
-    'The owner already approved this run. Automatic merge is requested only after required repository checks pass.',
+    'The owner already approved this run. Required repository checks and the end-to-end controller still govern merge and finalization.',
   ].join('\n')
   await updatePullRequest(prNumber, `AI audit remediation — run ${runId.slice(0, 8)}`, prBody)
-  const autoMerge = { queued: false, error: 'Deferred to the end-to-end remediation controller.' }
+
   const isPartial = findingsApplied + alreadyResolved < findings.length
   const payload: ApprovedRunRemediationResult = {
     kind: 'audit_batch_remediation', ok: true, approval: 'final', runId,
-    status: isPartial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
-    branch: branchName, prUrl, prNumber, autoMergeQueued: autoMerge.queued, autoMergeError: autoMerge.error,
+    status: isPartial ? 'partial' : 'pr_ready',
+    branch: branchName, prUrl, prNumber, autoMergeQueued: false, autoMergeError: 'Deferred to the end-to-end remediation controller.',
     findingsTotal: findings.length, findingsApplied, findingsAlreadyResolved: alreadyResolved,
     filesChanged: committed.length, skipped, approvedAt: new Date().toISOString(),
   }

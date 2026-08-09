@@ -11,11 +11,11 @@
     },
     {
       "path": "/api/cron/cos-video-poll",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/cos-video-queue-recovery",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/cyber-dependency-monitor",
@@ -43,7 +43,7 @@
     },
     {
       "path": "/api/cron/cos-brand-video",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/cos-campaign-measure",
@@ -63,7 +63,7 @@
     },
     {
       "path": "/api/cron/cos-engineering-missions",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/cos-auto-publish-exact",
@@ -79,11 +79,11 @@
     },
     {
       "path": "/api/cron/prospect-campaign",
-      "schedule": "* * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/press-campaign",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/outreach-digest",

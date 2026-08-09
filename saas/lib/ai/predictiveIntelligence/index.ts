@@ -1,7 +1,8 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON } from '@/lib/ai/validation'
 import type { BusinessAnalyzerSummary, BusinessModelProfile, PredictiveNeeds } from '@/lib/outreach/types'
 
+const ai = createPlatformAiPort()
 const allowedNeeds = ['reviews', 'website_redesign', 'seasonal_promotions', 'retention_campaigns', 'social_consistency'] as const
 
 export async function predictBusinessNeeds(args: {
@@ -20,18 +21,10 @@ export async function predictBusinessNeeds(args: {
     hmi_summary: 'Predictions prioritize near-term, low-risk marketing improvements for a public-facing business.',
   }
 
-  const prompt = `Predict the likely next business growth needs from public analysis and a business-model profile. Return JSON:
-{
-  "likely_next_needs":[{"need":"reviews"|"website_redesign"|"seasonal_promotions"|"retention_campaigns"|"social_consistency","priority":"low"|"medium"|"high","reason":string,"suggested_asset":string}],
-  "next_best_action": string,
-  "risk_flags": string[],
-  "hmi_summary": string
-}
-Language: ${args.language || 'en'}
-Analysis: ${JSON.stringify(args.analysis)}
-Profile: ${JSON.stringify(args.profile)}`
+  const prompt = `Predict the likely next business growth needs from public analysis and a business-model profile. Return JSON:\n{\n  "likely_next_needs":[{"need":"reviews"|"website_redesign"|"seasonal_promotions"|"retention_campaigns"|"social_consistency","priority":"low"|"medium"|"high","reason":string,"suggested_asset":string}],\n  "next_best_action": string,\n  "risk_flags": string[],\n  "hmi_summary": string\n}\nLanguage: ${args.language || 'en'}\nAnalysis: ${JSON.stringify(args.analysis)}\nProfile: ${JSON.stringify(args.profile)}`
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 1400 })
+  let raw = ''
+  try { raw = await ai.generate({ modelPreference: 'openai', prompt, maxTokens: 1400 }) } catch {}
   const parsed = raw ? safeParseJSON(raw) : null
   const needs = Array.isArray(parsed?.likely_next_needs) ? parsed.likely_next_needs : fallback.likely_next_needs
 

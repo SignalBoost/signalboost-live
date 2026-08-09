@@ -17,6 +17,7 @@ export type COSKernelDependencies<TGovernance> = {
   exactCache?: ExactCacheLayer
   roiMetrics?: AIROIMetricsSink
   baselineProviderCostUsd?: number
+  onTelemetryError?: (error: unknown) => void
 }
 
 export async function bootCOSKernel<TGovernance = unknown>(payload: {
@@ -35,16 +36,21 @@ export async function bootCOSKernel<TGovernance = unknown>(payload: {
   const rawCharacters = payload.rawHistory.reduce((sum, message) => sum + message.content.length, 0) + payload.rawUserPrompt.length
 
   const recordROI = async (source: 'business_rule' | 'exact_cache' | 'in_flight' | 'semantic_cache' | 'reasoning', before = rawCharacters, after = rawCharacters) => {
-    await dependencies.roiMetrics?.record({
-      taskId: payload.taskId,
-      source,
-      providerCalls: source === 'reasoning' ? 1 : 0,
-      estimatedProviderCostUsd: source === 'reasoning' ? baselineCost : 0,
-      estimatedCostAvoidedUsd: estimateAvoidedCost(source, baselineCost),
-      promptCharactersBefore: before,
-      promptCharactersAfter: after,
-      latencyMs: Date.now() - startedAt,
-    })
+    if (!dependencies.roiMetrics) return
+    try {
+      await dependencies.roiMetrics.record({
+        taskId: payload.taskId,
+        source,
+        providerCalls: source === 'reasoning' ? 1 : 0,
+        estimatedProviderCostUsd: source === 'reasoning' ? baselineCost : 0,
+        estimatedCostAvoidedUsd: estimateAvoidedCost(source, baselineCost),
+        promptCharactersBefore: before,
+        promptCharactersAfter: after,
+        latencyMs: Date.now() - startedAt,
+      })
+    } catch (error) {
+      dependencies.onTelemetryError?.(error)
+    }
   }
 
   for (const rule of dependencies.businessRules ?? []) {

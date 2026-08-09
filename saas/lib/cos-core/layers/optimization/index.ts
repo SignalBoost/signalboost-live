@@ -6,15 +6,35 @@ export type CompressionResult = {
   charactersAfter: number
 }
 
+/**
+ * Lossless prompt compression only.
+ *
+ * COS must never mutate user/provider-visible content merely to save tokens.
+ * Instead, remove only byte-identical duplicate messages while preserving
+ * order and the exact content of every retained message. This safely removes
+ * repeated system/context injections without changing code, YAML, whitespace,
+ * fixed-width data, or exact-formatting requests.
+ */
 export function compressPromptContext(messages: ChatMessage[]): CompressionResult {
   const before = messages.reduce((sum, message) => sum + message.content.length, 0)
-  const compressed = messages.map((message) => ({
-    ...message,
-    content: message.content
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim(),
-  }))
+  const seenSystemMessages = new Set<string>()
+  const compressed: ChatMessage[] = []
+
+  for (const message of messages) {
+    const previous = compressed.at(-1)
+    if (previous && previous.role === message.role && previous.name === message.name && previous.content === message.content) {
+      continue
+    }
+
+    if (message.role === 'system') {
+      const identity = `${message.name ?? ''}\u0000${message.content}`
+      if (seenSystemMessages.has(identity)) continue
+      seenSystemMessages.add(identity)
+    }
+
+    compressed.push({ ...message })
+  }
+
   const after = compressed.reduce((sum, message) => sum + message.content.length, 0)
   return { messages: compressed, charactersBefore: before, charactersAfter: after }
 }

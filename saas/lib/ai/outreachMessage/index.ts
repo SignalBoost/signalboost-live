@@ -1,5 +1,5 @@
 // saas/lib/ai/outreachMessage/index.ts
-import { callModel } from '@/lib/ai/modelRouter'
+import { callCosText } from '@/lib/cos/textGateway'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import type { OutreachAssets } from '@/lib/outreach/types'
 
@@ -64,12 +64,6 @@ export async function generateOutreachMessage(args: {
   assets: Omit<OutreachAssets, 'outreach_message'>
   language?: string
   category?: OutreachCategory
-  // What is actually being sold. When absent this generator pitches the SignalBoost
-  // platform itself, which is its original purpose. When present it pitches THAT offer
-  // instead and returns an email only — no LinkedIn or social variants. Without this,
-  // manual discovery could produce exactly one kind of email regardless of the campaign
-  // it was started for: asking it to sell an incident-remediation product still yielded
-  // the affiliate-mall and site-builder preview.
   offer?: string
 }): Promise<string> {
   const analysis = args.assets.analyzer_summary
@@ -122,9 +116,13 @@ Return ONLY valid JSON, no markdown, in exactly this shape:
 }`
 
   const prompt = offer ? offerPrompt : platformPrompt
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1400 })
+  const raw = await callCosText({
+    taskId: offer ? 'outreach-offer-draft' : `outreach-platform-${category}`,
+    modelPreference: 'claude',
+    prompt,
+    maxTokens: 1400,
+  })
 
-  // Parse the model's JSON; fall back to the kit-based default set on any failure.
   let set: OutreachMessageSet = fallback
   if (raw) {
     try {
@@ -144,23 +142,7 @@ Return ONLY valid JSON, no markdown, in exactly this shape:
     }
   }
 
-  // Run the primary (email) message through the existing safety guardrail.
-  // If it blocks, fall back to the safe kit default for the email body only.
   const safe = assertSafeOutreachMessage(set.email)
   const emailBody = safe.ok ? set.email : fallback.email
-
-  // The pipeline stores a single string. Return a combined, structured text block
-  // containing all three messages so nothing is lost and the UI can show them.
-  // Offer mode is a single outbound email — the LinkedIn and social variants belong to
-  // the platform pitch and only confuse a campaign selling something else.
-  //
-  // This is now the ONLY shape returned. The generator still drafts the LinkedIn and
-  // social-DM variants — the model produces them in one pass and they cost nothing
-  // extra — but they are no longer written into the draft body. Nothing in the system
-  // ever sends a LinkedIn message or a DM, so those sections were dead text sitting
-  // inside an email draft: they padded the queue preview, leaked into the approval
-  // digest, and were mistaken for something the platform intended to send. An outreach
-  // draft is an email. If the other channels are ever wanted, they belong in their own
-  // fields, not concatenated into this one.
   return [`SUBJECT: ${set.email_subject}`, ``, emailBody].join('\n')
 }

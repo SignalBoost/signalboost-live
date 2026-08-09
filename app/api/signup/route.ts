@@ -22,34 +22,26 @@ function isValidPassword(password: unknown): password is string {
 }
 
 export async function POST(req: Request) {
-  // Reject oversized bodies early
-  const contentLength = req.headers.get("content-length");
-  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_LENGTH) {
-    return NextResponse.json(
-      { success: false, error: "Request body too large" },
-      { status: 413 }
-    );
-  }
-
-  let body: SignupBody;
   try {
-    const raw = await req.text();
-    if (raw.length > MAX_BODY_LENGTH) {
+    // Reject oversized bodies before parsing
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_LENGTH) {
       return NextResponse.json(
         { success: false, error: "Request body too large" },
         { status: 413 }
       );
     }
-    body = JSON.parse(raw) as SignupBody;
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 }
-    );
-  }
 
-  try {
-    // Validate required fields — allowlist only known fields
+    let body: SignupBody;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
     if (typeof body !== "object" || body === null || Array.isArray(body)) {
       return NextResponse.json(
         { success: false, error: "Invalid request body" },
@@ -73,14 +65,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Only safe, non-sensitive data is returned — never echo back passwords or tokens
+    // Only return non-sensitive confirmation data
     return NextResponse.json({
       success: true,
-      message: "Signup API working"
+      message: "Signup received"
     });
-  } catch {
-    // Log error server-side only; return generic message to client
-    console.error("Signup route unexpected error");
+  } catch (err: unknown) {
+    // Log server-side only; never expose internal error details to the client
+    console.error("Signup route unexpected error:", err);
     return NextResponse.json(
       { success: false, error: "An unexpected error occurred" },
       { status: 500 }

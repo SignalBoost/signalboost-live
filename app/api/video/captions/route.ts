@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { parseCaptionText } from '@/lib/video/captions'
 import type { JsonSafeVideoResponse, SupportedVideoLocale } from '@/lib/video/types'
 
-const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
-const MAX_CAPTION_TEXT_BYTES = 1 * 1024 * 1024
+const MAX_REQUEST_BODY_BYTES = 1024 * 1024
+const MAX_CAPTION_TEXT_BYTES = 512 * 1024
 const MAX_CAPTION_CUES = 5000
 
 class PayloadTooLargeError extends Error {}
@@ -14,15 +14,24 @@ function localeFromRequest(request: Request): SupportedVideoLocale {
 }
 
 function errorResponse(locale: SupportedVideoLocale, status: number, message: string) {
-  return NextResponse.json({
+  const body: JsonSafeVideoResponse<null> = {
     ok: false,
     data: null,
-    error: { message },
+    error: message,
     meta: { locale, generatedAt: new Date().toISOString() },
-  }, { status })
+  }
+  return NextResponse.json(body, { status })
 }
 
-async function readLimitedRequestBody(request: Request): Promise<Uint8Array> {
+function declaredRequestBodyTooLarge(request: Request): boolean {
+  const contentLength = request.headers.get('content-length')
+  if (!contentLength) return false
+
+  const parsed = Number(contentLength)
+  return Number.isFinite(parsed) && parsed > MAX_REQUEST_BODY_BYTES
+}
+
+async function readRequestBodyWithLimit(request: Request): Promise<Uint8Array> {
   const reader = request.body?.getReader()
   if (!reader) return new Uint8Array()
 
@@ -32,6 +41,8 @@ async function readLimitedRequestBody(request: Request): Promise<Uint8Array> {
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
+    if (!value) continue
+
     received += value.byteLength
     if (received > MAX_REQUEST_BODY_BYTES) {
       throw new PayloadTooLargeError('Request body is too large')
@@ -48,59 +59,76 @@ async function readLimitedRequestBody(request: Request): Promise<Uint8Array> {
   return body
 }
 
-function utf8ByteLength(value: string): number {
+function textByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength
 }
 
 export async function POST(request: Request) {
   const locale = localeFromRequest(request)
-  const contentLength = request.headers.get('content-length')
-  if (contentLength !== null) {
-    const parsedContentLength = Number(contentLength)
-    if (!Number.isFinite(parsedContentLength) || parsedContentLength < 0) {
-      return errorResponse(locale, 400, 'Invalid request body')
-    }
-    if (parsedContentLength > MAX_REQUEST_BODY_BYTES) {
-      return errorResponse(locale, 413, 'Request body is too large')
-    }
-  }
 
+  let formData: FormData
   try {
-    const requestBody = await readLimitedRequestBody(request)
-    const formRequest = new Request(request.url, {
+    if (declaredRequestBodyTooLarge(request)) {
+      throw new PayloadTooLargeError('Request body is too large')
+    }
+
+    const requestBody = await readRequestBodyWithLimit(request)
+    const headers = new Headers(request.headers)
+    headers.delete('content-length')
+
+    formData = await new Request(request.url, {
       method: request.method,
-      headers: request.headers,
+      headers,
       body: requestBody,
-    })
-    const formData = await formRequest.formData()
-    const file = formData.get('captions')
-
-    if (file instanceof File && file.size > MAX_CAPTION_TEXT_BYTES) {
-      return errorResponse(locale, 413, 'Caption payload is too large')
-    }
-
-    const raw = typeof file === 'string' ? file : file instanceof File ? await file.text() : String(formData.get('text') || '')
-    if (utf8ByteLength(raw) > MAX_CAPTION_TEXT_BYTES) {
-      return errorResponse(locale, 413, 'Caption payload is too large')
-    }
-
-    const cues = parseCaptionText(raw)
-    if (cues.length > MAX_CAPTION_CUES) {
-      return errorResponse(locale, 413, 'Too many caption cues')
-    }
-
-    const body: JsonSafeVideoResponse<{ cues: typeof cues; cueCount: number }> = {
-      ok: true,
-      data: { cues, cueCount: cues.length },
-      error: null,
-      meta: { locale, generatedAt: new Date().toISOString() },
-    }
-    return NextResponse.json(body)
+    }).formData()
   } catch (error) {
-    console.error('Failed to process captions upload', error)
     if (error instanceof PayloadTooLargeError) {
-      return errorResponse(locale, 413, 'Request body is too large')
+      return errorResponse(locale, 413, 'Caption upload is too large')
     }
-    return errorResponse(locale, 400, 'Invalid captions payload')
+
+    console.error('Failed to read captions form data', error)
+    return errorResponse(locale, 400, 'Invalid captions form data')
   }
+
+  let raw: string
+  try {
+    const file = formData.get('captions')
+    if (typeof file === 'string') {
+      raw = file
+    } else if (file instanceof File) {
+      if (file.size > MAX_CAPTION_TEXT_BYTES) {
+        return errorResponse(locale, 413, 'Caption input is too large')
+      }
+      raw = await file.text()
+    } else {
+      raw = String(formData.get('text') || '')
+    }
+  } catch (error) {
+    console.error('Failed to read captions input', error)
+    return errorResponse(locale, 400, 'Invalid captions input')
+  }
+
+  if (textByteLength(raw) > MAX_CAPTION_TEXT_BYTES) {
+    return errorResponse(locale, 413, 'Caption input is too large')
+  }
+
+  let cues: ReturnType<typeof parseCaptionText>
+  try {
+    cues = parseCaptionText(raw)
+  } catch (error) {
+    console.error('Failed to parse captions input', error)
+    return errorResponse(locale, 400, 'Invalid captions input')
+  }
+
+  if (cues.length > MAX_CAPTION_CUES) {
+    return errorResponse(locale, 413, 'Too many caption cues')
+  }
+
+  const body: JsonSafeVideoResponse<{ cues: typeof cues; cueCount: number }> = {
+    ok: true,
+    data: { cues, cueCount: cues.length },
+    error: null,
+    meta: { locale, generatedAt: new Date().toISOString() },
+  }
+  return NextResponse.json(body)
 }

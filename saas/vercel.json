@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run prebuild && next build",
+  "ignoreCommand": "if echo \"$VERCEL_GIT_COMMIT_REF\" | grep -q '^ai/audit-run-'; then echo 'Skipping automated audit remediation preview build'; exit 0; else exit 1; fi",
   "crons": [
     {
       "path": "/api/cron/opportunity-scan",

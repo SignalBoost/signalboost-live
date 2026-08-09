@@ -4,8 +4,8 @@ import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url)
   const code = requestUrl.searchParams.get('code')
-  const rawNext = requestUrl.searchParams.get('next')
-  const next = rawNext?.startsWith('/') && !rawNext.startsWith('//') && !rawNext.startsWith('/\\') ? rawNext : '/dashboard'
+  const nextParam = requestUrl.searchParams.get('next')
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/dashboard'
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=missing_code', requestUrl.origin))

@@ -18,7 +18,7 @@ export function isPlatformOperator(
     user.email_verified === true &&
       email &&
       ownerEmails.some(
-        ownerEmail => ownerEmail.trim().toLowerCase() === email,
+        ownerEmail => String(ownerEmail).trim().toLowerCase() === email,
       ),
   )
 }

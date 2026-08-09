@@ -574,15 +574,22 @@ async function runOneCompany(
   const at = () => new Date().toISOString()
   try {
     // Screen first. A failure here costs one page fetch instead of a generation.
-    const screen = await withTimeout(
+    const timedOut: ScreenOutcome = {
+      pass: false,
+      reason: 'Timed out while looking for a published email.',
+    }
+    const screen: ScreenOutcome = await withTimeout(
       screenCandidate(candidate),
       SCREEN_TIMEOUT_MS,
-      () => ({ pass: false, reason: 'Timed out while looking for a published email.' } as ScreenOutcome),
+      () => timedOut,
     )
 
-    if (!screen.pass) {
-      return { drafted: false, result: { name: candidate.name, url: candidate.url, outcome: 'skipped', detail: screen.reason, at: at() } }
+    if (screen.pass !== true) {
+      const detail = screen.reason
+      return { drafted: false, result: { name: candidate.name, url: candidate.url, outcome: 'skipped', detail, at: at() } }
     }
+
+    const contactEmail = screen.contactEmail
 
     const message = await withTimeout(draftMessageFor(job, candidate), DRAFT_TIMEOUT_MS, () => '')
     if (!message || message.length < 40) {
@@ -598,7 +605,7 @@ async function runOneCompany(
         businessName: candidate.name,
         businessUrl: candidate.url,
         message,
-        contactEmail: screen.contactEmail,
+        contactEmail,
         senderKey: 'saasSales',
         productKey: job.offer,
       }),

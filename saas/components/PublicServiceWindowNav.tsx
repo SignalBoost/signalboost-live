@@ -47,31 +47,31 @@ const COPY: Record<Lang, Copy> = {
     intro: uiText('generatedUi.u_2f7c176cdfe373ae'),
     gated: uiText('generatedUi.u_d20312bc8022b58e'),
     groups: { free: uiText('generatedUi.u_5c2bd9d1471acbd9'), growth: uiText('generatedUi.u_dcba31525bd63b56'), office: uiText('generatedUi.u_d8e45e5224a0e88d') },
-    items: { websiteOptimizer: uiText('generatedUi.u_7c0cbab9b791858b'), repoCheck: uiText('generatedUi.u_c59c2a7247b87f50'), agencyEngine: uiText('generatedUi.u_3f4206fe133b6473'), promoteBusiness: uiText('generatedUi.u_142c459ee190faea'), outreach: uiText('generatedUi.u_a5803fdf10e57e66'), calendar: uiText('generatedUi.u_d5d0a30b517e3bea'), spreadsheets: uiText('generatedUi.u_fdae6602c2bebdcc') },
+    items: { websiteOptimizer: uiText('generatedUi.u_7c0cbab9b791858b'), repoCheck: `${uiText('generatedUi.u_c59c2a7247b87f50')} / ${uiText('generatedUi.u_281ad82f2d803589')}`, agencyEngine: uiText('generatedUi.u_3f4206fe133b6473'), promoteBusiness: uiText('generatedUi.u_142c459ee190faea'), outreach: uiText('generatedUi.u_a5803fdf10e57e66'), calendar: uiText('generatedUi.u_d5d0a30b517e3bea'), spreadsheets: uiText('generatedUi.u_fdae6602c2bebdcc') },
   },
   es: {
     intro: 'Acceso rápido antes de registrarte',
     gated: 'más información',
     groups: { free: 'Herramientas gratis', growth: 'Marketing + Ventas', office: 'Oficina' },
-    items: { websiteOptimizer: 'Optimizador Web', repoCheck: 'Revisión de Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocionar negocio', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Hojas de cálculo' },
+    items: { websiteOptimizer: 'Optimizador Web', repoCheck: 'Repo / Auditoría', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocionar negocio', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Hojas de cálculo' },
   },
   pt: {
     intro: 'Acesso rápido antes de se cadastrar',
     gated: 'saiba mais',
     groups: { free: 'Ferramentas grátis', growth: 'Marketing + Vendas', office: 'Escritório' },
-    items: { websiteOptimizer: 'Otimizador de Site', repoCheck: 'Verificação de Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promover negócio', outreach: 'Outreach', calendar: 'Calendário', spreadsheets: 'Planilhas' },
+    items: { websiteOptimizer: 'Otimizador de Site', repoCheck: 'Repo / Auditoria', agencyEngine: 'Agency Engine', promoteBusiness: 'Promover negócio', outreach: 'Outreach', calendar: 'Calendário', spreadsheets: 'Planilhas' },
   },
   pl: {
     intro: 'Szybki dostęp przed rejestracją',
     gated: 'dowiedz się więcej',
     groups: { free: 'Darmowe narzędzia', growth: 'Marketing + Sprzedaż', office: 'Biuro' },
-    items: { websiteOptimizer: 'Optymalizator Strony', repoCheck: 'Test Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocja firmy', outreach: 'Outreach', calendar: 'Kalendarz', spreadsheets: 'Arkusze' },
+    items: { websiteOptimizer: 'Optymalizator Strony', repoCheck: 'Repo / Audyt', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocja firmy', outreach: 'Outreach', calendar: 'Kalendarz', spreadsheets: 'Arkusze' },
   },
   ru: {
     intro: 'Быстрый доступ перед регистрацией',
     gated: 'подробнее',
     groups: { free: 'Бесплатные инструменты', growth: 'Marketing + Sales', office: 'Офис' },
-    items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo Check', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
+    items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo / Аудит', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
   },
 }
 

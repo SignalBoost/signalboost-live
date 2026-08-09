@@ -19,11 +19,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
   }
 
-  const redirectUrl = new URL(next, requestUrl.origin)
-
-  if (redirectUrl.origin !== requestUrl.origin) {
-    return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
-  }
-
-  return NextResponse.redirect(redirectUrl)
+  return NextResponse.redirect(new URL(next, requestUrl.origin))
 }

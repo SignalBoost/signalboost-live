@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-const MAX_REQUEST_BODY_BYTES = 4096;
+const MAX_REQUEST_BODY_LENGTH = 2048;
 const MAX_BUSINESS_NAME_LENGTH = 100;
-const ALLOWED_BODY_KEYS = new Set(["businessName"]);
+const INVALID_REQUEST_ERROR = "Invalid request body.";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => {
@@ -23,43 +23,49 @@ function escapeHtml(value: string) {
   });
 }
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function invalidRequest() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: INVALID_REQUEST_ERROR
+    },
+    { status: 400 }
+  );
+}
+
+function requestTooLarge() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Request body too large."
+    },
+    { status: 413 }
+  );
 }
 
 export async function POST(req: Request) {
   try {
     const contentLength = req.headers.get("content-length");
 
-    if (contentLength) {
+    if (contentLength !== null) {
       const parsedContentLength = Number(contentLength);
 
       if (
         !Number.isFinite(parsedContentLength) ||
-        parsedContentLength < 0 ||
-        parsedContentLength > MAX_REQUEST_BODY_BYTES
+        parsedContentLength > MAX_REQUEST_BODY_LENGTH
       ) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Request body is too large."
-          },
-          { status: 413 }
-        );
+        return requestTooLarge();
       }
     }
 
     const rawBody = await req.text();
-    const rawBodyBytes = new TextEncoder().encode(rawBody).length;
 
-    if (rawBodyBytes > MAX_REQUEST_BODY_BYTES) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Request body is too large."
-        },
-        { status: 413 }
-      );
+    if (rawBody.length > MAX_REQUEST_BODY_LENGTH) {
+      return requestTooLarge();
     }
 
     let body: unknown;
@@ -67,67 +73,49 @@ export async function POST(req: Request) {
     try {
       body = JSON.parse(rawBody);
     } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body."
-        },
-        { status: 400 }
-      );
+      return invalidRequest();
     }
 
-    if (!isJsonObject(body)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body."
-        },
-        { status: 400 }
-      );
+    if (!isPlainObject(body)) {
+      return invalidRequest();
     }
 
-    if (Object.keys(body).some((key) => !ALLOWED_BODY_KEYS.has(key))) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body."
-        },
-        { status: 400 }
-      );
+    const keys = Object.keys(body);
+
+    if (keys.length !== 1 || keys[0] !== "businessName") {
+      return invalidRequest();
     }
+
+    const businessName = body.businessName;
 
     if (
-      body.businessName !== undefined &&
-      (typeof body.businessName !== "string" ||
-        body.businessName.length > MAX_BUSINESS_NAME_LENGTH)
+      typeof businessName !== "string" ||
+      businessName.length > MAX_BUSINESS_NAME_LENGTH ||
+      /[\u0000-\u001F\u007F]/.test(businessName)
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid businessName."
-        },
-        { status: 400 }
-      );
+      return invalidRequest();
     }
 
-    const businessName = escapeHtml(body.businessName || "Generated Website");
+    const escapedBusinessName = escapeHtml(
+      businessName.length > 0 ? businessName : "Generated Website"
+    );
 
     return NextResponse.json({
       success: true,
       html: `
         <section style="padding:40px;font-family:sans-serif">
-          <h1>${businessName}</h1>
+          <h1>${escapedBusinessName}</h1>
           <p>AI generated website preview.</p>
         </section>
       `
     });
-  } catch (err) {
-    console.error("Failed to generate website", err);
+  } catch (err: unknown) {
+    console.error("Failed to generate website preview", err);
 
     return NextResponse.json(
       {
         success: false,
-        error: "An unexpected error occurred."
+        error: "Unable to generate website."
       },
       { status: 500 }
     );

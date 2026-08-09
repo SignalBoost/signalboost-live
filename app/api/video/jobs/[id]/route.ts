@@ -1,29 +1,28 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { resolve, sep } from 'node:path'
+import { isAbsolute, relative, resolve } from 'node:path'
 import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import type { JsonSafeVideoResponse } from '@/lib/video/types'
 
-const SAFE_VIDEO_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const VIDEO_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_RESULT_FILE_BYTES = 1024 * 1024
 const VIDEO_JOB_COLUMNS = 'id,status,result_url'
 
-function createMeta() {
+function meta() {
   return { locale: 'en', generatedAt: new Date().toISOString() }
 }
 
-function errorResponse(error: string, status: number) {
-  return NextResponse.json({ ok: false, data: null, error, meta: createMeta() }, { status })
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+function isPathInsideDirectory(directory: string, filePath: string) {
+  const relativePath = relative(directory, filePath)
+  return relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath)
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!SAFE_VIDEO_JOB_ID_PATTERN.test(id)) {
-    return errorResponse('Invalid video job id', 400)
+
+  if (!VIDEO_JOB_ID_PATTERN.test(id)) {
+    const body: JsonSafeVideoResponse<null> = { ok: false, data: null, error: 'Invalid video job id', meta: meta() }
+    return NextResponse.json(body, { status: 400 })
   }
 
   let data: any = null
@@ -35,37 +34,32 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!data) {
     const queueDir = resolve(process.cwd(), '.video-queue')
     const resultPath = resolve(queueDir, `${id}.result.json`)
-    const queueDirWithSeparator = queueDir.endsWith(sep) ? queueDir : `${queueDir}${sep}`
 
-    if (!resultPath.startsWith(queueDirWithSeparator)) {
-      return errorResponse('Invalid video job id', 400)
+    if (!isPathInsideDirectory(queueDir, resultPath)) {
+      const body: JsonSafeVideoResponse<null> = { ok: false, data: null, error: 'Invalid video job id', meta: meta() }
+      return NextResponse.json(body, { status: 400 })
     }
 
     if (existsSync(resultPath)) {
       try {
         const stats = statSync(resultPath)
         if (!stats.isFile() || stats.size > MAX_RESULT_FILE_BYTES) {
-          return errorResponse('Invalid video job result', 500)
+          throw new Error('Invalid video result file')
         }
 
-        const resultContent = readFileSync(resultPath, 'utf8')
-        if (Buffer.byteLength(resultContent, 'utf8') > MAX_RESULT_FILE_BYTES) {
-          return errorResponse('Invalid video job result', 500)
+        const parsed = JSON.parse(readFileSync(resultPath, 'utf8'))
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Invalid video result data')
         }
-
-        const parsed = JSON.parse(resultContent)
-        if (!isObjectRecord(parsed)) {
-          return errorResponse('Invalid video job result', 500)
-        }
-
         data = parsed
       } catch {
-        return errorResponse('Invalid video job result', 500)
+        const body: JsonSafeVideoResponse<null> = { ok: false, data: null, error: 'Invalid video result', meta: meta() }
+        return NextResponse.json(body, { status: 500 })
       }
     } else {
       data = { id, status: 'queued', result_url: null }
     }
   }
-  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: createMeta() }
+  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: meta() }
   return NextResponse.json(body)
 }

@@ -4,43 +4,23 @@ import { persistVideoUpload } from '@/lib/video/storage'
 import { calculateVideoQuota } from '@/lib/video/subscription'
 import type { JsonSafeVideoResponse, SupportedVideoLocale } from '@/lib/video/types'
 
-const MAX_UPLOAD_BYTES = 500 * 1024 * 1024
+const MAX_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024
+const MAX_MULTIPART_BODY_BYTES = MAX_VIDEO_UPLOAD_BYTES + 10 * 1024 * 1024
+const MAX_DATABASE_INTEGER = 2147483647
 const ALLOWED_VIDEO_MIME_TYPES = new Set([
   'video/mp4',
   'video/webm',
   'video/quicktime',
   'video/x-m4v',
-  'video/ogg',
   'video/x-msvideo',
+  'video/mpeg',
+  'video/ogg',
   'video/x-matroska',
 ])
-const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg', '.avi', '.mkv']
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['mp4', 'm4v', 'mov', 'webm', 'avi', 'mpeg', 'mpg', 'ogv', 'mkv'])
 
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) { return NextResponse.json(body, { status }) }
 function locale(value: FormDataEntryValue | null): SupportedVideoLocale { return ['en','es','pt','pl','ru'].includes(String(value)) ? String(value) as SupportedVideoLocale : 'en' }
-function errorResponse(message: string, status: number, lang: SupportedVideoLocale = 'en') {
-  return json({ ok: false, data: null, error: message, meta: { locale: lang, generatedAt: new Date().toISOString() } }, status)
-}
-function parseNonNegativeFiniteNumber(value: FormDataEntryValue | null, fallback = 0) {
-  if (value === null || value === '') return fallback
-  const numeric = Number(value)
-  return Number.isFinite(numeric) && numeric >= 0 && numeric <= Number.MAX_SAFE_INTEGER ? numeric : null
-}
-function hasAllowedVideoExtension(file: File) {
-  const name = (file.name || '').toLowerCase()
-  return ALLOWED_VIDEO_EXTENSIONS.some((extension) => name.endsWith(extension))
-}
-async function hasAllowedVideoSignature(file: File) {
-  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer())
-  const ascii = String.fromCharCode(...header)
-
-  return (
-    (header.length >= 12 && ascii.slice(4, 8) === 'ftyp') ||
-    (header.length >= 4 && header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3) ||
-    (header.length >= 4 && ascii.slice(0, 4) === 'OggS') ||
-    (header.length >= 12 && ascii.slice(0, 4) === 'RIFF' && ascii.slice(8, 11) === 'AVI')
-  )
-}
 
 async function resolveAccountId(supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>, userId: string) {
   const { data, error } = await supabase
@@ -54,78 +34,114 @@ async function resolveAccountId(supabase: Awaited<ReturnType<typeof createMarket
   return data?.id ?? null
 }
 
+function matchesAscii(header: Uint8Array, offset: number, value: string) {
+  if (header.length < offset + value.length) return false
+  for (let index = 0; index < value.length; index += 1) {
+    if (header[offset + index] !== value.charCodeAt(index)) return false
+  }
+  return true
+}
+
+async function hasAllowedVideoSignature(file: File) {
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer())
+  const isIsoBaseMedia = matchesAscii(header, 4, 'ftyp')
+  const isWebmOrMatroska = header.length >= 4 && header[0] === 0x1a && header[1] === 0x45 && header[2] === 0xdf && header[3] === 0xa3
+  const isAvi = matchesAscii(header, 0, 'RIFF') && matchesAscii(header, 8, 'AVI')
+  const isMpeg = header.length >= 4 && header[0] === 0x00 && header[1] === 0x00 && header[2] === 0x01 && (header[3] === 0xba || header[3] === 0xb3)
+  const isOgg = matchesAscii(header, 0, 'OggS')
+  return isIsoBaseMedia || isWebmOrMatroska || isAvi || isMpeg || isOgg
+}
+
+function extension(filename: string) {
+  const normalized = filename.toLowerCase()
+  const dot = normalized.lastIndexOf('.')
+  return dot >= 0 ? normalized.slice(dot + 1) : ''
+}
+
+async function validateVideoFile(file: File) {
+  if (file.size <= 0) return 'The video file is empty.'
+  if (file.size > MAX_VIDEO_UPLOAD_BYTES) return 'The video file is too large.'
+
+  const mimeType = file.type.split(';')[0].trim().toLowerCase()
+  if (!ALLOWED_VIDEO_MIME_TYPES.has(mimeType)) return 'Unsupported video file type.'
+  if (!ALLOWED_VIDEO_EXTENSIONS.has(extension(file.name))) return 'Unsupported video file extension.'
+  if (!(await hasAllowedVideoSignature(file))) return 'Unsupported or invalid video file.'
+
+  return null
+}
+
+function parseNonNegativeFiniteNumber(value: FormDataEntryValue | null) {
+  if (value === null || value === '') return 0
+  if (value instanceof File) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
 export async function POST(request: Request) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return errorResponse('Authentication service is unavailable.', 503)
+    return json({ ok: false, data: null, error: 'Video upload authentication is unavailable.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 503)
   }
 
   const supabase = await createMarketingServerSupabase()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    return errorResponse('Authentication is required.', 401)
+    return json({ ok: false, data: null, error: 'Authentication is required to upload videos.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 401)
   }
 
   let accountId: string | null
   try {
     accountId = await resolveAccountId(supabase, user.id)
   } catch {
-    return errorResponse('Unable to verify upload permissions.', 500)
+    return json({ ok: false, data: null, error: 'Unable to verify upload authorization.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 500)
   }
   if (!accountId) {
-    return errorResponse('Upload permissions could not be verified.', 403)
+    return json({ ok: false, data: null, error: 'No authorized account is available for video uploads.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 403)
   }
 
   const contentLengthHeader = request.headers.get('content-length')
   if (!contentLengthHeader) {
-    return errorResponse('Content-Length is required.', 411)
+    return json({ ok: false, data: null, error: 'Content-Length is required for video uploads.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 411)
   }
   const contentLength = Number(contentLengthHeader)
-  if (!Number.isFinite(contentLength) || contentLength <= 0) {
-    return errorResponse('Invalid Content-Length.', 400)
+  if (!Number.isFinite(contentLength) || contentLength < 0) {
+    return json({ ok: false, data: null, error: 'Invalid Content-Length header.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 400)
   }
-  if (contentLength > MAX_UPLOAD_BYTES) {
-    return errorResponse('The uploaded video is too large.', 413)
+  if (contentLength > MAX_MULTIPART_BODY_BYTES) {
+    return json({ ok: false, data: null, error: 'The upload request is too large.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 413)
   }
 
   let form: FormData
   try {
     form = await request.formData()
   } catch {
-    return errorResponse('Invalid upload form data.', 400)
+    return json({ ok: false, data: null, error: 'Invalid upload form data.', meta: { locale: 'en', generatedAt: new Date().toISOString() } }, 400)
   }
 
   const lang = locale(form.get('locale'))
   const video = form.get('video')
   if (!(video instanceof File)) {
-    return errorResponse('A video file is required.', 400, lang)
+    return json({ ok: false, data: null, error: 'A video file is required.', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 400)
   }
-  if (video.size <= 0) {
-    return errorResponse('The uploaded video is empty.', 400, lang)
-  }
-  if (video.size > MAX_UPLOAD_BYTES) {
-    return errorResponse('The uploaded video is too large.', 413, lang)
-  }
-  const videoMimeType = video.type.toLowerCase().split(';')[0].trim()
-  if (!ALLOWED_VIDEO_MIME_TYPES.has(videoMimeType) || !hasAllowedVideoExtension(video)) {
-    return errorResponse('Unsupported video file type.', 400, lang)
-  }
-  if (!(await hasAllowedVideoSignature(video))) {
-    return errorResponse('Invalid video file content.', 400, lang)
+
+  const videoValidationError = await validateVideoFile(video)
+  if (videoValidationError) {
+    return json({ ok: false, data: null, error: videoValidationError, meta: { locale: lang, generatedAt: new Date().toISOString() } }, 400)
   }
 
   const durationSec = parseNonNegativeFiniteNumber(form.get('durationSec'))
-  const existingUsedMinutes = parseNonNegativeFiniteNumber(form.get('usedMinutes'))
-  if (durationSec === null || existingUsedMinutes === null) {
-    return errorResponse('Invalid upload metadata.', 400, lang)
+  if (durationSec === null || durationSec > MAX_DATABASE_INTEGER) {
+    return json({ ok: false, data: null, error: 'Invalid video duration.', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 400)
   }
-  const additionalMinutes = Math.ceil(durationSec / 60)
-  if (existingUsedMinutes > Number.MAX_SAFE_INTEGER - additionalMinutes) {
-    return errorResponse('Invalid upload metadata.', 400, lang)
+
+  const usedMinutesInput = parseNonNegativeFiniteNumber(form.get('usedMinutes'))
+  const uploadedMinutes = Math.ceil(durationSec / 60)
+  if (usedMinutesInput === null || usedMinutesInput > Number.MAX_SAFE_INTEGER - uploadedMinutes) {
+    return json({ ok: false, data: null, error: 'Invalid usage metadata.', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 400)
   }
 
   const persisted = await persistVideoUpload(video)
   const tier = String(form.get('tier') || 'free')
-  const usedMinutes = existingUsedMinutes + additionalMinutes
+  const usedMinutes = usedMinutesInput + uploadedMinutes
   const quota = calculateVideoQuota(tier, usedMinutes, String(form.get('billingProvider') || 'stripe') === 'paypal' ? 'paypal' : 'stripe')
 
   const { error: insertError } = await supabase.from('video_storage').insert({
@@ -139,7 +155,7 @@ export async function POST(request: Request) {
     transcoded: false,
   })
   if (insertError) {
-    return errorResponse('Unable to save uploaded video metadata.', 500, lang)
+    return json({ ok: false, data: null, error: 'Unable to save video metadata.', meta: { locale: lang, generatedAt: new Date().toISOString() } }, 500)
   }
 
   return json({

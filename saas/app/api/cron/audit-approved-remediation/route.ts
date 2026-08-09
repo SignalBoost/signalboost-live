@@ -4,11 +4,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
+import { recordApprovedRemediationHeartbeat } from '@/lib/audit/remediationHeartbeat'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300
+export const maxDuration = 800
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -38,10 +39,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, recovered: false, runId: latest.data.id, reason: 'The latest approved run has no durable approval record.' })
   }
 
+  const actorUserId = String(approval.data.approved_by)
+  await recordApprovedRemediationHeartbeat({
+    admin,
+    runId: latest.data.id,
+    actorUserId,
+    lifecycleStatus: 'preparing',
+  })
+
   const remediation = await runApprovedAuditRemediationWithRetry({
     admin,
     runId: latest.data.id,
-    actorUserId: String(approval.data.approved_by),
+    actorUserId,
   })
 
   return NextResponse.json({

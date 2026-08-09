@@ -1,4 +1,4 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { callCosText } from '@/lib/cos/textGateway'
 import { safeParseJSON } from '@/lib/ai/validation'
 import { sanitizePublicText, sanitizeUrl } from '@/lib/ai/guardrails'
 import type { BusinessAnalyzerSummary } from '@/lib/outreach/types'
@@ -77,7 +77,7 @@ ${publicText || '(No public text extracted; use URL and conservative defaults.)'
 
 Security rules: public data only; no sensitive data; no personal profiling.`
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1800 })
+  const raw = await callCosText({ taskId: 'business-analysis', modelPreference: 'claude', prompt, maxTokens: 1800 })
   const parsed = raw ? safeParseJSON(raw) : null
 
   return {

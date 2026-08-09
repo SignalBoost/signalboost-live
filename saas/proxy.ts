@@ -4,6 +4,10 @@ import { createServerClient } from '@supabase/ssr'
 
 const OPERATOR_PATH = '/dashboard/operator'
 const BLOCKED_ERROR = 'AI execution globally disabled by administrator override.'
+const RATE_WINDOW_MS = 10 * 60_000
+const ANONYMOUS_MAX = 8
+
+const buckets = new Map<string, { count: number; resetAt: number }>()
 
 // Owner-only access to the AI Website Operator.
 // Set OPERATOR_OWNER_EMAILS in the environment (comma-separated) to control who has access,
@@ -21,7 +25,27 @@ export async function proxy(req: NextRequest) {
     return NextResponse.json({ error: BLOCKED_ERROR }, { status: 503 })
   }
 
-  // Only guard the operator path beyond autonomous API ingress.
+  // Preserve the former middleware.ts anonymous spend gate inside the single
+  // Next.js 16 proxy entrypoint. Signed-in users continue to use the existing
+  // plan/credit gates inside the routes themselves.
+  if (isPublicModelIngress(pathname) && req.method === 'POST' && !hasSessionCookie(req)) {
+    if (overLimit(`anonymous-concierge:${clientIpKey(req)}`)) {
+      const language = languageFrom(req)
+      return NextResponse.json(
+        {
+          reply: limitReply(language),
+          source: 'anonymous-preview-limit',
+          rate_limited: true,
+          sign_in_required: true,
+          execution_allowed: false,
+          external_action_taken: false,
+        },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(RATE_WINDOW_MS / 1000)) } },
+      )
+    }
+  }
+
+  // Only guard the operator path beyond autonomous API ingress and the public spend gate.
   if (!pathname.startsWith(OPERATOR_PATH)) {
     return NextResponse.next()
   }
@@ -64,6 +88,60 @@ function isAutonomousIngress(pathname: string) {
     || pathname === '/api/stripe/webhook'
     || pathname.startsWith('/api/autonomous-supervisor/')
     || pathname.startsWith('/api/internal/supervisor/')
+}
+
+function isPublicModelIngress(pathname: string) {
+  return pathname === '/api/concierge' || pathname === '/api/support'
+}
+
+function hasSessionCookie(req: NextRequest): boolean {
+  for (const cookie of req.cookies.getAll()) {
+    if (/^sb-.+-auth-token(\.\d+)?$/.test(cookie.name)) return true
+  }
+  return false
+}
+
+function clientIpKey(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for') || ''
+  const first = forwarded.split(',')[0]?.trim()
+  return first || req.headers.get('x-real-ip') || 'unknown'
+}
+
+function overLimit(key: string): boolean {
+  const now = Date.now()
+  const existing = buckets.get(key)
+
+  if (!existing || existing.resetAt <= now) {
+    buckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS })
+    return false
+  }
+
+  existing.count += 1
+
+  if (existing.count % 50 === 0 || buckets.size > 5000) {
+    for (const [bucketKey, bucket] of buckets) {
+      if (bucket.resetAt <= now) buckets.delete(bucketKey)
+    }
+  }
+
+  return existing.count > ANONYMOUS_MAX
+}
+
+function languageFrom(req: NextRequest): string {
+  const stored = req.cookies.get('sb_locale')?.value || ''
+  const normalized = stored.toLowerCase().slice(0, 2)
+  return ['en', 'es', 'pt', 'pl', 'ru'].includes(normalized) ? normalized : 'en'
+}
+
+function limitReply(language: string): string {
+  const messages: Record<string, string> = {
+    en: 'You have reached the free preview limit for this assistant. Sign in to keep going — your account has a much higher allowance, and the conversation continues from here.',
+    es: 'Ha alcanzado el límite de vista previa gratuita de este asistente. Inicie sesión para continuar: su cuenta tiene un límite mucho mayor y la conversación continúa desde aquí.',
+    pt: 'Você atingiu o limite da prévia gratuita deste assistente. Entre na sua conta para continuar: sua conta tem um limite muito maior e a conversa segue a partir daqui.',
+    pl: 'Osiągnięto limit bezpłatnego podglądu tego asystenta. Zaloguj się, aby kontynuować — Twoje konto ma znacznie wyższy limit, a rozmowa jest kontynuowana od tego miejsca.',
+    ru: 'Достигнут лимит бесплатного предпросмотра этого ассистента. Войдите в аккаунт, чтобы продолжить: там лимит значительно выше, а разговор продолжится с этого места.',
+  }
+  return messages[language] || messages.en
 }
 
 async function autonomousExecutionIsEnabled() {

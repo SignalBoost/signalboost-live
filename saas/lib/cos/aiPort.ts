@@ -1,11 +1,11 @@
 // saas/lib/cos/aiPort.ts
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
-import { callModel } from '@/lib/ai/modelRouter'
+import { callModel, type ModelProvider } from '@/lib/ai/modelRouter'
 import { callCosText } from '@/lib/cos/textGateway'
 
 export interface CosAiPort {
-  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number }): Promise<string>
+  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
 }
 
 function requireText(result: string | null, provider: string): string {

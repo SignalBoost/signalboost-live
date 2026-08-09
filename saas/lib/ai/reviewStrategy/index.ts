@@ -1,4 +1,4 @@
-import { callModel } from '@/lib/ai/modelRouter'
+import { callCosText } from '@/lib/cos/textGateway'
 import { safeParseJSON } from '@/lib/ai/validation'
 import type { BusinessAnalyzerSummary, ReviewStrategy } from '@/lib/outreach/types'
 
@@ -22,7 +22,7 @@ export async function generateReviewStrategy(args: {
 Language: ${args.language || 'en'}
 Analysis: ${JSON.stringify(args.analysis)}`
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 1200 })
+  const raw = await callCosText({ taskId: 'review-strategy', modelPreference: 'claude', prompt, maxTokens: 1200 })
   const parsed = raw ? safeParseJSON(raw) : null
   return {
     request_templates: Array.isArray(parsed?.request_templates) ? parsed.request_templates.map(String).slice(0, 5) : fallback.request_templates,

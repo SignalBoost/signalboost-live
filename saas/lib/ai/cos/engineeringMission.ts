@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
-import { callModel } from '@/lib/ai/modelRouter'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch } from '@/lib/ai/tools/repoWriter'
 import { runAudit } from '@/lib/audit/runner'
 import { verifyEngineeringCommit } from './engineeringVerification'
 
+const ai = createPlatformAiPort()
 const TABLE = 'cos_autonomy_state'
 const PREFIX = 'owner-engineering:'
 const DEFAULT_MAX_ITERATIONS = 20
@@ -239,7 +240,7 @@ async function chooseAction(row: EngineeringMissionRow): Promise<BrainAction | n
     },
   })
 
-  return parseAction(await callModel({
+  return parseAction(await ai.generate({
     systemPrompt: [
       'You are COS autonomous senior infrastructure/software engineer.',
       'Own the mission until it is verifiably resolved; do not behave like a consultant.',
@@ -406,8 +407,6 @@ export async function processOwnerEngineeringMissionTick(input: {
         } else if (verified.state === 'error' && /token is not configured/i.test(verified.summary)) {
           state = { ...state, stage: 'BLOCKED_MISSING_CREDENTIAL', blockedReason: verified.summary }
         } else {
-          // Pending/missing checks are an external state, not mission completion and not
-          // an engineering failure. Persist VERIFYING and let the next cron tick re-check.
           row = await saveMission(row, state)
           break
         }

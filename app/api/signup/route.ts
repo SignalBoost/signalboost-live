@@ -9,14 +9,14 @@ export async function POST(req: Request) {
       message: "Signup API working"
     });
   } catch (err: unknown) {
-    console.error("Signup API error", err);
+    console.error("Signup API error:", err);
 
     const isMalformedJson = err instanceof SyntaxError;
 
     return NextResponse.json(
       {
         success: false,
-        error: isMalformedJson ? "Invalid JSON payload" : "An unexpected error occurred"
+        error: isMalformedJson ? "Malformed JSON request body" : "Internal server error"
       },
       { status: isMalformedJson ? 400 : 500 }
     );

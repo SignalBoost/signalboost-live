@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ExactCacheLayer } from '../layers/exact-cache'
-import { KnowledgeLayer, type EmbeddingGenerator } from '../layers/knowledge'
+import { KnowledgeGraph, KnowledgeLayer, type EmbeddingGenerator } from '../layers/knowledge'
 import { LearningEngine } from '../layers/learning'
 import { MemoryLayer, withContextSummaryCache, type MemoryCompactor } from '../layers/memory'
 import { cosServiceDb, createSupabaseCOSStores } from './supabase'
@@ -19,8 +19,8 @@ export type PersistentCOSRuntimeOptions = {
 
 /**
  * Production composition root for Phase 2 intelligence.
- * All reusable knowledge, summaries, learning observations, exact results and
- * ROI telemetry share the same durable COS-owned database boundary.
+ * All reusable knowledge, graph facts, summaries, learning observations, exact
+ * results and ROI telemetry share the same durable COS-owned database boundary.
  */
 export function createPersistentCOSRuntime(options: PersistentCOSRuntimeOptions) {
   const db = options.db === undefined ? cosServiceDb() : options.db
@@ -44,6 +44,7 @@ export function createPersistentCOSRuntime(options: PersistentCOSRuntimeOptions)
 
   return {
     knowledge,
+    knowledgeGraph: new KnowledgeGraph(stores.knowledge),
     learning: new LearningEngine(stores.learning),
     memory: new MemoryLayer(
       compactMemory,

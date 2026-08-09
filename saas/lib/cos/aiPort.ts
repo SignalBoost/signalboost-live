@@ -11,6 +11,7 @@ export interface CosAiPort {
     maxTokens?: number
     modelPreference?: ModelProvider
     cacheValidator?: (text: string) => boolean
+    taskId?: string
   }): Promise<string>
 }
 
@@ -22,14 +23,14 @@ function requireText(result: string | null, provider: string): string {
 // SignalBoost host: all normal COS text generation enters the shared reuse gateway.
 export function createPlatformAiPort(): CosAiPort {
   return {
-    generate: async (input) => requireText(await callCosText({ ...input, taskId: 'cos-portable-text' }), 'platform'),
+    generate: async (input) => requireText(await callCosText({ ...input, taskId: input.taskId ?? 'cos-portable-text' }), 'platform'),
   }
 }
 
 // Private appliance remains explicitly local/fail-closed according to environment policy.
 export function createLocalApplianceAiPort(): CosAiPort {
   return {
-    generate: async ({ cacheValidator: _cacheValidator, ...input }) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+    generate: async ({ cacheValidator: _cacheValidator, taskId: _taskId, ...input }) => requireText(await callModel({ ...input, modelPreference: 'local' }), 'local appliance'),
   }
 }
 

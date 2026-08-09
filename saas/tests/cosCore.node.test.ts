@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { bootCOSKernel, pingBusinessRule } from '../lib/cos-core/cos-kernel.ts'
+import { ExactCacheLayer, MemoryExactCacheStore } from '../lib/cos-core/layers/exact-cache/index.ts'
 import { KnowledgeLayer, type KnowledgeRecord } from '../lib/cos-core/layers/knowledge/index.ts'
 import { MemoryLayer } from '../lib/cos-core/layers/memory/index.ts'
 import { ToolCompiler, type CanonicalToolDescription } from '../lib/cos-core/layers/reasoning/index.ts'
@@ -69,6 +70,49 @@ test('semantic cache hits avoid provider execution', async () => {
   assert.equal(result.source, 'semantic_cache')
   assert.equal(providerCalls, 0)
   assert.equal(saved.length, 0)
+})
+
+test('exact cache hits avoid embeddings and provider execution', async () => {
+  let embeddings = 0
+  let providerCalls = 0
+  const exactCache = new ExactCacheLayer(new MemoryExactCacheStore())
+  const knowledge = new KnowledgeLayer({
+    generateEmbedding: async () => { embeddings += 1; return [1, 0] },
+    store: { queryNearest: async () => null, save: async () => {} },
+  })
+  const memory = new MemoryLayer(async ({ sessionId }) => ({
+    sessionId,
+    summary: '',
+    extractedFacts: [],
+    recentMessages: [],
+  }))
+  const dependencies = {
+    knowledge,
+    memory,
+    exactCache,
+    selectCompute: () => ({ provider: 'openai' as const, model: 'cheap' }),
+    executeProvider: async () => {
+      providerCalls += 1
+      return { content: 'computed-once' }
+    },
+  }
+  const payload = {
+    taskId: 'tenant-a',
+    sessionId: 'session-a',
+    rawUserPrompt: 'same exact request',
+    rawHistory: [],
+    availableTools: [],
+    requestedModel: 'cheap',
+  }
+
+  const first = await bootCOSKernel(payload, {}, dependencies)
+  const second = await bootCOSKernel(payload, {}, dependencies)
+
+  assert.equal(first.data, 'computed-once')
+  assert.equal(second.data, 'computed-once')
+  assert.equal(second.source, 'exact_cache')
+  assert.equal(embeddings, 2)
+  assert.equal(providerCalls, 1)
 })
 
 test('business rules short-circuit before embeddings and providers', async () => {

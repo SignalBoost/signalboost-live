@@ -1,19 +1,18 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { resolve, sep } from 'node:path'
+import { isAbsolute, relative, resolve } from 'node:path'
 import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import type { JsonSafeVideoResponse } from '@/lib/video/types'
 
-const SAFE_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const VALID_JOB_ID = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_RESULT_FILE_BYTES = 1024 * 1024
-
-const meta = () => ({ locale: 'en', generatedAt: new Date().toISOString() })
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const meta = { locale: 'en', generatedAt: new Date().toISOString() }
 
-  if (!SAFE_JOB_ID_PATTERN.test(id)) {
-    return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta: meta() }, { status: 400 })
+  if (!VALID_JOB_ID.test(id)) {
+    return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta }, { status: 400 })
   }
 
   let data: any = null
@@ -25,31 +24,31 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!data) {
     const queueDir = resolve(process.cwd(), '.video-queue')
     const resultPath = resolve(queueDir, `${id}.result.json`)
+    const relativeResultPath = relative(queueDir, resultPath)
 
-    if (!resultPath.startsWith(`${queueDir}${sep}`)) {
-      return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta: meta() }, { status: 400 })
+    if (relativeResultPath.startsWith('..') || isAbsolute(relativeResultPath)) {
+      return NextResponse.json({ ok: false, data: null, error: 'Invalid job id', meta }, { status: 400 })
     }
 
     if (existsSync(resultPath)) {
       try {
         const stats = statSync(resultPath)
         if (!stats.isFile() || stats.size > MAX_RESULT_FILE_BYTES) {
-          return NextResponse.json({ ok: false, data: null, error: 'Invalid video result', meta: meta() }, { status: 500 })
+          return NextResponse.json({ ok: false, data: null, error: 'Invalid video result', meta }, { status: 500 })
         }
 
         const parsed = JSON.parse(readFileSync(resultPath, 'utf8'))
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          return NextResponse.json({ ok: false, data: null, error: 'Invalid video result', meta: meta() }, { status: 500 })
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return NextResponse.json({ ok: false, data: null, error: 'Invalid video result', meta }, { status: 500 })
         }
-
         data = parsed
       } catch {
-        return NextResponse.json({ ok: false, data: null, error: 'Invalid video result', meta: meta() }, { status: 500 })
+        return NextResponse.json({ ok: false, data: null, error: 'Invalid video result', meta }, { status: 500 })
       }
     } else {
       data = { id, status: 'queued', result_url: null }
     }
   }
-  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: meta() }
+  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta }
   return NextResponse.json(body)
 }

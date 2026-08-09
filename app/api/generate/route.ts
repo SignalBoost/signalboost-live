@@ -3,69 +3,74 @@ import OpenAI from 'openai'
 
 const MAX_PROMPT_LENGTH = 4000
 const MAX_MODE_LENGTH = 50
-
-const MODE_PATTERN = /^[A-Za-z0-9 _.-]+$/
+const MAX_LANGUAGE_LENGTH = 32
 
 const SUPPORTED_LANGUAGES: Record<string, string> = {
   en: 'English',
-  'en-us': 'English',
-  'en-gb': 'English',
+  english: 'English',
   es: 'Spanish',
+  spanish: 'Spanish',
   fr: 'French',
+  french: 'French',
   de: 'German',
+  german: 'German',
   it: 'Italian',
+  italian: 'Italian',
   pt: 'Portuguese',
+  portuguese: 'Portuguese',
   'pt-br': 'Portuguese',
   nl: 'Dutch',
-  sv: 'Swedish',
-  da: 'Danish',
-  no: 'Norwegian',
-  fi: 'Finnish',
-  pl: 'Polish',
-  cs: 'Czech',
-  hu: 'Hungarian',
-  ro: 'Romanian',
-  tr: 'Turkish',
+  dutch: 'Dutch',
   ja: 'Japanese',
+  japanese: 'Japanese',
   ko: 'Korean',
+  korean: 'Korean',
   zh: 'Chinese',
-  'zh-cn': 'Chinese',
-  'zh-tw': 'Chinese',
+  chinese: 'Chinese',
+  'zh-cn': 'Chinese (Simplified)',
+  'zh-tw': 'Chinese (Traditional)',
   ar: 'Arabic',
+  arabic: 'Arabic',
   hi: 'Hindi',
+  hindi: 'Hindi',
 }
 
-function createRequestId() {
-  return Math.random().toString(36).slice(2, 10)
+function getValidatedLanguage(value: unknown) {
+  if (value === undefined) {
+    return SUPPORTED_LANGUAGES.en
+  }
+
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (!normalized || normalized.length > MAX_LANGUAGE_LENGTH) {
+    return null
+  }
+
+  return SUPPORTED_LANGUAGES[normalized] || null
 }
 
 export async function POST(req: Request) {
-  const requestId = createRequestId()
-
   try {
-    let body: unknown
-
-    try {
-      body = await req.json()
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 })
-    }
+    const body: unknown = await req.json()
 
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
     }
 
-    const requestBody = body as Record<string, unknown>
-    const rawPrompt = requestBody.prompt
-    const rawMode = requestBody.mode ?? 'default'
-    const rawLanguage = requestBody.language ?? 'en'
+    const { prompt: rawPrompt, mode: rawMode, language: rawLanguage } = body as {
+      prompt?: unknown
+      mode?: unknown
+      language?: unknown
+    }
 
     if (typeof rawPrompt !== 'string') {
       return NextResponse.json({ error: 'Missing prompt.' }, { status: 400 })
     }
 
     const prompt = rawPrompt.trim()
-
     if (!prompt) {
       return NextResponse.json({ error: 'Missing prompt.' }, { status: 400 })
     }
@@ -74,35 +79,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Prompt is too long.' }, { status: 400 })
     }
 
-    if (typeof rawMode !== 'string') {
+    const modeValue = rawMode === undefined ? 'default' : rawMode
+    if (typeof modeValue !== 'string') {
       return NextResponse.json({ error: 'Invalid mode.' }, { status: 400 })
     }
 
-    const mode = rawMode.trim()
-
-    if (!mode || mode.length > MAX_MODE_LENGTH || !MODE_PATTERN.test(mode)) {
+    const mode = modeValue.trim()
+    if (!mode || mode.length > MAX_MODE_LENGTH) {
       return NextResponse.json({ error: 'Invalid mode.' }, { status: 400 })
     }
 
-    if (typeof rawLanguage !== 'string') {
+    const language = getValidatedLanguage(rawLanguage)
+    if (!language) {
       return NextResponse.json({ error: 'Invalid language.' }, { status: 400 })
     }
 
-    const language = SUPPORTED_LANGUAGES[rawLanguage.trim().toLowerCase()]
-
-    if (!language) {
-      return NextResponse.json({ error: 'Unsupported language.' }, { status: 400 })
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json({ error: 'Generation service unavailable.' }, { status: 503 })
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+        return NextResponse.json({ result: `SignalBoost draft (${mode}, ${language}): ${prompt}` })
       }
 
-      return NextResponse.json({ result: `SignalBoost draft (${mode}, ${language}): ${prompt}` })
+      return NextResponse.json({ error: 'AI generation is unavailable.' }, { status: 503 })
     }
 
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const client = new OpenAI({ apiKey })
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -115,12 +116,9 @@ export async function POST(req: Request) {
       temperature: 0.8,
     })
 
-    return NextResponse.json({ result: completion.choices[0].message?.content || 'No response.' })
+    return NextResponse.json({ result: completion.choices[0]?.message?.content || 'No response.' })
   } catch (error) {
-    console.error('Generate API error:', {
-      requestId,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-    })
+    console.error('Generate API error:', { name: error instanceof Error ? error.name : 'UnknownError' })
     return NextResponse.json({ error: 'Generation failed.' }, { status: 500 })
   }
 }

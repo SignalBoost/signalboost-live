@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-
-    return NextResponse.json({
-      success: true,
-      message: "Signup API working",
-      received: body
-    });
-  } catch (err: any) {
+    await req.json();
+  } catch {
     return NextResponse.json(
       {
         success: false,
-        error: err.message
+        error: "Invalid request body"
       },
-      { status: 500 }
+      { status: 400 }
     );
   }
+
+  return NextResponse.json({
+    success: true,
+    message: "Signup API working"
+  });
 }

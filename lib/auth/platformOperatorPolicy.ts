@@ -13,10 +13,10 @@ export function isPlatformOperator(
   const role = String(user.app_metadata?.role ?? '').trim().toLowerCase()
   if (role === 'owner' || role === 'platform_operator') return true
 
-  if (user.email_verified !== true) return false
-
   const email = String(user.email ?? '').trim().toLowerCase()
   return Boolean(
-    email && ownerEmails.some(ownerEmail => String(ownerEmail).trim().toLowerCase() === email),
+    email &&
+      user.email_verified === true &&
+      ownerEmails.some((ownerEmail) => String(ownerEmail).trim().toLowerCase() === email),
   )
 }

@@ -88,15 +88,19 @@ test('approved i18n findings receive real four-language catalog entries before m
   assert.match(system, /Translate naturally and professionally/)
 })
 
-test('deterministic source remediation remains restricted to exact safe raw JSX text', () => {
+test('approved security and code findings use governed AI remediation with source guardrails', () => {
   const engine = read('../lib/audit/approvedRunRemediation.ts')
   assert.match(engine, /category\.toLowerCase\(\) === 'i18n-raw-string'/)
   assert.match(engine, /LocalizedText/)
   assert.match(engine, /rawJsxTextPresent/)
+  assert.match(engine, /callAuditModel/)
+  assert.match(engine, /aiRemediateFile/)
+  assert.match(engine, /fixedFindingIndexes/)
+  assert.match(engine, /complete file/i)
   assert.match(engine, /findBadImports/)
   assert.match(engine, /preservedFraction/)
-  assert.match(engine, /Only exact i18n raw-text findings are supported/)
-  assert.doesNotMatch(engine, /callAuditModel/)
+  assert.match(engine, /MAX_AI_FILE_CHARS/)
+  assert.match(engine, /ai\/audit-run-/)
 })
 
 test('recovery cron and owner history resume the same approved lifecycle', () => {

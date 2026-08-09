@@ -1,9 +1,11 @@
 // Apply an already owner-approved audit run through one governed GitHub PR.
-// The current deterministic engine handles exact i18n raw-text findings only;
-// unsupported findings are reported instead of guessed or marked as repaired.
+// Exact i18n raw-text findings use deterministic remediation. Other code/security
+// findings may use the isolated Audit model, but only full-file edits that pass
+// repository/import/preservation guardrails are allowed onto the ai/* branch.
 
 import { commitFileToBranch, findBadImports, preservedFraction } from '@/lib/ai/tools/repoWriter'
 import { readRepoFile } from '@/lib/ai/tools/repoReader'
+import { callAuditModel } from '@/lib/audit/modelRouter'
 import { listRepoTree, parseRepoUrl, readRepoFileFrom } from '@/lib/audit/repoTarget'
 import { i18nRawStringPhrases } from '@/lib/audit/uxDetector'
 
@@ -11,6 +13,7 @@ const REPO = 'SignalBoost/signalboost-live'
 const BASE_BRANCH = 'main'
 const MAX_FINDINGS = 300
 const MAX_FILES = 60
+const MAX_AI_FILE_CHARS = 120_000
 
 export type ApprovedRunRemediationResult = {
   kind: 'audit_batch_remediation'
@@ -49,6 +52,12 @@ type GeneratedFile = {
   alreadyResolved: number
 }
 
+type AiRepairResult = {
+  content: string
+  fixedFindingIndexes: number[]
+  note?: string
+}
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
@@ -64,7 +73,7 @@ function rawTextFromFinding(finding: AuditFinding): string {
   return quoted?.[1]?.trim() || ''
 }
 
-function isSupportedFinding(finding: AuditFinding): boolean {
+function isDeterministicFinding(finding: AuditFinding): boolean {
   return finding.category.toLowerCase() === 'i18n-raw-string' && Boolean(rawTextFromFinding(finding))
 }
 
@@ -76,27 +85,14 @@ function rawJsxTextPresent(content: string, text: string): boolean {
   return rawJsxTextPattern(text).test(content)
 }
 
-// The authoritative "is this still a raw string?" test — asks the SAME i18n rule
-// that generated the finding whether it still flags the phrase in the file. This
-// is stronger than the exact >text< substring check: it stays true through
-// whitespace / adjacent-character drift, so a finding is only ever treated as
-// resolved when the detector agrees it is gone. That is what stops the loop where
-// a run reported "fixed" yet the next scan re-flagged the same text.
 function detectorFlagsPhrase(content: string, phrase: string): boolean {
   if (!phrase) return false
   return i18nRawStringPhrases(content).includes(phrase)
 }
 
-function localizedImportFor(file: string): string {
-  return "import { LocalizedText } from '@/components/i18n/LocalizedText'"
-}
-
-function ensureLocalizedImport(file: string, content: string): string {
-  if (/import\s*\{\s*LocalizedText\s*\}\s*from\s*['"]@\/components\/i18n\/LocalizedText['"]/.test(content)) {
-    return content
-  }
-
-  const importLine = localizedImportFor(file)
+function ensureLocalizedImport(content: string): string {
+  if (/import\s*\{\s*LocalizedText\s*\}\s*from\s*['"]@\/components\/i18n\/LocalizedText['"]/.test(content)) return content
+  const importLine = "import { LocalizedText } from '@/components/i18n/LocalizedText'"
   const directive = content.match(/^(['"]use client['"];?\s*\n)/)
   if (directive) {
     const prefix = directive[1]
@@ -106,28 +102,17 @@ function ensureLocalizedImport(file: string, content: string): string {
   return `${importLine}\n\n${content}`
 }
 
-function applyFinding(content: string, finding: AuditFinding): { content: string; applied: boolean; alreadyResolved: boolean; reason: string } {
-  if (!isSupportedFinding(finding)) {
-    return { content, applied: false, alreadyResolved: false, reason: 'Only exact i18n raw-text findings are supported by deterministic remediation.' }
+function applyDeterministicFinding(content: string, finding: AuditFinding): { content: string; applied: boolean; alreadyResolved: boolean; reason: string } {
+  if (!isDeterministicFinding(finding)) {
+    return { content, applied: false, alreadyResolved: false, reason: 'Finding requires governed AI remediation.' }
   }
-
   const text = rawTextFromFinding(finding)
-
-  // "Resolved" must mean the detector no longer flags this phrase — not merely
-  // that an exact >text< substring is absent. The old exact-only check silently
-  // marked findings resolved whenever the on-disk text drifted from the stored
-  // phrase, so they were reported fixed while the next scan re-flagged them.
   if (!detectorFlagsPhrase(content, text)) {
     return { content, applied: false, alreadyResolved: true, reason: 'The i18n detector no longer flags this text on main.' }
   }
-
-  // The detector still flags it, but the exact JSX node could not be located for a
-  // safe deterministic replacement. Do NOT claim it resolved — leave it visible so
-  // the run reports partial ("completed with exceptions") instead of a false fix.
   if (!rawJsxTextPresent(content, text)) {
     return { content, applied: false, alreadyResolved: false, reason: 'Raw text is still flagged but could not be matched for a safe automatic fix.' }
   }
-
   const replacement = `><LocalizedText fallback={${JSON.stringify(text)}} /><`
   const next = content.replace(rawJsxTextPattern(text), replacement)
   return { content: next, applied: next !== content, alreadyResolved: false, reason: next === content ? 'The exact JSX node could not be replaced safely.' : '' }
@@ -182,83 +167,70 @@ function groupByFile(findings: AuditFinding[]): Map<string, AuditFinding[]> {
 function existingRemediation(rows: any[]): ApprovedRunRemediationResult | null {
   for (const row of rows || []) {
     const payload = row?.payload
-    if (
-      payload?.kind === 'audit_batch_remediation' &&
-      payload?.approval === 'final' &&
-      payload?.ok === true &&
-      payload?.status !== 'partial' &&
-      payload?.lifecycleStatus !== 'partial'
-    ) {
+    if (payload?.kind === 'audit_batch_remediation' && payload?.approval === 'final' && payload?.ok === true && payload?.status !== 'partial' && payload?.lifecycleStatus !== 'partial') {
       return payload as ApprovedRunRemediationResult
     }
   }
   return null
 }
 
-function githubToken(): string | null {
-  return process.env.GITHUB_WRITE_TOKEN || null
+function stripJsonFence(value: string): string {
+  const trimmed = String(value || '').trim()
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  return (fenced?.[1] || trimmed).trim()
 }
 
-async function github(path: string, init?: RequestInit): Promise<{ ok: boolean; data: any; error: string }> {
-  const token = githubToken()
-  if (!token) return { ok: false, data: null, error: 'GITHUB_WRITE_TOKEN is not configured.' }
-  try {
-    const response = await fetch(`https://api.github.com${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      },
-      cache: 'no-store',
-    })
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok) return { ok: false, data, error: String(data?.message || `GitHub HTTP ${response.status}`) }
-    return { ok: true, data, error: '' }
-  } catch (error) {
-    return { ok: false, data: null, error: error instanceof Error ? error.message : 'GitHub request failed.' }
-  }
-}
+async function aiRemediateFile(file: string, content: string, findings: AuditFinding[]): Promise<{ ok: boolean; value?: AiRepairResult; error: string }> {
+  if (!findings.length) return { ok: true, value: { content, fixedFindingIndexes: [] }, error: '' }
+  if (content.length > MAX_AI_FILE_CHARS) return { ok: false, error: `File exceeds the ${MAX_AI_FILE_CHARS}-character governed AI repair limit.` }
 
-async function updatePullRequest(prNumber: number, title: string, body: string) {
-  return github(`/repos/${REPO}/pulls/${prNumber}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ title, body }),
+  const compactFindings = findings.map((finding, index) => ({
+    index,
+    severity: finding.severity,
+    category: finding.category,
+    title: finding.title,
+    detail: finding.detail,
+    recommendation: finding.recommendation,
+    line: finding.line ?? null,
+  }))
+  const prompt = [
+    `Repository: ${REPO}`,
+    `Target branch source: ${BASE_BRANCH}`,
+    `File: ${file}`,
+    '',
+    'The owner has already approved remediation for this audit run.',
+    'Repair ONLY the listed findings that can be safely fixed inside this one existing file.',
+    'Do not invent files, packages, environment variables, database columns, APIs, or product behavior.',
+    'Preserve public behavior unless a finding specifically requires restricting unsafe behavior.',
+    'Prefer minimal edits. If a finding cannot be safely repaired using only this file, leave it unchanged and do not list its index as fixed.',
+    'Return ONLY valid JSON with exactly this shape:',
+    '{"content":"COMPLETE updated file contents","fixedFindingIndexes":[0,1],"note":"short optional note"}',
+    'The content field MUST contain the complete file, never a patch, diff, ellipsis, or omitted section.',
+    '',
+    `Findings:\n${JSON.stringify(compactFindings, null, 2)}`,
+    '',
+    `Current complete file:\n<<<FILE\n${content}\nFILE`,
+  ].join('\n')
+
+  const response = await callAuditModel({
+    prompt,
+    systemPrompt: 'You are the governed remediation engine for a production SaaS repository. Apply minimal secure fixes only when supported by the provided source. Never claim a finding fixed unless the returned complete file actually implements the repair. Return only strict JSON.',
+    maxTokens: 16_000,
   })
-}
-
-async function queueAutoMerge(prNumber: number): Promise<{ queued: boolean; error: string }> {
-  const token = githubToken()
-  if (!token) return { queued: false, error: 'GITHUB_WRITE_TOKEN is not configured.' }
-  const pr = await github(`/repos/${REPO}/pulls/${prNumber}`)
-  const nodeId = pr.ok ? String(pr.data?.node_id || '') : ''
-  if (!nodeId) return { queued: false, error: pr.error || 'Could not resolve the pull request node id.' }
+  if (!response) return { ok: false, error: 'Audit remediation model returned no response.' }
 
   try {
-    const response = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `mutation EnableAuditAutoMerge($pullRequestId: ID!) {
-          enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) {
-            pullRequest { number autoMergeRequest { enabledAt } }
-          }
-        }`,
-        variables: { pullRequestId: nodeId },
-      }),
-      cache: 'no-store',
-    })
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok || Array.isArray(data?.errors)) {
-      const error = Array.isArray(data?.errors)
-        ? data.errors.map((entry: any) => String(entry?.message || '')).filter(Boolean).join(' | ')
-        : `GitHub GraphQL HTTP ${response.status}`
-      return { queued: false, error: error || 'Automatic merge could not be enabled.' }
-    }
-    return { queued: true, error: '' }
-  } catch (error) {
-    return { queued: false, error: error instanceof Error ? error.message : 'Automatic merge could not be enabled.' }
+    const parsed = JSON.parse(stripJsonFence(response)) as Partial<AiRepairResult>
+    const nextContent = typeof parsed.content === 'string' ? parsed.content : ''
+    const indexes = Array.isArray(parsed.fixedFindingIndexes)
+      ? [...new Set(parsed.fixedFindingIndexes.filter((value): value is number => Number.isInteger(value) && value >= 0 && value < findings.length))]
+      : []
+    if (!nextContent.trim()) return { ok: false, error: 'Audit remediation model did not return complete file content.' }
+    if (!indexes.length && nextContent !== content) return { ok: false, error: 'Audit remediation model changed the file without identifying a repaired finding.' }
+    if (indexes.length && nextContent === content) return { ok: false, error: 'Audit remediation model claimed findings fixed without changing the file.' }
+    return { ok: true, value: { content: nextContent, fixedFindingIndexes: indexes, note: typeof parsed.note === 'string' ? parsed.note : undefined }, error: '' }
+  } catch {
+    return { ok: false, error: 'Audit remediation model returned invalid JSON.' }
   }
 }
 
@@ -328,26 +300,48 @@ export async function runApprovedAuditRemediation(params: {
     let proposed = current.content
     let applied = 0
     let resolvedInFile = 0
-    const unsupported: string[] = []
+    let deterministicTouched = false
+    const aiFindings: AuditFinding[] = []
+    const deterministicFailures: string[] = []
+
     for (const finding of fileFindings) {
-      const result = applyFinding(proposed, finding)
+      if (!isDeterministicFinding(finding)) {
+        aiFindings.push(finding)
+        continue
+      }
+      const result = applyDeterministicFinding(proposed, finding)
       proposed = result.content
-      if (result.applied) applied += 1
+      if (result.applied) { applied += 1; deterministicTouched = true }
       else if (result.alreadyResolved) resolvedInFile += 1
-      else unsupported.push(result.reason)
+      else deterministicFailures.push(result.reason)
     }
+
+    if (deterministicTouched) proposed = ensureLocalizedImport(proposed)
+
+    if (aiFindings.length) {
+      const ai = await aiRemediateFile(file, proposed, aiFindings)
+      if (!ai.ok || !ai.value) {
+        skipped.push({ file, findingCount: aiFindings.length, reason: ai.error || 'Governed AI remediation failed.' })
+      } else {
+        proposed = ai.value.content
+        applied += ai.value.fixedFindingIndexes.length
+        const notFixed = aiFindings.length - ai.value.fixedFindingIndexes.length
+        if (notFixed > 0) skipped.push({ file, findingCount: notFixed, reason: ai.value.note || 'One or more findings could not be safely repaired in this file.' })
+      }
+    }
+
+    if (deterministicFailures.length) skipped.push({ file, findingCount: deterministicFailures.length, reason: deterministicFailures[0] })
 
     if (applied === 0) {
       alreadyResolved += resolvedInFile
-      skipped.push({ file, findingCount: fileFindings.length - resolvedInFile, reason: unsupported[0] || 'All findings are already resolved.' })
+      if (resolvedInFile === fileFindings.length) skipped.push({ file, findingCount: 0, reason: 'All findings are already resolved.' })
       continue
     }
 
-    proposed = ensureLocalizedImport(file, proposed)
     const badImports = findBadImports(proposed, file, paths, file.startsWith('saas/') ? deps.saas : deps.root)
     const kept = preservedFraction(current.content, proposed)
-    const unresolved = fileFindings.filter(isSupportedFinding).filter(finding => detectorFlagsPhrase(proposed, rawTextFromFinding(finding)))
-    if (badImports.length || kept < 0.5 || unresolved.length) {
+    const unresolvedI18n = fileFindings.filter(isDeterministicFinding).filter(finding => detectorFlagsPhrase(proposed, rawTextFromFinding(finding)))
+    if (badImports.length || kept < 0.5 || unresolvedI18n.length) {
       skipped.push({
         file,
         findingCount: fileFindings.length,
@@ -357,7 +351,6 @@ export async function runApprovedAuditRemediation(params: {
     }
 
     alreadyResolved += resolvedInFile
-    if (unsupported.length) skipped.push({ file, findingCount: unsupported.length, reason: unsupported[0] })
     generated.push({ file, content: proposed.endsWith('\n') ? proposed : `${proposed}\n`, applied, alreadyResolved: resolvedInFile })
   }
 
@@ -393,33 +386,18 @@ export async function runApprovedAuditRemediation(params: {
   }
 
   if (!committed.length || !prNumber || !prUrl) {
-    const payload: ApprovedRunRemediationResult = {
-      ...empty, branch: branchName, findingsAlreadyResolved: alreadyResolved, skipped,
-    }
+    const payload: ApprovedRunRemediationResult = { ...empty, branch: branchName, findingsAlreadyResolved: alreadyResolved, skipped }
     await admin.from('audit_logs').insert({ run_id: runId, user_id: actorUserId, payload })
     return payload
   }
 
   const findingsApplied = committed.reduce((sum, file) => sum + file.applied, 0)
   const changedFiles = committed.map(file => file.file)
-  const prBody = [
-    '## Owner-approved audit remediation', '',
-    `Audit run: \`${runId}\``,
-    `Target: \`${REPO}@${BASE_BRANCH}\``, '',
-    `- Findings applied: **${findingsApplied}**`,
-    `- Findings already resolved: **${alreadyResolved}**`,
-    `- Files changed: **${changedFiles.length}**`,
-    `- Findings skipped by safety rules: **${skipped.reduce((sum, item) => sum + item.findingCount, 0)}**`, '',
-    '### Changed files', ...changedFiles.map(file => `- \`${file}\``), '',
-    'The owner already approved this run. Automatic merge is requested only after required repository checks pass.',
-  ].join('\n')
-  await updatePullRequest(prNumber, `AI audit remediation — run ${runId.slice(0, 8)}`, prBody)
-  const autoMerge = { queued: false, error: 'Deferred to the end-to-end remediation controller.' }
   const isPartial = findingsApplied + alreadyResolved < findings.length
   const payload: ApprovedRunRemediationResult = {
     kind: 'audit_batch_remediation', ok: true, approval: 'final', runId,
-    status: isPartial ? 'partial' : autoMerge.queued ? 'auto_merge_queued' : 'pr_ready',
-    branch: branchName, prUrl, prNumber, autoMergeQueued: autoMerge.queued, autoMergeError: autoMerge.error,
+    status: isPartial ? 'partial' : 'pr_ready',
+    branch: branchName, prUrl, prNumber, autoMergeQueued: false, autoMergeError: 'Deferred to the end-to-end remediation controller.',
     findingsTotal: findings.length, findingsApplied, findingsAlreadyResolved: alreadyResolved,
     filesChanged: committed.length, skipped, approvedAt: new Date().toISOString(),
   }

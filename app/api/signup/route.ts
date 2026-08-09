@@ -1,39 +1,26 @@
 import { NextResponse } from "next/server";
 
-const MAX_BODY_LENGTH = 10_000;
+const MAX_BODY_BYTES = 16_384; // 16 KB
 
-interface SignupBody {
-  email: string;
-  password: string;
-  [key: string]: unknown;
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function isValidEmail(email: unknown): email is string {
-  if (typeof email !== "string") return false;
-  if (email.length < 3 || email.length > 254) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function isValidPassword(password: unknown): password is string {
-  if (typeof password !== "string") return false;
-  if (password.length < 8 || password.length > 128) return false;
-  return true;
+function isString(v: unknown): v is string {
+  return typeof v === "string";
 }
 
 export async function POST(req: Request) {
   try {
-    const rawText = await req.text();
-
-    if (rawText.length > MAX_BODY_LENGTH) {
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
       return NextResponse.json(
         { success: false, error: "Request body too large" },
-        { status: 400 }
+        { status: 413 }
       );
     }
 
     let body: unknown;
     try {
-      body = JSON.parse(rawText);
+      body = await req.json();
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid request body" },
@@ -48,30 +35,69 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, password } = body as SignupBody;
+    const raw = body as Record<string, unknown>;
 
-    if (!isValidEmail(email)) {
+    // Allowlist: only accept known fields
+    const allowedKeys = new Set(["email", "password", "name"]);
+    const unknownKeys = Object.keys(raw).filter((k) => !allowedKeys.has(k));
+    if (unknownKeys.length > 0) {
       return NextResponse.json(
-        { success: false, error: "Invalid or missing email address" },
+        { success: false, error: "Unexpected fields in request" },
         { status: 400 }
       );
     }
 
-    if (!isValidPassword(password)) {
+    const { email, password, name } = raw;
+
+    // email: required, string, valid format, max length
+    if (!isString(email) || email.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: "Password must be between 8 and 128 characters" },
+        { success: false, error: "email is required" },
+        { status: 400 }
+      );
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.length > 254 || !EMAIL_RE.test(normalizedEmail)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email format" },
         { status: 400 }
       );
     }
 
+    // password: required, string, length policy
+    if (!isString(password) || password.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "password is required" },
+        { status: 400 }
+      );
+    }
+    if (password.length < 8 || password.length > 128) {
+      return NextResponse.json(
+        { success: false, error: "password must be between 8 and 128 characters" },
+        { status: 400 }
+      );
+    }
+
+    // name: optional, string, max length
+    if (name !== undefined) {
+      if (!isString(name) || name.length > 200) {
+        return NextResponse.json(
+          { success: false, error: "Invalid name" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Return only non-sensitive confirmation data
     return NextResponse.json({
       success: true,
       message: "Signup API working"
     });
   } catch (err: unknown) {
-    console.error("Signup route unexpected error:", err);
+    // Log the error server-side only; do not expose internals to the client
+    console.error("[signup] Unexpected error:", err);
     return NextResponse.json(
-      { success: false, error: "An unexpected error occurred" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

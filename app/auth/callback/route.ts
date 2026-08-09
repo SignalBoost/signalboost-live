@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    console.error('Marketing OAuth callback error: auth_failed')
+    console.error('Marketing OAuth callback error')
     return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
   }
 

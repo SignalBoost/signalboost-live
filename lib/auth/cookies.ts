@@ -6,7 +6,6 @@ import type { CookieOptionsWithName } from '@supabase/ssr'
 export const saasSupabaseCookieOptions: CookieOptionsWithName = {
   path: '/',
   sameSite: 'lax',
-  httpOnly: true,
   secure: process.env.NODE_ENV !== 'development',
 }
 

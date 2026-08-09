@@ -7,7 +7,7 @@ export const saasSupabaseCookieOptions: CookieOptionsWithName = {
   path: '/',
   httpOnly: true,
   sameSite: 'lax',
-  secure: true,
+  secure: process.env.NODE_ENV !== 'development',
 }
 
 export const saasSupabaseRedirectUrl = 'https://saas.signalboostapp.com/auth/callback'

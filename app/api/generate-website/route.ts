@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const MAX_REQUEST_BODY_LENGTH = 4096;
+const MAX_CONTENT_LENGTH = 10 * 1024;
 const MAX_BUSINESS_NAME_LENGTH = 100;
 
 function escapeHtml(value: string) {
@@ -12,7 +12,7 @@ function escapeHtml(value: string) {
         return "&lt;";
       case ">":
         return "&gt;";
-      case "\"":
+      case '"':
         return "&quot;";
       case "'":
         return "&#39;";
@@ -26,79 +26,106 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ success: false, error }, { status });
-}
-
 export async function POST(req: Request) {
   try {
-    const contentType = req.headers.get("content-type") || "";
-    if (!contentType.toLowerCase().includes("application/json")) {
-      return jsonError("Content-Type must be application/json", 415);
+    const contentType = req.headers.get("content-type");
+    if (!contentType?.toLowerCase().includes("application/json")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Content-Type must be application/json"
+        },
+        { status: 415 }
+      );
     }
 
     const contentLength = req.headers.get("content-length");
-    if (contentLength !== null) {
+    if (contentLength) {
       const parsedLength = Number(contentLength);
-      if (
-        !Number.isSafeInteger(parsedLength) ||
-        parsedLength < 0 ||
-        parsedLength > MAX_REQUEST_BODY_LENGTH
-      ) {
-        return jsonError("Request body is too large", 413);
+      if (!Number.isFinite(parsedLength) || parsedLength > MAX_CONTENT_LENGTH) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request body is too large"
+          },
+          { status: 413 }
+        );
       }
-    }
-
-    const rawBody = await req.text();
-    if (rawBody.length > MAX_REQUEST_BODY_LENGTH) {
-      return jsonError("Request body is too large", 413);
     }
 
     let body: unknown;
     try {
-      body = rawBody ? JSON.parse(rawBody) : {};
+      body = await req.json();
     } catch {
-      return jsonError("Invalid JSON request body", 400);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid JSON body"
+        },
+        { status: 400 }
+      );
     }
 
     if (!isPlainObject(body)) {
-      return jsonError("Invalid request body", 400);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request body"
+        },
+        { status: 400 }
+      );
     }
 
-    const allowedKeys = new Set(["businessName"]);
-    if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
-      return jsonError("Invalid request body", 400);
+    const keys = Object.keys(body);
+    if (keys.length !== 1 || !keys.includes("businessName")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request body"
+        },
+        { status: 400 }
+      );
     }
 
-    const rawBusinessName = body.businessName;
-    if (rawBusinessName !== undefined && typeof rawBusinessName !== "string") {
-      return jsonError("businessName must be a string", 400);
+    if (typeof body.businessName !== "string") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "businessName must be a string"
+        },
+        { status: 400 }
+      );
     }
 
-    if (
-      typeof rawBusinessName === "string" &&
-      (rawBusinessName.length > MAX_BUSINESS_NAME_LENGTH || /[\u0000-\u001F\u007F]/.test(rawBusinessName))
-    ) {
-      return jsonError("businessName is invalid", 400);
+    const businessName = body.businessName.trim();
+    if (businessName.length === 0 || businessName.length > MAX_BUSINESS_NAME_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "businessName must be between 1 and 100 characters"
+        },
+        { status: 400 }
+      );
     }
 
-    const businessName = escapeHtml(rawBusinessName || "Generated Website");
+    const escapedBusinessName = escapeHtml(businessName);
 
     return NextResponse.json({
       success: true,
       html: `
         <section style="padding:40px;font-family:sans-serif">
-          <h1>${businessName}</h1>
+          <h1>${escapedBusinessName}</h1>
           <p>AI generated website preview.</p>
         </section>
       `
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Failed to generate website", err);
+
     return NextResponse.json(
       {
         success: false,
-        error: "Unable to generate website"
+        error: "Internal server error"
       },
       { status: 500 }
     );

@@ -226,11 +226,10 @@ async function resolveUsedMinutesWithTimeout(
   }
 }
 
-// Per-user/month in-flight de-duplication for the monthly usage figure. We do
-// not persist completed usage totals across requests: video_jobs writes happen
-// outside this route, and serving an old low total could understate current
-// consumption in concierge quota guidance. Keeping only in-flight coalescing
-// prevents duplicate concurrent reads without introducing stale completed data.
+// Completed monthly usage values are not reused across requests: returning a
+// cached low value after a new export is written can understate quota guidance.
+// The in-flight map below still deduplicates concurrent lookups without serving
+// a completed value during a post-export TTL window.
 const USAGE_TTL_MS = 0
 const USAGE_LOOKUP_TIMEOUT_MS = 5_000
 // Hard cap on distinct cached users/months per instance.
@@ -260,14 +259,16 @@ async function resolveUsedMinutesCached(
   const monthStartIso = currentUtcMonthStart(now).toISOString()
   const monthEndMs = nextUtcMonthStart(now).getTime()
   const cacheKey = usageCacheKey(userId, monthStartIso)
-  const hit = USAGE_TTL_MS > 0 ? usageCache.get(cacheKey) : undefined
-  if (hit && hit.expires > now) {
-    // Touch: re-insert to mark most-recently-used (Map keeps insertion order).
-    usageCache.delete(cacheKey)
-    usageCache.set(cacheKey, hit)
-    return hit.value
+  if (USAGE_TTL_MS > 0) {
+    const hit = usageCache.get(cacheKey)
+    if (hit && hit.expires > now) {
+      // Touch: re-insert to mark most-recently-used (Map keeps insertion order).
+      usageCache.delete(cacheKey)
+      usageCache.set(cacheKey, hit)
+      return hit.value
+    }
+    if (hit) usageCache.delete(cacheKey) // stale
   }
-  if (hit) usageCache.delete(cacheKey) // stale
 
   const existing = usageInflight.get(cacheKey)
   if (existing) return existing

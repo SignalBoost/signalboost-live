@@ -6,12 +6,14 @@ const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
 const MAX_CAPTION_TEXT_BYTES = 1024 * 1024
 const MAX_CAPTION_CUES = 5000
 
-class ClientInputError extends Error {
-  readonly status: 400 | 413
+type ClientErrorStatus = 400 | 413
 
-  constructor(message: string, status: 400 | 413 = 400) {
+class CaptionInputError extends Error {
+  status: ClientErrorStatus
+
+  constructor(message: string, status: ClientErrorStatus = 400) {
     super(message)
-    this.name = 'ClientInputError'
+    this.name = 'CaptionInputError'
     this.status = status
   }
 }
@@ -21,83 +23,25 @@ function localeFromRequest(request: Request): SupportedVideoLocale {
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(requested) ? requested as SupportedVideoLocale : 'en'
 }
 
-function errorResponse(locale: SupportedVideoLocale, status: 400 | 413, message: string) {
-  return NextResponse.json({
+function errorResponse(locale: SupportedVideoLocale, status: ClientErrorStatus, message: string) {
+  const body: JsonSafeVideoResponse<null> = {
     ok: false,
     data: null,
     error: message,
     meta: { locale, generatedAt: new Date().toISOString() },
-  }, { status })
+  }
+  return NextResponse.json(body, { status })
 }
 
-function validateContentLength(request: Request) {
-  const contentLength = request.headers.get('content-length')
-  if (contentLength === null) return
-
-  const normalized = contentLength.trim()
-  if (!/^\d+$/.test(normalized)) {
-    throw new ClientInputError('Invalid request headers', 400)
-  }
-
-  if (Number(normalized) > MAX_REQUEST_BODY_BYTES) {
-    throw new ClientInputError('Caption upload is too large', 413)
-  }
-}
-
-async function readLimitedRequestBody(request: Request): Promise<Uint8Array> {
-  const reader = request.body?.getReader()
-  if (!reader) return new Uint8Array()
-
-  const chunks: Uint8Array[] = []
-  let received = 0
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (!value) continue
-
-    received += value.byteLength
-    if (received > MAX_REQUEST_BODY_BYTES) {
-      await reader.cancel().catch(() => undefined)
-      throw new ClientInputError('Caption upload is too large', 413)
-    }
-
-    chunks.push(value)
-  }
-
-  const body = new Uint8Array(received)
-  let offset = 0
-  for (const chunk of chunks) {
-    body.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-
-  return body
-}
-
-async function limitedFormData(request: Request): Promise<FormData> {
-  validateContentLength(request)
-  const body = await readLimitedRequestBody(request)
-  const headers = new Headers()
-  const contentType = request.headers.get('content-type')
-  if (contentType) headers.set('content-type', contentType)
-
-  return new Request(request.url, {
-    method: request.method,
-    headers,
-    body,
-  }).formData()
-}
-
-function utf8ByteLengthExceeds(value: string, maxBytes: number): boolean {
+function isUtf8ByteLengthOverLimit(value: string, limit: number): boolean {
   let bytes = 0
 
   for (let i = 0; i < value.length; i += 1) {
     const code = value.charCodeAt(i)
 
-    if (code <= 0x7f) {
+    if (code < 0x80) {
       bytes += 1
-    } else if (code <= 0x7ff) {
+    } else if (code < 0x800) {
       bytes += 2
     } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
       const next = value.charCodeAt(i + 1)
@@ -111,35 +55,130 @@ function utf8ByteLengthExceeds(value: string, maxBytes: number): boolean {
       bytes += 3
     }
 
-    if (bytes > maxBytes) return true
+    if (bytes > limit) {
+      return true
+    }
   }
 
   return false
 }
 
-function validateCaptionTextSize(raw: string) {
-  if (utf8ByteLengthExceeds(raw, MAX_CAPTION_TEXT_BYTES)) {
-    throw new ClientInputError('Caption input is too large', 413)
+function assertCaptionTextSize(raw: string) {
+  if (isUtf8ByteLengthOverLimit(raw, MAX_CAPTION_TEXT_BYTES)) {
+    throw new CaptionInputError('Caption input is too large', 413)
   }
+}
+
+async function readRequestBodyWithLimit(request: Request): Promise<Uint8Array> {
+  const contentLengthHeader = request.headers.get('content-length')
+  if (contentLengthHeader) {
+    const contentLength = Number(contentLengthHeader)
+    if (!Number.isFinite(contentLength) || contentLength < 0) {
+      throw new CaptionInputError('Invalid request body', 400)
+    }
+    if (contentLength > MAX_REQUEST_BODY_BYTES) {
+      throw new CaptionInputError('Request body is too large', 413)
+    }
+  }
+
+  if (!request.body) {
+    return new Uint8Array()
+  }
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      break
+    }
+    if (!value) {
+      continue
+    }
+
+    total += value.byteLength
+    if (total > MAX_REQUEST_BODY_BYTES) {
+      try {
+        await reader.cancel()
+      } catch {
+        // Ignore cancellation errors after the request has already been rejected.
+      }
+      throw new CaptionInputError('Request body is too large', 413)
+    }
+
+    chunks.push(value)
+  }
+
+  const body = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return body
+}
+
+async function readLimitedFormData(request: Request): Promise<FormData> {
+  const body = await readRequestBodyWithLimit(request)
+  const headers = new Headers(request.headers)
+  headers.delete('content-length')
+
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    body,
+  }).formData()
+}
+
+async function rawCaptionTextFromFormData(formData: FormData): Promise<string> {
+  const file = formData.get('captions')
+
+  if (typeof file === 'string') {
+    assertCaptionTextSize(file)
+    return file
+  }
+
+  if (file instanceof File) {
+    if (file.size > MAX_CAPTION_TEXT_BYTES) {
+      throw new CaptionInputError('Caption input is too large', 413)
+    }
+
+    let raw: string
+    try {
+      raw = await file.text()
+    } catch {
+      throw new CaptionInputError('Invalid caption input', 400)
+    }
+
+    assertCaptionTextSize(raw)
+    return raw
+  }
+
+  const raw = String(formData.get('text') || '')
+  assertCaptionTextSize(raw)
+  return raw
 }
 
 export async function POST(request: Request) {
   const locale = localeFromRequest(request)
 
   try {
-    const formData = await limitedFormData(request)
-    const file = formData.get('captions')
+    const formData = await readLimitedFormData(request)
+    const raw = await rawCaptionTextFromFormData(formData)
+    let cues: ReturnType<typeof parseCaptionText>
 
-    if (file instanceof File && file.size > MAX_CAPTION_TEXT_BYTES) {
-      throw new ClientInputError('Caption input is too large', 413)
+    try {
+      cues = parseCaptionText(raw)
+    } catch (error) {
+      console.error('Failed to parse caption input', error)
+      throw new CaptionInputError('Invalid caption input', 400)
     }
 
-    const raw = typeof file === 'string' ? file : file instanceof File ? await file.text() : String(formData.get('text') || '')
-    validateCaptionTextSize(raw)
-
-    const cues = parseCaptionText(raw)
     if (cues.length > MAX_CAPTION_CUES) {
-      throw new ClientInputError('Caption input has too many cues', 413)
+      throw new CaptionInputError('Too many caption cues', 413)
     }
 
     const body: JsonSafeVideoResponse<{ cues: typeof cues; cueCount: number }> = {
@@ -150,11 +189,11 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(body)
   } catch (error) {
-    if (error instanceof ClientInputError) {
+    if (error instanceof CaptionInputError) {
       return errorResponse(locale, error.status, error.message)
     }
 
-    console.warn('Failed to process caption upload', error)
-    return errorResponse(locale, 400, 'Invalid caption input')
+    console.error('Failed to process captions upload', error)
+    return errorResponse(locale, 400, 'Invalid captions upload')
   }
 }

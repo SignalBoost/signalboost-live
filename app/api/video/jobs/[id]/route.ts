@@ -4,22 +4,26 @@ import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import type { JsonSafeVideoResponse } from '@/lib/video/types'
 
-const SAFE_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+const VIDEO_JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_RESULT_FILE_BYTES = 1024 * 1024
 
-function responseMeta() {
+function meta() {
   return { locale: 'en', generatedAt: new Date().toISOString() }
 }
 
 function errorResponse(error: string, status: number) {
-  return NextResponse.json({ ok: false, data: null, error, meta: responseMeta() }, { status })
+  return NextResponse.json({ ok: false, data: null, error, meta: meta() }, { status })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  if (!SAFE_JOB_ID_PATTERN.test(id)) {
-    return errorResponse('Invalid job id', 400)
+  if (!VIDEO_JOB_ID_PATTERN.test(id)) {
+    return errorResponse('Invalid video job id', 400)
   }
 
   let data: any = null
@@ -33,7 +37,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const resultPath = resolve(queueDir, `${id}.result.json`)
 
     if (!resultPath.startsWith(`${queueDir}${sep}`)) {
-      return errorResponse('Invalid job id', 400)
+      return errorResponse('Invalid video job id', 400)
     }
 
     if (existsSync(resultPath)) {
@@ -44,10 +48,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         }
 
         const parsed = JSON.parse(readFileSync(resultPath, 'utf8'))
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        if (!isRecord(parsed)) {
           return errorResponse('Invalid video job result', 500)
         }
-
         data = parsed
       } catch {
         return errorResponse('Invalid video job result', 500)
@@ -56,6 +59,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       data = { id, status: 'queued', result_url: null }
     }
   }
-  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: responseMeta() }
+  const body: JsonSafeVideoResponse<typeof data> = { ok: true, data, error: null, meta: meta() }
   return NextResponse.json(body)
 }

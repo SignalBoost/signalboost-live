@@ -1,5 +1,7 @@
-import { callModel } from '../../modelRouter.ts'
-import type { CosAutonomyBrain, CosAutonomyPlan, PortableManifest, PortableObservation } from './types.ts'
+import { createPlatformAiPort } from '../../../cos/aiPort.ts'
+import type { CosAutonomyBrain, CosAutonomyPlan, PortableManifest } from './types.ts'
+
+const ai = createPlatformAiPort()
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim()
@@ -22,23 +24,10 @@ function assertPlan(value: unknown, manifest: PortableManifest, objective: strin
     const action = item as Record<string, unknown>
     const capabilityId = String(action.capabilityId || '')
     if (!allowed.has(capabilityId)) throw new Error(`cos_autonomy_model_invented_capability:${capabilityId}`)
-    const params = action.params && typeof action.params === 'object' && !Array.isArray(action.params)
-      ? action.params as Record<string, unknown>
-      : {}
-    return {
-      actionId: String(action.actionId || `action-${index + 1}`),
-      capabilityId,
-      justification: String(action.justification || 'Selected from the portable capability manifest.'),
-      params,
-    }
+    const params = action.params && typeof action.params === 'object' && !Array.isArray(action.params) ? action.params as Record<string, unknown> : {}
+    return { actionId: String(action.actionId || `action-${index + 1}`), capabilityId, justification: String(action.justification || 'Selected from the portable capability manifest.'), params }
   })
-  return {
-    planId: String(raw.planId || `cos-plan-${Date.now()}`),
-    objective,
-    actions: normalizedActions,
-    expectedOutcome: String(raw.expectedOutcome || 'Objective satisfied and independently verified.'),
-    confidence: Number(raw.confidence),
-  }
+  return { planId: String(raw.planId || `cos-plan-${Date.now()}`), objective, actions: normalizedActions, expectedOutcome: String(raw.expectedOutcome || 'Objective satisfied and independently verified.'), confidence: Number(raw.confidence) }
 }
 
 function systemPrompt(): string {
@@ -53,34 +42,11 @@ function systemPrompt(): string {
   ].join(' ')
 }
 
-export function createModelBackedAutonomyBrain(input?: {
-  modelPreference?: 'claude' | 'openai' | 'local'
-  maxTokens?: number
-}): CosAutonomyBrain {
+export function createModelBackedAutonomyBrain(input?: { modelPreference?: 'claude' | 'openai' | 'local'; maxTokens?: number }): CosAutonomyBrain {
   return {
     async plan({ objective, manifest, observation, cycle, previousCycles }) {
-      const prompt = JSON.stringify({
-        objective,
-        cycle,
-        portable: {
-          portableId: manifest.portableId,
-          portableVersion: manifest.portableVersion,
-          capabilities: manifest.capabilities,
-        },
-        observation,
-        previousCycles: previousCycles.map(item => ({
-          cycle: item.cycle,
-          stateFingerprint: item.observation.stateFingerprint,
-          verification: item.verification,
-          recovery: item.recovery,
-        })),
-      })
-      const text = await callModel({
-        modelPreference: input?.modelPreference,
-        systemPrompt: systemPrompt(),
-        prompt,
-        maxTokens: input?.maxTokens ?? 2500,
-      })
+      const prompt = JSON.stringify({ objective, cycle, portable: { portableId: manifest.portableId, portableVersion: manifest.portableVersion, capabilities: manifest.capabilities }, observation, previousCycles: previousCycles.map(item => ({ cycle: item.cycle, stateFingerprint: item.observation.stateFingerprint, verification: item.verification, recovery: item.recovery })) })
+      const text = await ai.generate({ modelPreference: input?.modelPreference, systemPrompt: systemPrompt(), prompt, maxTokens: input?.maxTokens ?? 2500 })
       if (!text) throw new Error('cos_autonomy_model_unavailable')
       return assertPlan(extractJson(text), manifest, objective)
     },

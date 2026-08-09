@@ -8,25 +8,13 @@ export async function POST(req: Request) {
       success: true,
       message: "Login API working"
     });
-  } catch (err: unknown) {
-    if (err instanceof SyntaxError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request body"
-        },
-        { status: 400 }
-      );
-    }
-
-    console.error("Login API error", err);
-
+  } catch {
     return NextResponse.json(
       {
         success: false,
-        error: "Internal server error"
+        error: "Invalid request body"
       },
-      { status: 500 }
+      { status: 400 }
     );
   }
 }

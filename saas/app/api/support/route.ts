@@ -2,7 +2,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { portableBrandName } from '@/lib/portable/companyIdentity'
 import { NextRequest, NextResponse } from 'next/server'
-import { guardNarratedExecution } from '@/lib/ai/cos/executionHonesty'
+import { guardNarratedExecution, detectsNarratedExecution, NARRATED_EXECUTION_RETRY_INSTRUCTION } from '@/lib/ai/cos/executionHonesty'
 import { cachedSystem, recordUsage } from '@/lib/ai/usage'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
@@ -1910,6 +1910,15 @@ ${ev.summary}`
     // being something he discovers by opening an empty cockpit.
     let pressSearchNote = ''
 
+    // ── NARRATED-EXECUTION RETRY ────────────────────────────────────────────────
+    // Two passes at most. Pass 0 is the normal turn. If it ends with ZERO tools fired
+    // and a reply that narrates execution ("executing immediately", "I will call
+    // readRepoFile"), the model performed decisiveness instead of acting — so pass 1
+    // injects a blunt corrective turn and re-calls with tool_choice REQUIRED, which
+    // makes ending the turn without a real tool call impossible. The append-only
+    // guard further down remains the last-resort label when no retry budget is left.
+    let reply = ''
+    for (let honestyPass = 0; honestyPass < 2; honestyPass++) {
     while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 10 && remainingMs() > 12_000) {
       toolRounds++
 
@@ -1957,7 +1966,7 @@ ${ev.summary}`
       m && Array.isArray(m.content)
         ? m.content.filter((b: any) => b && b.type === 'text').map((b: any) => b.text).join('').trim()
         : ''
-    let reply = extractText(msg)
+    reply = extractText(msg)
     // If the loop ended while still mid-tool-call (round cap reached), the model never
     // got to write its answer. Force one tools-disabled synthesis so a read-heavy task
     // (e.g. an audit) returns its findings instead of the empty-response fallback.
@@ -1975,6 +1984,25 @@ ${ev.summary}`
         const synth = await callModel('none')
         if (synth) { msg = synth; reply = extractText(synth) }
       } catch { /* fall through to the budget/fallback messages below */ }
+    }
+
+    // Retry decision for this pass. Conditions, in order: only the first pass may
+    // retry; a turn that fired ANY tool is legitimate however it talks; a timed-out
+    // turn has no budget to spend; the forced call plus at least one tool round needs
+    // real time, so 30s is the floor; and only a reply that actually narrates
+    // execution qualifies — an honest plan phrased as a plan passes through untouched.
+    if (
+      honestyPass === 0 && reply && firedTools.size === 0 && !timedOut &&
+      remainingMs() > 30_000 && detectsNarratedExecution(reply)
+    ) {
+      convo.push({ role: 'assistant', content: (msg as any).content })
+      convo.push({ role: 'user', content: NARRATED_EXECUTION_RETRY_INSTRUCTION })
+      const forced = await callModel('required')
+      if (forced) { msg = forced; continue }
+      // The forced call itself timed out — fall through with what we have; the
+      // append-only guard below will at least label it honestly.
+    }
+    break
     }
     if (!reply) {
       const committedSomething = convo.some(

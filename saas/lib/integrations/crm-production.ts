@@ -11,6 +11,10 @@ function sfBase(ctx: IntegrationContext): string {
   return required(ctx.metadata?.instanceUrl || ctx.accountRef, 'Salesforce instance URL').replace(/\/$/, '')
 }
 
+function dynamicsBase(ctx: IntegrationContext): string {
+  return required(ctx.metadata?.instanceUrl || ctx.accountRef, 'Dynamics 365 instance URL').replace(/\/$/, '')
+}
+
 export const productionCrmAdapters: Record<string, Partial<IntegrationProvider>> = {
   salesforce: {
     async upsertContact(ctx, c): Promise<IntegrationResult> {
@@ -33,6 +37,35 @@ export const productionCrmAdapters: Record<string, Partial<IntegrationProvider>>
       const r = await integrationJson(fetch, `${base}/services/data/v61.0/sobjects/Task`, { method: 'POST', headers: bearer(ctx.accessToken), body: JSON.stringify({ Subject: a.subject || 'SignalBoost activity', Description: a.note || a.body || '', WhoId: a.contactId, WhatId: a.recordId, Status: 'Completed', Priority: 'Normal' }) })
       if (!r.ok || !r.data?.id) return bad('salesforce_activity_failed', r.data?.[0]?.message || String(r.status))
       return ok({ id: r.data.id }, 'salesforce_activity_logged')
+    },
+  },
+  dynamics365: {
+    async upsertContact(ctx, c): Promise<IntegrationResult> {
+      const base = dynamicsBase(ctx)
+      const email = required(c.email, 'email')
+      const headers = bearer(ctx.accessToken)
+      const filter = encodeURIComponent(`emailaddress1 eq '${email.replace(/'/g, "''")}'`)
+      const search = await integrationJson(fetch, `${base}/api/data/v9.2/contacts?$select=contactid&$filter=${filter}&$top=1`, { headers })
+      if (!search.ok) return bad('dynamics_contact_lookup_failed', search.data?.error?.message || String(search.status))
+      const id = search.data?.value?.[0]?.contactid
+      const body = { firstname: c.firstName || c.firstname, lastname: c.lastName || c.lastname || email, emailaddress1: email, telephone1: c.phone, jobtitle: c.title }
+      const r = await integrationJson(fetch, id ? `${base}/api/data/v9.2/contacts(${id})` : `${base}/api/data/v9.2/contacts`, { method: id ? 'PATCH' : 'POST', headers, body: JSON.stringify(body) })
+      if (!r.ok && r.status !== 204) return bad('dynamics_contact_failed', r.data?.error?.message || String(r.status))
+      return ok({ id: id || r.headers?.get?.('OData-EntityId'), updated: Boolean(id) }, 'dynamics_contact_upserted')
+    },
+    async upsertDeal(ctx, d): Promise<IntegrationResult> {
+      const base = dynamicsBase(ctx)
+      const body = { name: required(d.name, 'name'), estimatedvalue: d.amount, estimatedclosedate: d.closeDate || new Date(Date.now() + 30 * 86400000).toISOString(), description: d.description }
+      const r = await integrationJson(fetch, `${base}/api/data/v9.2/opportunities`, { method: 'POST', headers: bearer(ctx.accessToken), body: JSON.stringify(body) })
+      if (!r.ok && r.status !== 204) return bad('dynamics_deal_failed', r.data?.error?.message || String(r.status))
+      return ok({ id: r.headers?.get?.('OData-EntityId') }, 'dynamics_deal_created')
+    },
+    async logActivity(ctx, a): Promise<IntegrationResult> {
+      const base = dynamicsBase(ctx)
+      const body = { subject: a.subject || 'SignalBoost activity', description: a.note || a.body || '', scheduledend: a.timestamp || new Date().toISOString(), statecode: 1 }
+      const r = await integrationJson(fetch, `${base}/api/data/v9.2/tasks`, { method: 'POST', headers: bearer(ctx.accessToken), body: JSON.stringify(body) })
+      if (!r.ok && r.status !== 204) return bad('dynamics_activity_failed', r.data?.error?.message || String(r.status))
+      return ok({ id: r.headers?.get?.('OData-EntityId') }, 'dynamics_activity_logged')
     },
   },
   pipedrive: {
@@ -74,7 +107,7 @@ export const productionCrmAdapters: Record<string, Partial<IntegrationProvider>>
       return ok({ id: item?.details?.id }, 'zoho_deal_created')
     },
     async logActivity(ctx, a): Promise<IntegrationResult> {
-      const r = await integrationJson(fetch, 'https://www.zohoapis.com/crm/v6/Notes', { method: 'POST', headers: bearer(ctx.accessToken), body: JSON.stringify({ data: [{ Note_Title: a.subject || 'SignalBoost activity', Note_Content: a.note || a.body || '', Parent_Id: a.recordId, se_module: a.module || 'Contacts' }] }) })
+      const r = await integrationJson(fetch, 'https://www.zohoapis.com/crm/v6/Notes', { method: 'POST', headers: bearer(ctx.accessToken), body: JSON.stringify({ data: [{ Note_Title: a.subject || 'SignalBoost activity', Note_Content: a.note || a.body || '', Parent_Id: a.recordId, se_module: a.module || 'Contacts' }] })
       const item = r.data?.data?.[0]
       if (!r.ok || item?.status !== 'success') return bad('zoho_activity_failed', item?.message || String(r.status))
       return ok({ id: item?.details?.id }, 'zoho_activity_logged')

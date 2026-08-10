@@ -1,5 +1,10 @@
 {
   "buildCommand": "npm run prebuild && next build",
+  "env": {
+    "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
+    "COS_LIVE_SOURCES_ENABLED": "true",
+    "COS_LOCAL_FIRST_ENABLED": "true"
+  },
   "crons": [
     { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },
     { "path": "/api/cron/batch-poll", "schedule": "*/30 * * * *" },

@@ -1,1 +1,1 @@
-Initial COS curated corpus seed: 23 READY companies from saas/data/prospects.json.
+Primary corpus seed: reuse the full existing outreach_queue history first; the 23 static READY prospects remain supplemental only.

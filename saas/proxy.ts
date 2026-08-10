@@ -45,6 +45,17 @@ export async function proxy(req: NextRequest) {
     }
   }
 
+  // COS-FIRST LIVE ROUTING.
+  // Keep /api/concierge as the stable browser endpoint, but send every POST through
+  // the provider-independent COS primary wrapper first. The wrapper invokes the
+  // legacy concierge route directly only when local COS cannot safely answer or a
+  // governed tool/action turn requires the existing executor.
+  if (pathname === '/api/concierge' && req.method === 'POST') {
+    const cosPrimaryUrl = req.nextUrl.clone()
+    cosPrimaryUrl.pathname = '/api/cos-primary'
+    return NextResponse.rewrite(cosPrimaryUrl)
+  }
+
   // Only guard the operator path beyond autonomous API ingress and the public spend gate.
   if (!pathname.startsWith(OPERATOR_PATH)) {
     return NextResponse.next()

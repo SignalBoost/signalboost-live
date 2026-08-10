@@ -125,7 +125,7 @@ export default function BusinessIntelligenceCorpusPage() {
             <div><strong style={{ fontSize: 22 }}>{metrics.providerCalls ?? 0}</strong><div style={{ opacity: .6 }}>{copy.providerCalls}</div></div>
             <div><strong style={{ fontSize: 22 }}>{pct(metrics.providerAvoidanceRate)}</strong><div style={{ opacity: .6 }}>{copy.providerAvoidance}</div></div>
             <div><strong style={{ fontSize: 22 }}>{pct(metrics.averageConfidence)}</strong><div style={{ opacity: .6 }}>{copy.averageConfidence}</div></div>
-            <div><strong style={{ fontSize: 22 }}>{Math.round(metrics.averageLatencyMs ?? 0)} ms</strong><div style={{ opacity: .6 }}>{copy.averageLatency}</div></div>
+            <div><strong style={{ fontSize: 22 }}>{Math.round(metrics.averageLatencyMs ?? 0)} {copy.latencyUnit}</strong><div style={{ opacity: .6 }}>{copy.averageLatency}</div></div>
           </div>
         ) : <p style={{ opacity: .55 }}>{copy.metricsUnavailable}</p>}
       </section>

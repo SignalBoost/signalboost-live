@@ -1,4 +1,4 @@
-export { buildRevenueEvent, isRevenueEvent } from './revenue-event'
+export { buildRevenueEvent, isRevenueEvent } from './revenue-event.ts'
 export {
   REVENUE_EVENT_SCHEMA_VERSION,
   type RevenueActorRef,
@@ -9,4 +9,4 @@ export {
   type RevenueEventSource,
   type RevenueEventType,
   type RevenueOrganizationRef,
-} from './types'
+} from './types.ts'

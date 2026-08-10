@@ -12,6 +12,7 @@ import {
 import { isMissingCorpusTable } from './storage.ts'
 
 const FALLBACK_PROFILE_KEY = 'businessIntelligenceCorpus'
+const FALLBACK_COUNT_PAGE_SIZE = 1000
 
 function mapRow(row: any): BusinessIntelligenceRecord {
   return {
@@ -187,12 +188,38 @@ export async function queueCorpusRefresh(args: { canonicalDomain: string; corpus
   }
 }
 
+async function countEnterpriseFallbackCorpus(): Promise<number> {
+  const admin = getAdminSupabase()
+
+  // Prefer an exact server-side JSON-path count so corpus size is independent of
+  // the total Enterprise Memory population and does not stop at an arbitrary row cap.
+  const filtered = await admin
+    .from('enterprise_organizations')
+    .select('id', { count: 'exact', head: true })
+    .not(`profile->${FALLBACK_PROFILE_KEY}`, 'is', null)
+  if (!filtered.error && filtered.count != null) return filtered.count
+
+  // Older PostgREST deployments may reject JSON-path filters. Fall back to complete
+  // pagination rather than the old 10,000-row cap that could report 0 despite
+  // successfully persisted corpus records being later in the table.
+  let total = 0
+  for (let from = 0; ; from += FALLBACK_COUNT_PAGE_SIZE) {
+    const { data, error } = await admin
+      .from('enterprise_organizations')
+      .select('id,profile')
+      .range(from, from + FALLBACK_COUNT_PAGE_SIZE - 1)
+    if (error) return total
+    const page = data || []
+    total += page.filter(row => row?.profile?.[FALLBACK_PROFILE_KEY]).length
+    if (page.length < FALLBACK_COUNT_PAGE_SIZE) break
+  }
+  return total
+}
+
 export async function corpusCount(): Promise<number> {
   const admin = getAdminSupabase()
   const primary = await admin.from('business_intelligence_corpus').select('*', { count: 'exact', head: true })
   if (!primary.error) return primary.count || 0
   if (!isMissingCorpusTable(primary.error)) return 0
-  const { data, error } = await admin.from('enterprise_organizations').select('id,profile').limit(10000)
-  if (error) return 0
-  return (data || []).filter(row => row?.profile?.[FALLBACK_PROFILE_KEY]).length
+  return countEnterpriseFallbackCorpus()
 }

@@ -1,14 +1,15 @@
 // Durable-intent routing boundary for the support API.
 //
 // Long-running owner work is promoted into background jobs BEFORE the bounded chat
-// handler sees it. Cheap deterministic customer help and safe durable reuse are also
-// resolved here BEFORE routeCore initializes an external model client.
+// handler sees it. Cheap deterministic customer help, durable reuse, and COS-local
+// reasoning are resolved here BEFORE routeCore initializes an external model client.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { decideSupportLocalPreflight } from '@/lib/cos-core/layers/autonomy/supportPreflight'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
+import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import {
   isStableSupportReuseCandidate,
   loadSupportReuse,
@@ -81,6 +82,10 @@ function asksEngineeringStatus(text: string): boolean {
     && /\b(fix|repair|engineering|repo|repository|audit|bug|pipeline|platform|mission)\b/i.test(text)
 }
 
+function isMutationShaped(text: string): boolean {
+  return /\b(create|send|publish|deploy|commit|merge|delete|remove|change|update|edit|write|insert|archive|invite|reset|launch|start|run|execute|schedule|upload|approve|cancel|buy|purchase|charge)\b/i.test(text)
+}
+
 function engineeringStatusReply(mission: any): string {
   const state = mission.state || {}
   const trace = Array.isArray(state.trace) ? state.trace.slice(-3) : []
@@ -98,6 +103,7 @@ export async function POST(req: NextRequest) {
   const startedAt = Date.now()
   let reusableKey: string | null = null
   let reusablePrompt = ''
+  let cosFallback: Awaited<ReturnType<typeof tryCOSFirstAnswer>> | null = null
 
   try {
     const copy = req.clone()
@@ -211,14 +217,35 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+
+      // COS-FIRST: informational/read-only questions are now offered to COS's own local
+      // reasoning engine after deterministic/cache checks and BEFORE any Anthropic/OpenAI
+      // client is initialized. Mutation-shaped requests stay on the governed executor path.
+      const hasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
+      if (body?.executeMode !== true && !hasAttachments && !isMutationShaped(text)) {
+        cosFallback = await tryCOSFirstAnswer({
+          prompt: text,
+          userId: access?.userId || null,
+          language: languageCode(body),
+          privileged: isPrivileged,
+        })
+        if (cosFallback.handled) {
+          return routedReply(cosFallback.reply, 'local_cos_reasoning', {
+            providerCalls: 0,
+            local: true,
+            confidence_score: cosFallback.confidence,
+            external_ai_invoked: false,
+            provenance: cosFallback.provenance,
+          })
+        }
+      }
     }
   } catch (error) {
     console.error('support durable-intent/local-preflight router failed:', error)
   }
 
-  // Anything uncertain, current, actionable, privileged, or tool-shaped falls through
-  // to the existing grounded executor. Stable non-privileged answers are remembered
-  // after one successful provider response and can then be served without another call.
+  // Only unresolved, low-confidence, current, actionable, privileged-tool, or mutation
+  // work reaches the cloud-capable executor. This is now the explicit escalation boundary.
   const core = await import('./routeCore')
   const response = await core.POST(req)
 
@@ -232,6 +259,24 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Reuse persistence is best-effort and must never affect the live response.
+    }
+  }
+
+  if (cosFallback && !cosFallback.handled && response.ok) {
+    try {
+      const payload = await response.clone().json()
+      return NextResponse.json({
+        ...payload,
+        external_ai_invoked: true,
+        cos_local_attempt: {
+          attempted: cosFallback.provenance.localModelInvoked,
+          confidence_score: cosFallback.confidence,
+          escalation_reason: cosFallback.reason,
+          provenance: cosFallback.provenance,
+        },
+      }, { status: response.status })
+    } catch {
+      // Preserve the executor response unchanged when it is not JSON.
     }
   }
 

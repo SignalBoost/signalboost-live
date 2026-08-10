@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
+import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
+  let corpus: unknown = null
   if (job === 'daily') {
     try {
       learning = await runDailyAutonomousLearning({ miningSummary: result.summary })
@@ -35,7 +37,19 @@ export async function GET(req: NextRequest) {
       console.error('cron cos daily learning failed:', message)
       learning = { status: 'error', error: message }
     }
+
+    try {
+      const queued = await queueStaleCorpusRecords(250)
+      const refreshed = process.env.PROSPECT_LIVE_PROVIDER_EXECUTION === '1'
+        ? await runCorpusRefreshBatch(25)
+        : { processed: 0, succeeded: 0, failed: 0, results: [], skipped: 'PROSPECT_LIVE_PROVIDER_EXECUTION_DISABLED' }
+      corpus = { queued, refreshed }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Corpus maintenance failed'
+      console.error('cron COS corpus maintenance failed:', message)
+      corpus = { status: 'error', error: message }
+    }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, corpus })
 }

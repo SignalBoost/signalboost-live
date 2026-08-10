@@ -64,6 +64,7 @@ export default function BusinessIntelligenceCorpusPage() {
   const count = status?.count ?? 0
   const target = status?.target ?? 5000
   const completion = status?.completion ?? 0
+  const completionPercent = Number((completion * 100).toFixed(2))
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px', color: '#fff' }}>
@@ -75,7 +76,7 @@ export default function BusinessIntelligenceCorpusPage() {
         <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
           <div><strong style={{ fontSize: 28 }}>{loading ? '…' : count}</strong><div style={{ opacity: .6 }}>{copy.companies}</div></div>
           <div><strong style={{ fontSize: 28 }}>{target}</strong><div style={{ opacity: .6 }}>{copy.target}</div></div>
-          <div><strong style={{ fontSize: 28 }}>{completion}%</strong><div style={{ opacity: .6 }}>{copy.complete}</div></div>
+          <div><strong style={{ fontSize: 28 }}>{completionPercent}%</strong><div style={{ opacity: .6 }}>{copy.complete}</div></div>
         </div>
 
         <button

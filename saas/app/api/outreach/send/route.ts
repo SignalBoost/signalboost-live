@@ -4,18 +4,21 @@ import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendin
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { applyOutreachSignature } from '@/lib/outreach/signature'
 import { getRecipientHistory, duplicateReason, normalizeAddress } from '@/lib/outreach/recipientHistory'
-import { sendEmail } from '@/lib/email'
+import { sendEmail as sendLegacyEmail } from '@/lib/email'
+import { sendCosOutreachEmail } from '@/lib/communication-hub/cos-email'
+import { resolveBuyerEmailDelivery } from '@/lib/communication-hub/runtime'
 import { markOutreachSent } from '@/lib/outreach/markSent'
 
 export const dynamic = 'force-dynamic'
 
-// A COSA-drafted campaign carries its own subject line (written with the body in
-// the campaign language). Use it when present; otherwise keep the generic one so
-// manually generated outreach behaves exactly as before.
 function draftedSubject(outreach: any): string {
   const summary = outreach?.analyzer_summary
   const subject = summary && typeof summary === 'object' ? summary.outreach_subject : ''
   return typeof subject === 'string' ? subject.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))
 }
 
 export async function POST(req: NextRequest) {
@@ -42,8 +45,6 @@ export async function POST(req: NextRequest) {
 
   if (error || !outreach) return NextResponse.json({ error: error?.message || 'Outreach not found' }, { status: 404 })
 
-  // A real send may already exist even when schema drift left outreach_queue.status
-  // stuck at approved. Reconcile instead of sending the same email twice.
   const { data: priorSend } = await ctx.admin
     .from('outreach_sends')
     .select('id,sent_at,metadata')
@@ -65,14 +66,7 @@ export async function POST(req: NextRequest) {
 
   if (outreach.status !== 'approved') return NextResponse.json({ error: 'Outreach must be approved before sending.' }, { status: 409 })
 
-  // Signature and platform link are enforced here, not left to the draft: this covers
-  // rows written by every pipeline, including ones approved before the rule existed.
   const outboundMessage = applyOutreachSignature(String(outreach.outreach_message || ''), outreach.sender_key || 'saasSales')
-
-  // ADDRESS-LEVEL duplicate guard. The per-row check above only knows about THIS row;
-  // this one asks whether the person has already been emailed at all. A human may
-  // override with force:true — that is the deliberate follow-up case — but never by
-  // accident, and the response names exactly what was sent before.
   const recipientAddress = normalizeAddress(outreach.contact_email)
   const force = body?.force === true
   if (!force) {
@@ -95,14 +89,34 @@ export async function POST(req: NextRequest) {
 
   let providerResult: Record<string, unknown> = { mode: 'manual_record_only' }
   if (channel === 'email' && toEmail) {
-    const sent = await sendEmail({
-      from: 'saasSales',
-      to: toEmail,
-      subject: draftedSubject(outreach) || `Useful SignalBoost growth preview for ${outreach.business_name}`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${outboundMessage.replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))}</div>`,
-    })
-    if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed', providerResult: sent }, { status: 502 })
-    providerResult = sent
+    const subject = draftedSubject(outreach) || `Useful SignalBoost growth preview for ${outreach.business_name}`
+    const html = `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${escapeHtml(outboundMessage)}</div>`
+    const delivery = resolveBuyerEmailDelivery(String(ctx.user.id || 'signalboost'))
+
+    if (delivery) {
+      const sent = await sendCosOutreachEmail(delivery, {
+        to: [{ email: toEmail }],
+        subject,
+        text: outboundMessage,
+        html,
+      }, true)
+      if (!sent.ok) {
+        return NextResponse.json({ error: sent.errorCode || 'Email send failed', providerResult: sent }, { status: 502 })
+      }
+      providerResult = { ...sent, providerId: delivery.providerId, communicationHub: true }
+    } else {
+      // Backward-compatible host fallback while existing SignalBoost deployments
+      // migrate to COMMUNICATION_EMAIL_PROVIDER. Buyer deployments should configure
+      // the Communication Hub and therefore never depend on this host-specific path.
+      const sent = await sendLegacyEmail({
+        from: 'saasSales',
+        to: toEmail,
+        subject,
+        html,
+      })
+      if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed', providerResult: sent }, { status: 502 })
+      providerResult = { ...sent, communicationHub: false, legacyFallback: true }
+    }
   }
 
   const sentAt = new Date().toISOString()
@@ -126,9 +140,6 @@ export async function POST(req: NextRequest) {
     metadata: { channel, providerResult, queueReconcile },
   })
 
-  // A provider-accepted email is still a real send even if queue status reconciliation
-  // needed the schema-drift fallback. Return the reconciliation detail instead of
-  // silently pretending the status update succeeded.
   return NextResponse.json({
     ok: true,
     sentAt,

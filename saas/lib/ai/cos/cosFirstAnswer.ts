@@ -32,6 +32,8 @@ export type COSFirstAnswerResult =
       }
     }
 
+type COSFallbackProvenance = Extract<COSFirstAnswerResult, { handled: false }>['provenance']
+
 const STOP_WORDS = new Set([
   'about', 'after', 'again', 'also', 'because', 'before', 'being', 'could', 'does', 'from', 'have', 'into',
   'more', 'most', 'should', 'that', 'their', 'there', 'these', 'they', 'this', 'those', 'through', 'under', 'what',
@@ -206,8 +208,8 @@ export async function tryCOSFirstAnswer(input: {
   language?: string
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
-  const emptyProvenance = {
-    responseSource: 'external_fallback_required' as const,
+  const emptyProvenance: COSFallbackProvenance = {
+    responseSource: 'external_fallback_required',
     externalAiInvoked: false,
     localModelInvoked: false,
     internalSystemsConsulted: ['semantic/exact cache preflight'],

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildRevenueEvent, isRevenueEvent } from '../lib/revenue/events/index.ts'
+import { buildRevenueEvent, isRevenueEvent, type RevenueEventInput } from '../lib/revenue/events/index.ts'
 
 const base = {
   eventId: 'rev_evt_001',
@@ -35,6 +35,17 @@ test('buildRevenueEvent normalizes and freezes a canonical event', () => {
 test('revenue events require tenant boundaries and valid timestamps', () => {
   assert.throws(() => buildRevenueEvent({ ...base, tenant: { tenantId: '', environmentId: 'prod' } }), /tenant_id_required/)
   assert.throws(() => buildRevenueEvent({ ...base, occurredAt: 'not-a-date' }), /occurred_at_invalid/)
+})
+
+test('runtime validation rejects unknown event types and sources', () => {
+  assert.throws(
+    () => buildRevenueEvent({ ...base, type: 'unknown_event' } as unknown as RevenueEventInput),
+    /event_type_invalid/,
+  )
+  assert.throws(
+    () => buildRevenueEvent({ ...base, source: 'unknown_source' } as unknown as RevenueEventInput),
+    /event_source_invalid/,
+  )
 })
 
 test('monetary values require a valid currency pair', () => {

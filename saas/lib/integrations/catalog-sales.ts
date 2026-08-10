@@ -44,6 +44,13 @@ const salesforce: IntegrationProvider = applyProductionCrmAdapter({
   scopes: ['api', 'refresh_token'], docsUrl: 'https://developer.salesforce.com/docs',
   capabilities: ['contact_sync', 'deal_sync', 'activity_log', 'webhooks'],
 })
+const dynamics365: IntegrationProvider = applyProductionCrmAdapter({
+  id: 'dynamics365', label: 'Microsoft Dynamics 365', category: 'crm', auth: 'oauth2',
+  authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+  tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+  scopes: ['offline_access'], docsUrl: 'https://learn.microsoft.com/power-apps/developer/data-platform/webapi/overview',
+  capabilities: ['contact_sync', 'deal_sync', 'activity_log'],
+})
 
 const mailchimp: IntegrationProvider = { id: 'mailchimp', label: 'Mailchimp', category: 'email_marketing', auth: 'oauth2', authUrl: 'https://login.mailchimp.com/oauth2/authorize', tokenUrl: 'https://login.mailchimp.com/oauth2/token', scopes: [], docsUrl: 'https://mailchimp.com/developer/marketing/api/', capabilities: ['list_sync', 'campaign_create', 'automation_trigger', 'email_analytics'] }
 const sendgridMktg: IntegrationProvider = { id: 'sendgrid_marketing', label: 'SendGrid Marketing Campaigns', category: 'email_marketing', auth: 'api_key', docsUrl: 'https://docs.sendgrid.com/api-reference/marketing-campaigns', capabilities: ['list_sync', 'campaign_create', 'email_analytics'] }
@@ -95,7 +102,7 @@ const stripe: IntegrationProvider = { id: 'stripe', label: 'Stripe', category: '
 const paddle: IntegrationProvider = { id: 'paddle', label: 'Paddle', category: 'payments', auth: 'api_key', capabilities: ['subscription', 'invoice'] }
 const lemonsqueezy: IntegrationProvider = { id: 'lemonsqueezy', label: 'Lemon Squeezy', category: 'payments', auth: 'api_key', capabilities: ['payment_link', 'subscription'] }
 
-export const SALES_CATALOG: IntegrationProvider[] = [hubspot, salesforce, mailchimp, sendgridMktg, brevo, activecampaign, constantcontact, klaviyo, omnisend, drip, pipedrive, zohocrm, freshsales, intercom, drift, zendesk, segment, hightouch, rudderstack, apollo, zoominfo, clay, calendly, calcom, stripe, paddle, lemonsqueezy]
+export const SALES_CATALOG: IntegrationProvider[] = [hubspot, salesforce, dynamics365, mailchimp, sendgridMktg, brevo, activecampaign, constantcontact, klaviyo, omnisend, drip, pipedrive, zohocrm, freshsales, intercom, drift, zendesk, segment, hightouch, rudderstack, apollo, zoominfo, clay, calendly, calcom, stripe, paddle, lemonsqueezy]
 
 export function registerSalesCatalog(): void {
   for (const p of SALES_CATALOG) registerProvider(p)

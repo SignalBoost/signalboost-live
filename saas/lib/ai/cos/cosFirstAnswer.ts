@@ -1,6 +1,13 @@
 import { callLocalModel } from '@/lib/ai/local-inference'
 import { loadUserMemories } from '@/lib/ai/tools/userMemory'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
+import {
+  ContinuousLearningDirector,
+  type ContinuousLearningPolicy,
+  type KnowledgeGap,
+} from '@/lib/cos-core/layers/learning'
+import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
+import { cosServiceDb, createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 
 export type COSFirstAnswerResult =
   | {
@@ -11,6 +18,8 @@ export type COSFirstAnswerResult =
         responseSource: 'local_cos_reasoning'
         externalAiInvoked: false
         localModelInvoked: true
+        autonomousResearchInvoked: boolean
+        knowledgeNewlyRetained: number
         internalSystemsConsulted: string[]
         knowledgeFactsUsed: number
         learnedItemsUsed: number
@@ -25,6 +34,8 @@ export type COSFirstAnswerResult =
         responseSource: 'external_fallback_required'
         externalAiInvoked: false
         localModelInvoked: boolean
+        autonomousResearchInvoked: boolean
+        knowledgeNewlyRetained: number
         internalSystemsConsulted: string[]
         knowledgeFactsUsed: number
         learnedItemsUsed: number
@@ -33,6 +44,7 @@ export type COSFirstAnswerResult =
     }
 
 type COSFallbackProvenance = Extract<COSFirstAnswerResult, { handled: false }>['provenance']
+type InternalContext = Awaited<ReturnType<typeof retrieveInternalContext>>
 
 const STOP_WORDS = new Set([
   'about', 'after', 'again', 'also', 'because', 'before', 'being', 'could', 'does', 'from', 'have', 'into',
@@ -40,10 +52,31 @@ const STOP_WORDS = new Set([
   'when', 'where', 'which', 'while', 'with', 'would', 'your', 'you', 'and', 'the', 'for', 'are', 'how', 'why',
 ])
 
+const ZERO_LLM_INLINE_RESEARCH_POLICY: ContinuousLearningPolicy = {
+  allowedSourceKinds: new Set([
+    'official_documentation',
+    'research_paper',
+    'scientific_journal',
+    'library_material',
+    'news_article',
+    'public_dataset',
+    'video_transcript',
+    'approved_public_web',
+  ]),
+  minimumConfidence: 0.72,
+  maxCandidatesPerCycle: 12,
+  maxExternalCostUsdPerCycle: 0,
+}
+
 function configured(): boolean {
   return process.env.COS_LOCAL_FIRST_ENABLED !== 'false'
     && Boolean(process.env.LOCAL_AI_BASE_URL?.trim())
     && Boolean(process.env.LOCAL_AI_MODEL?.trim())
+}
+
+function inlineResearchEnabled(): boolean {
+  return process.env.COS_INLINE_RESEARCH_ENABLED !== 'false'
+    && process.env.COS_LIVE_SOURCES_ENABLED === 'true'
 }
 
 function threshold(): number {
@@ -202,96 +235,163 @@ function parseLocalResult(raw: string): { answer: string; confidence: number } |
   }
 }
 
+function internalPrompt(context: InternalContext): string {
+  return [
+    context.facts.length ? `KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}` : '',
+    context.learned.length ? `CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}` : '',
+    context.memories.length ? `USER ENTERPRISE MEMORY:\n${context.memories.join('\n')}` : '',
+  ].filter(Boolean).join('\n\n')
+}
+
+async function localAttempt(input: {
+  prompt: string
+  language?: string
+  context: InternalContext
+}): Promise<{ answer: string; confidence: number } | null> {
+  const raw = await callLocalModel({
+    temperature: 0.15,
+    maxTokens: 3000,
+    systemPrompt: `You are COS, SignalBoost's local, provider-independent reasoning engine. You are the PRIMARY reasoning layer, not a wrapper around a cloud model. Reason carefully from the user's question, your local model knowledge, and the supplied internal evidence. Distinguish evidence from inference. Never invent having consulted a source that is not present. If evidence is insufficient, lower confidence instead of bluffing. Reply in ${input.language || 'English'}. Return ONLY strict JSON with this shape: {"answer":"complete answer","confidence":0.0}.`,
+    prompt: `${internalPrompt(input.context) || 'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`,
+  }).catch(() => null)
+
+  if (!raw) return null
+  const parsed = parseLocalResult(raw)
+  if (!parsed) return null
+  const evidenceCount = input.context.facts.length + input.context.learned.length
+  const evidenceCeiling = evidenceCount >= 5 ? 0.96 : evidenceCount >= 2 ? 0.90 : evidenceCount === 1 ? 0.84 : 0.78
+  return { answer: parsed.answer, confidence: Math.min(parsed.confidence, evidenceCeiling) }
+}
+
+async function runInlineResearch(prompt: string): Promise<{ attempted: boolean; accepted: number }> {
+  if (!inlineResearchEnabled()) return { attempted: false, accepted: 0 }
+  const store = createSupabaseCOSStores()?.continuousLearning
+  const adapters = createLiveLearningAdapters()
+  if (!store || !adapters.length) return { attempted: false, accepted: 0 }
+
+  const gap: KnowledgeGap = {
+    id: `inline-support-${Date.now()}`,
+    subject: subjectFromPrompt(prompt),
+    question: safeText(prompt, 2000),
+    portableIds: [],
+    expectedReuse: 5,
+    expectedAvoidedCostUsd: 0.05,
+    urgency: 85,
+    evidence: ['COS local reasoning requested bounded research before any external-model fallback.'],
+  }
+
+  try {
+    const director = new ContinuousLearningDirector(store, ZERO_LLM_INLINE_RESEARCH_POLICY)
+    const cycle = new ContinuousLearningCycle(director, adapters)
+    const result = await cycle.run([gap], 0)
+    return { attempted: true, accepted: result.accepted }
+  } catch {
+    return { attempted: true, accepted: 0 }
+  }
+}
+
+function systemsWithResearch(context: InternalContext, researched: boolean): string[] {
+  return researched
+    ? [...new Set([...context.systems, 'Autonomous Research / Continuous Learning'])]
+    : context.systems
+}
+
 export async function tryCOSFirstAnswer(input: {
   prompt: string
   userId?: string | null
   language?: string
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
-  const emptyProvenance: COSFallbackProvenance = {
-    responseSource: 'external_fallback_required',
-    externalAiInvoked: false,
-    localModelInvoked: false,
-    internalSystemsConsulted: ['semantic/exact cache preflight'],
-    knowledgeFactsUsed: 0,
-    learnedItemsUsed: 0,
-    userMemoriesUsed: 0,
-  }
+  let context = await retrieveInternalContext(input.prompt, input.userId)
+  let research = { attempted: false, accepted: 0 }
 
   if (!configured()) {
-    const reason = 'Local COS inference is not configured.'
+    research = await runInlineResearch(input.prompt)
+    if (research.accepted > 0) context = await retrieveInternalContext(input.prompt, input.userId)
+    const reason = 'Local COS inference is not configured after internal retrieval and autonomous research.'
     void recordKnowledgeGap(input.prompt, 0, reason)
-    return { handled: false, confidence: 0, reason, provenance: emptyProvenance }
+    const provenance: COSFallbackProvenance = {
+      responseSource: 'external_fallback_required',
+      externalAiInvoked: false,
+      localModelInvoked: false,
+      autonomousResearchInvoked: research.attempted,
+      knowledgeNewlyRetained: research.accepted,
+      internalSystemsConsulted: systemsWithResearch(context, research.attempted),
+      knowledgeFactsUsed: context.facts.length,
+      learnedItemsUsed: context.learned.length,
+      userMemoriesUsed: context.memories.length,
+    }
+    return { handled: false, confidence: 0, reason, provenance }
   }
 
-  const context = await retrieveInternalContext(input.prompt, input.userId)
-  const evidenceCount = context.facts.length + context.learned.length
-  const internalContext = [
-    context.facts.length ? `KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}` : '',
-    context.learned.length ? `CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}` : '',
-    context.memories.length ? `USER ENTERPRISE MEMORY:\n${context.memories.join('\n')}` : '',
-  ].filter(Boolean).join('\n\n')
-
-  const raw = await callLocalModel({
-    temperature: 0.15,
-    maxTokens: 3000,
-    systemPrompt: `You are COS, SignalBoost's local, provider-independent reasoning engine. You are the PRIMARY reasoning layer, not a wrapper around a cloud model. Reason carefully from the user's question, your local model knowledge, and the supplied internal evidence. Distinguish evidence from inference. Never invent having consulted a source that is not present. If evidence is insufficient, lower confidence instead of bluffing. Reply in ${input.language || 'English'}. Return ONLY strict JSON with this shape: {"answer":"complete answer","confidence":0.0}.`,
-    prompt: `${internalContext || 'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`,
-  }).catch(() => null)
-
-  const provenanceBase = {
-    externalAiInvoked: false as const,
-    localModelInvoked: true as const,
-    internalSystemsConsulted: context.systems,
-    knowledgeFactsUsed: context.facts.length,
-    learnedItemsUsed: context.learned.length,
-    userMemoriesUsed: context.memories.length,
-  }
-
-  if (!raw) {
-    const reason = 'Local COS inference did not return an answer.'
-    void recordKnowledgeGap(input.prompt, 0, reason)
+  let attempt = await localAttempt({ prompt: input.prompt, language: input.language, context })
+  if (attempt && attempt.confidence >= threshold()) {
+    void resolveKnowledgeGap(input.prompt)
     return {
-      handled: false,
-      confidence: 0,
-      reason,
-      provenance: { responseSource: 'external_fallback_required', ...provenanceBase },
+      handled: true,
+      reply: attempt.answer,
+      confidence: attempt.confidence,
+      provenance: {
+        responseSource: 'local_cos_reasoning',
+        externalAiInvoked: false,
+        localModelInvoked: true,
+        autonomousResearchInvoked: false,
+        knowledgeNewlyRetained: 0,
+        internalSystemsConsulted: context.systems,
+        knowledgeFactsUsed: context.facts.length,
+        learnedItemsUsed: context.learned.length,
+        userMemoriesUsed: context.memories.length,
+      },
     }
   }
 
-  const parsed = parseLocalResult(raw)
-  if (!parsed) {
-    const reason = 'Local COS inference returned an unparseable result.'
-    void recordKnowledgeGap(input.prompt, 0, reason)
+  // Before any provider escalation, COS gets one bounded research pass across approved
+  // live sources (YouTube transcripts, scientific/technical feeds, official docs, etc.),
+  // retains admissible knowledge, reloads its internal context and retries local reasoning.
+  research = await runInlineResearch(input.prompt)
+  if (research.accepted > 0) context = await retrieveInternalContext(input.prompt, input.userId)
+  attempt = await localAttempt({ prompt: input.prompt, language: input.language, context })
+
+  if (attempt && attempt.confidence >= threshold()) {
+    void resolveKnowledgeGap(input.prompt)
     return {
-      handled: false,
-      confidence: 0,
-      reason,
-      provenance: { responseSource: 'external_fallback_required', ...provenanceBase },
+      handled: true,
+      reply: attempt.answer,
+      confidence: attempt.confidence,
+      provenance: {
+        responseSource: 'local_cos_reasoning',
+        externalAiInvoked: false,
+        localModelInvoked: true,
+        autonomousResearchInvoked: research.attempted,
+        knowledgeNewlyRetained: research.accepted,
+        internalSystemsConsulted: systemsWithResearch(context, research.attempted),
+        knowledgeFactsUsed: context.facts.length,
+        learnedItemsUsed: context.learned.length,
+        userMemoriesUsed: context.memories.length,
+      },
     }
   }
 
-  // Confidence is not accepted blindly from the model. Durable internal evidence raises
-  // the ceiling; an unsupported local answer can still pass, but only at a conservative cap.
-  const evidenceCeiling = evidenceCount >= 5 ? 0.96 : evidenceCount >= 2 ? 0.90 : evidenceCount === 1 ? 0.84 : 0.78
-  const confidence = Math.min(parsed.confidence, evidenceCeiling)
+  const confidence = attempt?.confidence ?? 0
+  const reason = attempt
+    ? `COS confidence ${confidence.toFixed(2)} remains below escalation threshold ${threshold().toFixed(2)} after autonomous research.`
+    : 'COS local inference did not produce a usable answer after autonomous research.'
+  void recordKnowledgeGap(input.prompt, confidence, reason)
 
-  if (confidence < threshold()) {
-    const reason = `Local COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`
-    void recordKnowledgeGap(input.prompt, confidence, reason)
-    return {
-      handled: false,
-      confidence,
-      reason,
-      provenance: { responseSource: 'external_fallback_required', ...provenanceBase },
-    }
-  }
-
-  void resolveKnowledgeGap(input.prompt)
   return {
-    handled: true,
-    reply: parsed.answer,
+    handled: false,
     confidence,
-    provenance: { responseSource: 'local_cos_reasoning', ...provenanceBase },
+    reason,
+    provenance: {
+      responseSource: 'external_fallback_required',
+      externalAiInvoked: false,
+      localModelInvoked: true,
+      autonomousResearchInvoked: research.attempted,
+      knowledgeNewlyRetained: research.accepted,
+      internalSystemsConsulted: systemsWithResearch(context, research.attempted),
+      knowledgeFactsUsed: context.facts.length,
+      learnedItemsUsed: context.learned.length,
+      userMemoriesUsed: context.memories.length,
+    },
   }
 }

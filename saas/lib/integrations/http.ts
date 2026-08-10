@@ -14,10 +14,10 @@ export async function integrationJson(
   fetcher: FetchLike,
   url: string,
   init?: RequestInit,
-): Promise<{ ok: boolean; status: number; data: any }> {
+): Promise<{ ok: boolean; status: number; data: any; headers: Headers }> {
   const response = await fetcher(url, init)
   const data = await response.json().catch(() => ({}))
-  return { ok: response.ok, status: response.status, data }
+  return { ok: response.ok, status: response.status, data, headers: response.headers }
 }
 
 export function bearer(token?: string): Record<string, string> {

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-09T23:30:00.000Z",
+  "prospects": [
+    {"id":"US-READY-001","company":"Caylent","country":"US","website":"https://caylent.com/","email":"hello@caylent.com","industry":"Cloud/DevOps","technicalFit":97,"revenuePotential":95,"status":"READY"},
+    {"id":"US-READY-002","company":"Cloudticity","country":"US","website":"https://www.cloudticity.com/","email":"sales@cloudticity.com","industry":"Managed Cloud","technicalFit":96,"revenuePotential":94,"status":"READY"},
+    {"id":"US-READY-003","company":"ClearScale","country":"US","website":"https://www.clearscale.com/","email":"info@clearscale.com","industry":"AWS Consulting","technicalFit":95,"revenuePotential":94,"status":"READY"},
+    {"id":"US-READY-004","company":"Mission Cloud","country":"US","website":"https://www.missioncloud.com/","email":"sales@missioncloud.com","industry":"AWS Managed Services","technicalFit":98,"revenuePotential":97,"status":"READY"},
+    {"id":"US-READY-005","company":"Burwood Group","country":"US","website":"https://www.burwood.com/","email":"info@burwood.com","industry":"Cloud/Managed IT","technicalFit":90,"revenuePotential":89,"status":"READY"},
+    {"id":"US-READY-006","company":"AHEAD","country":"US","website":"https://www.ahead.com/","email":"info@ahead.com","industry":"Cloud/Platform Engineering","technicalFit":94,"revenuePotential":97,"status":"READY"},
+    {"id":"US-READY-007","company":"InterVision Systems","country":"US","website":"https://intervision.com/","email":"CAQuotes@intervision.com","industry":"Managed Cloud","technicalFit":92,"revenuePotential":91,"status":"READY"},
+    {"id":"US-READY-008","company":"OpsLogic","country":"US","website":"https://opslogic.co/","email":"info@opslogic.co","industry":"DevOps/SRE","technicalFit":98,"revenuePotential":84,"status":"READY"},
+    {"id":"US-READY-009","company":"C-3 Solutions","country":"US","website":"https://c-3solutions.com/","email":"info@c-3solutions.com","industry":"Cloud/DevOps","technicalFit":90,"revenuePotential":79,"status":"READY"},
+    {"id":"US-READY-010","company":"CloudXpertize","country":"US","website":"https://cloudxpertize.com/","email":"biz@cloudxpertize.com","industry":"Cloud/DevOps","technicalFit":95,"revenuePotential":82,"status":"READY"},
+    {"id":"US-READY-011","company":"Shadow-Soft","country":"US","website":"https://shadow-soft.com/","email":"contact@shadow-soft.com","industry":"Kubernetes/Platform Engineering","technicalFit":98,"revenuePotential":88,"status":"READY"},
+    {"id":"US-READY-012","company":"EPI-USE Services for AWS","country":"US","website":"https://www.epiusecloud.com/","email":"aws@epiuse.com","industry":"AWS Managed Services","technicalFit":99,"revenuePotential":96,"status":"READY"},
+    {"id":"PL-READY-001","company":"Hostersi","country":"PL","website":"https://www.hostersi.pl/","email":"kontakt@hostersi.pl","industry":"Managed Cloud","technicalFit":98,"revenuePotential":91,"status":"READY"},
+    {"id":"PL-READY-002","company":"LCloud","country":"PL","website":"https://lcloud.pl/","email":"kontakt@lcloud.pl","industry":"AWS/GCP/DevOps","technicalFit":98,"revenuePotential":90,"status":"READY"},
+    {"id":"PL-READY-003","company":"CloudFerro","country":"PL","website":"https://cloudferro.com/","email":"info@cloudferro.com","industry":"Cloud Infrastructure","technicalFit":91,"revenuePotential":94,"status":"READY"},
+    {"id":"PL-READY-004","company":"Devapo","country":"PL","website":"https://devapo.io/","email":"contact@devapo.io","industry":"Cloud Native","technicalFit":87,"revenuePotential":84,"status":"READY"},
+    {"id":"PL-READY-005","company":"GetInData","country":"PL","website":"https://getindata.com/","email":"hello@getindata.com","industry":"Cloud/Data/AI","technicalFit":89,"revenuePotential":88,"status":"READY"},
+    {"id":"PL-READY-006","company":"CodiLime","country":"PL","website":"https://codilime.com/","email":"contact@codilime.com","industry":"Cloud Native/Networking","technicalFit":93,"revenuePotential":90,"status":"READY"},
+    {"id":"PL-READY-007","company":"SoftwareMill","country":"PL","website":"https://softwaremill.com/","email":"hello@softwaremill.com","industry":"Kubernetes/SRE","technicalFit":97,"revenuePotential":89,"status":"READY"},
+    {"id":"PL-READY-008","company":"Mysterious Code","country":"PL","website":"https://mysteriouscode.pl/","email":"kontakt@mysteriouscode.pl","industry":"AWS/DevOps","technicalFit":98,"revenuePotential":81,"status":"READY"},
+    {"id":"PL-READY-009","company":"Cloudowski","country":"PL","website":"https://cloudowski.com/","email":"tomasz@cloudowski.com","industry":"Kubernetes/DevOps","technicalFit":90,"revenuePotential":72,"status":"READY"},
+    {"id":"PL-READY-010","company":"Eficode Poland","country":"PL","website":"https://www.eficode.com/","email":"sales@eficode.com","industry":"Managed DevOps","technicalFit":97,"revenuePotential":96,"status":"READY"},
+    {"id":"PL-READY-011","company":"Chaos Gears","country":"PL","website":"https://chaosgears.com/","email":"hello@chaosgears.com","industry":"AWS Managed Cloud","technicalFit":99,"revenuePotential":93,"status":"READY"}
+  ]
+}

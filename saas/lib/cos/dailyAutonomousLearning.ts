@@ -6,6 +6,7 @@ import {
   type ContinuousLearningStore,
   type KnowledgeGap,
 } from '@/lib/cos-core/layers/learning'
+import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { runLearningCycleWithTelemetry, type ContinuousLearningMetric, type ContinuousLearningTelemetrySink } from '@/lib/cos-core/layers/learning/telemetry'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import type { MiningRunSummary } from '@/lib/cos/mining/types'
@@ -31,6 +32,7 @@ const ZERO_LLM_POLICY: ContinuousLearningPolicy = {
 export type DailyLearningResult = LearningCycleResult & {
   status: 'learned' | 'skipped'
   approvedUrls: number
+  autonomousGaps: number
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
@@ -130,12 +132,14 @@ export async function runDailyAutonomousLearning(input: {
   adapters?: ContinuousLearningSourceAdapter[]
   telemetry?: ContinuousLearningTelemetrySink
   approvedUrls?: string[]
+  gapSignals?: KnowledgeGapSignal[]
 }): Promise<DailyLearningResult> {
   const persistentStore = input.store ?? createSupabaseCOSStores()?.continuousLearning
   if (!persistentStore) {
     return {
       status: 'skipped',
       approvedUrls: 0,
+      autonomousGaps: 0,
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
@@ -145,6 +149,8 @@ export async function runDailyAutonomousLearning(input: {
   }
 
   const approvedUrls = input.approvedUrls ?? parseApprovedLearningUrls()
+  const autonomousGaps = generateKnowledgeGaps(input.gapSignals ?? [])
+  const gaps = [miningGap(input.miningSummary), ...autonomousGaps]
   const adapters = [
     miningAdapter(input.miningSummary),
     ...(approvedUrls.length ? [approvedUrlLearningAdapter(approvedUrls)] : []),
@@ -153,9 +159,15 @@ export async function runDailyAutonomousLearning(input: {
   const director = new ContinuousLearningDirector(persistentStore, ZERO_LLM_POLICY)
   const cycle = new ContinuousLearningCycle(director, adapters)
   const result = await runLearningCycleWithTelemetry(
-    () => cycle.run([miningGap(input.miningSummary)], 0),
+    () => cycle.run(gaps, 0),
     input.telemetry ?? consoleTelemetry,
   )
 
-  return { status: 'learned', approvedUrls: approvedUrls.length, ...result, externalCostUsd: 0 }
+  return {
+    status: 'learned',
+    approvedUrls: approvedUrls.length,
+    autonomousGaps: autonomousGaps.length,
+    ...result,
+    externalCostUsd: 0,
+  }
 }

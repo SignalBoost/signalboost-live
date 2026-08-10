@@ -27,8 +27,19 @@ function env(name: string | undefined) {
   return value && value.trim() ? value.trim() : undefined
 }
 
+function requireHttpsUrl(value: string) {
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    throw new Error('PROSPECT_PROVIDER_URL_INVALID')
+  }
+  if (parsed.protocol !== 'https:') throw new Error('PROSPECT_PROVIDER_HTTPS_REQUIRED')
+  return value.replace(/\/$/, '')
+}
+
 function baseUrl(definition: ProviderDefinition) {
-  return (env(definition.baseUrlEnv) || definition.baseUrl).replace(/\/$/, '')
+  return requireHttpsUrl(env(definition.baseUrlEnv) || definition.baseUrl)
 }
 
 function operation(definition: ProviderDefinition, capability: ProspectProviderCapability) {
@@ -40,8 +51,10 @@ function operation(definition: ProviderDefinition, capability: ProspectProviderC
 }
 
 function absolute(base: string, path: string) {
-  if (/^https:\/\//i.test(path)) return path
-  return `${base}${path.startsWith('/') ? '' : '/'}${path}`
+  const candidate = /^https?:\/\//i.test(path)
+    ? path
+    : `${base}${path.startsWith('/') ? '' : '/'}${path}`
+  return requireHttpsUrl(candidate)
 }
 
 function providerInput(input: unknown) {
@@ -102,7 +115,10 @@ class HttpProspectAdapter implements ProspectProviderAdapter {
   readonly providerId: string
   readonly displayName: string
   readonly capabilities: readonly ProspectProviderCapability[]
-  constructor(private readonly definition: ProviderDefinition) {
+  readonly definition: ProviderDefinition
+
+  constructor(definition: ProviderDefinition) {
+    this.definition = definition
     this.providerId = definition.providerId
     this.displayName = definition.displayName
     this.capabilities = definition.capabilities
@@ -110,6 +126,7 @@ class HttpProspectAdapter implements ProspectProviderAdapter {
 
   async testConnection(context: ProspectProviderContext): Promise<ProspectProviderHealth> {
     try {
+      baseUrl(this.definition)
       await authHeaders(this.definition, context)
       return { state: 'healthy', checkedAt: new Date().toISOString() }
     } catch (error) {

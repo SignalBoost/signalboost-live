@@ -1,6 +1,7 @@
 import type { ControlledLearningProgramConfig } from './program'
 
 export type LearningTriggerEnvironment = {
+  [key: string]: string | undefined
   COS_AUTONOMOUS_LEARNING_ENABLED?: string
   COS_AUTONOMOUS_LEARNING_MAX_GAPS?: string
   COS_AUTONOMOUS_LEARNING_MIN_REUSE?: string

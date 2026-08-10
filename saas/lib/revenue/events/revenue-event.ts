@@ -2,6 +2,32 @@ import { REVENUE_EVENT_SCHEMA_VERSION, type RevenueEvent, type RevenueEventInput
 
 const SECRET_KEY = /(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|cookie|private[_-]?key)/i
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/
+const EVENT_TYPES = new Set([
+  'lead_created',
+  'contact_created',
+  'prospect_enriched',
+  'email_sent',
+  'email_opened',
+  'email_clicked',
+  'reply_received',
+  'meeting_booked',
+  'meeting_completed',
+  'opportunity_created',
+  'opportunity_advanced',
+  'opportunity_won',
+  'opportunity_lost',
+  'invoice_paid',
+  'renewal_completed',
+])
+const EVENT_SOURCES = new Set([
+  'communication_hub',
+  'crm_hub',
+  'prospect_hub',
+  'revenue_hub',
+  'manual',
+  'universal_adapter',
+  'external_provider',
+])
 
 function assertNonEmpty(value: string | undefined, field: string): void {
   if (!value || !value.trim()) throw new Error(`${field}_required`)
@@ -45,6 +71,8 @@ export function buildRevenueEvent(input: RevenueEventInput, now = new Date().toI
   assertNonEmpty(input.eventId, 'event_id')
   assertNonEmpty(input.tenant?.tenantId, 'tenant_id')
   assertNonEmpty(input.tenant?.environmentId, 'environment_id')
+  if (!EVENT_TYPES.has(input.type)) throw new Error('event_type_invalid')
+  if (!EVENT_SOURCES.has(input.source)) throw new Error('event_source_invalid')
   assertIsoTimestamp(input.occurredAt, 'occurred_at')
 
   const receivedAt = input.receivedAt ?? now
@@ -75,7 +103,7 @@ export function buildRevenueEvent(input: RevenueEventInput, now = new Date().toI
     ...(input.campaign ? { campaign: { ...input.campaign } } : {}),
     ...(input.opportunityId?.trim() ? { opportunityId: input.opportunityId.trim() } : {}),
     ...(input.pipelineId?.trim() ? { pipelineId: input.pipelineId.trim() } : {}),
-    ...(input.value !== undefined ? { value: input.value, currency } : {}),
+    ...(input.value !== undefined ? { value: input.value, currency: currency as string } : {}),
     metadata: { ...metadata },
     confidence,
     evidenceRefs: [...new Set(input.evidenceRefs ?? [])].filter(Boolean).sort(),

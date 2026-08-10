@@ -98,16 +98,32 @@ function honestCorrection(languageCode: string): string {
  * Applies to ALL sessions, owner included: the owner is the one who received the
  * fabricated investigation, and an owner is not better served by fiction.
  */
+/**
+ * True when `reply` narrates tool execution — claims it is underway/done, or frames a
+ * real tool name as being invoked. Exposed on its own so the route can choose the
+ * stronger response first: a RETRY with tool_choice forced, so the model has no way to
+ * end its turn without actually calling something. The append below is the fallback
+ * for when the retry budget is gone.
+ */
+export function detectsNarratedExecution(reply: string): boolean {
+  if (!reply) return false
+  if (EXECUTION_CLAIM.test(reply)) return true
+  return KNOWN_TOOL_NAME.test(reply) && INVOCATION_FRAME.test(reply)
+}
+
+/**
+ * The corrective user turn injected before the forced retry. Deliberately blunt and in
+ * English regardless of user language — it is machine-to-model, never shown to a person.
+ */
+export const NARRATED_EXECUTION_RETRY_INSTRUCTION =
+  'STOP. Your previous message DESCRIBED tool calls ("I will call...", "executing now") but made none — zero tool_use blocks were emitted, nothing ran, and the user received fiction dressed as an investigation. Do not describe, announce, or plan tool calls. CALL them. Begin executing the first concrete step of your own plan immediately with a real tool invocation. Text without a tool call is not an acceptable next message.'
+
 export function guardNarratedExecution(
   reply: string,
   toolsFiredCount: number,
   languageCode: string,
 ): string {
   if (!reply || toolsFiredCount > 0) return reply
-
-  const claimsExecution = EXECUTION_CLAIM.test(reply)
-  const narratesInvocation = KNOWN_TOOL_NAME.test(reply) && INVOCATION_FRAME.test(reply)
-  if (!claimsExecution && !narratesInvocation) return reply
-
+  if (!detectsNarratedExecution(reply)) return reply
   return `${reply}\n\n${honestCorrection(languageCode)}`
 }

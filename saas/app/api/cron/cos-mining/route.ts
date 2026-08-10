@@ -3,6 +3,7 @@
 // CRON_SECRET exactly like the other crons. ?job=daily (default) or ?job=weekly.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 
 export const runtime = 'nodejs'
@@ -20,9 +21,21 @@ export async function GET(req: NextRequest) {
   const job = jobParam === 'weekly' ? 'weekly' : 'daily'
 
   const result = await runMiningPipeline({ job, actor: 'cron' })
-  if (!result.ok) {
+  if (!result.ok || !result.summary) {
     console.error('cron cos-mining failed:', result.error)
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
   }
-  return NextResponse.json({ ok: true, summary: result.summary })
+
+  let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
+  if (job === 'daily') {
+    try {
+      learning = await runDailyAutonomousLearning({ miningSummary: result.summary })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Daily learning failed'
+      console.error('cron cos daily learning failed:', message)
+      learning = { status: 'error', error: message }
+    }
+  }
+
+  return NextResponse.json({ ok: true, summary: result.summary, learning })
 }

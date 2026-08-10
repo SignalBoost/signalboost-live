@@ -60,8 +60,73 @@ function queryTerms(prompt: string): string[] {
   )].slice(0, 6)
 }
 
+function subjectFromPrompt(prompt: string): string {
+  return queryTerms(prompt).slice(0, 4).join(' ') || 'general reasoning'
+}
+
 function safeText(value: unknown, max = 1200): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+async function recordKnowledgeGap(prompt: string, confidence: number, reason: string): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  try {
+    const subject = subjectFromPrompt(prompt)
+    const question = safeText(prompt, 2000)
+    const capability = 'general_reasoning'
+    const existing = await db.from('cos_learning_gaps')
+      .select('id,repeated_count')
+      .eq('task_id', 'support')
+      .eq('subject', subject)
+      .eq('question', question)
+      .eq('capability', capability)
+      .maybeSingle()
+
+    if (existing.data?.id) {
+      await db.from('cos_learning_gaps').update({
+        confidence,
+        escalation_reason: safeText(reason, 1000),
+        repeated_count: Number(existing.data.repeated_count || 1) + 1,
+        status: 'pending',
+        last_seen_at: new Date().toISOString(),
+        resolved_at: null,
+      }).eq('id', existing.data.id)
+      return
+    }
+
+    await db.from('cos_learning_gaps').insert({
+      task_id: 'support',
+      subject,
+      question,
+      capability,
+      confidence,
+      escalation_reason: safeText(reason, 1000),
+      repeated_count: 1,
+      status: 'pending',
+      last_seen_at: new Date().toISOString(),
+    })
+  } catch {
+    // Gap persistence is best-effort during migrations and must never break a live answer.
+  }
+}
+
+async function resolveKnowledgeGap(prompt: string): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  try {
+    await db.from('cos_learning_gaps').update({
+      status: 'resolved',
+      resolved_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+    })
+      .eq('task_id', 'support')
+      .eq('question', safeText(prompt, 2000))
+      .eq('capability', 'general_reasoning')
+      .in('status', ['pending', 'learning', 'failed'])
+  } catch {
+    // Best-effort only.
+  }
 }
 
 async function retrieveInternalContext(prompt: string, userId?: string | null) {
@@ -152,7 +217,9 @@ export async function tryCOSFirstAnswer(input: {
   }
 
   if (!configured()) {
-    return { handled: false, confidence: 0, reason: 'Local COS inference is not configured.', provenance: emptyProvenance }
+    const reason = 'Local COS inference is not configured.'
+    void recordKnowledgeGap(input.prompt, 0, reason)
+    return { handled: false, confidence: 0, reason, provenance: emptyProvenance }
   }
 
   const context = await retrieveInternalContext(input.prompt, input.userId)
@@ -180,20 +247,24 @@ export async function tryCOSFirstAnswer(input: {
   }
 
   if (!raw) {
+    const reason = 'Local COS inference did not return an answer.'
+    void recordKnowledgeGap(input.prompt, 0, reason)
     return {
       handled: false,
       confidence: 0,
-      reason: 'Local COS inference did not return an answer.',
+      reason,
       provenance: { responseSource: 'external_fallback_required', ...provenanceBase },
     }
   }
 
   const parsed = parseLocalResult(raw)
   if (!parsed) {
+    const reason = 'Local COS inference returned an unparseable result.'
+    void recordKnowledgeGap(input.prompt, 0, reason)
     return {
       handled: false,
       confidence: 0,
-      reason: 'Local COS inference returned an unparseable result.',
+      reason,
       provenance: { responseSource: 'external_fallback_required', ...provenanceBase },
     }
   }
@@ -204,14 +275,17 @@ export async function tryCOSFirstAnswer(input: {
   const confidence = Math.min(parsed.confidence, evidenceCeiling)
 
   if (confidence < threshold()) {
+    const reason = `Local COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`
+    void recordKnowledgeGap(input.prompt, confidence, reason)
     return {
       handled: false,
       confidence,
-      reason: `Local COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`,
+      reason,
       provenance: { responseSource: 'external_fallback_required', ...provenanceBase },
     }
   }
 
+  void resolveKnowledgeGap(input.prompt)
   return {
     handled: true,
     reply: parsed.answer,

@@ -45,8 +45,28 @@ create unique index if not exists bic_refresh_one_active_per_domain
   on public.business_intelligence_corpus_refresh_queue (canonical_domain)
   where status in ('queued','running');
 
+create table if not exists public.business_intelligence_corpus_metrics (
+  id uuid primary key default gen_random_uuid(),
+  query_text text not null default '',
+  canonical_domain text,
+  internal_hit boolean not null default false,
+  sufficient boolean not null default false,
+  provider_called boolean not null default false,
+  provider_id text,
+  confidence numeric not null default 0 check (confidence >= 0 and confidence <= 1),
+  latency_ms integer not null default 0,
+  outcome text not null default 'not_found',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists bic_metrics_created_idx on public.business_intelligence_corpus_metrics (created_at desc);
+create index if not exists bic_metrics_provider_idx on public.business_intelligence_corpus_metrics (provider_called, provider_id);
+create index if not exists bic_metrics_internal_idx on public.business_intelligence_corpus_metrics (internal_hit, sufficient);
+
 alter table public.business_intelligence_corpus enable row level security;
 alter table public.business_intelligence_corpus_refresh_queue enable row level security;
+alter table public.business_intelligence_corpus_metrics enable row level security;
 
 comment on table public.business_intelligence_corpus is 'SignalBoost internal-first reusable company intelligence corpus. Service-role access only.';
 comment on table public.business_intelligence_corpus_refresh_queue is 'Background refresh/enrichment work for stale or insufficient corpus records.';
+comment on table public.business_intelligence_corpus_metrics is 'Internal-first lookup and provider-avoidance evidence for the Business Intelligence Corpus.';

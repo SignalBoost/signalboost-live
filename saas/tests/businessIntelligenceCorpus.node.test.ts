@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { CORPUS_DEFAULT_MIN_CONFIDENCE, CORPUS_TARGET_RECORDS, clampConfidence, isFresh, normalizeDomain } from '../lib/business-intelligence-corpus/contracts'
+import { summarizeCorpusMetrics } from '../lib/business-intelligence-corpus/metrics'
 import { evaluateCorpusEvidence } from '../lib/prospect-intelligence/corpus-policy.ts'
 import { corpusAvoidanceEvent } from '../lib/prospect-intelligence/corpus-telemetry.ts'
 import { buildCorpusRefreshPlan } from '../lib/prospect-intelligence/corpus-refresh.ts'
@@ -62,4 +63,20 @@ test('background refresh prioritizes weak recently-used records', () => {
     { id: 'weak-unused', evidence: [{ source: 'curated_file', confidence: 0.4, completeness: 0.5, verifiedAt: '2020-01-01T00:00:00.000Z' }], priority: 0.2 },
   ], { now })
   assert.deepEqual(plan.map(item => item.id), ['weak-recent', 'weak-unused'])
+})
+
+test('corpus metrics prove provider avoidance and internal resolution rate', () => {
+  const summary = summarizeCorpusMetrics([
+    { internal_hit: true, provider_called: false, confidence: 0.95, latency_ms: 10, outcome: 'resolved' },
+    { internal_hit: true, provider_called: false, confidence: 0.85, latency_ms: 20, outcome: 'resolved' },
+    { internal_hit: false, provider_called: true, confidence: 0.9, latency_ms: 100, outcome: 'resolved' },
+    { internal_hit: false, provider_called: false, confidence: 0, latency_ms: 5, outcome: 'not_found' },
+  ])
+  assert.equal(summary.lookups, 4)
+  assert.equal(summary.internalResolutions, 2)
+  assert.equal(summary.providerCalls, 1)
+  assert.equal(summary.internalResolutionRate, 0.5)
+  assert.equal(summary.providerAvoidanceRate, 0.75)
+  assert.equal(summary.averageConfidence, 0.675)
+  assert.equal(summary.averageLatencyMs, 33.75)
 })

@@ -219,13 +219,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Tool/mutation-shaped work remains on the governed executor. All other unresolved
-      // support questions get one COS-local reasoning attempt before any cloud provider.
+      // Successful owner engineering/campaign routing returns above. Every other
+      // non-execution question must traverse COS-first, even if an intent classifier
+      // recognized engineering vocabulary but could not start a mission.
       cosPrompt = text
       cosLanguage = languageCode(body)
       cosUserId = access?.userId || null
       cosPrivileged = isPrivileged
-      cosEligible = body?.executeMode !== true && !isOwnerEngineeringRequest(text)
+      cosEligible = body?.executeMode !== true
     }
   } catch (error) {
     console.error('support durable-intent/local-preflight router failed:', error)
@@ -248,9 +249,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Anything current, actionable, tool-shaped, or below COS confidence falls through
-  // to the existing grounded executor. Stable non-privileged answers are remembered
-  // after one successful provider response and can then be served without another call.
+  // Only after COS internal retrieval, local reasoning, and (when enabled) one bounded
+  // autonomous-research retry does unresolved work reach the governed external executor.
   const core = await import('./routeCore')
   const response = await core.POST(req)
 
@@ -277,6 +277,8 @@ export async function POST(req: NextRequest) {
           attempted: cosFallback.provenance.localModelInvoked,
           confidence_score: cosFallback.confidence,
           escalation_reason: cosFallback.reason,
+          autonomous_research_invoked: cosFallback.provenance.autonomousResearchInvoked,
+          knowledge_newly_retained: cosFallback.provenance.knowledgeNewlyRetained,
           provenance: cosFallback.provenance,
         },
       }, { status: response.status })

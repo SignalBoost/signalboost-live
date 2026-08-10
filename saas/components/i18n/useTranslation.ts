@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t as translate } from '@/lib/i18n/t'
 import { auditUiText } from '@/lib/i18n/auditUiCopy'
+import { BUSINESS_INTELLIGENCE_CORPUS_COPY } from '@/lib/i18n/businessIntelligenceCorpusCopy'
 
 export function useTranslation() {
   const { dict, lang, setLang } = useI18n()
@@ -16,11 +17,12 @@ export function useTranslation() {
   // only when the language actually changes — effects run once per mount as intended.
   const t = useCallback(
     (key: string, fallback: string = key): string => {
-      // This owner-only route is the status page for prospect/background campaign jobs.
-      // Its navbar entry previously fell back to "All Campaigns — Campaign Console",
-      // which made the real page effectively undiscoverable. Reuse the page's existing
-      // five-language copy so the menu names the destination exactly as the page does.
+      // Owner-only destinations that already maintain dedicated five-language copy
+      // reuse that copy in navigation rather than creating duplicate locale debt.
       if (key === 'nav.backgroundCampaigns') return auditUiText(lang, 'Background campaigns')
+      if (key === 'nav.businessIntelligenceCorpus') {
+        return (BUSINESS_INTELLIGENCE_CORPUS_COPY[lang] || BUSINESS_INTELLIGENCE_CORPUS_COPY.en).eyebrow
+      }
       return translate(dict, key, fallback)
     },
     [dict, lang],

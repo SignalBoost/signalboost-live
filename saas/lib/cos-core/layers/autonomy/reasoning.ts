@@ -22,6 +22,19 @@ export type LocalReasoningPolicy = {
   minimumKnownSteps: number
 }
 
+export type OutcomeVerification = {
+  checks: Array<{ name: string; passed: boolean; weight?: number }>
+  latencyMs: number
+  externalCostUsd?: number
+}
+
+export type OutcomeAssessment = {
+  score: number
+  succeeded: boolean
+  passedChecks: number
+  totalChecks: number
+}
+
 export const DEFAULT_LOCAL_REASONING_POLICY: LocalReasoningPolicy = {
   escalationThreshold: 0.62,
   minimumKnownSteps: 1,
@@ -57,6 +70,24 @@ function confidenceFor(task: LocalReasoningTask, strategy: LearnedStrategy | nul
   return Math.max(0, Math.min(1, score))
 }
 
+function assessVerification(verification: OutcomeVerification): OutcomeAssessment {
+  const valid = verification.checks.filter(check => check.name.trim())
+  if (!valid.length) return { score: 0, succeeded: false, passedChecks: 0, totalChecks: 0 }
+  let earned = 0
+  let possible = 0
+  let passedChecks = 0
+  for (const check of valid) {
+    const weight = Number.isFinite(check.weight) && (check.weight ?? 0) > 0 ? check.weight! : 1
+    possible += weight
+    if (check.passed) {
+      earned += weight
+      passedChecks += 1
+    }
+  }
+  const score = possible > 0 ? earned / possible : 0
+  return { score, succeeded: score >= 0.8, passedChecks, totalChecks: valid.length }
+}
+
 /** Planning-only, model-optional COS reasoning. This layer never calls a provider. */
 export class LocalReasoningDirector {
   constructor(
@@ -82,6 +113,22 @@ export class LocalReasoningDirector {
           : 'Deterministic plan meets the local-confidence threshold without a provider.'
         : 'Local confidence is below the governed escalation threshold.',
     }
+  }
+
+  async learnFromVerification(input: {
+    task: LocalReasoningTask
+    strategy: string
+    verification: OutcomeVerification
+  }): Promise<OutcomeAssessment> {
+    const assessment = assessVerification(input.verification)
+    await this.recordOutcome({
+      task: input.task,
+      strategy: input.strategy,
+      succeeded: assessment.succeeded,
+      latencyMs: input.verification.latencyMs,
+      externalCostUsd: input.verification.externalCostUsd,
+    })
+    return assessment
   }
 
   async recordOutcome(input: {

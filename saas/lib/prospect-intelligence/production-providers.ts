@@ -74,7 +74,7 @@ async function authHeaders(definition: ProviderDefinition, context: ProspectProv
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 }
 
-function crunchbaseBody(input: Record<string, unknown>) {
+function crunchbaseBody(input: Record<string, unknown>): Record<string, unknown> {
   if (Array.isArray(input.query) && Array.isArray(input.field_ids)) return input
   const name = String(input.name || input.company || input.keyword || '').trim()
   const query = name ? [{ type: 'predicate', field_id: 'identifier', operator_id: 'contains', values: [name] }] : []
@@ -85,11 +85,14 @@ function crunchbaseBody(input: Record<string, unknown>) {
   }
 }
 
-function cognismBody(input: Record<string, unknown>) {
-  return input.filters && typeof input.filters === 'object' ? input.filters : input
+function cognismBody(input: Record<string, unknown>): Record<string, unknown> {
+  if (input.filters && typeof input.filters === 'object' && !Array.isArray(input.filters)) {
+    return input.filters as Record<string, unknown>
+  }
+  return input
 }
 
-function dnbBody(input: Record<string, unknown>) {
+function dnbBody(input: Record<string, unknown>): Record<string, unknown> {
   if (typeof input.query === 'string') return { query: input.query, offset: Number(input.offset) || 0, size: Number(input.size) || 25 }
   const name = String(input.name || input.company || input.keyword || '').trim().replace(/:/g, ' ')
   return { query: `q=name:${name}`, offset: 0, size: Math.max(1, Math.min(100, Number(input.limit) || 25)) }

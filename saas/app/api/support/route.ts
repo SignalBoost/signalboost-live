@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (cosFallback && !cosFallback.handled && response.ok) {
+  if (cosFallback && 'reason' in cosFallback && response.ok) {
     try {
       const payload = await response.clone().json()
       return NextResponse.json({

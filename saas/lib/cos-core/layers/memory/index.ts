@@ -1,3 +1,4 @@
+import { deterministicMemoryCompactor } from './deterministic-compactor'
 import type {
   ChatMessage,
   CompressedMemorySnapshot,
@@ -6,7 +7,7 @@ import type {
 
 export class MemoryLayer {
   constructor(
-    private readonly compact: MemoryCompactor,
+    private readonly compact: MemoryCompactor = deterministicMemoryCompactor,
     private readonly maxRawTurns = 6,
     private readonly highFidelityTurns = 2,
   ) {}
@@ -34,5 +35,6 @@ export class MemoryLayer {
   }
 }
 
+export * from './deterministic-compactor'
 export * from './summary-cache'
 export type { ChatMessage, CompressedMemorySnapshot, MemoryCompactor } from './types'

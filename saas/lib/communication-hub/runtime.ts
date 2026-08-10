@@ -1,17 +1,21 @@
 import { communicationContext, type BuyerEmailConnection } from './config'
+import type { CommunicationPolicy } from './contracts'
 
 function value(name: string): string | undefined {
   const current = process.env[name]
   return current && current.trim() ? current.trim() : undefined
 }
 
+function policyMode(): CommunicationPolicy['mode'] {
+  const mode = value('COMMUNICATION_EMAIL_POLICY')
+  return mode === 'draft_only' || mode === 'automatic' || mode === 'approval_required'
+    ? mode
+    : 'approval_required'
+}
+
 export function resolveBuyerEmailConnection(orgId: string): BuyerEmailConnection | null {
   const providerId = value('COMMUNICATION_EMAIL_PROVIDER')
   if (!providerId) return null
-
-  const policyMode = value('COMMUNICATION_EMAIL_POLICY') as BuyerEmailConnection['policy'] extends infer P
-    ? P extends { mode: infer M } ? M : never
-    : never
 
   const common: BuyerEmailConnection = {
     providerId,
@@ -20,7 +24,7 @@ export function resolveBuyerEmailConnection(orgId: string): BuyerEmailConnection
     accessToken: value('COMMUNICATION_EMAIL_ACCESS_TOKEN'),
     apiKey: value('COMMUNICATION_EMAIL_API_KEY'),
     policy: {
-      mode: policyMode || 'approval_required',
+      mode: policyMode(),
       maxRecipientsPerMessage: Number(value('COMMUNICATION_EMAIL_MAX_RECIPIENTS') || 25),
     },
     metadata: {},

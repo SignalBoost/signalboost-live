@@ -1,10 +1,14 @@
 // Durable-intent routing boundary for the support API.
 //
 // Long-running owner work is promoted into background jobs BEFORE the bounded chat
-// handler sees it. This prevents an HTTP turn ending from becoming a mission stop.
+// handler sees it. Cheap deterministic customer help is also resolved here BEFORE
+// routeCore initializes an external model client.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
+import { decideSupportLocalPreflight } from '@/lib/cos-core/layers/autonomy/supportPreflight'
+import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import {
   parseProspectCampaignRequest,
   prospectCampaignQueuedReply,
@@ -43,8 +47,27 @@ function languageCode(body: any): string {
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
 }
 
-function routedReply(reply: string, source: string) {
-  return NextResponse.json({ reply, telemetry: { source }, source })
+function routedReply(reply: string, source: string, extra: Record<string, unknown> = {}) {
+  return NextResponse.json({ reply, telemetry: { source, ...extra }, source, ...extra })
+}
+
+async function recordLocalSavings(prompt: string, startedAt: number) {
+  try {
+    const stores = createSupabaseCOSStores()
+    if (!stores) return
+    await stores.roi.record({
+      taskId: 'support',
+      source: 'business_rule',
+      providerCalls: 0,
+      estimatedProviderCostUsd: 0,
+      estimatedCostAvoidedUsd: 0,
+      promptCharactersBefore: prompt.length,
+      promptCharactersAfter: 0,
+      latencyMs: Date.now() - startedAt,
+    })
+  } catch {
+    // Savings telemetry is best-effort and must never turn a free local answer into a failure.
+  }
 }
 
 function asksEngineeringStatus(text: string): boolean {
@@ -66,6 +89,7 @@ function engineeringStatusReply(mission: any): string {
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now()
   try {
     const copy = req.clone()
     const body = await copy.json().catch(() => null)
@@ -78,14 +102,8 @@ export async function POST(req: NextRequest) {
         const statusIntent = asksEngineeringStatus(text)
 
         if (engineeringIntent || statusIntent) {
-          // Persistence is part of COS itself. A missing mission table is therefore a
-          // recoverable COS infrastructure fault, not a reason to abandon the owner's
-          // mission. Bootstrap/verify it before touching the mission queue.
           const store = await ensureCosMissionStore()
           if (!store.ok) {
-            // Do not falsely claim the engineering task ran. Fall through to the existing
-            // grounded COS executor so it can continue diagnosing the infrastructure
-            // dependency in this request instead of terminating at the router boundary.
             console.error('COS mission-store recovery unavailable:', store.error)
           } else {
             if (statusIntent) {
@@ -150,14 +168,33 @@ export async function POST(req: NextRequest) {
           }), 'campaign-intent-router')
         }
       }
+
+      // Customer/visitor zero-provider path. Owner/admin traffic deliberately bypasses
+      // this gate because privileged requests need the full grounded COS executor.
+      const isPrivileged = Boolean(access?.isAdmin || access?.isOwner)
+      if (!isPrivileged && body?.executeMode !== true) {
+        const lang = languageCode(body)
+        const currentPage = String(body?.context?.currentPage || '/')
+        const local = getConciergeAnswer(text, lang, currentPage)
+        const decision = decideSupportLocalPreflight({
+          prompt: text,
+          localReply: local.reply,
+          isPrivileged,
+          executeMode: false,
+        })
+        if (decision.handled) {
+          const output = decision.output as { reply: string; source: string; providerCalls: number }
+          void recordLocalSavings(text, startedAt)
+          return routedReply(output.reply, output.source, { providerCalls: 0, local: true })
+        }
+      }
     }
   } catch (error) {
-    console.error('support durable-intent router failed:', error)
+    console.error('support durable-intent/local-preflight router failed:', error)
   }
 
-  // The durable layer is additive. If it cannot establish persistence, do not terminate
-  // the owner's engineering request here; give the existing grounded executor a chance to
-  // continue and diagnose/recover rather than saying "No code was changed".
+  // Anything uncertain, current, actionable, privileged, or tool-shaped falls through
+  // to the existing grounded executor. The optimization is deliberately fail-closed.
   const core = await import('./routeCore')
   return core.POST(req)
 }

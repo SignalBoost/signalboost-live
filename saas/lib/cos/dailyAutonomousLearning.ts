@@ -7,6 +7,7 @@ import {
   type KnowledgeGap,
 } from '@/lib/cos-core/layers/learning'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
+import { autonomousLearningIsExplicitlyEnabled } from '@/lib/cos-core/layers/learning/trigger'
 import { runLearningCycleWithTelemetry, type ContinuousLearningMetric, type ContinuousLearningTelemetrySink } from '@/lib/cos-core/layers/learning/telemetry'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import type { MiningRunSummary } from '@/lib/cos/mining/types'
@@ -134,6 +135,19 @@ export async function runDailyAutonomousLearning(input: {
   approvedUrls?: string[]
   gapSignals?: KnowledgeGapSignal[]
 }): Promise<DailyLearningResult> {
+  if (!autonomousLearningIsExplicitlyEnabled()) {
+    return {
+      status: 'skipped',
+      approvedUrls: 0,
+      autonomousGaps: 0,
+      gapsConsidered: 0,
+      documentsAcquired: 0,
+      accepted: 0,
+      rejected: {},
+      externalCostUsd: 0,
+    }
+  }
+
   const persistentStore = input.store ?? createSupabaseCOSStores()?.continuousLearning
   if (!persistentStore) {
     return {

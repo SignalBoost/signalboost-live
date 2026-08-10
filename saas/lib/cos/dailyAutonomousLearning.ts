@@ -7,6 +7,7 @@ import {
   type KnowledgeGap,
 } from '@/lib/cos-core/layers/learning'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
+import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { autonomousLearningIsExplicitlyEnabled } from '@/lib/cos-core/layers/learning/trigger'
 import { runLearningCycleWithTelemetry, type ContinuousLearningMetric, type ContinuousLearningTelemetrySink } from '@/lib/cos-core/layers/learning/telemetry'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
@@ -83,7 +84,6 @@ export function approvedUrlLearningAdapter(urls: string[], fetcher: FetchLike = 
           evidence: [`Daily approved-source fetch: ${url}`],
         })
       } catch {
-        // One unavailable school source must not fail the daily learning cycle.
       } finally {
         clearTimeout(timer)
       }
@@ -168,6 +168,7 @@ export async function runDailyAutonomousLearning(input: {
   const adapters = [
     miningAdapter(input.miningSummary),
     ...(approvedUrls.length ? [approvedUrlLearningAdapter(approvedUrls)] : []),
+    ...createLiveLearningAdapters(),
     ...(input.adapters ?? []),
   ]
   const director = new ContinuousLearningDirector(persistentStore, ZERO_LLM_POLICY)

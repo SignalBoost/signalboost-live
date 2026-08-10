@@ -262,17 +262,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (cosFallback && !cosFallback.handled && response.ok) {
+  const unresolvedCOS = cosFallback && !cosFallback.handled ? cosFallback : null
+  if (unresolvedCOS && response.ok) {
     try {
       const payload = await response.clone().json()
       return NextResponse.json({
         ...payload,
         external_ai_invoked: true,
         cos_local_attempt: {
-          attempted: cosFallback.provenance.localModelInvoked,
-          confidence_score: cosFallback.confidence,
-          escalation_reason: cosFallback.reason,
-          provenance: cosFallback.provenance,
+          attempted: unresolvedCOS.provenance.localModelInvoked,
+          confidence_score: unresolvedCOS.confidence,
+          escalation_reason: unresolvedCOS.reason,
+          provenance: unresolvedCOS.provenance,
         },
       }, { status: response.status })
     } catch {

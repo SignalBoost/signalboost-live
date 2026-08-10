@@ -16,6 +16,7 @@ export type BusinessIntelligenceCorpusCopy = {
   providerAvoidance: string
   averageConfidence: string
   averageLatency: string
+  latencyUnit: string
   internalFirstPolicy: string
   metricsUnavailable: string
 }
@@ -39,6 +40,7 @@ export const BUSINESS_INTELLIGENCE_CORPUS_COPY: Record<string, BusinessIntellige
     providerAvoidance: 'Provider avoidance',
     averageConfidence: 'Average confidence',
     averageLatency: 'Average latency',
+    latencyUnit: 'ms',
     internalFirstPolicy: 'COS checks internal intelligence first and only falls back to external providers when confidence or freshness is insufficient.',
     metricsUnavailable: 'Usage metrics will appear after corpus lookups are recorded.',
   },
@@ -60,6 +62,7 @@ export const BUSINESS_INTELLIGENCE_CORPUS_COPY: Record<string, BusinessIntellige
     providerAvoidance: 'Proveedores evitados',
     averageConfidence: 'Confianza media',
     averageLatency: 'Latencia media',
+    latencyUnit: 'ms',
     internalFirstPolicy: 'COS consulta primero la inteligencia interna y solo recurre a proveedores externos cuando la confianza o la vigencia son insuficientes.',
     metricsUnavailable: 'Las métricas de uso aparecerán después de registrar consultas del corpus.',
   },
@@ -81,6 +84,7 @@ export const BUSINESS_INTELLIGENCE_CORPUS_COPY: Record<string, BusinessIntellige
     providerAvoidance: 'Provedores evitados',
     averageConfidence: 'Confiança média',
     averageLatency: 'Latência média',
+    latencyUnit: 'ms',
     internalFirstPolicy: 'O COS consulta primeiro a inteligência interna e só usa provedores externos quando a confiança ou a atualidade forem insuficientes.',
     metricsUnavailable: 'As métricas de uso aparecerão depois que consultas ao corpus forem registradas.',
   },
@@ -102,6 +106,7 @@ export const BUSINESS_INTELLIGENCE_CORPUS_COPY: Record<string, BusinessIntellige
     providerAvoidance: 'Uniknięte wywołania',
     averageConfidence: 'Średnia pewność',
     averageLatency: 'Średnie opóźnienie',
+    latencyUnit: 'ms',
     internalFirstPolicy: 'COS najpierw sprawdza wiedzę wewnętrzną i korzysta z dostawców zewnętrznych tylko wtedy, gdy pewność lub świeżość danych są niewystarczające.',
     metricsUnavailable: 'Metryki użycia pojawią się po zarejestrowaniu wyszukań w korpusie.',
   },
@@ -123,6 +128,7 @@ export const BUSINESS_INTELLIGENCE_CORPUS_COPY: Record<string, BusinessIntellige
     providerAvoidance: 'Избежанные вызовы',
     averageConfidence: 'Средняя уверенность',
     averageLatency: 'Средняя задержка',
+    latencyUnit: 'мс',
     internalFirstPolicy: 'COS сначала проверяет внутреннюю информацию и обращается к внешним поставщикам только при недостаточной уверенности или свежести данных.',
     metricsUnavailable: 'Метрики использования появятся после регистрации запросов к корпусу.',
   },

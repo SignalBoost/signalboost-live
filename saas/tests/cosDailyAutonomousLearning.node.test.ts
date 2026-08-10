@@ -3,6 +3,7 @@ import test from 'node:test'
 import { runDailyAutonomousLearning } from '../lib/cos/dailyAutonomousLearning'
 import type { ContinuousLearningStore, LearningCandidate } from '../lib/cos-core/layers/learning'
 import type { ContinuousLearningMetric } from '../lib/cos-core/layers/learning/telemetry'
+import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle'
 
 class MemoryStore implements ContinuousLearningStore {
   records = new Map<string, LearningCandidate>()
@@ -28,6 +29,7 @@ test('daily COS learning persists and deduplicates with zero external AI cost', 
   const first = await runDailyAutonomousLearning({ miningSummary: summary, store, telemetry, approvedUrls: [] })
   assert.equal(first.status, 'learned')
   assert.equal(first.externalCostUsd, 0)
+  assert.equal(first.autonomousGaps, 0)
   assert.equal(first.accepted, 1)
   assert.equal(store.records.size, 1)
 
@@ -37,6 +39,50 @@ test('daily COS learning persists and deduplicates with zero external AI cost', 
   assert.equal(second.rejected.duplicate, 1)
   assert.equal(store.records.size, 1)
   assert.equal(metrics.length, 2)
+})
+
+test('daily COS learning consumes self-generated knowledge gaps', async () => {
+  const store = new MemoryStore()
+  const adapter: ContinuousLearningSourceAdapter = {
+    async acquire(gap) {
+      if (!gap.id.startsWith('auto-gap:')) return []
+      return [{
+        sourceKind: 'official_documentation',
+        sourceUri: `https://docs.example.test/${encodeURIComponent(gap.id)}`,
+        sourceTitle: 'Approved documentation',
+        observedAt: '2026-08-09T00:00:00.000Z',
+        subject: gap.subject,
+        text: `Verified reusable guidance for ${gap.question}`,
+        license: 'approved',
+        evidence: ['approved deterministic test source'],
+      }]
+    },
+  }
+
+  const result = await runDailyAutonomousLearning({
+    miningSummary: summary,
+    store,
+    approvedUrls: [],
+    adapters: [adapter],
+    gapSignals: [{
+      taskId: 'reasoning-1',
+      subject: 'email delivery',
+      capability: 'outreach',
+      objective: 'deliver outreach drafts reliably',
+      confidence: 0.35,
+      escalated: true,
+      succeeded: false,
+      missingFacts: ['provider delivery-state semantics'],
+      repeatedCount: 4,
+      externalCostUsd: 0.02,
+    }],
+  })
+
+  assert.equal(result.externalCostUsd, 0)
+  assert.equal(result.autonomousGaps, 1)
+  assert.equal(result.gapsConsidered, 2)
+  assert.ok(result.accepted >= 2)
+  assert.ok([...store.records.values()].some(record => record.subject === 'email delivery'))
 })
 
 test('daily COS learning only accepts explicitly configured https school URLs', async () => {

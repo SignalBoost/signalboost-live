@@ -1,14 +1,15 @@
 // Durable-intent routing boundary for the support API.
 //
 // Long-running owner work is promoted into background jobs BEFORE the bounded chat
-// handler sees it. Cheap deterministic customer help and safe durable reuse are also
-// resolved here BEFORE routeCore initializes an external model client.
+// handler sees it. Cheap deterministic customer help, safe durable reuse, and COS-local
+// reasoning are resolved here BEFORE routeCore initializes an external model client.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { decideSupportLocalPreflight } from '@/lib/cos-core/layers/autonomy/supportPreflight'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
+import { tryCOSFirstAnswer, type COSFirstAnswerResult } from '@/lib/ai/cos/cosFirstAnswer'
 import {
   isStableSupportReuseCandidate,
   loadSupportReuse,
@@ -98,6 +99,12 @@ export async function POST(req: NextRequest) {
   const startedAt = Date.now()
   let reusableKey: string | null = null
   let reusablePrompt = ''
+  let cosPrompt = ''
+  let cosLanguage = 'en'
+  let cosUserId: string | null = null
+  let cosPrivileged = false
+  let cosEligible = false
+  let cosFallback: COSFirstAnswerResult | null = null
 
   try {
     const copy = req.clone()
@@ -211,12 +218,37 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+
+      // Tool/mutation-shaped work remains on the governed executor. All other unresolved
+      // support questions get one COS-local reasoning attempt before any cloud provider.
+      cosPrompt = text
+      cosLanguage = languageCode(body)
+      cosUserId = access?.userId || null
+      cosPrivileged = isPrivileged
+      cosEligible = body?.executeMode !== true && !isOwnerEngineeringRequest(text)
     }
   } catch (error) {
     console.error('support durable-intent/local-preflight router failed:', error)
   }
 
-  // Anything uncertain, current, actionable, privileged, or tool-shaped falls through
+  if (cosEligible && cosPrompt) {
+    cosFallback = await tryCOSFirstAnswer({
+      prompt: cosPrompt,
+      userId: cosUserId,
+      language: cosLanguage,
+      privileged: cosPrivileged,
+    }).catch(() => null)
+
+    if (cosFallback?.handled) {
+      return routedReply(cosFallback.reply, 'local_cos_reasoning', {
+        confidence_score: cosFallback.confidence,
+        provenance: cosFallback.provenance,
+        external_ai_invoked: false,
+      })
+    }
+  }
+
+  // Anything current, actionable, tool-shaped, or below COS confidence falls through
   // to the existing grounded executor. Stable non-privileged answers are remembered
   // after one successful provider response and can then be served without another call.
   const core = await import('./routeCore')
@@ -232,6 +264,24 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Reuse persistence is best-effort and must never affect the live response.
+    }
+  }
+
+  if (cosFallback && 'reason' in cosFallback && response.ok) {
+    try {
+      const payload = await response.clone().json()
+      return NextResponse.json({
+        ...payload,
+        external_ai_invoked: true,
+        cos_local_attempt: {
+          attempted: cosFallback.provenance.localModelInvoked,
+          confidence_score: cosFallback.confidence,
+          escalation_reason: cosFallback.reason,
+          provenance: cosFallback.provenance,
+        },
+      }, { status: response.status })
+    } catch {
+      // Preserve the executor response unchanged when it is not JSON.
     }
   }
 

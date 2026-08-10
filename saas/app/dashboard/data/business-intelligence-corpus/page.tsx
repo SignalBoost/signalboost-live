@@ -26,8 +26,8 @@ type SeedResult = {
 }
 
 export default function BusinessIntelligenceCorpusPage() {
-  const { language } = useI18n()
-  const copy = BUSINESS_INTELLIGENCE_CORPUS_COPY[language] || BUSINESS_INTELLIGENCE_CORPUS_COPY.en
+  const { lang } = useI18n()
+  const copy = BUSINESS_INTELLIGENCE_CORPUS_COPY[lang] || BUSINESS_INTELLIGENCE_CORPUS_COPY.en
   const [status, setStatus] = useState<CorpusStatus | null>(null)
   const [result, setResult] = useState<SeedResult | null>(null)
   const [loading, setLoading] = useState(true)

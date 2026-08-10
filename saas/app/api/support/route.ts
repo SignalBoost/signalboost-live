@@ -1,14 +1,20 @@
 // Durable-intent routing boundary for the support API.
 //
 // Long-running owner work is promoted into background jobs BEFORE the bounded chat
-// handler sees it. Cheap deterministic customer help is also resolved here BEFORE
-// routeCore initializes an external model client.
+// handler sees it. Cheap deterministic customer help and safe durable reuse are also
+// resolved here BEFORE routeCore initializes an external model client.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { decideSupportLocalPreflight } from '@/lib/cos-core/layers/autonomy/supportPreflight'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
+import {
+  isStableSupportReuseCandidate,
+  loadSupportReuse,
+  saveSupportReuse,
+  supportReuseKey,
+} from '@/lib/cos/supportResponseReuse'
 import {
   parseProspectCampaignRequest,
   prospectCampaignQueuedReply,
@@ -51,13 +57,13 @@ function routedReply(reply: string, source: string, extra: Record<string, unknow
   return NextResponse.json({ reply, telemetry: { source, ...extra }, source, ...extra })
 }
 
-async function recordLocalSavings(prompt: string, startedAt: number) {
+async function recordLocalSavings(prompt: string, startedAt: number, source: 'business_rule' | 'exact_cache') {
   try {
     const stores = createSupabaseCOSStores()
     if (!stores) return
     await stores.roi.record({
       taskId: 'support',
-      source: 'business_rule',
+      source,
       providerCalls: 0,
       estimatedProviderCostUsd: 0,
       estimatedCostAvoidedUsd: 0,
@@ -90,6 +96,9 @@ function engineeringStatusReply(mission: any): string {
 
 export async function POST(req: NextRequest) {
   const startedAt = Date.now()
+  let reusableKey: string | null = null
+  let reusablePrompt = ''
+
   try {
     const copy = req.clone()
     const body = await copy.json().catch(() => null)
@@ -169,8 +178,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Customer/visitor zero-provider path. Owner/admin traffic deliberately bypasses
-      // this gate because privileged requests need the full grounded COS executor.
       const isPrivileged = Boolean(access?.isAdmin || access?.isOwner)
       if (!isPrivileged && body?.executeMode !== true) {
         const lang = languageCode(body)
@@ -184,8 +191,24 @@ export async function POST(req: NextRequest) {
         })
         if (decision.handled) {
           const output = decision.output as { reply: string; source: string; providerCalls: number }
-          void recordLocalSavings(text, startedAt)
+          void recordLocalSavings(text, startedAt, 'business_rule')
           return routedReply(output.reply, output.source, { providerCalls: 0, local: true })
+        }
+
+        const hasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
+        if (isStableSupportReuseCandidate({
+          prompt: text,
+          isPrivileged,
+          executeMode: false,
+          hasAttachments,
+        })) {
+          reusablePrompt = text
+          reusableKey = supportReuseKey({ prompt: text, language: lang, currentPage })
+          const reused = await loadSupportReuse(reusableKey)
+          if (reused) {
+            void recordLocalSavings(text, startedAt, 'exact_cache')
+            return routedReply(reused, 'cos-durable-reuse', { providerCalls: 0, local: true, reused: true })
+          }
         }
       }
     }
@@ -194,7 +217,23 @@ export async function POST(req: NextRequest) {
   }
 
   // Anything uncertain, current, actionable, privileged, or tool-shaped falls through
-  // to the existing grounded executor. The optimization is deliberately fail-closed.
+  // to the existing grounded executor. Stable non-privileged answers are remembered
+  // after one successful provider response and can then be served without another call.
   const core = await import('./routeCore')
-  return core.POST(req)
+  const response = await core.POST(req)
+
+  if (reusableKey && reusablePrompt && response.ok) {
+    try {
+      const payload = await response.clone().json()
+      const reply = typeof payload?.reply === 'string' ? payload.reply.trim() : ''
+      const source = String(payload?.source || '')
+      if (reply && !source.includes('error')) {
+        void saveSupportReuse(reusableKey, reply)
+      }
+    } catch {
+      // Reuse persistence is best-effort and must never affect the live response.
+    }
+  }
+
+  return response
 }

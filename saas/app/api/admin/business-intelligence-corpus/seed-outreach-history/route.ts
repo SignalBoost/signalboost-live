@@ -14,10 +14,14 @@ export async function POST() {
     const result = await seedCorpusFromExistingOutreachHistory()
     return NextResponse.json({ ok: result.failed === 0, ...result }, { status: result.failed ? 207 : 200 })
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error || '')
     console.error('business intelligence corpus outreach-history seed failed:', error)
     return NextResponse.json({
       ok: false,
-      error: error instanceof Error ? error.message : 'CORPUS_OUTREACH_HISTORY_SEED_FAILED',
+      error: detail || 'CORPUS_OUTREACH_HISTORY_SEED_FAILED',
+      stage: detail.startsWith('OUTREACH_HISTORY_READ_FAILED:') ? 'read_outreach_history' : 'seed_corpus',
+      providerCalls: 0,
+      externalAiCalls: 0,
     }, { status: 500 })
   }
 }

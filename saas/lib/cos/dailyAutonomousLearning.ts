@@ -10,7 +10,7 @@ import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/l
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { autonomousLearningIsExplicitlyEnabled } from '@/lib/cos-core/layers/learning/trigger'
 import { runLearningCycleWithTelemetry, type ContinuousLearningMetric, type ContinuousLearningTelemetrySink } from '@/lib/cos-core/layers/learning/telemetry'
-import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb, createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import type { MiningRunSummary } from '@/lib/cos/mining/types'
 
 const ZERO_LLM_POLICY: ContinuousLearningPolicy = {
@@ -38,6 +38,11 @@ export type DailyLearningResult = LearningCycleResult & {
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
+
+type QueuedGapBatch = {
+  ids: string[]
+  signals: KnowledgeGapSignal[]
+}
 
 function cleanText(value: string): string {
   return value
@@ -90,6 +95,55 @@ export function approvedUrlLearningAdapter(urls: string[], fetcher: FetchLike = 
     }
     return documents
   })
+}
+
+async function loadQueuedReasoningGaps(): Promise<QueuedGapBatch> {
+  const db = cosServiceDb()
+  if (!db) return { ids: [], signals: [] }
+
+  try {
+    const { data, error } = await db.from('cos_learning_gaps')
+      .select('id,task_id,subject,question,capability,confidence,escalation_reason,repeated_count')
+      .eq('status', 'pending')
+      .order('repeated_count', { ascending: false })
+      .order('last_seen_at', { ascending: false })
+      .limit(10)
+    if (error || !data?.length) return { ids: [], signals: [] }
+
+    return {
+      ids: data.map((row) => String(row.id)),
+      signals: data.map((row) => ({
+        taskId: String(row.task_id || 'support'),
+        subject: String(row.subject || 'general reasoning'),
+        capability: String(row.capability || 'general_reasoning'),
+        objective: String(row.question || ''),
+        confidence: Number(row.confidence || 0),
+        escalated: true,
+        succeeded: false,
+        repeatedCount: Number(row.repeated_count || 1),
+        // Conservative estimate of the cloud call this autonomous study aims to avoid.
+        externalCostUsd: 0.01,
+        evidence: row.escalation_reason ? [String(row.escalation_reason)] : ['COS local reasoning escalated'],
+      })),
+    }
+  } catch {
+    // The migration may not be applied yet on a newly deployed environment.
+    return { ids: [], signals: [] }
+  }
+}
+
+async function markQueuedReasoningGaps(ids: string[], accepted: number): Promise<void> {
+  if (!ids.length) return
+  const db = cosServiceDb()
+  if (!db) return
+  try {
+    await db.from('cos_learning_gaps').update({
+      status: accepted > 0 ? 'learning' : 'failed',
+      last_seen_at: new Date().toISOString(),
+    }).in('id', ids)
+  } catch {
+    // Best-effort lifecycle metadata only.
+  }
 }
 
 function miningGap(summary: MiningRunSummary): KnowledgeGap {
@@ -162,8 +216,9 @@ export async function runDailyAutonomousLearning(input: {
     }
   }
 
+  const queued = input.gapSignals ? { ids: [], signals: input.gapSignals } : await loadQueuedReasoningGaps()
   const approvedUrls = input.approvedUrls ?? parseApprovedLearningUrls()
-  const autonomousGaps = generateKnowledgeGaps(input.gapSignals ?? [])
+  const autonomousGaps = generateKnowledgeGaps(queued.signals)
   const gaps = [miningGap(input.miningSummary), ...autonomousGaps]
   const adapters = [
     miningAdapter(input.miningSummary),
@@ -177,6 +232,8 @@ export async function runDailyAutonomousLearning(input: {
     () => cycle.run(gaps, 0),
     input.telemetry ?? consoleTelemetry,
   )
+
+  await markQueuedReasoningGaps(queued.ids, result.accepted)
 
   return {
     status: 'learned',

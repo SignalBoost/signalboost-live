@@ -2,6 +2,8 @@ import { mergeIntelligence, resolveOrganization } from '@/lib/enterprise/memory/
 import type { KnowledgeGraph } from '@/lib/cos-core/layers/knowledge/persistent.ts'
 import type { BusinessIntelligenceRecord } from './contracts.ts'
 
+const FALLBACK_PROFILE_KEY = 'businessIntelligenceCorpus'
+
 export async function persistCorpusIntelligence(args: {
   record: BusinessIntelligenceRecord
   graph?: KnowledgeGraph
@@ -24,10 +26,21 @@ export async function persistCorpusIntelligence(args: {
     technologies: record.technologies || [],
     contacts: record.contacts || [],
     attributes: record.attributes,
+    confidence: record.confidence,
     sourceType: record.sourceType,
     sourceIds: record.sourceIds,
     verifiedAt: record.verifiedAt,
     refreshedAt: record.refreshedAt,
+    expiresAt: record.expiresAt,
+  }
+
+  // Enterprise Memory's mergeIntelligence() replaces organization.profile when a
+  // profile patch is supplied. Preserve all existing profile namespaces and keep
+  // the corpus record under its dedicated key so future internal-first lookups
+  // continue to find it after enrichment/learning writes.
+  const profile = {
+    ...(organization.profile || {}),
+    [FALLBACK_PROFILE_KEY]: snapshot,
   }
 
   await mergeIntelligence({
@@ -42,7 +55,7 @@ export async function persistCorpusIntelligence(args: {
     organizationPatch: {
       name: record.companyName,
       industry: record.industry,
-      profile: snapshot,
+      profile,
       confidence: record.confidence,
       aliases: [...record.aliases],
     },

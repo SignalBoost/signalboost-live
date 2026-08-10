@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "source": "saas/data/prospects.json",
+  "recordCount": 23,
+  "companies": [
+    "Caylent",
+    "Cloudticity",
+    "ClearScale",
+    "Mission Cloud",
+    "Burwood Group",
+    "AHEAD",
+    "InterVision Systems",
+    "OpsLogic",
+    "C-3 Solutions",
+    "CloudXpertize",
+    "Shadow-Soft",
+    "EPI-USE Services for AWS",
+    "Hostersi",
+    "LCloud",
+    "CloudFerro",
+    "Devapo",
+    "GetInData",
+    "CodiLime",
+    "SoftwareMill",
+    "Mysterious Code",
+    "Cloudowski",
+    "Eficode Poland",
+    "Chaos Gears"
+  ]
+}

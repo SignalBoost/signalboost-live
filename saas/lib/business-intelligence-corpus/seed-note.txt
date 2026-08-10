@@ -1,0 +1,1 @@
+Initial COS curated corpus seed: 23 READY companies from saas/data/prospects.json.

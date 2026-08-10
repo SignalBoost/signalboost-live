@@ -1,9 +1,15 @@
 import type { CommunicationAdapter, CommunicationCapability, CommunicationContext, CommunicationResult } from './contracts'
 import { GmailCommunicationAdapter, MicrosoftGraphCommunicationAdapter } from './native'
+import { SmtpCommunicationAdapter } from './smtp'
 import { UniversalEmailAdapter } from './universal'
 
 const adapters = new Map<string, CommunicationAdapter>()
-for (const adapter of [new GmailCommunicationAdapter(), new MicrosoftGraphCommunicationAdapter(), new UniversalEmailAdapter()]) adapters.set(adapter.providerId, adapter)
+for (const adapter of [
+  new GmailCommunicationAdapter(),
+  new MicrosoftGraphCommunicationAdapter(),
+  new SmtpCommunicationAdapter(),
+  new UniversalEmailAdapter(),
+]) adapters.set(adapter.providerId, adapter)
 
 export function registerCommunicationAdapter(adapter: CommunicationAdapter) {
   adapters.set(adapter.providerId, adapter)

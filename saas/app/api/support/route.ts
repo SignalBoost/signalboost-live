@@ -78,174 +78,87 @@ async function recordLocalSavings(prompt: string, startedAt: number, source: 'bu
 }
 
 function asksEngineeringStatus(text: string): boolean {
-  return /\b(status|progress|how(?:'s| is)|where are we|what happened|still working|audit status)\b/i.test(text)
-    && /\b(fix|repair|engineering|repo|repository|audit|bug|pipeline|platform|mission)\b/i.test(text)
-}
-
-function isMutationShaped(text: string): boolean {
-  return /\b(create|send|publish|deploy|commit|merge|delete|remove|change|update|edit|write|insert|archive|invite|reset|launch|start|run|execute|schedule|upload|approve|cancel|buy|purchase|charge)\b/i.test(text)
-}
-
-function engineeringStatusReply(mission: any): string {
-  const state = mission.state || {}
-  const trace = Array.isArray(state.trace) ? state.trace.slice(-3) : []
-  const recent = trace.length
-    ? trace.map((item: any) => `- ${item.action}: ${item.summary}`).join('\n')
-    : '- No tool action has completed yet.'
-  const commit = state.lastCommit
-    ? `\nBranch: ${state.lastCommit.branch}\nPR: ${state.lastCommit.prUrl || 'not created yet'}\nCommit: ${state.lastCommit.sha || 'none'}`
-    : `\nBranch: ${state.branch || 'not assigned'}\nNo commit has been created yet.`
-  const blocked = state.blockedReason ? `\nBlock: ${state.blockedReason}` : ''
-  return `COS engineering mission ${mission.id}\nStatus: ${mission.status}\nIteration: ${state.iteration || 0}/${state.maxIterations || '?'}${commit}${blocked}\nRecent grounded work:\n${recent}\nCOS continues automatically while the mission remains active; you do not need to say “continue”.`
+  return /\b(engineering|coding|code|repo|github|deployment|vercel|mission|build|pull request|pr)\b/i.test(text)
+    && /\b(status|progress|still running|what.*doing|where.*at|finished|done)\b/i.test(text)
 }
 
 export async function POST(req: NextRequest) {
   const startedAt = Date.now()
-  let reusableKey: string | null = null
-  let reusablePrompt = ''
-  let cosFallback: Awaited<ReturnType<typeof tryCOSFirstAnswer>> | null = null
+  const body = await req.clone().json().catch(() => ({}))
+  const prompt = latestUserMessage(body)
+  const lang = languageCode(body)
+  const access = await getAccess()
+  const privileged = Boolean(access.isOwner || access.isAdmin)
 
-  try {
-    const copy = req.clone()
-    const body = await copy.json().catch(() => null)
-    const text = latestUserMessage(body)
-
-    if (text) {
-      const access = await getAccess().catch(() => null)
-      if (access?.isOwner) {
-        const engineeringIntent = isOwnerEngineeringRequest(text)
-        const statusIntent = asksEngineeringStatus(text)
-
-        if (engineeringIntent || statusIntent) {
-          const store = await ensureCosMissionStore()
-          if (!store.ok) {
-            console.error('COS mission-store recovery unavailable:', store.error)
-          } else {
-            if (statusIntent) {
-              const active = await listActiveOwnerEngineeringMissions(20)
-              const mission = active.find(item => !access.userId || item.user_id === access.userId) || active[0]
-              if (mission) return routedReply(engineeringStatusReply(mission), 'cos-engineering-mission-status')
-            }
-
-            if (engineeringIntent) {
-              const started = await createOwnerEngineeringMission({ objective: text, userId: access.userId || null })
-              if (started.ok && started.mission) {
-                const repairNote = store.repaired ? ' COS repaired its mission persistence automatically before starting.' : ''
-                return routedReply(`${engineeringMissionQueuedReply(started.mission)}${repairNote}`, 'cos-engineering-mission-router')
-              }
-              console.error('COS engineering mission creation failed after store verification:', started.error)
-            }
-          }
-        }
-
-        const lang = languageCode(body)
-
-        const press = parsePressCampaignRequest(text, lang)
-        if (press) {
-          const started = await createPressCampaignJob({
-            brief: text,
-            goal: press.goal,
-            region: press.region,
-            language: press.language,
-            requestedCount: press.requestedCount,
-            createdBy: access.userId || null,
-          })
-          if (!started.ok || !started.job) {
-            return routedReply(`Press campaign could not be started: ${started.error || 'unknown error'}. Nothing was sent and no publication was contacted.`, 'campaign-intent-router')
-          }
-          return routedReply(pressCampaignQueuedReply({
-            jobId: started.job.id,
-            requestedCount: started.job.requested_count,
-            region: started.job.region,
-            capNote: started.capNote,
-            duplicateOf: started.duplicateOf,
-          }), 'campaign-intent-router')
-        }
-
-        const prospect = parseProspectCampaignRequest(text, lang)
-        if (prospect) {
-          const started = await createProspectCampaignJob({
-            offer: prospect.offer,
-            targetCriteria: prospect.targetCriteria,
-            region: prospect.region,
-            requestedCount: prospect.requestedCount,
-            language: prospect.language,
-            createdBy: access.userId || null,
-          })
-          if (!started.ok || !started.job) {
-            return routedReply(prospectCampaignQueueError(started.error || 'unknown error', prospect.language), 'campaign-intent-router')
-          }
-          return routedReply(prospectCampaignQueuedReply({
-            jobId: started.job.id,
-            requestedCount: started.job.requested_count,
-            region: started.job.region,
-            language: started.job.language,
-          }), 'campaign-intent-router')
-        }
-      }
-
-      const isPrivileged = Boolean(access?.isAdmin || access?.isOwner)
-      if (!isPrivileged && body?.executeMode !== true) {
-        const lang = languageCode(body)
-        const currentPage = String(body?.context?.currentPage || '/')
-        const local = getConciergeAnswer(text, lang, currentPage)
-        const decision = decideSupportLocalPreflight({
-          prompt: text,
-          localReply: local.reply,
-          isPrivileged,
-          executeMode: false,
-        })
-        if (decision.handled) {
-          const output = decision.output as { reply: string; source: string; providerCalls: number }
-          void recordLocalSavings(text, startedAt, 'business_rule')
-          return routedReply(output.reply, output.source, { providerCalls: 0, local: true })
-        }
-
-        const hasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
-        if (isStableSupportReuseCandidate({
-          prompt: text,
-          isPrivileged,
-          executeMode: false,
-          hasAttachments,
-        })) {
-          reusablePrompt = text
-          reusableKey = supportReuseKey({ prompt: text, language: lang, currentPage })
-          const reused = await loadSupportReuse(reusableKey)
-          if (reused) {
-            void recordLocalSavings(text, startedAt, 'exact_cache')
-            return routedReply(reused, 'cos-durable-reuse', { providerCalls: 0, local: true, reused: true })
-          }
-        }
-      }
-
-      // COS-FIRST: informational/read-only questions are now offered to COS's own local
-      // reasoning engine after deterministic/cache checks and BEFORE any Anthropic/OpenAI
-      // client is initialized. Mutation-shaped requests stay on the governed executor path.
-      const hasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
-      if (body?.executeMode !== true && !hasAttachments && !isMutationShaped(text)) {
-        cosFallback = await tryCOSFirstAnswer({
-          prompt: text,
-          userId: access?.userId || null,
-          language: languageCode(body),
-          privileged: isPrivileged,
-        })
-        if (cosFallback.handled) {
-          return routedReply(cosFallback.reply, 'local_cos_reasoning', {
-            providerCalls: 0,
-            local: true,
-            confidence_score: cosFallback.confidence,
-            external_ai_invoked: false,
-            provenance: cosFallback.provenance,
-          })
-        }
-      }
+  if (privileged && prompt && asksEngineeringStatus(prompt)) {
+    const active = await listActiveOwnerEngineeringMissions().catch(() => [])
+    if (active.length) {
+      const lines = active.slice(0, 8).map((mission: any) => `• ${mission.title || mission.id}: ${mission.status || 'running'}`)
+      return routedReply(lines.join('\n'), 'owner_engineering_status', { mission_count: active.length })
     }
-  } catch (error) {
-    console.error('support durable-intent/local-preflight router failed:', error)
   }
 
-  // Only unresolved, low-confidence, current, actionable, privileged-tool, or mutation
-  // work reaches the cloud-capable executor. This is now the explicit escalation boundary.
+  if (privileged && prompt && isOwnerEngineeringRequest(prompt)) {
+    try {
+      await ensureCosMissionStore()
+      const mission = await createOwnerEngineeringMission({ prompt, userId: access.userId || null, language: lang })
+      return routedReply(engineeringMissionQueuedReply(mission, lang), 'owner_engineering_mission', { mission_id: mission.id })
+    } catch (error) {
+      return routedReply(String(error instanceof Error ? error.message : error), 'owner_engineering_mission_error')
+    }
+  }
+
+  const prospectRequest = parseProspectCampaignRequest(prompt)
+  if (prospectRequest) {
+    try {
+      const job = await createProspectCampaignJob({ ...prospectRequest, userId: access.userId || null })
+      return routedReply(prospectCampaignQueuedReply(job, lang), 'prospect_campaign_job', { job_id: job.id })
+    } catch (error) {
+      return routedReply(prospectCampaignQueueError(error, lang), 'prospect_campaign_job_error')
+    }
+  }
+
+  const pressRequest = parsePressCampaignRequest(prompt)
+  if (pressRequest) {
+    try {
+      const job = await createPressCampaignJob({ ...pressRequest, userId: access.userId || null })
+      return routedReply(pressCampaignQueuedReply(job, lang), 'press_campaign_job', { job_id: job.id })
+    } catch (error) {
+      return routedReply(String(error instanceof Error ? error.message : error), 'press_campaign_job_error')
+    }
+  }
+
+  const platformAnswer = prompt ? await getConciergeAnswer(prompt, { userId: access.userId || undefined, language: lang }).catch(() => null) : null
+  if (platformAnswer?.answer) return routedReply(platformAnswer.answer, 'platform_unified')
+
+  const localPreflight = prompt ? await decideSupportLocalPreflight({ prompt, userId: access.userId || null, language: lang }).catch(() => null) : null
+  if (localPreflight?.handled && localPreflight.reply) {
+    void recordLocalSavings(prompt, startedAt, localPreflight.source === 'exact_cache' ? 'exact_cache' : 'business_rule')
+    return routedReply(localPreflight.reply, localPreflight.source, localPreflight.telemetry || {})
+  }
+
+  const reusablePrompt = prompt && isStableSupportReuseCandidate(prompt) ? prompt : null
+  const reusableKey = reusablePrompt ? supportReuseKey(reusablePrompt, lang) : null
+  if (reusableKey) {
+    const reused = await loadSupportReuse(reusableKey).catch(() => null)
+    if (reused?.reply) {
+      void recordLocalSavings(prompt, startedAt, 'exact_cache')
+      return routedReply(reused.reply, 'support_response_reuse')
+    }
+  }
+
+  const cosFallback = prompt
+    ? await tryCOSFirstAnswer({ prompt, userId: access.userId || null, language: lang, privileged }).catch(() => null)
+    : null
+
+  if (cosFallback?.handled) {
+    return routedReply(cosFallback.reply, 'local_cos_reasoning', {
+      confidence_score: cosFallback.confidence,
+      provenance: cosFallback.provenance,
+      external_ai_invoked: false,
+    })
+  }
+
   const core = await import('./routeCore')
   const response = await core.POST(req)
 
@@ -272,7 +185,7 @@ export async function POST(req: NextRequest) {
         cos_local_attempt: {
           attempted: unresolvedCOS.provenance.localModelInvoked,
           confidence_score: unresolvedCOS.confidence,
-          escalation_reason: unresolvedCOS.reason,
+          escalation_reason: 'reason' in unresolvedCOS ? unresolvedCOS.reason : 'external_fallback_required',
           provenance: unresolvedCOS.provenance,
         },
       }, { status: response.status })

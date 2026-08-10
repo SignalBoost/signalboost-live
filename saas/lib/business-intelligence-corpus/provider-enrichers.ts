@@ -16,15 +16,29 @@ function firstObject(value: unknown): Record<string, any> | null {
 }
 
 function normalizeProviderRecord(raw: unknown, lookup: CorpusLookup, providerId: string): BusinessIntelligenceRecord | null {
-  const obj = firstObject(raw)
-  if (!obj) return null
+  const root = firstObject(raw)
+  if (!root) return null
+  const obj = root.properties && typeof root.properties === 'object' && !Array.isArray(root.properties)
+    ? { ...root, ...root.properties }
+    : root
   const identifier = obj.identifier || obj.organization || obj.company || obj
-  const website = String(obj.website_url || obj.website || obj.url || identifier?.website_url || identifier?.website || lookup.canonicalDomain || '').trim()
-  const canonicalDomain = normalizeDomain(website || lookup.canonicalDomain || '')
+  const providerWebsite = String(obj.website_url || obj.website || obj.domain || obj.url || identifier?.website_url || identifier?.website || identifier?.domain || '').trim()
+  const providerDomain = normalizeDomain(providerWebsite)
+  const providerName = String(obj.name || obj.companyName || obj.organizationName || identifier?.value || identifier?.name || '').trim()
+  const providerEvidence = Boolean(providerDomain || providerName)
+  if (!providerEvidence) return null
+
+  const lookupDomain = normalizeDomain(lookup.canonicalDomain || '')
+  const canonicalDomain = providerDomain || lookupDomain
   if (!canonicalDomain) return null
-  const companyName = String(obj.name || obj.companyName || obj.organizationName || identifier?.value || identifier?.name || lookup.query || canonicalDomain).trim()
+
+  const exactDomainMatch = Boolean(providerDomain && lookupDomain && providerDomain === lookupDomain)
+  const companyName = providerName || String(lookup.query || canonicalDomain).trim()
   const description = String(obj.short_description || obj.description || obj.summary || '').trim() || undefined
-  const confidence = clampConfidence(Number(obj.confidence ?? obj.score ?? obj.matchConfidence ?? 0.82))
+  const reportedConfidence = Number(obj.confidence ?? obj.score ?? obj.matchConfidence)
+  const confidence = Number.isFinite(reportedConfidence)
+    ? clampConfidence(reportedConfidence)
+    : exactDomainMatch ? 0.82 : 0.72
   const now = new Date().toISOString()
   return {
     canonicalDomain,
@@ -35,12 +49,12 @@ function normalizeProviderRecord(raw: unknown, lookup: CorpusLookup, providerId:
     region: String(obj.region || obj.state || obj.location?.region || '').trim() || undefined,
     employeeCount: Number.isFinite(Number(obj.employeeCount ?? obj.numberOfEmployees ?? obj.employees)) ? Number(obj.employeeCount ?? obj.numberOfEmployees ?? obj.employees) : undefined,
     revenueUsd: Number.isFinite(Number(obj.revenueUsd ?? obj.revenue ?? obj.annualRevenue)) ? Number(obj.revenueUsd ?? obj.revenue ?? obj.annualRevenue) : undefined,
-    website: website || `https://${canonicalDomain}`,
+    website: providerWebsite || `https://${canonicalDomain}`,
     description,
     technologies: Array.isArray(obj.technologies) ? obj.technologies.map(String) : [],
     contacts: [],
     attributes: obj,
-    confidence: Math.max(0.6, confidence),
+    confidence,
     sourceType: 'provider',
     sourceIds: [providerId],
     verifiedAt: now,

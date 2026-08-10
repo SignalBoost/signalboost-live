@@ -17,18 +17,27 @@ export async function runCorpusRefreshBatch(limit = 25) {
   const results: Array<{ id: string; ok: boolean; domain: string; source?: string; error?: string }> = []
 
   for (const job of jobs ?? []) {
-    await admin.from('business_intelligence_corpus_refresh_queue').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', job.id)
+    const { data: claimed, error: claimError } = await admin
+      .from('business_intelligence_corpus_refresh_queue')
+      .update({ status: 'running', started_at: new Date().toISOString() })
+      .eq('id', job.id)
+      .eq('status', 'queued')
+      .select('id')
+      .maybeSingle()
+    if (claimError) throw new Error(claimError.message)
+    if (!claimed) continue
+
     try {
       const resolved = await resolveBusinessIntelligence({
         lookup: { query: job.canonical_domain, canonicalDomain: job.canonical_domain, requireFresh: true },
         enrichers,
       })
       if (!resolved) throw new Error('CORPUS_REFRESH_NO_RESULT')
-      await admin.from('business_intelligence_corpus_refresh_queue').update({ status: 'completed', finished_at: new Date().toISOString(), error: null }).eq('id', job.id)
+      await admin.from('business_intelligence_corpus_refresh_queue').update({ status: 'completed', finished_at: new Date().toISOString(), error: null }).eq('id', job.id).eq('status', 'running')
       results.push({ id: job.id, ok: true, domain: job.canonical_domain, source: resolved.source })
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'CORPUS_REFRESH_FAILED'
-      await admin.from('business_intelligence_corpus_refresh_queue').update({ status: 'failed', finished_at: new Date().toISOString(), error: message.slice(0, 500) }).eq('id', job.id)
+      await admin.from('business_intelligence_corpus_refresh_queue').update({ status: 'failed', finished_at: new Date().toISOString(), error: message.slice(0, 500) }).eq('id', job.id).eq('status', 'running')
       results.push({ id: job.id, ok: false, domain: job.canonical_domain, error: message })
     }
   }

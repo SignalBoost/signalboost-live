@@ -1,9 +1,10 @@
 // Shared Prospect Memory Service.
-// One boundary for COS and future portables to query fast prospects, inspect durable
-// Enterprise Memory, decide what is stale, and record usage without calling providers.
+// One boundary for COS and future portables to query curated local prospects first,
+// then fast durable Enterprise Memory, decide what is stale, and record usage.
 
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { getOrganizationMemory } from '@/lib/enterprise/memory/service'
+import { searchCuratedProspects } from './curatedSource'
 import {
   fieldsNeedingRefresh,
   getProspectMemory,
@@ -37,6 +38,22 @@ export type ProspectSearchResult = {
   source: 'hot_pool'
 }
 
+export type UnifiedProspectSearchResult = {
+  id: string
+  organizationId?: string
+  name: string
+  country: string
+  website: string
+  email: string
+  industry: string
+  technicalFit: number
+  revenuePotential: number
+  source: 'curated_file' | 'hot_pool'
+  contacts?: unknown[]
+  buyers?: unknown[]
+  staleFields?: string[]
+}
+
 function clampLimit(value: number | undefined) {
   const numeric = Number(value ?? 25)
   if (!Number.isFinite(numeric)) return 25
@@ -54,6 +71,63 @@ function number(value: unknown) {
 
 function profileCountry(profile: Record<string, unknown>) {
   return text(profile.country || profile.countryCode || profile.region)
+}
+
+function canonicalDomain(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./i, '').toLowerCase()
+  } catch {
+    return value.trim().toLowerCase().replace(/^www\./i, '')
+  }
+}
+
+export async function searchProspects(filters: ProspectSearchFilters = {}): Promise<UnifiedProspectSearchResult[]> {
+  const limit = clampLimit(filters.limit)
+  const curated = searchCuratedProspects({
+    country: filters.country,
+    industry: filters.industry,
+    limit,
+    requireEmail: filters.requireVerifiedEmail,
+  })
+
+  const results: UnifiedProspectSearchResult[] = curated.map(row => ({
+    id: row.id,
+    name: row.company,
+    country: row.country,
+    website: row.website,
+    email: row.email,
+    industry: row.industry,
+    technicalFit: row.technicalFit,
+    revenuePotential: row.revenuePotential,
+    source: 'curated_file',
+  }))
+  if (results.length >= limit) return results.slice(0, limit)
+
+  const seenDomains = new Set(results.map(row => canonicalDomain(row.website)).filter(Boolean))
+  const hot = await searchHotProspects({ ...filters, limit: limit - results.length })
+  for (const row of hot) {
+    if (seenDomains.has(row.canonicalDomain.toLowerCase())) continue
+    const contacts = Array.isArray(row.contacts) ? row.contacts : []
+    const primary = contacts.find((contact: any) => text(contact.business_email)) as any
+    results.push({
+      id: row.organizationId,
+      organizationId: row.organizationId,
+      name: row.name,
+      country: profileCountry(row.profile),
+      website: row.canonicalDomain ? `https://${row.canonicalDomain}` : '',
+      email: text(primary?.business_email),
+      industry: row.industry,
+      technicalFit: row.technicalFit,
+      revenuePotential: row.revenuePotential,
+      source: 'hot_pool',
+      contacts: row.contacts,
+      buyers: row.buyers,
+      staleFields: row.staleFields,
+    })
+    seenDomains.add(row.canonicalDomain.toLowerCase())
+    if (results.length >= limit) break
+  }
+  return results
 }
 
 export async function searchHotProspects(filters: ProspectSearchFilters = {}): Promise<ProspectSearchResult[]> {

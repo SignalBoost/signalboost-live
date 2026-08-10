@@ -44,9 +44,9 @@ export async function GET(req: NextRequest) {
   const channel = req.nextUrl.searchParams.get('channel')
   const locale = reportLangFromCookie(req.headers.get('cookie'))
 
-  // LIVE DATA: do not let a client-side display preference redefine the size of the
-  // database. Read the whole queue in database pages. The batching is transport
-  // protection only; there is no product-visible record ceiling here.
+  // Contacts is an inventory read. Never invoke AI/provider localization here: opening
+  // the page must be fast, deterministic, and free. Translation remains authoritative
+  // at human release time in PATCH, where only the one approved message is localized.
   const PAGE_SIZE = 1000
   const rows: any[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -65,25 +65,12 @@ export async function GET(req: NextRequest) {
     if (page.length < PAGE_SIZE) break
   }
 
-  // PENDING DRAFTS ARE DISPLAY COPIES, SO THE USER'S CURRENT LOCALE WINS AT THE MOMENT
-  // THEY ARE REVIEWED. The stored source remains untouched until the user approves it.
-  // This means switching English -> Polish -> Spanish changes the pending preview on the
-  // spot without permanently rewriting hundreds of records merely because the UI changed.
-  const pending = rows
-    .filter((row: any) => (row.status || 'pending') === 'pending' && String(row.outreach_message || '').trim())
-    .map((row: any) => ({ id: String(row.id), text: String(row.outreach_message || '') }))
-  const localizedPending = await localizeOutreachMessages(pending, locale)
-
   const normalized = rows.map((row: any) => {
-    const source = String(row.outreach_message || '')
-    const isPending = (row.status || 'pending') === 'pending'
-    const body = isPending ? (localizedPending.messages.get(String(row.id)) || source) : source
+    const body = String(row.outreach_message || '')
     return {
       ...withChannel(row),
-      // Returning the localized copy here makes every Contacts renderer path consistent,
-      // including older UI builds that fall back to outreach_message.
       outreach_message: body,
-      outbound_message: applyOutreachSignature(body, row.sender_key || 'saasSales', isPending ? locale : undefined),
+      outbound_message: applyOutreachSignature(body, row.sender_key || 'saasSales'),
     }
   })
 
@@ -93,7 +80,8 @@ export async function GET(req: NextRequest) {
     outreach,
     total: outreach.length,
     locale,
-    localizationFailed: localizedPending.failed,
+    localizationFailed: [],
+    displayLocalization: 'deferred_until_release',
     sendLimit,
   })
 }

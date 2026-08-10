@@ -1,20 +1,19 @@
 // saas/marketing-sales-host/director.ts
-// SignalBoost-coupled wiring for the autonomous director: it provides the real
-// 5-language copy generator (Anthropic) and runs the portable loop against this
-// app's stack. The director initiates into the approval queue only — it never
-// approves and never publishes. Theme selection is performance-weighted: it favors
-// the theme whose past campaigns drew the most real views, while still exploring.
-import Anthropic from '@anthropic-ai/sdk'
+// SignalBoost-coupled wiring for the autonomous director. Generation enters the
+// COS gateway so deterministic/cache reuse and provider-cost telemetry apply
+// before any external model is considered. The director initiates into the
+// approval queue only — it never approves and never publishes.
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { createSignalBoostMarketingHost } from './signalboostHost.ts'
 import { runDirector, type GeneratedCampaign } from '@/marketing-sales-core/director'
 import { LANGS, type Lang, type Actor, type MarketingHost } from '@/marketing-sales-core/types'
 import { buildFactualPreamble } from '@/portable-kernel'
 import { resolveCompanyFacts, hostBrandName } from '@/lib/portable/companyIdentity'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
 
 const ORG = 'signalboost'
-const MODEL = process.env.MARKETING_SALES_MODEL || 'claude-sonnet-4-6'
 const EXPLORE = 0.34 // keep testing every theme even when one is winning
+const ai = createPlatformAiPort()
 
 type Theme = { key: string; prompt: string }
 // Bounded, grounded themes — real SignalBoost offerings only, no invented products.
@@ -27,8 +26,7 @@ const THEMES: Theme[] = [
 
 // The optimization step: read which theme's published campaigns drew the most real
 // views (ms_events) and favor it — with EXPLORE-rate exploration so the director
-// never stops testing. Degrades SAFELY to date rotation when there is no data yet
-// (e.g. before metrics are flowing); it never throws and never blocks a run.
+// never stops testing. Degrades SAFELY to date rotation when there is no data yet.
 async function pickTheme(host: MarketingHost): Promise<Theme> {
   if (Math.random() < EXPLORE) return THEMES[Math.floor(Math.random() * THEMES.length)]
   try {
@@ -47,14 +45,9 @@ async function pickTheme(host: MarketingHost): Promise<Theme> {
 
 function makeGenerate(host: MarketingHost) {
   return async function generate(): Promise<GeneratedCampaign> {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) return null // honest: no key -> director produces nothing, queues nothing
-
     const theme = await pickTheme(host)
-    const client = new Anthropic({ apiKey })
     // Who this AI works for, and the rule that it may not invent facts. Same kernel the press
-    // portable uses — a generator with no company context invents product names (that is how a
-    // release naming a non-existent product once reached an editor).
+    // portable uses — a generator with no company context invents product names.
     const facts = await resolveCompanyFacts().catch(() => null)
     const system = [
       buildFactualPreamble(facts),
@@ -70,11 +63,11 @@ function makeGenerate(host: MarketingHost) {
 
     let text = ''
     try {
-      const resp = await client.messages.create({
-        model: MODEL, max_tokens: 1400, system,
-        messages: [{ role: 'user', content: `Theme: ${theme.prompt}` }],
+      text = await ai.generate({
+        systemPrompt: system,
+        prompt: `Theme: ${theme.prompt}`,
+        maxTokens: 1400,
       })
-      text = resp.content.map((b: any) => (b?.type === 'text' ? b.text : '')).join('').trim()
     } catch { return null }
 
     let parsed: any

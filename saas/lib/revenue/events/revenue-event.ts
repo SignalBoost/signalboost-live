@@ -1,4 +1,4 @@
-import { REVENUE_EVENT_SCHEMA_VERSION, type RevenueEvent, type RevenueEventInput } from './types'
+import { REVENUE_EVENT_SCHEMA_VERSION, type RevenueEvent, type RevenueEventInput } from './types.ts'
 
 const SECRET_KEY = /(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|cookie|private[_-]?key)/i
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/

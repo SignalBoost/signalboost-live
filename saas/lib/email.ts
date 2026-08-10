@@ -2,7 +2,6 @@ import { Resend } from 'resend'
 
 // Verified sender identities, aligned to the Signal ecosystem.
 // These addresses are used for outbound sending through Resend.
-// Reply handling is controlled separately by fallbackReplyTo() so replies do not depend on an inbound mailbox existing for every sender alias.
 export const SENDERS = {
   signalSupport: 'SignalBoost Team <signalsupport@signalboostapp.com>',
   saasSupport:   'SaaSSignal Team <saassupport@signalboostapp.com>',
@@ -14,26 +13,21 @@ export const SENDERS = {
 
 type SenderKey = keyof typeof SENDERS
 
+// Business-facing sender aliases must receive replies at the matching business
+// address. Never allow an owner/admin fallback address to leak into customer email.
+const REPLY_TO_BY_SENDER: Record<SenderKey, string> = {
+  signalSupport: 'signalsupport@signalboostapp.com',
+  saasSupport: 'saassupport@signalboostapp.com',
+  saasSales: 'saassales@signalboostapp.com',
+  saasMarketing: 'saasmarketing@signalboostapp.com',
+  saasPartners: 'saaspartners@signalboostapp.com',
+  saasContact: 'saascontact@signalboostapp.com',
+}
+
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return null
   return new Resend(apiKey)
-}
-
-function firstEmail(value: string | undefined) {
-  return String(value || '').split(',')[0]?.trim().toLowerCase() || ''
-}
-
-function fallbackReplyTo() {
-  return (
-    firstEmail(process.env.EMAIL_REPLY_TO) ||
-    firstEmail(process.env.REPLY_TO_EMAIL) ||
-    firstEmail(process.env.OWNER_EMAILS) ||
-    firstEmail(process.env.OWNER_EMAIL) ||
-    firstEmail(process.env.SIGNALBOOST_OWNER_EMAIL) ||
-    firstEmail(process.env.ADMIN_EMAIL) ||
-    undefined
-  )
 }
 
 export async function sendEmail(opts: {
@@ -52,7 +46,7 @@ export async function sendEmail(opts: {
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
-      replyTo: opts.replyTo || fallbackReplyTo(),
+      replyTo: opts.replyTo || REPLY_TO_BY_SENDER[opts.from],
     })
     if (error) return { ok: false as const, mode: 'resend' as const, error: error.message }
 

@@ -15,6 +15,16 @@ test('simple concierge help can stay local with zero provider calls', () => {
   }
 })
 
+test('supported-language greetings can stay local', () => {
+  for (const prompt of ['Olá', 'Hola', 'Cześć', 'Привет']) {
+    assert.equal(decideSupportLocalPreflight({
+      prompt,
+      localReply: 'local',
+      isPrivileged: false,
+    }).handled, true, prompt)
+  }
+})
+
 test('live-data and privileged requests always escalate', () => {
   assert.equal(decideSupportLocalPreflight({
     prompt: 'What is our MRR today?',
@@ -28,6 +38,21 @@ test('live-data and privileged requests always escalate', () => {
     localReply: 'Hello!',
     isPrivileged: true,
   }).handled, false)
+})
+
+test('action-shaped requests never use the zero-provider shortcut', () => {
+  for (const prompt of [
+    'Help create a campaign',
+    'Show me pricing',
+    'How do I find companies for outreach?',
+    'Help me fix the pipeline',
+  ]) {
+    assert.equal(decideSupportLocalPreflight({
+      prompt,
+      localReply: 'Local answer',
+      isPrivileged: false,
+    }).handled, false, prompt)
+  }
 })
 
 test('nontrivial requests do not get incorrectly answered locally', () => {

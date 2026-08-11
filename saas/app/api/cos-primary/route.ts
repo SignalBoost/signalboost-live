@@ -32,6 +32,10 @@ function confidenceThreshold(): number {
   return Number.isFinite(value) ? Math.max(0.5, Math.min(0.98, value)) : 0.72
 }
 
+function externalFallbackEnabled(): boolean {
+  return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED !== 'false'
+}
+
 function requestsExternalAction(input: string): boolean {
   const explicitExecution = /\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i
   const target = /\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i
@@ -68,7 +72,7 @@ function authoritativeProvenance(cos: any, external: { invoked: boolean; provide
     },
     local_reasoning: {
       invoked: p?.localModelInvoked ?? false,
-      model: p?.localModel ?? null,
+      model: p?.localModel ?? p?.reasonerLabel ?? null,
       confidence: cos?.confidence ?? null,
       threshold: confidenceThreshold(),
     },
@@ -80,6 +84,24 @@ function authoritativeProvenance(cos: any, external: { invoked: boolean; provide
   }
 }
 
+function escalationReason(cos: any, localError: string | null, requestedAction: boolean): { code: string; detail: string } {
+  if (localError) return { code: 'local_reasoner_exception', detail: localError }
+  if (requestedAction) return { code: 'explicit_external_action', detail: 'Delegated requested external action to governed executor.' }
+  if (cos && !cos.handled) {
+    const detail = String(cos.reason || 'COS declined the request without a reason.')
+    if (/not configured/i.test(detail)) return { code: 'local_reasoner_not_configured', detail }
+    if (/below escalation threshold/i.test(detail)) return { code: 'confidence_below_threshold', detail }
+    if (/did not return an answer/i.test(detail)) return { code: 'local_reasoner_no_answer', detail }
+    if (/unparseable/i.test(detail)) return { code: 'local_reasoner_unparseable', detail }
+    return { code: 'cos_first_declined', detail }
+  }
+  return { code: 'cos_first_unavailable', detail: 'COS-first attempt unavailable.' }
+}
+
+function logEscalation(event: Record<string, unknown>) {
+  console.warn('[cos-escalation-audit]', JSON.stringify({ at: new Date().toISOString(), ...event }))
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
@@ -87,18 +109,26 @@ export async function POST(req: NextRequest) {
   if (!input) return legacyConciergePost(new NextRequest(req.clone()))
 
   const access = await getAccess().catch(() => null)
-  const cos = await tryCOSFirstAnswer({ prompt: input, userId: access?.userId || null, language, privileged: Boolean(access?.isOwner || access?.isAdmin) }).catch(() => null)
+  let cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>> | null = null
+  let localError: string | null = null
+  try {
+    cos = await tryCOSFirstAnswer({ prompt: input, userId: access?.userId || null, language, privileged: Boolean(access?.isOwner || access?.isAdmin) })
+  } catch (error) {
+    localError = error instanceof Error ? error.message : String(error)
+    console.error('[cos-local-reasoner-error]', localError)
+  }
 
-  if (cos?.handled && !requestsExternalAction(input)) {
+  const requestedAction = requestsExternalAction(input)
+  if (cos?.handled && !requestedAction) {
     const executionProvenance = authoritativeProvenance(cos, { invoked: false })
     return NextResponse.json({
       reply: cos.reply,
-      source: 'cos-local-primary',
+      source: cos.provenance.responseSource === 'semantic_cache' ? 'cos-semantic-cache' : 'cos-local-primary',
       confidence_score: cos.confidence,
       confidence_threshold: confidenceThreshold(),
       external_ai_invoked: false,
       external_fallback_invoked: false,
-      local_model_invoked: true,
+      local_model_invoked: cos.provenance.localModelInvoked,
       execution_provenance: executionProvenance,
       provenance: cos.provenance,
       execution_allowed: false,
@@ -106,26 +136,75 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  const reason = escalationReason(cos, localError, requestedAction)
+  const auditBase = {
+    event: 'external_escalation_decision',
+    reason_code: reason.code,
+    reason: reason.detail,
+    confidence: cos?.confidence ?? null,
+    threshold: confidenceThreshold(),
+    local_model_invoked: cos?.provenance?.localModelInvoked ?? false,
+    local_model: cos?.provenance?.localModel ?? cos?.provenance?.reasonerLabel ?? null,
+    semantic_cache_hit: cos?.provenance?.semanticCacheHit ?? false,
+    knowledge_facts_used: cos?.provenance?.knowledgeFactsUsed ?? 0,
+    learned_items_used: cos?.provenance?.learnedItemsUsed ?? 0,
+    external_action_requested: requestedAction,
+    fallback_enabled: externalFallbackEnabled(),
+  }
+  logEscalation(auditBase)
+
+  if (!externalFallbackEnabled()) {
+    return NextResponse.json({
+      ok: false,
+      error: 'COS could not complete this request independently and external AI fallback is disabled.',
+      cos_first_attempted: Boolean(cos) || Boolean(localError),
+      cos_first_handled: false,
+      cos_first_confidence: cos?.confidence ?? 0,
+      confidence_threshold: confidenceThreshold(),
+      cos_first_reason: reason.detail,
+      escalation_reason_code: reason.code,
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      isolation_mode: true,
+      execution_provenance: authoritativeProvenance(cos, { invoked: false }),
+    }, { status: 503 })
+  }
+
   const response = await legacyConciergePost(new NextRequest(req.clone()))
   try {
     const payload = await response.clone().json()
     const external = providerFromPayload(payload)
-    const reason = cos && !cos.handled ? cos.reason : requestsExternalAction(input) ? 'Delegated requested external action to governed executor.' : 'COS-first attempt unavailable'
+    logEscalation({
+      event: 'external_escalation_result',
+      reason_code: reason.code,
+      provider: external.provider,
+      model: external.model,
+      status: response.status,
+    })
     const executionProvenance = authoritativeProvenance(cos, { invoked: true, ...external })
     return NextResponse.json({
       ...payload,
-      cos_first_attempted: Boolean(cos),
+      cos_first_attempted: Boolean(cos) || Boolean(localError),
       cos_first_handled: Boolean(cos?.handled),
       cos_first_confidence: cos?.confidence ?? null,
       confidence_threshold: confidenceThreshold(),
-      cos_first_reason: reason,
+      cos_first_reason: reason.detail,
+      escalation_reason_code: reason.code,
       cos_first_provenance: cos?.provenance ?? null,
       execution_provenance: executionProvenance,
       external_ai_invoked: true,
       external_fallback_invoked: true,
       isolation_mode: false,
     }, { status: response.status })
-  } catch {
+  } catch (error) {
+    logEscalation({
+      event: 'external_escalation_result_unparsed',
+      reason_code: reason.code,
+      provider: null,
+      model: null,
+      status: response.status,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return response
   }
 }

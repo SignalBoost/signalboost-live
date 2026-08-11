@@ -38,7 +38,17 @@ function externalFallbackEnabled(): boolean {
   return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED !== 'false'
 }
 
+function isProvenanceIntrospection(input: string): boolean {
+  const provenance = /\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|autonomous research|external ai|external provider|internal systems?)\b/i
+  const referent = /\b(previous|preceding|prior|last|just|that|this|answer|response|request|execution|used|invoked|contributed|generated|reasoning)\b/i
+  return provenance.test(input) && referent.test(input)
+}
+
 function requestsExternalAction(input: string): boolean {
+  // Provenance/introspection is an observation of already-recorded execution state.
+  // It must never be promoted into the governed mutation/external-action path merely
+  // because the question contains words such as "audit", "provider", "read" or "check".
+  if (isProvenanceIntrospection(input)) return false
   const explicitExecution = /\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i
   const target = /\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i
   return explicitExecution.test(input) && target.test(input)

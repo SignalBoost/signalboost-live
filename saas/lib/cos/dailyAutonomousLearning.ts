@@ -53,7 +53,7 @@ export function parseApprovedLearningUrls(): string[] {
 
 function miningGap(summary: MiningRunSummary) {
   return {
-    id: `daily-mining-${summary.started_at}`,
+    id: `daily-mining-${summary.run_id}`,
     subject: 'SignalBoost operational behavior',
     question: 'What reusable operational knowledge can COS learn from the latest mining run?',
     portableIds: ['cos'],
@@ -71,9 +71,9 @@ function miningAdapter(summary: MiningRunSummary): ContinuousLearningSourceAdapt
       if (!gap.id.startsWith('daily-mining-')) return []
       return [{
         sourceKind: 'work_experience',
-        sourceUri: `signalboost://mining/${summary.started_at}`,
+        sourceUri: `signalboost://mining/${summary.run_id}`,
         sourceTitle: 'SignalBoost daily mining run',
-        observedAt: summary.started_at,
+        observedAt: new Date().toISOString(),
         subject: gap.subject,
         text: JSON.stringify(summary),
         evidence: gap.evidence,

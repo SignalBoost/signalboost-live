@@ -4,12 +4,15 @@ import { ContinuousLearningDirector, type ContinuousLearningStore } from '@/lib/
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
+import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
 import type { MiningRunSummary } from './mining/types'
 
 export type DailyLearningResult = {
   status: 'skipped' | 'learned'
   approvedUrls: number
   autonomousGaps: number
+  corpusExpansionGaps: number
+  retainedKnowledge: number
   gapsConsidered: number
   documentsAcquired: number
   accepted: number
@@ -162,6 +165,8 @@ export async function runDailyAutonomousLearning(input: {
       status: 'skipped',
       approvedUrls: 0,
       autonomousGaps: 0,
+      corpusExpansionGaps: 0,
+      retainedKnowledge: 0,
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
@@ -177,6 +182,8 @@ export async function runDailyAutonomousLearning(input: {
       status: 'skipped',
       approvedUrls: 0,
       autonomousGaps: 0,
+      corpusExpansionGaps: 0,
+      retainedKnowledge: 0,
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
@@ -188,7 +195,11 @@ export async function runDailyAutonomousLearning(input: {
 
   const queued = input.gapSignals ? { ids: [], signals: input.gapSignals } : await loadQueuedReasoningGaps()
   const approvedUrls = input.approvedUrls ?? parseApprovedLearningUrls()
-  const autonomousGaps = generateKnowledgeGaps(queued.signals)
+  const reasoningGaps = generateKnowledgeGaps(queued.signals)
+  const dynamic = await generateDynamicKnowledgeGaps(12)
+  const reasoningKeys = new Set(reasoningGaps.map(gap => `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
+  const corpusExpansionGaps = dynamic.gaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
+  const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
   const gaps = [miningGap(input.miningSummary), ...autonomousGaps]
   const adapters = [
     miningAdapter(input.miningSummary),
@@ -209,6 +220,8 @@ export async function runDailyAutonomousLearning(input: {
     status: 'learned',
     approvedUrls: approvedUrls.length,
     autonomousGaps: autonomousGaps.length,
+    corpusExpansionGaps: corpusExpansionGaps.length,
+    retainedKnowledge: dynamic.retained,
     ...result,
     externalCostUsd: 0,
   }

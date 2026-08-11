@@ -70,6 +70,32 @@ a[href="/dashboard/outreach?channel=trade-press"] {
 }
 `
 
+const INITIAL_PAINT_GUARD_CSS = `
+html,
+body {
+  background: #030611;
+}
+
+.home {
+  background: #030611 !important;
+}
+
+.home .waves {
+  visibility: hidden;
+  animation: signalboostRevealHomeWaves 1ms 450ms forwards !important;
+}
+
+@keyframes signalboostRevealHomeWaves {
+  to { visibility: visible; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home .waves {
+    animation-delay: 0ms !important;
+  }
+}
+`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -79,6 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSON_LD) }}
         />
         <style dangerouslySetInnerHTML={{ __html: OLD_PRESS_WORKFLOW_HIDE_CSS }} />
+        <style dangerouslySetInnerHTML={{ __html: INITIAL_PAINT_GUARD_CSS }} />
       </head>
       <body
         style={{

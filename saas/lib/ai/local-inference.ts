@@ -1,4 +1,9 @@
-import { ensureRunpodReasonerStarted, runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
+import {
+  beginRunpodInferenceActivity,
+  endRunpodInferenceActivity,
+  ensureRunpodReasonerStarted,
+  runpodLifecycleEnabled,
+} from '@/lib/ai/cos/runpodLifecycle'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -39,13 +44,21 @@ async function waitForInference(config: LocalInferenceConfig): Promise<void> {
 
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+  let activityStarted = false
   try {
+    if (runpodLifecycleEnabled()) {
+      await beginRunpodInferenceActivity()
+      activityStarted = true
+    }
     await waitForInference(config)
     const response = await fetch(`${config.baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) }, signal: controller.signal, body: JSON.stringify({ model: config.model, max_tokens: args.maxTokens ?? 2048, temperature: args.temperature ?? 0.2, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' }, { role: 'user', content: args.prompt }] }) })
     if (!response.ok) { console.error('localInference: HTTP error', response.status, await response.text()); return null }
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }; const text = data.choices?.[0]?.message?.content
     return typeof text === 'string' && text.length > 0 ? text : null
-  } catch (error) { console.error('localInference: request failed', error); return null } finally { clearTimeout(timeout) }
+  } catch (error) { console.error('localInference: request failed', error); return null } finally {
+    clearTimeout(timeout)
+    if (activityStarted) await endRunpodInferenceActivity().catch(error => console.error('localInference: activity release failed', error))
+  }
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {

@@ -4,19 +4,21 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { COS_LEARNING_COPY, type CosLearningLanguage } from '@/lib/i18n/cosLearningCopy'
 
-type Readiness = { ok?:boolean; enabled?:boolean; questions?:number; sourceAdapters?:string[]; error?:string }
+type Readiness = { ok?:boolean; enabled?:boolean; questions?:number; sourceAdapters?:string[]; recommendedBatchSize?:number; error?:string }
+type CycleResult = {
+  gapsConsidered?: number
+  documentsAcquired?: number
+  accepted?: number
+  rejected?: Record<string, number>
+  sourceErrors?: Record<string, number>
+  externalCostUsd?: number
+}
 type LearningResult = {
   ok?: boolean
   curriculumQuestions?: number
   sourceAdapters?: string[]
-  result?: {
-    gapsConsidered?: number
-    documentsAcquired?: number
-    accepted?: number
-    rejected?: Record<string, number>
-    sourceErrors?: Record<string, number>
-    externalCostUsd?: number
-  }
+  batch?: { offset?:number; size?:number; nextOffset?:number; done?:boolean }
+  result?: CycleResult
   error?: string
 }
 
@@ -24,6 +26,10 @@ async function readResponse(response: Response): Promise<any> {
   const text = await response.text()
   if (!text) return {}
   try { return JSON.parse(text) } catch { return { error: `${response.status} ${response.statusText}: ${text.slice(0, 500)}` } }
+}
+
+function mergeCounts(target:Record<string,number>,source?:Record<string,number>){
+  for(const [key,value] of Object.entries(source??{}))target[key]=(target[key]??0)+Number(value||0)
 }
 
 export default function CosLearningPage() {
@@ -46,11 +52,26 @@ export default function CosLearningPage() {
 
   async function run(){
     setBusy(true);setError('')
+    const aggregate:CycleResult={gapsConsidered:0,documentsAcquired:0,accepted:0,rejected:{},sourceErrors:{},externalCostUsd:0}
     try{
-      const response=await fetch('/api/admin/cos-learning/foundational',{method:'POST'})
-      const body=await readResponse(response)
-      setResult(body)
-      if(!response.ok)setError(body?.error||copy.requestFailed)
+      const total=Math.max(1,status?.questions??25)
+      const limit=Math.max(1,Math.min(5,status?.recommendedBatchSize??3))
+      let offset=0
+      while(offset<total){
+        const response=await fetch('/api/admin/cos-learning/foundational',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({offset,limit})})
+        const body=await readResponse(response) as LearningResult
+        if(!response.ok||!body.ok)throw new Error(body?.error||copy.requestFailed)
+        const r=body.result??{}
+        aggregate.gapsConsidered=Number(aggregate.gapsConsidered||0)+Number(r.gapsConsidered||0)
+        aggregate.documentsAcquired=Number(aggregate.documentsAcquired||0)+Number(r.documentsAcquired||0)
+        aggregate.accepted=Number(aggregate.accepted||0)+Number(r.accepted||0)
+        aggregate.externalCostUsd=Number(aggregate.externalCostUsd||0)+Number(r.externalCostUsd||0)
+        mergeCounts(aggregate.rejected!,r.rejected)
+        mergeCounts(aggregate.sourceErrors!,r.sourceErrors)
+        offset=Number(body.batch?.nextOffset??(offset+limit))
+        setResult({ok:true,curriculumQuestions:total,sourceAdapters:body.sourceAdapters,result:{...aggregate,rejected:{...aggregate.rejected},sourceErrors:{...aggregate.sourceErrors}},batch:{offset:0,size:offset,nextOffset:offset,done:offset>=total}})
+        if(body.batch?.done)break
+      }
       await load()
     }catch(e){setError(e instanceof Error?e.message:copy.requestFailed)}finally{setBusy(false)}
   }

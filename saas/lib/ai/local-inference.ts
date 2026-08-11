@@ -12,11 +12,46 @@ export interface LocalInferenceConfig {
   timeoutMs: number
 }
 
+function normalizeHost(value: string): string {
+  return value.trim().toLowerCase().replace(/^\[|\]$/g, '')
+}
+
+function configuredRemoteHosts(): Set<string> {
+  return new Set(
+    (process.env.LOCAL_AI_ALLOWED_HOSTS || '')
+      .split(',')
+      .map(normalizeHost)
+      .filter(Boolean),
+  )
+}
+
+function isLoopbackOrInternalHost(hostname: string): boolean {
+  const host = normalizeHost(hostname)
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === 'ai-brain'
+}
+
 function normalizeBaseUrl(value: string): string {
   const url = new URL(value)
-  const allowedHosts = new Set(['127.0.0.1', 'localhost', '::1', '[::1]', 'ai-brain'])
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Local AI endpoint must use http or https')
-  if (!allowedHosts.has(url.hostname)) throw new Error(`Local AI endpoint host is not allowed: ${url.hostname}`)
+  const host = normalizeHost(url.hostname)
+  const internal = isLoopbackOrInternalHost(host)
+  const explicitlyAllowed = configuredRemoteHosts().has(host)
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Local AI endpoint must use http or https')
+  }
+  if (!internal && !explicitlyAllowed) {
+    throw new Error(`Local AI endpoint host is not allowed: ${url.hostname}. Add the exact host to LOCAL_AI_ALLOWED_HOSTS.`)
+  }
+  if (!internal && url.protocol !== 'https:') {
+    throw new Error('Remote local-AI endpoints must use https')
+  }
+  if (!internal && !process.env.LOCAL_AI_API_KEY?.trim()) {
+    throw new Error('LOCAL_AI_API_KEY is required for a remote local-AI endpoint')
+  }
+  if (url.username || url.password) {
+    throw new Error('Local AI endpoint credentials must not be embedded in LOCAL_AI_BASE_URL')
+  }
+
   return url.toString().replace(/\/$/, '')
 }
 

@@ -78,10 +78,27 @@ export function listDiagnosticThinkers(): string[] {
   return Array.from(THINKERS.keys()).sort()
 }
 
-// Intentionally disabled while COS independence is being measured. The Vercel
-// GEMINI_API_KEY may remain configured, but this runtime will not consume it.
 export function createGeminiThinker(): DiagnosticThinker | null {
-  return null
+  const apiKey = process.env.GOOGLE_AI_STUDIO_API_KEY || process.env.GEMINI_API_KEY || ''
+  if (!apiKey) return null
+  const model = process.env.COS_SUPERVISOR_GEMINI_MODEL || 'gemini-1.5-flash'
+  return {
+    id: 'gemini',
+    async think(incident, systemPrompt, responseSchema) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }],
+          generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema },
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error?.message || `Gemini returned ${res.status}`)
+      return body?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('') || ''
+    },
+  }
 }
 
 export function createModelRouterThinker(): DiagnosticThinker | null {
@@ -104,10 +121,10 @@ export function createModelRouterThinker(): DiagnosticThinker | null {
 export function resolveDiagnosticThinker(): DiagnosticThinker | null {
   const wanted = String(process.env.SUPERVISOR_THINKER_PROVIDER || '').trim().toLowerCase()
   if (wanted && THINKERS.has(wanted)) return THINKERS.get(wanted) as DiagnosticThinker
-  if (wanted === 'gemini') return null
+  if (wanted === 'gemini') return createGeminiThinker()
   if (wanted === 'claude' || wanted === 'openai') return createModelRouterThinker()
   if (THINKERS.size) return THINKERS.values().next().value as DiagnosticThinker
-  return createModelRouterThinker()
+  return createGeminiThinker() || createModelRouterThinker()
 }
 
 export async function diagnoseIncident(
@@ -124,5 +141,5 @@ export async function diagnoseIncident(
 }
 
 export async function diagnoseIncidentWithGemini(incident: NormalizedIncidentPayload): Promise<DiagnosticResult> {
-  return diagnoseIncident(incident, null)
+  return diagnoseIncident(incident, createGeminiThinker())
 }

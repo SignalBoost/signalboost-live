@@ -44,7 +44,7 @@ function autonomousLearningIsExplicitlyEnabled(): boolean {
   return process.env.COS_AUTONOMOUS_LEARNING_ENABLED === 'true'
 }
 
-function parseApprovedLearningUrls(): string[] {
+export function parseApprovedLearningUrls(): string[] {
   return String(process.env.COS_APPROVED_LEARNING_URLS || '')
     .split(',')
     .map((value) => value.trim())
@@ -82,7 +82,7 @@ function miningAdapter(summary: MiningRunSummary): ContinuousLearningSourceAdapt
   }
 }
 
-function approvedUrlLearningAdapter(urls: string[]): ContinuousLearningSourceAdapter {
+export function approvedUrlLearningAdapter(urls: string[]): ContinuousLearningSourceAdapter {
   return {
     kind: 'approved_public_web',
     async acquire(gap) {

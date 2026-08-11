@@ -28,17 +28,10 @@ export type LearningCycleResult = {
   documentsAcquired: number
   accepted: number
   rejected: Record<string, number>
+  sourceErrors: Record<string, number>
   externalCostUsd: number
 }
 
-/**
- * Runs one bounded proactive-learning cycle.
- *
- * Source adapters perform acquisition. This orchestrator never crawls arbitrary URLs and
- * never calls an AI provider directly. It converts acquired documents into deterministic
- * candidates, then lets ContinuousLearningDirector enforce provenance, confidence,
- * deduplication, source policy, candidate caps and budget.
- */
 export class ContinuousLearningCycle {
   constructor(
     private readonly director: ContinuousLearningDirector,
@@ -52,21 +45,45 @@ export class ContinuousLearningCycle {
       documentsAcquired: 0,
       accepted: 0,
       rejected: {},
+      sourceErrors: {},
       externalCostUsd: spentExternalCostUsd,
     }
 
     for (const gap of prioritized) {
       for (const adapter of this.adapters) {
-        const documents = await adapter.acquire(gap)
+        let documents: LearningSourceDocument[] = []
+        try {
+          documents = await adapter.acquire(gap)
+        } catch (error) {
+          const key = adapter.kind
+          result.sourceErrors[key] = (result.sourceErrors[key] ?? 0) + 1
+          console.warn('cosLearning: source acquisition failed', {
+            sourceKind: adapter.kind,
+            gapId: gap.id,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          continue
+        }
+
         result.documentsAcquired += documents.length
         for (const document of documents) {
           if (document.sourceKind !== adapter.kind) {
             this.recordDecision(result, { accepted: false, reason: 'source_not_allowed' })
             continue
           }
-          const decision = await this.director.admit(this.toCandidate(document), result.externalCostUsd)
-          this.recordDecision(result, decision)
-          if (!decision.accepted && decision.reason === 'budget_exhausted') return result
+          try {
+            const decision = await this.director.admit(this.toCandidate(document), result.externalCostUsd)
+            this.recordDecision(result, decision)
+            if (!decision.accepted && decision.reason === 'budget_exhausted') return result
+          } catch (error) {
+            result.sourceErrors.storage = (result.sourceErrors.storage ?? 0) + 1
+            console.warn('cosLearning: candidate admission failed', {
+              sourceKind: adapter.kind,
+              gapId: gap.id,
+              sourceUri: document.sourceUri,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
         }
       }
     }
@@ -77,9 +94,6 @@ export class ContinuousLearningCycle {
     const normalized = document.text.replace(/\s+/g, ' ').trim()
     const evidence = document.evidence?.filter(Boolean) ?? []
     if (!evidence.length && normalized) evidence.push(normalized.slice(0, 500))
-
-    // Deterministic extraction is intentionally conservative. Rich semantic extraction can
-    // be added later through the governed COS gateway; raw source text never becomes truth.
     const summary = normalized.slice(0, 1200)
     const confidence = normalized ? 0.8 : 0
     return {

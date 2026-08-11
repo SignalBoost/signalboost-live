@@ -18,11 +18,17 @@ export async function GET(){
 
 export async function POST(){
   const guard=await requireOwner(); if(!guard.ok)return NextResponse.json({error:guard.error},{status:guard.status})
-  if(process.env.COS_LIVE_SOURCES_ENABLED!=='true') return NextResponse.json({ok:false,error:'COS_LIVE_SOURCES_ENABLED must be true before foundational acquisition can run.'},{status:409})
-  const stores=createSupabaseCOSStores(); if(!stores)return NextResponse.json({ok:false,error:'COS Supabase service store is not configured.'},{status:503})
-  const adapters=createLiveLearningAdapters(); if(!adapters.length)return NextResponse.json({ok:false,error:'No approved live learning adapters are configured.'},{status:409})
-  const director=new ContinuousLearningDirector(stores.continuousLearning,{allowedSourceKinds:new Set(['work_experience','engineering_history','official_documentation','research_paper','scientific_journal','library_material','news_article','public_dataset','video_transcript','approved_public_web']),minimumConfidence:.72,maxCandidatesPerCycle:50,maxExternalCostUsdPerCycle:1})
-  const cycle=new ContinuousLearningCycle(director,adapters)
-  const result=await cycle.run(foundationalKnowledgeGaps())
-  return NextResponse.json({ok:true,curriculumQuestions:foundationalKnowledgeGaps().length,sourceAdapters:adapters.map(a=>a.kind),result})
+  try {
+    if(process.env.COS_LIVE_SOURCES_ENABLED!=='true') return NextResponse.json({ok:false,error:'COS_LIVE_SOURCES_ENABLED must be true before foundational acquisition can run.'},{status:409})
+    const stores=createSupabaseCOSStores(); if(!stores)return NextResponse.json({ok:false,error:'COS Supabase service store is not configured.'},{status:503})
+    const adapters=createLiveLearningAdapters(); if(!adapters.length)return NextResponse.json({ok:false,error:'No approved live learning adapters are configured.'},{status:409})
+    const director=new ContinuousLearningDirector(stores.continuousLearning,{allowedSourceKinds:new Set(['work_experience','engineering_history','official_documentation','research_paper','scientific_journal','library_material','news_article','public_dataset','video_transcript','approved_public_web']),minimumConfidence:.72,maxCandidatesPerCycle:50,maxExternalCostUsdPerCycle:1})
+    const cycle=new ContinuousLearningCycle(director,adapters)
+    const result=await cycle.run(foundationalKnowledgeGaps())
+    return NextResponse.json({ok:true,curriculumQuestions:foundationalKnowledgeGaps().length,sourceAdapters:adapters.map(a=>a.kind),result})
+  } catch (error) {
+    const message=error instanceof Error?error.message:String(error)
+    console.error('cosLearning: foundational run failed',error)
+    return NextResponse.json({ok:false,error:message||'Foundational learning run failed.'},{status:500})
+  }
 }

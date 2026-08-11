@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
-import { auditUiText } from '@/lib/i18n/auditUiCopy'
+import { COS_LEARNING_COPY, type CosLearningLanguage } from '@/lib/i18n/cosLearningCopy'
 
 type Readiness = {
   ok?: boolean
@@ -28,7 +28,7 @@ type LearningResult = {
 
 export default function CosLearningPage() {
   const { lang } = useTranslation()
-  const copy = (english: string) => auditUiText(lang, english)
+  const copy = COS_LEARNING_COPY[(lang in COS_LEARNING_COPY ? lang : 'en') as CosLearningLanguage]
   const [status, setStatus] = useState<Readiness | null>(null)
   const [result, setResult] = useState<LearningResult | null>(null)
   const [busy, setBusy] = useState(false)
@@ -40,9 +40,9 @@ export default function CosLearningPage() {
       const response = await fetch('/api/admin/cos-learning/foundational', { cache: 'no-store' })
       const body = await response.json()
       setStatus(body)
-      if (!response.ok) setError(body?.error || copy('Learning request failed.'))
+      if (!response.ok) setError(body?.error || copy.requestFailed)
     } catch {
-      setError(copy('Learning request failed.'))
+      setError(copy.requestFailed)
     }
   }
 
@@ -53,10 +53,10 @@ export default function CosLearningPage() {
       const response = await fetch('/api/admin/cos-learning/foundational', { method: 'POST' })
       const body = await response.json()
       setResult(body)
-      if (!response.ok) setError(body?.error || copy('Learning request failed.'))
+      if (!response.ok) setError(body?.error || copy.requestFailed)
       await load()
     } catch {
-      setError(copy('Learning request failed.'))
+      setError(copy.requestFailed)
     } finally {
       setBusy(false)
     }
@@ -69,22 +69,22 @@ export default function CosLearningPage() {
     <div className="min-h-[calc(100vh-80px)] bg-bg px-6 pb-16 pt-8 text-text">
       <div className="mx-auto max-w-5xl space-y-5">
         <div>
-          <h1 className="text-2xl font-semibold">{copy('COS Foundational Learning')}</h1>
-          <p className="mt-1 text-sm text-text-muted">{copy('Populate COS with governed, provenance-bearing knowledge from approved live sources.')}</p>
+          <h1 className="text-2xl font-semibold">{copy.title}</h1>
+          <p className="mt-1 text-sm text-text-muted">{copy.subtitle}</p>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
-          <Card label={status?.enabled ? copy('Live learning enabled') : copy('Live learning disabled')} value={status?.enabled ? '✓' : '—'} />
-          <Card label={copy('Study questions')} value={String(status?.questions ?? '—')} />
-          <Card label={copy('Source adapters')} value={String(status?.sourceAdapters?.length ?? '—')} />
+          <Card label={status?.enabled ? copy.liveEnabled : copy.liveDisabled} value={status?.enabled ? '✓' : '—'} />
+          <Card label={copy.studyQuestions} value={String(status?.questions ?? '—')} />
+          <Card label={copy.sourceAdapters} value={String(status?.sourceAdapters?.length ?? '—')} />
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button onClick={run} disabled={busy || !status?.enabled} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">
-            {busy ? copy('Learning in progress…') : copy('Run Foundational Learning')}
+            {busy ? copy.running : copy.run}
           </button>
           <button onClick={load} disabled={busy} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold">
-            {copy('Refresh status')}
+            {copy.refresh}
           </button>
         </div>
 
@@ -93,15 +93,15 @@ export default function CosLearningPage() {
         <section className="rounded-md border border-border bg-surface p-4">
           {r ? (
             <div className="grid gap-3 md:grid-cols-4">
-              <Card label={copy('Questions processed')} value={String(r.gapsConsidered ?? 0)} />
-              <Card label={copy('Documents acquired')} value={String(r.documentsAcquired ?? 0)} />
-              <Card label={copy('Knowledge accepted')} value={String(r.accepted ?? 0)} />
-              <Card label={copy('External cost')} value={`$${Number(r.externalCostUsd ?? 0).toFixed(4)}`} />
+              <Card label={copy.questionsProcessed} value={String(r.gapsConsidered ?? 0)} />
+              <Card label={copy.documentsAcquired} value={String(r.documentsAcquired ?? 0)} />
+              <Card label={copy.knowledgeAccepted} value={String(r.accepted ?? 0)} />
+              <Card label={copy.externalCost} value={`$${Number(r.externalCostUsd ?? 0).toFixed(4)}`} />
               {r.rejected && Object.keys(r.rejected).length > 0 && (
-                <div className="md:col-span-4 text-xs text-text-muted">{copy('Rejected')}: {Object.entries(r.rejected).map(([k,v]) => `${k}: ${v}`).join(' · ')}</div>
+                <div className="md:col-span-4 text-xs text-text-muted">{copy.rejected}: {Object.entries(r.rejected).map(([k,v]) => `${k}: ${v}`).join(' · ')}</div>
               )}
             </div>
-          ) : <p className="text-sm text-text-muted">{copy('No learning run has been completed on this page yet.')}</p>}
+          ) : <p className="text-sm text-text-muted">{copy.noRun}</p>}
         </section>
       </div>
     </div>

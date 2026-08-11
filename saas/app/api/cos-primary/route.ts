@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
+import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { getAccess } from '@/lib/auth/access'
 
 export const runtime = 'nodejs'
@@ -43,7 +45,6 @@ function requestsExternalAction(input: string): boolean {
 }
 
 function providerFromPayload(payload: any): { provider: string | null; model: string | null } {
-  // Only accept structured executor metadata. Never infer provider/model from prose.
   const candidates = [payload?.execution, payload?.metadata, payload?.provenance, payload]
   for (const item of candidates) {
     if (!item || typeof item !== 'object') continue
@@ -101,6 +102,27 @@ function escalationReason(cos: any, localError: string | null, requestedAction: 
 
 function logEscalation(event: Record<string, unknown>) {
   console.warn('[cos-escalation-audit]', JSON.stringify({ at: new Date().toISOString(), ...event }))
+}
+
+function legacyContinuityFailure(payload: any): boolean {
+  const text = JSON.stringify(payload ?? {}).toLowerCase()
+  return text.includes('both reasoning providers are temporarily unavailable') || text.includes('continuity protection detected a primary failure')
+}
+
+async function independentReasonerHealth() {
+  const resolved = resolveCosReasoner()
+  if (!resolved.config) return { configured: false, healthy: false, model: null, error: resolved.reason }
+  try {
+    const health = await checkLocalInferenceHealth(localInferenceConfigFromEnv())
+    return { configured: true, healthy: health.ok, model: health.model, error: health.error ?? null }
+  } catch (error) {
+    return {
+      configured: true,
+      healthy: false,
+      model: process.env.LOCAL_AI_MODEL?.trim() || null,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -164,6 +186,7 @@ export async function POST(req: NextRequest) {
       confidence_threshold: confidenceThreshold(),
       cos_first_reason: reason.detail,
       escalation_reason_code: reason.code,
+      independent_reasoner: await independentReasonerHealth(),
       external_ai_invoked: false,
       external_fallback_invoked: false,
       isolation_mode: true,
@@ -175,26 +198,36 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await response.clone().json()
     const external = providerFromPayload(payload)
+    const continuityFailed = legacyContinuityFailure(payload)
+    const reasonerHealth = continuityFailed ? await independentReasonerHealth() : null
     logEscalation({
       event: 'external_escalation_result',
       reason_code: reason.code,
       provider: external.provider,
       model: external.model,
       status: response.status,
+      continuity_failed: continuityFailed,
+      independent_reasoner: reasonerHealth,
     })
-    const executionProvenance = authoritativeProvenance(cos, { invoked: true, ...external })
+    const executionProvenance = authoritativeProvenance(cos, { invoked: !continuityFailed, ...external })
     return NextResponse.json({
       ...payload,
+      ...(continuityFailed ? {
+        reply: `COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`,
+        source: 'cos-independent-reasoner-unavailable',
+      } : {}),
       cos_first_attempted: Boolean(cos) || Boolean(localError),
       cos_first_handled: Boolean(cos?.handled),
       cos_first_confidence: cos?.confidence ?? null,
       confidence_threshold: confidenceThreshold(),
       cos_first_reason: reason.detail,
       escalation_reason_code: reason.code,
+      independent_reasoner: reasonerHealth,
       cos_first_provenance: cos?.provenance ?? null,
       execution_provenance: executionProvenance,
-      external_ai_invoked: true,
+      external_ai_invoked: !continuityFailed,
       external_fallback_invoked: true,
+      external_fallback_succeeded: !continuityFailed,
       isolation_mode: false,
     }, { status: response.status })
   } catch (error) {

@@ -1,18 +1,7 @@
 import { ensureRunpodReasonerStarted, runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
 
-export interface LocalModelCallArgs {
-  prompt: string
-  systemPrompt?: string
-  maxTokens?: number
-  temperature?: number
-}
-
-export interface LocalInferenceConfig {
-  baseUrl: string
-  model: string
-  apiKey?: string
-  timeoutMs: number
-}
+export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
+export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
 
 function normalizeHost(value: string): string { return value.trim().toLowerCase().replace(/^\[|\]$/g, '') }
 function configuredRemoteHosts(): Set<string> { return new Set((process.env.LOCAL_AI_ALLOWED_HOSTS || '').split(',').map(normalizeHost).filter(Boolean)) }
@@ -38,7 +27,8 @@ export function localInferenceConfigFromEnv(): LocalInferenceConfig {
 async function waitForInference(config: LocalInferenceConfig): Promise<void> {
   if (!runpodLifecycleEnabled()) return
   await ensureRunpodReasonerStarted()
-  const deadline = Date.now() + Number(process.env.RUNPOD_START_TIMEOUT_MS || '180000')
+  const timeoutMs = Number(process.env.RUNPOD_START_TIMEOUT_MS || '180000')
+  const deadline = Date.now() + (Number.isFinite(timeoutMs) ? timeoutMs : 180000)
   while (Date.now() < deadline) {
     const health = await checkLocalInferenceHealth(config)
     if (health.ok) return
@@ -60,5 +50,13 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 5000))
-  try { const response = await fetch(`${config.baseUrl}/models`, { headers: authHeaders(config.apiKey), signal: controller.signal }); if (!response.ok) return { ok: false, model: config.model, error: `HTTP ${response.status}` }; const data = await response.json() as { data?: Array<{ id?: string }> }; const available = data.data?.some(item => item.id === config.model) ?? false; return available ? { ok: true, model: config.model } : { ok: false, model: config.model, error: 'Configured model is not served by the local endpoint' } } catch (error) { return { ok: false, model: config.model, error: error instanceof Error ? error.message : 'Local inference health check failed' } finally { clearTimeout(timeout) }
+  try {
+    const response = await fetch(`${config.baseUrl}/models`, { headers: authHeaders(config.apiKey), signal: controller.signal })
+    if (!response.ok) return { ok: false, model: config.model, error: `HTTP ${response.status}` }
+    const data = await response.json() as { data?: Array<{ id?: string }> }
+    const available = data.data?.some(item => item.id === config.model) ?? false
+    return available ? { ok: true, model: config.model } : { ok: false, model: config.model, error: 'Configured model is not served by the local endpoint' }
+  } catch (error) {
+    return { ok: false, model: config.model, error: error instanceof Error ? error.message : 'Local inference health check failed' }
+  } finally { clearTimeout(timeout) }
 }

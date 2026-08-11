@@ -1,13 +1,16 @@
+import { createHash } from 'node:crypto'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { loadUserMemories } from '@/lib/ai/tools/userMemory'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
+import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
   | { handled: false; confidence: number; reason: string; provenance: COSProvenance }
 
 export type COSProvenance = {
-  responseSource: 'local_cos_reasoning' | 'external_fallback_required'
+  responseSource: 'semantic_cache' | 'local_cos_reasoning' | 'external_fallback_required'
   externalAiInvoked: false
   localModelInvoked: boolean
   reasonerLabel: string | null
@@ -18,6 +21,9 @@ export type COSProvenance = {
 }
 
 const STOP_WORDS = new Set(['about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why'])
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+type CachedCosAnswer = { reply:string; confidence:number; reasonerLabel:string|null }
 
 function threshold(): number {
   const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
@@ -65,10 +71,28 @@ async function retrieveInternalContext(prompt:string,userId?:string|null){
 }
 function parseLocalResult(raw:string){ const cleaned=raw.trim().replace(/^```json\s*/i,'').replace(/```$/i,'').trim(); try{const p=JSON.parse(cleaned) as {answer?:unknown;confidence?:unknown}; const answer=typeof p.answer==='string'?p.answer.trim():''; const confidence=Number(p.confidence); return answer&&Number.isFinite(confidence)?{answer,confidence:Math.max(0,Math.min(1,confidence))}:null}catch{return null} }
 
+function contextFingerprint(context:{facts:string[];learned:string[];memories:string[]}):string{
+  return createHash('sha256').update(JSON.stringify({facts:context.facts,learned:context.learned,memories:context.memories})).digest('hex')
+}
+
+async function readCachedAnswer(key:string):Promise<CachedCosAnswer|null>{
+  const db=cosServiceDb(); if(!db)return null
+  try { return (await new SupabaseExactCacheStore(db).get<CachedCosAnswer>(key))?.value ?? null } catch { return null }
+}
+async function writeCachedAnswer(key:string,value:CachedCosAnswer):Promise<void>{
+  const db=cosServiceDb(); if(!db)return
+  try { const now=Date.now(); await new SupabaseExactCacheStore(db).set(key,{value,createdAt:now,expiresAt:now+CACHE_TTL_MS}) } catch {}
+}
+
 export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean}):Promise<COSFirstAnswerResult>{
   // Internal COS knowledge is always consulted before deciding whether a reasoner or external fallback is required.
   const context=await retrieveInternalContext(input.prompt,input.userId)
   const base={ externalAiInvoked:false as const, localModelInvoked:false, reasonerLabel:null as string|null, internalSystemsConsulted:context.systems, knowledgeFactsUsed:context.facts.length, learnedItemsUsed:context.learned.length, userMemoriesUsed:context.memories.length }
+  const cacheKey=createExactCacheKey({taskId:'cos-first-answer',prompt:input.prompt,contextFingerprint:contextFingerprint(context),policyVersion:`threshold:${threshold().toFixed(2)}`,knowledgeVersion:null})
+  const cached=await readCachedAnswer(cacheKey)
+  if(cached&&cached.reply&&cached.confidence>=threshold()){
+    return {handled:true,reply:cached.reply,confidence:cached.confidence,provenance:{responseSource:'semantic_cache',...base,reasonerLabel:cached.reasonerLabel}}
+  }
 
   if(process.env.COS_LOCAL_FIRST_ENABLED==='false'){
     const reason='COS-first answering is disabled by COS_LOCAL_FIRST_ENABLED.'; void recordKnowledgeGap(input.prompt,0,reason)
@@ -76,24 +100,26 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   }
   const resolved=resolveCosReasoner()
   if(!resolved.config){
-    const reason='reason' in resolved?resolved.reason:'COS reasoner is not configured.'; void recordKnowledgeGap(input.prompt,0,reason)
+    const reason='reason' in resolved?resolved.reason:'Independent COS reasoner is not configured.'; void recordKnowledgeGap(input.prompt,0,reason)
     return {handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...base}}
   }
 
   const evidenceCount=context.facts.length+context.learned.length
   const internalContext=[context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',context.memories.length?`USER ENTERPRISE MEMORY:\n${context.memories.join('\n')}`:''].filter(Boolean).join('\n\n')
-  const reasoned=await callCosReasoner({temperature:.15,maxTokens:3000,systemPrompt:`You are COS, SignalBoost's provider-independent PRIMARY reasoning layer. Reason from the user's question, your model knowledge, and supplied internal evidence. Distinguish evidence from inference. Never invent sources. If evidence is insufficient, lower confidence. Reply in ${input.language||'English'}. Return ONLY strict JSON: {"answer":"complete answer","confidence":0.0}.`,prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
+  const reasoned=await callCosReasoner({temperature:.15,maxTokens:3000,systemPrompt:`You are COS, SignalBoost's independent PRIMARY reasoning layer. Reason from the user's question, your open/self-hosted model knowledge, and supplied internal evidence. Distinguish evidence from inference. Never invent sources. If evidence is insufficient, lower confidence. Reply in ${input.language||'English'}. Return ONLY strict JSON: {"answer":"complete answer","confidence":0.0}.`,prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
   const provenance={...base,localModelInvoked:true,reasonerLabel:reasoned?.reasoner.label??resolved.config.label}
-  if(!reasoned?.text){const reason='COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
-  const parsed=parseLocalResult(reasoned.text); if(!parsed){const reason='COS inference returned an unparseable result.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
+  if(!reasoned?.text){const reason='Independent COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
+  const parsed=parseLocalResult(reasoned.text); if(!parsed){const reason='Independent COS inference returned an unparseable result.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
   const ceiling=evidenceCount>=5?.96:evidenceCount>=2?.90:evidenceCount===1?.84:.78; const confidence=Math.min(parsed.confidence,ceiling)
   if(confidence<threshold()){const reason=`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`;void recordKnowledgeGap(input.prompt,confidence,reason);return{handled:false,confidence,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
+  void writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel})
   void resolveKnowledgeGap(input.prompt); return{handled:true,reply:parsed.answer,confidence,provenance:{responseSource:'local_cos_reasoning',...provenance}}
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult,language='en'):string{
   const p=result.provenance,evidence=`${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.userMemoriesUsed} memories`
-  if(language==='pt') return result.handled?`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → respondeu com ${p.reasonerLabel} e confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.`:`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
-  if(language==='es') return result.handled?`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → respondió con ${p.reasonerLabel} y confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.`:`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`
-  return result.handled?`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → answered with ${p.reasonerLabel} at confidence ${result.confidence.toFixed(2)}. No external AI was called.`:`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → did not reach sufficient confidence → external AI is the last resort.`
+  const source=p.responseSource==='semantic_cache'?'semantic cache':p.reasonerLabel
+  if(language==='pt') return result.handled?`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → respondeu via ${source} com confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.`:`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
+  if(language==='es') return result.handled?`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → respondió vía ${source} con confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.`:`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`
+  return result.handled?`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → answered via ${source} at confidence ${result.confidence.toFixed(2)}. No external AI was called.`:`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → did not reach sufficient confidence → external AI is the last resort.`
 }

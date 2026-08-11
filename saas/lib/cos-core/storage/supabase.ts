@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge'
 import type { KnowledgeFact, SemanticKnowledgeStore } from '../layers/knowledge/persistent'
@@ -114,6 +115,16 @@ export class SupabaseLearningStore implements LearningStore {
   }
 }
 
+function retainedFactId(taskId: string, subject: string, predicate: string): string {
+  return createHash('sha256').update(`${taskId}\n${subject}\n${predicate}`).digest('hex')
+}
+
+/**
+ * Continuous-learning admission is the durable retention boundary. Accepted material is
+ * stored in the learned corpus and fanned out into the same persistent fact store read by
+ * COS-first retrieval. This prevents the classic split-brain defect where research lands in
+ * one collection while the answer path searches another.
+ */
 export class SupabaseContinuousLearningStore implements ContinuousLearningStore {
   constructor(private readonly db: SupabaseClient) {}
 
@@ -125,7 +136,7 @@ export class SupabaseContinuousLearningStore implements ContinuousLearningStore 
   }
 
   async remember(candidate: LearningCandidate): Promise<void> {
-    const { error } = await this.db.from('cos_continuous_learning').insert({
+    const learnedRow = {
       content_hash: candidate.contentHash,
       source_kind: candidate.sourceKind,
       source_uri: candidate.sourceUri,
@@ -137,8 +148,40 @@ export class SupabaseContinuousLearningStore implements ContinuousLearningStore 
       confidence: candidate.confidence,
       license: candidate.license ?? null,
       evidence: candidate.evidence,
-    })
-    if (error) throw error
+    }
+
+    const { error: learningError } = await this.db.from('cos_continuous_learning').insert(learnedRow)
+    if (learningError) throw learningError
+
+    const now = new Date().toISOString()
+    const taskId = 'support'
+    const factRows = [
+      {
+        id: retainedFactId(taskId, candidate.subject, 'source_summary'),
+        task_id: taskId,
+        subject: candidate.subject,
+        predicate: 'source_summary',
+        object: candidate.summary,
+        confidence: candidate.confidence,
+        source: candidate.sourceUri,
+        updated_at: now,
+      },
+      ...candidate.facts.map((fact) => ({
+        id: retainedFactId(taskId, candidate.subject, fact.predicate),
+        task_id: taskId,
+        subject: candidate.subject,
+        predicate: fact.predicate,
+        object: fact.object,
+        confidence: fact.confidence,
+        source: candidate.sourceUri,
+        updated_at: now,
+      })),
+    ].filter((fact) => fact.subject.trim() && fact.predicate.trim() && fact.object.trim())
+
+    if (!factRows.length) return
+    const { error: factsError } = await this.db.from('cos_knowledge_facts')
+      .upsert(factRows, { onConflict: 'task_id,subject,predicate' })
+    if (factsError) throw factsError
   }
 }
 

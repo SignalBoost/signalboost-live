@@ -1,11 +1,16 @@
 # Business Intelligence Corpus
 
-Status: implementation batch
-Target: ~5,000 curated company records
+> Read `ONBOARD.md` first. Current subsystem status and cross-system handoff: `docs/marketing-sales-current-state.md`.
+
+**Status:** architecture/workflow complete; corpus population is ongoing operational data growth.
+**Target:** ~5,000 curated reusable company records.
+**Last production observation (2026-08-10):** 461 unique companies / 5,000 = 9.22%. This count is dated; use the live dashboard/status endpoint for the current value.
 
 ## Purpose
 
-SignalBoost should reuse business intelligence it already owns before purchasing or regenerating the same information. The corpus is the internal-first company intelligence layer shared by COS, Prospect Intelligence, Enterprise Memory, the Knowledge Graph, Revenue Intelligence and future Portables.
+SignalBoost reuses business intelligence it already owns before purchasing or regenerating the same information. The corpus is the internal-first company intelligence layer shared by COS, Prospect Intelligence, Enterprise Memory, the Knowledge Graph, Revenue Intelligence and future Portables.
+
+The 5,000 target is a **data-population target, not an architecture-completion target**. The lookup, fallback, persistence, refresh and reuse workflow is implemented even while the stored population continues to grow.
 
 ## Execution flow
 
@@ -20,7 +25,7 @@ confidence + freshness sufficient?
         ↓
 queue refresh / enrichment
         ↓
-configured external prospect providers
+configured external prospect providers, when permitted
         ↓
 normalize + validate + confidence score
         ↓
@@ -33,38 +38,96 @@ Knowledge Graph facts
 reuse on future requests
 ```
 
-## Initial corpus
+`resolveBusinessIntelligence()` implements this order. Provider enrichers are not consulted when the internal record is sufficient. If an internal record exists but is stale or low-confidence, a bounded refresh is queued before/alongside any permitted provider fallback.
 
-The target is 5,000 reusable company records. Bootstrap is internal-first:
+## Initial corpus and “never pay twice” rule
 
-1. import existing Enterprise Memory organizations;
-2. ingest curated records in bounded batches;
-3. enrich only missing, stale or low-confidence records through configured providers;
-4. preserve provider provenance and verification timestamps;
-5. stop paying for the same company intelligence once sufficient internal evidence exists.
+Bootstrap is internal-first:
 
-The status API reports actual record count and completion against the 5,000 target. The architecture does not claim that 5,000 records exist until the stored count reaches 5,000.
+1. reuse existing outreach history and already-discovered companies;
+2. import existing Enterprise Memory organizations where applicable;
+3. ingest curated records in bounded batches;
+4. deduplicate by canonical company/domain identity;
+5. enrich only missing, stale or low-confidence records through configured providers;
+6. preserve provider provenance and verification timestamps;
+7. persist successful enrichment back into internal stores so future requests do not buy the same intelligence again.
+
+The outreach-history recovery path proved the intended pattern in production: historical rows were normalized into unique company identities and persisted without paid provider or external-AI rediscovery. A row count is never substituted for a company count.
+
+## Storage and integration
+
+Corpus persistence is durable and integrated into SignalBoost-owned intelligence:
+
+- canonical corpus storage when available;
+- Enterprise Memory fallback/persistence under the dedicated corpus profile namespace;
+- Knowledge Graph facts for reusable structured company knowledge;
+- refresh queue for stale/low-confidence records;
+- provenance, verified/refreshed/expiry timestamps and confidence.
+
+Enterprise Memory writes must preserve the corpus namespace rather than overwrite it during later enrichment.
 
 ## Confidence and freshness
 
-Default sufficient confidence is 0.78. Records also carry explicit expiry dates. A provider fallback is permitted only when the internal record is missing, stale, or below the required confidence threshold.
+Default sufficient corpus confidence is defined by the corpus contracts (currently 0.78 unless a lookup supplies a stricter threshold). Records carry explicit expiry/freshness state.
+
+External-provider fallback is permitted only when the internal record is missing, stale, or below the required confidence threshold. The owner status API exposes this policy as:
+
+- `internalFirst: true`
+- `providerFallbackPolicy: confidence_or_freshness_insufficient_only`
+
+## Automatic use
+
+Consumers should call the corpus resolver/policy boundary rather than manually deciding when to use provider data. The expected behavior is automatic:
+
+```text
+Need company intelligence
+→ internal corpus
+→ Enterprise Memory / Knowledge reuse
+→ provider fallback only if internal evidence is insufficient
+→ persist successful enrichment internally
+→ reuse next time
+```
+
+COS and Prospect Intelligence should not require an operator to say “use the corpus.”
 
 ## Background learning and refresh
 
-Corpus maintenance is folded into the existing daily COS mining/learning execution rather than creating a second daily Vercel cron. Each daily run identifies stale/low-confidence records and, when live prospect-provider execution is enabled, processes a bounded refresh batch.
+Corpus maintenance is folded into COS learning/refresh execution rather than creating uncontrolled independent provider spend. Each run can identify stale/low-confidence records and process a bounded refresh batch when provider execution is configured and permitted.
 
-Successful enrichment is persisted back to the corpus and Enterprise Memory. This makes provider results durable corporate knowledge rather than one-use responses.
+Successful enrichment becomes durable corporate knowledge. Background learning must remain bounded, deduplicated, confidence-scored and provenance-aware.
 
 ## Cost model
 
-The intended order of operations is:
+Preferred order:
 
 ```text
-Internal corpus → Enterprise Memory / Knowledge reuse → external data provider → AI escalation only when required
+Internal corpus
+→ Enterprise Memory / Knowledge Graph / reuse
+→ configured commercial data provider only when needed
+→ external AI escalation only when required
 ```
 
-This reduces repeated commercial data-provider lookups. By improving the amount of structured internal context available to COS before reasoning, it also reduces unnecessary OpenAI/Anthropic research, summarization and rediscovery calls.
+This reduces repeated commercial-data lookups and unnecessary OpenAI/Anthropic research, summarization and rediscovery calls.
+
+## Operator surface
+
+Owner/admin dashboard:
+
+`/dashboard/data/business-intelligence-corpus`
+
+Status API:
+
+`/api/admin/business-intelligence-corpus/status`
+
+The dashboard reports actual stored company count, 5,000 target and percentage completion. Percentage must be calculated as `count / target * 100` (for example 461/5000 = 9.22%).
 
 ## Governance
 
-The corpus tables use RLS and are accessed through trusted server-side/service-role boundaries. Refresh jobs are bounded, deduplicated per active domain, provenance is retained, and provider execution remains subject to the existing prospect-provider feature gate.
+Corpus tables use RLS and trusted server/service-role boundaries. Refresh jobs are bounded and deduplicated, provenance is retained, provider execution stays behind the prospect-provider feature/policy gate, and paid/provider calls must never be triggered simply to inflate the corpus count.
+
+See also:
+
+- `docs/marketing-sales-current-state.md`
+- `saas/lib/business-intelligence-corpus/`
+- `saas/lib/prospect-intelligence/corpus-policy.ts`
+- `saas/lib/prospect-intelligence/corpus-telemetry.ts`

@@ -72,7 +72,7 @@ function authoritativeProvenance(cos: any, external: { invoked: boolean; provide
     },
     local_reasoning: {
       invoked: p?.localModelInvoked ?? false,
-      model: p?.localModel ?? p?.reasonerLabel ?? null,
+      model: p?.reasonerLabel ?? null,
       confidence: cos?.confidence ?? null,
       threshold: confidenceThreshold(),
     },
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     confidence: cos?.confidence ?? null,
     threshold: confidenceThreshold(),
     local_model_invoked: cos?.provenance?.localModelInvoked ?? false,
-    local_model: cos?.provenance?.localModel ?? cos?.provenance?.reasonerLabel ?? null,
+    local_model: cos?.provenance?.reasonerLabel ?? null,
     semantic_cache_hit: cos?.provenance?.semanticCacheHit ?? false,
     knowledge_facts_used: cos?.provenance?.knowledgeFactsUsed ?? 0,
     learned_items_used: cos?.provenance?.learnedItemsUsed ?? 0,

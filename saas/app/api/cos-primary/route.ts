@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
+import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { getAccess } from '@/lib/auth/access'
@@ -45,9 +46,6 @@ function isProvenanceIntrospection(input: string): boolean {
 }
 
 function requestsExternalAction(input: string): boolean {
-  // Provenance/introspection is an observation of already-recorded execution state.
-  // It must never be promoted into the governed mutation/external-action path merely
-  // because the question contains words such as "audit", "provider", "read" or "check".
   if (isProvenanceIntrospection(input)) return false
   const explicitExecution = /\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i
   const target = /\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i
@@ -140,6 +138,27 @@ export async function POST(req: NextRequest) {
   const input = latestUserText(body)
   const language = languageFrom(body)
   if (!input) return legacyConciergePost(new NextRequest(req.clone()))
+
+  const deterministic = tryDeterministicUtility({
+    prompt: input,
+    timezone: body?.context?.timezone || body?.context?.timeZone,
+    locale: language === 'pt' ? 'pt-BR' : language === 'es' ? 'es' : language === 'pl' ? 'pl' : language === 'ru' ? 'ru' : 'en-US',
+    confidenceThreshold: confidenceThreshold(),
+  })
+  if (deterministic) {
+    return NextResponse.json({
+      reply: deterministic.reply,
+      source: deterministic.source,
+      confidence_score: deterministic.confidence,
+      confidence_threshold: confidenceThreshold(),
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      local_model_invoked: false,
+      execution_provenance: deterministic.executionProvenance,
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
 
   const access = await getAccess().catch(() => null)
   let cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>> | null = null

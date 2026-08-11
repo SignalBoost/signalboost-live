@@ -1,8 +1,9 @@
 // saas/app/api/cos-primary/route.ts
-// COS isolation benchmark entrypoint. Cloud/external model fallback is hard-disabled
-// here so a benchmark can measure only COS local inference + retained knowledge.
+// Live COS-first entrypoint. COS reasoning is attempted first; governed cloud/tool
+// execution remains available as fallback when COS cannot safely handle the request.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { getAccess } from '@/lib/auth/access'
 
@@ -33,23 +34,21 @@ function confidenceThreshold(): number {
   return Number.isFinite(value) ? Math.max(0.5, Math.min(0.98, value)) : 0.72
 }
 
+function requestsExternalAction(input: string): boolean {
+  const text = String(input || '').trim()
+  if (!text) return false
+  const explicitExecution = /\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i
+  const repoOrLiveTarget = /\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i
+  const actionDemand = /\b(now|immediately|for real|actually|do not give me a plan|perform the|execute the|using every relevant tool)\b/i
+  return explicitExecution.test(text) && (repoOrLiveTarget.test(text) || actionDemand.test(text))
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
 
-  if (!input) {
-    return NextResponse.json({
-      reply: 'COS isolation mode requires a user prompt.',
-      source: 'cos-isolation-baseline',
-      confidence_score: 0,
-      confidence_threshold: confidenceThreshold(),
-      external_ai_invoked: false,
-      external_fallback_invoked: false,
-      local_model_invoked: false,
-      isolation_mode: true,
-    }, { status: 400 })
-  }
+  if (!input) return legacyConciergePost(new NextRequest(req.clone()))
 
   const access = await getAccess().catch(() => null)
   const cos = await tryCOSFirstAnswer({
@@ -59,7 +58,7 @@ export async function POST(req: NextRequest) {
     privileged: Boolean(access?.isOwner || access?.isAdmin),
   }).catch(() => null)
 
-  if (cos?.handled) {
+  if (cos?.handled && !requestsExternalAction(input)) {
     return NextResponse.json({
       reply: cos.reply,
       source: 'cos-local-primary',
@@ -68,7 +67,7 @@ export async function POST(req: NextRequest) {
       external_ai_invoked: false,
       external_fallback_invoked: false,
       local_model_invoked: true,
-      isolation_mode: true,
+      isolation_mode: false,
       diagnostics: {
         failure_reason: null,
         knowledge_facts_used: cos.provenance.knowledgeFactsUsed,
@@ -84,35 +83,42 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const reason = cos && !cos.handled ? cos.reason : 'COS local attempt was unavailable.'
-  const provenance = cos?.provenance ?? null
+  const response = await legacyConciergePost(new NextRequest(req.clone()))
+  try {
+    const payload = await response.clone().json()
+    const reason = cos && !cos.handled
+      ? cos.reason
+      : requestsExternalAction(input)
+        ? 'COS completed its first-pass reasoning, then delegated the requested external action to the governed executor.'
+        : 'COS-first attempt unavailable'
+    const provenance = cos?.provenance ?? null
 
-  // FAIL CLOSED. The legacy Concierge/Anthropic executor is intentionally not
-  // imported or called in this benchmark branch. A COS miss remains a COS miss.
-  return NextResponse.json({
-    reply: 'COS could not answer this request confidently using its local reasoning and retained internal knowledge. External AI fallback is disabled for this isolation benchmark.',
-    source: 'cos-local-insufficient',
-    confidence_score: cos?.confidence ?? 0,
-    confidence_threshold: confidenceThreshold(),
-    external_ai_invoked: false,
-    external_fallback_invoked: false,
-    local_model_invoked: Boolean(provenance?.localModelInvoked),
-    isolation_mode: true,
-    reason,
-    diagnostics: {
-      failure_reason: reason,
-      failure_kind: !provenance?.localModelInvoked
-        ? 'local_model_unavailable_or_not_configured'
-        : 'local_model_below_confidence_or_unparseable',
-      knowledge_facts_used: provenance?.knowledgeFactsUsed ?? 0,
-      learned_items_used: provenance?.learnedItemsUsed ?? 0,
-      user_memories_used: provenance?.userMemoriesUsed ?? 0,
-      autonomous_research_attempted: provenance?.autonomousResearchAttempted ?? false,
-      research_documents_acquired: provenance?.researchDocumentsAcquired ?? 0,
-      knowledge_newly_retained: provenance?.knowledgeNewlyRetained ?? 0,
-    },
-    provenance,
-    execution_allowed: false,
-    external_action_taken: false,
-  }, { status: 422 })
+    return NextResponse.json({
+      ...payload,
+      cos_first_attempted: Boolean(cos),
+      cos_first_handled: Boolean(cos?.handled),
+      cos_first_confidence: cos?.confidence ?? null,
+      confidence_threshold: confidenceThreshold(),
+      cos_first_reason: reason,
+      cos_first_provenance: provenance,
+      external_fallback_invoked: true,
+      isolation_mode: false,
+      diagnostics: {
+        failure_reason: cos?.handled ? null : reason,
+        failure_kind: cos?.handled
+          ? null
+          : !provenance?.localModelInvoked
+            ? 'local_model_unavailable_or_not_configured'
+            : 'local_model_below_confidence_or_unparseable',
+        knowledge_facts_used: provenance?.knowledgeFactsUsed ?? 0,
+        learned_items_used: provenance?.learnedItemsUsed ?? 0,
+        user_memories_used: provenance?.userMemoriesUsed ?? 0,
+        autonomous_research_attempted: provenance?.autonomousResearchAttempted ?? false,
+        research_documents_acquired: provenance?.researchDocumentsAcquired ?? 0,
+        knowledge_newly_retained: provenance?.knowledgeNewlyRetained ?? 0,
+      },
+    }, { status: response.status })
+  } catch {
+    return response
+  }
 }

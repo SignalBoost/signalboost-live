@@ -56,11 +56,12 @@ function providerFromPayload(payload: any): { provider: string | null; model: st
 
 function authoritativeProvenance(cos: any, external: { invoked: boolean; provider?: string | null; model?: string | null }) {
   const p = cos?.provenance ?? null
+  const semanticCacheHit = p?.responseSource === 'semantic_cache'
   return {
     schema_version: 1,
     authority: 'server_execution_telemetry',
     model_generated: false,
-    semantic_cache: { used: Boolean(p?.semanticCacheHit), evidence_count: p?.semanticCacheHit ? 1 : 0 },
+    semantic_cache: { used: semanticCacheHit, evidence_count: semanticCacheHit ? 1 : 0 },
     enterprise_memory: { used: (p?.knowledgeFactsUsed ?? 0) > 0, evidence_count: p?.knowledgeFactsUsed ?? 0 },
     knowledge_graph: { used: (p?.knowledgeFactsUsed ?? 0) > 0, evidence_count: p?.knowledgeFactsUsed ?? 0 },
     learned_corpus: { used: (p?.learnedItemsUsed ?? 0) > 0, evidence_count: p?.learnedItemsUsed ?? 0 },
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
     threshold: confidenceThreshold(),
     local_model_invoked: cos?.provenance?.localModelInvoked ?? false,
     local_model: cos?.provenance?.reasonerLabel ?? null,
-    semantic_cache_hit: cos?.provenance?.semanticCacheHit ?? false,
+    semantic_cache_hit: cos?.provenance?.responseSource === 'semantic_cache',
     knowledge_facts_used: cos?.provenance?.knowledgeFactsUsed ?? 0,
     learned_items_used: cos?.provenance?.learnedItemsUsed ?? 0,
     external_action_requested: requestedAction,

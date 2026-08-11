@@ -2,6 +2,7 @@
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as supportPost } from '@/app/api/support/route'
 import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, type VerifiedResearchResult } from '@/lib/ai/cos/researchBudget'
+import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { getAccess } from '@/lib/auth/access'
@@ -25,22 +26,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// The support route has its own 240-second model/tool budget, WITH ITS OWN
-// graceful degradation built in (round cap, forced final synthesis, self-
-// correction). This outer deadline MUST stay ABOVE that 240s inner budget —
-// setting it lower (as a prior version of this file did, at 195s) silently
-// discards the inner route's real, synthesized answer every time, before its
-// own degradation logic ever runs, and replaces it with this file's much
-// weaker single-search fallback. 260s leaves the inner route its full 240s
-// plus buffer, while staying under the platform-level 300-second limit so the
-// browser still always receives a terminal response instead of an endless
-// "Thinking…" state.
 const PRIMARY_TIMEOUT_MS = 260_000
-
-// Start a read-only research lifeline shortly before the hard outer deadline.
-// Normal requests never pay for this duplicate lookup: the timer is cancelled
-// when Primary finishes. If Primary is still running, the lifeline preserves a
-// bounded set of source-backed results for an honest partial response.
 const RESEARCH_LIFELINE_START_MS = 235_000
 const RESEARCH_RESULT_LIMIT = 12
 
@@ -62,6 +48,15 @@ function languageFrom(body: any): string {
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
 }
 
+function localeFrom(language: string): string {
+  return language === 'pt' ? 'pt-BR' : language === 'es' ? 'es' : language === 'pl' ? 'pl' : language === 'ru' ? 'ru' : 'en-US'
+}
+
+function confidenceThreshold(): number {
+  const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
+  return Number.isFinite(value) ? Math.max(0.5, Math.min(0.98, value)) : 0.72
+}
+
 function conversationIdFrom(body: any): string | null {
   const value = String(body?.context?.conversationId || '')
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
@@ -75,17 +70,6 @@ async function directProspectCampaign(
   language: string,
 ): Promise<NextResponse | null> {
   const parsed = parseProspectCampaignRequest(input, language)
-
-  // THE SILENT FALL-THROUGH WAS THE WORST PART OF THIS.
-  //
-  // When parsing failed this returned null and the brief went to the ordinary assistant,
-  // which answered it as a question — thoughtfully, at length, and about nothing that was
-  // asked. No job, no id, and NOTHING saying the campaign had not started. The operator
-  // discovered it by going to look for drafts that did not exist.
-  //
-  // A message that was never campaign-shaped still falls through silently, which is correct:
-  // an ordinary question deserves an ordinary answer. Only a NEAR MISS is reported, and the
-  // report names the missing piece.
   if (!parsed) {
     const miss = campaignBriefMiss(input)
     if (!miss) return null
@@ -100,9 +84,6 @@ async function directProspectCampaign(
     })
   }
 
-  // Only the verified owner may create this durable business job. Everyone else
-  // falls through to the governed support route, which keeps its existing access
-  // controls and customer-facing behavior.
   const access = await getAccess().catch(() => null)
   if (!access?.isOwner) return null
 
@@ -134,9 +115,6 @@ async function directProspectCampaign(
     })
     const conversationId = conversationIdFrom(body)
 
-    // Kick the exact job immediately after the response so a previously stuck campaign
-    // can never steal this campaign's first worker tick. Cron remains the durable retry
-    // path and uses fair scheduling across all unfinished campaigns.
     after(async () => {
       const tasks: Promise<unknown>[] = [advanceProspectCampaigns(started.job.id)]
       if (access.userId && conversationId) {
@@ -217,12 +195,8 @@ async function directPressCampaign(
   language: string,
 ): Promise<NextResponse | null> {
   const parsed = parsePressCampaignRequest(input, language)
-  // Not a multi-outlet press brief — an ordinary question deserves an ordinary answer,
-  // and a single-outlet pitch still fits comfortably in one turn.
   if (!parsed) return null
 
-  // Only the verified owner may create this durable business job. Everyone else falls
-  // through to the governed support route with its existing access controls.
   const access = await getAccess().catch(() => null)
   if (!access?.isOwner) return null
 
@@ -254,9 +228,6 @@ async function directPressCampaign(
     })
     const conversationId = conversationIdFrom(body)
 
-    // Kick the worker straight after the response so the first drafts do not wait for
-    // the next cron tick. The cron remains the durable retry path; persisting the turn
-    // is best-effort and must never delay the acknowledgement that the job is safe.
     after(async () => {
       const tasks: Promise<unknown>[] = [advancePressCampaigns()]
       if (access.userId && conversationId) {
@@ -336,19 +307,30 @@ export async function POST(req: NextRequest) {
   const input = latestUserText(body)
   const language = languageFrom(body)
 
-  // Multi-company outreach is a durable job, not a four-minute chat response.
-  // Dispatch it before any web-search lifeline, model call, backup comparison, or
-  // long HTTP transport can fail. This is the exact class of request that used to
-  // end as “Sorry, I could not answer that right now.”
+  const deterministic = tryDeterministicUtility({
+    prompt: input,
+    timezone: body?.context?.timezone || body?.context?.timeZone || req.headers.get('x-vercel-ip-timezone'),
+    locale: localeFrom(language),
+    confidenceThreshold: confidenceThreshold(),
+  })
+  if (deterministic) {
+    return NextResponse.json({
+      reply: deterministic.reply,
+      source: deterministic.source,
+      confidence_score: deterministic.confidence,
+      confidence_threshold: confidenceThreshold(),
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      local_model_invoked: false,
+      execution_provenance: deterministic.executionProvenance,
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
+
   const prospectCampaign = await directProspectCampaign(body, input, language)
   if (prospectCampaign) return prospectCampaign
 
-  // A MULTI-OUTLET PRESS CAMPAIGN IS THE SAME SHAPE OF WORK, and for five rounds it
-  // was attempted in the turn anyway. "Find thirty publications and prepare a campaign
-  // for each" is a live crawl plus thirty AI-written releases; the bounded limit is 260
-  // seconds. It never fitted, so the owner kept receiving a polished document, a
-  // “reply continue” message, and an empty cockpit. Dispatched here for the same reason
-  // and in the same place as sales: before anything that can time out.
   const pressCampaign = await directPressCampaign(body, input, language)
   if (pressCampaign) return pressCampaign
 
@@ -395,9 +377,6 @@ export async function POST(req: NextRequest) {
   researchLifeline?.cancel()
   const primary = primaryRun.response
 
-  // Primary authentication, authorization, validation, and rate-limit decisions
-  // are terminal. Backup COS must never turn a governed 4xx denial into HTTP 200,
-  // and it must not invoke the redundant provider for a denied request.
   if (primary && primary.status >= 400 && primary.status < 500) return primary
 
   const primarySnapshot = primary
@@ -412,9 +391,6 @@ export async function POST(req: NextRequest) {
   if (primary && immediateReasons.length === 0) {
     const healthyPrimary = primary
 
-    // Run the optional read-only shadow comparison only after the healthy Primary
-    // response is ready. It cannot delay the user response and remains bounded by
-    // runBackupCos's hard deadline.
     after(async () => {
       const backup = await runBackupCos(input, language).catch(() => null)
       if (!backup?.ok) return
@@ -438,8 +414,6 @@ export async function POST(req: NextRequest) {
     return healthyPrimary
   }
 
-  // A failed, empty, canned, or error-degraded Primary response is quarantined
-  // for this request. Only degraded requests invoke and await Backup COS.
   const backup = await runBackupCos(input, language).catch(() => null)
   const reasons = detectPrimaryCorruption({
     status: primary?.status ?? 500,

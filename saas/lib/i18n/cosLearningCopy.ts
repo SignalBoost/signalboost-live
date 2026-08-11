@@ -15,6 +15,7 @@ export type CosLearningCopy = {
   questionsProcessed: string
   externalCost: string
   rejected: string
+  sourceErrors: string
   noRun: string
   requestFailed: string
 }
@@ -35,6 +36,7 @@ export const COS_LEARNING_COPY: Record<CosLearningLanguage, CosLearningCopy> = {
     questionsProcessed: 'Questions processed',
     externalCost: 'External cost',
     rejected: 'Rejected',
+    sourceErrors: 'Source errors',
     noRun: 'No learning run has been completed on this page yet.',
     requestFailed: 'Learning request failed.',
   },
@@ -53,6 +55,7 @@ export const COS_LEARNING_COPY: Record<CosLearningLanguage, CosLearningCopy> = {
     questionsProcessed: 'Preguntas procesadas',
     externalCost: 'Costo externo',
     rejected: 'Rechazado',
+    sourceErrors: 'Errores de fuentes',
     noRun: 'Todavía no se ha completado ninguna ejecución de aprendizaje en esta página.',
     requestFailed: 'La solicitud de aprendizaje falló.',
   },
@@ -71,6 +74,7 @@ export const COS_LEARNING_COPY: Record<CosLearningLanguage, CosLearningCopy> = {
     questionsProcessed: 'Perguntas processadas',
     externalCost: 'Custo externo',
     rejected: 'Rejeitado',
+    sourceErrors: 'Erros das fontes',
     noRun: 'Nenhuma execução de aprendizado foi concluída nesta página ainda.',
     requestFailed: 'A solicitação de aprendizado falhou.',
   },
@@ -89,6 +93,7 @@ export const COS_LEARNING_COPY: Record<CosLearningLanguage, CosLearningCopy> = {
     questionsProcessed: 'Przetworzone pytania',
     externalCost: 'Koszt zewnętrzny',
     rejected: 'Odrzucone',
+    sourceErrors: 'Błędy źródeł',
     noRun: 'Na tej stronie nie ukończono jeszcze żadnego uruchomienia uczenia.',
     requestFailed: 'Żądanie uczenia nie powiodło się.',
   },
@@ -107,6 +112,7 @@ export const COS_LEARNING_COPY: Record<CosLearningLanguage, CosLearningCopy> = {
     questionsProcessed: 'Обработано вопросов',
     externalCost: 'Внешние расходы',
     rejected: 'Отклонено',
+    sourceErrors: 'Ошибки источников',
     noRun: 'На этой странице ещё не было завершено ни одного запуска обучения.',
     requestFailed: 'Запрос на обучение завершился ошибкой.',
   },

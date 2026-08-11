@@ -111,7 +111,7 @@ function legacyContinuityFailure(payload: any): boolean {
 
 async function independentReasonerHealth() {
   const resolved = resolveCosReasoner()
-  if (!resolved.config) return { configured: false, healthy: false, model: null, error: resolved.reason }
+  if ('reason' in resolved) return { configured: false, healthy: false, model: null, error: resolved.reason }
   try {
     const health = await checkLocalInferenceHealth(localInferenceConfigFromEnv())
     return { configured: true, healthy: health.ok, model: health.model, error: health.error ?? null }

@@ -9,6 +9,7 @@
     { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },
     { "path": "/api/cron/batch-poll", "schedule": "*/30 * * * *" },
     { "path": "/api/cron/cos-video-poll", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/cos-runpod-idle", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/cos-video-queue-recovery", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/cyber-dependency-monitor", "schedule": "15 8 * * *" },
     { "path": "/api/hub/cyber/prepare-github-pr", "schedule": "0 * * * *" },

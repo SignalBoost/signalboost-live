@@ -11,7 +11,7 @@ export async function GET() {
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
 
   const resolved = resolveCosReasoner()
-  if (!resolved.config) {
+  if (resolved.config === null) {
     return NextResponse.json({
       ok: false,
       configured: false,

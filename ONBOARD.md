@@ -3,1132 +3,463 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.2
-**COS Independence / Autonomous-Intelligence Phase:** COMPLETE — 2026-08-09
+**Version:** 1.3
+**Updated:** 2026-08-10
+**COS Independence / Autonomous-Intelligence Phase:** COMPLETE
+**Marketing & Sales Core Architecture:** COMPLETE
+**Enterprise Release Candidate:** EVIDENCE-BASED — do not infer from architecture or a green deployment
+
+---
+
+## Mandatory first-read rule
+
+This file is the canonical starting point for every developer, AI coding agent, reviewer, operator, contractor, and infrastructure assistant working on this repository.
+
+Required order:
+
+1. Read `ONBOARD.md`.
+2. Scan the current repository.
+3. Read the exact files related to the task.
+4. Verify current implementation from code before diagnosing or changing anything.
+5. Never report status or behavior from memory alone.
+
+`AGENTS.md` and `CLAUDE.md` are entry-point summaries. They do not replace this file or current repo inspection.
+
+For Marketing & Sales work, read these next:
+
+- `docs/marketing-sales-current-state.md`
+- `saas/docs/marketing-sales-module-design.md`
+- `docs/business-intelligence-corpus.md`
+- `docs/enterprise-release-candidate.md`
+
+For detailed historical/operational doctrine, `docs/ONBOARD-full.md` remains a deeper reference. If an older status statement there conflicts with this file, the current repository and this current-state handoff win.
 
 ---
 
 # Mission
 
-SignalBoost is not a collection of AI applications.
+SignalBoost is not a collection of unrelated AI applications.
 
-SignalBoost is a Cognitive Operating System (COS) that powers specialized software modules called **Portables**.
+SignalBoost is a Cognitive Operating System (COS) that powers specialized business modules and Portables. Portables perform business functions; COS owns the reusable intelligence, memory, learning, planning, governance, cost control, verification, and provider selection.
 
-Portables perform business functions.
-
-COS provides the intelligence.
-
-External AI providers are replaceable compute engines and escalation resources, not the owner of SignalBoost intelligence.
-
-The intelligence belongs to SignalBoost.
-
----
-
-# Vision
-
-Build software that becomes smarter, faster, cheaper, and more valuable every time it is used.
-
-Every improvement made to COS should automatically improve every Portable.
-
-Every dollar saved by COS benefits every customer.
-
-Every piece of verified knowledge discovered should become a permanent corporate asset.
+External AI/data providers are replaceable compute or enrichment resources. They are not the owner of SignalBoost intelligence.
 
 The target operating loop is:
 
-```
+```text
 Observe → Remember → Learn → Reason → Act → Verify → Improve
 ```
 
 ---
 
-# 2026-08-09 COS Independence Completion
+# 2026-08-10 Current Platform State
 
-The COS independence/autonomous-intelligence engineering phase is complete.
+## COS-first intelligence is complete
 
-This milestone changed COS from an architecture that could use memory and external models into an autonomous operating layer that owns reusable intelligence, planning, learning, execution policy, cost governance and provider selection.
+The architecture no longer treats Claude/OpenAI as the default brain.
 
-The completed system includes:
+Current reasoning order is:
 
-- persistent memory and durable knowledge
-- semantic and exact caching
-- knowledge graph components
-- autonomous knowledge-gap detection
-- daily and live-source learning paths
-- provenance, confidence and freshness controls
-- deterministic/business-rule reasoning before AI
-- local context compaction and automatic summaries
-- prompt/context reduction
-- in-flight request deduplication
-- durable response and reasoning reuse
-- learning-quality measurement
-- AI ROI and avoided-cost telemetry
-- autonomous missions
-- safety and execution gates
-- private/local AI endpoint support
-- local-primary/cloud-fallback routing
-- zero-cloud / zero-provider readiness assessment
-- provider-boundary enforcement
-- reusable skill registry
-- goal engine and goal-to-skill planning
-- AI role orchestration
-- cross-hub orchestration
-- autonomous decision integration
-- enterprise-memory persistence
-- revenue/outcome feedback signals
-- runtime independence evidence and regression validation
-
-The independence milestone means COS architecture no longer treats OpenAI or Anthropic as the system's brain. Provider calls are optional compute/escalation paths selected by COS when local, deterministic, cached, learned or reusable intelligence is insufficient.
-
-This phase is closed. Do not reopen or redesign it without a demonstrated regression or a new architectural requirement.
-
----
-
-# Completed Enterprise AI OS Layer
-
-COS now includes an Enterprise AI OS layer for turning business objectives into governed execution.
-
-Core flow:
-
-```
-Business Goal
+```text
+Request / Goal
     ↓
-Goal Engine
+Deterministic business rules
     ↓
-Planning / AI Roles
+Exact / semantic / durable reuse
     ↓
-Reusable Skill Registry
+Enterprise Memory
     ↓
-Cross-Hub Orchestration
+Knowledge Graph
     ↓
-COS Execution Governor
+Continuous Learning / user memory
     ↓
-Deterministic / Local / Provider Compute
+Local COS reasoning
+    ↓
+Confidence gate
+    ├─ sufficient → use COS result
+    └─ insufficient / unavailable → governed external-model fallback
     ↓
 Verification
     ↓
-Enterprise Memory + Outcome Signals
-    ↓
-Future Improvement
+Learning / memory / ROI telemetry
 ```
 
-This creates a reusable execution system rather than independent prompt chains inside individual Portables.
+Primary local reasoning implementation: `saas/lib/ai/cos/cosFirstAnswer.ts`.
 
----
+Low-confidence or unavailable local reasoning is recorded as a durable learning gap rather than being falsely reported as independent reasoning.
 
-# Five-Layer COS Execution Model
+Do not reopen the COS-independence foundation unless there is a demonstrated regression, failed requirement, measurable improvement opportunity, or new architectural need.
 
-The completed master execution path is organized around five practical intelligence layers.
+## Marketing & Sales core architecture is complete
 
-## Layer 1 — Deterministic / Business Rules
+The current scan found the major Marketing & Sales architecture/product code built:
 
-Programmatic logic executes first.
+- COS-first intelligence and governed cloud fallback;
+- Enterprise Memory;
+- Knowledge Graph;
+- Continuous Learning and durable reuse;
+- Goal Engine;
+- reusable Skill Registry;
+- enterprise AI roles / cross-hub orchestration;
+- Prospect Intelligence;
+- Business Intelligence Corpus;
+- Communication Hub;
+- CRM production paths;
+- Revenue Intelligence / outcome signals;
+- Universal Adapter / provider-neutral integration seams;
+- campaign and outreach queues;
+- human approval gates;
+- publishing/execution connectors;
+- audit, telemetry, cost governance, and five-language localization guardrails.
 
-Formatting, validation, routing, permissions, calculations, known workflows and other deterministic work must not consume AI tokens.
+“Core architecture complete” does **not** mean every optional third-party catalog entry is production-live for every buyer. Descriptor-only capabilities must continue to return `not_implemented` until a real production method exists. Buyer credentials, provider API approvals, account configuration, and environment-specific integrations remain buyer/environment responsibilities.
 
-## Layer 2 — Knowledge and Reuse
+## Business Intelligence Corpus workflow is complete
 
-COS searches known information and reusable work before generating anything new.
+The corpus is the internal-first reusable company-intelligence layer.
 
-This includes exact cache, semantic cache, durable response reuse and known procedures.
+```text
+Need company intelligence
+    ↓
+Internal Business Intelligence Corpus
+    ↓
+Confidence + freshness sufficient?
+    ├─ yes → use internal record; no provider call
+    └─ no  → bounded refresh / configured provider fallback when permitted
+                 ↓
+              normalize + validate + score
+                 ↓
+              corpus persistence
+                 ↓
+              Enterprise Memory
+                 ↓
+              Knowledge Graph
+                 ↓
+              reuse next time
+```
 
-## Layer 3 — Memory and Context
+The 5,000-company goal is a **data-population target, not unfinished architecture**.
 
-COS reconstructs only the context needed for the current task.
+Last production observation recorded on 2026-08-10: **461 unique companies / 5,000 = 9.22%**. This is a dated operational observation; always use the live dashboard/status endpoint for the current value.
 
-Long histories are compacted into reusable summaries so the complete conversation or workflow does not have to be repeatedly sent to a model.
+Owner/admin page:
 
-## Layer 4 — COS Reasoning and Skills
+`/dashboard/data/business-intelligence-corpus`
 
-Goals, learned procedures, reusable skills, autonomous decisions and local reasoning are attempted before cloud escalation.
+Status API:
 
-## Layer 5 — Replaceable Compute
+`/api/admin/business-intelligence-corpus/status`
 
-When additional model reasoning is justified, COS routes to the cheapest acceptable available compute resource, including private/local models or external providers.
+Key rule: never pay twice. Existing outreach history, Enterprise Memory, corpus records, Knowledge Graph facts, and prior provider results must be reused before commercial rediscovery.
 
-Completed results return to memory, knowledge, learning and telemetry so future executions can avoid repeating the same work.
+## Marketing & Sales enterprise RC is separate from build completion
+
+A green Vercel deployment is necessary but not sufficient to call the enterprise product Release Candidate.
+
+The dedicated fail-closed profile is:
+
+`saas/lib/release-candidate/marketing-sales.ts`
+
+It requires real passing evidence for all eight categories:
+
+1. deployment;
+2. multi-tenant isolation;
+3. security / authorization / approval / secret handling;
+4. resilience / backup / recovery;
+5. sustained load / soak performance;
+6. observability / audit coverage;
+7. end-to-end integration across COS/EAE, Prospect, Corpus, Communication, CRM, Revenue, Enterprise Memory, and Universal Adapter boundaries;
+8. documentation currency.
+
+Missing evidence is `not_run`, not pass. A warning or failure on a required gate prevents RC status. Never manufacture operational evidence from source inspection, unit tests, or architecture diagrams.
 
 ---
 
 # Core Principles
 
-## COS is the Brain
+## COS is the brain
 
-Every Portable uses COS.
+Every Portable should use shared COS intelligence and governance rather than creating a separate provider-owned reasoning silo.
 
-No exceptions.
+## AI is the last resort
 
----
+Never call an external model when deterministic code, known knowledge, cache, durable reuse, a verified skill, or local COS reasoning can solve the task adequately.
 
-## AI is the Last Resort
-
-Never call an external AI model if the answer or procedure already exists or COS can complete the work locally/deterministically.
-
-COS should always attempt existing intelligence first.
-
----
-
-## Local First
-
-For work requiring model reasoning, COS supports private/local AI as the primary reasoning path.
-
-Cloud models are fallback/escalation compute when policy, capability and economics justify them.
-
-COS must remain architecturally capable of operating with OpenAI and Anthropic credentials disabled.
-
----
-
-## Never Pay Twice
-
-If COS already knows something, reuse it.
-
-Never regenerate existing knowledge.
-
-Never rediscover the same buyer.
-
-Never rewrite identical content.
-
-Never repeat expensive searches.
-
-Never execute duplicate simultaneous work when callers can share one result.
-
----
-
-## Providers are Replaceable
-
-OpenAI
-
-Anthropic
-
-Gemini
-
-Mistral
-
-DeepSeek
-
-Qwen
-
-Local Models
-
-Future Providers
-
-All are interchangeable compute providers.
-
-No Portable should depend directly on any provider.
-
----
-
-## Intelligence Belongs to COS
-
-Providers may perform requested computation.
-
-COS owns:
-
-- Knowledge
-- Memory
-- Learning
-- Planning
-- Skills
-- Business Rules
-- Cost Governance
-- Telemetry
-- Decision Making
-- Provider Selection
-- Verification
-- Outcome Feedback
-
----
-
-# Architecture
-
-```
-                 User / Event / Goal
-                         │
-                         ▼
-                     Portable
-                         │
-                         ▼
-                        COS
-                         │
-       ┌─────────────────────────────────┐
-       │ Goal / Planning / Skills        │
-       │ Knowledge / Memory / Learning   │
-       │ Execution Governor              │
-       │ Verification / Telemetry        │
-       └─────────────────────────────────┘
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-    Deterministic     Local AI      Cloud Compute
-       Logic          / Private       Fallback
-                        Model
-```
-
----
-
-# COS Execution Order
-
-Every request MUST follow this order.
-
-```
-Request / Goal
-
-↓
-
-Business Rules
-
-↓
-
-Knowledge
-
-↓
-
-Learning
-
-↓
-
-Memory
-
-↓
-
-Exact Cache
-
-↓
-
-Semantic Cache
-
-↓
-
-Durable Reuse / Existing Running Request
-
-↓
-
-Context Compaction
-
-↓
-
-Budget Governor
-
-↓
-
-Goal / Skill / Reasoning Planner
-
-↓
-
-Local / Private Reasoning
-
-↓ when justified
-
-External Compute Escalation
-
-↓
-
-Validation / Verification
-
-↓
-
-Knowledge + Learning Update
-
-↓
-
-Outcome / Revenue Signals
-
-↓
-
-Telemetry / ROI
-
-↓
-
-Response / Action
-```
-
-Nothing intentionally bypasses this sequence.
-
----
-
-# Business Rules
-
-Business rules always execute before AI.
-
-Examples
-
-- formatting
-- calculations
-- regex
-- validation
-- routing
-- permissions
-- workflows
-- approvals
-
-Never use AI for deterministic logic.
-
----
-
-# Knowledge
-
-Knowledge contains reusable facts and verified procedures.
-
-Examples
-
-- companies
-- buyers
-- journalists
-- products
-- industries
-- competitors
-- contacts
-- previous research
-- verified engineering solutions
-- successful workflows
-
-Knowledge is reusable.
-
-Knowledge should never be unnecessarily regenerated.
-
----
-
-# Memory
-
-Memory stores task, workflow, user and enterprise context.
-
-COS supports durable enterprise memory while still distinguishing temporary working context from long-lived knowledge.
-
-Examples
-
-- current conversation
-- current workflow
-- current task
-- active user session
-- reusable enterprise context
-- prior outcomes
-
-Temporary memory may expire or compact.
-
-Verified durable knowledge persists.
-
----
-
-# Learning
-
-Learning changes future behavior.
-
-COS learning is useful only when it improves later execution.
-
-Learning therefore requires measurement rather than merely accumulating information.
-
-Example
-
-COS discovers and verifies:
-
-Company X never buys products under 500 employees.
-
-COS remembers this.
-
-Future searches automatically improve.
-
-Learning reduces future AI calls and unnecessary work.
-
----
-
-# Exact Cache
-
-If an identical request already exists and remains valid:
-
-Return it immediately.
-
-No AI.
-
-No search.
-
-No cost.
-
----
-
-# Semantic Cache
-
-If a sufficiently similar reusable request already exists:
-
-Reuse the previous knowledge/reasoning when valid.
-
-Example
-
-"Find MSPs in Brazil"
-
-and
-
-"Find Brazilian Managed Service Providers"
-
-should be candidates for shared knowledge rather than independent expensive discovery.
-
----
-
-# Durable Reuse
-
-COS persists reusable results and procedures beyond a single process/request lifecycle.
-
-Reuse must survive normal execution boundaries so restarting or scaling the application does not force COS to relearn work it already completed.
-
----
-
-# Existing Running Request
-
-If two Portables request the same work simultaneously:
-
-Execute only once when safe.
-
-Every caller can wait for the same result.
-
-Never pay twice.
-
----
-
-# Context Compaction
-
-COS does not repeatedly send unlimited historical context to a model.
-
-It creates bounded, reusable context summaries and retrieves only the information relevant to the current task.
-
-Context compaction is a cost-control and reasoning-quality mechanism.
-
----
-
-# Execution Governor
-
-Every governed AI request passes through the Governor.
-
-Responsibilities
-
-- Routing
-- Budget enforcement
-- Retry limits
-- Loop detection
-- Exact cache
-- Semantic cache
-- Durable reuse
-- Prompt/context reduction
-- Cost tracking
-- ROI telemetry
-- Provider selection
-- Provider translation
-- Local-primary routing
-- Cloud fallback policy
-- Runtime evidence
-
-Nothing intentionally bypasses the Governor.
-
----
-
-# Budget Governance
-
-Every request has limits.
-
-Examples
-
-Maximum
-
-- cost
-- turns
-- retries
-- tokens
-- execution time
-
-If exceeded:
-
-Execution stops or follows the applicable governed escalation/approval path.
-
----
-
-# Loop Detection
-
-Infinite reasoning loops are forbidden.
-
-COS must detect
-
-- repeated prompts
-- repeated retries
-- recursive reasoning
-- duplicate searches
-- repeated remediation attempts
-
-Stop or escalate according to policy.
-
----
-
-# Model Routing
-
-Always choose the cheapest acceptable execution path.
+## Local/internal first
 
 Preferred order:
 
-```
-Deterministic / Existing Knowledge
-        ↓
-Cache / Durable Reuse
-        ↓
-Reusable Skill / Learned Procedure
-        ↓
-Private / Local Model
-        ↓
-Approved Cloud Compute
+```text
+Deterministic / known knowledge
+→ exact / semantic / durable reuse
+→ verified skill / learned procedure
+→ local/private reasoning
+→ approved cloud compute or commercial data provider only when needed
 ```
 
-Never default to the most expensive model.
+## Never pay twice
+
+Do not regenerate known content, rediscover known buyers, rerun identical expensive searches, or buy company intelligence that SignalBoost already owns with sufficient confidence/freshness.
+
+## Providers are replaceable
+
+OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, local models, CRM vendors, communication providers, and prospect-data providers are edges around a provider-neutral core.
+
+No Portable should make a specific provider the owner of business intelligence or governance.
+
+## Human control is preserved
+
+Autonomy does not mean bypassing policy.
+
+Consequential actions remain behind the applicable approval boundary, including:
+
+- sending outreach when policy requires approval;
+- publishing;
+- spending money;
+- provider-key changes;
+- infrastructure/environment changes;
+- DNS changes;
+- migrations;
+- deletion/disablement;
+- sensitive production/provider mutations.
 
 ---
 
-# Provider Independence
+# COS Execution Model
 
-Portables never need to know whether execution uses:
+The practical layers are:
 
-- OpenAI
-- Anthropic
-- Gemini
-- Mistral
-- a private model
-- another future provider
+1. **Deterministic / Business Rules** — formatting, validation, routing, permissions, calculations, known workflows.
+2. **Knowledge / Reuse** — exact cache, semantic cache, durable response/procedure reuse.
+3. **Memory / Context** — Enterprise Memory and bounded context reconstruction/compaction.
+4. **Reasoning / Skills** — Goal Engine, reusable skills, learned procedures, local COS reasoning.
+5. **Replaceable Compute / Providers** — cloud models or external data/execution providers only when justified.
 
-Portables call COS.
-
-COS decides:
-
-- deterministic execution
-- skill reuse
-- provider
-- model
-- caching
-- context
-- budget
-- retries
-- fallback
-- validation
-
-Provider-boundary enforcement exists specifically to prevent provider-specific intelligence from leaking back into Portable architecture.
+Completed outcomes should return to memory, knowledge, learning and telemetry so future work gets cheaper and better.
 
 ---
 
-# Zero-Cloud Independence
+# Learning Doctrine
 
-COS includes explicit zero-cloud readiness/independence assessment.
+Accumulation is not learning. Learning must improve future execution.
 
-The purpose is to prove that normal COS intelligence can execute without OpenAI or Anthropic being architectural requirements.
+Every durable learned item should preserve applicable:
 
-The validation model covers:
+- source/provenance;
+- confidence;
+- acquisition/verification time;
+- freshness/expiry;
+- scope;
+- evidence;
+- reuse/outcome measurements.
 
-- local model configuration and health
-- local-primary execution
-- actual cloud fallback accounting
-- successful runtime samples
-- durable reuse
-- learning effectiveness
-- runtime evidence
-- ROI/cost avoidance
-- regression protection
+Contradictions should not silently overwrite trusted knowledge. Low-confidence discoveries remain low-confidence until verified.
 
-External provider availability may improve capability or quality for selected tasks, but it must not define ownership of the intelligence system.
+Continuous/background learning must be bounded and cost-governed. Do not turn “learning” into an uncontrolled provider or AI bill.
 
 ---
 
-# Canonical Tool Schema
+# Cost / ROI Governance
 
-All tools should be defined once.
+Track evidence such as:
 
-COS translates canonical capabilities into provider/runtime-specific representations.
+- provider calls avoided;
+- cache/reuse hits;
+- knowledge hits;
+- local executions;
+- external fallbacks;
+- estimated/actual provider cost;
+- avoided cost;
+- latency;
+- retries;
+- successful outcomes;
+- learning reuse/effectiveness.
 
-Portables should not duplicate provider-specific tool definitions.
-
----
-
-# Goal Engine
-
-COS can accept a business objective rather than requiring every operation to begin as a manually constructed prompt chain.
-
-The Goal Engine converts objectives into governed plans that can be mapped to reusable skills, AI roles, hubs and execution capabilities.
-
----
-
-# Reusable Skill Registry
-
-Repeatable procedures belong in a reusable skill registry.
-
-A skill represents a known way to perform a class of work.
-
-Skills reduce repeated model reasoning and allow COS to become more capable as verified procedures accumulate.
-
-Skills should be:
-
-- discoverable
-- scoped
-- governed
-- testable
-- reusable across Portables where appropriate
-- connected to outcome evidence
+The purpose is to prove cost reduction, not merely claim it.
 
 ---
 
-# AI Roles and Cross-Hub Orchestration
+# Marketing & Sales Integration Reality
 
-COS supports specialized AI roles and coordination across SignalBoost hubs.
+## Communication Hub
 
-Roles are execution responsibilities, not separate intelligence silos.
+Current documented production transports include:
 
-They share COS memory, knowledge, governance, skills and outcome signals.
+- Gmail / Google Workspace via Gmail API;
+- Microsoft 365 / Exchange Online via Microsoft Graph;
+- generic SMTP;
+- Universal Email Adapter for buyer-configured HTTPS email APIs.
 
-This allows a business objective to coordinate research, outreach, revenue operations, support and other capabilities without rebuilding the reasoning stack for every module.
+See `saas/lib/communication-hub/README.md`.
 
----
+## CRM
 
-# Autonomous Decisions
+Current production CRM paths include:
 
-Autonomous decisions are governed decisions.
+- HubSpot direct production methods;
+- Salesforce via the shared production CRM adapter;
+- Microsoft Dynamics 365 via the shared production CRM adapter;
+- Pipedrive via the shared production CRM adapter;
+- Zoho CRM via the shared production CRM adapter.
 
-Autonomy does not mean bypassing permissions, budgets, approvals, security controls or verification.
+See `saas/lib/integrations/catalog-sales.ts` and `saas/lib/integrations/crm-production.ts`.
 
-COS should autonomously perform work that policy allows and halt/escalate consequential actions according to the applicable control boundary.
+Catalog presence is not proof of a live method. Preserve the repository rule that descriptor-only capabilities remain honest.
 
----
+## Universal Adapter
 
-# Cost Optimization
+Provider-neutral seams exist for communication, revenue/operations and configuration-driven HTTP(S) provider actions. New providers should be added at the edge rather than by branching the core around vendor names.
 
-COS reduces costs using
-
-- deterministic code
-- business rules
-- exact cache
-- semantic cache
-- durable reuse
-- prompt/context compaction
-- rolling summaries
-- model cascading
-- local-primary reasoning
-- batch processing
-- budget governance
-- retry limits
-- loop detection
-- in-flight request deduplication
-- reusable skills
-- learned procedures
-
-Every optimization should reduce future cost without silently reducing required correctness or safety.
+Secrets remain backend-only references. Sensitive actions stay governed.
 
 ---
 
-# AI ROI Metrics
-
-Cost optimization must be measurable.
-
-COS tracks evidence such as:
-
-- provider calls avoided
-- tokens avoided
-- cache hits
-- semantic hits
-- knowledge hits
-- durable-reuse hits
-- local executions
-- cloud fallbacks
-- estimated/actual provider cost
-- avoided external cost
-- latency
-- learning reuse
-- successful runtime outcomes
-
-The purpose is to prove whether COS intelligence is reducing dependence and operating cost rather than merely claiming that it should.
-
----
-
-# Knowledge First
-
-Before calling AI, COS asks:
-
-Do I already know this?
-
-Can I retrieve it?
-
-Can I reuse a verified procedure?
-
-Can deterministic code solve it?
-
-If yes, do not buy reasoning unnecessarily.
-
----
-
-# Learning First
-
-Every completed task should have the opportunity to improve COS.
-
-Examples
-
-Research
-
-↓
-
-Knowledge
-
-Sales
-
-↓
-
-Buyer intelligence
-
-Press
-
-↓
-
-Journalist intelligence
-
-Supervisor
-
-↓
-
-Incident intelligence
-
-Engineering
-
-↓
-
-Verified solution patterns
-
-Revenue outcomes
-
-↓
-
-Strategy improvement
-
-Everything verified and reusable can become shared COS intelligence.
-
----
-
-# Continuous Learning
-
-COS MUST learn proactively as well as reactively.
-
-It should not wait for a Portable to ask the same expensive question repeatedly before improving itself.
-
-COS has three learning channels.
-
-## Work Experience
-
-Every completed Portable task can teach COS.
-
-Outcomes, successful strategies, failures, buyer responses, campaign performance, incident patterns and reusable decisions should improve future behavior.
-
-## Engineering Experience
-
-COS should learn from SignalBoost's own engineering history.
-
-Examples
-
-- successful fixes
-- failed builds
-- before-and-after code
-- verified commits
-- incident diagnoses
-- regression tests
-- architecture patterns
-
-A verified solution should become reusable engineering intelligence rather than being rediscovered later.
-
-## Independent Study
-
-COS may periodically study approved high-quality sources when doing so closes a real knowledge gap or is expected to reduce future external-AI cost.
-
-Approved source classes may include
-
-- official documentation
-- research papers
-- public datasets
-- approved public websites
-- repositories with suitable access and licensing
-- educational video transcripts
-- regulatory publications
-
-COS does NOT blindly ingest the internet.
-
----
-
-# Continuous Learning Execution Order
-
-Proactive learning follows this sequence.
-
-```
-Knowledge Gap
-
-↓
-
-Expected Reuse / ROI
-
-↓
-
-Source Policy
-
-↓
-
-Acquire
-
-↓
-
-Verify
-
-↓
-
-Deduplicate
-
-↓
-
-Confidence + Provenance
-
-↓
-
-Extract Reusable Facts / Procedures
-
-↓
-
-Knowledge Store
-
-↓
-
-Revalidation Schedule
-
-↓
-
-Learning Effectiveness Measurement
-
-↓
-
-Telemetry / ROI
+# Campaign / Outreach Doctrine
+
+A strategy written in chat is not a real campaign.
+
+Real campaign/outreach work must create durable records and flow through the appropriate queues/approval/execution surfaces.
+
+Representative lifecycle:
+
+```text
+strategy / targeting
+→ draft/assets
+→ approval queue
+→ human approve / hold / edit / reject where required
+→ configured connector execution
+→ provider-confirmed result/live evidence
+→ measurement
+→ revenue/outcome feedback
+→ memory/learning improvement
 ```
 
-A duplicate or already-known source stops before expensive processing.
-
-A low-confidence discovery does not silently become trusted knowledge.
+Never claim “sent,” “published,” or “completed” solely because an API call was attempted.
 
 ---
 
-# Learning Quality Validation
+# Security / Secret Rules
 
-Accumulation is not learning.
-
-COS must measure whether learned information improves later execution.
-
-Useful evidence includes:
-
-- later reuse
-- improved success/outcome rate
-- fewer external model calls
-- fewer retries
-- reduced cost
-- reduced latency
-- better decision confidence where measurable
-- successful application of a learned procedure
-
-Learning observations must be bounded and evaluated from current/relevant evidence rather than allowing stale history to dominate the assessment.
+- Never hard-code secrets.
+- Never print full provider keys or tokens.
+- Never expose secret values in logs, screenshots, PR bodies, email, or client UI.
+- Use approved Vault/environment-variable/server-side storage boundaries.
+- Preserve tenant/org scoping and RLS/server-role assumptions.
+- Keep owner/admin routes server-gated; client visibility is not authorization.
 
 ---
 
-# Continuous Learning Governance
+# Localization
 
-Every learned item must retain
+Core supported languages are:
 
-- source
-- source type
-- acquisition date
-- content identity or hash
-- confidence
-- supporting evidence
-- applicable scope
-- freshness or revalidation requirements where relevant
-- licensing or usage restrictions where relevant
+- English (`en`)
+- Spanish (`es`)
+- Portuguese (`pt`)
+- Polish (`pl`)
+- Russian (`ru`)
 
-Contradictory information must be preserved as a contradiction until it is resolved; COS must not overwrite a trusted fact merely because a newer source says something different.
-
-Learning budgets are mandatory.
-
-Continuous Learning MUST NOT become an uncontrolled background AI bill.
-
-Before external acquisition COS asks
-
-- Is this a real knowledge gap?
-- Is the answer already in Knowledge, Memory or Cache?
-- How many future tasks can reuse it?
-- What external cost can it avoid?
-- Is the source approved?
-- Can deterministic extraction solve it without AI?
-
-The default learning action is no action when expected reuse does not justify cost.
+New user-facing copy must follow the repository i18n guardrails. Do not add hardcoded English strings that bypass the locale system.
 
 ---
 
-# Experiential Learning Loop
+# Build / Test / Deploy Rules
 
-For executable engineering or operational knowledge, COS should prefer verified experience.
-
-```
-Observe
-
-↓
-
-Build / Plan
-
-↓
-
-Execute in Governed Environment
-
-↓
-
-Test
-
-↓
-
-Diagnose Failure
-
-↓
-
-Correct
-
-↓
-
-Verify
-
-↓
-
-Measure Outcome
-
-↓
-
-Remember Successful Pattern
-```
-
-Failed experiments are evidence, not reusable truth.
-
-Only verified outcomes should graduate into trusted procedures.
+- Prefer **coherent batches of related changes** so GitHub/Vercel do not build for every tiny edit.
+- Read a file before changing it.
+- Preserve existing behavior unless the task requires change.
+- Run/observe the relevant typecheck, production build and tests before calling a batch successful.
+- Never claim CI/build/deployment passed unless it actually did.
+- Never call a branch commit “production.”
+- Re-check current `main` after concurrent work; do not assume an earlier branch still represents production.
+- Keep Node strip-safety requirements for directly executed `.ts` tests: avoid runtime-emitting TypeScript constructs in guarded directories.
 
 ---
 
-# Telemetry
+# Navigation / Operator Surfaces
 
-Every governed execution should record applicable evidence including
+A page is not operationally discoverable merely because a route exists. Working owner/admin tools should be reachable through appropriate platform navigation.
 
-- portable
-- task
-- provider/path
-- model
-- tokens
-- latency
-- cost
-- cache hit
-- semantic hit
-- knowledge hit
-- durable reuse
-- duplicate request
-- retry count
-- loop depth
-- local execution
-- cloud fallback
-- success/failure outcome
+Known corpus operator route:
 
-Continuous Learning additionally records
+`/dashboard/data/business-intelligence-corpus`
 
-- knowledge gap
-- source type
-- source identity
-- acquisition cost
-- duplicate rejection
-- confidence
-- knowledge accepted or rejected
-- expected reuse
-- actual reuse when known
-- learning effectiveness
-- avoided future cost when measurable
-
-Nothing important to cost/governance should be invisible.
-
-Everything should be measurable.
+When adding a feature page, verify it works and then expose it in the correct menu if operators are expected to use it.
 
 ---
 
-# Portable Rules
+# Documentation Map
 
-Every Portable
+Current Marketing & Sales handoff:
 
-MUST
+- `docs/marketing-sales-current-state.md`
+- `saas/docs/marketing-sales-module-design.md`
+- `docs/business-intelligence-corpus.md`
+- `docs/enterprise-release-candidate.md`
 
-- use COS
-- use the Governor for governed intelligence execution
-- reuse shared knowledge and skills
-- update knowledge/learning where applicable
-- emit telemetry
-- respect budgets
-- respect caching
-- respect provider boundaries
+COS / enterprise architecture:
 
-MUST NOT
+- `saas/lib/ai/cos/`
+- `saas/lib/cos/`
+- `saas/lib/cos-core/`
+- `saas/lib/enterprise/`
+- `saas/lib/enterprise-ai-os/`
 
-- make provider-specific intelligence part of its architecture
-- duplicate business rules unnecessarily
-- duplicate knowledge
-- bypass governance
-- bypass approved execution controls
+Marketing / sales execution:
+
+- `saas/lib/prospect-intelligence/`
+- `saas/lib/business-intelligence-corpus/`
+- `saas/lib/communication-hub/`
+- `saas/lib/revenue/`
+- `saas/lib/revenue-operations/`
+- `saas/lib/integrations/`
+- COSA/outreach routes and dashboards under `saas/app/`.
+
+Enterprise acceptance:
+
+- `saas/lib/release-candidate/`
+- `docs/enterprise-release-candidate.md`
+
+Detailed historical/operational onboarding:
+
+- `docs/ONBOARD-full.md`
 
 ---
 
-# Compute Layer
+# Status Language
 
-External AI providers are compute engines.
+Use precise terms such as `draft`, `waiting_approval`, `approved`, `queued`, `running`, `ready`, `completed`, `published`, `failed`, `held`, and `changes_requested` according to the actual system state.
 
-They are not the intelligence.
+Examples:
 
-Private/local AI is also compute; COS remains the owner of memory, knowledge, policy, learning, planning and outcomes.
-
-Compute executes reasoning only when COS determines it is necessary and permitted.
-
-COS owns the intelligence.
+- a plan is not a campaign;
+- a queue row is not a sent email;
+- an attempted publish is not a published asset;
+- a branch is not production;
+- a green deployment is not enterprise RC acceptance;
+- a 5,000-company target is not proof that 5,000 companies are currently stored.
 
 ---
 
-# Operational Rule After Independence Completion
+# 2026-08-10 Change Log
 
-Do not create deployments merely to continue the completed COS-independence phase.
-
-Future COS changes require a concrete reason such as:
-
-- demonstrated regression
-- measurable performance/cost improvement
-- new business capability
-- new security/governance requirement
-- validated learning improvement
-- required provider/runtime compatibility
-
-The objective is now to use the completed architecture, collect operational evidence and improve it from measured outcomes rather than continuously rebuilding the independence foundation.
+- Confirmed COS-first/local-first intelligence and governed external fallback as current architecture.
+- Confirmed Business Intelligence Corpus workflow is complete and internal-first; 5,000-company population is ongoing operational data growth.
+- Recorded the dated production corpus observation of 461/5000 (9.22%) without redefining that number as software completion.
+- Marked Marketing & Sales core architecture/product code complete based on current repo scan.
+- Added a dedicated fail-closed Marketing & Sales RC profile so enterprise acceptance depends on real evidence rather than estimates.
+- Added/updated Marketing & Sales current-state, corpus, architecture and RC handoff documentation for future developers.
 
 ---
 
 # Definition of Success
 
-The best AI call
+The best AI call is the one that never has to happen.
 
-is the one that never happens.
+The best external data call is the one avoided because SignalBoost already owns sufficient verified intelligence.
 
-The best Portable
+The best Portable continuously teaches COS without bypassing governance.
 
-is the one that continuously teaches COS.
+The best architecture lets providers be replaced without rewriting business intelligence or control logic.
 
-The best improvement
-
-is one that automatically benefits every Portable.
-
-The best architecture
-
-is one where providers can be replaced without changing application code.
-
-The best learning cycle
-
-is one that creates verified reusable knowledge for less than the future work it prevents.
-
-The best autonomous system
-
-is one that can observe, remember, learn, reason, act, verify and improve while remaining governed and measurable.
-
-SignalBoost does not build AI applications.
-
-SignalBoost builds intelligent software powered by one Cognitive Operating System.
+The best enterprise release claim is one backed by recorded evidence.

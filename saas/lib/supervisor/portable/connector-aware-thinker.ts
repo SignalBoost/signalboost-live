@@ -21,14 +21,14 @@ const defaultRecipeReuse = createInMemoryRecipeReuseStore()
 export function createConnectorAwareThinker<TThinker extends Thinker>(options: ConnectorAwareThinkerOptions<TThinker>): TThinker {
   const tenantId = String(options.tenantId ?? '').trim()
   if (!tenantId) throw new Error('createConnectorAwareThinker: tenantId is required')
-  const reuse = options.recipeReuse ?? defaultRecipeReuse
+  const reuse: CosRecipeReuseStore = options.recipeReuse ?? options.host.recipeMemory ?? defaultRecipeReuse
 
   return new Proxy(options.thinker, {
     get(target, prop, receiver) {
       if (prop !== 'proposeRepairPlan') return Reflect.get(target, prop, receiver)
       return async (incident: SupervisorIncident): Promise<unknown> => {
         const reuseKey = incidentRecipeReuseKey(tenantId, incident)
-        const reusedRecipe = options.recipe ? undefined : reuse.get(reuseKey)
+        const reusedRecipe = options.recipe ? undefined : await reuse.get(reuseKey)
         const selectedRecipe = options.recipe ?? reusedRecipe ?? selectConnectorRecipe(incident)
         const run = (recipe: CosConnectorRecipe) => executeCosConnectorRecipe(options.host.connectors, {
           tenantId, environmentId: incident.environment, portableId: recipe.portableId, traceId: incident.incidentId, recipe,
@@ -38,13 +38,14 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
         const fallbackRecipe = sufficiency.sufficient ? null : selectEvidenceFallback(selectedRecipe, sufficiency.failedCapabilities)
         const fallback = fallbackRecipe ? await run(fallbackRecipe) : null
         const finalSufficiency = fallback ? assessDelegatedEvidence(fallback) : sufficiency
-        if (sufficiency.sufficient) reuse.set(reuseKey, selectedRecipe)
+        if (sufficiency.sufficient) await reuse.set(reuseKey, selectedRecipe)
         const enriched: SupervisorIncident = {
           ...incident,
           metadata: {
             ...incident.metadata,
             connectorEvidenceRecipe: selectedRecipe.id,
             connectorEvidenceRecipeReused: Boolean(reusedRecipe),
+            connectorEvidenceRecipeMemory: options.host.recipeMemory && reuse === options.host.recipeMemory ? 'buyer-hosted' : 'process-local',
             connectorEvidenceSufficient: sufficiency.sufficient || finalSufficiency.sufficient,
             connectorEvidenceSuccessful: sufficiency.successful + (fallback ? finalSufficiency.successful : 0),
             connectorEvidenceAttempted: sufficiency.attempted + (fallback ? finalSufficiency.attempted : 0),

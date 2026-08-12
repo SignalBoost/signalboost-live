@@ -1,13 +1,6 @@
 // saas/lib/supervisor/portable/host-context.ts
 //
 // THE ENTERPRISE INTEGRATION BOUNDARY for the Self-Healing Supervisor portable.
-//
-// A portable that is sold into another company's systems must never name, import,
-// or assume the platform it happens to have been built on. It brings BEHAVIOR; the
-// buyer brings INFRASTRUCTURE. This module defines the single contract through which
-// a buyer supplies everything the portable needs from their environment: datastore,
-// secrets, outbound notifications, identity of the approving humans, branding, and
-// (optionally) the buyer-owned connector runtime used to discover and invoke tools.
 
 import type {
   PortableCapabilityManifest,
@@ -15,6 +8,7 @@ import type {
   PortableConnectorInvocation,
   PortableConnectorExecutionResult,
 } from '../../../provider-hub-core/index.ts'
+import type { CosConnectorRecipe } from '../../ai/cos/connectorDelegation.ts'
 
 export interface SecretsProvider {
   getSecret(name: string): Promise<string | undefined>
@@ -54,10 +48,6 @@ export interface HostBranding {
   locale?: string
 }
 
-/**
- * Buyer-owned tool boundary. The Portable sees only this vendor-neutral contract;
- * credentials, provider SDKs and connection configuration remain in the buyer host.
- */
 export interface PortableConnectorRuntimePort {
   discover(input: {
     tenantId: string
@@ -70,13 +60,20 @@ export interface PortableConnectorRuntimePort {
   }): Promise<PortableConnectorExecutionResult>
 }
 
+/** Buyer-owned durable operational memory. The host decides whether this is SQL, KV, object storage, etc. */
+export interface PortableRecipeMemoryPort {
+  get(key: string): Promise<CosConnectorRecipe | undefined>
+  set(key: string, recipe: CosConnectorRecipe): Promise<void>
+}
+
 export interface HostContext {
   secrets: SecretsProvider
   notifications: NotificationSink
   approvers: ApproverDirectory
   branding: HostBranding
-  /** Optional for backward compatibility; required only by Portables that use connector capabilities. */
   connectors?: PortableConnectorRuntimePort
+  /** Optional durable memory for learned successful connector recipes. */
+  recipeMemory?: PortableRecipeMemoryPort
 }
 
 export function buildConsoleUrl(branding: HostBranding, path: string): string | undefined {

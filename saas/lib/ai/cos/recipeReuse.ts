@@ -2,8 +2,8 @@ import type { SupervisorIncident } from '../../supervisor/incident-schema.ts'
 import type { CosConnectorRecipe } from './connectorDelegation.ts'
 
 export interface CosRecipeReuseStore {
-  get(key: string): CosConnectorRecipe | undefined
-  set(key: string, recipe: CosConnectorRecipe): void
+  get(key: string): CosConnectorRecipe | undefined | Promise<CosConnectorRecipe | undefined>
+  set(key: string, recipe: CosConnectorRecipe): void | Promise<void>
 }
 
 export function createInMemoryRecipeReuseStore(): CosRecipeReuseStore {

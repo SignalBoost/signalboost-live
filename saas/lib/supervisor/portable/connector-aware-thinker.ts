@@ -8,10 +8,10 @@ import {
 } from '../../ai/cos/connectorDelegation.ts'
 import { compactDelegatedEvidence } from '../../ai/cos/evidenceCompaction.ts'
 
-export interface ConnectorAwareThinkerOptions {
+export interface ConnectorAwareThinkerOptions<TThinker extends Thinker> {
   host: HostContext
   tenantId: string
-  thinker: Thinker
+  thinker: TThinker
   recipe?: CosConnectorRecipe
 }
 
@@ -20,30 +20,36 @@ export interface ConnectorAwareThinkerOptions {
  * Routine read-only evidence is gathered deterministically, compacted, and attached to the
  * incident metadata before the underlying thinker runs. The thinker still owns diagnosis and
  * planning; write/consequential execution remains on the existing governed dispatch path.
+ *
+ * The wrapper preserves the original thinker surface so product-specific methods/properties are
+ * not lost when connector evidence is enabled.
  */
-export function createConnectorAwareThinker(options: ConnectorAwareThinkerOptions): Thinker {
+export function createConnectorAwareThinker<TThinker extends Thinker>(options: ConnectorAwareThinkerOptions<TThinker>): TThinker {
   const tenantId = String(options.tenantId ?? '').trim()
   if (!tenantId) throw new Error('createConnectorAwareThinker: tenantId is required')
   const recipe = options.recipe ?? SELF_HEALING_DIAGNOSTIC_RECIPE
 
-  return {
-    async proposeRepairPlan(incident: SupervisorIncident): Promise<unknown> {
-      const delegated = await executeCosConnectorRecipe(options.host.connectors, {
-        tenantId,
-        environmentId: incident.environment,
-        portableId: recipe.portableId,
-        traceId: incident.incidentId,
-        recipe,
-      })
-      const packet = compactDelegatedEvidence(delegated)
-      const enriched: SupervisorIncident = {
-        ...incident,
-        metadata: {
-          ...incident.metadata,
-          connectorEvidence: packet as unknown as SerializableValue,
-        },
+  return new Proxy(options.thinker, {
+    get(target, prop, receiver) {
+      if (prop !== 'proposeRepairPlan') return Reflect.get(target, prop, receiver)
+      return async (incident: SupervisorIncident): Promise<unknown> => {
+        const delegated = await executeCosConnectorRecipe(options.host.connectors, {
+          tenantId,
+          environmentId: incident.environment,
+          portableId: recipe.portableId,
+          traceId: incident.incidentId,
+          recipe,
+        })
+        const packet = compactDelegatedEvidence(delegated)
+        const enriched: SupervisorIncident = {
+          ...incident,
+          metadata: {
+            ...incident.metadata,
+            connectorEvidence: packet as unknown as SerializableValue,
+          },
+        }
+        return target.proposeRepairPlan(enriched)
       }
-      return options.thinker.proposeRepairPlan(enriched)
     },
-  }
+  }) as TThinker
 }

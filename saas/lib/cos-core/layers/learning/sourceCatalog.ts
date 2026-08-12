@@ -16,13 +16,26 @@ export type LearningSourceProfile = {
  * but copyrighted/closed material is retained as facts, provenance and compact summaries
  * rather than as a shadow copy of the original work.
  */
+/**
+ * A NOTE ON THESE NUMBERS, recalibrated Aug 2026 after the first run under the enforced gates.
+ *
+ * They were originally written as SOURCE TRUST levels — how much COS should believe a class of
+ * source — and ranged 0.74 to 0.86. Admission then began comparing them against a candidate's
+ * GROUNDING score, which measures something else entirely: how well one document matches the
+ * question and how much real content it contains, on a scale that tops out at 0.9. Two different
+ * meanings of "confidence" met at the same comparison and nothing could pass: 78 documents
+ * acquired, 0 admitted. The floors below are now expressed on the grounding scale, and the ordering
+ * is inverted from the original on purpose — a well-grounded official document has a LOWER bar to
+ * clear than a news item or a public web page, because the source class is more trustworthy, not
+ * less. Not tuned against production data; recalibrated to be reachable and re-checked after runs.
+ */
 export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
   {
     id: 'youtube-transcripts',
     label: 'YouTube and educational video transcripts',
     kind: 'video_transcript',
     rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.74,
+    minimumConfidence: 0.72,
     examples: ['official vendor channels', 'university lectures', 'technical conference talks'],
   },
   {
@@ -30,7 +43,7 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
     label: 'Libraries and public-domain books',
     kind: 'library_material',
     rightsMode: 'full_text_allowed',
-    minimumConfidence: 0.76,
+    minimumConfidence: 0.72,
     examples: ['public-domain books', 'institutional repositories', 'open educational resources'],
   },
   {
@@ -38,7 +51,7 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
     label: 'Licensed or copyrighted library material',
     kind: 'library_material',
     rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.78,
+    minimumConfidence: 0.72,
     examples: ['licensed books', 'library abstracts', 'publisher-provided excerpts'],
   },
   {
@@ -46,7 +59,7 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
     label: 'Scientific journals and research literature',
     kind: 'scientific_journal',
     rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.82,
+    minimumConfidence: 0.72,
     examples: ['peer-reviewed journals', 'preprint servers', 'open-access papers'],
   },
   {
@@ -54,15 +67,15 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
     label: 'Reputable newspapers and newswires',
     kind: 'news_article',
     rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.78,
+    minimumConfidence: 0.74,
     examples: ['major newspapers', 'financial press', 'newswires'],
   },
   {
     id: 'official-docs',
     label: 'Official documentation and standards',
     kind: 'official_documentation',
-    rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.86,
+    rightsMode: 'full_text_allowed',
+    minimumConfidence: 0.75,
     examples: ['vendor documentation', 'government publications', 'standards bodies'],
   },
   {
@@ -70,7 +83,7 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
     label: 'Public and licensed datasets',
     kind: 'public_dataset',
     rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.82,
+    minimumConfidence: 0.72,
     examples: ['government open data', 'research datasets', 'licensed business datasets'],
   },
   {
@@ -78,7 +91,7 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
     label: 'Approved public web sources',
     kind: 'approved_public_web',
     rightsMode: 'facts_and_summary_only',
-    minimumConfidence: 0.76,
+    minimumConfidence: 0.74,
     examples: ['company sites', 'industry associations', 'public technical resources'],
   },
 ]

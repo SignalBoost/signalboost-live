@@ -37,6 +37,10 @@ export interface CosBenchmarkObservation {
   externalAiInvoked: boolean
   localModelInvoked: boolean
   inferenceAvoided?: boolean
+  localCallsAvoided?: number
+  externalCallsAvoided?: number
+  estimatedExternalTokensAvoided?: number
+  estimatedExternalCostAvoidedUsd?: number
   notes?: string
 }
 
@@ -51,6 +55,12 @@ export interface CosBenchmarkSummary {
   isolationPass: boolean
   cacheReusePass: boolean
   internalKnowledgeContributionPass: boolean
+  totalLatencyMs: number
+  averageLatencyMs: number
+  localCallsAvoided: number
+  externalCallsAvoided: number
+  estimatedExternalTokensAvoided: number
+  estimatedExternalCostAvoidedUsd: number
   observations: CosBenchmarkObservation[]
 }
 
@@ -78,6 +88,13 @@ export function summarizeCosBenchmark(
   const internalKnowledgeContributionPass = internalCategories.every(category =>
     categoryPasses(category) && evidenceCountForCategory(category) > 0,
   )
+  const totalLatencyMs = observations.reduce((total, item) => total + Math.max(0, item.latencyMs || 0), 0)
+  const localCallsAvoided = observations.reduce((total, item) => total + Math.max(0, item.localCallsAvoided || 0), 0)
+  const externalCallsAvoided = observations.reduce((total, item) => total + Math.max(0, item.externalCallsAvoided || 0), 0)
+  const estimatedExternalTokensAvoided = observations.reduce((total, item) => total + Math.max(0, item.estimatedExternalTokensAvoided || 0), 0)
+  const estimatedExternalCostAvoidedUsd = Number(observations
+    .reduce((total, item) => total + Math.max(0, item.estimatedExternalCostAvoidedUsd || 0), 0)
+    .toFixed(8))
 
   return {
     schemaVersion: 1,
@@ -94,6 +111,12 @@ export function summarizeCosBenchmark(
       .filter(item => item.category === 'cache_reuse')
       .every(item => item.inferenceAvoided === true),
     internalKnowledgeContributionPass,
+    totalLatencyMs,
+    averageLatencyMs: observations.length ? totalLatencyMs / observations.length : 0,
+    localCallsAvoided,
+    externalCallsAvoided,
+    estimatedExternalTokensAvoided,
+    estimatedExternalCostAvoidedUsd,
     observations,
   }
 }

@@ -82,12 +82,10 @@ function estimatedInputCostPer1k(): number {
   const value = Number(process.env.COS_BASELINE_INPUT_COST_PER_1K || '0.003')
   return Number.isFinite(value) && value >= 0 ? value : 0.003
 }
-
 function estimatedOutputCostPer1k(): number {
   const value = Number(process.env.COS_BASELINE_OUTPUT_COST_PER_1K || '0.015')
   return Number.isFinite(value) && value >= 0 ? value : 0.015
 }
-
 // ~4 characters per token is the standard rough English approximation used throughout
 // this codebase's own cost-sizing comments; kept consistent rather than inventing a
 // second constant that would silently disagree with the first.
@@ -171,7 +169,45 @@ async function retrieveInternalContext(prompt:string,userId?:string|null){
   if(userId){ systems.push('User Enterprise Memory'); const loaded=await loadUserMemories(userId).catch(()=>[]); for(const item of loaded.slice(-20)) memories.push(`[${item.kind}] ${safeText(item.content,500)}`) }
   return {systems:[...new Set(systems)],facts,learned,memories}
 }
-function parseLocalResult(raw:string){ const cleaned=raw.trim().replace(/^```json\s*/i,'').replace(/```$/i,'').trim(); try{const p=JSON.parse(cleaned) as {answer?:unknown;confidence?:unknown}; const answer=typeof p.answer==='string'?p.answer.trim():''; const confidence=Number(p.confidence); return answer&&Number.isFinite(confidence)?{answer,confidence:Math.max(0,Math.min(1,confidence))}:null}catch{return null} }
+function extractBalancedJsonObject(text:string):string|null{
+  const start=text.indexOf('{')
+  if(start===-1)return null
+  let depth=0,inString=false,escaped=false
+  for(let i=start;i<text.length;i++){
+    const ch=text[i]
+    if(inString){
+      if(escaped)escaped=false
+      else if(ch==='\\')escaped=true
+      else if(ch==='"')inString=false
+      continue
+    }
+    if(ch==='"'){inString=true;continue}
+    if(ch==='{')depth++
+    else if(ch==='}'){depth--;if(depth===0)return text.slice(start,i+1)}
+  }
+  return null
+}
+
+function parseLocalResult(raw:string):{answer:string;confidence:number}|null{
+  const stripFences=(t:string)=>t.trim().replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim()
+  const tryParse=(t:string)=>{
+    try{
+      const p=JSON.parse(t) as {answer?:unknown;confidence?:unknown}
+      const answer=typeof p.answer==='string'?p.answer.trim():''
+      const confidence=Number(p.confidence)
+      return answer&&Number.isFinite(confidence)?{answer,confidence:Math.max(0,Math.min(1,confidence))}:null
+    }catch{return null}
+  }
+  const cleaned=stripFences(raw)
+  const direct=tryParse(cleaned)
+  if(direct)return direct
+  const extracted=extractBalancedJsonObject(cleaned)
+  if(extracted){
+    const recovered=tryParse(extracted)
+    if(recovered)return recovered
+  }
+  return null
+}
 
 function contextFingerprint(context:{facts:string[];learned:string[];memories:string[]}):string{
   return createHash('sha256').update(JSON.stringify({facts:context.facts,learned:context.learned,memories:context.memories})).digest('hex')
@@ -223,10 +259,17 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
 
   const evidenceCount=context.facts.length+context.learned.length
   const internalContext=[context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',context.memories.length?`USER ENTERPRISE MEMORY:\n${context.memories.join('\n')}`:''].filter(Boolean).join('\n\n')
-  const reasoned=await callCosReasoner({temperature:.15,maxTokens:3000,systemPrompt:`You are COS, SignalBoost's independent PRIMARY reasoning layer. Reason from the user's question, your open/self-hosted model knowledge, and supplied internal evidence. Distinguish evidence from inference. Never invent sources. If evidence is insufficient, lower confidence. Reply in ${input.language||'English'}. Return ONLY strict JSON: {"answer":"complete answer","confidence":0.0}.`,prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
+  const reasoned=await callCosReasoner({temperature:.15,maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS||'6000'),systemPrompt:`You are COS, SignalBoost's independent PRIMARY reasoning layer. Reason from the user's question, your open/self-hosted model knowledge, and supplied internal evidence. Distinguish evidence from inference. Never invent sources. If evidence is insufficient, lower confidence. Reply in ${input.language||'English'}. Return ONLY strict JSON, nothing before the opening brace and nothing after the closing brace — no preamble, no markdown fence, no trailing note: {"answer":"complete answer","confidence":0.0}.`,prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
   const provenance={...base,localModelInvoked:true,reasonerLabel:reasoned?.reasoner.label??resolved.config.label}
   if(!reasoned?.text){const reason='Independent COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
-  const parsed=parseLocalResult(reasoned.text); if(!parsed){const reason='Independent COS inference returned an unparseable result.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
+  const parsed=parseLocalResult(reasoned.text)
+  if(!parsed){
+    console.error('cosFirstAnswer: unparseable reasoner output, raw text follows:',reasoned.text)
+    const excerpt=safeText(reasoned.text,240)
+    const reason=`Independent COS inference returned an unparseable result. Raw output started: "${excerpt}"`
+    void recordKnowledgeGap(input.prompt,0,reason)
+    return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}
+  }
   const ceiling=evidenceCount>=5?.96:evidenceCount>=2?.90:evidenceCount===1?.84:.78; const confidence=Math.min(parsed.confidence,ceiling)
   if(confidence<threshold()){const reason=`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`;void recordKnowledgeGap(input.prompt,confidence,reason);return{handled:false,confidence,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
   void writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel})

@@ -1,12 +1,5 @@
 // saas/lib/ai/cos/reasonerOutput.ts
-//
-// Parsing the reasoner's reply, kept free of every platform dependency so it can be unit-tested on
-// its own — the module it used to live in imports Supabase, which made the parse path effectively
-// untestable and let a whole class of failure through unexamined.
-//
-// The reasoner is asked to wrap its entire answer inside one JSON string. That is convenient until
-// it stops writing mid-string, at which point strict parsing throws away a complete, useful,
-// three-quarters-finished answer and the user is told only that something was "unparseable".
+// Parsing stays dependency-free so malformed local-model output can be tested and recovered safely.
 
 export function extractBalancedJsonObject(text:string):string|null{
   const start=text.indexOf('{')
@@ -27,19 +20,6 @@ export function extractBalancedJsonObject(text:string):string|null{
   return null
 }
 
-/**
- * Recover the answer from a JSON object that was cut off mid-string.
- *
- * The reasoner is asked to wrap its whole answer inside one JSON string, which means a single
- * truncation — hitting the token ceiling three quarters of the way through a good answer —
- * discards ALL of it and the user gets nothing. That is a worse outcome than an incomplete answer
- * clearly labelled as incomplete, so the text written before the cut is salvaged.
- *
- * Called ONLY after strict parsing has already failed, so it is permissive about where the cut
- * landed: inside the answer string, or after it closed but before the object did. Both happen, and
- * the second one used to fall through to "unparseable" and return the user nothing at all. The
- * caller must treat the result as unfinished rather than passing it off as a whole answer.
- */
 export function salvageTruncatedAnswer(raw:string,minimumCharacters=200):string|null{
   const key=raw.indexOf('"answer"')
   if(key===-1)return null
@@ -59,7 +39,56 @@ export function salvageTruncatedAnswer(raw:string,minimumCharacters=200):string|
   return salvaged.length>=minimumCharacters?salvaged:null
 }
 
-export type LocalResult={answer:string;confidence:number;truncated?:boolean}
+function decodeLooseJsonString(value:string):string{
+  let out='',escaped=false
+  for(let i=0;i<value.length;i++){
+    const ch=value[i]
+    if(escaped){
+      if(ch==='n')out+='\n'
+      else if(ch==='t')out+='\t'
+      else if(ch==='r')out+='\r'
+      else if(ch==='"')out+='"'
+      else if(ch==='\\')out+='\\'
+      else out+=ch
+      escaped=false
+      continue
+    }
+    if(ch==='\\'){escaped=true;continue}
+    out+=ch
+  }
+  if(escaped)out+='\\'
+  return out.trim()
+}
+
+/**
+ * Qwen sometimes returns a complete answer/confidence pair but leaves literal newlines or
+ * unescaped quotation marks inside the answer string. Strict JSON parsing rejects the whole
+ * object even though the two fields are recoverable. Recover only when a numeric confidence
+ * field is present after the answer, so we never invent confidence for an unfinished response.
+ */
+export function recoverLooseAnswerAndConfidence(raw:string):{answer:string;confidence:number}|null{
+  const answerKey=/["']answer["']\s*:/i.exec(raw)
+  if(!answerKey)return null
+  const afterKey=(answerKey.index??0)+answerKey[0].length
+  let open=afterKey
+  while(open<raw.length&&/\s/.test(raw[open]))open++
+  const quote=raw[open]
+  if(quote!=='"'&&quote!=="'")return null
+  const confidencePattern=/[,}]\s*["']confidence["']\s*:\s*(-?(?:\d+(?:\.\d+)?|\.\d+))/ig
+  confidencePattern.lastIndex=open+1
+  let match:RegExpExecArray|null,last:RegExpExecArray|null=null
+  while((match=confidencePattern.exec(raw)))last=match
+  if(!last||last.index<=open+1)return null
+  let end=last.index
+  while(end>open+1&&/\s/.test(raw[end-1]))end--
+  if(end>open+1&&raw[end-1]===quote)end--
+  const answer=decodeLooseJsonString(raw.slice(open+1,end))
+  const confidence=Number(last[1])
+  if(answer.length<20||!Number.isFinite(confidence))return null
+  return{answer,confidence:Math.max(0,Math.min(1,confidence))}
+}
+
+export type LocalResult={answer:string;confidence:number;truncated?:boolean;recovered?:boolean}
 
 export function parseLocalResult(raw:string):LocalResult|null{
   const stripFences=(t:string)=>t.trim().replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim()
@@ -75,13 +104,11 @@ export function parseLocalResult(raw:string):LocalResult|null{
   const direct=tryParse(cleaned)
   if(direct)return direct
   const extracted=extractBalancedJsonObject(cleaned)
-  if(extracted){
-    const recovered=tryParse(extracted)
-    if(recovered)return recovered
-  }
+  if(extracted){const recovered=tryParse(extracted);if(recovered)return recovered}
+  const loose=recoverLooseAnswerAndConfidence(cleaned)
+  if(loose)return{...loose,recovered:true}
   const salvaged=salvageTruncatedAnswer(cleaned)
-  // No confidence was ever emitted — the model never reached that field — so none is invented here.
-  // The floor value keeps an unfinished answer out of the confident path on its own merits.
+  // No confidence was emitted, so a genuinely truncated answer still cannot enter the confident path.
   if(salvaged)return{answer:salvaged,confidence:0,truncated:true}
   return null
 }

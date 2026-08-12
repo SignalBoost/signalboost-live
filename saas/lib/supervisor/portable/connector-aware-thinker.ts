@@ -3,6 +3,7 @@ import type { SupervisorIncident, SerializableValue } from '../incident-schema.t
 import type { HostContext } from './host-context.ts'
 import { executeCosConnectorRecipe, type CosConnectorRecipe } from '../../ai/cos/connectorDelegation.ts'
 import { compactDelegatedEvidence } from '../../ai/cos/evidenceCompaction.ts'
+import { selectEvidenceFallback } from '../../ai/cos/evidenceFallback.ts'
 import { assessDelegatedEvidence } from '../../ai/cos/evidenceSufficiency.ts'
 import { selectConnectorRecipe } from '../../ai/cos/incidentRecipeRouter.ts'
 
@@ -14,12 +15,6 @@ export interface ConnectorAwareThinkerOptions<TThinker extends Thinker> {
   recipe?: CosConnectorRecipe
 }
 
-/**
- * Production bridge between the buyer-owned Connector Runtime and COS/Supervisor reasoning.
- * Routine read-only evidence is gathered deterministically, compacted, and attached to the
- * incident metadata before the underlying thinker runs. The thinker still owns diagnosis and
- * planning; write/consequential execution remains on the existing governed dispatch path.
- */
 export function createConnectorAwareThinker<TThinker extends Thinker>(options: ConnectorAwareThinkerOptions<TThinker>): TThinker {
   const tenantId = String(options.tenantId ?? '').trim()
   if (!tenantId) throw new Error('createConnectorAwareThinker: tenantId is required')
@@ -29,25 +24,30 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
       if (prop !== 'proposeRepairPlan') return Reflect.get(target, prop, receiver)
       return async (incident: SupervisorIncident): Promise<unknown> => {
         const selectedRecipe = options.recipe ?? selectConnectorRecipe(incident)
-        const delegated = await executeCosConnectorRecipe(options.host.connectors, {
+        const run = (recipe: CosConnectorRecipe) => executeCosConnectorRecipe(options.host.connectors, {
           tenantId,
           environmentId: incident.environment,
-          portableId: selectedRecipe.portableId,
+          portableId: recipe.portableId,
           traceId: incident.incidentId,
-          recipe: selectedRecipe,
+          recipe,
         })
-        const packet = compactDelegatedEvidence(delegated)
+        const delegated = await run(selectedRecipe)
         const sufficiency = assessDelegatedEvidence(delegated)
+        const fallbackRecipe = sufficiency.sufficient ? null : selectEvidenceFallback(selectedRecipe, sufficiency.failedCapabilities)
+        const fallback = fallbackRecipe ? await run(fallbackRecipe) : null
+        const finalSufficiency = fallback ? assessDelegatedEvidence(fallback) : sufficiency
         const enriched: SupervisorIncident = {
           ...incident,
           metadata: {
             ...incident.metadata,
             connectorEvidenceRecipe: selectedRecipe.id,
-            connectorEvidenceSufficient: sufficiency.sufficient,
-            connectorEvidenceSuccessful: sufficiency.successful,
-            connectorEvidenceAttempted: sufficiency.attempted,
+            connectorEvidenceSufficient: sufficiency.sufficient || finalSufficiency.sufficient,
+            connectorEvidenceSuccessful: sufficiency.successful + (fallback ? finalSufficiency.successful : 0),
+            connectorEvidenceAttempted: sufficiency.attempted + (fallback ? finalSufficiency.attempted : 0),
             connectorEvidenceFailedCapabilities: sufficiency.failedCapabilities as unknown as SerializableValue,
-            connectorEvidence: packet as unknown as SerializableValue,
+            connectorEvidence: compactDelegatedEvidence(delegated) as unknown as SerializableValue,
+            connectorEvidenceFallbackRecipe: fallbackRecipe?.id ?? null,
+            connectorEvidenceFallback: fallback ? compactDelegatedEvidence(fallback) as unknown as SerializableValue : null,
           },
         }
         return target.proposeRepairPlan(enriched)

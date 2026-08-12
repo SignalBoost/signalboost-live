@@ -13,9 +13,14 @@ test('an answer cut off mid-string is recovered instead of discarded', () => {
   assert.ok(!salvaged!.includes('"answer"'), 'the JSON wrapper must not leak into the answer')
 })
 
-test('a complete JSON object is left to the normal parser', () => {
-  const complete = '{"answer":"A full answer that closed its string properly and is long enough to pass the salvage floor several times over, with more than two hundred characters of content so length alone cannot be the reason it is rejected.","confidence":0.8}'
-  assert.equal(salvageTruncatedAnswer(complete), null)
+test('a cut landing AFTER the answer string closed is still salvaged', () => {
+  // The other half of the real failure: the model finished the answer, then stopped before the
+  // confidence field. Strict parsing fails, and this used to return the user nothing at all.
+  const raw = '{"answer":"Connection pool saturation is the likeliest cause: enterprise requests hold pooled connections longer and smaller tenants queue behind them, which shows up as wait time rather than CPU. Confirm with pg_stat_activity wait_event distribution.","confid'
+  const salvaged = salvageTruncatedAnswer(raw)
+  assert.ok(salvaged)
+  assert.ok(salvaged!.startsWith('Connection pool saturation'))
+  assert.ok(!salvaged!.includes('confid'), 'the trailing partial key must not leak into the answer')
 })
 
 test('a scrap too short to be useful is not salvaged', () => {

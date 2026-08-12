@@ -126,6 +126,21 @@ else
   log "Model $MODEL is already present in persistent storage."
 fi
 
+# COS's semantic cache (Aug 12) needs an embedding model on this same pod — one
+# vendor, one bill, same auth story as the reasoner. nomic-embed-text is small
+# (~275MB) and coexists with the 32B reasoner without meaningful VRAM pressure.
+# Set COS_EMBEDDING_MODEL to override; the Vercel-side LOCAL_AI_EMBEDDING_MODEL
+# env var must then match, and cos_knowledge_records.embedding must be resized
+# to that model's real output dimension — see
+# supabase/migrations/20260812_cos_semantic_cache_768.sql for the 768-dim default.
+EMBEDDING_MODEL="${COS_EMBEDDING_MODEL:-nomic-embed-text}"
+if ! OLLAMA_HOST='127.0.0.1:11435' OLLAMA_MODELS="$MODEL_DIR" ollama list | awk 'NR>1 {print $1}' | grep -Fxq "$EMBEDDING_MODEL"; then
+  log "Embedding model $EMBEDDING_MODEL is not present in persistent storage; pulling it now..."
+  OLLAMA_HOST='127.0.0.1:11435' OLLAMA_MODELS="$MODEL_DIR" ollama pull "$EMBEDDING_MODEL"
+else
+  log "Embedding model $EMBEDDING_MODEL is already present in persistent storage."
+fi
+
 cat > "$GATEWAY_FILE" <<'PY'
 #!/usr/bin/env python3
 import hmac

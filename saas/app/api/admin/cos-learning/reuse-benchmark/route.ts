@@ -48,9 +48,6 @@ export async function GET() {
     externalAiNotInvoked: provenance.externalAiInvoked === false,
   }
 
-  const answer = result.handled ? result.reply : null
-  const reason = result.handled ? null : result.reason
-
   return NextResponse.json({
     ok: Object.values(assertions).every(Boolean),
     prompt,
@@ -63,9 +60,9 @@ export async function GET() {
       sourceUri: row.source_uri,
       observedAt: row.observed_at,
     })),
-    answer,
+    answer: result.handled ? result.reply : null,
     confidence: result.confidence,
-    reason,
+    reason: result.handled === false ? result.reason : null,
     provenance,
     assertions,
   })

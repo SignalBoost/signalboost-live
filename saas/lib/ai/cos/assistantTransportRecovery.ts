@@ -4,6 +4,14 @@ export type StoredAssistantMessage = {
   created_at?: unknown
 }
 
+export const ASSISTANT_TRANSPORT_TIMEOUT_COPY = {
+  en: 'The page stopped waiting before it received the COS response. It could not confirm whether the server completed the request. Check History before retrying an action to avoid duplicates.',
+  es: 'La página dejó de esperar antes de recibir la respuesta de COS. No pudo confirmar si el servidor completó la solicitud. Revisa el Historial antes de repetir una acción para evitar duplicados.',
+  pt: 'A página parou de aguardar antes de receber a resposta do COS. Não foi possível confirmar se o servidor concluiu a solicitação. Verifique o Histórico antes de repetir uma ação para evitar duplicações.',
+  pl: 'Strona przestała czekać, zanim otrzymała odpowiedź COS. Nie można potwierdzić, czy serwer zakończył żądanie. Przed ponowieniem działania sprawdź Historię, aby uniknąć duplikatów.',
+  ru: 'Страница прекратила ожидание до получения ответа COS. Нельзя подтвердить, завершил ли сервер запрос. Перед повтором действия проверьте Историю, чтобы избежать дублирования.',
+} as const
+
 function normalize(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }

@@ -8,6 +8,8 @@ import { assessDelegatedEvidence } from '../../ai/cos/evidenceSufficiency.ts'
 import { selectConnectorRecipe } from '../../ai/cos/incidentRecipeRouter.ts'
 import { createInMemoryRecipeReuseStore, incidentRecipeReuseKey, scoreRecipeEvidence, type CosRecipeReuseStore } from '../../ai/cos/recipeReuse.ts'
 import { createInMemoryRecipeConfidenceStore, isRecipeCoolingDown, updateRecipeConfidence, type CosRecipeConfidenceStore, type RecipeConfidencePolicy } from '../../ai/cos/recipeConfidence.ts'
+import { selectLiveRecipe } from '../../ai/cos/liveRecipeSelection.ts'
+import type { RecipeOptimizationWeights } from '../../ai/cos/recipeOptimization.ts'
 
 export interface ConnectorAwareThinkerOptions<TThinker extends Thinker> {
   host: HostContext
@@ -18,6 +20,7 @@ export interface ConnectorAwareThinkerOptions<TThinker extends Thinker> {
   recipeConfidence?: CosRecipeConfidenceStore
   minimumRecipeQuality?: number
   confidencePolicy?: RecipeConfidencePolicy
+  optimizationWeights?: RecipeOptimizationWeights
 }
 
 const defaultRecipeReuse = createInMemoryRecipeReuseStore()
@@ -37,8 +40,13 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
         const reuseKey = incidentRecipeReuseKey(tenantId, incident)
         const priorConfidence = await confidence.get(reuseKey)
         const coolingDown = isRecipeCoolingDown(priorConfidence, options.confidencePolicy?.now?.() ?? Date.now())
-        const reusedRecipe = options.recipe || coolingDown ? undefined : await reuse.get(reuseKey)
-        let selectedRecipe = options.recipe ?? reusedRecipe ?? selectConnectorRecipe(incident)
+        const learnedRecipe = options.recipe ? undefined : await reuse.get(reuseKey)
+        const deterministicRecipe = selectConnectorRecipe(incident)
+        const optimized = options.recipe
+          ? { recipe: options.recipe, source: 'deterministic' as const, optimizationScore: 0 }
+          : selectLiveRecipe(learnedRecipe, deterministicRecipe, priorConfidence, minimumRecipeQuality, coolingDown, options.optimizationWeights)
+        let selectedRecipe = optimized.recipe
+        const learnedSelected = optimized.source === 'learned'
         const run = (recipe: CosConnectorRecipe) => executeCosConnectorRecipe(options.host.connectors, {
           tenantId, environmentId: incident.environment, portableId: recipe.portableId, traceId: incident.incidentId, recipe,
         })
@@ -47,9 +55,9 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
         let recipeQuality = scoreRecipeEvidence(delegated)
         let recipeReplaced = false
 
-        if (reusedRecipe && recipeQuality < minimumRecipeQuality && !options.recipe) {
-          const freshRecipe = selectConnectorRecipe(incident)
-          if (freshRecipe.id !== reusedRecipe.id || recipeQuality === 0) {
+        if (learnedSelected && recipeQuality < minimumRecipeQuality && !options.recipe) {
+          const freshRecipe = deterministicRecipe
+          if (freshRecipe.id !== selectedRecipe.id || recipeQuality === 0) {
             const freshDelegated = await run(freshRecipe)
             const freshQuality = scoreRecipeEvidence(freshDelegated)
             if (freshQuality > recipeQuality) {
@@ -77,7 +85,7 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
           metadata: {
             ...incident.metadata,
             connectorEvidenceRecipe: selectedRecipe.id,
-            connectorEvidenceRecipeReused: Boolean(reusedRecipe) && !recipeReplaced,
+            connectorEvidenceRecipeReused: learnedSelected && !recipeReplaced,
             connectorEvidenceRecipeReplaced: recipeReplaced,
             connectorEvidenceRecipeQuality: recipeQuality,
             connectorEvidenceRecipePromoted: nextConfidence.promoted,
@@ -85,6 +93,8 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
             connectorEvidenceRecipeFailures: nextConfidence.failures,
             connectorEvidenceRecipeCooldownUntil: nextConfidence.cooldownUntil ?? null,
             connectorEvidenceRecipeCoolingDown: coolingDown,
+            connectorEvidenceRecipeOptimizationSource: optimized.source,
+            connectorEvidenceRecipeOptimizationScore: optimized.optimizationScore,
             connectorEvidenceRecipeMemory: options.host.recipeMemory && reuse === options.host.recipeMemory ? 'buyer-hosted' : 'process-local',
             connectorEvidenceSufficient: usable,
             connectorEvidenceSuccessful: sufficiency.successful + (fallback ? finalSufficiency.successful : 0),

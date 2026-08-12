@@ -36,26 +36,12 @@ export function externalFallbackEnabled(): boolean {
   return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED !== 'false'
 }
 
-/**
- * Detects a question ABOUT the system's own reasoning — "show me the provenance",
- * "which model answered", "was the knowledge graph used" — as opposed to a question
- * that merely happens to share vocabulary with this domain. Requires BOTH a
- * provenance-vocabulary term AND a referent word pointing at a prior turn or the
- * execution itself, so an ordinary question about semantic caching in general
- * ("what is a semantic cache") does not falsely trigger introspection mode.
- */
 export function isProvenanceIntrospection(input: string): boolean {
   const provenance = /\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|autonomous research|external ai|external provider|internal systems?)\b/i
   const referent = /\b(previous|preceding|prior|last|just|that|this|answer|response|request|execution|used|invoked|contributed|generated|reasoning)\b/i
   return provenance.test(input) && referent.test(input)
 }
 
-/**
- * Detects a request to actually DO something external — run, fetch, deploy, commit —
- * as distinct from a question that merely discusses those verbs. A provenance question
- * is checked and excluded FIRST: "what did you just execute" contains "execute" but is
- * asking about the past, not requesting a new action.
- */
 export function requestsExternalAction(input: string): boolean {
   if (isProvenanceIntrospection(input)) return false
   const explicitExecution = /\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i
@@ -63,13 +49,6 @@ export function requestsExternalAction(input: string): boolean {
   return explicitExecution.test(input) && target.test(input)
 }
 
-/**
- * The ONE authoritative provenance report. Built entirely from `cos.provenance` —
- * the real, structured object tryCOSFirstAnswer computed while actually answering —
- * never from asking a model to describe what it thinks happened. This is what makes
- * "show me the provenance" answerable honestly instead of by confabulation: the data
- * either exists here, truthfully, or the field says it was not used.
- */
 export function authoritativeProvenance(
   cos: any,
   external: { invoked: boolean; provider?: string | null; model?: string | null },
@@ -81,8 +60,6 @@ export function authoritativeProvenance(
     authority: 'server_execution_telemetry',
     model_generated: false,
     semantic_cache: { used: semanticCacheHit, evidence_count: semanticCacheHit ? 1 : 0 },
-    // retrieved = handed to the reasoner; cited = its label appears in the answer. "Used" is only
-    // claimed when a citation proves it — retrieval alone overstated contribution in every report.
     enterprise_memory: { used: (p?.knowledgeFactsCited ?? 0) > 0, retrieved_count: p?.knowledgeFactsUsed ?? 0, evidence_count: p?.knowledgeFactsCited ?? 0 },
     knowledge_graph: { used: (p?.knowledgeFactsCited ?? 0) > 0, retrieved_count: p?.knowledgeFactsUsed ?? 0, evidence_count: p?.knowledgeFactsCited ?? 0 },
     learned_corpus: { used: (p?.learnedItemsCited ?? 0) > 0, retrieved_count: p?.learnedItemsUsed ?? 0, evidence_count: p?.learnedItemsCited ?? 0 },
@@ -102,48 +79,50 @@ export function authoritativeProvenance(
   }
 }
 
-/**
- * A short, honest sentence version of authoritativeProvenance for a chat reply —
- * support/route.ts returns prose to the user, not raw JSON. Every clause here reads
- * directly off the same authoritative object, so this can never diverge from what
- * authoritativeProvenance() itself would report. The formatter also understands
- * deterministic server-utility provenance, which shares the same execution schema
- * but is produced without COS reasoning at all.
+function usedLabel(value: boolean): string { return value ? 'USED' : 'NOT USED' }
+function invokedLabel(value: boolean): string { return value ? 'INVOKED' : 'NOT INVOKED' }
+
+/** Full, stable execution-provenance report. Retrieved and cited counts are kept separate:
+ * retrieval means evidence entered the reasoner context; USED means the answer actually cited it.
  */
 export function formatAuthoritativeProvenance(
   provenance: ReturnType<typeof authoritativeProvenance>,
   language: string,
 ): string {
   const recorded = provenance as any
-  const usedList: string[] = []
+  const kg = provenance.knowledge_graph as { used:boolean; evidence_count:number; retrieved_count?:number }
+  const em = provenance.enterprise_memory as { used:boolean; evidence_count:number; retrieved_count?:number }
+  const lc = provenance.learned_corpus as { used:boolean; evidence_count:number; retrieved_count?:number }
+  const um = provenance.user_memory as { used:boolean; evidence_count:number; retrieved_count?:number }
+  const lines = [
+    'This is the real, recorded provenance for the immediately preceding answer. It is server execution telemetry, not a model-generated reconstruction.',
+    '',
+    'Provenance',
+    '──────────',
+  ]
+
   if (recorded.deterministic_utility?.used) {
     const utility = String(recorded.deterministic_utility.utility || 'server utility')
-    const timezone = recorded.deterministic_utility.timezone ? `, ${recorded.deterministic_utility.timezone}` : ''
-    usedList.push(`deterministic server utility (${utility}${timezone})`)
+    const timezone = recorded.deterministic_utility.timezone ? `; timezone ${recorded.deterministic_utility.timezone}` : ''
+    lines.push(`Deterministic Utility : USED — ${utility}${timezone}`)
   }
-  if (provenance.semantic_cache.used) usedList.push('semantic cache')
-  const kg = provenance.knowledge_graph as { used: boolean; evidence_count: number; retrieved_count?: number }
-  const lc = provenance.learned_corpus as { used: boolean; evidence_count: number; retrieved_count?: number }
-  const um = provenance.user_memory as { used: boolean; evidence_count: number; retrieved_count?: number }
-  if (kg.used) usedList.push(`knowledge graph (${kg.evidence_count} of ${kg.retrieved_count ?? kg.evidence_count} retrieved facts cited)`)
-  if (lc.used) usedList.push(`learned corpus (${lc.evidence_count} of ${lc.retrieved_count ?? lc.evidence_count} retrieved items cited)`)
-  if (um.used) usedList.push(`your saved memory (${um.evidence_count} cited)`)
-  if (provenance.local_reasoning.invoked) usedList.push(`COS's own reasoner${provenance.local_reasoning.model ? ` (${provenance.local_reasoning.model})` : ''}`)
-  if (provenance.external_ai.invoked) usedList.push(`external AI${provenance.external_ai.provider ? ` (${provenance.external_ai.provider}${provenance.external_ai.model ? `, ${provenance.external_ai.model}` : ''})` : ''}`)
 
-  const usedText = usedList.length ? usedList.join(', ') : 'no COS internal systems — nothing was retrieved or invoked'
-  const confidenceText = provenance.local_reasoning.confidence != null
-    ? ` COS's own confidence was ${Number(provenance.local_reasoning.confidence).toFixed(2)} against a threshold of ${provenance.local_reasoning.threshold.toFixed(2)}.`
-    : ''
+  lines.push(
+    `Semantic Cache        : ${usedLabel(provenance.semantic_cache.used)} — ${provenance.semantic_cache.evidence_count} cached result${provenance.semantic_cache.evidence_count === 1 ? '' : 's'} contributed.`,
+    `Enterprise Memory     : ${usedLabel(em.used)} — ${em.evidence_count} cited of ${em.retrieved_count ?? em.evidence_count} retrieved retained fact${(em.retrieved_count ?? em.evidence_count) === 1 ? '' : 's'}.`,
+    `Knowledge Graph       : ${usedLabel(kg.used)} — ${kg.evidence_count} cited of ${kg.retrieved_count ?? kg.evidence_count} retrieved graph-backed fact${(kg.retrieved_count ?? kg.evidence_count) === 1 ? '' : 's'}.`,
+    `Learned Corpus        : ${usedLabel(lc.used)} — ${lc.evidence_count} cited of ${lc.retrieved_count ?? lc.evidence_count} retrieved learned item${(lc.retrieved_count ?? lc.evidence_count) === 1 ? '' : 's'}.`,
+    `User Memory           : ${usedLabel(um.used)} — ${um.evidence_count} cited of ${um.retrieved_count ?? um.evidence_count} retrieved saved memor${(um.retrieved_count ?? um.evidence_count) === 1 ? 'y' : 'ies'}.`,
+    `Autonomous Research   : ${usedLabel(provenance.autonomous_research.used)} — ${provenance.autonomous_research.documents_acquired} documents acquired; ${provenance.autonomous_research.new_knowledge_retained} new knowledge items retained during this request.`,
+    `Local Reasoning Engine: ${invokedLabel(provenance.local_reasoning.invoked)}${provenance.local_reasoning.model ? ` — ${provenance.local_reasoning.model}` : ''}.`,
+    `External AI Provider  : ${invokedLabel(provenance.external_ai.invoked)}${provenance.external_ai.invoked ? ` — provider ${provenance.external_ai.provider || 'unknown'}${provenance.external_ai.model ? `; model ${provenance.external_ai.model}` : ''}` : ' — no OpenAI, Anthropic, Gemini, or other external model contributed to the recorded answer.'}`,
+  )
 
-  const templates: Record<string, string> = {
-    en: `This is the real, recorded provenance for that answer — not a description generated after the fact: ${usedText}.${confidenceText}`,
-    es: `Esta es la procedencia real y registrada de esa respuesta, no una descripción generada después de los hechos: ${usedText}.${confidenceText}`,
-    pt: `Esta é a proveniência real e registrada dessa resposta — não uma descrição gerada depois do fato: ${usedText}.${confidenceText}`,
-    pl: `To jest prawdziwa, zarejestrowana proweniencja tej odpowiedzi — nie opis wygenerowany po fakcie: ${usedText}.${confidenceText}`,
-    ru: `Это реальное, зафиксированное происхождение этого ответа — не описание, придуманное постфактум: ${usedText}.${confidenceText}`,
+  if (provenance.local_reasoning.confidence != null) {
+    lines.push(`COS Confidence        : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${provenance.local_reasoning.threshold.toFixed(2)}.`)
   }
-  return templates[language] || templates.en
+  if (language !== 'en') lines.push('', 'Note: provenance labels remain explicit and stable; the recorded values above are language-independent telemetry.')
+  return lines.join('\n')
 }
 
 export function escalationReason(

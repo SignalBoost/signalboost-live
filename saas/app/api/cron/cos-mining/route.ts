@@ -9,7 +9,7 @@ import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-i
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET

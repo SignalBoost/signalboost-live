@@ -9,6 +9,7 @@ import type {
   PortableConnectorExecutionResult,
 } from '../../../provider-hub-core/index.ts'
 import type { CosConnectorRecipe } from '../../ai/cos/connectorDelegation.ts'
+import type { CosRecipeConfidenceRecord } from '../../ai/cos/recipeConfidence.ts'
 
 export interface SecretsProvider {
   getSecret(name: string): Promise<string | undefined>
@@ -60,10 +61,14 @@ export interface PortableConnectorRuntimePort {
   }): Promise<PortableConnectorExecutionResult>
 }
 
-/** Buyer-owned durable operational memory. The host decides whether this is SQL, KV, object storage, etc. */
 export interface PortableRecipeMemoryPort {
   get(key: string): Promise<CosConnectorRecipe | undefined>
   set(key: string, recipe: CosConnectorRecipe): Promise<void>
+}
+
+export interface PortableRecipeConfidencePort {
+  get(key: string): Promise<CosRecipeConfidenceRecord | undefined>
+  set(key: string, record: CosRecipeConfidenceRecord): Promise<void>
 }
 
 export interface HostContext {
@@ -72,8 +77,9 @@ export interface HostContext {
   approvers: ApproverDirectory
   branding: HostBranding
   connectors?: PortableConnectorRuntimePort
-  /** Optional durable memory for learned successful connector recipes. */
   recipeMemory?: PortableRecipeMemoryPort
+  /** Optional buyer-hosted quality history for learned connector recipes. */
+  recipeConfidence?: PortableRecipeConfidencePort
 }
 
 export function buildConsoleUrl(branding: HostBranding, path: string): string | undefined {

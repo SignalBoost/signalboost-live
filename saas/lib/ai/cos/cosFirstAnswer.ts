@@ -4,13 +4,18 @@ import { loadUserMemories } from '@/lib/ai/tools/userMemory'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
+import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
+import { SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
+import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
   | { handled: false; confidence: number; reason: string; provenance: COSProvenance }
 
 export type COSProvenance = {
-  responseSource: 'semantic_cache' | 'local_cos_reasoning' | 'external_fallback_required'
+  responseSource: 'semantic_cache' | 'semantic_similarity' | 'local_cos_reasoning' | 'external_fallback_required'
+  /** Present only when responseSource is 'semantic_similarity' — the cosine similarity score of the match, 0-1. */
+  similarityScore?: number
   externalAiInvoked: false
   localModelInvoked: boolean
   reasonerLabel: string | null
@@ -28,6 +33,34 @@ type CachedCosAnswer = { reply:string; confidence:number; reasonerLabel:string|n
 function threshold(): number {
   const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
   return Number.isFinite(value) ? Math.max(0.5, Math.min(0.98, value)) : 0.72
+}
+
+// A paraphrase match must be genuinely close, not merely topically related — 0.93
+// is deliberately conservative for a first deployment of a system that has never
+// been measured. Wrong on the strict side costs one extra reasoner call; wrong on
+// the loose side means COS could answer a DIFFERENT question with a cached reply.
+function semanticThreshold(): number {
+  const value = Number(process.env.COS_SEMANTIC_SIMILARITY_THRESHOLD || '0.93')
+  return Number.isFinite(value) ? Math.max(0.80, Math.min(0.999, value)) : 0.93
+}
+
+// Constructed once per module load, not per request — matches how cosServiceDb()
+// and the exact-cache store are already used elsewhere in this file. Returns null
+// wherever cosServiceDb() would (no Supabase service role configured), same as the
+// exact-cache path; the semantic layer is then simply skipped, never a hard failure.
+let knowledgeLayer: KnowledgeLayer | null | undefined
+function semanticKnowledgeLayer(): KnowledgeLayer | null {
+  if (knowledgeLayer !== undefined) return knowledgeLayer
+  const db = cosServiceDb()
+  knowledgeLayer = db
+    ? new KnowledgeLayer({
+        generateEmbedding: generateLocalEmbedding,
+        store: new SupabaseKnowledgeStore(db),
+        similarityThreshold: semanticThreshold(),
+        onError: (error) => console.error('cosFirstAnswer: semantic cache error', error),
+      })
+    : null
+  return knowledgeLayer
 }
 
 function queryTerms(prompt: string): string[] {
@@ -88,6 +121,18 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // Internal COS knowledge is always consulted before deciding whether a reasoner or external fallback is required.
   const context=await retrieveInternalContext(input.prompt,input.userId)
   const base={ externalAiInvoked:false as const, localModelInvoked:false, reasonerLabel:null as string|null, internalSystemsConsulted:context.systems, knowledgeFactsUsed:context.facts.length, learnedItemsUsed:context.learned.length, userMemoriesUsed:context.memories.length }
+  const contextWindow=[...context.facts,...context.learned].join('\n')
+  const knowledge=semanticKnowledgeLayer()
+  if(knowledge){
+    const nearest=await knowledge.lookupSemanticCache('cos-first-answer',input.prompt,contextWindow)
+    if(nearest){
+      const payload=nearest.responsePayload as CachedCosAnswer|null
+      if(payload?.reply&&payload.confidence>=threshold()){
+        return {handled:true,reply:payload.reply,confidence:payload.confidence,provenance:{responseSource:'semantic_similarity',...base,reasonerLabel:payload.reasonerLabel,similarityScore:nearest.similarityScore}}
+      }
+    }
+  }
+
   const cacheKey=createExactCacheKey({taskId:'cos-first-answer',prompt:input.prompt,contextFingerprint:contextFingerprint(context),policyVersion:`threshold:${threshold().toFixed(2)}`,knowledgeVersion:null})
   const cached=await readCachedAnswer(cacheKey)
   if(cached&&cached.reply&&cached.confidence>=threshold()){
@@ -113,12 +158,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const ceiling=evidenceCount>=5?.96:evidenceCount>=2?.90:evidenceCount===1?.84:.78; const confidence=Math.min(parsed.confidence,ceiling)
   if(confidence<threshold()){const reason=`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`;void recordKnowledgeGap(input.prompt,confidence,reason);return{handled:false,confidence,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
   void writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel})
+  if(knowledge){void knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer)}
   void resolveKnowledgeGap(input.prompt); return{handled:true,reply:parsed.answer,confidence,provenance:{responseSource:'local_cos_reasoning',...provenance}}
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult,language='en'):string{
   const p=result.provenance,evidence=`${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.userMemoriesUsed} memories`
-  const source=p.responseSource==='semantic_cache'?'semantic cache':p.reasonerLabel
+  const source=p.responseSource==='semantic_cache'?'exact-match cache':p.responseSource==='semantic_similarity'?`semantic match, similarity ${(p.similarityScore??0).toFixed(2)}`:p.reasonerLabel
   if(language==='pt') return result.handled?`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → respondeu via ${source} com confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.`:`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
   if(language==='es') return result.handled?`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → respondió vía ${source} con confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.`:`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`
   return result.handled?`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → answered via ${source} at confidence ${result.confidence.toFixed(2)}. No external AI was called.`:`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → did not reach sufficient confidence → external AI is the last resort.`

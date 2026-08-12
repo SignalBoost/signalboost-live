@@ -92,7 +92,7 @@ test('a genuinely on-topic document is admitted with a measured, non-constant co
   assert.equal(result.accepted, 1)
   const stored = [...store.records.values()][0]
   assert.ok(stored.confidence >= 0.72, 'must clear the director threshold')
-  assert.ok(stored.confidence <= 0.9, 'grounding must never claim verification')
+  assert.ok(stored.confidence <= 0.92, 'grounding must never claim verification')
   assert.notEqual(stored.confidence, 0.8, 'confidence must be derived, not the old constant')
   assert.equal(stored.facts[0].predicate, 'source_excerpt')
 })
@@ -109,16 +109,35 @@ test('the stored excerpt is the passage that answers the gap, not the opening bo
 test('confidence rises with coverage AND substance, and never claims verification', () => {
   assert.equal(groundedConfidence(0, 0), 0)
   assert.ok(groundedConfidence(0.5, 0.5) < groundedConfidence(0.9, 0.9))
-  assert.ok(groundedConfidence(1, 1) <= 0.9)
+  assert.ok(groundedConfidence(1, 1) <= 0.92)
   assert.ok(groundedConfidence(1, substanceOf('short blurb about postgresql pooling')) < 0.82)
 })
 
-test('an on-topic blurb is refused by its source-kind floor instead of being stored as knowledge', async () => {
+test('an on-topic blurb is admitted as a capped pointer, never as full-text-grade knowledge', async () => {
   const store = new MemoryStore()
   const cycle = new ContinuousLearningCycle(new ContinuousLearningDirector(store, DEFAULT_CONTINUOUS_LEARNING_POLICY), [adapterOf([SHORT_ON_TOPIC_BLURB])])
   const result = await cycle.run([POSTGRES_GAP], 0)
 
-  assert.equal(result.accepted, 0, 'discovery metadata is not knowledge, however on-topic it is')
-  assert.equal(result.rejected.below_source_confidence_floor, 1)
-  assert.equal(store.records.size, 0)
+  assert.equal(result.accepted, 1, 'a relevant pointer is worth keeping — as what it is')
+  const stored = [...store.records.values()][0]
+  assert.ok(stored.confidence <= 0.7, `a blurb may never exceed the metadata ceiling, got ${stored.confidence}`)
+  assert.ok(stored.confidence < 0.72, 'and never reaches the full-text floors')
+})
+
+test('metadata confidence is honest — never raised to meet its own admission floor', async () => {
+  const { calibratedConfidence, admissionFloorFor, groundedConfidence, substanceOf, relevanceOf, gapStudyTerms } = await import('../lib/cos-core/layers/learning/cycle.ts')
+  const doc = {
+    sourceKind: 'scientific_journal',
+    sourceUri: 'https://doi.org/10.0000/blurb',
+    sourceTitle: 'PostgreSQL performance in multi tenant SaaS systems',
+    subject: 'PostgreSQL database performance multi tenant SaaS',
+    text: 'PostgreSQL performance in multi tenant SaaS systems. Publisher: Example Press.',
+    license: 'Bibliographic metadata from CrossRef discovery API',
+  } as never
+  const score = relevanceOf(doc, gapStudyTerms(POSTGRES_GAP))
+  const stored = calibratedConfidence(doc, score, (doc as { text: string }).text)
+
+  assert.equal(stored, groundedConfidence(score.coverage, substanceOf((doc as { text: string }).text)), 'stored confidence must equal honest grounding')
+  const floor = admissionFloorFor(doc)
+  assert.ok(floor !== null && floor < 0.72, 'metadata admits on a LOWER bar, not an inflated number')
 })

@@ -58,6 +58,7 @@ export type {
   HostBranding,
   PortableConnectorRuntimePort,
   PortableRecipeMemoryPort,
+  PortableRecipeConfidencePort,
 } from './host-context.ts'
 export { buildConsoleUrl } from './host-context.ts'
 export { createEnterpriseNotifier } from './enterprise-notifier.ts'
@@ -73,6 +74,11 @@ export {
   type RecipeMemorySqlClient,
   type SqlRecipeMemoryOptions,
 } from './sql-recipe-memory.ts'
+export {
+  SqlRecipeConfidenceMemory,
+  createSqlRecipeConfidenceMemory,
+  type SqlRecipeConfidenceOptions,
+} from './sql-recipe-confidence.ts'
 export {
   createSiemAuditSink,
   teeAuditSinks,

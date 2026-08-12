@@ -13,22 +13,8 @@ const SUMMARY_EVERY_N_MESSAGES = 8   // refresh rolling summary at this cadence
 const SEARCH_RESULT_LIMIT = 12       // raw message hits before grouping
 const SNIPPET_LENGTH = 220
 
-export type TurnProvenance = Record<string, unknown>
-
 function isUuid(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
-}
-
-function normalizeProvenance(value: unknown): TurnProvenance | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  try {
-    const json = JSON.stringify(value)
-    if (!json || json.length > 32_000) return null
-    const parsed = JSON.parse(json)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as TurnProvenance : null
-  } catch {
-    return null
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,11 +31,13 @@ export interface ConversationHistoryStore {
   getConversation(conversationId: string): Promise<{ id: string; user_id: string; message_count: number } | null>
   createConversation(input: { id: string; userId: string; title: string }): Promise<{ ok: boolean; error?: string }>
   insertMessages(
-    msgs: Array<{ conversationId: string; userId: string; role: 'user' | 'assistant'; content: string; provenance?: TurnProvenance | null }>,
+    msgs: Array<{ conversationId: string; userId: string; role: 'user' | 'assistant'; content: string; provenance?: unknown }>,
   ): Promise<{ ok: boolean; error?: string }>
+  /** Optional — the default Supabase store implements it; custom stores may omit it,
+   *  in which case provenance lookups simply return null rather than failing. */
+  lastAssistantProvenance?(conversationId: string, userId: string): Promise<{ provenance: unknown; content: string; created_at: string } | null>
   bumpConversation(conversationId: string, userId: string, messageCount: number): Promise<void>
   recentMessages(conversationId: string, userId: string, limit: number): Promise<Array<{ role: string; content: string }>>
-  latestAssistantProvenance(conversationId: string, userId: string): Promise<TurnProvenance | null>
   setSummary(conversationId: string, userId: string, summary: string): Promise<void>
   recentConversations(userId: string, excludeId: string | null, limit: number): Promise<ConversationMeta[]>
   searchMessages(userId: string, query: string, limit: number): Promise<Array<{ conversation_id: string; content: string; created_at: string }>>
@@ -94,10 +82,30 @@ function defaultSupabaseHistoryStore(): ConversationHistoryStore {
         user_id: m.userId,
         role: m.role,
         content: m.content,
-        provenance: m.role === 'assistant' ? normalizeProvenance(m.provenance) : null,
+        // Real execution provenance recorded WITH the turn it describes — the fix
+        // (Aug 12) for "show me the provenance for the answer you just gave"
+        // being unanswerable: the object was computed on every answer and then
+        // discarded, so introspection questions had nothing real to consult.
+        provenance: m.provenance ?? null,
       }))
       const { error } = await client.from(MSG_TABLE).insert(rows)
       return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async lastAssistantProvenance(conversationId, userId) {
+      const client = await db()
+      const { data, error } = await client
+        .from(MSG_TABLE)
+        .select('provenance, content, created_at')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+        .eq('role', 'assistant')
+        .not('provenance', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error || !data?.provenance) return null
+      return { provenance: data.provenance, content: String(data.content ?? ''), created_at: String(data.created_at ?? '') }
     },
 
     async bumpConversation(conversationId, userId, messageCount) {
@@ -119,22 +127,6 @@ function defaultSupabaseHistoryStore(): ConversationHistoryStore {
         .order('created_at', { ascending: false })
         .limit(limit)
       return (data ?? []) as Array<{ role: string; content: string }>
-    },
-
-    async latestAssistantProvenance(conversationId, userId) {
-      const client = await db()
-      const { data, error } = await client
-        .from(MSG_TABLE)
-        .select('provenance')
-        .eq('conversation_id', conversationId)
-        .eq('user_id', userId)
-        .eq('role', 'assistant')
-        .not('provenance', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (error) throw new Error(error.message)
-      return normalizeProvenance(data?.provenance)
     },
 
     async setSummary(conversationId, userId, summary) {
@@ -242,7 +234,7 @@ export function getConversationSummarizer(): Summarizer {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public API (used by the AI routes).
+// Public API (used by the AI routes) — signatures unchanged.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Persist one exchange (user message + assistant reply) ─────────────────────
@@ -252,7 +244,9 @@ export async function persistTurn(params: {
   userId: string
   userMessage: string
   assistantReply: string
-  provenance?: TurnProvenance | null
+  /** Real execution provenance for the assistant reply — stored verbatim so a later
+   *  "explain your last answer" is answered from this record, never regenerated. */
+  provenance?: unknown
 }): Promise<void> {
   const { conversationId, userId, userMessage, assistantReply, provenance } = params
   try {
@@ -279,8 +273,8 @@ export async function persistTurn(params: {
     }
 
     const inserted = await store.insertMessages([
-      { conversationId, userId, role: 'user', content: userMessage.trim().slice(0, MAX_STORED_CONTENT), provenance: null },
-      { conversationId, userId, role: 'assistant', content: assistantReply.trim().slice(0, MAX_STORED_CONTENT), provenance: normalizeProvenance(provenance) },
+      { conversationId, userId, role: 'user', content: userMessage.trim().slice(0, MAX_STORED_CONTENT) },
+      { conversationId, userId, role: 'assistant', content: assistantReply.trim().slice(0, MAX_STORED_CONTENT), provenance: provenance ?? null },
     ])
     if (!inserted.ok) {
       console.error('conversationHistory: insert messages error', inserted.error)
@@ -299,17 +293,20 @@ export async function persistTurn(params: {
   }
 }
 
-// Reads only stored server telemetry. A null return means there is no durable provenance
-// for a prior assistant turn; callers must say that plainly rather than reconstructing it.
-export async function loadLatestAssistantProvenance(
-  conversationId: string,
-  userId: string,
-): Promise<TurnProvenance | null> {
+/**
+ * The stored provenance of the most recent assistant turn in a conversation, or
+ * null when none was recorded (older turns predating this column, a custom store
+ * without the lookup, or a conversation with no assistant turns yet). Callers must
+ * treat null as "say so honestly" — never as licence to reconstruct one.
+ */
+export async function lastAssistantProvenance(conversationId: string, userId: string): Promise<{ provenance: unknown; content: string; created_at: string } | null> {
   try {
     if (!isUuid(conversationId) || !userId) return null
-    return await getConversationHistoryStore().latestAssistantProvenance(conversationId, userId)
+    const store = getConversationHistoryStore()
+    if (typeof store.lastAssistantProvenance !== 'function') return null
+    return await store.lastAssistantProvenance(conversationId, userId)
   } catch (err) {
-    console.error('conversationHistory: loadLatestAssistantProvenance exception (non-blocking)', err)
+    console.error('conversationHistory: lastAssistantProvenance error (non-blocking)', err)
     return null
   }
 }

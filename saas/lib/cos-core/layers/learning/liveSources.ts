@@ -15,7 +15,7 @@ function transcriptLanguages(value?:string):string[]{const parsed=String(value||
 export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.env):ContinuousLearningSourceAdapter[]{
   if(env.COS_LIVE_SOURCES_ENABLED==='false')return[]
   const configuredTechFeeds=parseFeedList(env.COS_TECH_RSS_FEEDS);const configuredOfficialFeeds=parseFeedList(env.COS_OFFICIAL_DOC_FEEDS);const officialFeeds=[...BUILTIN_OFFICIAL_TECH_FEEDS,...configuredOfficialFeeds]
-  const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,2,'crossref'),scientificLearningConnector(openAlexScientificSearch,2,'openalex'),scientificLearningConnector(europePmcScientificSearch,2,'europe_pmc'),libraryLearningConnector(openLibrarySearch,2,'open_library'),newsLearningConnector(createGdeltNewsSearch(),2,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds),3,'official_docs')]
+  const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,2,'crossref'),scientificLearningConnector(openAlexScientificSearch,2,'openalex'),scientificLearningConnector(europePmcScientificSearch,2,'europe_pmc'),libraryLearningConnector(openLibrarySearch,2,'open_library'),newsLearningConnector(createGdeltNewsSearch(),2,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),3,'official_docs')]
   if(configuredTechFeeds.length)adapters.push(newsLearningConnector(createFeedSearch(configuredTechFeeds),3,'tech_feeds'))
   if(env.YOUTUBE_API_KEY){
     // Metadata learning always works with the existing Data API key. If an authorized

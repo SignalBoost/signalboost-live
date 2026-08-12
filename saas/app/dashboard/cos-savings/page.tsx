@@ -5,23 +5,43 @@ import {useTranslation} from '@/lib/i18n/useTranslation'
 import {COS_SAVINGS_COPY,type CosSavingsLanguage} from '@/lib/i18n/cosSavingsCopy'
 type BySource=Record<string,{count?:number;avoidedUsd?:number}>
 type Independence={ok?:boolean;proofComplete?:boolean;provider?:{total?:number;local?:number;cloud?:number;localRate?:number;fallbackRate?:number};roi?:{tasks?:number;providerCalls?:number;avoidedUsd?:number;bySource?:BySource};error?:string}
+type PodInfo={id:string;name:string;running:boolean;desiredStatus:string;costPerHr:number|null;uptimeSeconds:number}
+type RunpodStatus={ok?:boolean;configured?:boolean;pod?:PodInfo;estimatedSessionCostUsd?:number;idleMinutes?:number|null;autoStopEnabled?:boolean;autoStopIdleThresholdMinutes?:number;error?:string}
 async function readResponse(response:Response):Promise<any>{const text=await response.text();if(!text)return{};try{return JSON.parse(text)}catch{return{error:`${response.status} ${response.statusText}: ${text.slice(0,500)}`}}}
 export default function CosSavingsPage(){
   const{lang}=useTranslation()
   const copy=COS_SAVINGS_COPY[(lang in COS_SAVINGS_COPY?lang:'en')as CosSavingsLanguage]
   const[data,setData]=useState<Independence|null>(null)
+  const[pod,setPod]=useState<RunpodStatus|null>(null)
   const[busy,setBusy]=useState(false)
+  const[stopping,setStopping]=useState(false)
   const[error,setError]=useState('')
 
   async function load(){
     setBusy(true);setError('')
     try{
-      const response=await fetch('/api/admin/cos-independence',{cache:'no-store'})
-      const body=await readResponse(response)
-      setData(body)
-      if(!response.ok)setError(body?.error||copy.requestFailed)
+      const [independenceRes,podRes]=await Promise.all([
+        fetch('/api/admin/cos-independence',{cache:'no-store'}),
+        fetch('/api/admin/cos-runpod',{cache:'no-store'}),
+      ])
+      const independenceBody=await readResponse(independenceRes)
+      const podBody=await readResponse(podRes)
+      setData(independenceBody)
+      setPod(podBody)
+      if(!independenceRes.ok)setError(independenceBody?.error||copy.requestFailed)
     }catch(e){setError(e instanceof Error?e.message:copy.requestFailed)}
     finally{setBusy(false)}
+  }
+  async function stopPodNow(){
+    if(!window.confirm(copy.podStopConfirm))return
+    setStopping(true)
+    try{
+      const response=await fetch('/api/admin/cos-runpod',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'stop'})})
+      const body=await readResponse(response)
+      if(!response.ok)setError(body?.error||copy.requestFailed)
+      await load()
+    }catch(e){setError(e instanceof Error?e.message:copy.requestFailed)}
+    finally{setStopping(false)}
   }
   useEffect(()=>{void load()},[])
 
@@ -73,6 +93,28 @@ export default function CosSavingsPage(){
           </div>
           :<p className="mt-2 text-sm text-text-muted">{copy.noData}</p>}
         <p className="mt-4 text-xs text-text-muted">{copy.estimateNote}</p>
+      </section>
+
+      <section className="rounded-md border border-border bg-surface p-4">
+        <h2 className="text-sm font-semibold">{copy.podTitle}</h2>
+        {!pod?.configured
+          ?<p className="mt-2 text-sm text-text-muted">{copy.podNotConfigured}</p>
+          :pod.error
+            ?<p className="mt-2 text-sm text-danger">{pod.error}</p>
+            :pod.pod
+              ?<div className="mt-3 space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Card label={pod.pod.running?copy.podRunning:copy.podStopped} value={pod.pod.running?'●':'○'}/>
+                  <Card label={copy.podUptime} value={`${Math.floor(pod.pod.uptimeSeconds/3600)}h ${Math.floor((pod.pod.uptimeSeconds%3600)/60)}m`}/>
+                  <Card label={copy.podSessionCost} value={`$${Number(pod.estimatedSessionCostUsd??0).toFixed(2)}`}/>
+                </div>
+                <p className="text-xs text-text-muted">
+                  {pod.idleMinutes!=null?`${copy.podIdle} ${pod.idleMinutes}m. `:''}
+                  {pod.autoStopEnabled?`${copy.podAutoStopOn} (${pod.autoStopIdleThresholdMinutes}m).`:copy.podAutoStopOff}
+                </p>
+                {pod.pod.running&&<button onClick={stopPodNow} disabled={stopping} className="rounded-md border border-danger/40 bg-surface px-4 py-2 text-sm font-semibold text-danger disabled:opacity-50">{stopping?copy.podStopping:copy.podStop}</button>}
+              </div>
+              :<p className="mt-2 text-sm text-text-muted">{copy.podNotConfigured}</p>}
       </section>
     </div>
   </div>

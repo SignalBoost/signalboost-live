@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildCosLiveTelemetry } from '../lib/ai/cos/cosLiveTelemetry'
+import { buildCosLiveTelemetry } from '../lib/ai/cos/cosLiveTelemetry.ts'
 
 test('semantic reuse records avoided local/external calls and estimated savings', () => {
   const observation = buildCosLiveTelemetry({

@@ -35,9 +35,10 @@ export function extractBalancedJsonObject(text:string):string|null{
  * discards ALL of it and the user gets nothing. That is a worse outcome than an incomplete answer
  * clearly labelled as incomplete, so the text written before the cut is salvaged.
  *
- * Salvage is deliberately conservative: it fires only when a truncated `"answer"` string is present
- * and long enough to be useful, and the caller must treat the result as unfinished rather than
- * passing it off as a whole answer.
+ * Called ONLY after strict parsing has already failed, so it is permissive about where the cut
+ * landed: inside the answer string, or after it closed but before the object did. Both happen, and
+ * the second one used to fall through to "unparseable" and return the user nothing at all. The
+ * caller must treat the result as unfinished rather than passing it off as a whole answer.
  */
 export function salvageTruncatedAnswer(raw:string,minimumCharacters=200):string|null{
   const key=raw.indexOf('"answer"')
@@ -46,16 +47,14 @@ export function salvageTruncatedAnswer(raw:string,minimumCharacters=200):string|
   if(colon===-1)return null
   const open=raw.indexOf('"',colon+1)
   if(open===-1)return null
-  let out='',escaped=false,closed=false
+  let out='',escaped=false
   for(let i=open+1;i<raw.length;i++){
     const ch=raw[i]
     if(escaped){out+=ch==='n'?'\n':ch==='t'?'\t':ch;escaped=false;continue}
     if(ch==='\\'){escaped=true;continue}
-    if(ch==='"'){closed=true;break}
+    if(ch==='"')break
     out+=ch
   }
-  // A properly closed string is not a truncation — the normal parser owns that case.
-  if(closed)return null
   const salvaged=out.trim()
   return salvaged.length>=minimumCharacters?salvaged:null
 }

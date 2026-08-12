@@ -15,13 +15,16 @@ export async function GET() {
   const db = cosServiceDb()
   let learning = measureLearningQuality([])
   let provider = { total: 0, local: 0, cloud: 0, localRate: 0, fallbackRate: 0 }
-  let roi = { tasks: 0, providerCalls: 0, avoidedUsd: 0 }
+  let roi: { tasks: number; providerCalls: number; avoidedUsd: number; bySource: Record<string, { count: number; avoidedUsd: number }> } = { tasks: 0, providerCalls: 0, avoidedUsd: 0, bySource: {} }
 
   if (db) {
     const [{ data: learningRows }, { data: taskRows }, { data: roiRows }] = await Promise.all([
       db.from('cos_learning_observations').select('strategy,succeeded,latency_ms,external_cost_usd,created_at').order('created_at', { ascending: true }).limit(500),
       db.from('ai_task_log').select('provider,fallback_used').order('created_at', { ascending: false }).limit(1000),
-      db.from('cos_ai_roi_metrics').select('provider_calls,estimated_cost_avoided_usd').order('created_at', { ascending: false }).limit(1000),
+      // 'source' added Aug 12 so the dashboard can show WHY each call was avoided —
+      // reused from a paraphrase (semantic_similarity), reused verbatim (exact_cache),
+      // or answered fresh by COS's own reasoner (local_reasoner) with no cloud call.
+      db.from('cos_ai_roi_metrics').select('source,provider_calls,estimated_cost_avoided_usd').order('created_at', { ascending: false }).limit(1000),
     ])
 
     learning = measureLearningQuality((learningRows ?? []).map((row: any) => ({
@@ -39,10 +42,19 @@ export async function GET() {
     }
 
     const metrics = roiRows ?? []
+    const bySource: Record<string, { count: number; avoidedUsd: number }> = {}
+    for (const row of metrics as any[]) {
+      const key = String(row.source ?? 'unknown')
+      const entry = bySource[key] ?? { count: 0, avoidedUsd: 0 }
+      entry.count += 1
+      entry.avoidedUsd += Number(row.estimated_cost_avoided_usd ?? 0)
+      bySource[key] = entry
+    }
     roi = {
       tasks: metrics.length,
       providerCalls: metrics.reduce((sum: number, row: any) => sum + Number(row.provider_calls ?? 0), 0),
       avoidedUsd: metrics.reduce((sum: number, row: any) => sum + Number(row.estimated_cost_avoided_usd ?? 0), 0),
+      bySource,
     }
   }
 

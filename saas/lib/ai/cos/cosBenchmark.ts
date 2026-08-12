@@ -10,6 +10,19 @@ export type CosBenchmarkCategory =
   | 'provenance'
   | 'isolation'
 
+export const REQUIRED_COS_BENCHMARK_CATEGORIES: readonly CosBenchmarkCategory[] = [
+  'utility',
+  'routing',
+  'technical_reasoning',
+  'business_reasoning',
+  'enterprise_memory',
+  'knowledge_graph',
+  'continuous_learning',
+  'cache_reuse',
+  'provenance',
+  'isolation',
+]
+
 export interface CosBenchmarkObservation {
   id: string
   category: CosBenchmarkCategory
@@ -34,6 +47,7 @@ export interface CosBenchmarkSummary {
   passed: number
   failed: number
   passRate: number
+  requiredCategoriesPass: boolean
   isolationPass: boolean
   cacheReusePass: boolean
   internalKnowledgeContributionPass: boolean
@@ -49,8 +63,21 @@ export function summarizeCosBenchmark(
   const categoryPasses = (category: CosBenchmarkCategory) =>
     hasCategory(category) && observations.filter(item => item.category === category).every(item => item.passed)
 
+  const requiredCategoriesPass = REQUIRED_COS_BENCHMARK_CATEGORIES.every(category => categoryPasses(category))
+  const evidenceCountForCategory = (category: CosBenchmarkCategory) => observations
+    .filter(item => item.category === category)
+    .reduce((total, item) => total + (
+      category === 'enterprise_memory'
+        ? item.userMemoriesUsed
+        : category === 'knowledge_graph'
+          ? item.knowledgeFactsUsed
+          : item.learnedItemsUsed
+    ), 0)
+
   const internalCategories: CosBenchmarkCategory[] = ['enterprise_memory', 'knowledge_graph', 'continuous_learning']
-  const internalKnowledgeContributionPass = internalCategories.every(category => categoryPasses(category))
+  const internalKnowledgeContributionPass = internalCategories.every(category =>
+    categoryPasses(category) && evidenceCountForCategory(category) > 0,
+  )
 
   return {
     schemaVersion: 1,
@@ -59,6 +86,7 @@ export function summarizeCosBenchmark(
     passed,
     failed: observations.length - passed,
     passRate: observations.length ? passed / observations.length : 0,
+    requiredCategoriesPass,
     isolationPass: categoryPasses('isolation') && observations
       .filter(item => item.category === 'isolation')
       .every(item => item.externalAiInvoked === false),
@@ -72,6 +100,7 @@ export function summarizeCosBenchmark(
 
 export function benchmarkExitCode(summary: CosBenchmarkSummary): 0 | 1 {
   return summary.failed === 0
+    && summary.requiredCategoriesPass
     && summary.isolationPass
     && summary.cacheReusePass
     && summary.internalKnowledgeContributionPass

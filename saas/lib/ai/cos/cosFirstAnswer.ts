@@ -344,9 +344,19 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // never got to finish. Both stores swallow their own errors, so awaiting cannot fail the answer;
   // it costs a moment of latency on confident answers and is the difference between a cache that
   // exists and one that is merely wired.
-  await Promise.allSettled([
-    writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel}),
-    knowledge?knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer):Promise.resolve(),
+  // Awaited but BOUNDED. Awaiting alone traded one failure for another: when the embedding
+  // endpoint is slow to fail (model not pulled, pod mid-start), commitToMemory holds the request
+  // for up to the full LOCAL_AI timeout, and the page's 290s deadline dies for a cache write the
+  // user never asked for. The answer is already in hand at this point — the cache gets a few
+  // seconds to persist it and no more; a write that cannot finish in that window is logged and
+  // dropped, never allowed to cost the user the answer.
+  const cacheWriteBudgetMs=Number(process.env.COS_CACHE_WRITE_BUDGET_MS??'8000')
+  await Promise.race([
+    Promise.allSettled([
+      writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel}),
+      knowledge?knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer):Promise.resolve(),
+    ]),
+    new Promise<void>(resolve=>setTimeout(()=>{console.warn('cosFirstAnswer: cache write exceeded its budget and was abandoned',{budgetMs:cacheWriteBudgetMs});resolve()},cacheWriteBudgetMs)),
   ])
   // NOT recorded as "avoided" in the ROI-estimate sense the cache hits above are: this
   // is COS's OWN independent reasoner actually running (real RunPod compute, real

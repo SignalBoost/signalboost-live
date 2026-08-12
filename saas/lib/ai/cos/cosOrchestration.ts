@@ -104,13 +104,21 @@ export function authoritativeProvenance(
  * A short, honest sentence version of authoritativeProvenance for a chat reply —
  * support/route.ts returns prose to the user, not raw JSON. Every clause here reads
  * directly off the same authoritative object, so this can never diverge from what
- * authoritativeProvenance() itself would report.
+ * authoritativeProvenance() itself would report. The formatter also understands
+ * deterministic server-utility provenance, which shares the same execution schema
+ * but is produced without COS reasoning at all.
  */
 export function formatAuthoritativeProvenance(
   provenance: ReturnType<typeof authoritativeProvenance>,
   language: string,
 ): string {
+  const recorded = provenance as any
   const usedList: string[] = []
+  if (recorded.deterministic_utility?.used) {
+    const utility = String(recorded.deterministic_utility.utility || 'server utility')
+    const timezone = recorded.deterministic_utility.timezone ? `, ${recorded.deterministic_utility.timezone}` : ''
+    usedList.push(`deterministic server utility (${utility}${timezone})`)
+  }
   if (provenance.semantic_cache.used) usedList.push('semantic cache')
   if (provenance.knowledge_graph.used) usedList.push(`knowledge graph (${provenance.knowledge_graph.evidence_count} facts)`)
   if (provenance.learned_corpus.used) usedList.push(`learned corpus (${provenance.learned_corpus.evidence_count} items)`)

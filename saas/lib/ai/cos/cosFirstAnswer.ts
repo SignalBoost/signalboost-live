@@ -10,6 +10,7 @@ import { SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { SupabaseAIROIMetricsSink } from '@/lib/cos-core/storage/supabase'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
+import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
@@ -315,8 +316,23 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     void recordKnowledgeGap(input.prompt,0,reason)
     return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}
   }
-  const ceiling=evidenceCount>=5?.96:evidenceCount>=2?.90:evidenceCount===1?.84:.78; const confidence=Math.min(parsed.confidence,ceiling)
-  if(confidence<threshold()){const reason=`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`;void recordKnowledgeGap(input.prompt,confidence,reason);return{handled:false,confidence,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
+  const ceiling=evidenceCount>=5?.96:evidenceCount>=2?.90:evidenceCount===1?.84:.78
+  // Three independent ceilings, and the lowest wins. The model's own number says how sure it feels;
+  // the evidence ceiling says how much it had to go on; the specificity cap says whether the answer
+  // names anything checkable. Only the last one can catch a fluent, confident, useless answer —
+  // self-assessment never will, and with no external provider configured there is no second opinion
+  // to appeal to.
+  const specificity=assessAnswerSpecificity(parsed.answer)
+  const confidence=Math.min(parsed.confidence,ceiling,specificity.cap)
+  if(specificity.applies&&specificity.cap<1){console.warn('cosFirstAnswer: answer specificity capped confidence',{score:specificity.score,cap:specificity.cap,artifacts:specificity.artifacts,density:specificity.density,words:specificity.words,claimed:parsed.confidence,final:confidence})}
+  if(confidence<threshold()){
+    const cappedBySpecificity=specificity.applies&&specificity.cap<Math.min(parsed.confidence,ceiling)
+    const reason=cappedBySpecificity
+      ?`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}. ${specificityReason(specificity)}`
+      :`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`
+    void recordKnowledgeGap(input.prompt,confidence,reason)
+    return{handled:false,confidence,reason,provenance:{responseSource:'external_fallback_required',...provenance}}
+  }
   void writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel})
   if(knowledge){void knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer)}
   // NOT recorded as "avoided" in the ROI-estimate sense the cache hits above are: this

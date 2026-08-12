@@ -5,6 +5,7 @@ import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveS
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
+import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum'
 import type { MiningRunSummary } from './mining/types'
 
 export type DailyLearningResult = {
@@ -273,7 +274,7 @@ export async function runDailyAutonomousLearning(input: {
   const reasoningKeys = new Set(reasoningGaps.map(gap => `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const corpusExpansionGaps = dynamic.gaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
-  const curriculum = recurringTechnologyCurriculum()
+  const curriculum = [...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum()]
   const gaps = [miningGap(input.miningSummary), ...curriculum, ...autonomousGaps]
   const liveAdapters = createLiveLearningAdapters()
   const adapters = [

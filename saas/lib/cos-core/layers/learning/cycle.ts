@@ -5,7 +5,8 @@ import { minimumConfidenceForKind } from './sourceCatalog'
 
 export type LearningSourceDocument = { sourceKind:ContinuousLearningSourceKind; sourceUri:string; sourceTitle?:string; observedAt?:string; subject:string; text:string; license?:string|null; evidence?:string[] }
 export interface ContinuousLearningSourceAdapter { readonly kind:ContinuousLearningSourceKind; readonly id?:string; acquire(gap:KnowledgeGap):Promise<LearningSourceDocument[]> }
-export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number }
+export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
+
 const STOP_WORDS=new Set(['about','above','after','again','against','because','been','before','being','below','between','both','cannot','could','does','doing','down','during','each','from','further','have','having','here','into','itself','more','most','only','other','over','same','should','some','such','than','that','their','them','then','there','these','they','this','those','through','under','until','very','were','what','when','where','which','while','with','would','your'])
 export function distinctTerms(text:string):string[]{return[...new Set(String(text??'').toLowerCase().split(/[^\p{L}\p{N}-]+/u).map(term=>term.replace(/^-+|-+$/g,'').trim()).filter(term=>term.length>=4&&!STOP_WORDS.has(term)))]}
 export function matchesTerm(haystack:string,term:string):boolean{if(haystack.includes(term))return true;const stem=term.slice(0,Math.max(5,term.length-3));return stem.length>=5&&stem.length<term.length?haystack.includes(stem):false}
@@ -20,7 +21,49 @@ export function fullTextCharacters():number{return Math.round(envNumber('COS_LEA
 export function substanceOf(normalized:string):number{return Math.min(1,normalized.length/fullTextCharacters())}
 export function groundedConfidence(coverage:number,substance:number):number{const grounding=.55*Math.max(0,Math.min(1,coverage))+.45*Math.max(0,Math.min(1,substance));if(grounding<=0)return 0;return Number(Math.min(.92,.48+.58*grounding).toFixed(2))}
 function evidenceClass(document:LearningSourceDocument):'metadata'|'full'{const license=String(document.license??'').toLowerCase();return license.includes('metadata')||license.includes('discovery')?'metadata':'full'}
-/** Source trust is a ceiling/floor calibration, not a claim that metadata is as strong as full text. */
-export function calibratedConfidence(document:LearningSourceDocument,score:RelevanceScore,normalized:string):number{const raw=groundedConfidence(score.coverage,substanceOf(normalized)),kindFloor=minimumConfidenceForKind(document.sourceKind)??.72;if(evidenceClass(document)==='full')return raw;const title=String(document.sourceTitle??'').toLowerCase(),titleSignal=score.totalMatched>0&&distinctTerms(title).some(t=>matchesTerm(`${document.subject} ${normalized}`.toLowerCase(),t));const metadataBoost=titleSignal?Math.min(.12,.035*score.totalMatched):0;/* Metadata can clear admission only when it has concrete topical evidence. It never exceeds 0.82. */return Number(Math.min(.82,Math.max(raw,score.totalMatched>=2?kindFloor:raw)+metadataBoost).toFixed(2))}
+export function calibratedConfidence(document:LearningSourceDocument,score:RelevanceScore,normalized:string):number{const raw=groundedConfidence(score.coverage,substanceOf(normalized)),kindFloor=minimumConfidenceForKind(document.sourceKind)??.72;if(evidenceClass(document)==='full')return raw;const title=String(document.sourceTitle??'').toLowerCase(),titleSignal=score.totalMatched>0&&distinctTerms(title).some(t=>matchesTerm(`${document.subject} ${normalized}`.toLowerCase(),t));const metadataBoost=titleSignal?Math.min(.12,.035*score.totalMatched):0;return Number(Math.min(.82,Math.max(raw,score.totalMatched>=2?kindFloor:raw)+metadataBoost).toFixed(2))}
 export function sourceAwareRelevant(document:LearningSourceDocument,score:RelevanceScore,terms:{anchors:string[];supporting:string[]},floor=minimumRelevance(),minMatches=minimumTermMatches()):boolean{if(score.totalMatched<minMatches)return false;if(score.anchorsMatched.length>0&&score.coverage>=floor)return true;const title=String(document.sourceTitle??'').toLowerCase(),titleHits=[...terms.anchors,...terms.supporting].filter(term=>matchesTerm(title,term)).length;if(titleHits>=1&&score.totalMatched>=2)return true;if(['research_paper','scientific_journal','library_material','official_documentation'].includes(document.sourceKind)&&score.totalMatched>=2)return true;return false}
-export class ContinuousLearningCycle{constructor(private readonly director:ContinuousLearningDirector,private readonly adapters:ContinuousLearningSourceAdapter[]){}async run(gaps:KnowledgeGap[],spentExternalCostUsd=0):Promise<LearningCycleResult>{const prioritized=this.director.prioritizeGaps(gaps),result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd},floor=minimumRelevance(),minMatches=minimumTermMatches();for(const gap of prioritized){const terms=gapStudyTerms(gap),allTerms=[...terms.anchors,...terms.supporting];for(const adapter of this.adapters){let documents:LearningSourceDocument[]=[];try{documents=await adapter.acquire(gap)}catch(error){const key=adapter.id??adapter.kind;result.sourceErrors[key]=(result.sourceErrors[key]??0)+1;console.warn('cosLearning: source acquisition failed',{source:key,gapId:gap.id,error:error instanceof Error?error.message:String(error)});continue}result.documentsAcquired+=documents.length;for(const document of documents){if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'});continue}const source=adapter.id??adapter.kind,score=relevanceOf(document,terms);if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}const candidate=this.toCandidate(document,allTerms,score),kindFloor=minimumConfidenceForKind(document.sourceKind);if(kindFloor!==null&&candidate.confidence<kindFloor){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;console.warn('cosLearning: candidate below source confidence floor',{gapId:gap.id,source,sourceKind:document.sourceKind,confidence:candidate.confidence,kindFloor,evidenceClass:evidenceClass(document)});continue}try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision);if(!decision.accepted&&decision.reason==='budget_exhausted')return result}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}}}}return result}private toCandidate(document:LearningSourceDocument,terms:string[],score:RelevanceScore):LearningCandidate{const normalized=document.text.replace(/\s+/g,' ').trim(),evidence=document.evidence?.filter(Boolean)??[],summary=relevantExcerpt(normalized,terms,1200);if(!evidence.length&&summary)evidence.push(summary.slice(0,500));const confidence=normalized?calibratedConfidence(document,score,normalized):0;return{contentHash:createHash('sha256').update(`${document.sourceUri}\n${normalized}`).digest('hex'),sourceKind:document.sourceKind,sourceUri:document.sourceUri,sourceTitle:document.sourceTitle,observedAt:document.observedAt??new Date().toISOString(),subject:document.subject,summary,facts:summary?[{predicate:'source_excerpt',object:summary,confidence}]:[],confidence,license:document.license,evidence}}private recordDecision(result:LearningCycleResult,decision:ContinuousLearningDecision){if(decision.accepted){result.accepted+=1;return}result.rejected[decision.reason]=(result.rejected[decision.reason]??0)+1}}
+
+export class ContinuousLearningCycle{
+  constructor(private readonly director:ContinuousLearningDirector,private readonly adapters:ContinuousLearningSourceAdapter[]){}
+
+  async run(gaps:KnowledgeGap[],spentExternalCostUsd=0):Promise<LearningCycleResult>{
+    const prioritized=this.director.prioritizeGaps(gaps)
+    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
+    const floor=minimumRelevance(),minMatches=minimumTermMatches()
+    const startedAt=Date.now()
+    const cycleBudgetMs=Math.round(envNumber('COS_LEARNING_CYCLE_BUDGET_MS',240000,30000,290000))
+    const concurrency=Math.round(envNumber('COS_LEARNING_SOURCE_CONCURRENCY',6,1,12))
+
+    const tasks:Array<{gap:KnowledgeGap;adapter:ContinuousLearningSourceAdapter}> = []
+    for(const gap of prioritized) for(const adapter of this.adapters) tasks.push({gap,adapter})
+    let cursor=0
+
+    const worker=async()=>{
+      while(true){
+        if(Date.now()-startedAt>=cycleBudgetMs){result.timeBudgetExhausted=true;return}
+        const index=cursor++
+        if(index>=tasks.length)return
+        const {gap,adapter}=tasks[index]
+        const terms=gapStudyTerms(gap),allTerms=[...terms.anchors,...terms.supporting]
+        let documents:LearningSourceDocument[]=[]
+        try{documents=await adapter.acquire(gap)}catch(error){const key=adapter.id??adapter.kind;result.sourceErrors[key]=(result.sourceErrors[key]??0)+1;console.warn('cosLearning: source acquisition failed',{source:key,gapId:gap.id,error:error instanceof Error?error.message:String(error)});continue}
+        result.documentsAcquired+=documents.length
+        for(const document of documents){
+          if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'});continue}
+          const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
+          if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}
+          const candidate=this.toCandidate(document,allTerms,score),kindFloor=minimumConfidenceForKind(document.sourceKind)
+          if(kindFloor!==null&&candidate.confidence<kindFloor){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;console.warn('cosLearning: candidate below source confidence floor',{gapId:gap.id,source,sourceKind:document.sourceKind,confidence:candidate.confidence,kindFloor,evidenceClass:evidenceClass(document)});continue}
+          try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision)}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
+        }
+      }
+    }
+
+    await Promise.all(Array.from({length:Math.min(concurrency,tasks.length||1)},()=>worker()))
+    return result
+  }
+
+  private toCandidate(document:LearningSourceDocument,terms:string[],score:RelevanceScore):LearningCandidate{const normalized=document.text.replace(/\s+/g,' ').trim(),evidence=document.evidence?.filter(Boolean)??[],summary=relevantExcerpt(normalized,terms,1200);if(!evidence.length&&summary)evidence.push(summary.slice(0,500));const confidence=normalized?calibratedConfidence(document,score,normalized):0;return{contentHash:createHash('sha256').update(`${document.sourceUri}\n${normalized}`).digest('hex'),sourceKind:document.sourceKind,sourceUri:document.sourceUri,sourceTitle:document.sourceTitle,observedAt:document.observedAt??new Date().toISOString(),subject:document.subject,summary,facts:summary?[{predicate:'source_excerpt',object:summary,confidence}]:[],confidence,license:document.license,evidence}}
+  private recordDecision(result:LearningCycleResult,decision:ContinuousLearningDecision){if(decision.accepted){result.accepted+=1;return}result.rejected[decision.reason]=(result.rejected[decision.reason]??0)+1}
+}

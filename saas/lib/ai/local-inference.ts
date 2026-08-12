@@ -43,23 +43,28 @@ export function localInferenceConfigFromEnv(): LocalInferenceConfig {
 async function waitForInference(config: LocalInferenceConfig): Promise<void> {
   if (!runpodLifecycleEnabled()) return
   await ensureRunpodReasonerStarted()
-  const timeoutMs = Number(process.env.RUNPOD_START_TIMEOUT_MS || '180000')
-  const deadline = Date.now() + (Number.isFinite(timeoutMs) ? timeoutMs : 180000)
+  // Keep cold-start waiting bounded so a Vercel 300s function still has enough
+  // time for actual inference, persistence, and an honest response. The prior
+  // 180s default plus a 120s inference allowance left no serverless headroom.
+  const configured = Number(process.env.RUNPOD_START_TIMEOUT_MS || '90000')
+  const timeoutMs = Number.isFinite(configured) ? Math.max(5_000, Math.min(90_000, configured)) : 90_000
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const health = await checkLocalInferenceHealth(config)
     if (health.ok) return
     await new Promise(resolve => setTimeout(resolve, 3000))
   }
-  throw new Error('RunPod reasoner did not become healthy before startup timeout')
+  throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
 }
 
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
   const startedAt = Date.now()
-  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   let startupLatencyMs = 0
   let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
   let errorText: string | null = null
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  const controller = new AbortController()
   try {
     const startupStartedAt = Date.now()
     try {
@@ -67,6 +72,10 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     } finally {
       startupLatencyMs = Date.now() - startupStartedAt
     }
+    // Start the inference timeout only after the pod is healthy. Previously the
+    // abort timer started before cold-start waiting, so a long startup could consume
+    // the entire model timeout and make the subsequent fetch abort immediately.
+    timeout = setTimeout(() => controller.abort(), config.timeoutMs)
     inferenceStartedAt = Date.now()
     const response = await fetch(`${config.baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) }, signal: controller.signal, body: JSON.stringify({ model: config.model, max_tokens: args.maxTokens ?? 2048, temperature: args.temperature ?? 0.2, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' }, { role: 'user', content: args.prompt }] }) })
     httpStatus = response.status
@@ -83,7 +92,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     console.error('localInference: request failed', error)
     return null
   } finally {
-    clearTimeout(timeout)
+    if (timeout) clearTimeout(timeout)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     emitLocalInferenceTelemetry({

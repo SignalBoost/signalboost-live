@@ -33,14 +33,21 @@ const requiredProof: CosBenchmarkObservation[] = [
   observation({ id: 'zero-cloud', category: 'isolation', externalAiInvoked: false }),
 ]
 
-test('COS production proof summary passes only with isolation, cache reuse, and internal knowledge evidence', () => {
+test('COS production proof passes only with all required categories and evidence', () => {
   const summary = summarizeCosBenchmark(requiredProof, '2026-08-11T19:00:00-06:00')
   assert.equal(summary.total, 10)
   assert.equal(summary.failed, 0)
+  assert.equal(summary.requiredCategoriesPass, true)
   assert.equal(summary.isolationPass, true)
   assert.equal(summary.cacheReusePass, true)
   assert.equal(summary.internalKnowledgeContributionPass, true)
   assert.equal(benchmarkExitCode(summary), 0)
+})
+
+test('COS production proof fails closed when any mandatory category is missing', () => {
+  const summary = summarizeCosBenchmark(requiredProof.filter(item => item.category !== 'technical_reasoning'))
+  assert.equal(summary.requiredCategoriesPass, false)
+  assert.equal(benchmarkExitCode(summary), 1)
 })
 
 test('COS production proof fails closed when cache reuse still invokes inference', () => {
@@ -61,9 +68,13 @@ test('COS production proof fails closed when cloud AI appears in the isolation r
   assert.equal(benchmarkExitCode(summary), 1)
 })
 
-test('COS production proof does not mistake missing internal-evidence categories for a pass', () => {
-  const observations = requiredProof.filter(item => item.category !== 'knowledge_graph')
-  const summary = summarizeCosBenchmark(observations)
-  assert.equal(summary.internalKnowledgeContributionPass, false)
-  assert.equal(benchmarkExitCode(summary), 1)
+test('COS production proof requires positive evidence for every internal knowledge category', () => {
+  for (const category of ['enterprise_memory', 'knowledge_graph', 'continuous_learning'] as const) {
+    const observations = requiredProof.map(item => item.category === category
+      ? { ...item, userMemoriesUsed: 0, knowledgeFactsUsed: 0, learnedItemsUsed: 0 }
+      : item)
+    const summary = summarizeCosBenchmark(observations)
+    assert.equal(summary.internalKnowledgeContributionPass, false)
+    assert.equal(benchmarkExitCode(summary), 1)
+  }
 })

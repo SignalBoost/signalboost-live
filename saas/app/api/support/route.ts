@@ -1,10 +1,9 @@
 // Durable multi-turn provenance wrapper for the production support route.
 //
 // The legacy handler remains intact in routeCoreLegacy.ts. This wrapper adds the
-// missing conversation-level contract: every durable assistant turn can carry the
-// server provenance that produced it, and a later introspection question reads the
-// immediately preceding assistant row from storage instead of asking a model to
-// reconstruct what happened.
+// conversation-level contract: every durable assistant turn can carry the server
+// provenance that produced it, and later introspection reads stored telemetry rather
+// than asking a model to reconstruct what happened.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
@@ -18,6 +17,7 @@ import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import {
   attachRecordedTurnProvenance,
   latestRecordedTurnProvenance,
+  recordedTurnProvenanceByContent,
   type RecordedTurnProvenance,
 } from '@/lib/ai/cos/supportTurnProvenance'
 import { POST as legacyPOST } from './routeCoreLegacy'
@@ -37,6 +37,15 @@ function latestUserMessage(body: any): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i]
     if (message?.role === 'user' && typeof message.content === 'string' && message.content.trim()) return message.content.trim()
+  }
+  return ''
+}
+
+function previousAssistantMessage(body: any): string {
+  const messages = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message?.role === 'assistant' && typeof message.content === 'string' && message.content.trim()) return message.content.trim()
   }
   return ''
 }
@@ -99,9 +108,6 @@ async function persistResponseTurn(params: {
   const { conversationId, userId, userMessage, assistantReply, provenance, source } = params
   if (!provenance) return
 
-  // The legacy Anthropic path already persisted the transcript before returning.
-  // Attach provenance only when the latest row's persisted content exactly matches
-  // this reply; otherwise create this exchange instead of corrupting an older turn.
   if (source === 'anthropic-chief' || source === 'anthropic-concierge') {
     const attached = await attachRecordedTurnProvenance(conversationId, userId, assistantReply, provenance)
     if (attached) return
@@ -125,6 +131,7 @@ export async function POST(req: NextRequest) {
   }
 
   const prompt = latestUserMessage(body)
+  const precedingAssistant = previousAssistantMessage(body)
   const conversationId = conversationIdFrom(body)
   const languageCode = languageCodeFrom(body)
 
@@ -136,10 +143,15 @@ export async function POST(req: NextRequest) {
     isPrivileged = access.isAdmin
   } catch {}
 
-  // Introspection is answered BEFORE the legacy model path. The durable database row,
-  // not client-supplied message JSON and not a model narrative, is the only authority.
-  if (prompt && isProvenanceIntrospection(prompt) && conversationId && userId) {
-    const recorded = await latestRecordedTurnProvenance(conversationId, userId)
+  // Introspection is answered before any model path. Prefer the durable conversation
+  // key, then fall back to an exact match on the preceding assistant content carried
+  // by the request. The fallback is authenticated and exact-content scoped, so an
+  // omitted conversationId cannot silently turn provenance back into model narration.
+  if (prompt && isProvenanceIntrospection(prompt) && userId) {
+    const recorded =
+      (conversationId ? await latestRecordedTurnProvenance(conversationId, userId) : null)
+      ?? (precedingAssistant ? await recordedTurnProvenanceByContent(userId, precedingAssistant) : null)
+
     if (!recorded) {
       return NextResponse.json({
         reply: noPriorProvenanceReply(languageCode),

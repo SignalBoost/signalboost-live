@@ -25,7 +25,14 @@ const PROBE_PROMPT = 'cos semantic cache health probe — canonical text, do not
 type Stage = { ok: boolean; ms: number; detail: string }
 
 function failed(stage: string, error: unknown, ms: number): Stage {
-  const detail = error instanceof Error ? error.message : String(error)
+  // Supabase/PostgREST errors are plain objects, not Error instances — String() flattens them to
+  // "[object Object]" and hides the one thing this endpoint exists to surface. Serialize the
+  // object's own fields (message, details, hint, code) so the Postgres error reaches the reader.
+  const detail = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null
+      ? JSON.stringify(error)
+      : String(error)
   return { ok: false, ms, detail: `${stage} failed: ${detail}` }
 }
 

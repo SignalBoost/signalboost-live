@@ -12,6 +12,7 @@ import type { ApiCapabilityRegistry } from '../executors/api-capability-registry
 import type { ApprovalContinuationVerifier } from '../executors/approval-continuation.ts'
 import { createSupervisorDispatcher } from '../executors/create-supervisor-dispatcher.ts'
 import type { HostContext } from './host-context.ts'
+import { createConnectorAwareThinker } from './connector-aware-thinker.ts'
 import {
   createEntitlementGate,
   guardWithEntitlement,
@@ -37,6 +38,11 @@ export interface CreateLicensedSelfHealingSupervisorOptions<TThinker extends Thi
   apiCapabilities: ApiCapabilityRegistry
   approvalVerifier: ApprovalContinuationVerifier
   thinker: TThinker
+  /**
+   * Enables deterministic buyer-tool evidence gathering before COS/Supervisor reasoning.
+   * The buyer tenant id never leaves the buyer-hosted connector boundary.
+   */
+  connectorTenantId?: string
   onEntitlementRefusal?: (event: EntitlementRefusal) => void
 }
 
@@ -66,6 +72,9 @@ export function createLicensedSelfHealingSupervisor<TThinker extends Thinker>(
   if (!Array.isArray(options.license.publicKeysPem) || options.license.publicKeysPem.length === 0 || options.license.publicKeysPem.some(key => !key.trim())) {
     throw new Error('createLicensedSelfHealingSupervisor: license.publicKeysPem requires at least one public key')
   }
+  if (options.connectorTenantId && !options.host.connectors) {
+    throw new Error('createLicensedSelfHealingSupervisor: host.connectors is required when connectorTenantId is configured')
+  }
 
   const entitlement = createEntitlementGate({
     productId: options.license.productId ?? SELF_HEALING_PRODUCT_ID,
@@ -74,7 +83,13 @@ export function createLicensedSelfHealingSupervisor<TThinker extends Thinker>(
     publicKeysPem: [...options.license.publicKeysPem],
   })
 
-  const thinker = guardWithEntitlement(options.thinker, {
+  // Connector evidence sits INSIDE the entitlement guard. Therefore an unlicensed
+  // call is refused before capability discovery or any buyer-tool read can occur.
+  const evidenceAwareThinker = options.connectorTenantId
+    ? createConnectorAwareThinker({ host: options.host, tenantId: options.connectorTenantId, thinker: options.thinker })
+    : options.thinker
+
+  const thinker = guardWithEntitlement(evidenceAwareThinker, {
     gate: entitlement,
     classify: { proposeRepairPlan: { actionClass: 'execute', feature: 'repair.plan' } },
     onRefusal: options.onEntitlementRefusal,

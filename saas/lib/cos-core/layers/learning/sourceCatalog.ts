@@ -86,3 +86,24 @@ export const CONTINUOUS_LEARNING_SOURCE_CATALOG: LearningSourceProfile[] = [
 export function learningSourceProfile(id: string): LearningSourceProfile | null {
   return CONTINUOUS_LEARNING_SOURCE_CATALOG.find((profile) => profile.id === id) ?? null
 }
+
+/**
+ * The confidence a candidate of this source kind must reach before it is admitted as knowledge.
+ *
+ * These numbers were declared here from the start and never read by anything — admission used a
+ * single global 0.72 for every source, so an official-documentation claim and a news blurb were
+ * held to the same bar despite this catalogue saying 0.86 and 0.78. Several kinds appear under
+ * more than one profile (library material is listed both public-domain and licensed), so the
+ * MOST PERMISSIVE floor wins: the candidate only has to satisfy some approved profile for its
+ * kind, not every one of them.
+ *
+ * Returns null for a kind the catalogue does not describe, which leaves the global policy floor
+ * as the only gate rather than inventing a number for it.
+ */
+export function minimumConfidenceForKind(kind: ContinuousLearningSourceKind): number | null {
+  const floors = CONTINUOUS_LEARNING_SOURCE_CATALOG
+    .filter((profile) => profile.kind === kind)
+    .map((profile) => profile.minimumConfidence)
+    .filter((value) => Number.isFinite(value))
+  return floors.length ? Math.min(...floors) : null
+}

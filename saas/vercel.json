@@ -6,26 +6,93 @@
     "COS_LOCAL_FIRST_ENABLED": "true"
   },
   "crons": [
-    { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },
-    { "path": "/api/cron/batch-poll", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/cos-video-poll", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/cos-video-queue-recovery", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/cyber-dependency-monitor", "schedule": "15 8 * * *" },
-    { "path": "/api/hub/cyber/prepare-github-pr", "schedule": "0 * * * *" },
-    { "path": "/api/cron/cos-mining", "schedule": "30 6 * * *" },
-    { "path": "/api/cron/cos-mining?job=weekly", "schedule": "0 5 * * 0" },
-    { "path": "/api/cron/marketing-sales-director", "schedule": "0 7 * * *" },
-    { "path": "/api/cron/marketing-sales-video", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/cos-brand-video", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/cos-campaign-measure", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/cos-brand-dispatch", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/cos-governance-watchdog", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/cos-autonomy", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/cos-engineering-missions", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/cos-auto-publish-exact", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/vercel-observation", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/prospect-campaign", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/press-campaign", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/outreach-digest", "schedule": "0 13 * * *" }
+    {
+      "path": "/api/cron/opportunity-scan",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/batch-poll",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-video-poll",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-video-queue-recovery",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cyber-dependency-monitor",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/hub/cyber/prepare-github-pr",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-mining",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/cos-mining?job=weekly",
+      "schedule": "0 5 * * 0"
+    },
+    {
+      "path": "/api/cron/marketing-sales-director",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/marketing-sales-video",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-brand-video",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-campaign-measure",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/cos-brand-dispatch",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-governance-watchdog",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-autonomy",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-engineering-missions",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-auto-publish-exact",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/vercel-observation",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/prospect-campaign",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/press-campaign",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/outreach-digest",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/cos-runpod-idle-stop",
+      "schedule": "*/15 * * * *"
+    }
   ]
 }

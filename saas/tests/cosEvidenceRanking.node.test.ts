@@ -36,6 +36,23 @@ test('reranking labels each evidence store and drops unrelated learned material'
   assert.ok(result.learned.some(item => item.startsWith('[CL1]')))
   assert.ok(!result.learned.some(item => item.includes('economic planning')))
   assert.ok(result.memories[0]?.startsWith('[EM1]'))
+  assert.match(result.sourceBlock, /\[KG1\] Knowledge Graph/)
+  assert.match(result.sourceBlock, /\[CL1\] Learned Corpus/)
+  assert.match(result.sourceBlock, /\[EM1\] Enterprise Memory/)
+})
+
+test('reasoner source block globally prioritizes the strongest evidence', () => {
+  const result = rerankRetrievedEvidence(
+    'enterprise tenant API latency connection pool waits',
+    [{ subject:'enterprise tenant API latency', predicate:'observable', object:'connection pool acquisition wait and database lock wait by tenant', confidence:.95, source:'incident-recipe' }],
+    [{ subject:'API latency', summary:'Enterprise tenant connection pool queue waits can raise p95 without aggregate CPU saturation', facts:[], confidence:.88, source_kind:'learned_recipe', source_uri:'local:test' }],
+    [{kind:'note',content:'enterprise tenant API latency investigation compares connection pool waits'}],
+    safeText,
+  )
+  const first = result.sourceBlock.split('\n')[0]
+  assert.match(first, /^\[1\] \[(KG|CL|EM)\d+\]/)
+  assert.ok(result.sourceBlock.includes('relevance'))
+  assert.ok(result.sourceBlock.includes('Source:'))
 })
 
 test('evidence ceiling rewards relevant evidence rather than raw retrieval count', () => {

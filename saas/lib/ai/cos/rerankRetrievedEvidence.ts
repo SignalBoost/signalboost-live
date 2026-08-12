@@ -10,6 +10,7 @@ export type RerankedInternalEvidence = {
   facts: string[]
   learned: string[]
   memories: string[]
+  sourceBlock: string
   evidenceCount: number
   highRelevanceCount: number
   meanRelevance: number
@@ -21,6 +22,23 @@ function metrics(groups: RankedEvidence[][]): Pick<RerankedInternalEvidence, 'ev
   const highRelevanceCount = all.filter(item => item.relevance >= 0.42).length
   const meanRelevance = evidenceCount ? all.reduce((sum, item) => sum + item.relevance, 0) / evidenceCount : 0
   return { evidenceCount, highRelevanceCount, meanRelevance }
+}
+
+function sourceLabel(id: string): string {
+  if (id.startsWith('KG')) return 'Knowledge Graph'
+  if (id.startsWith('CL')) return 'Learned Corpus'
+  if (id.startsWith('EM')) return 'Enterprise Memory'
+  return 'Internal Evidence'
+}
+
+export function formatSourcesForReasoner(items: RankedEvidence[], maxCharsPerSource = 900): string {
+  if (!items.length) return 'No sufficiently relevant durable internal evidence was retrieved for this question.'
+  return items.map((item, index) => {
+    const text = item.text.length > maxCharsPerSource
+      ? `${item.text.slice(0, maxCharsPerSource).replace(/\s+\S*$/, '')} ...`
+      : item.text
+    return `[${index + 1}] [${item.id}] ${sourceLabel(item.id)} (relevance ${item.relevance.toFixed(2)}; confidence ${item.confidence.toFixed(2)})\n${text}\nSource: ${item.source}`
+  }).join('\n\n')
 }
 
 export function rerankRetrievedEvidence(
@@ -55,11 +73,15 @@ export function rerankRetrievedEvidence(
   const rankedFacts = rankEvidence(prompt, factCandidates, 8)
   const rankedLearned = rankEvidence(prompt, learnedCandidates, 8)
   const rankedMemories = rankEvidence(prompt, memoryCandidates, 6)
+  const globallyRanked = [...rankedFacts, ...rankedLearned, ...rankedMemories]
+    .sort((a, b) => b.relevance - a.relevance || b.confidence - a.confidence)
+    .slice(0, 12)
 
   return {
     facts: formatRankedEvidence(rankedFacts),
     learned: formatRankedEvidence(rankedLearned),
     memories: formatRankedEvidence(rankedMemories),
+    sourceBlock: formatSourcesForReasoner(globallyRanked),
     ...metrics([rankedFacts, rankedLearned, rankedMemories]),
   }
 }

@@ -72,6 +72,8 @@ export interface PortableConnectorRuntimeOptions {
   discovery: PortableCapabilityDiscoveryPort
   execution: PortableConnectorExecutionPort
   audit?: PortableConnectorAuditPort
+  /** Defaults true: consequential actions cannot execute if the buyer has no audit sink. */
+  requireAuditForConsequential?: boolean
   defaultTimeoutMs?: number
   maxTimeoutMs?: number
   createId?: () => string
@@ -107,7 +109,7 @@ function timeoutFor(requested: number | undefined, defaultTimeoutMs: number, max
 }
 
 function randomId(): string {
-  const cryptoLike = globalThis.crypto as Crypto | undefined
+  const cryptoLike = globalThis.crypto
   if (cryptoLike?.randomUUID) return cryptoLike.randomUUID()
   return `pcr_${Date.now()}_${Math.random().toString(36).slice(2)}`
 }
@@ -129,6 +131,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 export function createPortableConnectorRuntime(options: PortableConnectorRuntimeOptions) {
   const defaultTimeoutMs = options.defaultTimeoutMs ?? 15_000
   const maxTimeoutMs = options.maxTimeoutMs ?? 120_000
+  const requireAuditForConsequential = options.requireAuditForConsequential ?? true
   const createId = options.createId ?? randomId
   const now = options.now ?? (() => new Date())
 
@@ -159,6 +162,36 @@ export function createPortableConnectorRuntime(options: PortableConnectorRuntime
     })
   }
 
+  async function auditDecision(input: {
+    descriptor: PortableCapabilityDescriptor
+    invocation: PortableConnectorInvocation
+    approval: PortableApprovalEvidence | null
+    result: PortableConnectorExecutionResult
+    started: number
+  }): Promise<void> {
+    if (!options.audit) return
+    const event: PortableConnectorAuditEvent = Object.freeze({
+      schemaVersion: PORTABLE_CONNECTOR_RUNTIME_SCHEMA_VERSION,
+      eventId: createId(),
+      occurredAt: now().toISOString(),
+      tenantId: input.invocation.tenantId,
+      environmentId: input.invocation.environmentId,
+      portableId: input.invocation.portableId,
+      capabilityId: input.invocation.capabilityId,
+      providerId: input.descriptor.providerId,
+      connectionId: input.descriptor.connectionId,
+      risk: input.descriptor.risk,
+      requiresApproval: input.descriptor.requiresApproval,
+      approvalId: input.approval?.approvalId,
+      ok: input.result.ok,
+      durationMs: Math.max(0, Date.now() - input.started),
+      mode: input.result.mode,
+      error: input.result.error,
+      traceId: input.invocation.traceId,
+    })
+    await options.audit.append(event)
+  }
+
   async function invoke(input: {
     manifest: PortableCapabilityManifest
     invocation: PortableConnectorInvocation
@@ -177,9 +210,23 @@ export function createPortableConnectorRuntime(options: PortableConnectorRuntime
       return { ok: false, providerId: 'unresolved', capabilityId, mode: 'capability_unavailable', error: capabilityId }
     }
 
+    const invocation = Object.freeze({ ...input.invocation, tenantId, environmentId, portableId, capabilityId })
     const approval = validateApproval(input.invocation.approval)
+
     if (descriptor.requiresApproval && !approval) {
-      return { ok: false, providerId: descriptor.providerId, capabilityId, mode: 'approval_required', error: capabilityId }
+      const result = { ok: false, providerId: descriptor.providerId, capabilityId, mode: 'approval_required', error: capabilityId } as const
+      await auditDecision({ descriptor, invocation, approval, result, started })
+      return result
+    }
+
+    if (descriptor.risk === 'consequential' && requireAuditForConsequential && !options.audit) {
+      return {
+        ok: false,
+        providerId: descriptor.providerId,
+        capabilityId,
+        mode: 'audit_required',
+        error: 'consequential capability requires a buyer-controlled audit sink',
+      }
     }
 
     const timeoutMs = timeoutFor(input.invocation.timeoutMs, defaultTimeoutMs, maxTimeoutMs)
@@ -187,7 +234,7 @@ export function createPortableConnectorRuntime(options: PortableConnectorRuntime
     try {
       result = await withTimeout(options.execution.execute({
         descriptor,
-        invocation: Object.freeze({ ...input.invocation, tenantId, environmentId, portableId, capabilityId, approval: approval ?? undefined }),
+        invocation: Object.freeze({ ...invocation, approval: approval ?? undefined }),
       }), timeoutMs)
     } catch (error) {
       result = {
@@ -209,28 +256,7 @@ export function createPortableConnectorRuntime(options: PortableConnectorRuntime
       }
     }
 
-    if (options.audit) {
-      const event: PortableConnectorAuditEvent = Object.freeze({
-        schemaVersion: PORTABLE_CONNECTOR_RUNTIME_SCHEMA_VERSION,
-        eventId: createId(),
-        occurredAt: now().toISOString(),
-        tenantId,
-        environmentId,
-        portableId,
-        capabilityId,
-        providerId: descriptor.providerId,
-        connectionId: descriptor.connectionId,
-        risk: descriptor.risk,
-        requiresApproval: descriptor.requiresApproval,
-        approvalId: approval?.approvalId,
-        ok: result.ok,
-        durationMs: Math.max(0, Date.now() - started),
-        mode: result.mode,
-        error: result.error,
-        traceId: input.invocation.traceId,
-      })
-      await options.audit.append(event)
-    }
+    await auditDecision({ descriptor, invocation, approval, result, started })
 
     return Object.freeze({
       ...result,

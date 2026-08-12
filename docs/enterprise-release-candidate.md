@@ -6,9 +6,9 @@ SignalBoost is Release Candidate only when required evidence exists and every re
 
 ## Marketing & Sales status
 
-As of 2026-08-10, the current repo scan found the core Marketing & Sales architecture built: COS-first reasoning/fallback, Business Intelligence Corpus workflow, Enterprise Memory/Knowledge Graph/learning integration, Prospect Intelligence, Communication Hub, CRM production paths, Revenue Intelligence, Universal Adapter/provider-neutral integration, approval gates and campaign/outreach execution layers.
+As of 2026-08-12, the core Marketing & Sales architecture is built: COS-first reasoning/fallback, Business Intelligence Corpus workflow, Enterprise Memory/Knowledge Graph/learning integration, Prospect Intelligence, Communication Hub, CRM production paths, Revenue Intelligence, Universal Adapter/provider-neutral integration, approval gates and campaign/outreach execution layers.
 
-That means **core product construction and RC acceptance are now separate questions**:
+That means **core product construction and RC acceptance are separate questions**:
 
 - Core Marketing & Sales software: architecture/product-code complete.
 - Enterprise RC: true only after real target-environment evidence passes all required gates.
@@ -36,15 +36,21 @@ The generic `saas/lib/release-candidate/` evaluators remain the deterministic ev
 The Marketing & Sales profile deliberately defaults every missing requirement to `not_run`.
 
 - No evidence → `not_run`, never pass.
+- A gate explicitly marked `pass` with zero evidence is rejected by the evaluator.
+- Evidence dated after the readiness snapshot is rejected.
 - Required warning → not Release Candidate.
 - Required failure → not Release Candidate.
 - All required gates must be `pass` and carry real evidence for `releaseCandidate === true`.
 
 Do not manufacture operational evidence from source inspection. Architecture can prove that a control exists; it cannot prove that a production exercise ran successfully.
 
+## Evidence coverage
+
+Use `getMarketingSalesRcEvidenceCoverage()` to report the evidence gap without guessing. It returns the number of required gates, supplied gates, gates that pass with evidence, missing gate IDs and supplied-but-non-passing gate IDs. This is the preferred way to turn an informal completion estimate into a concrete RC punch list.
+
 ## Evidence rules
 
-Every evidence item must carry a non-empty reference and a valid observation timestamp. Suitable evidence kinds include tests, deployment records, runbooks with recorded execution, reports, metrics and manual/operational evidence where the gate requires it.
+Every evidence item must carry a non-empty reference and a valid observation timestamp that is not later than the generated readiness snapshot. Suitable evidence kinds include tests, deployment records, runbooks with recorded execution, reports, metrics and manual/operational evidence where the gate requires it.
 
 For integrations, prove the boundary actually used in the target environment. A catalog descriptor or optional connector that is not configured for that buyer does not need to be falsely exercised, but any connector claimed as part of the accepted production configuration must have real evidence.
 
@@ -52,9 +58,10 @@ For integrations, prove the boundary actually used in the target environment. A 
 
 1. Record evidence from the real target environment.
 2. Evaluate it with `evaluateMarketingSalesReleaseCandidate()` / the applicable RC evaluators.
-3. Resolve every failed, warning or not-run required gate.
-4. Repeat the affected exercise after remediation.
-5. Mark Marketing & Sales enterprise RC only when the deterministic snapshot returns `releaseCandidate === true`.
+3. Inspect `getMarketingSalesRcEvidenceCoverage()` for the remaining proof gap.
+4. Resolve every failed, warning or not-run required gate.
+5. Repeat the affected exercise after remediation.
+6. Mark Marketing & Sales enterprise RC only when the deterministic snapshot returns `releaseCandidate === true`.
 
 ## Developer handoff
 

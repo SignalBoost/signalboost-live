@@ -26,8 +26,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-const PRIMARY_TIMEOUT_MS = 260_000
-const RESEARCH_LIFELINE_START_MS = 235_000
+// Keep a large recovery margin inside Vercel's 300 s invocation ceiling. The previous
+// 260 s primary deadline left only ~40 s for bounded research/backup/serialization and
+// could let the platform cut the socket before the browser received any JSON at all.
+const PRIMARY_TIMEOUT_MS = 120_000
+const RESEARCH_LIFELINE_START_MS = 90_000
 const RESEARCH_RESULT_LIMIT = 12
 
 function latestUserText(body: any): string {

@@ -265,7 +265,12 @@ export default function Concierge() {
         body: JSON.stringify({
           messages: nextMessages,
           attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
-          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning' },
+          // timezone: the visitor's OWN browser zone, read with zero user input.
+          // Missing here meant every "what date is today" from a real visitor near
+          // midnight UTC could land on the wrong calendar day (deterministicUtilities
+          // defaults to UTC when none is supplied) — caught Aug 12 testing from
+          // Nicaragua, UTC-6, where UTC had already rolled to the next day locally.
+          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
         }),
       })
       const data = await res.json()

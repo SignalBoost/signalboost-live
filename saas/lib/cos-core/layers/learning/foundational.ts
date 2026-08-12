@@ -66,3 +66,39 @@ export function foundationalKnowledgeGaps(): KnowledgeGap[] {
     evidence:['SignalBoost foundational COS curriculum; acquisition must come from approved provenance-bearing sources.'],
   })))
 }
+
+const DOMAIN_STOP_WORDS = new Set(['about','because','been','from','have','into','more','only','over','than','that','their','them','then','there','these','they','this','what','when','where','which','while','with','your'])
+
+function terms(text: string): string[] {
+  return [...new Set(
+    String(text ?? '').toLowerCase().split(/[^\p{L}\p{N}-]+/u)
+      .map(word => word.replace(/^-+|-+$/g, '').trim())
+      .filter(word => word.length >= 4 && !DOMAIN_STOP_WORDS.has(word)),
+  )]
+}
+
+/**
+ * Map a free-text question onto the curriculum domain it belongs to.
+ *
+ * Knowledge gaps recorded from live chat used to take their subject straight from the user's
+ * words, which produced study subjects like "multi-tenant saas suddenly shows" — a truncated copy
+ * of one benchmark question. Those became the search terms for every source adapter and the match
+ * key for retrieval, so a gap could never line up with the curriculum that was meant to answer it.
+ * Anchoring to a domain subject fixes both: acquisition searches a real topic, and gaps about the
+ * same subject collapse onto one row instead of one per phrasing.
+ *
+ * Returns null when nothing matches well enough, so the caller can fall back rather than file a
+ * question under a domain it has nothing to do with.
+ */
+export function nearestFoundationalSubject(text: string, minimumOverlap = 2): string | null {
+  const wanted = terms(text)
+  if (!wanted.length) return null
+  let best: { subject: string; score: number } | null = null
+  for (const domain of FOUNDATIONAL_KNOWLEDGE_DOMAINS) {
+    const domainTerms = terms(`${domain.subject} ${domain.questions.join(' ')}`)
+    const subjectTerms = new Set(terms(domain.subject))
+    const score = wanted.reduce((total, word) => total + (subjectTerms.has(word) ? 2 : domainTerms.includes(word) ? 1 : 0), 0)
+    if (score >= minimumOverlap && (!best || score > best.score)) best = { subject: domain.subject, score }
+  }
+  return best?.subject ?? null
+}

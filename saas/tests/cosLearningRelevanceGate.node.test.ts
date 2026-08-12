@@ -1,8 +1,7 @@
-// saas/tests/cosLearningRelevanceGate.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ContinuousLearningDirector, DEFAULT_CONTINUOUS_LEARNING_POLICY, type ContinuousLearningStore, type KnowledgeGap, type LearningCandidate } from '../lib/cos-core/layers/learning/index'
-import { ContinuousLearningCycle, confidenceFromRelevance, relevantExcerpt, gapStudyTerms, type ContinuousLearningSourceAdapter, type LearningSourceDocument } from '../lib/cos-core/layers/learning/cycle'
+import { ContinuousLearningCycle, groundedConfidence, substanceOf, relevantExcerpt, gapStudyTerms, type ContinuousLearningSourceAdapter, type LearningSourceDocument } from '../lib/cos-core/layers/learning/cycle'
 
 class MemoryStore implements ContinuousLearningStore {
   records = new Map<string, LearningCandidate>()
@@ -25,7 +24,6 @@ function adapterOf(documents: LearningSourceDocument[]): ContinuousLearningSourc
   return { kind: 'video_transcript', id: 'test', acquire: async () => documents }
 }
 
-// The literal row found in production: a YouTube promo stored as knowledge about Postgres.
 const AGENTIC_RAG_PROMO: LearningSourceDocument = {
   sourceKind: 'video_transcript',
   sourceUri: 'https://www.youtube.com/watch?v=example',
@@ -44,13 +42,35 @@ const LABOUR_ECONOMICS_PAPER: LearningSourceDocument = {
   text: 'Recent Developments in the European Labor Market. Publisher: American Economic Association. Wage growth and participation rates across member states.',
 }
 
+const TRANSCRIPT_BODY = [
+  'Subscribe to the channel and hit the bell icon before we start.',
+  'In PostgreSQL, pg_stat_statements records execution statistics for every normalised statement, including total execution time, mean execution time and shared buffer reads.',
+  'That view answers the first question in any latency investigation: is the database actually spending time executing this query, or is the time being spent somewhere else entirely.',
+  'pg_stat_activity exposes the wait events of every backend, which lets an operator distinguish time spent executing a query from time spent waiting on a connection pool, a lock, or client I/O.',
+  'When aggregate CPU and memory look normal but tail latency triples, the time is almost always queueing rather than compute, and wait events are where that shows up.',
+  'Connection pool starvation is the classic multi tenant SaaS case: a large tenant holds pooled connections for longer, smaller tenants queue behind it, and the database itself never looks busy.',
+  'Idle in transaction sessions produce the same signature, because the connection is held without any query running on it.',
+  'Buffer statistics reveal whether a tenant workload has outgrown shared memory, at which point an index that used to be resident starts being read from disk for large tenants only.',
+  'Query plans change without any deployment when statistics are refreshed by autovacuum, so a plan that was an index scan for every tenant can become a sequential scan above a row count threshold that only the largest tenants cross.',
+  'All of this can be read without mutating production: pg_stat_statements deltas, pg_stat_activity samples, buffer statistics and the pool metrics your application already exports.',
+].join(' ')
+
 const REAL_POSTGRES_DOC: LearningSourceDocument = {
   sourceKind: 'video_transcript',
-  sourceUri: 'https://www.postgresql.org/docs/current/monitoring-stats.html',
-  sourceTitle: 'PostgreSQL monitoring statistics and wait events',
+  sourceUri: 'https://www.youtube.com/watch?v=transcript',
+  sourceTitle: 'Diagnosing PostgreSQL tail latency in multi tenant SaaS',
   observedAt: '2026-08-11T04:08:39.000Z',
   subject: 'PostgreSQL database performance multi tenant SaaS',
-  text: 'Subscribe to the channel and hit the bell icon. In PostgreSQL, pg_stat_statements records execution statistics for every normalised statement, including total execution time and buffer reads. pg_stat_activity exposes wait events, letting an operator distinguish time spent executing a query from time spent waiting on a connection pool or a lock. Buffer statistics reveal whether a tenant workload has outgrown shared memory.',
+  text: TRANSCRIPT_BODY,
+}
+
+const SHORT_ON_TOPIC_BLURB: LearningSourceDocument = {
+  sourceKind: 'video_transcript',
+  sourceUri: 'https://www.youtube.com/watch?v=blurb',
+  sourceTitle: 'PostgreSQL performance for multi tenant SaaS',
+  observedAt: '2026-08-11T04:08:39.000Z',
+  subject: 'PostgreSQL database performance multi tenant SaaS',
+  text: 'PostgreSQL performance for multi tenant SaaS. We cover pg_stat_statements, wait events and connection pool latency. Channel: Some Channel.',
 }
 
 test('off-topic documents are rejected with a stated reason instead of being stored as knowledge', async () => {
@@ -72,22 +92,33 @@ test('a genuinely on-topic document is admitted with a measured, non-constant co
   assert.equal(result.accepted, 1)
   const stored = [...store.records.values()][0]
   assert.ok(stored.confidence >= 0.72, 'must clear the director threshold')
-  assert.ok(stored.confidence <= 0.85, 'keyword overlap must never claim near-certainty')
+  assert.ok(stored.confidence <= 0.9, 'grounding must never claim verification')
   assert.notEqual(stored.confidence, 0.8, 'confidence must be derived, not the old constant')
   assert.equal(stored.facts[0].predicate, 'source_excerpt')
 })
 
 test('the stored excerpt is the passage that answers the gap, not the opening boilerplate', () => {
-  const terms = gapStudyTerms(POSTGRES_GAP)
+  const { anchors, supporting } = gapStudyTerms(POSTGRES_GAP)
   const normalized = REAL_POSTGRES_DOC.text.replace(/\s+/g, ' ').trim()
-  const excerpt = relevantExcerpt(normalized, terms, 1200)
+  const excerpt = relevantExcerpt(normalized, [...anchors, ...supporting], 1200)
 
   assert.ok(!excerpt.includes('hit the bell icon'), 'promotional lead-in must not survive as knowledge')
   assert.ok(excerpt.includes('pg_stat_activity'), 'the passage answering the question must be kept')
 })
 
-test('confidence is monotonic in coverage and bounded', () => {
-  assert.equal(confidenceFromRelevance(0), 0)
-  assert.ok(confidenceFromRelevance(0.5) < confidenceFromRelevance(0.9))
-  assert.ok(confidenceFromRelevance(1) <= 0.85)
+test('confidence rises with coverage AND substance, and never claims verification', () => {
+  assert.equal(groundedConfidence(0, 0), 0)
+  assert.ok(groundedConfidence(0.5, 0.5) < groundedConfidence(0.9, 0.9))
+  assert.ok(groundedConfidence(1, 1) <= 0.9)
+  assert.ok(groundedConfidence(1, substanceOf('short blurb about postgresql pooling')) < 0.82)
+})
+
+test('an on-topic blurb is refused by its source-kind floor instead of being stored as knowledge', async () => {
+  const store = new MemoryStore()
+  const cycle = new ContinuousLearningCycle(new ContinuousLearningDirector(store, DEFAULT_CONTINUOUS_LEARNING_POLICY), [adapterOf([SHORT_ON_TOPIC_BLURB])])
+  const result = await cycle.run([POSTGRES_GAP], 0)
+
+  assert.equal(result.accepted, 0, 'discovery metadata is not knowledge, however on-topic it is')
+  assert.equal(result.rejected.below_source_confidence_floor, 1)
+  assert.equal(store.records.size, 0)
 })

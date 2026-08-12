@@ -8,6 +8,7 @@ import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { SupabaseAIROIMetricsSink } from '@/lib/cos-core/storage/supabase'
+import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
@@ -133,7 +134,9 @@ function rankRows<T>(rows: T[], terms: string[], text: (row: T) => string, limit
     .map(item => item.row)
 }
 
-function subjectFromPrompt(prompt: string): string { return queryTerms(prompt).slice(0, 4).join(' ') || 'general reasoning' }
+function subjectFromPrompt(prompt: string): string {
+  return nearestFoundationalSubject(prompt) || queryTerms(prompt).slice(0, 4).join(' ') || 'general reasoning'
+}
 function safeText(value: unknown, max = 1200): string { return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max) }
 
 async function recordKnowledgeGap(prompt: string, confidence: number, reason: string): Promise<void> {

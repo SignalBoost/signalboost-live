@@ -2,7 +2,7 @@ import { evaluateReleaseCandidateReadiness } from './readiness.ts'
 import type { RcCheckCategory, RcCheckResult, RcCheckStatus, RcEvidence, RcReadinessSnapshot } from './types.ts'
 import type { TenantContext } from '../autonomous-systems/types.ts'
 
-export const MARKETING_SALES_RC_PROFILE_VERSION = '1.0.0' as const
+export const MARKETING_SALES_RC_PROFILE_VERSION = '1.1.0' as const
 
 export const MARKETING_SALES_RC_REQUIREMENTS = [
   { checkId: 'marketing_sales.deployment.production', category: 'deployment', summary: 'Production deployment builds, starts, and serves the Marketing & Sales surfaces.' },
@@ -24,6 +24,40 @@ export interface MarketingSalesRcEvidenceInput {
 }
 
 export type MarketingSalesRcEvidenceMap = Partial<Record<MarketingSalesRcCheckId, MarketingSalesRcEvidenceInput>>
+
+export interface MarketingSalesRcEvidenceCoverage {
+  readonly totalRequired: number
+  readonly supplied: number
+  readonly passedWithEvidence: number
+  readonly missingCheckIds: readonly MarketingSalesRcCheckId[]
+  readonly nonPassingCheckIds: readonly MarketingSalesRcCheckId[]
+}
+
+export function getMarketingSalesRcEvidenceCoverage(evidence: MarketingSalesRcEvidenceMap = {}): MarketingSalesRcEvidenceCoverage {
+  const missingCheckIds: MarketingSalesRcCheckId[] = []
+  const nonPassingCheckIds: MarketingSalesRcCheckId[] = []
+  let supplied = 0
+  let passedWithEvidence = 0
+
+  for (const requirement of MARKETING_SALES_RC_REQUIREMENTS) {
+    const row = evidence[requirement.checkId]
+    if (!row) {
+      missingCheckIds.push(requirement.checkId)
+      continue
+    }
+    supplied += 1
+    if (row.status === 'pass' && row.evidence.length > 0) passedWithEvidence += 1
+    else nonPassingCheckIds.push(requirement.checkId)
+  }
+
+  return Object.freeze({
+    totalRequired: MARKETING_SALES_RC_REQUIREMENTS.length,
+    supplied,
+    passedWithEvidence,
+    missingCheckIds: Object.freeze(missingCheckIds),
+    nonPassingCheckIds: Object.freeze(nonPassingCheckIds),
+  })
+}
 
 export function buildMarketingSalesRcChecks(evidence: MarketingSalesRcEvidenceMap = {}): readonly RcCheckResult[] {
   return MARKETING_SALES_RC_REQUIREMENTS.map(requirement => {

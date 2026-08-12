@@ -3,6 +3,22 @@ import { ensureRunpodReasonerStarted, runpodLifecycleEnabled } from '@/lib/ai/co
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
 
+export interface LocalInferenceTelemetry {
+  at: string
+  model: string
+  latencyMs: number
+  startupLatencyMs: number
+  inferenceLatencyMs: number
+  success: boolean
+  httpStatus: number | null
+  error: string | null
+  runpodLifecycleEnabled: boolean
+}
+
+function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
+  console.info('[cos-local-inference-telemetry]', JSON.stringify(event))
+}
+
 function normalizeHost(value: string): string { return value.trim().toLowerCase().replace(/^\[|\]$/g, '') }
 function configuredRemoteHosts(): Set<string> { return new Set((process.env.LOCAL_AI_ALLOWED_HOSTS || '').split(',').map(normalizeHost).filter(Boolean)) }
 function isLoopbackOrInternalHost(hostname: string): boolean { const host = normalizeHost(hostname); return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === 'ai-brain' }
@@ -38,14 +54,50 @@ async function waitForInference(config: LocalInferenceConfig): Promise<void> {
 }
 
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+  const startedAt = Date.now()
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+  let startupLatencyMs = 0
+  let inferenceStartedAt: number | null = null
+  let httpStatus: number | null = null
+  let errorText: string | null = null
   try {
-    await waitForInference(config)
+    const startupStartedAt = Date.now()
+    try {
+      await waitForInference(config)
+    } finally {
+      startupLatencyMs = Date.now() - startupStartedAt
+    }
+    inferenceStartedAt = Date.now()
     const response = await fetch(`${config.baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) }, signal: controller.signal, body: JSON.stringify({ model: config.model, max_tokens: args.maxTokens ?? 2048, temperature: args.temperature ?? 0.2, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' }, { role: 'user', content: args.prompt }] }) })
-    if (!response.ok) { console.error('localInference: HTTP error', response.status, await response.text()); return null }
+    httpStatus = response.status
+    if (!response.ok) {
+      errorText = `HTTP ${response.status}: ${await response.text()}`
+      console.error('localInference: HTTP error', response.status, errorText)
+      return null
+    }
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }; const text = data.choices?.[0]?.message?.content
+    if (typeof text !== 'string' || text.length === 0) errorText = 'Local inference returned an empty response'
     return typeof text === 'string' && text.length > 0 ? text : null
-  } catch (error) { console.error('localInference: request failed', error); return null } finally { clearTimeout(timeout) }
+  } catch (error) {
+    errorText = error instanceof Error ? error.message : String(error)
+    console.error('localInference: request failed', error)
+    return null
+  } finally {
+    clearTimeout(timeout)
+    const latencyMs = Date.now() - startedAt
+    const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
+    emitLocalInferenceTelemetry({
+      at: new Date().toISOString(),
+      model: config.model,
+      latencyMs,
+      startupLatencyMs,
+      inferenceLatencyMs,
+      success: errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300,
+      httpStatus,
+      error: errorText,
+      runpodLifecycleEnabled: runpodLifecycleEnabled(),
+    })
+  }
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {

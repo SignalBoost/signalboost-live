@@ -19,6 +19,17 @@ function normalize(value: unknown): RecordedTurnProvenance | null {
   }
 }
 
+export function normalizeAssistantContent(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .trim()
+    .slice(0, MAX_STORED_CONTENT)
+}
+
 export async function latestRecordedTurnProvenance(conversationId: string,userId: string): Promise<RecordedTurnProvenance | null> {
   if (!validId(conversationId) || !userId) return null
   const db = cosServiceDb(); if (!db) return null
@@ -34,13 +45,13 @@ export async function latestRecordedTurnProvenance(conversationId: string,userId
 
 export async function recordedTurnProvenanceByContent(userId: string,assistantContent: string): Promise<RecordedTurnProvenance | null> {
   if (!userId) return null
-  const expected = assistantContent.trim().slice(0, MAX_STORED_CONTENT); if (!expected) return null
+  const expected = normalizeAssistantContent(assistantContent); if (!expected) return null
   const db = cosServiceDb(); if (!db) return null
   try {
-    const { data, error } = await db.from('assistant_messages').select('provenance,content').eq('user_id', userId).eq('role', 'assistant').eq('content', expected).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    const { data, error } = await db.from('assistant_messages').select('provenance,content').eq('user_id', userId).eq('role', 'assistant').order('created_at', { ascending: false }).limit(20)
     if (error) throw error
-    if (String(data?.content || '') !== expected) return null
-    return normalize(data?.provenance)
+    const row = (data ?? []).find((item: any) => normalizeAssistantContent(item?.content) === expected)
+    return normalize(row?.provenance)
   } catch (error) {
     console.error('supportTurnProvenance: content provenance read failed', error)
     return null
@@ -49,7 +60,7 @@ export async function recordedTurnProvenanceByContent(userId: string,assistantCo
 
 export async function recordLatestUserTurnProvenance(userId:string,assistantContent:string,provenance:unknown,source?:string):Promise<boolean>{
   if(!userId)return false
-  const normalized=normalize(provenance); const content=assistantContent.trim().slice(0,MAX_STORED_CONTENT)
+  const normalized=normalize(provenance); const content=normalizeAssistantContent(assistantContent)
   if(!normalized||!content)return false
   const db=cosServiceDb(); if(!db)return false
   try{
@@ -65,19 +76,19 @@ export async function latestUserTurnProvenance(userId:string,expectedAssistantCo
   try{
     const {data,error}=await db.from('cos_latest_turn_provenance').select('assistant_content,provenance').eq('user_id',userId).maybeSingle()
     if(error)throw error
-    if(expectedAssistantContent){const expected=expectedAssistantContent.trim().slice(0,MAX_STORED_CONTENT);if(expected&&String(data?.assistant_content||'')!==expected)return null}
+    if(expectedAssistantContent){const expected=normalizeAssistantContent(expectedAssistantContent);if(expected&&normalizeAssistantContent(data?.assistant_content)!==expected)return null}
     return normalize(data?.provenance)
   }catch(error){console.error('supportTurnProvenance: latest-user provenance read failed',error);return null}
 }
 
 export async function attachRecordedTurnProvenance(conversationId: string,userId: string,assistantReply: string,provenance: unknown): Promise<boolean> {
   if (!validId(conversationId) || !userId) return false
-  const normalized = normalize(provenance); if (!normalized) return false
-  const expectedContent = assistantReply.trim().slice(0, MAX_STORED_CONTENT); if (!expectedContent) return false
-  const db = cosServiceDb(); if (!db) return false
+  const normalized=normalize(provenance); if(!normalized)return false
+  const expectedContent=normalizeAssistantContent(assistantReply); if(!expectedContent)return false
+  const db=cosServiceDb(); if(!db)return false
   try {
     const { data: row, error: readError } = await db.from('assistant_messages').select('id,content').eq('conversation_id', conversationId).eq('user_id', userId).eq('role', 'assistant').order('created_at', { ascending: false }).limit(1).maybeSingle()
-    if (readError || !row?.id || String(row.content || '') !== expectedContent) return false
+    if (readError || !row?.id || normalizeAssistantContent(row.content)!==expectedContent) return false
     const { error: updateError } = await db.from('assistant_messages').update({ provenance: normalized }).eq('id', row.id).eq('user_id', userId)
     if (updateError) throw updateError
     return true

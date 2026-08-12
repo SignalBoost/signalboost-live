@@ -158,7 +158,18 @@ export async function POST(req: NextRequest) {
       ...translation,
     })
   } catch (error) {
-    console.error('generated content translation failed', error instanceof Error ? error.message : error)
-    return NextResponse.json({ ok: false, code: 'translation_failed' }, { status: 502 })
+    // Never break a page because translation is unavailable. The original text
+    // remains authoritative and is returned unchanged. Do not cache this result,
+    // so a later request can translate normally once the local model is healthy.
+    console.warn('generated content local translation unavailable; serving original content', error instanceof Error ? error.message : error)
+    return NextResponse.json({
+      ok: true,
+      cached: false,
+      fallback: 'source-content',
+      sourceHash,
+      sourceLanguage: sourceLanguage ? normalizeReportLang(sourceLanguage) : 'en',
+      targetLanguage,
+      segments,
+    })
   }
 }

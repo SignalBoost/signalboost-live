@@ -11,7 +11,7 @@ import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { SupabaseAIROIMetricsSink } from '@/lib/cos-core/storage/supabase'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
-import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { parseLocalResult, citedEvidence } from '@/lib/ai/cos/reasonerOutput'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
@@ -35,6 +35,10 @@ export type COSProvenance = {
   knowledgeFactsUsed: number
   learnedItemsUsed: number
   userMemoriesUsed: number
+  /** Items whose [KG#]/[CL#]/[EM#] label appears in the answer — evidence demonstrably used, not merely retrieved. */
+  knowledgeFactsCited?: number
+  learnedItemsCited?: number
+  userMemoriesCited?: number
 }
 
 const STOP_WORDS = new Set(['about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why'])
@@ -180,6 +184,10 @@ export function COS_REASONER_SYSTEM_PROMPT(language: string): string {
     '- Every cause must also carry what would FALSIFY it. A cause nothing could disprove is not a diagnosis.',
     '- When asked to rank, rank by fit to the stated facts and justify the order. Do not renumber a list of equals.',
     '- Three causes named precisely beat six named vaguely.',
+    '- Naming a monitoring product is not naming a mechanism. "Check Grafana" says where to look, not what happened. For every cause, state the MECHANISM — what changed by itself with no deployment (statistics refreshed and a query plan flipped, a working set outgrew a cache or pool tier, data crossed a threshold only some tenants cross, a neighbour workload shifted) — and only then the observable that would show it.',
+    '',
+    'CITING INTERNAL EVIDENCE:',
+    '- Supplied evidence lines are labelled [KG#], [CL#], [EM#]. When one genuinely informs a claim, cite its label inline. NEVER cite an item that did not change what you wrote — an honest answer with zero citations is correct when the evidence was not useful, and false citations are worse than none.',
     '',
     'HONESTY:',
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',
@@ -213,14 +221,29 @@ async function retrieveInternalContext(prompt:string,userId?:string|null){
     systems.push('Enterprise Memory / Knowledge Graph','Continuous Learning Corpus')
     const factFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`predicate.ilike.%${t}%`,`object.ilike.%${t}%`]).join(',')
     const learnedFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`summary.ilike.%${t}%`]).join(',')
+    // Deterministic secondary ordering: rows tied on confidence used to come back in storage
+    // order, which shuffles the evidence between identical runs — and with it the reasoner's
+    // context, and with THAT its confidence. Same question, same corpus, same evidence, same order.
     const [fr,lr]=await Promise.allSettled([
-      db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at').or(factFilters).order('confidence',{ascending:false}).limit(16),
-      db.from('cos_continuous_learning').select('subject,summary,facts,confidence,source_kind,source_uri,observed_at').or(learnedFilters).order('confidence',{ascending:false}).limit(12),
+      db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at').or(factFilters).order('confidence',{ascending:false}).order('updated_at',{ascending:false}).order('subject',{ascending:true}).limit(16),
+      db.from('cos_continuous_learning').select('subject,summary,facts,confidence,source_kind,source_uri,observed_at').or(learnedFilters).order('confidence',{ascending:false}).order('observed_at',{ascending:false}).order('source_uri',{ascending:true}).limit(12),
     ])
-    if(fr.status==='fulfilled'&&!fr.value.error) for(const r of fr.value.data??[]) facts.push(`${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; source ${safeText(r.source,180)}]`)
-    if(lr.status==='fulfilled'&&!lr.value.error) for(const r of lr.value.data??[]){ const ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):''; learned.push(`${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`) }
+    // Evidence is LABELLED so use becomes checkable: the reasoner is told to cite [KG#]/[CL#]/[EM#]
+    // when an item informs a claim, and the answer is scanned for those markers afterwards.
+    // "Retrieved" and "demonstrably cited" are different claims and the provenance now makes both.
+    if(fr.status==='fulfilled'&&!fr.value.error) for(const r of fr.value.data??[]) facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; source ${safeText(r.source,180)}]`)
+    if(lr.status==='fulfilled'&&!lr.value.error) for(const r of lr.value.data??[]){ const ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):''; learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`) }
   }
-  if(userId){ systems.push('User Enterprise Memory'); const loaded=await loadUserMemories(userId).catch(()=>[]); for(const item of loaded.slice(-20)) memories.push(`[${item.kind}] ${safeText(item.content,500)}`) }
+  if(userId){
+    systems.push('User Enterprise Memory')
+    const loaded=await loadUserMemories(userId).catch(()=>[])
+    // Memories must EARN their place in a technical context the same way corpus rows do: by
+    // sharing terms with the question. Unconditionally appending the last twenty personal
+    // memories to every prompt polluted technical retrieval (five personal notes "contributing"
+    // to a SaaS latency diagnosis) and spent context-window budget the answer needed.
+    const relevant=loaded.filter(item=>{const text=String(item.content??'').toLowerCase();return terms.some(term=>text.includes(term))})
+    for(const item of relevant.slice(-8)) memories.push(`[EM${memories.length+1}] [${item.kind}] ${safeText(item.content,500)}`)
+  }
   return {systems:[...new Set(systems)],facts,learned,memories}
 }
 function contextFingerprint(context:{facts:string[];learned:string[];memories:string[]}):string{
@@ -235,6 +258,7 @@ async function writeCachedAnswer(key:string,value:CachedCosAnswer):Promise<void>
   const db=cosServiceDb(); if(!db)return
   try { const now=Date.now(); await new SupabaseExactCacheStore(db).set(key,{value,createdAt:now,expiresAt:now+CACHE_TTL_MS}) } catch {}
 }
+
 
 export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean}):Promise<COSFirstAnswerResult>{
   const startedAt=Date.now()
@@ -273,7 +297,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
 
   const evidenceCount=context.facts.length+context.learned.length
   const internalContext=[context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',context.memories.length?`USER ENTERPRISE MEMORY:\n${context.memories.join('\n')}`:''].filter(Boolean).join('\n\n')
-  const reasoned=await callCosReasoner({temperature:.15,maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS||'6000'),systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language||'English'),prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
+  const reasoned=await callCosReasoner({temperature:Number(process.env.COS_REASONER_TEMPERATURE??'0'),maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS||'6000'),systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language||'English'),prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
   const provenance={...base,localModelInvoked:true,reasonerLabel:reasoned?.reasoner.label??resolved.config.label}
   if(!reasoned?.text){const reason='Independent COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
   const parsed=parseLocalResult(reasoned.text)
@@ -314,8 +338,16 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     void recordKnowledgeGap(input.prompt,confidence,reason)
     return{handled:false,confidence,reason,bestEffortReply:parsed.answer,provenance:{responseSource:'external_fallback_required',...provenance}}
   }
-  void writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel})
-  if(knowledge){void knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer)}
+  // AWAITED, not fire-and-forget. Vercel freezes the function the moment the response returns,
+  // which killed every one of these writes mid-flight — the semantic cache sat at zero rows after
+  // every confident answer, with no error ever logged, because the embedding round-trip to the pod
+  // never got to finish. Both stores swallow their own errors, so awaiting cannot fail the answer;
+  // it costs a moment of latency on confident answers and is the difference between a cache that
+  // exists and one that is merely wired.
+  await Promise.allSettled([
+    writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel}),
+    knowledge?knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer):Promise.resolve(),
+  ])
   // NOT recorded as "avoided" in the ROI-estimate sense the cache hits above are: this
   // is COS's OWN independent reasoner actually running (real RunPod compute, real
   // latency), not a free reuse of prior work. It still avoided calling Claude/OpenAI —
@@ -323,7 +355,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // no cloud spend occurred, while estimatedCostAvoidedUsd reflects what a cloud
   // provider WOULD have cost, per the same estimate function as the cache paths.
   recordAvoidedCost('local_reasoner',input.prompt.length,parsed.answer.length,Date.now()-startedAt)
-  void resolveKnowledgeGap(input.prompt); return{handled:true,reply:parsed.answer,confidence,provenance:{responseSource:'local_cos_reasoning',...provenance}}
+  const cited=citedEvidence(parsed.answer)
+  void resolveKnowledgeGap(input.prompt); return{handled:true,reply:parsed.answer,confidence,provenance:{responseSource:'local_cos_reasoning',...provenance,knowledgeFactsCited:cited.kg,learnedItemsCited:cited.cl,userMemoriesCited:cited.em}}
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult,language='en'):string{

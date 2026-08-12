@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { portableBrandName } from '@/lib/portable/companyIdentity'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardNarratedExecution, detectsNarratedExecution, NARRATED_EXECUTION_RETRY_INSTRUCTION } from '@/lib/ai/cos/executionHonesty'
+import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { cachedSystem, recordUsage } from '@/lib/ai/usage'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
@@ -1601,6 +1602,28 @@ export async function POST(req: NextRequest) {
     }
 
     const latestUserMessage = [...sanitized].reverse().find(m => m.role === 'user')?.content || ''
+
+    // DETERMINISTIC DATE/TIME — answered from the server clock, never a model call.
+    // Found missing here on Aug 12: /api/cos-primary had this check, the live chat
+    // widget never did, so every "what date is today" from a real visitor went to
+    // full COS reasoning (or external AI) for a fact new Date() already knows for
+    // free. Checked before getConciergeAnswer and before any tool/model call — the
+    // cheapest possible answer wins whenever the question is this literal.
+    const deterministic = tryDeterministicUtility({
+      prompt: latestUserMessage,
+      timezone: body?.context?.timezone || body?.context?.timeZone,
+      locale: languageCode === 'pt' ? 'pt-BR' : languageCode === 'es' ? 'es' : languageCode === 'pl' ? 'pl' : languageCode === 'ru' ? 'ru' : 'en-US',
+      confidenceThreshold: Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72'),
+    })
+    if (deterministic) {
+      return NextResponse.json({
+        reply: deterministic.reply,
+        source: deterministic.source,
+        confidence_score: deterministic.confidence,
+        external_ai_invoked: false,
+      })
+    }
+
     const local = getConciergeAnswer(latestUserMessage, languageCode, currentPage)
 
     if (!process.env.ANTHROPIC_API_KEY) {

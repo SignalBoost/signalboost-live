@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
-import { findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string }
@@ -43,13 +43,13 @@ const COPY = {
   send:         { en: uiText('generatedUi.u_f6f4688ff23d50c6'),                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
   error:        { en: uiText('generatedUi.u_7a8adaf287716b05'), es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
   stopped:      { en: uiText('generatedUi.u_dfca6272ec004413'), es: 'Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.', pt: 'Solicitação interrompida. Nada foi enviado e nenhuma ação externa foi realizada.', pl: 'Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.', ru: 'Запрос остановлен. Ничего не отправлено, внешние действия не выполнялись.' },
-  timedOut:     { en: 'The page stopped waiting before it received the COS response. It could not confirm whether the server completed the request. Check History before retrying an action to avoid duplicates.', es: 'La página dejó de esperar antes de recibir la respuesta de COS. No pudo confirmar si el servidor completó la solicitud. Revisa el Historial antes de repetir una acción para evitar duplicados.', pt: 'A página parou de aguardar antes de receber a resposta do COS. Não foi possível confirmar se o servidor concluiu a solicitação. Verifique o Histórico antes de repetir uma ação para evitar duplicações.', pl: 'Strona przestała czekać, zanim otrzymała odpowiedź COS. Nie można potwierdzić, czy serwer zakończył żądanie. Przed ponowieniem działania sprawdź Historię, aby uniknąć duplikatów.', ru: 'Страница прекратила ожидание до получения ответа COS. Нельзя подтвердить, завершил ли сервер запрос. Перед повтором действия проверьте Историю, чтобы избежать дублирования.' },
+  timedOut:     ASSISTANT_TRANSPORT_TIMEOUT_COPY,
   stop:         { en: uiText('generatedUi.u_cae7d57bc067a514'), es: 'Detener', pt: 'Parar', pl: 'Zatrzymaj', ru: 'Остановить' },
   history:      { en: uiText('generatedUi.u_0e76960093379060'),                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
   newChat:      { en: uiText('generatedUi.u_db18382a249e0206'),                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
   noHistory:    { en: uiText('generatedUi.u_52a8737366b2b6bd'),                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
   loadingHistory: { en: uiText('generatedUi.u_ba3bbbe10d8bef66'),                            es: 'Cargando…',                           pt: 'Carregando…',                          pl: 'Ładowanie…',                           ru: 'Загрузка…' },
-  historyError: { en: uiText('generatedUi.u_b99f2969347b9565'),               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Не удалось загрузить историю.' },
+  historyError: { en: uiText('generatedUi.u_b99f2969347b9565'),               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Ошибка загрузки истории.' },
   deleteConfirm: { en: uiText('generatedUi.u_333e9b74d8484f03'),            es: '¿Eliminar esta conversación?',        pt: 'Excluir esta conversa?',               pl: 'Usunąć tę rozmowę?',                   ru: 'Удалить этот разговор?' },
   untitled:     { en: uiText('generatedUi.u_31d248c4457997d6'),                 es: 'Conversación sin título',             pt: 'Conversa sem título',                  pl: 'Rozmowa bez tytułu',                   ru: 'Разговор без названия' },
   close:        { en: uiText('generatedUi.u_7d9eb7acb13e2462'),                                  es: 'Cerrar',                              pt: 'Fechar',                               pl: 'Zamknij',                              ru: 'Закрыть' },
@@ -471,7 +471,7 @@ export default function AssistantPage() {
         <div style={{ position: 'absolute', inset: 0, zIndex: 20, borderRadius: 24, background: 'rgba(3,7,18,.82)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '2px dashed rgba(26,240,255,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 40 }}>📎</div>
-            <p style={{ color: '#1af0ff', fontSize: 16, fontWeight: 700, marginTop: 10 }}>{c(COPY.dropHere, l)}</p>
+            <p style={{ color: 'rgba(26,240,255,.9)', fontSize: 16, fontWeight: 700, marginTop: 10 }}>{c(COPY.dropHere, l)}</p>
           </div>
         </div>
       )}

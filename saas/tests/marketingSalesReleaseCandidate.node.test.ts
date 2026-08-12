@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   MARKETING_SALES_RC_REQUIREMENTS,
   evaluateMarketingSalesReleaseCandidate,
+  getMarketingSalesRcEvidenceCoverage,
   type MarketingSalesRcEvidenceMap,
 } from '../lib/release-candidate/index.ts'
 
@@ -25,6 +26,21 @@ test('Marketing & Sales RC profile fails closed when operational evidence has no
   assert.equal(snapshot.releaseCandidate, false)
   assert.equal(snapshot.requiredPassRate, 0)
   assert.deepEqual(snapshot.notRunRequiredCheckIds, MARKETING_SALES_RC_REQUIREMENTS.map(row => row.checkId).sort())
+})
+
+test('Marketing & Sales evidence coverage exposes exactly what remains unproven', () => {
+  const evidence = allPassingEvidence()
+  delete evidence['marketing_sales.resilience.recovery']
+  evidence['marketing_sales.performance.load_soak'] = {
+    status: 'warn',
+    evidence: [{ ref: 'evidence://partial-load', kind: 'metric', observedAt: generatedAt }],
+  }
+  const coverage = getMarketingSalesRcEvidenceCoverage(evidence)
+  assert.equal(coverage.totalRequired, 8)
+  assert.equal(coverage.supplied, 7)
+  assert.equal(coverage.passedWithEvidence, 6)
+  assert.deepEqual(coverage.missingCheckIds, ['marketing_sales.resilience.recovery'])
+  assert.deepEqual(coverage.nonPassingCheckIds, ['marketing_sales.performance.load_soak'])
 })
 
 test('Marketing & Sales RC profile becomes true only when every required gate has passing evidence', () => {

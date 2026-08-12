@@ -112,3 +112,15 @@ export function parseLocalResult(raw:string):LocalResult|null{
   if(salvaged)return{answer:salvaged,confidence:0,truncated:true}
   return null
 }
+
+/**
+ * Which retrieved items the answer actually leans on. Retrieval counts say what was HANDED to the
+ * reasoner; only a citation in the answer text shows an item informed a claim. Conflating the two
+ * overstated "used" in every provenance report — 12 learned items "contributed" to answers that
+ * visibly used none of them.
+ */
+export function citedEvidence(answer:string):{kg:number;cl:number;em:number}{
+  const text=String(answer??'')
+  const count=(prefix:string)=>new Set([...text.matchAll(new RegExp(`\\[${prefix}(\\d{1,2})\\]`,'g'))].map(m=>m[1])).size
+  return {kg:count('KG'),cl:count('CL'),em:count('EM')}
+}

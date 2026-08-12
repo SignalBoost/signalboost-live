@@ -39,17 +39,23 @@ export interface CosDelegationResult {
 }
 
 function manifestFor(recipe: CosConnectorRecipe): PortableCapabilityManifest {
+  const optional = new Set(recipe.optionalCapabilities ?? [])
+  const capabilityIds = [...new Set([...recipe.requiredCapabilities, ...(recipe.optionalCapabilities ?? [])])]
   return Object.freeze({
     portableId: recipe.portableId,
-    required: Object.freeze(recipe.requiredCapabilities.map(capabilityId => ({ capabilityId }))),
-    optional: Object.freeze((recipe.optionalCapabilities ?? []).map(capabilityId => ({ capabilityId }))),
+    manifestVersion: recipe.id,
+    requirements: Object.freeze(capabilityIds.map(capabilityId => Object.freeze({
+      capabilityId,
+      required: !optional.has(capabilityId),
+      allowedRisk: 'read' as const,
+    }))),
   })
 }
 
 /**
  * Runs routine evidence gathering without asking COS to reason between every tool call.
- * The runtime still owns tenant isolation, connector selection, permissions, approval,
- * provenance and audit. This layer only batches a known-safe operational recipe.
+ * The runtime still owns tenant isolation, connector selection, permissions, provenance
+ * and audit. This layer only batches a known-safe read-only operational recipe.
  */
 export async function executeCosConnectorRecipe(
   runtime: PortableConnectorRuntimePort | undefined,
@@ -61,18 +67,9 @@ export async function executeCosConnectorRecipe(
   if (request.portableId !== request.recipe.portableId) throw new Error('portableId does not match recipe')
 
   const manifest = manifestFor(request.recipe)
-  const discovery = await runtime.discover({
-    tenantId: request.tenantId,
-    environmentId: request.environmentId,
-    manifest,
-  })
-  if (discovery.resolution.missingRequired.length) {
-    return Object.freeze({
-      ok: false,
-      mode: 'capability_unavailable',
-      evidence: Object.freeze([]),
-      missingRequired: Object.freeze([...discovery.resolution.missingRequired]),
-    })
+  const discovery = await runtime.discover({ tenantId: request.tenantId, environmentId: request.environmentId, manifest })
+  if (discovery.resolution.missing.length) {
+    return Object.freeze({ ok: false, mode: 'capability_unavailable', evidence: Object.freeze([]), missingRequired: Object.freeze([...discovery.resolution.missing]) })
   }
 
   const evidence: CosDelegatedEvidence[] = []
@@ -82,9 +79,6 @@ export async function executeCosConnectorRecipe(
       if (step.optional) continue
       return Object.freeze({ ok: false, mode: 'capability_unavailable', evidence: Object.freeze(evidence), missingRequired: Object.freeze([step.capabilityId]) })
     }
-
-    // Routine delegation is intentionally read-only. Mutations remain explicit COS
-    // decisions and continue through the existing approval/dispatch path.
     if (descriptor.risk !== 'read') continue
 
     const result = await runtime.invoke({

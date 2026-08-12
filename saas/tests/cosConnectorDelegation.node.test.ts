@@ -21,14 +21,14 @@ function runtimeWith(capabilities: Record<string, 'read' | 'write' | 'consequent
         availability: 'available' as const,
         scopes: Object.freeze([]),
       }]))
-      const missingRequired = input.manifest.required.map(item => item.capabilityId).filter(id => !resolved[id])
+      const missing = input.manifest.requirements.filter(item => item.required && !resolved[item.capabilityId]).map(item => item.capabilityId)
       return {
         capabilities: Object.freeze(Object.values(resolved)),
         resolution: {
+          portableId: input.manifest.portableId,
+          satisfied: missing.length === 0,
           resolved,
-          missingRequired,
-          missingOptional: [],
-          ready: missingRequired.length === 0,
+          missing,
         },
       }
     },

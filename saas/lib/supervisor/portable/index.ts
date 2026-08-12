@@ -68,6 +68,12 @@ export {
   type EnterpriseDispatchStoreOptions,
 } from './enterprise-dispatch-store.ts'
 export {
+  SqlRecipeMemory,
+  createSqlRecipeMemory,
+  type RecipeMemorySqlClient,
+  type SqlRecipeMemoryOptions,
+} from './sql-recipe-memory.ts'
+export {
   createSiemAuditSink,
   teeAuditSinks,
   formatSiemRecord,

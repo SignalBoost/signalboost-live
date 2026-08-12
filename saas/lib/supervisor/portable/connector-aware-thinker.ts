@@ -3,6 +3,7 @@ import type { SupervisorIncident, SerializableValue } from '../incident-schema.t
 import type { HostContext } from './host-context.ts'
 import { executeCosConnectorRecipe, type CosConnectorRecipe } from '../../ai/cos/connectorDelegation.ts'
 import { compactDelegatedEvidence } from '../../ai/cos/evidenceCompaction.ts'
+import { assessDelegatedEvidence } from '../../ai/cos/evidenceSufficiency.ts'
 import { selectConnectorRecipe } from '../../ai/cos/incidentRecipeRouter.ts'
 
 export interface ConnectorAwareThinkerOptions<TThinker extends Thinker> {
@@ -36,11 +37,16 @@ export function createConnectorAwareThinker<TThinker extends Thinker>(options: C
           recipe: selectedRecipe,
         })
         const packet = compactDelegatedEvidence(delegated)
+        const sufficiency = assessDelegatedEvidence(delegated)
         const enriched: SupervisorIncident = {
           ...incident,
           metadata: {
             ...incident.metadata,
             connectorEvidenceRecipe: selectedRecipe.id,
+            connectorEvidenceSufficient: sufficiency.sufficient,
+            connectorEvidenceSuccessful: sufficiency.successful,
+            connectorEvidenceAttempted: sufficiency.attempted,
+            connectorEvidenceFailedCapabilities: sufficiency.failedCapabilities as unknown as SerializableValue,
             connectorEvidence: packet as unknown as SerializableValue,
           },
         }

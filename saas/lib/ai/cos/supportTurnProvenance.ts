@@ -2,6 +2,8 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 export type RecordedTurnProvenance = Record<string, unknown>
 
+const MAX_STORED_CONTENT = 4000
+
 function validId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
@@ -48,31 +50,34 @@ export async function latestRecordedTurnProvenance(
 }
 
 /**
- * Attach telemetry to the assistant row the legacy support handler just persisted.
- * Returns false when there is no row to update, allowing the wrapper to persist the
- * entire exchange itself for early-return paths that the legacy handler never stored.
+ * Attach telemetry to the exact assistant row the legacy support handler just
+ * persisted. Content matching prevents a failed current persist from accidentally
+ * attaching this turn's provenance to an older assistant message.
  */
 export async function attachRecordedTurnProvenance(
   conversationId: string,
   userId: string,
+  assistantReply: string,
   provenance: unknown,
 ): Promise<boolean> {
   if (!validId(conversationId) || !userId) return false
   const normalized = normalize(provenance)
   if (!normalized) return false
+  const expectedContent = assistantReply.trim().slice(0, MAX_STORED_CONTENT)
+  if (!expectedContent) return false
   const db = cosServiceDb()
   if (!db) return false
   try {
     const { data: row, error: readError } = await db
       .from('assistant_messages')
-      .select('id')
+      .select('id,content')
       .eq('conversation_id', conversationId)
       .eq('user_id', userId)
       .eq('role', 'assistant')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (readError || !row?.id) return false
+    if (readError || !row?.id || String(row.content || '') !== expectedContent) return false
 
     const { error: updateError } = await db
       .from('assistant_messages')

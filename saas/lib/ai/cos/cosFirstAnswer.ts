@@ -7,6 +7,7 @@ import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { SupabaseAIROIMetricsSink } from '@/lib/cos-core/storage/supabase'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
@@ -61,6 +62,74 @@ function semanticKnowledgeLayer(): KnowledgeLayer | null {
       })
     : null
   return knowledgeLayer
+}
+
+// ROI TELEMETRY — makes /api/admin/cos-independence's "estimated cost avoided" a real,
+// non-zero number instead of the orphaned-metric it was before Aug 12. cos_ai_roi_metrics
+// and SupabaseAIROIMetricsSink already existed; nothing on the actual production path
+// (tryCOSFirstAnswer) ever called .record() — the only caller was lib/cos-core/cos-kernel.ts,
+// which cosFirstAnswer does not go through. This wires the real path in directly.
+//
+// ESTIMATE, NOT MEASUREMENT — stated plainly rather than presented as fact. There is no
+// way to know what a Claude call WOULD have cost without actually making it, which is the
+// entire point of avoiding it. The number is a good-faith approximation at Anthropic's
+// published Sonnet rates (input/output per 1K tokens, override-able via env so it tracks
+// pricing changes without a code deploy), using output-length classes the file already
+// computes — a semantic/exact cache hit reuses a previously-generated reply, so it stands
+// in for a full generate call; a fresh local-reasoner answer assumes a comparable-length
+// completion. Both are ESTIMATES of the counterfactual, not receipts.
+function estimatedInputCostPer1k(): number {
+  const value = Number(process.env.COS_BASELINE_INPUT_COST_PER_1K || '0.003')
+  return Number.isFinite(value) && value >= 0 ? value : 0.003
+}
+
+function estimatedOutputCostPer1k(): number {
+  const value = Number(process.env.COS_BASELINE_OUTPUT_COST_PER_1K || '0.015')
+  return Number.isFinite(value) && value >= 0 ? value : 0.015
+}
+
+// ~4 characters per token is the standard rough English approximation used throughout
+// this codebase's own cost-sizing comments; kept consistent rather than inventing a
+// second constant that would silently disagree with the first.
+function estimateAvoidedProviderCostUsd(promptCharsBefore: number, replyChars: number): number {
+  const inputTokens = promptCharsBefore / 4
+  const outputTokens = Math.max(replyChars, 200) / 4 // floor: a cached reply that is itself short still stood in for a real generate call
+  return (inputTokens / 1000) * estimatedInputCostPer1k() + (outputTokens / 1000) * estimatedOutputCostPer1k()
+}
+
+let roiSinkInstance: SupabaseAIROIMetricsSink | null | undefined
+function roiSink(): SupabaseAIROIMetricsSink | null {
+  if (roiSinkInstance !== undefined) return roiSinkInstance
+  const db = cosServiceDb()
+  roiSinkInstance = db ? new SupabaseAIROIMetricsSink(db) : null
+  return roiSinkInstance
+}
+
+/**
+ * Fire-and-forget, matching every other cache write in this file — never blocks or
+ * fails the answer being returned. Called ONLY on a handled:true return, i.e. only
+ * when COS is actually about to answer WITHOUT calling external AI: this is a
+ * verifiable claim (an external call provably did not happen on this path), not a
+ * prediction about what the caller will do next. The external_fallback_required
+ * path deliberately does NOT record here — at that point in the code nothing has
+ * decided yet whether the caller will actually escalate, and recording a "cost
+ * incurred" entry for a call that has not happened would be the same kind of
+ * unearned claim this whole codebase has spent this week learning to refuse.
+ */
+function recordAvoidedCost(source: 'semantic_similarity' | 'exact_cache' | 'local_reasoner', promptChars: number, replyChars: number, latencyMs: number): void {
+  const sink = roiSink()
+  if (!sink) return
+  const avoided = estimateAvoidedProviderCostUsd(promptChars, replyChars)
+  void sink.record({
+    taskId: 'cos-first-answer',
+    source,
+    providerCalls: 0,
+    estimatedProviderCostUsd: 0,
+    estimatedCostAvoidedUsd: avoided,
+    promptCharactersBefore: promptChars,
+    promptCharactersAfter: promptChars,
+    latencyMs,
+  }).catch((error) => console.error('cosFirstAnswer: ROI recording failed', error))
 }
 
 function queryTerms(prompt: string): string[] {
@@ -118,6 +187,7 @@ async function writeCachedAnswer(key:string,value:CachedCosAnswer):Promise<void>
 }
 
 export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean}):Promise<COSFirstAnswerResult>{
+  const startedAt=Date.now()
   // Internal COS knowledge is always consulted before deciding whether a reasoner or external fallback is required.
   const context=await retrieveInternalContext(input.prompt,input.userId)
   const base={ externalAiInvoked:false as const, localModelInvoked:false, reasonerLabel:null as string|null, internalSystemsConsulted:context.systems, knowledgeFactsUsed:context.facts.length, learnedItemsUsed:context.learned.length, userMemoriesUsed:context.memories.length }
@@ -128,6 +198,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     if(nearest){
       const payload=nearest.responsePayload as CachedCosAnswer|null
       if(payload?.reply&&payload.confidence>=threshold()){
+        recordAvoidedCost('semantic_similarity',input.prompt.length,payload.reply.length,Date.now()-startedAt)
         return {handled:true,reply:payload.reply,confidence:payload.confidence,provenance:{responseSource:'semantic_similarity',...base,reasonerLabel:payload.reasonerLabel,similarityScore:nearest.similarityScore}}
       }
     }
@@ -136,6 +207,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const cacheKey=createExactCacheKey({taskId:'cos-first-answer',prompt:input.prompt,contextFingerprint:contextFingerprint(context),policyVersion:`threshold:${threshold().toFixed(2)}`,knowledgeVersion:null})
   const cached=await readCachedAnswer(cacheKey)
   if(cached&&cached.reply&&cached.confidence>=threshold()){
+    recordAvoidedCost('exact_cache',input.prompt.length,cached.reply.length,Date.now()-startedAt)
     return {handled:true,reply:cached.reply,confidence:cached.confidence,provenance:{responseSource:'semantic_cache',...base,reasonerLabel:cached.reasonerLabel}}
   }
 
@@ -159,6 +231,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if(confidence<threshold()){const reason=`COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`;void recordKnowledgeGap(input.prompt,confidence,reason);return{handled:false,confidence,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
   void writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel})
   if(knowledge){void knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer)}
+  // NOT recorded as "avoided" in the ROI-estimate sense the cache hits above are: this
+  // is COS's OWN independent reasoner actually running (real RunPod compute, real
+  // latency), not a free reuse of prior work. It still avoided calling Claude/OpenAI —
+  // recorded with providerCalls:0 and estimatedProviderCostUsd:0 to stay honest that
+  // no cloud spend occurred, while estimatedCostAvoidedUsd reflects what a cloud
+  // provider WOULD have cost, per the same estimate function as the cache paths.
+  recordAvoidedCost('local_reasoner',input.prompt.length,parsed.answer.length,Date.now()-startedAt)
   void resolveKnowledgeGap(input.prompt); return{handled:true,reply:parsed.answer,confidence,provenance:{responseSource:'local_cos_reasoning',...provenance}}
 }
 

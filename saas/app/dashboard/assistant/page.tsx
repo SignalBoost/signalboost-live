@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string }
@@ -42,13 +43,13 @@ const COPY = {
   send:         { en: uiText('generatedUi.u_f6f4688ff23d50c6'),                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
   error:        { en: uiText('generatedUi.u_7a8adaf287716b05'), es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
   stopped:      { en: uiText('generatedUi.u_dfca6272ec004413'), es: 'Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.', pt: 'Solicitação interrompida. Nada foi enviado e nenhuma ação externa foi realizada.', pl: 'Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.', ru: 'Запрос остановлен. Ничего не отправлено, внешние действия не выполнялись.' },
-  timedOut:     { en: uiText('generatedUi.u_dd8433ee354c3e99'), es: 'Esta tarea superó el límite de la solicitud y COS no pudo terminarla en un turno. No se envió nada ni se realizó ninguna acción externa. Los trabajos grandes deben dividirse: pide una empresa a la vez o ejecútalo desde la consola de prospección.', pt: 'Esta tarefa ultrapassou o limite da solicitação e o COS não conseguiu concluí-la em um turno. Nada foi enviado e nenhuma ação externa foi realizada. Trabalhos grandes precisam ser divididos: peça uma empresa por vez ou execute pelo console de prospecção.', pl: 'To zadanie przekroczyło limit żądania i COS nie mógł go dokończyć w jednej turze. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej. Duże zadania trzeba dzielić: poproś o jedną firmę naraz lub uruchom to z konsoli outreach.', ru: 'Задача превысила лимит запроса, и COS не смог завершить её за один ход. Ничего не отправлено, внешние действия не выполнялись. Крупные задания нужно разбивать: запрашивайте по одной компании или запускайте из консоли аутрича.' },
+  timedOut:     ASSISTANT_TRANSPORT_TIMEOUT_COPY,
   stop:         { en: uiText('generatedUi.u_cae7d57bc067a514'), es: 'Detener', pt: 'Parar', pl: 'Zatrzymaj', ru: 'Остановить' },
   history:      { en: uiText('generatedUi.u_0e76960093379060'),                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
   newChat:      { en: uiText('generatedUi.u_db18382a249e0206'),                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
   noHistory:    { en: uiText('generatedUi.u_52a8737366b2b6bd'),                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
   loadingHistory: { en: uiText('generatedUi.u_ba3bbbe10d8bef66'),                            es: 'Cargando…',                           pt: 'Carregando…',                          pl: 'Ładowanie…',                           ru: 'Загрузка…' },
-  historyError: { en: uiText('generatedUi.u_b99f2969347b9565'),               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Не удалось загрузить историю.' },
+  historyError: { en: uiText('generatedUi.u_b99f2969347b9565'),               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Ошибка загрузки истории.' },
   deleteConfirm: { en: uiText('generatedUi.u_333e9b74d8484f03'),            es: '¿Eliminar esta conversación?',        pt: 'Excluir esta conversa?',               pl: 'Usunąć tę rozmowę?',                   ru: 'Удалить этот разговор?' },
   untitled:     { en: uiText('generatedUi.u_31d248c4457997d6'),                 es: 'Conversación sin título',             pt: 'Conversa sem título',                  pl: 'Rozmowa bez tytułu',                   ru: 'Разговор без названия' },
   close:        { en: uiText('generatedUi.u_7d9eb7acb13e2462'),                                  es: 'Cerrar',                              pt: 'Fechar',                               pl: 'Zamknij',                              ru: 'Закрыть' },
@@ -64,9 +65,34 @@ const COPY = {
 }
 
 const DATE_LOCALES: Record<Lang, string> = { en: uiText('generatedUi.u_5c49f88dafe66e0e'), es: 'es-MX', pt: 'pt-BR', pl: 'pl-PL', ru: 'ru-RU' }
+const RECOVERY_POLL_DELAYS_MS = [0, 900, 2_100]
 
 function c(obj: any, lang: string): string {
   return obj?.[lang as Lang] ?? obj?.en ?? ''
+}
+
+async function recoverCompletedTurn(conversationId: string, userContent: string, sentAtMs: number): Promise<string | null> {
+  if (!conversationId || !userContent.trim()) return null
+
+  for (const delayMs of RECOVERY_POLL_DELAYS_MS) {
+    if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs))
+    try {
+      const res = await fetch(`/api/assistant/chats?id=${encodeURIComponent(conversationId)}`, { cache: 'no-store' })
+      if (!res.ok) continue
+      const data = await res.json()
+      const recovered = findRecoveredAssistantReply(
+        Array.isArray(data?.messages) ? data.messages : [],
+        userContent,
+        sentAtMs,
+      )
+      if (recovered) return recovered
+    } catch {
+      // The recovery read uses a separate request. If the network itself is down,
+      // keep the original transport error rather than retrying the POST.
+    }
+  }
+
+  return null
 }
 
 // ── Video JSON legacy renderer ────────────────────────────────────────────────
@@ -141,11 +167,9 @@ export default function AssistantPage() {
   const [loading, setLoading] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>('')
-  // The chat turn is a single bounded request: the server gives up at ~4 minutes.
-  // Without a client deadline a lost response leaves the bubble spinning forever
-  // with no error and no way out — which is exactly what "Thinking… for 10
-  // minutes" was. This aborts just after the server's own ceiling and always
-  // resolves the turn into a readable message.
+  // The page keeps a hard upper bound so a genuinely lost request cannot spin forever.
+  // If the POST response is lost after the server persisted the turn, the catch path below
+  // recovers that exact answer from conversation history rather than resending the POST.
   const abortRef = useRef<AbortController | null>(null)
   const CLIENT_DEADLINE_MS = 290_000
 
@@ -292,6 +316,8 @@ export default function AssistantPage() {
       const controller = new AbortController()
       abortRef.current = controller
       let hitDeadline = false
+      const sentAtMs = Date.now()
+      const conversationId = conversationIdRef.current
       const deadline = setTimeout(() => { hitDeadline = true; controller.abort() }, CLIENT_DEADLINE_MS)
 
       try {
@@ -302,7 +328,7 @@ export default function AssistantPage() {
           body: JSON.stringify({
             messages: apiMessages,
             attachments: attachments.length ? attachments : undefined,
-            context: { language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current },
+            context: { language: lang, currentPage: '/dashboard/assistant', conversationId },
           }),
         })
 
@@ -312,18 +338,40 @@ export default function AssistantPage() {
         let data: any = null
         try { data = JSON.parse(raw) } catch { data = null }
 
+        // If the response envelope itself is missing, first try the durable turn that
+        // the server may already have persisted. Never resend the POST: owner requests
+        // can mutate state, so replaying them would risk duplicate actions.
+        const directReply = data?.reply || data?.error || ''
+        if (!directReply) {
+          const recovered = await recoverCompletedTurn(conversationId, content, sentAtMs)
+          if (recovered) {
+            setMessages([...next, { role: 'assistant', content: recovered }])
+            return
+          }
+        }
+
         // Surface WHY it failed. The bare generic message told the owner nothing —
         // a 500, a 200 with an empty body, and a dropped connection all looked
         // identical, so a failing request could not be diagnosed without server logs.
-        // The status and the first part of the raw body are appended in brackets;
-        // they are diagnostics, not copy, so they are not translated.
         const gateway = res.status === 504 || res.status === 408 || res.status === 524
         const detail = `[${res.status}] ${String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 300)}`.trim()
         const fallback = gateway ? c(COPY.timedOut, l) : `${c(COPY.error, l)} ${detail}`
-        const reply = data?.reply || data?.error || fallback
+        const reply = directReply || fallback
         setMessages([...next, { role: 'assistant', content: reply }])
       } catch (err: any) {
         const aborted = err?.name === 'AbortError'
+
+        // A deliberate Stop must remain a stop. For deadline/network failures, however,
+        // the server may have completed and persisted the answer even though the browser
+        // lost the response. Recover that exact turn by conversation id + send timestamp.
+        if (!(aborted && !hitDeadline)) {
+          const recovered = await recoverCompletedTurn(conversationId, content, sentAtMs)
+          if (recovered) {
+            setMessages([...next, { role: 'assistant', content: recovered }])
+            return
+          }
+        }
+
         const failure = `${c(COPY.error, l)} [${String(err?.name || '')}] ${String(err?.message || '')}`.trim()
         setMessages([...next, { role: 'assistant', content: aborted ? (hitDeadline ? c(COPY.timedOut, l) : c(COPY.stopped, l)) : failure }])
       } finally {
@@ -423,7 +471,7 @@ export default function AssistantPage() {
         <div style={{ position: 'absolute', inset: 0, zIndex: 20, borderRadius: 24, background: 'rgba(3,7,18,.82)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '2px dashed rgba(26,240,255,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 40 }}>📎</div>
-            <p style={{ color: '#1af0ff', fontSize: 16, fontWeight: 700, marginTop: 10 }}>{c(COPY.dropHere, l)}</p>
+            <p style={{ color: 'rgba(26,240,255,.9)', fontSize: 16, fontWeight: 700, marginTop: 10 }}>{c(COPY.dropHere, l)}</p>
           </div>
         </div>
       )}

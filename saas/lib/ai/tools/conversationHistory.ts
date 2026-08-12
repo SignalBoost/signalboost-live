@@ -13,8 +13,22 @@ const SUMMARY_EVERY_N_MESSAGES = 8   // refresh rolling summary at this cadence
 const SEARCH_RESULT_LIMIT = 12       // raw message hits before grouping
 const SNIPPET_LENGTH = 220
 
+export type TurnProvenance = Record<string, unknown>
+
 function isUuid(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+}
+
+function normalizeProvenance(value: unknown): TurnProvenance | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  try {
+    const json = JSON.stringify(value)
+    if (!json || json.length > 32_000) return null
+    const parsed = JSON.parse(json)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as TurnProvenance : null
+  } catch {
+    return null
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,10 +45,11 @@ export interface ConversationHistoryStore {
   getConversation(conversationId: string): Promise<{ id: string; user_id: string; message_count: number } | null>
   createConversation(input: { id: string; userId: string; title: string }): Promise<{ ok: boolean; error?: string }>
   insertMessages(
-    msgs: Array<{ conversationId: string; userId: string; role: 'user' | 'assistant'; content: string }>,
+    msgs: Array<{ conversationId: string; userId: string; role: 'user' | 'assistant'; content: string; provenance?: TurnProvenance | null }>,
   ): Promise<{ ok: boolean; error?: string }>
   bumpConversation(conversationId: string, userId: string, messageCount: number): Promise<void>
   recentMessages(conversationId: string, userId: string, limit: number): Promise<Array<{ role: string; content: string }>>
+  latestAssistantProvenance(conversationId: string, userId: string): Promise<TurnProvenance | null>
   setSummary(conversationId: string, userId: string, summary: string): Promise<void>
   recentConversations(userId: string, excludeId: string | null, limit: number): Promise<ConversationMeta[]>
   searchMessages(userId: string, query: string, limit: number): Promise<Array<{ conversation_id: string; content: string; created_at: string }>>
@@ -79,6 +94,7 @@ function defaultSupabaseHistoryStore(): ConversationHistoryStore {
         user_id: m.userId,
         role: m.role,
         content: m.content,
+        provenance: m.role === 'assistant' ? normalizeProvenance(m.provenance) : null,
       }))
       const { error } = await client.from(MSG_TABLE).insert(rows)
       return error ? { ok: false, error: error.message } : { ok: true }
@@ -103,6 +119,22 @@ function defaultSupabaseHistoryStore(): ConversationHistoryStore {
         .order('created_at', { ascending: false })
         .limit(limit)
       return (data ?? []) as Array<{ role: string; content: string }>
+    },
+
+    async latestAssistantProvenance(conversationId, userId) {
+      const client = await db()
+      const { data, error } = await client
+        .from(MSG_TABLE)
+        .select('provenance')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+        .eq('role', 'assistant')
+        .not('provenance', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return normalizeProvenance(data?.provenance)
     },
 
     async setSummary(conversationId, userId, summary) {
@@ -210,7 +242,7 @@ export function getConversationSummarizer(): Summarizer {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public API (used by the AI routes) — signatures unchanged.
+// Public API (used by the AI routes).
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Persist one exchange (user message + assistant reply) ─────────────────────
@@ -220,8 +252,9 @@ export async function persistTurn(params: {
   userId: string
   userMessage: string
   assistantReply: string
+  provenance?: TurnProvenance | null
 }): Promise<void> {
-  const { conversationId, userId, userMessage, assistantReply } = params
+  const { conversationId, userId, userMessage, assistantReply, provenance } = params
   try {
     if (!isUuid(conversationId) || !userId || !userMessage.trim()) return
 
@@ -246,8 +279,8 @@ export async function persistTurn(params: {
     }
 
     const inserted = await store.insertMessages([
-      { conversationId, userId, role: 'user', content: userMessage.trim().slice(0, MAX_STORED_CONTENT) },
-      { conversationId, userId, role: 'assistant', content: assistantReply.trim().slice(0, MAX_STORED_CONTENT) },
+      { conversationId, userId, role: 'user', content: userMessage.trim().slice(0, MAX_STORED_CONTENT), provenance: null },
+      { conversationId, userId, role: 'assistant', content: assistantReply.trim().slice(0, MAX_STORED_CONTENT), provenance: normalizeProvenance(provenance) },
     ])
     if (!inserted.ok) {
       console.error('conversationHistory: insert messages error', inserted.error)
@@ -263,6 +296,21 @@ export async function persistTurn(params: {
     }
   } catch (err) {
     console.error('conversationHistory: persistTurn exception (non-blocking)', err)
+  }
+}
+
+// Reads only stored server telemetry. A null return means there is no durable provenance
+// for a prior assistant turn; callers must say that plainly rather than reconstructing it.
+export async function loadLatestAssistantProvenance(
+  conversationId: string,
+  userId: string,
+): Promise<TurnProvenance | null> {
+  try {
+    if (!isUuid(conversationId) || !userId) return null
+    return await getConversationHistoryStore().latestAssistantProvenance(conversationId, userId)
+  } catch (err) {
+    console.error('conversationHistory: loadLatestAssistantProvenance exception (non-blocking)', err)
+    return null
   }
 }
 

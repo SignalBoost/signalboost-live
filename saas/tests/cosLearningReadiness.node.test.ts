@@ -1,18 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { autonomousLearningReadiness } from '../lib/cos/dailyAutonomousLearning.ts'
-
-test('learning readiness explains when autonomous learning is disabled',()=>{
-  const status=autonomousLearningReadiness({COS_AUTONOMOUS_LEARNING_ENABLED:'false',COS_LIVE_SOURCES_ENABLED:'true'} as NodeJS.ProcessEnv)
-  assert.equal(status.autonomousEnabled,false)
-  assert.equal(status.ready,false)
-  assert.ok(status.warnings.some(item=>item.includes('COS_AUTONOMOUS_LEARNING_ENABLED')))
-})
-
-test('live learning exposes configured source adapters',()=>{
-  const status=autonomousLearningReadiness({COS_AUTONOMOUS_LEARNING_ENABLED:'true',COS_LIVE_SOURCES_ENABLED:'true'} as NodeJS.ProcessEnv)
-  assert.equal(status.autonomousEnabled,true)
-  assert.equal(status.liveSourcesEnabled,true)
-  assert.ok(status.liveAdapters>=6)
-  assert.equal(status.ready,true)
-})
+import { autonomousLearningReadiness,continuousLearningCurriculum } from '../lib/cos/dailyAutonomousLearning.ts'
+test('learning readiness explains when autonomous learning is disabled',()=>{const status=autonomousLearningReadiness({COS_AUTONOMOUS_LEARNING_ENABLED:'false',COS_LIVE_SOURCES_ENABLED:'true'} as NodeJS.ProcessEnv);assert.equal(status.autonomousEnabled,false);assert.equal(status.ready,false);assert.ok(status.warnings.some(item=>item.includes('COS_AUTONOMOUS_LEARNING_ENABLED')))})
+test('live learning exposes configured source adapters',()=>{const status=autonomousLearningReadiness({COS_AUTONOMOUS_LEARNING_ENABLED:'true',COS_LIVE_SOURCES_ENABLED:'true'} as NodeJS.ProcessEnv);assert.equal(status.autonomousEnabled,true);assert.equal(status.liveSourcesEnabled,true);assert.ok(status.liveAdapters>=6);assert.equal(status.ready,true)})
+test('daily curriculum forces broad technology learning even with no queued failure gaps',()=>{const gaps=continuousLearningCurriculum(new Date('2026-08-12T00:00:00Z'));assert.ok(gaps.length>=8);assert.ok(gaps.some(g=>/multi-tenant SaaS/i.test(g.subject+g.question)));assert.ok(gaps.some(g=>/observability/i.test(g.subject)));assert.ok(gaps.every(g=>g.id.includes('2026-08-12')))})

@@ -1,3 +1,4 @@
+// saas/lib/cos-core/layers/learning/index.ts
 export type LearningObservation = {
   taskId: string
   capability: string
@@ -99,7 +100,12 @@ export const DEFAULT_CONTINUOUS_LEARNING_POLICY: ContinuousLearningPolicy = {
     'video_transcript',
     'approved_public_web',
   ]),
-  minimumConfidence: 0.72,
+  // The floor of floors. Class- and kind-specific floors live in cycle.ts (admissionFloorFor):
+  // full-text evidence gates at its catalogue floor (0.72–0.75), metadata-class at
+  // COS_METADATA_ADMISSION_FLOOR (0.6). This policy value must sit AT the lowest of those, not
+  // above it — at 0.72 it silently re-rejected every metadata candidate the class floor had
+  // deliberately admitted, which made the metadata path dead code end to end.
+  minimumConfidence: 0.6,
   maxCandidatesPerCycle: 50,
   // Learning must save money over time, not create an unbounded background bill.
   maxExternalCostUsdPerCycle: 1,

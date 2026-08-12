@@ -100,10 +100,10 @@ async function persistResponseTurn(params: {
   if (!provenance) return
 
   // The legacy Anthropic path already persisted the transcript before returning.
-  // Attach provenance to that exact latest assistant row first; only create a new
-  // exchange if there was no row (early-return paths such as COS-first/date-time).
+  // Attach provenance only when the latest row's persisted content exactly matches
+  // this reply; otherwise create this exchange instead of corrupting an older turn.
   if (source === 'anthropic-chief' || source === 'anthropic-concierge') {
-    const attached = await attachRecordedTurnProvenance(conversationId, userId, provenance)
+    const attached = await attachRecordedTurnProvenance(conversationId, userId, assistantReply, provenance)
     if (attached) return
   }
 

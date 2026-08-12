@@ -5,7 +5,7 @@ export type RecordedTurnProvenance = Record<string, unknown>
 const MAX_STORED_CONTENT = 4000
 
 function validId(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
 function normalize(value: unknown): RecordedTurnProvenance | null {
@@ -19,11 +19,6 @@ function normalize(value: unknown): RecordedTurnProvenance | null {
   }
 }
 
-/**
- * Return provenance for the immediately preceding assistant message only.
- * Deliberately does NOT skip null-provenance rows: if the most recent answer has no
- * record, introspection must say so rather than accidentally describing an older turn.
- */
 export async function latestRecordedTurnProvenance(
   conversationId: string,
   userId: string,
@@ -50,10 +45,39 @@ export async function latestRecordedTurnProvenance(
 }
 
 /**
- * Attach telemetry to the exact assistant row the legacy support handler just
- * persisted. Content matching prevents a failed current persist from accidentally
- * attaching this turn's provenance to an older assistant message.
+ * Exact-content fallback for clients that have not yet supplied a durable conversation UUID.
+ * The request already contains the immediately preceding assistant turn; matching that
+ * content and authenticated user is safer than a user-wide "latest answer" lookup and
+ * prevents cross-tab/cross-conversation provenance mixups.
  */
+export async function recordedTurnProvenanceByContent(
+  userId: string,
+  assistantContent: string,
+): Promise<RecordedTurnProvenance | null> {
+  if (!userId) return null
+  const expected = assistantContent.trim().slice(0, MAX_STORED_CONTENT)
+  if (!expected) return null
+  const db = cosServiceDb()
+  if (!db) return null
+  try {
+    const { data, error } = await db
+      .from('assistant_messages')
+      .select('provenance,content')
+      .eq('user_id', userId)
+      .eq('role', 'assistant')
+      .eq('content', expected)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    if (String(data?.content || '') !== expected) return null
+    return normalize(data?.provenance)
+  } catch (error) {
+    console.error('supportTurnProvenance: content provenance read failed', error)
+    return null
+  }
+}
+
 export async function attachRecordedTurnProvenance(
   conversationId: string,
   userId: string,

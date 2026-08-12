@@ -11,6 +11,7 @@ import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { SupabaseAIROIMetricsSink } from '@/lib/cos-core/storage/supabase'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
+import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
@@ -215,46 +216,6 @@ async function retrieveInternalContext(prompt:string,userId?:string|null){
   if(userId){ systems.push('User Enterprise Memory'); const loaded=await loadUserMemories(userId).catch(()=>[]); for(const item of loaded.slice(-20)) memories.push(`[${item.kind}] ${safeText(item.content,500)}`) }
   return {systems:[...new Set(systems)],facts,learned,memories}
 }
-function extractBalancedJsonObject(text:string):string|null{
-  const start=text.indexOf('{')
-  if(start===-1)return null
-  let depth=0,inString=false,escaped=false
-  for(let i=start;i<text.length;i++){
-    const ch=text[i]
-    if(inString){
-      if(escaped)escaped=false
-      else if(ch==='\\')escaped=true
-      else if(ch==='"')inString=false
-      continue
-    }
-    if(ch==='"'){inString=true;continue}
-    if(ch==='{')depth++
-    else if(ch==='}'){depth--;if(depth===0)return text.slice(start,i+1)}
-  }
-  return null
-}
-
-function parseLocalResult(raw:string):{answer:string;confidence:number}|null{
-  const stripFences=(t:string)=>t.trim().replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim()
-  const tryParse=(t:string)=>{
-    try{
-      const p=JSON.parse(t) as {answer?:unknown;confidence?:unknown}
-      const answer=typeof p.answer==='string'?p.answer.trim():''
-      const confidence=Number(p.confidence)
-      return answer&&Number.isFinite(confidence)?{answer,confidence:Math.max(0,Math.min(1,confidence))}:null
-    }catch{return null}
-  }
-  const cleaned=stripFences(raw)
-  const direct=tryParse(cleaned)
-  if(direct)return direct
-  const extracted=extractBalancedJsonObject(cleaned)
-  if(extracted){
-    const recovered=tryParse(extracted)
-    if(recovered)return recovered
-  }
-  return null
-}
-
 function contextFingerprint(context:{facts:string[];learned:string[];memories:string[]}):string{
   return createHash('sha256').update(JSON.stringify({facts:context.facts,learned:context.learned,memories:context.memories})).digest('hex')
 }
@@ -310,9 +271,22 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if(!reasoned?.text){const reason='Independent COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}}
   const parsed=parseLocalResult(reasoned.text)
   if(!parsed){
-    console.error('cosFirstAnswer: unparseable reasoner output, raw text follows:',reasoned.text)
+    console.error('cosFirstAnswer: unparseable reasoner output',{characters:reasoned.text.length,raw:reasoned.text})
     const excerpt=safeText(reasoned.text,240)
-    const reason=`Independent COS inference returned an unparseable result. Raw output started: "${excerpt}"`
+    // The character count travels with the message because the excerpt is capped at 240 for display:
+    // without it, a 4,000-character answer cut off at the ceiling and a 90-character failure look
+    // identical to whoever reads this, and they need opposite fixes.
+    const reason=`Independent COS inference returned an unparseable result after ${reasoned.text.length} characters. Raw output started: "${excerpt}"`
+    void recordKnowledgeGap(input.prompt,0,reason)
+    return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}
+  }
+  if(parsed.truncated){
+    // The model was still writing when it stopped. The cause is either the token ceiling or the
+    // request timeout, and the character count separates them: near the ceiling means raise
+    // COS_REASONER_MAX_TOKENS; far short of it means the call was cut off before it finished.
+    const maxTokens=Number(process.env.COS_REASONER_MAX_TOKENS||'6000')
+    console.error('cosFirstAnswer: reasoner output truncated mid-answer',{characters:reasoned.text.length,salvagedCharacters:parsed.answer.length,maxTokens,raw:reasoned.text})
+    const reason=`Independent COS inference stopped mid-answer after ${reasoned.text.length} characters, so it never produced a confidence value. ${parsed.answer.length} characters were recoverable. Near the token ceiling, raise COS_REASONER_MAX_TOKENS (currently ${maxTokens}); far short of it, the call was cut off before the model finished.`
     void recordKnowledgeGap(input.prompt,0,reason)
     return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...provenance}}
   }

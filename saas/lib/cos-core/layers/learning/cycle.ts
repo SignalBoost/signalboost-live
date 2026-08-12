@@ -1,3 +1,4 @@
+// saas/lib/cos-core/layers/learning/cycle.ts
 import { createHash } from 'node:crypto'
 import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index'
 import { ContinuousLearningDirector } from './index'
@@ -20,8 +21,46 @@ export function minimumTermMatches():number{return Math.round(envNumber('COS_LEA
 export function fullTextCharacters():number{return Math.round(envNumber('COS_LEARNING_FULL_TEXT_CHARS',900,200,20000))}
 export function substanceOf(normalized:string):number{return Math.min(1,normalized.length/fullTextCharacters())}
 export function groundedConfidence(coverage:number,substance:number):number{const grounding=.55*Math.max(0,Math.min(1,coverage))+.45*Math.max(0,Math.min(1,substance));if(grounding<=0)return 0;return Number(Math.min(.92,.48+.58*grounding).toFixed(2))}
-function evidenceClass(document:LearningSourceDocument):'metadata'|'full'{const license=String(document.license??'').toLowerCase();return license.includes('metadata')||license.includes('discovery')?'metadata':'full'}
-export function calibratedConfidence(document:LearningSourceDocument,score:RelevanceScore,normalized:string):number{const raw=groundedConfidence(score.coverage,substanceOf(normalized)),kindFloor=minimumConfidenceForKind(document.sourceKind)??.72;if(evidenceClass(document)==='full')return raw;const title=String(document.sourceTitle??'').toLowerCase(),titleSignal=score.totalMatched>0&&distinctTerms(title).some(t=>matchesTerm(`${document.subject} ${normalized}`.toLowerCase(),t));const metadataBoost=titleSignal?Math.min(.12,.035*score.totalMatched):0;return Number(Math.min(.82,Math.max(raw,score.totalMatched>=2?kindFloor:raw)+metadataBoost).toFixed(2))}
+function evidenceClass(document:LearningSourceDocument):'metadata'|'full'{
+  const license=String(document.license??'').toLowerCase()
+  if(license.includes('metadata')||license.includes('discovery'))return'metadata'
+  // Length decides too: a two-line "document" IS discovery metadata whatever its license field
+  // says. Without this, sources that never set a license (most of them) had their blurbs scored
+  // as full evidence — the very hole the license check was meant to close.
+  return document.text.replace(/\s+/g,' ').trim().length<fullTextCharacters()*0.4?'metadata':'full'
+}
+/**
+ * A candidate's stored confidence is its HONEST grounding — how well it matches the question and
+ * how much real content it holds — for every evidence class alike.
+ *
+ * The previous version raised metadata-class candidates to the very floor they were about to be
+ * tested against (Math.max(raw, kindFloor) + a title boost, capped at 0.82). The intent — keep
+ * useful trusted-source metadata — was sound; the mechanism neutralised the floor gate and stamped
+ * every surviving blurb ~0.82, so a robotics question retrieved an obstetrics paper, an economics
+ * paper and a 2017 heat-transfer tutorial all "0.82-confident". Retrieval, the reasoner's evidence
+ * ranking, and the provenance report all consume this number; inflating it lies to all three.
+ * The admit-good-metadata intent now lives in metadataAdmissionFloor(), which lowers the BAR for
+ * that class instead of raising the NUMBER.
+ */
+export function metadataConfidenceCeiling():number{return envNumber('COS_METADATA_CONFIDENCE_CEILING',0.7,0,1)}
+
+export function calibratedConfidence(document:LearningSourceDocument,score:RelevanceScore,normalized:string):number{
+  const raw=groundedConfidence(score.coverage,substanceOf(normalized))
+  // Caps go DOWN, never up: a blurb can be perfectly on topic and still never be more than
+  // moderately confident knowledge, because there is almost nothing of it to be confident IN.
+  return evidenceClass(document)==='metadata'?Number(Math.min(raw,metadataConfidenceCeiling()).toFixed(2)):raw
+}
+
+/**
+ * The floor a metadata-class candidate must clear. Deliberately below the full-text floors: a
+ * relevant abstract or documentation blurb is worth keeping AS WHAT IT IS — a well-attributed
+ * pointer with modest confidence — and its honest grounding score rarely exceeds ~0.7 because
+ * substance is low by definition. Env-tunable; raising it toward 0.72 makes learning full-text-only.
+ */
+export function metadataAdmissionFloor():number{return envNumber('COS_METADATA_ADMISSION_FLOOR',0.6,0,1)}
+
+/** The floor THIS document must clear: the catalogue floor for full evidence, the metadata floor otherwise — never a number invented per document. */
+export function admissionFloorFor(document:LearningSourceDocument):number|null{const kindFloor=minimumConfidenceForKind(document.sourceKind);if(evidenceClass(document)==='full')return kindFloor??0.72;return kindFloor===null?metadataAdmissionFloor():Math.min(kindFloor,metadataAdmissionFloor())}
 export function sourceAwareRelevant(document:LearningSourceDocument,score:RelevanceScore,terms:{anchors:string[];supporting:string[]},floor=minimumRelevance(),minMatches=minimumTermMatches()):boolean{if(score.totalMatched<minMatches)return false;if(score.anchorsMatched.length>0&&score.coverage>=floor)return true;const title=String(document.sourceTitle??'').toLowerCase(),titleHits=[...terms.anchors,...terms.supporting].filter(term=>matchesTerm(title,term)).length;if(titleHits>=1&&score.totalMatched>=2)return true;if(['research_paper','scientific_journal','library_material','official_documentation'].includes(document.sourceKind)&&score.totalMatched>=2)return true;return false}
 
 export class ContinuousLearningCycle{
@@ -53,8 +92,8 @@ export class ContinuousLearningCycle{
           if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'});continue}
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
           if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}
-          const candidate=this.toCandidate(document,allTerms,score),kindFloor=minimumConfidenceForKind(document.sourceKind)
-          if(kindFloor!==null&&candidate.confidence<kindFloor){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;console.warn('cosLearning: candidate below source confidence floor',{gapId:gap.id,source,sourceKind:document.sourceKind,confidence:candidate.confidence,kindFloor,evidenceClass:evidenceClass(document)});continue}
+          const candidate=this.toCandidate(document,allTerms,score),kindFloor=admissionFloorFor(document)
+          if(kindFloor!==null&&candidate.confidence<kindFloor){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;console.warn('cosLearning: candidate below source confidence floor',{gapId:gap.id,source,sourceKind:document.sourceKind,confidence:candidate.confidence,floor:kindFloor,evidenceClass:evidenceClass(document)});continue}
           try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision)}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
         }
       }

@@ -73,10 +73,10 @@ async function requestEmbedding(text: string, config: LocalInferenceConfig, mode
   }
 }
 
-function missingModelError(attempt: Extract<EmbeddingAttempt, { ok: false }>, model: string): boolean {
-  if (attempt.status !== 404) return false
+function missingModelError(attempt: EmbeddingAttempt, model: string): boolean {
+  if (attempt.ok || attempt.status !== 404) return false
   const body = attempt.body.toLowerCase()
-  return body.includes(model.toLowerCase()) && (body.includes('model') && (body.includes('not found') || body.includes('pulling it')))
+  return body.includes(model.toLowerCase()) && body.includes('model') && (body.includes('not found') || body.includes('pulling it'))
 }
 
 function runpodAutoRepairEnabled(config: LocalInferenceConfig): boolean {

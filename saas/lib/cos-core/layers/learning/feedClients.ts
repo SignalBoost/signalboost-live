@@ -1,4 +1,5 @@
 import type { LearningConnectorResult, LearningConnectorSearch } from './connectors'
+import { fetchReadableDocument } from './documentFetch'
 
 type FetchLike = typeof fetch
 
@@ -55,7 +56,17 @@ function score(text: string, tokens: string[]): number {
  * provenance. It does not scrape publisher article bodies. Feed URLs are explicitly
  * configured or supplied from the trusted built-in catalog.
  */
-export function createFeedSearch(feeds: LearningFeed[], fetcher: FetchLike = fetch): LearningConnectorSearch {
+export type FeedSearchOptions = {
+  /**
+   * Fetch the page behind each selected entry instead of keeping the feed blurb. Enable ONLY for
+   * source classes whose bodies COS is entitled to read in full — official vendor documentation,
+   * standards bodies, government publications. Publisher article bodies stay summary-only, which is
+   * why this is off by default.
+   */
+  fullText?: boolean
+}
+
+export function createFeedSearch(feeds: LearningFeed[], fetcher: FetchLike = fetch, options: FeedSearchOptions = {}): LearningConnectorSearch {
   return async (query, limit) => {
     const tokens = queryTokens(query)
     const candidates: Array<LearningConnectorResult & { relevance: number }> = []
@@ -91,10 +102,21 @@ export function createFeedSearch(feeds: LearningFeed[], fetcher: FetchLike = fet
       }
     }
 
-    return candidates
+    const selected = candidates
       .sort((a, b) => b.relevance - a.relevance)
       .slice(0, Math.min(Math.max(limit, 1), 10))
       .map(({ relevance: _relevance, ...item }) => item)
+
+    if (!options.fullText) return selected
+
+    // Bodies are fetched only for the entries that survived selection, never for all 40 parsed
+    // entries: the ranking is free, the fetching is not.
+    return Promise.all(selected.map(async (item) => {
+      const body = await fetchReadableDocument(item.uri, { fetcher })
+      return body
+        ? { ...item, text: body, license: 'Official documentation page read in full from its published URL' }
+        : item
+    }))
   }
 }
 

@@ -56,6 +56,7 @@ export type {
   Approver,
   ApproverDirectory,
   HostBranding,
+  PortableConnectorRuntimePort,
 } from './host-context.ts'
 export { buildConsoleUrl } from './host-context.ts'
 export { createEnterpriseNotifier } from './enterprise-notifier.ts'

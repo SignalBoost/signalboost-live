@@ -22,6 +22,45 @@ export { PROVIDER_HUB_ACCEPTANCE_SCHEMA, runProviderHubAcceptance } from './acce
 export type { ProviderHubAcceptanceOptions, ProviderHubAcceptanceResult, ProviderHubCheck, ProviderHubCheckId } from './acceptance-harness.ts'
 export type { ProviderLiveDataReadEvidence, ProviderLiveDataReadState } from './live-data-read-evidence.ts'
 
+// ── Portable Connector Runtime ──────────────────────────────────────────────
+export {
+  PORTABLE_CONNECTOR_CAPABILITY_SCHEMA_VERSION,
+  createPortableCapabilityDescriptor,
+  resolvePortableCapabilities,
+} from './capability-runtime.ts'
+export type {
+  PortableCapabilityAvailability,
+  PortableCapabilityDescriptor,
+  PortableCapabilityDiscoveryPort,
+  PortableCapabilityManifest,
+  PortableCapabilityRequirement,
+  PortableCapabilityResolution,
+  PortableCapabilityRisk,
+} from './capability-runtime.ts'
+export {
+  PORTABLE_STRUCTURED_REFERENCE_SCHEMA_VERSION,
+  createPortableStructuredReference,
+  isPortableStructuredReference,
+} from './structured-reference.ts'
+export type {
+  PortableStructuredReference,
+  PortableStructuredReferenceKind,
+} from './structured-reference.ts'
+export {
+  PORTABLE_CONNECTOR_RUNTIME_SCHEMA_VERSION,
+  createPortableConnectorRuntime,
+} from './connector-runtime.ts'
+export type {
+  PortableApprovalEvidence,
+  PortableConnectorAuditEvent,
+  PortableConnectorAuditPort,
+  PortableConnectorExecutionPort,
+  PortableConnectorExecutionResult,
+  PortableConnectorInvocation,
+  PortableConnectorRuntimeOptions,
+  PortableRuntimeDiscovery,
+} from './connector-runtime.ts'
+
 export const PROVIDER_HUB_CONNECTION_SCHEMA_VERSION = 'provider-hub-connection-v1' as const
 
 export type ProviderAuthenticationMethod = 'api_key' | 'oauth' | 'service_account' | 'manual' | 'assisted'

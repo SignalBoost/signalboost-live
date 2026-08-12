@@ -27,6 +27,22 @@ test('release candidate requires every required gate to pass', () => {
   assert.deepEqual(snapshot.warningCheckIds, ['docs'])
 })
 
+test('a passing gate without recorded evidence is rejected', () => {
+  assert.throws(() => evaluateReleaseCandidateReadiness({
+    tenant: { tenantId: 'tenant-a', environmentId: 'prod' },
+    generatedAt: '2026-08-10T03:11:00.000Z',
+    checks: [{ checkId: 'deployment', category: 'deployment', status: 'pass', required: true, summary: 'claimed green', evidence: [] }],
+  }), /rc_pass_requires_evidence/)
+})
+
+test('evidence observed after the readiness snapshot is rejected', () => {
+  assert.throws(() => evaluateReleaseCandidateReadiness({
+    tenant: { tenantId: 'tenant-a', environmentId: 'prod' },
+    generatedAt: '2026-08-10T03:11:00.000Z',
+    checks: [{ checkId: 'deployment', category: 'deployment', status: 'pass', required: true, summary: 'production deployment green', evidence: [{ ...evidence[0], observedAt: '2026-08-10T03:12:00.000Z' }] }],
+  }), /rc_evidence_timestamp_after_snapshot/)
+})
+
 test('not-run required evidence blocks RC status', () => {
   const snapshot = evaluateReleaseCandidateReadiness({
     tenant: { tenantId: 'tenant-a', environmentId: 'prod' },

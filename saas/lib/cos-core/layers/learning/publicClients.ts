@@ -1,6 +1,8 @@
 import type { LearningConnectorSearch, LearningConnectorResult } from './connectors'
 
-async function getJson(url:string):Promise<any>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);try{const response=await fetch(url,{headers:{accept:'application/json','user-agent':'SignalBoost-COS/1.0 (https://signalboostapp.com)'},signal:controller.signal});if(!response.ok)throw new Error(`COS learning source failed: ${response.status}`);return response.json()}finally{clearTimeout(timer)}}
+const TRANSIENT_STATUS=new Set([408,425,429,500,502,503,504])
+function delay(ms:number){return new Promise(resolve=>setTimeout(resolve,ms))}
+async function getJson(url:string):Promise<any>{let lastError:unknown;for(let attempt=0;attempt<3;attempt++){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);try{const response=await fetch(url,{headers:{accept:'application/json','user-agent':'SignalBoost-COS/1.0 (https://signalboostapp.com)'},signal:controller.signal});if(!response.ok){const error=new Error(`COS learning source failed: ${response.status}`);if(!TRANSIENT_STATUS.has(response.status))throw error;lastError=error}else{return await response.json()}}catch(error){lastError=error;if(attempt>=2)throw error}finally{clearTimeout(timer)}await delay(250*(attempt+1))}throw lastError instanceof Error?lastError:new Error('COS learning source failed')}
 function clean(value:unknown):string{return String(value??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}
 function compactQuery(query:string,maxTerms=10):string{return clean(query).split(/\s+/).filter(Boolean).slice(0,maxTerms).join(' ')}
 

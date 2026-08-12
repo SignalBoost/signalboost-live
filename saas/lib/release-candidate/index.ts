@@ -9,9 +9,11 @@ export {
   MARKETING_SALES_RC_REQUIREMENTS,
   buildMarketingSalesRcChecks,
   evaluateMarketingSalesReleaseCandidate,
+  getMarketingSalesRcEvidenceCoverage,
 } from './marketing-sales.ts'
 export type {
   MarketingSalesRcCheckId,
+  MarketingSalesRcEvidenceCoverage,
   MarketingSalesRcEvidenceInput,
   MarketingSalesRcEvidenceMap,
 } from './marketing-sales.ts'

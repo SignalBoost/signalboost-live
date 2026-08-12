@@ -57,12 +57,17 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   const startedAt = Date.now()
   const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   let startupLatencyMs = 0
+  let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
   let errorText: string | null = null
   try {
     const startupStartedAt = Date.now()
-    await waitForInference(config)
-    startupLatencyMs = Date.now() - startupStartedAt
+    try {
+      await waitForInference(config)
+    } finally {
+      startupLatencyMs = Date.now() - startupStartedAt
+    }
+    inferenceStartedAt = Date.now()
     const response = await fetch(`${config.baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) }, signal: controller.signal, body: JSON.stringify({ model: config.model, max_tokens: args.maxTokens ?? 2048, temperature: args.temperature ?? 0.2, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' }, { role: 'user', content: args.prompt }] }) })
     httpStatus = response.status
     if (!response.ok) {
@@ -80,12 +85,13 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   } finally {
     clearTimeout(timeout)
     const latencyMs = Date.now() - startedAt
+    const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     emitLocalInferenceTelemetry({
       at: new Date().toISOString(),
       model: config.model,
       latencyMs,
       startupLatencyMs,
-      inferenceLatencyMs: Math.max(0, latencyMs - startupLatencyMs),
+      inferenceLatencyMs,
       success: errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300,
       httpStatus,
       error: errorText,

@@ -74,7 +74,7 @@ async function requestEmbedding(text: string, config: LocalInferenceConfig, mode
 }
 
 function missingModelError(attempt: EmbeddingAttempt, model: string): boolean {
-  if (attempt.ok || attempt.status !== 404) return false
+  if (!('status' in attempt) || attempt.status !== 404) return false
   const body = attempt.body.toLowerCase()
   return body.includes(model.toLowerCase()) && body.includes('model') && (body.includes('not found') || body.includes('pulling it'))
 }
@@ -166,12 +166,12 @@ export const generateLocalEmbedding: EmbeddingGenerator = async (text: string): 
   const model = embeddingModel()
   let attempt = await requestEmbedding(text, config, model)
 
-  if (!attempt.ok && missingModelError(attempt, model) && runpodAutoRepairEnabled(config)) {
+  if ('status' in attempt && missingModelError(attempt, model) && runpodAutoRepairEnabled(config)) {
     await pullEmbeddingModel(config, model)
     attempt = await requestEmbedding(text, config, model)
   }
 
-  if (!attempt.ok) {
+  if ('status' in attempt) {
     throw new Error(`localEmbeddings: HTTP ${attempt.status} — ${attempt.body}`)
   }
 
@@ -189,7 +189,7 @@ export async function checkLocalEmbeddingHealth(): Promise<{ ok: boolean; model:
   try {
     const config = localInferenceConfigFromEnv()
     const attempt = await requestEmbedding('health check', config, model)
-    if (!attempt.ok) return { ok: false, model, error: `HTTP ${attempt.status} — ${attempt.body}` }
+    if ('status' in attempt) return { ok: false, model, error: `HTTP ${attempt.status} — ${attempt.body}` }
     const vector = validateVector(attempt.vector, model)
     return { ok: true, model, dimensions: vector.length }
   } catch (error) {

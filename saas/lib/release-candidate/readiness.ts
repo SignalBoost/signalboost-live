@@ -24,23 +24,27 @@ function deepFreeze<T>(value: T): T {
   return value
 }
 
-function assertValidCheck(check: RcCheckResult): void {
+function assertValidCheck(check: RcCheckResult, generatedAt: number): void {
   if (!check.checkId.trim()) throw new Error('rc_check_id_required')
   if (!CATEGORIES.includes(check.category)) throw new Error('rc_check_category_invalid')
   if (!check.summary.trim()) throw new Error('rc_check_summary_required')
+  if (check.status === 'pass' && check.evidence.length === 0) throw new Error('rc_pass_requires_evidence')
   for (const evidence of check.evidence) {
     if (!evidence.ref.trim()) throw new Error('rc_evidence_ref_required')
-    if (!Number.isFinite(Date.parse(evidence.observedAt))) throw new Error('rc_evidence_timestamp_invalid')
+    const observedAt = Date.parse(evidence.observedAt)
+    if (!Number.isFinite(observedAt)) throw new Error('rc_evidence_timestamp_invalid')
+    if (observedAt > generatedAt) throw new Error('rc_evidence_timestamp_after_snapshot')
   }
 }
 
 export function evaluateReleaseCandidateReadiness(input: RcReadinessInput): RcReadinessSnapshot {
   if (!input.tenant.tenantId || !input.tenant.environmentId) throw new Error('tenant_required')
-  if (!Number.isFinite(Date.parse(input.generatedAt))) throw new Error('rc_generated_at_invalid')
+  const generatedAt = Date.parse(input.generatedAt)
+  if (!Number.isFinite(generatedAt)) throw new Error('rc_generated_at_invalid')
 
   const ids = new Set<string>()
   for (const check of input.checks) {
-    assertValidCheck(check)
+    assertValidCheck(check, generatedAt)
     if (ids.has(check.checkId)) throw new Error('duplicate_rc_check_id')
     ids.add(check.checkId)
   }

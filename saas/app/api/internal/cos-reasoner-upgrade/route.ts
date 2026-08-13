@@ -39,12 +39,36 @@ async function pullTarget() {
   const response = await fetch(`${root}/api/pull`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(key) },
-    body: JSON.stringify({ model: TARGET_MODEL, stream: false }),
+    body: JSON.stringify({ model: TARGET_MODEL, stream: true }),
     cache: 'no-store',
   })
-  const text = await response.text()
-  if (!response.ok) throw new Error(`RunPod model pull failed: HTTP ${response.status} ${text.slice(0, 1000)}`)
-  return { ok: true, response: text.slice(0, 1000) }
+  if (!response.ok) throw new Error(`RunPod model pull failed: HTTP ${response.status} ${(await response.text()).slice(0, 1000)}`)
+  if (!response.body) throw new Error('RunPod model pull returned no progress stream.')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let lastStatus = ''
+  let completed = false
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const event = JSON.parse(line) as { status?: string; error?: string }
+        if (event.error) throw new Error(event.error)
+        if (event.status) lastStatus = event.status
+        if (event.status === 'success') completed = true
+      } catch (error) {
+        if (error instanceof SyntaxError) continue
+        throw error
+      }
+    }
+  }
+  return { ok: completed, lastStatus: lastStatus || null }
 }
 
 async function testGemini() {

@@ -9,7 +9,7 @@
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
 **COS Independent Runtime:** REQUIRES A CONFIGURED OPEN/LOCAL MODEL ENDPOINT  
 **Marketing & Sales Core Architecture:** COMPLETE  
-**Self-Healing Supervisor native monitoring:** ACTIVE, WITH REMAINING PROBE GAPS  
+**Self-Healing Supervisor native monitoring:** ACTIVE; PROACTIVE PROBES IMPLEMENTED, PRODUCTION MIGRATION/RUNTIME VERIFICATION REQUIRED  
 **Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
 
 ---
@@ -90,7 +90,7 @@ Remote private inference must use HTTPS, authentication and exact-host allowlist
 
 # 2026-08-12 COS / Supervisor state
 
-Major merged capabilities added during the 2026-08-12 engineering sequence include:
+Major merged or implementation-complete capabilities added during the 2026-08-12 engineering sequence include:
 
 - portable buyer connector runtime and host exposure;
 - deterministic connector delegation recipes;
@@ -105,9 +105,13 @@ Major merged capabilities added during the 2026-08-12 engineering sequence inclu
 - robotics/physics learning curriculum integration;
 - native Self-Healing Supervisor monitoring runtime;
 - Vercel deployment/provider observation connected to native monitoring;
-- SignalBoost platform-health intelligence connected to native monitoring.
+- SignalBoost platform-health intelligence connected to native monitoring;
+- real native API latency/5xx probes with durable latency baselines;
+- real native database connection-pressure/latency probes;
+- real native storage reachability/usage/capacity probes;
+- real native TLS certificate-expiry probes.
 
-See `docs/HANDOFF-2026-08-12.md` for the dated handoff.
+See `docs/HANDOFF-2026-08-12.md` and `docs/portables/self-healing-monitoring-current-state-20260812.md` for the dated/current handoff.
 
 ---
 
@@ -121,11 +125,16 @@ Canonical implementation:
 
 - `saas/self-healing-host/native-monitoring-policy.ts`
 - `saas/self-healing-host/native-monitoring-runtime.ts`
+- `saas/self-healing-host/native-proactive-monitoring.ts`
+- `saas/app/api/cron/native-proactive-monitoring/route.ts`
+- `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql`
 - existing Vercel observer/provider-health path
 - existing SignalBoost platform-health intelligence
 - `docs/portables/self-healing-monitoring-current-state-20260812.md`
 
-Current native coverage includes Vercel deployment/provider health plus platform-health conditions such as queue growth, scheduler failures, provider failures, resource pressure, stale leases/heartbeats, verification failures and audit failures.
+Current native coverage includes Vercel deployment/provider health, platform-health conditions such as queue growth, scheduler failures, provider failures, resource pressure, stale leases/heartbeats, verification failures and audit failures, plus real proactive probes for API p95 latency/5xx error rate, database connection pressure/latency, storage health/usage/capacity and TLS certificate expiry.
+
+Probe observations are persisted in `self_healing_native_probe_samples`. API trend detection uses durable recent history. Database and storage probes use bounded service-role-only aggregate RPCs rather than exposing query text, credentials, object contents or other sensitive payloads.
 
 Existing external webhook adapters remain available for Datadog, PagerDuty, AWS CloudWatch/EventBridge, Prometheus Alertmanager, Splunk, Azure Monitor, Grafana Alerting and Google Cloud Operations. They are real deterministic adapters but remain `staged` until live-provider validation promotes them to `certified`.
 
@@ -147,16 +156,18 @@ Monitor / Observe
 
 Automatic routine repair never means arbitrary mutation. The action must remain inside an explicitly registered capability with allowed provider/resource/method/parameter scope, reversibility and execution limits.
 
-### Remaining native monitoring work
+### Native proactive monitoring deployment state
 
-As of 2026-08-12, the next real native probe families are:
+The four previously missing native probe families are implemented in `feat/native-proactive-monitors-20260812` / PR #1132. Production code uses real HTTP requests, Supabase/Postgres aggregate health data, Supabase Storage metadata and validated TLS handshakes; placeholders and mocks are confined to tests where needed.
 
-- API latency and 5xx/error-rate trends;
-- database latency/error/connection pressure;
-- storage capacity/error health;
-- TLS/certificate expiry.
+The migration `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql` must exist in the target Supabase project before the 15-minute cron can persist history or execute the database/storage RPC probes. The cron fails closed with `native_probe_store_unavailable` if that schema is absent. Do not call the proactive probes production-active until the migration is applied and a production cron run is verified.
 
-Branch `feat/native-proactive-monitors-20260812` was created, but attempted repository writes were blocked by the connector safety gate. Treat these four probes as **not implemented yet**. Do not add placeholders or claim completion from policy signal names alone.
+Optional environment configuration:
+
+- `SELF_HEALING_API_PROBE_URLS` — live HTTPS API targets; defaults to `/api/supervisor/native-health` on the production app.
+- `SELF_HEALING_TLS_TARGETS` — additional `host[:port]` certificate targets.
+- `SELF_HEALING_STORAGE_QUOTA_BYTES` — real storage quota for capacity-percentage alerts; without it the probe reports real usage without inventing a quota.
+- `SELF_HEALING_NATIVE_MONITORING_ENABLED=false` — explicit buyer opt-out.
 
 ---
 

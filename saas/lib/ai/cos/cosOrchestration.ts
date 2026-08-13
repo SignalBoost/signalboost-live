@@ -1,27 +1,5 @@
-//
-// THE ROOT CAUSE THIS FILE FIXES. As of Aug 12, /api/cos-primary/route.ts was the
-// ONLY place tryCOSFirstAnswer, the confidence gate, and the provenance-introspection
-// guard ever ran. app/api/support/route.ts — the route the real Concierge widget and
-// every actual user actually talks to — never called any of it and went straight to
-// Anthropic. Every "COS is not learning" symptom and every fabricated provenance
-// answer ("here is the provenance for... lead magnets" on a question that never
-// mentioned lead magnets) traced to that one fact: the whole COS-first system this
-// week was built, tested, and proven correct on a road nobody's real traffic drives on.
-//
-// WHY EXTRACTED RATHER THAN DUPLICATED. Copy-pasting this logic into support/route.ts
-// would create two implementations of "is this a provenance question" and "build an
-// authoritative provenance report" that will drift the moment either file is edited
-// without the other — the exact failure pattern this session found repeatedly
-// (route.ts vs routeCore.ts, draftMessageFor vs outreachMessage/index.ts). One
-// implementation, imported by both routes, so a fix here is a fix everywhere.
-//
-// WHAT STAYS OUT OF THIS FILE, DELIBERATELY. providerFromPayload and
-// legacyContinuityFailure parse the LEGACY /api/concierge JSON response shape —
-// specific to cos-primary's own escalation path, meaningless to support/route.ts,
-// which talks to Anthropic directly rather than through that legacy payload. Live
-// telemetry emission (buildCosLiveTelemetry/emitCosLiveTelemetry) is also not
-// included here, since it is not yet verified against support/route.ts's call shape;
-// wiring that in is a deliberate follow-up, not something to guess at silently.
+// saas/lib/ai/cos/cosOrchestration.ts
+// Shared COS routing and authoritative provenance policy used by live COS-first entrypoints.
 
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
@@ -48,21 +26,58 @@ export function requestsExternalAction(input: string): boolean {
   return explicitExecution.test(input) && target.test(input)
 }
 
+type FunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
+type EvidenceFunnel = { knowledgeGraph:FunnelStage; learnedCorpus:FunnelStage; userMemory:FunnelStage }
+
+function stage(value:any,fallbackRetrieved=0,fallbackCited=0,injectFallback=true):FunnelStage{
+  return {
+    retrieved:Number(value?.retrieved ?? fallbackRetrieved) || 0,
+    relevant:Number(value?.relevant ?? fallbackRetrieved) || 0,
+    selected:Number(value?.selected ?? fallbackRetrieved) || 0,
+    injected:Number(value?.injected ?? (injectFallback ? fallbackRetrieved : 0)) || 0,
+    cited:Number(value?.cited ?? fallbackCited) || 0,
+  }
+}
+
+function originFunnel(p:any):EvidenceFunnel|null{
+  if (!p?.cacheOrigin) return null
+  const stored=p.cacheOrigin.originEvidenceFunnel
+  if (stored) return {
+    knowledgeGraph:stage(stored.knowledgeGraph),
+    learnedCorpus:stage(stored.learnedCorpus),
+    userMemory:stage(stored.userMemory),
+  }
+  const facts=Number(p?.knowledgeFactsUsed??0), learned=Number(p?.learnedItemsUsed??0), memories=Number(p?.userMemoriesUsed??0)
+  return {
+    knowledgeGraph:stage(null,facts,Number(p?.knowledgeFactsCited??0),true),
+    learnedCorpus:stage(null,learned,Number(p?.learnedItemsCited??0),true),
+    userMemory:stage(null,memories,Number(p?.userMemoriesCited??0),true),
+  }
+}
+
 export function authoritativeProvenance(
   cos: any,
   external: { invoked: boolean; provider?: string | null; model?: string | null },
 ) {
   const p = cos?.provenance ?? null
   const semanticCacheHit = p?.responseSource === 'semantic_cache' || p?.responseSource === 'semantic_similarity'
+  const thisTurn=p?.cacheOrigin?.retrievedThisTurn
+  const kgFallback=semanticCacheHit ? Number(thisTurn?.facts??0) : Number(p?.knowledgeFactsUsed??0)
+  const lcFallback=semanticCacheHit ? Number(thisTurn?.learned??0) : Number(p?.learnedItemsUsed??0)
+  const umFallback=semanticCacheHit ? Number(thisTurn?.memories??0) : Number(p?.userMemoriesUsed??0)
+  const kg=stage(p?.evidenceFunnel?.knowledgeGraph,kgFallback,semanticCacheHit?0:Number(p?.knowledgeFactsCited??0),!semanticCacheHit)
+  const lc=stage(p?.evidenceFunnel?.learnedCorpus,lcFallback,semanticCacheHit?0:Number(p?.learnedItemsCited??0),!semanticCacheHit)
+  const um=stage(p?.evidenceFunnel?.userMemory,umFallback,semanticCacheHit?0:Number(p?.userMemoriesCited??0),!semanticCacheHit)
+
   return {
-    schema_version: 1,
+    schema_version: 2,
     authority: 'server_execution_telemetry',
     model_generated: false,
     semantic_cache: { used: semanticCacheHit, evidence_count: semanticCacheHit ? 1 : 0 },
-    enterprise_memory: { used: (p?.knowledgeFactsCited ?? 0) > 0, retrieved_count: p?.knowledgeFactsUsed ?? 0, evidence_count: p?.knowledgeFactsCited ?? 0 },
-    knowledge_graph: { used: (p?.knowledgeFactsCited ?? 0) > 0, retrieved_count: p?.knowledgeFactsUsed ?? 0, evidence_count: p?.knowledgeFactsCited ?? 0 },
-    learned_corpus: { used: (p?.learnedItemsCited ?? 0) > 0, retrieved_count: p?.learnedItemsUsed ?? 0, evidence_count: p?.learnedItemsCited ?? 0 },
-    user_memory: { used: (p?.userMemoriesCited ?? 0) > 0, retrieved_count: p?.userMemoriesUsed ?? 0, evidence_count: p?.userMemoriesCited ?? 0 },
+    enterprise_memory: { used:kg.cited>0,retrieved_count:kg.retrieved,relevant_count:kg.relevant,selected_count:kg.selected,injected_count:kg.injected,evidence_count:kg.cited },
+    knowledge_graph: { used:kg.cited>0,retrieved_count:kg.retrieved,relevant_count:kg.relevant,selected_count:kg.selected,injected_count:kg.injected,evidence_count:kg.cited },
+    learned_corpus: { used:lc.cited>0,retrieved_count:lc.retrieved,relevant_count:lc.relevant,selected_count:lc.selected,injected_count:lc.injected,evidence_count:lc.cited },
+    user_memory: { used:um.cited>0,retrieved_count:um.retrieved,relevant_count:um.relevant,selected_count:um.selected,injected_count:um.injected,evidence_count:um.cited },
     autonomous_research: {
       used: p?.autonomousResearchAttempted ?? false,
       documents_acquired: p?.researchDocumentsAcquired ?? 0,
@@ -70,42 +85,43 @@ export function authoritativeProvenance(
     },
     local_reasoning: {
       invoked: p?.localModelInvoked ?? false,
-      model: p?.reasonerLabel ?? null,
+      model: semanticCacheHit ? null : p?.reasonerLabel ?? null,
       confidence: cos?.confidence ?? null,
       threshold: confidenceThreshold(),
     },
     external_ai: { invoked: external.invoked, provider: external.provider ?? null, model: external.model ?? null },
-    /**
-     * WHERE THE SERVED TEXT CAME FROM. On a cache hit no reasoning happens at all, and the
-     * evidence lines above describe the turn that WROTE the answer, not this one — a
-     * distinction the report used to lose entirely, so a cached reply appeared as a live
-     * result with "0 cited of 12 retrieved" against a reasoner that never ran.
-     */
     answer_origin: {
       from_cache: semanticCacheHit,
       stored_at: p?.cacheOrigin?.storedAt ?? null,
       policy_version: p?.cacheOrigin?.policyVersion ?? null,
-      model: p?.reasonerLabel ?? null,
+      model: semanticCacheHit ? p?.reasonerLabel ?? null : null,
       retrieved_this_turn: p?.cacheOrigin?.retrievedThisTurn ?? null,
+      evidence_funnel: semanticCacheHit ? originFunnel(p) : null,
     },
   }
 }
 
 function usedLabel(value: boolean): string { return value ? 'USED' : 'NOT USED' }
 function invokedLabel(value: boolean): string { return value ? 'INVOKED' : 'NOT INVOKED' }
+function funnelText(value:any,singular:string,plural:string):string{
+  const retrieved=Number(value?.retrieved_count??value?.evidence_count??0)
+  const relevant=Number(value?.relevant_count??retrieved)
+  const selected=Number(value?.selected_count??relevant)
+  const injected=Number(value?.injected_count??selected)
+  const cited=Number(value?.evidence_count??0)
+  return `${usedLabel(Boolean(value?.used))} — ${retrieved} retrieved → ${relevant} relevant → ${selected} selected → ${injected} injected → ${cited} cited ${cited===1?singular:plural}.`
+}
+function originFunnelText(value:EvidenceFunnel|null):string{
+  if(!value) return 'origin evidence funnel was not recorded'
+  return `KG ${value.knowledgeGraph.injected} injected/${value.knowledgeGraph.cited} cited; corpus ${value.learnedCorpus.injected} injected/${value.learnedCorpus.cited} cited; memory ${value.userMemory.injected} injected/${value.userMemory.cited} cited`
+}
 
-/** Full, stable execution-provenance report. Retrieved and cited counts are kept separate:
- * retrieval means evidence entered the reasoner context; USED means the answer actually cited it.
- */
+/** A component is USED only when evidence from it is demonstrably cited by the answer on this request. */
 export function formatAuthoritativeProvenance(
   provenance: ReturnType<typeof authoritativeProvenance>,
   language: string,
 ): string {
   const recorded = provenance as any
-  const kg = provenance.knowledge_graph as { used:boolean; evidence_count:number; retrieved_count?:number }
-  const em = provenance.enterprise_memory as { used:boolean; evidence_count:number; retrieved_count?:number }
-  const lc = provenance.learned_corpus as { used:boolean; evidence_count:number; retrieved_count?:number }
-  const um = provenance.user_memory as { used:boolean; evidence_count:number; retrieved_count?:number }
   const lines = [
     'This is the real, recorded provenance for the immediately preceding answer. It is server execution telemetry, not a model-generated reconstruction.',
     '',
@@ -113,18 +129,14 @@ export function formatAuthoritativeProvenance(
     '──────────',
   ]
 
-  const origin = (provenance as any).answer_origin as
-    | { from_cache: boolean; stored_at: string | null; policy_version: string | null; model: string | null; retrieved_this_turn: { facts: number; learned: number; memories: number } | null }
-    | undefined
-  if (origin?.from_cache) {
-    const written = origin.stored_at ? `written ${origin.stored_at}` : 'written on an earlier turn (no stored-at recorded)'
-    const by = origin.model ? ` by ${origin.model}` : ''
-    const policy = origin.policy_version ? `, under answer policy ${origin.policy_version}` : ''
-    const retrieved = origin.retrieved_this_turn
-      ? ` ${origin.retrieved_this_turn.facts} knowledge facts, ${origin.retrieved_this_turn.learned} corpus items and ${origin.retrieved_this_turn.memories} memories were retrieved this turn solely to key the cache, and reached no reasoner.`
-      : ''
+  const origin=provenance.answer_origin
+  if(origin?.from_cache){
+    const written=origin.stored_at?`written ${origin.stored_at}`:'written on an earlier turn (no stored-at recorded)'
+    const by=origin.model?` by ${origin.model}`:''
+    const policy=origin.policy_version?`, under answer policy ${origin.policy_version}`:''
     lines.push(
-      `Answer Origin         : SERVED FROM CACHE — reply ${written}${by}${policy}. No reasoning ran on this request; the component lines below describe the turn that produced this answer.${retrieved}`,
+      `Answer Origin         : SERVED FROM CACHE — reply ${written}${by}${policy}. No local reasoning ran on this request.`,
+      `Origin Evidence       : ${originFunnelText(origin.evidence_funnel as EvidenceFunnel|null)}.`,
     )
   }
 
@@ -136,19 +148,17 @@ export function formatAuthoritativeProvenance(
 
   lines.push(
     `Semantic Cache        : ${usedLabel(provenance.semantic_cache.used)} — ${provenance.semantic_cache.evidence_count} cached result${provenance.semantic_cache.evidence_count === 1 ? '' : 's'} contributed.`,
-    `Enterprise Memory     : ${usedLabel(em.used)} — ${em.evidence_count} cited of ${em.retrieved_count ?? em.evidence_count} retrieved retained fact${(em.retrieved_count ?? em.evidence_count) === 1 ? '' : 's'}.`,
-    `Knowledge Graph       : ${usedLabel(kg.used)} — ${kg.evidence_count} cited of ${kg.retrieved_count ?? kg.evidence_count} retrieved graph-backed fact${(kg.retrieved_count ?? kg.evidence_count) === 1 ? '' : 's'}.`,
-    `Learned Corpus        : ${usedLabel(lc.used)} — ${lc.evidence_count} cited of ${lc.retrieved_count ?? lc.evidence_count} retrieved learned item${(lc.retrieved_count ?? lc.evidence_count) === 1 ? '' : 's'}.`,
-    `User Memory           : ${usedLabel(um.used)} — ${um.evidence_count} cited of ${um.retrieved_count ?? um.evidence_count} retrieved saved memor${(um.retrieved_count ?? um.evidence_count) === 1 ? 'y' : 'ies'}.`,
+    `Enterprise Memory     : ${funnelText(provenance.enterprise_memory,'retained fact','retained facts')}`,
+    `Knowledge Graph       : ${funnelText(provenance.knowledge_graph,'graph-backed fact','graph-backed facts')}`,
+    `Learned Corpus        : ${funnelText(provenance.learned_corpus,'learned item','learned items')}`,
+    `User Memory           : ${funnelText(provenance.user_memory,'saved memory','saved memories')}`,
     `Autonomous Research   : ${usedLabel(provenance.autonomous_research.used)} — ${provenance.autonomous_research.documents_acquired} documents acquired; ${provenance.autonomous_research.new_knowledge_retained} new knowledge items retained during this request.`,
     `Local Reasoning Engine: ${invokedLabel(provenance.local_reasoning.invoked)}${provenance.local_reasoning.model ? ` — ${provenance.local_reasoning.model}` : ''}.`,
     `External AI Provider  : ${invokedLabel(provenance.external_ai.invoked)}${provenance.external_ai.invoked ? ` — provider ${provenance.external_ai.provider || 'unknown'}${provenance.external_ai.model ? `; model ${provenance.external_ai.model}` : ''}` : ' — no OpenAI, Anthropic, Gemini, or other external model contributed to the recorded answer.'}`,
   )
 
   if (provenance.local_reasoning.confidence != null) {
-    // On a cache hit this number was scored when the answer was WRITTEN. Presenting it bare
-    // implies a gate evaluated this request, which it did not.
-    const inherited = origin?.from_cache ? ' Recorded when the cached answer was generated; no confidence gate ran on this request.' : ''
+    const inherited=origin?.from_cache?' Recorded when the cached answer was generated; no confidence gate ran on this request.':''
     lines.push(`COS Confidence        : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${provenance.local_reasoning.threshold.toFixed(2)}.${inherited}`)
   }
   if (language !== 'en') lines.push('', 'Note: provenance labels remain explicit and stable; the recorded values above are language-independent telemetry.')

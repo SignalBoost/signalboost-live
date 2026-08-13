@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle'
 import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index'
+import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors'
 import { createLiveLearningAdapters, guardLearningSourceAdapter } from '../lib/cos-core/layers/learning/liveSources'
 import { createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients'
 
@@ -43,7 +44,7 @@ test('transcript search uses one YouTube discovery and returns the full transcri
   }) as typeof fetch
 
   const search = createYouTubeTranscriptSearch('test-key', {
-    transcriptApiUrl: 'https://pod-8888.proxy.runpod.net/transcript',
+    transcriptApiUrl: 'https://pod-11434.proxy.runpod.net/transcript',
     transcriptApiToken: 'test-token',
     metadataFallback: true,
   }, fetcher)
@@ -56,6 +57,31 @@ test('transcript search uses one YouTube discovery and returns the full transcri
   assert.ok(!String(results[0].license).toLowerCase().includes('metadata'))
 })
 
+test('repeated subject discovery is cached within one learning run', async () => {
+  const calls: string[] = []
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.includes('youtube/v3/search')) return youtubeSearchResponse()
+    return new Response(JSON.stringify({ transcript: 'Substantive transcript evidence about tenant latency and connection pools. '.repeat(8) }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  const search = createYouTubeTranscriptSearch('test-key', { transcriptApiUrl: 'https://pod-11434.proxy.runpod.net/transcript', metadataFallback: true }, fetcher)
+
+  await search('Multi-tenant SaaS performance isolation', 2)
+  await search('Multi-tenant SaaS performance isolation', 2)
+
+  assert.equal(calls.filter(url => url.includes('youtube/v3/search')).length, 1, 'same subject should spend one search.list call')
+  assert.equal(calls.filter(url => url.includes('/transcript')).length, 2, 'transcript lookup may be retried for each question while discovery is shared')
+})
+
+test('YouTube learning connector searches by subject while relevance remains question-specific downstream', async () => {
+  const queries: string[] = []
+  const connector = youtubeLearningConnector(async (query) => { queries.push(query); return [] }, 2, 'youtube-test')
+  await connector.acquire(GAP)
+  await connector.acquire({ ...GAP, id: 'curriculum:multi-tenant-saas-performance-2', question: 'How do cache evictions affect enterprise tenants?' })
+  assert.deepEqual(queries, [GAP.subject, GAP.subject])
+})
+
 test('transcript failure reuses the same discovery result as metadata instead of issuing another YouTube search', async () => {
   const calls: string[] = []
   const fetcher = (async (input: any) => {
@@ -66,7 +92,7 @@ test('transcript failure reuses the same discovery result as metadata instead of
   }) as typeof fetch
 
   const search = createYouTubeTranscriptSearch('test-key', {
-    transcriptApiUrl: 'https://pod-8888.proxy.runpod.net/transcript',
+    transcriptApiUrl: 'https://pod-11434.proxy.runpod.net/transcript',
     metadataFallback: true,
   }, fetcher)
   const results = await search('postgresql tenant latency', 2)

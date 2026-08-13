@@ -39,3 +39,62 @@ test('semantic cache lookup and write embed the same canonical context for an id
   assert.equal(saved.length, 1)
   assert.doesNotMatch(saved[0].contextText, /relevance\s+0\./i)
 })
+
+test('identical prompt and material context hit before embedding even when ranking scores changed', async () => {
+  let embeddings = 0
+  let nearestCalls = 0
+  const cached = { reply: 'cached answer', origin: { userMemoriesUsed: 0 } }
+  const knowledge = new KnowledgeLayer({
+    generateEmbedding: async () => { embeddings += 1; return [1, 0] },
+    store: {
+      queryExact: async () => ({
+        taskId: 'cos-first-answer@policy',
+        originalPrompt: 'same prompt',
+        contextText: '[SK1] Diagnose latency [status validated; relevance 0.71; procedural guidance only]',
+        responsePayload: cached,
+        similarityScore: 1,
+      }),
+      queryNearest: async () => { nearestCalls += 1; return null },
+      save: async () => {},
+    },
+  })
+
+  const hit = await knowledge.lookupSemanticCache(
+    'cos-first-answer@policy',
+    'same prompt',
+    '[SK1] Diagnose latency [status validated; relevance 0.89; procedural guidance only]',
+  )
+
+  assert.ok(hit)
+  assert.equal(hit!.responsePayload, cached)
+  assert.equal(hit!.similarityScore, 1)
+  assert.equal(embeddings, 0)
+  assert.equal(nearestCalls, 0)
+})
+
+test('exact prompt does not bypass a material context change', async () => {
+  let embeddings = 0
+  const knowledge = new KnowledgeLayer({
+    generateEmbedding: async () => { embeddings += 1; return [1, 0] },
+    store: {
+      queryExact: async () => ({
+        taskId: 'cos-first-answer@policy',
+        originalPrompt: 'same prompt',
+        contextText: '[KG1] tenant latency — mechanism — plan shift [confidence 0.90; similarity 0.71; source internal]',
+        responsePayload: { reply: 'old' },
+        similarityScore: 1,
+      }),
+      queryNearest: async () => null,
+      save: async () => {},
+    },
+  })
+
+  const hit = await knowledge.lookupSemanticCache(
+    'cos-first-answer@policy',
+    'same prompt',
+    '[KG1] tenant latency — mechanism — cache-thrash shift [confidence 0.90; similarity 0.71; source internal]',
+  )
+
+  assert.equal(hit, null)
+  assert.equal(embeddings, 1)
+})

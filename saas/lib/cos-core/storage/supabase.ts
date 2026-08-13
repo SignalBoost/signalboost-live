@@ -18,6 +18,24 @@ export function cosServiceDb(): SupabaseClient | null {
 export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
   constructor(private readonly db: SupabaseClient) {}
 
+  async queryExact(options: { taskId: string; prompt: string }): Promise<CachedResponse | null> {
+    const { data, error } = await this.db.from('cos_knowledge_records')
+      .select('prompt_text,context_text,response_data')
+      .eq('task_id', options.taskId)
+      .eq('prompt_text', options.prompt)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    return data ? {
+      taskId: options.taskId,
+      originalPrompt: String(data.prompt_text ?? ''),
+      contextText: String(data.context_text ?? ''),
+      responsePayload: data.response_data,
+      similarityScore: 1,
+    } : null
+  }
+
   async queryNearest(vector: number[], options: { taskId: string }): Promise<CachedResponse | null> {
     const { data, error } = await this.db.rpc('cos_match_knowledge', {
       query_embedding: vector,

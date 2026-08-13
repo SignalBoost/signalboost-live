@@ -42,7 +42,16 @@ export class KnowledgeLayer {
 
   async lookupSemanticCache(taskId: string, prompt: string, contextWindow: string): Promise<CachedResponse | null> {
     try {
-      const embedding = await this.dependencies.generateEmbedding(semanticEmbeddingInput(prompt, contextWindow))
+      const stableContext = canonicalizeSemanticCacheContext(contextWindow)
+      const exact = await this.dependencies.store.queryExact?.({ taskId, prompt })
+      if (exact) {
+        const exactContext = canonicalizeSemanticCacheContext(exact.contextText ?? '')
+        if (exactContext === stableContext && !responseUsesUserMemory(exact.responsePayload)) {
+          return { ...exact, similarityScore: 1 }
+        }
+      }
+
+      const embedding = await this.dependencies.generateEmbedding(semanticEmbeddingInput(prompt, stableContext))
       const nearestMatch = await this.dependencies.store.queryNearest(embedding, { taskId })
       if (!nearestMatch || nearestMatch.similarityScore < this.similarityThreshold) return null
       if (responseUsesUserMemory(nearestMatch.responsePayload)) return null

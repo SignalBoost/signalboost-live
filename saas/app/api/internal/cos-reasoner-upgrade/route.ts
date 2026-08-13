@@ -110,7 +110,7 @@ async function runTeacherBenchmark() {
   const local = await tryCOSFirstAnswer({ prompt: BENCHMARK, language: 'English', userId: null, privileged: true })
   const teacher = await geminiAnswer(BENCHMARK, 3000)
   const localAnswer = local.handled ? local.reply : ('bestEffortReply' in local ? local.bestEffortReply || null : null)
-  const localReason = local.handled ? null : local.reason
+  const localReason = local.handled ? null : ('reason' in local ? local.reason : null)
   const assessment = assessAnswerSpecificity(teacher.text)
   await recordTeacherEscalation({
     prompt: BENCHMARK,
@@ -128,7 +128,7 @@ async function runTeacherBenchmark() {
     },
   })
   return {
-    local: { handled: local.handled, confidence: local.confidence, reason: local.handled ? null : local.reason, answer: localAnswer },
+    local: { handled: local.handled, confidence: local.confidence, reason: localReason, answer: localAnswer },
     teacher: { provider: 'gemini', model: teacher.model, answer: teacher.text, specificity: assessment },
   }
 }

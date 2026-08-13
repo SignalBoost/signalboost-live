@@ -36,6 +36,8 @@ test('parallel credit readers share one native request and receive cloned bodies
 test('credit cache cannot survive auth/session changes or metered credit mutations', async () => {
   const coordinator = await source('components/runtime/CreditStatusRequestCoordinator.tsx')
   assert.match(coordinator, /cookieFingerprint/)
+  assert.match(coordinator, /supabase\.auth\.onAuthStateChange\(\(\) => invalidate\(\)\)/)
+  assert.match(coordinator, /authListener\.subscription\.unsubscribe\(\)/)
   assert.match(coordinator, /key\.includes\('supabase'\) \|\| key\.includes\('auth'\)/)
   assert.match(coordinator, /signalboost:credits-invalidated/)
   assert.match(coordinator, /\/api\/video-generate/)

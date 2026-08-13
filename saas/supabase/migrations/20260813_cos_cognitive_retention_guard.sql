@@ -20,7 +20,7 @@ begin
         when 'learned' then interval '21 days'
         else interval '14 days'
       end;
-  elsif new.status = 'weakened' and (
+  elsif new.weakened_at is not null and (
     new.next_retention_due_at is null or new.next_retention_due_at > now() + interval '1 day'
   ) then
     new.next_retention_due_at := now() + interval '1 day';

@@ -7,6 +7,7 @@ import AppShell from '@/components/layout/AppShell'
 import ShareRouteChrome from '@/components/layout/ShareRouteChrome'
 import LanguageSuggestion from '@/components/LanguageSuggestion'
 import ProductContextBridge from '@/components/ProductContextBridge'
+import CreditStatusRequestCoordinator from '@/components/runtime/CreditStatusRequestCoordinator'
 import { I18nProvider } from '@/components/i18n/I18nProvider'
 import { Analytics } from '@vercel/analytics/react'
 const SITE_URL = 'https://saas.signalboostapp.com'
@@ -155,6 +156,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
         </div>
         <I18nProvider>
+          <CreditStatusRequestCoordinator />
           <ShareRouteChrome>
             <Navbar />
           </ShareRouteChrome>

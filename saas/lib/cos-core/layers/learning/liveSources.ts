@@ -4,11 +4,38 @@ import { crossrefScientificSearch,europePmcScientificSearch,openAlexScientificSe
 import { createGdeltNewsSearch,createYouTubeMetadataSearch,createYouTubeTranscriptSearch } from './mediaClients'
 import { BUILTIN_OFFICIAL_TECH_FEEDS,createFeedSearch,parseFeedList } from './feedClients'
 
-export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string }
+export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
 function externalGapOnly(adapter:ContinuousLearningSourceAdapter):ContinuousLearningSourceAdapter{return{kind:adapter.kind,id:adapter.id,async acquire(gap){if(gap.id.startsWith('daily-mining-'))return[];return adapter.acquire(gap)}}}
 function failureLimit(env:LiveLearningEnvironment):number{const value=Number(env.COS_LEARNING_SOURCE_FAILURE_LIMIT||'3');return Number.isFinite(value)?Math.max(1,Math.min(10,Math.round(value))):3}
 function circuitBreak(adapter:ContinuousLearningSourceAdapter,limit:number):ContinuousLearningSourceAdapter{let failures=0,open=false;return{kind:adapter.kind,id:adapter.id,async acquire(gap){if(open)return[];try{const documents=await adapter.acquire(gap);failures=0;return documents}catch(error){failures+=1;if(failures>=limit){open=true;console.warn('cosLearning: source circuit opened',{source:adapter.id??adapter.kind,failures,limit})}throw error}}}}
 function transcriptLanguages(value?:string):string[]{const parsed=String(value||'en').split(',').map(item=>item.trim()).filter(Boolean);return parsed.length?parsed.slice(0,8):['en']}
+
+/**
+ * The RunPod transcript service intentionally runs beside the local reasoner and reuses the same
+ * /workspace/cos-api-key. Explicit transcript variables always win. If they are absent, derive the
+ * 8888 transcript endpoint only from the exact HTTPS RunPod proxy hostname already trusted for the
+ * 11434 reasoner. Never infer from arbitrary hosts.
+ */
+export function resolveYouTubeTranscriptRuntime(env:LiveLearningEnvironment):{url:string;token?:string;derived:boolean}{
+  const explicitUrl=String(env.YOUTUBE_TRANSCRIPT_API_URL||'').trim()
+  const explicitToken=String(env.YOUTUBE_TRANSCRIPT_API_TOKEN||'').trim()
+  if(explicitUrl)return{url:explicitUrl,token:explicitToken||String(env.LOCAL_AI_API_KEY||'').trim()||undefined,derived:false}
+
+  const base=String(env.LOCAL_AI_BASE_URL||'').trim()
+  if(!base)return{url:'',token:undefined,derived:false}
+  try{
+    const parsed=new URL(base)
+    const match=parsed.hostname.match(/^([a-z0-9-]+)-11434\.proxy\.runpod\.net$/i)
+    if(parsed.protocol!=='https:'||!match)return{url:'',token:undefined,derived:false}
+    parsed.hostname=`${match[1]}-8888.proxy.runpod.net`
+    parsed.port=''
+    parsed.pathname='/transcript'
+    parsed.search=''
+    parsed.hash=''
+    return{url:parsed.toString(),token:explicitToken||String(env.LOCAL_AI_API_KEY||'').trim()||undefined,derived:true}
+  }catch{return{url:'',token:undefined,derived:false}}
+}
+
 /**
  * External learning sources are available by default whenever the autonomous-learning
  * cycle calls this factory. COS_LIVE_SOURCES_ENABLED=false remains an explicit emergency
@@ -21,7 +48,8 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
   if(configuredTechFeeds.length)adapters.push(newsLearningConnector(createFeedSearch(configuredTechFeeds),3,'tech_feeds'))
   if(env.YOUTUBE_API_KEY){
     adapters.push(youtubeLearningConnector(createYouTubeMetadataSearch(env.YOUTUBE_API_KEY),2,'youtube_metadata'))
-    if(env.YOUTUBE_TRANSCRIPT_API_URL)adapters.push(youtubeLearningConnector(createYouTubeTranscriptSearch(env.YOUTUBE_API_KEY,{transcriptApiUrl:env.YOUTUBE_TRANSCRIPT_API_URL,transcriptApiToken:env.YOUTUBE_TRANSCRIPT_API_TOKEN,languages:transcriptLanguages(env.YOUTUBE_TRANSCRIPT_LANGUAGES)}),2,'youtube_transcript'))
+    const transcript=resolveYouTubeTranscriptRuntime(env)
+    if(transcript.url)adapters.push(youtubeLearningConnector(createYouTubeTranscriptSearch(env.YOUTUBE_API_KEY,{transcriptApiUrl:transcript.url,transcriptApiToken:transcript.token,languages:transcriptLanguages(env.YOUTUBE_TRANSCRIPT_LANGUAGES)}),2,transcript.derived?'youtube_transcript_runpod':'youtube_transcript'))
   }
   const limit=failureLimit(env)
   return adapters.map(externalGapOnly).map(adapter=>circuitBreak(adapter,limit))

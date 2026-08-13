@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
+import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
 
 export const runtime = 'nodejs'
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
   let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
+  let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
     try {
@@ -48,6 +50,16 @@ export async function GET(req: NextRequest) {
       cognitive = { enabled: false, errors: [message] }
     }
 
+    // Consolidation shares the existing daily schedule. It re-tests retained skills after time,
+    // weakens stale/repeatedly failing skills, and never counts a delayed replay as new holdout breadth.
+    try {
+      consolidation = await runCognitiveConsolidationCycle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Cognitive consolidation failed'
+      console.error('cron COS cognitive consolidation failed:', message)
+      consolidation = { enabled: false, errors: [message] }
+    }
+
     try {
       const queued = await queueStaleCorpusRecords(250)
       const refreshed = process.env.PROSPECT_LIVE_PROVIDER_EXECUTION === '1'
@@ -61,5 +73,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, corpus })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, consolidation, corpus })
 }

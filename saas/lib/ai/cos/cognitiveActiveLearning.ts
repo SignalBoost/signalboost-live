@@ -1,6 +1,6 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
+import { createExternalTeacherAiPort, type ExternalTeacherProvider } from '@/lib/cos/aiPort'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import {
   buildLocalPracticeGenerationPrompt,
@@ -37,7 +37,7 @@ function externalEvaluationEnabled(): boolean {
   return process.env.COS_COGNITIVE_EXTERNAL_EVALUATION_ENABLED === 'true'
 }
 
-function externalEvaluatorProvider(): Exclude<ModelProvider, 'local'> {
+function configuredEvaluatorProvider(): ExternalTeacherProvider {
   const configured = process.env.COS_COGNITIVE_EVALUATOR_PROVIDER?.trim().toLowerCase()
   if (configured === 'openai' || configured === 'claude' || configured === 'gemini') return configured
   return 'gemini'
@@ -60,22 +60,38 @@ function skillEvidence(row: any): CognitiveSkillEvidence {
   }
 }
 
-async function insertPromotion(db: NonNullable<ReturnType<typeof cosServiceDb>>, row: any, nextStatus: CognitiveSkillStatus, reasons: string[]): Promise<void> {
-  if (String(row.status) === nextStatus) return
-  await db.from('cos_learning_promotions').insert({
-    skill_key: row.skill_key,
-    from_status: row.status,
-    to_status: nextStatus,
-    evidence: {
-      ...skillEvidence(row),
-      eligibility: evaluateCognitiveSkillEligibility(skillEvidence(row)),
-    },
-    policy_version: 'cognitive-promotion-v1',
-    reason: reasons.join(' '),
-  })
+function draftFromSkillRow(row: any): CognitiveSkillDraft {
+  const procedure = row?.procedure && typeof row.procedure === 'object' ? row.procedure : {}
+  const asStrings = (value: unknown): string[] => Array.isArray(value) ? value.map(item => clean(item, 900)).filter(Boolean) : []
+  return {
+    title: clean(row?.title, 180),
+    description: clean(row?.description, 1600),
+    problemClass: clean(procedure.problemClass || row?.subject, 320),
+    prerequisites: asStrings(procedure.prerequisites),
+    procedureSteps: asStrings(procedure.procedureSteps || procedure.principles),
+    discriminatingSignals: asStrings(procedure.discriminatingSignals),
+    tools: asStrings(procedure.tools),
+    observables: asStrings(procedure.observables),
+    falsifiers: asStrings(procedure.falsifiers),
+    commonFailureModes: asStrings(procedure.commonFailureModes),
+    prohibitedActions: asStrings(procedure.prohibitedActions),
+  }
 }
 
-export async function refreshCognitiveSkillStatus(skillKey: string): Promise<{ status: CognitiveSkillStatus; changed: boolean; eligibility: ReturnType<typeof evaluateCognitiveSkillEligibility> } | null> {
+async function refreshLinkedTeacherStatus(db: NonNullable<ReturnType<typeof cosServiceDb>>, row: any, status: CognitiveSkillStatus): Promise<void> {
+  const lessonId = Number(row?.provenance?.teacher_lesson_id)
+  if (!Number.isFinite(lessonId) || lessonId <= 0) return
+  await db.from('cos_teacher_lessons').update({
+    status: STRONG_STATUSES.has(status) ? 'promoted' : 'evaluated',
+    updated_at: new Date().toISOString(),
+  }).eq('id', lessonId)
+}
+
+export async function refreshCognitiveSkillStatus(skillKey: string): Promise<{
+  status: CognitiveSkillStatus
+  changed: boolean
+  eligibility: ReturnType<typeof evaluateCognitiveSkillEligibility>
+} | null> {
   const db = cosServiceDb()
   if (!db) return null
   const result = await db.from('cos_cognitive_skills').select('*').eq('skill_key', skillKey).maybeSingle()
@@ -84,18 +100,25 @@ export async function refreshCognitiveSkillStatus(skillKey: string): Promise<{ s
   const eligibility = evaluateCognitiveSkillEligibility(skillEvidence(row))
   const nextStatus = eligibility.recommendedStatus
   const changed = String(row.status) !== nextStatus
+
   if (changed) {
-    await insertPromotion(db, row, nextStatus, eligibility.reasons)
-    const update = await db.from('cos_cognitive_skills').update({ status: nextStatus, updated_at: new Date().toISOString() }).eq('id', row.id)
+    const promotion = await db.from('cos_learning_promotions').insert({
+      skill_key: row.skill_key,
+      from_status: row.status,
+      to_status: nextStatus,
+      evidence: { ...skillEvidence(row), eligibility },
+      policy_version: 'cognitive-promotion-v1',
+      reason: eligibility.reasons.join(' '),
+    })
+    if (promotion.error) throw promotion.error
+    const update = await db.from('cos_cognitive_skills').update({
+      status: nextStatus,
+      updated_at: new Date().toISOString(),
+    }).eq('id', row.id)
     if (update.error) throw update.error
   }
 
-  if (STRONG_STATUSES.has(nextStatus)) {
-    const teacherLessonId = Number(row.provenance?.teacher_lesson_id)
-    if (Number.isFinite(teacherLessonId) && teacherLessonId > 0) {
-      await db.from('cos_teacher_lessons').update({ status: 'promoted', updated_at: new Date().toISOString() }).eq('id', teacherLessonId)
-    }
-  }
+  await refreshLinkedTeacherStatus(db, row, nextStatus)
   return { status: nextStatus, changed, eligibility }
 }
 
@@ -108,7 +131,9 @@ async function enqueueVariant(args: {
 }): Promise<boolean> {
   const db = cosServiceDb()
   if (!db) return false
-  if (args.kind === 'holdout' && args.generationSource === 'local_generator') throw new Error('Local-generated variants cannot be holdouts.')
+  if (args.kind === 'holdout' && args.generationSource === 'local_generator') {
+    throw new Error('Local-generated variants cannot be holdouts.')
+  }
   const result = await db.from('cos_active_practice_queue').upsert({
     skill_key: args.skillKey,
     teacher_lesson_id: args.teacherLessonId,
@@ -128,12 +153,21 @@ async function enqueueVariant(args: {
 }
 
 async function linkedSkillForLesson(db: NonNullable<ReturnType<typeof cosServiceDb>>, lessonId: number): Promise<any | null> {
-  const result = await db.from('cos_cognitive_skills').select('*').contains('provenance', { teacher_lesson_id: lessonId }).limit(1).maybeSingle()
+  const result = await db.from('cos_cognitive_skills')
+    .select('*')
+    .contains('provenance', { teacher_lesson_id: lessonId })
+    .limit(1)
+    .maybeSingle()
   if (result.error) return null
   return result.data ?? null
 }
 
-async function persistDraft(db: NonNullable<ReturnType<typeof cosServiceDb>>, lesson: any, draft: CognitiveSkillDraft, reasonerLabel: string): Promise<any> {
+async function persistDraft(
+  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  lesson: any,
+  draft: CognitiveSkillDraft,
+  reasonerLabel: string,
+): Promise<any> {
   const skillKey = skillKeyForDraft(draft)
   const existing = await db.from('cos_cognitive_skills').select('*').eq('skill_key', skillKey).maybeSingle()
   if (existing.error) throw existing.error
@@ -154,14 +188,14 @@ async function persistDraft(db: NonNullable<ReturnType<typeof cosServiceDb>>, le
   }
 
   if (existing.data?.id) {
-    const existingStatus = String(existing.data.status) as CognitiveSkillStatus
+    const currentStatus = String(existing.data.status) as CognitiveSkillStatus
     const patch: Record<string, unknown> = {
       encounter_count: Number(existing.data.encounter_count || 0) + 1,
       provenance,
       metadata,
       updated_at: now,
     }
-    if (!STRONG_STATUSES.has(existingStatus) && existingStatus !== 'quarantined') {
+    if (!STRONG_STATUSES.has(currentStatus) && currentStatus !== 'quarantined') {
       patch.title = draft.title
       patch.description = draft.description
       patch.procedure = cognitiveSkillProcedure(draft)
@@ -200,7 +234,13 @@ async function generateLocalPractice(lesson: any, draft: CognitiveSkillDraft, sk
   const variants = parsePracticeVariants(reasoned.text).slice(0, 2)
   let queued = 0
   for (const variant of variants) {
-    if (await enqueueVariant({ skillKey, teacherLessonId: Number(lesson.id), kind: 'practice', variant, generationSource: 'local_generator' })) queued += 1
+    if (await enqueueVariant({
+      skillKey,
+      teacherLessonId: Number(lesson.id),
+      kind: 'practice',
+      variant,
+      generationSource: 'local_generator',
+    })) queued += 1
   }
   return queued
 }
@@ -208,15 +248,15 @@ async function generateLocalPractice(lesson: any, draft: CognitiveSkillDraft, sk
 async function runUnderstandingCheck(args: {
   skillRow: any
   variant: CognitivePracticeVariant
-  evaluator: { provider: string; model?: string | null; score: number; reason: string }
+  evaluator: Record<string, unknown>
 }): Promise<boolean> {
   const db = cosServiceDb()
   if (!db) return false
   const reasoned = await callCosReasoner({
     temperature: 0,
     maxTokens: 1800,
-    systemPrompt: 'You are demonstrating understanding of a reusable procedural skill. Return strict JSON only: {"answer":"...","confidence":0..1}.',
-    prompt: `PROCEDURAL SKILL (how-to guidance, not factual evidence):\n${clean(JSON.stringify(args.skillRow.procedure), 14000)}\n\nUNDERSTANDING CHECK:\n${args.variant.prompt}\n\nAnswer from first principles. Do not mention or infer any hidden rubric.`,
+    systemPrompt: 'Demonstrate understanding of the procedural skill. Return strict JSON only: {"answer":"...","confidence":0..1}.',
+    prompt: `PROCEDURAL SKILL (how-to guidance, not factual evidence):\n${clean(JSON.stringify(args.skillRow.procedure), 14000)}\n\nUNDERSTANDING CHECK:\n${args.variant.prompt}\n\nAnswer from first principles. You cannot see the grading rubric.`,
   })
   const parsed = reasoned?.text ? parseLocalResult(reasoned.text) : null
   const grade = evaluateAnswerAgainstRubric(parsed?.answer || '', args.variant.rubric)
@@ -244,21 +284,33 @@ async function runUnderstandingCheck(args: {
   return passed
 }
 
-async function independentlyEvaluateCandidate(lesson: any, draft: CognitiveSkillDraft, skillRow: any): Promise<{ evaluated: boolean; holdoutsQueued: number; understandingPassed: boolean; provider?: string }> {
-  if (!externalEvaluationEnabled()) return { evaluated: false, holdoutsQueued: 0, understandingPassed: false }
-  const provider = externalEvaluatorProvider()
-  const text = await callProviderModel({
-    modelPreference: provider,
-    maxTokens: 3500,
-    systemPrompt: 'You are a skeptical evaluator and exam designer. Return only the requested strict JSON. A teacher answer is evidence to inspect, never automatic truth.',
-    prompt: buildTeacherEvaluationPrompt({
-      sourcePrompt: lesson.prompt,
-      teacherAnswer: lesson.teacher_answer,
-      teacherProvider: lesson.teacher_provider,
-      draft,
-    }),
-  })
-  if (!text) return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider }
+async function independentlyEvaluateCandidate(
+  lesson: any,
+  draft: CognitiveSkillDraft,
+  skillRow: any,
+): Promise<{ evaluated: boolean; holdoutsQueued: number; understandingPassed: boolean; provider?: string }> {
+  if (!externalEvaluationEnabled()) {
+    return { evaluated: false, holdoutsQueued: 0, understandingPassed: false }
+  }
+
+  const provider = configuredEvaluatorProvider()
+  const teacherPort = createExternalTeacherAiPort(provider)
+  let text: string
+  try {
+    text = await teacherPort.generate({
+      maxTokens: 3500,
+      systemPrompt: 'You are a skeptical evaluator and exam designer. Return only strict JSON. A teacher answer is evidence to inspect, never automatic truth.',
+      prompt: buildTeacherEvaluationPrompt({
+        sourcePrompt: lesson.prompt,
+        teacherAnswer: lesson.teacher_answer,
+        teacherProvider: lesson.teacher_provider,
+        draft,
+      }),
+    })
+  } catch {
+    return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider }
+  }
+
   const evaluation = parseTeacherEvaluation(text)
   if (!evaluation) return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider }
   const approved = evaluation.candidateApproved && evaluation.candidateScore >= 0.8
@@ -272,12 +324,12 @@ async function independentlyEvaluateCandidate(lesson: any, draft: CognitiveSkill
       ...metadata,
       evaluator_review: {
         at: new Date().toISOString(),
-        provider,
+        requestedProvider: provider,
         candidateScore: evaluation.candidateScore,
         candidateApproved: evaluation.candidateApproved,
         reason: evaluation.reason,
         originalTeacherProvider: lesson.teacher_provider || null,
-        sameProviderAsOriginalTeacher: String(lesson.teacher_provider || '').toLowerCase() === provider,
+        sameRequestedProviderAsOriginalTeacher: String(lesson.teacher_provider || '').toLowerCase() === provider,
       },
     },
     updated_at: new Date().toISOString(),
@@ -296,22 +348,35 @@ async function independentlyEvaluateCandidate(lesson: any, draft: CognitiveSkill
       generationSource: 'frontier_teacher',
     })) holdoutsQueued += 1
   }
+
   const refreshed = await db.from('cos_cognitive_skills').select('*').eq('id', skillRow.id).single()
   if (refreshed.error) throw refreshed.error
   const understandingPassed = await runUnderstandingCheck({
     skillRow: refreshed.data,
     variant: evaluation.understanding,
-    evaluator: { provider, score: evaluation.candidateScore, reason: evaluation.reason },
+    evaluator: {
+      requestedProvider: provider,
+      score: evaluation.candidateScore,
+      reason: evaluation.reason,
+    },
   })
   return { evaluated: true, holdoutsQueued, understandingPassed, provider }
 }
 
-async function markLessonAttempt(db: NonNullable<ReturnType<typeof cosServiceDb>>, lesson: any, patch: Record<string, unknown>): Promise<void> {
+async function markLessonAttempt(
+  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  lesson: any,
+  patch: Record<string, unknown>,
+): Promise<void> {
   const metadata = lesson.metadata && typeof lesson.metadata === 'object' ? lesson.metadata : {}
   const attempts = Number(metadata.cognitive_evaluation_attempts || 0) + 1
   const result = await db.from('cos_teacher_lessons').update({
     ...patch,
-    metadata: { ...metadata, cognitive_evaluation_attempts: attempts, last_cognitive_evaluation_at: new Date().toISOString() },
+    metadata: {
+      ...metadata,
+      cognitive_evaluation_attempts: attempts,
+      last_cognitive_evaluation_at: new Date().toISOString(),
+    },
     updated_at: new Date().toISOString(),
   }).eq('id', lesson.id)
   if (result.error) throw result.error
@@ -320,7 +385,12 @@ async function markLessonAttempt(db: NonNullable<ReturnType<typeof cosServiceDb>
 export async function evaluateNextTeacherLesson(): Promise<Record<string, unknown> | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const lessonResult = await db.from('cos_teacher_lessons').select('*').in('status', ['captured', 'evaluated']).order('updated_at', { ascending: true }).limit(1).maybeSingle()
+  const lessonResult = await db.from('cos_teacher_lessons')
+    .select('*')
+    .in('status', ['captured', 'evaluated'])
+    .order('updated_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
   if (lessonResult.error) throw lessonResult.error
   const lesson = lessonResult.data as any
   if (!lesson) return null
@@ -328,15 +398,21 @@ export async function evaluateNextTeacherLesson(): Promise<Record<string, unknow
   const linked = await linkedSkillForLesson(db, Number(lesson.id))
   if (linked) {
     const refreshed = await refreshCognitiveSkillStatus(linked.skill_key)
-    const strong = refreshed ? STRONG_STATUSES.has(refreshed.status) : STRONG_STATUSES.has(String(linked.status) as CognitiveSkillStatus)
-    await db.from('cos_teacher_lessons').update({ status: strong ? 'promoted' : 'evaluated', updated_at: new Date().toISOString() }).eq('id', lesson.id)
-    return { lessonId: lesson.id, linkedSkill: linked.skill_key, status: refreshed?.status || linked.status, reusedExisting: true }
+    const status = refreshed?.status || (String(linked.status) as CognitiveSkillStatus)
+    if (STRONG_STATUSES.has(status)) {
+      return { lessonId: lesson.id, linkedSkill: linked.skill_key, status, reusedExisting: true }
+    }
+    if (!linked.evaluator_approved && externalEvaluationEnabled()) {
+      const independent = await independentlyEvaluateCandidate(lesson, draftFromSkillRow(linked), linked)
+      return { lessonId: lesson.id, linkedSkill: linked.skill_key, status, reusedExisting: true, independentEvaluation: independent }
+    }
+    return { lessonId: lesson.id, linkedSkill: linked.skill_key, status, reusedExisting: true, awaitingIndependentEvaluation: !linked.evaluator_approved }
   }
 
   const reflected = await callCosReasoner({
     temperature: 0.15,
     maxTokens: 3000,
-    systemPrompt: 'You are COS reflecting on a failed/escalated experience. Produce only the requested reusable-skill JSON. A teacher response is not automatically true.',
+    systemPrompt: 'You are COS reflecting on a failed/escalated experience. Produce only reusable-skill JSON. A teacher response is not automatically true.',
     prompt: buildSkillExtractionPrompt({
       prompt: lesson.prompt,
       localAnswer: lesson.local_answer,
@@ -348,6 +424,7 @@ export async function evaluateNextTeacherLesson(): Promise<Record<string, unknow
     await markLessonAttempt(db, lesson, {})
     return { lessonId: lesson.id, outcome: 'local_reflection_unavailable' }
   }
+
   const draft = parseCognitiveSkillDraft(reflected.text)
   if (!draft) {
     await markLessonAttempt(db, lesson, {})
@@ -357,11 +434,16 @@ export async function evaluateNextTeacherLesson(): Promise<Record<string, unknow
   if (!validation.ok) {
     const priorAttempts = Number(lesson.metadata?.cognitive_evaluation_attempts || 0)
     await markLessonAttempt(db, lesson, { status: priorAttempts >= 2 ? 'rejected' : 'captured' })
-    return { lessonId: lesson.id, outcome: 'candidate_structure_rejected', reasons: validation.reasons, reasoner: reflected.reasoner.label }
+    return {
+      lessonId: lesson.id,
+      outcome: 'candidate_structure_rejected',
+      reasons: validation.reasons,
+      reasoner: reflected.reasoner.label,
+    }
   }
 
   const skillRow = await persistDraft(db, lesson, draft, reflected.reasoner.label)
-  await db.from('cos_teacher_lessons').update({
+  const lessonUpdate = await db.from('cos_teacher_lessons').update({
     status: 'evaluated',
     metadata: {
       ...(lesson.metadata && typeof lesson.metadata === 'object' ? lesson.metadata : {}),
@@ -370,6 +452,7 @@ export async function evaluateNextTeacherLesson(): Promise<Record<string, unknow
     },
     updated_at: new Date().toISOString(),
   }).eq('id', lesson.id)
+  if (lessonUpdate.error) throw lessonUpdate.error
 
   const localPracticeQueued = await generateLocalPractice(lesson, draft, skillRow.skill_key)
   const independent = await independentlyEvaluateCandidate(lesson, draft, skillRow)
@@ -409,6 +492,7 @@ export async function runNextCognitivePractice(): Promise<Record<string, unknown
   if (!db) return null
   const item = await claimNextExercise()
   if (!item) return null
+
   try {
     const skillResult = await db.from('cos_cognitive_skills').select('*').eq('skill_key', item.skill_key).maybeSingle()
     if (skillResult.error || !skillResult.data) throw new Error('practice_skill_missing')
@@ -420,7 +504,7 @@ export async function runNextCognitivePractice(): Promise<Record<string, unknown
     const reasoned = await callCosReasoner({
       temperature: 0,
       maxTokens: 3200,
-      systemPrompt: 'Apply the supplied procedural skill independently. Return strict JSON only: {"answer":"...","confidence":0..1}. The skill is how-to guidance, not factual evidence.',
+      systemPrompt: 'Apply the procedural skill independently. Return strict JSON only: {"answer":"...","confidence":0..1}. The skill is how-to guidance, not factual evidence.',
       prompt: `PROCEDURAL SKILL:\n${clean(JSON.stringify(skill.procedure), 15000)}\n\n${String(item.exercise_kind).toUpperCase()} EXERCISE:\n${clean(item.prompt, 12000)}\n\nSolve from the case itself. You cannot see the grading rubric. Do not claim the skill as factual evidence.`,
     })
     const parsed = reasoned?.text ? parseLocalResult(reasoned.text) : null
@@ -456,7 +540,13 @@ export async function runNextCognitivePractice(): Promise<Record<string, unknown
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', item.id)
-    return { queueId: item.id, skillKey: item.skill_key, kind: item.exercise_kind, blocked: true, error: message }
+    return {
+      queueId: item.id,
+      skillKey: item.skill_key,
+      kind: item.exercise_kind,
+      blocked: true,
+      error: message,
+    }
   }
 }
 
@@ -468,9 +558,9 @@ export type CognitiveLearningCycleSummary = {
 }
 
 /**
- * Bounded daily active-learning cycle. It is intended to run inside the existing COS mining cron so
- * learning does not add another scheduled invocation. Local reflection/practice is the default;
- * external evaluation/holdout creation happens only when explicitly enabled.
+ * Bounded active-learning cycle. It is intentionally batched into the existing daily COS mining
+ * cron so learning does not add another scheduled invocation. Local reflection/practice is the
+ * default. Frontier candidate review and holdout creation require explicit opt-in.
  */
 export async function runCognitiveLearningCycle(): Promise<CognitiveLearningCycleSummary> {
   if (process.env.COS_COGNITIVE_ACTIVE_LEARNING_ENABLED === 'false') {

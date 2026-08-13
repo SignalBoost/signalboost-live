@@ -11,6 +11,7 @@ import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/found
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 import { parseLocalResult, citedEvidence } from '@/lib/ai/cos/reasonerOutput'
 import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
+import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/cos/groundingConfidence'
 
 export type EvidenceFunnelStage = {
   retrieved: number
@@ -422,7 +423,6 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     return {handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...base}}
   }
 
-  const evidenceCount=context.facts.length+context.learned.length
   const internalContext=[
     context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',
     context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',
@@ -463,7 +463,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     userMemoriesCited:cited.em,
     evidenceFunnel:executionFunnel(context,true,cited),
   }
-  const ceiling=evidenceCount>=5?.96:evidenceCount>=2?.90:evidenceCount===1?.84:.78
+  const groundedCount=citedKnowledgeEvidenceCount(cited)
+  const ceiling=groundedEvidenceCeiling(groundedCount)
   const specificity=assessAnswerSpecificity(parsed.answer)
   const confidence=Math.min(parsed.confidence,ceiling,specificity.cap)
   if(specificity.applies&&specificity.cap<1) console.warn('cosFirstAnswer: answer specificity capped confidence',{score:specificity.score,cap:specificity.cap,artifacts:specificity.artifacts,density:specificity.density,words:specificity.words,claimed:parsed.confidence,final:confidence})

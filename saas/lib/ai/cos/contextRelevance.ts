@@ -1,7 +1,7 @@
 import { generateLocalEmbeddings } from '@/lib/ai/cos/localEmbeddings'
 
 const STOP = new Set([
-  'about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why','only','normal','unchanged','without',
+  'about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why','only','normal','unchanged','without','suddenly','shows','showing','remain','remains','unaffected','occurred','overall','making',
 ])
 
 export type ContextCandidate<T> = { item: T; text: string }
@@ -28,6 +28,11 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(aa) * Math.sqrt(bb))
 }
 
+/**
+ * Terms used only to obtain a reasonably broad candidate pool before semantic ranking. Preserve
+ * compact technical tokens such as API, CPU, p95 and 5xx; dropping those because they are shorter
+ * than four characters is exactly the wrong tradeoff for engineering questions.
+ */
 export function relevanceTerms(text: string): string[] {
   return [...new Set(
     String(text ?? '')
@@ -35,8 +40,23 @@ export function relevanceTerms(text: string): string[] {
       .replace(/[^\p{L}\p{N}_-]+/gu, ' ')
       .split(/\s+/)
       .map(value => value.trim())
-      .filter(value => value.length >= 4 && !STOP.has(value)),
-  )].slice(0, 16)
+      .filter(value => {
+        if (!value || STOP.has(value)) return false
+        if (/^(?:p\d{2,3}|\dxx|api|cpu|ram|sql|tls|dns|gc|db)$/i.test(value)) return true
+        return value.length >= 4
+      }),
+  )].slice(0, 24)
+}
+
+/**
+ * Saved user/project memory should not bleed into a generic hypothetical. The benchmark "A
+ * multi-tenant SaaS..." is about an architecture pattern, not this user's company. Conversely,
+ * questions explicitly about me/us/SignalBoost/COS/Self-Healing do need that context.
+ */
+export function shouldRetrieveUserMemory(text: string): boolean {
+  const value = ` ${String(text ?? '').toLowerCase()} `
+  return /\b(?:i|me|my|mine|we|us|our|ours)\b/i.test(value)
+    || /\b(?:signalboost|cos|self[- ]healing|this project|this repo|our platform|our product)\b/i.test(value)
 }
 
 export function lexicalOverlapScore(query: string, candidate: string): number {

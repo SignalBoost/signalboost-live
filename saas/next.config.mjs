@@ -1,5 +1,6 @@
 // saas/next.config.mjs
-// Build-time HMI guard: review/confirmation surfaces stay inside their module.
+// Canonical Next.js configuration. Keep one config file so Vercel, local builds,
+// COS integrity checks, and output-file tracing all evaluate the same policy.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -44,9 +45,12 @@ function validateContextualRoutes() {
 
 validateContextualRoutes()
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {},
   // Vercel builds from `saas`, while the protected approved COS snapshot lives at
-  // repository root. Expand tracing and bind that exact snapshot to Concierge.
+  // repository root. Expand the trace root only far enough to include that exact
+  // governance snapshot, then bind it explicitly to the Concierge route.
   outputFileTracingRoot: path.join(process.cwd(), '..'),
   outputFileTracingIncludes: {
     '/api/concierge': ['../cos-core/brain.md'],

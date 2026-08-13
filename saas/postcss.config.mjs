@@ -1,7 +1,7 @@
-// saas/postcss.config.js
+// saas/postcss.config.mjs
 export default {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
   },
-};
+}

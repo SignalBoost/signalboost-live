@@ -52,9 +52,12 @@ async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export async function loadApprovedBrain(): Promise<string> {
+  // The exact governance snapshot is explicitly included for /api/concierge in
+  // next.config.mjs. Tell Turbopack not to widen fs tracing around process.cwd();
+  // without this annotation NFT conservatively traces most of the repository.
   const candidates = [
-    path.resolve(process.cwd(), '../cos-core/brain.md'),
-    path.resolve(process.cwd(), 'cos-core/brain.md'),
+    path.resolve(/* turbopackIgnore: true */ process.cwd(), '../cos-core/brain.md'),
+    path.resolve(/* turbopackIgnore: true */ process.cwd(), 'cos-core/brain.md'),
   ]
   for (const candidate of candidates) {
     try {

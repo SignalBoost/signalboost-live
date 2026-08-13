@@ -8,6 +8,8 @@ export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
 }
 
+export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
+
 function requireText(result: string | null, provider: string): string {
   if (!result) throw new Error(`${provider} AI provider returned no text`)
   return result
@@ -24,6 +26,21 @@ export function createPlatformAiPort(): CosAiPort {
 export function createLocalApplianceAiPort(): CosAiPort {
   return {
     generate: async (input) => requireText(await callProviderModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+  }
+}
+
+/**
+ * SignalBoost-host external teacher seam. Cognitive learning may ask an explicitly configured
+ * frontier provider to review a candidate or design unseen exams, but raw provider execution stays
+ * behind this approved COS adapter boundary. The teacher remains advisory and never becomes trusted
+ * factual knowledge merely because this port returned text.
+ */
+export function createExternalTeacherAiPort(provider: ExternalTeacherProvider): CosAiPort {
+  return {
+    generate: async (input) => requireText(
+      await callProviderModel({ ...input, modelPreference: provider }),
+      `external teacher ${provider}`,
+    ),
   }
 }
 

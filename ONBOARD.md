@@ -3,13 +3,13 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.5  
+**Version:** 1.6  
 **Updated:** 2026-08-12  
 **Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
 **COS Independent Runtime:** REQUIRES A CONFIGURED OPEN/LOCAL MODEL ENDPOINT  
 **Marketing & Sales Core Architecture:** COMPLETE  
-**Self-Healing Supervisor native monitoring:** ACTIVE; PROACTIVE PROBES IMPLEMENTED, PRODUCTION MIGRATION/RUNTIME VERIFICATION REQUIRED  
+**Self-Healing Supervisor native monitoring:** ACTIVE; PROACTIVE PROBE CODE MERGED, DATABASE/RUNTIME VERIFICATION REQUIRED  
 **Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
 
 ---
@@ -90,7 +90,7 @@ Remote private inference must use HTTPS, authentication and exact-host allowlist
 
 # 2026-08-12 COS / Supervisor state
 
-Major merged or implementation-complete capabilities added during the 2026-08-12 engineering sequence include:
+Major merged capabilities added during the 2026-08-12 engineering sequence include:
 
 - portable buyer connector runtime and host exposure;
 - deterministic connector delegation recipes;
@@ -109,9 +109,68 @@ Major merged or implementation-complete capabilities added during the 2026-08-12
 - real native API latency/5xx probes with durable latency baselines;
 - real native database connection-pressure/latency probes;
 - real native storage reachability/usage/capacity probes;
-- real native TLS certificate-expiry probes.
+- real native TLS certificate-expiry probes;
+- automatic learned-document → structured-fact promotion;
+- 768-dimensional semantic retrieval for structured COS knowledge facts;
+- answer-cache policy versioning and bounded freshness/age checks;
+- provenance evidence-funnel telemetry (`retrieved → relevant → selected → injected → cited`);
+- cache-origin provenance separated from current-request execution telemetry;
+- cited-grounding confidence credit: retrieved-but-unused KG/corpus items no longer raise the evidence ceiling.
+
+Relevant merged PRs in this sequence include #1128, #1131, #1133, #1134, #1135, #1136 and #1132. Re-check current `main` before assuming these are still the latest changes.
 
 See `docs/HANDOFF-2026-08-12.md` and `docs/portables/self-healing-monitoring-current-state-20260812.md` for the dated/current handoff.
+
+---
+
+# COS knowledge, cache and provenance — authoritative current state
+
+The live COS-first answer path now has three separate reuse/knowledge layers that must not be conflated:
+
+1. **Answer reuse** — exact and semantic cached answers are policy-versioned and age-bounded. Cache hits must report no fresh local-model invocation on the current request; the model/evidence that originally generated the cached answer is retained separately as answer-origin metadata.
+2. **Structured Knowledge Graph / Enterprise Memory facts** — `cos_knowledge_facts` supports 768-dimensional local embeddings and semantic nearest-neighbor retrieval through `cos_match_knowledge_facts`. New promoted facts are embedded with the existing local `nomic-embed-text` path; older facts are incrementally backfilled.
+3. **Continuous Learning corpus** — learned documents remain available to the answer path, but the corpus retrieval gate is still primarily lexical. Semantic ranking of the learned corpus is a logical next quality improvement after production migration/runtime verification.
+
+Authoritative provenance schema v2 reports the real evidence funnel for Knowledge Graph/Enterprise Memory, learned corpus and user memory:
+
+```text
+retrieved → relevant → selected → injected → cited
+```
+
+A component is called `USED` only when the answer demonstrably cites evidence from it. Retrieval or injection alone is not use. For cached answers, the current request reports zero evidence injection/citation by the reasoner because the reasoner did not run; the generating turn's origin evidence remains separately recorded.
+
+COS confidence no longer receives extra evidence credit merely because many internal items were injected. The higher evidence ceiling is earned only from cited Knowledge Graph + learned-corpus grounding. The model-only ceiling remains 0.78, above the default 0.72 escalation gate, so COS does not require internal citations in order to answer a well-supported question from its own model knowledge.
+
+### COS database/runtime verification still required
+
+Do not infer database state from a green Vercel build. Verify these migrations exist in the production Supabase project before depending on the corresponding behavior:
+
+- `saas/supabase/migrations/20260813_cos_learning_fact_promotion_state.sql`
+- `saas/supabase/migrations/20260813_cos_knowledge_fact_embeddings.sql`
+
+Then observe `/api/cron/cos-knowledge-promotion` successfully promoting/backfilling facts and verify semantic KG retrieval is actually returning embedded facts in production provenance.
+
+### Next COS quality sequence
+
+1. Verify the two COS production migrations and successful knowledge-promotion/backfill runtime behavior.
+2. Re-run the multi-tenant SaaS benchmark and inspect the full provenance funnel, not just final confidence.
+3. Add semantic ranking/relevance for the Continuous Learning corpus so its `relevant` stage is not merely the lexical SQL match set.
+4. Tune retrieval thresholds from observed benchmark data rather than blanket citation penalties.
+5. Continue hardening Crossref/GDELT/OpenAlex/YouTube and other learning-source reliability/admission yield.
+
+Primary files:
+
+- `saas/lib/ai/cos/cosFirstAnswer.ts`
+- `saas/lib/ai/cos/cosOrchestration.ts`
+- `saas/lib/ai/cos/cosAnswerPolicy.ts`
+- `saas/lib/ai/cos/groundingConfidence.ts`
+- `saas/lib/ai/cos/knowledgeFactSemantic.ts`
+- `saas/lib/ai/cos/knowledgeFactExtraction.ts`
+- `saas/lib/ai/cos/autoPromoteLearning.ts`
+- `saas/app/api/cron/cos-knowledge-promotion/route.ts`
+- `saas/lib/cos-core/storage/supabase.ts`
+- `saas/lib/cos-core/layers/knowledge/persistent.ts`
+- `saas/lib/ai/cos/localEmbeddings.ts`
 
 ---
 
@@ -158,9 +217,9 @@ Automatic routine repair never means arbitrary mutation. The action must remain 
 
 ### Native proactive monitoring deployment state
 
-The four previously missing native probe families are implemented in `feat/native-proactive-monitors-20260812` / PR #1132. Production code uses real HTTP requests, Supabase/Postgres aggregate health data, Supabase Storage metadata and validated TLS handshakes; placeholders and mocks are confined to tests where needed.
+PR #1132 is merged into `main` (merge commit `4e91da9a1f380e94a8c8476d860a770552c914db`). The branch preview passed the Vercel production build/typecheck gate before merge. Production code uses real HTTP requests, Supabase/Postgres aggregate health data, Supabase Storage metadata and validated TLS handshakes; placeholders and mocks are confined to tests where needed.
 
-The migration `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql` must exist in the target Supabase project before the 15-minute cron can persist history or execute the database/storage RPC probes. The cron fails closed with `native_probe_store_unavailable` if that schema is absent. Do not call the proactive probes production-active until the migration is applied and a production cron run is verified.
+The migration `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql` must exist in the target Supabase project before the 15-minute cron can persist history or execute the database/storage RPC probes. The cron fails closed with `native_probe_store_unavailable` if that schema is absent. Do not call the proactive probes production-runtime-verified until the migration is applied and a production `/api/cron/native-proactive-monitoring` run is observed successfully.
 
 Optional environment configuration:
 

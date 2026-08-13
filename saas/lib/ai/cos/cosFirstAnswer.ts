@@ -13,6 +13,7 @@ import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerS
 import { parseLocalResult, citedEvidence } from '@/lib/ai/cos/reasonerOutput'
 import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
 import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/cos/groundingConfidence'
+import { retrieveValidatedCognitiveSkills } from '@/lib/ai/cos/cognitiveSkillContext'
 
 export type EvidenceFunnelStage = {
   retrieved: number
@@ -43,17 +44,21 @@ export type COSProvenance = {
   knowledgeFactsUsed: number
   learnedItemsUsed: number
   userMemoriesUsed: number
+  cognitiveSkillsUsed: number
   /** Current-request retrieval funnel. USED is earned only at the cited stage. */
   evidenceFunnel: COSEvidenceFunnel
+  cognitiveSkillFunnel: EvidenceFunnelStage
   knowledgeFactsCited?: number
   learnedItemsCited?: number
   userMemoriesCited?: number
+  cognitiveSkillsCited?: number
   /** Cache metadata is separate from current-request execution telemetry. */
   cacheOrigin?: {
     storedAt: string | null
     policyVersion: string | null
-    retrievedThisTurn: { facts: number; learned: number; memories: number }
+    retrievedThisTurn: { facts: number; learned: number; memories: number; skills?: number }
     originEvidenceFunnel?: COSEvidenceFunnel | null
+    originCognitiveSkillFunnel?: EvidenceFunnelStage | null
   }
 }
 
@@ -64,10 +69,13 @@ type CachedAnswerOrigin = {
   knowledgeFactsUsed:number
   learnedItemsUsed:number
   userMemoriesUsed:number
+  cognitiveSkillsUsed:number
   knowledgeFactsCited:number
   learnedItemsCited:number
   userMemoriesCited:number
+  cognitiveSkillsCited:number
   evidenceFunnel?: COSEvidenceFunnel
+  cognitiveSkillFunnel?: EvidenceFunnelStage
 }
 type CachedCosAnswer = {
   reply:string
@@ -83,7 +91,9 @@ type InternalContext = {
   facts:string[]
   learned:string[]
   memories:string[]
-  funnel:{ knowledgeGraph:RetrievalCounts; learnedCorpus:RetrievalCounts; userMemory:RetrievalCounts }
+  skills:string[]
+  skillIds:string[]
+  funnel:{ knowledgeGraph:RetrievalCounts; learnedCorpus:RetrievalCounts; userMemory:RetrievalCounts; cognitiveSkills:RetrievalCounts }
 }
 
 function threshold(): number {
@@ -130,8 +140,10 @@ function cacheHitProvenance(
     knowledgeFactsUsed:number
     learnedItemsUsed:number
     userMemoriesUsed:number
+    cognitiveSkillsUsed:number
     internalSystemsConsulted:string[]
     evidenceFunnel:COSEvidenceFunnel
+    cognitiveSkillFunnel:EvidenceFunnelStage
   },
   responseSource: 'semantic_cache' | 'semantic_similarity',
   similarityScore?: number,
@@ -146,10 +158,13 @@ function cacheHitProvenance(
     knowledgeFactsUsed: origin?.knowledgeFactsUsed ?? 0,
     learnedItemsUsed: origin?.learnedItemsUsed ?? 0,
     userMemoriesUsed: origin?.userMemoriesUsed ?? 0,
+    cognitiveSkillsUsed: origin?.cognitiveSkillsUsed ?? 0,
     evidenceFunnel: base.evidenceFunnel,
+    cognitiveSkillFunnel: base.cognitiveSkillFunnel,
     knowledgeFactsCited: origin?.knowledgeFactsCited ?? 0,
     learnedItemsCited: origin?.learnedItemsCited ?? 0,
     userMemoriesCited: origin?.userMemoriesCited ?? 0,
+    cognitiveSkillsCited: origin?.cognitiveSkillsCited ?? 0,
     cacheOrigin: {
       storedAt: payload.storedAt ?? null,
       policyVersion: payload.policyVersion ?? null,
@@ -157,8 +172,10 @@ function cacheHitProvenance(
         facts: base.evidenceFunnel.knowledgeGraph.retrieved,
         learned: base.evidenceFunnel.learnedCorpus.retrieved,
         memories: base.evidenceFunnel.userMemory.retrieved,
+        skills: base.cognitiveSkillFunnel.retrieved,
       },
       originEvidenceFunnel: origin?.evidenceFunnel ?? null,
+      originCognitiveSkillFunnel: origin?.cognitiveSkillFunnel ?? null,
     },
     ...(similarityScore === undefined ? {} : { similarityScore }),
   }
@@ -238,7 +255,9 @@ export function COS_REASONER_SYSTEM_PROMPT(language: string): string {
     '- Naming a monitoring product is not naming a mechanism. "Check Grafana" says where to look, not what happened. For every cause, state the MECHANISM — what changed by itself with no deployment (statistics refreshed and a query plan flipped, a working set outgrew a cache or pool tier, data crossed a threshold only some tenants cross, a neighbour workload shifted) — and only then the observable that would show it.',
     '',
     'CITING INTERNAL EVIDENCE:',
-    '- Supplied evidence lines are labelled [KG#], [CL#], [EM#]. When one genuinely informs a claim, cite its label inline. NEVER cite an item that did not change what you wrote — an honest answer with zero citations is correct when the evidence was not useful, and false citations are worse than none.',
+    '- Supplied factual evidence lines are labelled [KG#], [CL#], [EM#]. Supplied validated procedural skills are labelled [SK#]. When one genuinely informs a claim or reasoning method, cite its label inline.',
+    '- A [SK#] skill is procedural guidance about HOW to reason; it is not factual corroboration. Never present it as a source proving a fact.',
+    '- NEVER cite an item that did not change what you wrote — an honest answer with zero citations is correct when the evidence/guidance was not useful, and false citations are worse than none.',
     '',
     'HONESTY:',
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',
@@ -294,13 +313,14 @@ async function semanticKnowledgeFacts(prompt: string, db: NonNullable<ReturnType
   ])
 }
 
-function emptyRetrieval(): RetrievalCounts { return { retrieved:0, relevant:0, selected:0 } }
+function emptyRetrieval(): RetrievalCounts { return { retrieved:0, relevant:0,selected:0 } }
+function stage(counts:RetrievalCounts,injected:boolean,cited=0):EvidenceFunnelStage{return {...counts,injected:injected?counts.selected:0,cited}}
 
 async function retrieveInternalContext(prompt:string,userId?:string|null):Promise<InternalContext>{
   const systems=['semantic/exact cache preflight']
-  const facts:string[]=[], learned:string[]=[], memories:string[]=[]
+  const facts:string[]=[], learned:string[]=[], memories:string[]=[], skills:string[]=[], skillIds:string[]=[]
   const terms=queryTerms(prompt), db=cosServiceDb()
-  const funnel={knowledgeGraph:emptyRetrieval(),learnedCorpus:emptyRetrieval(),userMemory:emptyRetrieval()}
+  const funnel={knowledgeGraph:emptyRetrieval(),learnedCorpus:emptyRetrieval(),userMemory:emptyRetrieval(),cognitiveSkills:emptyRetrieval()}
 
   if(db){
     systems.push('Enterprise Memory / Knowledge Graph','Continuous Learning Corpus')
@@ -369,20 +389,30 @@ async function retrieveInternalContext(prompt:string,userId?:string|null):Promis
     }
   }
 
-  return {systems:[...new Set(systems)],facts,learned,memories,funnel}
+  const cognitive=await retrieveValidatedCognitiveSkills(prompt).catch(error=>{
+    console.warn('[cos-cognitive-skill-context] ranking failed',error)
+    return {retrieved:0,relevant:0,selected:0,items:[]}
+  })
+  funnel.cognitiveSkills={retrieved:cognitive.retrieved,relevant:cognitive.relevant,selected:cognitive.selected}
+  if(cognitive.retrieved>0)systems.push('Validated Cognitive Skills')
+  for(const item of cognitive.items){skills.push(item.line);skillIds.push(item.id)}
+
+  return {systems:[...new Set(systems)],facts,learned,memories,skills,skillIds,funnel}
 }
 
 function executionFunnel(context:InternalContext,injected:boolean,cited={kg:0,cl:0,em:0}):COSEvidenceFunnel{
-  const stage=(counts:RetrievalCounts,citedCount:number):EvidenceFunnelStage=>({...counts,injected:injected?counts.selected:0,cited:citedCount})
   return {
-    knowledgeGraph:stage(context.funnel.knowledgeGraph,cited.kg),
-    learnedCorpus:stage(context.funnel.learnedCorpus,cited.cl),
-    userMemory:stage(context.funnel.userMemory,cited.em),
+    knowledgeGraph:stage(context.funnel.knowledgeGraph,injected,cited.kg),
+    learnedCorpus:stage(context.funnel.learnedCorpus,injected,cited.cl),
+    userMemory:stage(context.funnel.userMemory,injected,cited.em),
   }
 }
+function executionSkillFunnel(context:InternalContext,injected:boolean,cited=0):EvidenceFunnelStage{
+  return stage(context.funnel.cognitiveSkills,injected,cited)
+}
 
-function contextFingerprint(context:{facts:string[];learned:string[];memories:string[]}):string{
-  return createHash('sha256').update(JSON.stringify({facts:context.facts,learned:context.learned,memories:context.memories})).digest('hex')
+function contextFingerprint(context:{facts:string[];learned:string[];memories:string[];skills:string[]}):string{
+  return createHash('sha256').update(JSON.stringify({facts:context.facts,learned:context.learned,memories:context.memories,skills:context.skills})).digest('hex')
 }
 async function readCachedAnswer(key:string):Promise<CachedCosAnswer|null>{
   const db=cosServiceDb(); if(!db)return null
@@ -404,9 +434,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     knowledgeFactsUsed:context.facts.length,
     learnedItemsUsed:context.learned.length,
     userMemoriesUsed:context.memories.length,
+    cognitiveSkillsUsed:context.skills.length,
     evidenceFunnel:executionFunnel(context,false),
+    cognitiveSkillFunnel:executionSkillFunnel(context,false),
   }
-  const contextWindow=[...context.facts,...context.learned].join('\n')
+  const contextWindow=[...context.facts,...context.learned,...context.skills].join('\n')
 
   const policyVersion=answerPolicyVersion()
   const cacheTaskId=cosCacheTaskId('cos-first-answer',policyVersion)
@@ -448,6 +480,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',
     context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',
     context.memories.length?`USER ENTERPRISE MEMORY:\n${context.memories.join('\n')}`:'',
+    context.skills.length?`VALIDATED COGNITIVE PROCEDURAL SKILLS (HOW-TO GUIDANCE, NOT FACTUAL EVIDENCE):\n${context.skills.join('\n')}`:'',
   ].filter(Boolean).join('\n\n')
   const reasoned=await callCosReasoner({
     temperature:Number(process.env.COS_REASONER_TEMPERATURE??'0'),
@@ -455,7 +488,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language||'English'),
     prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`,
   }).catch(()=>null)
-  const reasoningProvenance={...base,localModelInvoked:true,reasonerLabel:reasoned?.reasoner.label??resolved.config.label,evidenceFunnel:executionFunnel(context,true)}
+  const reasoningProvenance={...base,localModelInvoked:true,reasonerLabel:reasoned?.reasoner.label??resolved.config.label,evidenceFunnel:executionFunnel(context,true),cognitiveSkillFunnel:executionSkillFunnel(context,true)}
 
   if(!reasoned?.text){
     const reason='Independent COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason)
@@ -482,8 +515,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     knowledgeFactsCited:cited.kg,
     learnedItemsCited:cited.cl,
     userMemoriesCited:cited.em,
+    cognitiveSkillsCited:cited.sk,
     evidenceFunnel:executionFunnel(context,true,cited),
+    cognitiveSkillFunnel:executionSkillFunnel(context,true,cited.sk),
   }
+  // Procedural skills intentionally do not count here: they shape reasoning but are not factual corroboration.
   const groundedCount=citedKnowledgeEvidenceCount(cited)
   const ceiling=groundedEvidenceCeiling(groundedCount)
   const specificity=assessAnswerSpecificity(parsed.answer)
@@ -509,10 +545,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       knowledgeFactsUsed:context.facts.length,
       learnedItemsUsed:context.learned.length,
       userMemoriesUsed:context.memories.length,
+      cognitiveSkillsUsed:context.skills.length,
       knowledgeFactsCited:cited.kg,
       learnedItemsCited:cited.cl,
       userMemoriesCited:cited.em,
+      cognitiveSkillsCited:cited.sk,
       evidenceFunnel:citedProvenance.evidenceFunnel,
+      cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
     },
   }
   const cacheWriteBudgetMs=Number(process.env.COS_CACHE_WRITE_BUDGET_MS??'8000')
@@ -530,9 +569,9 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult,language='en'):string{
-  const p=result.provenance,evidence=`${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.userMemoriesUsed} memories`
+  const p=result.provenance,evidence=`${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.cognitiveSkillsUsed} validated skills, ${p.userMemoriesUsed} memories`
   const source=p.responseSource==='semantic_cache'?'exact-match cache':p.responseSource==='semantic_similarity'?`semantic match, similarity ${(p.similarityScore??0).toFixed(2)}`:p.reasonerLabel
-  if(language==='pt') return result.handled?`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → respondeu via ${source} com confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.`:`Fluxo: COS consultou primeiro seu conhecimento, corpus e memória (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
-  if(language==='es') return result.handled?`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → respondió vía ${source} con confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.`:`Flujo: COS consultó primero su conocimiento, corpus y memoria (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`
-  return result.handled?`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → answered via ${source} at confidence ${result.confidence.toFixed(2)}. No external AI was called.`:`Workflow: COS searched its knowledge, learning corpus and memory first (${evidence}) → did not reach sufficient confidence → external AI is the last resort.`
+  if(language==='pt') return result.handled?`Fluxo: COS consultou primeiro seu conhecimento, corpus, habilidades validadas e memória (${evidence}) → respondeu via ${source} com confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.`:`Fluxo: COS consultou primeiro seu conhecimento, corpus, habilidades validadas e memória (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
+  if(language==='es') return result.handled?`Flujo: COS consultó primero su conocimiento, corpus, habilidades validadas y memoria (${evidence}) → respondió vía ${source} con confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.`:`Flujo: COS consultó primero su conocimiento, corpus, habilidades validadas y memoria (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`
+  return result.handled?`Workflow: COS searched its knowledge, learning corpus, validated skills and memory first (${evidence}) → answered via ${source} at confidence ${result.confidence.toFixed(2)}. No external AI was called.`:`Workflow: COS searched its knowledge, learning corpus, validated skills and memory first (${evidence}) → did not reach sufficient confidence → external AI is the last resort.`
 }

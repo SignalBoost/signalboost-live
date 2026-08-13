@@ -58,12 +58,16 @@ function rowToFact(row: any): KnowledgeFact {
   }
 }
 
-/** Incrementally upgrade pre-existing facts after the vector column migration is applied. */
-export async function backfillKnowledgeFactEmbeddings(limit = 8): Promise<KnowledgeFactBackfillResult> {
+/**
+ * Incrementally upgrade pre-existing facts after the vector column migration is applied.
+ * The bounded batch is embedded concurrently so one slow local-model request defines the batch
+ * latency instead of multiplying that latency by every row in the batch.
+ */
+export async function backfillKnowledgeFactEmbeddings(limit = 4): Promise<KnowledgeFactBackfillResult> {
   const db = cosServiceDb()
   if (!db) return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: 'COS Supabase service store is not configured' }
 
-  const requested = Math.max(1, Math.min(25, Math.floor(limit)))
+  const requested = Math.max(1, Math.min(8, Math.floor(limit)))
   const pending = await db.from('cos_knowledge_facts')
     .select('id,task_id,subject,predicate,object,confidence,source,updated_at')
     .is('embedding', null)
@@ -78,21 +82,17 @@ export async function backfillKnowledgeFactEmbeddings(limit = 8): Promise<Knowle
   }
 
   const store = new SupabaseKnowledgeStore(db)
-  let embedded = 0
-  let failed = 0
-  const errors: string[] = []
-
-  for (const row of pending.data ?? []) {
+  const attempts = await Promise.allSettled((pending.data ?? []).map(async row => {
     const fact = rowToFact(row)
-    try {
-      const vector = await generateLocalEmbedding(knowledgeFactEmbeddingText(fact))
-      await store.upsertFact(fact, vector)
-      embedded += 1
-    } catch (error) {
-      failed += 1
-      errors.push(error instanceof Error ? error.message : String(error))
-    }
-  }
+    const vector = await generateLocalEmbedding(knowledgeFactEmbeddingText(fact))
+    await store.upsertFact(fact, vector)
+    return fact.id
+  }))
+
+  const embedded = attempts.filter(result => result.status === 'fulfilled').length
+  const rejected = attempts.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+  const failed = rejected.length
+  const errors = rejected.map(result => result.reason instanceof Error ? result.reason.message : String(result.reason))
 
   const remainingQuery = await db.from('cos_knowledge_facts')
     .select('id', { count: 'exact', head: true })

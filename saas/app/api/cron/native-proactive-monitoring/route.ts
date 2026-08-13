@@ -4,7 +4,9 @@ import { runNativeMonitoring } from '@/self-healing-host/native-monitoring-runti
 import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
 import { collectAssessmentConfidenceIncident } from '@/self-healing-host/assessment-confidence-monitoring'
 import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native-persistence-monitoring'
+import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/platform-health-monitoring-adapter'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
+import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +31,26 @@ function parseTlsTargets(apiUrls: readonly string[]): CertificateTarget[] {
 }
 function storageQuotaBytes(): number | null { const raw = String(process.env.SELF_HEALING_STORAGE_QUOTA_BYTES || '').trim(); if (!raw) return null; const n = Number(raw); return Number.isFinite(n) && n > 0 ? n : null }
 
+async function readRows(db: any, table: string, limit = 100): Promise<Record<string, any>[]> {
+  const { data, error } = await db.from(table).select('*').limit(limit)
+  if (error) throw new Error(`${table}_read_failed`)
+  return (data ?? []) as Record<string, any>[]
+}
+
+function livePlatformHealthCollector(db: any) {
+  return platformHealthNativeMonitoringCollector(async () => {
+    const vercelStore = new SupabaseVercelHealthStore(db)
+    const [runs, instances, workItems, leases, triggers] = await Promise.all([
+      vercelStore.listRuns({ limit: 50 }),
+      readRows(db, 'supervisor_instances'),
+      readRows(db, 'supervisor_work_items'),
+      readRows(db, 'supervisor_leases'),
+      readRows(db, 'vercel_observation_triggers'),
+    ])
+    return { now: new Date(), runs, instances, workItems, leases, triggers }
+  })
+}
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const db = getAdminSupabase(); const store = new SupabaseNativeProbeStore(db)
@@ -39,18 +61,17 @@ export async function GET(req: NextRequest) {
   const collectors = [
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
     persistenceNativeMonitoringCollector({ db }),
+    livePlatformHealthCollector(db),
   ]
   const result = await runNativeMonitoring({ context: { provider: 'signalboost-platform', environment: 'production', metadata: { source: 'native-proactive-monitoring-cron', readOnly: true, providerMutations: false } }, collectors, nativeEnabled: process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false', externalConnected: process.env.SELF_HEALING_EXTERNAL_MONITORING_CONNECTED === 'true' })
 
-  // Evidence-quality deficits are preventive conditions too. A durable claim suppresses repeated
-  // COS work for the same fingerprint while allowing changed evidence to be investigated now.
   const confidenceIncident = await collectAssessmentConfidenceIncident(db).catch(() => null)
   const incidents = confidenceIncident ? [...result.incidents, confidenceIncident] : result.incidents
   const remediation = incidents.length ? await remediateNativeIncidents(incidents, { maxIncidents: 4 }) : []
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
-    schemaVersion: 'self-healing-native-proactive-monitoring-v3',
+    schemaVersion: 'self-healing-native-proactive-monitoring-v4',
     runAt: new Date().toISOString(),
     readOnly: result.readOnly,
     providerMutations: result.providerMutations,

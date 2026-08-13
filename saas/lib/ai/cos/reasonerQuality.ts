@@ -41,25 +41,27 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
   return quality.genericBuckets >= 2 && quality.mechanisms < 3
 }
 
-export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
-  const parsed = parseLocalResult(firstRaw)
-  const draft = parsed?.answer ?? firstRaw
+export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: string): string {
   return [
     originalPrompt,
     '',
-    'QUALITY REPAIR — your first draft was too category-shaped to be served as a senior diagnostic answer.',
-    'Rewrite it once. Do not defend or explain the first draft.',
+    'QUALITY REPAIR — solve the incident again from the original facts. Your previous draft was rejected as category-shaped; do not copy it, defend it, or reuse the headings from it.',
+    '',
+    'Reason from the asymmetries before naming causes:',
+    '- If only one tenant class is affected, prefer mechanisms scoped to that class or to resources it uniquely uses. Demote explanations that should affect all tenants equally.',
+    '- If overall traffic is unchanged, prefer state-dependent mechanisms such as queue/pool saturation at a tier boundary, working-set/cache threshold crossing, plan/cardinality changes, shard or routing placement, throttling/quota thresholds, or dependency behavior tied to that tenant class over a generic load explanation.',
+    '- If there was no deployment, distinguish mechanisms that can change without code: data growth/skew, statistics or plan changes, cache eviction, pool occupancy, noisy-neighbor placement, routing/config drift, certificate/DNS/dependency state, or provider-side throttling.',
+    '- Treat normal aggregate CPU and memory as evidence against global compute exhaustion, not as proof that waits, queues, locks, I/O, pools, caches, or downstream dependencies are healthy.',
     '',
     'The rewritten answer MUST:',
-    '- rank concrete causal mechanisms that explain ALL asymmetries stated in the question, not generic buckets such as "resource contention", "network latency", or "application bottleneck";',
-    '- explain how each mechanism could change with no deployment and unchanged overall traffic;',
-    '- for each ranked cause, name the exact read-only observable(s) that distinguish it from the others and the condition that would falsify it;',
-    '- use existing logs, traces, metrics, database/system views, configuration snapshots, or historical telemetry only; do not propose a production mutation;',
-    '- prefer mechanisms whose scope matches the affected tenant class over explanations that should affect every tenant equally;',
-    '- keep claims proportional to the supplied evidence and lower confidence if you still cannot make the diagnosis concrete.',
+    '- rank concrete causal mechanisms, not generic buckets such as "resource contention", "network latency", "configuration differences", or "application bottleneck";',
+    '- explicitly say why each mechanism fits the enterprise-only symptom, the no-deployment fact, the unchanged overall traffic, and the normal aggregate database CPU/memory;',
+    '- for each ranked cause, name exact read-only observables that distinguish it from the others and a condition that would falsify it;',
+    '- use only existing logs, traces, metrics, database/system views, configuration snapshots, query plans already captured by observability, or historical telemetry; do not require a production mutation;',
+    '- avoid EXPLAIN ANALYZE on production unless an equivalent plan is already captured, because executing it can add load or side effects;',
+    '- keep claims proportional to supplied evidence and lower confidence if the mechanisms remain uncertain.',
     '',
-    'FIRST DRAFT TO REPLACE:',
-    draft,
+    'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
   ].join('\n')
 }
 

@@ -115,12 +115,12 @@ export function parseLocalResult(raw:string):LocalResult|null{
 
 /**
  * Which retrieved items the answer actually leans on. Retrieval counts say what was HANDED to the
- * reasoner; only a citation in the answer text shows an item informed a claim. Conflating the two
- * overstated "used" in every provenance report — 12 learned items "contributed" to answers that
- * visibly used none of them.
+ * reasoner; only a citation in the answer text shows an item informed a claim. Procedural skills
+ * are tracked separately because using a validated HOW-to-reason skill is not factual grounding
+ * and therefore must not raise the knowledge-evidence confidence ceiling.
  */
-export function citedEvidence(answer:string):{kg:number;cl:number;em:number}{
+export function citedEvidence(answer:string):{kg:number;cl:number;em:number;sk:number}{
   const text=String(answer??'')
   const count=(prefix:string)=>new Set([...text.matchAll(new RegExp(`\\[${prefix}(\\d{1,2})\\]`,'g'))].map(m=>m[1])).size
-  return {kg:count('KG'),cl:count('CL'),em:count('EM')}
+  return {kg:count('KG'),cl:count('CL'),em:count('EM'),sk:count('SK')}
 }

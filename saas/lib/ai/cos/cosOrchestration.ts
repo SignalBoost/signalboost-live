@@ -14,7 +14,7 @@ export function externalFallbackEnabled(): boolean {
 }
 
 export function isProvenanceIntrospection(input: string): boolean {
-  const provenance = /\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|autonomous research|external ai|external provider|internal systems?)\b/i
+  const provenance = /\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|cognitive skill|cognitive skills|procedural skill|procedural skills|autonomous research|external ai|external provider|internal systems?)\b/i
   const referent = /\b(previous|preceding|prior|last|just|that|this|answer|response|request|execution|used|invoked|contributed|generated|reasoning)\b/i
   return provenance.test(input) && referent.test(input)
 }
@@ -65,18 +65,21 @@ export function authoritativeProvenance(
   const kgFallback=semanticCacheHit ? Number(thisTurn?.facts??0) : Number(p?.knowledgeFactsUsed??0)
   const lcFallback=semanticCacheHit ? Number(thisTurn?.learned??0) : Number(p?.learnedItemsUsed??0)
   const umFallback=semanticCacheHit ? Number(thisTurn?.memories??0) : Number(p?.userMemoriesUsed??0)
+  const skFallback=semanticCacheHit ? Number(thisTurn?.skills??0) : Number(p?.cognitiveSkillsUsed??0)
   const kg=stage(p?.evidenceFunnel?.knowledgeGraph,kgFallback,semanticCacheHit?0:Number(p?.knowledgeFactsCited??0),!semanticCacheHit)
   const lc=stage(p?.evidenceFunnel?.learnedCorpus,lcFallback,semanticCacheHit?0:Number(p?.learnedItemsCited??0),!semanticCacheHit)
   const um=stage(p?.evidenceFunnel?.userMemory,umFallback,semanticCacheHit?0:Number(p?.userMemoriesCited??0),!semanticCacheHit)
+  const sk=stage(p?.cognitiveSkillFunnel,skFallback,semanticCacheHit?0:Number(p?.cognitiveSkillsCited??0),!semanticCacheHit)
 
   return {
-    schema_version: 2,
+    schema_version: 3,
     authority: 'server_execution_telemetry',
     model_generated: false,
     semantic_cache: { used: semanticCacheHit, evidence_count: semanticCacheHit ? 1 : 0 },
     enterprise_memory: { used:kg.cited>0,retrieved_count:kg.retrieved,relevant_count:kg.relevant,selected_count:kg.selected,injected_count:kg.injected,evidence_count:kg.cited },
     knowledge_graph: { used:kg.cited>0,retrieved_count:kg.retrieved,relevant_count:kg.relevant,selected_count:kg.selected,injected_count:kg.injected,evidence_count:kg.cited },
     learned_corpus: { used:lc.cited>0,retrieved_count:lc.retrieved,relevant_count:lc.relevant,selected_count:lc.selected,injected_count:lc.injected,evidence_count:lc.cited },
+    cognitive_skills: { used:sk.cited>0,retrieved_count:sk.retrieved,relevant_count:sk.relevant,selected_count:sk.selected,injected_count:sk.injected,evidence_count:sk.cited,semantics:'procedural_guidance_not_factual_evidence' },
     user_memory: { used:um.cited>0,retrieved_count:um.retrieved,relevant_count:um.relevant,selected_count:um.selected,injected_count:um.injected,evidence_count:um.cited },
     autonomous_research: {
       used: p?.autonomousResearchAttempted ?? false,
@@ -97,6 +100,7 @@ export function authoritativeProvenance(
       model: semanticCacheHit ? p?.reasonerLabel ?? null : null,
       retrieved_this_turn: p?.cacheOrigin?.retrievedThisTurn ?? null,
       evidence_funnel: semanticCacheHit ? originFunnel(p) : null,
+      cognitive_skill_funnel: semanticCacheHit ? p?.cacheOrigin?.originCognitiveSkillFunnel ?? null : null,
     },
   }
 }
@@ -113,10 +117,10 @@ function funnelText(value:any,singular:string,plural:string):string{
 }
 function originFunnelText(value:EvidenceFunnel|null):string{
   if(!value) return 'origin evidence funnel was not recorded'
-  return `KG ${value.knowledgeGraph.injected} injected/${value.knowledgeGraph.cited} cited; corpus ${value.learnedCorpus.injected} injected/${value.learnedCorpus.cited} cited; memory ${value.userMemory.injected} injected/${value.userMemory.cited} cited`
+  return `KG ${value.knowledgeGraph.injected} injected/${value.knowledgeGraph.cited} cited; corpus ${value.learnedCorpus.injected}/${value.learnedCorpus.cited} cited; memory ${value.userMemory.injected}/${value.userMemory.cited} cited`
 }
 
-/** A component is USED only when evidence from it is demonstrably cited by the answer on this request. */
+/** A component is USED only when evidence/guidance from it is demonstrably cited by the answer on this request. */
 export function formatAuthoritativeProvenance(
   provenance: ReturnType<typeof authoritativeProvenance>,
   language: string,
@@ -151,6 +155,7 @@ export function formatAuthoritativeProvenance(
     `Enterprise Memory     : ${funnelText(provenance.enterprise_memory,'retained fact','retained facts')}`,
     `Knowledge Graph       : ${funnelText(provenance.knowledge_graph,'graph-backed fact','graph-backed facts')}`,
     `Learned Corpus        : ${funnelText(provenance.learned_corpus,'learned item','learned items')}`,
+    `Cognitive Skills      : ${funnelText(provenance.cognitive_skills,'procedural skill','procedural skills')} Procedural guidance does not count as factual grounding.`,
     `User Memory           : ${funnelText(provenance.user_memory,'saved memory','saved memories')}`,
     `Autonomous Research   : ${usedLabel(provenance.autonomous_research.used)} — ${provenance.autonomous_research.documents_acquired} documents acquired; ${provenance.autonomous_research.new_knowledge_retained} new knowledge items retained during this request.`,
     `Local Reasoning Engine: ${invokedLabel(provenance.local_reasoning.invoked)}${provenance.local_reasoning.model ? ` — ${provenance.local_reasoning.model}` : ''}.`,

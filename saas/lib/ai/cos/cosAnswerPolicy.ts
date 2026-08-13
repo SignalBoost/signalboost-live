@@ -99,7 +99,7 @@ export function cachedAnswerIsCurrent(
   policyVersion: string,
   maxAgeMs: number,
   now: number = Date.now(),
-): { ok: true } | { ok: false; reason: string } {
+): { ok: true; reason?: undefined } | { ok: false; reason: string } {
   if (!entry) return { ok: false, reason: 'no cached entry' }
   const stamped = entry.policyVersion ? String(entry.policyVersion) : null
   if (!stamped) return { ok: false, reason: 'cached answer predates answer-policy versioning' }

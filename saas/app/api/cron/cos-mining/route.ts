@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
+import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
 
 export const runtime = 'nodejs'
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
   }
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
+  let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
     try {
@@ -36,6 +38,14 @@ export async function GET(req: NextRequest) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'
       console.error('cron cos daily learning failed:', message)
       learning = { status: 'error', error: message }
+    }
+
+    try {
+      cognitive = await runCognitiveLearningCycle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Cognitive active learning failed'
+      console.error('cron COS cognitive active learning failed:', message)
+      cognitive = { enabled: false, errors: [message] }
     }
 
     try {
@@ -51,5 +61,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, corpus })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, corpus })
 }

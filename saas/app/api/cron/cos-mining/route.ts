@@ -7,6 +7,7 @@ import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
+import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
 
@@ -36,8 +37,9 @@ export async function GET(req: NextRequest) {
   let corpus: unknown = null
   if (job === 'daily') {
     // Daily learning, transcript acquisition, skill practice, and consolidation are legitimate COS
-    // local-compute work. Wake the dedicated runtime once at the start of that bounded batch; the
-    // idle-stop cron releases the GPU again after the configured quiet period.
+    // local-compute work. Lease + pre-warm the dedicated runtime once at the start of that bounded
+    // batch; the idle-stop cron releases the GPU again after the configured quiet period.
+    await touchRunpodActivityLease('daily_learning_batch')
     try {
       await ensureLocalInferenceRuntimeReady()
     } catch (error) {

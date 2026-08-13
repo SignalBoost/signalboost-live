@@ -3,12 +3,14 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.4
-**Updated:** 2026-08-10
-**COS Independence / Autonomous-Intelligence Architecture:** COMPLETE
-**COS Independent Runtime:** REQUIRES A CONFIGURED OPEN/LOCAL MODEL ENDPOINT
-**Marketing & Sales Core Architecture:** COMPLETE
-**Enterprise Release Candidate:** EVIDENCE-BASED — do not infer from architecture or a green deployment
+**Version:** 1.5  
+**Updated:** 2026-08-12  
+**Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
+**COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
+**COS Independent Runtime:** REQUIRES A CONFIGURED OPEN/LOCAL MODEL ENDPOINT  
+**Marketing & Sales Core Architecture:** COMPLETE  
+**Self-Healing Supervisor native monitoring:** ACTIVE, WITH REMAINING PROBE GAPS  
+**Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
 
 ---
 
@@ -16,27 +18,22 @@
 
 This file is the canonical starting point for every developer, AI coding agent, reviewer, operator, contractor, and infrastructure assistant working on this repository.
 
-Required order:
-
 1. Read `ONBOARD.md`.
-2. Scan the current repository.
-3. Read the exact files related to the task.
-4. Verify current implementation from code before diagnosing or changing anything.
-5. Never report status or behavior from memory alone.
+2. Read `docs/HANDOFF-2026-08-12.md` for the latest dated engineering delta.
+3. Scan current `main`.
+4. Read the exact files related to the task.
+5. Verify implementation from code before diagnosing, changing, or reporting status.
+6. Never report behavior from memory alone.
 
-`AGENTS.md` and `CLAUDE.md` are entry-point summaries. They do not replace this file or current repo inspection.
-
-For detailed historical/operational doctrine, `docs/ONBOARD-full.md` remains a deeper reference. If an older status statement there conflicts with this file, the current repository and this current-state handoff win.
+`AGENTS.md` and `CLAUDE.md` are entry-point summaries. `docs/ONBOARD-full.md` is the deeper historical/operational reference. Current repository evidence and this current-state handoff win over stale documentation.
 
 ---
 
 # Mission
 
-SignalBoost is a Cognitive Operating System (COS) that powers specialized business modules and Portables. Portables perform business functions; COS owns reusable intelligence, memory, learning, planning, governance, cost control, verification, and provider selection.
+SignalBoost is a Cognitive Operating System that powers specialized business modules and Portables. COS owns reusable intelligence, memory, learning, planning, governance, cost control, verification, provider selection and reusable operational knowledge.
 
-External AI/data providers are replaceable compute or enrichment resources. They are not the owner of SignalBoost intelligence.
-
-Target loop:
+External AI/data providers are replaceable compute or enrichment resources. They do not own SignalBoost intelligence.
 
 ```text
 Observe → Remember → Learn → Reason → Act → Verify → Improve
@@ -44,49 +41,27 @@ Observe → Remember → Learn → Reason → Act → Verify → Improve
 
 ---
 
-# 2026-08-10 Current Platform State
-
-## COS-first architecture is complete; runtime independence is configuration-dependent
-
-The architecture no longer treats Claude/OpenAI/Gemini as the default brain.
-
-Current reasoning order is:
+# COS execution order
 
 ```text
 Request / Goal
-    ↓
-Deterministic business rules
-    ↓
-Exact / semantic / durable reuse
-    ↓
-Enterprise Memory
-    ↓
-Knowledge Graph
-    ↓
-Continuous Learning / user memory
-    ↓
-Local/open COS reasoning
-    ↓
-Confidence gate
-    ├─ sufficient → use COS result
-    └─ insufficient → autonomous bounded research
-                         ↓
-                      retain verified knowledge
-                         ↓
-                      reload context + retry local reasoning
-                         ↓
-                      fail closed / governed fallback according to policy
-    ↓
-Verification
-    ↓
-Learning / memory / ROI telemetry
+→ deterministic business rules
+→ exact / semantic / durable reuse
+→ Enterprise Memory
+→ Knowledge Graph
+→ Continuous Learning / bounded context
+→ local/private COS reasoning
+→ confidence/evidence gate
+→ bounded research or replaceable provider only when justified and permitted
+→ verification
+→ learning / memory / ROI telemetry
 ```
 
-Primary implementation: `saas/lib/ai/cos/cosFirstAnswer.ts`.
+Primary answer path: `saas/lib/ai/cos/cosFirstAnswer.ts`.
 
-Important runtime truth: COS retrieves Enterprise Memory / Knowledge Graph / Continuous Learning context before testing whether the local model is configured. If local inference is unavailable, COS may still research and retain approved knowledge, but it cannot synthesize an independent final answer until a model endpoint is configured.
+Independent reasoning requires a configured private/open-model endpoint. Architecture support is not proof that a production endpoint is healthy.
 
-Required independent-reasoning variables:
+Typical configuration:
 
 ```dotenv
 COS_LOCAL_FIRST_ENABLED=true
@@ -97,103 +72,133 @@ LOCAL_AI_ALLOWED_HOSTS=<exact-hostname>
 LOCAL_AI_ALLOW_CLOUD_FALLBACK=false
 ```
 
-Loopback/internal appliance endpoints (`localhost`, `127.0.0.1`, `::1`, `ai-brain`) remain supported. A production SaaS deployment may instead use a separately hosted private open-model inference service. Remote endpoints must use HTTPS, require `LOCAL_AI_API_KEY`, and their exact hostname must be explicitly listed in `LOCAL_AI_ALLOWED_HOSTS`. This avoids turning the inference URL into an unrestricted SSRF/network egress primitive.
-
-The repository already contains a self-hosted open-model stack under `appliance/local-ai/`, supporting vLLM and llama.cpp with OpenAI-compatible endpoints. That stack or an equivalently secured private service supplies compute; it does not make OpenAI/Anthropic/Gemini the reasoning provider.
-
-For an isolation benchmark, leave OpenAI/Anthropic/Gemini reasoning disabled and require provenance to report `externalAiInvoked: false`.
+Remote private inference must use HTTPS, authentication and exact-host allowlisting. The repository also contains a self-hosted open-model stack under `appliance/local-ai/`.
 
 ---
 
-# Core Principles
+# Core principles
 
-## COS is the brain
+- COS is the reusable intelligence/governance layer; Portables should not create provider-owned reasoning silos.
+- AI is the last resort when deterministic code, known knowledge, cache, durable reuse or verified skills suffice.
+- Prefer local/private compute before approved commercial AI providers.
+- Never pay twice for knowledge or work SignalBoost already owns with sufficient confidence and freshness.
+- Providers are replaceable edges around a provider-neutral core.
+- Preserve tenant isolation, auditability and explicit execution boundaries.
+- Consequential actions remain behind applicable approval controls.
 
-Every Portable should use shared COS intelligence and governance rather than creating a provider-owned reasoning silo.
+---
 
-## AI is the last resort
+# 2026-08-12 COS / Supervisor state
 
-Never call an external model when deterministic code, known knowledge, cache, durable reuse, a verified skill, or local COS reasoning can solve the task adequately.
+Major merged capabilities added during the 2026-08-12 engineering sequence include:
 
-## Local/internal first
+- portable buyer connector runtime and host exposure;
+- deterministic connector delegation recipes;
+- delegated evidence compaction and bounded evidence packets;
+- connector-aware Supervisor reasoning;
+- incident-aware connector recipe routing;
+- adaptive evidence sufficiency scoring;
+- durable learned-knowledge/recipe reuse;
+- buyer-hosted durable recipe memory and SQL adapter;
+- recipe quality scoring, expiry/replacement and confidence lifecycle;
+- deterministic evidence reranking and Unicode-safe retrieval grounding;
+- robotics/physics learning curriculum integration;
+- native Self-Healing Supervisor monitoring runtime;
+- Vercel deployment/provider observation connected to native monitoring;
+- SignalBoost platform-health intelligence connected to native monitoring.
+
+See `docs/HANDOFF-2026-08-12.md` for the dated handoff.
+
+---
+
+# Self-Healing Supervisor — authoritative monitoring doctrine
+
+The Self-Healing Supervisor is intended to be **proactive**, not merely reactive to incidents delivered by another monitoring product.
+
+Native monitoring is a first-class capability and should be enabled by default for a plug-and-play installation. A buyer that already has monitoring may run `hybrid` mode or intentionally choose external-only monitoring.
+
+Canonical implementation:
+
+- `saas/self-healing-host/native-monitoring-policy.ts`
+- `saas/self-healing-host/native-monitoring-runtime.ts`
+- existing Vercel observer/provider-health path
+- existing SignalBoost platform-health intelligence
+- `docs/portables/self-healing-monitoring-current-state-20260812.md`
+
+Current native coverage includes Vercel deployment/provider health plus platform-health conditions such as queue growth, scheduler failures, provider failures, resource pressure, stale leases/heartbeats, verification failures and audit failures.
+
+Existing external webhook adapters remain available for Datadog, PagerDuty, AWS CloudWatch/EventBridge, Prometheus Alertmanager, Splunk, Azure Monitor, Grafana Alerting and Google Cloud Operations. They are real deterministic adapters but remain `staged` until live-provider validation promotes them to `certified`.
+
+### Remediation workflow
 
 ```text
-Deterministic / known knowledge
-→ exact / semantic / durable reuse
-→ verified skill / learned procedure
-→ local/private open-model reasoning
-→ approved cloud compute or commercial data provider only when policy permits and needed
+Monitor / Observe
+→ detect degradation, risk or incident
+→ collect bounded evidence
+→ diagnose / reason
+→ select registered repair capability
+→ policy / risk classification
+→ routine + explicitly pre-authorized bounded repair may execute automatically
+→ consequential action requires approval
+→ verify
+→ audit
+→ learn
 ```
 
-## Never pay twice
+Automatic routine repair never means arbitrary mutation. The action must remain inside an explicitly registered capability with allowed provider/resource/method/parameter scope, reversibility and execution limits.
 
-Do not regenerate known content, rediscover known buyers, rerun identical expensive searches, or buy company intelligence that SignalBoost already owns with sufficient confidence/freshness.
+### Remaining native monitoring work
 
-## Providers are replaceable
+As of 2026-08-12, the next real native probe families are:
 
-OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Qwen, local models, CRM vendors, communication providers, and prospect-data providers are edges around a provider-neutral core.
+- API latency and 5xx/error-rate trends;
+- database latency/error/connection pressure;
+- storage capacity/error health;
+- TLS/certificate expiry.
 
-## Human control is preserved
-
-Consequential actions remain behind applicable approval boundaries, including publishing, spending, provider-key changes, infrastructure/environment changes, DNS changes, migrations, deletion/disablement, and sensitive production/provider mutations.
-
----
-
-# COS Execution Model
-
-1. **Deterministic / Business Rules** — formatting, validation, routing, permissions, calculations, known workflows.
-2. **Knowledge / Reuse** — exact cache, semantic cache, durable response/procedure reuse.
-3. **Memory / Context** — Enterprise Memory and bounded context reconstruction/compaction.
-4. **Reasoning / Skills** — Goal Engine, reusable skills, learned procedures, local COS reasoning.
-5. **Replaceable Compute / Providers** — private/open-model compute first; external providers only when justified and permitted.
-
-Completed outcomes return to memory, knowledge, learning and telemetry so future work gets cheaper and better.
+Branch `feat/native-proactive-monitors-20260812` was created, but attempted repository writes were blocked by the connector safety gate. Treat these four probes as **not implemented yet**. Do not add placeholders or claim completion from policy signal names alone.
 
 ---
 
-# Learning Doctrine
+# Learning doctrine
 
-Accumulation is not learning. Learning must improve future execution. Durable learned items preserve source/provenance, confidence, acquisition/verification time, freshness/expiry, scope, evidence, and reuse/outcome measurements where applicable.
-
-Contradictions must not silently overwrite trusted knowledge. Continuous/background learning remains bounded and cost-governed.
+Accumulation is not learning. Durable learned items should preserve provenance, confidence, acquisition/verification time, freshness/expiry, scope, evidence and reuse/outcome measurements where applicable. Contradictions must not silently overwrite trusted knowledge. Background learning remains bounded and cost-governed.
 
 ---
 
-# Cost / ROI Governance
+# Cost / ROI governance
 
-Track provider calls avoided, cache/reuse hits, knowledge hits, local executions, external fallbacks, provider cost, avoided cost, latency, retries, successful outcomes, and learning reuse/effectiveness.
+Track provider calls avoided, cache/reuse hits, knowledge hits, local executions, external fallbacks, provider cost, avoided cost, latency, retries, successful outcomes and learning reuse/effectiveness.
 
 ---
 
-# Marketing & Sales State
+# Marketing & Sales state
 
 Marketing & Sales core architecture is complete, including Enterprise Memory, Knowledge Graph, Continuous Learning, Goal Engine, Prospect Intelligence, Business Intelligence Corpus, Communication Hub, CRM production paths, Revenue Intelligence, Universal Adapter seams, campaign/outreach queues, approval gates, audit, telemetry, cost governance and localization guardrails.
 
-The 5,000-company Business Intelligence Corpus goal is a data-population target, not unfinished architecture. Last dated production observation on 2026-08-10 was 461/5000 (9.22%); always use live status for the current number.
+The 5,000-company Business Intelligence Corpus is a data-population target, not unfinished architecture. Always use live status rather than a historical count.
 
-Owner/admin route: `/dashboard/data/business-intelligence-corpus`
-
+Owner/admin route: `/dashboard/data/business-intelligence-corpus`  
 Status API: `/api/admin/business-intelligence-corpus/status`
 
 ---
 
 # Enterprise Release Candidate
 
-A green Vercel deployment is necessary but not sufficient to call the enterprise product Release Candidate. The fail-closed profile is `saas/lib/release-candidate/marketing-sales.ts` and requires real evidence for deployment, tenant isolation, security, resilience, load/soak, observability, end-to-end integration, and documentation currency.
+A green Vercel deployment is necessary but not sufficient to declare Enterprise RC. The fail-closed profile is `saas/lib/release-candidate/marketing-sales.ts` and requires real evidence for deployment, tenant isolation, security, resilience, load/soak, observability, end-to-end integration and documentation currency.
 
 Missing evidence is `not_run`, not pass.
 
 ---
 
-# Security / Secret Rules
+# Security / secrets
 
-- Never hard-code secrets.
-- Never print full provider keys or tokens.
-- Never expose secret values in logs, screenshots, PR bodies, email, or client UI.
-- Use approved Vault/environment-variable/server-side storage boundaries.
+- Never hard-code or expose secrets.
+- Never print full provider keys/tokens.
+- Use approved Vault/environment/server-side storage boundaries.
 - Preserve tenant/org scoping and RLS/server-role assumptions.
 - Keep owner/admin routes server-gated.
-- Remote private inference endpoints must be HTTPS, authenticated, and exact-host allowlisted.
+- Remote private inference must be HTTPS, authenticated and exact-host allowlisted.
 
 ---
 
@@ -203,19 +208,32 @@ Core supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), Pol
 
 ---
 
-# Build / Test / Deploy Rules
+# Build / test / deploy rules
 
 - Prefer coherent batches of related changes.
-- Read a file before changing it.
+- Read files before changing them.
 - Preserve existing behavior unless the task requires change.
-- Run/observe relevant typecheck, production build and tests before calling a batch successful.
+- Reuse existing real collectors/adapters instead of duplicating them.
+- Do not add placeholders merely to increase feature/adapter counts.
+- Run/observe relevant typecheck, build and tests before calling a batch successful.
 - Never claim CI/build/deployment passed unless it actually did.
 - Never call a branch commit production.
 - Re-check current `main` after concurrent work.
 
 ---
 
-# Documentation Map
+# Documentation map
+
+Latest handoff:
+- `docs/HANDOFF-2026-08-12.md`
+
+Self-Healing Supervisor:
+- `docs/portables/self-healing-monitoring-current-state-20260812.md`
+- `docs/portables/self-healing-monitoring-connections.md`
+- `docs/portables/self-healing-technical-walkthrough.md`
+- `docs/portables/self-healing-operations-runbook.md`
+- `docs/portables/self-healing-integration-guide.md`
+- `docs/portables/self-healing-evaluation-brief.md`
 
 Marketing & Sales:
 - `docs/marketing-sales-current-state.md`
@@ -232,35 +250,17 @@ COS / enterprise architecture:
 - `saas/lib/enterprise-ai-os/`
 - `appliance/local-ai/`
 
-Detailed historical/operational onboarding: `docs/ONBOARD-full.md`.
+Historical/operational detail:
+- `docs/ONBOARD-full.md`
 
 ---
 
-# Status Language
+# Status language
 
-Use precise actual states. A plan is not a campaign; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not enterprise RC acceptance; architecture support for local inference is not proof that a production inference endpoint is configured and healthy.
-
----
-
-# 2026-08-10 Change Log
-
-- Confirmed COS retrieval occurs before the local-inference configuration gate.
-- Confirmed research → retain → reload → local retry is implemented.
-- Added secured support for a production-reachable private open-model inference endpoint using HTTPS + API key + exact-host allowlisting.
-- Documented required COS independent-runtime variables in `saas/.env.example`.
-- Clarified that COS independence architecture is complete while independent runtime requires a configured and healthy open/local model endpoint.
-- Preserved the existing self-hosted vLLM/llama.cpp appliance runtime.
+Use precise actual states. A plan is not execution; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not Enterprise RC acceptance; architecture support is not proof of configured runtime; a staged adapter is not certified; a policy signal is not proof that its collector exists.
 
 ---
 
-# Definition of Success
+# Definition of success
 
-The best AI call is the one that never has to happen.
-
-The best external data call is the one avoided because SignalBoost already owns sufficient verified intelligence.
-
-The best Portable continuously teaches COS without bypassing governance.
-
-The best architecture lets providers be replaced without rewriting business intelligence or control logic.
-
-The best enterprise release claim is one backed by recorded evidence.
+The best AI call is the one that never has to happen. The best external data call is the one avoided because SignalBoost already owns sufficient verified intelligence. The best Portable teaches COS without bypassing governance. The best architecture lets providers be replaced without rewriting business intelligence or control logic. The best self-healing system detects trouble early, resolves explicitly pre-authorized routine conditions safely, escalates consequential actions, verifies every outcome and learns from the result.

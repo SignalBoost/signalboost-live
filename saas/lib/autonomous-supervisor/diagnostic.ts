@@ -6,6 +6,7 @@ import {
   type SupervisorThinkerResponse,
 } from '@/lib/cos/supervisor-thinker-prompt'
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
+import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 const METHODS = new Set(['api', 'code_change', 'cli', 'ui_agent', 'human_action', 'no_action'])
@@ -41,22 +42,22 @@ export function validateDiagnostic(value: unknown, incidentId: string): Diagnost
 function fallbackDiagnostic(incident: NormalizedIncidentPayload, reason: string): DiagnosticResult {
   return {
     incident_id: incident.incident_id,
-    incident_summary: `${incident.project} deployment failed on Vercel.`,
-    diagnosis: `The supplied payload indicates a Vercel deployment failure. Automated LLM diagnosis was unavailable: ${reason}`,
-    confidence_score: 35,
-    confidence_reason: 'Diagnosis is based only on the normalized incident payload.',
+    incident_summary: `${incident.project} reported a ${incident.trigger.toLowerCase().replaceAll('_', ' ')} incident from ${incident.provider}.`,
+    diagnosis: `The supplied evidence confirms an incident but automated diagnosis was unavailable: ${reason}`,
+    confidence_score: 25,
+    confidence_reason: 'Diagnosis is based only on the normalized incident evidence because no diagnostic thinker completed the contract.',
     evidence: [
       { source: 'error_summary', finding: incident.error_summary },
-      { source: 'raw_logs', finding: incident.raw_logs.slice(0, 500) },
+      { source: 'supplied_evidence', finding: incident.raw_logs.slice(0, 700) },
     ],
-    missing_information: ['Validated LLM diagnostic response'],
+    missing_information: ['Validated COS or fallback diagnostic response'],
     recommended_execution_method: 'human_action',
     requires_ui_agent: false,
     requires_human_approval: true,
     risk_level: 'critical',
-    risk_reasons: ['Production deployment failure', 'No repair may execute without owner approval'],
-    repair_plan: [{ step: 1, action: 'Review the failed deployment and approve a bounded investigation.', executor: 'human', target: 'Vercel deployment and environment settings', expected_result: 'A safe repair path is confirmed before any production change.', requires_approval: true }],
-    verification_plan: [{ step: 1, check: 'Confirm a replacement deployment reaches READY.', success_condition: 'The latest production deployment is READY.' }],
+    risk_reasons: ['Automated diagnosis unavailable', 'No mutation may execute from an unvalidated diagnostic'],
+    repair_plan: [],
+    verification_plan: [],
     rollback_plan: [],
     escalation_reason: reason,
   }
@@ -68,14 +69,36 @@ export interface DiagnosticThinker {
 }
 
 const THINKERS = new Map<string, DiagnosticThinker>()
-
 export function registerDiagnosticThinker(thinker: DiagnosticThinker): void {
   if (!thinker?.id || typeof thinker.think !== 'function') throw new Error('A diagnostic thinker needs an id and a think() method')
   THINKERS.set(thinker.id, thinker)
 }
+export function listDiagnosticThinkers(): string[] { return Array.from(THINKERS.keys()).sort() }
 
-export function listDiagnosticThinkers(): string[] {
-  return Array.from(THINKERS.keys()).sort()
+/** COS Primary is the first diagnostic brain. External models are fallback, not the default. */
+export function createCosPrimaryDiagnosticThinker(): DiagnosticThinker {
+  return {
+    id: 'cos-primary',
+    async think(incident, systemPrompt, responseSchema) {
+      const prompt = [
+        systemPrompt,
+        '',
+        'INCIDENT EVIDENCE:',
+        JSON.stringify(incident),
+        '',
+        'REQUIRED RESPONSE SCHEMA:',
+        JSON.stringify(responseSchema),
+        '',
+        'Return only the diagnostic JSON object. Preserve incident_id exactly.',
+      ].join('\n')
+      const result = await tryCOSFirstAnswer({ prompt, userId: null, language: 'en', privileged: true })
+      if (!result.handled) {
+        const detail = 'reason' in result ? result.reason : 'COS Primary did not satisfy the diagnostic contract'
+        throw new Error(`COS Primary confidence ${result.confidence.toFixed(2)}: ${detail}`)
+      }
+      return result.reply
+    },
+  }
 }
 
 export function createGeminiThinker(): DiagnosticThinker | null {
@@ -86,13 +109,8 @@ export function createGeminiThinker(): DiagnosticThinker | null {
     id: 'gemini',
     async think(incident, systemPrompt, responseSchema) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }],
-          generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema },
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema } }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body?.error?.message || `Gemini returned ${res.status}`)
@@ -107,17 +125,13 @@ export function createModelRouterThinker(): DiagnosticThinker | null {
   return {
     id: preference,
     async think(incident, systemPrompt, responseSchema) {
-      const system = [
-        systemPrompt,
-        '',
-        'Return ONLY raw JSON — no prose, no markdown fences — matching this schema exactly:',
-        JSON.stringify(responseSchema),
-      ].join('\n')
+      const system = [systemPrompt, '', 'Return ONLY raw JSON — no prose, no markdown fences — matching this schema exactly:', JSON.stringify(responseSchema)].join('\n')
       return ai.generate({ prompt: JSON.stringify(incident), systemPrompt: system, maxTokens: 2000, modelPreference: preference as 'claude' | 'openai' })
     },
   }
 }
 
+/** External diagnostic fallback selection. Kept public for existing tests/configuration. */
 export function resolveDiagnosticThinker(): DiagnosticThinker | null {
   const wanted = String(process.env.SUPERVISOR_THINKER_PROVIDER || '').trim().toLowerCase()
   if (wanted && THINKERS.has(wanted)) return THINKERS.get(wanted) as DiagnosticThinker
@@ -127,17 +141,25 @@ export function resolveDiagnosticThinker(): DiagnosticThinker | null {
   return createGeminiThinker() || createModelRouterThinker()
 }
 
-export async function diagnoseIncident(
-  incident: NormalizedIncidentPayload,
-  thinker: DiagnosticThinker | null = resolveDiagnosticThinker(),
-): Promise<DiagnosticResult> {
-  if (!thinker) return fallbackDiagnostic(incident, 'No diagnostic thinker is configured')
-  try {
-    const text = await thinker.think(incident, SUPERVISOR_THINKER_SYSTEM_PROMPT, SUPERVISOR_THINKER_RESPONSE_SCHEMA)
-    return validateDiagnostic(extractJson(text), incident.incident_id)
-  } catch (err) {
-    return fallbackDiagnostic(incident, `${thinker.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`)
+async function runThinker(incident: NormalizedIncidentPayload, thinker: DiagnosticThinker): Promise<DiagnosticResult> {
+  const text = await thinker.think(incident, SUPERVISOR_THINKER_SYSTEM_PROMPT, SUPERVISOR_THINKER_RESPONSE_SCHEMA)
+  return validateDiagnostic(extractJson(text), incident.incident_id)
+}
+
+export async function diagnoseIncident(incident: NormalizedIncidentPayload, thinker?: DiagnosticThinker | null): Promise<DiagnosticResult> {
+  // An explicitly supplied thinker is deterministic test/override behavior. Otherwise COS is first.
+  if (thinker !== undefined) {
+    if (!thinker) return fallbackDiagnostic(incident, 'No diagnostic thinker is configured')
+    try { return await runThinker(incident, thinker) }
+    catch (err) { return fallbackDiagnostic(incident, `${thinker.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`) }
   }
+
+  const failures: string[] = []
+  for (const candidate of [createCosPrimaryDiagnosticThinker(), resolveDiagnosticThinker()].filter(Boolean) as DiagnosticThinker[]) {
+    try { return await runThinker(incident, candidate) }
+    catch (err) { failures.push(`${candidate.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`) }
+  }
+  return fallbackDiagnostic(incident, failures.length ? failures.join(' | ') : 'No diagnostic thinker is configured')
 }
 
 export async function diagnoseIncidentWithGemini(incident: NormalizedIncidentPayload): Promise<DiagnosticResult> {

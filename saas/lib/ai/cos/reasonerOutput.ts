@@ -113,6 +113,32 @@ export function parseLocalResult(raw:string):LocalResult|null{
   return null
 }
 
+export type EvidenceLabelPrefix='KG'|'CL'|'EM'|'SK'
+
+/** Return unique cited numeric labels in first-citation order. */
+export function citedLabelIndices(answer:string,prefix:EvidenceLabelPrefix):number[]{
+  const text=String(answer??'')
+  const seen=new Set<number>()
+  const indices:number[]=[]
+  for(const match of text.matchAll(new RegExp(`\\[${prefix}(\\d{1,2})\\]`,'g'))){
+    const index=Number(match[1])
+    if(!Number.isInteger(index)||index<1||seen.has(index))continue
+    seen.add(index)
+    indices.push(index)
+  }
+  return indices
+}
+
+/**
+ * Map cited 1-based labels back to the exact values supplied in that reasoning turn.
+ * Out-of-range/hallucinated labels are ignored rather than being credited to another item.
+ */
+export function citedIndexedValues<T>(answer:string,prefix:EvidenceLabelPrefix,values:readonly T[]):T[]{
+  return citedLabelIndices(answer,prefix)
+    .map(index=>values[index-1])
+    .filter((value):value is T=>value!==undefined)
+}
+
 /**
  * Which retrieved items the answer actually leans on. Retrieval counts say what was HANDED to the
  * reasoner; only a citation in the answer text shows an item informed a claim. Procedural skills
@@ -120,7 +146,10 @@ export function parseLocalResult(raw:string):LocalResult|null{
  * and therefore must not raise the knowledge-evidence confidence ceiling.
  */
 export function citedEvidence(answer:string):{kg:number;cl:number;em:number;sk:number}{
-  const text=String(answer??'')
-  const count=(prefix:string)=>new Set([...text.matchAll(new RegExp(`\\[${prefix}(\\d{1,2})\\]`,'g'))].map(m=>m[1])).size
-  return {kg:count('KG'),cl:count('CL'),em:count('EM'),sk:count('SK')}
+  return {
+    kg:citedLabelIndices(answer,'KG').length,
+    cl:citedLabelIndices(answer,'CL').length,
+    em:citedLabelIndices(answer,'EM').length,
+    sk:citedLabelIndices(answer,'SK').length,
+  }
 }

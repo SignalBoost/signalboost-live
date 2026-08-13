@@ -11,10 +11,15 @@ export type KnowledgeFact = {
   updatedAt: Date
 }
 
+export type KnowledgeFactMatch = KnowledgeFact & {
+  similarityScore: number
+}
+
 export interface PersistentKnowledgeStore extends KnowledgeStore {
   getFact(taskId: string, subject: string, predicate: string): Promise<KnowledgeFact | null>
-  upsertFact(fact: KnowledgeFact): Promise<void>
+  upsertFact(fact: KnowledgeFact, embeddingVector?: number[]): Promise<void>
   findFacts(taskId: string, subjects: string[]): Promise<KnowledgeFact[]>
+  queryNearestFacts(vector: number[], options?: { matchCount?: number; minSimilarity?: number }): Promise<KnowledgeFactMatch[]>
 }
 
 export interface SemanticKnowledgeStore extends PersistentKnowledgeStore {
@@ -29,11 +34,15 @@ export interface SemanticKnowledgeStore extends PersistentKnowledgeStore {
 export class KnowledgeGraph {
   constructor(private readonly store: PersistentKnowledgeStore) {}
 
-  async remember(fact: KnowledgeFact) {
-    await this.store.upsertFact(fact)
+  async remember(fact: KnowledgeFact, embeddingVector?: number[]) {
+    await this.store.upsertFact(fact, embeddingVector)
   }
 
   async recall(taskId: string, subjects: string[]) {
     return this.store.findFacts(taskId, subjects)
+  }
+
+  async recallSemantic(vector: number[], options?: { matchCount?: number; minSimilarity?: number }) {
+    return this.store.queryNearestFacts(vector, options)
   }
 }

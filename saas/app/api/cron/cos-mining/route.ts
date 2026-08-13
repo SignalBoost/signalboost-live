@@ -4,7 +4,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
-import { autoPromoteLearnedKnowledge } from '@/lib/ai/cos/autoPromoteLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
 
@@ -29,18 +28,10 @@ export async function GET(req: NextRequest) {
   }
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
-  let knowledgePromotion: Awaited<ReturnType<typeof autoPromoteLearnedKnowledge>> | null = null
   let corpus: unknown = null
   if (job === 'daily') {
     try {
       learning = await runDailyAutonomousLearning({ miningSummary: result.summary })
-      if (learning.status === 'learned') {
-        // Learning is not complete until accepted source material is promoted into the
-        // structured fact store that Enterprise Memory / Knowledge Graph retrieval reads.
-        // Bounded to a small batch so the cron remains predictable and owner-triggered
-        // extraction can still be used for backlog catch-up.
-        knowledgePromotion = await autoPromoteLearnedKnowledge(5)
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'
       console.error('cron cos daily learning failed:', message)
@@ -60,5 +51,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, knowledgePromotion, corpus })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, corpus })
 }

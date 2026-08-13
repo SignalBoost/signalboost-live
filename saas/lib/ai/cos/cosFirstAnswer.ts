@@ -60,6 +60,16 @@ function semanticThreshold(): number {
   return Number.isFinite(value) ? Math.max(0.80, Math.min(0.999, value)) : 0.93
 }
 
+function knowledgeFactSimilarityThreshold(): number {
+  const value = Number(process.env.COS_KNOWLEDGE_FACT_SIMILARITY_THRESHOLD || '0.55')
+  return Number.isFinite(value) ? Math.max(0.25, Math.min(0.95, value)) : 0.55
+}
+
+function knowledgeFactRetrievalBudgetMs(): number {
+  const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '5000')
+  return Number.isFinite(value) ? Math.max(500, Math.min(15_000, value)) : 5000
+}
+
 // Constructed once per module load, not per request — matches how cosServiceDb()
 // and the exact-cache store are already used elsewhere in this file. Returns null
 // wherever cosServiceDb() would (no Supabase service role configured), same as the
@@ -215,24 +225,55 @@ async function resolveKnowledgeGap(prompt: string): Promise<void> {
   try { await db.from('cos_learning_gaps').update({status:'resolved',resolved_at:new Date().toISOString(),last_seen_at:new Date().toISOString()}).eq('task_id','support').eq('question',safeText(prompt,2000)).eq('capability','general_reasoning').in('status',['pending','learning','failed']) } catch {}
 }
 
+async function semanticKnowledgeFacts(prompt: string, db: NonNullable<ReturnType<typeof cosServiceDb>>) {
+  const work = (async () => {
+    const vector = await generateLocalEmbedding(prompt)
+    return new SupabaseKnowledgeStore(db).queryNearestFacts(vector, {
+      matchCount: 16,
+      minSimilarity: knowledgeFactSimilarityThreshold(),
+    })
+  })().catch((error) => {
+    console.warn('cosFirstAnswer: semantic knowledge retrieval unavailable; lexical fallback will be used', error)
+    return null
+  })
+  const budgetMs = knowledgeFactRetrievalBudgetMs()
+  return Promise.race([
+    work,
+    new Promise<null>(resolve => setTimeout(() => {
+      console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs })
+      resolve(null)
+    }, budgetMs)),
+  ])
+}
+
 async function retrieveInternalContext(prompt:string,userId?:string|null){
   const systems=['semantic/exact cache preflight']; const facts:string[]=[], learned:string[]=[], memories:string[]=[]; const terms=queryTerms(prompt); const db=cosServiceDb()
-  if(db&&terms.length){
+  if(db){
     systems.push('Enterprise Memory / Knowledge Graph','Continuous Learning Corpus')
-    const factFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`predicate.ilike.%${t}%`,`object.ilike.%${t}%`]).join(',')
-    const learnedFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`summary.ilike.%${t}%`]).join(',')
-    // Deterministic secondary ordering: rows tied on confidence used to come back in storage
-    // order, which shuffles the evidence between identical runs — and with it the reasoner's
-    // context, and with THAT its confidence. Same question, same corpus, same evidence, same order.
-    const [fr,lr]=await Promise.allSettled([
-      db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at').or(factFilters).order('confidence',{ascending:false}).order('updated_at',{ascending:false}).order('subject',{ascending:true}).limit(16),
-      db.from('cos_continuous_learning').select('subject,summary,facts,confidence,source_kind,source_uri,observed_at').or(learnedFilters).order('confidence',{ascending:false}).order('observed_at',{ascending:false}).order('source_uri',{ascending:true}).limit(12),
+    const learnedPromise = terms.length
+      ? db.from('cos_continuous_learning')
+          .select('subject,summary,facts,confidence,source_kind,source_uri,observed_at')
+          .or(terms.flatMap(t=>[`subject.ilike.%${t}%`,`summary.ilike.%${t}%`]).join(','))
+          .order('confidence',{ascending:false}).order('observed_at',{ascending:false}).order('source_uri',{ascending:true}).limit(12)
+      : Promise.resolve({ data: [], error: null })
+    const [semanticResult, learnedResult] = await Promise.allSettled([
+      semanticKnowledgeFacts(prompt, db),
+      learnedPromise,
     ])
-    // Evidence is LABELLED so use becomes checkable: the reasoner is told to cite [KG#]/[CL#]/[EM#]
-    // when an item informs a claim, and the answer is scanned for those markers afterwards.
-    // "Retrieved" and "demonstrably cited" are different claims and the provenance now makes both.
-    if(fr.status==='fulfilled'&&!fr.value.error) for(const r of fr.value.data??[]) facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; source ${safeText(r.source,180)}]`)
-    if(lr.status==='fulfilled'&&!lr.value.error) for(const r of lr.value.data??[]){ const ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):''; learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`) }
+
+    const semanticRows = semanticResult.status === 'fulfilled' ? semanticResult.value : null
+    if(semanticRows?.length){
+      for(const r of semanticRows) facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; similarity ${Number(r.similarityScore||0).toFixed(2)}; source ${safeText(r.source,180)}]`)
+    } else if(terms.length) {
+      // Compatibility fallback while the vector migration/backfill rolls through production, and
+      // resilience fallback if local embeddings are temporarily unavailable. Semantic retrieval is
+      // the primary path; this preserves known facts rather than turning a migration gap into amnesia.
+      const factFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`predicate.ilike.%${t}%`,`object.ilike.%${t}%`]).join(',')
+      const fr=await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at').or(factFilters).order('confidence',{ascending:false}).order('updated_at',{ascending:false}).order('subject',{ascending:true}).limit(16)
+      if(!fr.error) for(const r of fr.data??[]) facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; source ${safeText(r.source,180)}]`)
+    }
+
+    if(learnedResult.status==='fulfilled'&&!learnedResult.value.error) for(const r of learnedResult.value.data??[]){ const ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):''; learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`) }
   }
   if(userId){
     systems.push('User Enterprise Memory')

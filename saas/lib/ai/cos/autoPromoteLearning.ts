@@ -1,5 +1,6 @@
 import { cosServiceDb, createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { persistKnowledgeFactWithEmbedding } from '@/lib/ai/cos/knowledgeFactSemantic'
 import {
   extractFactsFromDocument,
   toKnowledgeFact,
@@ -132,7 +133,8 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
       }
 
       for (const triple of result.grounded) {
-        await stores.knowledge.upsertFact(toKnowledgeFact(triple, document.sourceUri))
+        const fact = toKnowledgeFact(triple, document.sourceUri)
+        await persistKnowledgeFactWithEmbedding(stores.knowledge, fact)
         factsWritten += 1
       }
 

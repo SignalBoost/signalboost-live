@@ -40,21 +40,44 @@ export function localInferenceConfigFromEnv(): LocalInferenceConfig {
   return { baseUrl, model, apiKey: process.env.LOCAL_AI_API_KEY?.trim() || undefined, timeoutMs }
 }
 
-async function waitForInference(config: LocalInferenceConfig): Promise<void> {
-  if (!runpodLifecycleEnabled()) return
-  await ensureRunpodReasonerStarted()
-  // Keep cold-start waiting bounded so a Vercel 300s function still has enough
-  // time for actual inference, persistence, and an honest response. The prior
-  // 180s default plus a 120s inference allowance left no serverless headroom.
+let runtimeReadyPromise: Promise<void> | null = null
+
+function runpodStartTimeoutMs(): number {
+  // Keep cold-start waiting bounded so a Vercel 300s function still has enough time for actual
+  // inference, persistence, and an honest response.
   const configured = Number(process.env.RUNPOD_START_TIMEOUT_MS || '90000')
-  const timeoutMs = Number.isFinite(configured) ? Math.max(5_000, Math.min(90_000, configured)) : 90_000
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const health = await checkLocalInferenceHealth(config)
-    if (health.ok) return
-    await new Promise(resolve => setTimeout(resolve, 3000))
+  return Number.isFinite(configured) ? Math.max(5_000, Math.min(90_000, configured)) : 90_000
+}
+
+/**
+ * Shared wake/readiness gate for every consumer of the secured RunPod runtime: Qwen reasoning,
+ * local embeddings, and the co-located transcript service. A healthy running Pod is never resumed;
+ * a cold Pod is resumed once per process and then polled until the configured local model is served.
+ */
+export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
+  if (!runpodLifecycleEnabled()) return
+
+  const current = await checkLocalInferenceHealth(config)
+  if (current.ok) return
+  if (runtimeReadyPromise) return runtimeReadyPromise
+
+  runtimeReadyPromise = (async () => {
+    await ensureRunpodReasonerStarted()
+    const timeoutMs = runpodStartTimeoutMs()
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      const health = await checkLocalInferenceHealth(config)
+      if (health.ok) return
+      await new Promise(resolve => setTimeout(resolve, 3000))
+    }
+    throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
+  })()
+
+  try {
+    await runtimeReadyPromise
+  } finally {
+    runtimeReadyPromise = null
   }
-  throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
 }
 
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
@@ -68,13 +91,12 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   try {
     const startupStartedAt = Date.now()
     try {
-      await waitForInference(config)
+      await ensureLocalInferenceRuntimeReady(config)
     } finally {
       startupLatencyMs = Date.now() - startupStartedAt
     }
-    // Start the inference timeout only after the pod is healthy. Previously the
-    // abort timer started before cold-start waiting, so a long startup could consume
-    // the entire model timeout and make the subsequent fetch abort immediately.
+    // Start the inference timeout only after the pod is healthy. A cold start therefore cannot
+    // consume the actual model-call timeout before the request begins.
     timeout = setTimeout(() => controller.abort(), config.timeoutMs)
     inferenceStartedAt = Date.now()
     const response = await fetch(`${config.baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) }, signal: controller.signal, body: JSON.stringify({ model: config.model, max_tokens: args.maxTokens ?? 2048, temperature: args.temperature ?? 0.2, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' }, { role: 'user', content: args.prompt }] }) })

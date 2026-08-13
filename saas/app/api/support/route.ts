@@ -19,6 +19,7 @@ function noPriorProvenanceReply(languageCode:string):string{if(languageCode==='e
 function deterministicProvenance(body:any,prompt:string):RecordedTurnProvenance|null{const languageCode=languageCodeFrom(body);const result=tryDeterministicUtility({prompt,timezone:body?.context?.timezone||body?.context?.timeZone,locale:languageCode==='pt'?'pt-BR':languageCode==='es'?'es':languageCode==='pl'?'pl':languageCode==='ru'?'ru':'en-US',confidenceThreshold:Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72')});return result?.executionProvenance??null}
 function provenanceFromResponse(body:any,prompt:string,payload:any,isPrivileged:boolean):RecordedTurnProvenance|null{if(payload?.execution_provenance&&typeof payload.execution_provenance==='object'&&!Array.isArray(payload.execution_provenance))return payload.execution_provenance as RecordedTurnProvenance;const source=String(payload?.source||'');if(source.startsWith('deterministic-current-'))return deterministicProvenance(body,prompt);if(source==='anthropic-chief'||source==='anthropic-concierge')return authoritativeProvenance(null,{invoked:true,provider:'anthropic',model:isPrivileged?'claude-sonnet-4-6':'claude-haiku-4-5'}) as RecordedTurnProvenance;if(source==='deterministic-concierge')return authoritativeProvenance(null,{invoked:false}) as RecordedTurnProvenance;return null}
 async function persistResponseTurn(params:{conversationId:string;userId:string;userMessage:string;assistantReply:string;provenance:RecordedTurnProvenance|null;source:string}){const{conversationId,userId,userMessage,assistantReply,provenance,source}=params;if(!provenance)return;if(source==='anthropic-chief'||source==='anthropic-concierge'){const attached=await attachRecordedTurnProvenance(conversationId,userId,assistantReply,provenance);if(attached)return}await persistTurn({conversationId,userId,userMessage,assistantReply,provenance})}
+async function persistProvenanceReply(params:{conversationId:string|null;userId:string;userMessage:string;assistantReply:string;provenance:RecordedTurnProvenance|null}){const{conversationId,userId,userMessage,assistantReply,provenance}=params;if(!conversationId||!assistantReply)return;try{await persistTurn({conversationId,userId,userMessage,assistantReply,...(provenance?{provenance}:{})})}catch(error){console.error('support provenance reply persistence failed (non-blocking)',error)}}
 
 export async function POST(req:NextRequest){
   let body:any=null;try{body=await req.clone().json()}catch{return legacyPOST(req)}
@@ -30,8 +31,10 @@ export async function POST(req:NextRequest){
       ??(precedingAssistant?await recordedTurnProvenanceByContent(userId,precedingAssistant):null)
       ??(precedingAssistant?await latestUserTurnProvenance(userId,precedingAssistant):null)
       ??(!precedingAssistant?await latestUserTurnProvenance(userId):null)
-    if(!recorded)return NextResponse.json({reply:noPriorProvenanceReply(languageCode),source:'cos-no-provenance-record',external_ai_invoked:false})
-    return NextResponse.json({reply:formatAuthoritativeProvenance(recorded as any,languageCode),source:'cos-authoritative-provenance',execution_provenance:recorded,external_ai_invoked:false})
+    const reply=recorded?formatAuthoritativeProvenance(recorded as any,languageCode):noPriorProvenanceReply(languageCode)
+    await persistProvenanceReply({conversationId,userId,userMessage:prompt,assistantReply:reply,provenance:recorded})
+    if(!recorded)return NextResponse.json({reply,source:'cos-no-provenance-record',external_ai_invoked:false})
+    return NextResponse.json({reply,source:'cos-authoritative-provenance',execution_provenance:recorded,external_ai_invoked:false})
   }
 
   const response=await legacyPOST(req)

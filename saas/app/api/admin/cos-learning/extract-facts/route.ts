@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb, createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { extractFactsFromDocument, resolveExtractionBatch, toKnowledgeFact, type ExtractionSourceDocument } from '@/lib/ai/cos/knowledgeFactExtraction'
+import { persistKnowledgeFactWithEmbedding } from '@/lib/ai/cos/knowledgeFactSemantic'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 
 export const runtime = 'nodejs'
@@ -92,7 +93,8 @@ export async function POST(req: NextRequest) {
       ungrounded += result.rejectedUngrounded
       malformed += result.rejectedMalformed
       for (const triple of result.grounded) {
-        await stores.knowledge.upsertFact(toKnowledgeFact(triple, document.sourceUri))
+        const fact = toKnowledgeFact(triple, document.sourceUri)
+        await persistKnowledgeFactWithEmbedding(stores.knowledge, fact)
         factsWritten += 1
       }
       perDocument.push({

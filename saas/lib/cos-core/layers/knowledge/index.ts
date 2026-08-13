@@ -23,11 +23,12 @@ function semanticEmbeddingInput(prompt: string, contextWindow: string): string {
   return stableContext ? `${stableContext}\n${prompt}` : String(prompt ?? '')
 }
 
-function responseUsesUserMemory(payload: unknown): boolean {
+function responseUsesScopedMemory(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false
   const origin = (payload as Record<string, unknown>).origin
   if (!origin || typeof origin !== 'object' || Array.isArray(origin)) return false
-  return Number((origin as Record<string, unknown>).userMemoriesUsed || 0) > 0
+  const scoped = origin as Record<string, unknown>
+  return Number(scoped.userMemoriesUsed || 0) > 0 || Number(scoped.enterpriseMemoriesUsed || 0) > 0
 }
 
 function cachedReply(payload: unknown): string {
@@ -38,7 +39,7 @@ function cachedReply(payload: unknown): string {
 function citedLabels(payload: unknown): string[] {
   const seen = new Set<string>()
   const labels: string[] = []
-  for (const match of cachedReply(payload).matchAll(/\[(KG|CL|EM|SK)(\d{1,2})\]/g)) {
+  for (const match of cachedReply(payload).matchAll(/\[(KG|CL|OEM|EM|SK)(\d{1,2})\]/g)) {
     const label = `${match[1]}${match[2]}`
     if (seen.has(label)) continue
     seen.add(label)
@@ -50,7 +51,7 @@ function citedLabels(payload: unknown): string[] {
 function labelledContext(contextWindow: string): Map<string, string> {
   const map = new Map<string, string>()
   for (const line of canonicalizeSemanticCacheContext(contextWindow).split('\n')) {
-    const match = line.match(/^\[(KG|CL|EM|SK)(\d{1,2})\]\s/)
+    const match = line.match(/^\[(KG|CL|OEM|EM|SK)(\d{1,2})\]\s/)
     if (match) map.set(`${match[1]}${match[2]}`, line)
   }
   return map
@@ -78,7 +79,7 @@ export class KnowledgeLayer {
     try {
       const stableContext = canonicalizeSemanticCacheContext(contextWindow)
       const exact = await this.dependencies.store.queryExact?.({ taskId, prompt })
-      if (exact && !responseUsesUserMemory(exact.responsePayload)) {
+      if (exact && !responseUsesScopedMemory(exact.responsePayload)) {
         const exactContext = canonicalizeSemanticCacheContext(exact.contextText ?? '')
         const exactContextCurrent = exactContext === stableContext
           || citedCacheContextStillCurrent(exact.responsePayload, exactContext, stableContext)
@@ -88,7 +89,7 @@ export class KnowledgeLayer {
       const embedding = await this.dependencies.generateEmbedding(semanticEmbeddingInput(prompt, stableContext))
       const nearestMatch = await this.dependencies.store.queryNearest(embedding, { taskId })
       if (!nearestMatch || nearestMatch.similarityScore < this.similarityThreshold) return null
-      if (responseUsesUserMemory(nearestMatch.responsePayload)) return null
+      if (responseUsesScopedMemory(nearestMatch.responsePayload)) return null
       return nearestMatch
     } catch (error) {
       this.dependencies.onError?.(error)
@@ -98,7 +99,8 @@ export class KnowledgeLayer {
 
   async commitToMemory(taskId: string, prompt: string, contextWindow: string, responsePayload: unknown): Promise<void> {
     try {
-      if (responseUsesUserMemory(responsePayload)) return
+      // Organization/user scoped answers must never enter the global semantic memory store.
+      if (responseUsesScopedMemory(responsePayload)) return
       const stableContext = canonicalizeSemanticCacheContext(contextWindow)
       const embedding = await this.dependencies.generateEmbedding(semanticEmbeddingInput(prompt, stableContext))
       await this.dependencies.store.save({ taskId, promptText: prompt, contextText: stableContext, embeddingVector: embedding, responseData: responsePayload, createdAt: new Date() })

@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run prebuild && next build",
+  "ignoreCommand": "if [ -z \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then exit 1; else git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" \"$VERCEL_GIT_COMMIT_SHA\" -- .; fi",
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",
@@ -12,15 +13,15 @@
     },
     {
       "path": "/api/cron/batch-poll",
-      "schedule": "*/30 * * * *"
+      "schedule": "10 * * * *"
     },
     {
       "path": "/api/cron/cos-video-poll",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/20 * * * *"
     },
     {
       "path": "/api/cron/cos-video-queue-recovery",
-      "schedule": "*/15 * * * *"
+      "schedule": "7 * * * *"
     },
     {
       "path": "/api/cron/cyber-dependency-monitor",
@@ -28,7 +29,7 @@
     },
     {
       "path": "/api/hub/cyber/prepare-github-pr",
-      "schedule": "0 * * * *"
+      "schedule": "20 */6 * * *"
     },
     {
       "path": "/api/cron/cos-mining",
@@ -48,11 +49,11 @@
     },
     {
       "path": "/api/cron/marketing-sales-video",
-      "schedule": "*/15 * * * *"
+      "schedule": "12 * * * *"
     },
     {
       "path": "/api/cron/cos-brand-video",
-      "schedule": "*/15 * * * *"
+      "schedule": "22 * * * *"
     },
     {
       "path": "/api/cron/cos-campaign-measure",
@@ -60,39 +61,39 @@
     },
     {
       "path": "/api/cron/cos-brand-dispatch",
-      "schedule": "*/15 * * * *"
+      "schedule": "32 * * * *"
     },
     {
       "path": "/api/cron/cos-governance-watchdog",
-      "schedule": "*/15 * * * *"
+      "schedule": "42 */2 * * *"
     },
     {
       "path": "/api/cron/cos-autonomy",
-      "schedule": "*/30 * * * *"
+      "schedule": "17 * * * *"
     },
     {
       "path": "/api/cron/cos-engineering-missions",
-      "schedule": "*/30 * * * *"
+      "schedule": "27 * * * *"
     },
     {
       "path": "/api/cron/cos-auto-publish-exact",
-      "schedule": "*/15 * * * *"
+      "schedule": "52 */2 * * *"
     },
     {
       "path": "/api/cron/vercel-observation",
-      "schedule": "*/30 * * * *"
+      "schedule": "2 */2 * * *"
     },
     {
       "path": "/api/cron/native-proactive-monitoring",
-      "schedule": "*/15 * * * *"
+      "schedule": "5,35 * * * *"
     },
     {
       "path": "/api/cron/prospect-campaign",
-      "schedule": "*/30 * * * *"
+      "schedule": "37 */2 * * *"
     },
     {
       "path": "/api/cron/press-campaign",
-      "schedule": "*/15 * * * *"
+      "schedule": "47 */6 * * *"
     },
     {
       "path": "/api/cron/outreach-digest",

@@ -69,7 +69,18 @@ function decisionBase(candidate: KnowledgePromotionCandidate, options?: Relevanc
   const matched = new Set(matchedAnchors)
   const discriminativeMatched = discriminativeAnchors.filter(term => matched.has(term))
   const configuredMatches = Math.max(1, Math.round(options?.minSubjectMatches ?? minimumKnowledgePromotionSubjectMatches()))
-  const requiredMatches = anchors.length ? Math.min(anchors.length, configuredMatches) : 0
+
+  // Generic curriculum words (enterprise, database, performance, architecture, systems, etc.)
+  // are useful context but should not make a genuinely relevant source impossible to promote.
+  // Example: subject "Enterprise cybersecurity" has one meaningful domain anchor —
+  // "cybersecurity". A source that strongly contains that anchor should not be rejected merely
+  // because its title/excerpt does not repeat the generic word "enterprise". Conversely, a source
+  // that matches only a generic anchor still fails the discriminative-anchor gate below.
+  const meaningfulAnchorCount = discriminativeAnchors.length || anchors.length
+  const requiredMatches = anchors.length
+    ? Math.min(anchors.length, configuredMatches, Math.max(1, meaningfulAnchorCount))
+    : 0
+
   const minimumCoverage = Math.max(0, Math.min(1, options?.minSubjectCoverage ?? minimumKnowledgePromotionSubjectCoverage()))
   const coverage = anchors.length ? matchedAnchors.length / anchors.length : 0
   const confidence = Number.isFinite(candidate.confidence) ? Math.max(0, Math.min(1, candidate.confidence)) : 0

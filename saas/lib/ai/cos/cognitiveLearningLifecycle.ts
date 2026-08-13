@@ -21,6 +21,7 @@ export type CognitiveSkillEvidence = {
   productionSuccesses: number
   failureCount: number
   lastValidatedAt?: string | null
+  weakened?: boolean
   quarantined?: boolean
 }
 
@@ -93,6 +94,10 @@ function validationFresh(lastValidatedAt: string | null | undefined, freshnessDa
  * This function never changes answer confidence. It also never turns a teacher example into skill
  * mastery. Qualitative evaluator/understanding approvals are explicit prerequisites, and
  * learned/mastered require held-out variants rather than training-example reuse.
+ *
+ * Explicit weakened/quarantined states are sticky. Historical success counters cannot silently
+ * re-promote a skill after retention or production evidence has weakened it. A successful,
+ * separately recorded revalidation must first clear weakened_at before this evaluator can promote it.
  */
 export function evaluateCognitiveSkillEligibility(
   evidence: CognitiveSkillEvidence,
@@ -116,6 +121,17 @@ export function evaluateCognitiveSkillEligibility(
       productionRate,
       validationFresh: fresh,
       reasons: ['Skill is explicitly quarantined.'],
+    }
+  }
+
+  if (evidence.weakened) {
+    return {
+      recommendedStatus: 'weakened',
+      practiceRate,
+      holdoutRate,
+      productionRate,
+      validationFresh: fresh,
+      reasons: ['Skill is explicitly weakened and requires fresh revalidation before reuse.'],
     }
   }
 

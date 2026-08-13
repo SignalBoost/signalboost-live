@@ -10,10 +10,16 @@ Native monitoring is now a first-class host capability. The canonical policy is 
 
 The native runtime is observation-only: collectors detect conditions and create evidence/incidents through the Supervisor observation contract. Monitoring itself does not bypass the existing diagnosis, policy, execution, verification, audit, or approval boundaries.
 
-Production-integrated native sources currently include:
+Production-integrated native sources include:
 
 - Vercel deployment/provider health through the existing Vercel observer.
 - SignalBoost platform-health intelligence, including queue growth, scheduler failures, provider failures, resource pressure, stale leases/heartbeats, verification failures, audit failures, and related platform-health conditions.
+- Native proactive API probes for p95 latency, 5xx/network error rate, and durable latency-regression baselines.
+- Native database health probes for live RPC latency, connection pressure, active queries, and longest active query duration.
+- Native storage health probes for live Storage API reachability, bytes used, object/bucket counts, and capacity pressure when a real quota is configured.
+- Native TLS certificate probes using validated TLS handshakes and real peer-certificate expiry dates.
+
+The proactive collectors are implemented in `saas/self-healing-host/native-proactive-monitoring.ts` and run through `/api/cron/native-proactive-monitoring` on the registered 15-minute schedule. `/api/supervisor/native-health` is the default live API liveness target. Probe samples are persisted in `self_healing_native_probe_samples` so API latency regressions use durable history rather than a one-shot comparison.
 
 The runtime supports three modes:
 
@@ -49,16 +55,18 @@ Monitor / Observe
 
 Automatic execution is not permission to run arbitrary provider mutations. Routine repair still requires an explicitly registered capability, allowed resource/method/parameter scope, reversibility and execution limits under the existing Supervisor safety contract.
 
-## Remaining native monitoring gap
+## Native proactive probe deployment state
 
-The next native-monitoring batch should implement and connect real probes/collectors for:
+The four previously missing native probe families are now implemented with real collectors; no production probe uses placeholders or mocks.
 
-- API latency and 5xx/error-rate trends;
-- database latency/error/connection pressure;
-- storage capacity/error health;
-- TLS/certificate expiry.
+The required database objects and service-role-only aggregate RPCs are defined in `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql`. The application route fails closed with `native_probe_store_unavailable` until that migration exists in the target Supabase project. Therefore a green application build proves the code compiles, but production runtime activation of the database/storage/history-backed probes must not be claimed until the migration is applied and the cron is observed successfully.
 
-A branch named `feat/native-proactive-monitors-20260812` was created for this work, but the attempted repository write was blocked by the connector safety gate. Therefore these four probes must be treated as **not implemented yet**, not as completed work.
+Optional deployment configuration:
+
+- `SELF_HEALING_API_PROBE_URLS` — comma-separated live HTTPS API targets. Defaults to the platform native-health endpoint.
+- `SELF_HEALING_TLS_TARGETS` — comma-separated `host[:port]` TLS targets; API-target hosts are included automatically.
+- `SELF_HEALING_STORAGE_QUOTA_BYTES` — real storage quota used to calculate capacity percentage. If absent, the storage probe reports real usage without inventing a capacity percentage.
+- `SELF_HEALING_NATIVE_MONITORING_ENABLED=false` — intentional buyer opt-out from native monitoring.
 
 ## Status
 
@@ -66,4 +74,4 @@ The broader project was assessed at approximately 98% complete on 2026-08-12. Th
 
 ## Handoff rule
 
-Before continuing this work, inspect current `main`, the native monitoring policy/runtime, platform-health adapter, existing Vercel observer, monitoring adapter registry, and current tests. Do not recreate collectors or vendor adapters that already exist, and do not add placeholders merely to increase adapter count.
+Before continuing this work, inspect current `main`, the native monitoring policy/runtime, proactive collectors, platform-health adapter, existing Vercel observer, monitoring adapter registry, current tests, and production migration state. Do not recreate collectors or vendor adapters that already exist, and do not add placeholders merely to increase adapter count.

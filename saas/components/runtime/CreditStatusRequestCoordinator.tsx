@@ -15,6 +15,7 @@
 // coalesces short-lived status reads used by the UI.
 
 import { useLayoutEffect } from 'react'
+import { supabase } from '@/utils/supabase/client'
 
 export const CREDIT_STATUS_TTL_MS = 60_000
 export const CREDIT_STATUS_INVALIDATE_EVENT = 'signalboost:credits-invalidated'
@@ -77,9 +78,9 @@ function isMeteredMutation(input: RequestInfo | URL, init?: RequestInit): boolea
 }
 
 function cookieFingerprint(): string {
-  // Supabase browser sessions are cookie-backed in this app. Binding the tiny
-  // memory cache to the current cookie string prevents reuse after an auth/session
-  // change. A storage listener below covers cross-tab Supabase auth changes too.
+  // Bind the tiny memory cache to the current browser cookie state. The Supabase
+  // listener below handles same-tab auth changes; the storage listener handles
+  // cross-tab changes. The fingerprint is an additional fail-closed boundary.
   return document.cookie || ''
 }
 
@@ -148,6 +149,7 @@ export default function CreditStatusRequestCoordinator() {
       if (!event.key || key.includes('supabase') || key.includes('auth')) invalidate()
     }
     const onExplicitInvalidate = () => invalidate()
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => invalidate())
 
     window.fetch = coordinatedFetch
     window.addEventListener('storage', onStorage)
@@ -157,6 +159,7 @@ export default function CreditStatusRequestCoordinator() {
       if (window.fetch === coordinatedFetch) window.fetch = nativeFetch
       window.removeEventListener('storage', onStorage)
       window.removeEventListener(CREDIT_STATUS_INVALIDATE_EVENT, onExplicitInvalidate)
+      authListener.subscription.unsubscribe()
       invalidate()
     }
   }, [])

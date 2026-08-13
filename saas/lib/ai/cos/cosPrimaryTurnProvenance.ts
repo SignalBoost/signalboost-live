@@ -7,7 +7,8 @@ export async function readCosPrimaryPriorProvenance(userId:string|null,preceding
   const prior=await latestUserTurnProvenance(userId,precedingAssistant?.trim()||undefined)
   if(!prior)return null
   const access=await getAccess().catch(()=>null)
-  const liveSystemState=await buildCosLiveSystemState({userId,privileged:Boolean(access?.isOwner||access?.isAdmin)}).catch(()=>null)
+  if(!access?.isOwner&&!access?.isAdmin)return prior
+  const liveSystemState=await buildCosLiveSystemState({userId,privileged:true}).catch(()=>null)
   return liveSystemState?{...prior,live_system_state:liveSystemState}:prior
 }
 

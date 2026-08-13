@@ -10,7 +10,7 @@ Native monitoring is now a first-class host capability. The canonical policy is 
 
 The native runtime is observation-only: collectors detect conditions and create evidence/incidents through the Supervisor observation contract. Monitoring itself does not bypass the existing diagnosis, policy, execution, verification, audit, or approval boundaries.
 
-Production-integrated native sources include:
+Production-code native sources include:
 
 - Vercel deployment/provider health through the existing Vercel observer.
 - SignalBoost platform-health intelligence, including queue growth, scheduler failures, provider failures, resource pressure, stale leases/heartbeats, verification failures, audit failures, and related platform-health conditions.
@@ -57,9 +57,9 @@ Automatic execution is not permission to run arbitrary provider mutations. Routi
 
 ## Native proactive probe deployment state
 
-The four previously missing native probe families are now implemented with real collectors; no production probe uses placeholders or mocks.
+PR #1132 is merged into `main` at `4e91da9a1f380e94a8c8476d860a770552c914db`. The exact reconciled branch head passed the Vercel production build/typecheck gate before merge. The four previously missing native probe families therefore exist in current application code; no production probe uses placeholders or mocks.
 
-The required database objects and service-role-only aggregate RPCs are defined in `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql`. The application route fails closed with `native_probe_store_unavailable` until that migration exists in the target Supabase project. Therefore a green application build proves the code compiles, but production runtime activation of the database/storage/history-backed probes must not be claimed until the migration is applied and the cron is observed successfully.
+The required database objects and service-role-only aggregate RPCs are defined in `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql`. The application route fails closed with `native_probe_store_unavailable` until that migration exists in the target Supabase project. Therefore a green application deployment proves the code compiles/deploys, but production runtime activation of the database/storage/history-backed probes must not be claimed until the migration is applied and the cron is observed successfully.
 
 Optional deployment configuration:
 
@@ -74,4 +74,4 @@ The broader project was assessed at approximately 98% complete on 2026-08-12. Th
 
 ## Handoff rule
 
-Before continuing this work, inspect current `main`, the native monitoring policy/runtime, proactive collectors, platform-health adapter, existing Vercel observer, monitoring adapter registry, current tests, and production migration state. Do not recreate collectors or vendor adapters that already exist, and do not add placeholders merely to increase adapter count.
+Before continuing this work, inspect current `main`, the native monitoring policy/runtime, proactive collectors, platform-health adapter, existing Vercel observer, monitoring adapter registry, current tests, and production migration/runtime state. Do not recreate collectors or vendor adapters that already exist, and do not add placeholders merely to increase adapter count.

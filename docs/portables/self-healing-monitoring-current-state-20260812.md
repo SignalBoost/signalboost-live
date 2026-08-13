@@ -59,7 +59,16 @@ Automatic execution is not permission to run arbitrary provider mutations. Routi
 
 PR #1132 is merged into `main` at `4e91da9a1f380e94a8c8476d860a770552c914db`. The exact reconciled branch head passed the Vercel production build/typecheck gate before merge. The four previously missing native probe families therefore exist in current application code; no production probe uses placeholders or mocks.
 
-The required database objects and service-role-only aggregate RPCs are defined in `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql`. The application route fails closed with `native_probe_store_unavailable` until that migration exists in the target Supabase project. Therefore a green application deployment proves the code compiles/deploys, but production runtime activation of the database/storage/history-backed probes must not be claimed until the migration is applied and the cron is observed successfully.
+Production runtime verification is complete as of 2026-08-12 local / 2026-08-13 UTC:
+
+- Vercel production deployment `dpl_CUpwkAmcqEYu87pV3wQxEroYd6Cq` reached `READY` on merge commit `4e91da9a1f380e94a8c8476d860a770552c914db`, with `saas.signalboostapp.com` attached to that exact deployment.
+- `GET https://saas.signalboostapp.com/api/supervisor/native-health` returned HTTP 200 with the expected no-store JSON health payload.
+- `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql` was applied successfully to the production Supabase project and both service-role aggregate RPCs were executed successfully.
+- Vercel runtime logs show `/api/cron/native-proactive-monitoring` returning HTTP 200 in production at 2026-08-13 02:30:09 UTC.
+- The production sample table contains three persisted samples for each of the four probe families (`api`, `database`, `storage`, `certificate`) from 02:30 through 03:00 UTC, proving repeated scheduled persistence rather than a one-shot check.
+- Latest observed probe states at verification time were healthy across all four families. The live API probe recorded 0% request errors, the database probe reported bounded connection-pressure telemetry, the storage probe reported real object/bucket/usage telemetry, and the certificate probe reported a valid live peer certificate with expiry remaining.
+
+The application route still fails closed with `native_probe_store_unavailable` if the required schema is missing in another deployment target. That is intentional and should be preserved.
 
 Optional deployment configuration:
 
@@ -70,8 +79,8 @@ Optional deployment configuration:
 
 ## Status
 
-The broader project was assessed at approximately 98% complete on 2026-08-12. This is an engineering progress estimate, not enterprise Release Candidate acceptance. Green Vercel deployment alone is not sufficient RC evidence.
+The broader project was assessed at approximately 98% complete on 2026-08-12. This is an engineering progress estimate, not enterprise Release Candidate acceptance. Green Vercel deployment alone is not sufficient RC evidence. Native proactive monitoring itself is now production-runtime-verified; remaining project work is elsewhere in the broader release-evidence and COS quality backlog.
 
 ## Handoff rule
 
-Before continuing this work, inspect current `main`, the native monitoring policy/runtime, proactive collectors, platform-health adapter, existing Vercel observer, monitoring adapter registry, current tests, and production migration/runtime state. Do not recreate collectors or vendor adapters that already exist, and do not add placeholders merely to increase adapter count.
+Before continuing this work, inspect current `main`, the native monitoring policy/runtime, proactive collectors, platform-health adapter, existing Vercel observer, monitoring adapter registry, current tests, and live production state. Do not recreate collectors or vendor adapters that already exist, and do not add placeholders merely to increase adapter count. Treat the production verification above as dated evidence, not a substitute for re-checking live state after future monitoring changes.

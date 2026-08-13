@@ -18,7 +18,7 @@ type ProviderResult = { text: string; provider: Exclude<ModelProvider, 'local'>;
 function modelForProvider(provider: ModelProvider): string {
   if (provider === 'openai') return process.env.OPENAI_FALLBACK_MODEL?.trim() || 'gpt-4o-mini'
   if (provider === 'claude') return process.env.ANTHROPIC_FALLBACK_MODEL?.trim() || 'claude-sonnet-4-6'
-  if (provider === 'gemini') return process.env.GEMINI_FALLBACK_MODEL?.trim() || 'gemini-2.5-flash'
+  if (provider === 'gemini') return process.env.GEMINI_FALLBACK_MODEL?.trim() || 'gemini-3.6-flash'
   return process.env.LOCAL_AI_MODEL || 'local-model'
 }
 

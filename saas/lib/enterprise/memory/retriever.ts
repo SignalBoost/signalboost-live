@@ -27,6 +27,7 @@ function text(value: unknown): string {
 function number01(value: unknown): number {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return 0
+  if (numeric > 5 && numeric <= 100) return numeric / 100
   return Math.min(1, Math.max(0, numeric))
 }
 
@@ -34,6 +35,10 @@ function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? structuredClone(value as Record<string, unknown>)
     : {}
+}
+
+function array(value: unknown): unknown[] {
+  return Array.isArray(value) ? structuredClone(value) : []
 }
 
 function tags(...values: unknown[]): string[] {
@@ -93,20 +98,24 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
     const name = text(row.repo_name)
     const id = text(row.id) || compositeIdentity('/', owner, name)
     if (!id) continue
+    const snapshot = object(row.snapshot)
+    const topLanguages = array(row.primary_languages)
+    const topFrameworks = array(row.frameworks)
+    const topProducts = array(row.product_descriptions)
     candidates.push({
       id,
       kind: 'repository',
-      confidence: number01(row.intelligence_confidence),
+      confidence: number01(row.confidence ?? row.intelligence_confidence),
       occurredAt: text(row.analyzed_at) || text(row.last_repository_update) || null,
-      taskTags: tags(owner, name, row.primary_languages, row.frameworks, row.topics),
+      taskTags: tags(owner, name, row.primary_languages, row.frameworks, row.topics, snapshot.primaryLanguages, snapshot.primary_languages, snapshot.frameworks, snapshot.topics),
       payload: {
         owner,
         name,
-        defaultBranch: text(row.default_branch),
-        primaryLanguages: Array.isArray(row.primary_languages) ? structuredClone(row.primary_languages) : [],
-        frameworks: Array.isArray(row.frameworks) ? structuredClone(row.frameworks) : [],
-        productDescriptions: Array.isArray(row.product_descriptions) ? structuredClone(row.product_descriptions) : [],
-        lastAnalyzedCommitSha: text(row.last_analyzed_commit_sha),
+        defaultBranch: text(row.default_branch) || text(snapshot.defaultBranch) || text(snapshot.default_branch),
+        primaryLanguages: topLanguages.length ? topLanguages : array(snapshot.primaryLanguages ?? snapshot.primary_languages),
+        frameworks: topFrameworks.length ? topFrameworks : array(snapshot.frameworks),
+        productDescriptions: topProducts.length ? topProducts : array(snapshot.productDescriptions ?? snapshot.product_descriptions),
+        lastAnalyzedCommitSha: text(row.commit_sha) || text(row.last_analyzed_commit_sha) || text(snapshot.lastAnalyzedCommitSha),
       },
     })
   }
@@ -114,15 +123,17 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
   for (const row of rows.campaigns || []) {
     const id = text(row.campaign_id) || text(row.id)
     if (!id) continue
-    const performance = object(row.performance_data)
+    const performance = object(row.performance ?? row.performance_data)
+    const approvalDecision = text(row.approval_decision)
+    const occurredAt = text(row.approved_at) || text(row.updated_at) || text(row.created_at) || null
     candidates.push({
       id,
       kind: 'campaign',
       workspace: text(row.workspace) || null,
       confidence: confidenceFromRecord(row.confidence),
-      approved: text(row.approval_decision) === 'approved',
+      approved: approvalDecision === 'approved',
       performanceScore: number01(performance.score ?? performance.performanceScore),
-      occurredAt: text(row.approved_at) || text(row.updated_at) || text(row.created_at) || null,
+      occurredAt,
       taskTags: tags(row.workspace, row.objective, row.selected_audience, row.selected_product, row.channel, row.cta),
       payload: {
         campaignId: id,
@@ -135,11 +146,27 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
         executionStatus: text(row.execution_status),
       },
     })
+
+    if (approvalDecision) {
+      candidates.push({
+        id: `${id}:approval`,
+        kind: 'approval',
+        approved: approvalDecision === 'approved',
+        occurredAt,
+        taskTags: tags(id, approvalDecision, row.workspace),
+        payload: {
+          campaignId: id,
+          decision: approvalDecision,
+          approvedVersion: object(row.approved_version),
+          evidence: text(row.approval_evidence),
+        },
+      })
+    }
   }
 
   for (const row of rows.approvals || []) {
     const campaignId = text(row.campaign_id)
-    const createdAt = text(row.created_at)
+    const createdAt = text(row.created_at) || text(row.recorded_at)
     const id = text(row.id) || compositeIdentity(':', campaignId, createdAt)
     if (!id) continue
     candidates.push({
@@ -159,15 +186,15 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
 
   for (const row of rows.confidence || []) {
     const workspace = text(row.workspace)
-    const createdAt = text(row.created_at)
-    const id = text(row.id) || compositeIdentity(':', workspace, createdAt)
+    const occurredAt = text(row.recorded_at) || text(row.created_at)
+    const id = text(row.id) || compositeIdentity(':', workspace, occurredAt)
     if (!id) continue
     candidates.push({
       id,
       kind: 'confidence',
       workspace: workspace || null,
       confidence: confidenceFromRecord(row.confidence),
-      occurredAt: createdAt || null,
+      occurredAt: occurredAt || null,
       taskTags: tags(workspace),
       payload: { confidence: object(row.confidence) },
     })
@@ -178,7 +205,7 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
 
 export async function retrieveEnterpriseMemoryContext(args: {
   organizationId: string
-  workspace: string
+  workspace?: string
   taskTags?: readonly string[]
   limit?: number
 }): Promise<EnterpriseMemoryContext | null> {
@@ -187,13 +214,12 @@ export async function retrieveEnterpriseMemoryContext(args: {
   const { getAdminSupabase } = await import('../../../utils/supabase/server.ts')
   const admin = getAdminSupabase()
 
-  const [organizationResult, intelligenceResult, repositoriesResult, campaignsResult, approvalsResult, confidenceResult] = await Promise.all([
+  const [organizationResult, intelligenceResult, repositoriesResult, campaignsResult, confidenceResult] = await Promise.all([
     admin.from('enterprise_organizations').select('*').eq('id', organizationId).maybeSingle(),
     admin.from('enterprise_intelligence_snapshots').select('*').eq('organization_id', organizationId).order('analyzed_at', { ascending: false }).limit(10),
     admin.from('enterprise_repository_snapshots').select('*').eq('organization_id', organizationId).order('analyzed_at', { ascending: false }).limit(10),
-    admin.from('enterprise_campaign_memory').select('*').eq('organization_id', organizationId).order('updated_at', { ascending: false }).limit(30),
-    admin.from('enterprise_approval_history').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(30),
-    admin.from('enterprise_confidence_history').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(20),
+    admin.from('enterprise_campaign_memory').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(30),
+    admin.from('enterprise_confidence_history').select('*').eq('organization_id', organizationId).order('recorded_at', { ascending: false }).limit(20),
   ])
 
   const candidates = createEnterpriseMemoryCandidates({
@@ -201,7 +227,6 @@ export async function retrieveEnterpriseMemoryContext(args: {
     intelligence: Array.isArray(intelligenceResult.data) ? intelligenceResult.data : [],
     repositories: Array.isArray(repositoriesResult.data) ? repositoriesResult.data : [],
     campaigns: Array.isArray(campaignsResult.data) ? campaignsResult.data : [],
-    approvals: Array.isArray(approvalsResult.data) ? approvalsResult.data : [],
     confidence: Array.isArray(confidenceResult.data) ? confidenceResult.data : [],
   })
 

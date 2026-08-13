@@ -7,6 +7,8 @@ import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
+import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
 
 export const runtime = 'nodejs'
@@ -34,6 +36,16 @@ export async function GET(req: NextRequest) {
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
+    // Daily learning, transcript acquisition, skill practice, and consolidation are legitimate COS
+    // local-compute work. Lease + pre-warm the dedicated runtime once at the start of that bounded
+    // batch; the idle-stop cron releases the GPU again after the configured quiet period.
+    await touchRunpodActivityLease('daily_learning_batch')
+    try {
+      await ensureLocalInferenceRuntimeReady()
+    } catch (error) {
+      console.warn('cron COS local runtime could not be pre-warmed; individual learning stages will fail closed or use their existing fallbacks:', error instanceof Error ? error.message : String(error))
+    }
+
     try {
       learning = await runDailyAutonomousLearning({ miningSummary: result.summary })
     } catch (error) {

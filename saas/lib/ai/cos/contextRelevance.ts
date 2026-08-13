@@ -1,4 +1,6 @@
 import { generateLocalEmbeddings } from '@/lib/ai/cos/localEmbeddings'
+import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 
 const STOP = new Set([
   'about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why','only','normal','unchanged','without',
@@ -60,9 +62,9 @@ export function rankByVectors<T>(
 }
 
 /**
- * Re-rank a bounded lexical prefetch semantically with ONE local embeddings call. If the local
- * embedding endpoint is unavailable, fail conservative: require at least two meaningful query-term
- * matches instead of declaring every SQL ILIKE hit relevant.
+ * Re-rank a bounded lexical prefetch semantically with ONE local embeddings call. Mark the work in
+ * the same durable activity clock used by RunPod idle-stop, then wake through Qwen's bounded readiness
+ * gate. If semantic ranking is unavailable, fail conservative with lexical overlap.
  */
 export async function rankContextCandidates<T>(
   query: string,
@@ -71,6 +73,8 @@ export async function rankContextCandidates<T>(
 ): Promise<ContextRankResult<T>> {
   if (candidates.length === 0) return { mode: 'semantic', retrieved: 0, relevant: [] }
   try {
+    await touchRunpodActivityLease('semantic_context_ranking')
+    await ensureLocalInferenceRuntimeReady()
     const vectors = await generateLocalEmbeddings([query, ...candidates.map(candidate => candidate.text)])
     const queryVector = vectors[0] ?? []
     const ranked = rankByVectors(candidates, queryVector, vectors.slice(1), options.threshold).slice(0, options.limit)

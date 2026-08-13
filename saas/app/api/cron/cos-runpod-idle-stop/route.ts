@@ -3,23 +3,17 @@
 // Stops the COS reasoner pod when it has been idle past a configured threshold.
 // This is the direct fix for the Aug 11 finding: $5.72 of a fresh $20 RunPod balance
 // spent in ~13 hours of ordinary continuous rental with nothing calling the pod.
-// "Stop when idle" turns that into pennies of storage cost between real use.
+// "Stop when idle" turns that into storage-only cost between real use.
 //
-// SAFETY, matching every other autonomous-action gate in this codebase
-// (COS_AUTONOMOUS_LEARNING_ENABLED, COS_LIVE_SOURCES_ENABLED, the audit-approved-
-// remediation cron above): disabled by default. Nothing stops the pod until the
-// owner explicitly sets COS_RUNPOD_AUTO_STOP_ENABLED=true. Idleness is measured
-// from the same signal the owner-facing status route reports — the most recent
-// cos_ai_roi_metrics row — so what this cron acts on is exactly what a human
-// checking /dashboard/cos-savings or GET /api/admin/cos-runpod would see. Nothing
-// here decides idleness by a separate, invisible rule.
+// SAFETY: auto-stop is enabled by default only when the matching RunPod wake-on-demand lifecycle
+// is configured and active. An explicit COS_RUNPOD_AUTO_STOP_ENABLED=false remains an emergency
+// kill switch. Idleness is measured from the same cos_ai_roi_metrics signal shown to the owner.
 //
-// Deliberately does NOT run every minute. Stopping a few minutes later than the
-// exact idle threshold costs at most a few more minutes of the hourly rate — a
-// trivial amount — so this can run on the same relaxed cadence as the other
-// retimed crons (every 15 minutes) rather than needing tight scheduling.
+// Deliberately does NOT run every minute. Stopping a few minutes later than the exact idle threshold
+// costs only those extra minutes, so the existing every-15-minutes cadence is sufficient.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { runpodAutoStopEnabled, runpodLifecycleConfigured, runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
 import { runpodConfigured, queryPodStatus, stopPod } from '@/lib/hub/runpodTelemetry'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
@@ -46,14 +40,21 @@ async function minutesSinceLastCosActivity(): Promise<number | null> {
 }
 
 export async function GET(req: NextRequest) {
-  if (process.env.COS_RUNPOD_AUTO_STOP_ENABLED !== 'true') {
-    return NextResponse.json({ ok: true, stopped: false, reason: 'RunPod auto-stop is disabled by default (COS_RUNPOD_AUTO_STOP_ENABLED is not "true").' })
-  }
-
   const secret = process.env.CRON_SECRET
   const authorization = req.headers.get('authorization') || ''
   if (!secret || authorization !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!runpodAutoStopEnabled()) {
+    return NextResponse.json({
+      ok: true,
+      stopped: false,
+      autoStopEnabled: false,
+      lifecycleConfigured: runpodLifecycleConfigured(),
+      lifecycleEnabled: runpodLifecycleEnabled(),
+      reason: 'RunPod auto-stop requires configured wake-on-demand lifecycle and is disabled only by an explicit lifecycle/auto-stop kill switch.',
+    })
   }
 
   if (!runpodConfigured()) {
@@ -63,29 +64,26 @@ export async function GET(req: NextRequest) {
   try {
     const status = await queryPodStatus()
     if (!status.running) {
-      return NextResponse.json({ ok: true, stopped: false, reason: 'Pod is not currently running.' })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, reason: 'Pod is not currently running.' })
     }
 
     const idleMinutes = await minutesSinceLastCosActivity()
     const threshold = idleThresholdMinutes()
 
-    // No activity record at all is NOT treated as "infinitely idle, stop it" — that
-    // would stop a pod on its very first minute of life, before it has ever answered
-    // a question, which is the opposite of the intended behaviour. Absence of
-    // evidence here is absence of evidence, not evidence of idleness; skip and wait
-    // for a real signal on the next run.
+    // No activity record at all is NOT treated as "infinitely idle, stop it". Absence of evidence
+    // here is absence of evidence, not evidence of idleness; skip until a real COS activity exists.
     if (idleMinutes === null) {
-      return NextResponse.json({ ok: true, stopped: false, reason: 'No COS activity has been recorded yet; nothing to measure idleness against.' })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, reason: 'No COS activity has been recorded yet; nothing to measure idleness against.' })
     }
 
     if (idleMinutes < threshold) {
-      return NextResponse.json({ ok: true, stopped: false, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, reason: `Idle for ${Math.round(idleMinutes)} minutes, below the ${threshold}-minute threshold.` })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, reason: `Idle for ${Math.round(idleMinutes)} minutes, below the ${threshold}-minute threshold.` })
     }
 
     const result = await stopPod()
-    return NextResponse.json({ ok: true, stopped: true, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, pod: result })
+    return NextResponse.json({ ok: true, stopped: true, autoStopEnabled: true, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, pod: result })
   } catch (error) {
     console.error('cos-runpod-idle-stop: failed', error)
-    return NextResponse.json({ ok: false, stopped: false, error: error instanceof Error ? error.message : 'Idle-stop check failed.' }, { status: 500 })
+    return NextResponse.json({ ok: false, stopped: false, autoStopEnabled: true, error: error instanceof Error ? error.message : 'Idle-stop check failed.' }, { status: 500 })
   }
 }

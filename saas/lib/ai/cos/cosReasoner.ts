@@ -13,6 +13,7 @@
 // COS really used its independent model runtime.
 
 import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 
@@ -107,17 +108,9 @@ function buildSkillCitationRepairPrompt(originalPrompt: string, originalAnswer: 
  * If unavailable or unhealthy, callers fail closed and may separately invoke the
  * explicitly-labelled external escalation gateway.
  *
- * Diagnostic quality repair is deliberately LOCAL-ONLY. If the first draft is a generic category
- * list, COS gets one deterministic rewrite instruction and one more call to the same self-hosted
- * reasoner. This gives the local model a chance to turn a weak draft into a mechanism-level answer
- * before the caller considers an external provider. If the rewrite is not measurably better, the
- * first draft remains subject to the normal downstream confidence/specificity gate.
- *
- * If validated procedural skills were supplied and the final draft contains no [SK#] citation, COS
- * gets one citation-only audit using the same local model. The repair is accepted only if stripping
- * the added SK tags reproduces the original answer exactly (ignoring whitespace before punctuation),
- * and every added tag existed in the supplied prompt. This preserves authoritative provenance
- * without server-side citation inference or answer rewriting.
+ * The durable RunPod activity lease is touched before the first local model call. That protects
+ * the whole bounded reasoning/repair sequence from the idle-stop cron without turning health checks
+ * into activity or allowing one scheduled cost-control action to interrupt an in-flight answer.
  */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
@@ -129,6 +122,7 @@ export async function callCosReasoner(
     label: `independent-local:${(process.env.LOCAL_AI_MODEL || '').trim()}`,
   }
   const inference = localInferenceConfigFromEnv()
+  await touchRunpodActivityLease('qwen_reasoning')
   const first = await callLocalModel(args, inference).catch(() => null)
   if (!first) return null
 

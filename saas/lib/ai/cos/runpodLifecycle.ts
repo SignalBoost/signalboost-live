@@ -1,10 +1,25 @@
 // Cost-control lifecycle for a dedicated RunPod COS reasoner.
-// Disabled unless RUNPOD_LIFECYCLE_ENABLED=true. Secrets remain environment-only.
+// When RunPod credentials are configured, lifecycle management is enabled by default so the
+// dedicated GPU can be stopped while idle and resumed only when COS actually needs local compute.
+// Either lifecycle control or idle-stop can still be disabled explicitly with an environment flag.
 
 const RUNPOD_GRAPHQL_URL = 'https://api.runpod.io/graphql'
 
+function booleanOverride(name: string): boolean | null {
+  const value = process.env[name]?.trim().toLowerCase()
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return null
+}
+
+export function runpodLifecycleConfigured(): boolean {
+  return Boolean(process.env.RUNPOD_API_KEY?.trim()) && Boolean(process.env.RUNPOD_POD_ID?.trim())
+}
+
 function enabled() {
-  return process.env.RUNPOD_LIFECYCLE_ENABLED === 'true'
+  const override = booleanOverride('RUNPOD_LIFECYCLE_ENABLED')
+  if (override !== null) return override
+  return runpodLifecycleConfigured()
 }
 
 function config() {
@@ -30,6 +45,16 @@ async function graphql(query: string, variables: Record<string, unknown>) {
 
 export function runpodLifecycleEnabled() {
   return enabled()
+}
+
+/**
+ * Idle-stop is safe only when the matching wake-on-demand lifecycle is active and credentials are
+ * present. With that safety contract satisfied, auto-stop defaults ON; an explicit false remains an
+ * emergency/maintenance kill switch.
+ */
+export function runpodAutoStopEnabled(): boolean {
+  if (!runpodLifecycleConfigured() || !runpodLifecycleEnabled()) return false
+  return booleanOverride('COS_RUNPOD_AUTO_STOP_ENABLED') !== false
 }
 
 export async function ensureRunpodReasonerStarted(): Promise<{ attempted: boolean; started: boolean }> {

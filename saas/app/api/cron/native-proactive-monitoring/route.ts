@@ -47,15 +47,7 @@ function livePlatformHealthCollector(db: any) {
       readRows(db, 'supervisor_leases'),
       readRows(db, 'vercel_observation_triggers'),
     ])
-    return {
-      now: new Date(),
-      runs,
-      instances,
-      workItems,
-      leases,
-      triggers,
-      ciState: process.env.VERCEL_GIT_COMMIT_SHA ? 'passing' as const : 'unknown' as const,
-    }
+    return { now: new Date(), runs, instances, workItems, leases, triggers }
   })
 }
 

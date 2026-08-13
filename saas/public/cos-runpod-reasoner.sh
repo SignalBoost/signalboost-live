@@ -10,6 +10,7 @@ OLLAMA_LOG="$WORKSPACE/cos-ollama.log"
 GATEWAY_LOG="$WORKSPACE/cos-gateway.log"
 OLLAMA_PID_FILE="$WORKSPACE/cos-ollama.pid"
 GATEWAY_PID_FILE="$WORKSPACE/cos-gateway.pid"
+TRANSCRIPT_PORT="${TRANSCRIPT_SERVICE_PORT:-18888}"
 
 mkdir -p "$WORKSPACE" "$MODEL_DIR"
 umask 077
@@ -80,14 +81,16 @@ cat > "$GATEWAY_FILE" <<'PY'
 import hmac, http.client, json, os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 KEY_FILE = os.environ.get('COS_REASONER_KEY_FILE', '/workspace/cos-api-key')
-UPSTREAM_HOST = '127.0.0.1'
-UPSTREAM_PORT = 11435
+OLLAMA_HOST = '127.0.0.1'
+OLLAMA_PORT = 11435
+TRANSCRIPT_HOST = '127.0.0.1'
+TRANSCRIPT_PORT = int(os.environ.get('COS_TRANSCRIPT_INTERNAL_PORT', '18888'))
 with open(KEY_FILE, 'r', encoding='utf-8') as fh:
     EXPECTED = fh.read().strip()
 if not EXPECTED:
     raise SystemExit('COS reasoner API key file is empty')
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'SignalBoostCOSReasoner/1.0'
+    server_version = 'SignalBoostCOSGateway/2.0'
     def log_message(self, fmt, *args): print('[cos-gateway] ' + (fmt % args), flush=True)
     def _authorized(self):
         api_key = self.headers.get('x-api-key', '')
@@ -99,13 +102,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(401); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
     def _proxy(self):
         if not self._authorized(): return self._reject()
+        transcript = self.path == '/transcript' or self.path == '/transcript-health'
+        host = TRANSCRIPT_HOST if transcript else OLLAMA_HOST
+        port = TRANSCRIPT_PORT if transcript else OLLAMA_PORT
+        path = '/health' if self.path == '/transcript-health' else self.path
         length = int(self.headers.get('content-length','0') or '0')
         body = self.rfile.read(length) if length else None
-        headers = {'Host': f'{UPSTREAM_HOST}:{UPSTREAM_PORT}'}
+        headers = {'Host': f'{host}:{port}'}
         if self.headers.get('content-type'): headers['Content-Type'] = self.headers['content-type']
-        conn = http.client.HTTPConnection(UPSTREAM_HOST, UPSTREAM_PORT, timeout=300)
+        if transcript: headers['Authorization'] = f'Bearer {EXPECTED}'
+        conn = http.client.HTTPConnection(host, port, timeout=300)
         try:
-            conn.request(self.command, self.path, body=body, headers=headers)
+            conn.request(self.command, path, body=body, headers=headers)
             response = conn.getresponse(); payload = response.read()
             self.send_response(response.status)
             content_type = response.getheader('content-type')
@@ -119,12 +127,12 @@ class Handler(BaseHTTPRequestHandler):
     do_POST = _proxy
 if __name__ == '__main__':
     server = ThreadingHTTPServer(('0.0.0.0',11434), Handler)
-    print('[cos-gateway] listening on 0.0.0.0:11434; upstream 127.0.0.1:11435', flush=True)
+    print(f'[cos-gateway] listening on 0.0.0.0:11434; ollama={OLLAMA_HOST}:{OLLAMA_PORT}; transcript={TRANSCRIPT_HOST}:{TRANSCRIPT_PORT}', flush=True)
     server.serve_forever()
 PY
 chmod 700 "$GATEWAY_FILE"
 log 'Starting authenticated public gateway on 0.0.0.0:11434...'
-nohup env COS_REASONER_KEY_FILE="$KEY_FILE" python3 "$GATEWAY_FILE" >"$GATEWAY_LOG" 2>&1 &
+nohup env COS_REASONER_KEY_FILE="$KEY_FILE" COS_TRANSCRIPT_INTERNAL_PORT="$TRANSCRIPT_PORT" python3 "$GATEWAY_FILE" >"$GATEWAY_LOG" 2>&1 &
 echo $! > "$GATEWAY_PID_FILE"
 sleep 1
 
@@ -152,4 +160,5 @@ log 'Public RunPod port: 11434'
 log 'Vercel LOCAL_AI_BASE_URL = your RunPod 11434 proxy URL plus /v1'
 log 'Vercel LOCAL_AI_ALLOWED_HOSTS = exact hostname from that proxy URL'
 log 'Vercel LOCAL_AI_API_KEY = secret stored in /workspace/cos-api-key'
+log 'Transcript service, when installed, is routed through the same public gateway at /transcript.'
 log 'Do not paste that key into chat, GitHub, logs, or source code.'

@@ -48,10 +48,10 @@ export function guardLearningSourceAdapter(adapter:ContinuousLearningSourceAdapt
 function transcriptLanguages(value?:string):string[]{const parsed=String(value||'en').split(',').map(item=>item.trim()).filter(Boolean);return parsed.length?parsed.slice(0,8):['en']}
 
 /**
- * The RunPod transcript service intentionally runs beside the local reasoner and reuses the same
- * /workspace/cos-api-key. Explicit transcript variables always win. If they are absent, derive the
- * 8888 transcript endpoint only from the exact HTTPS RunPod proxy hostname already trusted for the
- * 11434 reasoner. Never infer from arbitrary hosts.
+ * The RunPod transcript service runs privately beside the local reasoner and is exposed through
+ * the same authenticated 11434 gateway at /transcript. Explicit transcript variables always win.
+ * If they are absent, derive only from the exact HTTPS RunPod 11434 proxy already trusted for local
+ * inference. This avoids a second public port and prevents collisions with RunPod/Jupyter services.
  */
 export function resolveYouTubeTranscriptRuntime(env:LiveLearningEnvironment):{url:string;token?:string;derived:boolean}{
   const explicitUrl=String(env.YOUTUBE_TRANSCRIPT_API_URL||'').trim()
@@ -62,9 +62,7 @@ export function resolveYouTubeTranscriptRuntime(env:LiveLearningEnvironment):{ur
   if(!base)return{url:'',token:undefined,derived:false}
   try{
     const parsed=new URL(base)
-    const match=parsed.hostname.match(/^([a-z0-9-]+)-11434\.proxy\.runpod\.net$/i)
-    if(parsed.protocol!=='https:'||!match)return{url:'',token:undefined,derived:false}
-    parsed.hostname=`${match[1]}-8888.proxy.runpod.net`
+    if(parsed.protocol!=='https:'||!/^([a-z0-9-]+)-11434\.proxy\.runpod\.net$/i.test(parsed.hostname))return{url:'',token:undefined,derived:false}
     parsed.port=''
     parsed.pathname='/transcript'
     parsed.search=''

@@ -12,12 +12,12 @@ test('explicit transcript runtime wins and can reuse LOCAL_AI_API_KEY when token
   assert.equal(resolved.derived, false)
 })
 
-test('RunPod transcript endpoint is derived from the existing reasoner proxy', () => {
+test('RunPod transcript endpoint is derived through the existing reasoner gateway', () => {
   const resolved = resolveYouTubeTranscriptRuntime({
     LOCAL_AI_BASE_URL: 'https://funde3nh1mp5mq-11434.proxy.runpod.net/v1',
     LOCAL_AI_API_KEY: 'shared-secret',
   })
-  assert.equal(resolved.url, 'https://funde3nh1mp5mq-8888.proxy.runpod.net/transcript')
+  assert.equal(resolved.url, 'https://funde3nh1mp5mq-11434.proxy.runpod.net/transcript')
   assert.equal(resolved.token, 'shared-secret')
   assert.equal(resolved.derived, true)
 })

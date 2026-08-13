@@ -35,6 +35,10 @@
       "schedule": "30 6 * * *"
     },
     {
+      "path": "/api/cron/cos-knowledge-promotion",
+      "schedule": "15 7 * * *"
+    },
+    {
       "path": "/api/cron/cos-mining?job=weekly",
       "schedule": "0 5 * * 0"
     },

@@ -10,10 +10,10 @@ import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { rankContextCandidates } from '@/lib/ai/cos/contextRelevance'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
-import { parseLocalResult, citedEvidence } from '@/lib/ai/cos/reasonerOutput'
+import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
 import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
 import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/cos/groundingConfidence'
-import { retrieveValidatedCognitiveSkills } from '@/lib/ai/cos/cognitiveSkillContext'
+import { retrieveValidatedCognitiveSkills, recordCitedCognitiveSkillReuse } from '@/lib/ai/cos/cognitiveSkillContext'
 
 export type EvidenceFunnelStage = {
   retrieved: number
@@ -217,7 +217,6 @@ function roiSink(): SupabaseAIROIMetricsSink | null {
   roiSinkInstance = db ? new SupabaseAIROIMetricsSink(db) : null
   return roiSinkInstance
 }
-
 function recordAvoidedCost(source: 'semantic_similarity' | 'exact_cache' | 'local_reasoner', promptChars: number, replyChars: number, latencyMs: number): void {
   const sink = roiSink()
   if (!sink) return
@@ -534,6 +533,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     void recordKnowledgeGap(input.prompt,confidence,reason)
     return{handled:false,confidence,reason,bestEffortReply:parsed.answer,provenance:{responseSource:'external_fallback_required',...citedProvenance}}
   }
+
+  // Reuse is earned only by an accepted fresh local answer that cites a skill from this exact turn.
+  // Cache-origin [SK#] labels are deliberately not remapped onto a later turn's retrieved skill ordering.
+  const citedSkillIds=citedIndexedValues(parsed.answer,'SK',context.skillIds)
+  if(citedSkillIds.length) void recordCitedCognitiveSkillReuse(citedSkillIds)
 
   const storedAnswer:CachedCosAnswer={
     reply:parsed.answer,

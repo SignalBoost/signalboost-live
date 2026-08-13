@@ -52,18 +52,17 @@ function parseApiUrls(): string[] {
 }
 
 function parseTlsTargets(apiUrls: readonly string[]): CertificateTarget[] {
-  const configured = String(process.env.SELF_HEALING_TLS_TARGETS || '')
+  const configured: CertificateTarget[] = String(process.env.SELF_HEALING_TLS_TARGETS || '')
     .split(',')
     .map(value => value.trim())
     .filter(Boolean)
-    .map(value => {
+    .flatMap(value => {
       const [host, portText] = value.split(':')
       const port = Number(portText || 443)
-      return host && Number.isInteger(port) && port > 0 && port <= 65535 ? { host, port } : null
+      return host && Number.isInteger(port) && port > 0 && port <= 65535 ? [{ host, port }] : []
     })
-    .filter((value): value is CertificateTarget => value != null)
 
-  const fromApi = apiUrls.flatMap(value => {
+  const fromApi: CertificateTarget[] = apiUrls.flatMap(value => {
     try {
       const url = new URL(value)
       if (url.protocol !== 'https:') return []
@@ -105,12 +104,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable' }, { status: 503 })
   }
 
+  const quotaBytes = storageQuotaBytes()
   const collectors = createNativeProactiveMonitoringCollectors({
     db,
     store,
     apiUrls,
     certificateTargets,
-    storageQuotaBytes: storageQuotaBytes(),
+    storageQuotaBytes: quotaBytes,
   })
 
   const result = await runNativeMonitoring({
@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
       apiTargets: apiUrls.length,
       tlsTargets: certificateTargets.length,
       maxDurationSeconds: maxDuration,
-      storageQuotaConfigured: storageQuotaBytes() != null,
+      storageQuotaConfigured: quotaBytes != null,
       apiTargetCap: apiTargetCap(),
     },
     collectorsRun: result.collectorsRun,

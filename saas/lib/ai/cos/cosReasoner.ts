@@ -14,6 +14,7 @@
 
 import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair } from '@/lib/ai/cos/reasonerQuality'
+import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 
 export type CosReasonerKind = 'independent-local'
 
@@ -49,6 +50,58 @@ export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: 
   }
 }
 
+export function skillCitationTags(text: string): string[] {
+  return [...new Set([...String(text ?? '').matchAll(/\[SK(\d{1,2})\]/g)].map(match => `[SK${Number(match[1])}]`))]
+}
+
+function normalizeCitationInvariant(text: string): string {
+  return String(text ?? '')
+    .replace(/\[SK\d{1,2}\]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim()
+}
+
+/**
+ * A citation repair is accepted only when the model changed nothing except adding citations that
+ * were actually supplied in the prompt. The server never infers skill use and never inserts a tag.
+ */
+export function validSkillCitationOnlyRepair(originalAnswer: string, repairedAnswer: string, allowedTags: string[]): boolean {
+  const allowed = new Set(allowedTags)
+  const citations = skillCitationTags(repairedAnswer)
+  if (!citations.length || citations.some(tag => !allowed.has(tag))) return false
+  return normalizeCitationInvariant(originalAnswer) === normalizeCitationInvariant(repairedAnswer)
+}
+
+export function skillCitationRepairNeeded(prompt: string, answer: string): boolean {
+  return skillCitationTags(prompt).length > 0 && skillCitationTags(answer).length === 0
+}
+
+function buildSkillCitationRepairPrompt(originalPrompt: string, originalAnswer: string, allowedTags: string[]): string {
+  return [
+    'CITATION-ONLY AUDIT. Do not rewrite, improve, shorten, expand, reorder, correct, or reformat the answer.',
+    '',
+    `The original reasoning prompt supplied these validated procedural skill labels: ${allowedTags.join(', ')}.`,
+    'A procedural skill is HOW-to guidance, not factual evidence.',
+    '',
+    'Your task:',
+    '1. Re-read the supplied procedural skill(s), the user question, and your answer.',
+    '2. If your answer materially relied on a supplied skill — for example its diagnostic principle, mechanism ordering, observables, or falsification method — add that exact [SK#] label inline at the first materially informed claim.',
+    '3. If the answer did not materially rely on a supplied skill, leave the answer exactly unchanged and add no citation.',
+    '4. You may add only the supplied [SK#] tags. Do not add KG/CL/EM citations.',
+    '5. Apart from inserting [SK#] tags, every word, number, punctuation mark, markdown marker, and ordering from ORIGINAL ANSWER must remain unchanged.',
+    '6. Preserve the original confidence value.',
+    '',
+    'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+    '',
+    'ORIGINAL REASONING PROMPT:',
+    originalPrompt,
+    '',
+    'ORIGINAL ANSWER:',
+    originalAnswer,
+  ].join('\n')
+}
+
 /**
  * Ask COS's independent reasoner. Success means the LOCAL_AI_* path actually answered.
  * If unavailable or unhealthy, callers fail closed and may separately invoke the
@@ -59,6 +112,12 @@ export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: 
  * reasoner. This gives the local model a chance to turn a weak draft into a mechanism-level answer
  * before the caller considers an external provider. If the rewrite is not measurably better, the
  * first draft remains subject to the normal downstream confidence/specificity gate.
+ *
+ * If validated procedural skills were supplied and the final draft contains no [SK#] citation, COS
+ * gets one citation-only audit using the same local model. The repair is accepted only if stripping
+ * the added SK tags reproduces the original answer exactly (ignoring whitespace before punctuation),
+ * and every added tag existed in the supplied prompt. This preserves authoritative provenance
+ * without server-side citation inference or answer rewriting.
  */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
@@ -98,6 +157,33 @@ export async function callCosReasoner(
         repaired: false,
       }))
     }
+  }
+
+  const allowedSkillTags = skillCitationTags(args.prompt)
+  const parsed = parseLocalResult(text)
+  if (parsed && skillCitationRepairNeeded(args.prompt, parsed.answer)) {
+    const audited = await callLocalModel(
+      {
+        ...args,
+        temperature: 0,
+        maxTokens: Math.max(2048, Math.min(Number(args.maxTokens ?? 4096), 6000)),
+        prompt: buildSkillCitationRepairPrompt(args.prompt, parsed.answer, allowedSkillTags),
+      },
+      inference,
+    ).catch(() => null)
+    const auditedParsed = audited ? parseLocalResult(audited) : null
+    const accepted = Boolean(auditedParsed && validSkillCitationOnlyRepair(parsed.answer, auditedParsed.answer, allowedSkillTags))
+    if (accepted && auditedParsed) {
+      text = JSON.stringify({ answer: auditedParsed.answer, confidence: parsed.confidence })
+    }
+    console.info('[cos-skill-citation-repair]', JSON.stringify({
+      at: new Date().toISOString(),
+      reasoner: config.label,
+      attempted: true,
+      accepted,
+      allowedTags: allowedSkillTags,
+      citedTags: auditedParsed ? skillCitationTags(auditedParsed.answer) : [],
+    }))
   }
 
   return { text, reasoner: config }

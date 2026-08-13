@@ -66,15 +66,17 @@ export async function GET(req: NextRequest) {
   try {
     const measured = await loadReport(suiteVersion, runId)
     if (!measured) return NextResponse.json({ ok: false, error: 'COS Supabase service store is not configured.' }, { status: 503 })
+    const calibrationMeasurable = measured.report.sampleSize >= 100
     return NextResponse.json({
       ok: true,
       suiteVersion,
       runId,
       ...measured,
-      calibrationReady: measured.report.sampleSize >= 100,
-      note: measured.report.sampleSize >= 100
-        ? 'Calibration map is measurable; validate it on a disjoint holdout set before changing live COS confidence.'
-        : 'Smoke data only. Do not use this calibration map to alter live COS confidence yet.',
+      calibrationMeasurable,
+      liveCalibrationReady: false,
+      note: calibrationMeasurable
+        ? 'Calibration is measurable, but live confidence calibration remains disabled until a disjoint holdout set independently validates it.'
+        : 'Smoke data only. Do not use this calibration map to alter live COS confidence.',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -185,7 +187,8 @@ export async function POST(req: NextRequest) {
     failures,
     report,
     calibration,
-    calibrationReady: false,
+    calibrationMeasurable: false,
+    liveCalibrationReady: false,
     note: 'This bounded smoke run measures the pipeline only. Never promote its fitted calibration into live confidence; certification requires a large disjoint holdout set.',
   }, { status: failures ? 207 : 200 })
 }

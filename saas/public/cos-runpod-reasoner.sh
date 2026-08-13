@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODEL="${COS_REASONER_MODEL:-qwen2.5-coder:32b}"
+MODEL="${COS_REASONER_MODEL:-qwen3:30b}"
 WORKSPACE="${COS_REASONER_WORKSPACE:-/workspace}"
 MODEL_DIR="${COS_REASONER_MODEL_DIR:-$WORKSPACE/ollama-models}"
 KEY_FILE="${COS_REASONER_KEY_FILE:-$WORKSPACE/cos-api-key}"

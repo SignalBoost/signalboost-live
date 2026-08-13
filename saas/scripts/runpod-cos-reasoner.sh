@@ -17,7 +17,7 @@ set -euo pipefail
 #   x-api-key: <key>
 # matching the existing SignalBoost LOCAL_AI_API_KEY client behavior.
 
-MODEL="${COS_REASONER_MODEL:-qwen2.5-coder:32b}"
+MODEL="${COS_REASONER_MODEL:-qwen3:30b}"
 WORKSPACE="${COS_REASONER_WORKSPACE:-/workspace}"
 MODEL_DIR="${COS_REASONER_MODEL_DIR:-$WORKSPACE/ollama-models}"
 KEY_FILE="${COS_REASONER_KEY_FILE:-$WORKSPACE/cos-api-key}"
@@ -126,13 +126,8 @@ else
   log "Model $MODEL is already present in persistent storage."
 fi
 
-# COS's semantic cache (Aug 12) needs an embedding model on this same pod — one
-# vendor, one bill, same auth story as the reasoner. nomic-embed-text is small
-# (~275MB) and coexists with the 32B reasoner without meaningful VRAM pressure.
-# Set COS_EMBEDDING_MODEL to override; the Vercel-side LOCAL_AI_EMBEDDING_MODEL
-# env var must then match, and cos_knowledge_records.embedding must be resized
-# to that model's real output dimension — see
-# supabase/migrations/20260812_cos_semantic_cache_768.sql for the 768-dim default.
+# COS's semantic cache needs an embedding model on this same pod — one vendor,
+# one bill, same auth story as the reasoner. nomic-embed-text is small (~275MB).
 EMBEDDING_MODEL="${COS_EMBEDDING_MODEL:-nomic-embed-text}"
 if ! OLLAMA_HOST='127.0.0.1:11435' OLLAMA_MODELS="$MODEL_DIR" ollama list | awk 'NR>1 {print $1}' | grep -Fxq "$EMBEDDING_MODEL"; then
   log "Embedding model $EMBEDDING_MODEL is not present in persistent storage; pulling it now..."
@@ -231,14 +226,12 @@ if ! kill -0 "$(cat "$GATEWAY_PID_FILE")" 2>/dev/null; then
   exit 1
 fi
 
-# Verify unauthenticated traffic is rejected.
 unauth_status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:11434/v1/models || true)"
 if [[ "$unauth_status" != '401' ]]; then
   log "ERROR: gateway security check failed; expected HTTP 401 without credentials, got $unauth_status"
   exit 1
 fi
 
-# Verify authenticated traffic reaches Ollama and exposes the configured model.
 auth_key="$(cat "$KEY_FILE")"
 models_json="$(curl -fsS --max-time 15 -H "x-api-key: $auth_key" http://127.0.0.1:11434/v1/models)"
 if ! printf '%s' "$models_json" | grep -Fq "$MODEL"; then

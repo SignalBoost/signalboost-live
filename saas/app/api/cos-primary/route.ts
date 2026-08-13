@@ -7,6 +7,7 @@ import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
+import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
 import { getAccess } from '@/lib/auth/access'
 import {
   isProvenanceIntrospection,
@@ -32,7 +33,6 @@ function legacyContinuityFailure(payload:any):boolean{const text=JSON.stringify(
 function noPriorReply(language:string):string{return language==='es'?'No tengo un registro de procedencia real para la respuesta inmediatamente anterior. No voy a inventarlo.':language==='pt'?'Não tenho um registro de proveniência real para a resposta imediatamente anterior. Não vou inventá-lo.':"I don't have a real provenance record for the immediately preceding answer. I won't fabricate one."}
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??null,localModelInvoked:p?.localModelInvoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??0,learnedItemsUsed:p?.learnedItemsUsed??0,userMemoriesUsed:p?.userMemoriesUsed??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
 
-
 /**
  * The honest low-confidence path. When COS's answer fell below the escalation threshold and no
  * external provider is available, the choice is between serving that answer clearly labelled and
@@ -48,6 +48,12 @@ function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswe
     '',
     cos.bestEffortReply,
   ].join('\n')
+}
+
+function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{
+  if(!cos)return null
+  if(cos.handled)return cos.reply
+  return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null
 }
 
 export async function POST(req:NextRequest){
@@ -74,5 +80,26 @@ export async function POST(req:NextRequest){
   if(!externalFallbackEnabled()){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),reply=lowConfidenceDraftReply(cos,reason)??'COS could not complete this request independently and external AI fallback is disabled.',liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:cos?.confidence??0,provenance:cos?.provenance,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,reply,executionProvenance,'failed_closed');return NextResponse.json({ok:false,error:reply,cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry},{status:503})}
 
   const response=await legacyConciergePost(new NextRequest(req.clone()))
-  try{const payload=await response.clone().json(),external=providerFromPayload(payload),continuityFailed=legacyContinuityFailure(payload),reasonerHealth=continuityFailed?await independentReasonerHealth():null;logEscalation({event:'external_escalation_result',reason_code:reason.code,provider:external.provider,model:external.model,status:response.status,continuity_failed:continuityFailed,independent_reasoner:reasonerHealth});const executionProvenance=authoritativeProvenance(cos,{invoked:!continuityFailed,...external}),reply=continuityFailed?(lowConfidenceDraftReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):String(payload?.reply||''),responseSource=continuityFailed?'cos-independent-reasoner-unavailable':'external_fallback',liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:continuityFailed?'failed_closed':'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:!continuityFailed});if(reply)await writeCosPrimaryProvenance(userId,reply,executionProvenance,responseSource);return NextResponse.json({...payload,...(continuityFailed?{reply,source:responseSource}:{}),cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:!continuityFailed,external_fallback_invoked:true,external_fallback_succeeded:!continuityFailed,isolation_mode:false,live_telemetry:liveTelemetry},{status:response.status})}catch(error){logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:null,model:null,status:response.status,error:error instanceof Error?error.message:String(error)});emitRequestTelemetry({startedAt,input,source:'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:true});return response}
+  try{
+    const payload=await response.clone().json(),external=providerFromPayload(payload),continuityFailed=legacyContinuityFailure(payload),reasonerHealth=continuityFailed?await independentReasonerHealth():null
+    logEscalation({event:'external_escalation_result',reason_code:reason.code,provider:external.provider,model:external.model,status:response.status,continuity_failed:continuityFailed,independent_reasoner:reasonerHealth})
+    const executionProvenance=authoritativeProvenance(cos,{invoked:!continuityFailed,...external})
+    const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):String(payload?.reply||'')
+    const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':'external_fallback'
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:continuityFailed?'failed_closed':'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:!continuityFailed})
+    if(!continuityFailed&&reply){
+      await recordTeacherEscalation({
+        prompt:input,
+        localAnswer:localDraft(cos),
+        localConfidence:cos?.confidence??null,
+        escalationReason:reason.detail,
+        teacherAnswer:reply,
+        teacherProvider:external.provider,
+        teacherModel:external.model,
+        metadata:{reasonCode:reason.code,responseStatus:response.status},
+      })
+    }
+    if(reply)await writeCosPrimaryProvenance(userId,reply,executionProvenance,responseSource)
+    return NextResponse.json({...payload,...(continuityFailed?{reply,source:responseSource}:{}),cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:!continuityFailed,external_fallback_invoked:true,external_fallback_succeeded:!continuityFailed,isolation_mode:false,live_telemetry:liveTelemetry},{status:response.status})
+  }catch(error){logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:null,model:null,status:response.status,error:error instanceof Error?error.message:String(error)});emitRequestTelemetry({startedAt,input,source:'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:true});return response}
 }

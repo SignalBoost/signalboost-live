@@ -52,18 +52,29 @@ async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export async function loadApprovedBrain(): Promise<string> {
-  const candidates = [
-    path.resolve(process.cwd(), '../cos-core/brain.md'),
-    path.resolve(process.cwd(), 'cos-core/brain.md'),
-  ]
-  for (const candidate of candidates) {
-    try {
-      const value = await readFile(candidate, 'utf8')
-      if (value.includes('signalboost-cos-brain-v1')) return value
-    } catch {
-      // Try the next traced deployment location.
-    }
+  // next.config.mjs explicitly includes the root governance snapshot for
+  // /api/concierge. Keep each fs expression statically scoped so Turbopack does
+  // not widen NFT tracing to the entire repository.
+  try {
+    const value = await readFile(
+      path.join(/* turbopackIgnore: true */ process.cwd(), '../cos-core/brain.md'),
+      'utf8',
+    )
+    if (value.includes('signalboost-cos-brain-v1')) return value
+  } catch {
+    // Local fallback below.
   }
+
+  try {
+    const value = await readFile(
+      path.join(/* turbopackIgnore: true */ process.cwd(), 'cos-core/brain.md'),
+      'utf8',
+    )
+    if (value.includes('signalboost-cos-brain-v1')) return value
+  } catch {
+    // Fail closed below.
+  }
+
   throw new Error('Approved COS brain snapshot is unavailable.')
 }
 

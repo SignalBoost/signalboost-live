@@ -8,6 +8,7 @@ const RATE_WINDOW_MS = 10 * 60_000
 const ANONYMOUS_MAX = 8
 
 const buckets = new Map<string, { count: number; resetAt: number }>()
+let autonomyStatusInFlight: Promise<boolean> | null = null
 
 // Owner-only access to the AI Website Operator.
 // Set OPERATOR_OWNER_EMAILS in the environment (comma-separated) to control who has access,
@@ -155,7 +156,7 @@ function limitReply(language: string): string {
   return messages[language] || messages.en
 }
 
-async function autonomousExecutionIsEnabled() {
+async function readAutonomousExecutionStatus(): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !key) return false
@@ -173,6 +174,32 @@ async function autonomousExecutionIsEnabled() {
   }
 }
 
+async function autonomousExecutionIsEnabled(): Promise<boolean> {
+  // Coalesce concurrent checks inside a warm Proxy instance without caching the
+  // result. Every new request burst still observes a fresh authoritative value,
+  // so the emergency stop does not acquire a stale-allow window.
+  if (autonomyStatusInFlight) return autonomyStatusInFlight
+  const read = readAutonomousExecutionStatus()
+  autonomyStatusInFlight = read
+  try {
+    return await read
+  } finally {
+    if (autonomyStatusInFlight === read) autonomyStatusInFlight = null
+  }
+}
+
 export const config = {
-  matcher: ['/dashboard/operator/:path*', '/api/:path*'],
+  // Proxy is not free work: only run it on paths that actually need the global
+  // autonomy gate, public-model spend gate/routing, or operator authentication.
+  matcher: [
+    '/dashboard/operator/:path*',
+    '/api/concierge',
+    '/api/support',
+    '/api/cron/:path*',
+    '/api/webhook/:path*',
+    '/api/hub/webhooks/:path*',
+    '/api/stripe/webhook',
+    '/api/autonomous-supervisor/:path*',
+    '/api/internal/supervisor/:path*',
+  ],
 }

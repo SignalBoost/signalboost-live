@@ -17,15 +17,69 @@ function clean(value: unknown, max: number): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
+}
+
 function promptHash(prompt: string): string {
-  return createHash('sha256').update(clean(prompt, 20_000)).digest('hex')
+  return sha256(clean(prompt, 20_000))
+}
+
+async function recordTeacherExperience(args: {
+  db: NonNullable<ReturnType<typeof cosServiceDb>>
+  hash: string
+  subject: string
+  input: TeacherEscalation
+}): Promise<void> {
+  const experienceHash = sha256(`teacher:${args.hash}`)
+  const existing = await args.db
+    .from('cos_cognitive_experiences')
+    .select('id,occurrence_count')
+    .eq('experience_hash', experienceHash)
+    .maybeSingle()
+
+  const now = new Date().toISOString()
+  const evidence = {
+    teacherProvider: args.input.teacherProvider ? clean(args.input.teacherProvider, 120) : null,
+    teacherModel: args.input.teacherModel ? clean(args.input.teacherModel, 200) : null,
+    localConfidence: Number.isFinite(Number(args.input.localConfidence)) ? Number(args.input.localConfidence) : null,
+    escalationReason: args.input.escalationReason ? clean(args.input.escalationReason, 1000) : null,
+    metadata: args.input.metadata ?? {},
+    lessonSemantics: 'teacher_signal_not_verified_truth',
+  }
+
+  if (existing.data?.id) {
+    await args.db
+      .from('cos_cognitive_experiences')
+      .update({
+        occurrence_count: Number(existing.data.occurrence_count || 1) + 1,
+        last_observed_at: now,
+        evidence,
+        updated_at: now,
+      })
+      .eq('id', existing.data.id)
+    return
+  }
+
+  await args.db.from('cos_cognitive_experiences').insert({
+    experience_hash: experienceHash,
+    subject: args.subject,
+    experience_kind: 'teacher',
+    prompt_hash: args.hash,
+    source_kind: 'external_teacher',
+    source_ref: `cos_teacher_lessons:${args.hash}`,
+    evidence,
+    first_observed_at: now,
+    last_observed_at: now,
+    updated_at: now,
+  })
 }
 
 /**
  * External answers are captured as teacher examples only. They are deliberately NOT written into
  * the factual knowledge graph or continuous-learning corpus: another model is not a primary source.
- * A later evaluator can compare the local draft with the teacher answer and promote only reusable,
- * evidence-backed lessons.
+ * The same event is also recorded as episodic experience so COS can later reflect on repeated
+ * failures/teachers without confusing "I experienced this" with "I learned this".
  */
 export async function recordTeacherEscalation(input: TeacherEscalation): Promise<void> {
   const db = cosServiceDb()
@@ -56,7 +110,9 @@ export async function recordTeacherEscalation(input: TeacherEscalation): Promise
     } else {
       await db.from('cos_teacher_lessons').insert(payload)
     }
+
+    await recordTeacherExperience({ db, hash, subject, input })
   } catch (error) {
-    console.warn('[cos-teacher-learning] failed to persist teacher example', error)
+    console.warn('[cos-teacher-learning] failed to persist teacher example/experience', error)
   }
 }

@@ -3,7 +3,7 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.6  
+**Version:** 1.7  
 **Updated:** 2026-08-12  
 **Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
@@ -20,10 +20,11 @@ This file is the canonical starting point for every developer, AI coding agent, 
 
 1. Read `ONBOARD.md`.
 2. Read `docs/HANDOFF-2026-08-12.md` for the latest dated engineering delta.
-3. Scan current `main`.
-4. Read the exact files related to the task.
-5. Verify implementation from code before diagnosing, changing, or reporting status.
-6. Never report behavior from memory alone.
+3. For COS learning/independence work, also read `docs/HANDOFF-COS-COGNITIVE-LEARNING-2026-08-12.md`.
+4. Scan current `main`.
+5. Read the exact files related to the task.
+6. Verify implementation from code before diagnosing, changing, or reporting status.
+7. Never report behavior from memory alone.
 
 `AGENTS.md` and `CLAUDE.md` are entry-point summaries. `docs/ONBOARD-full.md` is the deeper historical/operational reference. Current repository evidence and this current-state handoff win over stale documentation.
 
@@ -115,11 +116,14 @@ Major merged capabilities added during the 2026-08-12 engineering sequence inclu
 - answer-cache policy versioning and bounded freshness/age checks;
 - provenance evidence-funnel telemetry (`retrieved → relevant → selected → injected → cited`);
 - cache-origin provenance separated from current-request execution telemetry;
-- cited-grounding confidence credit: retrieved-but-unused KG/corpus items no longer raise the evidence ceiling.
+- cited-grounding confidence credit: retrieved-but-unused KG/corpus items no longer raise the evidence ceiling;
+- durable external-teacher lesson capture through `cos_teacher_lessons` without automatically treating frontier-model output as factual truth;
+- real fallback chain extended to Gemini alongside other approved external providers;
+- `qwen3:30b` made the durable local reasoner default in the current bootstrap path.
 
-Relevant merged PRs in this sequence include #1128, #1131, #1133, #1134, #1135, #1136 and #1132. Re-check current `main` before assuming these are still the latest changes.
+Relevant merged PRs in this sequence include #1128, #1131, #1133, #1134, #1135, #1136, #1132 and #1152. Re-check current `main` before assuming these are still the latest changes.
 
-See `docs/HANDOFF-2026-08-12.md` and `docs/portables/self-healing-monitoring-current-state-20260812.md` for the dated/current handoff.
+See `docs/HANDOFF-2026-08-12.md`, `docs/HANDOFF-COS-COGNITIVE-LEARNING-2026-08-12.md` and `docs/portables/self-healing-monitoring-current-state-20260812.md` for the dated/current handoff.
 
 ---
 
@@ -129,7 +133,7 @@ The live COS-first answer path now has three separate reuse/knowledge layers tha
 
 1. **Answer reuse** — exact and semantic cached answers are policy-versioned and age-bounded. Cache hits must report no fresh local-model invocation on the current request; the model/evidence that originally generated the cached answer is retained separately as answer-origin metadata.
 2. **Structured Knowledge Graph / Enterprise Memory facts** — `cos_knowledge_facts` supports 768-dimensional local embeddings and semantic nearest-neighbor retrieval through `cos_match_knowledge_facts`. New promoted facts are embedded with the existing local `nomic-embed-text` path; older facts are incrementally backfilled.
-3. **Continuous Learning corpus** — learned documents remain available to the answer path, but the corpus retrieval gate is still primarily lexical. Semantic ranking of the learned corpus is a logical next quality improvement after production migration/runtime verification.
+3. **Continuous Learning corpus** — learned documents remain available to the answer path, but retrieval relevance must be based on substantive evidence, not merely a curriculum/subject label.
 
 Authoritative provenance schema v2 reports the real evidence funnel for Knowledge Graph/Enterprise Memory, learned corpus and user memory:
 
@@ -147,15 +151,16 @@ Do not infer database state from a green Vercel build. Verify these migrations e
 
 - `saas/supabase/migrations/20260813_cos_learning_fact_promotion_state.sql`
 - `saas/supabase/migrations/20260813_cos_knowledge_fact_embeddings.sql`
+- `saas/supabase/migrations/20260813_cos_teacher_lessons.sql`
 
 Then observe `/api/cron/cos-knowledge-promotion` successfully promoting/backfilling facts and verify semantic KG retrieval is actually returning embedded facts in production provenance.
 
 ### Next COS quality sequence
 
-1. Verify the two COS production migrations and successful knowledge-promotion/backfill runtime behavior.
-2. Re-run the multi-tenant SaaS benchmark and inspect the full provenance funnel, not just final confidence.
-3. Add semantic ranking/relevance for the Continuous Learning corpus so its `relevant` stage is not merely the lexical SQL match set.
-4. Tune retrieval thresholds from observed benchmark data rather than blanket citation penalties.
+1. Re-run the multi-tenant SaaS benchmark and inspect the full provenance funnel, not just final confidence.
+2. Keep cross-domain KG and learned-corpus contamination blocked; relevance must come from substantive content, not a convenient label.
+3. Build the explicit cognitive learning lifecycle described below: experience → evaluation → practice → held-out validation → learned/mastered or weakened/quarantined.
+4. Measure independence and external-teacher avoidance on held-out workloads rather than tuning to one benchmark answer.
 5. Continue hardening Crossref/GDELT/OpenAlex/YouTube and other learning-source reliability/admission yield.
 
 Primary files:
@@ -167,6 +172,7 @@ Primary files:
 - `saas/lib/ai/cos/knowledgeFactSemantic.ts`
 - `saas/lib/ai/cos/knowledgeFactExtraction.ts`
 - `saas/lib/ai/cos/autoPromoteLearning.ts`
+- `saas/lib/ai/cos/teacherLearning.ts`
 - `saas/app/api/cron/cos-knowledge-promotion/route.ts`
 - `saas/lib/cos-core/storage/supabase.ts`
 - `saas/lib/cos-core/layers/knowledge/persistent.ts`
@@ -234,11 +240,87 @@ Optional environment configuration:
 
 Accumulation is not learning. Durable learned items should preserve provenance, confidence, acquisition/verification time, freshness/expiry, scope, evidence and reuse/outcome measurements where applicable. Contradictions must not silently overwrite trusted knowledge. Background learning remains bounded and cost-governed.
 
+## COS cognitive-learning north star
+
+The goal is not a perfect single model. The goal is a **continuously learning cognitive system** whose tools, memory, skills, specialist agents and accumulated validated experience make it progressively less dependent on external frontier models.
+
+Use workload-relative, empirical targets:
+
+- roughly **85% independent pass rate** is the mature target for a well-trained COS on the defined SignalBoost workload;
+- roughly **92–95%** is a longer-term super-agent ambition only if held-out evidence supports it;
+- OpenAI, Anthropic, Gemini and other frontier providers belong primarily in the genuinely difficult, novel, disputed or high-consequence tail.
+
+These percentages are capability targets, **not confidence targets**. Never raise confidence or weaken gates to make the independence number look better.
+
+Canonical human-inspired learning loop:
+
+```text
+PERCEIVE
+→ RECALL
+→ THINK
+→ INVESTIGATE / USE TOOLS
+→ TEST
+→ ANSWER / ACT
+→ FEEDBACK
+→ REFLECT
+→ LEARN
+→ PRACTICE ON UNSEEN VARIANTS
+→ CONSOLIDATE
+→ FORGET / WEAKEN / QUARANTINE BAD ASSOCIATIONS
+```
+
+Canonical learning-state progression:
+
+```text
+Captured / Encountered
+→ Evaluated / Studying
+→ Understood
+→ Practiced
+→ Validated
+→ Learned
+→ Mastered
+```
+
+A source document, retrieved chunk, teacher answer, or one successful retry is not automatically `learned`. Promotion to `learned`/`mastered` must require successful application on unseen/held-out variants and must remain independently measurable from answer confidence.
+
+COS should explicitly model:
+
+- **episodic memory** — important attempts, evidence, outcomes, corrections and disagreements;
+- **semantic memory** — validated generalized concepts/facts;
+- **procedural memory** — reusable skills/tool procedures with prerequisites, observables, falsifiers and failure modes;
+- **metacognition** — what COS knows, has only encountered, repeatedly gets wrong, has not tested, or should escalate;
+- **consolidation** — bounded review that clusters experiences, resolves contradictions, strengthens validated skills and schedules practice;
+- **forgetting/reconsolidation** — weakening, expiry, supersession or quarantine of stale/misleading knowledge rather than assuming more stored data always means more intelligence.
+
+External providers are **teachers/escalation resources, not automatic authorities**. Successful external escalations are captured in `cos_teacher_lessons`, but teacher text must not be promoted directly into trusted KG/corpus knowledge merely because it came from a frontier model.
+
+Teacher loop:
+
+```text
+COS attempts
+→ internal tools/specialists investigate
+→ external teacher only when justified
+→ capture local attempt + teacher result + disagreement/evidence
+→ evaluate
+→ extract reusable principle/skill candidate
+→ test on unseen variants
+→ promote only after validation
+→ measure whether future external calls for that problem class decline
+```
+
+If the same problem class repeatedly requires an external model, treat that as a learning-system failure even if the final user answer is good.
+
+Future COS Council design should obtain **independent first opinions before cross-agent discussion** to reduce groupthink. Exchange structured `claim / rationale summary / assumptions / evidence / falsifier / confidence` artifacts; do not use naive majority voting. Agent influence should eventually be informed by empirical domain-specific reliability.
+
+Full dated handoff: `docs/HANDOFF-COS-COGNITIVE-LEARNING-2026-08-12.md`.
+
 ---
 
 # Cost / ROI governance
 
 Track provider calls avoided, cache/reuse hits, knowledge hits, local executions, external fallbacks, provider cost, avoided cost, latency, retries, successful outcomes and learning reuse/effectiveness.
+
+For cognitive learning also track independent pass rate, external escalation rate by domain/problem class, held-out validation rate, retention, generalization, skill success/failure, revalidation/decay history and teacher-call avoidance after learning.
 
 ---
 
@@ -294,8 +376,9 @@ Core supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), Pol
 
 # Documentation map
 
-Latest handoff:
+Latest handoffs:
 - `docs/HANDOFF-2026-08-12.md`
+- `docs/HANDOFF-COS-COGNITIVE-LEARNING-2026-08-12.md`
 
 Self-Healing Supervisor:
 - `docs/portables/self-healing-monitoring-current-state-20260812.md`
@@ -327,10 +410,12 @@ Historical/operational detail:
 
 # Status language
 
-Use precise actual states. A plan is not execution; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not Enterprise RC acceptance; architecture support is not proof of configured runtime; a staged adapter is not certified; a policy signal is not proof that its collector exists.
+Use precise actual states. A plan is not execution; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not Enterprise RC acceptance; architecture support is not proof of configured runtime; a staged adapter is not certified; a policy signal is not proof that its collector exists; a captured teacher lesson is not learned knowledge; a passed training example is not held-out mastery.
 
 ---
 
 # Definition of success
 
 The best AI call is the one that never has to happen. The best external data call is the one avoided because SignalBoost already owns sufficient verified intelligence. The best Portable teaches COS without bypassing governance. The best architecture lets providers be replaced without rewriting business intelligence or control logic. The best self-healing system detects trouble early, resolves explicitly pre-authorized routine conditions safely, escalates consequential actions, verifies every outcome and learns from the result.
+
+For COS learning specifically, success means that validated experience measurably improves held-out performance, retains that improvement over time, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance rather than merely accumulating more text.

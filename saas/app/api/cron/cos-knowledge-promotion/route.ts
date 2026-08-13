@@ -13,15 +13,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Upgrade a small bounded batch of pre-existing facts first. If the vector migration has not
-  // reached this database yet the helper reports skipped and fact promotion continues normally.
-  const semanticBackfill = await backfillKnowledgeFactEmbeddings(8)
-
-  // Leave 15 seconds for persistence and the HTTP response. autoPromoteLearnedKnowledge
-  // will not begin another local-model extraction unless enough time remains for a cold
-  // start plus inference, so Vercel cannot kill this route merely because earlier work
-  // consumed most of the route deadline.
+  // One route-wide deadline: semantic backfill is bounded to four concurrent rows, then promotion
+  // sees the remaining budget and refuses to start a cold local-model extraction if too little time
+  // remains. The final 15 seconds stay reserved for persistence and the HTTP response.
   const deadlineMs = Date.now() + 285_000
+  const semanticBackfill = await backfillKnowledgeFactEmbeddings(4)
   const promotion = await autoPromoteLearnedKnowledge(5, deadlineMs)
   const ok = promotion.status !== 'error' && semanticBackfill.status !== 'error'
   return NextResponse.json({ ok, semanticBackfill, promotion }, { status: ok ? 200 : 500 })

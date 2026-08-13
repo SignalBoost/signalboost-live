@@ -76,7 +76,17 @@ export function authoritativeProvenance(
     authority: 'server_execution_telemetry',
     model_generated: false,
     semantic_cache: { used: semanticCacheHit, evidence_count: semanticCacheHit ? 1 : 0 },
-    enterprise_memory: { used:kg.cited>0,retrieved_count:kg.retrieved,relevant_count:kg.relevant,selected_count:kg.selected,injected_count:kg.injected,evidence_count:kg.cited },
+    // Enterprise Memory is a distinct organization-scoped subsystem. COS Primary does not yet
+    // retrieve it, so never alias Knowledge Graph counters into this field just to make it look used.
+    enterprise_memory: {
+      used:false,
+      retrieved_count:0,
+      relevant_count:0,
+      selected_count:0,
+      injected_count:0,
+      evidence_count:0,
+      status:'not_connected_to_cos_primary',
+    },
     knowledge_graph: { used:kg.cited>0,retrieved_count:kg.retrieved,relevant_count:kg.relevant,selected_count:kg.selected,injected_count:kg.injected,evidence_count:kg.cited },
     learned_corpus: { used:lc.cited>0,retrieved_count:lc.retrieved,relevant_count:lc.relevant,selected_count:lc.selected,injected_count:lc.injected,evidence_count:lc.cited },
     cognitive_skills: { used:sk.cited>0,retrieved_count:sk.retrieved,relevant_count:sk.relevant,selected_count:sk.selected,injected_count:sk.injected,evidence_count:sk.cited,semantics:'procedural_guidance_not_factual_evidence' },
@@ -115,9 +125,13 @@ function funnelText(value:any,singular:string,plural:string):string{
   const cited=Number(value?.evidence_count??0)
   return `${usedLabel(Boolean(value?.used))} — ${retrieved} retrieved → ${relevant} relevant → ${selected} selected → ${injected} injected → ${cited} cited ${cited===1?singular:plural}.`
 }
-function originFunnelText(value:EvidenceFunnel|null):string{
-  if(!value) return 'origin evidence funnel was not recorded'
-  return `KG ${value.knowledgeGraph.injected} injected/${value.knowledgeGraph.cited} cited; corpus ${value.learnedCorpus.injected}/${value.learnedCorpus.cited} cited; memory ${value.userMemory.injected}/${value.userMemory.cited} cited`
+function originFunnelText(value:EvidenceFunnel|null,skill:FunnelStage|null):string{
+  if(!value&&!skill) return 'origin evidence funnel was not recorded'
+  const evidence=value
+    ? `KG ${value.knowledgeGraph.injected} injected/${value.knowledgeGraph.cited} cited; corpus ${value.learnedCorpus.injected}/${value.learnedCorpus.cited} cited; memory ${value.userMemory.injected}/${value.userMemory.cited} cited`
+    : 'KG/corpus/memory origin funnel was not recorded'
+  const skills=skill?`; skills ${skill.injected} injected/${skill.cited} cited`:''
+  return `${evidence}${skills}`
 }
 
 /** A component is USED only when evidence/guidance from it is demonstrably cited by the answer on this request. */
@@ -140,7 +154,7 @@ export function formatAuthoritativeProvenance(
     const policy=origin.policy_version?`, under answer policy ${origin.policy_version}`:''
     lines.push(
       `Answer Origin         : SERVED FROM CACHE — reply ${written}${by}${policy}. No local reasoning ran on this request.`,
-      `Origin Evidence       : ${originFunnelText(origin.evidence_funnel as EvidenceFunnel|null)}.`,
+      `Origin Evidence       : ${originFunnelText(origin.evidence_funnel as EvidenceFunnel|null,origin.cognitive_skill_funnel as FunnelStage|null)}.`,
     )
   }
 
@@ -150,9 +164,13 @@ export function formatAuthoritativeProvenance(
     lines.push(`Deterministic Utility : USED — ${utility}${timezone}`)
   }
 
+  const enterpriseMemoryLine=recorded.enterprise_memory?.status==='not_connected_to_cos_primary'
+    ? 'Enterprise Memory     : NOT USED — organization-scoped Enterprise Memory is not yet connected to COS Primary; Knowledge Graph counters are not substituted for it.'
+    : `Enterprise Memory     : ${funnelText(provenance.enterprise_memory,'retained fact','retained facts')}`
+
   lines.push(
     `Semantic Cache        : ${usedLabel(provenance.semantic_cache.used)} — ${provenance.semantic_cache.evidence_count} cached result${provenance.semantic_cache.evidence_count === 1 ? '' : 's'} contributed.`,
-    `Enterprise Memory     : ${funnelText(provenance.enterprise_memory,'retained fact','retained facts')}`,
+    enterpriseMemoryLine,
     `Knowledge Graph       : ${funnelText(provenance.knowledge_graph,'graph-backed fact','graph-backed facts')}`,
     `Learned Corpus        : ${funnelText(provenance.learned_corpus,'learned item','learned items')}`,
     `Cognitive Skills      : ${funnelText(provenance.cognitive_skills,'procedural skill','procedural skills')} Procedural guidance does not count as factual grounding.`,

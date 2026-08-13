@@ -9,9 +9,11 @@ export interface ContinuousLearningSourceAdapter { readonly kind:ContinuousLearn
 export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
 
 const STOP_WORDS=new Set(['about','above','after','again','against','because','been','before','being','below','between','both','cannot','could','does','doing','down','during','each','from','further','have','having','here','into','itself','more','most','only','other','over','same','should','some','such','than','that','their','them','then','there','these','they','this','those','through','under','until','very','were','what','when','where','which','while','with','would','your'])
+const GENERIC_DOMAIN_ANCHORS=new Set(['api','apis','architecture','business','database','engineering','enterprise','intelligence','multi','operations','performance','saas','security','site','software','strategy','systems','tenant'])
 export function distinctTerms(text:string):string[]{return[...new Set(String(text??'').toLowerCase().split(/[^\p{L}\p{N}-]+/u).map(term=>term.replace(/^-+|-+$/g,'').trim()).filter(term=>term.length>=4&&!STOP_WORDS.has(term)))]}
 export function matchesTerm(haystack:string,term:string):boolean{if(haystack.includes(term))return true;const stem=term.slice(0,Math.max(5,term.length-3));return stem.length>=5&&stem.length<term.length?haystack.includes(stem):false}
 export function gapStudyTerms(gap:KnowledgeGap):{anchors:string[];supporting:string[]}{const anchors=distinctTerms(gap.subject).slice(0,8),anchorSet=new Set(anchors);return{anchors,supporting:distinctTerms(gap.question).filter(term=>!anchorSet.has(term)).slice(0,12)}}
+export function discriminativeDomainAnchors(anchors:string[]):string[]{return anchors.filter(term=>!GENERIC_DOMAIN_ANCHORS.has(term))}
 export type RelevanceScore={coverage:number;anchorsMatched:string[];supportingMatched:string[];totalMatched:number}
 export function relevanceOf(document:LearningSourceDocument,terms:{anchors:string[];supporting:string[]}):RelevanceScore{const haystack=`${document.sourceTitle??''} ${document.text}`.toLowerCase(),anchorsMatched=terms.anchors.filter(term=>matchesTerm(haystack,term)),supportingMatched=terms.supporting.filter(term=>matchesTerm(haystack,term)),weight=terms.anchors.length*2+terms.supporting.length,coverage=weight?(anchorsMatched.length*2+supportingMatched.length)/weight:0;return{coverage,anchorsMatched,supportingMatched,totalMatched:anchorsMatched.length+supportingMatched.length}}
 export function relevantExcerpt(normalized:string,terms:string[],max=1200):string{if(!normalized)return'';if(!terms.length)return normalized.slice(0,max);const sentences=normalized.split(/(?<=[.!?])\s+/).filter(Boolean),scored=sentences.map((sentence,index)=>({index,sentence,hits:terms.filter(term=>matchesTerm(sentence.toLowerCase(),term)).length})).filter(x=>x.hits>0).sort((a,b)=>b.hits-a.hits||a.index-b.index);if(!scored.length)return normalized.slice(0,max);let budget=max;const chosen=[] as typeof scored;for(const entry of scored){if(budget<=0)break;chosen.push(entry);budget-=entry.sentence.length+1}return chosen.sort((a,b)=>a.index-b.index).map(x=>x.sentence).join(' ').slice(0,max)}
@@ -61,7 +63,23 @@ export function metadataAdmissionFloor():number{return envNumber('COS_METADATA_A
 
 /** The floor THIS document must clear: the catalogue floor for full evidence, the metadata floor otherwise — never a number invented per document. */
 export function admissionFloorFor(document:LearningSourceDocument):number|null{const kindFloor=minimumConfidenceForKind(document.sourceKind);if(evidenceClass(document)==='full')return kindFloor??0.72;return kindFloor===null?metadataAdmissionFloor():Math.min(kindFloor,metadataAdmissionFloor())}
-export function sourceAwareRelevant(document:LearningSourceDocument,score:RelevanceScore,terms:{anchors:string[];supporting:string[]},floor=minimumRelevance(),minMatches=minimumTermMatches()):boolean{if(score.totalMatched<minMatches)return false;if(score.anchorsMatched.length>0&&score.coverage>=floor)return true;const title=String(document.sourceTitle??'').toLowerCase(),titleHits=[...terms.anchors,...terms.supporting].filter(term=>matchesTerm(title,term)).length;if(titleHits>=1&&score.totalMatched>=2)return true;if(['research_paper','scientific_journal','library_material','official_documentation'].includes(document.sourceKind)&&score.totalMatched>=2)return true;return false}
+export function sourceAwareRelevant(document:LearningSourceDocument,score:RelevanceScore,terms:{anchors:string[];supporting:string[]},floor=minimumRelevance(),minMatches=minimumTermMatches()):boolean{
+  if(score.totalMatched<minMatches)return false
+  const haystack=`${document.sourceTitle??''} ${document.text}`.toLowerCase()
+  const discriminative=discriminativeDomainAnchors(terms.anchors)
+  const discriminativeHits=discriminative.filter(term=>matchesTerm(haystack,term)).length
+  const trustedLongForm=['research_paper','scientific_journal','library_material','official_documentation'].includes(document.sourceKind)
+  // Long authoritative documents are especially prone to accidental lexical matches because a
+  // paper can mention generic words like "database", "performance" and "tenant" somewhere in
+  // thousands of words. Require either a discriminative domain term (postgresql, kubernetes, dns,
+  // llm, etc.) or several question-specific signals before such a document may enter durable memory.
+  if(trustedLongForm&&discriminative.length>0&&discriminativeHits===0&&score.supportingMatched.length<3)return false
+  if(score.anchorsMatched.length>0&&score.coverage>=floor)return true
+  const title=String(document.sourceTitle??'').toLowerCase(),titleHits=[...terms.anchors,...terms.supporting].filter(term=>matchesTerm(title,term)).length
+  if(titleHits>=1&&score.totalMatched>=2)return true
+  if(trustedLongForm&&score.totalMatched>=2)return true
+  return false
+}
 
 export class ContinuousLearningCycle{
   constructor(private readonly director:ContinuousLearningDirector,private readonly adapters:ContinuousLearningSourceAdapter[]){}

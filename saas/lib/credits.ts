@@ -72,6 +72,15 @@ function envList(name: string): string[] {
     .filter(Boolean)
 }
 
+export function isPrivilegedCreditEmail(emailValue: string | null | undefined): boolean {
+  const email = String(emailValue || '').trim().toLowerCase()
+  if (!email) return false
+  return (
+    envList('OWNER_EMAILS').includes(email) ||
+    envList('ADMIN_EMAILS').includes(email)
+  )
+}
+
 // ── Owner/admin bypass ────────────────────────────────────────────────────────
 // Looks up the user's email from Supabase auth and checks against
 // OWNER_EMAILS and ADMIN_EMAILS env vars. Returns true for privileged users
@@ -82,11 +91,7 @@ async function isPrivilegedUser(userId: string): Promise<boolean> {
     const supabase = adminClient()
     const { data, error } = await supabase.auth.admin.getUserById(userId)
     if (error || !data?.user?.email) return false
-    const email = data.user.email.toLowerCase()
-    return (
-      envList('OWNER_EMAILS').includes(email) ||
-      envList('ADMIN_EMAILS').includes(email)
-    )
+    return isPrivilegedCreditEmail(data.user.email)
   } catch {
     return false
   }
@@ -122,6 +127,16 @@ type CreditState = {
   allowances: { video: number; image: number; ai: number }
 }
 
+type CreditStateLookupOptions = {
+  // When a caller has already verified the Supabase user in the current request,
+  // pass that email so credit privilege can be resolved without another
+  // service-role auth.admin.getUserById() network round trip.
+  verifiedEmail?: string | null
+  // Internal callers that have already run isPrivilegedUser() can skip the
+  // second identical privilege lookup when they continue into state loading.
+  privilegeChecked?: boolean
+}
+
 function unlimitedState(): CreditState {
   return {
     plan:      'command',
@@ -145,9 +160,20 @@ function unlimitedState(): CreditState {
   Paid plans:
   - Launch/Growth/Command credits reset monthly (all meters together).
 */
-export async function getCreditState(userId: string): Promise<CreditState> {
-  // Owner/admin bypass — skip DB entirely
-  if (await isPrivilegedUser(userId)) return unlimitedState()
+export async function getCreditState(
+  userId: string,
+  options: CreditStateLookupOptions = {},
+): Promise<CreditState> {
+  if (options.verifiedEmail !== undefined) {
+    const verifiedEmail = String(options.verifiedEmail || '').trim()
+    if (verifiedEmail) {
+      if (isPrivilegedCreditEmail(verifiedEmail)) return unlimitedState()
+    } else if (!options.privilegeChecked && await isPrivilegedUser(userId)) {
+      return unlimitedState()
+    }
+  } else if (!options.privilegeChecked && await isPrivilegedUser(userId)) {
+    return unlimitedState()
+  }
 
   const supabase = adminClient()
 
@@ -305,7 +331,7 @@ export async function spendCredit(userId: string, type: CreditType): Promise<{
   }
 
   const supabase = adminClient()
-  const state = await getCreditState(userId)
+  const state = await getCreditState(userId, { privilegeChecked: true })
   const current = state[type]
 
   if (current <= 0) {
@@ -342,7 +368,7 @@ export async function refundCredit(userId: string, type: CreditType): Promise<vo
 
   if (!data) return
 
-  const plan     = (data as any).plan || 'free'
+  const plan      = (data as any).plan || 'free'
   const allowance = allowanceFor(type, plan)
   const current   = (data as any)[column] ?? 0
   const refunded  = Math.min(current + 1, allowance)

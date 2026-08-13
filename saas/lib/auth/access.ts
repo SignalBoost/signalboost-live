@@ -78,18 +78,23 @@ function buildContext(userId: string | null, email: string | null, role: Role): 
   }
 }
 
+// Reuse an identity that has already been verified by Supabase in the current
+// request. This avoids issuing a second auth.getUser() call when a route needs
+// both the authenticated user object and the canonical SignalBoost role.
+export function accessFromVerifiedIdentity(
+  userId: string,
+  emailValue: string | null | undefined,
+): AccessContext {
+  const email = String(emailValue || '').trim().toLowerCase()
+  return buildContext(userId, email || null, envRole(email))
+}
+
 export async function getAccess(): Promise<AccessContext> {
   const supabase = await getServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user?.id) return buildContext(null, null, 'guest')
-
-  const email = String(user.email || '').trim().toLowerCase()
-  const role = envRole(email)
-
-  // Only the canonical owner allowlist may create an owner context. Database
-  // team roles and legacy administrator configuration cannot elevate an account.
-  return buildContext(user.id, email, role)
+  return accessFromVerifiedIdentity(user.id, user.email)
 }
 
 export async function requireAdmin(): Promise<GuardResult> {

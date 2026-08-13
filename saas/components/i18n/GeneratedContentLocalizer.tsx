@@ -229,6 +229,18 @@ function renderEntry(entry: NodeEntry, translated: string) {
   LAST_RENDERED_TEXT.set(entry.node, rendered)
 }
 
+function needsServerTranslation(entry: NodeEntry, targetLanguage: SupportedLanguage): boolean {
+  if (entry.sourceLanguage === targetLanguage) return false
+
+  // Untagged generated content is produced in the platform's canonical source
+  // language (English). Treating sourceLanguage=null as "unknown" caused the
+  // English UI to repeatedly send English prose to /api/i18n/translate-content
+  // for an English→English no-op. Explicitly tagged non-English content still
+  // translates to English normally.
+  if (!entry.sourceLanguage && targetLanguage === 'en') return false
+  return true
+}
+
 function batches(entries: NodeEntry[]): NodeEntry[][] {
   const out: NodeEntry[][] = []
   let batch: NodeEntry[] = []
@@ -284,7 +296,7 @@ export default function GeneratedContentLocalizer() {
     let rerun = false
 
     const translateDocument = async () => {
-      if (cancelled) return
+      if (cancelled || document.visibilityState === 'hidden') return
       if (running) {
         rerun = true
         return
@@ -297,7 +309,7 @@ export default function GeneratedContentLocalizer() {
         const pending: NodeEntry[] = []
 
         for (const entry of collectEntries()) {
-          if (entry.sourceLanguage === targetLanguage) {
+          if (!needsServerTranslation(entry, targetLanguage)) {
             renderEntry(entry, entry.text)
             continue
           }
@@ -314,7 +326,7 @@ export default function GeneratedContentLocalizer() {
         }
 
         for (const batch of batches(pending)) {
-          if (cancelled) break
+          if (cancelled || document.visibilityState === 'hidden') break
           const translated = await requestTranslations(batch, targetLanguage)
           if (cancelled) break
 
@@ -331,15 +343,19 @@ export default function GeneratedContentLocalizer() {
         }
 
         saveCache(cache)
-      } while (rerun && !cancelled)
+      } while (rerun && !cancelled && document.visibilityState !== 'hidden')
 
       running = false
     }
 
     const schedule = () => {
-      if (cancelled) return
+      if (cancelled || document.visibilityState === 'hidden') return
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => { void translateDocument() }, 180)
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') schedule()
     }
 
     void translateDocument()
@@ -349,10 +365,12 @@ export default function GeneratedContentLocalizer() {
       subtree: true,
       characterData: true,
     })
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
       cancelled = true
       observer.disconnect()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       if (timer) clearTimeout(timer)
     }
   }, [lang])

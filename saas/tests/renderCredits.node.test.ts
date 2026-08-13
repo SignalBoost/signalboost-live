@@ -59,6 +59,22 @@ test('canonical protected access treats only owner as admin', async () => {
   assert.doesNotMatch(source, /team_members/)
 })
 
+test('credits status reuses the already-verified identity instead of repeating auth lookups', async () => {
+  const [access, credits, route] = await Promise.all([
+    readFile(path.resolve(process.cwd(), 'lib/auth/access.ts'), 'utf8').then(hydrateLocalizedSource),
+    readFile(path.resolve(process.cwd(), 'lib/credits.ts'), 'utf8').then(hydrateLocalizedSource),
+    readFile(path.resolve(process.cwd(), 'app/api/credits/route.ts'), 'utf8').then(hydrateLocalizedSource),
+  ])
+
+  assert.match(access, /export function accessFromVerifiedIdentity/)
+  assert.match(route, /accessFromVerifiedIdentity\(user\.id, user\.email\)/)
+  assert.doesNotMatch(route, /\bgetAccess\b/)
+  assert.match(route, /getCreditState\(user\.id, \{ verifiedEmail: user\.email \}\)/)
+  assert.match(credits, /export function isPrivilegedCreditEmail/)
+  assert.match(credits, /verifiedEmail\?: string \| null/)
+  assert.match(credits, /getCreditState\(userId, \{ privilegeChecked: true \}\)/)
+})
+
 test('admin layout is owner-only', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/admin/layout.tsx'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /if \(!access\.isOwner\) redirect\('\/dashboard'\)/)

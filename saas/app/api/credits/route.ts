@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import { getCreditState } from '@/lib/credits'
-import { getAccess } from '@/lib/auth/access'
+import { accessFromVerifiedIdentity } from '@/lib/auth/access'
 
 // Role and credit state are per-session — never let this be cached.
 export const dynamic = 'force-dynamic'
@@ -44,10 +44,10 @@ export async function GET() {
       )
     }
 
-    // Resolve role/permissions FIRST and independently. The navbar gates its
-    // owner/admin items on isOwner/isAdmin from this route, so a failure in the
-    // credit subsystem must never strip a privileged user of their access.
-    const access = await getAccess()
+    // The user above has already been verified by Supabase for this request.
+    // Reuse that trusted identity instead of issuing another auth.getUser()
+    // through getAccess().
+    const access = accessFromVerifiedIdentity(user.id, user.email)
 
     const meta = (user.user_metadata || {}) as Record<string, any>
     const name =
@@ -55,11 +55,12 @@ export async function GET() {
       meta.name ||
       (user.email ? user.email.split('@')[0] : null)
 
-    // Credit state is best-effort. If it throws, we still return the true role
-    // so privileged navigation and gates stay intact.
+    // Credit state is best-effort. Passing the already-verified email also
+    // prevents getCreditState() from doing a service-role getUserById() merely
+    // to rediscover owner/admin credit bypass.
     let state: Awaited<ReturnType<typeof getCreditState>> | null = null
     try {
-      state = await getCreditState(user.id)
+      state = await getCreditState(user.id, { verifiedEmail: user.email })
     } catch {
       state = null
     }

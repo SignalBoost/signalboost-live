@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosOrchestration.ts
 //
 // THE ROOT CAUSE THIS FILE FIXES. As of Aug 12, /api/cos-primary/route.ts was the
 // ONLY place tryCOSFirstAnswer, the confidence gate, and the provenance-introspection
@@ -76,6 +75,19 @@ export function authoritativeProvenance(
       threshold: confidenceThreshold(),
     },
     external_ai: { invoked: external.invoked, provider: external.provider ?? null, model: external.model ?? null },
+    /**
+     * WHERE THE SERVED TEXT CAME FROM. On a cache hit no reasoning happens at all, and the
+     * evidence lines above describe the turn that WROTE the answer, not this one — a
+     * distinction the report used to lose entirely, so a cached reply appeared as a live
+     * result with "0 cited of 12 retrieved" against a reasoner that never ran.
+     */
+    answer_origin: {
+      from_cache: semanticCacheHit,
+      stored_at: p?.cacheOrigin?.storedAt ?? null,
+      policy_version: p?.cacheOrigin?.policyVersion ?? null,
+      model: p?.reasonerLabel ?? null,
+      retrieved_this_turn: p?.cacheOrigin?.retrievedThisTurn ?? null,
+    },
   }
 }
 
@@ -101,6 +113,21 @@ export function formatAuthoritativeProvenance(
     '──────────',
   ]
 
+  const origin = (provenance as any).answer_origin as
+    | { from_cache: boolean; stored_at: string | null; policy_version: string | null; model: string | null; retrieved_this_turn: { facts: number; learned: number; memories: number } | null }
+    | undefined
+  if (origin?.from_cache) {
+    const written = origin.stored_at ? `written ${origin.stored_at}` : 'written on an earlier turn (no stored-at recorded)'
+    const by = origin.model ? ` by ${origin.model}` : ''
+    const policy = origin.policy_version ? `, under answer policy ${origin.policy_version}` : ''
+    const retrieved = origin.retrieved_this_turn
+      ? ` ${origin.retrieved_this_turn.facts} knowledge facts, ${origin.retrieved_this_turn.learned} corpus items and ${origin.retrieved_this_turn.memories} memories were retrieved this turn solely to key the cache, and reached no reasoner.`
+      : ''
+    lines.push(
+      `Answer Origin         : SERVED FROM CACHE — reply ${written}${by}${policy}. No reasoning ran on this request; the component lines below describe the turn that produced this answer.${retrieved}`,
+    )
+  }
+
   if (recorded.deterministic_utility?.used) {
     const utility = String(recorded.deterministic_utility.utility || 'server utility')
     const timezone = recorded.deterministic_utility.timezone ? `; timezone ${recorded.deterministic_utility.timezone}` : ''
@@ -119,7 +146,10 @@ export function formatAuthoritativeProvenance(
   )
 
   if (provenance.local_reasoning.confidence != null) {
-    lines.push(`COS Confidence        : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${provenance.local_reasoning.threshold.toFixed(2)}.`)
+    // On a cache hit this number was scored when the answer was WRITTEN. Presenting it bare
+    // implies a gate evaluated this request, which it did not.
+    const inherited = origin?.from_cache ? ' Recorded when the cached answer was generated; no confidence gate ran on this request.' : ''
+    lines.push(`COS Confidence        : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${provenance.local_reasoning.threshold.toFixed(2)}.${inherited}`)
   }
   if (language !== 'en') lines.push('', 'Note: provenance labels remain explicit and stable; the recorded values above are language-independent telemetry.')
   return lines.join('\n')

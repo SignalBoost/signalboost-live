@@ -12,6 +12,7 @@ import { SupabaseAIROIMetricsSink } from '@/lib/cos-core/storage/supabase'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 import { parseLocalResult, citedEvidence } from '@/lib/ai/cos/reasonerOutput'
+import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
 
 export type COSFirstAnswerResult =
   | { handled: true; reply: string; confidence: number; provenance: COSProvenance }
@@ -39,12 +40,38 @@ export type COSProvenance = {
   knowledgeFactsCited?: number
   learnedItemsCited?: number
   userMemoriesCited?: number
+  /**
+   * Present ONLY when the reply was served from a cache. A cached answer was written on an
+   * earlier turn, by whatever model and prompt were in force THEN — so the evidence counts
+   * above describe that turn, not this one. retrievedThisTurn records what this request
+   * actually did: retrieval ran to key the cache and reached no reasoner. Without this
+   * distinction the report reads "0 cited of 12 retrieved" and implies the reasoner looked
+   * at twelve items and ignored them, when in fact no reasoner ran at all.
+   */
+  cacheOrigin?: {
+    storedAt: string | null
+    policyVersion: string | null
+    retrievedThisTurn: { facts: number; learned: number; memories: number }
+  }
 }
 
 const STOP_WORDS = new Set(['about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why'])
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-type CachedCosAnswer = { reply:string; confidence:number; reasonerLabel:string|null }
+/**
+ * What is stored alongside a cached reply. The stamp (policyVersion/storedAt) is what makes a
+ * cache entry auditable and expirable instead of immortal; the origin snapshot is what lets a
+ * cache hit report honest provenance for the turn that actually produced the answer.
+ * Both are optional so pre-existing rows still parse — they are simply refused as stale.
+ */
+type CachedAnswerOrigin = {
+  knowledgeFactsUsed:number; learnedItemsUsed:number; userMemoriesUsed:number
+  knowledgeFactsCited:number; learnedItemsCited:number; userMemoriesCited:number
+}
+type CachedCosAnswer = {
+  reply:string; confidence:number; reasonerLabel:string|null
+  policyVersion?:string|null; storedAt?:string|null; origin?:CachedAnswerOrigin
+}
 
 function threshold(): number {
   const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
@@ -68,6 +95,58 @@ function knowledgeFactSimilarityThreshold(): number {
 function knowledgeFactRetrievalBudgetMs(): number {
   const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '5000')
   return Number.isFinite(value) ? Math.max(500, Math.min(15_000, value)) : 5000
+}
+
+/**
+ * The fingerprint of everything that decides what a generated answer looks like — the reasoner
+ * prompt, the model, and the confidence gate. Read on every request rather than memoised,
+ * because LOCAL_AI_MODEL is exactly the variable he is expected to change (the untried
+ * qwen2.5:32b-instruct swap) and a memoised version would keep serving the old model's cached
+ * answers until the next cold start, which is the failure this whole mechanism exists to stop.
+ *
+ * ONE LANGUAGE IS HASHED ON PURPOSE. The system prompt varies only by its closing "Reply in X"
+ * line; hashing per-language would split one cache into five that can never share a hit.
+ */
+function answerPolicyVersion(): string {
+  return cosAnswerPolicyVersion({
+    reasonerSystemPrompt: COS_REASONER_SYSTEM_PROMPT('English'),
+    model: process.env.LOCAL_AI_MODEL?.trim() || null,
+    threshold: threshold(),
+  })
+}
+
+/**
+ * Provenance for a reply that came out of a cache. The counts describe the ORIGINATING turn,
+ * taken from the stored snapshot — not this turn's retrieval, which never reached a reasoner.
+ * A pre-versioning entry has no snapshot and reports zeros, which is the honest answer: what
+ * produced it was never recorded.
+ */
+function cacheHitProvenance(
+  payload: CachedCosAnswer,
+  base: { knowledgeFactsUsed:number; learnedItemsUsed:number; userMemoriesUsed:number; internalSystemsConsulted:string[] },
+  responseSource: 'semantic_cache' | 'semantic_similarity',
+  similarityScore?: number,
+): COSProvenance {
+  const origin = payload.origin
+  return {
+    responseSource,
+    externalAiInvoked: false,
+    localModelInvoked: false,
+    reasonerLabel: payload.reasonerLabel,
+    internalSystemsConsulted: base.internalSystemsConsulted,
+    knowledgeFactsUsed: origin?.knowledgeFactsUsed ?? 0,
+    learnedItemsUsed: origin?.learnedItemsUsed ?? 0,
+    userMemoriesUsed: origin?.userMemoriesUsed ?? 0,
+    knowledgeFactsCited: origin?.knowledgeFactsCited ?? 0,
+    learnedItemsCited: origin?.learnedItemsCited ?? 0,
+    userMemoriesCited: origin?.userMemoriesCited ?? 0,
+    cacheOrigin: {
+      storedAt: payload.storedAt ?? null,
+      policyVersion: payload.policyVersion ?? null,
+      retrievedThisTurn: { facts: base.knowledgeFactsUsed, learned: base.learnedItemsUsed, memories: base.userMemoriesUsed },
+    },
+    ...(similarityScore === undefined ? {} : { similarityScore }),
+  }
 }
 
 // Constructed once per module load, not per request — matches how cosServiceDb()
@@ -307,23 +386,37 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const context=await retrieveInternalContext(input.prompt,input.userId)
   const base={ externalAiInvoked:false as const, localModelInvoked:false, reasonerLabel:null as string|null, internalSystemsConsulted:context.systems, knowledgeFactsUsed:context.facts.length, learnedItemsUsed:context.learned.length, userMemoriesUsed:context.memories.length }
   const contextWindow=[...context.facts,...context.learned].join('\n')
+  // EVERY cache read and write below is scoped to this version. Change the model, the reasoner
+  // prompt or the gate and the id changes with it, so answers generated under the old policy are
+  // invisible to the lookup — no migration, no purge, no stale answer surviving a model swap.
+  const policyVersion=answerPolicyVersion()
+  const cacheTaskId=cosCacheTaskId('cos-first-answer',policyVersion)
+  const cacheMaxAgeMs=cosCacheMaxAgeMs()
   const knowledge=semanticKnowledgeLayer()
   if(knowledge){
-    const nearest=await knowledge.lookupSemanticCache('cos-first-answer',input.prompt,contextWindow)
+    const nearest=await knowledge.lookupSemanticCache(cacheTaskId,input.prompt,contextWindow)
     if(nearest){
       const payload=nearest.responsePayload as CachedCosAnswer|null
-      if(payload?.reply&&payload.confidence>=threshold()){
+      // Belt and braces: the task-id partition should already exclude foreign-policy rows, but a
+      // stale entry served as current is the failure mode that made every quality change
+      // invisible, so the stamp is checked again here and the refusal is LOGGED with its reason.
+      // A cache that quietly declines to hit is indistinguishable from a cache that is broken.
+      const current=cachedAnswerIsCurrent(payload,policyVersion,cacheMaxAgeMs)
+      if(payload?.reply&&!current.ok){console.warn('cosFirstAnswer: semantic cache entry refused as stale',{reason:current.reason,similarity:nearest.similarityScore})}
+      if(payload?.reply&&current.ok&&payload.confidence>=threshold()){
         recordAvoidedCost('semantic_similarity',input.prompt.length,payload.reply.length,Date.now()-startedAt)
-        return {handled:true,reply:payload.reply,confidence:payload.confidence,provenance:{responseSource:'semantic_similarity',...base,reasonerLabel:payload.reasonerLabel,similarityScore:nearest.similarityScore}}
+        return {handled:true,reply:payload.reply,confidence:payload.confidence,provenance:cacheHitProvenance(payload,base,'semantic_similarity',nearest.similarityScore)}
       }
     }
   }
 
-  const cacheKey=createExactCacheKey({taskId:'cos-first-answer',prompt:input.prompt,contextFingerprint:contextFingerprint(context),policyVersion:`threshold:${threshold().toFixed(2)}`,knowledgeVersion:null})
+  const cacheKey=createExactCacheKey({taskId:cacheTaskId,prompt:input.prompt,contextFingerprint:contextFingerprint(context),policyVersion,knowledgeVersion:null})
   const cached=await readCachedAnswer(cacheKey)
-  if(cached&&cached.reply&&cached.confidence>=threshold()){
+  const cachedCurrent=cachedAnswerIsCurrent(cached,policyVersion,cacheMaxAgeMs)
+  if(cached?.reply&&!cachedCurrent.ok){console.warn('cosFirstAnswer: exact cache entry refused as stale',{reason:cachedCurrent.reason})}
+  if(cached&&cached.reply&&cachedCurrent.ok&&cached.confidence>=threshold()){
     recordAvoidedCost('exact_cache',input.prompt.length,cached.reply.length,Date.now()-startedAt)
-    return {handled:true,reply:cached.reply,confidence:cached.confidence,provenance:{responseSource:'semantic_cache',...base,reasonerLabel:cached.reasonerLabel}}
+    return {handled:true,reply:cached.reply,confidence:cached.confidence,provenance:cacheHitProvenance(cached,base,'semantic_cache')}
   }
 
   if(process.env.COS_LOCAL_FIRST_ENABLED==='false'){
@@ -355,7 +448,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if(parsed.truncated){
     // The model was still writing when it stopped. The cause is either the token ceiling or the
     // request timeout, and the character count separates them: near the ceiling means raise
-    // COS_REASONER_MAX_TOKENS; far short of it means the call was cut off before it finished.
+    // COS_REASONER_MAX_TOKENS; far short of it means the call was cut off before the model finished.
     const maxTokens=Number(process.env.COS_REASONER_MAX_TOKENS||'6000')
     console.error('cosFirstAnswer: reasoner output truncated mid-answer',{characters:reasoned.text.length,salvagedCharacters:parsed.answer.length,maxTokens,raw:reasoned.text})
     const reason=`Independent COS inference stopped mid-answer after ${reasoned.text.length} characters, so it never produced a confidence value. ${parsed.answer.length} characters were recoverable. Near the token ceiling, raise COS_REASONER_MAX_TOKENS (currently ${maxTokens}); far short of it, the call was cut off before the model finished.`
@@ -391,11 +484,32 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // user never asked for. The answer is already in hand at this point — the cache gets a few
   // seconds to persist it and no more; a write that cannot finish in that window is logged and
   // dropped, never allowed to cost the user the answer.
+  const cited=citedEvidence(parsed.answer)
+  // STAMPED. A stored answer now carries the policy that produced it and the moment it was
+  // produced, plus a snapshot of what evidence it actually cited. The stamp is what lets a
+  // later request decide whether this answer is still the current system's answer; the
+  // snapshot is what lets a cache hit report honest provenance instead of this turn's
+  // unrelated retrieval counts.
+  const storedAnswer:CachedCosAnswer={
+    reply:parsed.answer,
+    confidence,
+    reasonerLabel:provenance.reasonerLabel,
+    policyVersion,
+    storedAt:new Date().toISOString(),
+    origin:{
+      knowledgeFactsUsed:context.facts.length,
+      learnedItemsUsed:context.learned.length,
+      userMemoriesUsed:context.memories.length,
+      knowledgeFactsCited:cited.kg,
+      learnedItemsCited:cited.cl,
+      userMemoriesCited:cited.em,
+    },
+  }
   const cacheWriteBudgetMs=Number(process.env.COS_CACHE_WRITE_BUDGET_MS??'8000')
   await Promise.race([
     Promise.allSettled([
-      writeCachedAnswer(cacheKey,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel}),
-      knowledge?knowledge.commitToMemory('cos-first-answer',input.prompt,contextWindow,{reply:parsed.answer,confidence,reasonerLabel:provenance.reasonerLabel} as CachedCosAnswer):Promise.resolve(),
+      writeCachedAnswer(cacheKey,storedAnswer),
+      knowledge?knowledge.commitToMemory(cacheTaskId,input.prompt,contextWindow,storedAnswer):Promise.resolve(),
     ]),
     new Promise<void>(resolve=>setTimeout(()=>{console.warn('cosFirstAnswer: cache write exceeded its budget and was abandoned',{budgetMs:cacheWriteBudgetMs});resolve()},cacheWriteBudgetMs)),
   ])
@@ -406,7 +520,6 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // no cloud spend occurred, while estimatedCostAvoidedUsd reflects what a cloud
   // provider WOULD have cost, per the same estimate function as the cache paths.
   recordAvoidedCost('local_reasoner',input.prompt.length,parsed.answer.length,Date.now()-startedAt)
-  const cited=citedEvidence(parsed.answer)
   void resolveKnowledgeGap(input.prompt); return{handled:true,reply:parsed.answer,confidence,provenance:{responseSource:'local_cos_reasoning',...provenance,knowledgeFactsCited:cited.kg,learnedItemsCited:cited.cl,userMemoriesCited:cited.em}}
 }
 

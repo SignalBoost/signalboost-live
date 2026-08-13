@@ -13,6 +13,7 @@
 // COS really used its independent model runtime.
 
 import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair } from '@/lib/ai/cos/reasonerQuality'
 
 export type CosReasonerKind = 'independent-local'
 
@@ -52,6 +53,12 @@ export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: 
  * Ask COS's independent reasoner. Success means the LOCAL_AI_* path actually answered.
  * If unavailable or unhealthy, callers fail closed and may separately invoke the
  * explicitly-labelled external escalation gateway.
+ *
+ * Diagnostic quality repair is deliberately LOCAL-ONLY. If the first draft is a generic category
+ * list, COS gets one deterministic rewrite instruction and one more call to the same self-hosted
+ * reasoner. This gives the local model a chance to turn a weak draft into a mechanism-level answer
+ * before the caller considers an external provider. If the rewrite is not measurably better, the
+ * first draft remains subject to the normal downstream confidence/specificity gate.
  */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
@@ -62,6 +69,36 @@ export async function callCosReasoner(
     kind: 'independent-local',
     label: `independent-local:${(process.env.LOCAL_AI_MODEL || '').trim()}`,
   }
-  const text = await callLocalModel(args, localInferenceConfigFromEnv()).catch(() => null)
-  return text ? { text, reasoner: config } : null
+  const inference = localInferenceConfigFromEnv()
+  const first = await callLocalModel(args, inference).catch(() => null)
+  if (!first) return null
+
+  let text = first
+  if (reasonerDraftNeedsRepair(args.prompt, first)) {
+    const repaired = await callLocalModel(
+      {
+        ...args,
+        temperature: 0,
+        prompt: buildDiagnosticRepairPrompt(args.prompt, first),
+      },
+      inference,
+    ).catch(() => null)
+
+    if (repaired && preferRepairedDraft(args.prompt, first, repaired)) {
+      console.info('[cos-local-quality-repair]', JSON.stringify({
+        at: new Date().toISOString(),
+        reasoner: config.label,
+        repaired: true,
+      }))
+      text = repaired
+    } else {
+      console.warn('[cos-local-quality-repair]', JSON.stringify({
+        at: new Date().toISOString(),
+        reasoner: config.label,
+        repaired: false,
+      }))
+    }
+  }
+
+  return { text, reasoner: config }
 }

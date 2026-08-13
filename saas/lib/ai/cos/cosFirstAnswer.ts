@@ -7,6 +7,7 @@ import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { rankContextCandidates } from '@/lib/ai/cos/contextRelevance'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 import { parseLocalResult, citedEvidence } from '@/lib/ai/cos/reasonerOutput'
@@ -98,6 +99,16 @@ function semanticThreshold(): number {
 function knowledgeFactSimilarityThreshold(): number {
   const value = Number(process.env.COS_KNOWLEDGE_FACT_SIMILARITY_THRESHOLD || '0.55')
   return Number.isFinite(value) ? Math.max(0.25, Math.min(0.95, value)) : 0.55
+}
+
+function learnedContextSimilarityThreshold(): number {
+  const value = Number(process.env.COS_LEARNED_CONTEXT_SIMILARITY_THRESHOLD || '0.45')
+  return Number.isFinite(value) ? Math.max(0.20, Math.min(0.95, value)) : 0.45
+}
+
+function userMemorySimilarityThreshold(): number {
+  const value = Number(process.env.COS_USER_MEMORY_SIMILARITY_THRESHOLD || '0.52')
+  return Number.isFinite(value) ? Math.max(0.20, Math.min(0.95, value)) : 0.52
 }
 
 function knowledgeFactRetrievalBudgetMs(): number {
@@ -324,15 +335,20 @@ async function retrieveInternalContext(prompt:string,userId?:string|null):Promis
 
     if(learnedResult.status==='fulfilled'&&!learnedResult.value.error){
       const rows=learnedResult.value.data??[]
+      const candidates=rows.map(r=>({
+        item:r,
+        text:[safeText(r.subject,240),safeText(r.summary,1200),Array.isArray(r.facts)?r.facts.slice(0,6).map((f:unknown)=>safeText(f,400)).join(' '):''].filter(Boolean).join(' '),
+      }))
+      const ranked=await rankContextCandidates(prompt,candidates,{threshold:learnedContextSimilarityThreshold(),limit:candidates.length})
       funnel.learnedCorpus.retrieved=rows.length
-      // The learned corpus still uses its lexical gate today; keeping the stages explicit makes
-      // the future semantic ranker measurable rather than invisible.
-      funnel.learnedCorpus.relevant=rows.length
-      const selected=rows.slice(0,12)
+      funnel.learnedCorpus.relevant=ranked.relevant.length
+      const selected=ranked.relevant.slice(0,6)
       funnel.learnedCorpus.selected=selected.length
-      for(const r of selected){
+      if(ranked.mode==='semantic'&&rows.length) systems.push('Continuous Learning semantic relevance')
+      for(const candidate of selected){
+        const r=candidate.item
         const ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):''
-        learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`)
+        learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`)
       }
     }
   }
@@ -340,12 +356,17 @@ async function retrieveInternalContext(prompt:string,userId?:string|null):Promis
   if(userId){
     systems.push('User Enterprise Memory')
     const loaded=await loadUserMemories(userId).catch(()=>[])
+    const candidates=loaded.map(item=>({item,text:`${safeText(item.kind,80)} ${safeText(item.content,1000)}`}))
+    const ranked=await rankContextCandidates(prompt,candidates,{threshold:userMemorySimilarityThreshold(),limit:candidates.length})
     funnel.userMemory.retrieved=loaded.length
-    const relevant=loaded.filter(item=>{const text=String(item.content??'').toLowerCase();return terms.some(term=>text.includes(term))})
-    funnel.userMemory.relevant=relevant.length
-    const selected=relevant.slice(-8)
+    funnel.userMemory.relevant=ranked.relevant.length
+    const selected=ranked.relevant.slice(0,4)
     funnel.userMemory.selected=selected.length
-    for(const item of selected) memories.push(`[EM${memories.length+1}] [${item.kind}] ${safeText(item.content,500)}`)
+    if(ranked.mode==='semantic'&&loaded.length) systems.push('User memory semantic relevance')
+    for(const candidate of selected){
+      const item=candidate.item
+      memories.push(`[EM${memories.length+1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)
+    }
   }
 
   return {systems:[...new Set(systems)],facts,learned,memories,funnel}

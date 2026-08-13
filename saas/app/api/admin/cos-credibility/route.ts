@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     const started = Date.now()
     try {
       const result = await tryCOSFirstAnswer({ prompt: String(benchmarkCase.prompt), language: 'English' })
-      const answer = result.handled ? result.reply : result.bestEffortReply || result.reason
+      const answer = 'reply' in result ? result.reply : result.bestEffortReply || result.reason
       const gold = { ...((benchmarkCase.gold_spec || {}) as CredibilityGoldSpec), expectedAbstain: Boolean(benchmarkCase.expected_abstain) }
       const evaluated = evaluateCredibilityAnswer(answer, gold, !result.handled)
       const provenanceTruthful = provenanceMatchesAnswer(answer, result.provenance)

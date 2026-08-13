@@ -1,7 +1,7 @@
 // saas/tests/cosEvidenceCitation.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { citedEvidence } from '../lib/ai/cos/reasonerOutput'
+import { citedEvidence, citedIndexedValues, citedLabelIndices } from '../lib/ai/cos/reasonerOutput'
 import { citedKnowledgeEvidenceCount } from '../lib/ai/cos/groundingConfidence'
 
 test('citations are counted per unique labelled item', () => {
@@ -27,4 +27,10 @@ test('an answer with no citations claims no evidence use', () => {
 test('bracketed text that is not a label does not count', () => {
   const cited = citedEvidence('See [CLARIFICATION] and [KGB] and [EM] and [SKILL] — none of these are evidence labels.')
   assert.deepEqual(cited, { kg: 0, cl: 0, em: 0, sk: 0 })
+})
+
+test('cited labels map only to values supplied in the current turn', () => {
+  const answer = 'Apply the second method [SK2], then the first [SK1]. Reusing [SK2] does not double count. [SK9] is outside the supplied set.'
+  assert.deepEqual(citedLabelIndices(answer, 'SK'), [2, 1, 9])
+  assert.deepEqual(citedIndexedValues(answer, 'SK', ['skill-a', 'skill-b']), ['skill-b', 'skill-a'])
 })

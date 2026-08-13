@@ -3,6 +3,7 @@ export interface CachedResponse {
   originalPrompt: string
   responsePayload: unknown
   similarityScore: number
+  contextText?: string | null
 }
 
 export type KnowledgeRecord = {
@@ -15,6 +16,7 @@ export type KnowledgeRecord = {
 }
 
 export interface KnowledgeStore {
+  queryExact?(options: { taskId: string; prompt: string }): Promise<CachedResponse | null>
   queryNearest(vector: number[], options: { taskId: string }): Promise<CachedResponse | null>
   save(record: KnowledgeRecord): Promise<void>
 }

@@ -1,20 +1,15 @@
 // saas/app/api/admin/cos-cache/health/route.ts
 //
-// THE CACHE DISCRIMINATOR. The semantic cache has reported NOT USED across every benchmark run,
-// and the failure could live in any of three stages: embedding generation on the pod, the write
-// into cos_knowledge_records, or the similarity lookup. Chasing that across pod terminals, Vercel
-// log searches and SQL queries has cost days. This endpoint runs the whole chain in one request —
-// embed, write a probe row, look it up by similarity, delete it — and reports each stage with its
-// timing and, on failure, the actual error text. One URL answers "which stage is broken."
-//
-// GET only, owner-gated, and self-cleaning: the probe row is deleted at the end even when a later
-// stage fails, so repeated checks never pollute the cache. The probe uses task id
-// 'cache-health-probe', which the answering path never queries.
+// THE CACHE DISCRIMINATOR. This endpoint verifies both cache paths used by COS:
+// semantic cache (embedding -> write -> similarity lookup) and exact cache (write -> read -> delete).
+// It is owner-gated and self-cleaning so health checks never pollute either cache.
 
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { generateLocalEmbedding, LOCAL_EMBEDDING_DIMENSIONS } from '@/lib/ai/cos/localEmbeddings'
 import { cosServiceDb, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
+import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -25,9 +20,6 @@ const PROBE_PROMPT = 'cos semantic cache health probe — canonical text, do not
 type Stage = { ok: boolean; ms: number; detail: string }
 
 function failed(stage: string, error: unknown, ms: number): Stage {
-  // Supabase/PostgREST errors are plain objects, not Error instances — String() flattens them to
-  // "[object Object]" and hides the one thing this endpoint exists to surface. Serialize the
-  // object's own fields (message, details, hint, code) so the Postgres error reaches the reader.
   const detail = error instanceof Error
     ? error.message
     : typeof error === 'object' && error !== null
@@ -45,11 +37,11 @@ export async function GET() {
     return NextResponse.json({ ok: false, verdict: 'Supabase service credentials are not configured — nothing below can run.' }, { status: 500 })
   }
   const store = new SupabaseKnowledgeStore(db)
+  const exactStore = new SupabaseExactCacheStore(db)
   const report: Record<string, Stage> = {}
   let vector: number[] | null = null
 
-  // Stage 1 — embedding generation on the pod. If this fails, nothing downstream can work and the
-  // detail carries the pod's own error (model not pulled, pod stopped, auth, dimension mismatch).
+  // Stage 1 — embedding generation on the pod.
   {
     const started = Date.now()
     try {
@@ -60,49 +52,75 @@ export async function GET() {
     }
   }
 
-  // Stage 2 — the write. Inserts a real probe row through the same store the answer path uses.
+  // Stage 2 — semantic-cache write.
   if (vector) {
     const started = Date.now()
     try {
       await store.save({ taskId: PROBE_TASK_ID, promptText: PROBE_PROMPT, contextText: 'health probe', embeddingVector: vector, responseData: { probe: true }, createdAt: new Date() })
-      report.write = { ok: true, ms: Date.now() - started, detail: 'probe row inserted into cos_knowledge_records.' }
+      report.semanticWrite = { ok: true, ms: Date.now() - started, detail: 'probe row inserted into cos_knowledge_records.' }
     } catch (error) {
-      report.write = failed('write', error, Date.now() - started)
+      report.semanticWrite = failed('semantic write', error, Date.now() - started)
     }
   }
 
-  // Stage 3 — the similarity lookup, via the same RPC the answer path uses. Looking up the vector
-  // just written must return the probe with similarity ~1.0; anything else is a lookup defect.
-  if (vector && report.write?.ok) {
+  // Stage 3 — semantic similarity lookup.
+  if (vector && report.semanticWrite?.ok) {
     const started = Date.now()
     try {
       const nearest = await store.queryNearest(vector, { taskId: PROBE_TASK_ID })
-      report.lookup = nearest && nearest.originalPrompt === PROBE_PROMPT
+      report.semanticLookup = nearest && nearest.originalPrompt === PROBE_PROMPT
         ? { ok: true, ms: Date.now() - started, detail: `probe found with similarity ${nearest.similarityScore.toFixed(4)}.` }
         : { ok: false, ms: Date.now() - started, detail: `lookup returned ${nearest ? 'a different row' : 'nothing'} for a vector that was just written — cos_match_knowledge is the defect.` }
     } catch (error) {
-      report.lookup = failed('lookup', error, Date.now() - started)
+      report.semanticLookup = failed('semantic lookup', error, Date.now() - started)
     }
   }
 
-  // Cleanup — always, so health checks never leave probe rows behind.
+  // Stage 4 — exact-cache write/read/delete through the same store used by COS answers.
+  const exactKey = `cache-health-probe:${randomUUID()}`
+  {
+    const started = Date.now()
+    try {
+      const now = Date.now()
+      await exactStore.set(exactKey, { value: { probe: true }, createdAt: now, expiresAt: now + 60_000 })
+      const exact = await exactStore.get<{ probe: boolean }>(exactKey)
+      report.exactCache = exact?.value?.probe === true
+        ? { ok: true, ms: Date.now() - started, detail: 'cos_exact_cache write/read round trip succeeded.' }
+        : { ok: false, ms: Date.now() - started, detail: 'cos_exact_cache write completed but read-back did not return the probe.' }
+    } catch (error) {
+      report.exactCache = failed('exact cache', error, Date.now() - started)
+    } finally {
+      try { await exactStore.delete(exactKey) } catch { /* best effort */ }
+    }
+  }
+
+  // Semantic cleanup — always.
   try { await db.from('cos_knowledge_records').delete().eq('task_id', PROBE_TASK_ID) } catch { /* best effort */ }
 
-  // Live row count — how many REAL cached answers exist right now.
-  let cachedAnswers: number | null = null
+  let semanticCachedAnswers: number | null = null
+  let exactCachedAnswers: number | null = null
   try {
     const { count } = await db.from('cos_knowledge_records').select('id', { count: 'exact', head: true })
-    cachedAnswers = count ?? 0
+    semanticCachedAnswers = count ?? 0
+  } catch { /* leave null */ }
+  try {
+    const { count } = await db.from('cos_exact_cache').select('cache_key', { count: 'exact', head: true })
+    exactCachedAnswers = count ?? 0
   } catch { /* leave null */ }
 
-  const stages = Object.values(report)
-  const allOk = stages.length === 3 && stages.every(stage => stage.ok)
-  const firstFailure = Object.entries(report).find(([, stage]) => !stage.ok)
+  const requiredStages = ['embedding', 'semanticWrite', 'semanticLookup', 'exactCache']
+  const allOk = requiredStages.every(name => report[name]?.ok === true)
+  const firstFailure = requiredStages.find(name => report[name]?.ok === false)
   const verdict = allOk
-    ? `Every stage works. ${cachedAnswers === 0 ? 'The table is still empty, so no confident answer has completed a write since the last deploy — ask one question and re-check.' : `${cachedAnswers} cached answers are stored; if repeats still miss, the defect is in lookup thresholds, not the pipeline.`}`
+    ? `Every cache stage works. ${semanticCachedAnswers ?? 0} semantic answers and ${exactCachedAnswers ?? 0} exact answers are currently stored.`
     : firstFailure
-      ? `BROKEN AT: ${firstFailure[0]}. ${firstFailure[1].detail}`
-      : 'Embedding failed before any other stage could run.'
+      ? `BROKEN AT: ${firstFailure}. ${report[firstFailure].detail}`
+      : 'A required cache stage did not execute.'
 
-  return NextResponse.json({ ok: allOk, verdict, cachedAnswers, stages: report })
+  return NextResponse.json({
+    ok: allOk,
+    verdict,
+    cachedAnswers: { semantic: semanticCachedAnswers, exact: exactCachedAnswers },
+    stages: report,
+  })
 }

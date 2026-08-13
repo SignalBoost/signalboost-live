@@ -9,6 +9,7 @@ export type NativeMonitoringSignal =
   | "provider-health"
   | "database-health"
   | "storage-health"
+  | "persistence-health"
   | "certificate-expiry"
   | "resource-pressure"
   | "configuration-drift"
@@ -39,6 +40,7 @@ export const SELF_HEALING_NATIVE_MONITORING: NativeMonitoringPolicy = Object.fre
     "provider-health",
     "database-health",
     "storage-health",
+    "persistence-health",
     "certificate-expiry",
     "resource-pressure",
     "configuration-drift",

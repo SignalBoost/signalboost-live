@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runNativeMonitoring } from '@/self-healing-host/native-monitoring-runtime'
 import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
+import { collectAssessmentConfidenceIncident } from '@/self-healing-host/assessment-confidence-monitoring'
+import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native-persistence-monitoring'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-// Healthy runs stay cheap. Incident runs may perform COS diagnosis + governed remediation.
 export const maxDuration = 300
 
 const boundedNumber = (name: string, fallback: number, min: number, max: number): number => {
@@ -35,15 +36,21 @@ export async function GET(req: NextRequest) {
   const apiUrls = parseApiUrls(); const certificateTargets = parseTlsTargets(apiUrls)
   if (!apiUrls.length || !certificateTargets.length) return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable' }, { status: 503 })
   const quotaBytes = storageQuotaBytes()
-  const collectors = createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes })
+  const collectors = [
+    ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
+    persistenceNativeMonitoringCollector({ db }),
+  ]
   const result = await runNativeMonitoring({ context: { provider: 'signalboost-platform', environment: 'production', metadata: { source: 'native-proactive-monitoring-cron', readOnly: true, providerMutations: false } }, collectors, nativeEnabled: process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false', externalConnected: process.env.SELF_HEALING_EXTERNAL_MONITORING_CONNECTED === 'true' })
 
-  // The old route stopped at detection. Only anomalies enter the expensive path.
-  const remediation = result.incidents.length ? await remediateNativeIncidents(result.incidents, { maxIncidents: 4 }) : []
+  // Evidence-quality deficits are preventive conditions too. A durable claim suppresses repeated
+  // COS work for the same fingerprint while allowing changed evidence to be investigated now.
+  const confidenceIncident = await collectAssessmentConfidenceIncident(db).catch(() => null)
+  const incidents = confidenceIncident ? [...result.incidents, confidenceIncident] : result.incidents
+  const remediation = incidents.length ? await remediateNativeIncidents(incidents, { maxIncidents: 4 }) : []
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
-    schemaVersion: 'self-healing-native-proactive-monitoring-v2',
+    schemaVersion: 'self-healing-native-proactive-monitoring-v3',
     runAt: new Date().toISOString(),
     readOnly: result.readOnly,
     providerMutations: result.providerMutations,
@@ -51,7 +58,8 @@ export async function GET(req: NextRequest) {
     limits: { apiTargets: apiUrls.length, tlsTargets: certificateTargets.length, maxDurationSeconds: maxDuration, storageQuotaConfigured: quotaBytes != null, apiTargetCap: apiTargetCap() },
     collectorsRun: result.collectorsRun,
     signalsObserved: result.signalsObserved,
-    incidents: result.incidents,
+    incidents,
+    confidenceInvestigationClaimed: Boolean(confidenceIncident),
     remediation,
     collectorErrors: result.collectorErrors,
   }, { status })

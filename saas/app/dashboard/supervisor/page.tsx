@@ -42,13 +42,15 @@ import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
 import GlobalAiKillSwitch from '@/components/supervisor/GlobalAiKillSwitch'
 import OperationalAssessmentPanel from '@/components/supervisor/OperationalAssessmentPanel'
 type Row = Record<string, any>
+const PERSISTENCE_PROBE_ID = 'database'
+const PERSISTENCE_PROBE_TARGET = 'self-healing:persistence-roundtrip'
 const safeLang = (value?: string) => { const lang = (value || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru'].includes(lang) ? lang : 'en' }
 const fmt = (value?: string | null) => value || '—'
 const ms = (start?: string, end?: string) => { const a = Date.parse(start || ''); const b = Date.parse(end || ''); return Number.isFinite(a) && Number.isFinite(b) ? `${Math.max(0, Math.round((b - a) / 1000))}s` : '—' }
 const age = (value?: string) => { const t = Date.parse(value || ''); return Number.isFinite(t) ? `${Math.max(0, Math.round((Date.now() - t) / 60000))}m` : '—' }
 function countRuns(items: VercelHealthRun[], pred: (item: VercelHealthRun) => boolean) { return items.filter(pred).length }
-function Field({ k, v }: { k: string; v: any }) { return <div><dt style={muted}>{k}</dt><dd style={{ margin: 0, wordBreak: 'break-word' }}>{String(v ?? '—')}</dd></div> }
-function Card({ title, children }: { title: string; children: React.ReactNode }) { return <section style={panel}><h2 style={{ marginTop: 0 }}>{title}</h2>{children}</section> }
+function Field({ k, v }: { k: string; v: any }) { return <div><dt style={muted}>{k}</dt><dd style={{ margin: 0, wordBreak:'break-word' }}>{String(v ?? '—')}</dd></div> }
+function Card({ title, children }: { title: string; children: React.ReactNode }) { return <section style={panel}><h2 style={{ marginTop:0 }}>{title}</h2>{children}</section> }
 async function readTable(db: any, table: string, select = '*') { const { data } = await db.from(table).select(select).limit(100); return (data ?? []) as Row[] }
 function mapAudit(run: VercelHealthRun, type: string) { return run.auditEvents.find(e => e.eventType.includes(type))?.occurredAt }
 
@@ -69,6 +71,9 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   const killSwitchCopy = ((aiKillSwitchLocales as any)[lang] || (aiKillSwitchLocales as any).en) as Record<string,string>
   if (!access.isAdmin) return <main style={page}><h1>{t.title}</h1><p>{t.adminOnly}</p></main>
   const db = getAdminSupabase(); const runs = await new SupabaseVercelHealthStore(db).listRuns({ limit: 50 }).catch(() => [])
+  const { data: persistenceProbeRows } = await db.from('self_healing_native_probe_samples').select('status,observed_at,details').eq('probe_id',PERSISTENCE_PROBE_ID).eq('target',PERSISTENCE_PROBE_TARGET).order('observed_at',{ ascending:false }).limit(12)
+  const persistenceRecent = ((persistenceProbeRows ?? []) as Row[]).filter(row => Date.now() - Date.parse(String(row.observed_at || '')) <= 2 * 60 * 60 * 1000 && row.details?.verification === 'read_back_verified')
+  const persistenceEvidence = persistenceRecent.length ? { attempted: persistenceRecent.length, failed: persistenceRecent.filter(row => String(row.status) !== 'healthy').length } : null
   const [instances, workItems, leases, triggers] = await Promise.all([
     readTable(db, 'supervisor_instances').catch(() => []), readTable(db, 'supervisor_work_items').catch(() => []), readTable(db, 'supervisor_leases').catch(() => []), readTable(db, 'vercel_observation_triggers').catch(() => []),
   ])
@@ -129,9 +134,9 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     observation: { expected: successful.length + missedWindows, completed: successful.length },
     verification: { attempted: runs.length, failed: verificationFailed },
     audit: { runs: runs.length, withoutTerminalEvent: auditGaps },
-    // Nothing independently measures durable writes yet. Reported as unmeasured rather than
-    // borrowing audit's number and calling it persistence.
-    persistence: null,
+    // A dedicated controlled write/read round-trip now supplies independent persistence evidence.
+    // No audit or neighbouring metric is borrowed as a substitute.
+    persistence: persistenceEvidence,
     coordination: { absentInstances: 0, activeInstances: activeInstances.length, expiredLeasesWithWork, staleWork },
     providerConnectivity: { registered: bpal.providers.length, invalid: providerBroken.length },
     businessImpact: { blockedWork, queueDepth: activeWork.length },
@@ -255,7 +260,7 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     oldestEvidenceSeconds: evidenceAges.oldest,
     overdueSeconds: timing ? timing.overdueSeconds : 0,
     toleranceSeconds: timing ? timing.toleranceSeconds : 1,
-    inputs: [runs.length, successful.length, missedWindows, blockedWork, activeWork.length, verificationFailed, auditGaps, expiredLeasesWithWork, providerBroken.length, snapshot.unmeasured.join(','), lastObservationAt],
+    inputs: [runs.length, successful.length, missedWindows, blockedWork, activeWork.length, verificationFailed, auditGaps, expiredLeasesWithWork, providerBroken.length, persistenceRecent.length, persistenceEvidence?.failed ?? null, snapshot.unmeasured.join(','), lastObservationAt],
   }
   // Computed twice, deliberately. The first pass produces the fingerprint and the contradiction
   // count that the ledger row is built from; the second reports whether that row was actually
@@ -279,6 +284,8 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     auditGaps,
     unmeasuredDomains: snapshot.unmeasured,
     unverifiableLiveness: unverifiableRuntimes,
+    persistenceAttempted: persistenceEvidence?.attempted ?? 0,
+    persistenceFailed: persistenceEvidence?.failed ?? null,
     expiredLeasesWithWork,
     reconciliationBacklog: expiredLeases.length,
     missedObservationWindows: missedWindows,
@@ -308,13 +315,9 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
     inputDigest: integrityDraft.reproducibility.digest,
   })
   const ledgerWrite = await recordAssessmentIfChanged(db, assessmentRecord)
-  // Retained means a row with THIS fingerprint exists — either one we just wrote, or the
-  // identical newest row that made writing unnecessary. A failed or unreachable ledger leaves
-  // it false, and the console reports Partial rather than claiming a record it does not have.
   const inputsRetained = ledgerWrite.recorded || (!ledgerWrite.unavailable && ledgerHistory.records[0]?.inputDigest === assessmentRecord.inputDigest)
   const integrity = buildAssessmentIntegrity({ ...integrityInput, inputsRetained })
 
-  // ── FAIL CLOSED, exactly as saas/proxy.ts does ────────────────────────────────
   const { data: systemStatus, error: systemStatusError } = await db.from('system_status').select('ai_autonomous_execution_enabled').eq('id', 'global').maybeSingle()
   const killSwitchState: 'active' | 'engaged' | 'unavailable' = systemStatusError || !systemStatus ? 'unavailable' : systemStatus.ai_autonomous_execution_enabled === true ? 'active' : 'engaged'
   const githubWork = workItems.filter(w => String(w.provider) === 'github')
@@ -329,36 +332,23 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
   return <main style={page}>
     <section style={hero}><p style={kicker}>{t.kicker}</p><h1 style={{ margin:'6px 0' }}>{t.title}</h1><p style={muted}>{t.subtitle}</p><p style={notice}>{t.readOnly}</p></section>
     <GlobalAiKillSwitch state={killSwitchState} labels={{ title: t.aiKillSwitch, active: t.aiAutonomyActive, disabled: t.aiAutonomyDisabled, description: t.aiKillSwitchDescription, engage: t.engageGlobalKillSwitch, restore: t.restoreAiAutonomy, working: t.updatingAiStatus, error: t.aiStatusUpdateFailed, unavailable: killSwitchCopy.unavailable, unavailableDescription: killSwitchCopy.unavailableDescription, unavailableAction: killSwitchCopy.unavailableAction }} />
-
-    {/* AUDIENCE 1 — OPERATIONS. Always visible, nothing collapsed. */}
     <OperationalAssessmentPanel assessment={assessment} forecast={forecast} execution={execution} verification={verification} integrity={integrity} evidenceAge={evidenceAgeView} t={t} />
-
-    {/* Diagnostics collapse to one line. Eighteen green cards are not information. */}
     <Card title={t.systemDiagnostics}>
       <dl style={fields}><Field k={t.diagnosticsNominal} v={diagnosticSummary.nominal}/><Field k={t.diagnosticsNeedingAttention} v={diagnosticSummary.attention.length}/><Field k={t.operationalImpactLabel} v={diagnosticSummary.quiet ? t.impactNone : t.diagnosticsWorkingHours}/></dl>
       <p style={muted}>{diagnosticSummary.quiet ? (t.diagnosticsQuiet) : (t.diagnosticsAttention)}</p>
       {diagnosticSummary.attention.length ? <details open style={subcard}><summary>{`${t.diagnosticsNeedingAttention} · ${diagnosticSummary.attention.length}`}</summary>{diagnosticSummary.attention.map(d => { const policy = recommendationPolicy(d.status); return <article key={d.subsystemId} style={mini}>
-        {/* DEFAULT: the answer in five seconds. Twenty findings each showing eleven fields is
-            an investigation surface, not a triage surface. */}
         <h3>{(t as any)[d.subsystemId] || d.subsystemId}</h3>
         <dl style={fields}><Field k={t.status} v={d.label}/><Field k={t.operationalImpactLabel} v={d.impactStatement}/><Field k={t.recommendation} v={d.recommendation || (t.noActionRequired)}/></dl>
-        {/* EXPANDED: everything an auditor needs, and nothing an operator has to scroll past. */}
         <details style={subcard}><summary>{t.whyThisConclusion}</summary>
           <dl style={fields}><Field k={t.reasonLabel} v={d.explanation}/><Field k={t.evidence} v={d.evidence.join(' · ')}/><Field k={t.reasoningLabel} v={d.reasoning}/><Field k={t.changesWhen} v={d.changesWhen}/></dl>
           <dl style={fields}><Field k={t.ruleLabel} v={d.ruleName}/><Field k={t.rulePurpose} v={d.rulePurpose}/><Field k={t.safetyRationale} v={d.ruleSafetyRationale}/><Field k={t.failureMode} v={d.ruleFailureMode}/></dl>
           <dl style={fields}><Field k={t.policyLabel} v={policy.policyLabel}/><Field k={t.priorityLabel} v={policy.priorityLabel}/><Field k={t.actionDeadline} v={policy.actionDeadlineLabel}/><Field k={t.expectedResolution} v={policy.expectedResolution}/></dl>
           <details style={subcard}><summary>{`${t.policySource} · ${policy.sourceLabel}`}</summary><dl style={fields}><Field k={t.defaultPolicyLabel} v={policy.defaultActionDeadlineLabel}/><Field k={t.buyerOverride} v={policy.buyerActionDeadlineLabel}/><Field k={t.inEffect} v={policy.actionDeadlineLabel}/></dl><p style={muted}>{`${policy.rationale} ${t.defaultPolicyNote}`}</p></details>
-          {/* The chain as a chain: one column, an arrow between every link, so the logic can be
-              followed top to bottom rather than reassembled from a list. */}
           <div style={chainWrap}><p style={muted}>{t.inferenceChain}</p>{d.inferenceChain.map((step, index) => <div key={step.step}>{index > 0 ? <p style={chainArrow}>{'↓'}</p> : null}<div style={chainStep}><p style={chainLabel}>{(t as any)[`chain_${step.step}`] || step.step}</p><p style={chainText}>{step.statement}</p></div></div>)}</div>
-          {/* LAST, and deliberately so. Confidence in a finding is a judgement about everything
-              above it, and it reads as a hedge when it arrives before the reasoning it qualifies. */}
           <div style={findingConfidence}><p style={chainLabel}>{`${t.confidenceInThisFinding} · ${d.reasoningConfidence.label}`}</p><ul style={plainList}>{d.reasoningConfidence.factors.map(factor => <li key={factor.statement} style={factor.supports ? supportItem : conflictItem}>{factor.statement}</li>)}</ul></div>
         </details>
       </article> })}</details> : null}
     </Card>
-
-    {/* Incidents, split. Twelve verified failures are evidence the Supervisor worked. */}
     <div style={grid2}>
       <Card title={t.incidentQueue}>
         <details open style={subcard}><summary>{`${t.operationalIncidentsLabel} · ${incidents.active.length}`}</summary>{incidents.active.length ? incidents.active.map(rec => { const r = incidentById.get(rec.runId); return <article key={rec.runId} style={mini}><h3>{`${r?.incident?.provider} · ${r?.incident?.incidentId}`}</h3><dl style={fields}><Field k={t.severityLabel} v={rec.severity}/><Field k={t.verification} v={rec.status}/><Field k={t.evidence} v={r?.evidence.map(e=>e.summary).join(' | ')}/></dl></article> }) : <p style={muted}>{t.noOperationalIncidents}</p>}</details>
@@ -366,8 +356,6 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
       </Card>
       <Card title={t.activeWork}><div style={tableWrap}><table style={table}><thead><tr>{[t.workId,t.provider,t.project,t.environment,t.triggerSource,t.assignedSupervisor,t.leaseStatus,t.fence,t.currentStage,t.verificationStage,t.age,t.duration,t.status].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{activeWork.map(w => { const lease = leases.find(l => l.work_item_id === w.work_item_id && l.status === 'active'); const run = runs.find(r => r.governance?.workItemId === w.work_item_id); const trigger = triggers.find(tr => tr.work_item_id === w.work_item_id); return <tr key={w.work_item_id}><td>{w.work_item_id}</td><td>{w.provider}</td><td>{w.project_id || '—'}</td><td>{w.environment}</td><td>{trigger?.trigger_source || '—'}</td><td>{lease ? `${lease.owner_instance_id}/${lease.owner_runtime_id}` : '—'}</td><td>{lease?.status || '—'}</td><td>{lease?.fencing_token ?? '—'}</td><td>{w.state}</td><td>{run?.verification.status || '—'}</td><td>{age(w.created_at)}</td><td>{ms(w.created_at, run?.completedAt)}</td><td>{w.state}</td></tr> })}</tbody></table></div></Card>
     </div>
-
-    {/* AUDIENCE 2 — ENGINEERING. */}
     <details style={panel}>
       <summary style={summaryText}>{t.engineeringView}</summary>
       <div style={grid2}>
@@ -383,8 +371,6 @@ export default async function SupervisorOperationsCenter({ searchParams }: { sea
       </div>
       <Card title={`${t.filters} / ${t.search}`}><dl style={fields}><Field k={t.provider} v={providers.map(p=>p.providerId).join(', ')}/><Field k={t.environment} v={[...new Set(runs.map(r=>r.environment))].join(', ') || t.all}/><Field k={t.status} v={[...new Set(runs.map(r=>r.status))].join(', ') || t.all}/><Field k={t.triggerSource} v={[...new Set(triggers.map(tr=>tr.trigger_source).filter(Boolean))].join(', ') || t.all}/><Field k={t.supervisor} v={activeInstances.map(i=>i.instance_id).join(', ') || t.all}/><Field k={t.verificationState} v={[...new Set(runs.map(r=>r.verification.status))].join(', ') || t.all}/><Field k={t.search} v={`${t.project}, ${t.deployment}, ${t.incident}, ${t.provider}, ${t.workId}`}/></dl></Card>
     </details>
-
-    {/* AUDIENCE 3 — AUDIT. The score lives here, at the bottom, as a consequence of evidence. */}
     <details style={panel}>
       <summary style={summaryText}>{t.auditView}</summary>
       <Card title={t.evidenceLedger}>

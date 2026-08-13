@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge'
-import type { KnowledgeFact, SemanticKnowledgeStore } from '../layers/knowledge/persistent'
+import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent'
 import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory'
 import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning'
 import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization'
@@ -53,11 +53,19 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
     return data ? mapFact(data) : null
   }
 
-  async upsertFact(fact: KnowledgeFact): Promise<void> {
-    const { error } = await this.db.from('cos_knowledge_facts').upsert({
-      id: fact.id, task_id: fact.taskId, subject: fact.subject, predicate: fact.predicate,
-      object: fact.object, confidence: fact.confidence, source: fact.source, updated_at: fact.updatedAt.toISOString(),
-    }, { onConflict: 'task_id,subject,predicate' })
+  async upsertFact(fact: KnowledgeFact, embeddingVector?: number[]): Promise<void> {
+    const payload: Record<string, unknown> = {
+      id: fact.id,
+      task_id: fact.taskId,
+      subject: fact.subject,
+      predicate: fact.predicate,
+      object: fact.object,
+      confidence: fact.confidence,
+      source: fact.source,
+      updated_at: fact.updatedAt.toISOString(),
+    }
+    if (embeddingVector?.length) payload.embedding = embeddingVector
+    const { error } = await this.db.from('cos_knowledge_facts').upsert(payload, { onConflict: 'task_id,subject,predicate' })
     if (error) throw error
   }
 
@@ -66,6 +74,19 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
     const { data, error } = await this.db.from('cos_knowledge_facts').select('*').eq('task_id', taskId).in('subject', subjects)
     if (error) throw error
     return (data ?? []).map(mapFact)
+  }
+
+  async queryNearestFacts(vector: number[], options: { matchCount?: number; minSimilarity?: number } = {}): Promise<KnowledgeFactMatch[]> {
+    const { data, error } = await this.db.rpc('cos_match_knowledge_facts', {
+      query_embedding: vector,
+      match_count: Math.max(1, Math.min(50, Math.floor(options.matchCount ?? 16))),
+      min_similarity: Math.max(0, Math.min(1, options.minSimilarity ?? 0.55)),
+    })
+    if (error) throw error
+    return (data ?? []).map((row: any) => ({
+      ...mapFact(row),
+      similarityScore: Number(row.similarity),
+    }))
   }
 }
 

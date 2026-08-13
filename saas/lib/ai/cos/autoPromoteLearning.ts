@@ -30,9 +30,6 @@ const EMPTY: Omit<AutoPromotionResult, 'status'> = {
   stoppedForBudget: false,
 }
 
-// A cold RunPod start can consume ~90s and local inference can consume ~120s.
-// Never begin another document unless the caller has enough wall-clock budget for both,
-// plus a small margin for persistence and the HTTP response.
 const MIN_DOCUMENT_START_BUDGET_MS = 225_000
 const MAX_AUTO_RETRIES = 3
 
@@ -51,8 +48,6 @@ async function selectPromotionCandidates(limit: number) {
   const db = cosServiceDb()
   if (!db) return { data: [], error: null }
 
-  // First drain never-attempted rows oldest-first. This is database-level selection, so the
-  // promoter does not get stuck in a fixed newest-N window as the corpus grows.
   const pending = await db.from('cos_continuous_learning')
     .select('content_hash,subject,summary,source_uri,source_title,confidence,fact_extraction_attempts')
     .is('fact_extraction_status', null)
@@ -62,8 +57,6 @@ async function selectPromotionCandidates(limit: number) {
     .limit(limit)
   if (pending.error || (pending.data?.length ?? 0) >= limit) return pending
 
-  // Only after the pending queue is drained do we retry transient failures, oldest attempt first.
-  // Failed documents never block untouched documents, and automatic retries are bounded.
   const remaining = limit - (pending.data?.length ?? 0)
   const failed = await db.from('cos_continuous_learning')
     .select('content_hash,subject,summary,source_uri,source_title,confidence,fact_extraction_attempts')
@@ -78,7 +71,6 @@ async function selectPromotionCandidates(limit: number) {
 
 /**
  * Promote learned corpus documents into structured knowledge facts.
- *
  * Extraction uses COS's local reasoner and source-grounding checks. Completion is persisted on
  * the corpus row independently of fact count, so a valid zero-fact extraction is still complete.
  * The optional deadline prevents this background task from starting model work it cannot finish.
@@ -144,8 +136,6 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
         factsWritten += 1
       }
 
-      // Mark completed even when grounded.length === 0. The source was successfully examined;
-      // repeatedly selecting it would only starve older documents.
       const completedAt = new Date().toISOString()
       const { error: markError } = await db.from('cos_continuous_learning').update({
         fact_extraction_status: 'completed',
@@ -158,7 +148,10 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
       documentsCompleted += 1
     }
 
-    const status: AutoPromotionResult['status'] = documentsProcessed > 0 ? 'promoted' : 'skipped'
+    const status: AutoPromotionResult['status'] =
+      documentsProcessed === 0 ? 'skipped' :
+      documentsCompleted === 0 && documentsFailed > 0 ? 'error' :
+      'promoted'
     const result: AutoPromotionResult = {
       status,
       documentsProcessed,

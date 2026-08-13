@@ -241,6 +241,10 @@ function needsServerTranslation(entry: NodeEntry, targetLanguage: SupportedLangu
   return true
 }
 
+function documentIsHidden(): boolean {
+  return document.visibilityState === 'hidden'
+}
+
 function batches(entries: NodeEntry[]): NodeEntry[][] {
   const out: NodeEntry[][] = []
   let batch: NodeEntry[] = []
@@ -296,7 +300,7 @@ export default function GeneratedContentLocalizer() {
     let rerun = false
 
     const translateDocument = async () => {
-      if (cancelled || document.visibilityState === 'hidden') return
+      if (cancelled || documentIsHidden()) return
       if (running) {
         rerun = true
         return
@@ -326,7 +330,7 @@ export default function GeneratedContentLocalizer() {
         }
 
         for (const batch of batches(pending)) {
-          if (cancelled || document.visibilityState === 'hidden') break
+          if (cancelled || documentIsHidden()) break
           const translated = await requestTranslations(batch, targetLanguage)
           if (cancelled) break
 
@@ -343,13 +347,13 @@ export default function GeneratedContentLocalizer() {
         }
 
         saveCache(cache)
-      } while (rerun && !cancelled && document.visibilityState !== 'hidden')
+      } while (rerun && !cancelled && !documentIsHidden())
 
       running = false
     }
 
     const schedule = () => {
-      if (cancelled || document.visibilityState === 'hidden') return
+      if (cancelled || documentIsHidden()) return
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => { void translateDocument() }, 180)
     }

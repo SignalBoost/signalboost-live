@@ -43,13 +43,8 @@ export function minimumKnowledgePromotionSubjectCoverage(): number {
 
 function promotionTermMatches(haystack: string, term: string): boolean {
   if (matchesTerm(haystack, term)) return true
-
-  // Retained curriculum subjects commonly use compounds such as "data-layer", "multi-tenant",
-  // and "real-time" while source prose uses spaces. Treat punctuation variants as the same term;
-  // otherwise the stricter promotion gate would reject relevant material for formatting alone.
   const spaced = term.replace(/[-_]+/g, ' ')
   if (spaced !== term && matchesTerm(haystack, spaced)) return true
-
   const compactTerm = term.replace(/[-_\s]+/g, '')
   if (compactTerm.length < 4) return false
   const compactHaystack = haystack.replace(/[-_\s]+/g, '')
@@ -69,18 +64,7 @@ function decisionBase(candidate: KnowledgePromotionCandidate, options?: Relevanc
   const matched = new Set(matchedAnchors)
   const discriminativeMatched = discriminativeAnchors.filter(term => matched.has(term))
   const configuredMatches = Math.max(1, Math.round(options?.minSubjectMatches ?? minimumKnowledgePromotionSubjectMatches()))
-
-  // Generic curriculum words (enterprise, database, performance, architecture, systems, etc.)
-  // are useful context but should not make a genuinely relevant source impossible to promote.
-  // Example: subject "Enterprise cybersecurity" has one meaningful domain anchor —
-  // "cybersecurity". A source that strongly contains that anchor should not be rejected merely
-  // because its title/excerpt does not repeat the generic word "enterprise". Conversely, a source
-  // that matches only a generic anchor still fails the discriminative-anchor gate below.
-  const meaningfulAnchorCount = discriminativeAnchors.length || anchors.length
-  const requiredMatches = anchors.length
-    ? Math.min(anchors.length, configuredMatches, Math.max(1, meaningfulAnchorCount))
-    : 0
-
+  const requiredMatches = anchors.length ? Math.min(anchors.length, configuredMatches) : 0
   const minimumCoverage = Math.max(0, Math.min(1, options?.minSubjectCoverage ?? minimumKnowledgePromotionSubjectCoverage()))
   const coverage = anchors.length ? matchedAnchors.length / anchors.length : 0
   const confidence = Number.isFinite(candidate.confidence) ? Math.max(0, Math.min(1, candidate.confidence)) : 0
@@ -97,19 +81,6 @@ function decisionBase(candidate: KnowledgePromotionCandidate, options?: Relevanc
   }
 }
 
-/**
- * Second durable-memory gate for learned-corpus -> Knowledge Graph promotion.
- *
- * Continuous-learning admission asks whether a source was relevant to the question that caused the
- * study. Historical rows predate today's stricter admission rules, so a source-grounded extraction
- * alone is not sufficient: grounding proves only that a claim appears in the source, not that the
- * source belongs under the retained curriculum subject. Promotion therefore re-checks the stored
- * title/excerpt against the stored subject before COS may create structured KG facts.
- *
- * The gate is deliberately conservative. Rejecting a row here does NOT delete the learned corpus;
- * it only prevents that weakly-aligned row from becoming stronger structured knowledge. A future
- * operator can reclassify/re-study the source and promote it under a correct subject.
- */
 export function evaluateKnowledgePromotionRelevance(
   candidate: KnowledgePromotionCandidate,
   options?: RelevanceOptions,
@@ -126,15 +97,22 @@ export function evaluateKnowledgePromotionRelevance(
   if (!candidate.summary.trim() && !String(candidate.sourceTitle ?? '').trim()) return result(false, 'missing_evidence')
   if (base.confidence < base.confidenceFloor) return result(false, 'below_source_confidence_floor')
 
-  if (base.matchedAnchors.length < base.requiredMatches || base.coverage < base.minimumCoverage) {
+  // Generic curriculum terms are context, not evidence. For a short subject such as
+  // "Enterprise cybersecurity", demanding both words rejects a strong cybersecurity source simply
+  // because it does not repeat the generic word "enterprise". Permit the configured match-count
+  // shortfall only when every available discriminative anchor is actually present. Generic-only
+  // matches do NOT get this exception, so the historical lung/psychiatry contamination cases retain
+  // their existing insufficient-overlap rejection semantics.
+  const discriminativeException =
+    base.discriminativeAnchors.length > 0 &&
+    base.discriminativeMatched.length === base.discriminativeAnchors.length &&
+    base.discriminativeMatched.length < base.requiredMatches &&
+    base.coverage >= base.minimumCoverage
+
+  if ((base.matchedAnchors.length < base.requiredMatches || base.coverage < base.minimumCoverage) && !discriminativeException) {
     return result(false, 'insufficient_subject_overlap')
   }
 
-  // Generic subject words such as "architecture", "database", "performance", and "systems" are
-  // easy accidental matches in long technical/scientific documents. When the curriculum subject has
-  // a more discriminative anchor, require at least one such anchor unless three independent subject
-  // terms matched. This is what prevents a psychiatry paper mentioning "architecture" from becoming
-  // a distributed-systems KG source while still allowing broad multi-signal technical material.
   if (
     base.discriminativeAnchors.length > 0 &&
     base.discriminativeMatched.length === 0 &&

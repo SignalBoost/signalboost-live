@@ -29,7 +29,7 @@ function embeddingModel(): string {
 }
 
 type EmbeddingAttempt =
-  | { ok: true; vector: number[] }
+  | { ok: true; vectors: number[][] }
   | { ok: false; status: number; body: string }
 
 function validateVector(vector: number[], model: string): number[] {
@@ -44,7 +44,7 @@ function validateVector(vector: number[], model: string): number[] {
   return vector
 }
 
-async function requestEmbedding(text: string, config: LocalInferenceConfig, model: string): Promise<EmbeddingAttempt> {
+async function requestEmbeddings(texts: string[], config: LocalInferenceConfig, model: string): Promise<EmbeddingAttempt> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
@@ -55,19 +55,25 @@ async function requestEmbedding(text: string, config: LocalInferenceConfig, mode
         ...authHeaders(config.apiKey),
       },
       signal: controller.signal,
-      body: JSON.stringify({ model, input: text }),
+      body: JSON.stringify({ model, input: texts.length === 1 ? texts[0] : texts }),
     })
 
     if (!response.ok) {
       return { ok: false, status: response.status, body: await response.text() }
     }
 
-    const data = await response.json() as { data?: Array<{ embedding?: number[] }> }
-    const vector = data.data?.[0]?.embedding
-    if (!Array.isArray(vector) || vector.length === 0) {
-      throw new Error('localEmbeddings: endpoint returned no embedding vector')
+    const data = await response.json() as { data?: Array<{ embedding?: number[]; index?: number }> }
+    const items = Array.isArray(data.data) ? data.data : []
+    if (items.length !== texts.length) {
+      throw new Error(`localEmbeddings: endpoint returned ${items.length} vectors for ${texts.length} inputs`)
     }
-    return { ok: true, vector }
+
+    const ordered = [...items].sort((a, b) => Number(a.index ?? 0) - Number(b.index ?? 0))
+    const vectors = ordered.map(item => item.embedding)
+    if (vectors.some(vector => !Array.isArray(vector) || vector.length === 0)) {
+      throw new Error('localEmbeddings: endpoint returned an empty embedding vector')
+    }
+    return { ok: true, vectors: vectors as number[][] }
   } finally {
     clearTimeout(timeout)
   }
@@ -150,32 +156,38 @@ async function pullEmbeddingModel(config: LocalInferenceConfig, model: string): 
 }
 
 /**
- * Generate a local semantic-cache vector. If the secured RunPod/Ollama endpoint
- * reports that the configured embedding model is missing, repair that exact missing
- * model once through Ollama's authenticated native /api/pull endpoint and retry.
- *
- * This repair is deliberately narrow:
- * - only an HTTP 404 that names the configured model can trigger it;
- * - by default it is enabled only for the HTTPS RunPod proxy shape used by COS;
- * - LOCAL_AI_EMBEDDING_AUTO_REPAIR=false disables it;
- * - failed pulls enter a five-minute process-local cooldown instead of stalling every turn;
- * - no external AI provider is involved.
+ * Generate one or more local semantic vectors in a SINGLE embeddings request. Context ranking uses
+ * this instead of firing a request per candidate, which keeps local relevance filtering cheaper
+ * than the reasoning call it is protecting.
  */
-export const generateLocalEmbedding: EmbeddingGenerator = async (text: string): Promise<number[]> => {
+export async function generateLocalEmbeddings(texts: string[]): Promise<number[][]> {
+  const normalized = texts.map(text => String(text ?? '').trim())
+  if (normalized.length === 0) return []
   const config = localInferenceConfigFromEnv()
   const model = embeddingModel()
-  let attempt = await requestEmbedding(text, config, model)
+  let attempt = await requestEmbeddings(normalized, config, model)
 
   if ('status' in attempt && missingModelError(attempt, model) && runpodAutoRepairEnabled(config)) {
     await pullEmbeddingModel(config, model)
-    attempt = await requestEmbedding(text, config, model)
+    attempt = await requestEmbeddings(normalized, config, model)
   }
 
   if ('status' in attempt) {
     throw new Error(`localEmbeddings: HTTP ${attempt.status} — ${attempt.body}`)
   }
 
-  return validateVector(attempt.vector, model)
+  return attempt.vectors.map(vector => validateVector(vector, model))
+}
+
+/**
+ * Generate a local semantic-cache vector. If the secured RunPod/Ollama endpoint
+ * reports that the configured embedding model is missing, repair that exact missing
+ * model once through Ollama's authenticated native /api/pull endpoint and retry.
+ */
+export const generateLocalEmbedding: EmbeddingGenerator = async (text: string): Promise<number[]> => {
+  const [vector] = await generateLocalEmbeddings([text])
+  if (!vector) throw new Error('localEmbeddings: endpoint returned no embedding vector')
+  return vector
 }
 
 /**
@@ -188,9 +200,9 @@ export async function checkLocalEmbeddingHealth(): Promise<{ ok: boolean; model:
   const model = embeddingModel()
   try {
     const config = localInferenceConfigFromEnv()
-    const attempt = await requestEmbedding('health check', config, model)
+    const attempt = await requestEmbeddings(['health check'], config, model)
     if ('status' in attempt) return { ok: false, model, error: `HTTP ${attempt.status} — ${attempt.body}` }
-    const vector = validateVector(attempt.vector, model)
+    const vector = validateVector(attempt.vectors[0] ?? [], model)
     return { ok: true, model, dimensions: vector.length }
   } catch (error) {
     return { ok: false, model, error: error instanceof Error ? error.message : 'Embedding health check failed' }

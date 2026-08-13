@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runNativeMonitoring } from '@/self-healing-host/native-monitoring-runtime'
 import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
+import { verifyPendingVercelRemediations } from '@/self-healing-host/remediation-verifier'
 import { collectAssessmentConfidenceIncident } from '@/self-healing-host/assessment-confidence-monitoring'
 import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native-persistence-monitoring'
 import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/platform-health-monitoring-adapter'
@@ -55,6 +56,18 @@ export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const db = getAdminSupabase(); const store = new SupabaseNativeProbeStore(db)
   try { await store.verifySchema() } catch (error) { return NextResponse.json({ ok: false, error: 'native_probe_store_unavailable', detail: error instanceof Error ? error.message.slice(0,220) : 'native probe schema unavailable' }, { status: 503 }) }
+
+  // Verification is part of every proactive cycle: a repair is not considered healed merely
+  // because a provider accepted the mutation. Pending Vercel repairs are checked against
+  // the provider's production deployment state before new diagnosis/remediation begins.
+  const remediationVerification = await verifyPendingVercelRemediations(10).catch(error => ({
+    checked: 0,
+    verified: 0,
+    failed: 0,
+    pending: 0,
+    errors: [error instanceof Error ? error.message : 'remediation verification failed'],
+  }))
+
   const apiUrls = parseApiUrls(); const certificateTargets = parseTlsTargets(apiUrls)
   if (!apiUrls.length || !certificateTargets.length) return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable' }, { status: 503 })
   const quotaBytes = storageQuotaBytes()
@@ -71,12 +84,13 @@ export async function GET(req: NextRequest) {
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
-    schemaVersion: 'self-healing-native-proactive-monitoring-v4',
+    schemaVersion: 'self-healing-native-proactive-monitoring-v5',
     runAt: new Date().toISOString(),
     readOnly: result.readOnly,
     providerMutations: result.providerMutations,
     mode: result.mode,
     limits: { apiTargets: apiUrls.length, tlsTargets: certificateTargets.length, maxDurationSeconds: maxDuration, storageQuotaConfigured: quotaBytes != null, apiTargetCap: apiTargetCap() },
+    remediationVerification,
     collectorsRun: result.collectorsRun,
     signalsObserved: result.signalsObserved,
     incidents,

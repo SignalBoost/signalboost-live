@@ -28,6 +28,22 @@ test('generated reports and documents translate from preserved original text', (
   assert.match(client, /\/api\/i18n\/translate-content/)
 })
 
+test('the English UI does not send canonical untagged English content through the translation API', () => {
+  const client = read('../components/i18n/GeneratedContentLocalizer.tsx')
+
+  assert.match(client, /function needsServerTranslation/)
+  assert.match(client, /!entry\.sourceLanguage && targetLanguage === 'en'/)
+  assert.match(client, /if \(!needsServerTranslation\(entry, targetLanguage\)\)/)
+})
+
+test('generated-content translation pauses while the browser tab is hidden and resumes when visible', () => {
+  const client = read('../components/i18n/GeneratedContentLocalizer.tsx')
+
+  assert.match(client, /document\.visibilityState === 'hidden'/)
+  assert.match(client, /visibilitychange/)
+  assert.match(client, /document\.visibilityState === 'visible'/)
+})
+
 test('translation preserves technical content and never rewrites the original record', () => {
   const engine = read('../lib/i18n/contentTranslation.ts')
 

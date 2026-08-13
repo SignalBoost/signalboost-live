@@ -8,22 +8,32 @@ export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
 }
 
+export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
+
 function requireText(result: string | null, provider: string): string {
   if (!result) throw new Error(`${provider} AI provider returned no text`)
   return result
 }
 
-// SignalBoost host: all normal COS text generation enters the shared reuse gateway.
 export function createPlatformAiPort(): CosAiPort {
   return {
     generate: async (input) => requireText(await callCosText({ ...input, taskId: 'cos-portable-text' }), 'platform'),
   }
 }
 
-// Private appliance remains explicitly local/fail-closed according to environment policy.
 export function createLocalApplianceAiPort(): CosAiPort {
   return {
     generate: async (input) => requireText(await callProviderModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+  }
+}
+
+/** SignalBoost-host adapter for optional frontier teacher/evaluator work. */
+export function createExternalTeacherAiPort(provider: ExternalTeacherProvider): CosAiPort {
+  return {
+    generate: async (input) => requireText(
+      await callProviderModel({ ...input, modelPreference: provider }),
+      `external teacher ${provider}`,
+    ),
   }
 }
 

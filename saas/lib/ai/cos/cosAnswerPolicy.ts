@@ -29,11 +29,12 @@
 import { createHash } from 'node:crypto'
 
 /**
- * Bump this by hand when the GATE changes in a way the inputs below cannot see — the
- * specificity scorer's rules, the evidence ceiling, the citation accounting. Changing the
+ * Bump this by hand when the GATE or evidence representation changes in a way the inputs
+ * below cannot see — the specificity scorer's rules, evidence ceiling, citation accounting,
+ * or the serialized evidence context used by semantic cache embeddings. Changing the
  * reasoner prompt or the model does NOT need a manual bump; those are hashed directly.
  */
-export const COS_ANSWER_GATE_REVISION = '2026-08-13.skill-citation-integrity.v2'
+export const COS_ANSWER_GATE_REVISION = '2026-08-13.structured-evidence.v3'
 
 export type CosAnswerPolicyInputs = {
   /** The exact reasoner system prompt in force. Hash the same language every time (see cosFirstAnswer) so five locales do not fragment one cache into five. */

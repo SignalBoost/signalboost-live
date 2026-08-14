@@ -8,7 +8,7 @@ import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
-import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/ai/cos/providerExecutionTrace'
+import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
 import {
   isProvenanceIntrospection,

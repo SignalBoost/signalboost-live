@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto'
-import { callProviderModelDetailed, recordProviderExecutionTrace, type ModelCallArgs, type ModelProvider } from '@/lib/ai/providerRouter'
+import {
+  callProviderModelDetailed,
+  recordProviderExecutionTrace,
+  withProviderExecutionTrace,
+  type ModelCallArgs,
+  type ModelProvider,
+  type ProviderExecutionTrace,
+} from '@/lib/ai/providerRouter'
 import { cosServiceDb } from '@/lib/cos-core/storage'
 
 export type CosTextGatewayInput = ModelCallArgs & {
@@ -13,6 +20,12 @@ export type CosTextGatewayResult = {
   requestedProvider: ModelProvider | null
   fallbackUsed: boolean
   source: 'provider' | 'cache'
+}
+
+export type { ProviderExecutionTrace }
+
+export async function withCosProviderExecutionTrace<T>(work: () => Promise<T>): Promise<{ result: T; trace: ProviderExecutionTrace }> {
+  return withProviderExecutionTrace(work)
 }
 
 type StoredText = {

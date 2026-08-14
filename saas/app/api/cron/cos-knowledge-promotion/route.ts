@@ -1,6 +1,8 @@
+// saas/app/api/cron/cos-knowledge-promotion/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { autoPromoteLearnedKnowledge } from '@/lib/ai/cos/autoPromoteLearning'
 import { backfillKnowledgeFactEmbeddings } from '@/lib/ai/cos/knowledgeFactSemantic'
+import { backfillLearnedCorpusEmbeddings } from '@/lib/ai/cos/learnedCorpusSemantic'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 
@@ -29,7 +31,11 @@ export async function GET(req: NextRequest) {
   // 15 seconds stay reserved for persistence and the HTTP response.
   const deadlineMs = Date.now() + 285_000
   const semanticBackfill = await backfillKnowledgeFactEmbeddings(4)
+  // Corpus rows get the same incremental embedding upgrade as facts, so semantic corpus retrieval
+  // becomes real without a manual step. Bounded to four rows per pass; scheduling the cron more
+  // often drains the backlog of pre-existing rows faster.
+  const corpusBackfill = await backfillLearnedCorpusEmbeddings(4)
   const promotion = await autoPromoteLearnedKnowledge(5, deadlineMs)
-  const ok = promotion.status !== 'error' && semanticBackfill.status !== 'error'
-  return NextResponse.json({ ok, semanticBackfill, promotion }, { status: ok ? 200 : 500 })
+  const ok = promotion.status !== 'error' && semanticBackfill.status !== 'error' && corpusBackfill.status !== 'error'
+  return NextResponse.json({ ok, semanticBackfill, corpusBackfill, promotion }, { status: ok ? 200 : 500 })
 }

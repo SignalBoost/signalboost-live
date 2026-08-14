@@ -35,7 +35,7 @@ import { createHash } from 'node:crypto'
  * embeddings. Changing the reasoner prompt or the model does NOT need a manual bump; those are
  * hashed directly.
  */
-export const COS_ANSWER_GATE_REVISION = '2026-08-13.domain-gated-retrieval.v4'
+export const COS_ANSWER_GATE_REVISION = '2026-08-13.domain-gate-calibrated.v5'
 
 export type CosAnswerPolicyInputs = {
   /** The exact reasoner system prompt in force. Hash the same language every time (see cosFirstAnswer) so five locales do not fragment one cache into five. */

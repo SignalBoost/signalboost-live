@@ -8,6 +8,7 @@ import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
+import { withProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/ai/providerRouter'
 import { getAccess } from '@/lib/auth/access'
 import {
   isProvenanceIntrospection,
@@ -28,38 +29,30 @@ export const maxDuration = 300
 function latestUserText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role!=='user')continue;const content=messages[i]?.content;if(typeof content==='string')return content;if(Array.isArray(content))return content.map((block:any)=>String(block?.text||'')).join('\n').trim()}return''}
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
-function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
+function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
+function normalizeProvider(value:string|null):string|null{return value==='claude'?'anthropic':value}
+function externalExecution(payload:any,trace:ProviderExecutionTrace,isPrivileged:boolean):{provider:string|null;model:string|null;invoked:boolean;source:'provider'|'cache'|null}{
+  const explicit=providerFromPayload(payload),source=String(payload?.source||'')
+  const directAnthropic=source==='anthropic-chief'||source==='anthropic-concierge'
+  if(explicit.provider||explicit.model)return{provider:normalizeProvider(explicit.provider),model:explicit.model,invoked:payload?.external_ai_invoked!==false,source:'provider'}
+  if(directAnthropic)return{provider:'anthropic',model:isPrivileged?'claude-sonnet-4-6':'claude-haiku-4-5',invoked:true,source:'provider'}
+  return{provider:normalizeProvider(trace.provider),model:trace.model,invoked:trace.invoked,source:trace.source}
+}
 function legacyContinuityFailure(payload:any):boolean{const text=JSON.stringify(payload??{}).toLowerCase();return text.includes('both reasoning providers are temporarily unavailable')||text.includes('continuity protection detected a primary failure')}
 function noPriorReply(language:string):string{return language==='es'?'No tengo un registro de procedencia real para la respuesta inmediatamente anterior. No voy a inventarlo.':language==='pt'?'Não tenho um registro de proveniência real para a resposta imediatamente anterior. Não vou inventá-lo.':"I don't have a real provenance record for the immediately preceding answer. I won't fabricate one."}
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??null,localModelInvoked:p?.localModelInvoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??0,learnedItemsUsed:p?.learnedItemsUsed??0,userMemoriesUsed:p?.userMemoriesUsed??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
 
-/**
- * The honest low-confidence path. When COS's answer fell below the escalation threshold and no
- * external provider is available, the choice is between serving that answer clearly labelled and
- * serving nothing. Nothing was what shipped first, and it made every hard question a dead end the
- * user could not see past. The label carries the measured confidence and the gate's stated reason,
- * so the draft can never be mistaken for a confident result — and the provenance records it as a
- * low-confidence draft, not as a handled answer.
- */
 function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }): string | null {
   if (!cos || cos.handled || !('bestEffortReply' in cos) || !cos.bestEffortReply) return null
-  return [
-    `⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,
-    '',
-    cos.bestEffortReply,
-  ].join('\n')
+  return [`⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
 }
 
-function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{
-  if(!cos)return null
-  if(cos.handled)return cos.reply
-  return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null
-}
+function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{if(!cos)return null;if(cos.handled)return cos.reply;return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null}
 
 export async function POST(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
-  const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body)
+  const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
 
   if(isProvenanceIntrospection(input)){
     const prior=await readCosPrimaryPriorProvenance(userId,precedingAssistant||undefined)
@@ -72,34 +65,25 @@ export async function POST(req:NextRequest){
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source);return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
-  try{cos=await tryCOSFirstAnswer({prompt:input,userId,language,privileged:Boolean(access?.isOwner||access?.isAdmin)})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+  try{cos=await tryCOSFirstAnswer({prompt:input,userId,language,privileged:isPrivileged})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   const requestedAction=requestsExternalAction(input)
   if(cos?.handled&&!requestedAction){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   const reason=escalationReason(cos,localError,requestedAction);logEscalation({event:'external_escalation_decision',reason_code:reason.code,reason:reason.detail,confidence:cos?.confidence??null,threshold:confidenceThreshold(),local_model_invoked:cos?.provenance?.localModelInvoked??false,local_model:cos?.provenance?.reasonerLabel??null,semantic_cache_hit:cos?.provenance?.responseSource==='semantic_cache'||cos?.provenance?.responseSource==='semantic_similarity',knowledge_facts_used:cos?.provenance?.knowledgeFactsUsed??0,learned_items_used:cos?.provenance?.learnedItemsUsed??0,external_action_requested:requestedAction,fallback_enabled:externalFallbackEnabled()})
   if(!externalFallbackEnabled()){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),reply=lowConfidenceDraftReply(cos,reason)??'COS could not complete this request independently and external AI fallback is disabled.',liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:cos?.confidence??0,provenance:cos?.provenance,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,reply,executionProvenance,'failed_closed');return NextResponse.json({ok:false,error:reply,cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry},{status:503})}
 
-  const response=await legacyConciergePost(new NextRequest(req.clone()))
+  const traced=await withProviderExecutionTrace(()=>legacyConciergePost(new NextRequest(req.clone()))),response=traced.result
   try{
-    const payload=await response.clone().json(),external=providerFromPayload(payload),continuityFailed=legacyContinuityFailure(payload),reasonerHealth=continuityFailed?await independentReasonerHealth():null
-    logEscalation({event:'external_escalation_result',reason_code:reason.code,provider:external.provider,model:external.model,status:response.status,continuity_failed:continuityFailed,independent_reasoner:reasonerHealth})
-    const executionProvenance=authoritativeProvenance(cos,{invoked:!continuityFailed,...external})
+    const payload=await response.clone().json(),continuityFailed=legacyContinuityFailure(payload),external=externalExecution(payload,traced.trace,isPrivileged),externalInvoked=!continuityFailed&&external.invoked,reasonerHealth=continuityFailed?await independentReasonerHealth():null
+    logEscalation({event:'external_escalation_result',reason_code:reason.code,provider:external.provider,model:external.model,status:response.status,continuity_failed:continuityFailed,external_ai_invoked:externalInvoked,provider_source:external.source,independent_reasoner:reasonerHealth})
+    const executionProvenance=authoritativeProvenance(cos,{invoked:externalInvoked,provider:external.provider,model:external.model})
     const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):String(payload?.reply||'')
     const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':'external_fallback'
-    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:continuityFailed?'failed_closed':'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:!continuityFailed})
-    if(!continuityFailed&&reply){
-      await recordTeacherEscalation({
-        prompt:input,
-        localAnswer:localDraft(cos),
-        localConfidence:cos?.confidence??null,
-        escalationReason:reason.detail,
-        teacherAnswer:reply,
-        teacherProvider:external.provider,
-        teacherModel:external.model,
-        metadata:{reasonCode:reason.code,responseStatus:response.status},
-      })
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:continuityFailed?'failed_closed':'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:externalInvoked})
+    if(externalInvoked&&!continuityFailed&&reply){
+      await recordTeacherEscalation({prompt:input,localAnswer:localDraft(cos),localConfidence:cos?.confidence??null,escalationReason:reason.detail,teacherAnswer:reply,teacherProvider:external.provider,teacherModel:external.model,metadata:{reasonCode:reason.code,responseStatus:response.status}})
     }
     if(reply)await writeCosPrimaryProvenance(userId,reply,executionProvenance,responseSource)
-    return NextResponse.json({...payload,...(continuityFailed?{reply,source:responseSource}:{}),cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:!continuityFailed,external_fallback_invoked:true,external_fallback_succeeded:!continuityFailed,isolation_mode:false,live_telemetry:liveTelemetry},{status:response.status})
-  }catch(error){logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:null,model:null,status:response.status,error:error instanceof Error?error.message:String(error)});emitRequestTelemetry({startedAt,input,source:'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:true});return response}
+    return NextResponse.json({...payload,...(continuityFailed?{reply,source:responseSource}:{}),cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:external.provider,external_model:external.model,external_provider_source:external.source,external_fallback_invoked:true,external_fallback_succeeded:!continuityFailed,isolation_mode:false,live_telemetry:liveTelemetry},{status:response.status})
+  }catch(error){logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:normalizeProvider(traced.trace.provider),model:traced.trace.model,status:response.status,error:error instanceof Error?error.message:String(error)});emitRequestTelemetry({startedAt,input,source:'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:traced.trace.invoked});return response}
 }

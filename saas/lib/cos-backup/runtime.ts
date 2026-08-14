@@ -1,12 +1,11 @@
 // saas/lib/cos-backup/runtime.ts
-// saas/lib/cos-backup/runtime.ts
 // Read-only Backup COS provider and sanitized recovery logging. This module may
 // reason and log, but it cannot call business tools or mutate provider state.
 
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { callModel } from '@/lib/ai/modelRouter'
+import { callModelDetailed } from '@/lib/ai/modelRouter'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import type { BackupCosAnswer } from './policy.ts'
 import type { CosBackupRuntimeConfig, DecisionLogSink } from '@/cos-backup-core'
@@ -88,13 +87,16 @@ function extractJson(value: string): Record<string, unknown> | null {
   }
 }
 
-export async function runBackupCos(normalizedInput: string, language = 'en'): Promise<BackupCosAnswer> {
-  const brain = await loadApprovedBrain()
-  const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
-  const raw = await withDeadline(
-    callModel({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
-    backupTimeoutMs(),
-  )
+function finalizeBackupAnswer(
+  brain: string,
+  raw: string | null,
+  execution: {
+    provider?: string | null
+    model?: string | null
+    source?: 'provider' | 'cache' | 'configured_reasoner' | null
+    externalAiInvoked?: boolean
+  } = {},
+): BackupCosAnswer {
   const parsed = extractJson(String(raw || ''))
   const answer = String(parsed?.answer || raw || '').trim()
   return {
@@ -105,7 +107,26 @@ export async function runBackupCos(normalizedInput: string, language = 'en'): Pr
     proposedTool: parsed?.proposedTool ? String(parsed.proposedTool).slice(0, 120) : null,
     confidence: Math.max(0, Math.min(100, Number(parsed?.confidence) || 50)),
     brainDigest: digest(brain),
+    provider: execution.provider ?? null,
+    model: execution.model ?? null,
+    reasoningSource: execution.source ?? null,
+    externalAiInvoked: execution.externalAiInvoked,
   }
+}
+
+export async function runBackupCos(normalizedInput: string, language = 'en'): Promise<BackupCosAnswer> {
+  const brain = await loadApprovedBrain()
+  const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
+  const execution = await withDeadline(
+    callModelDetailed({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
+    backupTimeoutMs(),
+  )
+  return finalizeBackupAnswer(brain, execution?.text ?? null, {
+    provider: execution?.provider ?? null,
+    model: execution?.model ?? null,
+    source: execution?.source ?? null,
+    externalAiInvoked: execution?.source === 'provider' && execution.provider !== 'local',
+  })
 }
 
 export async function recordCosRecovery(log: CosRecoveryLog): Promise<void> {
@@ -157,21 +178,25 @@ export async function runBackupCosWithConfig(
 ): Promise<BackupCosAnswer> {
   const brain = await (config.loadBrain ? config.loadBrain() : loadApprovedBrain())
   const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
-  const ask = config.reasoner
-    ? config.reasoner.ask(prompt, { maxTokens: 1200 })
-    : callModel({ modelPreference: 'openai', prompt, maxTokens: 1200 })
-  const raw = await withDeadline(ask, config.timeoutMs ?? backupTimeoutMs())
-  const parsed = extractJson(String(raw || ''))
-  const answer = String(parsed?.answer || raw || '').trim()
-  return {
-    ok: answer.length >= 10,
-    answer: answer || 'COS continuity mode is active, but the backup reasoning provider is temporarily unavailable.',
-    intent: String(parsed?.intent || 'general_assistance').slice(0, 120),
-    requiresApproval: Boolean(parsed?.requiresApproval),
-    proposedTool: parsed?.proposedTool ? String(parsed.proposedTool).slice(0, 120) : null,
-    confidence: Math.max(0, Math.min(100, Number(parsed?.confidence) || 50)),
-    brainDigest: digest(brain),
+
+  if (config.reasoner) {
+    const raw = await withDeadline(config.reasoner.ask(prompt, { maxTokens: 1200 }), config.timeoutMs ?? backupTimeoutMs())
+    return finalizeBackupAnswer(brain, raw, {
+      source: 'configured_reasoner',
+      externalAiInvoked: undefined,
+    })
   }
+
+  const execution = await withDeadline(
+    callModelDetailed({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
+    config.timeoutMs ?? backupTimeoutMs(),
+  )
+  return finalizeBackupAnswer(brain, execution?.text ?? null, {
+    provider: execution?.provider ?? null,
+    model: execution?.model ?? null,
+    source: execution?.source ?? null,
+    externalAiInvoked: execution?.source === 'provider' && execution.provider !== 'local',
+  })
 }
 
 export async function recordCosRecoveryWithConfig(

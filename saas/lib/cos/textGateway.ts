@@ -1,34 +1,50 @@
 import { createHash } from 'node:crypto'
-import { callProviderModel, type ModelCallArgs } from '@/lib/ai/providerRouter'
+import {
+  callProviderModelDetailed,
+  recordProviderExecutionTrace,
+  withProviderExecutionTrace,
+  type ModelCallArgs,
+  type ModelProvider,
+  type ProviderExecutionTrace,
+} from '@/lib/ai/providerRouter'
 import { cosServiceDb } from '@/lib/cos-core/storage'
 
 export type CosTextGatewayInput = ModelCallArgs & {
   taskId?: string
 }
 
-type StoredText = { text?: string }
+export type CosTextGatewayResult = {
+  text: string
+  provider: ModelProvider | null
+  model: string | null
+  requestedProvider: ModelProvider | null
+  fallbackUsed: boolean
+  source: 'provider' | 'cache'
+}
+
+export type { ProviderExecutionTrace }
+
+export async function withCosProviderExecutionTrace<T>(work: () => Promise<T>): Promise<{ result: T; trace: ProviderExecutionTrace }> {
+  return withProviderExecutionTrace(work)
+}
+
+type StoredText = {
+  text?: string
+  provider?: ModelProvider
+  model?: string
+  requestedProvider?: ModelProvider
+  fallbackUsed?: boolean
+}
 
 function cacheIdentity(input: CosTextGatewayInput) {
-  const stable = JSON.stringify({
-    taskId: input.taskId ?? 'cos-text',
-    prompt: input.prompt,
-    systemPrompt: input.systemPrompt ?? '',
-    maxTokens: input.maxTokens ?? 2048,
-    modelPreference: input.modelPreference ?? null,
-  })
+  const stable = JSON.stringify({ taskId: input.taskId ?? 'cos-text', prompt: input.prompt, systemPrompt: input.systemPrompt ?? '', maxTokens: input.maxTokens ?? 2048, modelPreference: input.modelPreference ?? null })
   return createHash('sha256').update(stable).digest('hex')
 }
 
-const inFlight = new Map<string, Promise<string | null>>()
+const inFlight = new Map<string, Promise<CosTextGatewayResult | null>>()
 
-/**
- * Compatibility gateway for SignalBoost text generation.
- *
- * Durable exact reuse is checked before compute, and same-process duplicate requests
- * share one in-flight promise. Raw provider execution is isolated behind providerRouter;
- * feature routes and Portables never need provider credentials or provider APIs.
- */
-export async function callCosText(input: CosTextGatewayInput): Promise<string | null> {
+/** Compatibility gateway with durable exact reuse and truthful provider provenance. */
+export async function callCosTextDetailed(input: CosTextGatewayInput): Promise<CosTextGatewayResult | null> {
   const key = cacheIdentity(input)
   const existing = inFlight.get(key)
   if (existing) return existing
@@ -40,33 +56,32 @@ export async function callCosText(input: CosTextGatewayInput): Promise<string | 
         const { data, error } = await db.from('cos_text_cache').select('response_data').eq('cache_key', key).maybeSingle()
         if (!error) {
           const stored = data?.response_data as StoredText | undefined
-          if (stored?.text) return stored.text
+          if (stored?.text) {
+            recordProviderExecutionTrace({ provider: stored.provider ?? null, model: stored.model ?? null, invoked: false, source: 'cache' })
+            return { text: stored.text, provider: stored.provider ?? null, model: stored.model ?? null, requestedProvider: stored.requestedProvider ?? null, fallbackUsed: stored.fallbackUsed === true, source: 'cache' as const }
+          }
         }
-      } catch {
-        // Cache is an optimization. Governed compute remains available.
-      }
+      } catch { /* Cache is an optimization. */ }
     }
 
-    const text = await callProviderModel(input)
-    if (text && db) {
+    const result = await callProviderModelDetailed(input)
+    if (result && db) {
       try {
         await db.from('cos_text_cache').upsert({
           cache_key: key,
           task_id: input.taskId ?? 'cos-text',
-          response_data: { text },
+          response_data: { text: result.text, provider: result.provider, model: result.model, requestedProvider: result.requestedProvider, fallbackUsed: result.fallbackUsed },
           updated_at: new Date().toISOString(),
         })
-      } catch {
-        // Persistence failures never repeat or fail successful provider work.
-      }
+      } catch { /* Persistence failures never repeat or fail successful provider work. */ }
     }
-    return text
+    return result ? { text: result.text, provider: result.provider, model: result.model, requestedProvider: result.requestedProvider, fallbackUsed: result.fallbackUsed, source: 'provider' as const } : null
   })()
 
   inFlight.set(key, execution)
-  try {
-    return await execution
-  } finally {
-    inFlight.delete(key)
-  }
+  try { return await execution } finally { inFlight.delete(key) }
+}
+
+export async function callCosText(input: CosTextGatewayInput): Promise<string | null> {
+  return (await callCosTextDetailed(input))?.text ?? null
 }

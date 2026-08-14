@@ -1,0 +1,1 @@
+Structured learned evidence must render JSON content and must never degrade to [object Object].

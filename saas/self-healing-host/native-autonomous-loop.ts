@@ -6,9 +6,11 @@ import { executeCosConnectorRecipe } from '@/lib/ai/cos/connectorDelegation'
 import { compactDelegatedEvidence } from '@/lib/ai/cos/evidenceCompaction'
 import { NATIVE_PLATFORM_INCIDENT_RECIPE } from '@/lib/ai/cos/incidentRecipeRouter'
 import { createSignalBoostSupervisorConnectorRuntime, SIGNALBOOST_SUPERVISOR_CONNECTOR_TENANT } from './signalboost-supervisor-connectors'
-import { createSignalBoostGatewayHost, GATEWAY_POLICY } from '@/agent-gateway-host/signalboost-host'
+import { createNativeRepairActionResolver } from './native-repair-action-resolver'
+import { SELF_HEALING_GATEWAY_POLICY } from './self-healing-gateway-policy'
+import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
-import { resolveSupervisorRepairAction, resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-gateway-host/supervisor-actions'
+import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-gateway-host/supervisor-actions'
 
 function severity(value: SupervisorIncident['severity']): SupervisorSeverity {
   if (value === 'critical') return 'CRITICAL'
@@ -17,11 +19,7 @@ function severity(value: SupervisorIncident['severity']): SupervisorSeverity {
 }
 
 export function nativeIncidentToNormalized(incident: SupervisorIncident, connectorEvidence: unknown): NormalizedIncidentPayload {
-  const rawEvidence = {
-    incidentEvidence: incident.evidence,
-    metadata: incident.metadata,
-    connectorEvidence,
-  }
+  const rawEvidence = { incidentEvidence: incident.evidence, metadata: incident.metadata, connectorEvidence }
   return {
     incident_id: incident.incidentId,
     timestamp: incident.detectedAt,
@@ -77,9 +75,9 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
       const dispatched = await dispatchRepairPlan({
         incident: { incident_id: normalized.incident_id, project: normalized.project, provider: normalized.provider },
         repairPlan,
-        policy: GATEWAY_POLICY,
+        policy: SELF_HEALING_GATEWAY_POLICY,
         host: createSignalBoostGatewayHost(),
-        resolveAction: resolveSupervisorRepairAction,
+        resolveAction: createNativeRepairActionResolver(incident),
         resolveParams: resolveSupervisorRepairParams,
         agentId: 'cos-native-self-healing',
       })

@@ -3,6 +3,7 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 import { runNativeMonitoring } from '@/self-healing-host/native-monitoring-runtime'
 import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
 import { collectAssessmentConfidenceIncident } from '@/self-healing-host/assessment-confidence-monitoring'
+import { collectConfigurationDriftIncident } from '@/self-healing-host/configuration-drift-monitoring'
 import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native-persistence-monitoring'
 import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/platform-health-monitoring-adapter'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
@@ -41,11 +42,8 @@ function livePlatformHealthCollector(db: any) {
   return platformHealthNativeMonitoringCollector(async () => {
     const vercelStore = new SupabaseVercelHealthStore(db)
     const [runs, instances, workItems, leases, triggers] = await Promise.all([
-      vercelStore.listRuns({ limit: 50 }),
-      readRows(db, 'supervisor_instances'),
-      readRows(db, 'supervisor_work_items'),
-      readRows(db, 'supervisor_leases'),
-      readRows(db, 'vercel_observation_triggers'),
+      vercelStore.listRuns({ limit: 50 }), readRows(db, 'supervisor_instances'), readRows(db, 'supervisor_work_items'),
+      readRows(db, 'supervisor_leases'), readRows(db, 'vercel_observation_triggers'),
     ])
     return { now: new Date(), runs, instances, workItems, leases, triggers }
   })
@@ -60,29 +58,26 @@ export async function GET(req: NextRequest) {
   const quotaBytes = storageQuotaBytes()
   const collectors = [
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
-    persistenceNativeMonitoringCollector({ db }),
-    livePlatformHealthCollector(db),
+    persistenceNativeMonitoringCollector({ db }), livePlatformHealthCollector(db),
   ]
   const result = await runNativeMonitoring({ context: { provider: 'signalboost-platform', environment: 'production', metadata: { source: 'native-proactive-monitoring-cron', readOnly: true, providerMutations: false } }, collectors, nativeEnabled: process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false', externalConnected: process.env.SELF_HEALING_EXTERNAL_MONITORING_CONNECTED === 'true' })
 
-  const confidenceIncident = await collectAssessmentConfidenceIncident(db).catch(() => null)
-  const incidents = confidenceIncident ? [...result.incidents, confidenceIncident] : result.incidents
+  // Configuration drift is investigated independently of any displayed percentage. When it is
+  // present it is the root condition; suppress the derivative confidence incident for this cycle.
+  const configurationIncident = await collectConfigurationDriftIncident(db).catch(() => null)
+  const confidenceIncident = configurationIncident ? null : await collectAssessmentConfidenceIncident(db).catch(() => null)
+  const preventive = [configurationIncident, confidenceIncident].filter(Boolean) as typeof result.incidents
+  const incidents = [...result.incidents, ...preventive]
   const remediation = incidents.length ? await remediateNativeIncidents(incidents, { maxIncidents: 4 }) : []
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
-    schemaVersion: 'self-healing-native-proactive-monitoring-v4',
-    runAt: new Date().toISOString(),
-    readOnly: result.readOnly,
-    providerMutations: result.providerMutations,
-    mode: result.mode,
+    schemaVersion: 'self-healing-native-proactive-monitoring-v5',
+    runAt: new Date().toISOString(), readOnly: result.readOnly, providerMutations: result.providerMutations, mode: result.mode,
     limits: { apiTargets: apiUrls.length, tlsTargets: certificateTargets.length, maxDurationSeconds: maxDuration, storageQuotaConfigured: quotaBytes != null, apiTargetCap: apiTargetCap() },
-    collectorsRun: result.collectorsRun,
-    signalsObserved: result.signalsObserved,
-    incidents,
-    confidenceInvestigationClaimed: Boolean(confidenceIncident),
-    remediation,
-    collectorErrors: result.collectorErrors,
+    collectorsRun: result.collectorsRun, signalsObserved: result.signalsObserved, incidents,
+    configurationInvestigationClaimed: Boolean(configurationIncident), confidenceInvestigationClaimed: Boolean(confidenceIncident),
+    remediation, collectorErrors: result.collectorErrors,
   }, { status })
 }
 export async function POST(req: NextRequest) { return GET(req) }

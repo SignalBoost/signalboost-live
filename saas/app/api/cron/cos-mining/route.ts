@@ -8,6 +8,7 @@ import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
 import { runCognitiveCompositionCycle } from '@/lib/ai/cos/cognitiveSkillComposition'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
+import { refreshMetacognitiveCapabilityMap } from '@/lib/ai/cos/cognitiveMetacognition'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
   let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
   let composition: Awaited<ReturnType<typeof runCognitiveCompositionCycle>> | { enabled: false; errors: string[] } | null = null
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
+  let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
     // Daily learning, transcript acquisition, skill practice, composition/transfer, and consolidation
@@ -64,9 +66,6 @@ export async function GET(req: NextRequest) {
       cognitive = { enabled: false, errors: [message] }
     }
 
-    // Composition runs only when at least two validated skills have distributed relevance to a real
-    // learning gap. Local practice is cheap; independent transfer validation is optional and must
-    // show advantage over the strongest single member before a composite can be promoted.
     try {
       composition = await runCognitiveCompositionCycle()
     } catch (error) {
@@ -75,14 +74,22 @@ export async function GET(req: NextRequest) {
       composition = { enabled: false, errors: [message] }
     }
 
-    // Consolidation shares the existing daily schedule. It re-tests retained skills after time,
-    // weakens stale/repeatedly failing skills, and never counts a delayed replay as new holdout breadth.
     try {
       consolidation = await runCognitiveConsolidationCycle()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Cognitive consolidation failed'
       console.error('cron COS cognitive consolidation failed:', message)
       consolidation = { enabled: false, errors: [message] }
+    }
+
+    // Rebuild metacognitive state after learning/composition/consolidation so selection on the next
+    // request reflects the newest strong, weak, quarantined and unresolved capability evidence.
+    try {
+      metacognition = await refreshMetacognitiveCapabilityMap()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Metacognitive capability refresh failed'
+      console.error('cron COS metacognitive refresh failed:', message)
+      metacognition = { status: 'error', error: message }
     }
 
     try {
@@ -98,5 +105,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, composition, consolidation, corpus })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, composition, consolidation, metacognition, corpus })
 }

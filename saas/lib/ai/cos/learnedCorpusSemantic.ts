@@ -5,7 +5,7 @@
 type ServiceDb = NonNullable<Awaited<ReturnType<typeof import('@/lib/cos-core/storage/supabase')['cosServiceDb']>>>
 
 const REJECTED_PREFIX = 'relevance_rejected:'
-const ELIGIBLE_PENDING_FILTER = `fact_extraction_error.is.null,fact_extraction_error.not.ilike.${REJECTED_PREFIX}%`
+const ELIGIBLE_FILTER = `fact_extraction_error.is.null,fact_extraction_error.not.ilike.${REJECTED_PREFIX}%`
 
 async function serviceDb(): Promise<ServiceDb | null> {
   const { cosServiceDb } = await import('@/lib/cos-core/storage/supabase')
@@ -51,6 +51,14 @@ export type LearnedCorpusBackfillResult = {
   error?: string
 }
 
+export type LearnedCorpusEmbeddingStats = {
+  total: number | null
+  rejected: number | null
+  eligible: number | null
+  eligibleEmbedded: number | null
+  pending: number | null
+}
+
 /** The exact subject + summary + structured-facts projection used for local corpus embeddings. */
 export function learnedCorpusEmbeddingText(row: {
   subject?: unknown
@@ -89,15 +97,32 @@ export async function queryNearestLearnedCorpus(
   }))
 }
 
+/** Truthful learned-corpus embedding state. Total retained rows never doubles as the backlog. */
+export async function getLearnedCorpusEmbeddingStats(): Promise<LearnedCorpusEmbeddingStats> {
+  const db = await serviceDb()
+  if (!db) return { total: null, rejected: null, eligible: null, eligibleEmbedded: null, pending: null }
+
+  const [totalResult, rejectedResult, embeddedResult] = await Promise.all([
+    db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true }),
+    db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true }).ilike('fact_extraction_error', `${REJECTED_PREFIX}%`),
+    db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true }).not('embedding', 'is', null).or(ELIGIBLE_FILTER),
+  ])
+
+  if (totalResult.error || rejectedResult.error || embeddedResult.error) {
+    return { total: null, rejected: null, eligible: null, eligibleEmbedded: null, pending: null }
+  }
+
+  const total = totalResult.count ?? 0
+  const rejected = rejectedResult.count ?? 0
+  const eligible = Math.max(0, total - rejected)
+  const eligibleEmbedded = Math.max(0, Math.min(eligible, embeddedResult.count ?? 0))
+  const pending = Math.max(0, eligible - eligibleEmbedded)
+  return { total, rejected, eligible, eligibleEmbedded, pending }
+}
+
 /** Number of useful retained rows still missing an embedding. Quarantined rows do not count. */
 export async function countPendingLearnedCorpusEmbeddings(): Promise<number | null> {
-  const db = await serviceDb()
-  if (!db) return null
-  const pending = await db.from('cos_continuous_learning')
-    .select('content_hash', { count: 'exact', head: true })
-    .is('embedding', null)
-    .or(ELIGIBLE_PENDING_FILTER)
-  return pending.error ? null : pending.count ?? 0
+  return (await getLearnedCorpusEmbeddingStats()).pending
 }
 
 /** Best-effort embed-on-write for one accepted corpus row. */
@@ -137,7 +162,7 @@ export async function backfillLearnedCorpusEmbeddings(limit = 4): Promise<Learne
   const pending = await db.from('cos_continuous_learning')
     .select('content_hash,subject,summary,facts,confidence,fact_extraction_error')
     .is('embedding', null)
-    .or(ELIGIBLE_PENDING_FILTER)
+    .or(ELIGIBLE_FILTER)
     .order('confidence', { ascending: false })
     .order('observed_at', { ascending: false })
     .limit(requested)

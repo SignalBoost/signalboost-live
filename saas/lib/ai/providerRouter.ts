@@ -13,7 +13,12 @@ export interface ModelCallArgs {
   systemPrompt?: string
 }
 
-type ProviderResult = { text: string; provider: Exclude<ModelProvider, 'local'>; model: string }
+type ProviderResult = { text: string; provider: ModelProvider; model: string }
+
+export type ProviderExecutionResult = ProviderResult & {
+  requestedProvider: ModelProvider
+  fallbackUsed: boolean
+}
 
 function modelForProvider(provider: ModelProvider): string {
   if (provider === 'openai') return process.env.OPENAI_FALLBACK_MODEL?.trim() || 'gpt-4o-mini'
@@ -145,7 +150,7 @@ async function callExternalChain(args: ModelCallArgs, preference: Exclude<ModelP
   return null
 }
 
-async function callLocal(args: ModelCallArgs): Promise<{ text: string; provider: ModelProvider; model: string } | null> {
+async function callLocal(args: ModelCallArgs): Promise<ProviderResult | null> {
   const result = await callLocalModel(args)
   if (result) return { text: result, provider: 'local', model: modelForProvider('local') }
 
@@ -191,8 +196,8 @@ async function logAiTask(args: {
   }
 }
 
-/** Raw compute execution. Never call from a Portable or feature route. */
-export async function callProviderModel(args: ModelCallArgs): Promise<string | null> {
+/** Raw compute execution with truthful provider/model metadata. */
+export async function callProviderModelDetailed(args: ModelCallArgs): Promise<ProviderExecutionResult | null> {
   const preference = args.modelPreference ?? providerFromEnvironment() ?? 'claude'
   const startedAt = Date.now()
 
@@ -206,12 +211,13 @@ export async function callProviderModel(args: ModelCallArgs): Promise<string | n
     : await callExternalChain(args, preference)
 
   const actualProvider = result?.provider ?? preference
+  const fallbackUsed = Boolean(result && actualProvider !== preference)
   await logAiTask({
     taskType: args.systemPrompt ? 'system_prompt_call' : 'model_call',
     provider: actualProvider,
-    status: result ? (actualProvider === preference ? 'success' : 'fallback') : 'error',
+    status: result ? (fallbackUsed ? 'fallback' : 'success') : 'error',
     durationMs: Date.now() - startedAt,
-    fallbackUsed: Boolean(result && actualProvider !== preference),
+    fallbackUsed,
     metadata: {
       maxTokens: args.maxTokens ?? 2048,
       promptLength: args.prompt.length,
@@ -221,5 +227,10 @@ export async function callProviderModel(args: ModelCallArgs): Promise<string | n
     },
   })
 
-  return result?.text ?? null
+  return result ? { ...result, requestedProvider: preference, fallbackUsed } : null
+}
+
+/** Raw compute execution. Never call from a Portable or feature route. */
+export async function callProviderModel(args: ModelCallArgs): Promise<string | null> {
+  return (await callProviderModelDetailed(args))?.text ?? null
 }

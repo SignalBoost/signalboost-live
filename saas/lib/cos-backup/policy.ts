@@ -10,6 +10,10 @@ export type BackupCosAnswer = {
   proposedTool: string | null
   confidence: number
   brainDigest: string
+  provider?: string | null
+  model?: string | null
+  reasoningSource?: 'provider' | 'cache' | 'configured_reasoner' | null
+  externalAiInvoked?: boolean
 }
 
 export type PrimaryCosSnapshot = {

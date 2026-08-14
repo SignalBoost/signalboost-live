@@ -105,7 +105,7 @@ function recordAvoidedCost(source:'semantic_similarity'|'exact_cache'|'local_rea
 
 function queryTerms(prompt:string):string[]{return relevanceTerms(prompt).slice(0,12)}
 function subjectFromPrompt(prompt:string):string{return nearestFoundationalSubject(prompt)||queryTerms(prompt).slice(0,4).join(' ')||'general reasoning'}
-function safeText(value:unknown,max=1200):string{return String(value??'').replace(/\s+/g,' ').trim().slice(0,max)}
+function safeText(value:unknown,max=1200):string{const raw=typeof value==='string'?value:(value&&typeof value==='object'?JSON.stringify(value):String(value??''));return raw.replace(/\s+/g,' ').trim().slice(0,max)}
 function organizationMemoryCitationCount(answer:string):number{const seen=new Set<number>();for(const match of String(answer??'').matchAll(/\[OEM(\d{1,2})\]/g)){const index=Number(match[1]);if(Number.isInteger(index)&&index>0)seen.add(index)}return seen.size}
 function rejectedLearningRow(row:any):boolean{return String(row?.fact_extraction_error??'').trim().toLowerCase().startsWith('relevance_rejected:')}
 

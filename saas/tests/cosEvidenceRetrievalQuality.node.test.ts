@@ -27,3 +27,10 @@ test('COS primary filters rejected corpus rows and semantically gates Enterprise
   assert.match(source, /directly supports a factual claim you make, use and cite it/)
   assert.match(source, /neq\('predicate','excluded_from_cos_retrieval'\)/)
 })
+
+test('structured learned facts are serialized instead of degrading to object placeholders', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(source, /value&&typeof value==='object'\?JSON\.stringify\(value\)/)
+  assert.match(source, /r\.facts\.slice\(0,6\)\.map\(\(f:unknown\)=>safeText\(f,400\)\)/)
+  assert.match(source, /r\.facts\.slice\(0,4\)\.map\(\(f:unknown\)=>safeText\(f,300\)\)/)
+})

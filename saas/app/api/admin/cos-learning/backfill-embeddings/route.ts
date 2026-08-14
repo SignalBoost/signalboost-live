@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
-import { backfillLearnedCorpusEmbeddings } from '@/lib/ai/cos/learnedCorpusSemantic'
+import {
+  backfillLearnedCorpusEmbeddings,
+  countPendingLearnedCorpusEmbeddings,
+} from '@/lib/ai/cos/learnedCorpusSemantic'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,23 +14,12 @@ export const maxDuration = 300
 const BATCH_SIZE = 8
 const MAX_BATCHES = 12
 
-async function remainingCount(): Promise<number | null> {
-  const db = cosServiceDb()
-  if (!db) return null
-  const result = await db
-    .from('cos_continuous_learning')
-    .select('content_hash', { count: 'exact', head: true })
-    .is('embedding', null)
-  if (result.error) throw result.error
-  return result.count ?? 0
-}
-
 export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
 
   try {
-    return NextResponse.json({ ok: true, remaining: await remainingCount(), batchSize: BATCH_SIZE })
+    return NextResponse.json({ ok: true, remaining: await countPendingLearnedCorpusEmbeddings(), batchSize: BATCH_SIZE })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : 'Unable to read learned-corpus embedding backlog.' },
@@ -67,7 +58,7 @@ export async function POST() {
       if (result.embedded === 0) break
     }
 
-    if (remaining == null) remaining = await remainingCount()
+    if (remaining == null) remaining = await countPendingLearnedCorpusEmbeddings()
 
     return NextResponse.json({
       ok: true,

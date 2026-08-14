@@ -7,7 +7,7 @@ import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
-import { rankContextCandidates } from '@/lib/ai/cos/contextRelevance'
+import { rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
@@ -58,7 +58,6 @@ export type COSProvenance = {
   }
 }
 
-const STOP_WORDS=new Set(['about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why'])
 const CACHE_TTL_MS=24*60*60*1000
 
 type CachedAnswerOrigin={
@@ -79,7 +78,7 @@ function semanticThreshold():number{const value=Number(process.env.COS_SEMANTIC_
 function knowledgeFactSimilarityThreshold():number{const value=Number(process.env.COS_KNOWLEDGE_FACT_SIMILARITY_THRESHOLD||'0.55');return Number.isFinite(value)?Math.max(.25,Math.min(.95,value)):.55}
 function learnedContextSimilarityThreshold():number{const value=Number(process.env.COS_LEARNED_CONTEXT_SIMILARITY_THRESHOLD||'0.45');return Number.isFinite(value)?Math.max(.20,Math.min(.95,value)):.45}
 function userMemorySimilarityThreshold():number{const value=Number(process.env.COS_USER_MEMORY_SIMILARITY_THRESHOLD||'0.52');return Number.isFinite(value)?Math.max(.20,Math.min(.95,value)):.52}
-function enterpriseMemoryLexicalThreshold():number{const value=Number(process.env.COS_ENTERPRISE_MEMORY_LEXICAL_THRESHOLD||'0.16');return Number.isFinite(value)?Math.max(.08,Math.min(.8,value)):.16}
+function enterpriseMemorySimilarityThreshold():number{const value=Number(process.env.COS_ENTERPRISE_MEMORY_SIMILARITY_THRESHOLD||'0.52');return Number.isFinite(value)?Math.max(.30,Math.min(.95,value)):.52}
 function knowledgeFactRetrievalBudgetMs():number{const value=Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS||'5000');return Number.isFinite(value)?Math.max(500,Math.min(15000,value)):5000}
 function answerPolicyVersion():string{return cosAnswerPolicyVersion({reasonerSystemPrompt:COS_REASONER_SYSTEM_PROMPT('English'),model:process.env.LOCAL_AI_MODEL?.trim()||null,threshold:threshold()})}
 
@@ -104,11 +103,11 @@ let roiSinkInstance:SupabaseAIROIMetricsSink|null|undefined
 function roiSink():SupabaseAIROIMetricsSink|null{if(roiSinkInstance!==undefined)return roiSinkInstance;const db=cosServiceDb();roiSinkInstance=db?new SupabaseAIROIMetricsSink(db):null;return roiSinkInstance}
 function recordAvoidedCost(source:'semantic_similarity'|'exact_cache'|'local_reasoner',promptChars:number,replyChars:number,latencyMs:number):void{const sink=roiSink();if(!sink)return;void sink.record({taskId:'cos-first-answer',source,providerCalls:0,estimatedProviderCostUsd:0,estimatedCostAvoidedUsd:estimateAvoidedProviderCostUsd(promptChars,replyChars),promptCharactersBefore:promptChars,promptCharactersAfter:promptChars,latencyMs}).catch(error=>console.error('cosFirstAnswer: ROI recording failed',error))}
 
-function queryTerms(prompt:string):string[]{return[...new Set(prompt.toLowerCase().replace(/[^a-z0-9\s_-]/g,' ').split(/\s+/).map(p=>p.trim()).filter(p=>p.length>=4&&!STOP_WORDS.has(p)))].slice(0,6)}
+function queryTerms(prompt:string):string[]{return relevanceTerms(prompt).slice(0,12)}
 function subjectFromPrompt(prompt:string):string{return nearestFoundationalSubject(prompt)||queryTerms(prompt).slice(0,4).join(' ')||'general reasoning'}
 function safeText(value:unknown,max=1200):string{return String(value??'').replace(/\s+/g,' ').trim().slice(0,max)}
 function organizationMemoryCitationCount(answer:string):number{const seen=new Set<number>();for(const match of String(answer??'').matchAll(/\[OEM(\d{1,2})\]/g)){const index=Number(match[1]);if(Number.isInteger(index)&&index>0)seen.add(index)}return seen.size}
-function lexicalRelevance(prompt:string,value:unknown):number{const terms=queryTerms(prompt);if(!terms.length)return 0;const haystack=safeText(typeof value==='string'?value:JSON.stringify(value),4000).toLowerCase();const hits=terms.filter(term=>haystack.includes(term)).length;return hits/terms.length}
+function rejectedLearningRow(row:any):boolean{return String(row?.fact_extraction_error??'').trim().toLowerCase().startsWith('relevance_rejected:')}
 
 export function COS_REASONER_SYSTEM_PROMPT(language:string):string{return[
   "You are COS, SignalBoost's independent PRIMARY reasoning layer.",'Reason from the question, your own model knowledge, and any supplied internal evidence.','',
@@ -122,7 +121,8 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string{return[
   'CITING INTERNAL EVIDENCE:',
   '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill. Cite a label inline only when it genuinely informed the answer.',
   '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
-  '- NEVER cite an item that did not change what you wrote. An honest answer with zero citations is correct when supplied evidence was not useful.','',
+  '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge.',
+  '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.','',
   'HONESTY:','- Distinguish evidence from inference. Never invent sources, numbers or telemetry.','- If you cannot name specific observables, say so plainly and set confidence low.','',
   `Reply in ${language}.`,'Return ONLY strict JSON, nothing before the opening brace and nothing after the closing brace: {"answer":"complete answer","confidence":0.0}.',
 ].join('\n')}
@@ -141,12 +141,31 @@ async function retrieveInternalContext(prompt:string,userId?:string|null,privile
 
   if(db){
     systems.push('Knowledge Graph','Continuous Learning Corpus')
-    const learnedPromise=terms.length?db.from('cos_continuous_learning').select('subject,summary,facts,confidence,source_kind,source_uri,observed_at').or(terms.flatMap(t=>[`subject.ilike.%${t}%`,`summary.ilike.%${t}%`]).join(',')).order('confidence',{ascending:false}).order('observed_at',{ascending:false}).order('source_uri',{ascending:true}).limit(24):Promise.resolve({data:[],error:null})
+    const learnedPromise=terms.length
+      ? db.from('cos_continuous_learning').select('subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error').or(terms.flatMap(t=>[`subject.ilike.%${t}%`,`summary.ilike.%${t}%`]).join(',')).order('confidence',{ascending:false}).order('observed_at',{ascending:false}).order('source_uri',{ascending:true}).limit(128)
+      : Promise.resolve({data:[],error:null})
     const [semanticResult,learnedResult]=await Promise.allSettled([semanticKnowledgeFacts(prompt,db),learnedPromise])
     const semanticRows=semanticResult.status==='fulfilled'?semanticResult.value:null
-    if(semanticRows!==null){funnel.knowledgeGraph.retrieved=semanticRows.length;const relevant=semanticRows.filter(r=>Number(r.similarityScore||0)>=knowledgeFactSimilarityThreshold());funnel.knowledgeGraph.relevant=relevant.length;const selected=relevant.slice(0,16);funnel.knowledgeGraph.selected=selected.length;for(const r of selected)facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; similarity ${Number(r.similarityScore||0).toFixed(2)}; source ${safeText(r.source,180)}]`)}
-    else if(terms.length){const factFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`predicate.ilike.%${t}%`,`object.ilike.%${t}%`]).join(','),fr=await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at').or(factFilters).order('confidence',{ascending:false}).order('updated_at',{ascending:false}).order('subject',{ascending:true}).limit(32);if(!fr.error){const rows=fr.data??[];funnel.knowledgeGraph.retrieved=rows.length;funnel.knowledgeGraph.relevant=rows.length;const selected=rows.slice(0,16);funnel.knowledgeGraph.selected=selected.length;for(const r of selected)facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; source ${safeText(r.source,180)}]`)}}
-    if(learnedResult.status==='fulfilled'&&!learnedResult.value.error){const rows=learnedResult.value.data??[],candidates=rows.map(r=>({item:r,text:[safeText(r.subject,240),safeText(r.summary,1200),Array.isArray(r.facts)?r.facts.slice(0,6).map((f:unknown)=>safeText(f,400)).join(' '):''].filter(Boolean).join(' ')})),ranked=await rankContextCandidates(prompt,candidates,{threshold:learnedContextSimilarityThreshold(),limit:candidates.length});funnel.learnedCorpus.retrieved=rows.length;funnel.learnedCorpus.relevant=ranked.relevant.length;const selected=ranked.relevant.slice(0,6);funnel.learnedCorpus.selected=selected.length;if(ranked.mode==='semantic'&&rows.length)systems.push('Continuous Learning semantic relevance');for(const candidate of selected){const r=candidate.item,ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):'';learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`)}}
+    if(semanticRows!==null){
+      funnel.knowledgeGraph.retrieved=semanticRows.length
+      const relevant=semanticRows.filter(r=>r.predicate!=='excluded_from_cos_retrieval'&&Number(r.similarityScore||0)>=knowledgeFactSimilarityThreshold())
+      funnel.knowledgeGraph.relevant=relevant.length
+      const selected=relevant.slice(0,16);funnel.knowledgeGraph.selected=selected.length
+      for(const r of selected)facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; similarity ${Number(r.similarityScore||0).toFixed(2)}; source ${safeText(r.source,180)}]`)
+    }else if(terms.length){
+      const factFilters=terms.flatMap(t=>[`subject.ilike.%${t}%`,`predicate.ilike.%${t}%`,`object.ilike.%${t}%`]).join(',')
+      const fr=await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at').neq('predicate','excluded_from_cos_retrieval').or(factFilters).order('confidence',{ascending:false}).order('updated_at',{ascending:false}).order('subject',{ascending:true}).limit(64)
+      if(!fr.error){const rows=fr.data??[];funnel.knowledgeGraph.retrieved=rows.length;funnel.knowledgeGraph.relevant=rows.length;const selected=rows.slice(0,16);funnel.knowledgeGraph.selected=selected.length;for(const r of selected)facts.push(`[KG${facts.length+1}] ${safeText(r.subject,180)} — ${safeText(r.predicate,120)} — ${safeText(r.object,600)} [confidence ${Number(r.confidence||0).toFixed(2)}; source ${safeText(r.source,180)}]`)}
+    }
+    if(learnedResult.status==='fulfilled'&&!learnedResult.value.error){
+      const rows=(learnedResult.value.data??[]).filter(row=>!rejectedLearningRow(row))
+      const candidates=rows.map(r=>({item:r,text:[safeText(r.subject,240),safeText(r.summary,1200),Array.isArray(r.facts)?r.facts.slice(0,6).map((f:unknown)=>safeText(f,400)).join(' '):''].filter(Boolean).join(' ')}))
+      const ranked=await rankContextCandidates(prompt,candidates,{threshold:learnedContextSimilarityThreshold(),limit:candidates.length})
+      funnel.learnedCorpus.retrieved=rows.length;funnel.learnedCorpus.relevant=ranked.relevant.length
+      const selected=ranked.relevant.slice(0,6);funnel.learnedCorpus.selected=selected.length
+      if(ranked.mode==='semantic'&&rows.length)systems.push('Continuous Learning semantic relevance')
+      for(const candidate of selected){const r=candidate.item,ef=Array.isArray(r.facts)?r.facts.slice(0,4).map((f:unknown)=>safeText(f,300)).join('; '):'';learned.push(`[CL${learned.length+1}] ${safeText(r.subject,180)}: ${safeText(r.summary,800)}${ef?` Facts: ${ef}`:''} [confidence ${Number(r.confidence||0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(r.source_kind,80)} ${safeText(r.source_uri,280)}]`)}
+    }
   }
 
   const scopeResolution=await resolveCosEnterpriseMemoryScope({privileged}).catch(()=>({scope:null,status:'lookup_failed' as const}))
@@ -156,16 +175,29 @@ async function retrieveInternalContext(prompt:string,userId?:string|null,privile
     try{
       const context=await retrieveEnterpriseMemoryContext({organizationId:scopeResolution.scope.organizationId,workspace:scopeResolution.scope.workspace,taskTags:terms,limit:12})
       const rows=context?.memories??[];funnel.enterpriseMemory.retrieved=rows.length
-      const scored=rows.map(item=>({item,relevance:lexicalRelevance(prompt,{kind:item.kind,workspace:item.workspace,tags:item.taskTags,payload:item.payload})})).filter(x=>x.relevance>=enterpriseMemoryLexicalThreshold()).sort((a,b)=>b.relevance-a.relevance||b.item.score-a.item.score)
-      funnel.enterpriseMemory.relevant=scored.length;const selected=scored.slice(0,4);funnel.enterpriseMemory.selected=selected.length
+      const candidates=rows.map(item=>({item,text:[safeText(item.kind,80),safeText(item.workspace,120),(item.taskTags??[]).join(' '),safeText(JSON.stringify(item.payload),2400)].filter(Boolean).join(' ')}))
+      const ranked=await rankContextCandidates(prompt,candidates,{threshold:enterpriseMemorySimilarityThreshold(),limit:candidates.length})
+      funnel.enterpriseMemory.relevant=ranked.relevant.length
+      const selected=ranked.relevant.slice(0,4);funnel.enterpriseMemory.selected=selected.length
+      if(ranked.mode==='semantic'&&rows.length)systems.push('Enterprise Memory semantic relevance')
       enterpriseMemoryStatus=rows.length?(selected.length?'connected':'scoped_no_relevant_memory'):'scoped_no_memory'
-      for(const entry of selected){const item=entry.item;enterpriseMemories.push(`[OEM${enterpriseMemories.length+1}] [organization ${scopeResolution.scope.organizationId}; ${safeText(item.kind,60)}${item.workspace?`; workspace ${safeText(item.workspace,80)}`:''}] ${safeText(JSON.stringify(item.payload),850)} [confidence ${Number(item.confidence||0).toFixed(2)}; retrieval_score ${Number(item.score||0).toFixed(2)}; relevance ${entry.relevance.toFixed(2)}]`)}
+      for(const candidate of selected){const item=candidate.item;enterpriseMemories.push(`[OEM${enterpriseMemories.length+1}] [organization ${scopeResolution.scope.organizationId}; ${safeText(item.kind,60)}${item.workspace?`; workspace ${safeText(item.workspace,80)}`:''}] ${safeText(JSON.stringify(item.payload),850)} [confidence ${Number(item.confidence||0).toFixed(2)}; retrieval_score ${Number(item.score||0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}]`)}
     }catch(error){enterpriseMemoryStatus='retrieval_error';console.warn('[cos-enterprise-memory] retrieval failed',error)}
   }
 
-  if(userId){systems.push('Saved User Memory');const loaded=await loadUserMemories(userId).catch(()=>[]),candidates=loaded.map(item=>({item,text:`${safeText(item.kind,80)} ${safeText(item.content,1000)}`})),ranked=await rankContextCandidates(prompt,candidates,{threshold:userMemorySimilarityThreshold(),limit:candidates.length});funnel.userMemory.retrieved=loaded.length;funnel.userMemory.relevant=ranked.relevant.length;const selected=ranked.relevant.slice(0,4);funnel.userMemory.selected=selected.length;if(ranked.mode==='semantic'&&loaded.length)systems.push('User memory semantic relevance');for(const candidate of selected){const item=candidate.item;memories.push(`[EM${memories.length+1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)}}
+  if(userId){
+    systems.push('Saved User Memory')
+    const loaded=await loadUserMemories(userId).catch(()=>[]),candidates=loaded.map(item=>({item,text:`${safeText(item.kind,80)} ${safeText(item.content,1000)}`})),ranked=await rankContextCandidates(prompt,candidates,{threshold:userMemorySimilarityThreshold(),limit:candidates.length})
+    funnel.userMemory.retrieved=loaded.length;funnel.userMemory.relevant=ranked.relevant.length
+    const selected=ranked.relevant.slice(0,4);funnel.userMemory.selected=selected.length
+    if(ranked.mode==='semantic'&&loaded.length)systems.push('User memory semantic relevance')
+    for(const candidate of selected){const item=candidate.item;memories.push(`[EM${memories.length+1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)}
+  }
 
-  const cognitive=await retrieveValidatedCognitiveSkills(prompt).catch(error=>{console.warn('[cos-cognitive-skill-context] ranking failed',error);return{retrieved:0,relevant:0,selected:0,items:[]}});funnel.cognitiveSkills={retrieved:cognitive.retrieved,relevant:cognitive.relevant,selected:cognitive.selected};if(cognitive.retrieved>0)systems.push('Validated Cognitive Skills');for(const item of cognitive.items){skills.push(item.line);skillIds.push(item.id)}
+  const cognitive=await retrieveValidatedCognitiveSkills(prompt).catch(error=>{console.warn('[cos-cognitive-skill-context] ranking failed',error);return{retrieved:0,relevant:0,selected:0,items:[]}})
+  funnel.cognitiveSkills={retrieved:cognitive.retrieved,relevant:cognitive.relevant,selected:cognitive.selected}
+  if(cognitive.retrieved>0)systems.push('Validated Cognitive Skills')
+  for(const item of cognitive.items){skills.push(item.line);skillIds.push(item.id)}
   return{systems:[...new Set(systems)],facts,learned,enterpriseMemories,memories,skills,skillIds,enterpriseMemoryStatus,enterpriseMemoryOrganizationId,funnel}
 }
 
@@ -181,7 +213,6 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const contextWindow=[...context.facts,...context.learned,...context.enterpriseMemories,...context.skills].join('\n'),scopedMemorySelected=context.enterpriseMemories.length>0||context.memories.length>0
   const policyVersion=answerPolicyVersion(),cacheTaskId=cosCacheTaskId('cos-first-answer',policyVersion),cacheMaxAgeMs=cosCacheMaxAgeMs(),knowledge=semanticKnowledgeLayer()
 
-  // Never let a global semantic answer outrank scoped memory that is relevant on this turn.
   if(knowledge&&!scopedMemorySelected){const nearest=await knowledge.lookupSemanticCache(cacheTaskId,input.prompt,contextWindow);if(nearest){const payload=nearest.responsePayload as CachedCosAnswer|null,current=cachedAnswerIsCurrent(payload,policyVersion,cacheMaxAgeMs);if(payload?.reply&&!current.ok)console.warn('cosFirstAnswer: semantic cache entry refused as stale',{reason:current.reason,similarity:nearest.similarityScore});if(payload?.reply&&current.ok&&payload.confidence>=threshold()){recordAvoidedCost('semantic_similarity',input.prompt.length,payload.reply.length,Date.now()-startedAt);return{handled:true,reply:payload.reply,confidence:payload.confidence,provenance:cacheHitProvenance(payload,base,'semantic_similarity',nearest.similarityScore)}}}}
 
   const cacheKey=createExactCacheKey({taskId:cacheTaskId,prompt:input.prompt,contextFingerprint:contextFingerprint(context),policyVersion,knowledgeVersion:null}),cached=await readCachedAnswer(cacheKey),cachedCurrent=cachedAnswerIsCurrent(cached,policyVersion,cacheMaxAgeMs)
@@ -190,7 +221,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if(process.env.COS_LOCAL_FIRST_ENABLED==='false'){const reason='COS-first answering is disabled by COS_LOCAL_FIRST_ENABLED.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...base}}}
   const resolved=resolveCosReasoner();if(!resolved.config){const reason='reason'in resolved?resolved.reason:'Independent COS reasoner is not configured.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...base}}}
 
-  const internalContext=[context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',context.enterpriseMemories.length?`ORGANIZATION ENTERPRISE MEMORY:\n${context.enterpriseMemories.join('\n')}`:'',context.memories.length?`SAVED USER MEMORY:\n${context.memories.join('\n')}`:'',context.skills.length?`VALIDATED COGNITIVE PROCEDURAL SKILLS (HOW-TO GUIDANCE, NOT FACTUAL EVIDENCE):\n${context.skills.join('\n')}`:''].filter(Boolean).join('\n\n')
+  const internalContext=[
+    context.skills.length?`VALIDATED COGNITIVE PROCEDURAL SKILLS (HOW-TO GUIDANCE, NOT FACTUAL EVIDENCE):\n${context.skills.join('\n')}`:'',
+    context.memories.length?`SAVED USER MEMORY:\n${context.memories.join('\n')}`:'',
+    context.facts.length?`KNOWLEDGE GRAPH FACTS:\n${context.facts.join('\n')}`:'',
+    context.learned.length?`CONTINUOUS LEARNING CORPUS:\n${context.learned.join('\n')}`:'',
+    context.enterpriseMemories.length?`ORGANIZATION ENTERPRISE MEMORY:\n${context.enterpriseMemories.join('\n')}`:'',
+  ].filter(Boolean).join('\n\n')
   const reasoned=await callCosReasoner({temperature:Number(process.env.COS_REASONER_TEMPERATURE??'0'),maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS||'6000'),systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language||'English'),prompt:`${internalContext||'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`}).catch(()=>null)
   const reasoningProvenance={...base,localModelInvoked:true,reasonerLabel:reasoned?.reasoner.label??resolved.config.label,evidenceFunnel:executionFunnel(context,true),cognitiveSkillFunnel:executionSkillFunnel(context,true)}
   if(!reasoned?.text){const reason='Independent COS inference did not return an answer.';void recordKnowledgeGap(input.prompt,0,reason);return{handled:false,confidence:0,reason,provenance:{responseSource:'external_fallback_required',...reasoningProvenance}}}

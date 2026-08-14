@@ -16,6 +16,7 @@ import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } 
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { maybeBuildCognitiveCouncilAdvisory } from '@/lib/ai/cos/cognitiveCouncil'
 
 export type CosReasonerKind = 'independent-local'
 
@@ -103,6 +104,11 @@ function buildSkillCitationRepairPrompt(originalPrompt: string, originalAnswer: 
   ].join('\n')
 }
 
+function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
+  if (process.env.COS_COUNCIL_ENABLED === 'false') return false
+  return String(args.systemPrompt ?? '').includes("SignalBoost's independent PRIMARY reasoning layer")
+}
+
 /**
  * Ask COS's independent reasoner. Success means the LOCAL_AI_* path actually answered.
  * If unavailable or unhealthy, callers fail closed and may separately invoke the
@@ -123,21 +129,47 @@ export async function callCosReasoner(
   }
   const inference = localInferenceConfigFromEnv()
   await touchRunpodActivityLease('qwen_reasoning')
-  const first = await callLocalModel(args, inference).catch(() => null)
+
+  let effectiveArgs = args
+  if (primaryCouncilEligible(args)) {
+    const council = await maybeBuildCognitiveCouncilAdvisory({
+      prompt: args.prompt,
+      reasonerLabel: config.label,
+    }).catch(error => {
+      console.warn('[cos-council] advisory failed closed', error instanceof Error ? error.message : String(error))
+      return null
+    })
+    if (council?.advisory) {
+      effectiveArgs = {
+        ...args,
+        prompt: `${args.prompt}\n\n${council.advisory}`,
+      }
+      console.info('[cos-council]', JSON.stringify({
+        at: new Date().toISOString(),
+        sessionId: council.sessionId,
+        problemClass: council.problemClass,
+        triggerReasons: council.trigger.reasons,
+        roles: council.opinions.map(opinion => opinion.role),
+        opinions: council.opinions.length,
+      }))
+    }
+  }
+
+  const first = await callLocalModel(effectiveArgs, inference).catch(() => null)
   if (!first) return null
 
   let text = first
-  if (reasonerDraftNeedsRepair(args.prompt, first)) {
+  if (reasonerDraftNeedsRepair(effectiveArgs.prompt, first)) {
     const repaired = await callLocalModel(
       {
-        ...args,
+        ...effectiveArgs,
         temperature: 0,
-        prompt: buildDiagnosticRepairPrompt(args.prompt, first),
+        prompt: buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
       },
       inference,
     ).catch(() => null)
 
-    if (repaired && preferRepairedDraft(args.prompt, first, repaired)) {
+    if (repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired)) {
       console.info('[cos-local-quality-repair]', JSON.stringify({
         at: new Date().toISOString(),
         reasoner: config.label,
@@ -153,15 +185,15 @@ export async function callCosReasoner(
     }
   }
 
-  const allowedSkillTags = skillCitationTags(args.prompt)
+  const allowedSkillTags = skillCitationTags(effectiveArgs.prompt)
   const parsed = parseLocalResult(text)
-  if (parsed && skillCitationRepairNeeded(args.prompt, parsed.answer)) {
+  if (parsed && skillCitationRepairNeeded(effectiveArgs.prompt, parsed.answer)) {
     const audited = await callLocalModel(
       {
-        ...args,
+        ...effectiveArgs,
         temperature: 0,
-        maxTokens: Math.max(2048, Math.min(Number(args.maxTokens ?? 4096), 6000)),
-        prompt: buildSkillCitationRepairPrompt(args.prompt, parsed.answer, allowedSkillTags),
+        maxTokens: Math.max(2048, Math.min(Number(effectiveArgs.maxTokens ?? 4096), 6000)),
+        prompt: buildSkillCitationRepairPrompt(effectiveArgs.prompt, parsed.answer, allowedSkillTags),
       },
       inference,
     ).catch(() => null)

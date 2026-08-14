@@ -5,6 +5,7 @@ import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import {
   backfillLearnedCorpusEmbeddings,
   countPendingLearnedCorpusEmbeddings,
+  getLearnedCorpusEmbeddingStats,
 } from '@/lib/ai/cos/learnedCorpusSemantic'
 
 export const runtime = 'nodejs'
@@ -16,10 +17,11 @@ const MAX_BATCHES = 12
 
 export async function GET() {
   const guard = await requireOwner()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error, authRequired: guard.status === 401 }, { status: guard.status })
 
   try {
-    return NextResponse.json({ ok: true, remaining: await countPendingLearnedCorpusEmbeddings(), batchSize: BATCH_SIZE })
+    const stats = await getLearnedCorpusEmbeddingStats()
+    return NextResponse.json({ ok: true, ...stats, remaining: stats.pending, batchSize: BATCH_SIZE })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : 'Unable to read learned-corpus embedding backlog.' },
@@ -30,7 +32,7 @@ export async function GET() {
 
 export async function POST() {
   const guard = await requireOwner()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error, authRequired: guard.status === 401 }, { status: guard.status })
 
   const startedAt = Date.now()
   let attempted = 0
@@ -59,14 +61,16 @@ export async function POST() {
     }
 
     if (remaining == null) remaining = await countPendingLearnedCorpusEmbeddings()
+    const stats = await getLearnedCorpusEmbeddingStats()
 
     return NextResponse.json({
       ok: true,
-      completed: remaining === 0,
+      completed: stats.pending === 0,
       attempted,
       embedded,
       failed,
-      remaining,
+      ...stats,
+      remaining: stats.pending ?? remaining,
       batches,
       batchSize: BATCH_SIZE,
       durationMs: Date.now() - startedAt,

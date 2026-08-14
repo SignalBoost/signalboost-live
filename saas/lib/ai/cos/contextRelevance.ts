@@ -58,7 +58,7 @@ export function foundationalDomainMatches(text: string, limit = 2): Foundational
     .map(domain => {
       const subjectTerms = new Set(normalizedDomainTerms(domain.subject))
       const questionTerms = new Set(normalizedDomainTerms(domain.questions.join(' ')))
-      const score = wanted.reduce((total, term) => total + (subjectTerms.has(term) ? 3 : questionTerms.has(term) ? 1 : 0), 0)
+      const score = wanted.reduce((total, term) => total + (subjectTerms.has(term) ? 2 : questionTerms.has(term) ? 1 : 0), 0)
       return { id: domain.id, subject: domain.subject, score }
     })
     .filter(match => match.score >= 2)

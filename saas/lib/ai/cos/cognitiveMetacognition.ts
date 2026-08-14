@@ -81,8 +81,6 @@ export function assessSkillSelection(evidence: SkillSelectionEvidence): SkillSel
   reliability -= failurePenalty
   reliability = Math.max(0.35, Math.min(0.99, reliability))
 
-  // Semantic relevance remains primary, but verified historical evidence breaks ties and prevents a
-  // less reliable skill from winning only because its wording is marginally closer to the prompt.
   const historicalInfluence = Math.min(0.22, 0.10 + evidenceWeight * 0.06)
   const selectionScore = Math.max(0, Math.min(1, similarity * (1 - historicalInfluence) + reliability * historicalInfluence))
   if (!reasons.length) reasons.push('No production/retention history yet; selection relies primarily on held-out validation and semantic relevance.')
@@ -135,6 +133,11 @@ function capabilityKey(value: unknown): string {
   return normalized || 'general-reasoning'
 }
 
+function skillProblemClass(row: any): string {
+  const procedure = row?.procedure && typeof row.procedure === 'object' ? row.procedure : {}
+  return String(procedure.problemClass || row?.subject || 'general reasoning')
+}
+
 /**
  * Deterministically rebuild the durable capability map from current skills and unresolved learning
  * gaps. No model call is required; this is metacognitive bookkeeping over existing evidence.
@@ -145,7 +148,7 @@ export async function refreshMetacognitiveCapabilityMap(): Promise<{ refreshed: 
   if (!db) return { refreshed: 0, regions }
 
   const [skillsResult, gapsResult] = await Promise.all([
-    db.from('cos_cognitive_skills').select('subject,status,production_attempts,production_successes,retention_attempts,retention_successes,failure_count'),
+    db.from('cos_cognitive_skills').select('subject,procedure,status,production_attempts,production_successes,retention_attempts,retention_successes,failure_count'),
     db.from('cos_learning_gaps').select('capability,subject,status').in('status', ['pending', 'learning', 'failed']),
   ])
   if (skillsResult.error) throw skillsResult.error
@@ -159,7 +162,7 @@ export async function refreshMetacognitiveCapabilityMap(): Promise<{ refreshed: 
   }
 
   for (const row of skillsResult.data ?? []) {
-    const bucket = ensure((row as any).subject)
+    const bucket = ensure(skillProblemClass(row))
     const status = String((row as any).status)
     if (status === 'validated' || status === 'learned' || status === 'mastered') bucket.evidence.strongSkills += 1
     if (status === 'weakened') bucket.evidence.weakenedSkills += 1
@@ -171,7 +174,8 @@ export async function refreshMetacognitiveCapabilityMap(): Promise<{ refreshed: 
     bucket.evidence.failureCount += Number((row as any).failure_count || 0)
   }
   for (const row of gapsResult.data ?? []) {
-    const bucket = ensure((row as any).capability || (row as any).subject)
+    // Gap subject describes the observed problem class more precisely than the broad capability tag.
+    const bucket = ensure((row as any).subject || (row as any).capability)
     bucket.evidence.unresolvedGaps += 1
   }
 

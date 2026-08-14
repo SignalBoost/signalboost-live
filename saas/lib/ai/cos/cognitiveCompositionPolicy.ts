@@ -39,6 +39,11 @@ export type CognitiveCompositionPromotionPolicy = {
   validationFreshnessDays: number
 }
 
+/**
+ * Composition promotion is intentionally harder than merely passing a task. A reusable composite
+ * procedure must outperform the strongest single member on independent transfer cases; otherwise
+ * COS has not demonstrated that composition adds capability.
+ */
 export const DEFAULT_COGNITIVE_COMPOSITION_POLICY: CognitiveCompositionPromotionPolicy = {
   minPracticeAttemptsForPracticed: 2,
   minPracticeRateForPracticed: 0.7,
@@ -99,6 +104,11 @@ function fresh(lastValidatedAt: string | null | undefined, days: number, nowMs: 
   return nowMs - parsed <= Math.max(1, days) * 86_400_000
 }
 
+/**
+ * Use multiple skills only when relevance is genuinely distributed. Retrieval has already applied
+ * the normal semantic floor; this check prevents a weak second skill from being attached merely to
+ * manufacture a "composition" claim.
+ */
 export function assessCognitiveCompositionOpportunity(
   similarities: number[],
   options: { maxRelevanceGap?: number; minSecondSimilarity?: number } = {},

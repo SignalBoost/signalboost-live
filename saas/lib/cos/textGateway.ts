@@ -1,12 +1,27 @@
 import { createHash } from 'node:crypto'
-import { callProviderModel, type ModelCallArgs } from '@/lib/ai/providerRouter'
+import { callProviderModelDetailed, type ModelCallArgs, type ModelProvider } from '@/lib/ai/providerRouter'
 import { cosServiceDb } from '@/lib/cos-core/storage'
 
 export type CosTextGatewayInput = ModelCallArgs & {
   taskId?: string
 }
 
-type StoredText = { text?: string }
+export type CosTextGatewayResult = {
+  text: string
+  provider: ModelProvider | null
+  model: string | null
+  requestedProvider: ModelProvider | null
+  fallbackUsed: boolean
+  source: 'provider' | 'cache'
+}
+
+type StoredText = {
+  text?: string
+  provider?: ModelProvider
+  model?: string
+  requestedProvider?: ModelProvider
+  fallbackUsed?: boolean
+}
 
 function cacheIdentity(input: CosTextGatewayInput) {
   const stable = JSON.stringify({
@@ -19,7 +34,7 @@ function cacheIdentity(input: CosTextGatewayInput) {
   return createHash('sha256').update(stable).digest('hex')
 }
 
-const inFlight = new Map<string, Promise<string | null>>()
+const inFlight = new Map<string, Promise<CosTextGatewayResult | null>>()
 
 /**
  * Compatibility gateway for SignalBoost text generation.
@@ -28,7 +43,7 @@ const inFlight = new Map<string, Promise<string | null>>()
  * share one in-flight promise. Raw provider execution is isolated behind providerRouter;
  * feature routes and Portables never need provider credentials or provider APIs.
  */
-export async function callCosText(input: CosTextGatewayInput): Promise<string | null> {
+export async function callCosTextDetailed(input: CosTextGatewayInput): Promise<CosTextGatewayResult | null> {
   const key = cacheIdentity(input)
   const existing = inFlight.get(key)
   if (existing) return existing
@@ -40,27 +55,49 @@ export async function callCosText(input: CosTextGatewayInput): Promise<string | 
         const { data, error } = await db.from('cos_text_cache').select('response_data').eq('cache_key', key).maybeSingle()
         if (!error) {
           const stored = data?.response_data as StoredText | undefined
-          if (stored?.text) return stored.text
+          if (stored?.text) {
+            return {
+              text: stored.text,
+              provider: stored.provider ?? null,
+              model: stored.model ?? null,
+              requestedProvider: stored.requestedProvider ?? null,
+              fallbackUsed: stored.fallbackUsed === true,
+              source: 'cache' as const,
+            }
+          }
         }
       } catch {
         // Cache is an optimization. Governed compute remains available.
       }
     }
 
-    const text = await callProviderModel(input)
-    if (text && db) {
+    const result = await callProviderModelDetailed(input)
+    if (result && db) {
       try {
         await db.from('cos_text_cache').upsert({
           cache_key: key,
           task_id: input.taskId ?? 'cos-text',
-          response_data: { text },
+          response_data: {
+            text: result.text,
+            provider: result.provider,
+            model: result.model,
+            requestedProvider: result.requestedProvider,
+            fallbackUsed: result.fallbackUsed,
+          },
           updated_at: new Date().toISOString(),
         })
       } catch {
         // Persistence failures never repeat or fail successful provider work.
       }
     }
-    return text
+    return result ? {
+      text: result.text,
+      provider: result.provider,
+      model: result.model,
+      requestedProvider: result.requestedProvider,
+      fallbackUsed: result.fallbackUsed,
+      source: 'provider' as const,
+    } : null
   })()
 
   inFlight.set(key, execution)
@@ -69,4 +106,8 @@ export async function callCosText(input: CosTextGatewayInput): Promise<string | 
   } finally {
     inFlight.delete(key)
   }
+}
+
+export async function callCosText(input: CosTextGatewayInput): Promise<string | null> {
+  return (await callCosTextDetailed(input))?.text ?? null
 }

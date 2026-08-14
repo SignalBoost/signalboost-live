@@ -31,13 +31,12 @@ function threshold(): number {
 
 function leafDependencies(row: any): string[] {
   const provenance = row?.provenance && typeof row.provenance === 'object' ? row.provenance : {}
-  return Array.isArray(provenance.leaf_member_skill_keys)
-    ? [...new Set(provenance.leaf_member_skill_keys.map((item: unknown) => safe(item, 240)).filter(Boolean))]
-    : []
+  const rawLeaves: unknown[] = Array.isArray(provenance.leaf_member_skill_keys) ? provenance.leaf_member_skill_keys : []
+  return [...new Set<string>(rawLeaves.map(item => safe(item, 240)).filter((item): item is string => Boolean(item)))]
 }
 
 async function dependencyHealth(rows: any[]): Promise<Map<string, boolean>> {
-  const allLeaves = [...new Set(rows.flatMap(leafDependencies))]
+  const allLeaves = [...new Set<string>(rows.flatMap(leafDependencies))]
   const health = new Map<string, boolean>()
   if (!allLeaves.length) return health
   const db = cosServiceDb()
@@ -66,7 +65,7 @@ async function dependencyHealth(rows: any[]): Promise<Map<string, boolean>> {
  * procedures. It never becomes factual corroboration and never increases answer confidence.
  */
 export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<CognitiveSkillContextResult> {
-  const empty = { retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] }
+  const empty: CognitiveSkillContextResult = { retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] }
   const db = cosServiceDb()
   if (!db) return empty
 

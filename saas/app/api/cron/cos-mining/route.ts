@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
+import { runCognitiveCompositionCycle } from '@/lib/ai/cos/cognitiveSkillComposition'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -33,12 +34,13 @@ export async function GET(req: NextRequest) {
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
   let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
+  let composition: Awaited<ReturnType<typeof runCognitiveCompositionCycle>> | { enabled: false; errors: string[] } | null = null
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
-    // Daily learning, transcript acquisition, skill practice, and consolidation are legitimate COS
-    // local-compute work. Lease + pre-warm the dedicated runtime once at the start of that bounded
-    // batch; the idle-stop cron releases the GPU again after the configured quiet period.
+    // Daily learning, transcript acquisition, skill practice, composition/transfer, and consolidation
+    // are legitimate COS local-compute work. Lease + pre-warm the dedicated runtime once for the
+    // bounded batch; the idle-stop cron releases the GPU after the configured quiet period.
     await touchRunpodActivityLease('daily_learning_batch')
     try {
       await ensureLocalInferenceRuntimeReady()
@@ -60,6 +62,17 @@ export async function GET(req: NextRequest) {
       const message = error instanceof Error ? error.message : 'Cognitive active learning failed'
       console.error('cron COS cognitive active learning failed:', message)
       cognitive = { enabled: false, errors: [message] }
+    }
+
+    // Composition runs only when at least two validated skills have distributed relevance to a real
+    // learning gap. Local practice is cheap; independent transfer validation is optional and must
+    // show advantage over the strongest single member before a composite can be promoted.
+    try {
+      composition = await runCognitiveCompositionCycle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Cognitive skill composition failed'
+      console.error('cron COS cognitive skill composition failed:', message)
+      composition = { enabled: false, errors: [message] }
     }
 
     // Consolidation shares the existing daily schedule. It re-tests retained skills after time,
@@ -85,5 +98,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, consolidation, corpus })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, composition, consolidation, corpus })
 }

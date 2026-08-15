@@ -63,8 +63,16 @@ export async function GET(req: NextRequest) {
 
   try {
     const status = await queryPodStatus()
+    console.info('[cos-runpod-idle-stop]', JSON.stringify({
+      at: new Date().toISOString(),
+      podId: status.id,
+      desiredStatus: status.desiredStatus,
+      running: status.running,
+      uptimeSeconds: status.uptimeSeconds,
+      costPerHr: status.costPerHr,
+    }))
     if (!status.running) {
-      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, reason: 'Pod is not currently running.' })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, reason: 'Pod is not currently running.' })
     }
 
     const idleMinutes = await minutesSinceLastCosActivity()
@@ -73,11 +81,11 @@ export async function GET(req: NextRequest) {
     // No activity record at all is NOT treated as "infinitely idle, stop it". Absence of evidence
     // here is absence of evidence, not evidence of idleness; skip until a real COS activity exists.
     if (idleMinutes === null) {
-      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, reason: 'No COS activity has been recorded yet; nothing to measure idleness against.' })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, reason: 'No COS activity has been recorded yet; nothing to measure idleness against.' })
     }
 
     if (idleMinutes < threshold) {
-      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, reason: `Idle for ${Math.round(idleMinutes)} minutes, below the ${threshold}-minute threshold.` })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, reason: `Idle for ${Math.round(idleMinutes)} minutes, below the ${threshold}-minute threshold.` })
     }
 
     const result = await stopPod()

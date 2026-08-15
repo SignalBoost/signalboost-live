@@ -26,7 +26,7 @@ test('non-government volatile facts still require live evidence but not a govern
   assert.equal(freshEvidenceMeetsAuthority('What is the current software version?', []), false)
 })
 
-test('grounded body carries live evidence and synthesis must cite it', () => {
+test('grounded body carries live evidence and synthesis must cite both evidence id and source URL', () => {
   const sources = prepareFreshEvidence([
     { title: 'Official White House', url: 'https://www.whitehouse.gov/administration/', snippet: 'Donald J. Trump is the 47th President of the United States.' },
   ])
@@ -35,6 +35,7 @@ test('grounded body carries live evidence and synthesis must cite it', () => {
 
   assert.match(content, /CURRENT-FACT LIVE EVIDENCE/)
   assert.match(content, /\[LIVE1\]/)
-  assert.equal(replyCitesFreshEvidence('Donald Trump. [LIVE1]', sources), true)
-  assert.equal(replyCitesFreshEvidence('Donald Trump.', sources), false)
+  assert.equal(replyCitesFreshEvidence('Donald Trump. [LIVE1] https://www.whitehouse.gov/administration/', sources), true)
+  assert.equal(replyCitesFreshEvidence('Donald Trump. [LIVE1]', sources), false)
+  assert.equal(replyCitesFreshEvidence('Donald Trump. https://www.whitehouse.gov/administration/', sources), false)
 })

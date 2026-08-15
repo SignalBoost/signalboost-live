@@ -1,19 +1,13 @@
 // saas/app/api/cron/cos-runpod-idle-stop/route.ts
 //
 // Stops the COS reasoner pod when it has been idle past a configured threshold.
-// This is the direct fix for the Aug 11 finding: $5.72 of a fresh $20 RunPod balance
-// spent in ~13 hours of ordinary continuous rental with nothing calling the pod.
-// "Stop when idle" turns that into storage-only cost between real use.
-//
-// SAFETY: auto-stop is enabled by default only when the matching RunPod wake-on-demand lifecycle
-// is configured and active. An explicit COS_RUNPOD_AUTO_STOP_ENABLED=false remains an emergency
-// kill switch. Idleness is measured from the same cos_ai_roi_metrics signal shown to the owner.
-//
-// Deliberately does NOT run every minute. Stopping a few minutes later than the exact idle threshold
-// costs only those extra minutes, so the existing every-15-minutes cadence is sufficient.
+// A running GPU whose reasoner never became healthy is treated as orphaned compute and stopped
+// after a short cold-start grace period, regardless of recent failed-request activity.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runpodAutoStopEnabled, runpodLifecycleConfigured, runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
+import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { shouldStopUnhealthyRunpod } from '@/lib/ai/cos/runpodOrphanGuard'
 import { runpodConfigured, queryPodStatus, stopPod } from '@/lib/hub/runpodTelemetry'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
@@ -24,6 +18,11 @@ export const maxDuration = 30
 function idleThresholdMinutes(): number {
   const value = Number(process.env.COS_RUNPOD_IDLE_MINUTES || '30')
   return Number.isFinite(value) && value > 0 ? value : 30
+}
+
+function unhealthyGraceSeconds(): number {
+  const value = Number(process.env.COS_RUNPOD_UNHEALTHY_GRACE_SECONDS || '300')
+  return Number.isFinite(value) ? Math.max(60, Math.min(900, Math.round(value))) : 300
 }
 
 async function minutesSinceLastCosActivity(): Promise<number | null> {
@@ -37,6 +36,16 @@ async function minutesSinceLastCosActivity(): Promise<number | null> {
     .maybeSingle()
   if (!data?.created_at) return null
   return Math.max(0, (Date.now() - new Date(String(data.created_at)).getTime()) / 60_000)
+}
+
+async function probeReasonerHealth(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const config = localInferenceConfigFromEnv()
+    const health = await checkLocalInferenceHealth({ ...config, timeoutMs: Math.min(config.timeoutMs, 5_000) })
+    return health.ok ? { ok: true } : { ok: false, error: health.error || 'health check failed' }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'health check failed' }
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -75,21 +84,46 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, reason: 'Pod is not currently running.' })
     }
 
+    // A paid GPU that has been running past the cold-start grace window but still cannot serve
+    // the configured model is orphaned compute. Failed requests must not refresh an activity timer
+    // and keep that GPU billable. This probe never invokes RunPod lifecycle/wake behavior.
+    const health = await probeReasonerHealth()
+    const graceSeconds = unhealthyGraceSeconds()
+    if (shouldStopUnhealthyRunpod({ running: status.running, uptimeSeconds: status.uptimeSeconds, healthy: health.ok, graceSeconds })) {
+      const result = await stopPod()
+      console.warn('[cos-runpod-orphan-stop]', JSON.stringify({
+        at: new Date().toISOString(),
+        podId: status.id,
+        previousDesiredStatus: status.desiredStatus,
+        uptimeSeconds: status.uptimeSeconds,
+        reasonerHealthy: false,
+        healthError: health.error || null,
+        graceSeconds,
+        requestedDesiredStatus: result.desiredStatus,
+      }))
+      return NextResponse.json({
+        ok: true,
+        stopped: true,
+        autoStopEnabled: true,
+        orphanedUnhealthyCompute: true,
+        reason: `RunPod had been running for ${status.uptimeSeconds}s without a healthy COS reasoner; stopped after the ${graceSeconds}s startup grace period.`,
+        pod: result,
+      })
+    }
+
     const idleMinutes = await minutesSinceLastCosActivity()
     const threshold = idleThresholdMinutes()
 
-    // No activity record at all is NOT treated as "infinitely idle, stop it". Absence of evidence
-    // here is absence of evidence, not evidence of idleness; skip until a real COS activity exists.
     if (idleMinutes === null) {
-      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, reason: 'No COS activity has been recorded yet; nothing to measure idleness against.' })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, reasonerHealthy: health.ok, reason: 'No COS activity has been recorded yet; nothing to measure idleness against.' })
     }
 
     if (idleMinutes < threshold) {
-      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, reason: `Idle for ${Math.round(idleMinutes)} minutes, below the ${threshold}-minute threshold.` })
+      return NextResponse.json({ ok: true, stopped: false, autoStopEnabled: true, pod: status, reasonerHealthy: health.ok, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, reason: `Idle for ${Math.round(idleMinutes)} minutes, below the ${threshold}-minute threshold.` })
     }
 
     const result = await stopPod()
-    return NextResponse.json({ ok: true, stopped: true, autoStopEnabled: true, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, pod: result })
+    return NextResponse.json({ ok: true, stopped: true, autoStopEnabled: true, reasonerHealthy: health.ok, idleMinutes: Math.round(idleMinutes), thresholdMinutes: threshold, pod: result })
   } catch (error) {
     console.error('cos-runpod-idle-stop: failed', error)
     return NextResponse.json({ ok: false, stopped: false, autoStopEnabled: true, error: error instanceof Error ? error.message : 'Idle-stop check failed.' }, { status: 500 })

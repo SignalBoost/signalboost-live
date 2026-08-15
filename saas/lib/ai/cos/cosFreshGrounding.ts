@@ -13,18 +13,30 @@ function normalizedUrl(value: string): string | null {
   }
 }
 
-function authorityScore(result: SearchResult): number {
+function hostFromUrl(value: string): string {
   try {
-    const host = new URL(result.url).hostname.toLowerCase().replace(/^www\./, '')
-    let score = 0
-    if (host.endsWith('.gov') || host.includes('.gov.')) score += 100
-    if (host.endsWith('.mil') || host.includes('.mil.')) score += 95
-    if (host.endsWith('.edu') || host.includes('.edu.')) score += 45
-    if (/\bofficial\b/i.test(result.title)) score += 20
-    return score
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, '')
   } catch {
-    return 0
+    return ''
   }
+}
+
+function isGovernmentHost(host: string): boolean {
+  return host.endsWith('.gov') || host.includes('.gov.') || host === 'gov.uk' || host.endsWith('.gov.uk')
+}
+
+function authorityScore(result: SearchResult): number {
+  const host = hostFromUrl(result.url)
+  let score = 0
+  if (isGovernmentHost(host)) score += 100
+  if (host.endsWith('.mil') || host.includes('.mil.')) score += 95
+  if (host.endsWith('.edu') || host.includes('.edu.')) score += 45
+  if (/\bofficial\b/i.test(result.title)) score += 20
+  return score
+}
+
+function requiresGovernmentAuthority(input: string): boolean {
+  return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister)\b/i.test(input)
 }
 
 export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshEvidenceSource[] {
@@ -52,6 +64,12 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
     ...entry.result,
     id: `LIVE${index + 1}`,
   }))
+}
+
+export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
+  if (!sources.length) return false
+  if (!requiresGovernmentAuthority(input)) return true
+  return sources.some(source => isGovernmentHost(hostFromUrl(source.url)))
 }
 
 export function freshEvidenceSearchQuery(input: string, now = new Date()): string {

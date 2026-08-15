@@ -195,7 +195,8 @@ function objectRecord(value: unknown): Record<string, unknown> | null {
 function safePrimitive(value: unknown): string | number | boolean | null | undefined {
   if (typeof value === 'string') return safeText(value, 500)
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'boolean' || value === null) return value
+  if (typeof value === 'boolean') return value
+  if (value === null) return null
   return undefined
 }
 

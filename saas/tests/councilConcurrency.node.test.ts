@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { runCouncilMembersConcurrently } from '../lib/ai/cos/councilConcurrency'
+import { runCouncilMembersConcurrently } from '../lib/ai/cos/councilConcurrency.ts'
 
 function wait(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))

@@ -9,5 +9,9 @@ export async function runCouncilMembersConcurrently<T>(
     }
   }))
 
-  return results.filter((result): result is T => result !== null)
+  const successful: T[] = []
+  for (const result of results) {
+    if (result !== null) successful.push(result as T)
+  }
+  return successful
 }

@@ -7,6 +7,7 @@ import { compactDelegatedEvidence } from '@/lib/ai/cos/evidenceCompaction'
 import { NATIVE_PLATFORM_INCIDENT_RECIPE } from '@/lib/ai/cos/incidentRecipeRouter'
 import { createSignalBoostSupervisorConnectorRuntime, SIGNALBOOST_SUPERVISOR_CONNECTOR_TENANT } from './signalboost-supervisor-connectors'
 import { createNativeRepairActionResolver } from './native-repair-action-resolver'
+import { recordCouncilOutcomesFromRepairDispatch, type CouncilOutcomeBridgeSummary } from './council-outcome-bridge'
 import { SELF_HEALING_GATEWAY_POLICY } from './self-healing-gateway-policy'
 import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
@@ -46,6 +47,7 @@ export interface NativeRemediationResult {
   repairSteps: number
   outcome: 'no_action' | 'executed' | 'staged' | 'unavailable'
   message: string
+  objectiveOutcomes?: CouncilOutcomeBridgeSummary
 }
 
 export async function remediateNativeIncidents(incidents: readonly SupervisorIncident[], options: { maxIncidents?: number } = {}): Promise<NativeRemediationResult[]> {
@@ -81,6 +83,12 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         resolveParams: resolveSupervisorRepairParams,
         agentId: 'cos-native-self-healing',
       })
+      const objectiveOutcomes = await recordCouncilOutcomesFromRepairDispatch({
+        incidentId: incident.incidentId,
+        provider: incident.provider,
+        environment: incident.environment || 'production',
+        dispatch: dispatched,
+      })
       const summary = summarizeRepairDispatch(dispatched, repairPlan.length)
       results.push({
         incidentId: incident.incidentId,
@@ -89,6 +97,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         repairSteps: repairPlan.length,
         outcome: dispatched.completed ? 'executed' : summary.mode === 'staged' ? 'staged' : 'unavailable',
         message: dispatched.completed ? 'The registered repair completed through Agent Gateway governance.' : summary.message,
+        objectiveOutcomes,
       })
     } catch (error) {
       results.push({ incidentId: incident.incidentId, diagnosisConfidence: diagnostic.confidence_score, diagnosis: diagnostic.diagnosis, repairSteps: repairPlan.length, outcome: 'unavailable', message: error instanceof Error ? error.message : 'governed remediation failed' })

@@ -18,6 +18,7 @@ import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRep
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { maybeBuildCognitiveCouncilAdvisory } from '@/lib/ai/cos/cognitiveCouncil'
 import { runCouncilChallengeRound } from '@/lib/ai/cos/cognitiveCouncilChallenge'
+import { bindCouncilSessionCorrelations } from '@/lib/ai/cos/councilObjectiveOutcome'
 
 export type CosReasonerKind = 'independent-local'
 
@@ -141,6 +142,11 @@ export async function callCosReasoner(
       return null
     })
     if (council?.advisory) {
+      if (council.sessionId) {
+        await bindCouncilSessionCorrelations(council.sessionId, args.prompt).catch(error => {
+          console.warn('[cos-council-correlation] binding failed closed', error instanceof Error ? error.message : String(error))
+        })
+      }
       const challengeRound = await runCouncilChallengeRound({
         council,
         governedPrompt: args.prompt,

@@ -79,6 +79,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         repairPlan,
         policy: SELF_HEALING_GATEWAY_POLICY,
         host: createSignalBoostGatewayHost(),
+        executionAttemptId: incident.detectedAt,
         resolveAction: createNativeRepairActionResolver(incident),
         resolveParams: resolveSupervisorRepairParams,
         agentId: 'cos-native-self-healing',

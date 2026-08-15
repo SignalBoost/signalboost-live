@@ -1,95 +1,79 @@
-// saas/tests/authoritativeFactGrounding.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  VOLATILE_FACT_CATEGORIES,
   classifyAuthoritativeVolatileFact,
   groundAuthoritativeVolatileFact,
-  renderAuthoritativeGroundedReply,
 } from '../lib/ai/cos/authoritativeFactGrounding.ts'
-import { buildCosLiveTelemetry } from '../lib/ai/cos/cosLiveTelemetry.ts'
+import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import {
+  freshEvidenceMeetsAuthority,
+  freshEvidenceSearchQuery,
+  prepareFreshEvidence,
+} from '../lib/ai/cos/cosFreshGrounding.ts'
 
-const USAGOV_BODY = '<main>The 47th and current president of the United States is <strong>Donald John Trump</strong>. He was sworn into office on January 20, 2025.</main>'
-
-function fakeFetch(map: Record<string, { ok?: boolean; status?: number; body?: string }>) {
-  return async (url: string) => {
-    const hit = map[url]
-    if (!hit) return { ok: false, status: 404, text: async () => '' }
-    return { ok: hit.ok ?? true, status: hit.status ?? 200, text: async () => hit.body ?? '' }
-  }
-}
-
-test('recognizes present-tense US president questions but not historical ones', () => {
-  for (const question of ['Who is the current US president?', 'Who is the president of the United States?', 'current POTUS?']) {
-    assert.equal(classifyAuthoritativeVolatileFact(question)?.id, 'us_president')
-  }
-  for (const question of ['Who was the US president in 1990?', 'previous US president', 'Explain presidential succession']) {
-    assert.equal(classifyAuthoritativeVolatileFact(question), null)
-  }
+test('current office-holder questions use generic freshness policy, not a fixed fact registry', () => {
+  assert.equal(requiresFreshExternalEvidence('Who is currently the president of the United States?'), true)
+  assert.equal(requiresFreshExternalEvidence('Who is the current prime minister of Canada?'), true)
+  assert.equal(requiresFreshExternalEvidence('Who is the CEO of Example Corp now?'), true)
+  assert.equal(VOLATILE_FACT_CATEGORIES.length, 0)
+  assert.equal(classifyAuthoritativeVolatileFact('Who is currently the president of the United States?'), null)
 })
 
-test('extracts the current president from live government page text without a model', async () => {
-  const grounded = await groundAuthoritativeVolatileFact('Who is the current US president?', {
-    fetch: fakeFetch({ 'https://www.usa.gov/presidents': { body: USAGOV_BODY } }),
-    now: () => Date.parse('2026-08-15T12:00:00.000Z'),
+test('retired fixed-source grounder performs no network request', async () => {
+  let calls = 0
+  const grounded = await groundAuthoritativeVolatileFact('Who is currently the president of the United States?', {
+    fetch: async () => {
+      calls += 1
+      return { ok: true, status: 200, text: async () => '<main>should never be read</main>' }
+    },
   })
-  assert.ok(grounded)
-  if (!grounded) return
-  assert.equal(grounded.answer, 'The current President of the United States is Donald John Trump.')
-  assert.equal(grounded.sourceId, 'usagov_presidents')
-  const reply = renderAuthoritativeGroundedReply(grounded)
-  assert.match(reply, /Donald John Trump/)
-  assert.match(reply, /usa\.gov\/presidents/)
-  assert.match(reply, /2026-08-15T12:00:00\.000Z/)
-})
-
-test('returns null when the authoritative source is unavailable or no longer exposes the fact', async () => {
-  assert.equal(await groundAuthoritativeVolatileFact('Who is the current US president?', {
-    fetch: fakeFetch({ 'https://www.usa.gov/presidents': { ok: false, status: 503 } }),
-  }), null)
-  assert.equal(await groundAuthoritativeVolatileFact('Who is the current US president?', {
-    fetch: fakeFetch({ 'https://www.usa.gov/presidents': { body: '<main>Maintenance</main>' } }),
-  }), null)
-})
-
-test('authoritative direct answers are counted as inference avoided', () => {
-  const telemetry = buildCosLiveTelemetry({
-    responseSource: 'authoritative_source',
-    latencyMs: 25,
-    confidence: 1,
-    reasonerLabel: null,
-    localModelInvoked: false,
-    externalAiInvoked: false,
-    promptChars: 40,
-    replyChars: 120,
-  })
-  assert.equal(telemetry.inferenceAvoided, true)
-  assert.equal(telemetry.localCallsAvoided, 1)
-  assert.equal(telemetry.externalCallsAvoided, 1)
-})
-
-// --- Multi-source resilience: the fix for "one hardcoded source silently rotted" ---
-import { groundAuthoritativeVolatileFact } from '../lib/ai/cos/authoritativeFactGrounding'
-
-test('falls through to the next authoritative source when the first no longer exposes the fact', async () => {
-  const pages: Record<string, string> = {
-    // First source (Wikipedia) returns a page that no longer contains the name (rotted/empty).
-    'https://simple.wikipedia.org/wiki/List_of_presidents_of_the_United_States': '<main>Site maintenance.</main>',
-    // Second source (White House) still names the sitting president.
-    'https://www.whitehouse.gov/administration/': '<h1>President Donald Trump</h1>',
-  }
-  const fetch = async (url: string) => ({
-    ok: url in pages,
-    status: url in pages ? 200 : 404,
-    text: async () => pages[url] ?? '',
-  })
-  const grounded = await groundAuthoritativeVolatileFact('who is the current US president', { fetch, now: () => Date.parse('2026-08-15T00:00:00Z') })
-  assert.ok(grounded, 'should recover via a later source when the first is empty')
-  assert.match(grounded!.answer, /Donald Trump/)
-  assert.equal(grounded!.sourceId, 'whitehouse_administration')
-})
-
-test('returns null only when EVERY authoritative source fails — never a stale guess', async () => {
-  const fetch = async () => ({ ok: false, status: 503, text: async () => '' })
-  const grounded = await groundAuthoritativeVolatileFact('who is the current US president', { fetch })
   assert.equal(grounded, null)
+  assert.equal(calls, 0)
+})
+
+test('fresh-evidence search query is source-agnostic and current-date scoped', () => {
+  const query = freshEvidenceSearchQuery(
+    'Who is currently the president of the United States?',
+    new Date('2026-08-15T12:00:00.000Z'),
+  )
+  assert.match(query, /official authoritative source/i)
+  assert.match(query, /2026-08-15/)
+  assert.doesNotMatch(query, /usa\.gov/i)
+  assert.doesNotMatch(query, /whitehouse\.gov/i)
+})
+
+test('authority policy dynamically promotes government evidence without preselecting a URL', () => {
+  const prepared = prepareFreshEvidence([
+    {
+      title: 'Commentary about the office holder',
+      url: 'https://example.com/commentary',
+      snippet: 'Secondary commentary.',
+    },
+    {
+      title: 'Official office holder page',
+      url: 'https://agency.gov/leadership',
+      snippet: 'Official current leadership information.',
+    },
+  ])
+
+  assert.equal(prepared[0].url, 'https://agency.gov/leadership')
+  assert.equal(
+    freshEvidenceMeetsAuthority('Who is currently the president of the United States?', prepared),
+    true,
+  )
+})
+
+test('office-holder evidence fails closed when live search has no government authority', () => {
+  const prepared = prepareFreshEvidence([
+    {
+      title: 'News report',
+      url: 'https://example.com/news',
+      snippet: 'A report naming an office holder.',
+    },
+  ])
+  assert.equal(
+    freshEvidenceMeetsAuthority('Who is currently the president of the United States?', prepared),
+    false,
+  )
 })

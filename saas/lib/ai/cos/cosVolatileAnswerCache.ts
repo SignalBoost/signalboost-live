@@ -4,7 +4,7 @@ import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 
-export const COS_VOLATILE_CACHE_POLICY_VERSION = 'cos-volatile-live-v1'
+export const COS_VOLATILE_CACHE_POLICY_VERSION = 'cos-volatile-live-v2'
 const DEFAULT_TTL_MS = 60 * 60 * 1000
 const MIN_TTL_MS = 60 * 1000
 const MAX_TTL_MS = 24 * 60 * 60 * 1000

@@ -70,6 +70,10 @@ function enoughRelevance(source: FreshMemoryEvidenceSource): boolean {
   return source.relevance >= 0.2
 }
 
+async function safeQuery<T>(query: PromiseLike<T>): Promise<T | { data: []; error: null }> {
+  try { return await query } catch { return { data: [], error: null } }
+}
+
 export function freshMemoryEvidenceIsSufficient(
   policy: CosFreshnessPolicy,
   sources: FreshMemoryEvidenceSource[],
@@ -110,28 +114,24 @@ export async function retrieveFreshMemoryEvidence(
   const learnedFilter = queryFilter(terms, ['subject','summary','source_title'])
 
   const [awarenessResult, learnedResult] = await Promise.all([
-    db.from('cos_world_awareness')
+    safeQuery(db.from('cos_world_awareness')
       .select('source_uri,source_title,snippet,source_kind,observed_at,source_host')
       .gte('observed_at', cutoffAt)
       .gt('expires_at', new Date(nowMs).toISOString())
       .or(awarenessFilter)
       .order('observed_at', { ascending:false })
-      .limit(40)
-      .then(result => result)
-      .catch(() => ({ data:[], error:null } as any)),
-    db.from('cos_continuous_learning')
+      .limit(40)),
+    safeQuery(db.from('cos_continuous_learning')
       .select('source_uri,source_title,summary,source_kind,observed_at,confidence,fact_extraction_error')
       .gte('observed_at', cutoffAt)
       .or(learnedFilter)
       .order('observed_at', { ascending:false })
       .order('confidence', { ascending:false })
-      .limit(60)
-      .then(result => result)
-      .catch(() => ({ data:[], error:null } as any)),
+      .limit(60)),
   ])
 
   const candidates: FreshMemoryEvidenceSource[] = []
-  for (const row of awarenessResult.data ?? []) {
+  for (const row of (awarenessResult as any).data ?? []) {
     const observedAt = safeObservedAt(row.observed_at)
     if (!observedAt) continue
     const url = String(row.source_uri || '')
@@ -150,7 +150,7 @@ export async function retrieveFreshMemoryEvidence(
     })
   }
 
-  for (const row of learnedResult.data ?? []) {
+  for (const row of (learnedResult as any).data ?? []) {
     if (String(row.fact_extraction_error || '').toLowerCase().startsWith('relevance_rejected:')) continue
     const observedAt = safeObservedAt(row.observed_at)
     if (!observedAt) continue

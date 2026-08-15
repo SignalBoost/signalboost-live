@@ -90,6 +90,8 @@ export interface DispatchRepairPlanOptions {
   repairPlan: readonly RepairStep[]
   policy: GovernancePolicy
   host: GatewayHost
+  /** Stable identity for one detected remediation attempt. Replays reuse it; later attempts do not. */
+  executionAttemptId?: string
   /** Defaults to resolveNothing — nothing is executable until the host teaches it something. */
   resolveAction?: RepairActionResolver
   /** Optional extra params for the staged approval. Identified facts only, never secrets. */
@@ -114,6 +116,10 @@ export interface DispatchRepairPlanResult {
   stoppedAt?: { step: number; reason: string }
 }
 
+function safeAttemptId(value: unknown): string {
+  return String(value ?? '').replace(/[^A-Za-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180)
+}
+
 /** Build the normalized request for one repair step. Exported for inspection and tests. */
 export function repairStepToRequest(
   incident: RepairIncident,
@@ -121,9 +127,11 @@ export function repairStepToRequest(
   resolvedTarget: string | null,
   agentId: string,
   extraParams: Readonly<Record<string, unknown>> = {},
+  executionAttemptId?: string,
 ): AgentRequest {
+  const attemptId = safeAttemptId(executionAttemptId)
   return {
-    requestId: `${incident.incident_id}:repair:${step.step}`,
+    requestId: `${incident.incident_id}:repair:${step.step}${attemptId ? `:attempt:${attemptId}` : ''}`,
     protocol: 'supervisor',
     agentId,
     action: {
@@ -133,6 +141,7 @@ export function repairStepToRequest(
         incidentId: incident.incident_id,
         project: incident.project,
         stepNumber: step.step,
+        ...(attemptId ? { executionAttemptId: attemptId } : {}),
         // The prose is carried for the human reviewing the PR — never used as a target.
         describedAction: step.action,
         describedTarget: step.target,
@@ -168,7 +177,7 @@ export async function dispatchRepairPlan(
     const resolvedTarget = forcedHuman ? null : resolve(step, options.incident)
 
     const extraParams = options.resolveParams ? options.resolveParams(step, options.incident) : {}
-    const request = repairStepToRequest(options.incident, step, resolvedTarget, agentId, extraParams)
+    const request = repairStepToRequest(options.incident, step, resolvedTarget, agentId, extraParams, options.executionAttemptId)
     const outcome = await runGoverned(request, options.policy, options.host)
 
     results.push({ step: step.step, action: step.action, resolvedTarget, outcome })

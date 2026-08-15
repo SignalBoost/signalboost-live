@@ -1,5 +1,5 @@
 // Generic freshness policy. It classifies the SHAPE of the question rather than maintaining
-// a catalog of presidents, CEOs, prices, laws, versions, etc. Query-time orchestration can use
+// a catalog of presidents, CEOs, prices, laws, versions, etc. Query-time COS orchestration uses
 // maxMemoryAgeMs to decide whether recent sourced memory is fresh enough before going live.
 
 export type CosFreshnessPolicy = {
@@ -53,7 +53,12 @@ export function freshnessPolicyForQuestion(input: string): CosFreshnessPolicy {
   return { required: false, maxMemoryAgeMs: null, reason: 'ordinary_memory_reasoning', forceLiveVerification: false }
 }
 
-/** Backward-compatible boolean used by existing orchestration. */
-export function requiresFreshExternalEvidence(input: string): boolean {
-  return freshnessPolicyForQuestion(input).required
+/**
+ * Legacy route hook retained only so older callers compile. Freshness no longer means
+ * "route to an external model"; it is handled inside tryCOSFirstAnswer via recent sourced
+ * memory and, only when needed, live authoritative verification. Returning false here retires
+ * the old pre-COS live-search/Gemini path without changing the route API surface.
+ */
+export function requiresFreshExternalEvidence(_input: string): boolean {
+  return false
 }

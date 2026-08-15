@@ -1,14 +1,60 @@
 import * as base from './cosOrchestrationEnterprise'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
 export const isProvenanceIntrospection=base.isProvenanceIntrospection
-export function requestsExternalAction(input:string):boolean{return requiresFreshExternalEvidence(input)||base.requestsExternalAction(input)}
-export const authoritativeProvenance=base.authoritativeProvenance
+// Freshness is no longer an external-AI action. Only genuine tool/execution requests delegate here.
+export const requestsExternalAction=base.requestsExternalAction
 export const escalationReason=base.escalationReason
 export const logEscalation=base.logEscalation
 export const independentReasonerHealth=base.independentReasonerHealth
+
+export function authoritativeProvenance(cos:any,external:{invoked:boolean;provider?:string|null;model?:string|null}){
+  const recorded=base.authoritativeProvenance(cos,external) as any
+  const freshness=cos?.provenance?.freshnessAwareness
+  if(!freshness||typeof freshness!=='object')return recorded
+
+  const memorySources=Array.isArray(freshness.memorySources)?freshness.memorySources:[]
+  const liveSources=Array.isArray(freshness.liveSources)?freshness.liveSources:[]
+  recorded.freshness_awareness={
+    required:Boolean(freshness.required),
+    reason:freshness.reason??null,
+    max_memory_age_ms:freshness.maxMemoryAgeMs??null,
+    force_live_verification:Boolean(freshness.forceLiveVerification),
+    source:freshness.source??null,
+    grounded_at:freshness.groundedAt??null,
+    synthesis_status:freshness.synthesisStatus??null,
+    failed_closed:Boolean(freshness.failedClosed),
+  }
+  recorded.fresh_memory={
+    used:Boolean(freshness.memorySufficient&&freshness.source==='fresh_memory'),
+    attempted:Boolean(freshness.memoryAttempted),
+    sufficient:Boolean(freshness.memorySufficient),
+    reason:freshness.memoryReason??null,
+    sources:memorySources,
+  }
+  recorded.live_external_evidence={
+    used:Boolean(freshness.liveSufficient&&liveSources.length),
+    attempted:Boolean(freshness.liveAttempted),
+    retrieved_at:freshness.liveAttempted?(freshness.groundedAt??null):null,
+    error:freshness.liveAttempted&&!freshness.liveSufficient?(freshness.liveReason??'insufficient live evidence'):null,
+    sources:liveSources,
+  }
+  if(freshness.cacheHit){
+    recorded.volatile_answer_cache={
+      used:true,
+      policy_version:recorded.answer_origin?.policy_version??null,
+      stored_at:recorded.answer_origin?.stored_at??null,
+      age_ms:Number(freshness.cacheAgeMs??0),
+      expires_at:freshness.cacheExpiresAt??null,
+      original_grounded_at:freshness.cacheOriginGroundedAt??null,
+      original_external_provider:null,
+      original_external_model:null,
+      origin_live_sources:[],
+    }
+  }
+  return recorded
+}
 
 function value(v:unknown):string{return v==null?'unknown':String(v)}
 function entries(v:any):string{if(!v||typeof v!=='object')return'none';const rows=Object.entries(v).sort(([a],[b])=>a.localeCompare(b));return rows.length?rows.map(([k,n])=>`${k} ${n}`).join(', '):'none'}
@@ -49,16 +95,21 @@ function formatMaterialProvenance(provenance:any):string{
   const localInvoked=Boolean(provenance?.local_reasoning?.invoked)
   const researchUsed=Boolean(provenance?.autonomous_research?.used)
   const liveEvidence=provenance?.live_external_evidence
+  const freshMemory=provenance?.fresh_memory
+  const freshness=provenance?.freshness_awareness
   if(origin?.from_cache){
     const written=origin.stored_at?` written ${origin.stored_at}`:''
     const model=origin.model?` by ${origin.model}`:''
     lines.push(`Answer Origin          : CACHE —${written}${model}.`)
   }
   if(volatileCache?.used){
-    lines.push(`Volatile Answer Cache  : USED — live-grounded answer reused; age ${count(volatileCache.age_ms)} ms${volatileCache.expires_at?`; expires ${volatileCache.expires_at}`:''}.`)
-    if(volatileCache.original_grounded_at)lines.push(`Original Live Grounding: ${volatileCache.original_grounded_at}${volatileCache.original_external_provider?` — ${volatileCache.original_external_provider}${volatileCache.original_external_model?` / ${volatileCache.original_external_model}`:''}`:''}.`)
-    const originSources=Array.isArray(volatileCache.origin_live_sources)?volatileCache.origin_live_sources:[]
-    for(const source of originSources)lines.push(`  [${source?.id||'LIVE'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}`)
+    lines.push(`Volatile Answer Cache  : USED — grounded answer reused; age ${count(volatileCache.age_ms)} ms${volatileCache.expires_at?`; expires ${volatileCache.expires_at}`:''}.`)
+    if(volatileCache.original_grounded_at)lines.push(`Original Grounding     : ${volatileCache.original_grounded_at}.`)
+  }
+  if(freshMemory?.used){
+    const sources=Array.isArray(freshMemory.sources)?freshMemory.sources:[]
+    lines.push(`Fresh Sourced Memory   : USED — ${sources.length} recent source${sources.length===1?'':'s'} satisfied the freshness policy.`)
+    for(const source of sources)lines.push(`  [${source?.id||'MEM'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}${source?.observedAt?` (observed ${source.observedAt})`:''}`)
   }
   if(provenance?.deterministic_utility?.used){
     const utility=String(provenance.deterministic_utility.utility||'server utility')
@@ -75,6 +126,7 @@ function formatMaterialProvenance(provenance:any):string{
     lines.push(`Live External Evidence : USED — ${sources.length} live source${sources.length===1?'':'s'} retrieved${liveEvidence.retrieved_at?` at ${liveEvidence.retrieved_at}`:''}.`)
     for(const source of sources)lines.push(`  [${source?.id||'LIVE'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}`)
   }
+  if(freshness?.required)lines.push(`Freshness Policy       : ${freshness.reason||'required'} — answer source ${freshness.source||'unknown'}; model memory alone was not accepted as current evidence.`)
   if(researchUsed)lines.push(`Autonomous Research    : USED — ${count(provenance.autonomous_research.documents_acquired)} live documents acquired; ${count(provenance.autonomous_research.new_knowledge_retained)} retained as new durable knowledge.`)
   if(localInvoked&&!externalMaterial)lines.push(`Local Reasoning Engine : INVOKED — ${provenance.local_reasoning.model||'local model'}.`)
   if(externalMaterial)lines.push(`External AI Provider   : INVOKED — ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''}.`)
@@ -87,6 +139,7 @@ function formatMaterialProvenance(provenance:any):string{
     ['Cognitive Skills',provenance?.cognitive_skills],
     ['User Memory',provenance?.user_memory],
   ] as const){if(!contributed(item)&&consulted(item))consultedOnly.push(`${label}: ${funnel(item)}`)}
+  if(freshMemory?.attempted&&!freshMemory?.used)consultedOnly.push(`Fresh Sourced Memory: checked but ${freshMemory?.reason||'did not satisfy freshness/corroboration requirements'}`)
   if(localInvoked&&externalMaterial)consultedOnly.push(`Local Reasoning Engine: ${provenance.local_reasoning.model||'local model'} invoked, but its draft was superseded and did not generate the recorded answer`)
   if(externalInvoked&&!externalAccepted)consultedOnly.push(`External AI Provider: ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} invoked, but its synthesis was rejected by the freshness grounding gate`)
   if(consultedOnly.length)lines.push('','Consulted but not material','──────────────────────────',consultedOnly.join('; ')+'.')
@@ -109,7 +162,7 @@ function formatMaterialProvenance(provenance:any):string{
   return lines.join('\n')
 }
 
-export function formatAuthoritativeProvenance(provenance:ReturnType<typeof base.authoritativeProvenance>&Record<string,unknown>,language:string):string{
+export function formatAuthoritativeProvenance(provenance:ReturnType<typeof authoritativeProvenance>&Record<string,unknown>,language:string):string{
   const recorded=provenance as any
   const concise=formatMaterialProvenance(recorded)
   const localized=language!=='en'?`${concise}\n\nNote: provenance labels remain explicit and stable; the recorded values above are language-independent telemetry.`:concise

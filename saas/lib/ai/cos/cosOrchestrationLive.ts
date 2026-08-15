@@ -43,7 +43,11 @@ function formatMaterialProvenance(provenance:any):string{
   ]
   const origin=provenance?.answer_origin
   const externalInvoked=Boolean(provenance?.external_ai?.invoked)
+  const externalAccepted=provenance?.external_ai?.accepted!==false
+  const externalMaterial=externalInvoked&&externalAccepted
   const localInvoked=Boolean(provenance?.local_reasoning?.invoked)
+  const researchUsed=Boolean(provenance?.autonomous_research?.used)
+  const liveEvidence=provenance?.live_external_evidence
   if(origin?.from_cache){
     const written=origin.stored_at?` written ${origin.stored_at}`:''
     const model=origin.model?` by ${origin.model}`:''
@@ -53,14 +57,20 @@ function formatMaterialProvenance(provenance:any):string{
     const utility=String(provenance.deterministic_utility.utility||'server utility')
     lines.push(`Deterministic Utility  : ${utility}`)
   }
-  if(provenance?.semantic_cache?.used)lines.push(`Semantic Cache         : ${count(provenance.semantic_cache.evidence_count)} cached result contributed.`)
-  if(contributed(provenance?.enterprise_memory))lines.push(`Enterprise Memory      : ${funnel(provenance.enterprise_memory)}.`)
-  if(contributed(provenance?.knowledge_graph))lines.push(`Knowledge Graph        : ${funnel(provenance.knowledge_graph)}.`)
-  if(contributed(provenance?.learned_corpus))lines.push(`Learned Corpus         : ${funnel(provenance.learned_corpus)}.`)
-  if(contributed(provenance?.cognitive_skills))lines.push(`Cognitive Skills       : ${funnel(provenance.cognitive_skills)}. Procedural guidance; not factual grounding.`)
-  if(contributed(provenance?.user_memory))lines.push(`User Memory            : ${funnel(provenance.user_memory)}.`)
-  if(localInvoked&&!externalInvoked)lines.push(`Local Reasoning Engine : ${provenance.local_reasoning.model||'local model'} — invoked.`)
-  if(externalInvoked)lines.push(`External AI Provider   : ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} — invoked.`)
+  if(provenance?.semantic_cache?.used)lines.push(`Semantic Cache         : USED — ${count(provenance.semantic_cache.evidence_count)} cached result contributed.`)
+  if(contributed(provenance?.enterprise_memory))lines.push(`Enterprise Memory      : USED — ${funnel(provenance.enterprise_memory)}.`)
+  if(contributed(provenance?.knowledge_graph))lines.push(`Knowledge Graph        : USED — ${funnel(provenance.knowledge_graph)}.`)
+  if(contributed(provenance?.learned_corpus))lines.push(`Learned Corpus         : USED — ${funnel(provenance.learned_corpus)}.`)
+  if(contributed(provenance?.cognitive_skills))lines.push(`Cognitive Skills       : USED — ${funnel(provenance.cognitive_skills)}. Procedural guidance; not factual grounding.`)
+  if(contributed(provenance?.user_memory))lines.push(`User Memory            : USED — ${funnel(provenance.user_memory)}.`)
+  if(liveEvidence?.used){
+    const sources=Array.isArray(liveEvidence.sources)?liveEvidence.sources:[]
+    lines.push(`Live External Evidence : USED — ${sources.length} live source${sources.length===1?'':'s'} retrieved${liveEvidence.retrieved_at?` at ${liveEvidence.retrieved_at}`:''}.`)
+    for(const source of sources)lines.push(`  [${source?.id||'LIVE'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}`)
+  }
+  if(researchUsed)lines.push(`Autonomous Research    : USED — ${count(provenance.autonomous_research.documents_acquired)} live documents acquired; ${count(provenance.autonomous_research.new_knowledge_retained)} retained as new durable knowledge.`)
+  if(localInvoked&&!externalMaterial)lines.push(`Local Reasoning Engine : INVOKED — ${provenance.local_reasoning.model||'local model'}.`)
+  if(externalMaterial)lines.push(`External AI Provider   : INVOKED — ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''}.`)
 
   const consultedOnly:string[]=[]
   for(const [label,item] of [
@@ -70,12 +80,23 @@ function formatMaterialProvenance(provenance:any):string{
     ['Cognitive Skills',provenance?.cognitive_skills],
     ['User Memory',provenance?.user_memory],
   ] as const){if(!contributed(item)&&consulted(item))consultedOnly.push(`${label}: ${funnel(item)}`)}
-  if(localInvoked&&externalInvoked)consultedOnly.push(`Local Reasoning Engine: ${provenance.local_reasoning.model||'local model'} invoked, but its draft was superseded and did not generate the recorded answer`)
+  if(localInvoked&&externalMaterial)consultedOnly.push(`Local Reasoning Engine: ${provenance.local_reasoning.model||'local model'} invoked, but its draft was superseded and did not generate the recorded answer`)
+  if(externalInvoked&&!externalAccepted)consultedOnly.push(`External AI Provider: ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} invoked, but its synthesis was rejected by the freshness grounding gate`)
   if(consultedOnly.length)lines.push('','Consulted but not material','──────────────────────────',consultedOnly.join('; ')+'.')
+
+  const notUsed:string[]=[]
+  if(!provenance?.semantic_cache?.used)notUsed.push('Semantic Cache')
+  if(!contributed(provenance?.enterprise_memory)&&!consulted(provenance?.enterprise_memory))notUsed.push('Enterprise Memory')
+  if(!contributed(provenance?.knowledge_graph)&&!consulted(provenance?.knowledge_graph))notUsed.push('Knowledge Graph')
+  if(!contributed(provenance?.learned_corpus)&&!consulted(provenance?.learned_corpus))notUsed.push('Learned Corpus')
+  if(!researchUsed)notUsed.push('Autonomous Research')
+  if(!localInvoked)notUsed.push('Local Reasoning Engine')
+  if(!externalInvoked)notUsed.push('External AI Provider')
+  if(notUsed.length)lines.push('','Explicitly not used','───────────────────',notUsed.map(label=>`${label}: NOT USED.`).join(' '))
 
   const learned=count(provenance?.autonomous_research?.new_knowledge_retained)
   const acquired=count(provenance?.autonomous_research?.documents_acquired)
-  lines.push('','Request Learning','────────────────',learned>0||acquired>0?`${acquired} documents acquired; ${learned} new knowledge items retained.`:'No new knowledge was acquired or retained during this request.')
+  lines.push('','Request Learning','────────────────',learned>0?`${acquired} documents acquired; ${learned} new knowledge items retained.`:acquired>0?`${acquired} live documents were retrieved for this request; 0 new knowledge items were retained.`:'No new knowledge was acquired or retained during this request.')
 
   if(provenance?.local_reasoning?.confidence!=null)lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(provenance.local_reasoning.threshold??0).toFixed(2)}.`)
   return lines.join('\n')

@@ -20,7 +20,7 @@ import {
   replyCitesFreshEvidence,
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
-import { readVolatileAnswerCache, volatileCacheHitProvenance, writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
+import { writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
@@ -85,17 +85,13 @@ export async function POST(req:NextRequest){
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source);return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   const requiresFreshEvidence=requiresFreshExternalEvidence(input),requestedAction=requestsExternalAction(input)
-  if(requiresFreshEvidence){
-    const cached=await readVolatileAnswerCache({prompt:input,language})
-    if(cached){
-      const executionProvenance=volatileCacheHitProvenance(authoritativeProvenance(null,{invoked:false}),cached)
-      const reply=cached.value.reply
-      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'volatile_cache',confidence:null,externalAiInvoked:false})
-      console.info('[cos-volatile-cache-hit]',JSON.stringify({at:new Date().toISOString(),ageMs:cached.ageMs,ttlRemainingMs:cached.ttlRemainingMs,groundedAt:cached.value.groundedAt,sourceUrls:cached.value.liveSources.map(source=>source.url)}))
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-volatile-live-cache')
-      return NextResponse.json({reply,source:'cos-volatile-live-cache',confidence_score:null,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,volatile_cache_hit:true,volatile_cache_age_ms:cached.ageMs,volatile_cache_expires_at:cached.expiresAt==null?null:new Date(cached.expiresAt).toISOString(),live_evidence_retrieved_this_turn:false,live_evidence_sources:cached.value.liveSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
-    }
-  }
+  // A volatile current-fact question ("who is the president", "latest X") must be re-verified
+  // against a live source on EVERY request. Serving a stored answer here is what returns
+  // hours-old data with a fresh-looking timestamp — an informed person re-checks a fact that
+  // can change rather than repeating what they last heard. The volatile answer cache is
+  // therefore NOT read on this path; it is kept only as a same-request coalescing/telemetry
+  // record, never as a substitute for a live fetch. (See writeVolatileAnswerCache below, which
+  // still records what was fetched for auditing, but nothing reads it back as an answer.)
 
   const directCategory=requiresFreshEvidence?classifyAuthoritativeVolatileFact(input):null
   if(directCategory){

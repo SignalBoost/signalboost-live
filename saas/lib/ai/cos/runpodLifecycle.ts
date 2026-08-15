@@ -3,9 +3,8 @@
 // dedicated GPU can be stopped while idle and resumed only when COS actually needs local compute.
 // Either lifecycle control or idle-stop can still be disabled explicitly with an environment flag.
 
-import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '@/lib/ai/cos/runpodConfig'
-
-const RUNPOD_GRAPHQL_URL = 'https://api.runpod.io/graphql'
+import { runpodControlConfigured } from '@/lib/ai/cos/runpodConfig'
+import { queryPodStatus, startPod, stopPod } from '@/lib/hub/runpodTelemetry'
 
 function booleanOverride(name: string): boolean | null {
   const value = process.env[name]?.trim().toLowerCase()
@@ -24,27 +23,6 @@ function enabled() {
   return runpodLifecycleConfigured()
 }
 
-function config() {
-  const apiKey = configuredRunpodApiKey()
-  const podId = configuredRunpodPodId()
-  if (!apiKey || !podId) throw new Error('RUNPOD_API_KEY plus RUNPOD_POD_ID (or a standard RunPod LOCAL_AI_BASE_URL) are required when RunPod lifecycle is enabled')
-  return { apiKey, podId }
-}
-
-async function graphql(query: string, variables: Record<string, unknown>) {
-  const { apiKey } = config()
-  const response = await fetch(`${RUNPOD_GRAPHQL_URL}?api_key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-    cache: 'no-store',
-  })
-  if (!response.ok) throw new Error(`RunPod lifecycle HTTP ${response.status}`)
-  const payload = await response.json() as { data?: unknown; errors?: Array<{ message?: string }> }
-  if (payload.errors?.length) throw new Error(payload.errors.map(error => error.message || 'RunPod GraphQL error').join('; '))
-  return payload.data
-}
-
 export function runpodLifecycleEnabled() {
   return enabled()
 }
@@ -59,22 +37,78 @@ export function runpodAutoStopEnabled(): boolean {
   return booleanOverride('COS_RUNPOD_AUTO_STOP_ENABLED') !== false
 }
 
-export async function ensureRunpodReasonerStarted(): Promise<{ attempted: boolean; started: boolean }> {
-  if (!enabled()) return { attempted: false, started: false }
-  const { podId } = config()
-  await graphql(
-    `mutation ResumeCosPod($input: PodResumeInput!) { podResume(input: $input) { id desiredStatus } }`,
-    { input: { podId, gpuCount: 1 } },
-  )
-  return { attempted: true, started: true }
+export type RunpodStartResult = {
+  attempted: boolean
+  started: boolean
+  resumeRequested: boolean
+  previousStatus: string | null
+  desiredStatus: string | null
 }
 
-export async function stopRunpodReasoner(): Promise<{ attempted: boolean; stopped: boolean }> {
+export async function ensureRunpodReasonerStarted(): Promise<RunpodStartResult> {
+  if (!enabled()) {
+    return { attempted: false, started: false, resumeRequested: false, previousStatus: null, desiredStatus: null }
+  }
+
+  const before = await queryPodStatus()
+  if (before.running) {
+    console.info('[cos-runpod-lifecycle]', JSON.stringify({
+      at: new Date().toISOString(),
+      action: 'resume_skipped',
+      previousStatus: before.desiredStatus,
+      desiredStatus: before.desiredStatus,
+      reason: 'pod_already_running',
+    }))
+    return {
+      attempted: false,
+      started: true,
+      resumeRequested: false,
+      previousStatus: before.desiredStatus,
+      desiredStatus: before.desiredStatus,
+    }
+  }
+
+  const resumed = await startPod()
+  const started = resumed.desiredStatus === 'RUNNING'
+  console.info('[cos-runpod-lifecycle]', JSON.stringify({
+    at: new Date().toISOString(),
+    action: 'resume_requested',
+    previousStatus: before.desiredStatus,
+    desiredStatus: resumed.desiredStatus,
+    started,
+  }))
+  return {
+    attempted: true,
+    started,
+    resumeRequested: true,
+    previousStatus: before.desiredStatus,
+    desiredStatus: resumed.desiredStatus,
+  }
+}
+
+export async function stopRunpodReasoner(): Promise<{ attempted: boolean; stopped: boolean; previousStatus?: string; desiredStatus?: string }> {
   if (!enabled()) return { attempted: false, stopped: false }
-  const { podId } = config()
-  await graphql(
-    `mutation StopCosPod($input: PodStopInput!) { podStop(input: $input) { id desiredStatus } }`,
-    { input: { podId } },
-  )
-  return { attempted: true, stopped: true }
+
+  const before = await queryPodStatus()
+  if (!before.running) {
+    console.info('[cos-runpod-lifecycle]', JSON.stringify({
+      at: new Date().toISOString(),
+      action: 'stop_skipped',
+      previousStatus: before.desiredStatus,
+      desiredStatus: before.desiredStatus,
+      reason: 'pod_not_running',
+    }))
+    return { attempted: false, stopped: true, previousStatus: before.desiredStatus, desiredStatus: before.desiredStatus }
+  }
+
+  const stopped = await stopPod()
+  const didStop = stopped.desiredStatus === 'EXITED'
+  console.info('[cos-runpod-lifecycle]', JSON.stringify({
+    at: new Date().toISOString(),
+    action: 'stop_requested',
+    previousStatus: before.desiredStatus,
+    desiredStatus: stopped.desiredStatus,
+    stopped: didStop,
+  }))
+  return { attempted: true, stopped: didStop, previousStatus: before.desiredStatus, desiredStatus: stopped.desiredStatus }
 }

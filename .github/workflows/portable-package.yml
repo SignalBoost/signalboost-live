@@ -14,6 +14,7 @@ on:
       - 'saas/lib/supervisor/**'
       - 'saas/portable-license/**'
       - 'saas/tests/supervisorReleaseBlockers.node.test.ts'
+      - 'saas/tests/selfHealingPortableCapabilityPolicy.node.test.ts'
       - 'saas/scripts/build-portable.mjs'
       - 'docs/portables/self-healing-*.md'
       - '.github/workflows/portable-package.yml'
@@ -22,6 +23,7 @@ on:
       - 'saas/lib/supervisor/**'
       - 'saas/portable-license/**'
       - 'saas/tests/supervisorReleaseBlockers.node.test.ts'
+      - 'saas/tests/selfHealingPortableCapabilityPolicy.node.test.ts'
       - 'saas/scripts/build-portable.mjs'
       - 'docs/portables/self-healing-*.md'
       - '.github/workflows/portable-package.yml'
@@ -51,7 +53,7 @@ jobs:
         run: npm ci
 
       - name: Run audited release-blocker regressions
-        run: node --test tests/supervisorReleaseBlockers.node.test.ts
+        run: node --test tests/supervisorReleaseBlockers.node.test.ts tests/selfHealingPortableCapabilityPolicy.node.test.ts
 
       - name: Verify buyer boundary
         run: node scripts/build-portable.mjs --check

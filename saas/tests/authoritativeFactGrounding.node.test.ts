@@ -1,3 +1,4 @@
+// saas/tests/authoritativeFactGrounding.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -64,4 +65,31 @@ test('authoritative direct answers are counted as inference avoided', () => {
   assert.equal(telemetry.inferenceAvoided, true)
   assert.equal(telemetry.localCallsAvoided, 1)
   assert.equal(telemetry.externalCallsAvoided, 1)
+})
+
+// --- Multi-source resilience: the fix for "one hardcoded source silently rotted" ---
+import { groundAuthoritativeVolatileFact } from '../lib/ai/cos/authoritativeFactGrounding'
+
+test('falls through to the next authoritative source when the first no longer exposes the fact', async () => {
+  const pages: Record<string, string> = {
+    // First source (Wikipedia) returns a page that no longer contains the name (rotted/empty).
+    'https://simple.wikipedia.org/wiki/List_of_presidents_of_the_United_States': '<main>Site maintenance.</main>',
+    // Second source (White House) still names the sitting president.
+    'https://www.whitehouse.gov/administration/': '<h1>President Donald Trump</h1>',
+  }
+  const fetch = async (url: string) => ({
+    ok: url in pages,
+    status: url in pages ? 200 : 404,
+    text: async () => pages[url] ?? '',
+  })
+  const grounded = await groundAuthoritativeVolatileFact('who is the current US president', { fetch, now: () => Date.parse('2026-08-15T00:00:00Z') })
+  assert.ok(grounded, 'should recover via a later source when the first is empty')
+  assert.match(grounded!.answer, /Donald Trump/)
+  assert.equal(grounded!.sourceId, 'whitehouse_administration')
+})
+
+test('returns null only when EVERY authoritative source fails — never a stale guess', async () => {
+  const fetch = async () => ({ ok: false, status: 503, text: async () => '' })
+  const grounded = await groundAuthoritativeVolatileFact('who is the current US president', { fetch })
+  assert.equal(grounded, null)
 })

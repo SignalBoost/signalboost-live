@@ -15,6 +15,8 @@ export type FreshnessAwareAnswer = {
   groundedAt: string | null
   sources: GroundingEvidence[]
   sourceIds: string[]
+  memorySources: GroundingEvidence[]
+  liveSources: GroundingEvidence[]
   memoryAttempted: boolean
   memorySufficient: boolean
   memoryReason: string
@@ -38,16 +40,17 @@ export async function answerFreshnessSensitiveQuestion(input:{
 }):Promise<FreshnessAwareAnswer>{
   const nowMs=input.nowMs??Date.now()
   const memory=await retrieveFreshMemoryEvidence(input.question,input.policy,nowMs)
+  const memoryEvidence=memory.sources.map(memoryToGrounding)
 
   if(memory.sufficient&&memory.sources.length){
-    const evidence=memory.sources.map(memoryToGrounding)
-    const synthesis=await synthesizeGroundedEvidence({question:input.question,sources:evidence,minimumCitations:minimumMemoryCitations(memory.sources)})
+    const synthesis=await synthesizeGroundedEvidence({question:input.question,sources:memoryEvidence,minimumCitations:minimumMemoryCitations(memory.sources)})
     if(synthesis.status==='answered'&&synthesis.answer){
       const groundedAt=new Date(nowMs).toISOString()
       return{
         ok:true,
-        reply:renderGroundedEvidenceReply({answer:synthesis.answer,sourceIds:synthesis.sourceIds,sources:evidence,groundedAt,fromMemory:true}),
-        source:'fresh_memory',confidence:0.9,localModelInvoked:true,localModel:synthesis.model,groundedAt,sources:evidence,sourceIds:synthesis.sourceIds,
+        reply:renderGroundedEvidenceReply({answer:synthesis.answer,sourceIds:synthesis.sourceIds,sources:memoryEvidence,groundedAt,fromMemory:true}),
+        source:'fresh_memory',confidence:0.9,localModelInvoked:true,localModel:synthesis.model,groundedAt,sources:memoryEvidence,sourceIds:synthesis.sourceIds,
+        memorySources:memoryEvidence,liveSources:[],
         memoryAttempted:true,memorySufficient:true,memoryReason:memory.reason,
         liveAttempted:false,liveSufficient:false,liveReason:null,synthesisStatus:synthesis.status,error:null,
       }
@@ -57,22 +60,24 @@ export async function answerFreshnessSensitiveQuestion(input:{
   }
 
   const live=await researchLiveAuthoritativeEvidence(input.question,new Date(nowMs))
+  const liveEvidence=live.sources.map(liveToGrounding)
   if(!live.sufficient||!live.sources.length){
     const reason=live.reason||'live authoritative evidence was unavailable'
     return{
-      ok:false,reply:failReply(reason),source:'failed_closed',confidence:0,localModelInvoked:false,localModel:null,groundedAt:live.retrievedAt||null,sources:live.sources.map(liveToGrounding),sourceIds:[],
+      ok:false,reply:failReply(reason),source:'failed_closed',confidence:0,localModelInvoked:false,localModel:null,groundedAt:live.retrievedAt||null,sources:liveEvidence,sourceIds:[],
+      memorySources:memoryEvidence,liveSources:liveEvidence,
       memoryAttempted:memory.attempted,memorySufficient:memory.sufficient,memoryReason:memory.reason,
       liveAttempted:true,liveSufficient:false,liveReason:reason,synthesisStatus:'not_run',error:reason,
     }
   }
 
-  const evidence=live.sources.map(liveToGrounding)
-  const synthesis=await synthesizeGroundedEvidence({question:input.question,sources:evidence,minimumCitations:minimumLiveCitations(live.sources)})
+  const synthesis=await synthesizeGroundedEvidence({question:input.question,sources:liveEvidence,minimumCitations:minimumLiveCitations(live.sources)})
   if(synthesis.status==='answered'&&synthesis.answer){
     return{
       ok:true,
-      reply:renderGroundedEvidenceReply({answer:synthesis.answer,sourceIds:synthesis.sourceIds,sources:evidence,groundedAt:live.retrievedAt,fromMemory:false}),
-      source:'live_verification',confidence:live.sources.some(source=>source.authorityTier==='primary')?0.97:0.9,localModelInvoked:true,localModel:synthesis.model,groundedAt:live.retrievedAt,sources:evidence,sourceIds:synthesis.sourceIds,
+      reply:renderGroundedEvidenceReply({answer:synthesis.answer,sourceIds:synthesis.sourceIds,sources:liveEvidence,groundedAt:live.retrievedAt,fromMemory:false}),
+      source:'live_verification',confidence:live.sources.some(source=>source.authorityTier==='primary')?0.97:0.9,localModelInvoked:true,localModel:synthesis.model,groundedAt:live.retrievedAt,sources:liveEvidence,sourceIds:synthesis.sourceIds,
+      memorySources:memoryEvidence,liveSources:liveEvidence,
       memoryAttempted:memory.attempted,memorySufficient:memory.sufficient,memoryReason:memory.reason,
       liveAttempted:true,liveSufficient:true,liveReason:live.reason,synthesisStatus:synthesis.status,error:null,
     }
@@ -80,7 +85,8 @@ export async function answerFreshnessSensitiveQuestion(input:{
 
   const reason=synthesis.status==='conflict'?'live authoritative sources conflict':synthesis.error||'live evidence did not establish the requested fact'
   return{
-    ok:false,reply:failReply(reason),source:'failed_closed',confidence:0,localModelInvoked:synthesis.invoked,localModel:synthesis.model||null,groundedAt:live.retrievedAt,sources:evidence,sourceIds:synthesis.sourceIds,
+    ok:false,reply:failReply(reason),source:'failed_closed',confidence:0,localModelInvoked:synthesis.invoked,localModel:synthesis.model||null,groundedAt:live.retrievedAt,sources:liveEvidence,sourceIds:synthesis.sourceIds,
+    memorySources:memoryEvidence,liveSources:liveEvidence,
     memoryAttempted:memory.attempted,memorySufficient:memory.sufficient,memoryReason:memory.reason,
     liveAttempted:true,liveSufficient:true,liveReason:live.reason,synthesisStatus:synthesis.status,error:reason,
   }

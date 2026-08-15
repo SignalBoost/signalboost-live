@@ -104,8 +104,12 @@ export function authorityTier(query: string, result: SearchResult): AuthorityTie
 
 export function authoritativeSearchQuery(input: string, policy: CosEvidencePolicy, now = new Date()): string {
   const base = String(input || '').trim()
-  const freshness = policy.freshnessRequired ? ` current as of ${now.toISOString().slice(0, 10)}` : ''
-  return `${base}${freshness} official primary authoritative source documentation`.slice(0, 400)
+  if (policy.freshnessRequired) {
+    // Keep this byte-for-byte aligned with cosFreshGrounding.freshEvidenceSearchQuery so the
+    // route's existing five-minute search cache is reused rather than issuing a second web query.
+    return `${base} official authoritative source current as of ${now.toISOString().slice(0, 10)}`.slice(0, 400)
+  }
+  return `${base} official primary authoritative source documentation`.slice(0, 400)
 }
 
 export function prepareAuthoritativeEvidence(

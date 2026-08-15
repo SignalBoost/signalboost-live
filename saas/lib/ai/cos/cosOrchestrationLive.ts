@@ -42,6 +42,7 @@ function formatMaterialProvenance(provenance:any):string{
     '─────────────────────',
   ]
   const origin=provenance?.answer_origin
+  const volatileCache=provenance?.volatile_answer_cache
   const externalInvoked=Boolean(provenance?.external_ai?.invoked)
   const externalAccepted=provenance?.external_ai?.accepted!==false
   const externalMaterial=externalInvoked&&externalAccepted
@@ -52,6 +53,12 @@ function formatMaterialProvenance(provenance:any):string{
     const written=origin.stored_at?` written ${origin.stored_at}`:''
     const model=origin.model?` by ${origin.model}`:''
     lines.push(`Answer Origin          : CACHE —${written}${model}.`)
+  }
+  if(volatileCache?.used){
+    lines.push(`Volatile Answer Cache  : USED — live-grounded answer reused; age ${count(volatileCache.age_ms)} ms${volatileCache.expires_at?`; expires ${volatileCache.expires_at}`:''}.`)
+    if(volatileCache.original_grounded_at)lines.push(`Original Live Grounding: ${volatileCache.original_grounded_at}${volatileCache.original_external_provider?` — ${volatileCache.original_external_provider}${volatileCache.original_external_model?` / ${volatileCache.original_external_model}`:''}`:''}.`)
+    const originSources=Array.isArray(volatileCache.origin_live_sources)?volatileCache.origin_live_sources:[]
+    for(const source of originSources)lines.push(`  [${source?.id||'LIVE'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}`)
   }
   if(provenance?.deterministic_utility?.used){
     const utility=String(provenance.deterministic_utility.utility||'server utility')

@@ -11,7 +11,7 @@ export type CosFreshnessPolicy = {
 
 const EXPLICIT_CURRENT = /\b(?:current|currently|today|tonight|now|latest|right now|at present|as of(?: today| now| this moment)?)\b/i
 const EXPLICIT_VERIFY = /\b(?:verify|confirm|fact[- ]?check|check (?:a )?source|show (?:me )?(?:the )?source|cite (?:a )?source|official source|authoritative source)\b/i
-const PRESENT_IDENTITY = /^\s*who\s+is\b/i
+const PRESENT_ROLE_RELATION = /^\s*who\s+is\s+(?:the\s+)?[^?]{1,100}\b(?:of|at|for)\b/i
 const PRESENT_LEADERSHIP = /^\s*who\s+(?:leads|heads|runs)\b/i
 const HISTORICAL = /\b(?:who was|who were|former|previous|formerly|historical|history of|in (?:18|19|20)\d{2}|during (?:18|19|20)\d{2})\b/i
 const DIAGNOSTIC_OR_DESIGN = /\b(?:diagnose|troubleshoot|debug|root cause|rank (?:the )?(?:causes|hypotheses)|architect|design (?:an?|the)|how would you distinguish|without making production changes)\b/i
@@ -24,8 +24,8 @@ const HOUR = 60 * MINUTE
  * How an informed human treats freshness:
  * - explicit current/now/latest wording: memory must be very recent;
  * - explicit verification/source request: go live instead of trusting remembered state;
- * - present-tense identity/leadership questions: recent sourced memory is acceptable for a day;
- * - historical, diagnostic, design, and transformative work is not forced into live lookup.
+ * - present-tense role/leadership questions: recent sourced memory is acceptable for a day;
+ * - ordinary identity, historical, diagnostic, design, and transformative work stays memory-first.
  */
 export function freshnessPolicyForQuestion(input: string): CosFreshnessPolicy {
   const text = String(input || '').replace(/\s+/g, ' ').trim()
@@ -46,8 +46,8 @@ export function freshnessPolicyForQuestion(input: string): CosFreshnessPolicy {
   if (EXPLICIT_CURRENT.test(text)) {
     return { required: true, maxMemoryAgeMs: HOUR, reason: 'explicit_current_state', forceLiveVerification: false }
   }
-  if (PRESENT_IDENTITY.test(text) || PRESENT_LEADERSHIP.test(text)) {
-    return { required: true, maxMemoryAgeMs: 24 * HOUR, reason: 'present_tense_identity', forceLiveVerification: false }
+  if (PRESENT_ROLE_RELATION.test(text) || PRESENT_LEADERSHIP.test(text)) {
+    return { required: true, maxMemoryAgeMs: 24 * HOUR, reason: 'present_tense_role_relation', forceLiveVerification: false }
   }
 
   return { required: false, maxMemoryAgeMs: null, reason: 'ordinary_memory_reasoning', forceLiveVerification: false }

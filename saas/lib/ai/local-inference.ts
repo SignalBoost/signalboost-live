@@ -54,9 +54,10 @@ function runpodStartTimeoutMs(): number {
  * local embeddings, and the co-located transcript service. A healthy running Pod is never resumed;
  * a cold Pod is resumed once per process and then polled until the configured local model is served.
  *
- * Cost fail-safe: if this gate itself resumed a stopped pod and readiness never succeeds, it sends an
- * immediate stop before propagating the error. A pod that was already running before this request is
- * never stopped merely because its reasoner health check failed.
+ * Cost fail-safe: if this gate started compute — either by resuming a stopped Pod or by repairing a
+ * broken container boot contract and restarting the Pod — readiness failure sends an immediate stop
+ * before propagating the error. Compute that was already healthy/running before this request is not
+ * claimed by this fail-safe.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
   if (!runpodLifecycleEnabled()) return
@@ -77,12 +78,14 @@ export async function ensureLocalInferenceRuntimeReady(config = localInferenceCo
       }
       throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
     } catch (error) {
-      if (wake.resumeRequested) {
+      if (wake.computeStartedByRequest) {
         try {
           const stopped = await stopRunpodReasoner()
           console.warn('[cos-runpod-cold-start-failsafe]', JSON.stringify({
             at: new Date().toISOString(),
-            resumeRequested: true,
+            resumeRequested: wake.resumeRequested,
+            startupContractRepaired: wake.startupContractRepaired,
+            computeStartedByRequest: wake.computeStartedByRequest,
             stopAttempted: stopped.attempted,
             stopped: stopped.stopped,
             previousStatus: stopped.previousStatus ?? null,

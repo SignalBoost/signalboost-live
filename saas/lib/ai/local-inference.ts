@@ -1,4 +1,6 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { ensureRunpodReasonerStarted, runpodLifecycleEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
+import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -13,6 +15,20 @@ export interface LocalInferenceTelemetry {
   httpStatus: number | null
   error: string | null
   runpodLifecycleEnabled: boolean
+}
+
+const runpodWakeContext = new AsyncLocalStorage<RunpodWakePermission>()
+
+export function withRunpodWakePermission<T>(permission: RunpodWakePermission, operation: () => Promise<T>): Promise<T> {
+  return runpodWakeContext.run(permission, operation)
+}
+
+export function currentRunpodWakePermission(): RunpodWakePermission | null {
+  return runpodWakeContext.getStore() ?? null
+}
+
+export function runpodWakePermitted(): boolean {
+  return currentRunpodWakePermission()?.allowed === true
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -50,20 +66,35 @@ function runpodStartTimeoutMs(): number {
 }
 
 /**
- * Shared wake/readiness gate for every consumer of the secured RunPod runtime: Qwen reasoning,
- * local embeddings, and the co-located transcript service. A healthy running Pod is never resumed;
- * a cold Pod is resumed once per process and then polled until the configured local model is served.
+ * Shared readiness gate for every consumer of the secured RunPod runtime.
  *
- * Cost fail-safe: if this gate started compute — either by resuming a stopped Pod or by repairing a
- * broken container boot contract and restarting the Pod — readiness failure sends an immediate stop
- * before propagating the error. Compute that was already healthy/running before this request is not
- * claimed by this fail-safe.
+ * CRITICAL COST BOUNDARY: a stopped/unhealthy RunPod may be resumed ONLY inside a request-scoped
+ * permission created from a fresh same-origin user interaction. Background jobs, cron handlers,
+ * delayed server-to-server calls, stale browser replays and tests have no permission by default and
+ * therefore fail fast instead of allocating GPU compute. If the model is already healthy, callers
+ * may continue to use it without changing lifecycle state.
+ *
+ * Cost fail-safe: if an authorized interactive gate started compute and readiness never succeeds, it
+ * immediately stops the Pod before propagating the error.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
   if (!runpodLifecycleEnabled()) return
 
   const current = await checkLocalInferenceHealth(config)
   if (current.ok) return
+
+  const permission = currentRunpodWakePermission()
+  if (!permission?.allowed) {
+    console.info('[cos-runpod-wake-blocked]', JSON.stringify({
+      at: new Date().toISOString(),
+      reason: permission?.reason ?? 'no_request_scoped_wake_permission',
+      source: permission?.source ?? 'background_or_untrusted',
+      interactionId: permission?.interactionId ?? null,
+      healthError: current.error ?? null,
+    }))
+    throw new Error('Reasoner is stopped or unhealthy and this request is not allowed to wake RunPod')
+  }
+
   if (runtimeReadyPromise) return runtimeReadyPromise
 
   runtimeReadyPromise = (async () => {

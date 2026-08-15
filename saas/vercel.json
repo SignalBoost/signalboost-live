@@ -101,7 +101,7 @@
     },
     {
       "path": "/api/cron/cos-runpod-idle-stop",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

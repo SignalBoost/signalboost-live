@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
+import { runCouncilMembersConcurrently } from '@/lib/ai/cos/councilConcurrency'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 
@@ -406,8 +407,7 @@ export async function maybeBuildCognitiveCouncilAdvisory(input: {
   const inference = localInferenceConfigFromEnv()
   await touchRunpodActivityLease('cognitive_council')
 
-  const opinions: CouncilOpinion[] = []
-  for (const role of roles) {
+  const opinions = await runCouncilMembersConcurrently<CouncilOpinion>(roles.map(role => async () => {
     const definition = ROLE_DEFINITIONS.find(item => item.role === role)!
     const credibilityWeight = await credibilityFor(role, problemClass)
     const raw = await callLocalModel({
@@ -416,12 +416,12 @@ export async function maybeBuildCognitiveCouncilAdvisory(input: {
       systemPrompt: 'You are a bounded specialist inside SignalBoost COS Council. Return only the requested structured review artifact.',
       prompt: memberPrompt(definition, question, input.prompt, allowedLabels),
     }, inference).catch(() => null)
-    if (!raw) continue
+    if (!raw) return null
     const opinion = parseOpinion(raw, role, allowedLabels, credibilityWeight)
-    if (!opinion) continue
-    opinions.push(opinion)
+    if (!opinion) return null
     await persistOpinion(sessionId, opinion, input.reasonerLabel)
-  }
+    return opinion
+  }))
 
   const success = opinions.length >= 2
   await completeSession(sessionId, success)

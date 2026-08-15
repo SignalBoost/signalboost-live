@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/authoritativeFactGrounding.ts
 // Direct live-source grounding for narrow volatile facts that do not require model synthesis.
 // A recognized fact is answered only when a first-party/government source yields the value.
 // Source failure returns null; callers must fail closed rather than substitute model memory.
@@ -64,11 +65,50 @@ function extractCurrentUsPresident(body: string): string | null {
   return `The current President of the United States is ${name}.`
 }
 
+// USAGov restructured /presidents in 2026 to render the name dynamically, so its static HTML no
+// longer contains the president's name — exactly how a single hardcoded source silently rots and
+// serves stale/empty answers. The category therefore carries MULTIPLE independent authoritative
+// sources; grounding walks them in order and the first that still yields a name wins, so one page
+// changing shape can never again produce a stale answer. Extractors are matched to each source's
+// ACTUAL current page text, not a phrasing we wish it used.
+function extractPresidentFromWikipedia(body: string): string | null {
+  const text = pageText(body)
+  // Verified against live page text. Two shapes Wikipedia uses:
+  //  forward: "Donald Trump is the 47th and current president"
+  //  reverse: "current president of the United States is Donald John Trump"
+  const forward = text.match(/([A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-]+(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-]+){1,3})\s+is the\s+[0-9A-Za-z]+\s+and current president/)
+  const reverse = text.match(/current president of the United States is\s+([A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-\s]{2,60}?)(?=[.,;])/i)
+  const raw = (forward?.[1] || reverse?.[1] || '').trim().replace(/\s+/g, ' ')
+  return raw && raw.length <= 60 ? `The current President of the United States is ${raw}.` : null
+}
+
+function extractPresidentFromWhiteHouse(body: string): string | null {
+  const text = pageText(body)
+  const m = text.match(/President\s+([A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-]+(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-]+){1,3})/)
+  if (!m) return null
+  const name = m[1].trim().replace(/\s+/g, ' ')
+  return name && name.length <= 60 ? `The current President of the United States is ${name}.` : null
+}
+
 export const VOLATILE_FACT_CATEGORIES: VolatileFactCategory[] = [
   {
     id: 'us_president',
     matches: isCurrentUsPresidentQuestion,
+    // Ordered by structural stability for this fact: Wikipedia names the incumbent in stable prose,
+    // whitehouse.gov names the sitting president, USAGov kept last as a legacy check.
     sources: [
+      {
+        id: 'wikipedia_potus',
+        label: 'Wikipedia — List of presidents of the United States',
+        url: 'https://simple.wikipedia.org/wiki/List_of_presidents_of_the_United_States',
+        extract: extractPresidentFromWikipedia,
+      },
+      {
+        id: 'whitehouse_administration',
+        label: 'The White House — Administration',
+        url: 'https://www.whitehouse.gov/administration/',
+        extract: extractPresidentFromWhiteHouse,
+      },
       {
         id: 'usagov_presidents',
         label: 'USAGov — Presidents, vice presidents, and first ladies',

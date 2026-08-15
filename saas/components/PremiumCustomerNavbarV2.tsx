@@ -8,6 +8,7 @@ import { useTranslation } from '@/components/i18n/useTranslation'
 import AuthModal from './AuthModal.tsx'
 import { supabase } from '@/utils/supabase/client'
 import { uiText } from '@/lib/i18n/uiText'
+import { BUSINESS_INTELLIGENCE_CORPUS_COPY } from '@/lib/i18n/businessIntelligenceCorpusCopy'
 
 type NavItem = {
   icon: string
@@ -54,9 +55,6 @@ const GROUPS: NavGroup[] = [
       { icon: '🎬', labelKey: 'nav.videoPipeline', fallbackLabel: uiText('generatedUi.u_36d4f0c2fcf34e05'), href: '/dashboard/cosa/video-pipeline' },
       { icon: '🗂️', labelKey: 'nav.pressPrint', fallbackLabel: uiText('generatedUi.u_ba2f8d68f462717f'), href: '/dashboard/marketing/press-print' },
       { icon: '🧾', labelKey: 'nav.pressOutreach', fallbackLabel: uiText('generatedUi.u_8dc7472b90ff7180'), href: '/dashboard/marketing/press-outreach' },
-      // The DRAFT QUEUE sits above the cockpit deliberately. Approving drafts is the daily
-      // job; connecting providers is setup you finish once. A menu should be ordered by how
-      // often an entry is needed, not by how the features were built.
       { icon: '📝', labelKey: 'nav.pressDrafts', fallbackLabel: uiText('generatedUi.u_pressdrafts_navlabel'), href: '/dashboard/marketing/press-drafts' },
       { icon: '📰', labelKey: 'nav.pressProviders', fallbackLabel: uiText('generatedUi.u_9d597b5a530fd867'), href: '/dashboard/marketing/press-providers' },
       { icon: '📢', labelKey: 'nav.promote', fallbackLabel: uiText('generatedUi.u_5834dab085442471'), href: '/dashboard/promote' },
@@ -67,9 +65,6 @@ const GROUPS: NavGroup[] = [
       { icon: '📊', labelKey: 'nav.salesPipeline', fallbackLabel: uiText('generatedUi.u_22a3534629d2dcf1'), href: '/dashboard/sales/pipeline' },
       { icon: '📨', labelKey: 'nav.myOutreach', fallbackLabel: uiText('generatedUi.u_04c411dc1ee0d29f'), href: '/dashboard/my-outreach' },
       { icon: '📇', labelKey: 'nav.admOutreachConsole', fallbackLabel: uiText('navExtra.admOutreachConsole'), href: '/admin/outreach', requiresOwner: true },
-      // Background campaigns had no entry anywhere. A campaign was started from chat, a job id
-      // was handed back, and the only way to see what the worker did was to know a URL nobody
-      // had been told. Same defect as an acceptance page with no link to it.
       { icon: '🛰️', labelKey: 'nav.backgroundCampaigns', fallbackLabel: `${uiText('generatedUi.u_350fd0c928342e75')} — ${uiText('generatedUi.u_5a6c6aa4a802b400')}`, href: '/dashboard/outreach/campaigns', requiresOwner: true },
       { icon: '🛡️', labelKey: 'nav.outreachApprovals', fallbackLabel: uiText('outreachApprovals.title'), href: '/dashboard/hub/outreach-approvals', requiresOwner: true },
       { icon: '⛏️', labelKey: 'nav.cosMining', fallbackLabel: uiText('generatedUi.u_e595ed3d019ad2a5'), href: '/dashboard/cos-mining' },
@@ -147,25 +142,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { icon: '🤖', labelKey: 'nav.cosAssistant', fallbackLabel: uiText('generatedUi.u_f7186e7e576a60ad'), href: '/dashboard/assistant', requiresOwner: true },
       { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: uiText('generatedUi.u_4943e64e40762052'), href: '/admin', requiresOwner: true },
-
-      // ── SELF-HEALING SUPERVISOR, IN THE ORDER THE PRODUCT IS OPERATED ──────────
-      //
-      // These eleven entries were previously three, scattered through this group at
-      // positions 3, 8 and 9, and the other EIGHT pages could not be reached by any
-      // sequence of clicks anywhere in the platform — including the demo screen built
-      // for prospects to watch and the approval queue where a repair is authorised.
-      // A buyer evaluating self-healing software could not get to the screen where the
-      // healing is approved, which is the one screen the category is named after.
-      //
-      // They are now one contiguous block in WORKFLOW ORDER: connect what it watches,
-      // see what it sees, decide, review what ran, then the operator surfaces. The
-      // order is the answer to "where do I go next" — a reader who follows the list
-      // downward is following the product's own sequence.
-      //
-      // Labels are COMPOSED FROM EXISTING locale keys for the reason documented below
-      // on the acceptance entries: `fallbackLabel` is checked by validate:i18n-locale-keys,
-      // so a plain English string here fails the guard, and new generatedUi keys would
-      // mean editing five locale files of ~2,800 keys each.
+      { icon: '🧠', labelKey: 'nav.businessIntelligenceCorpus', fallbackLabel: BUSINESS_INTELLIGENCE_CORPUS_COPY.en.eyebrow, href: '/dashboard/data/business-intelligence-corpus', requiresOwner: true },
       { icon: '🛑', labelKey: 'nav.supervisorSOC', fallbackLabel: uiText('generatedUi.u_67524288ec825ae4'), href: '/dashboard/supervisor', requiresOwner: true },
       { icon: '🔌', labelKey: 'nav.supervisorProviders', fallbackLabel: `${uiText('generatedUi.u_9de790933254b865')} — ${uiText('generatedUi.u_2a93e812bc1ecd33')}`, href: '/dashboard/supervisor/providers', requiresOwner: true },
       { icon: '▲', labelKey: 'nav.supervisorVercelHealth', fallbackLabel: `${uiText('generatedUi.u_68edc75c015e2e10')} — ${uiText('generatedUi.u_55898449eb74fb2e')}`, href: '/dashboard/supervisor/vercel-health', requiresOwner: true },
@@ -175,31 +152,13 @@ const GROUPS: NavGroup[] = [
       { icon: '🧬', labelKey: 'nav.supervisorProtocolCapabilities', fallbackLabel: uiText('generatedUi.u_c38c6df0902b4c66'), href: '/dashboard/supervisor/protocol-capabilities', requiresOwner: true },
       { icon: '🛰️', labelKey: 'nav.supervisorHa', fallbackLabel: uiText('generatedUi.u_4f794af09d6d3e3c'), href: '/dashboard/supervisor/ha', requiresOwner: true },
       { icon: '✅', labelKey: 'nav.supervisorAcceptance', fallbackLabel: uiText('generatedUi.u_68cb08a39a30554a'), href: '/dashboard/supervisor/acceptance', requiresOwner: true },
-      // The prospect-facing pair. The operator runs the first on a screen share; the
-      // second is the read-only record a prospect opens later with no account at all.
       { icon: '🎬', labelKey: 'nav.supervisorDemo', fallbackLabel: `${uiText('generatedUi.u_9de790933254b865')} — ${uiText('generatedUi.u_75c419ef704f82fe')}`, href: '/dashboard/supervisor/demo', requiresOwner: true },
       { icon: '🔗', labelKey: 'nav.supervisorPublicDemo', fallbackLabel: `${uiText('generatedUi.u_75c419ef704f82fe')} — ${uiText('generatedUi.u_14269d3cc697c30f')}`, href: '/demo/supervisor', requiresOwner: true },
-      // Mints licence credentials, so it is owner-only and sits last, away from the
-      // demo entries — a prospect watching a screen share must never see this screen.
       { icon: '🔑', labelKey: 'nav.supervisorLicense', fallbackLabel: `${uiText('generatedUi.u_9de790933254b865')} — ${uiText('generatedUi.u_f3ec8e880a46c8a6')}`, href: '/dashboard/supervisor/license', requiresOwner: true },
-      // ── end Supervisor block ───────────────────────────────────────────────────
       { icon: '🎛️', labelKey: 'nav.consoleHub', fallbackLabel: uiText('generatedUi.u_3cbf6d117f4dc1b5'), href: '/hub', requiresOwner: true },
       { icon: '🔐', labelKey: 'nav.vault', fallbackLabel: uiText('generatedUi.u_e7ccb35263c6b8a0'), href: '/vault', requiresOwner: true },
       { icon: '🧠', labelKey: 'nav.cosHub', fallbackLabel: uiText('generatedUi.u_a4a4f4e10a389fd8'), href: '/hub/cos', requiresOwner: true },
       { icon: '🚀', labelKey: 'nav.onboardingAdmin', fallbackLabel: uiText('generatedUi.u_6cda524ff713f2b8'), href: '/admin/onboarding', requiresOwner: true },
-      // Acceptance runs for the other two portables that produce their evidence on THIS
-      // deployment. They existed as pages with no way to reach them, which is the same defect
-      // as an acceptance harness reachable only from a CLI: the run is available in principle
-      // and unavailable in practice. Placed beside the supervisor's so all three sit together.
-      //
-      // Their labels are COMPOSED FROM EXISTING locale keys — "Press media" / "Provider Hub"
-      // plus "Run acceptance" — rather than from new generatedUi keys. Two reasons, and the
-      // first is a guard: `fallbackLabel` is a checked property, so a plain English string here
-      // fails validate:i18n-locale-keys (it did, before this comment existed). The second is
-      // that adding new generatedUi keys means editing five locale files of ~2,800 keys each,
-      // and a slot swap there has cost real time twice. Composition translates today in all
-      // five languages, and the declared labelKeys let a future locale entry override the
-      // composed label with a hand-written one.
       { icon: '📰', labelKey: 'nav.pressAcceptance', fallbackLabel: `${uiText('generatedUi.u_85c253de08e70759')} — ${uiText('generatedUi.u_96385fbce0625bd2')}`, href: '/dashboard/press-media/acceptance', requiresOwner: true },
       { icon: '🧩', labelKey: 'nav.providerHubAcceptance', fallbackLabel: `${uiText('generatedUi.u_a082185bfb56e8e0')} — ${uiText('generatedUi.u_96385fbce0625bd2')}`, href: '/dashboard/provider-hub/acceptance', requiresOwner: true },
       { icon: '🧩', labelKey: 'nav.providerHubStatus', fallbackLabel: uiText('generatedUi.u_9a955057059a488c'), href: '/dashboard/provider-hub', requiresOwner: true },
@@ -280,9 +239,6 @@ export default function PremiumCustomerNavbarV2() {
       try {
         const response = await fetch('/api/credits', { cache: 'no-store' })
         if (!response.ok) {
-          // A non-200 (transient 401/500) must NOT silently strip an owner/admin
-          // of their navigation. Retry once, then leave the last known role
-          // untouched rather than hiding privileged items.
           if (attempt < 1 && !cancelled) return loadRole(attempt + 1)
           return
         }
@@ -292,7 +248,6 @@ export default function PremiumCustomerNavbarV2() {
         setIsOwner(Boolean(data.isOwner))
         if (typeof data.credits === 'number') setCredits(data.credits)
       } catch {
-        // Network error: retry once, then keep existing role — never hide controls.
         if (attempt < 1 && !cancelled) return loadRole(attempt + 1)
       }
     }

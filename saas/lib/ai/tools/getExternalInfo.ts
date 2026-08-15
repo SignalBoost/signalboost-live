@@ -12,6 +12,7 @@ import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
 
 export type SearchResult = { title: string; url: string; snippet: string }
+export type ExternalInfoOptions = { bypassCache?: boolean }
 
 export interface WebSearchPort {
   // Return up to `count` results, or throw Error(message) explaining why none.
@@ -19,7 +20,7 @@ export interface WebSearchPort {
 }
 
 const cache = new Map<string, { at: number; results: SearchResult[] }>()
-const CACHE_MS = 5 * 60 * 1000 // 5 minutes
+const CACHE_MS = 5 * 60 * 1000 // 5 minutes — never used for explicit live volatile-fact checks.
 const MAX_CACHE_ENTRIES = 50
 const DEFAULT_RESULT_COUNT = 10
 const MAX_RESULT_COUNT = 12
@@ -66,26 +67,44 @@ function defaultSearchPort(): WebSearchPort {
 export function setWebSearchPort(p: WebSearchPort): void { searchPort = p }
 export function getWebSearchPort(): WebSearchPort { return searchPort ?? defaultSearchPort() }
 
-export async function getExternalInfo(query: string, requestedCount = DEFAULT_RESULT_COUNT): Promise<{ ok: boolean; results: SearchResult[]; error?: string }> {
+function isFreshnessQuery(query: string): boolean {
+  const q = String(query || '').toLowerCase()
+  return /\bcurrent\b/.test(q)
+    && /\b(?:latest|today|now|as of)\b/.test(q)
+    && /\b(?:authoritative|official|verification)\b/.test(q)
+}
+
+export async function getExternalInfo(
+  query: string,
+  requestedCount = DEFAULT_RESULT_COUNT,
+  options: ExternalInfoOptions = {},
+): Promise<{ ok: boolean; results: SearchResult[]; error?: string }> {
   const q = String(query || '').trim().slice(0, 400)
   if (!q) return { ok: false, results: [], error: 'Empty search query.' }
   const count = Math.max(1, Math.min(Number(requestedCount) || DEFAULT_RESULT_COUNT, MAX_RESULT_COUNT))
+  const bypassCache = options.bypassCache === true || isFreshnessQuery(q)
 
   const key = `${count}:${q.toLowerCase()}`
-  const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < CACHE_MS) {
-    return { ok: true, results: hit.results }
+  if (!bypassCache) {
+    const hit = cache.get(key)
+    if (hit && Date.now() - hit.at < CACHE_MS) {
+      return { ok: true, results: hit.results }
+    }
   }
 
   try {
     const results = await getWebSearchPort().search(q, count)
     if (!results.length) return { ok: false, results: [], error: 'No results found.' }
 
-    if (cache.size >= MAX_CACHE_ENTRIES) {
-      const oldest = cache.keys().next().value
-      if (oldest !== undefined) cache.delete(oldest)
+    // A truly-live caller deliberately bypasses both cache read and cache write. This prevents a
+    // later current-fact request from inheriting evidence captured on an earlier request.
+    if (!bypassCache) {
+      if (cache.size >= MAX_CACHE_ENTRIES) {
+        const oldest = cache.keys().next().value
+        if (oldest !== undefined) cache.delete(oldest)
+      }
+      cache.set(key, { at: Date.now(), results })
     }
-    cache.set(key, { at: Date.now(), results })
 
     return { ok: true, results }
   } catch (e) {

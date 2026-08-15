@@ -1,10 +1,12 @@
 import * as base from './cosOrchestrationEnterprise'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
 export const isProvenanceIntrospection=base.isProvenanceIntrospection
-export function requestsExternalAction(input:string):boolean{return requiresFreshExternalEvidence(input)||base.requestsExternalAction(input)}
+// A current-fact lookup is evidence retrieval, not an externally consequential action. Treating it
+// as an "external action" skipped the local COS path entirely and forced the answer into the legacy
+// provider fallback. Actual tool/execution requests still use the governed base detector.
+export const requestsExternalAction=base.requestsExternalAction
 export const authoritativeProvenance=base.authoritativeProvenance
 export const escalationReason=base.escalationReason
 export const logEscalation=base.logEscalation

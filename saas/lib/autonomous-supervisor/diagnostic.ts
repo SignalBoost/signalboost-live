@@ -11,12 +11,12 @@ import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
+import { supervisorDiagnosticCacheKey } from './diagnostic-cache-key.ts'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 const METHODS = new Set(['api', 'code_change', 'cli', 'ui_agent', 'human_action', 'no_action'])
 const RISKS = new Set(['low', 'medium', 'high', 'critical'])
 const ai = createPlatformAiPort()
-const DIAGNOSTIC_CACHE_PREFIX = 'cos-supervisor-diagnostic:v3:'
 const DIAGNOSTIC_IN_FLIGHT = new Map<string, Promise<DiagnosticResult>>()
 
 function boundedNumber(name: string, fallback: number, min: number, max: number): number {
@@ -34,10 +34,6 @@ function supervisorLocalMaxTokens(): number {
 
 function diagnosticCacheTtlMs(): number {
   return Math.round(boundedNumber('COS_SUPERVISOR_DIAGNOSTIC_CACHE_MS', 60 * 60_000, 60_000, 6 * 60 * 60_000))
-}
-
-function diagnosticCacheKey(incident: NormalizedIncidentPayload): string {
-  return `${DIAGNOSTIC_CACHE_PREFIX}${incident.incident_id}`
 }
 
 function extractJson(text: string): unknown {
@@ -94,7 +90,7 @@ async function readCachedDiagnostic(incident: NormalizedIncidentPayload): Promis
   const db = cosServiceDb()
   if (!db) return null
   try {
-    const entry = await new SupabaseExactCacheStore(db).get<DiagnosticResult>(diagnosticCacheKey(incident))
+    const entry = await new SupabaseExactCacheStore(db).get<DiagnosticResult>(supervisorDiagnosticCacheKey(incident))
     if (!entry?.value) return null
     return validateDiagnostic(entry.value, incident.incident_id)
   } catch {
@@ -107,7 +103,7 @@ async function writeCachedDiagnostic(incident: NormalizedIncidentPayload, diagno
   if (!db) return
   try {
     const now = Date.now()
-    await new SupabaseExactCacheStore(db).set(diagnosticCacheKey(incident), {
+    await new SupabaseExactCacheStore(db).set(supervisorDiagnosticCacheKey(incident), {
       value: diagnostic,
       createdAt: now,
       expiresAt: now + ttlMs,
@@ -253,7 +249,7 @@ export async function diagnoseIncident(incident: NormalizedIncidentPayload, thin
     return cached
   }
 
-  const key = diagnosticCacheKey(incident)
+  const key = supervisorDiagnosticCacheKey(incident)
   const existing = DIAGNOSTIC_IN_FLIGHT.get(key)
   if (existing) {
     console.info('[cos-supervisor-diagnostic]', JSON.stringify({ at: new Date().toISOString(), incidentId: incident.incident_id, source: 'in_flight_dedupe', modelCalls: 0 }))

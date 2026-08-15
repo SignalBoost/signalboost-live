@@ -4,22 +4,26 @@ on:
   pull_request:
     paths:
       - 'saas/lib/ai/cos/**'
+      - 'saas/lib/autonomous-supervisor/**'
       - 'saas/self-healing-host/**'
       - 'saas/agent-gateway-host/**'
       - 'saas/supabase/migrations/**'
       - 'saas/tests/cosCouncil*.node.test.ts'
       - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
+      - 'saas/tests/supervisorDiagnosticCacheKey.node.test.ts'
       - '.github/workflows/cos-council-regression.yml'
   push:
     branches:
       - main
     paths:
       - 'saas/lib/ai/cos/**'
+      - 'saas/lib/autonomous-supervisor/**'
       - 'saas/self-healing-host/**'
       - 'saas/agent-gateway-host/**'
       - 'saas/supabase/migrations/**'
       - 'saas/tests/cosCouncil*.node.test.ts'
       - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
+      - 'saas/tests/supervisorDiagnosticCacheKey.node.test.ts'
       - '.github/workflows/cos-council-regression.yml'
   workflow_dispatch:
 
@@ -59,6 +63,9 @@ jobs:
 
       - name: Run native monitoring policy regression
         run: node --test tests/selfHealingNativeMonitoringPolicy.node.test.ts
+
+      - name: Run Supervisor diagnostic cache identity regression
+        run: node --test tests/supervisorDiagnosticCacheKey.node.test.ts
 
       - name: Verify strip-safe module boundary
         run: npm run validate:strip-safe

@@ -1,4 +1,4 @@
-import { ensureRunpodReasonerStarted, runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
+import { ensureRunpodReasonerStarted, runpodLifecycleEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -53,6 +53,10 @@ function runpodStartTimeoutMs(): number {
  * Shared wake/readiness gate for every consumer of the secured RunPod runtime: Qwen reasoning,
  * local embeddings, and the co-located transcript service. A healthy running Pod is never resumed;
  * a cold Pod is resumed once per process and then polled until the configured local model is served.
+ *
+ * Cost fail-safe: if this gate itself resumed a stopped pod and readiness never succeeds, it sends an
+ * immediate stop before propagating the error. A pod that was already running before this request is
+ * never stopped merely because its reasoner health check failed.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
   if (!runpodLifecycleEnabled()) return
@@ -62,15 +66,35 @@ export async function ensureLocalInferenceRuntimeReady(config = localInferenceCo
   if (runtimeReadyPromise) return runtimeReadyPromise
 
   runtimeReadyPromise = (async () => {
-    await ensureRunpodReasonerStarted()
-    const timeoutMs = runpodStartTimeoutMs()
-    const deadline = Date.now() + timeoutMs
-    while (Date.now() < deadline) {
-      const health = await checkLocalInferenceHealth(config)
-      if (health.ok) return
-      await new Promise(resolve => setTimeout(resolve, 3000))
+    const wake = await ensureRunpodReasonerStarted()
+    try {
+      const timeoutMs = runpodStartTimeoutMs()
+      const deadline = Date.now() + timeoutMs
+      while (Date.now() < deadline) {
+        const health = await checkLocalInferenceHealth(config)
+        if (health.ok) return
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+      throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
+    } catch (error) {
+      if (wake.resumeRequested) {
+        try {
+          const stopped = await stopRunpodReasoner()
+          console.warn('[cos-runpod-cold-start-failsafe]', JSON.stringify({
+            at: new Date().toISOString(),
+            resumeRequested: true,
+            stopAttempted: stopped.attempted,
+            stopped: stopped.stopped,
+            previousStatus: stopped.previousStatus ?? null,
+            desiredStatus: stopped.desiredStatus ?? null,
+            reason: error instanceof Error ? error.message : String(error),
+          }))
+        } catch (stopError) {
+          console.error('[cos-runpod-cold-start-failsafe] stop failed', stopError instanceof Error ? stopError.message : String(stopError))
+        }
+      }
+      throw error
     }
-    throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
   })()
 
   try {

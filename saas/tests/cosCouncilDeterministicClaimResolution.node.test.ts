@@ -6,8 +6,8 @@ import test from 'node:test'
 import {
   normalizeCouncilMachinePrediction,
   resolveCouncilMachinePrediction,
-} from '@/lib/ai/cos/councilMachinePrediction'
-import { extractCouncilCognitiveSkillRefs } from '@/lib/ai/cos/councilObjectiveOutcome'
+} from '../lib/ai/cos/councilMachinePrediction.ts'
+import { extractCouncilCognitiveSkillRefs } from '../lib/ai/cos/councilPromptProvenance.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const migrationPath = path.join(here, '../supabase/migrations/20260815_cos_council_deterministic_claim_resolution.sql')

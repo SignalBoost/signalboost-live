@@ -16,8 +16,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 function idleThresholdMinutes(): number {
-  const value = Number(process.env.COS_RUNPOD_IDLE_MINUTES || '30')
-  return Number.isFinite(value) && value > 0 ? value : 30
+  const value = Number(process.env.COS_RUNPOD_IDLE_MINUTES || '10')
+  return Number.isFinite(value) && value > 0 ? value : 10
 }
 
 function unhealthyGraceSeconds(): number {

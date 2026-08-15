@@ -129,7 +129,7 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
         similarity: entry.candidate.similarity,
         selectionScore: entry.selection.selectionScore,
         evidenceReliability: entry.selection.evidenceReliability,
-        line: `[SK${index + 1}] ${safe(row.title, 240)} — ${safe(row.description, 900)} Procedure: ${safe(JSON.stringify(row.procedure ?? {}), 3000)} [status ${entry.status}; semantic relevance ${entry.candidate.similarity.toFixed(2)}; selection evidence ${entry.selection.evidenceReliability.toFixed(2)}; procedural guidance only, not factual evidence]`,
+        line: `[SK${index + 1}] [skill_key=${safe(row.skill_key, 240)}] ${safe(row.title, 240)} — ${safe(row.description, 900)} Procedure: ${safe(JSON.stringify(row.procedure ?? {}), 3000)} [status ${entry.status}; semantic relevance ${entry.candidate.similarity.toFixed(2)}; selection evidence ${entry.selection.evidenceReliability.toFixed(2)}; procedural guidance only, not factual evidence]`,
       }
     }),
   }

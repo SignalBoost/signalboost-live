@@ -6,9 +6,8 @@ import {
   type SupervisorThinkerResponse,
 } from '@/lib/cos/supervisor-thinker-prompt'
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
-import { callLocalModel, checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
-import { runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { supervisorDiagnosticCacheKey } from './diagnostic-cache-key.ts'
@@ -125,10 +124,56 @@ export function registerDiagnosticThinker(thinker: DiagnosticThinker): void {
 }
 export function listDiagnosticThinkers(): string[] { return Array.from(THINKERS.keys()).sort() }
 
+async function callSupervisorLocalModelWithoutWake(
+  prompt: string,
+  systemPrompt: string,
+  maxTokens: number,
+  timeoutMs: number,
+): Promise<string> {
+  const baseConfig = localInferenceConfigFromEnv()
+  const health = await checkLocalInferenceHealth({ ...baseConfig, timeoutMs: Math.min(baseConfig.timeoutMs, 5_000) })
+  if (!health.ok) throw new Error(`COS local reasoner is not already healthy; background wake suppressed: ${health.error || 'health check failed'}`)
+
+  await touchRunpodActivityLease('supervisor_diagnostic').catch(() => undefined)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const auth = baseConfig.apiKey ? { Authorization: `Bearer ${baseConfig.apiKey}`, 'x-api-key': baseConfig.apiKey } : {}
+    const response = await fetch(`${baseConfig.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: baseConfig.model,
+        max_tokens: maxTokens,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    })
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => '')).slice(0, 300)
+      throw new Error(`COS local diagnostic HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+    }
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+    const text = data.choices?.[0]?.message?.content
+    if (typeof text !== 'string' || !text.trim()) throw new Error('COS local diagnostic returned an empty response')
+    return text
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`COS local diagnostic timed out after ${timeoutMs}ms`)
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 /**
  * COS Primary is the first diagnostic brain, but background supervisor work is intentionally
- * single-pass. It must not fan out through the interactive Cognitive Council or trigger answer
- * repair/citation passes. One incident gets at most one bounded local Qwen request.
+ * single-pass and existing-runtime-only. It must not fan out through the interactive Cognitive
+ * Council, trigger repair/citation passes, or wake a stopped RunPod GPU. If Qwen is already healthy,
+ * one incident gets at most one bounded local request; otherwise the governed fallback path runs.
  */
 export function createCosPrimaryDiagnosticThinker(): DiagnosticThinker {
   return {
@@ -144,29 +189,12 @@ export function createCosPrimaryDiagnosticThinker(): DiagnosticThinker {
         'Return only the diagnostic JSON object. Preserve incident_id exactly.',
       ].join('\n')
 
-      const baseConfig = localInferenceConfigFromEnv()
-      const timeoutMs = supervisorLocalTimeoutMs()
-      const maxTokens = supervisorLocalMaxTokens()
-
-      // When lifecycle control is unavailable, do a cheap health probe first. A stopped/unreachable
-      // pod should fail in ~5 seconds and move to the governed fallback, not occupy a 35s inference slot.
-      if (!runpodLifecycleEnabled()) {
-        const health = await checkLocalInferenceHealth({ ...baseConfig, timeoutMs: Math.min(baseConfig.timeoutMs, 5_000) })
-        if (!health.ok) throw new Error(`COS local reasoner unavailable: ${health.error || 'health check failed'}`)
-      }
-
-      await touchRunpodActivityLease('supervisor_diagnostic').catch(() => undefined)
-      const text = await callLocalModel(
-        {
-          prompt,
-          systemPrompt,
-          maxTokens,
-          temperature: 0,
-        },
-        { ...baseConfig, timeoutMs },
+      return callSupervisorLocalModelWithoutWake(
+        prompt,
+        systemPrompt,
+        supervisorLocalMaxTokens(),
+        supervisorLocalTimeoutMs(),
       )
-      if (!text) throw new Error(`COS local diagnostic returned no response within ${timeoutMs}ms`)
-      return text
     },
   }
 }

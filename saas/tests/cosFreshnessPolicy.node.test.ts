@@ -17,17 +17,22 @@ test('current facts require fresh knowledge without topic-specific role lists', 
   }
 })
 
-test('present-tense identity questions get a bounded memory freshness window generically', () => {
+test('present-tense role relations get a bounded memory freshness window generically', () => {
   for (const question of [
     'Who is the President of the United States?',
-    'Who is Satya Nadella?',
+    'Who is the CEO of Apple?',
     'Who leads the European Commission?',
   ]) {
     const policy=freshnessPolicyForQuestion(question)
     assert.equal(policy.required,true,question)
-    assert.equal(policy.reason,'present_tense_identity',question)
+    assert.equal(policy.reason,'present_tense_role_relation',question)
     assert.equal(policy.maxMemoryAgeMs,24*60*60*1000,question)
   }
+})
+
+test('ordinary identity is memory-first rather than automatically treated as volatile', () => {
+  assert.equal(freshnessPolicyForQuestion('Who is William Shakespeare?').required,false)
+  assert.equal(freshnessPolicyForQuestion('Who is Satya Nadella?').required,false)
 })
 
 test('explicit verification bypasses remembered/cache answers and checks live evidence', () => {

@@ -7,6 +7,11 @@ import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import {
+  classifyAuthoritativeVolatileFact,
+  groundAuthoritativeVolatileFact,
+  renderAuthoritativeGroundedReply,
+} from '@/lib/ai/cos/authoritativeFactGrounding'
+import {
   attachFreshEvidenceProvenance,
   bodyWithFreshEvidence,
   freshEvidenceMeetsAuthority,
@@ -90,6 +95,33 @@ export async function POST(req:NextRequest){
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-volatile-live-cache')
       return NextResponse.json({reply,source:'cos-volatile-live-cache',confidence_score:null,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,volatile_cache_hit:true,volatile_cache_age_ms:cached.ageMs,volatile_cache_expires_at:cached.expiresAt==null?null:new Date(cached.expiresAt).toISOString(),live_evidence_retrieved_this_turn:false,live_evidence_sources:cached.value.liveSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
+  }
+
+  const directCategory=requiresFreshEvidence?classifyAuthoritativeVolatileFact(input):null
+  if(directCategory){
+    const attemptedAt=new Date().toISOString()
+    const grounded=await groundAuthoritativeVolatileFact(input,{fetch:(url,headers)=>fetch(url,{headers,cache:'no-store'})})
+    if(!grounded){
+      const detail='The configured authoritative source did not yield a verifiable current fact. Model-memory fallback is prohibited for this fact category.'
+      const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:[],retrievedAt:attemptedAt,error:detail,synthesisAccepted:null})
+      ;(executionProvenance as any).authoritative_source={used:false,attempted:true,category:directCategory.id,source_urls:directCategory.sources.map(source=>source.url),fetched_at:attemptedAt,error:detail}
+      const reply=freshEvidenceUnavailableReply(language)
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
+      logEscalation({event:'authoritative_direct_fact_miss',category:directCategory.id,source_urls:directCategory.sources.map(source=>source.url),external_ai_invoked:false,local_model_invoked:false})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source-unavailable')
+      return NextResponse.json({ok:false,reply,error:reply,source:'cos-authoritative-source-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,authoritative_source_attempted:true,authoritative_source_urls:directCategory.sources.map(source=>source.url),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
+    }
+
+    const directSource:FreshEvidenceSource={id:'LIVE1',title:grounded.sourceLabel,url:grounded.sourceUrl,snippet:grounded.answer}
+    const reply=renderAuthoritativeGroundedReply(grounded)
+    const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:[directSource],retrievedAt:grounded.fetchedAt,error:null,synthesisAccepted:null})
+    ;(executionProvenance as any).authoritative_source={used:true,attempted:true,category:grounded.categoryId,id:grounded.sourceId,label:grounded.sourceLabel,url:grounded.sourceUrl,fetched_at:grounded.fetchedAt}
+    ;(executionProvenance as any).answer_origin={from_cache:false,provider:null,model:null,authoritative_source:grounded.sourceId,grounded_at:grounded.fetchedAt}
+    const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply,groundedAt:grounded.fetchedAt,liveSources:[directSource],externalProvider:null,externalModel:null}})
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'authoritative_source',confidence:1,externalAiInvoked:false})
+    logEscalation({event:'authoritative_direct_fact_hit',category:grounded.categoryId,provider:'authoritative_source',model:grounded.sourceId,status:200,source_url:grounded.sourceUrl,external_ai_invoked:false,local_model_invoked:false})
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source')
+    return NextResponse.json({ok:true,reply,source:'cos-authoritative-source',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,authoritative_source:{id:grounded.sourceId,label:grounded.sourceLabel,url:grounded.sourceUrl,fetched_at:grounded.fetchedAt},volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:[{id:directSource.id,title:directSource.title,url:directSource.url}],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
 
   let freshSources:FreshEvidenceSource[]=[],freshRetrievedAt:string|null=null,freshError:string|null=null,externalRequest=new NextRequest(req.clone())

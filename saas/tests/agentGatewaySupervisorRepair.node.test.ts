@@ -42,7 +42,6 @@ function host() {
   return { host: h, performed, approvals }
 }
 
-/** Allowlists the one reversible action the resolver can recognize. */
 const POLICY: GovernancePolicy = {
   classifier: defaultConsequenceClassifier,
   allowlist: [{ actionKind: 'supervisor_repair', target: 'restart_worker', rollback: 'restore previous worker generation' }],
@@ -55,7 +54,6 @@ test('the default resolver recognizes nothing, so every step halts into a PR', a
   const result = await dispatchRepairPlan({
     incident: INCIDENT, repairPlan: [step()], policy: POLICY, host: h, resolveAction: resolveNothing,
   })
-
   assert.equal(result.completed, false)
   assert.equal(result.results[0].resolvedTarget, null)
   assert.equal(result.results[0].outcome.verdict, 'halt_for_approval')
@@ -68,7 +66,6 @@ test('a recognized, allowlisted, reversible step actually executes', async () =>
   const result = await dispatchRepairPlan({
     incident: INCIDENT, repairPlan: [step()], policy: POLICY, host: h, resolveAction: resolveRestart,
   })
-
   assert.equal(result.completed, true)
   assert.equal(result.results[0].resolvedTarget, 'restart_worker')
   assert.equal(result.results[0].outcome.verdict, 'execute')
@@ -83,7 +80,6 @@ test('RULE 1: requires_approval forces a halt even when the action is allowliste
     repairPlan: [step({ requires_approval: true })],
     policy: POLICY, host: h, resolveAction: resolveRestart,
   })
-
   assert.equal(result.results[0].outcome.verdict, 'halt_for_approval')
   assert.equal(result.results[0].resolvedTarget, null, 'the diagnosis\'s caution is binding')
   assert.equal(performed.length, 0)
@@ -96,7 +92,6 @@ test("RULE 2: an executor of 'human' is never machine-dispatched", async () => {
     repairPlan: [step({ executor: 'human' })],
     policy: POLICY, host: h, resolveAction: resolveRestart,
   })
-
   assert.equal(result.results[0].outcome.verdict, 'halt_for_approval')
   assert.equal(performed.length, 0)
 })
@@ -119,15 +114,13 @@ test('RULE 3: model prose never becomes an executable target', async () => {
 test('RULE 4: the plan stops at the first step that does not execute', async () => {
   const { host: h, performed } = host()
   const plan = [
-    step({ step: 1 }),                                   // recognized → executes
-    step({ step: 2, action: 'Rotate the production API key' }), // unrecognized → halts
-    step({ step: 3 }),                                   // must never run
+    step({ step: 1 }),
+    step({ step: 2, action: 'Rotate the production API key' }),
+    step({ step: 3 }),
   ]
-
   const result = await dispatchRepairPlan({
     incident: INCIDENT, repairPlan: plan, policy: POLICY, host: h, resolveAction: resolveRestart,
   })
-
   assert.equal(result.completed, false)
   assert.equal(result.results.length, 2, 'step 3 was never attempted')
   assert.equal(result.stoppedAt?.step, 2)
@@ -153,7 +146,6 @@ test('an execution failure stops the plan and is reported, not swallowed', async
     incident: INCIDENT, repairPlan: [step({ step: 1 }), step({ step: 2 })],
     policy: POLICY, host: failing, resolveAction: resolveRestart,
   })
-
   assert.equal(result.completed, false)
   assert.equal(result.results.length, 1)
   assert.match(result.stoppedAt?.reason ?? '', /vercel api unreachable/)
@@ -165,4 +157,14 @@ test('the request carries incident context so a PR is reviewable', () => {
   assert.equal(req.action.params?.incidentId, 'inc-1')
   assert.equal(req.action.params?.project, 'signalboost')
   assert.equal(req.action.params?.expectedResult, 'worker resumes')
+})
+
+test('repair attempt identity is idempotent for one detection and distinct for later detections', () => {
+  const first = repairStepToRequest(INCIDENT, step(), 'restart_worker', 'autonomous-supervisor', {}, '2026-08-15T12:00:00.000Z')
+  const replay = repairStepToRequest(INCIDENT, step(), 'restart_worker', 'autonomous-supervisor', {}, '2026-08-15T12:00:00.000Z')
+  const later = repairStepToRequest(INCIDENT, step(), 'restart_worker', 'autonomous-supervisor', {}, '2026-08-15T12:05:00.000Z')
+  assert.equal(first.requestId, replay.requestId)
+  assert.notEqual(first.requestId, later.requestId)
+  assert.match(first.requestId, /:attempt:2026-08-15T12:00:00.000Z$/)
+  assert.equal(first.action.params?.executionAttemptId, '2026-08-15T12:00:00.000Z')
 })

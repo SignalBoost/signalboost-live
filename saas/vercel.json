@@ -4,7 +4,8 @@
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",
-    "COS_LOCAL_FIRST_ENABLED": "true"
+    "COS_LOCAL_FIRST_ENABLED": "true",
+    "COS_WORLD_AWARENESS_ENABLED": "true"
   },
   "crons": [
     {
@@ -38,6 +39,10 @@
     {
       "path": "/api/cron/cos-knowledge-promotion",
       "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/cron/cos-world-awareness",
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/cos-mining?job=weekly",

@@ -26,10 +26,14 @@ export async function POST(req:NextRequest){
   let userId:string|null=null,isPrivileged=false;try{const access=await getAccess();userId=access.userId;isPrivileged=Boolean(access.isAdmin||access.isOwner)}catch{}
 
   if(prompt&&isProvenanceIntrospection(prompt)&&userId){
+    // Prefer the exact conversation record. If the UI did not send a durable conversation id,
+    // or rendered the preceding assistant text differently, fall back to the latest provenance
+    // that this same signed-in user's immediately preceding answer wrote. This is still recorded
+    // execution telemetry; it never asks a model to reconstruct provenance after the fact.
     const recorded=(conversationId?await latestRecordedTurnProvenance(conversationId,userId):null)
       ??(precedingAssistant?await recordedTurnProvenanceByContent(userId,precedingAssistant):null)
       ??(precedingAssistant?await latestUserTurnProvenance(userId,precedingAssistant):null)
-      ??(!precedingAssistant?await latestUserTurnProvenance(userId):null)
+      ??await latestUserTurnProvenance(userId)
     if(!recorded)return NextResponse.json({reply:noPriorProvenanceReply(languageCode),source:'cos-no-provenance-record',external_ai_invoked:false})
     return NextResponse.json({reply:formatAuthoritativeProvenance(recorded as any,languageCode),source:'cos-authoritative-provenance',execution_provenance:recorded,external_ai_invoked:false})
   }

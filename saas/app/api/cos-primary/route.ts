@@ -15,6 +15,7 @@ import {
   replyCitesFreshEvidence,
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
+import { readVolatileAnswerCache, volatileCacheHitProvenance, writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
@@ -79,6 +80,18 @@ export async function POST(req:NextRequest){
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source);return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   const requiresFreshEvidence=requiresFreshExternalEvidence(input),requestedAction=requestsExternalAction(input)
+  if(requiresFreshEvidence){
+    const cached=await readVolatileAnswerCache({prompt:input,language})
+    if(cached){
+      const executionProvenance=volatileCacheHitProvenance(authoritativeProvenance(null,{invoked:false}),cached)
+      const reply=cached.value.reply
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'volatile_cache',confidence:null,externalAiInvoked:false})
+      console.info('[cos-volatile-cache-hit]',JSON.stringify({at:new Date().toISOString(),ageMs:cached.ageMs,ttlRemainingMs:cached.ttlRemainingMs,groundedAt:cached.value.groundedAt,sourceUrls:cached.value.liveSources.map(source=>source.url)}))
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-volatile-live-cache')
+      return NextResponse.json({reply,source:'cos-volatile-live-cache',confidence_score:null,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,volatile_cache_hit:true,volatile_cache_age_ms:cached.ageMs,volatile_cache_expires_at:cached.expiresAt==null?null:new Date(cached.expiresAt).toISOString(),live_evidence_retrieved_this_turn:false,live_evidence_sources:cached.value.liveSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+  }
+
   let freshSources:FreshEvidenceSource[]=[],freshRetrievedAt:string|null=null,freshError:string|null=null,externalRequest=new NextRequest(req.clone())
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
@@ -128,7 +141,9 @@ export async function POST(req:NextRequest){
     const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':requiresFreshEvidence?'external_fresh_grounded':'external_fallback'
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:continuityFailed?'failed_closed':'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:externalInvoked})
     if(externalInvoked&&!continuityFailed&&reply&&!requiresFreshEvidence){await recordTeacherEscalation({prompt:input,localAnswer:localDraft(cos),localConfidence:cos?.confidence??null,escalationReason:reason.detail,teacherAnswer:reply,teacherProvider:external.provider,teacherModel:external.model,metadata:{reasonCode:reason.code,responseStatus:response.status}})}
+    let volatileCacheWritten=false
+    if(requiresFreshEvidence&&freshRetrievedAt&&externalInvoked&&!continuityFailed&&response.ok&&reply){volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider:external.provider,externalModel:external.model}})}
     if(reply)await writeCosPrimaryProvenance(userId,reply,executionProvenance,responseSource)
-    return NextResponse.json({...payload,reply,source:responseSource,cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:external.provider,external_model:external.model,external_provider_source:external.source,external_fallback_invoked:true,external_fallback_succeeded:!continuityFailed,isolation_mode:false,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry},{status:response.status})
+    return NextResponse.json({...payload,reply,source:responseSource,cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:external.provider,external_model:external.model,external_provider_source:external.source,external_fallback_invoked:true,external_fallback_succeeded:!continuityFailed,isolation_mode:false,volatile_cache_written:volatileCacheWritten,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry},{status:response.status})
   }catch(error){logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:normalizeProvider(traced.trace.provider),model:traced.trace.model,status:response.status,error:error instanceof Error?error.message:String(error)});emitRequestTelemetry({startedAt,input,source:'external_fallback',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:traced.trace.invoked});return response}
 }

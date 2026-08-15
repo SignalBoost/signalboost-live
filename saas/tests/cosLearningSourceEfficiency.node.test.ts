@@ -3,8 +3,9 @@ import test from 'node:test'
 import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle'
 import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index'
 import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors'
+import { createFeedSearch } from '../lib/cos-core/layers/learning/feedClients'
 import { createLiveLearningAdapters, guardLearningSourceAdapter } from '../lib/cos-core/layers/learning/liveSources'
-import { createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients'
+import { createGdeltNewsSearch, createYouTubeTranscriptSearch, LearningSourceFetchError } from '../lib/cos-core/layers/learning/mediaClients'
 
 const GAP: KnowledgeGap = {
   id: 'curriculum:multi-tenant-saas-performance',
@@ -116,6 +117,12 @@ test('configured transcript runtime replaces the redundant YouTube metadata adap
   assert.deepEqual(youtubeIds, ['youtube_transcript_runpod'])
 })
 
+test('built-in first-party news feeds remain available when GDELT is unavailable', () => {
+  const ids = createLiveLearningAdapters({ COS_LIVE_SOURCES_ENABLED: 'true' }).map(adapter => adapter.id)
+  assert.ok(ids.includes('gdelt'))
+  assert.ok(ids.includes('builtin_tech_news'))
+})
+
 test('source guard serializes a provider burst and queued calls stop after the circuit opens', async () => {
   let active = 0
   let maxActive = 0
@@ -132,7 +139,7 @@ test('source guard serializes a provider burst and queued calls stop after the c
       throw new Error('rate limited')
     },
   }
-  const guarded = guardLearningSourceAdapter(base, 2, 0)
+  const guarded = guardLearningSourceAdapter(base, 2, 0, 30_000)
 
   const settled = await Promise.allSettled(Array.from({ length: 6 }, () => guarded.acquire(GAP)))
 
@@ -140,4 +147,77 @@ test('source guard serializes a provider burst and queued calls stop after the c
   assert.equal(underlyingCalls, 2, 'queued calls must not hit the provider after the failure limit opens the circuit')
   assert.equal(settled.filter(result => result.status === 'rejected').length, 2)
   assert.equal(settled.filter(result => result.status === 'fulfilled').length, 4)
+})
+
+test('one HTTP 429 opens the source circuit immediately instead of waiting for the normal failure limit', async () => {
+  let underlyingCalls = 0
+  const base: ContinuousLearningSourceAdapter = {
+    kind: 'news_article',
+    id: 'gdelt-test',
+    async acquire() {
+      underlyingCalls += 1
+      throw new LearningSourceFetchError('COS learning source failed: 429', 429, true, 60_000)
+    },
+  }
+  const guarded = guardLearningSourceAdapter(base, 3, 0, 30_000)
+  const settled = await Promise.allSettled(Array.from({ length: 5 }, () => guarded.acquire(GAP)))
+
+  assert.equal(underlyingCalls, 1)
+  assert.equal(settled.filter(result => result.status === 'rejected').length, 1)
+  assert.equal(settled.filter(result => result.status === 'fulfilled').length, 4)
+})
+
+test('identical GDELT throttling failure is cooled and reused instead of refetched immediately', async () => {
+  let calls = 0
+  const fetcher = (async () => {
+    calls += 1
+    return new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } })
+  }) as typeof fetch
+  const search = createGdeltNewsSearch(fetcher)
+
+  await assert.rejects(() => search('regional kubernetes outage', 2), /429/)
+  await assert.rejects(() => search('regional kubernetes outage', 2), /429/)
+
+  assert.equal(calls, 2, 'first lookup may use two bounded attempts; identical retry must reuse the cached failure')
+})
+
+test('successful identical GDELT query is cached within the learning run', async () => {
+  let calls = 0
+  const fetcher = (async () => {
+    calls += 1
+    return new Response(JSON.stringify({
+      articles: [{
+        url: 'https://example.com/kubernetes-latency',
+        title: 'Kubernetes regional latency incident',
+        domain: 'example.com',
+        language: 'English',
+        seendate: '20260815T120000Z',
+      }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  const search = createGdeltNewsSearch(fetcher)
+
+  const first = await search('kubernetes regional latency', 2)
+  const second = await search('kubernetes regional latency', 2)
+
+  assert.equal(calls, 1)
+  assert.equal(first.length, 1)
+  assert.deepEqual(second, first)
+})
+
+test('feed search fetches each publication once and reuses it across learning questions', async () => {
+  let calls = 0
+  const xml = `<?xml version="1.0"?><rss><channel><item><title>Kubernetes latency update</title><link>https://example.com/update</link><description>Regional Kubernetes networking latency and DNS behavior.</description><pubDate>Sat, 15 Aug 2026 12:00:00 GMT</pubDate></item></channel></rss>`
+  const fetcher = (async () => {
+    calls += 1
+    return new Response(xml, { status: 200, headers: { 'content-type': 'application/rss+xml' } })
+  }) as typeof fetch
+  const search = createFeedSearch([{ url: 'https://example.com/feed.xml', label: 'Example' }], fetcher)
+
+  const first = await search('kubernetes latency', 3)
+  const second = await search('kubernetes networking', 3)
+
+  assert.equal(calls, 1)
+  assert.equal(first.length, 1)
+  assert.equal(second.length, 1)
 })

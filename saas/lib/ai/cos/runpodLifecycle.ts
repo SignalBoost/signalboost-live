@@ -4,7 +4,14 @@
 // Either lifecycle control or idle-stop can still be disabled explicitly with an environment flag.
 
 import { runpodControlConfigured } from '@/lib/ai/cos/runpodConfig'
-import { queryPodStatus, startPod, stopPod } from '@/lib/hub/runpodTelemetry'
+import {
+  configurePodStartupContract,
+  queryPodRuntimeConfig,
+  queryPodStatus,
+  runpodStartupContractMatches,
+  startPod,
+  stopPod,
+} from '@/lib/hub/runpodTelemetry'
 
 function booleanOverride(name: string): boolean | null {
   const value = process.env[name]?.trim().toLowerCase()
@@ -41,46 +48,122 @@ export type RunpodStartResult = {
   attempted: boolean
   started: boolean
   resumeRequested: boolean
+  computeStartedByRequest: boolean
+  startupContractRepaired: boolean
   previousStatus: string | null
   desiredStatus: string | null
 }
 
+/**
+ * Ensure a cold RunPod will actually start the COS reasoner, not merely allocate a GPU.
+ *
+ * RunPod recreates container-disk state when a Pod restarts, while /workspace persists. The COS
+ * bootstrap and models live under /workspace, so every wake first verifies the Pod's Docker start
+ * contract. A missing/mismatched contract is repaired before compute is resumed. If the Pod is
+ * already RUNNING but unhealthy (this function is called only after the local health probe fails),
+ * a mismatched contract is repaired by stopping the unusable container, updating it, and starting
+ * it once with the correct bootstrap command.
+ */
 export async function ensureRunpodReasonerStarted(): Promise<RunpodStartResult> {
   if (!enabled()) {
-    return { attempted: false, started: false, resumeRequested: false, previousStatus: null, desiredStatus: null }
+    return {
+      attempted: false,
+      started: false,
+      resumeRequested: false,
+      computeStartedByRequest: false,
+      startupContractRepaired: false,
+      previousStatus: null,
+      desiredStatus: null,
+    }
   }
 
   const before = await queryPodStatus()
-  if (before.running) {
+  const runtimeConfig = await queryPodRuntimeConfig()
+  const contractMatches = runpodStartupContractMatches(runtimeConfig)
+
+  if (before.running && contractMatches) {
     console.info('[cos-runpod-lifecycle]', JSON.stringify({
       at: new Date().toISOString(),
       action: 'resume_skipped',
       previousStatus: before.desiredStatus,
       desiredStatus: before.desiredStatus,
+      startupContract: 'healthy',
       reason: 'pod_already_running',
     }))
     return {
       attempted: false,
       started: true,
       resumeRequested: false,
+      computeStartedByRequest: false,
+      startupContractRepaired: false,
       previousStatus: before.desiredStatus,
       desiredStatus: before.desiredStatus,
     }
   }
 
+  let startupContractRepaired = false
+  let computeStartedByRequest = false
+
+  if (!contractMatches) {
+    console.warn('[cos-runpod-lifecycle]', JSON.stringify({
+      at: new Date().toISOString(),
+      action: 'startup_contract_repair_required',
+      previousStatus: before.desiredStatus,
+      currentEntrypoint: runtimeConfig.dockerEntrypoint,
+      currentStartCmdCount: runtimeConfig.dockerStartCmd.length,
+    }))
+
+    if (before.running) {
+      const stopped = await stopPod()
+      if (stopped.desiredStatus !== 'EXITED') {
+        throw new Error(`RunPod boot-contract repair could not stop the unhealthy Pod; desiredStatus=${stopped.desiredStatus}`)
+      }
+    }
+
+    const configured = await configurePodStartupContract()
+    startupContractRepaired = true
+    console.info('[cos-runpod-lifecycle]', JSON.stringify({
+      at: new Date().toISOString(),
+      action: 'startup_contract_repaired',
+      previousStatus: before.desiredStatus,
+      desiredStatus: configured.desiredStatus,
+      image: configured.image,
+      volumeMountPath: configured.volumeMountPath,
+    }))
+
+    // RunPod documents Pod update as a reset operation. If the update itself left the Pod RUNNING,
+    // treat that GPU allocation as initiated by this request so the cold-start fail-safe owns it.
+    if (configured.desiredStatus === 'RUNNING') {
+      computeStartedByRequest = true
+      return {
+        attempted: true,
+        started: true,
+        resumeRequested: false,
+        computeStartedByRequest,
+        startupContractRepaired,
+        previousStatus: before.desiredStatus,
+        desiredStatus: configured.desiredStatus,
+      }
+    }
+  }
+
   const resumed = await startPod()
   const started = resumed.desiredStatus === 'RUNNING'
+  computeStartedByRequest = started
   console.info('[cos-runpod-lifecycle]', JSON.stringify({
     at: new Date().toISOString(),
     action: 'resume_requested',
     previousStatus: before.desiredStatus,
     desiredStatus: resumed.desiredStatus,
     started,
+    startupContractRepaired,
   }))
   return {
     attempted: true,
     started,
     resumeRequested: true,
+    computeStartedByRequest,
+    startupContractRepaired,
     previousStatus: before.desiredStatus,
     desiredStatus: resumed.desiredStatus,
   }

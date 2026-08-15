@@ -17,6 +17,7 @@ import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { maybeBuildCognitiveCouncilAdvisory } from '@/lib/ai/cos/cognitiveCouncil'
+import { runCouncilChallengeRound } from '@/lib/ai/cos/cognitiveCouncilChallenge'
 
 export type CosReasonerKind = 'independent-local'
 
@@ -140,9 +141,20 @@ export async function callCosReasoner(
       return null
     })
     if (council?.advisory) {
+      const challengeRound = await runCouncilChallengeRound({
+        council,
+        governedPrompt: args.prompt,
+        reasonerLabel: config.label,
+      }).catch(error => {
+        console.warn('[cos-council-challenge] challenge round failed closed', error instanceof Error ? error.message : String(error))
+        return null
+      })
+      const advisory = challengeRound?.advisory
+        ? `${council.advisory}\n\n${challengeRound.advisory}`
+        : council.advisory
       effectiveArgs = {
         ...args,
-        prompt: `${args.prompt}\n\n${council.advisory}`,
+        prompt: `${args.prompt}\n\n${advisory}`,
       }
       console.info('[cos-council]', JSON.stringify({
         at: new Date().toISOString(),
@@ -151,6 +163,8 @@ export async function callCosReasoner(
         triggerReasons: council.trigger.reasons,
         roles: council.opinions.map(opinion => opinion.role),
         opinions: council.opinions.length,
+        challenges: challengeRound?.challenges.length ?? 0,
+        rebuttals: challengeRound?.rebuttals.length ?? 0,
       }))
     }
   }

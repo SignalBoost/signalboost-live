@@ -3,6 +3,7 @@ export type CosLiveResponseSource =
   | 'semantic_cache'
   | 'semantic_similarity'
   | 'volatile_cache'
+  | 'authoritative_source'
   | 'local_cos_reasoning'
   | 'external_fallback'
   | 'failed_closed'
@@ -50,6 +51,7 @@ export function buildCosLiveTelemetry(input: CosLiveTelemetryInput, at = new Dat
     || input.responseSource === 'semantic_cache'
     || input.responseSource === 'semantic_similarity'
     || input.responseSource === 'volatile_cache'
+    || input.responseSource === 'authoritative_source'
   const inferenceAvoided = reuse && !input.localModelInvoked && !input.externalAiInvoked
   const inputTokens = tokensFromChars(input.promptChars || 0)
   const outputTokens = tokensFromChars(input.replyChars || 0)

@@ -1,14 +1,53 @@
 import * as base from './cosOrchestrationEnterprise'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
 export const isProvenanceIntrospection=base.isProvenanceIntrospection
-export function requestsExternalAction(input:string):boolean{return requiresFreshExternalEvidence(input)||base.requestsExternalAction(input)}
-export const authoritativeProvenance=base.authoritativeProvenance
+// Fresh/precise factual grounding is a COS reasoning concern, not an instruction to invoke
+// an external AI provider. Only actual execution/tool requests count as external actions here.
+export const requestsExternalAction=base.requestsExternalAction
 export const escalationReason=base.escalationReason
 export const logEscalation=base.logEscalation
 export const independentReasonerHealth=base.independentReasonerHealth
+
+export function authoritativeProvenance(cos:any,external:{invoked:boolean;provider?:string|null;model?:string|null}){
+  const recorded=base.authoritativeProvenance(cos,external) as any
+  const evidence=cos?.provenance?.authoritativeEvidence
+  if(evidence&&typeof evidence==='object'){
+    const sources=Array.isArray(evidence.sources)?evidence.sources:[]
+    recorded.autonomous_research={
+      ...(recorded.autonomous_research||{}),
+      used:Boolean(evidence.used),
+      documents_acquired:sources.length,
+      new_knowledge_retained:0,
+    }
+    recorded.live_external_evidence={
+      used:Boolean(evidence.used),
+      attempted:true,
+      retrieved_at:evidence.retrievedAt||null,
+      error:evidence.sufficient===false?'Authoritative evidence was insufficient for the configured policy.':null,
+      sources:sources.map((source:any)=>({
+        id:source?.id||'AUTH',
+        title:source?.title||'authoritative source',
+        url:source?.url||null,
+        authority_tier:source?.authorityTier||null,
+        authority_score:source?.authorityScore??null,
+      })),
+    }
+    recorded.authoritative_grounding={
+      used:Boolean(evidence.used),
+      policy_mode:evidence.policyMode||null,
+      policy_reason:evidence.policyReason||null,
+      freshness_required:Boolean(evidence.freshnessRequired),
+      search_query:evidence.searchQuery||null,
+      retrieved_at:evidence.retrievedAt||null,
+      sufficient:Boolean(evidence.sufficient),
+      minimum_citations:Number(evidence.minimumCitations||0),
+      synthesis_status:evidence.synthesisStatus||null,
+    }
+  }
+  return recorded
+}
 
 function value(v:unknown):string{return v==null?'unknown':String(v)}
 function entries(v:any):string{if(!v||typeof v!=='object')return'none';const rows=Object.entries(v).sort(([a],[b])=>a.localeCompare(b));return rows.length?rows.map(([k,n])=>`${k} ${n}`).join(', '):'none'}
@@ -49,6 +88,7 @@ function formatMaterialProvenance(provenance:any):string{
   const localInvoked=Boolean(provenance?.local_reasoning?.invoked)
   const researchUsed=Boolean(provenance?.autonomous_research?.used)
   const liveEvidence=provenance?.live_external_evidence
+  const authoritativeGrounding=provenance?.authoritative_grounding
   if(origin?.from_cache){
     const written=origin.stored_at?` written ${origin.stored_at}`:''
     const model=origin.model?` by ${origin.model}`:''
@@ -72,9 +112,10 @@ function formatMaterialProvenance(provenance:any):string{
   if(contributed(provenance?.user_memory))lines.push(`User Memory            : USED — ${funnel(provenance.user_memory)}.`)
   if(liveEvidence?.used){
     const sources=Array.isArray(liveEvidence.sources)?liveEvidence.sources:[]
-    lines.push(`Live External Evidence : USED — ${sources.length} live source${sources.length===1?'':'s'} retrieved${liveEvidence.retrieved_at?` at ${liveEvidence.retrieved_at}`:''}.`)
-    for(const source of sources)lines.push(`  [${source?.id||'LIVE'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}`)
+    lines.push(`Live External Evidence : USED — ${sources.length} authoritative source${sources.length===1?'':'s'} retrieved${liveEvidence.retrieved_at?` at ${liveEvidence.retrieved_at}`:''}.`)
+    for(const source of sources)lines.push(`  [${source?.id||'AUTH'}] ${source?.title||'source'} — ${source?.url||'URL unavailable'}${source?.authority_tier?` (${source.authority_tier})`:''}`)
   }
+  if(authoritativeGrounding?.used)lines.push(`Authoritative Grounding: USED — policy ${authoritativeGrounding.policy_mode||'unknown'}; ${authoritativeGrounding.synthesis_status||'unknown'}; model memory was not accepted as factual authority.`)
   if(researchUsed)lines.push(`Autonomous Research    : USED — ${count(provenance.autonomous_research.documents_acquired)} live documents acquired; ${count(provenance.autonomous_research.new_knowledge_retained)} retained as new durable knowledge.`)
   if(localInvoked&&!externalMaterial)lines.push(`Local Reasoning Engine : INVOKED — ${provenance.local_reasoning.model||'local model'}.`)
   if(externalMaterial)lines.push(`External AI Provider   : INVOKED — ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''}.`)
@@ -88,7 +129,7 @@ function formatMaterialProvenance(provenance:any):string{
     ['User Memory',provenance?.user_memory],
   ] as const){if(!contributed(item)&&consulted(item))consultedOnly.push(`${label}: ${funnel(item)}`)}
   if(localInvoked&&externalMaterial)consultedOnly.push(`Local Reasoning Engine: ${provenance.local_reasoning.model||'local model'} invoked, but its draft was superseded and did not generate the recorded answer`)
-  if(externalInvoked&&!externalAccepted)consultedOnly.push(`External AI Provider: ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} invoked, but its synthesis was rejected by the freshness grounding gate`)
+  if(externalInvoked&&!externalAccepted)consultedOnly.push(`External AI Provider: ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} invoked, but its synthesis was rejected by the grounding gate`)
   if(consultedOnly.length)lines.push('','Consulted but not material','──────────────────────────',consultedOnly.join('; ')+'.')
 
   const notUsed:string[]=[]
@@ -109,7 +150,7 @@ function formatMaterialProvenance(provenance:any):string{
   return lines.join('\n')
 }
 
-export function formatAuthoritativeProvenance(provenance:ReturnType<typeof base.authoritativeProvenance>&Record<string,unknown>,language:string):string{
+export function formatAuthoritativeProvenance(provenance:ReturnType<typeof authoritativeProvenance>&Record<string,unknown>,language:string):string{
   const recorded=provenance as any
   const concise=formatMaterialProvenance(recorded)
   const localized=language!=='en'?`${concise}\n\nNote: provenance labels remain explicit and stable; the recorded values above are language-independent telemetry.`:concise

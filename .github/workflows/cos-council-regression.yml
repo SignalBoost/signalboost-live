@@ -1,0 +1,64 @@
+name: COS Council Deterministic Regression
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/ai/cos/**'
+      - 'saas/self-healing-host/**'
+      - 'saas/agent-gateway-host/**'
+      - 'saas/supabase/migrations/**'
+      - 'saas/tests/cosCouncil*.node.test.ts'
+      - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
+      - '.github/workflows/cos-council-regression.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'saas/lib/ai/cos/**'
+      - 'saas/self-healing-host/**'
+      - 'saas/agent-gateway-host/**'
+      - 'saas/supabase/migrations/**'
+      - 'saas/tests/cosCouncil*.node.test.ts'
+      - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
+      - '.github/workflows/cos-council-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cos-council-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run deterministic Council regressions
+        run: >-
+          node --test
+          tests/cosCouncilObjectiveOutcome.node.test.ts
+          tests/cosCouncilDeterministicClaimResolution.node.test.ts
+
+      - name: Run native monitoring policy regression
+        run: node --test tests/selfHealingNativeMonitoringPolicy.node.test.ts
+
+      - name: Verify strip-safe module boundary
+        run: npm run validate:strip-safe

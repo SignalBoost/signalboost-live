@@ -129,7 +129,7 @@ export function bodyWithFreshEvidence(body: any, input: string, sources: FreshEv
 
 export function replyCitesFreshEvidence(reply: string, sources: FreshEvidenceSource[]): boolean {
   const text = String(reply || '')
-  return sources.some(source => text.includes(`[${source.id}]`))
+  return sources.some(source => text.includes(`[${source.id}]`) && text.includes(source.url))
 }
 
 export function attachFreshEvidenceProvenance<T extends Record<string, any>>(

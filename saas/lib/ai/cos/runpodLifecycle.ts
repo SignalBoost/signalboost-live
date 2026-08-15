@@ -3,6 +3,8 @@
 // dedicated GPU can be stopped while idle and resumed only when COS actually needs local compute.
 // Either lifecycle control or idle-stop can still be disabled explicitly with an environment flag.
 
+import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '@/lib/ai/cos/runpodConfig'
+
 const RUNPOD_GRAPHQL_URL = 'https://api.runpod.io/graphql'
 
 function booleanOverride(name: string): boolean | null {
@@ -13,7 +15,7 @@ function booleanOverride(name: string): boolean | null {
 }
 
 export function runpodLifecycleConfigured(): boolean {
-  return Boolean(process.env.RUNPOD_API_KEY?.trim()) && Boolean(process.env.RUNPOD_POD_ID?.trim())
+  return runpodControlConfigured()
 }
 
 function enabled() {
@@ -23,9 +25,9 @@ function enabled() {
 }
 
 function config() {
-  const apiKey = process.env.RUNPOD_API_KEY?.trim()
-  const podId = process.env.RUNPOD_POD_ID?.trim()
-  if (!apiKey || !podId) throw new Error('RUNPOD_API_KEY and RUNPOD_POD_ID are required when RunPod lifecycle is enabled')
+  const apiKey = configuredRunpodApiKey()
+  const podId = configuredRunpodPodId()
+  if (!apiKey || !podId) throw new Error('RUNPOD_API_KEY plus RUNPOD_POD_ID (or a standard RunPod LOCAL_AI_BASE_URL) are required when RunPod lifecycle is enabled')
   return { apiKey, podId }
 }
 

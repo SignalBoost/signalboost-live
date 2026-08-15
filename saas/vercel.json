@@ -42,7 +42,7 @@
     },
     {
       "path": "/api/cron/cos-world-awareness",
-      "schedule": "25 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/cos-mining?job=weekly",

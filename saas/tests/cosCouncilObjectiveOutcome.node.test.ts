@@ -4,7 +4,7 @@ import {
   classifyDeterministicToolOutcome,
   extractCouncilCorrelationRefs,
   normalizeCouncilObjectiveOutcome,
-} from '@/lib/ai/cos/councilObjectiveOutcome'
+} from '../lib/ai/cos/councilObjectiveOutcomePure.ts'
 
 test('extracts exact incident and execution correlations from governed JSON context', () => {
   const refs = extractCouncilCorrelationRefs(JSON.stringify({

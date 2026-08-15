@@ -99,20 +99,34 @@ export function extractCouncilCorrelationRefs(prompt: string): Partial<Record<Co
   return refs
 }
 
+/** Capture only the exact [SK#] -> durable skill_key mapping already injected in governed context. */
+export function extractCouncilCognitiveSkillRefs(prompt: string): Record<string, string> {
+  const text = String(prompt ?? '').slice(0, 80_000)
+  const refs: Record<string, string> = {}
+  for (const match of text.matchAll(/\[SK(\d{1,2})\]\s+\[skill_key=([A-Za-z0-9._:-]{1,240})\]/g)) {
+    refs[`[SK${Number(match[1])}]`] = safeText(match[2], 240)
+  }
+  return refs
+}
+
 /**
- * Bind a Council session to exact identifiers already present in the governed prompt. Failure is
- * deliberately non-fatal to answering; it only means later automatic outcome correlation cannot
- * happen for this session.
+ * Bind a Council session to exact identifiers and skill keys already present in the governed prompt.
+ * Failure is deliberately non-fatal to answering; it only prevents later automatic correlation or
+ * unambiguous positive skill-outcome attribution for this session.
  */
 export async function bindCouncilSessionCorrelations(sessionId: string, prompt: string): Promise<Partial<Record<CouncilCorrelationKind, string>>> {
   if (!validUuid(sessionId)) return {}
   const refs = extractCouncilCorrelationRefs(prompt)
-  if (!Object.keys(refs).length) return refs
+  const skillRefs = extractCouncilCognitiveSkillRefs(prompt)
+  if (!Object.keys(refs).length && !Object.keys(skillRefs).length) return refs
 
   const db = cosServiceDb()
   if (!db) return refs
+  const update: Record<string, unknown> = {}
+  if (Object.keys(refs).length) update.correlation_refs = refs
+  if (Object.keys(skillRefs).length) update.cognitive_skill_refs = skillRefs
   const result = await db.from('cos_council_sessions')
-    .update({ correlation_refs: refs })
+    .update(update)
     .eq('id', sessionId)
   if (result.error) throw result.error
   return refs
@@ -156,9 +170,10 @@ export function normalizeCouncilObjectiveOutcome(input: CouncilObjectiveOutcomeI
 }
 
 /**
- * Store objective evidence and correlate it to the newest exact-matching Council session. This
- * does NOT change specialist credibility. Credibility still requires explicit role verdicts through
- * cos_record_council_verified_outcome after deterministic evidence can actually resolve a claim.
+ * Store objective evidence and correlate it to the newest exact-matching Council session. If this is
+ * a new matched outcome, a separate deterministic resolver may compare pre-registered machine
+ * predictions against bounded facts. That resolver is fail-closed and cannot block the governed
+ * operation that produced the evidence.
  */
 export async function recordCouncilObjectiveOutcome(rawInput: CouncilObjectiveOutcomeInput): Promise<CouncilObjectiveOutcomeResult> {
   const input = normalizeCouncilObjectiveOutcome(rawInput)
@@ -177,11 +192,31 @@ export async function recordCouncilObjectiveOutcome(rawInput: CouncilObjectiveOu
   if (result.error) throw result.error
   const data = result.data && typeof result.data === 'object' ? result.data as Record<string, unknown> : {}
 
+  const outcomeId = typeof data.outcome_id === 'string' && data.outcome_id ? data.outcome_id : null
+  const matchedSessionId = typeof data.matched_session_id === 'string' && data.matched_session_id ? data.matched_session_id : null
+  if (Boolean(data.inserted) && outcomeId && matchedSessionId) {
+    try {
+      const { resolveCouncilObjectiveOutcomeClaims } = await import('@/lib/ai/cos/councilClaimResolution')
+      const resolution = await resolveCouncilObjectiveOutcomeClaims(outcomeId)
+      console.info('[cos-council-claim-resolution]', JSON.stringify({
+        at: new Date().toISOString(),
+        outcomeId,
+        sessionId: matchedSessionId,
+        predictionsFound: resolution.predictionsFound,
+        predictionsResolved: resolution.predictionsResolved,
+        roleScoresInserted: resolution.roleScoresInserted,
+        skillSuccessesRecorded: resolution.skillSuccessesRecorded,
+      }))
+    } catch (error) {
+      console.warn('[cos-council-claim-resolution] objective resolution failed closed', error instanceof Error ? error.message : String(error))
+    }
+  }
+
   return {
     ok: true,
     inserted: Boolean(data.inserted),
-    outcomeId: typeof data.outcome_id === 'string' && data.outcome_id ? data.outcome_id : null,
-    matchedSessionId: typeof data.matched_session_id === 'string' && data.matched_session_id ? data.matched_session_id : null,
+    outcomeId,
+    matchedSessionId,
     matchedProblemClass: typeof data.matched_problem_class === 'string' && data.matched_problem_class ? data.matched_problem_class : null,
     correlation: input.correlation,
     outcomeStatus: input.outcomeStatus,

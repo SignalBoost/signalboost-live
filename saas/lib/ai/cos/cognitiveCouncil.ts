@@ -4,6 +4,12 @@ import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { runCouncilMembersConcurrently } from '@/lib/ai/cos/councilConcurrency'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
+import {
+  COUNCIL_MACHINE_FACT_PATHS,
+  COUNCIL_MACHINE_OPERATORS,
+  normalizeCouncilMachinePrediction,
+  type CouncilMachinePrediction,
+} from '@/lib/ai/cos/councilMachinePrediction'
 
 export type CouncilRole = 'architect' | 'sre' | 'database' | 'security' | 'business' | 'skeptic'
 export type CouncilMetacognitiveRegion = 'strong' | 'developing' | 'weak' | 'untested' | 'conflicted' | 'unknown'
@@ -27,6 +33,7 @@ export type CouncilClaim = {
   assumptions: string[]
   observable: string
   falsifier: string
+  machinePrediction?: CouncilMachinePrediction
 }
 
 export type CouncilOpinion = {
@@ -241,15 +248,19 @@ function parseOpinion(raw: string, role: CouncilRole, allowedLabels: Set<string>
   try {
     const parsed = JSON.parse(cleaned.slice(start, end + 1)) as any
     const claims: CouncilClaim[] = Array.isArray(parsed.claims)
-      ? parsed.claims.slice(0, 5).map((claim: any) => ({
-          claim: safeText(claim?.claim, 900),
-          evidence: Array.isArray(claim?.evidence)
-            ? claim.evidence.map((item: unknown) => safeText(item, 40)).filter((item: string) => allowedLabels.has(item)).slice(0, 8)
-            : [],
-          assumptions: Array.isArray(claim?.assumptions) ? claim.assumptions.map((item: unknown) => safeText(item, 300)).filter(Boolean).slice(0, 5) : [],
-          observable: safeText(claim?.observable, 700),
-          falsifier: safeText(claim?.falsifier, 700),
-        })).filter((claim: CouncilClaim) => claim.claim)
+      ? parsed.claims.slice(0, 5).map((claim: any) => {
+          const machinePrediction = normalizeCouncilMachinePrediction(claim?.machine_prediction ?? claim?.machinePrediction)
+          return {
+            claim: safeText(claim?.claim, 900),
+            evidence: Array.isArray(claim?.evidence)
+              ? claim.evidence.map((item: unknown) => safeText(item, 40)).filter((item: string) => allowedLabels.has(item)).slice(0, 8)
+              : [],
+            assumptions: Array.isArray(claim?.assumptions) ? claim.assumptions.map((item: unknown) => safeText(item, 300)).filter(Boolean).slice(0, 5) : [],
+            observable: safeText(claim?.observable, 700),
+            falsifier: safeText(claim?.falsifier, 700),
+            ...(machinePrediction ? { machinePrediction } : {}),
+          }
+        }).filter((claim: CouncilClaim) => claim.claim)
       : []
     const conclusion = safeText(parsed.conclusion, 1200)
     if (!conclusion || !claims.length) return null
@@ -279,10 +290,18 @@ function memberPrompt(definition: RoleDefinition, question: string, governedProm
     'Do not invent telemetry. If evidence is missing, state the assumption and request a verification observable.',
     'Your job is not to agree with a presumed majority. Your job is to make the strongest falsifiable domain-specific case you can.',
     '',
+    'OPTIONAL MACHINE PREDICTION:',
+    '- For a claim that a future deterministic/read-back result can DIRECTLY test, you may pre-register machine_prediction.',
+    '- Omit machine_prediction when the available objective fact would only show that an operation recovered but would not discriminate the claim itself.',
+    '- Never use Council agreement, model confidence, semantic similarity, or an inferred fact as a machine predicate.',
+    `- Allowed fact_path values: ${COUNCIL_MACHINE_FACT_PATHS.join(', ')}.`,
+    `- Allowed operators: ${COUNCIL_MACHINE_OPERATORS.join(', ')}. Numeric comparison operators require a numeric expected value.`,
+    '- A matching predicate later counts only as predictive support, not as new factual evidence inside this answer.',
+    '',
     `Allowed evidence labels: ${[...allowedLabels].join(', ') || 'none'}`,
     '',
     'Return ONLY strict JSON:',
-    '{"conclusion":"...","claims":[{"claim":"...","evidence":["[KG1]"],"assumptions":["..."],"observable":"...","falsifier":"..."}],"confidence":0.0,"verification_requests":["..."]}',
+    '{"conclusion":"...","claims":[{"claim":"...","evidence":["[KG1]"],"assumptions":["..."],"observable":"...","falsifier":"...","machine_prediction":{"fact_path":"verified","operator":"eq","expected":true}}],"confidence":0.0,"verification_requests":["..."]}',
     '',
     'GOVERNED COS CONTEXT AND QUESTION:',
     governedPrompt.slice(0, 30000),
@@ -299,6 +318,9 @@ function advisoryText(advisory: Omit<CouncilAdvisory, 'advisory'>): string {
       `  Assumptions: ${claim.assumptions.join('; ') || 'none stated'}`,
       `  Observable: ${claim.observable || 'not supplied'}`,
       `  Falsifier: ${claim.falsifier || 'not supplied'}`,
+      claim.machinePrediction
+        ? `  Pre-registered machine prediction: ${claim.machinePrediction.factPath} ${claim.machinePrediction.operator} ${JSON.stringify(claim.machinePrediction.expected)}`
+        : '  Pre-registered machine prediction: none',
     ].join('\n')).join('\n')
     return [
       `${opinion.role.toUpperCase()} [verified-history weight ${opinion.credibilityWeight.toFixed(2)}; member confidence ${opinion.confidence.toFixed(2)}]`,
@@ -321,6 +343,7 @@ function advisoryText(advisory: Omit<CouncilAdvisory, 'advisory'>): string {
     '- Council confidence values are opinions, not answer confidence and not factual evidence.',
     '- Deterministic/tool evidence already present in the governed context outranks every Council opinion.',
     '- Resolve disagreements using evidence, observables and falsifiers. If unresolved, preserve the uncertainty in the answer and confidence.',
+    '- Pre-registered machine predictions are future falsifiability contracts, not evidence for the current answer.',
     '- Never cite the Council as a source. Cite only legitimate supplied KG/CL/OEM evidence labels when they truly support a factual claim.',
   ].join('\n')
 }

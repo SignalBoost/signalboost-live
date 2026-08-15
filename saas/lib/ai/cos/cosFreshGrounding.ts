@@ -1,4 +1,5 @@
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
+import { authorityScore, authorityTier } from '@/lib/ai/cos/cosAuthoritativeResearch'
 
 export type FreshEvidenceSource = SearchResult & { id: string }
 
@@ -11,32 +12,6 @@ function normalizedUrl(value: string): string | null {
   } catch {
     return null
   }
-}
-
-function hostFromUrl(value: string): string {
-  try {
-    return new URL(value).hostname.toLowerCase().replace(/^www\./, '')
-  } catch {
-    return ''
-  }
-}
-
-function isGovernmentHost(host: string): boolean {
-  return host.endsWith('.gov') || host.includes('.gov.') || host === 'gov.uk' || host.endsWith('.gov.uk')
-}
-
-function authorityScore(result: SearchResult): number {
-  const host = hostFromUrl(result.url)
-  let score = 0
-  if (isGovernmentHost(host)) score += 100
-  if (host.endsWith('.mil') || host.includes('.mil.')) score += 95
-  if (host.endsWith('.edu') || host.includes('.edu.')) score += 45
-  if (/\bofficial\b/i.test(result.title)) score += 20
-  return score
-}
-
-function requiresGovernmentAuthority(input: string): boolean {
-  return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister)\b/i.test(input)
 }
 
 export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshEvidenceSource[] {
@@ -59,7 +34,9 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
     })
     .filter(Boolean) as Array<{ result: SearchResult; index: number }>
 
-  cleaned.sort((a, b) => authorityScore(b.result) - authorityScore(a.result) || a.index - b.index)
+  // Generic source-quality ordering only. Topic-specific authority decisions belong to the
+  // evidence policy/research layer, not hard-coded role or entity lists.
+  cleaned.sort((a, b) => authorityScore('', b.result) - authorityScore('', a.result) || a.index - b.index)
   return cleaned.slice(0, Math.max(1, Math.min(limit, 12))).map((entry, index) => ({
     ...entry.result,
     id: `LIVE${index + 1}`,
@@ -68,8 +45,12 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
 
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
   if (!sources.length) return false
-  if (!requiresGovernmentAuthority(input)) return true
-  return sources.some(source => isGovernmentHost(hostFromUrl(source.url)))
+  const tiers = sources.map(source => authorityTier(input, source))
+  const primary = tiers.filter(tier => tier === 'primary').length
+  const institutional = tiers.filter(tier => tier === 'institutional').length
+  // This is intentionally generic. The stricter evidence-first COS gate performs the final
+  // sufficiency decision; this route-level check only prevents arbitrary single low-quality hits.
+  return primary >= 1 || institutional >= 1 || sources.length >= 2
 }
 
 export function freshEvidenceSearchQuery(input: string, now = new Date()): string {

@@ -1,4 +1,6 @@
 // saas/lib/hub/runpodTelemetry.ts
+import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '@/lib/ai/cos/runpodConfig'
+
 const GRAPHQL_ENDPOINT = 'https://api.runpod.io/graphql'
 const REQUEST_TIMEOUT_MS = 15_000
 
@@ -12,7 +14,7 @@ export type PodStatus = {
 }
 
 export function runpodConfigured(): boolean {
-  return Boolean(process.env.RUNPOD_API_KEY?.trim()) && Boolean(process.env.RUNPOD_POD_ID?.trim())
+  return runpodControlConfigured()
 }
 
 function fallbackHourlyRate(): number {
@@ -21,7 +23,7 @@ function fallbackHourlyRate(): number {
 }
 
 async function graphqlRequest<T>(query: string): Promise<T> {
-  const apiKey = process.env.RUNPOD_API_KEY?.trim()
+  const apiKey = configuredRunpodApiKey()
   if (!apiKey) throw new Error('RUNPOD_API_KEY is not configured')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -41,8 +43,8 @@ async function graphqlRequest<T>(query: string): Promise<T> {
 }
 
 export async function queryPodStatus(): Promise<PodStatus> {
-  const podId = process.env.RUNPOD_POD_ID?.trim()
-  if (!podId) throw new Error('RUNPOD_POD_ID is not configured')
+  const podId = configuredRunpodPodId()
+  if (!podId) throw new Error('RUNPOD_POD_ID is not configured and could not be derived from LOCAL_AI_BASE_URL')
   const data = await graphqlRequest<{
     myself?: { pods?: Array<{ id: string; name: string; desiredStatus?: string; costPerHr?: number | null; runtime?: { uptimeInSeconds?: number } | null }> }
   }>(`query { myself { pods { id name desiredStatus costPerHr runtime { uptimeInSeconds } } } }`)
@@ -53,8 +55,8 @@ export async function queryPodStatus(): Promise<PodStatus> {
 }
 
 export async function startPod(): Promise<{ id: string; desiredStatus: string }> {
-  const podId = process.env.RUNPOD_POD_ID?.trim()
-  if (!podId) throw new Error('RUNPOD_POD_ID is not configured')
+  const podId = configuredRunpodPodId()
+  if (!podId) throw new Error('RUNPOD_POD_ID is not configured and could not be derived from LOCAL_AI_BASE_URL')
   const data = await graphqlRequest<{ podResume?: { id: string; desiredStatus: string } }>(
     `mutation { podResume(input: { podId: "${podId}", gpuCount: 1 }) { id desiredStatus } }`,
   )
@@ -63,8 +65,8 @@ export async function startPod(): Promise<{ id: string; desiredStatus: string }>
 }
 
 export async function stopPod(): Promise<{ id: string; desiredStatus: string }> {
-  const podId = process.env.RUNPOD_POD_ID?.trim()
-  if (!podId) throw new Error('RUNPOD_POD_ID is not configured')
+  const podId = configuredRunpodPodId()
+  if (!podId) throw new Error('RUNPOD_POD_ID is not configured and could not be derived from LOCAL_AI_BASE_URL')
   const data = await graphqlRequest<{ podStop?: { id: string; desiredStatus: string } }>(
     `mutation { podStop(input: { podId: "${podId}" }) { id desiredStatus } }`,
   )

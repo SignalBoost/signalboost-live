@@ -6,12 +6,39 @@ import {
   type SupervisorThinkerResponse,
 } from '@/lib/cos/supervisor-thinker-prompt'
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
-import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
+import { callLocalModel, checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
+import { runpodLifecycleEnabled } from '@/lib/ai/cos/runpodLifecycle'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 const METHODS = new Set(['api', 'code_change', 'cli', 'ui_agent', 'human_action', 'no_action'])
 const RISKS = new Set(['low', 'medium', 'high', 'critical'])
 const ai = createPlatformAiPort()
+const DIAGNOSTIC_CACHE_PREFIX = 'cos-supervisor-diagnostic:v3:'
+const DIAGNOSTIC_IN_FLIGHT = new Map<string, Promise<DiagnosticResult>>()
+
+function boundedNumber(name: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(process.env[name] ?? fallback)
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback
+}
+
+function supervisorLocalTimeoutMs(): number {
+  return Math.round(boundedNumber('COS_SUPERVISOR_LOCAL_TIMEOUT_MS', 35_000, 5_000, 60_000))
+}
+
+function supervisorLocalMaxTokens(): number {
+  return Math.round(boundedNumber('COS_SUPERVISOR_LOCAL_MAX_TOKENS', 1_800, 512, 3_000))
+}
+
+function diagnosticCacheTtlMs(): number {
+  return Math.round(boundedNumber('COS_SUPERVISOR_DIAGNOSTIC_CACHE_MS', 60 * 60_000, 60_000, 6 * 60 * 60_000))
+}
+
+function diagnosticCacheKey(incident: NormalizedIncidentPayload): string {
+  return `${DIAGNOSTIC_CACHE_PREFIX}${incident.incident_id}`
+}
 
 function extractJson(text: string): unknown {
   const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim()
@@ -63,6 +90,33 @@ function fallbackDiagnostic(incident: NormalizedIncidentPayload, reason: string)
   }
 }
 
+async function readCachedDiagnostic(incident: NormalizedIncidentPayload): Promise<DiagnosticResult | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  try {
+    const entry = await new SupabaseExactCacheStore(db).get<DiagnosticResult>(diagnosticCacheKey(incident))
+    if (!entry?.value) return null
+    return validateDiagnostic(entry.value, incident.incident_id)
+  } catch {
+    return null
+  }
+}
+
+async function writeCachedDiagnostic(incident: NormalizedIncidentPayload, diagnostic: DiagnosticResult, ttlMs = diagnosticCacheTtlMs()): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  try {
+    const now = Date.now()
+    await new SupabaseExactCacheStore(db).set(diagnosticCacheKey(incident), {
+      value: diagnostic,
+      createdAt: now,
+      expiresAt: now + ttlMs,
+    })
+  } catch (error) {
+    console.warn('[cos-supervisor-diagnostic] cache write failed', error instanceof Error ? error.message : String(error))
+  }
+}
+
 export interface DiagnosticThinker {
   id: string
   think(incident: NormalizedIncidentPayload, systemPrompt: string, responseSchema: unknown): Promise<string>
@@ -75,14 +129,16 @@ export function registerDiagnosticThinker(thinker: DiagnosticThinker): void {
 }
 export function listDiagnosticThinkers(): string[] { return Array.from(THINKERS.keys()).sort() }
 
-/** COS Primary is the first diagnostic brain. External models are fallback, not the default. */
+/**
+ * COS Primary is the first diagnostic brain, but background supervisor work is intentionally
+ * single-pass. It must not fan out through the interactive Cognitive Council or trigger answer
+ * repair/citation passes. One incident gets at most one bounded local Qwen request.
+ */
 export function createCosPrimaryDiagnosticThinker(): DiagnosticThinker {
   return {
     id: 'cos-primary',
     async think(incident, systemPrompt, responseSchema) {
       const prompt = [
-        systemPrompt,
-        '',
         'INCIDENT EVIDENCE:',
         JSON.stringify(incident),
         '',
@@ -91,12 +147,30 @@ export function createCosPrimaryDiagnosticThinker(): DiagnosticThinker {
         '',
         'Return only the diagnostic JSON object. Preserve incident_id exactly.',
       ].join('\n')
-      const result = await tryCOSFirstAnswer({ prompt, userId: null, language: 'en', privileged: true })
-      if (!result.handled) {
-        const detail = 'reason' in result ? result.reason : 'COS Primary did not satisfy the diagnostic contract'
-        throw new Error(`COS Primary confidence ${result.confidence.toFixed(2)}: ${detail}`)
+
+      const baseConfig = localInferenceConfigFromEnv()
+      const timeoutMs = supervisorLocalTimeoutMs()
+      const maxTokens = supervisorLocalMaxTokens()
+
+      // When lifecycle control is unavailable, do a cheap health probe first. A stopped/unreachable
+      // pod should fail in ~5 seconds and move to the governed fallback, not occupy a 35s inference slot.
+      if (!runpodLifecycleEnabled()) {
+        const health = await checkLocalInferenceHealth({ ...baseConfig, timeoutMs: Math.min(baseConfig.timeoutMs, 5_000) })
+        if (!health.ok) throw new Error(`COS local reasoner unavailable: ${health.error || 'health check failed'}`)
       }
-      return result.reply
+
+      await touchRunpodActivityLease('supervisor_diagnostic').catch(() => undefined)
+      const text = await callLocalModel(
+        {
+          prompt,
+          systemPrompt,
+          maxTokens,
+          temperature: 0,
+        },
+        { ...baseConfig, timeoutMs },
+      )
+      if (!text) throw new Error(`COS local diagnostic returned no response within ${timeoutMs}ms`)
+      return text
     },
   }
 }
@@ -146,20 +220,53 @@ async function runThinker(incident: NormalizedIncidentPayload, thinker: Diagnost
   return validateDiagnostic(extractJson(text), incident.incident_id)
 }
 
+async function diagnoseIncidentUncached(incident: NormalizedIncidentPayload): Promise<DiagnosticResult> {
+  const failures: string[] = []
+  for (const candidate of [createCosPrimaryDiagnosticThinker(), resolveDiagnosticThinker()].filter(Boolean) as DiagnosticThinker[]) {
+    try {
+      const result = await runThinker(incident, candidate)
+      await writeCachedDiagnostic(incident, result)
+      return result
+    } catch (err) {
+      failures.push(`${candidate.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`)
+    }
+  }
+
+  const fallback = fallbackDiagnostic(incident, failures.length ? failures.join(' | ') : 'No diagnostic thinker is configured')
+  // Cache hard failure briefly so webhook retries or a persistent probe cannot immediately hammer
+  // the stopped/unhealthy pod and all external fallbacks again.
+  await writeCachedDiagnostic(incident, fallback, Math.min(diagnosticCacheTtlMs(), 5 * 60_000))
+  return fallback
+}
+
 export async function diagnoseIncident(incident: NormalizedIncidentPayload, thinker?: DiagnosticThinker | null): Promise<DiagnosticResult> {
-  // An explicitly supplied thinker is deterministic test/override behavior. Otherwise COS is first.
+  // An explicitly supplied thinker is deterministic test/override behavior and bypasses cache.
   if (thinker !== undefined) {
     if (!thinker) return fallbackDiagnostic(incident, 'No diagnostic thinker is configured')
     try { return await runThinker(incident, thinker) }
     catch (err) { return fallbackDiagnostic(incident, `${thinker.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`) }
   }
 
-  const failures: string[] = []
-  for (const candidate of [createCosPrimaryDiagnosticThinker(), resolveDiagnosticThinker()].filter(Boolean) as DiagnosticThinker[]) {
-    try { return await runThinker(incident, candidate) }
-    catch (err) { failures.push(`${candidate.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`) }
+  const cached = await readCachedDiagnostic(incident)
+  if (cached) {
+    console.info('[cos-supervisor-diagnostic]', JSON.stringify({ at: new Date().toISOString(), incidentId: incident.incident_id, source: 'cache', modelCalls: 0 }))
+    return cached
   }
-  return fallbackDiagnostic(incident, failures.length ? failures.join(' | ') : 'No diagnostic thinker is configured')
+
+  const key = diagnosticCacheKey(incident)
+  const existing = DIAGNOSTIC_IN_FLIGHT.get(key)
+  if (existing) {
+    console.info('[cos-supervisor-diagnostic]', JSON.stringify({ at: new Date().toISOString(), incidentId: incident.incident_id, source: 'in_flight_dedupe', modelCalls: 0 }))
+    return existing
+  }
+
+  const pending = diagnoseIncidentUncached(incident)
+  DIAGNOSTIC_IN_FLIGHT.set(key, pending)
+  try {
+    return await pending
+  } finally {
+    if (DIAGNOSTIC_IN_FLIGHT.get(key) === pending) DIAGNOSTIC_IN_FLIGHT.delete(key)
+  }
 }
 
 export async function diagnoseIncidentWithGemini(incident: NormalizedIncidentPayload): Promise<DiagnosticResult> {

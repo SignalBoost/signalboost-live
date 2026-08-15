@@ -55,34 +55,13 @@ export interface RepairIncident {
   provider?: string
 }
 
-/**
- * Maps a model-written repair step onto a known, executable action id — or null when it
- * recognizes nothing, which is the safe default. The host supplies this; it is the ONLY
- * place a free-text repair action can become something the gateway will act on.
- */
 export type RepairActionResolver = (step: RepairStep, incident: RepairIncident) => string | null
-
-/**
- * Optional companion to the resolver: extra parameters carried into the request, and from
- * there into the approval PR the owner reads.
- *
- * THESE ARE FACTS THE DIAGNOSIS IDENTIFIED, NEVER VALUES IT INVENTED. A diagnosis can say
- * WHICH environment variable is missing and WHICH environment it belongs to — that is
- * diagnosis. Supplying the secret itself is not, and must come from the buyer's vault or
- * from a person. Nothing returned here should ever be a credential.
- */
 export type RepairParamResolver = (
   step: RepairStep,
   incident: RepairIncident,
 ) => Readonly<Record<string, unknown>>
 
-/** Recognizes nothing. The correct starting point: every step halts for a human. */
 export const resolveNothing: RepairActionResolver = () => null
-
-/**
- * The target used when no known action matches. Deliberately not a real verb, so the
- * classifier returns 'unknown' and Gate 1 halts it.
- */
 export const UNRECOGNIZED_TARGET = 'unrecognized_repair_action'
 
 export interface DispatchRepairPlanOptions {
@@ -90,40 +69,41 @@ export interface DispatchRepairPlanOptions {
   repairPlan: readonly RepairStep[]
   policy: GovernancePolicy
   host: GatewayHost
-  /** Defaults to resolveNothing — nothing is executable until the host teaches it something. */
+  /** Stable identity for one detected remediation attempt. Replays reuse it; later attempts do not. */
+  executionAttemptId?: string
   resolveAction?: RepairActionResolver
-  /** Optional extra params for the staged approval. Identified facts only, never secrets. */
   resolveParams?: RepairParamResolver
-  /** Identifies the supervisor as the calling agent in the audit trail. */
   agentId?: string
 }
 
 export interface RepairStepOutcome {
   step: number
   action: string
-  /** The resolved action id, or null when nothing was recognized. */
   resolvedTarget: string | null
   outcome: GatewayOutcome
 }
 
 export interface DispatchRepairPlanResult {
-  /** True only if every step executed successfully. */
   completed: boolean
   results: readonly RepairStepOutcome[]
-  /** Set when the run stopped early, naming why. */
   stoppedAt?: { step: number; reason: string }
 }
 
-/** Build the normalized request for one repair step. Exported for inspection and tests. */
+function safeAttemptId(value: unknown): string {
+  return String(value ?? '').replace(/[^A-Za-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180)
+}
+
 export function repairStepToRequest(
   incident: RepairIncident,
   step: RepairStep,
   resolvedTarget: string | null,
   agentId: string,
   extraParams: Readonly<Record<string, unknown>> = {},
+  executionAttemptId?: string,
 ): AgentRequest {
+  const attemptId = safeAttemptId(executionAttemptId)
   return {
-    requestId: `${incident.incident_id}:repair:${step.step}`,
+    requestId: `${incident.incident_id}:repair:${step.step}${attemptId ? `:attempt:${attemptId}` : ''}`,
     protocol: 'supervisor',
     agentId,
     action: {
@@ -133,61 +113,45 @@ export function repairStepToRequest(
         incidentId: incident.incident_id,
         project: incident.project,
         stepNumber: step.step,
-        // The prose is carried for the human reviewing the PR — never used as a target.
+        ...(attemptId ? { executionAttemptId: attemptId } : {}),
         describedAction: step.action,
         describedTarget: step.target,
         expectedResult: step.expected_result,
         executor: step.executor,
         requiresApproval: step.requires_approval,
-        // Host-identified facts. Never a credential — see RepairParamResolver.
         ...extraParams,
       },
     },
   }
 }
 
-/**
- * Run a diagnosed repair plan through the governed socket, in order, stopping at the first
- * step that does not execute.
- *
- * Returns what happened to every step it attempted. A halt is a normal outcome, not an
- * error: the owner gets a PR and the remaining steps wait.
- */
 export async function dispatchRepairPlan(
   options: DispatchRepairPlanOptions,
 ): Promise<DispatchRepairPlanResult> {
   const resolve = options.resolveAction ?? resolveNothing
   const agentId = options.agentId ?? 'autonomous-supervisor'
   const results: RepairStepOutcome[] = []
-
   const ordered = [...options.repairPlan].sort((a, b) => a.step - b.step)
 
   for (const step of ordered) {
-    // Rule 2 and Rule 1: the diagnosis's own caution is binding and can only tighten.
     const forcedHuman = step.requires_approval || step.executor === 'human'
     const resolvedTarget = forcedHuman ? null : resolve(step, options.incident)
-
     const extraParams = options.resolveParams ? options.resolveParams(step, options.incident) : {}
-    const request = repairStepToRequest(options.incident, step, resolvedTarget, agentId, extraParams)
+    const request = repairStepToRequest(options.incident, step, resolvedTarget, agentId, extraParams, options.executionAttemptId)
     const outcome = await runGoverned(request, options.policy, options.host)
-
     results.push({ step: step.step, action: step.action, resolvedTarget, outcome })
-
-    // Rule 4: a later step must never run against a half-repaired system.
     if (outcome.verdict !== 'execute' || !outcome.ok) {
       return {
         completed: false,
         results,
         stoppedAt: {
           step: step.step,
-          reason:
-            outcome.verdict === 'execute'
-              ? `step ${step.step} failed: ${outcome.error ?? 'execution failed'}`
-              : `step ${step.step} ${outcome.verdict}: ${outcome.reason}`,
+          reason: outcome.verdict === 'execute'
+            ? `step ${step.step} failed: ${outcome.error ?? 'execution failed'}`
+            : `step ${step.step} ${outcome.verdict}: ${outcome.reason}`,
         },
       }
     }
   }
-
   return { completed: true, results }
 }

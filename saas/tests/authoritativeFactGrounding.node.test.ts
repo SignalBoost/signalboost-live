@@ -8,6 +8,7 @@ import {
 import { buildCosLiveTelemetry } from '../lib/ai/cos/cosLiveTelemetry.ts'
 
 const USAGOV_BODY = '<main>The 47th and current president of the United States is <strong>Donald John Trump</strong>. He was sworn into office on January 20, 2025.</main>'
+const WHITEHOUSE_BODY = '<main><h1>The Administration</h1><h2>President Donald John Trump</h2><p>45th & 47th President of the United States</p></main>'
 
 function fakeFetch(map: Record<string, { ok?: boolean; status?: number; body?: string }>) {
   return async (url: string) => {
@@ -26,28 +27,56 @@ test('recognizes present-tense US president questions but not historical ones', 
   }
 })
 
-test('extracts the current president from live government page text without a model', async () => {
+test('corroborates the current president across White House and USAGov without a model', async () => {
   const grounded = await groundAuthoritativeVolatileFact('Who is the current US president?', {
-    fetch: fakeFetch({ 'https://www.usa.gov/presidents': { body: USAGOV_BODY } }),
+    fetch: fakeFetch({
+      'https://www.whitehouse.gov/administration/': { body: WHITEHOUSE_BODY },
+      'https://www.usa.gov/presidents': { body: USAGOV_BODY },
+    }),
     now: () => Date.parse('2026-08-15T12:00:00.000Z'),
   })
   assert.ok(grounded)
   if (!grounded) return
   assert.equal(grounded.answer, 'The current President of the United States is Donald John Trump.')
-  assert.equal(grounded.sourceId, 'usagov_presidents')
+  assert.equal(grounded.sources.length, 2)
+  assert.deepEqual(grounded.sources.map(source => source.sourceId), ['whitehouse_administration', 'usagov_presidents'])
   const reply = renderAuthoritativeGroundedReply(grounded)
   assert.match(reply, /Donald John Trump/)
+  assert.match(reply, /whitehouse\.gov\/administration/)
   assert.match(reply, /usa\.gov\/presidents/)
   assert.match(reply, /2026-08-15T12:00:00\.000Z/)
 })
 
-test('returns null when the authoritative source is unavailable or no longer exposes the fact', async () => {
+test('one healthy authoritative source can verify when the other is unavailable', async () => {
+  const grounded = await groundAuthoritativeVolatileFact('Who is the current US president?', {
+    fetch: fakeFetch({
+      'https://www.whitehouse.gov/administration/': { ok: false, status: 503 },
+      'https://www.usa.gov/presidents': { body: USAGOV_BODY },
+    }),
+  })
+  assert.ok(grounded)
+  assert.equal(grounded?.sources.length, 1)
+  assert.equal(grounded?.sources[0]?.sourceId, 'usagov_presidents')
+})
+
+test('fails closed when no authoritative source verifies the fact', async () => {
   assert.equal(await groundAuthoritativeVolatileFact('Who is the current US president?', {
-    fetch: fakeFetch({ 'https://www.usa.gov/presidents': { ok: false, status: 503 } }),
+    fetch: fakeFetch({
+      'https://www.whitehouse.gov/administration/': { ok: false, status: 503 },
+      'https://www.usa.gov/presidents': { body: '<main>Maintenance</main>' },
+    }),
   }), null)
-  assert.equal(await groundAuthoritativeVolatileFact('Who is the current US president?', {
-    fetch: fakeFetch({ 'https://www.usa.gov/presidents': { body: '<main>Maintenance</main>' } }),
-  }), null)
+})
+
+test('fails closed when authoritative sources disagree', async () => {
+  const conflictingWhiteHouse = '<main><h1>The Administration</h1><h2>President Jane Example</h2><p>48th President of the United States</p></main>'
+  const grounded = await groundAuthoritativeVolatileFact('Who is the current US president?', {
+    fetch: fakeFetch({
+      'https://www.whitehouse.gov/administration/': { body: conflictingWhiteHouse },
+      'https://www.usa.gov/presidents': { body: USAGOV_BODY },
+    }),
+  })
+  assert.equal(grounded, null)
 })
 
 test('authoritative direct answers are counted as inference avoided', () => {

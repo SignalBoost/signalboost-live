@@ -1,64 +1,31 @@
-// Generic freshness policy. It classifies the SHAPE of the question rather than maintaining
-// a catalog of presidents, CEOs, prices, laws, versions, etc. Query-time COS orchestration uses
-// maxMemoryAgeMs to decide whether recent sourced memory is fresh enough before going live.
+// Dependency-free policy for deciding when pretrained/local knowledge is not
+// sufficient because the answer can change without a code or model update.
 
-export type CosFreshnessPolicy = {
-  required: boolean
-  maxMemoryAgeMs: number | null
-  reason: string
-  forceLiveVerification: boolean
-}
+const CURRENT_MARKER = /\b(current|currently|today|tonight|now|latest|right now|at present|as of today)\b/i
 
-const EXPLICIT_CURRENT = /\b(?:current|currently|today|tonight|now|latest|right now|at present|as of(?: today| now| this moment)?)\b/i
-const EXPLICIT_VERIFY = /\b(?:verify|confirm|fact[- ]?check|check (?:a )?source|show (?:me )?(?:the )?source|cite (?:a )?source|official source|authoritative source)\b/i
-const PRESENT_ROLE_RELATION = /^\s*who\s+is\s+(?:the\s+)?[^?]{1,100}\b(?:of|at|for)\b/i
-const PRESENT_LEADERSHIP = /^\s*who\s+(?:leads|heads|runs)\b/i
-const HISTORICAL = /\b(?:who was|who were|former|previous|formerly|historical|history of|in (?:18|19|20)\d{2}|during (?:18|19|20)\d{2})\b/i
-const DIAGNOSTIC_OR_DESIGN = /\b(?:diagnose|troubleshoot|debug|root cause|rank (?:the )?(?:causes|hypotheses)|architect|design (?:an?|the)|how would you distinguish|without making production changes)\b/i
-const TRANSFORMATIVE = /\b(?:rewrite|edit|proofread|translate|summarize|paraphrase|brainstorm|draft|compose)\b/i
+const DYNAMIC_ROLE = /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)\b/i
 
-const MINUTE = 60 * 1000
-const HOUR = 60 * MINUTE
+const VOLATILE_STATE = /\b(?:price|prices|exchange rate|exchange rates|stock price|stock prices|weather|forecast|forecasts|score|scores|standings|schedule|schedules|availability|outage|outages|service status|law|laws|regulation|regulations|policy|policies|version|release)\b/i
+
+const PRESENT_TENSE_OFFICE_HOLDER = /\bwho\s+is\s+(?:the\s+)?(?:current\s+)?(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)\b/i
+
+const CURRENT_LEADER = /\bwho\s+(?:currently\s+)?(?:leads|heads|runs)\b/i
+const LIVE_NEWS = /\b(?:latest|today(?:'s)?)\s+(?:news|results?|scores?|standings)\b/i
 
 /**
- * How an informed human treats freshness:
- * - explicit current/now/latest wording: memory must be very recent;
- * - explicit verification/source request: go live instead of trusting remembered state;
- * - present-tense role/leadership questions: recent sourced memory is acceptable for a day;
- * - ordinary identity, historical, diagnostic, design, and transformative work stays memory-first.
+ * Returns true only when the wording itself indicates that the answer depends
+ * on live world state. These requests must not be accepted solely from model
+ * pretraining or an answer cache, even when the local model reports high
+ * confidence.
  */
-export function freshnessPolicyForQuestion(input: string): CosFreshnessPolicy {
+export function requiresFreshExternalEvidence(input: string): boolean {
   const text = String(input || '').replace(/\s+/g, ' ').trim()
-  if (!text) return { required: false, maxMemoryAgeMs: null, reason: 'empty_input', forceLiveVerification: false }
+  if (!text) return false
 
-  if (HISTORICAL.test(text)) {
-    return { required: false, maxMemoryAgeMs: null, reason: 'historical_question', forceLiveVerification: false }
-  }
-  if (DIAGNOSTIC_OR_DESIGN.test(text)) {
-    return { required: false, maxMemoryAgeMs: null, reason: 'analytical_reasoning', forceLiveVerification: false }
-  }
-  if (TRANSFORMATIVE.test(text)) {
-    return { required: false, maxMemoryAgeMs: null, reason: 'transformative_task', forceLiveVerification: false }
-  }
-  if (EXPLICIT_VERIFY.test(text)) {
-    return { required: true, maxMemoryAgeMs: 0, reason: 'explicit_live_verification', forceLiveVerification: true }
-  }
-  if (EXPLICIT_CURRENT.test(text)) {
-    return { required: true, maxMemoryAgeMs: HOUR, reason: 'explicit_current_state', forceLiveVerification: false }
-  }
-  if (PRESENT_ROLE_RELATION.test(text) || PRESENT_LEADERSHIP.test(text)) {
-    return { required: true, maxMemoryAgeMs: 24 * HOUR, reason: 'present_tense_role_relation', forceLiveVerification: false }
-  }
+  if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
+  if (CURRENT_LEADER.test(text)) return true
+  if (LIVE_NEWS.test(text)) return true
+  if (CURRENT_MARKER.test(text) && (DYNAMIC_ROLE.test(text) || VOLATILE_STATE.test(text))) return true
 
-  return { required: false, maxMemoryAgeMs: null, reason: 'ordinary_memory_reasoning', forceLiveVerification: false }
-}
-
-/**
- * Legacy route hook retained only so older callers compile. Freshness no longer means
- * "route to an external model"; it is handled inside tryCOSFirstAnswer via recent sourced
- * memory and, only when needed, live authoritative verification. Returning false here retires
- * the old pre-COS live-search/Gemini path without changing the route API surface.
- */
-export function requiresFreshExternalEvidence(_input: string): boolean {
   return false
 }

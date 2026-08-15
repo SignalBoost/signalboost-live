@@ -36,19 +36,13 @@ File: `saas/lib/ai/cos/councilMachinePrediction.ts`
 
 Predictions support only fixed bounded fact paths already allowed into the objective outcome ledger, plus `outcome_status`.
 
-Operators:
-- `eq`
-- `neq`
-- `gt`
-- `gte`
-- `lt`
-- `lte`
+Operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`.
 
 Expected values are primitive string/number/boolean only. Numeric comparison operators require numbers. There is no eval, regex, arbitrary JSONPath, semantic matching, model interpretation, Council voting, or confidence threshold in the resolver.
 
 ## Council pre-registration
 
-`saas/lib/ai/cos/cognitiveCouncil.ts` now lets an independent first-opinion claim optionally include `machine_prediction`.
+`saas/lib/ai/cos/cognitiveCouncil.ts` lets an independent first-opinion claim optionally include `machine_prediction`.
 
 Important boundaries:
 - specialists are told to omit a machine prediction when an observable would only prove generic recovery rather than discriminate their claim;
@@ -72,15 +66,28 @@ The resolver:
 
 A role with mixed supported/refuted predictions is not scored. A role with three registered predictions and only two objective facts is not scored.
 
+## Retry-safe objective evidence identity
+
+A post-merge review of the preceding objective-outcome slice found a real retry hazard: native Self-Healing originally reused `${incident_id}:repair:${step}` as the Agent Gateway request identity. A failed repair attempt followed by a later successful attempt for the same fingerprint could therefore collide in the objective-outcome ledger and leave stale evidence.
+
+This slice fixes that boundary:
+- `DispatchRepairPlanOptions` now accepts `executionAttemptId`;
+- native Self-Healing passes the incident's stable `detectedAt` value as the attempt identity;
+- the Agent Gateway request id becomes `${incident}:repair:${step}:attempt:${detectedAt}` for native remediation;
+- replaying the same detected incident remains idempotent because its `detectedAt` is stable;
+- a genuinely later detection gets a different request/source reference, so later success cannot be discarded behind an earlier failure.
+
+This preserves the existing objective-ledger uniqueness rule without fabricating random write-time identifiers.
+
 ## Skill provenance and learning boundary
 
-`saas/lib/ai/cos/cognitiveSkillContext.ts` now injects the durable skill key alongside `[SK#]`:
+`saas/lib/ai/cos/cognitiveSkillContext.ts` injects the durable skill key alongside `[SK#]`:
 
 ```text
 [SK1] [skill_key=...]
 ```
 
-`saas/lib/ai/cos/councilObjectiveOutcome.ts` captures the exact `[SK#] -> skill_key` mapping from governed context into the Council session.
+The exact `[SK#] -> skill_key` mapping is captured from governed context into the Council session.
 
 A supported role may record positive production evidence for a cognitive skill only when all scored prediction claims unambiguously cite the same single `[SK#]` procedure. This uses the existing externally verified cognitive production-outcome path.
 
@@ -124,19 +131,24 @@ Immediately after migration, without synthetic incidents or fabricated evidence:
 
 The first real qualifying governed operation will populate the ledger automatically.
 
-## Regression coverage
+## Regression coverage and strip-safe boundary
 
-Added:
+Tests:
+- `saas/tests/cosCouncilObjectiveOutcome.node.test.ts`
 - `saas/tests/cosCouncilDeterministicClaimResolution.node.test.ts`
 
-It covers whitelist enforcement, numeric type safety, unresolved missing facts, exact support/refutation, deterministic outcome status, exact skill-key provenance parsing, and SQL safety invariants.
+A review found that the older objective-outcome test imported the database-backed runtime through `@/`, which made direct `node --test` loading fail before assertions ran. This slice fixes the dependency boundary rather than hiding it behind an alias loader:
+- `saas/lib/ai/cos/councilObjectiveOutcomePure.ts` now contains the pure correlation/classification/bounded-fact logic;
+- `saas/lib/ai/cos/councilPromptProvenance.ts` contains the pure `[SK#] -> skill_key` parser;
+- the runtime database wrapper re-exports the pure objective API;
+- both tests use direct relative `.ts` imports and no longer initialize Supabase merely to test deterministic helpers.
 
-The repository's legacy top-level test command has historically enumerated test files manually. Do not claim this new test runs in CI unless that test runner is separately updated. Production builds type-check the imported runtime modules.
+The repository's top-level `npm test` command still manually enumerates a very large list of test files. These two tests are directly runnable with Node now, but do not claim they are included in that legacy aggregate command unless the list is separately updated. `validate:strip-safe` and the production TypeScript build remain merge gates.
 
 ## Preserved concurrent work
 
-This slice was rebased after concurrent COS improvements landed. In particular, it preserves the parallel Council member executor and the newer freshness-aware memory/world-awareness work on `main`; it does not revert or replace them.
+This slice was rebased after concurrent COS improvements landed. It preserves the parallel Council member executor and the freshness-aware memory/world-awareness work merged through PR #1206; it does not revert or replace them.
 
 ## Follow-on
 
-The next useful step is broader objective verifier coverage: route additional deterministic deployment, database read-back, and registered Self-Healing verification results through the same objective-outcome ledger. Claim-resolution coverage should expand only when a provider-neutral fact can be bounded and verified independently; do not add fuzzy or model-judged predicates just to increase scoring volume.
+The next useful step is broader objective verifier coverage: route additional deterministic deployment, database read-back, and registered Self-Healing verification results through the same objective-outcome ledger. Claim-resolution coverage should expand only when a provider-neutral fact can be bounded and verified independently; do not add fuzzy or model-judged predicates merely to increase scoring volume.

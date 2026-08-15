@@ -1,35 +1,39 @@
 // lib/infra-pr/redeploy.ts
-// Production redeploy. Preferred: VERCEL_DEPLOY_HOOK_URL (one POST).
-// Fallback: Deployments API via VERCEL_TOKEN + VERCEL_PROJECT_ID.
+// Production redeploy. General callers may use a deploy hook; governed Self-Healing retries require
+// the authenticated Deployments API because later objective verification must name the exact
+// deployment created by this operation.
 type R = { ok: boolean; data?: any; error?: string };
 
-export async function triggerProductionRedeploy(): Promise<R> {
+export async function triggerProductionRedeploy(options: { requireExactIdentity?: boolean } = {}): Promise<R> {
   const hook = process.env.VERCEL_DEPLOY_HOOK_URL;
-  if (hook) {
+  const token = process.env.VERCEL_TOKEN;
+  const projectId = process.env.VERCEL_PROJECT_ID;
+  const teamId = process.env.VERCEL_TEAM_ID;
+
+  if (!options.requireExactIdentity && hook) {
     try {
       const res = await fetch(hook, { method: 'POST' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: `Deploy hook returned ${res.status}` };
-      return { ok: true, data: { via: 'deploy_hook', ...body } };
+      return { ok: true, data: { ...body, via: 'deploy_hook' } };
     } catch (e: any) {
       return { ok: false, error: e?.message || 'deploy hook request failed' };
     }
   }
 
-  const token = process.env.VERCEL_TOKEN;
-  const projectId = process.env.VERCEL_PROJECT_ID;
-  const teamId = process.env.VERCEL_TEAM_ID;
   if (!token || !projectId) {
     return {
       ok: false,
-      error: 'No VERCEL_DEPLOY_HOOK_URL, and VERCEL_TOKEN / VERCEL_PROJECT_ID missing for fallback',
+      error: options.requireExactIdentity
+        ? 'VERCEL_TOKEN / VERCEL_PROJECT_ID are required for an exactly verifiable production redeploy'
+        : 'No VERCEL_DEPLOY_HOOK_URL, and VERCEL_TOKEN / VERCEL_PROJECT_ID missing for fallback',
     };
   }
 
-  const team = teamId ? `&teamId=${teamId}` : '';
+  const team = teamId ? `&teamId=${encodeURIComponent(teamId)}` : '';
   try {
     const listRes = await fetch(
-      `https://api.vercel.com/v6/deployments?projectId=${projectId}&target=production&limit=1${team}`,
+      `https://api.vercel.com/v6/deployments?projectId=${encodeURIComponent(projectId)}&target=production&limit=1${team}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     const listBody = await listRes.json();
@@ -54,7 +58,23 @@ export async function triggerProductionRedeploy(): Promise<R> {
     if (!createRes.ok) {
       return { ok: false, error: createBody?.error?.message || `redeploy ${createRes.status}` };
     }
-    return { ok: true, data: { via: 'deployments_api', id: createBody?.id, url: createBody?.url } };
+    const deploymentId = typeof createBody?.id === 'string' ? createBody.id.trim() : '';
+    if (options.requireExactIdentity && !deploymentId) {
+      return { ok: false, error: 'Vercel redeploy succeeded without returning an exact deployment id' };
+    }
+    const deploymentUrl = typeof createBody?.url === 'string' && createBody.url.trim()
+      ? (createBody.url.startsWith('http://') || createBody.url.startsWith('https://') ? createBody.url : `https://${createBody.url}`)
+      : null;
+    return {
+      ok: true,
+      data: {
+        via: 'deployments_api',
+        id: deploymentId || undefined,
+        url: createBody?.url,
+        deploymentId: deploymentId || undefined,
+        deploymentUrl,
+      },
+    };
   } catch (e: any) {
     return { ok: false, error: e?.message || 'redeploy API request failed' };
   }

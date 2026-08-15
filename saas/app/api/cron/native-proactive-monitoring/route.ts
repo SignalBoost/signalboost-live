@@ -6,6 +6,7 @@ import { collectAssessmentConfidenceIncident } from '@/self-healing-host/assessm
 import { collectConfigurationDriftIncident } from '@/self-healing-host/configuration-drift-monitoring'
 import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native-persistence-monitoring'
 import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/platform-health-monitoring-adapter'
+import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 
@@ -53,8 +54,16 @@ export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const db = getAdminSupabase(); const store = new SupabaseNativeProbeStore(db)
   try { await store.verifySchema() } catch (error) { return NextResponse.json({ ok: false, error: 'native_probe_store_unavailable', detail: error instanceof Error ? error.message.slice(0,220) : 'native probe schema unavailable' }, { status: 503 }) }
+
+  // Resolve only prior repair attempts here. Current-cycle deployments are intentionally left for a
+  // later cycle so objective evidence is based on a separately observed provider state transition.
+  const priorRepairVerification = await verifyPendingExactVercelRepairOutcomes(db).catch(error => ({
+    candidates: 0, checked: 0, alreadyRecorded: 0, pending: 0, success: 0, failure: 0, recorded: 0,
+    errors: [error instanceof Error ? error.message.slice(0, 500) : 'exact Vercel repair verification failed'],
+  }))
+
   const apiUrls = parseApiUrls(); const certificateTargets = parseTlsTargets(apiUrls)
-  if (!apiUrls.length || !certificateTargets.length) return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable' }, { status: 503 })
+  if (!apiUrls.length || !certificateTargets.length) return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable', priorRepairVerification }, { status: 503 })
   const quotaBytes = storageQuotaBytes()
   const collectors = [
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
@@ -72,12 +81,12 @@ export async function GET(req: NextRequest) {
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
-    schemaVersion: 'self-healing-native-proactive-monitoring-v5',
+    schemaVersion: 'self-healing-native-proactive-monitoring-v6',
     runAt: new Date().toISOString(), readOnly: result.readOnly, providerMutations: result.providerMutations, mode: result.mode,
     limits: { apiTargets: apiUrls.length, tlsTargets: certificateTargets.length, maxDurationSeconds: maxDuration, storageQuotaConfigured: quotaBytes != null, apiTargetCap: apiTargetCap() },
     collectorsRun: result.collectorsRun, signalsObserved: result.signalsObserved, incidents,
     configurationInvestigationClaimed: Boolean(configurationIncident), confidenceInvestigationClaimed: Boolean(confidenceIncident),
-    remediation, collectorErrors: result.collectorErrors,
+    priorRepairVerification, remediation, collectorErrors: result.collectorErrors,
   }, { status })
 }
 export async function POST(req: NextRequest) { return GET(req) }

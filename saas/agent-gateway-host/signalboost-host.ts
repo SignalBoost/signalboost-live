@@ -36,7 +36,11 @@ export function createSignalBoostGatewayHost(): GatewayHost {
         createObservationPolicyRecoveryExecutor({
           reconcile: () => reconcileObservationPolicy(getAdminSupabase()),
         }),
-        createRetryDeploymentExecutor({ redeploy: triggerProductionRedeploy }),
+        createRetryDeploymentExecutor({
+          // Self-Healing may only claim a later production outcome when the initiating repair names
+          // the exact deployment it created. A deploy hook without exact identity fails closed here.
+          redeploy: () => triggerProductionRedeploy({ requireExactIdentity: true }),
+        }),
         createUniversalChainExecutor({
           runUniversalProvider: async (input) => {
             const r = await runUniversalProvider(input)

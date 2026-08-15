@@ -11,6 +11,8 @@ on:
       - 'saas/tests/cosCouncil*.node.test.ts'
       - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
       - 'saas/tests/supervisorDiagnosticCacheKey.node.test.ts'
+      - 'saas/tests/vercelExactRepairVerification.node.test.ts'
+      - 'saas/tests/nativeSelfHealingAcceptance.node.test.ts'
       - '.github/workflows/cos-council-regression.yml'
   push:
     branches:
@@ -24,6 +26,8 @@ on:
       - 'saas/tests/cosCouncil*.node.test.ts'
       - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
       - 'saas/tests/supervisorDiagnosticCacheKey.node.test.ts'
+      - 'saas/tests/vercelExactRepairVerification.node.test.ts'
+      - 'saas/tests/nativeSelfHealingAcceptance.node.test.ts'
       - '.github/workflows/cos-council-regression.yml'
   workflow_dispatch:
 
@@ -66,6 +70,12 @@ jobs:
 
       - name: Run Supervisor diagnostic cache identity regression
         run: node --test tests/supervisorDiagnosticCacheKey.node.test.ts
+
+      - name: Run exact Vercel repair verification regression
+        run: node --test tests/vercelExactRepairVerification.node.test.ts
+
+      - name: Run native Self-Healing acceptance regression
+        run: node --test tests/nativeSelfHealingAcceptance.node.test.ts
 
       - name: Verify strip-safe module boundary
         run: npm run validate:strip-safe

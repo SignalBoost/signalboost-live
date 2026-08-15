@@ -1,6 +1,8 @@
 // Direct live-source grounding for narrow volatile facts that do not require model synthesis.
-// A recognized fact is answered only when a first-party/government source yields the value.
-// Source failure returns null; callers must fail closed rather than substitute model memory.
+// A recognized fact is answered only from first-party/government sources.
+// Multiple configured sources are queried concurrently: agreeing sources corroborate the answer,
+// one healthy source can survive another source's outage, and conflicting authoritative answers
+// fail closed. Callers must never substitute model memory for a recognized volatile fact.
 
 export type FetchLike = (
   url: string,
@@ -20,6 +22,13 @@ export type VolatileFactCategory = {
   sources: AuthoritativeSource[]
 }
 
+export type GroundedSourceEvidence = {
+  sourceId: string
+  sourceLabel: string
+  sourceUrl: string
+  fetchedAt: string
+}
+
 export type GroundedFact = {
   answer: string
   categoryId: string
@@ -27,6 +36,7 @@ export type GroundedFact = {
   sourceLabel: string
   sourceUrl: string
   fetchedAt: string
+  sources: GroundedSourceEvidence[]
 }
 
 function pageText(body: string): string {
@@ -55,13 +65,30 @@ function isCurrentUsPresidentQuestion(prompt: string): boolean {
     || /^\s*(?:current\s+)?potus\s*\??\s*$/i.test(p)
 }
 
-function extractCurrentUsPresident(body: string): string | null {
+function canonicalPresidentAnswer(name: string): string | null {
+  const cleaned = String(name || '').trim().replace(/\s+/g, ' ')
+  if (!cleaned || cleaned.length > 80) return null
+  return `The current President of the United States is ${cleaned}.`
+}
+
+function extractCurrentUsPresidentFromUsaGov(body: string): string | null {
   const text = pageText(body)
   const match = text.match(/current president of the United States is ([A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-\s]{2,80}?)(?=[.,;])/i)
-  if (!match) return null
-  const name = match[1].trim().replace(/\s+/g, ' ')
-  if (!name || name.length > 80) return null
-  return `The current President of the United States is ${name}.`
+  return match ? canonicalPresidentAnswer(match[1]) : null
+}
+
+function extractCurrentUsPresidentFromWhiteHouse(body: string): string | null {
+  const text = pageText(body)
+  const match = text.match(/\bPresident\s+([A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'’\-\s]{2,80}?)(?=\s+(?:\d{1,2}(?:st|nd|rd|th)\s*&\s*)?\d{1,2}(?:st|nd|rd|th)\s+President of the United States\b)/i)
+  return match ? canonicalPresidentAnswer(match[1]) : null
+}
+
+function normalizedAnswer(answer: string): string {
+  return String(answer || '')
+    .toLowerCase()
+    .replace(/[.’']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 export const VOLATILE_FACT_CATEGORIES: VolatileFactCategory[] = [
@@ -70,10 +97,16 @@ export const VOLATILE_FACT_CATEGORIES: VolatileFactCategory[] = [
     matches: isCurrentUsPresidentQuestion,
     sources: [
       {
+        id: 'whitehouse_administration',
+        label: 'The White House — Administration',
+        url: 'https://www.whitehouse.gov/administration/',
+        extract: extractCurrentUsPresidentFromWhiteHouse,
+      },
+      {
         id: 'usagov_presidents',
         label: 'USAGov — Presidents, vice presidents, and first ladies',
         url: 'https://www.usa.gov/presidents',
-        extract: extractCurrentUsPresident,
+        extract: extractCurrentUsPresidentFromUsaGov,
       },
     ],
   },
@@ -91,27 +124,53 @@ export async function groundAuthoritativeVolatileFact(
   if (!category) return null
   const now = deps.now ?? Date.now
 
-  for (const source of category.sources) {
+  const attempts = await Promise.all(category.sources.map(async source => {
     try {
       const response = await deps.fetch(source.url, { accept: 'text/html,application/json' })
-      if (!response.ok) continue
+      if (!response.ok) return null
       const answer = source.extract(await response.text())
-      if (!answer?.trim()) continue
+      if (!answer?.trim()) return null
       return {
         answer: answer.trim(),
-        categoryId: category.id,
+        normalized: normalizedAnswer(answer),
         sourceId: source.id,
         sourceLabel: source.label,
         sourceUrl: source.url,
         fetchedAt: new Date(now()).toISOString(),
       }
     } catch {
-      continue
+      return null
     }
+  }))
+
+  const verified = attempts.filter((item): item is NonNullable<typeof item> => Boolean(item))
+  if (!verified.length) return null
+
+  // If multiple authoritative sources answer, they must agree. A disagreement is safer to surface
+  // as unavailable than to choose one source or ask a model to arbitrate from memory.
+  const distinct = new Set(verified.map(item => item.normalized))
+  if (distinct.size !== 1) return null
+
+  const primary = verified[0]
+  return {
+    answer: primary.answer,
+    categoryId: category.id,
+    sourceId: primary.sourceId,
+    sourceLabel: primary.sourceLabel,
+    sourceUrl: primary.sourceUrl,
+    fetchedAt: primary.fetchedAt,
+    sources: verified.map(({ sourceId, sourceLabel, sourceUrl, fetchedAt }) => ({
+      sourceId,
+      sourceLabel,
+      sourceUrl,
+      fetchedAt,
+    })),
   }
-  return null
 }
 
 export function renderAuthoritativeGroundedReply(fact: GroundedFact): string {
-  return `${fact.answer}\n\nSource: ${fact.sourceLabel} (${fact.sourceUrl}), retrieved ${fact.fetchedAt}.`
+  const citations = fact.sources.map(source =>
+    `- ${source.sourceLabel} (${source.sourceUrl}), retrieved ${source.fetchedAt}.`,
+  )
+  return `${fact.answer}\n\nSource${citations.length === 1 ? '' : 's'}:\n${citations.join('\n')}`
 }

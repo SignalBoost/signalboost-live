@@ -1,12 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import { requiresFreshExternalEvidence, structuredLiveDataKind } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
 test('current US president requires live external verification', () => {
   assert.equal(requiresFreshExternalEvidence('Who is the current President of the United States?'), true)
   assert.equal(requiresFreshExternalEvidence('Who is the President of the United States?'), true)
   assert.equal(requiresFreshExternalEvidence('Who is currently the president of the United States?”'), true)
   assert.equal(requiresFreshExternalEvidence('Is Donald Trump still the President of the United States?'), true)
+})
+
+test('high-frequency public values require the structured real-time path', () => {
+  assert.equal(structuredLiveDataKind('What is the TSLA stock price?'), 'financial')
+  assert.equal(structuredLiveDataKind('TSLA stock price'), 'financial')
+  assert.equal(structuredLiveDataKind('What is the USD to EUR exchange rate?'), 'financial')
+  assert.equal(structuredLiveDataKind('Bitcoin price'), 'financial')
+  assert.equal(structuredLiveDataKind('Weather in Paramaribo?'), 'weather')
+  assert.equal(structuredLiveDataKind('What is the NBA score?'), 'sports')
+  assert.equal(structuredLiveDataKind('NBA standings'), 'sports')
 })
 
 test('clearly external volatile facts require live verification even without the word current', () => {
@@ -39,14 +49,16 @@ test('explicit freshness wording forces live verification across public volatile
 test('historical and conceptual questions do not masquerade as current-world lookups', () => {
   assert.equal(requiresFreshExternalEvidence('Who was President of the United States in 1999?'), false)
   assert.equal(requiresFreshExternalEvidence('What was the TSLA stock price in 2020?'), false)
+  assert.equal(structuredLiveDataKind('What was the TSLA stock price in 2020?'), null)
   assert.equal(requiresFreshExternalEvidence('Explain how stock prices work.'), false)
+  assert.equal(structuredLiveDataKind('Explain how stock prices work.'), null)
   assert.equal(requiresFreshExternalEvidence('How does weather forecasting work?'), false)
   assert.equal(requiresFreshExternalEvidence('How is a prime minister elected?'), false)
   assert.equal(requiresFreshExternalEvidence('Explain database transaction isolation levels.'), false)
   assert.equal(requiresFreshExternalEvidence('Diagnose enterprise-only API latency with normal database CPU.'), false)
 })
 
-test('internal business and creation requests are not hijacked by public-web freshness routing', () => {
+test('internal business and creation requests are not hijacked by public live-data routing', () => {
   assert.equal(requiresFreshExternalEvidence('How should I market my latest product?'), false)
   assert.equal(requiresFreshExternalEvidence('How should I price my latest product?'), false)
   assert.equal(requiresFreshExternalEvidence('Create a marketing plan for my newest product.'), false)
@@ -55,4 +67,5 @@ test('internal business and creation requests are not hijacked by public-web fre
   assert.equal(requiresFreshExternalEvidence('What is our current inventory?'), false)
   assert.equal(requiresFreshExternalEvidence('Schedule my latest campaign for tomorrow.'), false)
   assert.equal(requiresFreshExternalEvidence('Build a stock price dashboard component.'), false)
+  assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
 })

@@ -6,6 +6,21 @@ function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8')
 }
 
+test('COS Primary scopes requests with validated RunPod wake permission', () => {
+  const route = source('../app/api/cos-primary/route.ts')
+  assert.ok(route.includes('evaluateRunpodWakePermission'))
+  assert.ok(route.includes("interactionHeader: req.headers.get('x-signalboost-user-interaction')"))
+  assert.ok(route.includes("requestOrigin: req.headers.get('origin')"))
+  assert.ok(route.includes('expectedOrigin: req.nextUrl.origin'))
+  assert.ok(route.includes("secFetchSite: req.headers.get('sec-fetch-site')"))
+  assert.ok(route.includes('withRunpodWakePermission(wakePermission'))
+  assert.ok(route.includes("from './routeCore.ts'"))
+
+  const core = source('../app/api/cos-primary/routeCore.ts')
+  assert.ok(core.includes("from './baseRoute.ts'"), 'current COS Primary core must preserve the non-fresh base route')
+  assert.ok(core.includes('handleFreshSinglePass'), 'current fresh-fact single-pass route must remain intact')
+})
+
 test('ordinary COS preflights runtime before bounded enterprise semantic retrieval', () => {
   const text = source('../lib/ai/cos/cosFirstAnswer.ts')
   const exported = text.slice(text.indexOf('export async function tryCOSFirstAnswer'))

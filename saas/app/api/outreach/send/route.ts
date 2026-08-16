@@ -8,6 +8,8 @@ import { sendEmail as sendLegacyEmail } from '@/lib/email'
 import { sendCosOutreachEmail } from '@/lib/communication-hub/cos-email'
 import { resolveBuyerEmailDelivery } from '@/lib/communication-hub/runtime'
 import { markOutreachSent } from '@/lib/outreach/markSent'
+import { buildRevenueEvent } from '@/lib/revenue/events/revenue-event.ts'
+import { recordVerifiedRevenueEventOutcome } from '@/lib/revenue/events/cos-outcome-learning.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +21,10 @@ function draftedSubject(outreach: any): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))
+}
+
+function runtimeEnvironmentId(): string {
+  return String(process.env.VERCEL_ENV || process.env.NODE_ENV || 'production').trim() || 'production'
 }
 
 export async function POST(req: NextRequest) {
@@ -88,6 +94,8 @@ export async function POST(req: NextRequest) {
   if (!limit.ok) return NextResponse.json({ error: 'Daily outreach send limit reached', sendLimit: limit }, { status: 429 })
 
   let providerResult: Record<string, unknown> = { mode: 'manual_record_only' }
+  let providerConfirmedEmail = false
+  let usedCommunicationHub = false
   if (channel === 'email' && toEmail) {
     const subject = draftedSubject(outreach) || `Useful SignalBoost growth preview for ${outreach.business_name}`
     const html = `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${escapeHtml(outboundMessage)}</div>`
@@ -103,6 +111,8 @@ export async function POST(req: NextRequest) {
       if (!sent.ok) {
         return NextResponse.json({ error: sent.errorCode || 'Email send failed', providerResult: sent }, { status: 502 })
       }
+      providerConfirmedEmail = true
+      usedCommunicationHub = true
       providerResult = { ...sent, providerId: delivery.providerId, communicationHub: true }
     } else {
       // Backward-compatible host fallback while existing SignalBoost deployments
@@ -115,19 +125,20 @@ export async function POST(req: NextRequest) {
         html,
       })
       if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed', providerResult: sent }, { status: 502 })
+      providerConfirmedEmail = true
       providerResult = { ...sent, communicationHub: false, legacyFallback: true }
     }
   }
 
   const sentAt = new Date().toISOString()
-  const { error: sendError } = await ctx.admin.from('outreach_sends').insert({
+  const { data: sendRecord, error: sendError } = await ctx.admin.from('outreach_sends').insert({
     outreach_id: outreachId,
     business_id: outreach.business_id,
     channel,
     sent_at: sentAt,
     metadata: { providerResult, toEmail: toEmail || null },
-  })
-  if (sendError) return NextResponse.json({ error: sendError.message, providerResult }, { status: 500 })
+  }).select('id').single()
+  if (sendError || !sendRecord?.id) return NextResponse.json({ error: sendError?.message || 'Outreach send record failed', providerResult }, { status: 500 })
 
   const queueReconcile = await markOutreachSent(ctx.admin, outreachId, sentAt)
 
@@ -139,6 +150,33 @@ export async function POST(req: NextRequest) {
     targetId: outreachId,
     metadata: { channel, providerResult, queueReconcile },
   })
+
+  // COS learning is deliberately downstream of the provider confirmation and durable send record.
+  // It is best-effort telemetry: a learning write can never turn a successful outreach send into an
+  // API failure. Manual-record-only paths are excluded because they do not prove actual delivery.
+  if (providerConfirmedEmail) {
+    try {
+      const providerId = typeof providerResult.providerId === 'string' ? providerResult.providerId : ''
+      const revenueEvent = buildRevenueEvent({
+        eventId: `outreach-send:${sendRecord.id}`,
+        tenant: {
+          tenantId: String(outreach.user_id || ctx.user.id || 'signalboost'),
+          environmentId: runtimeEnvironmentId(),
+        },
+        occurredAt: sentAt,
+        type: 'email_sent',
+        source: usedCommunicationHub ? 'communication_hub' : 'external_provider',
+        ...(providerId ? { sourceProvider: providerId } : {}),
+        ...(outreach.campaign_job_id ? { campaign: { id: String(outreach.campaign_job_id) } } : {}),
+        confidence: 1,
+        evidenceRefs: [`outreach_sends:${sendRecord.id}`],
+        correlationId: outreachId,
+      })
+      await recordVerifiedRevenueEventOutcome(revenueEvent)
+    } catch (learningError) {
+      console.warn('[outreach] COS revenue outcome learning failed', learningError)
+    }
+  }
 
   return NextResponse.json({
     ok: true,

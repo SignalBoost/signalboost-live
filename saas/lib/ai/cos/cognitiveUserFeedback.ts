@@ -66,13 +66,14 @@ export function decideCosUserFeedbackExperience(input: CosUserFeedbackInput): Co
   const correctionHash = correctionText ? sha256(correctionText) : null
   const { success, score } = resultFor(feedbackType)
   const experienceHash = sha256([
-    'user-feedback-v1',
+    'user-feedback-v2',
     conversationRefHash,
+    promptHash,
     assistantResponseHash,
     feedbackType,
     correctionHash || '',
   ].join(':'))
-  const sourceRef = `assistant-feedback:${conversationRefHash}:${assistantResponseHash}`
+  const sourceRef = `assistant-feedback:${conversationRefHash}:${promptHash}:${assistantResponseHash}`
   const subject = nearestFoundationalSubject(prompt) || 'general reasoning'
 
   let reason = 'explicit_user_feedback'
@@ -102,10 +103,11 @@ export function decideCosUserFeedbackExperience(input: CosUserFeedbackInput): Co
     success,
     score,
     evidence: eligible ? {
-      schemaVersion: 1,
+      schemaVersion: 2,
       semantics: 'user_feedback_signal_not_verified_truth',
       feedbackType,
       feedbackSemantics: 'explicit_user_feedback_requires_independent_validation_before_promotion',
+      promptHash,
       assistantResponseHash,
       conversationRefHash,
       correctionText: feedbackType === 'correction' ? correctionText : null,

@@ -3,12 +3,12 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.8  
-**Updated:** 2026-08-13  
+**Version:** 1.9  
+**Updated:** 2026-08-16  
 **Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
 **COS Independent Runtime:** ACTIVE on the current local RunPod reasoner (`qwen2.5-coder:32b`); `qwen3:30b` is the intended durable default but is not yet live on the existing pod  
-**COS Cognitive Learning:** DURABLE ACTIVE-LEARNING LOOP MERGED; first procedural skill empirically validated  
+**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; CONTINUOUS NORMAL-TURN EXPERIENCE CAPTURE + INDEPENDENCE METRICS CURRENTLY UNDER ACCEPTANCE  
 **Marketing & Sales Core Architecture:** COMPLETE  
 **Self-Healing Supervisor:** NATIVE PROACTIVE MONITORING PRODUCTION-VERIFIED; NATIVE INCIDENT → COS → GOVERNED AGENT GATEWAY/MCP LOOP MERGED  
 **Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
@@ -20,15 +20,72 @@
 This file is the canonical starting point for every developer, AI coding agent, reviewer, operator, contractor, and infrastructure assistant working on this repository.
 
 1. Read `ONBOARD.md`.
-2. Read `docs/HANDOFF-2026-08-13.md` for the current dated engineering takeover state.
-3. For COS active learning, read `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`.
-4. For Self-Healing, read `docs/portables/self-healing-monitoring-current-state-20260813.md`.
-5. Scan current `main`.
-6. Read the exact files related to the task.
-7. Verify implementation/runtime from code and live evidence before diagnosing, changing, or reporting status.
-8. Never report behavior from memory alone.
+2. Read `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md` for the current COS continuous-learning / independence program and its exact evidence level.
+3. Read `docs/HANDOFF-2026-08-13.md` for the broader dated engineering takeover state.
+4. For COS active learning, read `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`.
+5. For Self-Healing, read `docs/portables/self-healing-monitoring-current-state-20260813.md`.
+6. Scan current `main`.
+7. Read the exact files related to the task.
+8. Verify implementation/runtime from code and live evidence before diagnosing, changing, or reporting status.
+9. Never report behavior from memory alone.
 
 `AGENTS.md` and `CLAUDE.md` are entry-point summaries. `docs/ONBOARD-full.md` is the deeper historical/operational reference. Current repository evidence and the newest dated handoff win over stale documentation.
+
+---
+
+# 2026-08-16 CURRENT COS LEARNING / INDEPENDENCE OVERRIDE
+
+The primary COS development objective is now **continuous independence training and capability expansion**: COS must keep learning from normal work and measurably reduce dependence on replaceable external AI teachers without weakening evidence, confidence, safety or approval gates.
+
+North-star loop:
+
+```text
+Observe
+→ Attempt
+→ Measure
+→ Identify Gap
+→ Investigate
+→ Learn
+→ Practice
+→ Validate
+→ Use
+→ Measure Outcome
+→ Retain / Strengthen / Weaken / Quarantine
+→ Compose
+→ Repeat
+```
+
+The underlying model is replaceable compute. **COS is the learner.** The durable asset is COS-owned memory, experiences, facts, procedural skills, metacognitive capability state, outcome history, source/provenance knowledge and governance.
+
+Current increment on `feat/cos-continuous-independence-learning-20260816` adds:
+
+- bounded episodic capture of meaningful normal COS turns in `cos_cognitive_experiences`;
+- explicit separation of local reasoning, answer-cache reuse, fresh verification, external-required failure and other runtime routes;
+- no model answer text automatically retained as factual truth;
+- volatile/current requests retain only routing/outcome learning, never the current answer as timeless semantic fact;
+- repeated identical turn outcomes increment occurrence evidence rather than creating unlimited duplicates;
+- owner-only read-only runtime independence report at `/api/admin/cos-learning/independence`;
+- metrics for local accepted work, cache reuse, fresh verification, external-required attempts, teacher interactions, teacher dependency and grounded reuse by problem class;
+- an isolated `COS continuous independence learning` CI gate.
+
+**Evidence boundary:** until this increment is merged, deployed and observed through a real production turn plus durable DB evidence, report it as implementation/acceptance work — not production-proven behavior.
+
+The runtime independence report is deliberately labeled `observed_runtime_learning_metrics_not_heldout_certification`. Runtime traffic is not a hidden benchmark. Cache reuse is useful operational independence but not new reasoning competence. A COS-gate-accepted answer is not the same thing as a verified business/production outcome.
+
+The mature target remains roughly **85% independent pass rate on a separate held-out SignalBoost workload**. Never lower the 0.72 confidence/evidence gate, inflate scores, fabricate skills, or count self-generated practice as holdout evidence to improve that number.
+
+Next COS independence increments after production proof of this slice:
+
+1. durable user feedback/correction experiences;
+2. verified production-outcome wiring from Self-Healing, campaigns, sales, CRM and governed tool execution;
+3. autonomous curriculum prioritization from repeated failures, teacher dependency/cost, business importance and weak/untested/conflicted capability areas;
+4. factual reconsolidation/pruning for stale, superseded, contradictory, duplicate and low-value knowledge;
+5. broad real skill-library expansion and composition/transfer;
+6. teacher-dependency trend by problem class;
+7. separate hidden held-out certification toward the ~85% independent target;
+8. model-swap validation proving COS intelligence survives replacement of Qwen or another underlying reasoner.
+
+Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.
 
 ---
 
@@ -520,6 +577,9 @@ Core supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), Pol
 
 # Documentation map
 
+**Current COS independence / continuous learning:**
+- `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`
+
 **Current master handoff:**
 - `docs/HANDOFF-2026-08-13.md`
 
@@ -563,6 +623,8 @@ Core supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), Pol
 
 # Recent merged sequence to know before touching COS/Self-Healing
 
+Historical foundation:
+
 - #1132 — native proactive Self-Healing probes;
 - #1133–#1136 — evidence funnel, cache/provenance and cited-grounding confidence hardening;
 - #1138 — semantic filtering/generic diagnostic-quality repair;
@@ -574,27 +636,34 @@ Core supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), Pol
 - #1157 — BYOM/BYOA enterprise release requirement;
 - #1158 — citation-safe procedural skill provenance;
 - #1159 — native Self-Healing incident-to-governed-remediation loop;
-- #1160 — durable active-learning/practice/holdout loop.
+- #1160 — durable active-learning/practice/holdout loop;
+- #1162 — retention, consolidation, weakening and quarantine;
+- subsequent composition/transfer and metacognition increments are merged and must be preserved.
+
+Current Aug-16 hardening/knowledge sequence includes the live-current-data policy, structured real-time data, source governance, cache lineage, semantic embedding transport/shared query work, reviewed prospect-history corpus seeding, and verified platform self-knowledge through #1252. Always scan current `main` because parallel agents continue to advance it.
 
 ---
 
 # Next engineering priorities
 
-1. Observe the first real post-#1160 active-learning cycle end to end and inspect queue/experience/promotion evidence.
-2. Wire cited-skill reuse accounting only after actual cited use.
-3. Add delayed retention/revalidation, consolidation and contradiction-driven weakening/quarantine.
-4. Add teacher-dependency metrics by problem class.
-5. Build a broad hidden held-out benchmark suite across engineering/SRE/cloud/database/security/business/sales-marketing/tool use and measure progress toward ~85% independent pass.
-6. Install/switch to Qwen3 only through legitimate pod shell access, then benchmark before/after.
-7. Run a controlled real post-#1159 anomalous Self-Healing scenario and verify bounded evidence → COS → Agent Gateway/MCP → approval/execute → verify/audit without widening permissions.
-8. Continue improving full-text/transcript source acquisition and honest provider-failure/429 handling.
-9. Preserve BYOM/BYOA and Enterprise RC evidence requirements.
+1. Production-prove the current continuous normal-turn experience capture and owner-only independence report on the exact merged deployment.
+2. Ingest explicit user feedback/corrections as governed episodic evidence; never auto-promote corrections to fact without validation.
+3. Wire verified production outcomes from Self-Healing, campaigns, sales/CRM and governed tools into cognitive outcome learning.
+4. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance and weak/untested/conflicted metacognitive classes.
+5. Extend consistent pruning/reconsolidation from procedural skills to factual KG/corpus knowledge: staleness, supersession, contradiction, duplication, weakening/quarantine and bounded pruning.
+6. Expand the real validated skill library across SRE, Postgres, cloud, networking, security, software, AI, business, marketing and sales, then exercise composition/transfer on genuine overlapping skills.
+7. Track teacher dependency and independent completion by problem class and verify the trend improves without reducing quality.
+8. Build/maintain a broad hidden held-out suite; only held-out evidence may establish progress toward ~85% independent pass.
+9. Validate that accumulated COS intelligence survives a model swap; Qwen3 cutover remains separate and must be runtime-proven before claiming it live.
+10. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries and Enterprise RC evidence requirements throughout learning expansion.
 
 ---
 
 # Status language
 
 Use precise actual states. A plan is not execution; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not Enterprise RC acceptance; architecture support is not proof of configured runtime; a staged adapter is not certified; a policy signal is not proof that its collector exists; a captured teacher lesson is not learned knowledge; a passed training example is not held-out mastery; a validated procedural skill is not factual evidence; a repository model default is not proof that model is live.
+
+For continuous learning specifically: an episodic encounter is not knowledge; COS gate acceptance is not verified outcome; runtime independence is not held-out certification; cache reuse is not new reasoning competence; current-fact retrieval is not timeless memory; recurrence is not truth; and external-teacher reduction is meaningful only if verified quality is maintained or improved.
 
 ---
 
@@ -603,3 +672,5 @@ Use precise actual states. A plan is not execution; a queue row is not a sent em
 The best AI call is the one that never has to happen. The best external data call is the one avoided because SignalBoost already owns sufficient verified intelligence. The best Portable teaches COS without bypassing governance. The best architecture lets providers be replaced without rewriting business intelligence or control logic. The best self-healing system detects trouble early, investigates with bounded buyer-owned evidence, resolves explicitly pre-authorized routine conditions safely, escalates consequential actions, verifies every outcome and learns from the result.
 
 For COS learning specifically, success means that validated experience measurably improves held-out performance, retains that improvement over time, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance rather than merely accumulating more text.
+
+The long-term proof is a trend: more problems completed with COS-owned memory/skills/tools and local/private compute, fewer external-teacher calls for already-learned classes, stronger verified real-world outcomes, and stable performance when the underlying model/provider is replaced.

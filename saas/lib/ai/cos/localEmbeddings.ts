@@ -111,6 +111,14 @@ function ollamaNativeBaseUrl(config: LocalInferenceConfig): string {
   return url.toString().replace(/\/$/, '')
 }
 
+function ollamaNativeFallbackEligible(config: LocalInferenceConfig): boolean {
+  try {
+    return /\/v1\/?$/.test(new URL(config.baseUrl).pathname)
+  } catch {
+    return false
+  }
+}
+
 async function requestNativeEmbeddings(texts: string[], config: LocalInferenceConfig, model: string): Promise<EmbeddingAttempt> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
@@ -143,8 +151,15 @@ async function requestNativeEmbeddings(texts: string[], config: LocalInferenceCo
   }
 }
 
-function openAiEmbeddingEndpointUnavailable(attempt: EmbeddingAttempt, model: string): attempt is EmbeddingFailure {
-  return 'status' in attempt && attempt.status === 404 && !missingModelError(attempt, model)
+function openAiEmbeddingEndpointUnavailable(
+  attempt: EmbeddingAttempt,
+  config: LocalInferenceConfig,
+  model: string,
+): attempt is EmbeddingFailure {
+  return 'status' in attempt
+    && attempt.status === 404
+    && !missingModelError(attempt, model)
+    && ollamaNativeFallbackEligible(config)
 }
 
 async function requestCompatibleEmbeddings(
@@ -153,7 +168,7 @@ async function requestCompatibleEmbeddings(
   model: string,
 ): Promise<{ attempt: EmbeddingAttempt; transport: EmbeddingTransport }> {
   const openAiAttempt = await requestEmbeddings(texts, config, model)
-  if (!openAiEmbeddingEndpointUnavailable(openAiAttempt, model)) {
+  if (!openAiEmbeddingEndpointUnavailable(openAiAttempt, config, model)) {
     return { attempt: openAiAttempt, transport: 'openai' }
   }
 

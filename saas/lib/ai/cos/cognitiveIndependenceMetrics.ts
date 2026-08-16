@@ -7,8 +7,15 @@ export type CosIndependenceExperienceRow = {
   evidence?: Record<string, unknown> | null
 }
 
+export type CosVerifiedOutcomeMetricBucket = {
+  outcomes: number
+  successes: number
+  failures: number
+  observed: number
+}
+
 export type CosIndependenceMetrics = {
-  schemaVersion: 2
+  schemaVersion: 3
   semantics: 'observed_runtime_learning_metrics_not_heldout_certification'
   targetIndependentPassRate: number
   observedTurnAttempts: number
@@ -27,6 +34,12 @@ export type CosIndependenceMetrics = {
   negativeFeedback: number
   userCorrections: number
   feedbackSignals: number
+  verifiedProductionOutcomes: number
+  verifiedProductionSuccesses: number
+  verifiedProductionFailures: number
+  verifiedProductionObserved: number
+  verifiedProductionSuccessRate: number | null
+  outcomeDomains: Record<string, CosVerifiedOutcomeMetricBucket>
   subjects: Record<string, {
     attempts: number
     independentAccepted: number
@@ -35,6 +48,10 @@ export type CosIndependenceMetrics = {
     positiveFeedback: number
     negativeFeedback: number
     userCorrections: number
+    productionOutcomes: number
+    productionSuccesses: number
+    productionFailures: number
+    productionObserved: number
   }>
 }
 
@@ -66,6 +83,18 @@ function accepted(row: CosIndependenceExperienceRow): boolean {
   return row.success === true
 }
 
+function outcomeStatus(row: CosIndependenceExperienceRow): 'success' | 'failure' | 'observed' {
+  const status = String(object(row.evidence).outcomeStatus ?? '').trim().toLowerCase()
+  if (status === 'success' || status === 'failure' || status === 'observed') return status
+  if (row.success === true) return 'success'
+  if (row.success === false) return 'failure'
+  return 'observed'
+}
+
+function newOutcomeBucket(): CosVerifiedOutcomeMetricBucket {
+  return { outcomes: 0, successes: 0, failures: 0, observed: 0 }
+}
+
 /**
  * Compute operational independence trends from durable episodic evidence.
  *
@@ -74,16 +103,16 @@ function accepted(row: CosIndependenceExperienceRow): boolean {
  * traffic is not a hidden test set, cache reuse is not new reasoning competence, and live data
  * retrieval is a data dependency rather than an external-AI reasoning dependency.
  *
- * Explicit user feedback is reported as a separate quality signal. It never rewrites historical
- * independence counts, creates factual authority, or turns a runtime acceptance into a verified
- * production outcome.
+ * Explicit user feedback is reported as a separate quality signal. Verified objective production
+ * outcomes are also separate: they measure whether real-world work succeeded after execution, not
+ * whether the answer path was independently completed. Neither signal rewrites independence math.
  */
 export function computeCosIndependenceMetrics(
   rows: CosIndependenceExperienceRow[],
   targetIndependentPassRate = 0.85,
 ): CosIndependenceMetrics {
   const metrics: CosIndependenceMetrics = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     semantics: 'observed_runtime_learning_metrics_not_heldout_certification',
     targetIndependentPassRate: Math.max(0, Math.min(1, Number(targetIndependentPassRate) || 0.85)),
     observedTurnAttempts: 0,
@@ -102,6 +131,12 @@ export function computeCosIndependenceMetrics(
     negativeFeedback: 0,
     userCorrections: 0,
     feedbackSignals: 0,
+    verifiedProductionOutcomes: 0,
+    verifiedProductionSuccesses: 0,
+    verifiedProductionFailures: 0,
+    verifiedProductionObserved: 0,
+    verifiedProductionSuccessRate: null,
+    outcomeDomains: {},
     subjects: {},
   }
 
@@ -116,6 +151,10 @@ export function computeCosIndependenceMetrics(
       positiveFeedback: 0,
       negativeFeedback: 0,
       userCorrections: 0,
+      productionOutcomes: 0,
+      productionSuccesses: 0,
+      productionFailures: 0,
+      productionObserved: 0,
     }
     metrics.subjects[subject] = bucket
 
@@ -138,6 +177,30 @@ export function computeCosIndependenceMetrics(
       } else if (feedbackType === 'correction') {
         metrics.userCorrections += occurrences
         bucket.userCorrections += occurrences
+      }
+      continue
+    }
+    if (kind === 'production_use' && source === 'verified_objective_outcome') {
+      const status = outcomeStatus(row)
+      const domain = String(object(row.evidence).domain ?? 'other').replace(/\s+/g, ' ').trim().slice(0, 80) || 'other'
+      const domainBucket = metrics.outcomeDomains[domain] ?? newOutcomeBucket()
+      metrics.outcomeDomains[domain] = domainBucket
+
+      metrics.verifiedProductionOutcomes += occurrences
+      bucket.productionOutcomes += occurrences
+      domainBucket.outcomes += occurrences
+      if (status === 'success') {
+        metrics.verifiedProductionSuccesses += occurrences
+        bucket.productionSuccesses += occurrences
+        domainBucket.successes += occurrences
+      } else if (status === 'failure') {
+        metrics.verifiedProductionFailures += occurrences
+        bucket.productionFailures += occurrences
+        domainBucket.failures += occurrences
+      } else {
+        metrics.verifiedProductionObserved += occurrences
+        bucket.productionObserved += occurrences
+        domainBucket.observed += occurrences
       }
       continue
     }
@@ -182,6 +245,10 @@ export function computeCosIndependenceMetrics(
   const teacherDecisionPopulation = metrics.independentAcceptedTurns + metrics.teacherInteractions
   if (teacherDecisionPopulation > 0) {
     metrics.teacherDependencyRate = metrics.teacherInteractions / teacherDecisionPopulation
+  }
+  const terminalProductionOutcomes = metrics.verifiedProductionSuccesses + metrics.verifiedProductionFailures
+  if (terminalProductionOutcomes > 0) {
+    metrics.verifiedProductionSuccessRate = metrics.verifiedProductionSuccesses / terminalProductionOutcomes
   }
   return metrics
 }

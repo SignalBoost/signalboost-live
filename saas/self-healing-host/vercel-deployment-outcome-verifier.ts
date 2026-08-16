@@ -1,5 +1,6 @@
 import { RETRY_DEPLOYMENT_TARGET } from '@/agent-gateway-host/deployment-recovery'
 import { recordCouncilFollowupObjectiveOutcome } from '@/lib/ai/cos/councilObjectiveOutcome'
+import { recordVerifiedCosProductionOutcome } from '@/lib/ai/cos/cognitiveVerifiedOutcome'
 import { classifyExactVercelDeployment } from './vercel-deployment-verification-pure.ts'
 
 export type VercelRepairVerificationSummary = {
@@ -136,26 +137,46 @@ export async function verifyPendingExactVercelRepairOutcomes(db: any): Promise<V
         continue
       }
 
+      const outcomeSummary = classified.outcomeStatus === 'success'
+        ? `The exact Vercel deployment created by the governed retry reached READY: ${deploymentId}.`
+        : `The exact Vercel deployment created by the governed retry reached terminal ${classified.state}: ${deploymentId}.`
+      const facts = {
+        verified: classified.verified,
+        healthy: classified.verified,
+        status: classified.state,
+        state: classified.state,
+        deploymentId: classified.deploymentId,
+        deploymentUrl: classified.deploymentUrl,
+      }
       const recorded = await recordCouncilFollowupObjectiveOutcome({
         parentOutcomeId: parent.id,
         sourceClass: 'production_outcome',
         sourceRef,
         outcomeStatus: classified.outcomeStatus,
-        summary: classified.outcomeStatus === 'success'
-          ? `The exact Vercel deployment created by the governed retry reached READY: ${deploymentId}.`
-          : `The exact Vercel deployment created by the governed retry reached terminal ${classified.state}: ${deploymentId}.`,
-        facts: {
-          verified: classified.verified,
-          healthy: classified.verified,
-          status: classified.state,
-          state: classified.state,
-          deploymentId: classified.deploymentId,
-          deploymentUrl: classified.deploymentUrl,
-        },
+        summary: outcomeSummary,
+        facts,
       })
       existing.add(sourceRef)
       if (recorded.inserted) summary.recorded += 1
       summary[classified.outcomeStatus] += 1
+
+      if (recorded.inserted && recorded.outcomeId) {
+        try {
+          await recordVerifiedCosProductionOutcome({
+            sourceClass: 'production_outcome',
+            sourceRef,
+            domain: 'self_healing',
+            outcomeStatus: classified.outcomeStatus,
+            summary: outcomeSummary,
+            problemClass: recorded.matchedProblemClass || 'incident diagnosis',
+            facts,
+            correlation: recorded.correlation,
+            idempotencyKey: `council-objective:${recorded.outcomeId}`,
+          })
+        } catch (learningError) {
+          summary.errors.push(`${deploymentId}:cos_learning:${safeText(learningError instanceof Error ? learningError.message : learningError, 400)}`)
+        }
+      }
     } catch (error) {
       summary.errors.push(`${deploymentId}:${safeText(error instanceof Error ? error.message : error, 400)}`)
     }

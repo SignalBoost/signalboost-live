@@ -3,6 +3,7 @@ import {
   classifyDeterministicToolOutcome,
   recordCouncilObjectiveOutcome,
 } from '@/lib/ai/cos/councilObjectiveOutcome'
+import { recordVerifiedCosProductionOutcome } from '@/lib/ai/cos/cognitiveVerifiedOutcome'
 
 export interface CouncilOutcomeBridgeSummary {
   attempted: number
@@ -54,27 +55,47 @@ export async function recordCouncilOutcomesFromRepairDispatch(input: {
       result: outcome.result,
       error: outcome.error,
     })
+    const sourceRef = `agent-gateway:${safeText(outcome.requestId, 700)}`
+    const facts = {
+      ...classified.facts,
+      provider: safeText(input.provider || 'unknown', 120),
+      environment: safeText(input.environment || 'production', 120),
+      gatewayRequestId: safeText(outcome.requestId, 700),
+      action: safeText(step.action, 500),
+      resolvedTarget: safeText(step.resolvedTarget || '', 300),
+      consequenceClass: safeText(outcome.consequenceClass, 120),
+    }
 
     try {
       const recorded = await recordCouncilObjectiveOutcome({
         sourceClass: 'deterministic_tool',
-        sourceRef: `agent-gateway:${safeText(outcome.requestId, 700)}`,
+        sourceRef,
         correlation: { kind: 'incident_id', value: incidentId },
         outcomeStatus: classified.status,
         summary: classified.summary,
-        facts: {
-          ...classified.facts,
-          provider: safeText(input.provider || 'unknown', 120),
-          environment: safeText(input.environment || 'production', 120),
-          gatewayRequestId: safeText(outcome.requestId, 700),
-          action: safeText(step.action, 500),
-          resolvedTarget: safeText(step.resolvedTarget || '', 300),
-          consequenceClass: safeText(outcome.consequenceClass, 120),
-        },
+        facts,
       })
       if (recorded.inserted) summary.recorded += 1
       if (recorded.matchedSessionId) summary.matched += 1
       summary[classified.status] += 1
+
+      if (recorded.inserted && recorded.outcomeId) {
+        try {
+          await recordVerifiedCosProductionOutcome({
+            sourceClass: 'deterministic_tool',
+            sourceRef,
+            domain: 'self_healing',
+            outcomeStatus: classified.status,
+            summary: classified.summary,
+            problemClass: recorded.matchedProblemClass || 'incident diagnosis',
+            facts,
+            correlation: recorded.correlation,
+            idempotencyKey: `council-objective:${recorded.outcomeId}`,
+          })
+        } catch (learningError) {
+          summary.errors.push(`cos_learning:${safeText(learningError instanceof Error ? learningError.message : learningError, 400)}`)
+        }
+      }
     } catch (error) {
       summary.errors.push(error instanceof Error ? error.message.slice(0, 500) : 'Council objective-outcome write failed')
     }

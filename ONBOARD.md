@@ -3,12 +3,12 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.10  
+**Version:** 1.11  
 **Updated:** 2026-08-16  
 **Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
 **COS Independent Runtime:** ACTIVE on the current local RunPod reasoner (`qwen2.5-coder:32b`); `qwen3:30b` is the intended durable default but is not yet live on the existing pod  
-**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; EXPLICIT USER FEEDBACK LEARNING UNDER ACCEPTANCE  
+**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; USER FEEDBACK MERGED WITH PRODUCTION ACCEPTANCE PENDING; VERIFIED PRODUCTION-OUTCOME WIRING IN PR #1259  
 **Marketing & Sales Core Architecture:** COMPLETE  
 **Self-Healing Supervisor:** NATIVE PROACTIVE MONITORING PRODUCTION-VERIFIED; NATIVE INCIDENT → COS → GOVERNED AGENT GATEWAY/MCP LOOP MERGED  
 **Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
@@ -68,7 +68,9 @@ PR #1253 (`feat/cos-continuous-independence-learning-20260816`) is merged and ha
 - metrics for local accepted work, cache reuse, fresh verification, external-required attempts, teacher interactions, teacher dependency and grounded reuse by problem class;
 - an isolated `COS continuous independence learning` CI gate.
 
-Current increment `feat/cos-user-feedback-learning-20260816` adds governed explicit helpful / not-helpful / correction feedback as episodic learning evidence and extends independence reporting with separate quality signals. It remains under acceptance until merged and production-observed.
+PR #1255 added governed explicit helpful / not-helpful / correction feedback as episodic learning evidence and was merged as `429bfd5a750ba7c6804cb13773bc0a4708cc0f7c`. Production acceptance of real feedback events remains pending; do not infer it from merge/deploy status alone.
+
+Current increment PR #1259 (`feat/cos-verified-production-outcomes-20260816`) adds a generic, idempotent verified production/business outcome recorder, wires the already-authoritative Self-Healing tool/read-back and exact Vercel terminal-verification paths into it, and extends independence reporting with verified production success/failure/observed metrics by problem class and domain. At this point it is an open implementation PR; CI/merge/production runtime proof are still required.
 
 The runtime independence report is deliberately labeled `observed_runtime_learning_metrics_not_heldout_certification`. Runtime traffic is not a hidden benchmark. Cache reuse is useful operational independence but not new reasoning competence. A COS-gate-accepted answer is not the same thing as a verified business/production outcome.
 
@@ -76,8 +78,8 @@ The mature target remains roughly **85% independent pass rate on a separate held
 
 Next COS independence increments:
 
-1. production-prove the current explicit user feedback/correction increment;
-2. verified production-outcome wiring from Self-Healing, campaigns, sales, CRM and governed tool execution;
+1. production-prove the merged explicit user feedback/correction increment (#1255);
+2. merge and production-prove verified Self-Healing production-outcome learning (#1259), then connect campaign, sales and CRM authoritative outcome producers to the same generic recorder;
 3. autonomous curriculum prioritization from repeated failures, teacher dependency/cost, business importance and weak/untested/conflicted capability areas;
 4. factual reconsolidation/pruning for stale, superseded, contradictory, duplicate and low-value knowledge;
 5. broad real skill-library expansion and composition/transfer;
@@ -93,7 +95,25 @@ PR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCx
 
 Therefore normal-turn capture/deduplication is production-proven for a real external-required failure path. **Accepted local/cache encounter acceptance remains pending** because the observed production request could not obtain RunPod capacity; do not claim the full #1253 acceptance matrix complete until a real accepted local/cache turn is observed.
 
-Current follow-on increment `feat/cos-user-feedback-learning-20260816` adds explicit helpful / not-helpful / correction signals as `feedback` episodic experiences. User correction text remains bounded unverified evidence; it cannot automatically promote a fact or skill, raise confidence, or widen execution authority. Negative/correction signals become eligible inputs for the later autonomous curriculum prioritizer only after this evidence layer is production-accepted.
+PR #1255 adds explicit helpful / not-helpful / correction signals as `feedback` episodic experiences. User correction text remains bounded unverified evidence; it cannot automatically promote a fact or skill, raise confidence, or widen execution authority. Negative/correction signals become eligible inputs for the later autonomous curriculum prioritizer only after this evidence layer is production-accepted.
+
+### 2026-08-16 verified production-outcome increment — PR #1259
+
+PR #1259 introduces `saas/lib/ai/cos/cognitiveVerifiedOutcome.ts` as the generic bridge from objective real-world evidence into `production_use` episodic memory. The recorder:
+
+- accepts only `deterministic_tool`, `production_outcome`, or `authoritative_record` source classes;
+- rejects model/Council output as verified outcome authority;
+- records `success`, `failure`, or non-terminal `observed` separately;
+- uses deterministic idempotency so duplicate delivery of one authoritative event is not counted as new proof;
+- preserves the bounded COS problem-class taxonomy and records a small domain class (`self_healing`, `campaign`, `sales`, `crm`, `governed_tool`, `workflow`, `other`);
+- bounds retained facts/summary and labels the experience `verified_production_outcome_signal_not_factual_promotion`;
+- never promotes a fact or skill, increases answer confidence, or widens execution authority merely because an outcome exists.
+
+The first real producer wiring is Self-Healing because it already has authoritative evidence boundaries: governed Agent Gateway deterministic tool/read-back results and the exact Vercel deployment terminal verifier. Specific procedural skill credit remains on the pre-existing deterministic Council prediction attribution path; a problem-class success alone is not causal proof that one skill produced it.
+
+The owner independence report now has separate verified production outcome totals, success/failure/observed counts, terminal production success rate, per-domain buckets and per-problem-class outcome counts. Observed/non-terminal rows are excluded from the success-rate denominator, and these metrics do not alter independent-answer or teacher-dependency math.
+
+**Evidence level at this line:** implementation PR only. CI, merge, deployment and real `production_use` row evidence are still required. Campaign/sales/CRM have the generic recorder contract available after merge, but their authoritative producers are not yet wired and must not be reported as such.
 
 ---
 
@@ -523,9 +543,10 @@ For cognitive learning also track:
 - paraphrase/generalization robustness;
 - skill success/failure/revalidation/decay;
 - teacher-call avoidance after learning;
-- actual cited skill reuse.
+- actual cited skill reuse;
+- verified production success/failure/observed outcomes by problem class and operating domain.
 
-The best evidence that COS learned a class is improved held-out behavior plus fewer repeat external escalations, not more rows in a database.
+The best evidence that COS learned a class is improved held-out behavior plus fewer repeat external escalations **and** stable/improving verified real-world outcomes, not more rows in a database.
 
 ---
 
@@ -648,19 +669,19 @@ Historical foundation:
 - #1162 — retention, consolidation, weakening and quarantine;
 - subsequent composition/transfer and metacognition increments are merged and must be preserved.
 
-Current Aug-16 hardening/knowledge sequence includes the live-current-data policy, structured real-time data, source governance, cache lineage, semantic embedding transport/shared query work, reviewed prospect-history corpus seeding, and verified platform self-knowledge through #1252. Always scan current `main` because parallel agents continue to advance it.
+Current Aug-16 hardening/knowledge sequence includes the live-current-data policy, structured real-time data, source governance, cache lineage, semantic embedding transport/shared query work, reviewed prospect-history corpus seeding, verified platform self-knowledge through #1252, continuous ordinary-turn experience capture in #1253, and explicit user-feedback learning in #1255. PR #1259 is the current verified production-outcome learning increment and is not merged at this documentation point. Always scan current `main` because parallel agents continue to advance it.
 
 ---
 
 # Next engineering priorities
 
 1. Complete the remaining accepted local/cache production proof for #1253 when RunPod capacity permits; preserve the already verified external-required encounter evidence.
-2. Production-prove explicit user helpful / not-helpful / correction ingestion and verify feedback appears in the independence quality report without changing capability math.
-3. Wire verified production outcomes from Self-Healing, campaigns, sales/CRM and governed tools into cognitive outcome learning.
-4. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance and weak/untested/conflicted metacognitive classes.
+2. Production-prove explicit user helpful / not-helpful / correction ingestion from #1255 and verify feedback appears in the independence quality report without changing capability math.
+3. Merge and production-prove #1259 verified Self-Healing outcome learning, then wire authoritative campaign, sales and CRM outcome producers to the same generic recorder rather than building parallel learning stores.
+4. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance, negative/correction feedback, verified production failures and weak/untested/conflicted metacognitive classes.
 5. Extend consistent pruning/reconsolidation from procedural skills to factual KG/corpus knowledge: staleness, supersession, contradiction, duplication, weakening/quarantine and bounded pruning.
 6. Expand the real validated skill library across SRE, Postgres, cloud, networking, security, software, AI, business, marketing and sales, then exercise composition/transfer on genuine overlapping skills.
-7. Track teacher dependency and independent completion by problem class and verify the trend improves without reducing quality.
+7. Track teacher dependency, independent completion and verified production success by problem class and verify the trend improves without reducing quality.
 8. Build/maintain a broad hidden held-out suite; only held-out evidence may establish progress toward ~85% independent pass.
 9. Validate that accumulated COS intelligence survives a model swap; Qwen3 cutover remains separate and must be runtime-proven before claiming it live.
 10. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries and Enterprise RC evidence requirements throughout learning expansion.
@@ -671,7 +692,7 @@ Current Aug-16 hardening/knowledge sequence includes the live-current-data polic
 
 Use precise actual states. A plan is not execution; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not Enterprise RC acceptance; architecture support is not proof of configured runtime; a staged adapter is not certified; a policy signal is not proof that its collector exists; a captured teacher lesson is not learned knowledge; a passed training example is not held-out mastery; a validated procedural skill is not factual evidence; a repository model default is not proof that model is live.
 
-For continuous learning specifically: an episodic encounter is not knowledge; COS gate acceptance is not verified outcome; runtime independence is not held-out certification; cache reuse is not new reasoning competence; current-fact retrieval is not timeless memory; recurrence is not truth; and external-teacher reduction is meaningful only if verified quality is maintained or improved.
+For continuous learning specifically: an episodic encounter is not knowledge; COS gate acceptance is not verified outcome; runtime independence is not held-out certification; cache reuse is not new reasoning competence; current-fact retrieval is not timeless memory; recurrence is not truth; a verified problem-class outcome is not causal proof of one skill; and external-teacher reduction is meaningful only if verified quality is maintained or improved.
 
 ---
 

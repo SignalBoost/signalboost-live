@@ -5,7 +5,7 @@
 // dimensions for nomic-embed-text; model swaps must migrate the database rather than
 // pad/truncate vectors and silently corrupt cosine similarity.
 
-import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import type { LocalInferenceConfig } from '@/lib/ai/local-inference'
 import type { EmbeddingGenerator } from '@/lib/cos-core/layers/knowledge/types'
 
@@ -156,9 +156,11 @@ async function pullEmbeddingModel(config: LocalInferenceConfig, model: string): 
 }
 
 /**
- * Generate one or more local semantic vectors in a SINGLE embeddings request. Context ranking uses
- * this instead of firing a request per candidate, which keeps local relevance filtering cheaper
- * than the reasoning call it is protecting.
+ * Generate one or more local semantic vectors in a SINGLE embeddings request.
+ *
+ * This base function intentionally does NOT change RunPod lifecycle state. Background learning,
+ * embed-on-write and backfill jobs can use it and fail soft while the GPU is stopped rather than
+ * allocating compute merely to fill vectors.
  */
 export async function generateLocalEmbeddings(texts: string[]): Promise<number[][]> {
   const normalized = texts.map(text => String(text ?? '').trim())
@@ -179,16 +181,34 @@ export async function generateLocalEmbeddings(texts: string[]): Promise<number[]
   return attempt.vectors.map(vector => validateVector(vector, model))
 }
 
-/**
- * Generate a local semantic-cache vector. If the secured RunPod/Ollama endpoint
- * reports that the configured embedding model is missing, repair that exact missing
- * model once through Ollama's authenticated native /api/pull endpoint and retry.
- */
+/** Foreground lifecycle-aware batch embedding path. */
+export async function generateReadyLocalEmbeddings(texts: string[]): Promise<number[][]> {
+  const normalized = texts.map(text => String(text ?? '').trim())
+  if (normalized.length === 0) return []
+  if (process.env.COS_LOCAL_FIRST_ENABLED === 'false') {
+    throw new Error('localEmbeddings: COS local-first is disabled by COS_LOCAL_FIRST_ENABLED')
+  }
+  const config = localInferenceConfigFromEnv()
+  await ensureLocalInferenceRuntimeReady(config)
+  return generateLocalEmbeddings(normalized)
+}
+
+/** Canonical foreground embedding API used by interactive COS retrieval. */
 export const generateLocalEmbedding: EmbeddingGenerator = async (text: string): Promise<number[]> => {
+  const [vector] = await generateReadyLocalEmbeddings([text])
+  if (!vector) throw new Error('localEmbeddings: ready endpoint returned no embedding vector')
+  return vector
+}
+
+/** Passive single-vector API for background persistence/backfill. It never changes lifecycle state. */
+export const generatePassiveLocalEmbedding: EmbeddingGenerator = async (text: string): Promise<number[]> => {
   const [vector] = await generateLocalEmbeddings([text])
   if (!vector) throw new Error('localEmbeddings: endpoint returned no embedding vector')
   return vector
 }
+
+/** Backward-compatible explicit name for callers that want readiness intent to be obvious. */
+export const generateReadyLocalEmbedding: EmbeddingGenerator = generateLocalEmbedding
 
 /**
  * Read-only owner health check. It intentionally does NOT auto-pull a missing model;

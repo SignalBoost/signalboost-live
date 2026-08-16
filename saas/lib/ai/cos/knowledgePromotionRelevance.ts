@@ -1,4 +1,8 @@
 import { discriminativeDomainAnchors, distinctTerms, matchesTerm } from '@/lib/cos-core/layers/learning/cycle'
+import {
+  DEFAULT_CONTINUOUS_LEARNING_POLICY,
+  type ContinuousLearningSourceKind,
+} from '@/lib/cos-core/layers/learning/index'
 import { minimumConfidenceForKind } from '@/lib/cos-core/layers/learning/sourceCatalog'
 
 export type KnowledgePromotionCandidate = {
@@ -11,7 +15,7 @@ export type KnowledgePromotionCandidate = {
 
 export type KnowledgePromotionRelevanceDecision = {
   eligible: boolean
-  reason: 'eligible' | 'missing_subject' | 'missing_evidence' | 'below_source_confidence_floor' | 'insufficient_subject_overlap' | 'missing_discriminative_subject_anchor'
+  reason: 'eligible' | 'source_not_allowed' | 'missing_subject' | 'missing_evidence' | 'below_source_confidence_floor' | 'insufficient_subject_overlap' | 'missing_discriminative_subject_anchor'
   anchors: string[]
   matchedAnchors: string[]
   discriminativeAnchors: string[]
@@ -39,6 +43,11 @@ export function minimumKnowledgePromotionSubjectMatches(): number {
 
 export function minimumKnowledgePromotionSubjectCoverage(): number {
   return envNumber('COS_KG_PROMOTION_MIN_SUBJECT_COVERAGE', 0.3, 0, 1)
+}
+
+export function knowledgePromotionSourceAllowed(sourceKind: string): boolean {
+  const normalized = String(sourceKind ?? '').trim() as ContinuousLearningSourceKind
+  return Boolean(normalized) && DEFAULT_CONTINUOUS_LEARNING_POLICY.allowedSourceKinds.has(normalized)
 }
 
 function promotionTermMatches(haystack: string, term: string): boolean {
@@ -93,6 +102,10 @@ export function evaluateKnowledgePromotionRelevance(
     coverage: Number(base.coverage.toFixed(3)),
   })
 
+  // Continuous-learning admission is the trust boundary for durable factual promotion. Rows can
+  // exist for benchmarks, migrations, fixtures, audits or historical diagnostics; their presence
+  // in the table must never be interpreted as permission to become trusted Knowledge Graph facts.
+  if (!knowledgePromotionSourceAllowed(candidate.sourceKind)) return result(false, 'source_not_allowed')
   if (!candidate.subject.trim() || base.anchors.length === 0) return result(false, 'missing_subject')
   if (!candidate.summary.trim() && !String(candidate.sourceTitle ?? '').trim()) return result(false, 'missing_evidence')
   if (base.confidence < base.confidenceFloor) return result(false, 'below_source_confidence_floor')

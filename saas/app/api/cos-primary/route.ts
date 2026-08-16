@@ -24,6 +24,7 @@ import { writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
+import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
@@ -134,6 +135,21 @@ export async function POST(req:NextRequest){
       const reply=freshEvidenceUnavailableReply(language),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable')
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
+    }
+    // TIER 2: local Qwen synthesizes from the fetched evidence BEFORE any external model. Same
+    // citation gate the external path must pass; every failure falls through to tier 3 unchanged.
+    if(!requestedAction){
+      const localSynthesis=await synthesizeFreshEvidenceLocally({input,sources:freshSources,retrievedAt:freshRetrievedAt,language})
+      if(localSynthesis){
+        const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})
+        ;(executionProvenance as any).answer_origin={from_cache:false,provider:null,model:localSynthesis.reasonerLabel,grounded_at:freshRetrievedAt}
+        logEscalation({event:'fresh_local_synthesis_accepted',documents_acquired:freshSources.length,reasoner:localSynthesis.reasonerLabel,external_ai_invoked:false,local_model_invoked:true})
+        const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:localSynthesis.reply,source:'local_cos_reasoning',confidence:1,externalAiInvoked:false})
+        const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply:localSynthesis.reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider:null,externalModel:null}})
+        await writeCosPrimaryProvenance(userId,localSynthesis.reply,executionProvenance,'cos-fresh-local-grounded')
+        return NextResponse.json({ok:true,reply:localSynthesis.reply,source:'cos-fresh-local-grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+      }
+      logEscalation({event:'fresh_local_synthesis_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
     }
     externalRequest=jsonRequest(req,bodyWithFreshEvidence(body,input,freshSources,freshRetrievedAt))
   }

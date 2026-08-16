@@ -1,6 +1,4 @@
-// saas/tests/freshEvidenceLocalSynthesis.node.test.ts
-// Pins tier-2 behavior: sources-only local synthesis is accepted ONLY with citations; every
-// dishonest or failed path returns null so tier 3 takes over. No network, no model.
+// Pins tier-2 behavior: the local model selects evidence IDs, while the server renders exact URLs.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import Module from 'node:module'
@@ -15,26 +13,38 @@ const orig = (Module as any).prototype.require
 }
 
 const { synthesizeFreshEvidenceLocally } = require('../lib/ai/cos/freshEvidenceLocalSynthesis')
-const sources = [{ id: 'LIVE1', title: 'Kantei — Prime Minister of Japan', url: 'https://japan.kantei.go.jp/index.html', snippet: 'The Prime Minister is X.' }]
-const args = { input: 'who is the PM of Japan', sources, retrievedAt: '2026-08-15T00:00:00Z', language: 'English' }
+const sources = [
+  { id: 'LIVE1', title: 'Official leadership page', url: 'https://government.gov/leadership', snippet: 'The current president is X.' },
+  { id: 'LIVE2', title: 'Independent reference', url: 'https://reference.example/president-x', snippet: 'X is the current president.' },
+]
+const args = { input: 'who is currently the president?', sources, retrievedAt: '2026-08-16T00:00:00Z', language: 'en' }
 
-test('accepts a cited, sources-grounded local answer', async () => {
-  localReply = 'The Prime Minister of Japan is X. [LIVE1] (https://japan.kantei.go.jp/index.html)'
+test('accepts structured evidence ids and server-renders exact citations', async () => {
+  localReply = JSON.stringify({ answer: 'The current president is X.', evidenceIds: ['LIVE1', 'LIVE2'] })
   const out = await synthesizeFreshEvidenceLocally(args)
-  assert.ok(out); assert.match(out!.reply, /LIVE1/)
+  assert.ok(out)
+  assert.match(out!.reply, /\[LIVE1\] \(https:\/\/government\.gov\/leadership\)/)
+  assert.match(out!.reply, /\[LIVE2\] \(https:\/\/reference\.example\/president-x\)/)
 })
 
-test('rejects an uncited answer — uncited synthesis not accepted from ANY model', async () => {
-  localReply = 'The Prime Minister of Japan is X.'
+test('rejects a leadership answer that selects only one host', async () => {
+  localReply = JSON.stringify({ answer: 'The current president is X.', evidenceIds: ['LIVE1'] })
   assert.equal(await synthesizeFreshEvidenceLocally(args), null)
 })
 
-test('honors the model\'s own EVIDENCE_INSUFFICIENT verdict', async () => {
-  localReply = 'EVIDENCE_INSUFFICIENT'
+test('rejects invented evidence ids', async () => {
+  localReply = JSON.stringify({ answer: 'The current president is X.', evidenceIds: ['LIVE99'] })
   assert.equal(await synthesizeFreshEvidenceLocally(args), null)
 })
 
-test('fails closed when the reasoner is unreachable or empty', async () => {
+test('honors EVIDENCE_INSUFFICIENT and malformed output', async () => {
+  localReply = JSON.stringify({ answer: 'EVIDENCE_INSUFFICIENT', evidenceIds: [] })
+  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
+  localReply = 'The current president is X.'
+  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
+})
+
+test('fails closed when the reasoner is unreachable or evidence is empty', async () => {
   localReply = null
   assert.equal(await synthesizeFreshEvidenceLocally(args), null)
   assert.equal(await synthesizeFreshEvidenceLocally({ ...args, sources: [] }), null)

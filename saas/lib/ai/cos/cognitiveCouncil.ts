@@ -1,9 +1,10 @@
+// saas/lib/ai/cos/cognitiveCouncil.ts
 import { createHash } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { runCouncilMembersConcurrently } from '@/lib/ai/cos/councilConcurrency'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import {
   COUNCIL_MACHINE_FACT_PATHS,
   COUNCIL_MACHINE_OPERATORS,
@@ -116,7 +117,7 @@ function capabilityKey(value: unknown): string {
 }
 
 function problemClassFromQuestion(question: string): string {
-  return nearestFoundationalSubject(question) || safeText(question, 180) || 'general reasoning'
+  return classifyProblemClass(question)
 }
 
 function extractQuestion(prompt: string): string {

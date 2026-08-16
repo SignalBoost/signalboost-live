@@ -21,14 +21,12 @@ function boundedInt(value: unknown, fallback: number, min: number, max: number):
 }
 
 function buildQuery(limit: number, offset: number): string {
-  return `SELECT ?item ?itemLabel ?website ?countryLabel ?industryLabel WHERE {
+  return `SELECT ?item ?itemLabel ?website WHERE {
   ?item wdt:P31 wd:${WIKIDATA_BUSINESS_QID};
-        wdt:P856 ?website.
-  OPTIONAL { ?item wdt:P17 ?country. }
-  OPTIONAL { ?item wdt:P452 ?industry. }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+        wdt:P856 ?website;
+        rdfs:label ?itemLabel.
+  FILTER(LANG(?itemLabel) = "en")
 }
-ORDER BY ?item
 LIMIT ${limit}
 OFFSET ${offset}`
 }
@@ -85,6 +83,7 @@ function candidateToRecord(candidate: WikidataCompanyCandidate, now = new Date()
       officialWebsiteEvidence: 'P856',
       sourceDatasetLicense: 'CC0',
       sourceAcquisition: 'bounded_wikidata_query_service',
+      canonicalWebsiteSelection: 'prefer_root_path_then_shortest_domain_then_shortest_url',
       externalProviderCalls: 0,
       externalAiCalls: 0,
     },

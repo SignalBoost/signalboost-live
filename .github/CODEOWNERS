@@ -8,6 +8,7 @@ ONBOARD.md @SignalBoost
 /cos-core/ @SignalBoost
 /saas/app/api/concierge/route.ts @SignalBoost
 /saas/app/api/support/route.ts @SignalBoost
+/saas/app/api/support/routeCoreLegacy.ts @SignalBoost
 /saas/lib/cos-backup/ @SignalBoost
 /saas/scripts/check-cos-integrity.mjs @SignalBoost
 

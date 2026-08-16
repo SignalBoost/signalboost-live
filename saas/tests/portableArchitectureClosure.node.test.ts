@@ -83,7 +83,7 @@ test('Self-Healing Supervisor is architecture-complete and cleared for licensing
   assert.equal(descriptor?.implementationStatus, 'implemented')
   assert.equal(descriptor?.manifest.status, 'live')
   assert.equal(descriptor?.manifest.licensingAvailable, true)
-  assert.equal(descriptor?.route, '/dashboard/supervisor')
+  assert.equal(descriptor?.route, '/self-healing-supervisor')
 })
 
 test('Browser Agent Ecosystem is architecture-complete while production execution remains excluded', () => {

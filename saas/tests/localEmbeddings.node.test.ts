@@ -4,14 +4,24 @@ import assert from 'node:assert/strict'
 import {
   checkLocalEmbeddingHealth,
   generateLocalEmbedding,
+  generatePassiveLocalEmbedding,
   LOCAL_EMBEDDING_DIMENSIONS,
 } from '../lib/ai/cos/localEmbeddings.ts'
+import { withRunpodWakePermission } from '../lib/ai/local-inference.ts'
+import { desiredRunpodStartupContract } from '../lib/hub/runpodTelemetry.ts'
 
 const originalEnv = { ...process.env }
 const originalFetch = globalThis.fetch
 
 function vector() {
   return Array.from({ length: LOCAL_EMBEDDING_DIMENSIONS }, (_, index) => (index + 1) / 10_000)
+}
+
+function resetLifecycleEnv() {
+  delete process.env.COS_LOCAL_FIRST_ENABLED
+  delete process.env.RUNPOD_API_KEY
+  delete process.env.RUNPOD_POD_ID
+  delete process.env.RUNPOD_LIFECYCLE_ENABLED
 }
 
 function configureLoopback() {
@@ -21,6 +31,8 @@ function configureLoopback() {
   delete process.env.LOCAL_AI_EMBEDDING_AUTO_REPAIR
   delete process.env.LOCAL_AI_ALLOWED_HOSTS
   delete process.env.LOCAL_AI_API_KEY
+  resetLifecycleEnv()
+  process.env.RUNPOD_LIFECYCLE_ENABLED = 'false'
 }
 
 function configureRunPod() {
@@ -30,6 +42,8 @@ function configureRunPod() {
   process.env.LOCAL_AI_MODEL = 'qwen2.5-coder:32b'
   process.env.LOCAL_AI_EMBEDDING_MODEL = 'nomic-embed-text'
   delete process.env.LOCAL_AI_EMBEDDING_AUTO_REPAIR
+  resetLifecycleEnv()
+  process.env.RUNPOD_LIFECYCLE_ENABLED = 'false'
 }
 
 test.afterEach(() => {
@@ -124,4 +138,140 @@ test('embedding health check is read-only and reports a missing model without pu
   assert.equal(health.model, 'nomic-embed-text')
   assert.match(health.error || '', /404/)
   assert.deepEqual(urls, ['https://example-pod-11434.proxy.runpod.net/v1/embeddings'])
+})
+
+test('COS local-first kill switch blocks foreground embedding before any network or lifecycle activity', async () => {
+  configureRunPod()
+  process.env.COS_LOCAL_FIRST_ENABLED = 'false'
+  process.env.RUNPOD_LIFECYCLE_ENABLED = 'true'
+  process.env.RUNPOD_API_KEY = 'EXAMPLE_NOTAREAL_RUNPOD_KEY'
+  process.env.RUNPOD_POD_ID = 'examplepod'
+  const urls: string[] = []
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    urls.push(String(input))
+    return new Response('unexpected network call', { status: 500 })
+  }) as typeof fetch
+
+  await assert.rejects(
+    () => generateLocalEmbedding('must not wake while disabled'),
+    /COS local-first is disabled/,
+  )
+  assert.deepEqual(urls, [])
+})
+
+test('passive background embedding never calls RunPod lifecycle APIs', async () => {
+  configureRunPod()
+  process.env.RUNPOD_LIFECYCLE_ENABLED = 'true'
+  process.env.RUNPOD_API_KEY = 'EXAMPLE_NOTAREAL_RUNPOD_KEY'
+  process.env.RUNPOD_POD_ID = 'examplepod'
+  const urls: string[] = []
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input)
+    urls.push(url)
+    if (url === 'https://example-pod-11434.proxy.runpod.net/v1/embeddings') {
+      return new Response(JSON.stringify({ data: [{ embedding: vector(), index: 0 }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    return new Response(`unexpected URL: ${url}`, { status: 500 })
+  }) as typeof fetch
+
+  const result = await generatePassiveLocalEmbedding('background embedding')
+  assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
+  assert.deepEqual(urls, ['https://example-pod-11434.proxy.runpod.net/v1/embeddings'])
+})
+
+test('stopped RunPod is made ready before the first authorized foreground embedding request', async () => {
+  configureRunPod()
+  process.env.RUNPOD_LIFECYCLE_ENABLED = 'true'
+  process.env.RUNPOD_API_KEY = 'EXAMPLE_NOTAREAL_RUNPOD_KEY'
+  process.env.RUNPOD_POD_ID = 'examplepod'
+
+  const urls: string[] = []
+  let modelChecks = 0
+  let resumeRequested = false
+  const startupContract = desiredRunpodStartupContract()
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    urls.push(url)
+
+    if (url === 'https://example-pod-11434.proxy.runpod.net/v1/models') {
+      modelChecks += 1
+      if (modelChecks === 1) return new Response('', { status: 404 })
+      return new Response(JSON.stringify({ data: [{ id: 'qwen2.5-coder:32b' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (url.startsWith('https://api.runpod.io/graphql')) {
+      const query = String((JSON.parse(String(init?.body)) as { query?: string }).query || '')
+      if (query.includes('myself { pods')) {
+        return new Response(JSON.stringify({
+          data: {
+            myself: {
+              pods: [{
+                id: 'examplepod',
+                name: 'embedding-test',
+                desiredStatus: 'EXITED',
+                costPerHr: 0.44,
+                runtime: null,
+              }],
+            },
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (query.includes('podResume')) {
+        resumeRequested = true
+        return new Response(JSON.stringify({
+          data: { podResume: { id: 'examplepod', desiredStatus: 'RUNNING' } },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ errors: [{ message: 'unexpected GraphQL operation' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (url === 'https://rest.runpod.io/v1/pods/examplepod') {
+      return new Response(JSON.stringify({
+        id: 'examplepod',
+        desiredStatus: 'EXITED',
+        image: 'runpod/pytorch:test',
+        dockerEntrypoint: startupContract.dockerEntrypoint,
+        dockerStartCmd: startupContract.dockerStartCmd,
+        volumeMountPath: '/workspace',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    if (url === 'https://example-pod-11434.proxy.runpod.net/v1/embeddings') {
+      return new Response(JSON.stringify({ data: [{ embedding: vector(), index: 0 }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    return new Response(`unexpected URL: ${url}`, { status: 500 })
+  }) as typeof fetch
+
+  const result = await withRunpodWakePermission({
+    allowed: true,
+    source: 'user_interactive',
+    interactionId: '3c9479dd-eec5-4f7c-91de-42f447379b43',
+    issuedAtMs: Date.now(),
+    ageMs: 0,
+    reason: 'test_authorized_foreground_embedding',
+  }, () => generateLocalEmbedding('wake before semantic retrieval'))
+
+  const embeddingsIndex = urls.indexOf('https://example-pod-11434.proxy.runpod.net/v1/embeddings')
+  const finalModelCheckIndex = urls.lastIndexOf('https://example-pod-11434.proxy.runpod.net/v1/models')
+  assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
+  assert.equal(resumeRequested, true)
+  assert.equal(modelChecks, 2)
+  assert.ok(finalModelCheckIndex >= 0)
+  assert.ok(embeddingsIndex > finalModelCheckIndex, 'embedding request must occur only after runtime readiness succeeds')
 })

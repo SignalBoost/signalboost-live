@@ -1,4 +1,4 @@
-import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { generatePassiveLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { cosServiceDb, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import type { KnowledgeFact, PersistentKnowledgeStore } from '@/lib/cos-core/layers/knowledge/persistent'
 
@@ -31,7 +31,7 @@ export async function persistKnowledgeFactWithEmbedding(
   fact: KnowledgeFact,
 ): Promise<KnowledgeFactEmbeddingResult> {
   try {
-    const embedding = await generateLocalEmbedding(knowledgeFactEmbeddingText(fact))
+    const embedding = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(fact))
     await store.upsertFact(fact, embedding)
     return { embedded: true }
   } catch (error) {
@@ -84,7 +84,7 @@ export async function backfillKnowledgeFactEmbeddings(limit = 4): Promise<Knowle
   const store = new SupabaseKnowledgeStore(db)
   const attempts = await Promise.allSettled((pending.data ?? []).map(async row => {
     const fact = rowToFact(row)
-    const vector = await generateLocalEmbedding(knowledgeFactEmbeddingText(fact))
+    const vector = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(fact))
     await store.upsertFact(fact, vector)
     return fact.id
   }))

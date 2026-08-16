@@ -2,11 +2,12 @@
 // Live web search for the Chief of Staff.
 // Returns structured top results (title, url, snippet) for market/competitor/news queries.
 //
-// PORTABLE: the search provider is INJECTED. The default adapter uses the Brave
-// Search API (BRAVE_SEARCH_API_KEY; free tier: 2,000 queries/month). A buyer of
-// the Chief-of-Staff portable calls setWebSearchPort(...) once to use their own
-// search provider and key.
+// PORTABLE: search providers are injected. Ordinary web retrieval uses WebSearchPort;
+// high-frequency public values (weather/financial/sports) use StructuredLiveDataPort so
+// COS never mistakes an ordinary web snippet for a real-time feed.
 
+import { structuredLiveDataKind } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { getStructuredLiveInfo } from '@/lib/ai/tools/getStructuredLiveInfo'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
@@ -93,6 +94,21 @@ export async function getExternalInfo(
   if (!q) return { ok: false, results: [], error: 'Empty search query.' }
   const count = Math.max(1, Math.min(Number(requestedCount) || DEFAULT_RESULT_COUNT, MAX_RESULT_COUNT))
   const bypassCache = options.bypassCache === true || isFreshnessQuery(q)
+
+  // High-frequency values are not allowed to degrade to ordinary web snippets. The structured
+  // provider is the system-of-record boundary for this class; if unavailable, return failure so
+  // the caller can fail closed rather than synthesize a potentially stale value.
+  if (bypassCache) {
+    const structuredKind = structuredLiveDataKind(q)
+    if (structuredKind) {
+      const structured = await getStructuredLiveInfo(q, structuredKind)
+      return {
+        ok: structured.ok,
+        results: structured.results,
+        ...(structured.error ? { error: structured.error } : {}),
+      }
+    }
+  }
 
   const key = `${count}:${q.toLowerCase()}`
   if (!bypassCache) {

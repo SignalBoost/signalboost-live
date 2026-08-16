@@ -1,0 +1,178 @@
+name: COS feedback UI and docs patch
+
+on:
+  push:
+    branches: [feat/cos-user-feedback-learning-20260816]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[cos-feedback-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/cos-user-feedback-learning-20260816
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch assistant feedback UI and COS handoff docs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected exactly one anchor, found {text.count(old)}')
+              return text.replace(old, new, 1)
+
+          page = Path('saas/app/dashboard/assistant/page.tsx')
+          text = page.read_text()
+          text = replace_once(
+              text,
+              "type Msg = { role: 'user' | 'assistant'; content: string }\n",
+              "type Msg = { role: 'user' | 'assistant'; content: string }\n"
+              "type FeedbackKind = 'positive' | 'negative' | 'correction'\n"
+              "type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }\n",
+              'assistant feedback types',
+          )
+          text = replace_once(
+              text,
+              "  stop:         { en: uiText('generatedUi.u_cae7d57bc067a514'), es: 'Detener', pt: 'Parar', pl: 'Zatrzymaj', ru: 'Остановить' },\n",
+              "  stop:         { en: uiText('generatedUi.u_cae7d57bc067a514'), es: 'Detener', pt: 'Parar', pl: 'Zatrzymaj', ru: 'Остановить' },\n"
+              "  helpful:      { en: 'Helpful', es: 'Útil', pt: 'Útil', pl: 'Pomocne', ru: 'Полезно' },\n"
+              "  notHelpful:   { en: 'Not helpful', es: 'No útil', pt: 'Não ajudou', pl: 'Niepomocne', ru: 'Не помогло' },\n"
+              "  correctThis:  { en: 'Correct this', es: 'Corregir', pt: 'Corrigir', pl: 'Popraw', ru: 'Исправить' },\n"
+              "  correctionPlaceholder: { en: 'What should COS learn from this?', es: '¿Qué debería aprender COS de esto?', pt: 'O que o COS deve aprender com isso?', pl: 'Czego COS powinien się z tego nauczyć?', ru: 'Что COS должен из этого извлечь?' },\n"
+              "  submitCorrection: { en: 'Submit correction', es: 'Enviar corrección', pt: 'Enviar correção', pl: 'Wyślij poprawkę', ru: 'Отправить исправление' },\n"
+              "  cancelCorrection: { en: 'Cancel', es: 'Cancelar', pt: 'Cancelar', pl: 'Anuluj', ru: 'Отмена' },\n"
+              "  feedbackSaved: { en: 'Feedback saved for COS learning.', es: 'Comentarios guardados para el aprendizaje de COS.', pt: 'Feedback salvo para o aprendizado do COS.', pl: 'Opinia zapisana do uczenia COS.', ru: 'Отзыв сохранён для обучения COS.' },\n"
+              "  feedbackError: { en: 'Could not save feedback.', es: 'No se pudieron guardar los comentarios.', pt: 'Não foi possível salvar o feedback.', pl: 'Nie udało się zapisać opinii.', ru: 'Не удалось сохранить отзыв.' },\n",
+              'assistant feedback copy',
+          )
+          text = replace_once(
+              text,
+              "  const [messages, setMessages] = useState<Msg[]>([])\n",
+              "  const [messages, setMessages] = useState<Msg[]>([])\n"
+              "  const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})\n",
+              'assistant feedback state',
+          )
+          text = replace_once(
+              text,
+              "  function stopRequest() {\n    abortRef.current?.abort()\n  }\n",
+              "  async function submitFeedback(messageIndex: number, assistantContent: string, feedbackType: FeedbackKind, correctionText?: string) {\n"
+              "    const conversationId = conversationIdRef.current\n"
+              "    if (!conversationId || !assistantContent.trim()) return\n"
+              "    const current = feedbackByMessage[messageIndex]\n"
+              "    if (current?.status === 'saving') return\n"
+              "    setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { ...prev[messageIndex], status: 'saving', kind: feedbackType } }))\n"
+              "    try {\n"
+              "      const response = await fetch('/api/assistant/feedback', {\n"
+              "        method: 'POST',\n"
+              "        headers: { 'Content-Type': 'application/json' },\n"
+              "        body: JSON.stringify({ conversationId, assistantContent, feedbackType, correctionText }),\n"
+              "      })\n"
+              "      if (!response.ok) throw new Error(`feedback_http_${response.status}`)\n"
+              "      setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { status: 'saved', kind: feedbackType, correctionOpen: false, correction: '' } }))\n"
+              "    } catch {\n"
+              "      setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { ...prev[messageIndex], status: 'error', kind: feedbackType } }))\n"
+              "    }\n"
+              "  }\n\n"
+              "  function stopRequest() {\n    abortRef.current?.abort()\n  }\n",
+              'assistant feedback submitter',
+          )
+          old_render = "                {msg.role === 'assistant' ? <VideoJsonMessage content={msg.content} /> : msg.content}\n"
+          new_render = """                {msg.role === 'assistant' ? (\n                  <>\n                    <VideoJsonMessage content={msg.content} />\n                    {(() => {\n                      const feedback = feedbackByMessage[i] || { status: 'idle' as const }\n                      const busy = feedback.status === 'saving'\n                      const correction = feedback.correction || ''\n                      return (\n                        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,.08)' }}>\n                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>\n                            <button type=\"button\" disabled={busy || feedback.status === 'saved'} onClick={() => submitFeedback(i, msg.content, 'positive')} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid rgba(34,197,94,.32)', background: 'rgba(34,197,94,.08)', color: '#86efac', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5 }}>👍 {c(COPY.helpful, l)}</button>\n                            <button type=\"button\" disabled={busy || feedback.status === 'saved'} onClick={() => submitFeedback(i, msg.content, 'negative')} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid rgba(248,113,113,.32)', background: 'rgba(248,113,113,.08)', color: '#fca5a5', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5 }}>👎 {c(COPY.notHelpful, l)}</button>\n                            <button type=\"button\" disabled={busy || feedback.status === 'saved'} onClick={() => setFeedbackByMessage(prev => ({ ...prev, [i]: { ...(prev[i] || { status: 'idle' }), correctionOpen: true, correction: prev[i]?.correction || '' } }))} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid rgba(26,240,255,.28)', background: 'rgba(26,240,255,.06)', color: '#67e8f9', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5 }}>✎ {c(COPY.correctThis, l)}</button>\n                            {feedback.status === 'saved' && <span style={{ color: '#86efac', fontSize: 11.5 }}>{c(COPY.feedbackSaved, l)}</span>}\n                            {feedback.status === 'error' && <span style={{ color: '#fca5a5', fontSize: 11.5 }}>{c(COPY.feedbackError, l)}</span>}\n                          </div>\n                          {feedback.correctionOpen && feedback.status !== 'saved' && (\n                            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>\n                              <textarea value={correction} onChange={e => setFeedbackByMessage(prev => ({ ...prev, [i]: { ...(prev[i] || { status: 'idle' }), correctionOpen: true, correction: e.target.value } }))} placeholder={c(COPY.correctionPlaceholder, l)} rows={3} maxLength={4000} style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(3,7,18,.55)', color: '#fff', padding: '9px 10px', fontSize: 12, resize: 'vertical' }} />\n                              <div style={{ display: 'flex', gap: 7 }}>\n                                <button type=\"button\" disabled={busy || !correction.trim()} onClick={() => submitFeedback(i, msg.content, 'correction', correction)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.12)', color: '#67e8f9', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5, fontWeight: 700 }}>{c(COPY.submitCorrection, l)}</button>\n                                <button type=\"button\" disabled={busy} onClick={() => setFeedbackByMessage(prev => ({ ...prev, [i]: { ...(prev[i] || { status: 'idle' }), correctionOpen: false } }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: 'rgba(255,255,255,.65)', cursor: 'pointer', fontSize: 11.5 }}>{c(COPY.cancelCorrection, l)}</button>\n                              </div>\n                            </div>\n                          )}\n                        </div>\n                      )\n                    })()}\n                  </>\n                ) : msg.content}\n"""
+          text = replace_once(text, old_render, new_render, 'assistant feedback renderer')
+          page.write_text(text)
+
+          onboard = Path('ONBOARD.md')
+          text = onboard.read_text()
+          text = replace_once(text, '**Version:** 1.9  ', '**Version:** 1.10  ', 'ONBOARD version')
+          text = replace_once(
+              text,
+              '**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; CONTINUOUS NORMAL-TURN EXPERIENCE CAPTURE + INDEPENDENCE METRICS CURRENTLY UNDER ACCEPTANCE  ',
+              '**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; EXPLICIT USER FEEDBACK LEARNING UNDER ACCEPTANCE  ',
+              'ONBOARD learning status',
+          )
+          proof_anchor = 'Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.\n'
+          proof = """Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.\n\n### 2026-08-16 continuous-learning production evidence\n\nPR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` for merge `3efccc51c10630c4eabb83f5288912c2edcf02bf` reached `READY`. A real ordinary `/api/concierge` request after the merge created durable encounter `c2953516-436a-4e3e-8fa7-dfc978d272c3`; the same failed/local-escalation outcome occurred twice and reconciled to `occurrence_count = 2` rather than creating duplicate rows. The evidence is explicitly `episodic_turn_signal_not_factual_truth`, contains no `answer` or `response` key, and records local Qwen attempted / external AI not yet invoked at the COS-first decision boundary. Matching Vercel telemetry showed RunPod could not start because the host reported insufficient free GPUs, after which the governed external fallback eventually used Gemini.\n\nTherefore normal-turn capture/deduplication is production-proven for a real external-required failure path. **Accepted local/cache encounter acceptance remains pending** because the observed production request could not obtain RunPod capacity; do not claim the full #1253 acceptance matrix complete until a real accepted local/cache turn is observed.\n\nCurrent follow-on increment `feat/cos-user-feedback-learning-20260816` adds explicit helpful / not-helpful / correction signals as `feedback` episodic experiences. User correction text remains bounded unverified evidence; it cannot automatically promote a fact or skill, raise confidence, or widen execution authority. Negative/correction signals become eligible inputs for the later autonomous curriculum prioritizer only after this evidence layer is production-accepted.\n"""
+          text = replace_once(text, proof_anchor, proof, 'ONBOARD production proof')
+          text = replace_once(
+              text,
+              '1. Production-prove the current continuous normal-turn experience capture and owner-only independence report on the exact merged deployment.\n2. Ingest explicit user feedback/corrections as governed episodic evidence; never auto-promote corrections to fact without validation.\n',
+              '1. Complete the remaining accepted local/cache production proof for #1253 when RunPod capacity permits; preserve the already verified external-required encounter evidence.\n2. Production-prove explicit user helpful / not-helpful / correction ingestion and verify feedback appears in the independence quality report without changing capability math.\n',
+              'ONBOARD next priorities',
+          )
+          onboard.write_text(text)
+
+          handoff = Path('docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md')
+          text = handoff.read_text()
+          addition = """
+
+## 2026-08-16 production acceptance update for PR #1253
+
+PR #1253 is now merged. Exact merge SHA: `3efccc51c10630c4eabb83f5288912c2edcf02bf`. Exact production deployment: `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` — `READY`.
+
+Production has real post-merge normal-turn evidence:
+
+- encounter id `c2953516-436a-4e3e-8fa7-dfc978d272c3`;
+- `experience_kind = encounter`;
+- `source_kind = cos_local_escalation`;
+- two identical failed/local-escalation outcomes reconciled to `occurrence_count = 2`;
+- evidence semantics `episodic_turn_signal_not_factual_truth`;
+- no `answer` key and no `response` key retained;
+- success semantics `cos_gate_acceptance_not_verified_business_outcome`;
+- route `external_required`;
+- local model attempted: true;
+- external AI invoked at the COS-first decision boundary: false.
+
+Matching Vercel telemetry showed the interactive request was authorized to wake RunPod, but RunPod returned `There are not enough free GPUs on the host machine to start this pod.` The local attempt therefore failed safely and the outer governed fallback later reached Gemini after Anthropic/OpenAI billing/quota failures.
+
+**Evidence status:** normal-turn persistence, bounded semantics and repeat reconciliation are production-proven for the external-required failure route. An accepted local/cache ordinary encounter remains pending because the observed request could not obtain RunPod capacity. Do not relabel this partial proof as a complete acceptance matrix.
+
+## Explicit user feedback / correction increment
+
+Current branch: `feat/cos-user-feedback-learning-20260816`.
+
+This increment uses the already-existing `experience_kind = feedback` instead of creating a parallel memory system.
+
+Contract:
+
+- assistant feedback is accepted only for an authenticated user's persisted conversation/assistant response;
+- the learning prompt/subject is derived from the server-owned transcript, not trusted from client input;
+- supported signals are `positive`, `negative`, and `correction`;
+- correction text is bounded and explicitly labeled `unverified_user_correction_requires_validation`;
+- no feedback automatically creates KG facts, learned-corpus knowledge, procedural skills, confidence bonuses or new execution authority;
+- repeated identical feedback reconciles by deterministic experience hash;
+- negative/correction feedback is only a future curriculum signal, not automatic learning/promotion;
+- independence reporting exposes positive/negative/correction quality counts separately without rewriting independent-acceptance or teacher-dependency metrics;
+- assistant UI exposes localized helpful / not-helpful / correction controls in EN/ES/PT/PL/RU.
+
+Production proof required after merge:
+
+1. exact deployment READY;
+2. submit one positive feedback item on a persisted assistant response;
+3. verify a durable `feedback` experience with no assistant answer text retained;
+4. submit one bounded correction and verify its unverified semantics / promotion-deny flags;
+5. repeat identical feedback and verify occurrence reconciliation;
+6. verify independence quality metrics count feedback but capability/teacher metrics do not change merely because feedback exists.
+
+After this, the next independence increment remains verified production-outcome wiring and autonomous curriculum prioritization from repeated failures, external-teacher dependence/cost, business importance, and weak/untested/conflicted capability classes.
+"""
+          if '## 2026-08-16 production acceptance update for PR #1253' in text:
+              raise SystemExit('handoff production update already present')
+          handoff.write_text(text.rstrip() + addition + '\n')
+          PY
+      - name: Remove temporary patch workflow
+        run: git rm .github/workflows/cos-feedback-ui-doc-patch.yml
+      - name: Commit patched UI and docs
+        run: |
+          git config user.name 'SignalBoost CI'
+          git config user.email 'cadomos@gmail.com'
+          git add saas/app/dashboard/assistant/page.tsx ONBOARD.md docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md .github/workflows/cos-feedback-ui-doc-patch.yml
+          git commit -m 'feat(cos): wire explicit user feedback learning UI [cos-feedback-patched]'
+          git push origin HEAD:feat/cos-user-feedback-learning-20260816

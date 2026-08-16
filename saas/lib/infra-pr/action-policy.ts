@@ -7,7 +7,7 @@
 // critical/destructive action IDs flagged strict high-risk.
 //
 // RBAC: tiered clearance. Roles are INJECTED by the host app (auth-agnostic).
-import { ActionVerb, RiskTier, ApprovalTier, Role } from './types.ts';
+import type { ActionVerb, RiskTier, ApprovalTier, Role } from './types.ts';
 
 const HIGH_RISK_ACTION_IDS: Record<string, true> = {
   drop_table: true, drop_schema: true, truncate_table: true, delete_row: true,

@@ -6,6 +6,7 @@ on:
       - 'cos-core/**'
       - 'saas/app/api/concierge/route.ts'
       - 'saas/app/api/support/route.ts'
+      - 'saas/app/api/support/routeCoreLegacy.ts'
       - 'saas/lib/cos-backup/**'
       - 'saas/scripts/check-cos-integrity.mjs'
       - 'saas/tests/cosBackupIntegrity.node.test.ts'
@@ -17,6 +18,7 @@ on:
       - 'cos-core/**'
       - 'saas/app/api/concierge/route.ts'
       - 'saas/app/api/support/route.ts'
+      - 'saas/app/api/support/routeCoreLegacy.ts'
       - 'saas/lib/cos-backup/**'
       - 'saas/scripts/check-cos-integrity.mjs'
       - 'saas/tests/cosBackupIntegrity.node.test.ts'
@@ -78,6 +80,7 @@ jobs:
             'cos-core/',
             'saas/app/api/concierge/route.ts',
             'saas/app/api/support/route.ts',
+            'saas/app/api/support/routeCoreLegacy.ts',
             'saas/lib/cos-backup/',
             'saas/scripts/check-cos-integrity.mjs',
             'saas/tests/cosBackupIntegrity.node.test.ts',

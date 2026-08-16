@@ -18,7 +18,7 @@ import {
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
-import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
   type COSFirstAnswerResult,
@@ -280,10 +280,23 @@ export async function tryCOSFirstAnswer(input: {
     try {
       await ensureLocalInferenceRuntimeReady()
     } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
       console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({
         at: new Date().toISOString(),
-        reason: error instanceof Error ? error.message : String(error),
+        reason,
       }))
+      // A failed authorized cold-start preflight may have already stopped compute through the
+      // lifecycle fail-safe. Enterprise retrieval still gets its lexical/internal fallbacks, but it
+      // must not inherit the original interactive wake authority and immediately start a second
+      // lifecycle attempt from semantic embedding calls in the same request.
+      return withRunpodWakePermission({
+        allowed: false,
+        source: 'background_or_untrusted',
+        interactionId: null,
+        issuedAtMs: null,
+        ageMs: null,
+        reason: 'runtime_preflight_failed_no_retry',
+      }, () => tryEnterpriseCOSFirstAnswer(input))
     }
   }
 

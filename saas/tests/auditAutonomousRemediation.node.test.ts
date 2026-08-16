@@ -119,8 +119,8 @@ test('ONBOARD preserves governed AI execution and truthful status doctrine', () 
   const onboard = read('../../ONBOARD.md')
 
   assert.match(onboard, /Consequential actions remain behind applicable approval controls/i)
-  assert.match(onboard, /Never claim a test, build, deployment, push, PR, or merge succeeded unless it was actually verified/i)
-  assert.match(onboard, /Sensitive actions remain behind explicit governance and approval gates/i)
+  assert.match(onboard, /EVIDENCE-BASED — never infer from architecture or a green deployment/i)
+  assert.match(onboard, /Verify implementation\/runtime from code and live evidence before diagnosing, changing, or reporting status/i)
 })
 
 test('failed GitHub checks and stalled stages never look actively pending', () => {

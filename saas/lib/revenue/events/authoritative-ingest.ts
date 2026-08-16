@@ -1,5 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { recordVerifiedCosProductionOutcome } from '@/lib/ai/cos/cognitiveVerifiedOutcome'
+import {
+  recordVerifiedCosProductionOutcome,
+  type CosVerifiedProductionOutcomeInput,
+} from '@/lib/ai/cos/cognitiveVerifiedOutcome'
 import { decideRevenueCosOutcome } from './cos-outcome-policy.ts'
 import type { RevenueEvent } from './types.ts'
 
@@ -11,6 +14,10 @@ export type AuthoritativeRevenueEventResult = {
   cosInserted: boolean
   cosError?: string
 }
+
+type RevenueOutcomeRecorder = (
+  input: CosVerifiedProductionOutcomeInput,
+) => Promise<{ stored: boolean; inserted: boolean }>
 
 function errorCode(error: unknown): string {
   if (!error || typeof error !== 'object') return ''
@@ -33,6 +40,7 @@ function errorMessage(error: unknown): string {
 export async function acceptAuthoritativeRevenueEvent(
   db: SupabaseClient,
   event: RevenueEvent,
+  options: { recordOutcome?: RevenueOutcomeRecorder } = {},
 ): Promise<AuthoritativeRevenueEventResult> {
   const insert = await db.from('revenue_events').insert({
     event_id: event.eventId,
@@ -74,8 +82,9 @@ export async function acceptAuthoritativeRevenueEvent(
     }
   }
 
+  const recordOutcome = options.recordOutcome ?? recordVerifiedCosProductionOutcome
   try {
-    const learned = await recordVerifiedCosProductionOutcome({
+    const learned = await recordOutcome({
       sourceClass: 'authoritative_record',
       sourceRef: `revenue_event:${event.eventId}`,
       domain: decision.domain,

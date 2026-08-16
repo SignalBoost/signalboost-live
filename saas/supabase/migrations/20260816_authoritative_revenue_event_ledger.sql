@@ -65,6 +65,9 @@ create index if not exists revenue_events_correlation_idx
   where correlation_id is not null;
 
 alter table public.revenue_events enable row level security;
+revoke all on table public.revenue_events from anon, authenticated;
+revoke all on table public.revenue_events from service_role;
+grant select, insert on table public.revenue_events to service_role;
 
 comment on table public.revenue_events is
-  'Immutable accepted RevenueEvent ledger. Service-role access only; event acceptance does not itself imply a successful business outcome or learned COS skill.';
+  'Immutable accepted RevenueEvent ledger. Service-role insert/select only; event acceptance does not itself imply a successful business outcome or learned COS skill.';

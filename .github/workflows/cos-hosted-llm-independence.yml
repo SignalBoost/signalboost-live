@@ -1,0 +1,37 @@
+name: COS hosted-LLM independence
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/ai/providerRouter.ts'
+      - 'saas/lib/cos-backup/runtime.ts'
+      - 'saas/tests/cosHostedLlmIndependence.node.test.ts'
+      - '.github/workflows/cos-hosted-llm-independence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/ai/providerRouter.ts'
+      - 'saas/lib/cos-backup/runtime.ts'
+      - 'saas/tests/cosHostedLlmIndependence.node.test.ts'
+      - '.github/workflows/cos-hosted-llm-independence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  local-defaults:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - run: node --test tests/cosHostedLlmIndependence.node.test.ts
+      - run: npm run typecheck

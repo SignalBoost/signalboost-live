@@ -26,11 +26,17 @@ test('ordinary COS preflights runtime before bounded enterprise semantic retriev
   const exported = text.slice(text.indexOf('export async function tryCOSFirstAnswer'))
   const fresh = exported.indexOf('requiresFreshExternalEvidence(input.prompt)')
   const preflight = exported.indexOf('await ensureLocalInferenceRuntimeReady()')
+  const noRetryScope = exported.indexOf('return withRunpodWakePermission({')
+  const noRetryReason = exported.indexOf("reason: 'runtime_preflight_failed_no_retry'")
   const enterprise = exported.lastIndexOf('return tryEnterpriseCOSFirstAnswer(input)')
 
   assert.ok(fresh >= 0, 'fresh/current-fact routing must remain present')
   assert.ok(preflight > fresh, 'ordinary runtime preflight must not precede fresh/current-fact routing')
-  assert.ok(enterprise > preflight, 'runtime readiness must finish before enterprise retrieval starts')
+  assert.ok(noRetryScope > preflight, 'failed preflight must enter an explicit no-wake scope before lexical/enterprise fallback')
+  assert.ok(noRetryReason > noRetryScope, 'no-wake fallback must carry an explicit failed-preflight reason')
+  assert.ok(exported.includes("source: 'background_or_untrusted'"), 'failed-preflight fallback must not retain interactive wake authority')
+  assert.ok(exported.includes('() => tryEnterpriseCOSFirstAnswer(input)'), 'lexical/internal enterprise fallback must remain available after wake suppression')
+  assert.ok(enterprise > preflight, 'normal runtime readiness must finish before enterprise retrieval starts')
 })
 
 test('foreground embedding kill switch fails before config, readiness, or fetch', () => {

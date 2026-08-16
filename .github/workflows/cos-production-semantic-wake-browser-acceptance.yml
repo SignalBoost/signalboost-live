@@ -72,13 +72,17 @@ jobs:
             const responseSource = String(provenance?.responseSource || '')
             const knowledgeFactsUsed = Number(provenance?.knowledgeFactsUsed || 0)
             const learnedItemsUsed = Number(provenance?.learnedItemsUsed || 0)
-            const similarityScore = Number(provenance?.similarityScore)
+            const rawSimilarityScore = provenance?.similarityScore
+            const similarityScore =
+              typeof rawSimilarityScore === 'number' && Number.isFinite(rawSimilarityScore)
+                ? rawSimilarityScore
+                : null
             const semanticEvidence =
               responseSource === 'semantic_cache' ||
               responseSource === 'semantic_similarity' ||
               knowledgeFactsUsed > 0 ||
               learnedItemsUsed > 0 ||
-              Number.isFinite(similarityScore)
+              similarityScore !== null
 
             console.log(JSON.stringify({
               acceptance: 'cos-production-semantic-wake-browser-v1',
@@ -92,7 +96,7 @@ jobs:
               response_source: responseSource || null,
               knowledge_facts_used: knowledgeFactsUsed,
               learned_items_used: learnedItemsUsed,
-              similarity_score: Number.isFinite(similarityScore) ? similarityScore : null,
+              similarity_score: similarityScore,
               reasoner_label: provenance?.reasonerLabel || null,
               reply: String(payload?.reply || '').slice(0, 1200),
             }, null, 2))

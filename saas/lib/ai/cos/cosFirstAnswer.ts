@@ -18,7 +18,7 @@ import {
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
 import { generateLocalEmbedding } from './localEmbeddings'
-import { recordCosTurnExperience } from './cognitiveTurnExperience'
+import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import {

@@ -36,6 +36,9 @@ const GENERAL_PROBLEM_CLASSES: { id: string; test: RegExp }[] = [
   // Facts that change over time. Grouping these together is what lets COS trend how often it can
   // answer current questions from its own fresh knowledge instead of an external teacher.
   { id: 'current public facts', test: /\b(current|currently|today|todays|right now|as of now|latest|most recent|nowadays|this (?:year|month|week)|who is the (?:president|prime minister|ceo|leader))\b/i },
+  // Durable campaign/sales/CRM/revenue outcomes share one bounded capability bucket. The specific
+  // operating domain remains separate evidence metadata, so this does not collapse those systems.
+  { id: 'sales and revenue operations', test: /\b(outreach|campaign|sales|crm|opportunit(?:y|ies)|pipeline|invoice|renewal|lead|prospect|meeting booked|meeting completed|reply received|email sent|email opened|email clicked)\b/i },
   // Explicitly subjective asks. Listed BEFORE the factual people/definition classes because
   // "who is the worst president" is a judgment wearing a "who is" costume, and COS must never
   // group it with verifiable identity facts.

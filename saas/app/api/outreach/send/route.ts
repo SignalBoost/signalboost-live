@@ -8,6 +8,8 @@ import { sendEmail as sendLegacyEmail } from '@/lib/email'
 import { sendCosOutreachEmail } from '@/lib/communication-hub/cos-email'
 import { resolveBuyerEmailDelivery } from '@/lib/communication-hub/runtime'
 import { markOutreachSent } from '@/lib/outreach/markSent'
+import { buildRevenueEvent } from '@/lib/revenue/events/revenue-event'
+import { acceptAuthoritativeRevenueEvent } from '@/lib/revenue/events/authoritative-ingest'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +21,10 @@ function draftedSubject(outreach: any): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))
+}
+
+function environmentId(): string {
+  return String(process.env.VERCEL_ENV || process.env.NODE_ENV || 'unknown').trim() || 'unknown'
 }
 
 export async function POST(req: NextRequest) {
@@ -120,14 +126,59 @@ export async function POST(req: NextRequest) {
   }
 
   const sentAt = new Date().toISOString()
-  const { error: sendError } = await ctx.admin.from('outreach_sends').insert({
+  const { data: sendRecord, error: sendError } = await ctx.admin.from('outreach_sends').insert({
     outreach_id: outreachId,
     business_id: outreach.business_id,
     channel,
     sent_at: sentAt,
     metadata: { providerResult, toEmail: toEmail || null },
-  })
-  if (sendError) return NextResponse.json({ error: sendError.message, providerResult }, { status: 500 })
+  }).select('id').single()
+  if (sendError || !sendRecord) {
+    return NextResponse.json({ error: sendError?.message || 'Outreach send record was not persisted', providerResult }, { status: 500 })
+  }
+
+  // Only a provider-confirmed email becomes an authoritative RevenueEvent. Manual record-only
+  // activity remains deliberately excluded from COS learning.
+  if (channel === 'email' && toEmail && providerResult.mode !== 'manual_record_only') {
+    const providerId = typeof providerResult.providerId === 'string' ? providerResult.providerId : undefined
+    const event = buildRevenueEvent({
+      eventId: `outreach_send:${sendRecord.id}`,
+      tenant: {
+        tenantId: String(outreach.user_id || ctx.user.id || 'signalboost'),
+        environmentId: environmentId(),
+      },
+      occurredAt: sentAt,
+      type: 'email_sent',
+      source: providerResult.communicationHub === true ? 'communication_hub' : 'external_provider',
+      ...(providerId ? { sourceProvider: providerId } : {}),
+      actor: { id: String(ctx.user.id || '') || undefined },
+      organization: {
+        ...(outreach.business_id ? { id: String(outreach.business_id) } : {}),
+        ...(outreach.business_name ? { name: String(outreach.business_name) } : {}),
+      },
+      ...(outreach.campaign_job_id ? { campaign: { id: String(outreach.campaign_job_id) } } : {}),
+      metadata: {
+        outreachId,
+        channel,
+        deliveryPath: providerResult.communicationHub === true ? 'communication_hub' : 'legacy_email_provider',
+      },
+      confidence: 1,
+      evidenceRefs: [`outreach_send:${sendRecord.id}`],
+      correlationId: String(outreach.campaign_job_id || outreachId),
+    })
+
+    try {
+      await acceptAuthoritativeRevenueEvent(ctx.admin, event)
+    } catch (revenueEventError) {
+      // The source send is already objectively persisted. Learning/ledger failure must not rewrite
+      // that operational truth or turn a successful provider send into a false delivery failure.
+      console.error('authoritative_revenue_event_record_failed', {
+        outreachId,
+        eventId: event.eventId,
+        error: revenueEventError instanceof Error ? revenueEventError.message : String(revenueEventError),
+      })
+    }
+  }
 
   const queueReconcile = await markOutreachSent(ctx.admin, outreachId, sentAt)
 

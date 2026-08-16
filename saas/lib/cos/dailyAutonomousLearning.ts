@@ -1,3 +1,4 @@
+// saas/lib/cos/dailyAutonomousLearning.ts
 import type { ContinuousLearningSourceAdapter } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningStore, type KnowledgeGap } from '@/lib/cos-core/layers/learning'
@@ -5,6 +6,7 @@ import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveS
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
+import { loadCosCurriculumSignals } from '@/lib/ai/cos/cosCurriculumPriority'
 import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum'
 import type { MiningRunSummary } from './mining/types'
 
@@ -15,6 +17,7 @@ export type DailyLearningResult = {
   autonomousGaps: number
   curriculumGaps: number
   corpusExpansionGaps: number
+  weaknessCurriculumSignals: number
   retainedKnowledge: number
   liveSourceAdapters: number
   gapsConsidered: number
@@ -235,6 +238,7 @@ export async function runDailyAutonomousLearning(input: {
       autonomousGaps: 0,
       curriculumGaps: 0,
       corpusExpansionGaps: 0,
+      weaknessCurriculumSignals: 0,
       retainedKnowledge: 0,
       liveSourceAdapters: readiness.liveAdapters,
       gapsConsidered: 0,
@@ -256,6 +260,7 @@ export async function runDailyAutonomousLearning(input: {
       autonomousGaps: 0,
       curriculumGaps: 0,
       corpusExpansionGaps: 0,
+      weaknessCurriculumSignals: 0,
       retainedKnowledge: 0,
       liveSourceAdapters: readiness.liveAdapters,
       gapsConsidered: 0,
@@ -270,7 +275,9 @@ export async function runDailyAutonomousLearning(input: {
   const queued = input.gapSignals ? { ids: [], signals: input.gapSignals } : await loadQueuedReasoningGaps()
   const approvedUrls = input.approvedUrls ?? parseApprovedLearningUrls()
   const reasoningGaps = generateKnowledgeGaps(queued.signals)
-  const dynamic = await generateDynamicKnowledgeGaps(12)
+  // What COS is measurably worst at on real work outranks what its corpus is merely thin about.
+  const weaknessCurriculumSignals = await loadCosCurriculumSignals()
+  const dynamic = await generateDynamicKnowledgeGaps(12, weaknessCurriculumSignals)
   const reasoningKeys = new Set(reasoningGaps.map(gap => `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const corpusExpansionGaps = dynamic.gaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
@@ -289,6 +296,8 @@ export async function runDailyAutonomousLearning(input: {
     queuedGaps: queued.signals.length,
     generatedGaps: autonomousGaps.length,
     corpusExpansionGaps: corpusExpansionGaps.length,
+    weaknessCurriculumSignals: weaknessCurriculumSignals.length,
+    weaknessCurriculumSubjects: weaknessCurriculumSignals.map(signal => signal.subject),
     retainedKnowledge: dynamic.retained,
     curriculumGaps: curriculum.length,
     adapterKinds: adapters.map(a => a.id ?? a.kind),
@@ -305,6 +314,7 @@ export async function runDailyAutonomousLearning(input: {
     autonomousGaps: autonomousGaps.length,
     curriculumGaps: curriculum.length,
     corpusExpansionGaps: corpusExpansionGaps.length,
+    weaknessCurriculumSignals: weaknessCurriculumSignals.length,
     retainedKnowledge: dynamic.retained,
     liveSourceAdapters: liveAdapters.length,
     ...result,

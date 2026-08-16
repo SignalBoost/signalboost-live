@@ -108,7 +108,7 @@ test('ordinary COS primes the shared query embedding before enterprise semantic 
   const fresh = exported.indexOf('requiresFreshExternalEvidence(input.prompt)')
   const readiness = exported.indexOf('await ensureLocalInferenceRuntimeReady()')
   const prime = exported.indexOf('await generateLocalEmbedding(input.prompt)')
-  const enterprise = exported.lastIndexOf('return tryEnterpriseCOSFirstAnswer(input)')
+  const enterprise = exported.lastIndexOf('tryEnterpriseCOSFirstAnswer(input)')
 
   assert.ok(fresh >= 0, 'fresh/current-fact policy must remain first')
   assert.ok(readiness > fresh, 'ordinary runtime readiness must remain after fresh routing')

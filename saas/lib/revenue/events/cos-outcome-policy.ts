@@ -1,6 +1,6 @@
 import type { RevenueEvent, RevenueEventType } from './types.ts'
 
-export type RevenueCosOutcomeDomain = 'campaign' | 'sales' | 'crm' | 'revenue'
+export type RevenueCosOutcomeDomain = 'campaign' | 'sales' | 'crm'
 export type RevenueCosOutcomeStatus = 'success' | 'failure' | 'observed'
 
 export type RevenueCosOutcomeDecision = {
@@ -24,7 +24,6 @@ function domainFor(type: RevenueEventType): RevenueCosOutcomeDomain {
   if (type === 'email_sent' || type === 'email_opened' || type === 'email_clicked') return 'campaign'
   if (type === 'reply_received' || type === 'meeting_booked' || type === 'meeting_completed') return 'sales'
   if (type.startsWith('opportunity_')) return 'crm'
-  if (type === 'invoice_paid' || type === 'renewal_completed') return 'revenue'
   return 'sales'
 }
 

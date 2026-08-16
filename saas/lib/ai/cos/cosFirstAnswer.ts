@@ -17,6 +17,7 @@ import {
   type FreshEvidenceSource,
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
+import { generateLocalEmbedding } from './localEmbeddings'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import {
@@ -273,12 +274,14 @@ export async function tryCOSFirstAnswer(input: {
   }
 
   // Ordinary enterprise retrieval has bounded semantic-query budgets. Complete any authorized
-  // RunPod cold-start lifecycle before those timers begin so no abandoned retrieval promise can
-  // keep paid compute waking after lexical fallback already returned. Under #1224, background and
-  // server-to-server callers fail closed here; lexical/external fallback remains available.
+  // RunPod cold-start lifecycle and one shared foreground query embedding before those timers begin.
+  // Subsequent KG/corpus lookups reuse the short-lived embedding cache instead of making duplicate
+  // embedding-model calls inside independent 5-second retrieval races. Under #1224, background and
+  // server-to-server callers still fail closed here; lexical/external fallback remains available.
   if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
     try {
       await ensureLocalInferenceRuntimeReady()
+      await generateLocalEmbedding(input.prompt)
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({

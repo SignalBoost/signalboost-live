@@ -10,7 +10,8 @@ const DYNAMIC_ROLE = new RegExp(`\\b${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 // These facts are inherently operational/volatile when a user asks for their value or status.
 // A user should not need to remember to type "current" for COS to understand that a stock price,
 // weather report, score, outage, flight status, or breaking-news answer can become stale immediately.
-const INHERENTLY_LIVE_STATE = /\b(?:news|updates?|result|results|price|prices|share price|share prices|exchange rate|exchange rates|stock price|stock prices|market|markets|weather|forecast|forecasts|score|scores|standings|schedule|schedules|availability|inventory|outage|outages|service status|flight status|departure status|arrival status|traffic|delay|delays|wait time|wait times|alert|alerts|poll|polls|election result|election results)\b/i
+// Avoid generic "market" here because it is also a verb in ordinary marketing requests.
+const INHERENTLY_LIVE_STATE = /\b(?:news|updates?|result|results|price|prices|share price|share prices|exchange rate|exchange rates|stock price|stock prices|stock market|financial market|market price|market prices|market data|weather|forecast|forecasts|score|scores|standings|schedule|schedules|availability|inventory|outage|outages|service status|flight status|departure status|arrival status|traffic|delay|delays|wait time|wait times|alert|alerts|poll|polls|election result|election results)\b/i
 
 // These are versioned/current-state domains. They require a live check when the user is asking for
 // the operative/current value rather than asking a conceptual or explicitly historical question.

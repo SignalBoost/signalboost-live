@@ -64,6 +64,26 @@ test('non-model-specific OpenAI embedding 404 falls back to authenticated native
   assert.equal(calls[1].apiKey, 'EXAMPLE_NOTAREAL_LOCAL_AI_KEY')
 })
 
+test('non-v1 embedding 404 does not probe native Ollama paths', async () => {
+  configureRunPod()
+  process.env.LOCAL_AI_BASE_URL = 'https://EXAMPLE-pod-11434.proxy.runpod.net/openai'
+  const urls: string[] = []
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input)
+    urls.push(url)
+    return new Response('', { status: 404 })
+  }) as typeof fetch
+
+  await assert.rejects(
+    () => generatePassiveLocalEmbedding('do not widen fallback'),
+    /localEmbeddings: HTTP 404/,
+  )
+  assert.deepEqual(urls, [
+    'https://example-pod-11434.proxy.runpod.net/openai/embeddings',
+  ])
+})
+
 test('native fallback preserves missing-model auto-repair and retries native transport once', async () => {
   configureRunPod()
   const urls: string[] = []

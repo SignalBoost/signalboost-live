@@ -27,6 +27,51 @@ function publicSearchUrl(query: string): string {
   return `https://search.brave.com/search?q=${encodeURIComponent(query)}`
 }
 
+type Scalar = string | number | boolean
+
+type ScalarEntry = { path: string; value: Scalar; score: number }
+
+function scalarPriority(path: string): number {
+  const key = path.toLowerCase()
+  if (/\b(?:price|last|value|rate|exchange|currency|symbol|ticker)\b/.test(key)) return 100
+  if (/\b(?:temperature|temp|condition|forecast|humidity|wind|precip|rain|snow)\b/.test(key)) return 95
+  if (/\b(?:score|points|team|home|away|status|period|quarter|inning|time_remaining)\b/.test(key)) return 90
+  if (/\b(?:name|title|date|time|timestamp|updated|market|change|percent|unit)\b/.test(key)) return 70
+  return 10
+}
+
+function collectScalars(value: unknown, path = 'data', depth = 0, out: ScalarEntry[] = []): ScalarEntry[] {
+  if (out.length >= 120 || depth > 7 || value == null) return out
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const text = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value
+    if (text !== '') out.push({ path, value: text as Scalar, score: scalarPriority(path) })
+    return out
+  }
+  if (Array.isArray(value)) {
+    for (let index = 0; index < Math.min(value.length, 8); index += 1) {
+      collectScalars(value[index], `${path}[${index}]`, depth + 1, out)
+    }
+    return out
+  }
+  if (typeof value === 'object') {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      collectScalars(child, `${path}.${key}`, depth + 1, out)
+      if (out.length >= 120) break
+    }
+  }
+  return out
+}
+
+function compactStructuredSnippet(vertical: string, observedAt: string, rawResults: unknown[]): string {
+  const entries = collectScalars(rawResults)
+    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
+    .slice(0, 28)
+    .map(entry => `${entry.path}=${String(entry.value).slice(0, 80)}`)
+
+  const prefix = `STRUCTURED_REALTIME vertical=${vertical}; observed_at=${observedAt}; `
+  return `${prefix}${entries.join('; ')}`.slice(0, 480)
+}
+
 function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
   return {
     async fetch(query: string, expectedKind: StructuredLiveKind): Promise<StructuredLiveInfoResult> {
@@ -75,13 +120,14 @@ function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
         if (!rawResults.length) return { ok: false, results: [], vertical, error: 'Structured provider returned no real-time records.' }
 
         const observedAt = new Date().toISOString()
-        const compactPayload = JSON.stringify({ vertical: vertical || expectedKind, results: rawResults }).slice(0, 6000)
+        const resolvedVertical = vertical || expectedKind
+        const compactPayload = compactStructuredSnippet(resolvedVertical, observedAt, rawResults)
 
         return {
           ok: true,
-          vertical: vertical || expectedKind,
+          vertical: resolvedVertical,
           results: [{
-            title: `Brave Rich Search real-time ${vertical || expectedKind} data`,
+            title: `Brave Rich Search real-time ${resolvedVertical} data`,
             url: publicSearchUrl(query),
             snippet: compactPayload,
             sourceKind: 'structured_realtime',

@@ -32,6 +32,9 @@ type EmbeddingAttempt =
   | { ok: true; vectors: number[][] }
   | { ok: false; status: number; body: string }
 
+type EmbeddingFailure = Extract<EmbeddingAttempt, { ok: false }>
+type EmbeddingTransport = 'openai' | 'native'
+
 function validateVector(vector: number[], model: string): number[] {
   if (vector.length !== LOCAL_EMBEDDING_DIMENSIONS) {
     throw new Error(
@@ -100,12 +103,85 @@ function runpodAutoRepairEnabled(config: LocalInferenceConfig): boolean {
 function ollamaNativeBaseUrl(config: LocalInferenceConfig): string {
   const url = new URL(config.baseUrl)
   if (!/\/v1\/?$/.test(url.pathname)) {
-    throw new Error('localEmbeddings: automatic model repair requires an Ollama OpenAI-compatible base URL ending in /v1')
+    throw new Error('localEmbeddings: native Ollama compatibility requires a base URL ending in /v1')
   }
   url.pathname = url.pathname.replace(/\/v1\/?$/, '') || '/'
   url.search = ''
   url.hash = ''
   return url.toString().replace(/\/$/, '')
+}
+
+function ollamaNativeFallbackEligible(config: LocalInferenceConfig): boolean {
+  try {
+    return /\/v1\/?$/.test(new URL(config.baseUrl).pathname)
+  } catch {
+    return false
+  }
+}
+
+async function requestNativeEmbeddings(texts: string[], config: LocalInferenceConfig, model: string): Promise<EmbeddingAttempt> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+  try {
+    const response = await fetch(`${ollamaNativeBaseUrl(config)}/api/embed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(config.apiKey),
+      },
+      signal: controller.signal,
+      body: JSON.stringify({ model, input: texts.length === 1 ? texts[0] : texts }),
+    })
+
+    if (!response.ok) {
+      return { ok: false, status: response.status, body: await response.text() }
+    }
+
+    const data = await response.json() as { embeddings?: number[][] }
+    const vectors = Array.isArray(data.embeddings) ? data.embeddings : []
+    if (vectors.length !== texts.length) {
+      throw new Error(`localEmbeddings: native endpoint returned ${vectors.length} vectors for ${texts.length} inputs`)
+    }
+    if (vectors.some(vector => !Array.isArray(vector) || vector.length === 0)) {
+      throw new Error('localEmbeddings: native endpoint returned an empty embedding vector')
+    }
+    return { ok: true, vectors }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function openAiEmbeddingEndpointUnavailable(
+  attempt: EmbeddingAttempt,
+  config: LocalInferenceConfig,
+  model: string,
+): attempt is EmbeddingFailure {
+  return 'status' in attempt
+    && attempt.status === 404
+    && !missingModelError(attempt, model)
+    && ollamaNativeFallbackEligible(config)
+}
+
+async function requestCompatibleEmbeddings(
+  texts: string[],
+  config: LocalInferenceConfig,
+  model: string,
+): Promise<{ attempt: EmbeddingAttempt; transport: EmbeddingTransport }> {
+  const openAiAttempt = await requestEmbeddings(texts, config, model)
+  if (!openAiEmbeddingEndpointUnavailable(openAiAttempt, config, model)) {
+    return { attempt: openAiAttempt, transport: 'openai' }
+  }
+
+  console.info('[cos-embedding-transport-fallback]', JSON.stringify({
+    at: new Date().toISOString(),
+    from: 'openai_v1_embeddings',
+    to: 'ollama_native_api_embed',
+    status: openAiAttempt.status,
+  }))
+  return {
+    attempt: await requestNativeEmbeddings(texts, config, model),
+    transport: 'native',
+  }
 }
 
 function pullTimeoutMs(): number {
@@ -167,11 +243,17 @@ export async function generateLocalEmbeddings(texts: string[]): Promise<number[]
   if (normalized.length === 0) return []
   const config = localInferenceConfigFromEnv()
   const model = embeddingModel()
-  let attempt = await requestEmbeddings(normalized, config, model)
+  let { attempt, transport } = await requestCompatibleEmbeddings(normalized, config, model)
 
   if ('status' in attempt && missingModelError(attempt, model) && runpodAutoRepairEnabled(config)) {
     await pullEmbeddingModel(config, model)
-    attempt = await requestEmbeddings(normalized, config, model)
+    if (transport === 'native') {
+      attempt = await requestNativeEmbeddings(normalized, config, model)
+    } else {
+      const retried = await requestCompatibleEmbeddings(normalized, config, model)
+      attempt = retried.attempt
+      transport = retried.transport
+    }
   }
 
   if ('status' in attempt) {
@@ -220,7 +302,7 @@ export async function checkLocalEmbeddingHealth(): Promise<{ ok: boolean; model:
   const model = embeddingModel()
   try {
     const config = localInferenceConfigFromEnv()
-    const attempt = await requestEmbeddings(['health check'], config, model)
+    const { attempt } = await requestCompatibleEmbeddings(['health check'], config, model)
     if ('status' in attempt) return { ok: false, model, error: `HTTP ${attempt.status} — ${attempt.body}` }
     const vector = validateVector(attempt.vectors[0] ?? [], model)
     return { ok: true, model, dimensions: vector.length }

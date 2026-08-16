@@ -1,0 +1,33 @@
+name: Business Intelligence Wikidata Seed
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/business-intelligence-corpus/wikidata-public.ts'
+      - 'saas/app/api/admin/business-intelligence-corpus/seed-wikidata/route.ts'
+      - 'saas/tests/businessIntelligenceWikidata.node.test.ts'
+      - '.github/workflows/business-intelligence-wikidata.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/business-intelligence-corpus/wikidata-public.ts'
+      - 'saas/app/api/admin/business-intelligence-corpus/seed-wikidata/route.ts'
+      - 'saas/tests/businessIntelligenceWikidata.node.test.ts'
+      - '.github/workflows/business-intelligence-wikidata.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - run: node --test tests/businessIntelligenceWikidata.node.test.ts
+      - run: npm run typecheck

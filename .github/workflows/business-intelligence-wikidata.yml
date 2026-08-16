@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'saas/lib/business-intelligence-corpus/wikidata-public.ts'
+      - 'saas/lib/business-intelligence-corpus/wikidata-public-parser.ts'
       - 'saas/app/api/admin/business-intelligence-corpus/seed-wikidata/route.ts'
       - 'saas/tests/businessIntelligenceWikidata.node.test.ts'
       - '.github/workflows/business-intelligence-wikidata.yml'
@@ -11,6 +12,7 @@ on:
     branches: [main]
     paths:
       - 'saas/lib/business-intelligence-corpus/wikidata-public.ts'
+      - 'saas/lib/business-intelligence-corpus/wikidata-public-parser.ts'
       - 'saas/app/api/admin/business-intelligence-corpus/seed-wikidata/route.ts'
       - 'saas/tests/businessIntelligenceWikidata.node.test.ts'
       - '.github/workflows/business-intelligence-wikidata.yml'

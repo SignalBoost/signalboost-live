@@ -30,6 +30,34 @@ test('platform self-knowledge is a small versioned set of deterministic code-der
   assert.match(byPredicate.get('bounded_request_owned_retry') || '', /same request started the compute/i)
 })
 
+test('versioned self-knowledge claims remain mechanically aligned with implementation', () => {
+  const browser = source('../app/api/cos-browser/route.ts')
+  assert.ok(browser.includes('evaluateRunpodWakePermission'))
+  assert.ok(browser.includes("interactionHeader: req.headers.get('x-signalboost-user-interaction')"))
+  assert.ok(browser.includes("requestOrigin: req.headers.get('origin')"))
+  assert.ok(browser.includes("secFetchSite: req.headers.get('sec-fetch-site')"))
+  assert.ok(browser.includes('withRunpodWakePermission(permission'))
+
+  const embeddings = source('../lib/ai/cos/localEmbeddings.ts')
+  const passiveStart = embeddings.indexOf('export const generatePassiveLocalEmbedding')
+  const passiveEnd = embeddings.indexOf('/** Backward-compatible explicit name', passiveStart)
+  const passive = embeddings.slice(passiveStart, passiveEnd)
+  assert.ok(passive.includes('generateLocalEmbeddings([text])'))
+  assert.equal(passive.includes('ensureLocalInferenceRuntimeReady'), false)
+
+  const firstAnswer = source('../lib/ai/cos/cosFirstAnswer.ts')
+  const entry = firstAnswer.slice(firstAnswer.indexOf('export async function tryCOSFirstAnswer'))
+  assert.ok(entry.indexOf('requiresFreshExternalEvidence(input.prompt)') < entry.indexOf('await ensureLocalInferenceRuntimeReady()'))
+
+  const localInference = source('../lib/ai/local-inference.ts')
+  const readyStart = localInference.indexOf('export async function ensureLocalInferenceRuntimeReady')
+  const readyEnd = localInference.indexOf('export async function callLocalModel', readyStart)
+  const ready = localInference.slice(readyStart, readyEnd)
+  assert.ok(ready.includes('if (firstWake.computeStartedByRequest)'))
+  assert.ok(ready.includes('retryWake = await ensureRunpodReasonerStarted()'))
+  assert.ok(ready.includes('MAX_RUNPOD_READINESS_BUDGET_MS'))
+})
+
 test('self-knowledge persistence stays on local passive embedding and existing Knowledge Graph storage', () => {
   const text = source('../lib/ai/cos/platformSelfKnowledge.ts')
   assert.ok(text.includes('persistKnowledgeFactWithEmbedding'))

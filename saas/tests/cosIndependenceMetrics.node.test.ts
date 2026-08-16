@@ -26,6 +26,7 @@ test('independence metrics distinguish local generation, cache reuse, fresh veri
     },
   ])
 
+  assert.equal(metrics.schemaVersion, 2)
   assert.equal(metrics.observedTurnAttempts, 7)
   assert.equal(metrics.independentAcceptedTurns, 6)
   assert.equal(metrics.localAcceptedTurns, 2)
@@ -42,6 +43,9 @@ test('independence metrics distinguish local generation, cache reuse, fresh veri
     independentAccepted: 5,
     externalRequired: 0,
     teacherInteractions: 0,
+    positiveFeedback: 0,
+    negativeFeedback: 0,
+    userCorrections: 0,
   })
 })
 
@@ -82,4 +86,42 @@ test('teacher rows do not masquerade as turn attempts', () => {
   assert.equal(metrics.teacherInteractions, 4)
   assert.equal(metrics.teacherDependencyRate, 1)
   assert.equal(metrics.independentAcceptanceRate, null)
+})
+
+test('explicit feedback is a quality signal and never changes independence math', () => {
+  const metrics = computeCosIndependenceMetrics([
+    {
+      experience_kind: 'encounter', subject: 'Kubernetes', success: true, occurrence_count: 2,
+      evidence: { routeClass: 'local', acceptedByCosGate: true, externalAiInvoked: false },
+    },
+    {
+      experience_kind: 'feedback', subject: 'Kubernetes', source_kind: 'user_feedback', occurrence_count: 3,
+      evidence: { feedbackType: 'positive', semantics: 'user_feedback_signal_not_verified_truth' },
+    },
+    {
+      experience_kind: 'feedback', subject: 'Kubernetes', source_kind: 'user_feedback', occurrence_count: 2,
+      evidence: { feedbackType: 'negative', semantics: 'user_feedback_signal_not_verified_truth' },
+    },
+    {
+      experience_kind: 'feedback', subject: 'Kubernetes', source_kind: 'user_feedback', occurrence_count: 1,
+      evidence: { feedbackType: 'correction', semantics: 'user_feedback_signal_not_verified_truth' },
+    },
+  ])
+
+  assert.equal(metrics.observedTurnAttempts, 2)
+  assert.equal(metrics.independentAcceptedTurns, 2)
+  assert.equal(metrics.independentAcceptanceRate, 1)
+  assert.equal(metrics.feedbackSignals, 6)
+  assert.equal(metrics.positiveFeedback, 3)
+  assert.equal(metrics.negativeFeedback, 2)
+  assert.equal(metrics.userCorrections, 1)
+  assert.deepEqual(metrics.subjects.Kubernetes, {
+    attempts: 2,
+    independentAccepted: 2,
+    externalRequired: 0,
+    teacherInteractions: 0,
+    positiveFeedback: 3,
+    negativeFeedback: 2,
+    userCorrections: 1,
+  })
 })

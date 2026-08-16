@@ -28,44 +28,66 @@ function publicSearchUrl(query: string): string {
 }
 
 type Scalar = string | number | boolean
-
 type ScalarEntry = { path: string; value: Scalar; score: number }
 
+function terminalKey(path: string): string {
+  const tail = path.split('.').pop() || path
+  return tail.replace(/\[\d+\]/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase()
+}
+
 function scalarPriority(path: string): number {
-  const key = path.toLowerCase()
-  if (/\b(?:price|last|value|rate|exchange|currency|symbol|ticker)\b/.test(key)) return 100
-  if (/\b(?:temperature|temp|condition|forecast|humidity|wind|precip|rain|snow)\b/.test(key)) return 95
-  if (/\b(?:score|points|team|home|away|status|period|quarter|inning|time_remaining)\b/.test(key)) return 90
-  if (/\b(?:name|title|date|time|timestamp|updated|market|change|percent|unit)\b/.test(key)) return 70
+  const key = terminalKey(path)
+
+  // The requested current value must outrank historical series, metadata and chart payloads.
+  // Normalize camelCase/snake_case/dotted provider fields before scoring so keys such as
+  // regularMarketPrice, last_trade_price and exchangeRate are treated consistently.
+  if (['price', 'currentprice', 'regularmarketprice', 'lastprice', 'lasttradeprice', 'quoteprice', 'rate', 'exchangerate', 'conversionrate'].includes(key)) return 140
+  if (['symbol', 'ticker', 'basecurrency', 'quotecurrency', 'currency', 'fromcurrency', 'tocurrency'].includes(key)) return 130
+  if (['temperature', 'temp', 'currenttemperature', 'condition', 'conditions', 'weather'].includes(key)) return 135
+  if (['score', 'homescore', 'awayscore', 'points', 'status', 'gamestatus', 'matchstatus'].includes(key)) return 135
+
+  if (key.includes('price') || key.includes('quote') || key.includes('rate')) return 115
+  if (key.includes('temperature') || key.includes('forecast') || key.includes('humidity') || key.includes('wind') || key.includes('precip') || key.includes('rain') || key.includes('snow')) return 110
+  if (key.includes('score') || key.includes('team') || key.includes('home') || key.includes('away') || key.includes('period') || key.includes('quarter') || key.includes('inning') || key.includes('timeremaining')) return 105
+  if (key.includes('close') || key.includes('open') || key.includes('high') || key.includes('low') || key.includes('change') || key.includes('percent') || key.includes('marketcap') || key.includes('volume')) return 95
+  if (key.includes('name') || key.includes('title') || key.includes('date') || key.includes('time') || key.includes('timestamp') || key.includes('updated') || key.includes('market') || key.includes('unit')) return 75
   return 10
 }
 
 function collectScalars(value: unknown, path = 'data', depth = 0, out: ScalarEntry[] = []): ScalarEntry[] {
-  if (out.length >= 120 || depth > 7 || value == null) return out
+  if (out.length >= 512 || depth > 8 || value == null) return out
+
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     const text = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value
     if (text !== '') out.push({ path, value: text as Scalar, score: scalarPriority(path) })
     return out
   }
+
   if (Array.isArray(value)) {
-    for (let index = 0; index < Math.min(value.length, 8); index += 1) {
+    for (let index = 0; index < Math.min(value.length, 12); index += 1) {
       collectScalars(value[index], `${path}[${index}]`, depth + 1, out)
+      if (out.length >= 512) break
     }
     return out
   }
+
   if (typeof value === 'object') {
-    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    // Traverse likely answer-bearing fields first. This matters for rich stock payloads that can
+    // contain large historical/chart objects before the current quote in provider insertion order.
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => scalarPriority(`${path}.${b}`) - scalarPriority(`${path}.${a}`) || a.localeCompare(b))
+    for (const [key, child] of entries) {
       collectScalars(child, `${path}.${key}`, depth + 1, out)
-      if (out.length >= 120) break
+      if (out.length >= 512) break
     }
   }
   return out
 }
 
-function compactStructuredSnippet(vertical: string, observedAt: string, rawResults: unknown[]): string {
+export function compactStructuredLiveEvidence(vertical: string, observedAt: string, rawResults: unknown[]): string {
   const entries = collectScalars(rawResults)
     .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
-    .slice(0, 28)
+    .slice(0, 32)
     .map(entry => `${entry.path}=${String(entry.value).slice(0, 80)}`)
 
   const prefix = `STRUCTURED_REALTIME vertical=${vertical}; observed_at=${observedAt}; `
@@ -121,7 +143,7 @@ function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
 
         const observedAt = new Date().toISOString()
         const resolvedVertical = vertical || expectedKind
-        const compactPayload = compactStructuredSnippet(resolvedVertical, observedAt, rawResults)
+        const compactPayload = compactStructuredLiveEvidence(resolvedVertical, observedAt, rawResults)
 
         return {
           ok: true,

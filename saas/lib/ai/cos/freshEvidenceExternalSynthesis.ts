@@ -31,6 +31,9 @@ export async function synthesizeFreshEvidenceExternally(args: {
     taskId: `cos-fresh-external:${args.retrievedAt}`,
     prompt: freshEvidenceSynthesisPrompt(args),
     systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
+    // Fresh/current facts are evidence-synthesis tasks, not local-memory reasoning tasks.
+    // Prefer Gemini only after COS has already retrieved and authority-checked live evidence.
+    modelPreference: 'gemini',
     maxTokens: 700,
   }).catch(() => null)
 

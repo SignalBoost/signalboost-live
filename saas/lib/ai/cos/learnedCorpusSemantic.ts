@@ -13,8 +13,8 @@ async function serviceDb(): Promise<ServiceDb | null> {
 }
 
 async function embed(text: string): Promise<number[]> {
-  const { generateLocalEmbedding } = await import('@/lib/ai/cos/localEmbeddings')
-  return generateLocalEmbedding(text)
+  const { generatePassiveLocalEmbedding } = await import('@/lib/ai/cos/localEmbeddings')
+  return generatePassiveLocalEmbedding(text)
 }
 
 function stableText(value: unknown, max: number): string {
@@ -125,7 +125,7 @@ export async function countPendingLearnedCorpusEmbeddings(): Promise<number | nu
   return (await getLearnedCorpusEmbeddingStats()).pending
 }
 
-/** Best-effort embed-on-write for one accepted corpus row. */
+/** Best-effort embed-on-write for one accepted corpus row. This background path never wakes GPU compute. */
 export async function embedLearnedCorpusRow(row: {
   content_hash: string
   subject?: unknown
@@ -153,6 +153,7 @@ export async function embedLearnedCorpusRow(row: {
 /**
  * Incrementally embed only eligible retained corpus rows. Relevance-rejected rows intentionally stay
  * unembedded so semantic retrieval and backfill status cannot mistake quarantine for usable memory.
+ * The background batch is passive and never resumes stopped RunPod compute.
  */
 export async function backfillLearnedCorpusEmbeddings(limit = 4): Promise<LearnedCorpusBackfillResult> {
   const db = await serviceDb()

@@ -9,7 +9,6 @@ import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
-import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
 import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
@@ -17,6 +16,7 @@ import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/c
 import { retrieveValidatedCognitiveSkills, recordCitedCognitiveSkillReuse } from '@/lib/ai/cos/cognitiveSkillContext'
 import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemory'
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -245,7 +245,7 @@ function recordAvoidedCost(source:'semantic_similarity'|'exact_cache'|'local_rea
 }
 
 function queryTerms(prompt:string):string[] { return relevanceTerms(prompt).slice(0, 12) }
-function subjectFromPrompt(prompt:string):string { return nearestFoundationalSubject(prompt) || queryTerms(prompt).slice(0, 4).join(' ') || 'general reasoning' }
+function subjectFromPrompt(prompt:string):string { return classifyProblemClass(prompt) }
 function safeText(value:unknown, max=1200):string {
   let raw:string
   if (typeof value === 'string') raw = value

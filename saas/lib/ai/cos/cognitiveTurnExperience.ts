@@ -1,6 +1,7 @@
+// saas/lib/ai/cos/cognitiveTurnExperience.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 
 export type CosTurnLearningProvenance = {
   responseSource?: string | null
@@ -85,7 +86,7 @@ export function decideCosTurnExperience(input: CosTurnExperienceInput): CosTurnE
   const provenance = input.provenance ?? null
   const route = routeClass(provenance)
   const acceptedByCosGate = input.handled === true && Number(input.confidence || 0) > 0
-  const subject = nearestFoundationalSubject(prompt) || 'general reasoning'
+  const subject = classifyProblemClass(prompt)
   const responseSource = clean(provenance?.responseSource || 'unknown', 120) || 'unknown'
   const experienceHash = sha256(`turn:${promptHash}:${responseSource}:${acceptedByCosGate ? 'accepted' : 'not_accepted'}`)
 

@@ -1,6 +1,7 @@
+// saas/lib/ai/cos/teacherLearning.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 
 export type TeacherEscalation = {
   prompt: string
@@ -88,7 +89,7 @@ export async function recordTeacherEscalation(input: TeacherEscalation): Promise
   if (!db || !prompt || !teacherAnswer) return
 
   const hash = promptHash(prompt)
-  const subject = nearestFoundationalSubject(prompt) || clean(prompt, 240)
+  const subject = classifyProblemClass(prompt)
   try {
     const existing = await db.from('cos_teacher_lessons').select('id,repeat_count').eq('prompt_hash', hash).maybeSingle()
     const payload = {

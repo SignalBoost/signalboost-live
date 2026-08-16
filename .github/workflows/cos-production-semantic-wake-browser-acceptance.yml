@@ -1,0 +1,110 @@
+name: COS Production Semantic Wake Browser Acceptance
+
+on:
+  push:
+    branches:
+      - test/cos-production-semantic-wake-browser-acceptance-20260816
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cos-production-semantic-wake-browser-acceptance
+  cancel-in-progress: false
+
+jobs:
+  browser-semantic-wake:
+    name: Real browser semantic wake acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install SaaS dependencies
+        working-directory: saas
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: saas
+        run: npx playwright install --with-deps chromium
+
+      - name: Exercise production through the real Concierge browser boundary
+        working-directory: saas
+        env:
+          PLAYWRIGHT_BASE_URL: https://saas.signalboostapp.com
+          ACCEPTANCE_PROMPT: What is computer vision a subfield of?
+        run: |
+          cat > tests/cosProductionSemanticWake.acceptance.spec.ts <<'TS'
+          import { test, expect } from '@playwright/test'
+
+          test('ordinary browser turn uses real semantic evidence without external AI', async ({ page }) => {
+            test.setTimeout(300_000)
+            const prompt = process.env.ACCEPTANCE_PROMPT || 'What is computer vision a subfield of?'
+
+            await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 90_000 })
+            await page.keyboard.press('Control+K')
+
+            const panel = page.locator('#signalboost-concierge-panel')
+            await expect(panel).toBeVisible({ timeout: 30_000 })
+            const input = panel.locator('textarea')
+            await expect(input).toBeVisible()
+            await input.fill(prompt)
+
+            const responsePromise = page.waitForResponse(
+              response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/concierge',
+              { timeout: 270_000 },
+            )
+            await input.press('Enter')
+            const response = await responsePromise
+            const requestHeaders = await response.request().allHeaders()
+            const payload = await response.json()
+
+            const provenance = payload?.provenance || {}
+            const responseSource = String(provenance?.responseSource || '')
+            const knowledgeFactsUsed = Number(provenance?.knowledgeFactsUsed || 0)
+            const learnedItemsUsed = Number(provenance?.learnedItemsUsed || 0)
+            const similarityScore = Number(provenance?.similarityScore)
+            const semanticEvidence =
+              responseSource === 'semantic_cache' ||
+              responseSource === 'semantic_similarity' ||
+              knowledgeFactsUsed > 0 ||
+              learnedItemsUsed > 0 ||
+              Number.isFinite(similarityScore)
+
+            console.log(JSON.stringify({
+              acceptance: 'cos-production-semantic-wake-browser-v1',
+              http_status: response.status(),
+              prompt,
+              request_origin: requestHeaders.origin || null,
+              sec_fetch_site: requestHeaders['sec-fetch-site'] || null,
+              source: payload?.source || null,
+              external_ai_invoked: payload?.external_ai_invoked ?? null,
+              local_model_invoked: payload?.local_model_invoked ?? null,
+              response_source: responseSource || null,
+              knowledge_facts_used: knowledgeFactsUsed,
+              learned_items_used: learnedItemsUsed,
+              similarity_score: Number.isFinite(similarityScore) ? similarityScore : null,
+              reasoner_label: provenance?.reasonerLabel || null,
+              reply: String(payload?.reply || '').slice(0, 1200),
+            }, null, 2))
+
+            expect(response.status()).toBe(200)
+            expect(String(payload?.reply || '').trim().length).toBeGreaterThan(0)
+            expect(payload?.external_ai_invoked).toBe(false)
+            expect(['cos-local-primary', 'cos-semantic-cache']).toContain(payload?.source)
+            expect(semanticEvidence).toBe(true)
+            expect(String(requestHeaders.origin || '')).toBe('https://saas.signalboostapp.com')
+            expect(['same-origin', 'same-site']).toContain(String(requestHeaders['sec-fetch-site'] || ''))
+          })
+          TS
+
+          npx playwright test tests/cosProductionSemanticWake.acceptance.spec.ts --project=chromium --workers=1 --retries=0

@@ -35,6 +35,15 @@ test('negative feedback becomes curriculum-eligible evidence without factual aut
   assert.equal(decision.evidence.automaticFactPromotionAllowed, false)
 })
 
+test('feedback uses the shared bounded problem taxonomy', () => {
+  const decision = decideCosUserFeedbackExperience({
+    ...base,
+    prompt: 'Who is the current President of the United States?',
+    feedbackType: 'negative',
+  })
+  assert.equal(decision.subject, 'current public facts')
+})
+
 test('correction retains bounded user text explicitly as unverified feedback', () => {
   const decision = decideCosUserFeedbackExperience({
     ...base,

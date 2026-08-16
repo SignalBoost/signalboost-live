@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
+import { classifyProblemClass, knownProblemClasses } from '@/lib/ai/cos/cosProblemClass'
+import { FOUNDATIONAL_KNOWLEDGE_DOMAINS } from '@/lib/cos-core/layers/learning/foundational'
 
 export const COS_VERIFIED_OUTCOME_DOMAINS = [
   'self_healing',
@@ -42,6 +43,11 @@ export type CosVerifiedProductionOutcomeDecision = {
   score: number | null
   evidence: Record<string, unknown>
 }
+
+const CANONICAL_PROBLEM_CLASSES = new Set([
+  ...knownProblemClasses(),
+  ...FOUNDATIONAL_KNOWLEDGE_DOMAINS.map(domain => domain.subject),
+])
 
 function clean(value: unknown, max: number): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -89,6 +95,12 @@ function normalizedOccurredAt(value: unknown): string {
   return Number.isFinite(time) ? new Date(time).toISOString() : new Date().toISOString()
 }
 
+function normalizedProblemClass(input: CosVerifiedProductionOutcomeInput, summary: string): string {
+  const provided = clean(input.problemClass, 180)
+  if (provided && CANONICAL_PROBLEM_CLASSES.has(provided)) return provided
+  return classifyProblemClass(clean(input.prompt || provided || summary, 20_000))
+}
+
 /**
  * Convert externally verified operational/business evidence into bounded COS episodic evidence.
  *
@@ -123,8 +135,7 @@ export function decideVerifiedCosProductionOutcome(
   const summary = clean(input?.summary, 4000)
   if (!summary) throw new Error('Verified COS outcome summary is required.')
 
-  const subjectSeed = clean(input?.problemClass || input?.prompt || summary, 20_000)
-  const subject = classifyProblemClass(subjectSeed)
+  const subject = normalizedProblemClass(input, summary)
   const correlationKind = clean(input?.correlation?.kind, 120)
   const correlationValue = clean(input?.correlation?.value, 500)
   const idempotencyKey = clean(

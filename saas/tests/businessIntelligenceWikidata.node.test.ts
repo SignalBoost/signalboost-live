@@ -59,5 +59,30 @@ test('Wikidata company parsing deduplicates multiple statements by canonical dom
 
   assert.equal(parsed.length, 1)
   assert.equal(parsed[0]?.canonicalDomain, 'example.com')
-  assert.equal(parsed[0]?.companyName, 'Example Inc.')
+  assert.equal(parsed[0]?.companyName, 'Example Incorporated')
+})
+
+test('Wikidata company parsing counts one QID once across regional official websites', () => {
+  const parsed = parseWikidataCompanyBindings([
+    {
+      item: { value: 'http://www.wikidata.org/entity/Q312' },
+      itemLabel: { value: 'Apple Inc.' },
+      website: { value: 'https://apple.com.cn/' },
+    },
+    {
+      item: { value: 'http://www.wikidata.org/entity/Q312' },
+      itemLabel: { value: 'Apple Inc.' },
+      website: { value: 'https://apple.com/ae-ar/' },
+    },
+    {
+      item: { value: 'http://www.wikidata.org/entity/Q312' },
+      itemLabel: { value: 'Apple Inc.' },
+      website: { value: 'https://apple.com/' },
+    },
+  ])
+
+  assert.equal(parsed.length, 1)
+  assert.equal(parsed[0]?.qid, 'Q312')
+  assert.equal(parsed[0]?.canonicalDomain, 'apple.com')
+  assert.equal(parsed[0]?.website, 'https://apple.com/')
 })

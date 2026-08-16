@@ -7,7 +7,6 @@ import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
-import { raceSemanticRetrievalWithBudget } from '@/lib/ai/cos/semanticRetrievalBudget'
 import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
@@ -18,6 +17,7 @@ import { retrieveValidatedCognitiveSkills, recordCitedCognitiveSkillReuse } from
 import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemory'
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
+import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -360,12 +360,13 @@ async function semanticKnowledgeFacts(prompt:string, db:NonNullable<ReturnType<t
     return null
   })
   const budgetMs = knowledgeFactRetrievalBudgetMs()
-  return raceSemanticRetrievalWithBudget({
+  return Promise.race([
     work,
-    budgetMs,
-    fallback:null,
-    onTimeout:() => console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs }),
-  })
+    new Promise<null>(resolve => setTimeout(() => {
+      console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs })
+      resolve(null)
+    }, budgetMs)),
+  ])
 }
 
 async function semanticLearnedCorpus(prompt:string) {
@@ -387,12 +388,13 @@ async function semanticLearnedCorpus(prompt:string) {
     return null
   })
   const budgetMs = knowledgeFactRetrievalBudgetMs()
-  return raceSemanticRetrievalWithBudget({
+  return Promise.race([
     work,
-    budgetMs,
-    fallback:null,
-    onTimeout:() => console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs }),
-  })
+    new Promise<null>(resolve => setTimeout(() => {
+      console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs })
+      resolve(null)
+    }, budgetMs)),
+  ])
 }
 
 function emptyRetrieval():RetrievalCounts { return { retrieved:0, relevant:0, selected:0 } }
@@ -462,12 +464,13 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         Number(row.similarity || 0) >= learnedContextSimilarityThreshold() && domainCompatibleContext(prompt, corpusCandidateText(row)),
       )
       funnel.learnedCorpus.relevant = relevant.length
-      const selected = relevant.slice(0, 6)
+      // Substantive rows take the limited injection slots first; metadata pointers fill leftovers.
+      const selected = selectLearnedCorpusRows<(typeof relevant)[number]>(relevant, 6)
       funnel.learnedCorpus.selected = selected.length
       if (semanticLearned.length) systems.push('Continuous Learning semantic retrieval')
       for (const row of selected) {
         const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map(fact => safeText(fact,300)).join('; ') : ''
-        learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarity || 0).toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+        learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarity || 0).toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
       }
     } else if (terms.length) {
       const learnedResult = await db.from('cos_continuous_learning')
@@ -480,13 +483,15 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         const ranked = await rankContextCandidates(prompt, candidates, { threshold:learnedContextSimilarityThreshold(), limit:candidates.length })
         funnel.learnedCorpus.retrieved = rows.length
         funnel.learnedCorpus.relevant = ranked.relevant.length
-        const selected = ranked.relevant.slice(0, 6)
+        // Same substance preference on the backfill-window path: candidates wrap the row in `item`.
+        const rankedWithSummary = ranked.relevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
+        const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
         funnel.learnedCorpus.selected = selected.length
         if (ranked.mode === 'semantic' && rows.length) systems.push('Continuous Learning semantic relevance')
         for (const candidate of selected) {
           const row = candidate.item
           const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
-          learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+          learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
         }
       }
     }

@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: cos-production-semantic-wake-browser-acceptance
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   browser-semantic-wake:
@@ -107,4 +107,4 @@ jobs:
           })
           TS
 
-          npx playwright test tests/cosProductionSemanticWake.acceptance.spec.ts --project=chromium --workers=1 --retries=0
+          npx playwright test tests/cosProductionSemanticWake.acceptance.spec.ts --workers=1 --retries=0

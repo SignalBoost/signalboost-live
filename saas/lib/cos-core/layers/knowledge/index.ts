@@ -90,6 +90,17 @@ export class KnowledgeLayer {
       const nearestMatch = await this.dependencies.store.queryNearest(embedding, { taskId })
       if (!nearestMatch || nearestMatch.similarityScore < this.similarityThreshold) return null
       if (responseUsesScopedMemory(nearestMatch.responsePayload)) return null
+
+      // Semantic similarity is not freshness proof. A nearby historical answer may remain above the
+      // embedding threshold even after the factual evidence it cited has changed or disappeared.
+      // Apply the same evidence reconciliation used by exact-prompt reuse: unchanged full context is
+      // safe, and context growth is safe only when every cited evidence line remains byte-for-byte
+      // current after canonicalization. Otherwise force fresh reasoning over today's evidence.
+      const nearestContext = canonicalizeSemanticCacheContext(nearestMatch.contextText ?? '')
+      const nearestContextCurrent = nearestContext === stableContext
+        || citedCacheContextStillCurrent(nearestMatch.responsePayload, nearestContext, stableContext)
+      if (!nearestContextCurrent) return null
+
       return nearestMatch
     } catch (error) {
       this.dependencies.onError?.(error)

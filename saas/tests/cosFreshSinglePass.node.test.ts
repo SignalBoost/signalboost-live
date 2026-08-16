@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
-const here = dirname(fileURLToPath(import.meta.url))
-const route = readFileSync(join(here, '../app/api/cos-primary/route.ts'), 'utf8')
+const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
 
 test('fresh facts do not re-enter generic COS after live synthesis attempt', () => {
   assert.match(route, /if\(!requestedAction&&!requiresFreshEvidence\)/)

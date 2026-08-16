@@ -5,6 +5,7 @@
 // dimensions for nomic-embed-text; model swaps must migrate the database rather than
 // pad/truncate vectors and silently corrupt cosine similarity.
 
+import { createHash } from 'node:crypto'
 import { ensureLocalInferenceRuntimeReady, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import type { LocalInferenceConfig } from '@/lib/ai/local-inference'
 import type { EmbeddingGenerator } from '@/lib/cos-core/layers/knowledge/types'
@@ -16,9 +17,18 @@ export const DEFAULT_LOCAL_EMBEDDING_MODEL = 'nomic-embed-text'
 const DEFAULT_PULL_TIMEOUT_MS = 60_000
 const MAX_PULL_TIMEOUT_MS = 90_000
 const REPAIR_FAILURE_COOLDOWN_MS = 5 * 60_000
+const DEFAULT_FOREGROUND_QUERY_CACHE_TTL_MS = 30_000
+const MAX_FOREGROUND_QUERY_CACHE_ENTRIES = 64
 
 let repairPromise: Promise<void> | null = null
 let lastRepairFailureAt = 0
+
+type ForegroundEmbeddingCacheEntry = {
+  promise: Promise<number[]>
+  expiresAt: number | null
+}
+
+const foregroundQueryEmbeddingCache = new Map<string, ForegroundEmbeddingCacheEntry>()
 
 function authHeaders(apiKey?: string): Record<string, string> {
   return apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {}
@@ -26,6 +36,34 @@ function authHeaders(apiKey?: string): Record<string, string> {
 
 function embeddingModel(): string {
   return (process.env.LOCAL_AI_EMBEDDING_MODEL || DEFAULT_LOCAL_EMBEDDING_MODEL).trim()
+}
+
+function foregroundQueryCacheTtlMs(): number {
+  const value = Number(process.env.COS_FOREGROUND_EMBEDDING_CACHE_TTL_MS || String(DEFAULT_FOREGROUND_QUERY_CACHE_TTL_MS))
+  if (!Number.isFinite(value)) return DEFAULT_FOREGROUND_QUERY_CACHE_TTL_MS
+  return Math.max(5_000, Math.min(120_000, Math.round(value)))
+}
+
+function foregroundQueryCacheKey(text: string): string {
+  return createHash('sha256')
+    .update([
+      String(process.env.LOCAL_AI_BASE_URL || '').trim().toLowerCase(),
+      embeddingModel(),
+      text,
+    ].join('\n'))
+    .digest('hex')
+}
+
+function pruneForegroundQueryCache(now = Date.now()): void {
+  for (const [key, entry] of foregroundQueryEmbeddingCache) {
+    if (entry.expiresAt !== null && entry.expiresAt <= now) foregroundQueryEmbeddingCache.delete(key)
+  }
+  if (foregroundQueryEmbeddingCache.size < MAX_FOREGROUND_QUERY_CACHE_ENTRIES) return
+  for (const [key, entry] of foregroundQueryEmbeddingCache) {
+    if (entry.expiresAt === null) continue
+    foregroundQueryEmbeddingCache.delete(key)
+    if (foregroundQueryEmbeddingCache.size < MAX_FOREGROUND_QUERY_CACHE_ENTRIES) break
+  }
 }
 
 type EmbeddingAttempt =
@@ -275,11 +313,51 @@ export async function generateReadyLocalEmbeddings(texts: string[]): Promise<num
   return generateLocalEmbeddings(normalized)
 }
 
-/** Canonical foreground embedding API used by interactive COS retrieval. */
+/**
+ * Canonical foreground embedding API used by interactive COS retrieval.
+ * Identical foreground query vectors are shared while in flight and retained briefly after success.
+ * This lets the ordinary COS preflight warm one embedding outside bounded KG/corpus retrieval timers,
+ * then lets both semantic stores reuse that exact vector without duplicate model work. The cache key
+ * is hashed so raw prompt text is not retained as a Map key, and passive/background APIs do not use it.
+ */
 export const generateLocalEmbedding: EmbeddingGenerator = async (text: string): Promise<number[]> => {
-  const [vector] = await generateReadyLocalEmbeddings([text])
-  if (!vector) throw new Error('localEmbeddings: ready endpoint returned no embedding vector')
-  return vector
+  const normalized = String(text ?? '').trim()
+  if (!normalized) throw new Error('localEmbeddings: foreground embedding text is empty')
+  if (process.env.COS_LOCAL_FIRST_ENABLED === 'false') {
+    throw new Error('localEmbeddings: COS local-first is disabled by COS_LOCAL_FIRST_ENABLED')
+  }
+
+  const now = Date.now()
+  pruneForegroundQueryCache(now)
+  const key = foregroundQueryCacheKey(normalized)
+  const existing = foregroundQueryEmbeddingCache.get(key)
+  if (existing && (existing.expiresAt === null || existing.expiresAt > now)) {
+    const vector = await existing.promise
+    return [...vector]
+  }
+  if (existing) foregroundQueryEmbeddingCache.delete(key)
+
+  const promise = (async () => {
+    const [vector] = await generateReadyLocalEmbeddings([normalized])
+    if (!vector) throw new Error('localEmbeddings: ready endpoint returned no embedding vector')
+    return vector
+  })()
+  const entry: ForegroundEmbeddingCacheEntry = { promise, expiresAt: null }
+  foregroundQueryEmbeddingCache.set(key, entry)
+
+  void promise.then(
+    () => {
+      if (foregroundQueryEmbeddingCache.get(key) !== entry) return
+      entry.expiresAt = Date.now() + foregroundQueryCacheTtlMs()
+      pruneForegroundQueryCache()
+    },
+    () => {
+      if (foregroundQueryEmbeddingCache.get(key) === entry) foregroundQueryEmbeddingCache.delete(key)
+    },
+  )
+
+  const vector = await promise
+  return [...vector]
 }
 
 /** Passive single-vector API for background persistence/backfill. It never changes lifecycle state. */

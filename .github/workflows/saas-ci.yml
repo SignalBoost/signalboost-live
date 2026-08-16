@@ -62,6 +62,19 @@ jobs:
       - name: Verify governed readiness, passive no-wake, and native Ollama fallback
         run: npx --yes tsx --test tests/localEmbeddings.node.test.ts tests/localEmbeddingsNativeFallback.node.test.ts
 
+  cos-cache-provenance:
+    name: COS cache provenance policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify cached origin lineage and replay retrieval separation
+        run: npx --yes tsx --test tests/cosLiveSystemStateProvenance.node.test.ts tests/cosProvenanceFormat.node.test.ts
+
   build:
     name: Production build (next build)
     runs-on: ubuntu-latest

@@ -4241,5 +4241,15 @@
       "medium": "Średnie",
       "high": "Wysokie"
     }
+  },
+  "assistantFeedback": {
+    "helpful": "Pomocne",
+    "notHelpful": "Niepomocne",
+    "correctThis": "Popraw",
+    "correctionPlaceholder": "Czego COS powinien się z tego nauczyć?",
+    "submitCorrection": "Wyślij poprawkę",
+    "cancelCorrection": "Anuluj",
+    "feedbackSaved": "Opinia zapisana do uczenia COS.",
+    "feedbackError": "Nie udało się zapisać opinii."
   }
 }

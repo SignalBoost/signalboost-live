@@ -4241,5 +4241,15 @@
       "medium": "Средний",
       "high": "Высокий"
     }
+  },
+  "assistantFeedback": {
+    "helpful": "Полезно",
+    "notHelpful": "Не помогло",
+    "correctThis": "Исправить",
+    "correctionPlaceholder": "Что COS должен из этого извлечь?",
+    "submitCorrection": "Отправить исправление",
+    "cancelCorrection": "Отмена",
+    "feedbackSaved": "Отзыв сохранён для обучения COS.",
+    "feedbackError": "Не удалось сохранить отзыв."
   }
 }

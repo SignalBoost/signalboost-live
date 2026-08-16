@@ -1,6 +1,8 @@
+// saas/lib/ai/local-inference.ts
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ensureRunpodReasonerStarted, runpodLifecycleEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
 import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
+import { configuredRunpodApiKey, configuredRunpodPodId, explicitRunpodPodId, deriveRunpodPodIdFromLocalAiBaseUrl } from '@/lib/ai/cos/runpodConfig'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -108,11 +110,28 @@ async function waitForLocalInferenceHealth(config: LocalInferenceConfig, timeout
  * share one end-to-end readiness budget so model inference and downstream response work remain reserved.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
-  if (!runpodLifecycleEnabled()) return
-
   const readinessStartedAt = Date.now()
   const current = await checkLocalInferenceHealth(config)
   if (current.ok) return
+
+  // Lifecycle disabled/unconfigured used to return SILENTLY here, before any log. An authorized
+  // browser turn would then quietly skip the wake, fail the health check and fall through to an
+  // external provider — indistinguishable, from the outside, from "the model refused to wake".
+  // Diagnosing it required reading source. Every other refusal in this path logs its reason, so
+  // this one does too: it names WHICH half of the contract is missing (credentials vs pod id vs
+  // explicit kill switch), because those have completely different fixes.
+  if (!runpodLifecycleEnabled()) {
+    console.warn('[cos-runpod-lifecycle-disabled]', JSON.stringify({
+      at: new Date().toISOString(),
+      effect: 'stopped_or_unhealthy_reasoner_will_not_be_woken; request falls back to its configured external path',
+      runpodApiKeyPresent: Boolean(configuredRunpodApiKey()),
+      podIdResolved: configuredRunpodPodId(),
+      podIdSource: explicitRunpodPodId() ? 'RUNPOD_POD_ID' : (deriveRunpodPodIdFromLocalAiBaseUrl() ? 'derived_from_LOCAL_AI_BASE_URL' : 'unresolved'),
+      lifecycleKillSwitch: process.env.RUNPOD_LIFECYCLE_ENABLED?.trim().toLowerCase() ?? null,
+      healthError: current.error ?? null,
+    }))
+    return
+  }
 
   const permission = currentRunpodWakePermission()
   if (!permission?.allowed) {

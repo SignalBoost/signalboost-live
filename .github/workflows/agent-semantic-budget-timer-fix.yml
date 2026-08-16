@@ -1,0 +1,72 @@
+name: Agent Semantic Budget Timer Fix
+
+on:
+  push:
+    branches:
+      - fix/cos-semantic-budget-timer-cancel-20260816
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    if: ${{ !contains(github.event.head_commit.message, '[semantic-budget-patch]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/cos-semantic-budget-timer-cancel-20260816
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - name: Install dependencies
+        working-directory: saas
+        run: npm ci --no-audit --no-fund
+      - name: Patch semantic budget races and add behavioral regression
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          enterprise = Path('saas/lib/ai/cos/cosFirstAnswerEnterprise.ts')
+          source = enterprise.read_text()
+          import_anchor = "import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'\n"
+          import_line = "import { raceSemanticRetrievalWithBudget } from '@/lib/ai/cos/semanticRetrievalBudget'\n"
+          if import_line not in source:
+              if import_anchor not in source:
+                  raise SystemExit('embedding import anchor not found')
+              source = source.replace(import_anchor, import_anchor + import_line, 1)
+
+          old_knowledge = """  const budgetMs = knowledgeFactRetrievalBudgetMs()\n  return Promise.race([\n    work,\n    new Promise<null>(resolve => setTimeout(() => {\n      console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs })\n      resolve(null)\n    }, budgetMs)),\n  ])\n"""
+          new_knowledge = """  const budgetMs = knowledgeFactRetrievalBudgetMs()\n  return raceSemanticRetrievalWithBudget({\n    work,\n    budgetMs,\n    fallback:null,\n    onTimeout:() => console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs }),\n  })\n"""
+          if old_knowledge not in source:
+              raise SystemExit('semantic knowledge budget block not found')
+          source = source.replace(old_knowledge, new_knowledge, 1)
+
+          old_corpus = """  const budgetMs = knowledgeFactRetrievalBudgetMs()\n  return Promise.race([\n    work,\n    new Promise<null>(resolve => setTimeout(() => {\n      console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs })\n      resolve(null)\n    }, budgetMs)),\n  ])\n"""
+          new_corpus = """  const budgetMs = knowledgeFactRetrievalBudgetMs()\n  return raceSemanticRetrievalWithBudget({\n    work,\n    budgetMs,\n    fallback:null,\n    onTimeout:() => console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs }),\n  })\n"""
+          if old_corpus not in source:
+              raise SystemExit('semantic corpus budget block not found')
+          source = source.replace(old_corpus, new_corpus, 1)
+          enterprise.write_text(source)
+
+          Path('saas/lib/ai/cos/semanticRetrievalBudget.ts').write_text("""export async function raceSemanticRetrievalWithBudget<T>(options: {\n  work: Promise<T>\n  budgetMs: number\n  fallback: T\n  onTimeout: () => void\n}): Promise<T> {\n  let timeoutHandle: ReturnType<typeof setTimeout> | null = null\n  const timeoutResult = new Promise<T>(resolve => {\n    timeoutHandle = setTimeout(() => {\n      options.onTimeout()\n      resolve(options.fallback)\n    }, options.budgetMs)\n  })\n\n  try {\n    return await Promise.race([options.work, timeoutResult])\n  } finally {\n    if (timeoutHandle !== null) clearTimeout(timeoutHandle)\n  }\n}\n""")
+
+          Path('saas/tests/semanticRetrievalBudgetTimer.node.test.ts').write_text("""import assert from 'node:assert/strict'\nimport test from 'node:test'\nimport { setTimeout as sleep } from 'node:timers/promises'\nimport { raceSemanticRetrievalWithBudget } from '../lib/ai/cos/semanticRetrievalBudget.ts'\n\ntest('completed semantic retrieval cancels its late timeout callback', async () => {\n  let timeoutCalls = 0\n  const result = await raceSemanticRetrievalWithBudget({\n    work: Promise.resolve('semantic-result'),\n    budgetMs: 10,\n    fallback: 'lexical-fallback',\n    onTimeout: () => { timeoutCalls += 1 },\n  })\n\n  assert.equal(result, 'semantic-result')\n  await sleep(30)\n  assert.equal(timeoutCalls, 0)\n})\n\ntest('actual over-budget semantic retrieval still returns fallback and reports once', async () => {\n  let timeoutCalls = 0\n  const result = await raceSemanticRetrievalWithBudget({\n    work: sleep(40).then(() => 'semantic-result'),\n    budgetMs: 5,\n    fallback: 'lexical-fallback',\n    onTimeout: () => { timeoutCalls += 1 },\n  })\n\n  assert.equal(result, 'lexical-fallback')\n  assert.equal(timeoutCalls, 1)\n  await sleep(50)\n  assert.equal(timeoutCalls, 1)\n})\n""")
+          PY
+      - name: Run focused regression
+        working-directory: saas
+        run: npx --yes tsx --test tests/semanticRetrievalBudgetTimer.node.test.ts
+      - name: Typecheck
+        working-directory: saas
+        run: npx tsc --noEmit
+      - name: Commit repair
+        run: |
+          git config user.name "SignalBoost CI"
+          git config user.email "cadomos@gmail.com"
+          git add saas/lib/ai/cos/cosFirstAnswerEnterprise.ts saas/lib/ai/cos/semanticRetrievalBudget.ts saas/tests/semanticRetrievalBudgetTimer.node.test.ts
+          git commit -m "fix(cos): cancel completed semantic budget timers [semantic-budget-patch]"
+          git push origin HEAD:fix/cos-semantic-budget-timer-cancel-20260816

@@ -1,3 +1,4 @@
+// saas/lib/cos-core/layers/learning/dynamicGaps.ts
 import type { KnowledgeGap } from './index'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from './gaps'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -96,16 +97,25 @@ async function queuedSignals(): Promise<KnowledgeGapSignal[]> {
   }
 }
 
-export async function generateDynamicKnowledgeGaps(limit = 12): Promise<{ gaps: KnowledgeGap[]; retained: number; reasoningGaps: number }> {
+/**
+ * Build this cycle's study list.
+ *
+ * `injectedSignals` lets the HOST supply failure-driven curriculum signals (measured independence,
+ * verified production failures, user corrections) without this kernel module importing anything
+ * host-specific. They are merged with the queued reasoning gaps and ranked by the same
+ * generateKnowledgeGaps() scoring, so weakness on real work outranks mere corpus thinness.
+ */
+export async function generateDynamicKnowledgeGaps(limit = 12, injectedSignals: KnowledgeGapSignal[] = []): Promise<{ gaps: KnowledgeGap[]; retained: number; reasoningGaps: number; curriculumSignals: number }> {
   const db = cosServiceDb()
-  if (!db) return { gaps: [], retained: 0, reasoningGaps: 0 }
+  const curriculum = (injectedSignals || []).filter(signal => signal && signal.subject && signal.objective)
+  if (!db) return { gaps: [], retained: 0, reasoningGaps: 0, curriculumSignals: curriculum.length }
 
   try {
     const [{ data: rows }, { count }] = await Promise.all([
       db.from('cos_continuous_learning').select('subject,summary,source_kind,source_title,observed_at,confidence').order('observed_at', { ascending: false }).limit(300),
       db.from('cos_continuous_learning').select('*', { count: 'exact', head: true }),
     ])
-    const signals = await queuedSignals()
+    const signals = [...curriculum, ...await queuedSignals()]
     const operational = generateKnowledgeGaps(signals)
     const corpus = corpusExpansionGaps((rows || []) as RetainedRow[])
     const seen = new Set<string>()
@@ -119,9 +129,9 @@ export async function generateDynamicKnowledgeGaps(limit = 12): Promise<{ gaps: 
       .sort((a, b) => b.urgency - a.urgency || b.expectedReuse - a.expectedReuse)
       .slice(0, Math.max(1, Math.min(25, limit)))
 
-    return { gaps, retained: count || 0, reasoningGaps: operational.length }
+    return { gaps, retained: count || 0, reasoningGaps: operational.length, curriculumSignals: curriculum.length }
   } catch (error) {
     console.warn('cosLearning: dynamic gap generation failed', error instanceof Error ? error.message : String(error))
-    return { gaps: [], retained: 0, reasoningGaps: 0 }
+    return { gaps: [], retained: 0, reasoningGaps: 0, curriculumSignals: curriculum.length }
   }
 }

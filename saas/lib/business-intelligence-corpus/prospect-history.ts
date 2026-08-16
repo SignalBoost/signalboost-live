@@ -1,9 +1,10 @@
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { normalizeDomain, type BusinessIntelligenceRecord } from './contracts.ts'
-import { corpusCount, upsertCorpusRecord } from './service.ts'
+import { corpusCount, lookupCorpus, upsertCorpusRecord } from './service.ts'
 
 const DAY_MS = 86_400_000
 const PAGE_SIZE = 200
+const LOOKUP_BATCH_SIZE = 20
 const SECOND_LEVEL_SUFFIXES = new Set(['com.br', 'co.uk', 'com.au', 'co.jp', 'co.in', 'com.mx', 'co.nz'])
 const BLOCKED_HOST_PREFIXES = new Set(['blog', 'news', 'support', 'docs', 'careers', 'jobs', 'community', 'forum', 'help', 'servicos'])
 const BLOCKED_ROOT_SUFFIXES = ['.gov', '.mil', '.edu', '.org']
@@ -73,7 +74,7 @@ function observationIdentity(observation: ProspectHistoryObservation) {
 
   const email = cleanEmail(observation.detail)
   const sameDomainEmail = Boolean(email && email.split('@')[1] === host && observation.outcome === 'drafted')
-  return { host, name, rootKey, nameKey, email: sameDomainEmail ? email : undefined, sameDomainEmail }
+  return { host, name, email: sameDomainEmail ? email : undefined }
 }
 
 function bestName(observations: Array<{ name: string }>): string {
@@ -203,24 +204,24 @@ async function loadProspectHistoryObservations(): Promise<ProspectHistoryObserva
   return observations
 }
 
-async function existingCanonicalDomains(): Promise<Set<string>> {
-  const admin = getAdminSupabase()
-  const domains = new Set<string>()
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await admin
-      .from('business_intelligence_corpus')
-      .select('canonical_domain')
-      .order('canonical_domain', { ascending: true })
-      .range(from, from + 999)
-    if (error) throw new Error(`CORPUS_DOMAIN_READ_FAILED: ${error.message}`)
-    const page = data || []
-    for (const row of page) {
-      const domain = normalizeDomain(String(row.canonical_domain || ''))
-      if (domain) domains.add(domain)
+async function missingCorpusCandidates(candidates: readonly ValidatedProspectCandidate[]) {
+  const missing: ValidatedProspectCandidate[] = []
+  for (let index = 0; index < candidates.length; index += LOOKUP_BATCH_SIZE) {
+    const chunk = candidates.slice(index, index + LOOKUP_BATCH_SIZE)
+    const checked = await Promise.all(chunk.map(async candidate => ({
+      candidate,
+      lookup: await lookupCorpus({
+        query: candidate.record.canonicalDomain,
+        canonicalDomain: candidate.record.canonicalDomain,
+        minConfidence: 0,
+        requireFresh: false,
+      }),
+    })))
+    for (const item of checked) {
+      if (!item.lookup.hit) missing.push(item.candidate)
     }
-    if (page.length < 1000) break
   }
-  return domains
+  return missing
 }
 
 export async function seedCorpusFromValidatedProspectHistory(args: { apply?: boolean; limit?: number } = {}) {
@@ -228,8 +229,7 @@ export async function seedCorpusFromValidatedProspectHistory(args: { apply?: boo
   const limit = Math.max(1, Math.min(500, Math.floor(args.limit ?? 250)))
   const observations = await loadProspectHistoryObservations()
   const candidates = validateProspectHistoryObservations(observations)
-  const existing = await existingCanonicalDomains()
-  const newCandidates = candidates.filter(candidate => !existing.has(candidate.record.canonicalDomain))
+  const newCandidates = await missingCorpusCandidates(candidates)
   const selected = newCandidates.slice(0, limit)
   const before = await corpusCount()
 

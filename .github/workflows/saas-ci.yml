@@ -75,6 +75,19 @@ jobs:
       - name: Verify cached origin lineage and replay retrieval separation
         run: npx --yes tsx --test tests/cosLiveSystemStateProvenance.node.test.ts tests/cosProvenanceFormat.node.test.ts
 
+  cos-platform-self-knowledge:
+    name: COS platform self-knowledge policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify versioned internal facts, passive embeddings, and governed promotion ownership
+        run: npx --yes tsx --test tests/platformSelfKnowledge.node.test.ts
+
   build:
     name: Production build (next build)
     runs-on: ubuntu-latest

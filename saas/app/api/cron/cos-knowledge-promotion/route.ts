@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { autoPromoteLearnedKnowledge } from '@/lib/ai/cos/autoPromoteLearning'
 import { backfillKnowledgeFactEmbeddings } from '@/lib/ai/cos/knowledgeFactSemantic'
 import { backfillLearnedCorpusEmbeddings } from '@/lib/ai/cos/learnedCorpusSemantic'
+import { seedPlatformSelfKnowledge } from '@/lib/ai/cos/platformSelfKnowledge'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 
@@ -17,8 +18,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Embedding backfill runs before local fact extraction, so wake/lease the shared local runtime
-  // once for this bounded batch. If pre-warm fails, existing stages still report their own errors.
+  // Embedding work runs under one governed wake/lease owned by this bounded knowledge-promotion job.
+  // The self-knowledge seeder itself uses only passive embeddings and cannot independently wake GPU
+  // compute; this route performs readiness explicitly before invoking it.
   await touchRunpodActivityLease('knowledge_promotion_batch')
   try {
     await ensureLocalInferenceRuntimeReady()
@@ -26,16 +28,14 @@ export async function GET(req: NextRequest) {
     console.warn('cron COS knowledge promotion local runtime could not be pre-warmed:', error instanceof Error ? error.message : String(error))
   }
 
-  // One route-wide deadline: semantic backfill is bounded to four concurrent rows, then promotion
-  // sees the remaining budget and refuses to start model work if too little time remains. The final
-  // 15 seconds stay reserved for persistence and the HTTP response.
+  // One route-wide deadline: first ensure the small versioned set of code-derived platform facts is
+  // present with embeddings, then drain older semantic backlogs and promote learned knowledge. The
+  // final 15 seconds stay reserved for persistence and the HTTP response.
   const deadlineMs = Date.now() + 285_000
+  const platformSelfKnowledge = await seedPlatformSelfKnowledge()
   const semanticBackfill = await backfillKnowledgeFactEmbeddings(4)
-  // Corpus rows get the same incremental embedding upgrade as facts, so semantic corpus retrieval
-  // becomes real without a manual step. Bounded to four rows per pass; scheduling the cron more
-  // often drains the backlog of pre-existing rows faster.
   const corpusBackfill = await backfillLearnedCorpusEmbeddings(4)
   const promotion = await autoPromoteLearnedKnowledge(5, deadlineMs)
-  const ok = promotion.status !== 'error' && semanticBackfill.status !== 'error' && corpusBackfill.status !== 'error'
-  return NextResponse.json({ ok, semanticBackfill, corpusBackfill, promotion }, { status: ok ? 200 : 500 })
+  const ok = platformSelfKnowledge.failed === 0 && promotion.status !== 'error' && semanticBackfill.status !== 'error' && corpusBackfill.status !== 'error'
+  return NextResponse.json({ ok, platformSelfKnowledge, semanticBackfill, corpusBackfill, promotion }, { status: ok ? 200 : 500 })
 }

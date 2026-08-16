@@ -116,7 +116,7 @@ function extractCandidates(text: string, role: string): string[] {
   for (const pattern of patterns) {
     let match: RegExpExecArray | null
     while ((match = pattern.exec(text)) !== null) {
-      const candidate = String(match[1] || '').trim().replace(/[|,;:]+$/g, '')
+      const candidate = String(match[1] || '').trim().replace(/[|,;:.!?]+$/g, '')
       if (candidateLooksLikePerson(candidate)) out.add(candidate)
     }
   }
@@ -299,7 +299,7 @@ export function replyCitesIndependentFreshEvidence(reply: string, input: string,
       .map(source => freshEvidenceHost(source.url))
       .filter(Boolean),
   )
-  if (!requiresIndependentCorroboration(input)) return citedHosts.size >= 1
+  if (!requiresIndependentCorroation(input)) return citedHosts.size >= 1
   return citedHosts.size >= 2
 }
 

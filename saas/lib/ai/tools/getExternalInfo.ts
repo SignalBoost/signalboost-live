@@ -21,6 +21,10 @@ export type SearchResult = {
   // COS retrieved the result. Keeping the two timestamps separate prevents an old
   // article retrieved now from masquerading as newly published evidence.
   sourceDate?: string
+  // Structured real-time providers annotate observations explicitly. Generic web-search
+  // results leave these fields unset.
+  sourceKind?: 'structured_realtime'
+  observedAt?: string
 }
 export type ExternalInfoOptions = { bypassCache?: boolean }
 
@@ -85,6 +89,14 @@ function isFreshnessQuery(query: string): boolean {
     && /\b(?:authoritative|official|verification)\b/.test(q)
 }
 
+function structuredProviderQuery(query: string): string {
+  const stripped = String(query || '').replace(
+    /\s+current\s+latest\s+official\s+authoritative\s+independent\s+verification\s+as\s+of\s+\d{4}-\d{2}-\d{2}\s*$/i,
+    '',
+  ).trim()
+  return stripped || String(query || '').trim()
+}
+
 export async function getExternalInfo(
   query: string,
   requestedCount = DEFAULT_RESULT_COUNT,
@@ -99,9 +111,10 @@ export async function getExternalInfo(
   // provider is the system-of-record boundary for this class; if unavailable, return failure so
   // the caller can fail closed rather than synthesize a potentially stale value.
   if (bypassCache) {
-    const structuredKind = structuredLiveDataKind(q)
+    const structuredQuery = structuredProviderQuery(q)
+    const structuredKind = structuredLiveDataKind(structuredQuery)
     if (structuredKind) {
-      const structured = await getStructuredLiveInfo(q, structuredKind)
+      const structured = await getStructuredLiveInfo(structuredQuery, structuredKind)
       return {
         ok: structured.ok,
         results: structured.results,

@@ -7,9 +7,12 @@ import {
 } from '../lib/ai/cos/authoritativeFactGrounding.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 import {
+  FRESH_SEARCH_RESULT_BUDGET,
+  FRESH_SELECTED_EVIDENCE_BUDGET,
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
   prepareFreshEvidence,
+  resolveDeterministicFreshOfficeHolder,
 } from '../lib/ai/cos/cosFreshGrounding.ts'
 
 test('current office-holder questions use generic freshness policy, not a fixed fact registry', () => {
@@ -75,4 +78,68 @@ test('public office-holder evidence requires government authority and an indepen
     { title: 'Second report', url: 'https://example.org/news', snippet: 'Another report naming an office holder.' },
   ])
   assert.equal(freshEvidenceMeetsAuthority('Who is currently the president of the United States?', noGovernment), false)
+})
+
+test('deterministic resolver answers a simple current office-holder fact when independent live sources agree', () => {
+  const prepared = prepareFreshEvidence([
+    {
+      title: 'President Ada Lovelace | Official leadership',
+      url: 'https://agency.gov/leadership',
+      snippet: 'The president of Example Republic is Ada Lovelace.',
+    },
+    {
+      title: 'Ada Lovelace is the current president',
+      url: 'https://independent.example/news',
+      snippet: 'Ada Lovelace is the current president of Example Republic.',
+    },
+    {
+      title: 'Background profile',
+      url: 'https://third.example/profile',
+      snippet: 'Historical background only.',
+    },
+  ], FRESH_SELECTED_EVIDENCE_BUDGET)
+
+  const resolved = resolveDeterministicFreshOfficeHolder(
+    'Who is currently the president of Example Republic?',
+    prepared,
+  )
+  assert.ok(resolved)
+  assert.equal(resolved?.name, 'Ada Lovelace')
+  assert.equal(resolved?.confidence, 0.99)
+  assert.equal(resolved?.sources.length, 2)
+  assert.match(resolved?.reply || '', /Ada Lovelace/)
+  assert.match(resolved?.reply || '', /\[LIVE1\]/)
+  assert.equal(FRESH_SEARCH_RESULT_BUDGET, 6)
+  assert.equal(FRESH_SELECTED_EVIDENCE_BUDGET, 4)
+})
+
+test('deterministic resolver refuses conflicting office-holder evidence instead of guessing', () => {
+  const prepared = prepareFreshEvidence([
+    {
+      title: 'President Ada Lovelace | Official leadership',
+      url: 'https://agency.gov/leadership',
+      snippet: 'The president of Example Republic is Ada Lovelace.',
+    },
+    {
+      title: 'Ada Lovelace is the current president',
+      url: 'https://one.example/news',
+      snippet: 'Ada Lovelace is the current president of Example Republic.',
+    },
+    {
+      title: 'President Grace Hopper',
+      url: 'https://other.gov/leadership',
+      snippet: 'The president of Example Republic is Grace Hopper.',
+    },
+    {
+      title: 'Grace Hopper is the current president',
+      url: 'https://two.example/news',
+      snippet: 'Grace Hopper is the current president of Example Republic.',
+    },
+  ], FRESH_SELECTED_EVIDENCE_BUDGET)
+
+  const resolved = resolveDeterministicFreshOfficeHolder(
+    'Who is currently the president of Example Republic?',
+    prepared,
+  )
+  assert.equal(resolved, null)
 })

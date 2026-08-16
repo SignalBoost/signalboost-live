@@ -115,7 +115,14 @@ test('findings are finalized only from a confirmed merged GitHub PR', () => {
   assert.match(lifecycle, /finalize_audit_run_remediation_v2/)
   assert.match(lifecycle, /set fixed = true/)
   assert.match(lifecycle, /audit_run_remediated/)
-  assert.match(route, /const findingsFixed = remediation\.merged \? remediation\.findingsApplied : 0/)
+
+  // Approval is asynchronous: the HTTP response must never claim a finding is fixed.
+  // Only the merged-PR recovery/system path above may call the finalizer.
+  assert.match(route, /findingsFixed: 0/)
+  assert.match(route, /status: 'preparing'/)
+  assert.match(route, /lifecycleStatus: 'preparing'/)
+  assert.match(route, /\}, \{ status: 202 \}\)/)
+  assert.doesNotMatch(route, /finalize_audit_run_remediation_v2/)
   assert.doesNotMatch(route, /findingsApplied \+ remediation\.findingsAlreadyResolved/)
 })
 

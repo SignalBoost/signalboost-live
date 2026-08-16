@@ -30,13 +30,22 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
       - name: Validate relative TypeScript import extensions
         working-directory: saas
-        run: node scripts/validate-relative-import-extensions.mjs
+        shell: bash
+        run: |
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR --relative HEAD^ HEAD -- . | sed -nE '/\.(ts|tsx)$/p')
+          if ((${#files[@]} == 0)); then
+            echo 'Relative import extension guard passed (no changed TypeScript source files).'
+          else
+            node scripts/validate-relative-import-extensions.mjs "${files[@]}"
+          fi

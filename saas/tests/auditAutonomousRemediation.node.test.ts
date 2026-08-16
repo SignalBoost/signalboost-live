@@ -76,8 +76,10 @@ test('remediation lifecycle shows truthful dynamic progress and a real worker he
   assert.match(runs, /lifecycleUpdatedAt:/)
   assert.doesNotMatch(runs, /const checkedAt = new Date\(\)\.toISOString\(\)/)
 
-  assert.match(approval, /remediation\.activityHeartbeatAt/)
-  assert.match(approval, /remediationWithActivity/)
+  // Approval happens before the asynchronous worker can emit a real heartbeat.
+  // It may truthfully report when activity was checked, but it must not fabricate a heartbeat.
+  assert.match(approval, /activityCheckedAt: new Date\(\)\.toISOString\(\)/)
+  assert.doesNotMatch(approval, /activityHeartbeatAt/)
   assert.doesNotMatch(approval, /const checkedAt = new Date\(\)\.toISOString\(\)/)
 })
 
@@ -116,9 +118,9 @@ test('approval is durable and recovery does not ask the owner again', () => {
 test('ONBOARD preserves governed AI execution and truthful status doctrine', () => {
   const onboard = read('../../ONBOARD.md')
 
-  assert.match(onboard, /AI builds\. Humans stay in control\./i)
-  assert.match(onboard, /Never claim a test, build, deployment, push, PR, or merge succeeded unless it was actually verified/i)
-  assert.match(onboard, /Sensitive actions remain behind explicit governance and approval gates/i)
+  assert.match(onboard, /Consequential actions remain behind applicable approval controls/i)
+  assert.match(onboard, /EVIDENCE-BASED — never infer from architecture or a green deployment/i)
+  assert.match(onboard, /Verify implementation\/runtime from code and live evidence before diagnosing, changing, or reporting status/i)
 })
 
 test('failed GitHub checks and stalled stages never look actively pending', () => {

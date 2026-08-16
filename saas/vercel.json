@@ -88,6 +88,10 @@
       "schedule": "5,35 * * * *"
     },
     {
+      "path": "/api/cron/audit-approved-remediation",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/prospect-campaign",
       "schedule": "37 */2 * * *"
     },

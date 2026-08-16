@@ -9,6 +9,8 @@ import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string }
+type FeedbackKind = 'positive' | 'negative' | 'correction'
+type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }
 type ConvSummary = { id: string; title: string; summary: string; message_count: number; updated_at: string }
 type VideoItem = { title: string; type: string; id: string }
 
@@ -45,6 +47,14 @@ const COPY = {
   stopped:      { en: uiText('generatedUi.u_dfca6272ec004413'), es: 'Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.', pt: 'Solicitação interrompida. Nada foi enviado e nenhuma ação externa foi realizada.', pl: 'Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.', ru: 'Запрос остановлен. Ничего не отправлено, внешние действия не выполнялись.' },
   timedOut:     ASSISTANT_TRANSPORT_TIMEOUT_COPY,
   stop:         { en: uiText('generatedUi.u_cae7d57bc067a514'), es: 'Detener', pt: 'Parar', pl: 'Zatrzymaj', ru: 'Остановить' },
+  helpful:      { en: 'Helpful', es: 'Útil', pt: 'Útil', pl: 'Pomocne', ru: 'Полезно' },
+  notHelpful:   { en: 'Not helpful', es: 'No útil', pt: 'Não ajudou', pl: 'Niepomocne', ru: 'Не помогло' },
+  correctThis:  { en: 'Correct this', es: 'Corregir', pt: 'Corrigir', pl: 'Popraw', ru: 'Исправить' },
+  correctionPlaceholder: { en: 'What should COS learn from this?', es: '¿Qué debería aprender COS de esto?', pt: 'O que o COS deve aprender com isso?', pl: 'Czego COS powinien się z tego nauczyć?', ru: 'Что COS должен из этого извлечь?' },
+  submitCorrection: { en: 'Submit correction', es: 'Enviar corrección', pt: 'Enviar correção', pl: 'Wyślij poprawkę', ru: 'Отправить исправление' },
+  cancelCorrection: { en: 'Cancel', es: 'Cancelar', pt: 'Cancelar', pl: 'Anuluj', ru: 'Отмена' },
+  feedbackSaved: { en: 'Feedback saved for COS learning.', es: 'Comentarios guardados para el aprendizaje de COS.', pt: 'Feedback salvo para o aprendizado do COS.', pl: 'Opinia zapisana do uczenia COS.', ru: 'Отзыв сохранён для обучения COS.' },
+  feedbackError: { en: 'Could not save feedback.', es: 'No se pudieron guardar los comentarios.', pt: 'Não foi possível salvar o feedback.', pl: 'Nie udało się zapisać opinii.', ru: 'Не удалось сохранить отзыв.' },
   history:      { en: uiText('generatedUi.u_0e76960093379060'),                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
   newChat:      { en: uiText('generatedUi.u_db18382a249e0206'),                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
   noHistory:    { en: uiText('generatedUi.u_52a8737366b2b6bd'),                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
@@ -163,6 +173,7 @@ export default function AssistantPage() {
   const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
 
   const [messages, setMessages] = useState<Msg[]>([])
+  const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
@@ -385,6 +396,25 @@ export default function AssistantPage() {
     }
   }
 
+  async function submitFeedback(messageIndex: number, assistantContent: string, feedbackType: FeedbackKind, correctionText?: string) {
+    const conversationId = conversationIdRef.current
+    if (!conversationId || !assistantContent.trim()) return
+    const current = feedbackByMessage[messageIndex]
+    if (current?.status === 'saving') return
+    setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { ...prev[messageIndex], status: 'saving', kind: feedbackType } }))
+    try {
+      const response = await fetch('/api/assistant/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, assistantContent, feedbackType, correctionText }),
+      })
+      if (!response.ok) throw new Error(`feedback_http_${response.status}`)
+      setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { status: 'saved', kind: feedbackType, correctionOpen: false, correction: '' } }))
+    } catch {
+      setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { ...prev[messageIndex], status: 'error', kind: feedbackType } }))
+    }
+  }
+
   function stopRequest() {
     abortRef.current?.abort()
   }
@@ -522,7 +552,36 @@ export default function AssistantPage() {
           {messages.map((msg, i) => (
             <div key={`${msg.role}-${i}`} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
               <div style={{ maxWidth: msg.role === 'user' ? '80%' : '100%', width: msg.role === 'assistant' ? '100%' : 'auto', padding: '12px 16px', borderRadius: 16, borderTopRightRadius: msg.role === 'user' ? 4 : 16, borderTopLeftRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'rgba(26,240,255,.07)', border: `1px solid ${msg.role === 'user' ? 'rgba(255,195,0,.28)' : 'rgba(26,240,255,.2)'}`, color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal' }}>
-                {msg.role === 'assistant' ? <VideoJsonMessage content={msg.content} /> : msg.content}
+                {msg.role === 'assistant' ? (
+                  <>
+                    <VideoJsonMessage content={msg.content} />
+                    {(() => {
+                      const feedback = feedbackByMessage[i] || { status: 'idle' as const }
+                      const busy = feedback.status === 'saving'
+                      const correction = feedback.correction || ''
+                      return (
+                        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <button type="button" disabled={busy || feedback.status === 'saved'} onClick={() => submitFeedback(i, msg.content, 'positive')} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid rgba(34,197,94,.32)', background: 'rgba(34,197,94,.08)', color: '#86efac', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5 }}>👍 {c(COPY.helpful, l)}</button>
+                            <button type="button" disabled={busy || feedback.status === 'saved'} onClick={() => submitFeedback(i, msg.content, 'negative')} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid rgba(248,113,113,.32)', background: 'rgba(248,113,113,.08)', color: '#fca5a5', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5 }}>👎 {c(COPY.notHelpful, l)}</button>
+                            <button type="button" disabled={busy || feedback.status === 'saved'} onClick={() => setFeedbackByMessage(prev => ({ ...prev, [i]: { ...(prev[i] || { status: 'idle' }), correctionOpen: true, correction: prev[i]?.correction || '' } }))} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid rgba(26,240,255,.28)', background: 'rgba(26,240,255,.06)', color: '#67e8f9', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5 }}>✎ {c(COPY.correctThis, l)}</button>
+                            {feedback.status === 'saved' && <span style={{ color: '#86efac', fontSize: 11.5 }}>{c(COPY.feedbackSaved, l)}</span>}
+                            {feedback.status === 'error' && <span style={{ color: '#fca5a5', fontSize: 11.5 }}>{c(COPY.feedbackError, l)}</span>}
+                          </div>
+                          {feedback.correctionOpen && feedback.status !== 'saved' && (
+                            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                              <textarea value={correction} onChange={e => setFeedbackByMessage(prev => ({ ...prev, [i]: { ...(prev[i] || { status: 'idle' }), correctionOpen: true, correction: e.target.value } }))} placeholder={c(COPY.correctionPlaceholder, l)} rows={3} maxLength={4000} style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(3,7,18,.55)', color: '#fff', padding: '9px 10px', fontSize: 12, resize: 'vertical' }} />
+                              <div style={{ display: 'flex', gap: 7 }}>
+                                <button type="button" disabled={busy || !correction.trim()} onClick={() => submitFeedback(i, msg.content, 'correction', correction)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.12)', color: '#67e8f9', cursor: busy ? 'wait' : 'pointer', fontSize: 11.5, fontWeight: 700 }}>{c(COPY.submitCorrection, l)}</button>
+                                <button type="button" disabled={busy} onClick={() => setFeedbackByMessage(prev => ({ ...prev, [i]: { ...(prev[i] || { status: 'idle' }), correctionOpen: false } }))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: 'rgba(255,255,255,.65)', cursor: 'pointer', fontSize: 11.5 }}>{c(COPY.cancelCorrection, l)}</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </>
+                ) : msg.content}
               </div>
             </div>
           ))}

@@ -3,12 +3,12 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.9  
+**Version:** 1.10  
 **Updated:** 2026-08-16  
 **Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
 **COS Independent Runtime:** ACTIVE on the current local RunPod reasoner (`qwen2.5-coder:32b`); `qwen3:30b` is the intended durable default but is not yet live on the existing pod  
-**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; CONTINUOUS NORMAL-TURN EXPERIENCE CAPTURE + INDEPENDENCE METRICS CURRENTLY UNDER ACCEPTANCE  
+**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; EXPLICIT USER FEEDBACK LEARNING UNDER ACCEPTANCE  
 **Marketing & Sales Core Architecture:** COMPLETE  
 **Self-Healing Supervisor:** NATIVE PROACTIVE MONITORING PRODUCTION-VERIFIED; NATIVE INCIDENT → COS → GOVERNED AGENT GATEWAY/MCP LOOP MERGED  
 **Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
@@ -86,6 +86,14 @@ Next COS independence increments after production proof of this slice:
 8. model-swap validation proving COS intelligence survives replacement of Qwen or another underlying reasoner.
 
 Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.
+
+### 2026-08-16 continuous-learning production evidence
+
+PR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` for merge `3efccc51c10630c4eabb83f5288912c2edcf02bf` reached `READY`. A real ordinary `/api/concierge` request after the merge created durable encounter `c2953516-436a-4e3e-8fa7-dfc978d272c3`; the same failed/local-escalation outcome occurred twice and reconciled to `occurrence_count = 2` rather than creating duplicate rows. The evidence is explicitly `episodic_turn_signal_not_factual_truth`, contains no `answer` or `response` key, and records local Qwen attempted / external AI not yet invoked at the COS-first decision boundary. Matching Vercel telemetry showed RunPod could not start because the host reported insufficient free GPUs, after which the governed external fallback eventually used Gemini.
+
+Therefore normal-turn capture/deduplication is production-proven for a real external-required failure path. **Accepted local/cache encounter acceptance remains pending** because the observed production request could not obtain RunPod capacity; do not claim the full #1253 acceptance matrix complete until a real accepted local/cache turn is observed.
+
+Current follow-on increment `feat/cos-user-feedback-learning-20260816` adds explicit helpful / not-helpful / correction signals as `feedback` episodic experiences. User correction text remains bounded unverified evidence; it cannot automatically promote a fact or skill, raise confidence, or widen execution authority. Negative/correction signals become eligible inputs for the later autonomous curriculum prioritizer only after this evidence layer is production-accepted.
 
 ---
 
@@ -646,8 +654,8 @@ Current Aug-16 hardening/knowledge sequence includes the live-current-data polic
 
 # Next engineering priorities
 
-1. Production-prove the current continuous normal-turn experience capture and owner-only independence report on the exact merged deployment.
-2. Ingest explicit user feedback/corrections as governed episodic evidence; never auto-promote corrections to fact without validation.
+1. Complete the remaining accepted local/cache production proof for #1253 when RunPod capacity permits; preserve the already verified external-required encounter evidence.
+2. Production-prove explicit user helpful / not-helpful / correction ingestion and verify feedback appears in the independence quality report without changing capability math.
 3. Wire verified production outcomes from Self-Healing, campaigns, sales/CRM and governed tools into cognitive outcome learning.
 4. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance and weak/untested/conflicted metacognitive classes.
 5. Extend consistent pruning/reconsolidation from procedural skills to factual KG/corpus knowledge: staleness, supersession, contradiction, duplication, weakening/quarantine and bounded pruning.

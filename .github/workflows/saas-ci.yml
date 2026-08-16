@@ -49,6 +49,19 @@ jobs:
       - name: Verify live-first routing, authority, structured evidence, and no local-model path
         run: node --test tests/cosFreshnessPolicy.node.test.ts tests/cosFreshLiveRouting.node.test.ts tests/cosFreshGrounding.node.test.ts tests/cosStructuredLiveInfo.node.test.ts
 
+  cos-embedding-transport:
+    name: COS embedding transport compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify governed readiness, passive no-wake, and native Ollama fallback
+        run: node --test tests/localEmbeddings.node.test.ts tests/localEmbeddingsNativeFallback.node.test.ts
+
   build:
     name: Production build (next build)
     runs-on: ubuntu-latest

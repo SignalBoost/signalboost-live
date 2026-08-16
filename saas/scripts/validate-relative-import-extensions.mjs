@@ -4,6 +4,10 @@
 // TypeScript bundler resolver accept extensionless relative imports. Keep directly runnable
 // TypeScript sources compatible with both environments by rejecting resolvable relative
 // module specifiers that omit their .ts or .tsx extension.
+//
+// With no arguments this performs a full repository audit. CI passes only TypeScript files
+// changed by the current commit so legacy extensionless imports cannot keep main permanently
+// red while every new/modified file is still held to the ESM-safe contract.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve } from 'node:path'
@@ -78,6 +82,21 @@ function sourceFilesIn(directory) {
   return files
 }
 
+function requestedSourceFiles(paths) {
+  const files = []
+  for (const path of paths) {
+    const full = resolve(ROOT, path)
+    const local = relative(ROOT, full)
+    if (local === '..' || local.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)) {
+      throw new Error(`Refusing to scan a path outside the saas workspace: ${path}`)
+    }
+    if (!existsSync(full) || !statSync(full).isFile()) continue
+    if (!SOURCE_EXTENSIONS.some((extension) => full.endsWith(extension))) continue
+    files.push(full)
+  }
+  return [...new Set(files)]
+}
+
 function resolvedTarget(file, specifier) {
   const target = resolve(dirname(file), specifier)
   for (const extension of SOURCE_EXTENSIONS) {
@@ -92,10 +111,12 @@ function lineOf(source, index) {
   return source.slice(0, index).split('\n').length
 }
 
+const requested = process.argv.slice(2).filter(Boolean)
+const filesToScan = requested.length ? requestedSourceFiles(requested) : sourceFilesIn(ROOT)
 const violations = []
 let scanned = 0
 
-for (const file of sourceFilesIn(ROOT)) {
+for (const file of filesToScan) {
   scanned++
   const source = readFileSync(file, 'utf8')
   const code = scrub(source)
@@ -134,4 +155,5 @@ if (violations.length) {
   process.exit(1)
 }
 
-console.log(`Relative import extension guard passed (${scanned} TypeScript source files scanned).`)
+const scope = requested.length ? 'changed' : 'repository'
+console.log(`Relative import extension guard passed (${scanned} ${scope} TypeScript source files scanned).`)

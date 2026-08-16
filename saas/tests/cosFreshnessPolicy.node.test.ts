@@ -5,6 +5,7 @@ import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 test('current US president requires live external verification', () => {
   assert.equal(requiresFreshExternalEvidence('Who is the current President of the United States?'), true)
   assert.equal(requiresFreshExternalEvidence('Who is the President of the United States?'), true)
+  assert.equal(requiresFreshExternalEvidence('Who is currently the president of the United States?”'), true)
 })
 
 test('other volatile current facts require live verification', () => {
@@ -12,6 +13,9 @@ test('other volatile current facts require live verification', () => {
   assert.equal(requiresFreshExternalEvidence('What is the exchange rate right now?'), true)
   assert.equal(requiresFreshExternalEvidence("What is today's weather forecast?"), true)
   assert.equal(requiresFreshExternalEvidence('What are the latest NBA standings?'), true)
+  assert.equal(requiresFreshExternalEvidence('What is the breaking news from Warsaw?'), true)
+  assert.equal(requiresFreshExternalEvidence('What are the recent election results?'), true)
+  assert.equal(requiresFreshExternalEvidence('Is there a live service outage?'), true)
 })
 
 test('historical and stable reasoning questions stay on the local path', () => {

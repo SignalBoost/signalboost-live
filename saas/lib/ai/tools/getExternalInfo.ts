@@ -11,7 +11,16 @@ import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
 
-export type SearchResult = { title: string; url: string; snippet: string }
+export type SearchResult = {
+  title: string
+  url: string
+  snippet: string
+  // Provider-reported content date when available. For Brave Web Search this is the
+  // result `age` field (the page's relevant published/updated timestamp), not the time
+  // COS retrieved the result. Keeping the two timestamps separate prevents an old
+  // article retrieved now from masquerading as newly published evidence.
+  sourceDate?: string
+}
 export type ExternalInfoOptions = { bypassCache?: boolean }
 
 export interface WebSearchPort {
@@ -56,6 +65,7 @@ function defaultSearchPort(): WebSearchPort {
           title: String(r?.title || '').slice(0, 200),
           url: String(r?.url || ''),
           snippet: String(r?.description || '').replace(/<[^>]+>/g, '').slice(0, 400),
+          sourceDate: typeof r?.age === 'string' && r.age.trim() ? r.age.trim().slice(0, 80) : undefined,
         })).filter((r: SearchResult) => r.title && r.url)
       } finally {
         clearTimeout(timeout)

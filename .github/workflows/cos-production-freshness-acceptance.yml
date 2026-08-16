@@ -127,7 +127,7 @@ jobs:
           - label: fx
             prompt: 'What is the USD to EUR exchange rate?'
           - label: sports
-            prompt: "What are today's MLB scores?"
+            prompt: 'Give me one MLB score from today.'
     steps:
       - name: Exercise structured production data path
         env:

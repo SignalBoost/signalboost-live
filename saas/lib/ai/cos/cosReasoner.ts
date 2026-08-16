@@ -18,6 +18,7 @@ import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRep
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { maybeBuildCognitiveCouncilAdvisory } from '@/lib/ai/cos/cognitiveCouncil'
 import { runCouncilChallengeRound } from '@/lib/ai/cos/cognitiveCouncilChallenge'
+import { startTurnBudget, hasBudgetFor, remainingMs, localCallEstimateMs, challengeRoundEstimateMs } from '@/lib/ai/cos/cosTurnBudget'
 import { bindCouncilSessionCorrelations } from '@/lib/ai/cos/councilObjectiveOutcome'
 
 export type CosReasonerKind = 'independent-local'
@@ -130,6 +131,9 @@ export async function callCosReasoner(
     label: `independent-local:${(process.env.LOCAL_AI_MODEL || '').trim()}`,
   }
   const inference = localInferenceConfigFromEnv()
+  // One wall-clock budget for the whole turn. Optional phases below consult it so a slow run
+  // degrades to a slightly less polished answer instead of being killed at the platform ceiling.
+  const budget = startTurnBudget()
   await touchRunpodActivityLease('qwen_reasoning')
 
   let effectiveArgs = args
@@ -147,14 +151,14 @@ export async function callCosReasoner(
           console.warn('[cos-council-correlation] binding failed closed', error instanceof Error ? error.message : String(error))
         })
       }
-      const challengeRound = await runCouncilChallengeRound({
+      const challengeRound = hasBudgetFor(budget, challengeRoundEstimateMs()) ? await runCouncilChallengeRound({
         council,
         governedPrompt: args.prompt,
         reasonerLabel: config.label,
       }).catch(error => {
         console.warn('[cos-council-challenge] challenge round failed closed', error instanceof Error ? error.message : String(error))
         return null
-      })
+      }) : (console.warn('[cos-turn-budget] challenge round skipped to protect the turn deadline', JSON.stringify({ remainingMs: remainingMs(budget) })), null)
       const advisory = challengeRound?.advisory
         ? `${council.advisory}\n\n${challengeRound.advisory}`
         : council.advisory
@@ -179,7 +183,9 @@ export async function callCosReasoner(
   if (!first) return null
 
   let text = first
-  if (reasonerDraftNeedsRepair(effectiveArgs.prompt, first)) {
+  // Optional quality-repair pass: worth a full local round-trip only if the turn can still afford
+  // one. Out of budget, the first draft stands — a slightly rougher answer beats a killed request.
+  if (reasonerDraftNeedsRepair(effectiveArgs.prompt, first) && hasBudgetFor(budget, localCallEstimateMs())) {
     const repaired = await callLocalModel(
       {
         ...effectiveArgs,
@@ -207,7 +213,8 @@ export async function callCosReasoner(
 
   const allowedSkillTags = skillCitationTags(effectiveArgs.prompt)
   const parsed = parseLocalResult(text)
-  if (parsed && skillCitationRepairNeeded(effectiveArgs.prompt, parsed.answer)) {
+  // Optional skill-citation repair: same budget rule as the quality-repair pass above.
+  if (parsed && skillCitationRepairNeeded(effectiveArgs.prompt, parsed.answer) && hasBudgetFor(budget, localCallEstimateMs())) {
     const audited = await callLocalModel(
       {
         ...effectiveArgs,

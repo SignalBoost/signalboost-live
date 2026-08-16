@@ -1,6 +1,8 @@
+// saas/lib/ai/cos/cognitiveCouncilChallenge.ts
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { runCouncilMembersConcurrently } from '@/lib/ai/cos/councilConcurrency'
 import type { CouncilAdvisory, CouncilOpinion, CouncilRole } from '@/lib/ai/cos/cognitiveCouncil'
 
 export type CouncilChallengePair = {
@@ -360,10 +362,16 @@ export async function runCouncilChallengeRound(input: {
   const rebuttals: CouncilRebuttal[] = []
   await touchRunpodActivityLease('cognitive_council_challenge')
 
-  for (const pair of pairs) {
+  // Pairs are independent of one another, so they run CONCURRENTLY — only the challenge→rebuttal
+  // step inside a pair is genuinely sequential (the rebuttal answers that specific challenge).
+  // Previously this was a sequential `for` loop issuing 2 local calls per pair, which made the
+  // challenge round the largest serial block in a turn. Promise ordering is preserved, so
+  // challenges and rebuttals keep a deterministic order.
+  type PairOutcome = { challenge: CouncilChallenge; rebuttal: CouncilRebuttal | null }
+  const outcomes = await runCouncilMembersConcurrently<PairOutcome>(pairs.map(pair => async () => {
     const challenger = opinionByRole.get(pair.challengerRole)
     const target = opinionByRole.get(pair.targetRole)
-    if (!challenger || !target || !target.claims[pair.targetClaimIndex]) continue
+    if (!challenger || !target || !target.claims[pair.targetClaimIndex]) return null
 
     const rawChallenge = await callLocalModel({
       temperature: 0,
@@ -371,13 +379,12 @@ export async function runCouncilChallengeRound(input: {
       systemPrompt: 'You are a bounded adversarial reviewer inside SignalBoost COS Council. Return only the requested challenge artifact.',
       prompt: challengePrompt({ challenger, target, targetClaimIndex: pair.targetClaimIndex, governedPrompt: input.governedPrompt, allowedLabels }),
     }, inference).catch(() => null)
-    if (!rawChallenge) continue
+    if (!rawChallenge) return null
 
     const parsedChallenge = parseChallenge(rawChallenge, pair, allowedLabels)
-    if (!parsedChallenge) continue
+    if (!parsedChallenge) return null
     const id = await persistChallenge(input.council.sessionId, parsedChallenge, input.reasonerLabel)
     const challenge: CouncilChallenge = { ...parsedChallenge, id }
-    challenges.push(challenge)
 
     const rawRebuttal = await callLocalModel({
       temperature: 0,
@@ -385,12 +392,17 @@ export async function runCouncilChallengeRound(input: {
       systemPrompt: 'You are a bounded Council member responding to a specific challenge. Return only the requested rebuttal artifact.',
       prompt: rebuttalPrompt({ target, targetClaimIndex: pair.targetClaimIndex, challenge, governedPrompt: input.governedPrompt }),
     }, inference).catch(() => null)
-    if (!rawRebuttal) continue
+    if (!rawRebuttal) return { challenge, rebuttal: null }
 
     const rebuttal = parseRebuttal(rawRebuttal, challenge)
-    if (!rebuttal) continue
-    rebuttals.push(rebuttal)
+    if (!rebuttal) return { challenge, rebuttal: null }
     await persistRebuttal(input.council.sessionId, rebuttal, input.reasonerLabel)
+    return { challenge, rebuttal }
+  }))
+
+  for (const outcome of outcomes) {
+    challenges.push(outcome.challenge)
+    if (outcome.rebuttal) rebuttals.push(outcome.rebuttal)
   }
 
   await markChallengeRound(input.council.sessionId, challenges.length)

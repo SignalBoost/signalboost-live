@@ -1,6 +1,8 @@
+// saas/lib/ai/local-inference.ts
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ensureRunpodReasonerStarted, runpodLifecycleEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
 import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
+import { configuredRunpodApiKey, configuredRunpodPodId, explicitRunpodPodId, deriveRunpodPodIdFromLocalAiBaseUrl } from '@/lib/ai/cos/runpodConfig'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -62,6 +64,9 @@ const COS_PRIMARY_FUNCTION_BUDGET_MS = 300_000
 const COS_POST_INFERENCE_RESERVE_MS = 60_000
 const MAX_RUNPOD_READINESS_BUDGET_MS = 120_000
 const MIN_RUNPOD_READINESS_SLICE_MS = 5_000
+// Ceiling on how much of the function budget a single inference may reserve when deciding whether a
+// cold start still fits. 150s leaves >=90s for a wake inside the 300s ceiling.
+const COLD_START_INFERENCE_RESERVE_CAP_MS = 150_000
 
 function runpodStartTimeoutMs(): number {
   const configured = Number(process.env.RUNPOD_START_TIMEOUT_MS || '90000')
@@ -69,10 +74,26 @@ function runpodStartTimeoutMs(): number {
 }
 
 function runpodTotalReadinessBudgetMs(config: LocalInferenceConfig): number {
-  // /api/cos-primary and its browser ingress run with maxDuration=300s. Reserve the configured
-  // model-call timeout plus a fixed tail for retrieval, persistence, telemetry and serialization.
-  // The cold-start gate may use only what remains, never a fresh 60s retry on top of the first wait.
-  const available = COS_PRIMARY_FUNCTION_BUDGET_MS - config.timeoutMs - COS_POST_INFERENCE_RESERVE_MS
+  // /api/cos-primary and its browser ingress run with maxDuration=300s. Reserve the model-call
+  // timeout plus a fixed tail for retrieval, persistence, telemetry and serialization. The
+  // cold-start gate may use only what remains, never a fresh 60s retry on top of the first wait.
+  //
+  // CRITICAL: the reservation is capped at COLD_START_INFERENCE_RESERVE_CAP_MS rather than using
+  // the raw configured timeout. Raising LOCAL_AI_TIMEOUT_MS to accommodate slow answers used to
+  // shrink `available` to zero, so the readiness gate threw "no safe RunPod readiness budget
+  // remains" and the turn escalated to an external provider WITHOUT EVER ATTEMPTING A WAKE — a
+  // latency setting silently disabling cold start. A stopped pod must always be wakeable; a long
+  // per-call timeout only ever applies to a pod that is already running.
+  const inferenceReserveMs = Math.min(config.timeoutMs, COLD_START_INFERENCE_RESERVE_CAP_MS)
+  if (inferenceReserveMs < config.timeoutMs) {
+    console.info('[cos-runpod-readiness-budget-clamped]', JSON.stringify({
+      at: new Date().toISOString(),
+      configuredInferenceTimeoutMs: config.timeoutMs,
+      inferenceReserveUsedMs: inferenceReserveMs,
+      note: 'cold-start wake budget preserved; the configured timeout still applies once the pod is healthy',
+    }))
+  }
+  const available = COS_PRIMARY_FUNCTION_BUDGET_MS - inferenceReserveMs - COS_POST_INFERENCE_RESERVE_MS
   return Math.max(0, Math.min(MAX_RUNPOD_READINESS_BUDGET_MS, available))
 }
 
@@ -108,11 +129,28 @@ async function waitForLocalInferenceHealth(config: LocalInferenceConfig, timeout
  * share one end-to-end readiness budget so model inference and downstream response work remain reserved.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
-  if (!runpodLifecycleEnabled()) return
-
   const readinessStartedAt = Date.now()
   const current = await checkLocalInferenceHealth(config)
   if (current.ok) return
+
+  // Lifecycle disabled/unconfigured used to return SILENTLY here, before any log. An authorized
+  // browser turn would then quietly skip the wake, fail the health check and fall through to an
+  // external provider — indistinguishable, from the outside, from "the model refused to wake".
+  // Diagnosing it required reading source. Every other refusal in this path logs its reason, so
+  // this one does too: it names WHICH half of the contract is missing (credentials vs pod id vs
+  // explicit kill switch), because those have completely different fixes.
+  if (!runpodLifecycleEnabled()) {
+    console.warn('[cos-runpod-lifecycle-disabled]', JSON.stringify({
+      at: new Date().toISOString(),
+      effect: 'stopped_or_unhealthy_reasoner_will_not_be_woken; request falls back to its configured external path',
+      runpodApiKeyPresent: Boolean(configuredRunpodApiKey()),
+      podIdResolved: configuredRunpodPodId(),
+      podIdSource: explicitRunpodPodId() ? 'RUNPOD_POD_ID' : (deriveRunpodPodIdFromLocalAiBaseUrl() ? 'derived_from_LOCAL_AI_BASE_URL' : 'unresolved'),
+      lifecycleKillSwitch: process.env.RUNPOD_LIFECYCLE_ENABLED?.trim().toLowerCase() ?? null,
+      healthError: current.error ?? null,
+    }))
+    return
+  }
 
   const permission = currentRunpodWakePermission()
   if (!permission?.allowed) {

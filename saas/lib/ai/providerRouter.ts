@@ -71,23 +71,6 @@ async function callClaude(args: ModelCallArgs): Promise<ProviderResult | null> {
   } catch (err) { console.error('providerRouter: Claude exception', err); return null }
 }
 
-async function callOpenAI(args: ModelCallArgs): Promise<ProviderResult | null> {
-  try {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) { console.warn('providerRouter: OPENAI_API_KEY missing'); return null }
-    const model = modelForProvider('openai')
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, max_tokens: args.maxTokens ?? 2048, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Always return valid JSON when asked.' }, { role: 'user', content: args.prompt }] }),
-    })
-    if (!response.ok) { console.error('providerRouter: OpenAI HTTP error', response.status, await response.text()); return null }
-    const data = await response.json(); const text = data.choices?.[0]?.message?.content || ''
-    if (!text) return null
-    console.log('providerRouter: OpenAI response received, length:', text.length)
-    return { text, provider: 'openai', model }
-  } catch (err) { console.error('providerRouter: OpenAI exception', err); return null }
-}
-
 async function callGemini(args: ModelCallArgs): Promise<ProviderResult | null> {
   try {
     const apiKey = process.env.GEMINI_API_KEY
@@ -106,32 +89,75 @@ async function callGemini(args: ModelCallArgs): Promise<ProviderResult | null> {
   } catch (err) { console.error('providerRouter: Gemini exception', err); return null }
 }
 
+/**
+ * OpenAI is deliberately NOT part of any execution path.
+ *
+ * Owner decision (2026-08-16): OpenAI is removed as a COS provider. It had been first in the
+ * default chain, so an exhausted OpenAI balance returned HTTP 429 and failed the turn BEFORE the
+ * local reasoner was ever consulted — an external account balance could take down a system whose
+ * whole purpose is local independence. A provider that must never run does not belong in the
+ * ordering at all; leaving it in "just as a last resort" is how it ends up first again.
+ *
+ * Any caller still requesting 'openai' is normalised to the local-independence-friendly external
+ * order rather than being failed, because refusing outright would break unrelated feature routes
+ * that still pass a stale preference string.
+ */
 function externalOrder(preference: Exclude<ModelProvider, 'local'>): Array<Exclude<ModelProvider, 'local'>> {
-  const rest: Array<Exclude<ModelProvider, 'local'>> = preference === 'openai' ? ['gemini', 'claude'] : preference === 'claude' ? ['gemini', 'openai'] : ['claude', 'openai']
-  return [preference, ...rest]
+  const usable: Array<Exclude<ModelProvider, 'local'>> = preference === 'gemini' ? ['gemini', 'claude'] : ['claude', 'gemini']
+  return usable
 }
 
+/**
+ * EXTERNAL PROVIDERS ARE DISABLED BY OWNER POLICY (2026-08-16).
+ *
+ * OpenAI, Gemini and Claude are all removed from COS execution. The trigger was an exhausted
+ * OpenAI balance returning HTTP 429 and failing a chat turn BEFORE the local reasoner was ever
+ * consulted — an external account balance taking down a system whose entire purpose is local
+ * independence. The decision that followed is broader than that one provider: COS answers from its
+ * own reasoner, its own memory and live authoritative sources, or it says it cannot answer. It does
+ * not borrow a stranger's model.
+ *
+ * This is the fail-closed rung of the grounding ladder applied globally: an honest "I could not
+ * answer this locally" is worth more than a fluent answer from a model COS cannot audit, cannot
+ * ground, and does not own.
+ *
+ * The provider implementations remain in the file intentionally. Re-enabling is then a reviewable
+ * policy change here, not an archaeology exercise — and keeping them visible makes it obvious that
+ * the block is deliberate rather than an accident of deletion.
+ */
 async function callExternalChain(args: ModelCallArgs, preference: Exclude<ModelProvider, 'local'>): Promise<ProviderResult | null> {
-  for (const provider of externalOrder(preference)) {
-    const result = provider === 'openai' ? await callOpenAI(args) : provider === 'gemini' ? await callGemini(args) : await callClaude(args)
-    if (result) { if (provider !== preference) console.warn(`providerRouter: ${preference} unavailable — external fallback succeeded with ${provider}`); return result }
-  }
+  console.warn('[cos-external-provider-blocked]', JSON.stringify({
+    at: new Date().toISOString(),
+    requestedProvider: preference,
+    promptChars: args.prompt.length,
+    policy: 'cos_is_local_only_external_ai_disabled',
+    effect: 'no external model was called; the caller must fail closed or answer from local/COS-owned evidence',
+  }))
   return null
 }
 
 async function callLocal(args: ModelCallArgs): Promise<ProviderResult | null> {
   const result = await callLocalModel(args)
   if (result) return { text: result, provider: 'local', model: modelForProvider('local') }
-  if (process.env.LOCAL_AI_ALLOW_CLOUD_FALLBACK !== 'true') { console.error('providerRouter: local inference failed and cloud fallback is disabled'); return null }
+  // No cloud fallback exists any more: local failure is reported honestly instead of silently
+  // becoming an external answer. LOCAL_AI_ALLOW_CLOUD_FALLBACK is intentionally no longer honoured.
+  console.error('providerRouter: local inference failed; COS is local-only so this request fails closed')
+  return null
   const configured = process.env.LOCAL_AI_CLOUD_FALLBACK_PROVIDER?.trim().toLowerCase()
-  const fallback: Exclude<ModelProvider, 'local'> = configured === 'openai' || configured === 'gemini' ? configured : 'claude'
+  const fallback: Exclude<ModelProvider, 'local'> = configured === 'gemini' ? 'gemini' : 'claude'
   console.warn(`providerRouter: local inference failed — explicit cloud fallback to ${fallback}`)
   return callExternalChain(args, fallback)
 }
 
 function providerFromEnvironment(): ModelProvider | undefined {
   const value = process.env.AI_MODEL_PROVIDER?.trim().toLowerCase()
-  return value === 'local' || value === 'openai' || value === 'claude' || value === 'gemini' ? value : undefined
+  // 'openai' is intentionally not accepted: a stale env value must not be able to put a removed
+  // provider back at the head of the chain. It falls through to the caller's default instead.
+  if (value === 'openai') {
+    console.warn('[providerRouter] AI_MODEL_PROVIDER=openai is no longer supported; OpenAI has been removed from COS execution paths')
+    return undefined
+  }
+  return value === 'local' || value === 'claude' || value === 'gemini' ? value : undefined
 }
 
 async function logAiTask(args: { taskType: string; provider: ModelProvider; status: 'success' | 'error' | 'fallback'; durationMs: number; fallbackUsed?: boolean; errorMessage?: string; metadata?: Record<string, unknown> }) {

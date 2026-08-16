@@ -57,7 +57,7 @@ Observe
 
 The underlying model is replaceable compute. **COS is the learner.** The durable asset is COS-owned memory, experiences, facts, procedural skills, metacognitive capability state, outcome history, source/provenance knowledge and governance.
 
-Current increment on `feat/cos-continuous-independence-learning-20260816` adds:
+PR #1253 (`feat/cos-continuous-independence-learning-20260816`) is merged and has partial production proof. It provides:
 
 - bounded episodic capture of meaningful normal COS turns in `cos_cognitive_experiences`;
 - explicit separation of local reasoning, answer-cache reuse, fresh verification, external-required failure and other runtime routes;
@@ -68,15 +68,15 @@ Current increment on `feat/cos-continuous-independence-learning-20260816` adds:
 - metrics for local accepted work, cache reuse, fresh verification, external-required attempts, teacher interactions, teacher dependency and grounded reuse by problem class;
 - an isolated `COS continuous independence learning` CI gate.
 
-**Evidence boundary:** until this increment is merged, deployed and observed through a real production turn plus durable DB evidence, report it as implementation/acceptance work — not production-proven behavior.
+Current increment `feat/cos-user-feedback-learning-20260816` adds governed explicit helpful / not-helpful / correction feedback as episodic learning evidence and extends independence reporting with separate quality signals. It remains under acceptance until merged and production-observed.
 
 The runtime independence report is deliberately labeled `observed_runtime_learning_metrics_not_heldout_certification`. Runtime traffic is not a hidden benchmark. Cache reuse is useful operational independence but not new reasoning competence. A COS-gate-accepted answer is not the same thing as a verified business/production outcome.
 
 The mature target remains roughly **85% independent pass rate on a separate held-out SignalBoost workload**. Never lower the 0.72 confidence/evidence gate, inflate scores, fabricate skills, or count self-generated practice as holdout evidence to improve that number.
 
-Next COS independence increments after production proof of this slice:
+Next COS independence increments:
 
-1. durable user feedback/correction experiences;
+1. production-prove the current explicit user feedback/correction increment;
 2. verified production-outcome wiring from Self-Healing, campaigns, sales, CRM and governed tool execution;
 3. autonomous curriculum prioritization from repeated failures, teacher dependency/cost, business importance and weak/untested/conflicted capability areas;
 4. factual reconsolidation/pruning for stale, superseded, contradictory, duplicate and low-value knowledge;

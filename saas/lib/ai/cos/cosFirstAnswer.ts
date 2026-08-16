@@ -18,6 +18,7 @@ import {
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
   type COSFirstAnswerResult,
@@ -270,5 +271,21 @@ export async function tryCOSFirstAnswer(input: {
   if (requiresFreshExternalEvidence(input.prompt)) {
     return tryFreshCurrentFact(input)
   }
+
+  // Ordinary enterprise retrieval has bounded semantic-query budgets. Complete any authorized
+  // RunPod cold-start lifecycle before those timers begin so no abandoned retrieval promise can
+  // keep paid compute waking after lexical fallback already returned. Under #1224, background and
+  // server-to-server callers fail closed here; lexical/external fallback remains available.
+  if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
+    try {
+      await ensureLocalInferenceRuntimeReady()
+    } catch (error) {
+      console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({
+        at: new Date().toISOString(),
+        reason: error instanceof Error ? error.message : String(error),
+      }))
+    }
+  }
+
   return tryEnterpriseCOSFirstAnswer(input)
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { nativeIncidentToNormalized } from '../self-healing-host/native-autonomous-loop.ts'
+import { nativeIncidentToNormalized } from '../self-healing-host/native-incident-normalization.ts'
 import { classifyAction } from '../lib/infra-pr/action-policy.ts'
 
 /**

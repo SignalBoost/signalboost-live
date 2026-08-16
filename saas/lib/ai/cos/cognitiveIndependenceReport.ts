@@ -3,7 +3,7 @@ import {
   computeCosIndependenceMetrics,
   type CosIndependenceExperienceRow,
   type CosIndependenceMetrics,
-} from './cognitiveIndependenceMetrics'
+} from '@/lib/ai/cos/cognitiveIndependenceMetrics'
 
 const DEFAULT_WINDOW_DAYS = 30
 const MAX_WINDOW_DAYS = 180

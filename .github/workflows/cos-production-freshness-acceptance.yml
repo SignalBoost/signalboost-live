@@ -1,0 +1,113 @@
+name: COS Production Freshness Acceptance
+
+on:
+  # This path-scoped push runs the acceptance once when the workflow itself is introduced/changed.
+  # workflow_dispatch keeps it available for deliberate production acceptance runs later.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cos-production-freshness-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-current-fact:
+    name: Live current fact skips RunPod
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Exercise production concierge path
+        env:
+          TARGET_URL: https://saas.signalboostapp.com/api/concierge
+          APP_ORIGIN: https://saas.signalboostapp.com
+        run: |
+          set -euo pipefail
+          cat > payload.json <<'JSON'
+          {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Who is currently the president of the United States?”"
+              }
+            ],
+            "context": {
+              "language": "en",
+              "acceptance": "cos-production-freshness-v1"
+            }
+          }
+          JSON
+
+          STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          HTTP_CODE="$(curl --silent --show-error --location \
+            --max-time 150 \
+            --request POST "$TARGET_URL" \
+            --header 'Content-Type: application/json' \
+            --header 'Accept: application/json' \
+            --header "Origin: $APP_ORIGIN" \
+            --header 'Sec-Fetch-Site: same-origin' \
+            --header 'Sec-Fetch-Mode: cors' \
+            --header "Referer: $APP_ORIGIN/" \
+            --data-binary @payload.json \
+            --output response.json \
+            --write-out '%{http_code}')"
+          FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "acceptance_started_at=$STARTED_AT"
+          echo "acceptance_finished_at=$FINISHED_AT"
+          echo "http_code=$HTTP_CODE"
+          cat response.json
+          echo
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Expected HTTP 200 from production current-fact route, got $HTTP_CODE" >&2
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          const payload = JSON.parse(fs.readFileSync('response.json', 'utf8'))
+          const fail = message => { console.error(message); process.exit(1) }
+
+          if (payload.ok !== true) fail(`Expected ok=true, got ${JSON.stringify(payload.ok)}`)
+          if (payload.source !== 'external_fresh_grounded') fail(`Expected external_fresh_grounded, got ${payload.source}`)
+          if (payload.local_model_invoked !== false) fail(`Local model must be false, got ${JSON.stringify(payload.local_model_invoked)}`)
+          if (payload.external_ai_invoked !== true) fail(`External AI must be invoked, got ${JSON.stringify(payload.external_ai_invoked)}`)
+          if (String(payload.external_provider || '').toLowerCase() !== 'gemini') fail(`Expected Gemini, got ${payload.external_provider}`)
+          if (payload.live_evidence_retrieved_this_turn !== true) fail('Expected live evidence retrieved this turn')
+
+          const sources = Array.isArray(payload.live_evidence_sources) ? payload.live_evidence_sources : []
+          if (sources.length < 2) fail(`Expected at least two live evidence sources, got ${sources.length}`)
+          const government = sources.some(source => {
+            try {
+              const host = new URL(String(source.url || '')).hostname.toLowerCase()
+              return host.endsWith('.gov') || host.includes('.gov.') || host === 'gov.uk' || host.endsWith('.gov.uk')
+            } catch { return false }
+          })
+          if (!government) fail('Expected an authoritative government source in live evidence')
+
+          const provenance = payload.execution_provenance || {}
+          if (provenance?.fresh_local_synthesis?.attempted !== false) {
+            fail(`Fresh local synthesis must be attempted=false, got ${JSON.stringify(provenance?.fresh_local_synthesis)}`)
+          }
+          if (provenance?.local_reasoning?.used === true) fail('Local reasoning must not be used')
+          if (provenance?.answer_origin?.from_cache !== false) fail('Current answer must not come from cache')
+          if (String(provenance?.answer_origin?.provider || '').toLowerCase() !== 'gemini') {
+            fail(`Answer origin must be Gemini, got ${provenance?.answer_origin?.provider}`)
+          }
+          if (provenance?.live_external_evidence?.used !== true) fail('Provenance must record live external evidence as used')
+
+          const answer = String(payload.reply || '')
+          if (!answer.includes('[LIVE') || !answer.includes('http')) fail('Answer must carry server-rendered live evidence citations')
+
+          console.log(JSON.stringify({
+            acceptance: 'PASS',
+            source: payload.source,
+            provider: payload.external_provider,
+            model: payload.external_model,
+            local_model_invoked: payload.local_model_invoked,
+            live_sources: sources.length,
+            stopping_reason: provenance?.evidence_budget?.stopping_reason || null,
+          }, null, 2))
+          NODE

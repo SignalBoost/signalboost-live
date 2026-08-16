@@ -6,11 +6,14 @@
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy'
 import {
+  FRESH_SEARCH_RESULT_BUDGET,
+  FRESH_SELECTED_EVIDENCE_BUDGET,
   freshEvidenceGroundingBlock,
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
   prepareFreshEvidence,
   replyCitesIndependentFreshEvidence,
+  resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
@@ -31,18 +34,38 @@ function emptyStage() {
   return { retrieved: 0, relevant: 0, selected: 0, injected: 0, cited: 0 }
 }
 
+function freshVerificationUnavailable(language = 'en'): string {
+  if (language === 'es') return 'No pude verificar este dato actual con suficientes fuentes independientes y autorizadas. No voy a adivinar ni usar un modelo externo para sustituir evidencia que falta.'
+  if (language === 'pt') return 'Não consegui verificar este fato atual com fontes independentes e autorizadas suficientes. Não vou adivinhar nem usar um modelo externo para substituir evidência ausente.'
+  if (language === 'pl') return 'Nie udało mi się zweryfikować tego aktualnego faktu w wystarczającej liczbie niezależnych i autorytatywnych źródeł. Nie będę zgadywać ani używać zewnętrznego modelu zamiast brakujących dowodów.'
+  if (language === 'ru') return 'Мне не удалось подтвердить этот текущий факт достаточным числом независимых авторитетных источников. Я не буду угадывать или использовать внешнюю модель вместо отсутствующих доказательств.'
+  return 'I could not verify this current fact from enough independent authoritative live sources. I will not guess or use an external model as a substitute for missing evidence.'
+}
+
 function freshProvenance(args: {
   reasonerLabel: string | null
   localModelInvoked: boolean
   retrievedAt: string
   sources: FreshEvidenceSource[]
+  documentsAcquired?: number
+  responseSource?: string
+  deterministicResolverUsed?: boolean
+  externalAiNecessary?: boolean
+  escalationReasonCode?: string | null
+  escalationReason?: string | null
+  evidenceBudget?: Record<string, unknown>
 }) {
   return {
-    responseSource: args.localModelInvoked ? 'local_cos_reasoning' : 'external_fallback_required',
+    responseSource: args.responseSource ?? (args.localModelInvoked ? 'local_cos_reasoning' : 'external_fallback_required'),
     externalAiInvoked: false as const,
+    externalAiNecessary: args.externalAiNecessary === true,
+    escalationReasonCode: args.escalationReasonCode ?? null,
+    escalationReason: args.escalationReason ?? null,
+    deterministicFreshFactUsed: args.deterministicResolverUsed === true,
+    evidenceBudget: args.evidenceBudget ?? null,
     localModelInvoked: args.localModelInvoked,
     reasonerLabel: args.reasonerLabel,
-    internalSystemsConsulted: ['Freshness Policy', 'Live Web Search', ...(args.localModelInvoked ? ['Independent Local Reasoner'] : [])],
+    internalSystemsConsulted: ['Freshness Policy', 'Live Web Search', ...(args.deterministicResolverUsed ? ['Deterministic Authoritative Resolver'] : []), ...(args.localModelInvoked ? ['Independent Local Reasoner'] : [])],
     knowledgeFactsUsed: 0,
     learnedItemsUsed: 0,
     enterpriseMemoriesUsed: 0,
@@ -63,7 +86,7 @@ function freshProvenance(args: {
     userMemoriesCited: 0,
     cognitiveSkillsCited: 0,
     autonomousResearchAttempted: true,
-    researchDocumentsAcquired: args.sources.length,
+    researchDocumentsAcquired: args.documentsAcquired ?? args.sources.length,
     knowledgeNewlyRetained: 0,
     liveExternalEvidence: {
       retrievedAt: args.retrievedAt,
@@ -82,13 +105,69 @@ async function tryFreshCurrentFact(input: {
   const query = freshEvidenceSearchQuery(input.prompt, new Date(retrievedAt))
 
   // bypassCache=true is load-bearing: a volatile fact is searched again on every user request.
-  const live = await getExternalInfo(query, 10, { bypassCache: true })
-  const sources = live.ok ? prepareFreshEvidence(live.results, 10) : []
+  // The result count is deliberately bounded. COS does not keep collecting low-value documents
+  // after enough authoritative evidence exists for deterministic or local synthesis.
+  const live = await getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })
+  const documentsAcquired = live.ok ? live.results.length : 0
+  const sources = live.ok ? prepareFreshEvidence(live.results, FRESH_SELECTED_EVIDENCE_BUDGET) : []
+  const baseBudget = {
+    search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
+    results_received: documentsAcquired,
+    evidence_selected: sources.length,
+  }
 
   if (!live.ok || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
     const reason = live.error
       ? `Live current-fact verification failed: ${live.error}`
       : 'Live current-fact verification did not produce enough independent authoritative evidence.'
+    return {
+      handled: true,
+      reply: freshVerificationUnavailable(input.language),
+      confidence: 0,
+      provenance: freshProvenance({
+        reasonerLabel: null,
+        localModelInvoked: false,
+        retrievedAt,
+        sources,
+        documentsAcquired,
+        responseSource: 'live_verification_refusal',
+        externalAiNecessary: false,
+        escalationReasonCode: 'insufficient_live_authority',
+        escalationReason: reason,
+        evidenceBudget: { ...baseBudget, stopping_reason: 'insufficient_authoritative_evidence_no_cloud_escalation' },
+      }) as any,
+    }
+  }
+
+  const deterministic = resolveDeterministicFreshOfficeHolder(input.prompt, sources)
+  if (deterministic) {
+    return {
+      handled: true,
+      reply: deterministic.reply,
+      confidence: deterministic.confidence,
+      provenance: freshProvenance({
+        reasonerLabel: null,
+        localModelInvoked: false,
+        retrievedAt,
+        sources: deterministic.sources,
+        documentsAcquired,
+        responseSource: 'deterministic_authoritative_fact',
+        deterministicResolverUsed: true,
+        externalAiNecessary: false,
+        escalationReasonCode: null,
+        escalationReason: null,
+        evidenceBudget: {
+          ...baseBudget,
+          evidence_selected: deterministic.sources.length,
+          stopping_reason: 'authoritative_cross_source_consensus',
+        },
+      }) as any,
+    }
+  }
+
+  const resolved = resolveCosReasoner()
+  if (!resolved.config) {
+    const reason = 'Live evidence was retrieved, but the independent local reasoner is not configured for grounded synthesis.'
     return {
       handled: false,
       confidence: 0,
@@ -98,21 +177,11 @@ async function tryFreshCurrentFact(input: {
         localModelInvoked: false,
         retrievedAt,
         sources,
-      }) as any,
-    }
-  }
-
-  const resolved = resolveCosReasoner()
-  if (!resolved.config) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'Live evidence was retrieved, but the independent local reasoner is not configured for grounded synthesis.',
-      provenance: freshProvenance({
-        reasonerLabel: null,
-        localModelInvoked: false,
-        retrievedAt,
-        sources,
+        documentsAcquired,
+        externalAiNecessary: true,
+        escalationReasonCode: 'local_reasoner_not_configured',
+        escalationReason: reason,
+        evidenceBudget: { ...baseBudget, stopping_reason: 'authoritative_evidence_ready_local_reasoner_unavailable' },
       }) as any,
     }
   }
@@ -139,38 +208,48 @@ async function tryFreshCurrentFact(input: {
     localModelInvoked: true,
     retrievedAt,
     sources,
+    documentsAcquired,
+    evidenceBudget: { ...baseBudget, stopping_reason: 'bounded_evidence_sent_to_local_reasoner' },
   })
 
   if (!reasoned?.text) {
+    const reason = 'Live evidence was retrieved, but independent local synthesis returned no answer.'
     return {
       handled: false,
       confidence: 0,
-      reason: 'Live evidence was retrieved, but independent local synthesis returned no answer.',
-      provenance: provenance as any,
+      reason,
+      provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_failed', escalationReason: reason } as any,
     }
   }
 
   const parsed = parseLocalResult(reasoned.text)
   if (!parsed || parsed.truncated) {
+    const reason = 'Live evidence was retrieved, but independent local synthesis was incomplete or unparseable.'
     return {
       handled: false,
       confidence: 0,
-      reason: 'Live evidence was retrieved, but independent local synthesis was incomplete or unparseable.',
-      provenance: provenance as any,
+      reason,
+      provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any,
     }
   }
 
   const citesIndependentEvidence = replyCitesIndependentFreshEvidence(parsed.answer, input.prompt, sources)
   const confidence = Math.max(0, Math.min(1, parsed.confidence))
   if (!citesIndependentEvidence || confidence < confidenceThreshold()) {
+    const reason = !citesIndependentEvidence
+      ? 'Current-fact synthesis was rejected because it did not cite the required independent live sources.'
+      : `Current-fact synthesis confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`
     return {
       handled: false,
       confidence,
-      reason: !citesIndependentEvidence
-        ? 'Current-fact synthesis was rejected because it did not cite the required independent live sources.'
-        : `Current-fact synthesis confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`,
+      reason,
       bestEffortReply: parsed.answer,
-      provenance: provenance as any,
+      provenance: {
+        ...provenance,
+        externalAiNecessary: true,
+        escalationReasonCode: !citesIndependentEvidence ? 'citation_grounding_rejected' : 'local_synthesis_below_threshold',
+        escalationReason: reason,
+      } as any,
     }
   }
 
@@ -178,7 +257,7 @@ async function tryFreshCurrentFact(input: {
     handled: true,
     reply: parsed.answer,
     confidence,
-    provenance: provenance as any,
+    provenance: { ...provenance, externalAiNecessary: false, escalationReasonCode: null, escalationReason: null } as any,
   }
 }
 

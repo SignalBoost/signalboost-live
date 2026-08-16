@@ -299,7 +299,7 @@ export function replyCitesIndependentFreshEvidence(reply: string, input: string,
       .map(source => freshEvidenceHost(source.url))
       .filter(Boolean),
   )
-  if (!requiresIndependentCorroation(input)) return citedHosts.size >= 1
+  if (!requiresIndependentCorroboration(input)) return citedHosts.size >= 1
   return citedHosts.size >= 2
 }
 

@@ -2,11 +2,12 @@
 // Live web search for the Chief of Staff.
 // Returns structured top results (title, url, snippet) for market/competitor/news queries.
 //
-// PORTABLE: the search provider is INJECTED. The default adapter uses the Brave
-// Search API (BRAVE_SEARCH_API_KEY; free tier: 2,000 queries/month). A buyer of
-// the Chief-of-Staff portable calls setWebSearchPort(...) once to use their own
-// search provider and key.
+// PORTABLE: search providers are injected. Ordinary web retrieval uses WebSearchPort;
+// high-frequency public values (weather/financial/sports) use StructuredLiveDataPort so
+// COS never mistakes an ordinary web snippet for a real-time feed.
 
+import { structuredLiveDataKind } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { getStructuredLiveInfo } from '@/lib/ai/tools/getStructuredLiveInfo'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
@@ -20,6 +21,10 @@ export type SearchResult = {
   // COS retrieved the result. Keeping the two timestamps separate prevents an old
   // article retrieved now from masquerading as newly published evidence.
   sourceDate?: string
+  // Structured real-time providers annotate observations explicitly. Generic web-search
+  // results leave these fields unset.
+  sourceKind?: 'structured_realtime'
+  observedAt?: string
 }
 export type ExternalInfoOptions = { bypassCache?: boolean }
 
@@ -84,6 +89,14 @@ function isFreshnessQuery(query: string): boolean {
     && /\b(?:authoritative|official|verification)\b/.test(q)
 }
 
+function structuredProviderQuery(query: string): string {
+  const stripped = String(query || '').replace(
+    /\s+current\s+latest\s+official\s+authoritative\s+independent\s+verification\s+as\s+of\s+\d{4}-\d{2}-\d{2}\s*$/i,
+    '',
+  ).trim()
+  return stripped || String(query || '').trim()
+}
+
 export async function getExternalInfo(
   query: string,
   requestedCount = DEFAULT_RESULT_COUNT,
@@ -93,6 +106,22 @@ export async function getExternalInfo(
   if (!q) return { ok: false, results: [], error: 'Empty search query.' }
   const count = Math.max(1, Math.min(Number(requestedCount) || DEFAULT_RESULT_COUNT, MAX_RESULT_COUNT))
   const bypassCache = options.bypassCache === true || isFreshnessQuery(q)
+
+  // High-frequency values are not allowed to degrade to ordinary web snippets. The structured
+  // provider is the system-of-record boundary for this class; if unavailable, return failure so
+  // the caller can fail closed rather than synthesize a potentially stale value.
+  if (bypassCache) {
+    const structuredQuery = structuredProviderQuery(q)
+    const structuredKind = structuredLiveDataKind(structuredQuery)
+    if (structuredKind) {
+      const structured = await getStructuredLiveInfo(structuredQuery, structuredKind)
+      return {
+        ok: structured.ok,
+        results: structured.results,
+        ...(structured.error ? { error: structured.error } : {}),
+      }
+    }
+  }
 
   const key = `${count}:${q.toLowerCase()}`
   if (!bypassCache) {

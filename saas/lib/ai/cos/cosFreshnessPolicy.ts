@@ -12,38 +12,54 @@ const LOOKUP_INTENT = /^\s*(?:who|what|when|where|which|is|are|has|have|did|does
 const HISTORICAL_ANCHOR = /\b(?:yesterday|last\s+(?:week|month|year)|historical(?:ly)?|formerly|previously|in\s+(?:19|20)\d{2}|as\s+of\s+(?:19|20)\d{2})\b/i
 const CONCEPTUAL_OR_CREATIVE = /^\s*(?:explain|describe|define|teach|write|draft|create|design|build|plan|recommend|suggest|how\s+(?:do|does|did|is|are|can|could|would|should)|why\s+(?:do|does|did|is|are|can|could|would|should))\b/i
 
-// Public office/corporate leadership can change abruptly. Present-tense holder questions
-// are always live even when the user omits the word "current". Accept natural English
-// variants such as "the current president" and "currently the president".
 const PRESENT_TENSE_OFFICE_HOLDER = new RegExp(`\\bwho\\s+(?:is|['’]s)\\s+(?:(?:the\\s+)?current(?:ly)?\\s+(?:the\\s+)?|(?:the\\s+)?)${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 const TERSE_CURRENT_OFFICE_HOLDER = new RegExp(`^\\s*(?:current|currently)\\s+${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 const CURRENT_LEADER = /\bwho\s+(?:currently\s+)?(?:leads|heads|runs)\b/i
 const ROLE_STATUS_CHECK = new RegExp(`^\\s*(?:is|are)\\s+[^?.!]{1,100}\\b(?:still\\s+)?(?:the\\s+)?${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 
-// Public news/current-events queries.
 const NEWS_STATE = /\b(?:news|headlines?|breaking news|news updates?)\b/i
 const LIVE_NEWS = /\b(?:latest|today(?:'s)?|live|breaking|recent|updated)\s+(?:news|headlines?|updates?)\b/i
 
-// Clearly external fast-changing data domains. These patterns deliberately avoid generic
-// words such as "price", "result", "schedule", "availability", "inventory", and "market"
-// because those commonly describe a user's own business data or actions.
+// High-frequency public data that should use a structured real-time provider when available.
 const WEATHER_STATE = /\b(?:weather|weather forecast|forecast(?:s)?|temperature|rainfall|snowfall|storm warning|hurricane warning)\b/i
 const FINANCIAL_STATE = /\b(?:exchange rate|exchange rates|forex rate|forex rates|stock price|stock prices|share price|share prices|crypto price|crypto prices|cryptocurrency price|cryptocurrency prices|market data|market quote|market quotes|stock market|financial market|index value|index values)\b/i
 const TICKER_PRICE = /\b[A-Z]{1,6}(?:['’]s)?\s+(?:stock\s+)?price\b/
 const CRYPTO_PRICE = /\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b.{0,35}\b(?:price|quote|rate)\b|\b(?:price|quote|rate)\b.{0,35}\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b/i
 const SPORTS_STATE = /\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b.{0,45}\b(?:score|scores|standings|schedule)\b|\b(?:score|scores|standings)\b.{0,45}\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b/i
 const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa)\b.{0,60}\b(?:score|scores|standings|schedule)\b/i
+
 const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
 const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
 const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
 
+function normalizedText(input: string): string {
+  return String(input || '').replace(/\s+/g, ' ').trim()
+}
+
 function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
   if (!state.test(text)) return false
   if (LOOKUP_INTENT.test(text)) return true
-  // Terse noun-phrase searches such as "Weather in Paramaribo?" are also lookups.
   return !/[.!]\s+\w/.test(text) && text.split(/\s+/).length <= 12
+}
+
+export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
+
+/**
+ * Identifies external high-frequency values for which ordinary web snippets are not an
+ * adequate source of truth. Callers should use a structured real-time provider and fail
+ * closed if that provider cannot return current data; they must not silently fall back to
+ * pretrained/model memory or a stale generic-search snippet.
+ */
+export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
+  const text = normalizedText(input)
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text)) return null
+
+  if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
+  if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
+  if (TERSE_SPORTS_STATE.test(text) || (LOOKUP_INTENT.test(text) && SPORTS_STATE.test(text))) return 'sports'
+  return null
 }
 
 /**
@@ -54,40 +70,26 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
  * to establish the answer. COS must retrieve fresh external evidence on this turn.
  */
 export function requiresFreshExternalEvidence(input: string): boolean {
-  const text = String(input || '').replace(/\s+/g, ' ').trim()
+  const text = normalizedText(input)
   if (!text) return false
 
-  // Explicitly historical questions are not current-world lookups.
   if (HISTORICAL_ANCHOR.test(text)) return false
 
-  // Present-tense public/corporate office-holder questions are inherently current.
   if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
   if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true
   if (CURRENT_LEADER.test(text)) return true
   if (ROLE_STATUS_CHECK.test(text)) return true
 
-  // Current/breaking news is always an external live-data question.
   if (LIVE_NEWS.test(text)) return true
   if (LOOKUP_INTENT.test(text) && NEWS_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
 
-  // Do not hijack explanatory, creative, planning, or internal-work requests merely because
-  // they contain words that can also appear in a live-data question.
   if (CONCEPTUAL_OR_CREATIVE.test(text)) return false
 
-  // These domains are externally volatile by their nature. A user should not have to add
-  // "current" to "TSLA stock price", "Weather in Paramaribo", or "NBA standings".
-  if (isDirectOrTerseLookup(text, WEATHER_STATE)) return true
-  if (isDirectOrTerseLookup(text, FINANCIAL_STATE)) return true
-  if (TICKER_PRICE.test(text)) return true
-  if (isDirectOrTerseLookup(text, CRYPTO_PRICE)) return true
-  if (TERSE_SPORTS_STATE.test(text)) return true
-  if (LOOKUP_INTENT.test(text) && SPORTS_STATE.test(text)) return true
+  if (structuredLiveDataKind(text)) return true
   if (LOOKUP_INTENT.test(text) && OUTAGE_STATE.test(text)) return true
   if (isDirectOrTerseLookup(text, TRAVEL_STATE)) return true
   if (isDirectOrTerseLookup(text, ELECTION_STATE)) return true
 
-  // Laws/regulations and software/security advisories are current-state lookups only when
-  // the request is actually asking for their operative/latest state.
   if (LOOKUP_INTENT.test(text) && PUBLIC_RULE_STATE.test(text)) return true
   if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
 

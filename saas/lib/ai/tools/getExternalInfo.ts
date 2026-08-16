@@ -39,6 +39,57 @@ const MAX_CACHE_ENTRIES = 50
 const DEFAULT_RESULT_COUNT = 10
 const MAX_RESULT_COUNT = 12
 
+// Public-office identity is a primary-source problem, not a media-consensus problem. General-news
+// outlets are intentionally excluded from the usable evidence set for this narrow query class.
+// They remain available for actual news/research queries elsewhere in COS.
+const GENERAL_NEWS_MEDIA_HOST_SUFFIXES = [
+  'cnn.com',
+  'foxnews.com',
+  'msnbc.com',
+  'bbc.com',
+  'bbc.co.uk',
+  'nbcnews.com',
+  'cbsnews.com',
+  'abcnews.go.com',
+  'reuters.com',
+  'apnews.com',
+  'politico.com',
+  'theguardian.com',
+  'nytimes.com',
+  'washingtonpost.com',
+  'usatoday.com',
+  'newsweek.com',
+  'npr.org',
+  'aljazeera.com',
+  'bloomberg.com',
+  'cnbc.com',
+  'forbes.com',
+] as const
+
+const PUBLIC_OFFICE_ROLE_RE = /\b(?:president|vice\s+president|prime\s+minister|premier|chancellor|governor|mayor|secretary\s+of\s+state|attorney\s+general|speaker|minister|monarch|king|queen|pope)\b/i
+const CURRENT_OFFICE_MARKER_RE = /\b(?:current|currently|now|today|at\s+present)\b/i
+const MEDIA_STYLE_TITLE_RE = /\b(?:breaking\s+news|latest\s+news|headlines|news\s+and\s+analysis|live\s+updates)\b/i
+
+function sourceHost(value: string): string {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+export function isGeneralNewsMediaResult(result: Pick<SearchResult, 'title' | 'url'>): boolean {
+  const host = sourceHost(result.url)
+  if (!host) return false
+  if (GENERAL_NEWS_MEDIA_HOST_SUFFIXES.some(suffix => host === suffix || host.endsWith(`.${suffix}`))) return true
+  return MEDIA_STYLE_TITLE_RE.test(String(result.title || ''))
+}
+
+export function isCurrentPublicOfficeQuery(query: string): boolean {
+  const text = String(query || '')
+  return PUBLIC_OFFICE_ROLE_RE.test(text) && CURRENT_OFFICE_MARKER_RE.test(text)
+}
+
 // ── Default adapter: Brave Search ─────────────────────────────────────────────
 let searchPort: WebSearchPort | null = null
 
@@ -132,8 +183,21 @@ export async function getExternalInfo(
   }
 
   try {
-    const results = await getWebSearchPort().search(q, count)
-    if (!results.length) return { ok: false, results: [], error: 'No results found.' }
+    const rawResults = await getWebSearchPort().search(q, count)
+    const enforcePrimaryOfficeSources = isCurrentPublicOfficeQuery(q)
+    const results = enforcePrimaryOfficeSources
+      ? rawResults.filter(result => !isGeneralNewsMediaResult(result))
+      : rawResults
+
+    if (!results.length) {
+      return {
+        ok: false,
+        results: [],
+        error: enforcePrimaryOfficeSources && rawResults.length
+          ? 'No non-media authoritative/reference results survived the public-office source policy.'
+          : 'No results found.',
+      }
+    }
 
     // A truly-live caller deliberately bypasses both cache read and cache write. This prevents a
     // later current-fact request from inheriting evidence captured on an earlier request.

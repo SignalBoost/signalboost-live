@@ -20,12 +20,27 @@ export function authoritativeProvenance(
   const current = cos?.provenance ?? null
   const live = current?.liveExternalEvidence
   const sources = Array.isArray(live?.sources) ? live.sources : []
+  const semanticCacheReplay = current?.responseSource === 'semantic_cache' || current?.responseSource === 'semantic_similarity'
 
   provenance.external_ai = {
     ...(provenance.external_ai || {}),
     necessary: external.invoked ? current?.externalAiNecessary !== false : false,
     escalation_reason_code: current?.escalationReasonCode ?? null,
     escalation_reason: current?.escalationReason ?? null,
+  }
+
+  // Context retrieval can occur before a semantic-cache lookup resolves. On a cache replay that
+  // context was never consumed by a reasoner, so it is retrieval telemetry only: never injected,
+  // never cited, and never USED. The original generation funnel remains preserved separately under
+  // answer_origin.evidence_funnel and is not modified here.
+  if (semanticCacheReplay) {
+    for (const key of ['enterprise_memory', 'knowledge_graph', 'learned_corpus', 'cognitive_skills', 'user_memory']) {
+      const item = provenance?.[key]
+      if (!item || typeof item !== 'object') continue
+      item.used = false
+      item.injected_count = 0
+      item.evidence_count = 0
+    }
   }
 
   if (current?.deterministicFreshFactUsed === true) {

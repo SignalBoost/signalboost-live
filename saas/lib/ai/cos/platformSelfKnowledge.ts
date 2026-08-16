@@ -86,7 +86,7 @@ export async function seedPlatformSelfKnowledge(): Promise<PlatformSelfKnowledge
 
   const store = new SupabaseKnowledgeStore(db)
   const facts = platformSelfKnowledgeFacts()
-  const results = await Promise.all(facts.map(async fact => {
+  const settled = await Promise.allSettled(facts.map(async fact => {
     const existing = await db.from('cos_knowledge_facts')
       .select('object,confidence,source,embedding')
       .eq('task_id', fact.taskId)
@@ -101,11 +101,13 @@ export async function seedPlatformSelfKnowledge(): Promise<PlatformSelfKnowledge
     return 'embedded' as const
   }))
 
+  const fulfilled = settled.filter((result): result is PromiseFulfilledResult<'embedded' | 'skipped'> => result.status === 'fulfilled')
+  const rejected = settled.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
   return {
     attempted: facts.length,
-    embedded: results.filter(result => result === 'embedded').length,
-    skipped: results.filter(result => result === 'skipped').length,
-    failed: 0,
-    errors: [],
+    embedded: fulfilled.filter(result => result.value === 'embedded').length,
+    skipped: fulfilled.filter(result => result.value === 'skipped').length,
+    failed: rejected.length,
+    errors: rejected.map(result => result.reason instanceof Error ? result.reason.message : String(result.reason)).slice(0, 8),
   }
 }

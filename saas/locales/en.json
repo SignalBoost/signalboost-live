@@ -4241,5 +4241,15 @@
       "medium": "Medium",
       "high": "High"
     }
+  },
+  "assistantFeedback": {
+    "helpful": "Helpful",
+    "notHelpful": "Not helpful",
+    "correctThis": "Correct this",
+    "correctionPlaceholder": "What should COS learn from this?",
+    "submitCorrection": "Submit correction",
+    "cancelCorrection": "Cancel",
+    "feedbackSaved": "Feedback saved for COS learning.",
+    "feedbackError": "Could not save feedback."
   }
 }

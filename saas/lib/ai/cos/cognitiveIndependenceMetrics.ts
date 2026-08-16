@@ -8,7 +8,7 @@ export type CosIndependenceExperienceRow = {
 }
 
 export type CosIndependenceMetrics = {
-  schemaVersion: 1
+  schemaVersion: 2
   semantics: 'observed_runtime_learning_metrics_not_heldout_certification'
   targetIndependentPassRate: number
   observedTurnAttempts: number
@@ -23,11 +23,18 @@ export type CosIndependenceMetrics = {
   teacherDependencyRate: number | null
   skillGroundedAcceptedTurns: number
   factualGroundedAcceptedTurns: number
+  positiveFeedback: number
+  negativeFeedback: number
+  userCorrections: number
+  feedbackSignals: number
   subjects: Record<string, {
     attempts: number
     independentAccepted: number
     externalRequired: number
     teacherInteractions: number
+    positiveFeedback: number
+    negativeFeedback: number
+    userCorrections: number
   }>
 }
 
@@ -66,13 +73,17 @@ function accepted(row: CosIndependenceExperienceRow): boolean {
  * model teacher. They are intentionally NOT the ~85% held-out certification metric: production
  * traffic is not a hidden test set, cache reuse is not new reasoning competence, and live data
  * retrieval is a data dependency rather than an external-AI reasoning dependency.
+ *
+ * Explicit user feedback is reported as a separate quality signal. It never rewrites historical
+ * independence counts, creates factual authority, or turns a runtime acceptance into a verified
+ * production outcome.
  */
 export function computeCosIndependenceMetrics(
   rows: CosIndependenceExperienceRow[],
   targetIndependentPassRate = 0.85,
 ): CosIndependenceMetrics {
   const metrics: CosIndependenceMetrics = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     semantics: 'observed_runtime_learning_metrics_not_heldout_certification',
     targetIndependentPassRate: Math.max(0, Math.min(1, Number(targetIndependentPassRate) || 0.85)),
     observedTurnAttempts: 0,
@@ -87,6 +98,10 @@ export function computeCosIndependenceMetrics(
     teacherDependencyRate: null,
     skillGroundedAcceptedTurns: 0,
     factualGroundedAcceptedTurns: 0,
+    positiveFeedback: 0,
+    negativeFeedback: 0,
+    userCorrections: 0,
+    feedbackSignals: 0,
     subjects: {},
   }
 
@@ -98,6 +113,9 @@ export function computeCosIndependenceMetrics(
       independentAccepted: 0,
       externalRequired: 0,
       teacherInteractions: 0,
+      positiveFeedback: 0,
+      negativeFeedback: 0,
+      userCorrections: 0,
     }
     metrics.subjects[subject] = bucket
 
@@ -106,6 +124,21 @@ export function computeCosIndependenceMetrics(
     if (kind === 'teacher' || source === 'external_teacher') {
       metrics.teacherInteractions += occurrences
       bucket.teacherInteractions += occurrences
+      continue
+    }
+    if (kind === 'feedback' || source === 'user_feedback') {
+      const feedbackType = String(object(row.evidence).feedbackType ?? '').trim().toLowerCase()
+      metrics.feedbackSignals += occurrences
+      if (feedbackType === 'positive') {
+        metrics.positiveFeedback += occurrences
+        bucket.positiveFeedback += occurrences
+      } else if (feedbackType === 'negative') {
+        metrics.negativeFeedback += occurrences
+        bucket.negativeFeedback += occurrences
+      } else if (feedbackType === 'correction') {
+        metrics.userCorrections += occurrences
+        bucket.userCorrections += occurrences
+      }
       continue
     }
     if (kind !== 'encounter') continue

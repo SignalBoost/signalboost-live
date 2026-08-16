@@ -225,3 +225,54 @@ After this slice is production-proven, prioritize:
 - Capability status does not manufacture factual confidence.
 - No learning mechanism widens execution authority or bypasses approvals.
 - All promotions must remain auditable, reversible/quarantinable and evidence-based.
+
+## 2026-08-16 production acceptance update for PR #1253
+
+PR #1253 is now merged. Exact merge SHA: `3efccc51c10630c4eabb83f5288912c2edcf02bf`. Exact production deployment: `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` — `READY`.
+
+Production has real post-merge normal-turn evidence:
+
+- encounter id `c2953516-436a-4e3e-8fa7-dfc978d272c3`;
+- `experience_kind = encounter`;
+- `source_kind = cos_local_escalation`;
+- two identical failed/local-escalation outcomes reconciled to `occurrence_count = 2`;
+- evidence semantics `episodic_turn_signal_not_factual_truth`;
+- no `answer` key and no `response` key retained;
+- success semantics `cos_gate_acceptance_not_verified_business_outcome`;
+- route `external_required`;
+- local model attempted: true;
+- external AI invoked at the COS-first decision boundary: false.
+
+Matching Vercel telemetry showed the interactive request was authorized to wake RunPod, but RunPod returned `There are not enough free GPUs on the host machine to start this pod.` The local attempt therefore failed safely and the outer governed fallback later reached Gemini after Anthropic/OpenAI billing/quota failures.
+
+**Evidence status:** normal-turn persistence, bounded semantics and repeat reconciliation are production-proven for the external-required failure route. An accepted local/cache ordinary encounter remains pending because the observed request could not obtain RunPod capacity. Do not relabel this partial proof as a complete acceptance matrix.
+
+## Explicit user feedback / correction increment
+
+Current branch: `feat/cos-user-feedback-learning-20260816`.
+
+This increment uses the already-existing `experience_kind = feedback` instead of creating a parallel memory system.
+
+Contract:
+
+- assistant feedback is accepted only for an authenticated user's persisted conversation/assistant response;
+- the learning prompt/subject is derived from the server-owned transcript, not trusted from client input;
+- supported signals are `positive`, `negative`, and `correction`;
+- correction text is bounded and explicitly labeled `unverified_user_correction_requires_validation`;
+- no feedback automatically creates KG facts, learned-corpus knowledge, procedural skills, confidence bonuses or new execution authority;
+- repeated identical feedback reconciles by deterministic experience hash;
+- negative/correction feedback is only a future curriculum signal, not automatic learning/promotion;
+- independence reporting exposes positive/negative/correction quality counts separately without rewriting independent-acceptance or teacher-dependency metrics;
+- assistant UI exposes localized helpful / not-helpful / correction controls in EN/ES/PT/PL/RU.
+
+Production proof required after merge:
+
+1. exact deployment READY;
+2. submit one positive feedback item on a persisted assistant response;
+3. verify a durable `feedback` experience with no assistant answer text retained;
+4. submit one bounded correction and verify its unverified semantics / promotion-deny flags;
+5. repeat identical feedback and verify occurrence reconciliation;
+6. verify independence quality metrics count feedback but capability/teacher metrics do not change merely because feedback exists.
+
+After this, the next independence increment remains verified production-outcome wiring and autonomous curriculum prioritization from repeated failures, external-teacher dependence/cost, business importance, and weak/untested/conflicted capability classes.
+

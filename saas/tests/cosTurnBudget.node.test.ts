@@ -12,7 +12,7 @@ import {
   turnBudgetMs,
   localCallEstimateMs,
   challengeRoundEstimateMs,
-} from '../lib/ai/cos/cosTurnBudget'
+} from '../lib/ai/cos/cosTurnBudget.ts'
 
 test('budget never exceeds the platform ceiling minus reserved overhead', () => {
   assert.equal(turnBudgetMs(), 255_000) // 300s ceiling - 45s reserved

@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classifyProblemClass, knownProblemClasses, UNCLASSIFIED_PROBLEM_CLASS } from '../lib/ai/cos/cosProblemClass'
+import { classifyProblemClass, knownProblemClasses, UNCLASSIFIED_PROBLEM_CLASS } from '../lib/ai/cos/cosProblemClass.ts'
 
 test('never returns the prompt itself — unbounded subjects are the defect being removed', () => {
   const prompts = [
@@ -23,7 +23,6 @@ test('never returns the prompt itself — unbounded subjects are the defect bein
 })
 
 test('the same question in different words lands in ONE class (recurrence can concentrate)', () => {
-  // These were two separate subjects in production, so nothing could ever trend.
   const a = classifyProblemClass('Who is the current US president?')
   const b = classifyProblemClass('Who is the current President of the United States?')
   const c = classifyProblemClass('who is currently the president of the united states?')
@@ -51,8 +50,6 @@ test('ordinary turns split into real classes instead of one giant bucket', () =>
 })
 
 test('a foundational domain outranks a general intent when both match', () => {
-  // Documented precedence: capability grouping beats phrasing intent, so a planning question about
-  // latency still counts toward the SRE capability area rather than a generic planning bucket.
   assert.match(
     classifyProblemClass('Should we prioritise the latency fix or the corpus work?'),
     /site reliability engineering/,

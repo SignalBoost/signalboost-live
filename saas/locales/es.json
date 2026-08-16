@@ -4241,5 +4241,15 @@
       "medium": "Medio",
       "high": "Alto"
     }
+  },
+  "assistantFeedback": {
+    "helpful": "Útil",
+    "notHelpful": "No útil",
+    "correctThis": "Corregir",
+    "correctionPlaceholder": "¿Qué debería aprender COS de esto?",
+    "submitCorrection": "Enviar corrección",
+    "cancelCorrection": "Cancelar",
+    "feedbackSaved": "Comentarios guardados para el aprendizaje de COS.",
+    "feedbackError": "No se pudieron guardar los comentarios."
   }
 }

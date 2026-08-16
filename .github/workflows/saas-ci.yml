@@ -60,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Verify governed readiness, passive no-wake, and native Ollama fallback
-        run: npx --yes tsx --test tests/localEmbeddings.node.test.ts tests/localEmbeddingsNativeFallback.node.test.ts
+        run: npx --yes tsx --test --test-concurrency=1 tests/localEmbeddings.node.test.ts tests/localEmbeddingsNativeFallback.node.test.ts
 
   cos-cache-provenance:
     name: COS cache provenance policy

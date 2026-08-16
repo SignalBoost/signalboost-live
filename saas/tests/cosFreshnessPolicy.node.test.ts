@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
 test('current US president requires live external verification', () => {
   assert.equal(requiresFreshExternalEvidence('Who is the current President of the United States?'), true)

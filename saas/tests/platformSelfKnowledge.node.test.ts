@@ -53,9 +53,11 @@ test('versioned self-knowledge claims remain mechanically aligned with implement
   const readyStart = localInference.indexOf('export async function ensureLocalInferenceRuntimeReady')
   const readyEnd = localInference.indexOf('export async function callLocalModel', readyStart)
   const ready = localInference.slice(readyStart, readyEnd)
+  assert.ok(localInference.includes('const MAX_RUNPOD_READINESS_BUDGET_MS = 120_000'))
+  assert.ok(ready.includes('totalReadinessBudgetMs'))
+  assert.ok(ready.includes('remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs)'))
   assert.ok(ready.includes('if (firstWake.computeStartedByRequest)'))
   assert.ok(ready.includes('retryWake = await ensureRunpodReasonerStarted()'))
-  assert.ok(ready.includes('MAX_RUNPOD_READINESS_BUDGET_MS'))
 })
 
 test('self-knowledge persistence stays on local passive embedding and existing Knowledge Graph storage', () => {

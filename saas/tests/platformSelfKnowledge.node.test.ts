@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { platformSelfKnowledgeFacts } from '../lib/ai/cos/platformSelfKnowledge'
+import { platformSelfKnowledgeFacts } from '../lib/ai/cos/platformSelfKnowledge.ts'
 
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8')

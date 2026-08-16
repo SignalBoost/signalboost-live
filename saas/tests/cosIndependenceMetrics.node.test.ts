@@ -26,7 +26,7 @@ test('independence metrics distinguish local generation, cache reuse, fresh veri
     },
   ])
 
-  assert.equal(metrics.schemaVersion, 2)
+  assert.equal(metrics.schemaVersion, 3)
   assert.equal(metrics.observedTurnAttempts, 7)
   assert.equal(metrics.independentAcceptedTurns, 6)
   assert.equal(metrics.localAcceptedTurns, 2)
@@ -46,6 +46,10 @@ test('independence metrics distinguish local generation, cache reuse, fresh veri
     positiveFeedback: 0,
     negativeFeedback: 0,
     userCorrections: 0,
+    productionOutcomes: 0,
+    productionSuccesses: 0,
+    productionFailures: 0,
+    productionObserved: 0,
   })
 })
 
@@ -123,5 +127,49 @@ test('explicit feedback is a quality signal and never changes independence math'
     positiveFeedback: 3,
     negativeFeedback: 2,
     userCorrections: 1,
+    productionOutcomes: 0,
+    productionSuccesses: 0,
+    productionFailures: 0,
+    productionObserved: 0,
   })
+})
+
+test('verified production outcomes report real-world success separately from answer independence', () => {
+  const metrics = computeCosIndependenceMetrics([
+    {
+      experience_kind: 'encounter', subject: 'incident diagnosis', source_kind: 'cos_local_reasoning', success: true,
+      evidence: { routeClass: 'local', acceptedByCosGate: true, externalAiInvoked: false },
+    },
+    {
+      experience_kind: 'production_use', subject: 'incident diagnosis', source_kind: 'verified_objective_outcome', success: true,
+      evidence: { outcomeStatus: 'success', domain: 'self_healing', semantics: 'verified_production_outcome_signal_not_factual_promotion' },
+    },
+    {
+      experience_kind: 'production_use', subject: 'incident diagnosis', source_kind: 'verified_objective_outcome', success: false,
+      evidence: { outcomeStatus: 'failure', domain: 'self_healing', semantics: 'verified_production_outcome_signal_not_factual_promotion' },
+    },
+    {
+      experience_kind: 'production_use', subject: 'incident diagnosis', source_kind: 'verified_objective_outcome', success: null,
+      evidence: { outcomeStatus: 'observed', domain: 'self_healing', semantics: 'verified_production_outcome_signal_not_factual_promotion' },
+    },
+    {
+      experience_kind: 'production_use', subject: 'incident diagnosis', source_kind: 'verified_production_outcome', success: true,
+      evidence: { evidence: { source: 'council_objective_prediction' } },
+    },
+  ])
+
+  assert.equal(metrics.observedTurnAttempts, 1)
+  assert.equal(metrics.independentAcceptedTurns, 1)
+  assert.equal(metrics.verifiedProductionOutcomes, 3)
+  assert.equal(metrics.verifiedProductionSuccesses, 1)
+  assert.equal(metrics.verifiedProductionFailures, 1)
+  assert.equal(metrics.verifiedProductionObserved, 1)
+  assert.equal(metrics.verifiedProductionSuccessRate, 0.5)
+  assert.deepEqual(metrics.outcomeDomains.self_healing, {
+    outcomes: 3,
+    successes: 1,
+    failures: 1,
+    observed: 1,
+  })
+  assert.equal(metrics.subjects['incident diagnosis'].productionOutcomes, 3)
 })

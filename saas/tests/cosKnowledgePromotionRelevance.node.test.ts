@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { evaluateKnowledgePromotionRelevance } from '../lib/ai/cos/knowledgePromotionRelevance'
+import { evaluateKnowledgePromotionRelevance, knowledgePromotionSourceAllowed } from '../lib/ai/cos/knowledgePromotionRelevance'
 
 const options = { minSubjectMatches: 2, minSubjectCoverage: 0.3 }
 
@@ -16,6 +16,33 @@ test('relevant Kubernetes material is eligible for structured KG promotion', () 
   assert.equal(decision.eligible, true)
   assert.ok(decision.matchedAnchors.includes('kubernetes'))
   assert.ok(decision.matchedAnchors.includes('containers'))
+})
+
+test('benchmark fixtures can never auto-promote into durable Knowledge Graph facts', () => {
+  assert.equal(knowledgePromotionSourceAllowed('benchmark_fixture'), false)
+  const decision = evaluateKnowledgePromotionRelevance({
+    sourceKind: 'benchmark_fixture',
+    subject: 'Database and data-layer performance',
+    sourceTitle: 'Synthetic benchmark fixture',
+    summary: 'Database data-layer performance improves when the benchmark fixture uses a synthetic index.',
+    confidence: 0.99,
+  }, options)
+
+  assert.equal(decision.eligible, false)
+  assert.equal(decision.reason, 'source_not_allowed')
+})
+
+test('unknown source kinds fail closed even when relevance and confidence are strong', () => {
+  const decision = evaluateKnowledgePromotionRelevance({
+    sourceKind: 'model_generated_test_material',
+    subject: 'Enterprise cybersecurity incident response',
+    sourceTitle: 'Enterprise cybersecurity incident response',
+    summary: 'Enterprise cybersecurity incident response contains a detailed and apparently relevant procedure.',
+    confidence: 1,
+  }, options)
+
+  assert.equal(decision.eligible, false)
+  assert.equal(decision.reason, 'source_not_allowed')
 })
 
 test('a lung-disease paper cannot become database-performance knowledge just because it says performance', () => {

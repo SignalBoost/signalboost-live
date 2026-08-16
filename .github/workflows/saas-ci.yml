@@ -98,8 +98,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify episodic turns, explicit feedback, verified outcomes, and independence metric semantics
-        run: npx --yes tsx --test tests/cosContinuousTurnLearning.node.test.ts tests/cosUserFeedbackLearning.node.test.ts tests/cosVerifiedProductionOutcome.node.test.ts tests/cosIndependenceMetrics.node.test.ts
+      - name: Verify episodic turns, explicit feedback, verified outcomes, revenue outcomes, and independence metric semantics
+        run: npx --yes tsx --test tests/cosContinuousTurnLearning.node.test.ts tests/cosUserFeedbackLearning.node.test.ts tests/cosVerifiedProductionOutcome.node.test.ts tests/cosRevenueOutcomeLearning.node.test.ts tests/cosIndependenceMetrics.node.test.ts
 
   build:
     name: Production build (next build)

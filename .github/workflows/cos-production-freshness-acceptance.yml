@@ -111,3 +111,109 @@ jobs:
             stopping_reason: provenance?.evidence_budget?.stopping_reason || null,
           }, null, 2))
           NODE
+
+  structured-live-data:
+    name: Structured real-time facts skip RunPod
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: weather
+            prompt: 'Weather in Paramaribo?'
+          - label: stock
+            prompt: 'What is the TSLA stock price?'
+          - label: fx
+            prompt: 'What is the USD to EUR exchange rate?'
+    steps:
+      - name: Exercise structured production data path
+        env:
+          TARGET_URL: https://saas.signalboostapp.com/api/concierge
+          APP_ORIGIN: https://saas.signalboostapp.com
+          ACCEPTANCE_LABEL: ${{ matrix.label }}
+          ACCEPTANCE_PROMPT: ${{ matrix.prompt }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          fs.writeFileSync('payload.json', JSON.stringify({
+            messages: [{ role: 'user', content: process.env.ACCEPTANCE_PROMPT }],
+            context: {
+              language: 'en',
+              acceptance: `cos-production-structured-live-v1-${process.env.ACCEPTANCE_LABEL}`,
+            },
+          }))
+          NODE
+
+          STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          HTTP_CODE="$(curl --silent --show-error --location \
+            --max-time 150 \
+            --request POST "$TARGET_URL" \
+            --header 'Content-Type: application/json' \
+            --header 'Accept: application/json' \
+            --header "Origin: $APP_ORIGIN" \
+            --header 'Sec-Fetch-Site: same-origin' \
+            --header 'Sec-Fetch-Mode: cors' \
+            --header "Referer: $APP_ORIGIN/" \
+            --data-binary @payload.json \
+            --output response.json \
+            --write-out '%{http_code}')"
+          FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "acceptance_label=$ACCEPTANCE_LABEL"
+          echo "acceptance_started_at=$STARTED_AT"
+          echo "acceptance_finished_at=$FINISHED_AT"
+          echo "http_code=$HTTP_CODE"
+          cat response.json
+          echo
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Expected HTTP 200 from structured live-data route, got $HTTP_CODE" >&2
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          const payload = JSON.parse(fs.readFileSync('response.json', 'utf8'))
+          const fail = message => { console.error(message); process.exit(1) }
+
+          if (payload.ok !== true) fail(`Expected ok=true, got ${JSON.stringify(payload.ok)}`)
+          if (payload.source !== 'external_fresh_grounded') fail(`Expected external_fresh_grounded, got ${payload.source}`)
+          if (payload.local_model_invoked !== false) fail(`Local model must be false, got ${JSON.stringify(payload.local_model_invoked)}`)
+          if (payload.external_ai_invoked !== true) fail(`External AI must be invoked, got ${JSON.stringify(payload.external_ai_invoked)}`)
+          if (String(payload.external_provider || '').toLowerCase() !== 'gemini') fail(`Expected Gemini, got ${payload.external_provider}`)
+          if (payload.live_evidence_retrieved_this_turn !== true) fail('Expected structured live evidence retrieved this turn')
+          if (payload.volatile_cache_written !== false) fail(`Structured current answer must not be written to volatile cache, got ${payload.volatile_cache_written}`)
+
+          const sources = Array.isArray(payload.live_evidence_sources) ? payload.live_evidence_sources : []
+          if (sources.length !== 1) fail(`Expected exactly one structured provider evidence item, got ${sources.length}`)
+          if (!/Brave Rich Search real-time/i.test(String(sources[0]?.title || ''))) {
+            fail(`Expected Brave Rich Search real-time evidence, got ${JSON.stringify(sources[0])}`)
+          }
+
+          const provenance = payload.execution_provenance || {}
+          if (provenance?.fresh_local_synthesis?.attempted !== false) fail('Fresh local synthesis must remain disabled')
+          if (provenance?.local_reasoning?.invoked === true || provenance?.local_reasoning?.used === true) fail('Local Qwen reasoning must not run')
+          if (provenance?.answer_origin?.from_cache !== false) fail('Structured current answer must not come from cache')
+          if (String(provenance?.answer_origin?.provider || '').toLowerCase() !== 'gemini') fail('Answer origin must be Gemini')
+          if (provenance?.live_external_evidence?.used !== true) fail('Provenance must record live external evidence as used')
+          if (provenance?.evidence_budget?.results_received !== 1 || provenance?.evidence_budget?.evidence_selected !== 1) {
+            fail(`Expected one structured evidence result through the funnel, got ${JSON.stringify(provenance?.evidence_budget)}`)
+          }
+
+          const answer = String(payload.reply || '')
+          if (!answer.includes('[LIVE1]') || !answer.includes('http')) fail('Answer must cite the structured evidence item')
+
+          console.log(JSON.stringify({
+            acceptance: 'PASS',
+            label: process.env.ACCEPTANCE_LABEL,
+            source: payload.source,
+            provider: payload.external_provider,
+            model: payload.external_model,
+            local_model_invoked: payload.local_model_invoked,
+            evidence_title: sources[0]?.title,
+            stopping_reason: provenance?.evidence_budget?.stopping_reason || null,
+          }, null, 2))
+          NODE

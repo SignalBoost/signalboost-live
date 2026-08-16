@@ -18,6 +18,7 @@ import {
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
 import { generateLocalEmbedding } from './localEmbeddings'
+import { recordCosTurnExperience } from './cognitiveTurnExperience'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import {
@@ -263,6 +264,17 @@ async function tryFreshCurrentFact(input: {
   }
 }
 
+async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
+  await recordCosTurnExperience({
+    prompt: input.prompt,
+    handled: result.handled,
+    confidence: result.confidence,
+    provenance: result.provenance,
+    failureReason: result.handled ? null : result.reason,
+  })
+  return result
+}
+
 export async function tryCOSFirstAnswer(input: {
   prompt: string
   userId?: string | null
@@ -270,7 +282,7 @@ export async function tryCOSFirstAnswer(input: {
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
   if (requiresFreshExternalEvidence(input.prompt)) {
-    return tryFreshCurrentFact(input)
+    return learnFromTurn(input, await tryFreshCurrentFact(input))
   }
 
   // Ordinary enterprise retrieval has bounded semantic-query budgets. Complete any authorized
@@ -292,7 +304,7 @@ export async function tryCOSFirstAnswer(input: {
       // lifecycle fail-safe. Enterprise retrieval still gets its lexical/internal fallbacks, but it
       // must not inherit the original interactive wake authority and immediately start a second
       // lifecycle attempt from semantic embedding calls in the same request.
-      return withRunpodWakePermission({
+      const result = await withRunpodWakePermission({
         allowed: false,
         source: 'background_or_untrusted',
         interactionId: null,
@@ -300,8 +312,9 @@ export async function tryCOSFirstAnswer(input: {
         ageMs: null,
         reason: 'runtime_preflight_failed_no_retry',
       }, () => tryEnterpriseCOSFirstAnswer(input))
+      return learnFromTurn(input, result)
     }
   }
 
-  return tryEnterpriseCOSFirstAnswer(input)
+  return learnFromTurn(input, await tryEnterpriseCOSFirstAnswer(input))
 }

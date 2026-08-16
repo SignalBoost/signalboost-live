@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { authoritativeProvenance, formatAuthoritativeProvenance } from '../lib/ai/cos/cosOrchestration'
+import { authoritativeProvenance, formatAuthoritativeProvenance } from '../lib/ai/cos/cosOrchestration.ts'
 
 test('complete provenance reports retrieved, relevant, selected, injected and cited stages', () => {
   const provenance = authoritativeProvenance({
@@ -25,6 +25,7 @@ test('complete provenance reports retrieved, relevant, selected, injected and ci
 
   const formatted = formatAuthoritativeProvenance(provenance, 'en')
   for (const label of [
+    'Answer Origin',
     'Semantic Cache',
     'Enterprise Memory',
     'Knowledge Graph',
@@ -36,13 +37,14 @@ test('complete provenance reports retrieved, relevant, selected, injected and ci
     'COS Confidence',
   ]) assert.ok(formatted.includes(label), `missing ${label}`)
 
-  assert.match(formatted, /Learned Corpus\s+: USED — 20 retrieved → 20 relevant → 6 selected → 6 injected → 2 cited learned items/)
-  assert.match(formatted, /Knowledge Graph\s+: NOT USED — 32 retrieved → 7 relevant → 4 selected → 4 injected → 0 cited graph-backed facts/)
-  assert.match(formatted, /User Memory\s+: NOT USED — 15 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited saved memories/)
-  assert.match(formatted, /Local Reasoning Engine: INVOKED — independent-local:qwen2\.5-coder:32b/)
-  assert.match(formatted, /External AI Provider\s+: NOT INVOKED/)
+  assert.match(formatted, /Answer Origin\s+: FRESH — generated during this request/)
+  assert.match(formatted, /Learned Corpus\s+: USED — 20 retrieved → 20 relevant → 6 selected → 6 injected → 2 cited/)
+  assert.match(formatted, /Knowledge Graph: 32 retrieved → 7 relevant → 4 selected → 4 injected → 0 cited/)
+  assert.match(formatted, /User Memory: 15 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited/)
+  assert.match(formatted, /Local Reasoning Engine\s+: INVOKED — independent-local:qwen2\.5-coder:32b/)
+  assert.match(formatted, /External AI Provider: NOT USED/)
   assert.match(formatted, /COS Confidence\s+: 0\.85 — threshold 0\.72/)
-  assert.equal(provenance.schema_version, 2)
+  assert.equal(provenance.schema_version, 4)
 })
 
 test('cache-hit provenance separates current retrieval from the turn that generated the answer', () => {
@@ -59,8 +61,8 @@ test('cache-hit provenance separates current retrieval from the turn that genera
       userMemoriesUsed: 0,
       userMemoriesCited: 0,
       evidenceFunnel: {
-        knowledgeGraph: { retrieved: 18, relevant: 3, selected: 3, injected: 0, cited: 0 },
-        learnedCorpus: { retrieved: 9, relevant: 9, selected: 2, injected: 0, cited: 0 },
+        knowledgeGraph: { retrieved: 18, relevant: 3, selected: 3, injected: 3, cited: 1 },
+        learnedCorpus: { retrieved: 9, relevant: 9, selected: 2, injected: 2, cited: 2 },
         userMemory: { retrieved: 4, relevant: 0, selected: 0, injected: 0, cited: 0 },
       },
       cacheOrigin: {
@@ -77,12 +79,18 @@ test('cache-hit provenance separates current retrieval from the turn that genera
   }, { invoked: false })
 
   const formatted = formatAuthoritativeProvenance(provenance, 'en')
-  assert.match(formatted, /Answer Origin\s+: SERVED FROM CACHE/)
-  assert.match(formatted, /Origin Evidence\s+: KG 4 injected\/1 cited; corpus 6 injected\/2 cited; memory 0 injected\/0 cited/)
-  assert.match(formatted, /Semantic Cache\s+: USED/)
-  assert.match(formatted, /Knowledge Graph\s+: NOT USED — 18 retrieved → 3 relevant → 3 selected → 0 injected → 0 cited/)
-  assert.match(formatted, /Learned Corpus\s+: NOT USED — 9 retrieved → 9 relevant → 2 selected → 0 injected → 0 cited/)
-  assert.match(formatted, /Local Reasoning Engine: NOT INVOKED\./)
-  assert.match(formatted, /Recorded when the cached answer was generated; no confidence gate ran on this request/)
+  assert.match(formatted, /Answer Origin\s+: CACHE — written 2026-08-12T12:00:00\.000Z by independent-local:qwen2\.5-coder:32b/)
+  assert.match(formatted, /Original Lineage/)
+  assert.match(formatted, /Local Reasoning Engine\s+: INVOKED — independent-local:qwen2\.5-coder:32b/)
+  assert.match(formatted, /Learned Corpus\s+: 12 retrieved → 12 relevant → 6 selected → 6 injected → 2 cited/)
+  assert.match(formatted, /Knowledge Graph\s+: 24 retrieved → 5 relevant → 4 selected → 4 injected → 1 cited/)
+  assert.match(formatted, /Current Retrieval Attempt/)
+  assert.match(formatted, /Knowledge Graph\s+: 18 retrieved → 3 relevant → 3 selected → 0 injected — NOT INJECTED into the cached answer/)
+  assert.match(formatted, /Learned Corpus\s+: 9 retrieved → 9 relevant → 2 selected → 0 injected — NOT INJECTED into the cached answer/)
+  assert.match(formatted, /COS Confidence\s+: 0\.90 — threshold 0\.72 \(based on original lineage\)/)
+  assert.equal(provenance.knowledge_graph.injected_count, 0)
+  assert.equal(provenance.learned_corpus.injected_count, 0)
+  assert.equal(provenance.answer_origin.evidence_funnel?.knowledgeGraph.injected, 4)
+  assert.equal(provenance.answer_origin.evidence_funnel?.learnedCorpus.injected, 6)
   assert.equal(provenance.answer_origin.model, 'independent-local:qwen2.5-coder:32b')
 })

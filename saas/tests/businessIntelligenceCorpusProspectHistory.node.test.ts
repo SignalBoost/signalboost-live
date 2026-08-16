@@ -3,12 +3,14 @@ import test from 'node:test'
 import { validateProspectHistoryObservations, type ProspectHistoryObservation } from '../lib/business-intelligence-corpus/prospect-history.ts'
 
 const at = '2026-08-10T06:00:00.000Z'
+const snippet = 'Example Cloud provides managed cloud infrastructure and support services for business customers.'
 
 function observation(overrides: Partial<ProspectHistoryObservation> = {}): ProspectHistoryObservation {
   return {
     jobId: 'job-1',
     name: 'Example Cloud',
     url: 'https://examplecloud.com',
+    snippet,
     outcome: 'skipped',
     observedAt: at,
     region: 'US',
@@ -17,7 +19,7 @@ function observation(overrides: Partial<ProspectHistoryObservation> = {}): Prosp
   }
 }
 
-test('promotes repeated registrable-root company identity without external enrichment', () => {
+test('promotes repeated registrable-root company identity only with reusable profile evidence', () => {
   const candidates = validateProspectHistoryObservations([
     observation(),
     observation({ jobId: 'job-2', observedAt: '2026-08-10T07:00:00.000Z' }),
@@ -27,20 +29,31 @@ test('promotes repeated registrable-root company identity without external enric
   const candidate = candidates[0]
   assert.equal(candidate.record.canonicalDomain, 'examplecloud.com')
   assert.equal(candidate.record.companyName, 'Example Cloud')
+  assert.equal(candidate.record.description, snippet)
   assert.equal(candidate.record.sourceType, 'learned')
   assert.equal(candidate.record.confidence, 0.8)
   assert.equal(candidate.distinctCampaignJobs, 2)
+  assert.equal(candidate.descriptionEvidenceRows, 2)
   assert.equal(candidate.sameDomainContactEvidence, 0)
   assert.deepEqual(candidate.record.sourceIds, ['prospect_campaign_job:job-1', 'prospect_campaign_job:job-2'])
   assert.equal(candidate.record.attributes.externalProviderCalls, 0)
   assert.equal(candidate.record.attributes.externalAiCalls, 0)
 })
 
-test('allows one sighting only when drafted contact evidence is on the exact company domain', () => {
+test('does not count repeated identity-only sightings as ready corpus profiles', () => {
+  const candidates = validateProspectHistoryObservations([
+    observation({ snippet: null }),
+    observation({ jobId: 'job-2', snippet: null }),
+  ])
+  assert.deepEqual(candidates, [])
+})
+
+test('allows one sighting when exact same-domain contact evidence establishes reusable business identity', () => {
   const accepted = validateProspectHistoryObservations([
     observation({
       name: 'Cloud.ru',
       url: 'https://cloud.ru',
+      snippet: 'Cloud.ru provides cloud services and AI technology for business customers.',
       detail: 'info@cloud.ru',
       outcome: 'drafted',
       language: 'ru',
@@ -56,6 +69,7 @@ test('allows one sighting only when drafted contact evidence is on the exact com
     observation({
       name: 'Cloud.ru',
       url: 'https://cloud.ru',
+      snippet: null,
       detail: 'cloud@example.net',
       outcome: 'drafted',
     }),

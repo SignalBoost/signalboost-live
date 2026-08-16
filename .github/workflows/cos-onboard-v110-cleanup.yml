@@ -1,0 +1,40 @@
+name: COS onboarding v1.10 cleanup
+
+on:
+  push:
+    branches: [feat/cos-user-feedback-learning-20260816]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/cos-user-feedback-learning-20260816
+          fetch-depth: 0
+      - name: Normalize current COS learning status
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('ONBOARD.md')
+          text = p.read_text()
+          old = """Current increment on `feat/cos-continuous-independence-learning-20260816` adds:\n\n- bounded episodic capture of meaningful normal COS turns in `cos_cognitive_experiences`;\n- explicit separation of local reasoning, answer-cache reuse, fresh verification, external-required failure and other runtime routes;\n- no model answer text automatically retained as factual truth;\n- volatile/current requests retain only routing/outcome learning, never the current answer as timeless semantic fact;\n- repeated identical turn outcomes increment occurrence evidence rather than creating unlimited duplicates;\n- owner-only read-only runtime independence report at `/api/admin/cos-learning/independence`;\n- metrics for local accepted work, cache reuse, fresh verification, external-required attempts, teacher interactions, teacher dependency and grounded reuse by problem class;\n- an isolated `COS continuous independence learning` CI gate.\n\n**Evidence boundary:** until this increment is merged, deployed and observed through a real production turn plus durable DB evidence, report it as implementation/acceptance work — not production-proven behavior.\n"""
+          new = """PR #1253 (`feat/cos-continuous-independence-learning-20260816`) is merged and has partial production proof. It provides:\n\n- bounded episodic capture of meaningful normal COS turns in `cos_cognitive_experiences`;\n- explicit separation of local reasoning, answer-cache reuse, fresh verification, external-required failure and other runtime routes;\n- no model answer text automatically retained as factual truth;\n- volatile/current requests retain only routing/outcome learning, never the current answer as timeless semantic fact;\n- repeated identical turn outcomes increment occurrence evidence rather than creating unlimited duplicates;\n- owner-only read-only runtime independence report at `/api/admin/cos-learning/independence`;\n- metrics for local accepted work, cache reuse, fresh verification, external-required attempts, teacher interactions, teacher dependency and grounded reuse by problem class;\n- an isolated `COS continuous independence learning` CI gate.\n\nCurrent increment `feat/cos-user-feedback-learning-20260816` adds governed explicit helpful / not-helpful / correction feedback as episodic learning evidence and extends independence reporting with separate quality signals. It remains under acceptance until merged and production-observed.\n"""
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale current-increment block, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          text = text.replace('Next COS independence increments after production proof of this slice:', 'Next COS independence increments:', 1)
+          text = text.replace('1. durable user feedback/correction experiences;\n2. verified production-outcome wiring', '1. production-prove the current explicit user feedback/correction increment;\n2. verified production-outcome wiring', 1)
+          p.write_text(text)
+          PY
+      - name: Remove temporary workflow and commit
+        run: |
+          git rm .github/workflows/cos-onboard-v110-cleanup.yml
+          git config user.name 'SignalBoost CI'
+          git config user.email 'cadomos@gmail.com'
+          git add -A
+          git commit -m 'docs(cos): align onboarding with current learning increment'
+          git push origin HEAD:feat/cos-user-feedback-learning-20260816

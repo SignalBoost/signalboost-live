@@ -39,6 +39,29 @@ const MAX_CACHE_ENTRIES = 50
 const DEFAULT_RESULT_COUNT = 10
 const MAX_RESULT_COUNT = 12
 
+// COS source-governance exclusion boundary. Results from these hosts are not usable live
+// evidence and therefore cannot flow into grounding, provenance, research retention, or cache.
+const EXCLUDED_LIVE_SOURCE_HOSTS = new Set([
+  'cnn.com',
+])
+
+function liveSourceHost(value: string): string {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+export function isExcludedLiveSource(url: string): boolean {
+  const host = liveSourceHost(url)
+  if (!host) return true
+  for (const excluded of EXCLUDED_LIVE_SOURCE_HOSTS) {
+    if (host === excluded || host.endsWith(`.${excluded}`)) return true
+  }
+  return false
+}
+
 // ── Default adapter: Brave Search ─────────────────────────────────────────────
 let searchPort: WebSearchPort | null = null
 
@@ -132,8 +155,16 @@ export async function getExternalInfo(
   }
 
   try {
-    const results = await getWebSearchPort().search(q, count)
-    if (!results.length) return { ok: false, results: [], error: 'No results found.' }
+    const rawResults = await getWebSearchPort().search(q, count)
+    const results = rawResults.filter(result => !isExcludedLiveSource(result.url))
+    if (!results.length) {
+      const rejected = rawResults.length > 0
+      return {
+        ok: false,
+        results: [],
+        error: rejected ? 'Search results did not meet COS live-source policy.' : 'No results found.',
+      }
+    }
 
     // A truly-live caller deliberately bypasses both cache read and cache write. This prevents a
     // later current-fact request from inheriting evidence captured on an earlier request.

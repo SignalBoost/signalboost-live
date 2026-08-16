@@ -16,6 +16,7 @@ export type ProspectHistoryObservation = Readonly<{
   jobId: string
   name: string
   url: string
+  snippet?: string | null
   detail?: string | null
   outcome?: string | null
   observedAt?: string | null
@@ -28,6 +29,7 @@ export type ValidatedProspectCandidate = Readonly<{
   evidenceRows: number
   distinctCampaignJobs: number
   sameDomainContactEvidence: number
+  descriptionEvidenceRows: number
 }>
 
 function identityKey(value: string): string {
@@ -57,6 +59,11 @@ function cleanEmail(value: unknown): string | undefined {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined
 }
 
+function cleanSnippet(value: unknown): string | undefined {
+  const snippet = String(value || '').replace(/\s+/g, ' ').trim()
+  return snippet.length >= 20 ? snippet.slice(0, 1200) : undefined
+}
+
 function observationIdentity(observation: ProspectHistoryObservation) {
   const host = normalizeDomain(observation.url)
   if (!host || !host.includes('.') || isBlockedHost(host)) return null
@@ -74,7 +81,7 @@ function observationIdentity(observation: ProspectHistoryObservation) {
 
   const email = cleanEmail(observation.detail)
   const sameDomainEmail = Boolean(email && email.split('@')[1] === host && observation.outcome === 'drafted')
-  return { host, name, email: sameDomainEmail ? email : undefined }
+  return { host, name, email: sameDomainEmail ? email : undefined, snippet: cleanSnippet(observation.snippet) }
 }
 
 function bestName(observations: Array<{ name: string }>): string {
@@ -82,6 +89,13 @@ function bestName(observations: Array<{ name: string }>): string {
   for (const item of observations) counts.set(item.name, (counts.get(item.name) || 0) + 1)
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].length - b[0].length || a[0].localeCompare(b[0]))[0]?.[0] || ''
+}
+
+function bestDescription(values: string[]): string | undefined {
+  const counts = new Map<string, number>()
+  for (const value of values) counts.set(value, (counts.get(value) || 0) + 1)
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]))[0]?.[0]
 }
 
 function confidenceForEvidence(jobs: number, sameDomainContacts: number): number {
@@ -113,6 +127,10 @@ export function validateProspectHistoryObservations(
     const contacts = [...new Set(group.map(item => item.identity.email).filter((value): value is string => Boolean(value)))]
     if (jobIds.length < 2 && contacts.length === 0) continue
 
+    const snippets = group.map(item => item.identity.snippet).filter((value): value is string => Boolean(value))
+    const description = bestDescription(snippets)
+    if (!description && contacts.length === 0) continue
+
     const names = group.map(item => ({ name: item.identity.name }))
     const companyName = bestName(names)
     if (!companyName) continue
@@ -136,14 +154,16 @@ export function validateProspectHistoryObservations(
         companyName,
         aliases: [...new Set(group.map(item => item.identity.name).filter(name => name !== companyName))],
         website: `https://${host}`,
+        description,
         contacts: contacts.map(email => ({ email })),
         technologies: [],
         attributes: {
           prospectHistoryValidated: true,
-          validationRule: 'registrable_root_name_identity_plus_repeated_campaign_or_same_domain_contact_v1',
+          validationRule: 'registrable_root_name_identity_plus_repeated_campaign_or_same_domain_contact_with_profile_evidence_v2',
           evidenceRows: group.length,
           distinctCampaignJobs: jobIds.length,
           sameDomainContactEvidence: contacts.length,
+          descriptionEvidenceRows: snippets.length,
           discoveryRegions: regions,
           discoveryLanguages: languages,
           outcomes,
@@ -160,6 +180,7 @@ export function validateProspectHistoryObservations(
       evidenceRows: group.length,
       distinctCampaignJobs: jobIds.length,
       sameDomainContactEvidence: contacts.length,
+      descriptionEvidenceRows: snippets.length,
     })
   }
 
@@ -177,19 +198,33 @@ async function loadProspectHistoryObservations(): Promise<ProspectHistoryObserva
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await admin
       .from('prospect_campaign_jobs')
-      .select('id,region,language,results')
+      .select('id,region,language,results,candidates')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
     if (error) throw new Error(`PROSPECT_HISTORY_READ_FAILED: ${error.message}`)
     const page = data || []
     for (const job of page) {
+      const snippetsByHost = new Map<string, string>()
+      const rawCandidates = Array.isArray(job.candidates) ? job.candidates : []
+      for (const candidate of rawCandidates) {
+        if (!candidate || typeof candidate !== 'object') continue
+        const host = normalizeDomain(String((candidate as any).url || ''))
+        const snippet = cleanSnippet((candidate as any).snippet)
+        if (!host || !snippet) continue
+        const existing = snippetsByHost.get(host)
+        if (!existing || snippet.length > existing.length) snippetsByHost.set(host, snippet)
+      }
+
       const results = Array.isArray(job.results) ? job.results : []
       for (const result of results) {
         if (!result || typeof result !== 'object') continue
+        const url = String((result as any).url || '')
+        const host = normalizeDomain(url)
         observations.push({
           jobId: String(job.id || ''),
           name: String((result as any).name || ''),
-          url: String((result as any).url || ''),
+          url,
+          snippet: snippetsByHost.get(host) || null,
           detail: (result as any).detail || null,
           outcome: (result as any).outcome || null,
           observedAt: (result as any).at || null,
@@ -274,6 +309,7 @@ export async function seedCorpusFromValidatedProspectHistory(args: { apply?: boo
       evidenceRows: candidate.evidenceRows,
       distinctCampaignJobs: candidate.distinctCampaignJobs,
       sameDomainContactEvidence: candidate.sameDomainContactEvidence,
+      descriptionEvidenceRows: candidate.descriptionEvidenceRows,
     })),
   }
 }

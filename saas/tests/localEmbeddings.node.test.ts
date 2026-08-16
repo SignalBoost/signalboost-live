@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import {
   checkLocalEmbeddingHealth,
@@ -29,6 +30,7 @@ function configureLoopback() {
   process.env.LOCAL_AI_MODEL = 'qwen2.5-coder:32b'
   process.env.LOCAL_AI_EMBEDDING_MODEL = 'nomic-embed-text'
   delete process.env.LOCAL_AI_EMBEDDING_AUTO_REPAIR
+  delete process.env.COS_FOREGROUND_EMBEDDING_CACHE_TTL_MS
   delete process.env.LOCAL_AI_ALLOWED_HOSTS
   delete process.env.LOCAL_AI_API_KEY
   resetLifecycleEnv()
@@ -42,6 +44,7 @@ function configureRunPod() {
   process.env.LOCAL_AI_MODEL = 'qwen2.5-coder:32b'
   process.env.LOCAL_AI_EMBEDDING_MODEL = 'nomic-embed-text'
   delete process.env.LOCAL_AI_EMBEDDING_AUTO_REPAIR
+  delete process.env.COS_FOREGROUND_EMBEDDING_CACHE_TTL_MS
   resetLifecycleEnv()
   process.env.RUNPOD_LIFECYCLE_ENABLED = 'false'
 }
@@ -69,6 +72,48 @@ test('local embeddings use the secured OpenAI-compatible embedding endpoint', as
   assert.equal(observedUrl, 'http://127.0.0.1:11434/v1/embeddings')
   assert.equal(observedModel, 'nomic-embed-text')
   assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
+})
+
+test('identical foreground query embeddings share one in-flight request and short-lived result', async () => {
+  configureLoopback()
+  let embeddingRequests = 0
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input)
+    assert.equal(url, 'http://127.0.0.1:11434/v1/embeddings')
+    embeddingRequests += 1
+    await new Promise(resolve => setTimeout(resolve, 20))
+    return new Response(JSON.stringify({ data: [{ embedding: vector(), index: 0 }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }) as typeof fetch
+
+  const prompt = 'shared foreground semantic query regression'
+  const [first, second] = await Promise.all([
+    generateLocalEmbedding(prompt),
+    generateLocalEmbedding(prompt),
+  ])
+  const third = await generateLocalEmbedding(prompt)
+
+  assert.equal(embeddingRequests, 1)
+  assert.equal(first.length, LOCAL_EMBEDDING_DIMENSIONS)
+  assert.deepEqual(second, first)
+  assert.deepEqual(third, first)
+})
+
+test('ordinary COS primes the shared query embedding before enterprise semantic budgets begin', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', import.meta.url), 'utf8')
+  const exported = source.slice(source.indexOf('export async function tryCOSFirstAnswer'))
+  const fresh = exported.indexOf('requiresFreshExternalEvidence(input.prompt)')
+  const readiness = exported.indexOf('await ensureLocalInferenceRuntimeReady()')
+  const prime = exported.indexOf('await generateLocalEmbedding(input.prompt)')
+  const enterprise = exported.lastIndexOf('return tryEnterpriseCOSFirstAnswer(input)')
+
+  assert.ok(fresh >= 0, 'fresh/current-fact policy must remain first')
+  assert.ok(readiness > fresh, 'ordinary runtime readiness must remain after fresh routing')
+  assert.ok(prime > readiness, 'query embedding must be primed only after governed runtime readiness')
+  assert.ok(enterprise > prime, 'enterprise semantic retrieval must start only after the shared query embedding is ready')
 })
 
 test('missing RunPod embedding model is pulled through the authenticated Ollama gateway and retried once', async () => {

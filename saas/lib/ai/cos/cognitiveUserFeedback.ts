@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 
 export type CosUserFeedbackType = 'positive' | 'negative' | 'correction'
 
@@ -74,7 +74,7 @@ export function decideCosUserFeedbackExperience(input: CosUserFeedbackInput): Co
     correctionHash || '',
   ].join(':'))
   const sourceRef = `assistant-feedback:${conversationRefHash}:${promptHash}:${assistantResponseHash}`
-  const subject = nearestFoundationalSubject(prompt) || 'general reasoning'
+  const subject = classifyProblemClass(prompt)
 
   let reason = 'explicit_user_feedback'
   let eligible = true

@@ -64,6 +64,9 @@ const COS_PRIMARY_FUNCTION_BUDGET_MS = 300_000
 const COS_POST_INFERENCE_RESERVE_MS = 60_000
 const MAX_RUNPOD_READINESS_BUDGET_MS = 120_000
 const MIN_RUNPOD_READINESS_SLICE_MS = 5_000
+// Ceiling on how much of the function budget a single inference may reserve when deciding whether a
+// cold start still fits. 150s leaves >=90s for a wake inside the 300s ceiling.
+const COLD_START_INFERENCE_RESERVE_CAP_MS = 150_000
 
 function runpodStartTimeoutMs(): number {
   const configured = Number(process.env.RUNPOD_START_TIMEOUT_MS || '90000')
@@ -71,10 +74,26 @@ function runpodStartTimeoutMs(): number {
 }
 
 function runpodTotalReadinessBudgetMs(config: LocalInferenceConfig): number {
-  // /api/cos-primary and its browser ingress run with maxDuration=300s. Reserve the configured
-  // model-call timeout plus a fixed tail for retrieval, persistence, telemetry and serialization.
-  // The cold-start gate may use only what remains, never a fresh 60s retry on top of the first wait.
-  const available = COS_PRIMARY_FUNCTION_BUDGET_MS - config.timeoutMs - COS_POST_INFERENCE_RESERVE_MS
+  // /api/cos-primary and its browser ingress run with maxDuration=300s. Reserve the model-call
+  // timeout plus a fixed tail for retrieval, persistence, telemetry and serialization. The
+  // cold-start gate may use only what remains, never a fresh 60s retry on top of the first wait.
+  //
+  // CRITICAL: the reservation is capped at COLD_START_INFERENCE_RESERVE_CAP_MS rather than using
+  // the raw configured timeout. Raising LOCAL_AI_TIMEOUT_MS to accommodate slow answers used to
+  // shrink `available` to zero, so the readiness gate threw "no safe RunPod readiness budget
+  // remains" and the turn escalated to an external provider WITHOUT EVER ATTEMPTING A WAKE — a
+  // latency setting silently disabling cold start. A stopped pod must always be wakeable; a long
+  // per-call timeout only ever applies to a pod that is already running.
+  const inferenceReserveMs = Math.min(config.timeoutMs, COLD_START_INFERENCE_RESERVE_CAP_MS)
+  if (inferenceReserveMs < config.timeoutMs) {
+    console.info('[cos-runpod-readiness-budget-clamped]', JSON.stringify({
+      at: new Date().toISOString(),
+      configuredInferenceTimeoutMs: config.timeoutMs,
+      inferenceReserveUsedMs: inferenceReserveMs,
+      note: 'cold-start wake budget preserved; the configured timeout still applies once the pod is healthy',
+    }))
+  }
+  const available = COS_PRIMARY_FUNCTION_BUDGET_MS - inferenceReserveMs - COS_POST_INFERENCE_RESERVE_MS
   return Math.max(0, Math.min(MAX_RUNPOD_READINESS_BUDGET_MS, available))
 }
 

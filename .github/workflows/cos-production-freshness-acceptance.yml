@@ -126,6 +126,8 @@ jobs:
             prompt: 'What is the TSLA stock price?'
           - label: fx
             prompt: 'What is the USD to EUR exchange rate?'
+          - label: sports
+            prompt: 'What are the current MLB standings?'
     steps:
       - name: Exercise structured production data path
         env:

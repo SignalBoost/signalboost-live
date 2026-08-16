@@ -3,12 +3,13 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.11  
+**Version:** 1.12  
 **Updated:** 2026-08-16  
 **Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
 **COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
 **COS Independent Runtime:** ACTIVE on the current local RunPod reasoner (`qwen2.5-coder:32b`); `qwen3:30b` is the intended durable default but is not yet live on the existing pod  
-**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; USER FEEDBACK MERGED WITH PRODUCTION ACCEPTANCE PENDING; VERIFIED PRODUCTION-OUTCOME WIRING IN PR #1259  
+**Hosted-LLM Runtime Dependency:** SELLER-MANAGED DEFAULT MUST BE LOCAL/PRIVATE OR FAIL CLOSED; CLAUDE / OPENAI / GEMINI MAY EXIST ONLY AS EXPLICIT OPTIONAL BYOM/BYOA OR TEACHER ADAPTERS, NEVER AUTOMATIC FALLBACK  
+**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; USER FEEDBACK MERGED WITH PRODUCTION ACCEPTANCE PENDING; VERIFIED PRODUCTION-OUTCOME LEARNING MERGED IN #1259 WITH PRODUCTION RUNTIME ACCEPTANCE STILL REQUIRED  
 **Marketing & Sales Core Architecture:** COMPLETE  
 **Self-Healing Supervisor:** NATIVE PROACTIVE MONITORING PRODUCTION-VERIFIED; NATIVE INCIDENT → COS → GOVERNED AGENT GATEWAY/MCP LOOP MERGED  
 **Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
@@ -57,6 +58,10 @@ Observe
 
 The underlying model is replaceable compute. **COS is the learner.** The durable asset is COS-owned memory, experiences, facts, procedural skills, metacognitive capability state, outcome history, source/provenance knowledge and governance.
 
+**Seller-managed runtime independence rule:** SignalBoost/COS must be able to reason and operate with COS-owned memory/skills/tools plus local/private replaceable compute, and must fail closed when that compute is unavailable. Claude, OpenAI, Gemini or another hosted foundation-model vendor must never be selected by default, by a stale environment preference, or as an automatic fallback after local/private inference fails. Explicit buyer-selected BYOM/BYOA adapters and bounded teacher/evaluator adapters may remain provider-neutral extension points; they are not required product dependencies and do not own COS intelligence or governance.
+
+PR #1267 (`feat/cos-hosted-llm-independence-20260816`) is the current runtime-hardening increment. Its first batch changes generic seller-managed model routing to local/private by default, prevents stale `AI_MODEL_PROVIDER=openai|claude|gemini` configuration from redirecting generic COS calls, keeps local failure fail-closed, and changes Backup COS default continuity reasoning from hard-coded OpenAI to local/private compute. The dedicated hosted-LLM independence regression is green on the implementation branch. The same increment also repairs the canonical COS integrity guard so it validates the current split support runtime (`route.ts` wrapper + `routeCoreLegacy.ts`) and protects the real Chief-of-Staff core through CODEOWNERS. **Do not call full runtime independence complete yet:** the legacy support/Chief-of-Staff implementation still contains a direct Anthropic tool-planning loop, and the platform image port still contains a direct OpenAI image-generation adapter. Those boundaries must be replaced or made explicitly optional/injected without weakening current owner/admin/customer permissions, approval gates, execution honesty or provenance.
+
 PR #1253 (`feat/cos-continuous-independence-learning-20260816`) is merged and has partial production proof. It provides:
 
 - bounded episodic capture of meaningful normal COS turns in `cos_cognitive_experiences`;
@@ -70,7 +75,7 @@ PR #1253 (`feat/cos-continuous-independence-learning-20260816`) is merged and ha
 
 PR #1255 added governed explicit helpful / not-helpful / correction feedback as episodic learning evidence and was merged as `429bfd5a750ba7c6804cb13773bc0a4708cc0f7c`. Production acceptance of real feedback events remains pending; do not infer it from merge/deploy status alone.
 
-Current increment PR #1259 (`feat/cos-verified-production-outcomes-20260816`) adds a generic, idempotent verified production/business outcome recorder, wires the already-authoritative Self-Healing tool/read-back and exact Vercel terminal-verification paths into it, and extends independence reporting with verified production success/failure/observed metrics by problem class and domain. At this point it is an open implementation PR; CI/merge/production runtime proof are still required.
+PR #1259 (`feat/cos-verified-production-outcomes-20260816`) is merged as `e2be2911b2f6800b6eb8f113f6880da1bc7ebcae`. It adds a generic, idempotent verified production/business outcome recorder, wires the already-authoritative Self-Healing tool/read-back and exact Vercel terminal-verification paths into it, and extends independence reporting with verified production success/failure/observed metrics by problem class and domain. **Merge status is not production acceptance:** deployment/runtime proof and a real durable `production_use` outcome row still require verification before this increment is called production-proven.
 
 The runtime independence report is deliberately labeled `observed_runtime_learning_metrics_not_heldout_certification`. Runtime traffic is not a hidden benchmark. Cache reuse is useful operational independence but not new reasoning competence. A COS-gate-accepted answer is not the same thing as a verified business/production outcome.
 
@@ -79,19 +84,20 @@ The mature target remains roughly **85% independent pass rate on a separate held
 Next COS independence increments:
 
 1. production-prove the merged explicit user feedback/correction increment (#1255);
-2. merge and production-prove verified Self-Healing production-outcome learning (#1259), then connect campaign, sales and CRM authoritative outcome producers to the same generic recorder;
-3. autonomous curriculum prioritization from repeated failures, teacher dependency/cost, business importance and weak/untested/conflicted capability areas;
-4. factual reconsolidation/pruning for stale, superseded, contradictory, duplicate and low-value knowledge;
-5. broad real skill-library expansion and composition/transfer;
-6. teacher-dependency trend by problem class;
-7. separate hidden held-out certification toward the ~85% independent target;
-8. model-swap validation proving COS intelligence survives replacement of Qwen or another underlying reasoner.
+2. production-prove merged verified Self-Healing production-outcome learning (#1259), then connect campaign, sales and CRM authoritative outcome producers to the same generic recorder;
+3. complete #1267 and subsequent runtime migration so seller-managed support/tool planning and creative generation have no required Claude/OpenAI/Gemini execution path while preserving explicit BYOM/BYOA adapters;
+4. autonomous curriculum prioritization from repeated failures, teacher dependency/cost, business importance and weak/untested/conflicted capability areas;
+5. factual reconsolidation/pruning for stale, superseded, contradictory, duplicate and low-value knowledge;
+6. broad real skill-library expansion and composition/transfer;
+7. teacher-dependency trend by problem class;
+8. separate hidden held-out certification toward the ~85% independent target;
+9. model-swap validation proving COS intelligence survives replacement of Qwen or another underlying reasoner.
 
 Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.
 
 ### 2026-08-16 continuous-learning production evidence
 
-PR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` for merge `3efccc51c10630c4eabb83f5288912c2edcf02bf` reached `READY`. A real ordinary `/api/concierge` request after the merge created durable encounter `c2953516-436a-4e3e-8fa7-dfc978d272c3`; the same failed/local-escalation outcome occurred twice and reconciled to `occurrence_count = 2` rather than creating duplicate rows. The evidence is explicitly `episodic_turn_signal_not_factual_truth`, contains no `answer` or `response` key, and records local Qwen attempted / external AI not yet invoked at the COS-first decision boundary. Matching Vercel telemetry showed RunPod could not start because the host reported insufficient free GPUs, after which the governed external fallback eventually used Gemini.
+PR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` for merge `3efccc51c10630c4eabb83f5288912c2edcf02bf` reached `READY`. A real ordinary `/api/concierge` request after the merge created durable encounter `c2953516-436a-4e3e-8fa7-dfc978d272c3`; the same failed/local-escalation outcome occurred twice and reconciled to `occurrence_count = 2` rather than creating duplicate rows. The evidence is explicitly `episodic_turn_signal_not_factual_truth`, contains no `answer` or `response` key, and records local Qwen attempted / external AI not yet invoked at the COS-first decision boundary. Matching Vercel telemetry showed RunPod could not start because the host reported insufficient free GPUs, after which the then-governed external fallback eventually used Gemini. That historical event is evidence of why the stricter seller-managed no-hosted-fallback rule is now being enforced; it is not the desired runtime architecture going forward.
 
 Therefore normal-turn capture/deduplication is production-proven for a real external-required failure path. **Accepted local/cache encounter acceptance remains pending** because the observed production request could not obtain RunPod capacity; do not claim the full #1253 acceptance matrix complete until a real accepted local/cache turn is observed.
 
@@ -113,7 +119,7 @@ The first real producer wiring is Self-Healing because it already has authoritat
 
 The owner independence report now has separate verified production outcome totals, success/failure/observed counts, terminal production success rate, per-domain buckets and per-problem-class outcome counts. Observed/non-terminal rows are excluded from the success-rate denominator, and these metrics do not alter independent-answer or teacher-dependency math.
 
-**Evidence level at this line:** implementation PR only. CI, merge, deployment and real `production_use` row evidence are still required. Campaign/sales/CRM have the generic recorder contract available after merge, but their authoritative producers are not yet wired and must not be reported as such.
+**Evidence level at this line:** merged implementation (`e2be2911b2f6800b6eb8f113f6880da1bc7ebcae`), not yet production-runtime-proven in this handoff. Deployment acceptance and real authoritative `production_use` evidence are still required. Campaign/sales/CRM have the generic recorder contract available after merge, but their authoritative producers are not yet wired and must not be reported as such.
 
 ---
 
@@ -143,7 +149,8 @@ Request / Goal
 → validated procedural skills
 → local/private COS reasoning
 → confidence/evidence gate
-→ bounded research or replaceable external teacher/provider only when justified and permitted
+→ bounded research / deterministic tools
+→ explicit buyer-selected BYOM/BYOA or bounded teacher/evaluator adapter only when separately justified and permitted; never automatic hosted-model fallback
 → verification
 → learning / episodic memory / skill practice / ROI telemetry
 ```
@@ -152,7 +159,7 @@ Primary answer path: `saas/lib/ai/cos/cosFirstAnswer.ts`.
 
 Current live development reasoner at this handoff: `qwen2.5-coder:32b` on the existing RunPod pod. Do **not** report Qwen3 as live until production telemetry proves the pod was updated and `LOCAL_AI_MODEL` points to it.
 
-Typical configuration:
+Typical seller-managed configuration:
 
 ```dotenv
 COS_LOCAL_FIRST_ENABLED=true
@@ -171,7 +178,8 @@ Remote private inference must use HTTPS, authentication and exact-host allowlist
 
 - COS is the reusable intelligence/governance layer; Portables must not create provider-owned reasoning silos.
 - AI is the last resort when deterministic code, known knowledge, cache, durable reuse or validated skills suffice.
-- Prefer local/private compute before approved commercial AI providers.
+- Seller-managed COS uses local/private replaceable compute and fails closed when it is unavailable; hosted commercial models are never an automatic fallback.
+- Explicit BYOM/BYOA and bounded teacher/evaluator adapters remain optional provider-neutral edges, not required product dependencies.
 - Never pay twice for knowledge or work SignalBoost already owns with sufficient confidence and freshness.
 - Providers are replaceable edges around a provider-neutral core.
 - Preserve tenant isolation, auditability and explicit execution boundaries.
@@ -282,7 +290,7 @@ Use empirical workload-relative targets:
 
 - roughly **85% independent pass rate** is the mature target on the defined SignalBoost workload;
 - roughly **92–95%** is a longer-term ambition only if held-out evidence supports it;
-- external frontier models belong primarily in the genuinely difficult/novel/disputed/high-consequence tail.
+- external frontier models, if explicitly configured as teachers/evaluators, belong only in the genuinely difficult/novel/disputed/high-consequence tail and are never required seller-managed runtime fallback.
 
 These percentages are capability targets, not confidence targets.
 
@@ -326,14 +334,14 @@ COS models/should model:
 - **consolidation** — bounded review/cluster/contradiction resolution/practice scheduling;
 - **forgetting/reconsolidation** — weakening, expiry, supersession or quarantine of stale/misleading knowledge.
 
-External providers are teachers/escalation resources, not automatic authorities.
+External providers are optional teachers/escalation resources when explicitly configured, not automatic authorities or seller-managed fallback dependencies.
 
 Teacher loop:
 
 ```text
 COS attempts
 → internal tools/specialists investigate
-→ external teacher only when justified
+→ explicit optional external teacher only when justified/configured
 → capture local attempt + teacher result + disagreement/evidence
 → evaluate
 → extract generalized procedural candidate
@@ -435,12 +443,13 @@ PR #1157 made AI portability an enterprise release requirement.
 Required properties:
 
 - no mandatory Qwen/RunPod/OpenAI/Anthropic/Gemini dependency;
+- seller-managed runtime defaults to local/private compute and fails closed rather than silently using a hosted foundation model;
 - buyer-owned credentials/compute where desired;
 - replaceable model/agent adapters;
 - models are not governance authorities;
 - COS-owned memory/skills/provenance survive model swaps.
 
-A buyer can deploy COS alongside its existing OpenAI, Anthropic, or other agent. The development stack does not define the product identity.
+A buyer can deploy COS alongside its existing OpenAI, Anthropic, Gemini or other agent through an explicit BYOM/BYOA adapter. The development stack and optional adapters do not define the product identity.
 
 Reference: `docs/portables/cos-byom-byoa-enterprise.md` and `saas/lib/release-candidate/cos-enterprise-ai.ts`.
 
@@ -532,7 +541,7 @@ Automatic routine repair never means arbitrary mutation. The action must remain 
 
 # Cost / ROI governance
 
-Track provider calls avoided, cache/reuse hits, knowledge hits, local executions, external fallbacks, provider cost, avoided cost, latency, retries, successful outcomes and learning reuse/effectiveness.
+Track provider calls avoided, cache/reuse hits, knowledge hits, local executions, explicit optional teacher/provider calls, provider cost, avoided cost, latency, retries, successful outcomes and learning reuse/effectiveness. Seller-managed hosted-model fallback is not a valid resilience metric because that path is prohibited by the current runtime-independence rule.
 
 For cognitive learning also track:
 
@@ -659,7 +668,7 @@ Historical foundation:
 - #1138 — semantic filtering/generic diagnostic-quality repair;
 - #1140 — RunPod transcript installer + secure transcript endpoint derivation;
 - #1141 — learning-source pacing/circuit/reuse hardening;
-- #1152 — Gemini fallback + teacher lesson capture + Qwen3 durable default;
+- #1152 — historical Gemini fallback + teacher lesson capture + Qwen3 durable default; the automatic hosted fallback aspect is superseded by the 2026-08-16 seller-managed local/private-or-fail-closed rule;
 - cognitive lifecycle/experience/skill work preceding #1156;
 - #1156 — only validated procedural skills can enter live reasoning;
 - #1157 — BYOM/BYOA enterprise release requirement;
@@ -669,7 +678,7 @@ Historical foundation:
 - #1162 — retention, consolidation, weakening and quarantine;
 - subsequent composition/transfer and metacognition increments are merged and must be preserved.
 
-Current Aug-16 hardening/knowledge sequence includes the live-current-data policy, structured real-time data, source governance, cache lineage, semantic embedding transport/shared query work, reviewed prospect-history corpus seeding, verified platform self-knowledge through #1252, continuous ordinary-turn experience capture in #1253, and explicit user-feedback learning in #1255. PR #1259 is the current verified production-outcome learning increment and is not merged at this documentation point. Always scan current `main` because parallel agents continue to advance it.
+Current Aug-16 hardening/knowledge sequence includes the live-current-data policy, structured real-time data, source governance, cache lineage, semantic embedding transport/shared query work, reviewed prospect-history corpus seeding, verified platform self-knowledge through #1252, continuous ordinary-turn experience capture in #1253, explicit user-feedback learning in #1255, and verified production-outcome learning in merged PR #1259 (`e2be2911b2f6800b6eb8f113f6880da1bc7ebcae`). PR #1267 is the current seller-managed hosted-LLM-dependency hardening increment. Always scan current `main` because parallel agents continue to advance it.
 
 ---
 
@@ -677,14 +686,15 @@ Current Aug-16 hardening/knowledge sequence includes the live-current-data polic
 
 1. Complete the remaining accepted local/cache production proof for #1253 when RunPod capacity permits; preserve the already verified external-required encounter evidence.
 2. Production-prove explicit user helpful / not-helpful / correction ingestion from #1255 and verify feedback appears in the independence quality report without changing capability math.
-3. Merge and production-prove #1259 verified Self-Healing outcome learning, then wire authoritative campaign, sales and CRM outcome producers to the same generic recorder rather than building parallel learning stores.
-4. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance, negative/correction feedback, verified production failures and weak/untested/conflicted metacognitive classes.
-5. Extend consistent pruning/reconsolidation from procedural skills to factual KG/corpus knowledge: staleness, supersession, contradiction, duplication, weakening/quarantine and bounded pruning.
-6. Expand the real validated skill library across SRE, Postgres, cloud, networking, security, software, AI, business, marketing and sales, then exercise composition/transfer on genuine overlapping skills.
-7. Track teacher dependency, independent completion and verified production success by problem class and verify the trend improves without reducing quality.
-8. Build/maintain a broad hidden held-out suite; only held-out evidence may establish progress toward ~85% independent pass.
-9. Validate that accumulated COS intelligence survives a model swap; Qwen3 cutover remains separate and must be runtime-proven before claiming it live.
-10. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries and Enterprise RC evidence requirements throughout learning expansion.
+3. Production-prove merged #1259 verified Self-Healing outcome learning, then wire authoritative campaign, sales and CRM outcome producers to the same generic recorder rather than building parallel learning stores.
+4. Finish #1267 and follow-on runtime migration: remove required/direct Anthropic support planning and direct OpenAI image-generation dependencies from seller-managed paths while preserving explicit BYOM/BYOA adapters, permissions, approvals, provenance and fail-closed behavior.
+5. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance, negative/correction feedback, verified production failures and weak/untested/conflicted metacognitive classes.
+6. Extend consistent pruning/reconsolidation from procedural skills to factual KG/corpus knowledge: staleness, supersession, contradiction, duplication, weakening/quarantine and bounded pruning.
+7. Expand the real validated skill library across SRE, Postgres, cloud, networking, security, software, AI, business, marketing and sales, then exercise composition/transfer on genuine overlapping skills.
+8. Track teacher dependency, independent completion and verified production success by problem class and verify the trend improves without reducing quality.
+9. Build/maintain a broad hidden held-out suite; only held-out evidence may establish progress toward ~85% independent pass.
+10. Validate that accumulated COS intelligence survives a model swap; Qwen3 cutover remains separate and must be runtime-proven before claiming it live.
+11. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries and Enterprise RC evidence requirements throughout learning expansion.
 
 ---
 
@@ -694,6 +704,8 @@ Use precise actual states. A plan is not execution; a queue row is not a sent em
 
 For continuous learning specifically: an episodic encounter is not knowledge; COS gate acceptance is not verified outcome; runtime independence is not held-out certification; cache reuse is not new reasoning competence; current-fact retrieval is not timeless memory; recurrence is not truth; a verified problem-class outcome is not causal proof of one skill; and external-teacher reduction is meaningful only if verified quality is maintained or improved.
 
+For provider independence specifically: a blocked hosted-provider call site is not the same as removing the dependency; an optional BYOM/BYOA adapter is not a seller-managed runtime dependency; a green local-default test is not proof that every runtime bypass is gone; and a local/private inference failure must not be silently converted into a Claude/OpenAI/Gemini answer.
+
 ---
 
 # Definition of success
@@ -702,4 +714,4 @@ The best AI call is the one that never has to happen. The best external data cal
 
 For COS learning specifically, success means that validated experience measurably improves held-out performance, retains that improvement over time, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance rather than merely accumulating more text.
 
-The long-term proof is a trend: more problems completed with COS-owned memory/skills/tools and local/private compute, fewer external-teacher calls for already-learned classes, stronger verified real-world outcomes, and stable performance when the underlying model/provider is replaced.
+The long-term proof is a trend: more problems completed with COS-owned memory/skills/tools and local/private compute, fewer external-teacher calls for already-learned classes, stronger verified real-world outcomes, no automatic hosted-model dependency in seller-managed operation, and stable performance when the underlying model/provider is replaced.

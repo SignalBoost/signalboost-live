@@ -118,7 +118,7 @@ export async function runBackupCos(normalizedInput: string, language = 'en'): Pr
   const brain = await loadApprovedBrain()
   const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
   const execution = await withDeadline(
-    callModelDetailed({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
+    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: 1200 }),
     backupTimeoutMs(),
   )
   return finalizeBackupAnswer(brain, execution?.text ?? null, {
@@ -162,13 +162,11 @@ export async function recordCosRecovery(log: CosRecoveryLog): Promise<void> {
 }
 
 /**
- * Host-agnostic entry points (additive — every function above this line is
- * unchanged and remains the default SignalBoost path: env timeout, the local
- * cos-core/brain.md snapshot, OpenAI, and the cos_decisions table). A buyer
- * supplies loadBrain / reasoner / log via CosBackupRuntimeConfig to run
- * Backup COS continuity on THEIR approved playbook, THEIR model provider,
- * and THEIR audit store, with zero change to this file. See
- * saas/cos-backup-host/signalboostCosBackupHost.ts for the reference
+ * Host-agnostic entry points. Every function above remains the default SignalBoost path: env
+ * timeout, the local cos-core/brain.md snapshot, local/private model compute, and the cos_decisions
+ * table. A buyer supplies loadBrain / reasoner / log via CosBackupRuntimeConfig to run Backup COS
+ * continuity on THEIR approved playbook, THEIR model provider, and THEIR audit store, with zero
+ * change to this file. See saas/cos-backup-host/signalboostCosBackupHost.ts for the reference
  * SignalBoost binding of this same config shape.
  */
 export async function runBackupCosWithConfig(
@@ -188,7 +186,7 @@ export async function runBackupCosWithConfig(
   }
 
   const execution = await withDeadline(
-    callModelDetailed({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
+    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: 1200 }),
     config.timeoutMs ?? backupTimeoutMs(),
   )
   return finalizeBackupAnswer(brain, execution?.text ?? null, {

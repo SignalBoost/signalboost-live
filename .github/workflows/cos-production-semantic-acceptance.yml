@@ -1,0 +1,120 @@
+name: COS Production Semantic Acceptance
+
+on:
+  push:
+    branches: [test/cos-production-semantic-acceptance-20260816]
+    paths:
+      - '.github/workflows/cos-production-semantic-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-local-first:
+    name: Production semantic retrieval uses local-first path
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Exercise production browser COS path
+        env:
+          TARGET_URL: https://saas.signalboostapp.com/api/concierge
+          APP_ORIGIN: https://saas.signalboostapp.com
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          const crypto = require('node:crypto')
+          const nonce = crypto.randomUUID()
+          const issuedAtMs = Date.now()
+          const payload = {
+            messages: [{
+              role: 'user',
+              content: `Explain SignalBoost's internal RunPod wake governance for interactive COS requests and why background semantic embedding/backfill work remains passive. Acceptance nonce ${nonce}.`,
+            }],
+            context: {
+              language: 'en',
+              acceptance: 'cos-production-semantic-transport-v1',
+              userInteraction: { id: nonce, issuedAtMs },
+            },
+          }
+          fs.writeFileSync('payload.json', JSON.stringify(payload))
+          fs.writeFileSync('acceptance-meta.json', JSON.stringify({ nonce, issuedAtMs }, null, 2))
+          NODE
+
+          STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          HTTP_CODE="$(curl --silent --show-error --location \
+            --max-time 240 \
+            --request POST "$TARGET_URL" \
+            --header 'Content-Type: application/json' \
+            --header 'Accept: application/json' \
+            --header 'x-signalboost-user-interaction: 1' \
+            --header "Origin: $APP_ORIGIN" \
+            --header 'Sec-Fetch-Site: same-origin' \
+            --header 'Sec-Fetch-Mode: cors' \
+            --header "Referer: $APP_ORIGIN/" \
+            --data-binary @payload.json \
+            --output response.json \
+            --write-out '%{http_code}')"
+          FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "acceptance_started_at=$STARTED_AT"
+          echo "acceptance_finished_at=$FINISHED_AT"
+          echo "http_code=$HTTP_CODE"
+          cat acceptance-meta.json
+          cat response.json
+          echo
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Expected HTTP 200 from production browser COS route, got $HTTP_CODE" >&2
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          const payload = JSON.parse(fs.readFileSync('response.json', 'utf8'))
+          const fail = message => { console.error(message); process.exit(1) }
+          const provenance = payload.provenance || payload.execution_provenance || {}
+          const execution = payload.execution_provenance || {}
+
+          if (typeof payload.reply !== 'string' || payload.reply.trim().length < 20) {
+            fail('Expected a non-empty production COS reply')
+          }
+          if (payload.local_model_invoked !== true && provenance.localModelInvoked !== true && execution?.local_reasoning?.invoked !== true) {
+            fail(`Expected the local-first reasoning path to be invoked, got ${JSON.stringify({local_model_invoked: payload.local_model_invoked, provenance: provenance.localModelInvoked, execution: execution?.local_reasoning?.invoked})}`)
+          }
+
+          const knowledgeFacts = Number(provenance.knowledgeFactsUsed ?? execution?.knowledge_graph?.evidence_count ?? 0)
+          const learnedItems = Number(provenance.learnedItemsUsed ?? execution?.learned_corpus?.evidence_count ?? 0)
+          const semanticUsed = knowledgeFacts > 0 || learnedItems > 0 || execution?.knowledge_graph?.used === true || execution?.learned_corpus?.used === true
+          if (!semanticUsed) {
+            fail(`Expected semantic knowledge-graph or learned-corpus evidence to contribute, got ${JSON.stringify({knowledgeFacts, learnedItems, knowledge_graph: execution?.knowledge_graph, learned_corpus: execution?.learned_corpus})}`)
+          }
+
+          const serialized = JSON.stringify(payload)
+          if (/localEmbeddings:\s*HTTP\s*404/i.test(serialized)) {
+            fail('Production response still reports localEmbeddings HTTP 404')
+          }
+
+          console.log(JSON.stringify({
+            acceptance: 'PASS',
+            source: payload.source || null,
+            confidence: payload.confidence_score ?? null,
+            local_model_invoked: payload.local_model_invoked ?? provenance.localModelInvoked ?? null,
+            external_ai_invoked: payload.external_ai_invoked ?? null,
+            response_source: provenance.responseSource || null,
+            knowledge_facts_used: knowledgeFacts,
+            learned_items_used: learnedItems,
+          }, null, 2))
+          NODE
+
+      - name: Upload objective acceptance response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-production-semantic-acceptance
+          path: |
+            response.json
+            acceptance-meta.json
+          if-no-files-found: warn

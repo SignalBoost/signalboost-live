@@ -100,6 +100,10 @@
       "schedule": "47 */6 * * *"
     },
     {
+      "path": "/api/cron/business-intelligence-corpus-populate",
+      "schedule": "57 * * * *"
+    },
+    {
       "path": "/api/cron/outreach-digest",
       "schedule": "0 13 * * *"
     },

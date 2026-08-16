@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parseWikidataCompanyBindings } from '../lib/business-intelligence-corpus/wikidata-public.ts'
+import { parseWikidataCompanyBindings } from '../lib/business-intelligence-corpus/wikidata-public-parser.ts'
 
 test('Wikidata company parsing keeps sourced business identity and official website', () => {
   const parsed = parseWikidataCompanyBindings([

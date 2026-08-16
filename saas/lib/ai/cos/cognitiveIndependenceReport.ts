@@ -58,7 +58,7 @@ export async function getCosIndependenceReport(options: {
     .from('cos_cognitive_experiences')
     .select('experience_kind,subject,source_kind,success,occurrence_count,evidence,last_observed_at')
     .gte('last_observed_at', since)
-    .in('experience_kind', ['encounter', 'teacher', 'feedback'])
+    .in('experience_kind', ['encounter', 'teacher', 'feedback', 'production_use'])
     .order('last_observed_at', { ascending: false })
     .limit(rowLimit)
 
@@ -74,6 +74,8 @@ export async function getCosIndependenceReport(options: {
     caveats: [
       'Operational independence measures completion without external AI reasoning; cache reuse and fresh-data verification are reported separately from new local reasoning.',
       'Explicit user feedback is an unverified quality/curriculum signal. It does not retroactively convert runtime acceptance into factual truth or a verified business outcome.',
+      'Verified production outcome metrics count only objective outcome experiences; observed/non-terminal evidence is excluded from the production success-rate denominator.',
+      'A verified problem-class outcome does not automatically prove that one specific skill caused the result; skill credit still requires separate deterministic attribution.',
       'COS gate acceptance is not the same as a verified business or production outcome.',
       'The ~85% independence target must be certified on a separate held-out SignalBoost workload; this report cannot certify it.',
     ],

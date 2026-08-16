@@ -21,6 +21,8 @@ test('positive feedback is episodic quality evidence, never automatic knowledge'
   assert.equal(decision.evidence.executionAuthorityChangeAllowed, false)
   assert.equal(decision.evidence.curriculumSignalEligible, false)
   assert.equal('assistantContent' in decision.evidence, false)
+  assert.equal('answer' in decision.evidence, false)
+  assert.match(String(decision.evidence.assistantResponseHash), /^[a-f0-9]{64}$/)
 })
 
 test('negative feedback becomes curriculum-eligible evidence without factual authority', () => {

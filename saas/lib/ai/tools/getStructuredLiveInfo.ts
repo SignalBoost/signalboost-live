@@ -1,10 +1,14 @@
 import type { SearchResult } from './getExternalInfo'
 
 export type StructuredLiveKind = 'weather' | 'financial' | 'sports'
+export type StructuredSearchResult = SearchResult & {
+  sourceKind: 'structured_realtime'
+  observedAt: string
+}
 
 export type StructuredLiveInfoResult = {
   ok: boolean
-  results: SearchResult[]
+  results: StructuredSearchResult[]
   vertical?: string
   error?: string
 }
@@ -43,11 +47,7 @@ function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
         searchUrl.searchParams.set('count', '3')
         searchUrl.searchParams.set('enable_rich_callback', '1')
 
-        const discovery = await fetch(searchUrl, {
-          signal: controller.signal,
-          cache: 'no-store',
-          headers,
-        })
+        const discovery = await fetch(searchUrl, { signal: controller.signal, cache: 'no-store', headers })
         if (!discovery.ok) return { ok: false, results: [], error: `Brave rich discovery returned ${discovery.status}.` }
 
         const discoveryJson: any = await discovery.json()
@@ -67,11 +67,7 @@ function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
 
         const richUrl = new URL('https://api.search.brave.com/res/v1/web/rich')
         richUrl.searchParams.set('callback_key', callbackKey)
-        const rich = await fetch(richUrl, {
-          signal: controller.signal,
-          cache: 'no-store',
-          headers,
-        })
+        const rich = await fetch(richUrl, { signal: controller.signal, cache: 'no-store', headers })
         if (!rich.ok) return { ok: false, results: [], vertical, error: `Brave rich result returned ${rich.status}.` }
 
         const richJson: any = await rich.json()
@@ -79,10 +75,7 @@ function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
         if (!rawResults.length) return { ok: false, results: [], vertical, error: 'Structured provider returned no real-time records.' }
 
         const observedAt = new Date().toISOString()
-        const compactPayload = JSON.stringify({
-          vertical: vertical || expectedKind,
-          results: rawResults,
-        }).slice(0, 6000)
+        const compactPayload = JSON.stringify({ vertical: vertical || expectedKind, results: rawResults }).slice(0, 6000)
 
         return {
           ok: true,
@@ -96,11 +89,7 @@ function defaultStructuredLiveDataPort(): StructuredLiveDataPort {
           }],
         }
       } catch (error) {
-        return {
-          ok: false,
-          results: [],
-          error: error instanceof Error ? error.message : 'Structured real-time lookup failed.',
-        }
+        return { ok: false, results: [], error: error instanceof Error ? error.message : 'Structured real-time lookup failed.' }
       } finally {
         clearTimeout(timeout)
       }
@@ -112,10 +101,7 @@ export function getStructuredLiveDataPort(): StructuredLiveDataPort {
   return structuredLiveDataPort ?? defaultStructuredLiveDataPort()
 }
 
-export async function getStructuredLiveInfo(
-  query: string,
-  expectedKind: StructuredLiveKind,
-): Promise<StructuredLiveInfoResult> {
+export async function getStructuredLiveInfo(query: string, expectedKind: StructuredLiveKind): Promise<StructuredLiveInfoResult> {
   const q = String(query || '').trim().slice(0, 400)
   if (!q) return { ok: false, results: [], error: 'Empty structured live-data query.' }
   return getStructuredLiveDataPort().fetch(q, expectedKind)

@@ -116,7 +116,7 @@ function extractCandidates(text: string, role: string): string[] {
   for (const pattern of patterns) {
     let match: RegExpExecArray | null
     while ((match = pattern.exec(text)) !== null) {
-      const candidate = String(match[1] || '').trim().replace(/[|,;:]+$/g, '')
+      const candidate = String(match[1] || '').trim().replace(/[|,;:.!?]+$/g, '')
       if (candidateLooksLikePerson(candidate)) out.add(candidate)
     }
   }

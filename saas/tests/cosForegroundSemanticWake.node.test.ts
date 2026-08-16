@@ -41,6 +41,33 @@ test('ordinary COS preflights runtime before bounded enterprise semantic retriev
   assert.ok(enterprise > preflight, 'normal runtime readiness must finish before enterprise retrieval starts')
 })
 
+test('authorized cold wake retry is bounded by one end-to-end readiness budget and retains request ownership', () => {
+  const text = source('../lib/ai/local-inference.ts')
+  const readyStart = text.indexOf('export async function ensureLocalInferenceRuntimeReady')
+  const readyEnd = text.indexOf('export async function callLocalModel', readyStart)
+  const ready = text.slice(readyStart, readyEnd)
+
+  assert.ok(text.includes('const COS_PRIMARY_FUNCTION_BUDGET_MS = 300_000'))
+  assert.ok(text.includes('const COS_POST_INFERENCE_RESERVE_MS = 60_000'))
+  assert.ok(text.includes('const MAX_RUNPOD_READINESS_BUDGET_MS = 120_000'))
+  assert.ok(text.includes('COS_PRIMARY_FUNCTION_BUDGET_MS - config.timeoutMs - COS_POST_INFERENCE_RESERVE_MS'))
+  assert.ok(text.includes('remainingReadinessBudgetMs(startedAt: number, totalBudgetMs: number)'))
+
+  assert.ok(ready.includes('firstWake = await ensureRunpodReasonerStarted()'))
+  assert.ok(ready.includes('if (firstWake.computeStartedByRequest)'))
+  assert.ok(ready.includes('retryWake = await ensureRunpodReasonerStarted()'))
+  assert.ok(ready.includes("'[cos-runpod-cold-start-retry]'"))
+  assert.ok(ready.includes('Math.min(60_000, remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs))'))
+  assert.ok(ready.includes('firstWake?.computeStartedByRequest === true || retryWake?.computeStartedByRequest === true'))
+  assert.equal(ready.includes('Math.min(60_000, timeoutMs)'), false, 'retry must not receive a fresh standalone 60s allowance')
+
+  const firstWakeIndex = ready.indexOf('firstWake = await ensureRunpodReasonerStarted()')
+  const retryGuardIndex = ready.indexOf('if (firstWake.computeStartedByRequest)')
+  const retryWakeIndex = ready.indexOf('retryWake = await ensureRunpodReasonerStarted()')
+  assert.ok(retryGuardIndex > firstWakeIndex)
+  assert.ok(retryWakeIndex > retryGuardIndex, 'second resume must remain inside first-request ownership guard')
+})
+
 test('foreground embedding kill switch fails before config, readiness, or fetch', () => {
   const text = source('../lib/ai/cos/localEmbeddings.ts')
   const readyStart = text.indexOf('export async function generateReadyLocalEmbeddings')

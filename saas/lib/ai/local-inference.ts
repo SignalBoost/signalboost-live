@@ -58,11 +58,39 @@ export function localInferenceConfigFromEnv(): LocalInferenceConfig {
 
 let runtimeReadyPromise: Promise<void> | null = null
 
+const COS_PRIMARY_FUNCTION_BUDGET_MS = 300_000
+const COS_POST_INFERENCE_RESERVE_MS = 60_000
+const MAX_RUNPOD_READINESS_BUDGET_MS = 120_000
+const MIN_RUNPOD_READINESS_SLICE_MS = 5_000
+
 function runpodStartTimeoutMs(): number {
-  // Keep cold-start waiting bounded so a Vercel 300s function still has enough time for actual
-  // inference, persistence, and an honest response.
   const configured = Number(process.env.RUNPOD_START_TIMEOUT_MS || '90000')
   return Number.isFinite(configured) ? Math.max(5_000, Math.min(90_000, configured)) : 90_000
+}
+
+function runpodTotalReadinessBudgetMs(config: LocalInferenceConfig): number {
+  // /api/cos-primary and its browser ingress run with maxDuration=300s. Reserve the configured
+  // model-call timeout plus a fixed tail for retrieval, persistence, telemetry and serialization.
+  // The cold-start gate may use only what remains, never a fresh 60s retry on top of the first wait.
+  const available = COS_PRIMARY_FUNCTION_BUDGET_MS - config.timeoutMs - COS_POST_INFERENCE_RESERVE_MS
+  return Math.max(0, Math.min(MAX_RUNPOD_READINESS_BUDGET_MS, available))
+}
+
+function remainingReadinessBudgetMs(startedAt: number, totalBudgetMs: number): number {
+  return Math.max(0, totalBudgetMs - (Date.now() - startedAt))
+}
+
+async function waitForLocalInferenceHealth(config: LocalInferenceConfig, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (true) {
+    const remainingMs = deadline - Date.now()
+    if (remainingMs < 1_000) return false
+    const health = await checkLocalInferenceHealth({ ...config, timeoutMs: Math.min(config.timeoutMs, remainingMs) })
+    if (health.ok) return true
+    const sleepMs = Math.min(3_000, Math.max(0, deadline - Date.now()))
+    if (sleepMs <= 0) return false
+    await new Promise(resolve => setTimeout(resolve, sleepMs))
+  }
 }
 
 /**
@@ -75,11 +103,14 @@ function runpodStartTimeoutMs(): number {
  * may continue to use it without changing lifecycle state.
  *
  * Cost fail-safe: if an authorized interactive gate started compute and readiness never succeeds, it
- * immediately stops the Pod before propagating the error.
+ * immediately stops the Pod before propagating the error. A cold start that returns to EXITED may be
+ * resumed one additional time under the same already-validated request permission, but both attempts
+ * share one end-to-end readiness budget so model inference and downstream response work remain reserved.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
   if (!runpodLifecycleEnabled()) return
 
+  const readinessStartedAt = Date.now()
   const current = await checkLocalInferenceHealth(config)
   if (current.ok) return
 
@@ -98,25 +129,66 @@ export async function ensureLocalInferenceRuntimeReady(config = localInferenceCo
   if (runtimeReadyPromise) return runtimeReadyPromise
 
   runtimeReadyPromise = (async () => {
-    const wake = await ensureRunpodReasonerStarted()
+    const totalReadinessBudgetMs = runpodTotalReadinessBudgetMs(config)
+    let firstWake: Awaited<ReturnType<typeof ensureRunpodReasonerStarted>> | null = null
+    let retryWake: Awaited<ReturnType<typeof ensureRunpodReasonerStarted>> | null = null
     try {
-      const timeoutMs = runpodStartTimeoutMs()
-      const deadline = Date.now() + timeoutMs
-      while (Date.now() < deadline) {
-        const health = await checkLocalInferenceHealth(config)
-        if (health.ok) return
-        await new Promise(resolve => setTimeout(resolve, 3000))
+      if (remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs) < MIN_RUNPOD_READINESS_SLICE_MS) {
+        throw new Error(`Reasoner unavailable (cold start): no safe RunPod readiness budget remains after reserving ${config.timeoutMs}ms for inference and ${COS_POST_INFERENCE_RESERVE_MS}ms for downstream work`)
       }
-      throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within ${timeoutMs}ms`)
+
+      firstWake = await ensureRunpodReasonerStarted()
+      const firstWaitMs = Math.min(runpodStartTimeoutMs(), remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs))
+      if (firstWaitMs < MIN_RUNPOD_READINESS_SLICE_MS) {
+        throw new Error('Reasoner unavailable (cold start): RunPod lifecycle setup exhausted the safe readiness budget')
+      }
+      if (await waitForLocalInferenceHealth(config, firstWaitMs)) return
+
+      // Production acceptance observed RunPod acknowledge podResume, fall back to EXITED, and then
+      // recover on a second resume. Retry exactly once only when this request owned the first compute
+      // allocation. The retry receives only the readiness time still available after the first attempt.
+      if (firstWake.computeStartedByRequest) {
+        const beforeRetryMs = remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs)
+        if (beforeRetryMs >= MIN_RUNPOD_READINESS_SLICE_MS) {
+          retryWake = await ensureRunpodReasonerStarted()
+          if (retryWake.computeStartedByRequest) {
+            const retryTimeoutMs = Math.min(60_000, remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs))
+            if (retryTimeoutMs < MIN_RUNPOD_READINESS_SLICE_MS) {
+              throw new Error('Reasoner unavailable (cold start): retry lifecycle setup exhausted the safe readiness budget')
+            }
+            console.warn('[cos-runpod-cold-start-retry]', JSON.stringify({
+              at: new Date().toISOString(),
+              firstResumeRequested: firstWake.resumeRequested,
+              firstStartupContractRepaired: firstWake.startupContractRepaired,
+              retryResumeRequested: retryWake.resumeRequested,
+              retryStartupContractRepaired: retryWake.startupContractRepaired,
+              previousStatus: retryWake.previousStatus,
+              desiredStatus: retryWake.desiredStatus,
+              totalReadinessBudgetMs,
+              readinessElapsedMs: Date.now() - readinessStartedAt,
+              retryTimeoutMs,
+            }))
+            if (await waitForLocalInferenceHealth(config, retryTimeoutMs)) return
+            throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within the ${totalReadinessBudgetMs}ms total readiness budget`)
+          }
+        }
+      }
+
+      throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within the ${totalReadinessBudgetMs}ms total readiness budget`)
     } catch (error) {
-      if (wake.computeStartedByRequest) {
+      const computeStartedByRequest = firstWake?.computeStartedByRequest === true || retryWake?.computeStartedByRequest === true
+      if (computeStartedByRequest) {
         try {
           const stopped = await stopRunpodReasoner()
           console.warn('[cos-runpod-cold-start-failsafe]', JSON.stringify({
             at: new Date().toISOString(),
-            resumeRequested: wake.resumeRequested,
-            startupContractRepaired: wake.startupContractRepaired,
-            computeStartedByRequest: wake.computeStartedByRequest,
+            resumeRequested: firstWake?.resumeRequested ?? false,
+            startupContractRepaired: firstWake?.startupContractRepaired ?? false,
+            retryResumeRequested: retryWake?.resumeRequested ?? false,
+            retryStartupContractRepaired: retryWake?.startupContractRepaired ?? false,
+            computeStartedByRequest,
+            totalReadinessBudgetMs,
+            readinessElapsedMs: Date.now() - readinessStartedAt,
             stopAttempted: stopped.attempted,
             stopped: stopped.stopped,
             previousStatus: stopped.previousStatus ?? null,

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
-import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
+import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection, requestsExternalAction } from '@/lib/ai/cos/cosOrchestration'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import {
   attachRecordedTurnProvenance,
@@ -75,11 +75,21 @@ function provenanceFromResponse(body: any, prompt: string, payload: any, isPrivi
   const source = String(payload?.source || '')
   if (source.startsWith('deterministic-current-')) return deterministicProvenance(body, prompt)
   if (source === 'anthropic-chief' || source === 'anthropic-concierge') {
-    return authoritativeProvenance(null, {
+    const provenance = authoritativeProvenance(null, {
       invoked: true,
       provider: 'anthropic',
       model: isPrivileged ? 'claude-sonnet-4-6' : 'claude-haiku-4-5',
-    }) as RecordedTurnProvenance
+    }) as any
+    const explicitAction = requestsExternalAction(prompt)
+    provenance.external_ai = {
+      ...(provenance.external_ai || {}),
+      necessary: explicitAction,
+      escalation_reason_code: explicitAction ? 'explicit_external_action' : 'legacy_route_missing_escalation_trace',
+      escalation_reason: explicitAction
+        ? 'The user explicitly requested an external action that requires the governed executor.'
+        : 'The legacy provider route did not embed its COS escalation decision in the response; this invocation is recorded as not justified until that trace is present.',
+    }
+    return provenance as RecordedTurnProvenance
   }
   if (source === 'deterministic-concierge') return authoritativeProvenance(null, { invoked: false }) as RecordedTurnProvenance
   return null

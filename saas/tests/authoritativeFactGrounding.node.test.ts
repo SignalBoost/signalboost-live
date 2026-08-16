@@ -37,13 +37,13 @@ test('fresh-evidence search query is source-agnostic and current-date scoped', (
     'Who is currently the president of the United States?',
     new Date('2026-08-15T12:00:00.000Z'),
   )
-  assert.match(query, /official authoritative source/i)
+  assert.match(query, /official authoritative independent verification/i)
   assert.match(query, /2026-08-15/)
   assert.doesNotMatch(query, /usa\.gov/i)
   assert.doesNotMatch(query, /whitehouse\.gov/i)
 })
 
-test('authority policy dynamically promotes government evidence without preselecting a URL', () => {
+test('authority policy ranks government evidence dynamically without preselecting a URL', () => {
   const prepared = prepareFreshEvidence([
     {
       title: 'Commentary about the office holder',
@@ -56,24 +56,23 @@ test('authority policy dynamically promotes government evidence without preselec
       snippet: 'Official current leadership information.',
     },
   ])
-
   assert.equal(prepared[0].url, 'https://agency.gov/leadership')
-  assert.equal(
-    freshEvidenceMeetsAuthority('Who is currently the president of the United States?', prepared),
-    true,
-  )
+  assert.equal(freshEvidenceMeetsAuthority('Who is currently the president of the United States?', prepared), true)
 })
 
-test('office-holder evidence fails closed when live search has no government authority', () => {
-  const prepared = prepareFreshEvidence([
+test('public office-holder evidence requires government authority and an independent second host', () => {
+  const oneGovernmentHost = prepareFreshEvidence([
     {
-      title: 'News report',
-      url: 'https://example.com/news',
-      snippet: 'A report naming an office holder.',
+      title: 'Official office holder page',
+      url: 'https://agency.gov/leadership',
+      snippet: 'Official current leadership information.',
     },
   ])
-  assert.equal(
-    freshEvidenceMeetsAuthority('Who is currently the president of the United States?', prepared),
-    false,
-  )
+  assert.equal(freshEvidenceMeetsAuthority('Who is currently the president of the United States?', oneGovernmentHost), false)
+
+  const noGovernment = prepareFreshEvidence([
+    { title: 'News report', url: 'https://example.com/news', snippet: 'A report naming an office holder.' },
+    { title: 'Second report', url: 'https://example.org/news', snippet: 'Another report naming an office holder.' },
+  ])
+  assert.equal(freshEvidenceMeetsAuthority('Who is currently the president of the United States?', noGovernment), false)
 })

@@ -20,6 +20,7 @@ test('volatile operational facts require live verification even without the word
   assert.equal(requiresFreshExternalEvidence('What is flight status for AA123?'), true)
   assert.equal(requiresFreshExternalEvidence('What is traffic like in Warsaw?'), true)
   assert.equal(requiresFreshExternalEvidence('What is the election result?'), true)
+  assert.equal(requiresFreshExternalEvidence('What is the latest stock market data?'), true)
 })
 
 test('explicit freshness wording forces live verification across volatile domains', () => {
@@ -34,12 +35,14 @@ test('explicit freshness wording forces live verification across volatile domain
   assert.equal(requiresFreshExternalEvidence('What is the latest software release?'), true)
 })
 
-test('historical and conceptual questions do not masquerade as current-world lookups', () => {
+test('historical, conceptual, and marketing requests do not masquerade as current-world lookups', () => {
   assert.equal(requiresFreshExternalEvidence('Who was President of the United States in 1999?'), false)
   assert.equal(requiresFreshExternalEvidence('What was the TSLA stock price in 2020?'), false)
   assert.equal(requiresFreshExternalEvidence('Explain how stock prices work.'), false)
   assert.equal(requiresFreshExternalEvidence('How does weather forecasting work?'), false)
   assert.equal(requiresFreshExternalEvidence('How is a prime minister elected?'), false)
+  assert.equal(requiresFreshExternalEvidence('How should I market my latest product?'), false)
+  assert.equal(requiresFreshExternalEvidence('Create a marketing plan for my newest product.'), false)
   assert.equal(requiresFreshExternalEvidence('Explain database transaction isolation levels.'), false)
   assert.equal(requiresFreshExternalEvidence('Diagnose enterprise-only API latency with normal database CPU.'), false)
 })

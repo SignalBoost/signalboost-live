@@ -46,8 +46,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify live-first routing, authority, and no local-model path
-        run: node --test tests/cosFreshnessPolicy.node.test.ts tests/cosFreshLiveRouting.node.test.ts tests/cosFreshGrounding.node.test.ts
+      - name: Verify live-first routing, authority, structured evidence, and no local-model path
+        run: node --test tests/cosFreshnessPolicy.node.test.ts tests/cosFreshLiveRouting.node.test.ts tests/cosFreshGrounding.node.test.ts tests/cosStructuredLiveInfo.node.test.ts
 
   build:
     name: Production build (next build)

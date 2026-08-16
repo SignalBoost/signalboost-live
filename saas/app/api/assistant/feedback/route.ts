@@ -80,16 +80,21 @@ export async function POST(request: NextRequest) {
   }
 
   const messages = (transcript.data ?? []) as ConversationMessage[]
-  let assistantIndex = -1
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
+  const matchingAssistantIndexes: number[] = []
+  for (let index = 0; index < messages.length; index += 1) {
     if (messages[index]?.role === 'assistant' && messages[index]?.content === assistantContent) {
-      assistantIndex = index
-      break
+      matchingAssistantIndexes.push(index)
     }
   }
-  if (assistantIndex < 0) {
+  if (matchingAssistantIndexes.length === 0) {
     return NextResponse.json({ error: 'Assistant response not found in this conversation' }, { status: 404 })
   }
+  // Identical rendered answer text may legitimately occur under different prompts. Without a stable
+  // message id in the current UI contract, choosing one would risk teaching COS from the wrong turn.
+  if (matchingAssistantIndexes.length !== 1) {
+    return NextResponse.json({ error: 'Ambiguous assistant response; feedback target is not unique' }, { status: 409 })
+  }
+  const assistantIndex = matchingAssistantIndexes[0]
 
   let prompt = ''
   for (let index = assistantIndex - 1; index >= 0; index -= 1) {

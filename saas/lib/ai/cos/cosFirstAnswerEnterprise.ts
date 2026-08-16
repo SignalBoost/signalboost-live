@@ -7,6 +7,7 @@ import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { raceSemanticRetrievalWithBudget } from '@/lib/ai/cos/semanticRetrievalBudget'
 import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
@@ -359,13 +360,12 @@ async function semanticKnowledgeFacts(prompt:string, db:NonNullable<ReturnType<t
     return null
   })
   const budgetMs = knowledgeFactRetrievalBudgetMs()
-  return Promise.race([
+  return raceSemanticRetrievalWithBudget({
     work,
-    new Promise<null>(resolve => setTimeout(() => {
-      console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs })
-      resolve(null)
-    }, budgetMs)),
-  ])
+    budgetMs,
+    fallback:null,
+    onTimeout:() => console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs }),
+  })
 }
 
 async function semanticLearnedCorpus(prompt:string) {
@@ -387,13 +387,12 @@ async function semanticLearnedCorpus(prompt:string) {
     return null
   })
   const budgetMs = knowledgeFactRetrievalBudgetMs()
-  return Promise.race([
+  return raceSemanticRetrievalWithBudget({
     work,
-    new Promise<null>(resolve => setTimeout(() => {
-      console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs })
-      resolve(null)
-    }, budgetMs)),
-  ])
+    budgetMs,
+    fallback:null,
+    onTimeout:() => console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs }),
+  })
 }
 
 function emptyRetrieval():RetrievalCounts { return { retrieved:0, relevant:0, selected:0 } }

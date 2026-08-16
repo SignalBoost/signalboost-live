@@ -22,6 +22,7 @@ test('positive feedback is episodic quality evidence, never automatic knowledge'
   assert.equal(decision.evidence.curriculumSignalEligible, false)
   assert.equal('assistantContent' in decision.evidence, false)
   assert.equal('answer' in decision.evidence, false)
+  assert.match(String(decision.evidence.promptHash), /^[a-f0-9]{64}$/)
   assert.match(String(decision.evidence.assistantResponseHash), /^[a-f0-9]{64}$/)
 })
 
@@ -63,4 +64,17 @@ test('identical feedback is deterministic while different corrections get distin
   assert.equal(a.experienceHash, b.experienceHash)
   assert.notEqual(c.experienceHash, d.experienceHash)
   assert.notEqual(a.experienceHash, c.experienceHash)
+})
+
+test('the same assistant wording under a different prompt is a distinct learning event', () => {
+  const a = decideCosUserFeedbackExperience({ ...base, feedbackType: 'negative' })
+  const b = decideCosUserFeedbackExperience({
+    ...base,
+    prompt: 'Explain why this deployment is unavailable.',
+    feedbackType: 'negative',
+  })
+  assert.notEqual(a.promptHash, b.promptHash)
+  assert.equal(a.assistantResponseHash, b.assistantResponseHash)
+  assert.notEqual(a.experienceHash, b.experienceHash)
+  assert.notEqual(a.sourceRef, b.sourceRef)
 })

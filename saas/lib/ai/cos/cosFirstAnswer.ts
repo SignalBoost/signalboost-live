@@ -265,12 +265,13 @@ async function tryFreshCurrentFact(input: {
 }
 
 async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
+  const failureReason = 'reason' in result ? result.reason : null
   await recordCosTurnExperience({
     prompt: input.prompt,
     handled: result.handled,
     confidence: result.confidence,
     provenance: result.provenance,
-    failureReason: result.handled ? null : result.reason,
+    failureReason,
   })
   return result
 }

@@ -703,3 +703,15 @@ The best AI call is the one that never has to happen. The best external data cal
 For COS learning specifically, success means that validated experience measurably improves held-out performance, retains that improvement over time, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance rather than merely accumulating more text.
 
 The long-term proof is a trend: more problems completed with COS-owned memory/skills/tools and local/private compute, fewer external-teacher calls for already-learned classes, stronger verified real-world outcomes, and stable performance when the underlying model/provider is replaced.
+
+
+### 2026-08-17 — latest baseline SaaS CI repair in progress
+
+- Main `a52fa47e0ec88c9b8938b8c1c83b82a2eb8fdb0c` restored `cognitiveFactConsolidation.ts`.
+- Main `5abf0fb59fd2e774dc69da7fd6a25a6ff8d9e837` then accidentally replaced `localEmbeddings.ts` with knowledge-fact code; clean branch `fix/baseline-saas-ci-latest-20260817` restores the prior governed embedding runtime.
+- Also aligns the embedding repair test with the `/v1/models` readiness probe and removes the credits comment-only `getAccess` false positive.
+- Supersedes residual repair PR #1271. Refresh COS memory/cache PR #1270 only after this baseline repair merges.
+
+- Follow-up CI inspection also aligned four pre-existing source contracts with their current intentional implementations: job-scoped prospect advancement, 120s/90s Concierge bounds, the public Self-Healing route, and comment-safe portable-browser dependency wording.
+
+- Governance diagnosis confirmed the protected Chief-of-Staff capabilities remain in delegated `routeCoreLegacy.ts`; the integrity checker now validates and hashes the wrapper plus delegated core instead of falsely scanning only the wrapper.

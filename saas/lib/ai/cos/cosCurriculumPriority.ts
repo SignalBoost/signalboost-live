@@ -233,17 +233,21 @@ export async function loadCosCurriculumSignals(
 }
 
 
-export type CosCurriculumTrack = { id:'cyber_defense'|'software_engineering'|'agent_systems'; title:string; topics:string[]; evaluation:string[]; safetyBoundary:string }
+export type CosCurriculumTrack = { id:'cyber_defense'|'software_engineering'|'agent_systems'|'ml_data_engineering'|'ai_systems_safety'; title:string; topics:string[]; evaluation:string[]; safetyBoundary:string }
 /** Versioned focus tracks; gaps determine what is studied, this manifest determines how it is evaluated. */
 export const COS_CORE_CURRICULUM_TRACKS:ReadonlyArray<CosCurriculumTrack>=[
  {id:'cyber_defense',title:'Cyber defense',topics:['secure coding','vulnerability analysis','incident triage','logs and network/cloud security','defensive remediation'],evaluation:['authorized read-only analysis','isolated lab exercise','evidence-backed remediation plan'],safetyBoundary:'Authorized defensive sources and isolated labs only; no uncontrolled production testing or offensive execution.'},
  {id:'software_engineering',title:'Coding and computer science',topics:['software design','TypeScript and Next.js','databases','testing and debugging','distributed systems','APIs'],evaluation:['reproducible test','code review against specification','holdout debugging task'],safetyBoundary:'Changes remain reviewable and require approval before production deployment.'},
+ {id:'ml_data_engineering',title:'ML and data engineering',topics:['dataset lineage and quality','deduplication and labeling','bias checks','embeddings and retrieval evaluation','model selection','fine-tuning and inference evaluation'],evaluation:['reproducible dataset-quality check','retrieval holdout evaluation','bounded model experiment'],safetyBoundary:'No frontier-model training claims; datasets require provenance, scope controls, and privacy review.'},
+ {id:'ai_systems_safety',title:'AI systems and safety',topics:['GPU and inference operations','networking and capacity','observability and cost control','recovery','alignment','human approval and domain evidence'],evaluation:['capacity or incident simulation','observability review','policy-gated action simulation'],safetyBoundary:'No physical hardware validation; consequential infrastructure changes require approval and rollback evidence.'},
  {id:'agent_systems',title:'Agent systems',topics:['perception planning bounded action','RAG and evidence quality','symbolic and BDI reasoning','multi-agent coordination','evaluation and prompt optimization','human collaboration and alignment'],evaluation:['grounded planning task','tool-policy simulation','held-out agent evaluation'],safetyBoundary:'Consequential actions remain approval-governed; provenance and uncertainty must be recorded.'},
 ]
 export function coreCurriculumTrackForSubject(subject:string):CosCurriculumTrack|null{
  const value=String(subject??'').toLowerCase()
  if(/security|cyber|vulnerab|incident|network|threat|defen/.test(value))return COS_CORE_CURRICULUM_TRACKS[0]
  if(/code|software|program|typescript|next|database|api|debug|computer science/.test(value))return COS_CORE_CURRICULUM_TRACKS[1]
- if(/agent|rag|retrieval|prompt|symbolic|multi-agent|alignment|planning/.test(value))return COS_CORE_CURRICULUM_TRACKS[2]
+ if(/machine learning|ml |dataset|data science|embedding|fine.tun|model evaluation/.test(value))return COS_CORE_CURRICULUM_TRACKS[2]
+ if(/gpu|inference|cloud|capacity|observability|alignment|safety|ethic|hardware/.test(value))return COS_CORE_CURRICULUM_TRACKS[3]
+ if(/agent|rag|retrieval|prompt|symbolic|multi-agent|planning/.test(value))return COS_CORE_CURRICULUM_TRACKS[4]
  return null
 }

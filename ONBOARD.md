@@ -726,3 +726,9 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Fix adds three interrogative-shape checks that short-circuit to `false` before the verb+noun test: an execution verb immediately followed by a wh-word ("check why", "audit what"), the input opening on an interrogative/auxiliary word, and the input ending in a question mark. Real imperative commands ("check the users table and report row counts", "deploy the latest commit to production") are unaffected.
 - Regression test: `tests/cosOrchestrationActionClassifier.node.test.ts`, 6/6 passing. Registered in CI as its own job, `cos-orchestration-action-classifier` in `.github/workflows/saas-ci.yml`, run via `npx tsx --test` (the file has pre-existing `@/` aliases that plain `node --test`/`npm test` cannot resolve — same reason `cos-platform-self-knowledge` uses `tsx`). A green Vercel/Next.js build only proves the app compiles; it does not prove this test runs in CI, hence the dedicated job rather than relying on build success alone.
 - Verified against current `main` at time of fix: full-repo `tsc --noEmit` exit 0, `npm run build` (the same command Vercel runs) succeeds, workflow YAML re-parses valid after the edit.
+
+
+### 2026-08-17 — COS definitional confidence and provenance
+
+- PR #1274 merged as `a2b36f3609e38407aec2970c30050999d4fedac3`: conceptual and comparison questions no longer receive the diagnostic artifact-specificity confidence cap; that cap remains for actual diagnostics.
+- Canonical Enterprise Memory and Semantic Cache definitions are now recorded as a material provenance contributor only when their distinctive definition text was used. Added the regression test to the normal SaaS test command.

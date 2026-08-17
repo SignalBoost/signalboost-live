@@ -5,7 +5,20 @@ import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai
 export function confidenceThreshold(): number { const value=Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72'); return Number.isFinite(value)?Math.max(.5,Math.min(.98,value)):.72 }
 export function externalFallbackEnabled(): boolean { return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED!=='false' }
 export function isProvenanceIntrospection(input:string):boolean{const provenance=/\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|cognitive skill|cognitive skills|procedural skill|procedural skills|autonomous research|external ai|external provider|internal systems?)\b/i,referent=/\b(previous|preceding|prior|last|just|that|this|answer|response|request|execution|used|invoked|contributed|generated|reasoning)\b/i;return provenance.test(input)&&referent.test(input)}
-export function requestsExternalAction(input:string):boolean{if(isProvenanceIntrospection(input))return false;const explicitExecution=/\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i,target=/\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i;return explicitExecution.test(input)&&target.test(input)}
+export function requestsExternalAction(input:string):boolean{if(isProvenanceIntrospection(input))return false;const explicitExecution=/\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i,target=/\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i,
+  // A diagnostic question can contain the same verb+noun combination as a real command
+  // ("check why the table is slow" vs "check the users table") — the difference is whether the
+  // sentence is asking something or instructing something. These three checks catch the diagnostic
+  // shape without needing a full parser: (1) the execution verb is immediately followed by a wh-word,
+  // which is the giveaway that what follows is a question the verb is merely opening ("check WHY...",
+  // "audit WHAT..."); (2) the whole input opens on an interrogative/auxiliary word, the way a real
+  // question does regardless of any verb buried later in the sentence; (3) the input ends in a
+  // question mark, which no imperative command does.
+  diagnosticVerbThenQuestionWord=/\b(?:run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research)\s+(?:why|what|how|whether|if|when|where)\b/i,
+  diagnosticOpener=/^\s*(why|what|how|when|where|which|who|explain|describe|tell me|is|are|was|were|does|did|do|could|would|should)\b/i,
+  endsAsQuestion=/\?\s*$/;
+  if(diagnosticVerbThenQuestionWord.test(input)||diagnosticOpener.test(input)||endsAsQuestion.test(input))return false;
+  return explicitExecution.test(input)&&target.test(input)}
 
 type FunnelStage={retrieved:number;relevant:number;selected:number;injected:number;cited:number}
 type EvidenceFunnel={knowledgeGraph:FunnelStage;learnedCorpus:FunnelStage;enterpriseMemory:FunnelStage;userMemory:FunnelStage}

@@ -201,3 +201,44 @@ export async function pruneWeakKnowledgeFacts(limit = 20): Promise<Array<Record<
 }
 
 export { recordFactRevision }
+
+function positiveInt(value: unknown, fallback: number, max = 20): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.max(1, Math.min(max, Math.floor(parsed))) : fallback
+}
+
+export type FactConsolidationSummary = {
+  enabled: boolean
+  decayed: Array<Record<string, unknown>>
+  pruned: Array<Record<string, unknown>>
+  errors: string[]
+}
+
+/**
+ * Bounded fact-level memory-quality cycle: decay staleness first, then prune what has already
+ * decayed below the floor — same two-step shape as runCognitiveConsolidationCycle() for skills.
+ * Wired into the same daily cos-mining cron rather than a new scheduled invocation, so this is
+ * the fact-level counterpart running alongside the skill-level cycle, not a parallel schedule.
+ */
+export async function runFactConsolidationCycle(): Promise<FactConsolidationSummary> {
+  if (process.env.COS_FACT_CONSOLIDATION_ENABLED === 'false') {
+    return { enabled: false, decayed: [], pruned: [], errors: [] }
+  }
+  const staleLimit = positiveInt(process.env.COS_FACT_STALE_PER_CYCLE, 20, 50)
+  const pruneLimit = positiveInt(process.env.COS_FACT_PRUNE_PER_CYCLE, 20, 50)
+  const summary: FactConsolidationSummary = { enabled: true, decayed: [], pruned: [], errors: [] }
+
+  try {
+    summary.decayed = await weakenStaleKnowledgeFacts(staleLimit)
+  } catch (error) {
+    summary.errors.push(`stale:${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  try {
+    summary.pruned = await pruneWeakKnowledgeFacts(pruneLimit)
+  } catch (error) {
+    summary.errors.push(`prune:${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  return summary
+}

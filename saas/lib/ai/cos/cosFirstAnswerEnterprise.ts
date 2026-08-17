@@ -674,7 +674,19 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English'),
     prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`,
-  }).catch(() => null)
+  }).catch(error => {
+    // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
+    // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission
+    // denied mid-call — produced the identical generic "did not return an answer" message with zero
+    // way to tell those apart from Vercel logs. Log the real error and elapsed time before discarding it.
+    console.error('[cos-first-answer-reasoner-failed]', JSON.stringify({
+      at: new Date().toISOString(),
+      elapsedMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : null,
+    }))
+    return null
+  })
 
   const reasoningProvenance = {
     ...base,

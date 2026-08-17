@@ -713,3 +713,5 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Supersedes residual repair PR #1271. Refresh COS memory/cache PR #1270 only after this baseline repair merges.
 
 - Follow-up CI inspection also aligned four pre-existing source contracts with their current intentional implementations: job-scoped prospect advancement, 120s/90s Concierge bounds, the public Self-Healing route, and comment-safe portable-browser dependency wording.
+
+- Governance diagnosis confirmed the protected Chief-of-Staff capabilities remain in delegated `routeCoreLegacy.ts`; the integrity checker now validates and hashes the wrapper plus delegated core instead of falsely scanning only the wrapper.

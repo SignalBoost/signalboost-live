@@ -127,6 +127,19 @@ jobs:
       - name: Verify quality-repair audit persistence degrades safely without database configuration
         run: npx --yes tsx --test tests/qualityRepairDecisionLogging.node.test.ts
 
+  cos-core-learning-curriculum:
+    name: COS core learning curriculum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify cyber defense, software engineering, and agent learning tracks
+        run: npx --yes tsx --test tests/cosCoreLearningCurriculum.node.test.ts
+
   cos-platform-self-knowledge:
     name: COS platform self-knowledge policy
     runs-on: ubuntu-latest

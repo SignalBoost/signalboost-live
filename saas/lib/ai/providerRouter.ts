@@ -3,7 +3,7 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { callLocalModel } from './local-inference'
+import { callLocalModel } from './local-inference.ts'
 
 export type ModelProvider = 'claude' | 'openai' | 'gemini' | 'local'
 

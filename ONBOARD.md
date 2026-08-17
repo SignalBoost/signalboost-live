@@ -738,3 +738,26 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 
 - PR #1276 merged as `a1389aa1597f2d3a56fe7283b76000f2c22a0f57`: no-preference provider calls and both Backup COS continuity paths now select local inference. Hosted/unknown `AI_MODEL_PROVIDER` values cannot silently select blocked external providers.
 - Added a dedicated `tsx` CI regression for provider preference; the production build, typecheck, provider regression, policy, import-extension, QA, and audit checks passed before merge.
+
+
+### 2026-08-17 — staged COS capability implementation plan
+
+**Principle:** COS continuously improves through measured outcomes, but consequential actions remain approval-governed. It may investigate, retrieve evidence, simulate, draft, test in isolation, and prepare an exact change autonomously; publishing, outreach, spending, production mutation, and self-deployment require the applicable human approval.
+
+1. **Close the learning loop first.** Every COS task must emit an outcome record: task/problem class, evidence sufficiency, confidence, result quality, reuse success/failure, cost/latency, and explicit feedback. A weak or failed turn creates a canonical learning gap rather than being silently forgotten. Promote knowledge/recipes/skills only after validation; weaken or quarantine them on repeated failure.
+
+2. **Gap → governed implementation plan.** For each validated gap, COS produces a bounded specification: objective, evidence, scope, API/schema/UI/test implications, risk classification, rollback/verification plan, and approval requirement. Low-risk read-only investigations can proceed under policy; implementation and deployment remain gated.
+
+3. **Objective decomposition and measurement.** Convert approved business objectives into measurable subgoals, dependencies, owners, evidence requirements, and review checkpoints. Initial SignalBoost objectives: qualified opportunities, approval-ready campaigns, and verified conversion/revenue outcomes.
+
+4. **Adaptive capability/recipe selection.** Select only approved tools and recipes using measured reliability, latency, cost, evidence quality, and prior outcomes. Automatically demote unhealthy paths; preserve evidence and decision provenance.
+
+5. **Scoped evidence fusion.** Combine approved internal data, CRM, analytics, live authoritative sources, and—when connected—communications signals. Preserve tenant/scope controls, citations, evidence funnels, and strict separation of durable memory from answer caches.
+
+6. **Commercial execution rollout.**
+   - Phase 1: create drafts, research, scripts, campaigns, and approval-ready work.
+   - Phase 2: publish through approved connectors and monitor outcomes.
+   - Phase 3: predictive optimization, data mining, and monetization recommendations.
+   - Phase 4: lead capture, CRM updates, approved outreach, conversion tracking, and closed-loop learning.
+
+**Immediate build priority:** implement items 1 and 2 end-to-end: low-confidence/failed COS turns must create a durable, deduplicated, measurable learning-gap plan with evidence, validation criteria, owner/approval state, and later outcome feedback.

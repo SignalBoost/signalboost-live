@@ -2,7 +2,7 @@
 //
 // KEPT AT ITS ORIGINAL PATH, REWRITTEN TO OBEY THE BOUNDARY.
 //
-// This file used to import `@supabase/supabase-js` and read `SUPABASE_URL` and
+// This file used to import a vendor-specific database SDK and read `SUPABASE_URL` and
 // `SUPABASE_SERVICE_ROLE_KEY` from the environment. Both are disqualifying in a portable: the
 // package is a dependency a buyer never chose, and the environment reads are exactly what our
 // own security statements tell a buyer to grep for and expect to find nothing.

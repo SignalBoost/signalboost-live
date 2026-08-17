@@ -114,6 +114,19 @@ jobs:
       - name: Verify a caller with no explicit preference and no env override reaches local reasoning, never a blocked hosted provider
         run: npx --yes tsx --test tests/providerRouterDefaultPreference.node.test.ts
 
+  cos-quality-repair-audit:
+    name: COS quality-repair audit persistence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify quality-repair audit persistence degrades safely without database configuration
+        run: npx --yes tsx --test tests/qualityRepairDecisionLogging.node.test.ts
+
   cos-platform-self-knowledge:
     name: COS platform self-knowledge policy
     runs-on: ubuntu-latest

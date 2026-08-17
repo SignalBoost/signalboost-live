@@ -179,7 +179,20 @@ export async function callCosReasoner(
     }
   }
 
-  const first = await callLocalModel(effectiveArgs, inference).catch(() => null)
+  const first = await callLocalModel(effectiveArgs, inference).catch(error => {
+    // This is the actual HTTP call to the reasoner endpoint. Every caller up the chain
+    // (callCosReasoner, then cosFirstAnswerEnterprise) only ever sees `null` from here — so a
+    // cold-start timeout, an aborted fetch, or an HTTP error from the endpoint all looked identical
+    // to "the model declined to answer" with zero way to tell them apart from Vercel logs.
+    console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
+      at: new Date().toISOString(),
+      phase: 'draft',
+      reasoner: config.label,
+      error: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : null,
+    }))
+    return null
+  })
   if (!first) return null
 
   let text = first
@@ -193,7 +206,16 @@ export async function callCosReasoner(
         prompt: buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
       },
       inference,
-    ).catch(() => null)
+    ).catch(error => {
+      console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
+        at: new Date().toISOString(),
+        phase: 'quality_repair',
+        reasoner: config.label,
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : null,
+      }))
+      return null
+    })
 
     if (repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired)) {
       console.info('[cos-local-quality-repair]', JSON.stringify({
@@ -223,7 +245,16 @@ export async function callCosReasoner(
         prompt: buildSkillCitationRepairPrompt(effectiveArgs.prompt, parsed.answer, allowedSkillTags),
       },
       inference,
-    ).catch(() => null)
+    ).catch(error => {
+      console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
+        at: new Date().toISOString(),
+        phase: 'skill_citation_repair',
+        reasoner: config.label,
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : null,
+      }))
+      return null
+    })
     const auditedParsed = audited ? parseLocalResult(audited) : null
     const accepted = Boolean(auditedParsed && validSkillCitationOnlyRepair(parsed.answer, auditedParsed.answer, allowedSkillTags))
     if (accepted && auditedParsed) {

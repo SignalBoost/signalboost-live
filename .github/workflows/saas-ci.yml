@@ -101,6 +101,19 @@ jobs:
       - name: Verify definitional questions bypass the diagnostic-specificity cap and canonical self-knowledge is reported as a material contributor
         run: npx --yes tsx --test tests/cosDefinitionalAnswerQuality.node.test.ts
 
+  provider-router-default-preference:
+    name: Provider router default preference resolves to local
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify a caller with no explicit preference and no env override reaches local reasoning, never a blocked hosted provider
+        run: npx --yes tsx --test tests/providerRouterDefaultPreference.node.test.ts
+
   cos-platform-self-knowledge:
     name: COS platform self-knowledge policy
     runs-on: ubuntu-latest

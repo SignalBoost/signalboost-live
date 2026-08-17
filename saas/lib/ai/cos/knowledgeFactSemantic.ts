@@ -1,6 +1,7 @@
 import { generatePassiveLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { cosServiceDb, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import type { KnowledgeFact, PersistentKnowledgeStore } from '@/lib/cos-core/layers/knowledge/persistent'
+import { resolveFactContradiction, recordFactRevision } from '@/lib/ai/cos/cognitiveFactConsolidation'
 
 export type KnowledgeFactEmbeddingResult = {
   embedded: boolean
@@ -21,26 +22,53 @@ export function knowledgeFactEmbeddingText(fact: Pick<KnowledgeFact, 'subject' |
 }
 
 /**
- * Persist the fact even if semantic embedding is temporarily unavailable. Knowledge acquisition
- * must not fail merely because the local embedding model is cold or because the database migration
- * has not reached a deployment yet. Once the embedding path is healthy, the backfill job upgrades
- * those rows without re-running fact extraction.
+ * A fact never silently overwrites a different existing claim for the same (task, subject,
+ * predicate) — see cognitiveFactConsolidation.ts for why. This reads the existing row first,
+ * resolves any contradiction (higher confidence wins, loser is penalized not deleted), and audits
+ * the outcome to cos_knowledge_fact_revisions before writing. Reaffirming the same claim (no
+ * material difference) or writing a brand-new subject/predicate both skip the audit — there is
+ * nothing to reconcile.
  */
+async function reconcileFactForPersistence(store: PersistentKnowledgeStore, fact: KnowledgeFact): Promise<KnowledgeFact> {
+  const existing = await store.getFact(fact.taskId, fact.subject, fact.predicate)
+  const decision = resolveFactContradiction(existing, fact)
+  const reconciled: KnowledgeFact = decision.winner === 'existing'
+    ? { ...fact, object: existing!.object, confidence: decision.persistedConfidence }
+    : { ...fact, confidence: decision.persistedConfidence }
+
+  if (decision.isContradiction) {
+    const db = cosServiceDb()
+    if (db) {
+      await recordFactRevision(db, {
+        taskId: fact.taskId, subject: fact.subject, predicate: fact.predicate,
+        revisionKind: 'contradiction',
+        previousObject: existing!.object, previousConfidence: existing!.confidence,
+        newObject: reconciled.object, newConfidence: reconciled.confidence,
+        reason: decision.winner === 'incoming'
+          ? 'incoming claim had equal or higher confidence than the existing fact'
+          : 'existing claim had higher confidence; incoming claim distrusted, not discarded',
+      })
+    }
+  }
+  return reconciled
+}
+
 export async function persistKnowledgeFactWithEmbedding(
   store: PersistentKnowledgeStore,
   fact: KnowledgeFact,
 ): Promise<KnowledgeFactEmbeddingResult> {
+  const reconciled = await reconcileFactForPersistence(store, fact)
   try {
-    const embedding = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(fact))
-    await store.upsertFact(fact, embedding)
+    const embedding = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(reconciled))
+    await store.upsertFact(reconciled, embedding)
     return { embedded: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.warn('cosKnowledgeFact: semantic embedding unavailable; storing fact without vector', {
-      factId: fact.id,
+      factId: reconciled.id,
       error: message,
     })
-    await store.upsertFact(fact)
+    await store.upsertFact(reconciled)
     return { embedded: false, error: message }
   }
 }

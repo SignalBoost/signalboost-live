@@ -80,3 +80,16 @@ export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRa
   if (repaired.genericBuckets !== first.genericBuckets) return repaired.genericBuckets < first.genericBuckets
   return repaired.score > first.score
 }
+
+
+export type QualityRepairDecisionInput = { repairKind:'quality_repair'|'skill_citation_repair'; reasonerLabel:string; accepted:boolean; details:Record<string,unknown> }
+/** Best-effort audit persistence; never blocks COS reasoning. */
+export async function recordQualityRepairDecision(input:QualityRepairDecisionInput):Promise<void>{
+  try{
+    const { cosServiceDb }=await import('@/lib/cos-core/storage/supabase')
+    const db=cosServiceDb()
+    if(!db)return
+    const result=await db.from('cos_quality_repair_decisions').insert({repair_kind:input.repairKind,reasoner_label:input.reasonerLabel,accepted:input.accepted,details:input.details})
+    if(result.error)throw result.error
+  }catch(error){console.warn('cosReasonerQuality: failed to persist quality-repair decision',error instanceof Error?error.message:String(error))}
+}

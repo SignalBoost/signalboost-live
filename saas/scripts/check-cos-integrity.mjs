@@ -6,19 +6,23 @@ import process from 'node:process'
 const root = path.resolve(process.cwd())
 const conciergePath = path.join(root, 'app/api/concierge/route.ts')
 const supportPath = path.join(root, 'app/api/support/route.ts')
+const supportCorePath = path.join(root, 'app/api/support/routeCoreLegacy.ts')
 const backupRuntimePath = path.join(root, 'lib/cos-backup/runtime.ts')
 const backupPolicyPath = path.join(root, 'lib/cos-backup/policy.ts')
 const nextConfigPath = path.join(root, 'next.config.mjs')
 const brainPath = path.resolve(root, '../cos-core/brain.md')
 
-const [concierge, support, backupRuntime, backupPolicy, nextConfig, brain] = await Promise.all([
+const [concierge, support, supportCore, backupRuntime, backupPolicy, nextConfig, brain] = await Promise.all([
   readFile(conciergePath, 'utf8'),
   readFile(supportPath, 'utf8'),
+  readFile(supportCorePath, 'utf8'),
   readFile(backupRuntimePath, 'utf8'),
   readFile(backupPolicyPath, 'utf8'),
   readFile(nextConfigPath, 'utf8'),
   readFile(brainPath, 'utf8'),
 ])
+
+const supportSurface = `${support}\n${supportCore}`
 
 const failures = []
 
@@ -32,11 +36,11 @@ if (/const backupPromise = runBackupCos/.test(concierge)) failures.push('backup_
 if (/Promise\.all\s*\(\s*\[\s*primaryPromise\s*,\s*backupPromise/.test(concierge)) failures.push('healthy_primary_blocked_by_backup')
 if (/createClient|\.from\(|\.insert\(|\.update\(|proposeCampaign|sendPress|publishCore|socialPlatformFrom|isPressCreationRequest/i.test(concierge)) failures.push('concierge_contains_direct_business_side_effect')
 
-if (!/function chiefOfStaffPrompt\(/.test(support)) failures.push('chief_of_staff_prompt_missing')
-if (!/loadUserMemories/.test(support)) failures.push('user_memory_loader_missing')
-if (!/searchPastConversations/.test(support)) failures.push('conversation_history_missing')
-if (!/getBusinessMetrics/.test(support)) failures.push('live_metrics_missing')
-if (!/trusted senior advisor/.test(support)) failures.push('chief_of_staff_identity_missing')
+if (!/function chiefOfStaffPrompt\(/.test(supportSurface)) failures.push('chief_of_staff_prompt_missing')
+if (!/loadUserMemories/.test(supportSurface)) failures.push('user_memory_loader_missing')
+if (!/searchPastConversations/.test(supportSurface)) failures.push('conversation_history_missing')
+if (!/getBusinessMetrics/.test(supportSurface)) failures.push('live_metrics_missing')
+if (!/trusted senior advisor/.test(supportSurface)) failures.push('chief_of_staff_identity_missing')
 
 if (!/withDeadline/.test(backupRuntime) || !/COS_BACKUP_TIMEOUT_MS/.test(backupRuntime)) failures.push('backup_deadline_missing')
 if (!/loadApprovedBrain/.test(backupRuntime)) failures.push('backup_brain_loader_missing')
@@ -60,7 +64,7 @@ const report = {
   schema: 'signalboost-cos-integrity-v3',
   brainDigest: createHash('sha256').update(brain).digest('hex'),
   conciergeDigest: createHash('sha256').update(concierge).digest('hex'),
-  supportDigest: createHash('sha256').update(support).digest('hex'),
+  supportDigest: createHash('sha256').update(supportSurface).digest('hex'),
   backupRuntimeDigest: createHash('sha256').update(backupRuntime).digest('hex'),
   backupPolicyDigest: createHash('sha256').update(backupPolicy).digest('hex'),
   nextConfigDigest: createHash('sha256').update(nextConfig).digest('hex'),

@@ -118,7 +118,7 @@ export async function runBackupCos(normalizedInput: string, language = 'en'): Pr
   const brain = await loadApprovedBrain()
   const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
   const execution = await withDeadline(
-    callModelDetailed({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
+    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: 1200 }),
     backupTimeoutMs(),
   )
   return finalizeBackupAnswer(brain, execution?.text ?? null, {
@@ -188,7 +188,7 @@ export async function runBackupCosWithConfig(
   }
 
   const execution = await withDeadline(
-    callModelDetailed({ modelPreference: 'openai', prompt, maxTokens: 1200 }),
+    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: 1200 }),
     config.timeoutMs ?? backupTimeoutMs(),
   )
   return finalizeBackupAnswer(brain, execution?.text ?? null, {

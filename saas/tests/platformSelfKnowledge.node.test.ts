@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { platformSelfKnowledgeFacts } from '../lib/ai/cos/platformSelfKnowledge'
+import { platformSelfKnowledgeFacts } from '../lib/ai/cos/platformSelfKnowledge.ts'
 
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -11,7 +11,7 @@ test('platform self-knowledge is a small versioned set of deterministic code-der
   const timestamp = new Date('2026-08-16T00:00:00.000Z')
   const facts = platformSelfKnowledgeFacts(timestamp)
 
-  assert.equal(facts.length, 4)
+  assert.equal(facts.length, 6)
   assert.equal(new Set(facts.map(fact => fact.id)).size, facts.length)
   assert.equal(new Set(facts.map(fact => `${fact.taskId}:${fact.subject}:${fact.predicate}`)).size, facts.length)
 
@@ -19,15 +19,17 @@ test('platform self-knowledge is a small versioned set of deterministic code-der
     assert.equal(fact.taskId, 'support')
     assert.equal(fact.confidence, 1)
     assert.equal(fact.updatedAt, timestamp)
-    assert.match(fact.source, /^platform-self-knowledge:v1:/)
+    assert.match(fact.source, /^platform-self-knowledge:v2:/)
     assert.ok(fact.object.length >= 120)
   }
 
-  const byPredicate = new Map(facts.map(fact => [fact.predicate, fact.object]))
-  assert.match(byPredicate.get('interactive_wake_authority') || '', /fresh same-origin user interaction/i)
-  assert.match(byPredicate.get('background_embedding_lifecycle') || '', /must not wake stopped RunPod compute/i)
-  assert.match(byPredicate.get('fresh_facts_bypass_ordinary_runpod_preflight') || '', /before ordinary RunPod readiness/i)
-  assert.match(byPredicate.get('bounded_request_owned_retry') || '', /same request started the compute/i)
+  const byPredicate = new Map(facts.map(fact => [`${fact.subject}:${fact.predicate}`, fact.object]))
+  assert.match(byPredicate.get('SignalBoost COS Enterprise Memory:authoritative_definition') || '', /durable organization-scoped operational knowledge/i)
+  assert.match(byPredicate.get('SignalBoost COS Semantic Cache:authoritative_definition') || '', /previously generated answer/i)
+  assert.match(byPredicate.get('SignalBoost COS RunPod wake governance:interactive_wake_authority') || '', /fresh same-origin user interaction/i)
+  assert.match(byPredicate.get('SignalBoost COS RunPod wake governance:background_embedding_lifecycle') || '', /must not wake stopped RunPod compute/i)
+  assert.match(byPredicate.get('SignalBoost COS fresh-data routing:fresh_facts_bypass_ordinary_runpod_preflight') || '', /before ordinary RunPod readiness/i)
+  assert.match(byPredicate.get('SignalBoost COS RunPod cold-start recovery:bounded_request_owned_retry') || '', /same request started the compute/i)
 })
 
 test('versioned self-knowledge claims remain mechanically aligned with implementation', () => {

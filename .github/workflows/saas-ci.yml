@@ -88,6 +88,19 @@ jobs:
       - name: Verify diagnostic questions never route to the governed-executor action path
         run: npx --yes tsx --test tests/cosOrchestrationActionClassifier.node.test.ts
 
+  cos-definitional-answer-quality:
+    name: COS definitional answer quality and canonical self-knowledge provenance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify definitional questions bypass the diagnostic-specificity cap and canonical self-knowledge is reported as a material contributor
+        run: npx --yes tsx --test tests/cosDefinitionalAnswerQuality.node.test.ts
+
   cos-platform-self-knowledge:
     name: COS platform self-knowledge policy
     runs-on: ubuntu-latest

@@ -761,3 +761,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
    - Phase 4: lead capture, CRM updates, approved outreach, conversion tracking, and closed-loop learning.
 
 **Immediate build priority:** implement items 1 and 2 end-to-end: low-confidence/failed COS turns must create a durable, deduplicated, measurable learning-gap plan with evidence, validation criteria, owner/approval state, and later outcome feedback.
+
+
+### 2026-08-17 — COS quality-repair decision audit
+
+- PR #1279 merged as `daa23e2237505851e6376f2f3c320a7d752f759a`: accepted and rejected diagnostic-quality and skill-citation repair decisions are now persisted best-effort in `cos_quality_repair_decisions`, with a dedicated CI regression. Database unavailability is non-blocking and never interrupts COS reasoning.

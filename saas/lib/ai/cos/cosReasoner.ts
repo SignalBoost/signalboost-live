@@ -14,7 +14,7 @@
 
 import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
-import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair } from '@/lib/ai/cos/reasonerQuality'
+import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { maybeBuildCognitiveCouncilAdvisory } from '@/lib/ai/cos/cognitiveCouncil'
 import { runCouncilChallengeRound } from '@/lib/ai/cos/cognitiveCouncilChallenge'
@@ -223,6 +223,7 @@ export async function callCosReasoner(
         reasoner: config.label,
         repaired: true,
       }))
+      void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired) } })
       text = repaired
     } else {
       console.warn('[cos-local-quality-repair]', JSON.stringify({
@@ -230,6 +231,7 @@ export async function callCosReasoner(
         reasoner: config.label,
         repaired: false,
       }))
+      void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null } })
     }
   }
 
@@ -268,6 +270,7 @@ export async function callCosReasoner(
       allowedTags: allowedSkillTags,
       citedTags: auditedParsed ? skillCitationTags(auditedParsed.answer) : [],
     }))
+    void recordQualityRepairDecision({ repairKind:'skill_citation_repair', reasonerLabel:config.label, accepted, details:{ allowedTags:allowedSkillTags, citedTags:auditedParsed?skillCitationTags(auditedParsed.answer):[] } })
   }
 
   return { text, reasoner: config }

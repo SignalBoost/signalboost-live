@@ -1,140 +1,203 @@
-import { generatePassiveLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
-import { cosServiceDb, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
-import type { KnowledgeFact, PersistentKnowledgeStore } from '@/lib/cos-core/layers/knowledge/persistent'
-import { resolveFactContradiction, recordFactRevision } from '@/lib/ai/cos/cognitiveFactConsolidation'
+// saas/lib/ai/cos/cognitiveFactConsolidation.ts
+//
+// Item 3 (long-term memory quality) at the FACT level. Skills already have staleness/weakening
+// (cognitiveConsolidation.ts) and quarantine-on-contradiction (cognitiveLearningLifecycle.ts).
+// cos_knowledge_facts had none of that: upsertFact() silently overwrote the object on any
+// (task_id,subject,predicate) collision, with zero audit trail and no revalidation cycle.
+//
+// The decision logic here is pure and DB-free, same split as cognitiveHeldOutCertification.ts —
+// testable without Supabase. The DB-backed functions at the bottom are thin callers.
+//
+// Design choice: a fact is never silently deleted or silently overwritten. A contradiction always
+// keeps the higher-confidence claim and always logs the loser to cos_knowledge_fact_revisions;
+// staleness decays confidence rather than deleting outright, so a fact fades before it disappears;
+// pruning only removes what staleness has already decayed below the floor. Same shape as the skill
+// lifecycle: weaken before quarantine, never an instant drop from strong to gone.
 
-export type KnowledgeFactEmbeddingResult = {
-  embedded: boolean
-  error?: string
-}
+import type { KnowledgeFact } from '@/lib/cos-core/layers/knowledge/persistent'
+// cosServiceDb is imported lazily inside the DB-backed functions below, not here at module scope.
+// `node --test` cannot resolve the `@/` alias, so a top-level value-import of it makes this whole
+// file unloadable in plain node tests (this bit tests/cosUserFeedbackLearning already, pre-existing
+// on main). Keeping the pure decision logic above free of `@/` imports is what keeps it testable.
 
-export type KnowledgeFactBackfillResult = {
-  status: 'backfilled' | 'skipped' | 'error'
-  attempted: number
-  embedded: number
-  failed: number
-  remaining: number | null
-  error?: string
-}
+export const FACT_STALENESS_DAYS = 30 // matches DEFAULT_COGNITIVE_RETENTION_POLICY.staleValidationDays
+export const FACT_STALENESS_DECAY_PER_PERIOD = 0.85 // confidence *= this, once per staleness period elapsed
+export const FACT_CONTRADICTION_LOSER_PENALTY = 0.7 // the claim that loses a contradiction is not deleted outright, just distrusted
+export const FACT_PRUNE_CONFIDENCE_FLOOR = 0.15
 
-export function knowledgeFactEmbeddingText(fact: Pick<KnowledgeFact, 'subject' | 'predicate' | 'object'>): string {
-  return `${fact.subject}\n${fact.predicate}\n${fact.object}`
+function normalizeFactObject(value: string): string {
+  return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 /**
- * A fact never silently overwrites a different existing claim for the same (task, subject,
- * predicate) — see cognitiveFactConsolidation.ts for why. This reads the existing row first,
- * resolves any contradiction (higher confidence wins, loser is penalized not deleted), and audits
- * the outcome to cos_knowledge_fact_revisions before writing. Reaffirming the same claim (no
- * material difference) or writing a brand-new subject/predicate both skip the audit — there is
- * nothing to reconcile.
+ * Conservative on purpose: only an EXACT match after normalization counts as "the same claim".
+ * Any other difference in wording is treated as a possible contradiction and goes through the
+ * review path below rather than being assumed equivalent — silently assuming two different
+ * phrasings agree is exactly the failure mode this file exists to close off.
  */
-async function reconcileFactForPersistence(store: PersistentKnowledgeStore, fact: KnowledgeFact): Promise<KnowledgeFact> {
-  const existing = await store.getFact(fact.taskId, fact.subject, fact.predicate)
-  const decision = resolveFactContradiction(existing, fact)
-  const reconciled: KnowledgeFact = decision.winner === 'existing'
-    ? { ...fact, object: existing!.object, confidence: decision.persistedConfidence }
-    : { ...fact, confidence: decision.persistedConfidence }
-
-  if (decision.isContradiction) {
-    const db = cosServiceDb()
-    if (db) {
-      await recordFactRevision(db, {
-        taskId: fact.taskId, subject: fact.subject, predicate: fact.predicate,
-        revisionKind: 'contradiction',
-        previousObject: existing!.object, previousConfidence: existing!.confidence,
-        newObject: reconciled.object, newConfidence: reconciled.confidence,
-        reason: decision.winner === 'incoming'
-          ? 'incoming claim had equal or higher confidence than the existing fact'
-          : 'existing claim had higher confidence; incoming claim distrusted, not discarded',
-      })
-    }
-  }
-  return reconciled
+export function factsMateriallyDiffer(previousObject: string, incomingObject: string): boolean {
+  return normalizeFactObject(previousObject) !== normalizeFactObject(incomingObject)
 }
 
-export async function persistKnowledgeFactWithEmbedding(
-  store: PersistentKnowledgeStore,
-  fact: KnowledgeFact,
-): Promise<KnowledgeFactEmbeddingResult> {
-  const reconciled = await reconcileFactForPersistence(store, fact)
-  try {
-    const embedding = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(reconciled))
-    await store.upsertFact(reconciled, embedding)
-    return { embedded: true }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn('cosKnowledgeFact: semantic embedding unavailable; storing fact without vector', {
-      factId: reconciled.id,
-      error: message,
-    })
-    await store.upsertFact(reconciled)
-    return { embedded: false, error: message }
-  }
+export type FactContradictionDecision = {
+  isContradiction: boolean
+  winner: 'incoming' | 'existing' | 'none'
+  persistedConfidence: number
+  revisionKind: 'contradiction' | null
 }
 
-function rowToFact(row: any): KnowledgeFact {
+/**
+ * Called before every upsert. If there's no existing fact, or the incoming claim matches the
+ * existing one, this is not a contradiction — the existing/no-op confidence just passes through
+ * (a reaffirmation is allowed to raise confidence toward the incoming value, never silently drop it).
+ * If the claims differ, higher confidence wins; the loser's confidence is penalized rather than the
+ * row being deleted, and the caller is expected to log a revision either way.
+ */
+export function resolveFactContradiction(
+  existing: Pick<KnowledgeFact, 'object' | 'confidence'> | null,
+  incoming: Pick<KnowledgeFact, 'object' | 'confidence'>,
+): FactContradictionDecision {
+  if (!existing) {
+    return { isContradiction: false, winner: 'incoming', persistedConfidence: incoming.confidence, revisionKind: null }
+  }
+  if (!factsMateriallyDiffer(existing.object, incoming.object)) {
+    const persistedConfidence = Math.max(existing.confidence, incoming.confidence)
+    return { isContradiction: false, winner: 'incoming', persistedConfidence, revisionKind: null }
+  }
+  const incomingWins = incoming.confidence >= existing.confidence
+  const persistedConfidence = incomingWins
+    ? incoming.confidence
+    : existing.confidence * FACT_CONTRADICTION_LOSER_PENALTY
   return {
-    id: String(row.id),
-    taskId: String(row.task_id),
-    subject: String(row.subject ?? ''),
-    predicate: String(row.predicate ?? ''),
-    object: String(row.object ?? ''),
-    confidence: Number(row.confidence ?? 0),
-    source: String(row.source ?? ''),
-    updatedAt: new Date(row.updated_at),
+    isContradiction: true,
+    winner: incomingWins ? 'incoming' : 'existing',
+    persistedConfidence: Math.max(0, Math.min(1, persistedConfidence)),
+    revisionKind: 'contradiction',
   }
 }
 
+export function daysSince(updatedAt: Date, now: Date = new Date()): number {
+  return Math.max(0, (now.getTime() - updatedAt.getTime()) / 86_400_000)
+}
+
 /**
- * Incrementally upgrade pre-existing facts after the vector column migration is applied.
- * The bounded batch is embedded concurrently so one slow local-model request defines the batch
- * latency instead of multiplying that latency by every row in the batch.
+ * How many full staleness periods have elapsed since a fact was last written or reaffirmed, and
+ * what its confidence becomes after decaying once per period. A fact touched last week is not
+ * decayed at all; a fact untouched for 3x the staleness window has decayed three times.
  */
-export async function backfillKnowledgeFactEmbeddings(limit = 4): Promise<KnowledgeFactBackfillResult> {
+export function decayedFactConfidence(
+  currentConfidence: number,
+  updatedAt: Date,
+  now: Date = new Date(),
+  stalenessDays: number = FACT_STALENESS_DAYS,
+  decayPerPeriod: number = FACT_STALENESS_DECAY_PER_PERIOD,
+): { periodsElapsed: number; decayedConfidence: number } {
+  const periodsElapsed = Math.floor(daysSince(updatedAt, now) / Math.max(1, stalenessDays))
+  const decayedConfidence = currentConfidence * Math.pow(decayPerPeriod, periodsElapsed)
+  return { periodsElapsed, decayedConfidence: Math.max(0, Math.min(1, decayedConfidence)) }
+}
+
+export function shouldPruneFact(confidence: number, floor: number = FACT_PRUNE_CONFIDENCE_FLOOR): boolean {
+  return confidence < floor
+}
+
+// Minimal duck-typed shape instead of importing cosServiceDb's return type, so this file has zero
+// `@/` value imports and stays loadable under plain `node --test` (see note above the imports).
+type FactRevisionDb = { from: (table: string) => { insert: (payload: Record<string, unknown>) => PromiseLike<{ error: unknown }> } }
+
+async function recordFactRevision(
+  db: FactRevisionDb,
+  args: {
+    taskId: string; subject: string; predicate: string
+    revisionKind: 'contradiction' | 'staleness_decay' | 'pruned'
+    previousObject: string | null; previousConfidence: number | null
+    newObject: string | null; newConfidence: number | null
+    reason: string
+  },
+): Promise<void> {
+  const result = await db.from('cos_knowledge_fact_revisions').insert({
+    task_id: args.taskId,
+    subject: args.subject,
+    predicate: args.predicate,
+    revision_kind: args.revisionKind,
+    previous_object: args.previousObject,
+    previous_confidence: args.previousConfidence,
+    new_object: args.newObject,
+    new_confidence: args.newConfidence,
+    reason: args.reason,
+  })
+  if (result.error) throw result.error
+}
+
+/**
+ * Fetches every fact untouched since the staleness window, decays its confidence, updates the row,
+ * and audits the change. Facts that decay below the prune floor here are recorded as 'staleness_decay'
+ * this pass — pruneWeakKnowledgeFacts() is a separate, explicit second step so decay and deletion are
+ * never the same action.
+ */
+export async function weakenStaleKnowledgeFacts(limit = 20): Promise<Array<Record<string, unknown>>> {
+  const { cosServiceDb } = await import('@/lib/cos-core/storage/supabase')
   const db = cosServiceDb()
-  if (!db) return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: 'COS Supabase service store is not configured' }
+  if (!db) return []
+  const cutoff = new Date(Date.now() - FACT_STALENESS_DAYS * 86_400_000).toISOString()
+  const result = await db.from('cos_knowledge_facts')
+    .select('id,task_id,subject,predicate,object,confidence,updated_at')
+    .lt('updated_at', cutoff)
+    .order('updated_at', { ascending: true })
+    .limit(Math.max(1, limit))
+  if (result.error) throw result.error
 
-  const requested = Math.max(1, Math.min(8, Math.floor(limit)))
-  const pending = await db.from('cos_knowledge_facts')
-    .select('id,task_id,subject,predicate,object,confidence,source,updated_at')
-    .is('embedding', null)
-    .order('confidence', { ascending: false })
-    .order('updated_at', { ascending: false })
-    .limit(requested)
-
-  if (pending.error) {
-    const message = pending.error.message || String(pending.error)
-    console.warn('cosKnowledgeFact: embedding backfill skipped', message)
-    return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: message }
+  const decayed: Array<Record<string, unknown>> = []
+  for (const row of result.data || []) {
+    const { periodsElapsed, decayedConfidence } = decayedFactConfidence(Number(row.confidence), new Date(row.updated_at))
+    if (periodsElapsed < 1 || decayedConfidence >= Number(row.confidence)) continue
+    const update = await db.from('cos_knowledge_facts').update({
+      confidence: decayedConfidence,
+      updated_at: new Date().toISOString(),
+    }).eq('id', row.id)
+    if (update.error) throw update.error
+    await recordFactRevision(db, {
+      taskId: row.task_id, subject: row.subject, predicate: row.predicate,
+      revisionKind: 'staleness_decay',
+      previousObject: row.object, previousConfidence: Number(row.confidence),
+      newObject: row.object, newConfidence: decayedConfidence,
+      reason: `${periodsElapsed} staleness period(s) elapsed with no reaffirmation`,
+    })
+    decayed.push({ subject: row.subject, predicate: row.predicate, fromConfidence: row.confidence, toConfidence: decayedConfidence })
   }
-
-  const store = new SupabaseKnowledgeStore(db)
-  const attempts = await Promise.allSettled((pending.data ?? []).map(async row => {
-    const fact = rowToFact(row)
-    const vector = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(fact))
-    await store.upsertFact(fact, vector)
-    return fact.id
-  }))
-
-  const embedded = attempts.filter(result => result.status === 'fulfilled').length
-  const rejected = attempts.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-  const failed = rejected.length
-  const errors = rejected.map(result => result.reason instanceof Error ? result.reason.message : String(result.reason))
-
-  const remainingQuery = await db.from('cos_knowledge_facts')
-    .select('id', { count: 'exact', head: true })
-    .is('embedding', null)
-  const remaining = remainingQuery.error ? null : remainingQuery.count ?? 0
-  const attempted = (pending.data ?? []).length
-  const status: KnowledgeFactBackfillResult['status'] = attempted === 0 ? 'skipped' : embedded === 0 && failed > 0 ? 'error' : 'backfilled'
-
-  return {
-    status,
-    attempted,
-    embedded,
-    failed,
-    remaining,
-    ...(errors.length ? { error: errors.join(' | ').slice(0, 1500) } : {}),
-  }
+  return decayed
 }
+
+/**
+ * Deletes facts already at or below the prune floor. Run this AFTER weakenStaleKnowledgeFacts in
+ * the same cycle, never before — pruning is only ever the second step of an already-decayed fact,
+ * not a shortcut applied to a fact that has never been given a chance to decay first.
+ */
+export async function pruneWeakKnowledgeFacts(limit = 20): Promise<Array<Record<string, unknown>>> {
+  const { cosServiceDb } = await import('@/lib/cos-core/storage/supabase')
+  const db = cosServiceDb()
+  if (!db) return []
+  const result = await db.from('cos_knowledge_facts')
+    .select('id,task_id,subject,predicate,object,confidence')
+    .lt('confidence', FACT_PRUNE_CONFIDENCE_FLOOR)
+    .order('confidence', { ascending: true })
+    .limit(Math.max(1, limit))
+  if (result.error) throw result.error
+
+  const pruned: Array<Record<string, unknown>> = []
+  for (const row of result.data || []) {
+    await recordFactRevision(db, {
+      taskId: row.task_id, subject: row.subject, predicate: row.predicate,
+      revisionKind: 'pruned',
+      previousObject: row.object, previousConfidence: Number(row.confidence),
+      newObject: null, newConfidence: null,
+      reason: `confidence ${Number(row.confidence).toFixed(3)} below prune floor ${FACT_PRUNE_CONFIDENCE_FLOOR}`,
+    })
+    const del = await db.from('cos_knowledge_facts').delete().eq('id', row.id)
+    if (del.error) throw del.error
+    pruned.push({ subject: row.subject, predicate: row.predicate, confidence: row.confidence })
+  }
+  return pruned
+}
+
+export { recordFactRevision }

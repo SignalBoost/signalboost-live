@@ -163,8 +163,8 @@ test('missing RunPod embedding model is pulled through the authenticated Ollama 
     'https://example-pod-11434.proxy.runpod.net/api/pull',
     'https://example-pod-11434.proxy.runpod.net/v1/embeddings',
   ])
-  assert.equal(calls[1].authorization, 'Bearer EXAMPLE_NOTAREAL_LOCAL_AI_KEY')
-  assert.deepEqual(calls[1].body, { model: 'nomic-embed-text', stream: false })
+  assert.equal(calls[2].authorization, 'Bearer EXAMPLE_NOTAREAL_LOCAL_AI_KEY')
+  assert.deepEqual(calls[2].body, { model: 'nomic-embed-text', stream: false })
 })
 
 test('embedding health check is read-only and reports a missing model without pulling it', async () => {

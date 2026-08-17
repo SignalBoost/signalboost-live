@@ -3,6 +3,11 @@ import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 
+/** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
+export function promptAppearsDiagnostic(prompt: string): boolean {
+  return DIAGNOSTIC_PROMPT.test(String(prompt ?? ''))
+}
+
 export type ReasonerDraftQuality = {
   parseable: boolean
   diagnostic: boolean
@@ -14,7 +19,7 @@ export type ReasonerDraftQuality = {
 
 export function assessReasonerDraft(prompt: string, raw: string): ReasonerDraftQuality {
   const parsed = parseLocalResult(String(raw ?? ''))
-  const diagnostic = DIAGNOSTIC_PROMPT.test(String(prompt ?? ''))
+  const diagnostic = promptAppearsDiagnostic(prompt)
   if (!parsed) {
     return { parseable: false, diagnostic, cap: 0, score: 0, genericBuckets: 0, mechanisms: 0 }
   }

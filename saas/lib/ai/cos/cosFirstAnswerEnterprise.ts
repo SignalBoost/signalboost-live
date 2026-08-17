@@ -10,6 +10,7 @@ import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
+import { promptAppearsDiagnostic } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
 import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
 import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/cos/groundingConfidence'
@@ -18,7 +19,7 @@ import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemor
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
-import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -52,6 +53,7 @@ export type COSProvenance = {
   enterpriseMemoriesCited?:number
   userMemoriesCited?:number
   cognitiveSkillsCited?:number
+  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
   cacheOrigin?:{
     storedAt:string|null
     policyVersion:string|null
@@ -76,6 +78,7 @@ type CachedAnswerOrigin = {
   cognitiveSkillsCited:number
   evidenceFunnel?:COSEvidenceFunnel
   cognitiveSkillFunnel?:EvidenceFunnelStage
+  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
 }
 
 type CachedCosAnswer = {
@@ -718,6 +721,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
 
   const cited = citedEvidence(parsed.answer)
   const enterpriseCited = organizationMemoryCitationCount(parsed.answer)
+  const canonicalSelfKnowledgeUsed = canonicalSelfKnowledgeContribution(parsed.answer)
   const citedProvenance = {
     ...reasoningProvenance,
     knowledgeFactsCited:cited.kg,
@@ -727,19 +731,22 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     cognitiveSkillsCited:cited.sk,
     evidenceFunnel:executionFunnel(context, true, cited, enterpriseCited),
     cognitiveSkillFunnel:executionSkillFunnel(context, true, cited.sk),
+    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition } } : {}),
   }
   const groundedCount = citedKnowledgeEvidenceCount({ kg:cited.kg, cl:cited.cl, oem:enterpriseCited })
   const ceiling = groundedEvidenceCeiling(groundedCount)
   const specificity = assessAnswerSpecificity(parsed.answer)
-  const confidence = Math.min(parsed.confidence, ceiling, specificity.cap)
-  if (specificity.applies && specificity.cap < 1) {
+  const diagnosticQuestion = promptAppearsDiagnostic(input.prompt)
+  const specificityCap = diagnosticQuestion ? specificity.cap : 1
+  const confidence = Math.min(parsed.confidence, ceiling, specificityCap)
+  if (specificity.applies && specificityCap < 1) {
     console.warn('cosFirstAnswer: answer specificity capped confidence', {
-      score:specificity.score, cap:specificity.cap, artifacts:specificity.artifacts, density:specificity.density,
+      score:specificity.score, cap:specificityCap, artifacts:specificity.artifacts, density:specificity.density,
       words:specificity.words, claimed:parsed.confidence, final:confidence,
     })
   }
   if (confidence < threshold()) {
-    const cappedBySpecificity = specificity.applies && specificity.cap < Math.min(parsed.confidence, ceiling)
+    const cappedBySpecificity = specificity.applies && specificityCap < Math.min(parsed.confidence, ceiling)
     const reason = cappedBySpecificity
       ? `COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}. ${specificityReason(specificity)}`
       : `COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`
@@ -769,6 +776,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       cognitiveSkillsCited:cited.sk,
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
+      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition } } : {}),
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')

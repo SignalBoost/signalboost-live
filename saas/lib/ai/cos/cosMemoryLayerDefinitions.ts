@@ -11,3 +11,15 @@ export const SEMANTIC_ANSWER_CACHE_DEFINITION =
 
 export const MEMORY_LAYER_COMPARISON_GUARDRAIL =
   'When defining or comparing COS components, explain their purpose, scope, lifetime, and authority. Do not force incident-diagnostic observables, falsifiers, database wait events, or prompt examples into a conceptual answer unless the user asks for diagnosis or verification.'
+
+
+/** Detect when the recorded answer materially used a canonical COS definition. */
+const ENTERPRISE_MEMORY_FINGERPRINT = /durable organization-scoped operational knowledge/i
+const SEMANTIC_CACHE_FINGERPRINT = /policy-versioned, age-bounded reuse/i
+export type CanonicalSelfKnowledgeContribution = { enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; used:boolean }
+export function canonicalSelfKnowledgeContribution(answer:string):CanonicalSelfKnowledgeContribution {
+  const text=String(answer ?? '')
+  const enterpriseMemoryDefinition=ENTERPRISE_MEMORY_FINGERPRINT.test(text)
+  const semanticCacheDefinition=SEMANTIC_CACHE_FINGERPRINT.test(text)
+  return { enterpriseMemoryDefinition, semanticCacheDefinition, used:enterpriseMemoryDefinition || semanticCacheDefinition }
+}

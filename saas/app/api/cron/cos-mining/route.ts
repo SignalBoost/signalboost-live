@@ -8,6 +8,7 @@ import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
 import { runCognitiveCompositionCycle } from '@/lib/ai/cos/cognitiveSkillComposition'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
+import { runFactConsolidationCycle } from '@/lib/ai/cos/cognitiveFactConsolidation'
 import { refreshMetacognitiveCapabilityMap } from '@/lib/ai/cos/cognitiveMetacognition'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
   let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
   let composition: Awaited<ReturnType<typeof runCognitiveCompositionCycle>> | { enabled: false; errors: string[] } | null = null
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
+  let factConsolidation: Awaited<ReturnType<typeof runFactConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
@@ -82,6 +84,14 @@ export async function GET(req: NextRequest) {
       consolidation = { enabled: false, errors: [message] }
     }
 
+    try {
+      factConsolidation = await runFactConsolidationCycle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Fact consolidation failed'
+      console.error('cron COS fact consolidation failed:', message)
+      factConsolidation = { enabled: false, errors: [message] }
+    }
+
     // Rebuild metacognitive state after learning/composition/consolidation so selection on the next
     // request reflects the newest strong, weak, quarantined and unresolved capability evidence.
     try {
@@ -105,5 +115,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, composition, consolidation, metacognition, corpus })
+  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, composition, consolidation, factConsolidation, metacognition, corpus })
 }

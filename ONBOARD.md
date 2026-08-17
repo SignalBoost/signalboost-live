@@ -703,3 +703,12 @@ The best AI call is the one that never has to happen. The best external data cal
 For COS learning specifically, success means that validated experience measurably improves held-out performance, retains that improvement over time, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance rather than merely accumulating more text.
 
 The long-term proof is a trend: more problems completed with COS-owned memory/skills/tools and local/private compute, fewer external-teacher calls for already-learned classes, stronger verified real-world outcomes, and stable performance when the underlying model/provider is replaced.
+
+
+### 2026-08-17 — baseline SaaS CI repair in progress
+
+- Clean repair branch: `fix/baseline-saas-ci-20260817`, based on production main `297771ea9a45b9b98f5ec9ee89615bdb7cdc07fe`.
+- Restores the accidentally overwritten `cognitiveFactConsolidation.ts` implementation.
+- Aligns the RunPod embedding transport test with the governed `/v1/models` readiness probe.
+- Removes a comment-only `getAccess` false positive from the credits route contract test.
+- This repair is isolated from COS memory/cache definition PR #1270; refresh #1270 only after this baseline repair merges.

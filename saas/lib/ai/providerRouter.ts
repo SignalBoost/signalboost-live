@@ -143,21 +143,19 @@ async function callLocal(args: ModelCallArgs): Promise<ProviderResult | null> {
   // becoming an external answer. LOCAL_AI_ALLOW_CLOUD_FALLBACK is intentionally no longer honoured.
   console.error('providerRouter: local inference failed; COS is local-only so this request fails closed')
   return null
-  const configured = process.env.LOCAL_AI_CLOUD_FALLBACK_PROVIDER?.trim().toLowerCase()
-  const fallback: Exclude<ModelProvider, 'local'> = configured === 'gemini' ? 'gemini' : 'claude'
-  console.warn(`providerRouter: local inference failed — explicit cloud fallback to ${fallback}`)
-  return callExternalChain(args, fallback)
 }
 
-function providerFromEnvironment(): ModelProvider | undefined {
-  const value = process.env.AI_MODEL_PROVIDER?.trim().toLowerCase()
-  // 'openai' is intentionally not accepted: a stale env value must not be able to put a removed
-  // provider back at the head of the chain. It falls through to the caller's default instead.
-  if (value === 'openai') {
-    console.warn('[providerRouter] AI_MODEL_PROVIDER=openai is no longer supported; OpenAI has been removed from COS execution paths')
-    return undefined
+export function resolveProviderPreference(
+  explicitPreference?: ModelProvider,
+  environmentPreference = process.env.AI_MODEL_PROVIDER,
+): ModelProvider {
+  if (explicitPreference) return explicitPreference
+  const value = String(environmentPreference || '').trim().toLowerCase()
+  if (value && value !== 'local') {
+    if (value === 'openai' || value === 'claude' || value === 'gemini') console.warn(`[providerRouter] AI_MODEL_PROVIDER=${value} cannot select a hosted provider; COS defaults to local`)
+    else console.warn(`[providerRouter] ignoring unknown AI_MODEL_PROVIDER=${value}; defaulting to local`)
   }
-  return value === 'local' || value === 'claude' || value === 'gemini' ? value : undefined
+  return 'local'
 }
 
 async function logAiTask(args: { taskType: string; provider: ModelProvider; status: 'success' | 'error' | 'fallback'; durationMs: number; fallbackUsed?: boolean; errorMessage?: string; metadata?: Record<string, unknown> }) {
@@ -169,7 +167,7 @@ async function logAiTask(args: { taskType: string; provider: ModelProvider; stat
 
 /** Raw compute execution with truthful provider/model metadata. */
 export async function callProviderModelDetailed(args: ModelCallArgs): Promise<ProviderExecutionResult | null> {
-  const preference = args.modelPreference ?? providerFromEnvironment() ?? 'claude'
+  const preference = resolveProviderPreference(args.modelPreference)
   const startedAt = Date.now()
   console.log('providerRouter: calling', preference, { maxTokens: args.maxTokens ?? 2048, promptLength: args.prompt.length })
   const result = preference === 'local' ? await callLocal(args) : await callExternalChain(args, preference)

@@ -776,3 +776,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-17 — COS ML/data and AI systems/safety curriculum
 
 - PR #1283 merged as `70a302e806d8fb720e06aa8f0adf417469a80eda`: adds ML/data engineering and AI systems/safety tracks to the core curriculum. Each has bounded evaluations and explicit safety limits; AI research remains reproducible, evidence-driven work across all tracks, not unverified claims of novel theory.
+
+
+### 2026-08-17 — COS cognitive science and human decision-making curriculum
+
+- PR #1285 merged as `9fde9c214d5d4e99ef4a5bc5919912452ad0674d`: adds cognitive science, ethical behavioral economics, human-agent collaboration, and cognitive-load/accessibility learning. The manifest explicitly forbids mental-state inference, diagnosis, manipulation, and psychological profiling; it permits only consented, task-relevant behavior and aggregated outcomes.

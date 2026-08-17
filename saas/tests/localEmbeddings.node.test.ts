@@ -158,6 +158,7 @@ test('missing RunPod embedding model is pulled through the authenticated Ollama 
   assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
   assert.equal(embeddingAttempts, 2)
   assert.deepEqual(calls.map(call => call.url), [
+    'https://example-pod-11434.proxy.runpod.net/v1/models',
     'https://example-pod-11434.proxy.runpod.net/v1/embeddings',
     'https://example-pod-11434.proxy.runpod.net/api/pull',
     'https://example-pod-11434.proxy.runpod.net/v1/embeddings',

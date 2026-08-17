@@ -45,8 +45,7 @@ export async function GET() {
     }
 
     // The user above has already been verified by Supabase for this request.
-    // Reuse that trusted identity instead of issuing another auth.getUser()
-    // through getAccess().
+    // Reuse that trusted identity instead of issuing another auth lookup.
     const access = accessFromVerifiedIdentity(user.id, user.email)
 
     const meta = (user.user_metadata || {}) as Record<string, any>

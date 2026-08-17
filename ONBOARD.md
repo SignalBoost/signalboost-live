@@ -89,6 +89,10 @@ Next COS independence increments:
 
 Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.
 
+### 2026-08-17 Enterprise Memory / Semantic Cache correction in progress
+
+Rebased clean branch `fix/cos-memory-cache-definitions-rebased-20260817` corrects a production-observed conceptual answer that conflated the semantic answer cache with embedding storage and incorrectly described it as unscoped. The correction adds dependency-free authoritative definitions, seeds them as verified platform self-knowledge, limits diagnostic observable/falsifier instructions to diagnostic questions, prevents prompt examples from becoming evidence, bumps the answer-policy revision so the inaccurate cached answer cannot replay, and adds regression coverage. Merge, deployment, self-knowledge reseeding, and production re-verification remain pending at this line.
+
 ### 2026-08-16 continuous-learning production evidence
 
 PR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` for merge `3efccc51c10630c4eabb83f5288912c2edcf02bf` reached `READY`. A real ordinary `/api/concierge` request after the merge created durable encounter `c2953516-436a-4e3e-8fa7-dfc978d272c3`; the same failed/local-escalation outcome occurred twice and reconciled to `occurrence_count = 2` rather than creating duplicate rows. The evidence is explicitly `episodic_turn_signal_not_factual_truth`, contains no `answer` or `response` key, and records local Qwen attempted / external AI not yet invoked at the COS-first decision boundary. Matching Vercel telemetry showed RunPod could not start because the host reported insufficient free GPUs, after which the governed external fallback eventually used Gemini.

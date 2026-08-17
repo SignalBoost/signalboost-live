@@ -771,3 +771,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-17 — COS core continuous-learning curriculum
 
 - PR #1281 merged as `d707c6d4ddcebb1aabbed3c570938fe05b28de48`: the measured-gap curriculum now has explicit tracks for cyber defense, software engineering/computer science, and agent systems. Each defines topics, isolated/holdout evaluation modes, and safety boundaries. Gaps remain selected by real weakness; the tracks determine the learning and evaluation approach.
+
+
+### 2026-08-17 — COS ML/data and AI systems/safety curriculum
+
+- PR #1283 merged as `70a302e806d8fb720e06aa8f0adf417469a80eda`: adds ML/data engineering and AI systems/safety tracks to the core curriculum. Each has bounded evaluations and explicit safety limits; AI research remains reproducible, evidence-driven work across all tracks, not unverified claims of novel theory.

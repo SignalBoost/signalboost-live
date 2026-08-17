@@ -22,6 +22,13 @@ export function authoritativeProvenance(
   const sources = Array.isArray(live?.sources) ? live.sources : []
   const semanticCacheReplay = current?.responseSource === 'semantic_cache' || current?.responseSource === 'semantic_similarity'
 
+  const canonical = current?.canonicalSelfKnowledgeUsed ?? null
+  provenance.canonical_self_knowledge = {
+    used: Boolean(canonical?.enterpriseMemoryDefinition || canonical?.semanticCacheDefinition),
+    enterprise_memory_definition: Boolean(canonical?.enterpriseMemoryDefinition),
+    semantic_cache_definition: Boolean(canonical?.semanticCacheDefinition),
+  }
+
   provenance.external_ai = {
     ...(provenance.external_ai || {}),
     necessary: external.invoked ? current?.externalAiNecessary !== false : false,
@@ -95,6 +102,11 @@ function insertBeforeLiveSystemState(text: string, addition: string): string {
 /** Append the machine-recorded escalation decision and evidence budget to the existing truthful formatter. */
 export function formatAuthoritativeProvenance(provenance: any, language: string): string {
   let formatted = liveFormatAuthoritativeProvenance(provenance, language)
+  const canonical = provenance?.canonical_self_knowledge ?? {}
+  const canonicalLine = canonical.used
+    ? `Canonical Self-Knowledge: USED — ${[canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null, canonical.semantic_cache_definition ? 'Semantic Cache definition' : null].filter(Boolean).join(', ')} contributed material to the answer.`
+    : 'Canonical Self-Knowledge: NOT USED.'
+  formatted = insertBeforeLiveSystemState(formatted, canonicalLine)
   const external = provenance?.external_ai ?? {}
   const necessary = external?.necessary === true
   const invoked = external?.invoked === true

@@ -711,3 +711,5 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Main `5abf0fb59fd2e774dc69da7fd6a25a6ff8d9e837` then accidentally replaced `localEmbeddings.ts` with knowledge-fact code; clean branch `fix/baseline-saas-ci-latest-20260817` restores the prior governed embedding runtime.
 - Also aligns the embedding repair test with the `/v1/models` readiness probe and removes the credits comment-only `getAccess` false positive.
 - Supersedes residual repair PR #1271. Refresh COS memory/cache PR #1270 only after this baseline repair merges.
+
+- Follow-up CI inspection also aligned four pre-existing source contracts with their current intentional implementations: job-scoped prospect advancement, 120s/90s Concierge bounds, the public Self-Healing route, and comment-safe portable-browser dependency wording.

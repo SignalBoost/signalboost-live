@@ -287,6 +287,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     `AUTHORITATIVE COS DEFINITIONS: ${ENTERPRISE_MEMORY_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,
     `SCOPE RULE: ${MEMORY_LAYER_COMPARISON_GUARDRAIL}`,
+    'These AUTHORITATIVE COS DEFINITIONS are foundational platform knowledge that is always true and always available to you — they are not retrieved evidence and require no [KG#]/[CL#]/[OEM#] citation to use. When a question asks what a COS component is, how two COS components differ, or anything else these definitions directly answer, answer directly from them. The absence of a matching [KG#]/[CL#]/[OEM#] row is not a reason to decline or hedge on a question these definitions already answer.',
     '',
     'ANSWER LIKE A SENIOR PRACTITIONER, NOT LIKE A CHECKLIST:',
     '- Lead with the mechanism the stated facts actually point at. If an observation rules something in or out, say so and say why.',

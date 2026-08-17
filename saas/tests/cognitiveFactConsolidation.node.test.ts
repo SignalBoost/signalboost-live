@@ -10,6 +10,7 @@ import {
   factsMateriallyDiffer,
   decayedFactConfidence,
   shouldPruneFact,
+  runFactConsolidationCycle,
   FACT_STALENESS_DAYS,
   FACT_PRUNE_CONFIDENCE_FLOOR,
 } from '../lib/ai/cos/cognitiveFactConsolidation.ts'
@@ -82,4 +83,19 @@ test('shouldPruneFact only fires below the floor, never at or above it', () => {
   assert.equal(shouldPruneFact(FACT_PRUNE_CONFIDENCE_FLOOR - 0.01), true)
   assert.equal(shouldPruneFact(FACT_PRUNE_CONFIDENCE_FLOOR), false)
   assert.equal(shouldPruneFact(FACT_PRUNE_CONFIDENCE_FLOOR + 0.01), false)
+})
+
+test('runFactConsolidationCycle is a no-op returning enabled:false when disabled by env, no DB touched', async () => {
+  const previous = process.env.COS_FACT_CONSOLIDATION_ENABLED
+  process.env.COS_FACT_CONSOLIDATION_ENABLED = 'false'
+  try {
+    const summary = await runFactConsolidationCycle()
+    assert.equal(summary.enabled, false)
+    assert.deepEqual(summary.decayed, [])
+    assert.deepEqual(summary.pruned, [])
+    assert.deepEqual(summary.errors, [])
+  } finally {
+    if (previous === undefined) delete process.env.COS_FACT_CONSOLIDATION_ENABLED
+    else process.env.COS_FACT_CONSOLIDATION_ENABLED = previous
+  }
 })

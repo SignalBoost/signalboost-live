@@ -732,3 +732,9 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 
 - PR #1274 merged as `a2b36f3609e38407aec2970c30050999d4fedac3`: conceptual and comparison questions no longer receive the diagnostic artifact-specificity confidence cap; that cap remains for actual diagnostics.
 - Canonical Enterprise Memory and Semantic Cache definitions are now recorded as a material provenance contributor only when their distinctive definition text was used. Added the regression test to the normal SaaS test command.
+
+
+### 2026-08-17 — local-only provider routing continuity repair
+
+- PR #1276 merged as `a1389aa1597f2d3a56fe7283b76000f2c22a0f57`: no-preference provider calls and both Backup COS continuity paths now select local inference. Hosted/unknown `AI_MODEL_PROVIDER` values cannot silently select blocked external providers.
+- Added a dedicated `tsx` CI regression for provider preference; the production build, typecheck, provider regression, policy, import-extension, QA, and audit checks passed before merge.

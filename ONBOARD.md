@@ -801,3 +801,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-18 — COS industrial HMI, PLC, and operational-safety curriculum
 
 - PR #1293 merged as `64755bcaf03662ab0488932c64c80cac0dc57696`: adds real-time HMI/SCADA concepts, alarms, PLC/controller integration concepts, human factors, and digital-twin/operator-acceptance evaluation. COS has no direct PLC/equipment command authority; live changes require authorized engineers, approval, rollback testing, and an emergency-stop path.
+
+
+### 2026-08-18 — COS AutoML and explainable-AI curriculum
+
+- PR #1295 merged as `88ec82b9455abb20ef6b8f06f9233e506e7be01e`: expands ML/data learning with AutoML feature engineering/tuning, XAI/attribution, drift checks, reproducible evaluation, and portable deployment. High-impact use remains governed: dataset provenance/privacy, holdouts, and human review are required; AutoML scores/explanations do not prove fairness, correctness, or legal compliance.

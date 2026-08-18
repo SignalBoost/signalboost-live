@@ -833,3 +833,11 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-18 — Dynamic-gap hygiene closure
 
 - The daily run exposed one remaining bypass: dynamic corpus-expansion gaps could reintroduce a chat-fragment subject after queued-gap filtering. Dynamic targets now pass through the same foundational-domain normalization before acquisition; unclassifiable fragments are dropped, and re-anchored targets use a bounded study question so the raw fragment cannot become an external search query.
+
+### 2026-08-18 — Tiered continuous-learning admission
+
+- COS now classifies candidate evidence into **high-confidence**, **probationary**, or **rejected** without altering raw relevance or confidence.
+- High-confidence evidence requires raw relevance ≥0.85, confidence ≥0.80, and source floor ≥0.75 before direct durable admission.
+- Probationary evidence requires gap-adjusted relevance ≥0.70, confidence ≥0.65, and source floor ≥0.60. Gap alignment is recorded separately as `gap_adjusted_relevance`; it never overwrites the measured raw relevance.
+- Probationary evidence is retained with provenance, source identity, content hash, publication observation time, scores, and promotion basis. It promotes only from qualifying curriculum-gap alignment or an exact claim match from a distinct source; weaker evidence is rejected and logged.
+- New CI coverage asserts strict thresholds, transparent gap adjustment, corroboration requirements, and rejection of weak evidence. Dashboard work must expose the funnel: acquired → high-confidence → probationary → promoted → rejected, per curriculum track.

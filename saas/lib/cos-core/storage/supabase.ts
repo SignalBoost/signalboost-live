@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge'
-import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent'
-import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory'
-import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning'
-import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization'
+import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge/index.ts'
+import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent.ts'
+import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory/index.ts'
+import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning/index.ts'
+import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization/index.ts'
 
 let singleton: SupabaseClient | null | undefined
 
@@ -178,6 +179,53 @@ export class SupabaseContinuousLearningStore implements ContinuousLearningStore 
       evidence: candidate.evidence,
     })
     if (error) throw error
+  }
+
+  async rememberProbationary(candidate: LearningCandidate): Promise<boolean> {
+    const admission = candidate.admission
+    if (!admission || admission.tier !== 'probationary') return false
+    const normalizedClaim = `${candidate.subject}\n${candidate.facts.map(fact => `${fact.predicate}\n${fact.object}`).join('\n')}`
+      .toLowerCase().replace(/\s+/g, ' ').trim()
+    const claimFingerprint = createHash('sha256').update(normalizedClaim).digest('hex')
+    const { data: existing, error: existingError } = await this.db
+      .from('cos_learning_probationary')
+      .select('*')
+      .eq('claim_fingerprint', claimFingerprint)
+      .eq('status', 'probationary')
+      .neq('source_uri', candidate.sourceUri)
+      .limit(20)
+    if (existingError) throw existingError
+
+    const now = new Date().toISOString()
+    const row = {
+      content_hash: candidate.contentHash, claim_fingerprint: claimFingerprint,
+      source_kind: candidate.sourceKind, source_uri: candidate.sourceUri, source_title: candidate.sourceTitle ?? null,
+      observed_at: candidate.observedAt, subject: candidate.subject, summary: candidate.summary, facts: candidate.facts,
+      confidence: candidate.confidence, raw_relevance: admission.rawRelevance, gap_adjusted_relevance: admission.gapAdjustedRelevance,
+      source_floor: admission.sourceFloor, gap_aligned: admission.gapAligned, corroboration_required: admission.corroborationRequired,
+      admission_reason: admission.reason, status: 'probationary', license: candidate.license ?? null, evidence: candidate.evidence,
+    }
+    const mustPromote = admission.gapAligned || Boolean(existing?.length)
+    const probationaryRow: any = mustPromote ? { ...row, status: 'promoted', promoted_at: now } : row
+    const { error: storedError } = await (this.db.from('cos_learning_probationary') as any).upsert(probationaryRow, { onConflict: 'content_hash' })
+    if (storedError) throw storedError
+    if (!mustPromote) return false
+
+    const promoted = [...(existing ?? []), { ...row, status: 'promoted', promoted_at: now }]
+    for (const item of promoted) {
+      const { error } = await this.db.from('cos_continuous_learning').upsert({
+        content_hash: item.content_hash, source_kind: item.source_kind, source_uri: item.source_uri, source_title: item.source_title,
+        observed_at: item.observed_at, subject: item.subject, summary: item.summary, facts: item.facts, confidence: item.confidence,
+        license: item.license, evidence: item.evidence,
+      }, { onConflict: 'content_hash' })
+      if (error) throw error
+    }
+    if (existing?.length) {
+      const { error } = await this.db.from('cos_learning_probationary').update({ status: 'promoted', promoted_at: now })
+        .eq('claim_fingerprint', claimFingerprint).eq('status', 'probationary')
+      if (error) throw error
+    }
+    return true
   }
 }
 

@@ -157,20 +157,30 @@ export class ContinuousLearningDirector {
     if (!candidate.sourceUri.trim() || !candidate.observedAt || !candidate.evidence.length) {
       return { accepted: false, reason: 'missing_provenance' }
     }
-    const confidenceFloor = candidate.admission?.tier === 'probationary'
-      ? PROBATIONARY_MINIMUM_CONFIDENCE
-      : this.policy.minimumConfidence
-    if (!Number.isFinite(candidate.confidence) || candidate.confidence < confidenceFloor) {
+    // Tier metadata is consulted ONLY when a candidate fails the standing policy floor. A candidate
+    // that clears it is admitted to durable knowledge exactly as before tiers existed, whatever its
+    // tier says — otherwise attaching tier metadata to strong candidates would quietly tighten
+    // admission, the defect the first wiring had. The borderline band lives in TWO places: below the
+    // source-kind floor (the cycle handles that) and between the source-kind floor and this policy
+    // floor — metadata-class documents pass their 0.6 kind floor and used to die here at 0.72
+    // (production run cb84fe69: 112 confidence_too_low). The probationary tier now holds that band.
+    const meetsDurableConfidence = Number.isFinite(candidate.confidence)
+      && candidate.confidence >= this.policy.minimumConfidence
+    const probationaryEligible = !meetsDurableConfidence
+      && candidate.admission?.tier === 'probationary'
+      && Number.isFinite(candidate.confidence)
+      && candidate.confidence >= PROBATIONARY_MINIMUM_CONFIDENCE
+    if (!meetsDurableConfidence && !probationaryEligible) {
       return { accepted: false, reason: 'confidence_too_low' }
     }
-    if (candidate.admission?.tier === 'rejected') return { accepted: false, reason: 'tier_threshold_not_met' }
+    const confidenceFloor = probationaryEligible ? PROBATIONARY_MINIMUM_CONFIDENCE : this.policy.minimumConfidence
     const reusableFacts = candidate.facts.filter(fact =>
       fact.predicate.trim() && fact.object.trim() && Number.isFinite(fact.confidence) && fact.confidence >= confidenceFloor,
     )
     if (!reusableFacts.length) return { accepted: false, reason: 'no_reusable_facts' }
     if (await this.store.hasContent(candidate.contentHash)) return { accepted: false, reason: 'duplicate' }
     const admitted = { ...candidate, facts: reusableFacts }
-    if (candidate.admission?.tier === 'probationary') {
+    if (probationaryEligible) {
       if (!this.store.rememberProbationary) return { accepted: false, reason: 'probationary_storage_unavailable' }
       return (await this.store.rememberProbationary(admitted))
         ? { accepted: true, reason: 'probationary_promoted' }

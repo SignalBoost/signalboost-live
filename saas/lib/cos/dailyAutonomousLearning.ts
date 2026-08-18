@@ -7,8 +7,8 @@ import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/l
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
 import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS, nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
-import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum'
-import type { MiningRunSummary } from './mining/types'
+import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum.ts'
+import type { MiningRunSummary } from './mining/types.ts'
 
 export type DailyLearningResult = {
   status: 'skipped' | 'learned'
@@ -24,6 +24,7 @@ export type DailyLearningResult = {
   gapsConsidered: number
   documentsAcquired: number
   accepted: number
+  probationary: number
   rejected: Record<string, number>
   sourceErrors: Record<string, number>
   externalCostUsd: number
@@ -167,7 +168,7 @@ export function approvedUrlLearningAdapter(urls: string[]): ContinuousLearningSo
 }
 
 async function runLearningCycleWithTelemetry(
-  run: () => Promise<{ gapsConsidered: number; documentsAcquired: number; accepted: number; acceptedSubjects: string[]; rejected: Record<string, number>; sourceErrors: Record<string, number>; externalCostUsd: number }>,
+  run: () => Promise<{ gapsConsidered: number; documentsAcquired: number; accepted: number; probationary: number; acceptedSubjects: string[]; rejected: Record<string, number>; sourceErrors: Record<string, number>; externalCostUsd: number }>,
   telemetry: ContinuousLearningTelemetrySink,
 ) {
   const startedAt = Date.now()
@@ -340,6 +341,7 @@ export async function runDailyAutonomousLearning(input: {
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
+      probationary: 0,
       rejected: {},
       sourceErrors: {},
       externalCostUsd: 0,
@@ -363,6 +365,7 @@ export async function runDailyAutonomousLearning(input: {
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
+      probationary: 0,
       rejected: {},
       sourceErrors: {},
       externalCostUsd: 0,

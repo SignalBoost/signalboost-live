@@ -821,3 +821,10 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Only foundational knowledge domains may be sent to external learning sources. Legacy free-text gap subjects are re-anchored from their own question when possible; otherwise they remain capability evidence but enter terminal `unstudyable` status rather than consuming study slots.
 - Queued gaps are resolved only when admitted evidence was produced for that gap's normalized subject. The cycle now returns `acceptedSubjects` to support that exact decision.
 - Added the `unstudyable` status migration and regression coverage for the observed chat-fragment cases.
+
+
+### 2026-08-18 — Declared-versus-learned curriculum coverage
+
+- Added owner-only `GET /api/admin/cos-learning/coverage`, which compares all declared study subjects with retained corpus evidence and reports `never_studied`, `thin`, `stale`, or `learned` coverage.
+- Coverage is deliberately distinct from competence and independence: it verifies whether material arrived, not whether COS can use it well.
+- The report also exposes undeclared corpus subjects so drift and residual junk are visible rather than silently counted as learning.

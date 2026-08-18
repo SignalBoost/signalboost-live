@@ -791,3 +791,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-18 — COS space science and applied physics curriculum
 
 - PR #1289 merged as `fe496ad28bf2212d9e6feeaffe0e8f1c0e3d4366`: adds space science/scientific computing and applied physics/advanced engineering tracks. Both are research, public-data, and simulation bounded: no spacecraft or mission control; no medical diagnosis/treatment, device certification, fabrication claims, lab control, or safety-critical deployment without qualified validation.
+
+
+### 2026-08-18 — COS computational creativity, arts, and AI ethics curriculum
+
+- PR #1291 merged as `695497c94a88d9e4561ebe7acfea0f3e88d2f423`: adds art/music/aesthetics, creative collaboration, authorship, copyright, licensing, attribution, and provenance learning. It requires AI-use disclosure, rights respect, no living-artist impersonation or claims of human experience/authorship, and retains human final creative/legal/cultural judgment.

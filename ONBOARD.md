@@ -796,3 +796,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-18 — COS computational creativity, arts, and AI ethics curriculum
 
 - PR #1291 merged as `695497c94a88d9e4561ebe7acfea0f3e88d2f423`: adds art/music/aesthetics, creative collaboration, authorship, copyright, licensing, attribution, and provenance learning. It requires AI-use disclosure, rights respect, no living-artist impersonation or claims of human experience/authorship, and retains human final creative/legal/cultural judgment.
+
+
+### 2026-08-18 — COS industrial HMI, PLC, and operational-safety curriculum
+
+- PR #1293 merged as `64755bcaf03662ab0488932c64c80cac0dc57696`: adds real-time HMI/SCADA concepts, alarms, PLC/controller integration concepts, human factors, and digital-twin/operator-acceptance evaluation. COS has no direct PLC/equipment command authority; live changes require authorized engineers, approval, rollback testing, and an emergency-stop path.

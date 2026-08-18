@@ -1,4 +1,3 @@
-// saas/lib/cos-core/layers/learning/cycle.ts
 import { createHash } from 'node:crypto'
 import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index'
 import { ContinuousLearningDirector } from './index'
@@ -6,7 +5,9 @@ import { minimumConfidenceForKind } from './sourceCatalog'
 
 export type LearningSourceDocument = { sourceKind:ContinuousLearningSourceKind; sourceUri:string; sourceTitle?:string; observedAt?:string; subject:string; text:string; license?:string|null; evidence?:string[] }
 export interface ContinuousLearningSourceAdapter { readonly kind:ContinuousLearningSourceKind; readonly id?:string; acquire(gap:KnowledgeGap):Promise<LearningSourceDocument[]> }
-export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
+// acceptedSubjects records WHICH gaps actually produced admitted evidence. Without it a caller can
+// only see that the cycle accepted something overall, which is not enough to close the right gaps.
+export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; acceptedSubjects:string[]; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
 
 const STOP_WORDS=new Set(['about','above','after','again','against','because','been','before','being','below','between','both','cannot','could','does','doing','down','during','each','from','further','have','having','here','into','itself','more','most','only','other','over','same','should','some','such','than','that','their','them','then','there','these','they','this','those','through','under','until','very','were','what','when','where','which','while','with','would','your'])
 const GENERIC_DOMAIN_ANCHORS=new Set(['api','apis','architecture','business','database','engineering','enterprise','intelligence','multi','operations','performance','saas','security','site','software','strategy','systems','tenant'])
@@ -86,7 +87,8 @@ export class ContinuousLearningCycle{
 
   async run(gaps:KnowledgeGap[],spentExternalCostUsd=0):Promise<LearningCycleResult>{
     const prioritized=this.director.prioritizeGaps(gaps)
-    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
+    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,acceptedSubjects:[],rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
+    const acceptedSubjects=new Set<string>()
     const floor=minimumRelevance(),minMatches=minimumTermMatches()
     const startedAt=Date.now()
     const cycleBudgetMs=Math.round(envNumber('COS_LEARNING_CYCLE_BUDGET_MS',240000,30000,290000))
@@ -112,12 +114,13 @@ export class ContinuousLearningCycle{
           if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}
           const candidate=this.toCandidate(document,allTerms,score),kindFloor=admissionFloorFor(document)
           if(kindFloor!==null&&candidate.confidence<kindFloor){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;console.warn('cosLearning: candidate below source confidence floor',{gapId:gap.id,source,sourceKind:document.sourceKind,confidence:candidate.confidence,floor:kindFloor,evidenceClass:evidenceClass(document)});continue}
-          try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision)}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
+          try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision);if(decision.accepted){const learned=String(gap.subject??'').trim();if(learned)acceptedSubjects.add(learned)}}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
         }
       }
     }
 
     await Promise.all(Array.from({length:Math.min(concurrency,tasks.length||1)},()=>worker()))
+    result.acceptedSubjects=[...acceptedSubjects]
     return result
   }
 

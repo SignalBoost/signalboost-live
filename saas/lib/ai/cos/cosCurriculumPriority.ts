@@ -254,12 +254,12 @@ export function coreCurriculumTrackForSubject(subject:string):CosCurriculumTrack
  if(/code|software|program|typescript|next|database|api|debug|computer science/.test(value))return COS_CORE_CURRICULUM_TRACKS[1]
  if(/machine learning|ml |dataset|data science|embedding|fine.tun|model evaluation/.test(value))return COS_CORE_CURRICULUM_TRACKS[2]
  if(/gpu|inference|cloud|capacity|observability|alignment|safety|ethic|hardware/.test(value))return COS_CORE_CURRICULUM_TRACKS[3]
- if(/hmi|plc|industrial|scada|alarm|controller|operator safety/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
- if(/art|music|creative|aesthetic|authorship|copyright|licens|artist|cultur/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
- if(/space|astronomy|astrophys|planetary|orbital|gravity|telescope|rocket/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
- if(/semiconductor|nanotech|photon|laser|quantum|renewable energy|solar cell|medical physics/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
- if(/robot|drone|edge ai|lidar|thermal|multispectral|sensor fusion|bvlos|aerial/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
- if(/cognitive|psycholog|behavioral economics|decision bias|attention|memory|human.agent|accessibility|cognitive load/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
+ if(/hmi|plc|industrial|scada|alarm|controller|operator safety/.test(value))return COS_CORE_CURRICULUM_TRACKS[4]
+ if(/art|music|creative|aesthetic|authorship|copyright|licens|artist|cultur/.test(value))return COS_CORE_CURRICULUM_TRACKS[5]
+ if(/space|astronomy|astrophys|planetary|orbital|gravity|telescope|rocket/.test(value))return COS_CORE_CURRICULUM_TRACKS[6]
+ if(/semiconductor|nanotech|photon|laser|quantum|renewable energy|solar cell|medical physics/.test(value))return COS_CORE_CURRICULUM_TRACKS[7]
+ if(/robot|drone|edge ai|lidar|thermal|multispectral|sensor fusion|bvlos|aerial/.test(value))return COS_CORE_CURRICULUM_TRACKS[8]
+ if(/cognitive|psycholog|behavioral economics|decision bias|attention|memory|human.agent|accessibility|cognitive load/.test(value))return COS_CORE_CURRICULUM_TRACKS[9]
  if(/agent|rag|retrieval|prompt|symbolic|multi-agent|planning/.test(value))return COS_CORE_CURRICULUM_TRACKS[10]
  return null
 }

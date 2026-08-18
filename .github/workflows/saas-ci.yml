@@ -155,7 +155,13 @@ jobs:
       - name: Verify unstudyable chat fragments never become study subjects
         run: npx --yes tsx --test tests/cosLearningGapHygiene.node.test.ts
       - name: Verify tiered admission preserves raw quality and blocks weak evidence
-        run: npx --yes tsx --test tests/cosTieredLearningAdmission.node.test.ts
+        run: >-
+          npx --yes tsx --test
+          tests/cosTieredLearningAdmission.node.test.ts
+          tests/cosTieredAdmissionFlow.node.test.ts
+          tests/cosProbationaryPromotion.node.test.ts
+      - name: Verify the independence dashboard never reports missing data as zero
+        run: npx --yes tsx --test tests/cosIndependenceDashboardModel.node.test.ts
       - name: Verify declared-vs-learned curriculum coverage reporting
         run: npx --yes tsx --test tests/cosCurriculumCoverage.node.test.ts
 

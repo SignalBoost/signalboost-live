@@ -600,7 +600,7 @@ async function writeCachedAnswer(key:string, value:CachedCosAnswer):Promise<void
   } catch {}
 }
 
-export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean}):Promise<COSFirstAnswerResult> {
+export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
   const startedAt = Date.now()
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged))
   const base = {
@@ -625,7 +625,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const cacheMaxAgeMs = cosCacheMaxAgeMs()
   const knowledge = semanticKnowledgeLayer()
 
-  if (knowledge && !scopedMemorySelected) {
+  if (!input.disableCache && knowledge && !scopedMemorySelected) {
     const nearest = await knowledge.lookupSemanticCache(cacheTaskId, input.prompt, contextWindow)
     if (nearest) {
       const payload = nearest.responsePayload as CachedCosAnswer|null
@@ -645,7 +645,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     policyVersion,
     knowledgeVersion:null,
   })
-  const cached = await readCachedAnswer(cacheKey)
+  const cached = input.disableCache ? null : await readCachedAnswer(cacheKey)
   const cachedCurrent = cachedAnswerIsCurrent(cached, policyVersion, cacheMaxAgeMs)
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
   if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold()) {
@@ -780,7 +780,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')
-  await Promise.race([
+  if (!input.disableCache) await Promise.race([
     Promise.allSettled([
       writeCachedAnswer(cacheKey, storedAnswer),
       knowledge ? knowledge.commitToMemory(cacheTaskId, input.prompt, contextWindow, storedAnswer) : Promise.resolve(),

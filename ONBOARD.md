@@ -839,6 +839,12 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Durable admissions continue to use their established source and policy floors unchanged. Candidates below those floors may enter the separate probationary store only when they clear its lower documented thresholds; they are never retrievable until corroborated.
 - Corroboration now recognizes a different durable source for the same normalized subject, and a bounded daily promotion pass copies confirmed probationary evidence into the durable corpus before marking it promoted.
 
+### 2026-08-18 — Private live capability benchmark
+
+- Private held-out benchmark cases, run history, and per-case outcomes live in dedicated RLS-protected tables and are not part of COS learning acquisition.
+- The owner-only runner invokes the normal COS path with both semantic and exact answer caches disabled; external-AI, cache, missing-provenance, or safety failures cannot pass.
+- Owner dashboard: `/dashboard/cos-capability-benchmark`. Populate active private cases in `cos_capability_benchmark_cases`, then run bounded batches through the dashboard.
+
 ### 2026-08-18 — Tiered continuous-learning admission
 
 - COS now classifies candidate evidence into **high-confidence**, **probationary**, or **rejected** without altering raw relevance or confidence.

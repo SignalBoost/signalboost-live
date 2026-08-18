@@ -781,3 +781,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-17 — COS cognitive science and human decision-making curriculum
 
 - PR #1285 merged as `9fde9c214d5d4e99ef4a5bc5919912452ad0674d`: adds cognitive science, ethical behavioral economics, human-agent collaboration, and cognitive-load/accessibility learning. The manifest explicitly forbids mental-state inference, diagnosis, manipulation, and psychological profiling; it permits only consented, task-relevant behavior and aggregated outcomes.
+
+
+### 2026-08-18 — COS robotics, edge AI, and aerial sensing curriculum
+
+- PR #1287 merged as `dd1ed0708020934252f3344489a692f854b5d08d`: adds an edge-AI/robotics track covering sensor fusion, LiDAR/thermal/multispectral interpretation, digital twins, recorded datasets, and BVLOS safety planning. It is strictly simulation/dataset-only: no weaponization, target selection, harmful surveillance, or live autonomous drone control.

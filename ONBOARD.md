@@ -855,6 +855,6 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 
 ### 2026-08-18 — COS benchmark run reliability
 
-- Capability benchmark requests are now bounded to two held-out cases per web request so local-model evaluation cannot exceed the server execution budget and leave a misleading `running` row.
+- Capability benchmark requests are now bounded to two held-out cases per web request and rotate through active cases across completed runs, so local-model evaluation cannot exceed the server execution budget or repeatedly test only the first cases.
 - Each case records an explicit execution failure result instead of losing the entire run; stale runs are reconciled to failed with an actionable retry message.
 - The owner dashboard now renders structured benchmark errors safely instead of showing `[object Object]`.

@@ -852,3 +852,13 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Probationary evidence requires gap-adjusted relevance ≥0.70, confidence ≥0.65, and source floor ≥0.60. Gap alignment is recorded separately as `gap_adjusted_relevance`; it never overwrites the measured raw relevance.
 - Probationary evidence is retained with provenance, source identity, content hash, publication observation time, scores, and promotion basis. It promotes only from qualifying curriculum-gap alignment or an exact claim match from a distinct source; weaker evidence is rejected and logged.
 - New CI coverage asserts strict thresholds, transparent gap adjustment, corroboration requirements, and rejection of weak evidence. Dashboard work must expose the funnel: acquired → high-confidence → probationary → promoted → rejected, per curriculum track.
+
+### 2026-08-18 — COS benchmark run reliability
+
+- Capability benchmark requests are now bounded to two held-out cases per web request and rotate through active cases across completed runs, so local-model evaluation cannot exceed the server execution budget or repeatedly test only the first cases.
+- Each case records an explicit execution failure result instead of losing the entire run; stale runs are reconciled to failed with an actionable retry message.
+- The owner dashboard now renders structured benchmark errors safely instead of showing `[object Object]`.
+
+### 2026-08-18 — SaaS CI curriculum baseline repair
+
+- Restored the independence-data regression gate by pointing the curriculum workflow at the existing `cosIndependenceMetrics.node.test.ts`; it verifies missing independence rates remain `null`, not an invented zero.

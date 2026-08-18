@@ -786,3 +786,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-18 — COS robotics, edge AI, and aerial sensing curriculum
 
 - PR #1287 merged as `dd1ed0708020934252f3344489a692f854b5d08d`: adds an edge-AI/robotics track covering sensor fusion, LiDAR/thermal/multispectral interpretation, digital twins, recorded datasets, and BVLOS safety planning. It is strictly simulation/dataset-only: no weaponization, target selection, harmful surveillance, or live autonomous drone control.
+
+
+### 2026-08-18 — COS space science and applied physics curriculum
+
+- PR #1289 merged as `fe496ad28bf2212d9e6feeaffe0e8f1c0e3d4366`: adds space science/scientific computing and applied physics/advanced engineering tracks. Both are research, public-data, and simulation bounded: no spacecraft or mission control; no medical diagnosis/treatment, device certification, fabrication claims, lab control, or safety-critical deployment without qualified validation.

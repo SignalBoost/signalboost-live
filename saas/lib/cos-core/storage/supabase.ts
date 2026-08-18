@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge'
-import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent'
-import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory'
-import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning'
-import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization'
+import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge/index.ts'
+import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent.ts'
+import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory/index.ts'
+import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning/index.ts'
+import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization/index.ts'
 
 let singleton: SupabaseClient | null | undefined
 

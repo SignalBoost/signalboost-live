@@ -806,3 +806,11 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 ### 2026-08-18 — COS AutoML and explainable-AI curriculum
 
 - PR #1295 merged as `88ec82b9455abb20ef6b8f06f9233e506e7be01e`: expands ML/data learning with AutoML feature engineering/tuning, XAI/attribution, drift checks, reproducible evaluation, and portable deployment. High-impact use remains governed: dataset provenance/privacy, holdouts, and human review are required; AutoML scores/explanations do not prove fairness, correctness, or legal compliance.
+
+
+### 2026-08-18 — Curriculum routing and execution
+
+- Replaced positional curriculum-track lookup with explicit subject-routing rules and stable track IDs, preventing future insertions from assigning the wrong evaluation or safety boundary.
+- Added enterprise commercial and governance tracks with approval, evidence, privacy, and compliance boundaries.
+- The daily learning cycle now studies a bounded rotating set of track topics, prioritizing tracks with measured weakness, and preserves track/evaluation/safety evidence through admission and retention.
+- Added CI and hermetic end-to-end coverage proving curriculum topics reach the learning cycle and are remembered.

@@ -828,3 +828,8 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Added owner-only `GET /api/admin/cos-learning/coverage`, which compares all declared study subjects with retained corpus evidence and reports `never_studied`, `thin`, `stale`, or `learned` coverage.
 - Coverage is deliberately distinct from competence and independence: it verifies whether material arrived, not whether COS can use it well.
 - The report also exposes undeclared corpus subjects so drift and residual junk are visible rather than silently counted as learning.
+
+
+### 2026-08-18 — Dynamic-gap hygiene closure
+
+- The daily run exposed one remaining bypass: dynamic corpus-expansion gaps could reintroduce a chat-fragment subject after queued-gap filtering. Dynamic targets now pass through the same foundational-domain normalization before acquisition; unclassifiable fragments are dropped, and re-anchored targets use a bounded study question so the raw fragment cannot become an external search query.

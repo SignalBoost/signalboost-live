@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   isStudyableGapSubject,
+  normalizeDynamicStudyGaps,
   normalizeQueuedGapSubject,
   queuedGapResolution,
 } from '../lib/cos/dailyAutonomousLearning'
@@ -46,6 +47,36 @@ test('an already-studyable subject is passed through untouched', () => {
   const domain = FOUNDATIONAL_KNOWLEDGE_DOMAINS[0].subject
   assert.equal(normalizeQueuedGapSubject(domain, ''), domain)
   assert.equal(normalizeQueuedGapSubject(domain, 'unrelated question text'), domain)
+})
+
+test('dynamic corpus gaps cannot bypass subject hygiene into acquisition', () => {
+  const gaps = normalizeDynamicStudyGaps([
+    {
+      id: 'dynamic:computer-vision-fragment',
+      subject: 'computer vision subfield',
+      question: 'is computer vision a subfield of what',
+      portableIds: ['cos'],
+      expectedReuse: 1,
+      expectedAvoidedCostUsd: 0,
+      urgency: 50,
+      evidence: [],
+    },
+    {
+      id: 'dynamic:tenant-latency',
+      subject: 'multi tenant saas suddenly shows',
+      question: 'A multi-tenant SaaS has normal database CPU but enterprise API p95 latency triples',
+      portableIds: ['cos'],
+      expectedReuse: 1,
+      expectedAvoidedCostUsd: 0,
+      urgency: 50,
+      evidence: [],
+    },
+  ])
+
+  assert.equal(gaps.some(gap => gap.subject === 'computer vision subfield'), false)
+  assert.equal(gaps.length, 1)
+  assert.ok(isStudyableGapSubject(gaps[0].subject))
+  assert.equal(/computer vision subfield/i.test(gaps[0].question), false)
 })
 
 test('only a gap whose own subject produced evidence is resolved', () => {

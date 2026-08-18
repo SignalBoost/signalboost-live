@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classifyTieredAdmission } from '../lib/ai/cos/tieredLearningAdmission'
+import { classifyTieredAdmission } from '../lib/ai/cos/tieredLearningAdmission.ts'
 
 test('high-confidence evidence is immediately eligible only at the strict thresholds', () => {
   const decision = classifyTieredAdmission({ rawRelevance: 0.85, confidence: 0.8, sourceFloor: 0.75, gapAligned: false })

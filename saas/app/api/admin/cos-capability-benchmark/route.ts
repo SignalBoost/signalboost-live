@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     for (const row of selected.data ?? []) {
       const outcome = await runPrivateCapabilityCase({ id: String(row.id), track: String(row.track), prompt: String(row.prompt), requiredTerms: terms(row.required_terms), forbiddenTerms: terms(row.forbidden_terms), requiresProvenance: true, requiresLocalReasoning: Boolean(row.requires_local_reasoning) })
       if (outcome.score.passed) passed += 1
-      const inserted = await db.from('cos_capability_benchmark_results').insert({ run_id: run.data.id, case_id: row.id, track: row.track, passed: outcome.score.passed, reasons: outcome.score.reasons, response_source: outcome.provenance.responseSource, local_model_invoked: outcome.provenance.localModelInvoked, external_ai_invoked: outcome.provenance.externalAiInvoked, latency_ms: outcome.latencyMs })
+      const inserted = await db.from('cos_capability_benchmark_results').insert({ run_id: run.data.id, case_id: row.id, track: row.track, passed: outcome.score.passed, reasons: outcome.score.reasons, response_excerpt: outcome.replyExcerpt, response_source: outcome.provenance.responseSource, local_model_invoked: outcome.provenance.localModelInvoked, external_ai_invoked: outcome.provenance.externalAiInvoked, latency_ms: outcome.latencyMs })
       if (inserted.error) throw inserted.error
     }
     const attempted = selected.data?.length ?? 0

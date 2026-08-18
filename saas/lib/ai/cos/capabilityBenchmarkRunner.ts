@@ -16,5 +16,7 @@ export async function runPrivateCapabilityCase(test: PrivateBenchmarkCase) {
       semanticCache: result.provenance.responseSource === 'semantic_cache' || result.provenance.responseSource === 'semantic_similarity',
     },
   })
-  return { score, latencyMs: Date.now() - started, provenance: result.provenance }
+  // Kept only in the owner-only benchmark evidence table; never returned by the dashboard API.
+  // A bounded excerpt is enough to diagnose a rubric failure without retaining unbounded output.
+  return { score, replyExcerpt: reply.slice(0, 12_000), latencyMs: Date.now() - started, provenance: result.provenance }
 }

@@ -64,6 +64,7 @@ export function calibratedConfidence(document:LearningSourceDocument,score:Relev
 export function metadataAdmissionFloor():number{return envNumber('COS_METADATA_ADMISSION_FLOOR',0.6,0,1)}
 
 /** The floor THIS document must clear: the catalogue floor for full evidence, the metadata floor otherwise — never a number invented per document. */
+export function candidate0Confidence(document:LearningSourceDocument,score:RelevanceScore):number{const normalized=document.text.replace(/\s+/g,' ').trim();return normalized?calibratedConfidence(document,score,normalized):0}
 export function admissionFloorFor(document:LearningSourceDocument):number|null{const kindFloor=minimumConfidenceForKind(document.sourceKind);if(evidenceClass(document)==='full')return kindFloor??0.72;return kindFloor===null?metadataAdmissionFloor():Math.min(kindFloor,metadataAdmissionFloor())}
 export function sourceAwareRelevant(document:LearningSourceDocument,score:RelevanceScore,terms:{anchors:string[];supporting:string[]},floor=minimumRelevance(),minMatches=minimumTermMatches()):boolean{
   if(score.totalMatched<minMatches)return false
@@ -114,11 +115,17 @@ export class ContinuousLearningCycle{
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
           if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}
           const kindFloor=admissionFloorFor(document)
-          let candidate=this.toCandidate(document,allTerms,score)
-          if(kindFloor!==null&&candidate.confidence<kindFloor){
-            const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate.confidence, sourceFloor: kindFloor, gapAligned: gap.id.startsWith('curriculum:') || gap.id.startsWith('track-study:') })
-            if(admission.tier==='rejected'){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;continue}
-            candidate={...candidate,admission}
+          // Classify every candidate and attach the result. This does NOT tighten anything: the
+          // director only consults tier metadata for candidates that fail its policy confidence
+          // floor, so a strong candidate is admitted as before whatever its tier says. Attaching it
+          // unconditionally is what lets the director defer the band that passes the source-kind
+          // floor (metadata: 0.6) but fails the policy floor (0.72) — the band that produced 112
+          // confidence_too_low rejections in production run cb84fe69 with zero probationary catches.
+          const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate0Confidence(document,score), sourceFloor: kindFloor ?? 0, gapAligned: gap.id.startsWith('curriculum:') })
+          const candidate={...this.toCandidate(document,allTerms,score),admission}
+          if(kindFloor!==null&&candidate.confidence<kindFloor&&admission.tier!=='probationary'){
+            result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1
+            continue
           }
           try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision);if(decision.accepted){const learned=String(gap.subject??'').trim();if(learned)acceptedSubjects.add(learned)}}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
         }

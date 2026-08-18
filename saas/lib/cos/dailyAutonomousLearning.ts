@@ -168,7 +168,7 @@ export function approvedUrlLearningAdapter(urls: string[]): ContinuousLearningSo
 }
 
 async function runLearningCycleWithTelemetry(
-  run: () => Promise<{ gapsConsidered: number; documentsAcquired: number; accepted: number; acceptedSubjects: string[]; rejected: Record<string, number>; sourceErrors: Record<string, number>; externalCostUsd: number }>,
+  run: () => Promise<{ gapsConsidered: number; documentsAcquired: number; accepted: number; probationary: number; acceptedSubjects: string[]; rejected: Record<string, number>; sourceErrors: Record<string, number>; externalCostUsd: number }>,
   telemetry: ContinuousLearningTelemetrySink,
 ) {
   const startedAt = Date.now()

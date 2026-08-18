@@ -24,6 +24,7 @@ export type DailyLearningResult = {
   gapsConsidered: number
   documentsAcquired: number
   accepted: number
+  probationary: number
   rejected: Record<string, number>
   sourceErrors: Record<string, number>
   externalCostUsd: number
@@ -340,6 +341,7 @@ export async function runDailyAutonomousLearning(input: {
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
+      probationary: 0,
       rejected: {},
       sourceErrors: {},
       externalCostUsd: 0,
@@ -363,6 +365,7 @@ export async function runDailyAutonomousLearning(input: {
       gapsConsidered: 0,
       documentsAcquired: 0,
       accepted: 0,
+      probationary: 0,
       rejected: {},
       sourceErrors: {},
       externalCostUsd: 0,

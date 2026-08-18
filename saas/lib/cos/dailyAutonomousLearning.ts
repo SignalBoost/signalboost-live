@@ -213,6 +213,32 @@ export function normalizeQueuedGapSubject(subject: string, question: string): st
 }
 
 /**
+ * Dynamic corpus gaps are also acquisition targets.  They must cross the same bounded-subject
+ * boundary as queued gaps; otherwise a fragment already present in the corpus can bypass the
+ * queue hygiene and become tomorrow's search query and accepted subject.
+ */
+export function normalizeDynamicStudyGaps(gaps: KnowledgeGap[]): KnowledgeGap[] {
+  const seen = new Set<string>()
+  const normalized: KnowledgeGap[] = []
+  for (const gap of gaps) {
+    const subject = normalizeQueuedGapSubject(gap.subject, gap.question)
+    if (!subject) continue
+    const key = `${subject.toLowerCase()}::${gap.question.toLowerCase()}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    normalized.push(subject === gap.subject ? gap : {
+      ...gap,
+      subject,
+      // Adapters build their external query from subject + question. Do not carry the unbounded
+      // corpus fragment into that query after it has been re-anchored.
+      question: `What current, verifiable evidence is relevant to ${subject}?`,
+      evidence: [...(gap.evidence ?? []), `reanchored_from_subject=${String(gap.subject).slice(0, 180)}`],
+    })
+  }
+  return normalized
+}
+
+/**
  * A gap is only resolved when its own subject produced admitted evidence. Marking every queued gap
  * resolved because the cycle accepted something somewhere closes gaps that were never answered.
  */
@@ -349,8 +375,9 @@ export async function runDailyAutonomousLearning(input: {
   // What COS is measurably worst at on real work outranks what its corpus is merely thin about.
   const weaknessCurriculumSignals = await loadCosCurriculumSignals()
   const dynamic = await generateDynamicKnowledgeGaps(12, weaknessCurriculumSignals)
+  const normalizedDynamicGaps = normalizeDynamicStudyGaps(dynamic.gaps)
   const reasoningKeys = new Set(reasoningGaps.map(gap => `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
-  const corpusExpansionGaps = dynamic.gaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
+  const corpusExpansionGaps = normalizedDynamicGaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
   // The declared curriculum tracks are studied too, not merely stored: a bounded, rotating slice of
   // track topics enters the same acquisition/admission cycle as every other gap, weakest tracks first.

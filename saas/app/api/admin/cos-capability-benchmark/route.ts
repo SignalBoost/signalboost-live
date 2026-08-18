@@ -10,7 +10,7 @@ export const maxDuration = 300
 const MAX_CASES_PER_RUN = 2
 const STALE_RUN_MS = 10 * 60_000
 const terms = (value: unknown) => Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
-const errorText = (value: unknown) => value instanceof Error ? value.message : typeof value === 'string' ? value : JSON.stringify(value)
+const errorText = (value: unknown): string => value instanceof Error ? value.message : typeof value === 'string' ? value : JSON.stringify(value) || String(value ?? 'Unknown benchmark error')
 
 async function reconcileStaleRuns(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
   const cutoff = new Date(Date.now() - STALE_RUN_MS).toISOString()

@@ -2,12 +2,13 @@ import { createHash } from 'node:crypto'
 import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index'
 import { ContinuousLearningDirector } from './index'
 import { minimumConfidenceForKind } from './sourceCatalog'
+import { classifyTieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 
 export type LearningSourceDocument = { sourceKind:ContinuousLearningSourceKind; sourceUri:string; sourceTitle?:string; observedAt?:string; subject:string; text:string; license?:string|null; evidence?:string[] }
 export interface ContinuousLearningSourceAdapter { readonly kind:ContinuousLearningSourceKind; readonly id?:string; acquire(gap:KnowledgeGap):Promise<LearningSourceDocument[]> }
 // acceptedSubjects records WHICH gaps actually produced admitted evidence. Without it a caller can
 // only see that the cycle accepted something overall, which is not enough to close the right gaps.
-export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; acceptedSubjects:string[]; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
+export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; probationary:number; acceptedSubjects:string[]; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
 
 const STOP_WORDS=new Set(['about','above','after','again','against','because','been','before','being','below','between','both','cannot','could','does','doing','down','during','each','from','further','have','having','here','into','itself','more','most','only','other','over','same','should','some','such','than','that','their','them','then','there','these','they','this','those','through','under','until','very','were','what','when','where','which','while','with','would','your'])
 const GENERIC_DOMAIN_ANCHORS=new Set(['api','apis','architecture','business','database','engineering','enterprise','intelligence','multi','operations','performance','saas','security','site','software','strategy','systems','tenant'])
@@ -87,7 +88,7 @@ export class ContinuousLearningCycle{
 
   async run(gaps:KnowledgeGap[],spentExternalCostUsd=0):Promise<LearningCycleResult>{
     const prioritized=this.director.prioritizeGaps(gaps)
-    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,acceptedSubjects:[],rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
+    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,probationary:0,acceptedSubjects:[],rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
     const acceptedSubjects=new Set<string>()
     const floor=minimumRelevance(),minMatches=minimumTermMatches()
     const startedAt=Date.now()
@@ -112,7 +113,9 @@ export class ContinuousLearningCycle{
           if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'});continue}
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
           if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}
-          const candidate=this.toCandidate(document,allTerms,score),kindFloor=admissionFloorFor(document)
+          const kindFloor=admissionFloorFor(document)
+          const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: calibratedConfidence(document,score,document.text.replace(/\\s+/g,' ').trim()), sourceFloor: kindFloor ?? 0, gapAligned: gap.id.startsWith('curriculum:') || gap.id.startsWith('track-study:') })
+          const candidate=this.toCandidate(document,allTerms,score,admission)
           if(kindFloor!==null&&candidate.confidence<kindFloor){result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1;console.warn('cosLearning: candidate below source confidence floor',{gapId:gap.id,source,sourceKind:document.sourceKind,confidence:candidate.confidence,floor:kindFloor,evidenceClass:evidenceClass(document)});continue}
           try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision);if(decision.accepted){const learned=String(gap.subject??'').trim();if(learned)acceptedSubjects.add(learned)}}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
         }
@@ -124,6 +127,6 @@ export class ContinuousLearningCycle{
     return result
   }
 
-  private toCandidate(document:LearningSourceDocument,terms:string[],score:RelevanceScore):LearningCandidate{const normalized=document.text.replace(/\s+/g,' ').trim(),evidence=document.evidence?.filter(Boolean)??[],summary=relevantExcerpt(normalized,terms,1200);if(!evidence.length&&summary)evidence.push(summary.slice(0,500));const confidence=normalized?calibratedConfidence(document,score,normalized):0;return{contentHash:createHash('sha256').update(`${document.sourceUri}\n${normalized}`).digest('hex'),sourceKind:document.sourceKind,sourceUri:document.sourceUri,sourceTitle:document.sourceTitle,observedAt:document.observedAt??new Date().toISOString(),subject:document.subject,summary,facts:summary?[{predicate:'source_excerpt',object:summary,confidence}]:[],confidence,license:document.license,evidence}}
-  private recordDecision(result:LearningCycleResult,decision:ContinuousLearningDecision){if(decision.accepted){result.accepted+=1;return}result.rejected[decision.reason]=(result.rejected[decision.reason]??0)+1}
+  private toCandidate(document:LearningSourceDocument,terms:string[],score:RelevanceScore,admission?:import('@/lib/ai/cos/tieredLearningAdmission').TieredAdmission):LearningCandidate{const normalized=document.text.replace(/\s+/g,' ').trim(),evidence=document.evidence?.filter(Boolean)??[],summary=relevantExcerpt(normalized,terms,1200);if(!evidence.length&&summary)evidence.push(summary.slice(0,500));const confidence=normalized?calibratedConfidence(document,score,normalized):0;return{contentHash:createHash('sha256').update(`${document.sourceUri}\n${normalized}`).digest('hex'),sourceKind:document.sourceKind,sourceUri:document.sourceUri,sourceTitle:document.sourceTitle,observedAt:document.observedAt??new Date().toISOString(),subject:document.subject,summary,facts:summary?[{predicate:'source_excerpt',object:summary,confidence}]:[],confidence,license:document.license,evidence,admission}}
+  private recordDecision(result:LearningCycleResult,decision:ContinuousLearningDecision){if(decision.accepted){result.accepted+=1;return}if('deferred' in decision&&decision.deferred){result.probationary+=1;return}result.rejected[decision.reason]=(result.rejected[decision.reason]??0)+1}
 }

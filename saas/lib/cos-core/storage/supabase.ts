@@ -184,9 +184,8 @@ export class SupabaseContinuousLearningStore implements ContinuousLearningStore 
   async rememberProbationary(candidate: LearningCandidate): Promise<boolean> {
     const admission = candidate.admission
     if (!admission || admission.tier !== 'probationary') return false
-    const normalizedClaim = `${candidate.subject}\n${candidate.facts.map(fact => `${fact.predicate}\n${fact.object}`).join('\n')}`
-      .toLowerCase().replace(/\s+/g, ' ').trim()
-    const claimFingerprint = createHash('sha256').update(normalizedClaim).digest('hex')
+    const normalizedSubject = candidate.subject.toLowerCase().replace(/\s+/g, ' ').trim()
+    const claimFingerprint = createHash('sha256').update(normalizedSubject).digest('hex')
     const { data: existing, error: existingError } = await this.db
       .from('cos_learning_probationary')
       .select('*')
@@ -205,7 +204,10 @@ export class SupabaseContinuousLearningStore implements ContinuousLearningStore 
       source_floor: admission.sourceFloor, gap_aligned: admission.gapAligned, corroboration_required: admission.corroborationRequired,
       admission_reason: admission.reason, status: 'probationary', license: candidate.license ?? null, evidence: candidate.evidence,
     }
-    const mustPromote = admission.gapAligned || Boolean(existing?.length)
+    const { data: durable, error: durableError } = await this.db.from('cos_continuous_learning').select('content_hash')
+      .eq('subject', candidate.subject).neq('source_uri', candidate.sourceUri).limit(1)
+    if (durableError) throw durableError
+    const mustPromote = admission.gapAligned || Boolean(existing?.length) || Boolean(durable?.length)
     const probationaryRow: any = mustPromote ? { ...row, status: 'promoted', promoted_at: now } : row
     const { error: storedError } = await (this.db.from('cos_learning_probationary') as any).upsert(probationaryRow, { onConflict: 'content_hash' })
     if (storedError) throw storedError

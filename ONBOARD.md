@@ -834,6 +834,11 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 
 - The daily run exposed one remaining bypass: dynamic corpus-expansion gaps could reintroduce a chat-fragment subject after queued-gap filtering. Dynamic targets now pass through the same foundational-domain normalization before acquisition; unclassifiable fragments are dropped, and re-anchored targets use a bounded study question so the raw fragment cannot become an external search query.
 
+### 2026-08-18 — Tiered-admission reachability repair
+
+- Durable admissions continue to use their established source and policy floors unchanged. Candidates below those floors may enter the separate probationary store only when they clear its lower documented thresholds; they are never retrievable until corroborated.
+- Corroboration now recognizes a different durable source for the same normalized subject, and a bounded daily promotion pass copies confirmed probationary evidence into the durable corpus before marking it promoted.
+
 ### 2026-08-18 — Tiered continuous-learning admission
 
 - COS now classifies candidate evidence into **high-confidence**, **probationary**, or **rejected** without altering raw relevance or confidence.

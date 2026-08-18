@@ -71,6 +71,7 @@ export type LearningCandidate = {
   confidence: number
   license?: string | null
   evidence: string[]
+  admission?: TieredAdmission
 }
 
 export type ContinuousLearningDecision =

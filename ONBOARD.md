@@ -814,3 +814,10 @@ The long-term proof is a trend: more problems completed with COS-owned memory/sk
 - Added enterprise commercial and governance tracks with approval, evidence, privacy, and compliance boundaries.
 - The daily learning cycle now studies a bounded rotating set of track topics, prioritizing tracks with measured weakness, and preserves track/evaluation/safety evidence through admission and retention.
 - Added CI and hermetic end-to-end coverage proving curriculum topics reach the learning cycle and are remembered.
+
+
+### 2026-08-18 — Learning-gap hygiene
+
+- Only foundational knowledge domains may be sent to external learning sources. Legacy free-text gap subjects are re-anchored from their own question when possible; otherwise they remain capability evidence but enter terminal `unstudyable` status rather than consuming study slots.
+- Queued gaps are resolved only when admitted evidence was produced for that gap's normalized subject. The cycle now returns `acceptedSubjects` to support that exact decision.
+- Added the `unstudyable` status migration and regression coverage for the observed chat-fragment cases.

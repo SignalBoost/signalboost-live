@@ -6,6 +6,7 @@ import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
 import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
+import { FOUNDATIONAL_KNOWLEDGE_DOMAINS, nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum'
 import type { MiningRunSummary } from './mining/types'
 
@@ -166,7 +167,7 @@ export function approvedUrlLearningAdapter(urls: string[]): ContinuousLearningSo
 }
 
 async function runLearningCycleWithTelemetry(
-  run: () => Promise<{ gapsConsidered: number; documentsAcquired: number; accepted: number; rejected: Record<string, number>; sourceErrors: Record<string, number>; externalCostUsd: number }>,
+  run: () => Promise<{ gapsConsidered: number; documentsAcquired: number; accepted: number; acceptedSubjects: string[]; rejected: Record<string, number>; sourceErrors: Record<string, number>; externalCostUsd: number }>,
   telemetry: ContinuousLearningTelemetrySink,
 ) {
   const startedAt = Date.now()
@@ -175,24 +176,85 @@ async function runLearningCycleWithTelemetry(
   return result
 }
 
+/**
+ * Which queued gaps are worth STUDYING.
+ *
+ * `subject` is the grouping key for the whole learning loop and the search anchor every source
+ * adapter uses, so it decides what acquisition goes looking for. Production data on 2026-08-17
+ * showed what happens when anything is allowed through: "worse president times",
+ * "show components relationships" and "computer vision subfield" were stored as durable corpus
+ * subjects and re-studied daily — chat fragments sent to journal APIs as research queries.
+ *
+ * The bounded problem-class taxonomy (cosProblemClass) is the right key for CAPABILITY tracking —
+ * "opinion and judgment", "writing and content", "cos self description" are real classes — but they
+ * are not research topics, and searching journals for them returns noise. Only a foundational study
+ * domain is a legitimate acquisition target, so that is the bar here. Gaps that fail it still exist
+ * as capability signal; they simply are not sent to source adapters.
+ */
+const STUDYABLE_GAP_SUBJECTS: ReadonlySet<string> = new Set(
+  FOUNDATIONAL_KNOWLEDGE_DOMAINS.map(domain => domain.subject.toLowerCase()),
+)
+
+export function isStudyableGapSubject(subject: string): boolean {
+  return STUDYABLE_GAP_SUBJECTS.has(String(subject ?? '').replace(/\s+/g, ' ').trim().toLowerCase())
+}
+
+/**
+ * Re-anchor a queued gap onto a real study domain rather than trusting the stored subject string.
+ * Returns null when neither the subject nor its own question maps to a study domain, so the caller
+ * drops the gap instead of turning a chat fragment into an acquisition query.
+ */
+export function normalizeQueuedGapSubject(subject: string, question: string): string | null {
+  const stored = String(subject ?? '').replace(/\s+/g, ' ').trim()
+  if (isStudyableGapSubject(stored)) return stored
+  const text = `${String(question ?? '').trim()} ${stored}`.trim()
+  const derived = text ? nearestFoundationalSubject(text) : null
+  return derived && isStudyableGapSubject(derived) ? derived : null
+}
+
+/**
+ * A gap is only resolved when its own subject produced admitted evidence. Marking every queued gap
+ * resolved because the cycle accepted something somewhere closes gaps that were never answered.
+ */
+export function queuedGapResolution(subject: string, acceptedSubjects: string[]): 'resolved' | 'failed' {
+  const value = String(subject ?? '').trim().toLowerCase()
+  return acceptedSubjects.some(accepted => String(accepted ?? '').trim().toLowerCase() === value) ? 'resolved' : 'failed'
+}
+
 async function loadQueuedReasoningGaps(): Promise<{ ids: string[]; signals: KnowledgeGapSignal[] }> {
   const db = createSupabaseCOSStores() ? (await import('@/lib/cos-core/storage/supabase')).cosServiceDb() : null
   if (!db) return { ids: [], signals: [] }
   try {
     const { data } = await db.from('cos_learning_gaps').select('*').in('status', ['pending', 'failed']).order('last_seen_at', { ascending: false }).limit(25)
     const rows = data ?? []
+    const usable: Array<{ row: any; subject: string }> = []
+    const dropped: string[] = []
+    const droppedIds: string[] = []
+    for (const row of rows) {
+      const stored = String(row?.subject || '')
+      const subject = normalizeQueuedGapSubject(stored, String(row?.question || ''))
+      if (!subject) { dropped.push(stored.slice(0, 60)); droppedIds.push(String(row?.id)); continue }
+      usable.push({ row, subject })
+    }
+    if (dropped.length) {
+      console.warn('[cos-learning-gap-subject-unstudyable]', JSON.stringify({ dropped: dropped.length, examples: dropped.slice(0, 5) }))
+      // Take them out of the study window so a fragment cannot occupy a slot every cycle forever.
+      // Best-effort: if the 'unstudyable' status migration has not been applied yet the update is
+      // rejected and swallowed, and the gap is still correctly skipped for this cycle.
+      try { await db.from('cos_learning_gaps').update({ status: 'unstudyable', last_seen_at: new Date().toISOString() }).in('id', droppedIds) } catch {}
+    }
     return {
-      ids: rows.map((r: any) => String(r.id)),
-      signals: rows.map((r: any) => ({
-        taskId: String(r.task_id || 'support'),
-        subject: String(r.subject || ''),
-        capability: String(r.capability || 'general_reasoning'),
-        objective: String(r.question || ''),
-        confidence: Number(r.confidence || 0),
+      ids: usable.map(({ row }) => String(row.id)),
+      signals: usable.map(({ row, subject }) => ({
+        taskId: String(row.task_id || 'support'),
+        subject,
+        capability: String(row.capability || 'general_reasoning'),
+        objective: String(row.question || ''),
+        confidence: Number(row.confidence || 0),
         escalated: true,
         succeeded: false,
-        repeatedCount: Number(r.repeated_count || 1),
-        evidence: r.escalation_reason ? [String(r.escalation_reason)] : [],
+        repeatedCount: Number(row.repeated_count || 1),
+        evidence: row.escalation_reason ? [String(row.escalation_reason)] : [],
         portableIds: ['cos'],
       })),
     }
@@ -201,16 +263,23 @@ async function loadQueuedReasoningGaps(): Promise<{ ids: string[]; signals: Know
   }
 }
 
-async function markQueuedReasoningGaps(ids: string[], accepted: number) {
-  if (!ids.length) return
+async function markQueuedReasoningGaps(
+  queued: Array<{ id: string; subject: string }>,
+  acceptedSubjects: string[],
+) {
+  if (!queued.length) return
   const db = (await import('@/lib/cos-core/storage/supabase')).cosServiceDb()
   if (!db) return
+  const now = new Date().toISOString()
+  const resolvedIds = queued.filter(gap => queuedGapResolution(gap.subject, acceptedSubjects) === 'resolved').map(gap => gap.id)
+  const failedIds = queued.filter(gap => !resolvedIds.includes(gap.id)).map(gap => gap.id)
   try {
-    await db.from('cos_learning_gaps').update({
-      status: accepted > 0 ? 'resolved' : 'failed',
-      resolved_at: accepted > 0 ? new Date().toISOString() : null,
-      last_seen_at: new Date().toISOString(),
-    }).in('id', ids)
+    if (resolvedIds.length) {
+      await db.from('cos_learning_gaps').update({ status: 'resolved', resolved_at: now, last_seen_at: now }).in('id', resolvedIds)
+    }
+    if (failedIds.length) {
+      await db.from('cos_learning_gaps').update({ status: 'failed', resolved_at: null, last_seen_at: now }).in('id', failedIds)
+    }
   } catch {}
 }
 
@@ -315,7 +384,10 @@ export async function runDailyAutonomousLearning(input: {
   const director = new ContinuousLearningDirector(persistentStore, ZERO_LLM_POLICY)
   const cycle = new ContinuousLearningCycle(director, adapters)
   const result = await runLearningCycleWithTelemetry(() => cycle.run(gaps, 0), input.telemetry ?? consoleTelemetry)
-  await markQueuedReasoningGaps(queued.ids, result.accepted)
+  await markQueuedReasoningGaps(
+    queued.ids.map((id, index) => ({ id, subject: queued.signals[index]?.subject ?? '' })),
+    result.acceptedSubjects ?? [],
+  )
 
   return {
     status: 'learned',

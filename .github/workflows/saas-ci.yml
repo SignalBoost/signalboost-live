@@ -146,11 +146,14 @@ jobs:
           tests/cosRoboticsEdgeAiCurriculum.node.test.ts
           tests/cosSpaceAppliedPhysicsCurriculum.node.test.ts
           tests/cosComputationalCreativityCurriculum.node.test.ts
+          tests/cosIndustrialHmiCurriculum.node.test.ts
           tests/cosEnterpriseCurriculum.node.test.ts
           tests/cosCurriculumPriority.node.test.ts
           tests/cosCurriculumStudyGaps.node.test.ts
       - name: Verify curriculum topics are actually studied by the daily learning cycle
         run: npx --yes tsx --test tests/cosCurriculumStudyExecution.node.test.ts
+      - name: Verify unstudyable chat fragments never become study subjects
+        run: npx --yes tsx --test tests/cosLearningGapHygiene.node.test.ts
 
   cos-platform-self-knowledge:
     name: COS platform self-knowledge policy
@@ -221,4 +224,3 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Issue #205 architecture
         run: npm run verify:issue-205
-<!-- ONBOARD.md -->

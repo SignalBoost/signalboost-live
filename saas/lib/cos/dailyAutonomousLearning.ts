@@ -1,4 +1,3 @@
-// saas/lib/cos/dailyAutonomousLearning.ts
 import type { ContinuousLearningSourceAdapter } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningStore, type KnowledgeGap } from '@/lib/cos-core/layers/learning'
@@ -6,7 +5,7 @@ import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveS
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
-import { loadCosCurriculumSignals } from '@/lib/ai/cos/cosCurriculumPriority'
+import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
 import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum'
 import type { MiningRunSummary } from './mining/types'
 
@@ -17,6 +16,7 @@ export type DailyLearningResult = {
   autonomousGaps: number
   curriculumGaps: number
   corpusExpansionGaps: number
+  trackStudyGaps: number
   weaknessCurriculumSignals: number
   retainedKnowledge: number
   liveSourceAdapters: number
@@ -238,6 +238,7 @@ export async function runDailyAutonomousLearning(input: {
       autonomousGaps: 0,
       curriculumGaps: 0,
       corpusExpansionGaps: 0,
+      trackStudyGaps: 0,
       weaknessCurriculumSignals: 0,
       retainedKnowledge: 0,
       liveSourceAdapters: readiness.liveAdapters,
@@ -260,6 +261,7 @@ export async function runDailyAutonomousLearning(input: {
       autonomousGaps: 0,
       curriculumGaps: 0,
       corpusExpansionGaps: 0,
+      trackStudyGaps: 0,
       weaknessCurriculumSignals: 0,
       retainedKnowledge: 0,
       liveSourceAdapters: readiness.liveAdapters,
@@ -281,7 +283,12 @@ export async function runDailyAutonomousLearning(input: {
   const reasoningKeys = new Set(reasoningGaps.map(gap => `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const corpusExpansionGaps = dynamic.gaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
-  const curriculum = [...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum()]
+  // The declared curriculum tracks are studied too, not merely stored: a bounded, rotating slice of
+  // track topics enters the same acquisition/admission cycle as every other gap, weakest tracks first.
+  const trackStudy = curriculumTrackStudyGaps({
+    prioritySubjects: weaknessCurriculumSignals.map(signal => signal.subject),
+  })
+  const curriculum = [...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
   const gaps = [miningGap(input.miningSummary), ...curriculum, ...autonomousGaps]
   const liveAdapters = createLiveLearningAdapters()
   const adapters = [
@@ -300,6 +307,8 @@ export async function runDailyAutonomousLearning(input: {
     weaknessCurriculumSubjects: weaknessCurriculumSignals.map(signal => signal.subject),
     retainedKnowledge: dynamic.retained,
     curriculumGaps: curriculum.length,
+    trackStudyGaps: trackStudy.length,
+    trackStudySubjects: trackStudy.map(gap => gap.subject),
     adapterKinds: adapters.map(a => a.id ?? a.kind),
   }))
 
@@ -314,6 +323,7 @@ export async function runDailyAutonomousLearning(input: {
     autonomousGaps: autonomousGaps.length,
     curriculumGaps: curriculum.length,
     corpusExpansionGaps: corpusExpansionGaps.length,
+    trackStudyGaps: trackStudy.length,
     weaknessCurriculumSignals: weaknessCurriculumSignals.length,
     retainedKnowledge: dynamic.retained,
     liveSourceAdapters: liveAdapters.length,

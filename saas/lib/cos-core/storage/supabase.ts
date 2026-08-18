@@ -206,10 +206,8 @@ export class SupabaseContinuousLearningStore implements ContinuousLearningStore 
       admission_reason: admission.reason, status: 'probationary', license: candidate.license ?? null, evidence: candidate.evidence,
     }
     const mustPromote = admission.gapAligned || Boolean(existing?.length)
-    const { error: storedError } = await this.db.from('cos_learning_probationary').upsert(
-      mustPromote ? { ...row, status: 'promoted', promoted_at: now } : row,
-      { onConflict: 'content_hash' },
-    )
+    const probationaryRow: any = mustPromote ? { ...row, status: 'promoted', promoted_at: now } : row
+    const { error: storedError } = await (this.db.from('cos_learning_probationary') as any).upsert(probationaryRow, { onConflict: 'content_hash' })
     if (storedError) throw storedError
     if (!mustPromote) return false
 

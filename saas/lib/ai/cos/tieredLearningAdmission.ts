@@ -1,4 +1,5 @@
 export type AdmissionTier = 'high_confidence' | 'probationary' | 'rejected'
+export const PROBATIONARY_MINIMUM_CONFIDENCE = 0.65
 
 export type TieredAdmission = {
   tier: AdmissionTier

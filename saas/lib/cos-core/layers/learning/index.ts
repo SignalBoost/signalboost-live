@@ -1,4 +1,4 @@
-import type { TieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
+import { PROBATIONARY_MINIMUM_CONFIDENCE, type TieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 // saas/lib/cos-core/layers/learning/index.ts
 export type LearningObservation = {
   taskId: string
@@ -157,12 +157,15 @@ export class ContinuousLearningDirector {
     if (!candidate.sourceUri.trim() || !candidate.observedAt || !candidate.evidence.length) {
       return { accepted: false, reason: 'missing_provenance' }
     }
-    if (!Number.isFinite(candidate.confidence) || candidate.confidence < this.policy.minimumConfidence) {
+    const confidenceFloor = candidate.admission?.tier === 'probationary'
+      ? PROBATIONARY_MINIMUM_CONFIDENCE
+      : this.policy.minimumConfidence
+    if (!Number.isFinite(candidate.confidence) || candidate.confidence < confidenceFloor) {
       return { accepted: false, reason: 'confidence_too_low' }
     }
     if (candidate.admission?.tier === 'rejected') return { accepted: false, reason: 'tier_threshold_not_met' }
     const reusableFacts = candidate.facts.filter(fact =>
-      fact.predicate.trim() && fact.object.trim() && Number.isFinite(fact.confidence) && fact.confidence >= this.policy.minimumConfidence,
+      fact.predicate.trim() && fact.object.trim() && Number.isFinite(fact.confidence) && fact.confidence >= confidenceFloor,
     )
     if (!reusableFacts.length) return { accepted: false, reason: 'no_reusable_facts' }
     if (await this.store.hasContent(candidate.contentHash)) return { accepted: false, reason: 'duplicate' }

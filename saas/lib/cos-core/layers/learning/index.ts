@@ -1,3 +1,4 @@
+import type { TieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 // saas/lib/cos-core/layers/learning/index.ts
 export type LearningObservation = {
   taskId: string
@@ -55,6 +56,7 @@ export type KnowledgeGap = {
   expectedAvoidedCostUsd: number
   urgency: number
   evidence: string[]
+  admission?: TieredAdmission
 }
 
 export type LearningCandidate = {
@@ -72,12 +74,15 @@ export type LearningCandidate = {
 }
 
 export type ContinuousLearningDecision =
-  | { accepted: true; reason: 'new_verified_knowledge' }
-  | { accepted: false; reason: 'duplicate' | 'source_not_allowed' | 'confidence_too_low' | 'missing_provenance' | 'no_reusable_facts' | 'budget_exhausted' }
+  | { accepted: true; reason: 'new_verified_knowledge' | 'probationary_promoted' }
+  | { accepted: false; deferred: true; reason: 'probationary' }
+  | { accepted: false; reason: 'duplicate' | 'source_not_allowed' | 'confidence_too_low' | 'missing_provenance' | 'no_reusable_facts' | 'budget_exhausted' | 'tier_threshold_not_met' | 'probationary_storage_unavailable' }
 
 export interface ContinuousLearningStore {
   hasContent(contentHash: string): Promise<boolean>
   remember(candidate: LearningCandidate): Promise<void>
+  /** Persist conditional evidence and return true only when it was promoted. */
+  rememberProbationary?(candidate: LearningCandidate): Promise<boolean>
 }
 
 export interface ContinuousLearningPolicy {
@@ -154,13 +159,21 @@ export class ContinuousLearningDirector {
     if (!Number.isFinite(candidate.confidence) || candidate.confidence < this.policy.minimumConfidence) {
       return { accepted: false, reason: 'confidence_too_low' }
     }
+    if (candidate.admission?.tier === 'rejected') return { accepted: false, reason: 'tier_threshold_not_met' }
     const reusableFacts = candidate.facts.filter(fact =>
       fact.predicate.trim() && fact.object.trim() && Number.isFinite(fact.confidence) && fact.confidence >= this.policy.minimumConfidence,
     )
     if (!reusableFacts.length) return { accepted: false, reason: 'no_reusable_facts' }
     if (await this.store.hasContent(candidate.contentHash)) return { accepted: false, reason: 'duplicate' }
+    const admitted = { ...candidate, facts: reusableFacts }
+    if (candidate.admission?.tier === 'probationary') {
+      if (!this.store.rememberProbationary) return { accepted: false, reason: 'probationary_storage_unavailable' }
+      return (await this.store.rememberProbationary(admitted))
+        ? { accepted: true, reason: 'probationary_promoted' }
+        : { accepted: false, deferred: true, reason: 'probationary' }
+    }
 
-    await this.store.remember({ ...candidate, facts: reusableFacts })
+    await this.store.remember(admitted)
     return { accepted: true, reason: 'new_verified_knowledge' }
   }
 }

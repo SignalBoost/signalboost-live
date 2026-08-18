@@ -36,15 +36,20 @@ export async function POST(request: NextRequest) {
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   const body = await request.json().catch(() => ({}))
   const limit = Math.max(1, Math.min(MAX_CASES_PER_RUN, Math.floor(Number(body.limit) || MAX_CASES_PER_RUN)))
-  const selected = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning').eq('active', true).order('created_at', { ascending: true }).limit(limit)
-  if (selected.error) return NextResponse.json({ error: selected.error.message }, { status: 500 })
+  const cases = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning').eq('active', true).order('created_at', { ascending: true }).limit(200)
+  if (cases.error) return NextResponse.json({ error: cases.error.message }, { status: 500 })
+  const completedRuns = await db.from('cos_capability_benchmark_runs').select('id').eq('status', 'completed').limit(2000)
+  if (completedRuns.error) return NextResponse.json({ error: completedRuns.error.message }, { status: 500 })
+  const activeCases = cases.data ?? []
+  const start = activeCases.length ? ((completedRuns.data?.length ?? 0) * limit) % activeCases.length : 0
+  const selected = [...activeCases.slice(start), ...activeCases.slice(0, start)].slice(0, limit)
   const run = await db.from('cos_capability_benchmark_runs').insert({ requested_limit: limit }).select('id').single()
   if (run.error || !run.data) return NextResponse.json({ error: run.error?.message ?? 'Could not create benchmark run.' }, { status: 500 })
 
   let passed = 0
   let attempted = 0
   try {
-    for (const row of selected.data ?? []) {
+    for (const row of selected) {
       attempted += 1
       try {
         const outcome = await runPrivateCapabilityCase({ id: String(row.id), track: String(row.track), prompt: String(row.prompt), requiredTerms: terms(row.required_terms), forbiddenTerms: terms(row.forbidden_terms), requiresProvenance: true, requiresLocalReasoning: Boolean(row.requires_local_reasoning) })

@@ -8,7 +8,7 @@ import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dyn
 import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS, nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum.ts'
-import type { MiningRunSummary } from './mining/types'
+import type { MiningRunSummary } from './mining/types.ts'
 
 export type DailyLearningResult = {
   status: 'skipped' | 'learned'

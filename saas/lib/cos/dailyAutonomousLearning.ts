@@ -7,7 +7,7 @@ import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/l
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
 import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS, nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
-import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum'
+import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum.ts'
 import type { MiningRunSummary } from './mining/types'
 
 export type DailyLearningResult = {

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index'
-import { ContinuousLearningDirector } from './index'
-import { minimumConfidenceForKind } from './sourceCatalog'
+import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index.ts'
+import { ContinuousLearningDirector } from './index.ts'
+import { minimumConfidenceForKind } from './sourceCatalog.ts'
 import { classifyTieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 
 export type LearningSourceDocument = { sourceKind:ContinuousLearningSourceKind; sourceUri:string; sourceTitle?:string; observedAt?:string; subject:string; text:string; license?:string|null; evidence?:string[] }

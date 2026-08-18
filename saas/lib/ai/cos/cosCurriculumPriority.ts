@@ -395,22 +395,14 @@ function utcDayNumber(now: Date): number {
   return Number.isFinite(time) ? Math.floor(time / 86_400_000) : 0
 }
 
-/**
- * The acquisition query is `subject + question`, and the public source clients truncate it to the
- * first 8-10 terms (compactQuery in publicClients/mediaClients). So the opening words are the whole
- * search budget: every filler word spent there is a real search term lost.
- *
- * The first production run of these gaps proved the cost — 367 documents acquired, 186 rejected as
- * not relevant — because the question opened on "What does current, verifiable practice establish
- * about..." and burned most of the budget before reaching any subject matter. It also repeated the
- * topic, which the subject had already contributed.
- *
- * So: lead with the track domain, keep the analytical terms, and carry the evaluation modes and the
- * safety boundary in the gap's evidence instead (trackEvidenceLines already records both) rather
- * than in the text that becomes a search query.
- */
 function studyQuestion(track: CosCurriculumTrack, topic: string): string {
-  return `${track.title}: what mechanisms, evidence, failure modes and verification methods does current practice establish for ${topic}?`
+  return [
+    `What does current, verifiable practice establish about ${topic} within ${track.title.toLowerCase()},`,
+    'including the mechanisms involved, the evidence that distinguishes correct from incorrect approaches,',
+    'the failure modes that appear in real deployments, and how a claim in this area can be checked?',
+    `Study must be evaluated by: ${track.evaluation.join('; ')}.`,
+    `Boundary: ${track.safetyBoundary}`,
+  ].join(' ')
 }
 
 /**

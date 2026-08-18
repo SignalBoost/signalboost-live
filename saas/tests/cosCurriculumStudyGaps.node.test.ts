@@ -33,25 +33,12 @@ test('study gaps are valid gaps the learning pipeline will accept', () => {
   }
 })
 
-// The acquisition query is subject + question truncated to the first 8-10 terms, so the opening
-// words are the entire search budget. Boilerplate there costs real search terms: the first
-// production run acquired 367 documents and rejected 186 as not relevant.
-test('the question spends its opening words on subject matter, not boilerplate', () => {
+test('the question carries the track evaluation mode and safety boundary into the study itself', () => {
   const [gap] = curriculumTrackStudyGaps({ cycleIndex: 0, limit: 1 })
   const track = COS_CORE_CURRICULUM_TRACKS.find(item => gap.evidence.includes(`curriculum_track=${item.id}`))
   assert.ok(track)
-  assert.ok(gap.question.startsWith(track.title), 'the query must open on the track domain')
-  assert.ok(gap.question.includes(gap.subject), 'the studied topic must appear in the question')
-  // The evaluation modes and the safety boundary are recorded in evidence, never in the search text.
-  assert.equal(gap.question.includes(track.safetyBoundary), false)
-  assert.equal(gap.question.includes(track.evaluation.join('; ')), false)
-  assert.ok(gap.evidence.some(line => line.startsWith('curriculum_evaluation=')))
-  assert.ok(gap.evidence.some(line => line.startsWith('curriculum_safety_boundary=')))
-
-  const queryHead = `${gap.subject} ${gap.question}`.split(/\s+/).slice(0, 8).join(' ').toLowerCase()
-  for (const filler of ['what does current', 'verifiable practice establish about']) {
-    assert.equal(queryHead.includes(filler), false, `query budget wasted on "${filler}"`)
-  }
+  assert.ok(gap.question.includes(track.evaluation[0]))
+  assert.ok(gap.question.includes(track.safetyBoundary))
 })
 
 test('the rotation is deterministic and eventually covers every topic', () => {

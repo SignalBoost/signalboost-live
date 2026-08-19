@@ -44,6 +44,29 @@ export function runpodAutoStopEnabled(): boolean {
   return booleanOverride('COS_RUNPOD_AUTO_STOP_ENABLED') !== false
 }
 
+/**
+ * Whether the idle-stop cron may stop a RUNNING pod whose reasoner never became healthy — distinct
+ * from runpodAutoStopEnabled(), and deliberately independent of it.
+ *
+ * ROOT-CAUSED Aug 19 2026: RunPod releases the GPU reservation on the pod's specific host when a Pod
+ * is stopped; if another customer takes that GPU before the pod resumes, the wake fails with "not
+ * enough free GPUs on the host machine" until a matching GPU frees up again. The 10-minute idle
+ * timeout this repo shipped was trading a small hourly saving for exactly that outage, repeatedly.
+ * Disabling COS_RUNPOD_AUTO_STOP_ENABLED stops that timeout from ever firing again.
+ *
+ * But the SAME kill switch used to also disable the orphan guard — the check that stops a pod which
+ * IS running (still billing at the full GPU rate) but whose reasoner has never come up healthy after
+ * a startup grace period. That is a different failure and a different cost: an idle-but-healthy pod
+ * losing its GPU reservation is the host-lock problem above; a running-but-broken pod is just paying
+ * for nothing, indefinitely, until someone notices. Bundling them under one flag meant the fix for
+ * one problem silently removed the guard against the other. Split so each can be set independently;
+ * the orphan guard defaults ON.
+ */
+export function runpodOrphanGuardEnabled(): boolean {
+  if (!runpodLifecycleConfigured() || !runpodLifecycleEnabled()) return false
+  return booleanOverride('COS_RUNPOD_ORPHAN_GUARD_ENABLED') !== false
+}
+
 export type RunpodStartResult = {
   attempted: boolean
   started: boolean

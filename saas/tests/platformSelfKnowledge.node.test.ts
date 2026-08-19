@@ -1,3 +1,4 @@
+// saas/tests/platformSelfKnowledge.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -11,7 +12,7 @@ test('platform self-knowledge is a small versioned set of deterministic code-der
   const timestamp = new Date('2026-08-16T00:00:00.000Z')
   const facts = platformSelfKnowledgeFacts(timestamp)
 
-  assert.equal(facts.length, 6)
+  assert.equal(facts.length, 11)
   assert.equal(new Set(facts.map(fact => fact.id)).size, facts.length)
   assert.equal(new Set(facts.map(fact => `${fact.taskId}:${fact.subject}:${fact.predicate}`)).size, facts.length)
 
@@ -19,7 +20,7 @@ test('platform self-knowledge is a small versioned set of deterministic code-der
     assert.equal(fact.taskId, 'support')
     assert.equal(fact.confidence, 1)
     assert.equal(fact.updatedAt, timestamp)
-    assert.match(fact.source, /^platform-self-knowledge:v2:/)
+    assert.match(fact.source, /^platform-self-knowledge:v3:/)
     assert.ok(fact.object.length >= 120)
   }
 
@@ -30,6 +31,33 @@ test('platform self-knowledge is a small versioned set of deterministic code-der
   assert.match(byPredicate.get('SignalBoost COS RunPod wake governance:background_embedding_lifecycle') || '', /must not wake stopped RunPod compute/i)
   assert.match(byPredicate.get('SignalBoost COS fresh-data routing:fresh_facts_bypass_ordinary_runpod_preflight') || '', /before ordinary RunPod readiness/i)
   assert.match(byPredicate.get('SignalBoost COS RunPod cold-start recovery:bounded_request_owned_retry') || '', /same request started the compute/i)
+
+  const authPolicy = byPredicate.get('SignalBoost COS authorization and escalation policy:fail_closed_approval_boundary') || ''
+  assert.match(authPolicy, /fail closed/i)
+  assert.match(authPolicy, /approval/i)
+  assert.match(authPolicy, /external/i)
+
+  const admission = byPredicate.get('SignalBoost COS knowledge admission:confidence_relevance_durability_gate') || ''
+  assert.match(admission, /high-confidence/i)
+  assert.match(admission, /durable/i)
+  assert.match(admission, /relevance/i)
+
+  const tiered = byPredicate.get('SignalBoost COS tiered learning admission:probationary_corroboration_promotion') || ''
+  assert.match(tiered, /probationary/i)
+  assert.match(tiered, /corroboration/i)
+  assert.match(tiered, /durable/i)
+
+  const provenance = byPredicate.get('SignalBoost COS execution provenance:model_source_cache_disclosure') || ''
+  assert.match(provenance, /provenance/i)
+  assert.match(provenance, /model/i)
+  assert.match(provenance, /source/i)
+  assert.match(provenance, /cache/i)
+
+  const tenantIsolation = byPredicate.get('SignalBoost COS Enterprise Memory tenant isolation:organization_scoped_isolation') || ''
+  assert.match(tenantIsolation, /Enterprise Memory/)
+  assert.match(tenantIsolation, /Semantic Cache/)
+  assert.match(tenantIsolation, /tenant/i)
+  assert.match(tenantIsolation, /isolation/i)
 })
 
 test('versioned self-knowledge claims remain mechanically aligned with implementation', () => {

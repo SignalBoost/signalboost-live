@@ -18,6 +18,8 @@ import {
 } from './cosFreshGrounding'
 import { parseLocalResult } from './reasonerOutput'
 import { generateLocalEmbedding } from './localEmbeddings'
+import { classifyRunpodFailure, runpodCapacityUnavailableReason } from './runpodCapacityError'
+import { configuredRunpodPodId } from './runpodConfig'
 import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
@@ -106,10 +108,6 @@ async function tryFreshCurrentFact(input: {
 }): Promise<COSFirstAnswerResult> {
   const retrievedAt = new Date().toISOString()
   const query = freshEvidenceSearchQuery(input.prompt, new Date(retrievedAt))
-
-  // bypassCache=true is load-bearing: a volatile fact is searched again on every user request.
-  // The result count is deliberately bounded. COS does not keep collecting low-value documents
-  // after enough authoritative evidence exists for deterministic or local synthesis.
   const live = await getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })
   const documentsAcquired = live.ok ? live.results.length : 0
   const sources = live.ok ? prepareFreshEvidence(live.results, FRESH_SELECTED_EVIDENCE_BUDGET) : []
@@ -193,8 +191,6 @@ async function tryFreshCurrentFact(input: {
   const reasoned = await callCosReasoner({
     temperature: 0,
     maxTokens: 1800,
-    // Deliberately does not contain the PRIMARY-reasoner marker, so simple current facts never fan
-    // out into the Cognitive Council.
     systemPrompt: [
       'You are SignalBoost COS live-fact verifier.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
@@ -217,23 +213,13 @@ async function tryFreshCurrentFact(input: {
 
   if (!reasoned?.text) {
     const reason = 'Live evidence was retrieved, but independent local synthesis returned no answer.'
-    return {
-      handled: false,
-      confidence: 0,
-      reason,
-      provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_failed', escalationReason: reason } as any,
-    }
+    return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_failed', escalationReason: reason } as any }
   }
 
   const parsed = parseLocalResult(reasoned.text)
   if (!parsed || parsed.truncated) {
     const reason = 'Live evidence was retrieved, but independent local synthesis was incomplete or unparseable.'
-    return {
-      handled: false,
-      confidence: 0,
-      reason,
-      provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any,
-    }
+    return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }
   }
 
   const citesIndependentEvidence = replyCitesIndependentFreshEvidence(parsed.answer, input.prompt, sources)
@@ -256,12 +242,7 @@ async function tryFreshCurrentFact(input: {
     }
   }
 
-  return {
-    handled: true,
-    reply: parsed.answer,
-    confidence,
-    provenance: { ...provenance, externalAiNecessary: false, escalationReasonCode: null, escalationReason: null } as any,
-  }
+  return { handled: true, reply: parsed.answer, confidence, provenance: { ...provenance, externalAiNecessary: false, escalationReasonCode: null, escalationReason: null } as any }
 }
 
 async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
@@ -286,25 +267,13 @@ export async function tryCOSFirstAnswer(input: {
     return learnFromTurn(input, await tryFreshCurrentFact(input))
   }
 
-  // Ordinary enterprise retrieval has bounded semantic-query budgets. Complete any authorized
-  // RunPod cold-start lifecycle and one shared foreground query embedding before those timers begin.
-  // Subsequent KG/corpus lookups reuse the short-lived embedding cache instead of making duplicate
-  // embedding-model calls inside independent 5-second retrieval races. Under #1224, background and
-  // server-to-server callers still fail closed here; lexical/external fallback remains available.
   if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
     try {
       await ensureLocalInferenceRuntimeReady()
       await generateLocalEmbedding(input.prompt)
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
-      console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({
-        at: new Date().toISOString(),
-        reason,
-      }))
-      // A failed authorized cold-start preflight may have already stopped compute through the
-      // lifecycle fail-safe. Enterprise retrieval still gets its lexical/internal fallbacks, but it
-      // must not inherit the original interactive wake authority and immediately start a second
-      // lifecycle attempt from semantic embedding calls in the same request.
+      console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({ at: new Date().toISOString(), reason }))
       const result = await withRunpodWakePermission({
         allowed: false,
         source: 'background_or_untrusted',
@@ -313,6 +282,12 @@ export async function tryCOSFirstAnswer(input: {
         ageMs: null,
         reason: 'runtime_preflight_failed_no_retry',
       }, () => tryEnterpriseCOSFirstAnswer(input))
+
+      const capacity = classifyRunpodFailure(reason)
+      if (capacity.capacityUnavailable && !result.handled) {
+        const capacityReason = runpodCapacityUnavailableReason({ podId: configuredRunpodPodId(), originalMessage: reason })
+        return learnFromTurn(input, { ...result, reason: capacityReason })
+      }
       return learnFromTurn(input, result)
     }
   }

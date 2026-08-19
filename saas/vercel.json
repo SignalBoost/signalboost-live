@@ -5,6 +5,7 @@
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",
     "COS_LOCAL_FIRST_ENABLED": "true",
+    "COS_RUNPOD_AUTO_STOP_ENABLED": "false",
     "RUNPOD_POD_ID": "yvj6e9zboi7ofo",
     "LOCAL_AI_BASE_URL": "https://yvj6e9zboi7ofo-11434.proxy.runpod.net/v1",
     "LOCAL_AI_ALLOWED_HOSTS": "yvj6e9zboi7ofo-11434.proxy.runpod.net",
@@ -110,10 +111,6 @@
     {
       "path": "/api/cron/outreach-digest",
       "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/cos-runpod-idle-stop",
-      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/cos-learning-continuity",

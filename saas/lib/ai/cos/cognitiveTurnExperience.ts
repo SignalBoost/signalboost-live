@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
+import { recordCapabilityFailure, type CapabilityFailureKind } from '@/lib/ai/cos/benchmarkCuration'
 
 export type CosTurnLearningProvenance = {
   responseSource?: string | null
@@ -71,6 +72,37 @@ function sourceKindFor(route: CosTurnExperienceDecision['routeClass']): string {
   if (route === 'fresh') return 'cos_live_verification'
   if (route === 'external_required') return 'cos_local_escalation'
   return 'cos_runtime'
+}
+
+function benchmarkFailureKind(input: CosTurnExperienceInput): CapabilityFailureKind {
+  const code = clean(input.provenance?.escalationReasonCode, 160).toLowerCase()
+  const reason = clean(input.failureReason || input.provenance?.escalationReason, 600).toLowerCase()
+  const combined = `${code} ${reason}`
+  if (combined.includes('timeout') || combined.includes('expired')) return 'timeout_retry'
+  if (combined.includes('schema') || combined.includes('pgrst')) return 'schema_error'
+  if (combined.includes('tool')) return 'tool_error'
+  if (Number(input.confidence || 0) < 0.72) return 'low_confidence'
+  return 'unhandled_error'
+}
+
+async function captureFailedTurnForBenchmark(input: CosTurnExperienceInput, decision: CosTurnExperienceDecision): Promise<void> {
+  if (decision.acceptedByCosGate) return
+  const meaningfulFailure = decision.routeClass === 'external_required' || Boolean(input.failureReason) || Number(input.confidence || 0) < 0.72
+  if (!meaningfulFailure) return
+  try {
+    await recordCapabilityFailure({
+      prompt: input.prompt,
+      track: decision.subject,
+      failureKind: benchmarkFailureKind(input),
+      requiresLocalReasoning: input.provenance?.localModelInvoked !== false,
+      sourceMetadata: {
+        source: 'cos_turn_experience',
+        route: decision.routeClass,
+      },
+    })
+  } catch (error) {
+    console.warn('[cos-turn-learning] failed to queue benchmark candidate', error)
+  }
 }
 
 /**
@@ -154,6 +186,10 @@ export function decideCosTurnExperience(input: CosTurnExperienceInput): CosTurnE
 export async function recordCosTurnExperience(input: CosTurnExperienceInput): Promise<{ stored: boolean; repeated: boolean; decision: CosTurnExperienceDecision }> {
   const decision = decideCosTurnExperience(input)
   if (!decision.eligible) return { stored: false, repeated: false, decision }
+
+  // Keep benchmark curation independent from episodic-memory persistence. If either store has a
+  // transient problem the other can still succeed, and real COS failures remain useful learning data.
+  await captureFailedTurnForBenchmark(input, decision)
 
   const db = cosServiceDb()
   if (!db) return { stored: false, repeated: false, decision }

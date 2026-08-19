@@ -110,6 +110,10 @@
     {
       "path": "/api/cron/cos-runpod-idle-stop",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-learning-continuity",
+      "schedule": "45 7 * * *"
     }
   ]
 }

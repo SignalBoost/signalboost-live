@@ -26,6 +26,7 @@ import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
 import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 
 export const runtime = 'nodejs'
@@ -84,6 +85,12 @@ export async function POST(request: NextRequest) {
   let reasonerError = ''
   let passed = 0
   let attempted = 0
+  // A run that could not reach the reasoner is not a capability measurement, and recording it as
+  // 0/2 is worse than recording nothing: it is indistinguishable from COS reasoning badly, and it
+  // drags the visible pass rate down for as long as the GPU is unavailable. Aug 19 2026 produced a
+  // full day of 0% that meant "no free GPU on the host", not "COS got the answers wrong".
+  let blockedVerdict: string | null = null
+  let blockedSummary = ''
   try {
     await withRunpodWakePermission(ownerWakePermission, async () => {
       try {
@@ -92,6 +99,16 @@ export async function POST(request: NextRequest) {
         reasonerReady = false
         reasonerError = errorText(error).slice(0, 600)
         console.warn('[cos-capability-benchmark] reasoner readiness failed; results will reflect run conditions, not capability:', reasonerError)
+      }
+
+      // PRE-FLIGHT. Ask the reasoner one 16-token question before scoring anything. This costs a
+      // second and buys the difference between "COS failed the test" and "there was nothing to test".
+      const probe = await probeReasoner()
+      if (probe.verdict !== 'ok') {
+        blockedVerdict = probe.verdict
+        blockedSummary = probe.summary.slice(0, 1200)
+        console.warn('[cos-capability-benchmark] blocked before scoring:', blockedVerdict, blockedSummary)
+        return
       }
 
       for (const row of selected) {
@@ -108,6 +125,15 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    if (blockedVerdict) {
+      // Recorded as 'failed', never 'completed': failed runs are excluded from the rotation counter
+      // and read on the dashboard as a run that did not happen, which is exactly what it was.
+      const blockedError = `Reasoner unavailable (${blockedVerdict}) — no cases were scored. ${blockedSummary}`
+      await db.from('cos_capability_benchmark_runs').update({ status: 'failed', completed_at: new Date().toISOString(), attempted: 0, passed: 0, error: blockedError.slice(0, 2000) }).eq('id', run.data.id)
+      return NextResponse.json({ ok: false, runId: run.data.id, blocked: true, verdict: blockedVerdict, error: blockedError, reasonerReady, reasonerError: reasonerError || undefined, next: 'GET /api/admin/cos-reasoner/diagnose for the full probe.' }, { status: 503 })
+    }
+
     await db.from('cos_capability_benchmark_runs').update({ status: 'completed', completed_at: new Date().toISOString(), attempted, passed }).eq('id', run.data.id)
     return NextResponse.json({ ok: true, runId: run.data.id, attempted, passed, passRate: attempted ? passed / attempted : 0, reasonerReady, reasonerError: reasonerError || undefined })
   } catch (error) {

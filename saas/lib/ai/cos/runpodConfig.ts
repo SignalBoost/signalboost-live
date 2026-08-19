@@ -8,8 +8,10 @@ export function explicitRunpodPodId(): string | null {
 
 /**
  * The standard RunPod proxy host is <pod-id>-<port>.proxy.runpod.net.
- * LOCAL_AI_BASE_URL already has to point at that host for the COS reasoner, so requiring the
- * same pod id a second time is unnecessary and can silently disable lifecycle cost control.
+ * LOCAL_AI_BASE_URL is the endpoint COS actually health-checks and invokes, so when it carries a
+ * RunPod pod id that id is authoritative for lifecycle control too. Otherwise COS can resume one
+ * pod via RUNPOD_POD_ID while probing a different/stale proxy URL and spend the whole cold-start
+ * budget waiting on HTTP 404s from the wrong endpoint.
  */
 export function deriveRunpodPodIdFromLocalAiBaseUrl(value = process.env.LOCAL_AI_BASE_URL || ''): string | null {
   if (!value.trim()) return null
@@ -22,8 +24,24 @@ export function deriveRunpodPodIdFromLocalAiBaseUrl(value = process.env.LOCAL_AI
   }
 }
 
+let mismatchLogged = false
+
 export function configuredRunpodPodId(): string | null {
-  return explicitRunpodPodId() || deriveRunpodPodIdFromLocalAiBaseUrl()
+  const derived = deriveRunpodPodIdFromLocalAiBaseUrl()
+  const explicit = explicitRunpodPodId()
+
+  if (derived && explicit && derived !== explicit && !mismatchLogged) {
+    mismatchLogged = true
+    console.warn('[cos-runpod-config-mismatch]', JSON.stringify({
+      at: new Date().toISOString(),
+      explicitPodId: explicit,
+      endpointPodId: derived,
+      selectedPodId: derived,
+      reason: 'LOCAL_AI_BASE_URL is authoritative because it is the endpoint COS actually invokes',
+    }))
+  }
+
+  return derived || explicit
 }
 
 export function runpodControlConfigured(): boolean {

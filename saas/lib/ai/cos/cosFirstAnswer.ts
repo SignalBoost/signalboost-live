@@ -284,9 +284,16 @@ export async function tryCOSFirstAnswer(input: {
       }, () => tryEnterpriseCOSFirstAnswer(input))
 
       const capacity = classifyRunpodFailure(reason)
-      if (capacity.capacityUnavailable && !result.handled) {
+      if (capacity.capacityUnavailable && result.handled === false) {
         const capacityReason = runpodCapacityUnavailableReason({ podId: configuredRunpodPodId(), originalMessage: reason })
-        return learnFromTurn(input, { ...result, reason: capacityReason })
+        const failedResult: COSFirstAnswerResult = {
+          handled: false,
+          confidence: result.confidence,
+          reason: capacityReason,
+          ...('bestEffortReply' in result && result.bestEffortReply ? { bestEffortReply: result.bestEffortReply } : {}),
+          provenance: result.provenance,
+        }
+        return learnFromTurn(input, failedResult)
       }
       return learnFromTurn(input, result)
     }

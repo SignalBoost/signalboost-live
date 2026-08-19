@@ -6,115 +6,39 @@
     "COS_LIVE_SOURCES_ENABLED": "true",
     "COS_LOCAL_FIRST_ENABLED": "true",
     "COS_RUNPOD_AUTO_STOP_ENABLED": "false",
+    "COS_RUNPOD_ORPHAN_GUARD_ENABLED": "true",
     "RUNPOD_POD_ID": "yvj6e9zboi7ofo",
     "LOCAL_AI_BASE_URL": "https://yvj6e9zboi7ofo-11434.proxy.runpod.net/v1",
     "LOCAL_AI_ALLOWED_HOSTS": "yvj6e9zboi7ofo-11434.proxy.runpod.net",
     "LOCAL_AI_MODEL": "qwen2.5-coder:32b"
   },
   "crons": [
-    {
-      "path": "/api/cron/opportunity-scan",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/batch-poll",
-      "schedule": "10 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-video-poll",
-      "schedule": "*/20 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-video-queue-recovery",
-      "schedule": "7 * * * *"
-    },
-    {
-      "path": "/api/cron/cyber-dependency-monitor",
-      "schedule": "15 8 * * *"
-    },
-    {
-      "path": "/api/hub/cyber/prepare-github-pr",
-      "schedule": "20 */6 * * *"
-    },
-    {
-      "path": "/api/cron/cos-mining",
-      "schedule": "30 6 * * *"
-    },
-    {
-      "path": "/api/cron/cos-knowledge-promotion",
-      "schedule": "15 7 * * *"
-    },
-    {
-      "path": "/api/cron/cos-mining?job=weekly",
-      "schedule": "0 5 * * 0"
-    },
-    {
-      "path": "/api/cron/marketing-sales-director",
-      "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/cron/marketing-sales-video",
-      "schedule": "12 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-brand-video",
-      "schedule": "22 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-campaign-measure",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/cos-brand-dispatch",
-      "schedule": "32 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-governance-watchdog",
-      "schedule": "42 */2 * * *"
-    },
-    {
-      "path": "/api/cron/cos-autonomy",
-      "schedule": "17 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-engineering-missions",
-      "schedule": "27 * * * *"
-    },
-    {
-      "path": "/api/cron/cos-auto-publish-exact",
-      "schedule": "52 */2 * * *"
-    },
-    {
-      "path": "/api/cron/vercel-observation",
-      "schedule": "2 */2 * * *"
-    },
-    {
-      "path": "/api/cron/native-proactive-monitoring",
-      "schedule": "5,35 * * * *"
-    },
-    {
-      "path": "/api/cron/audit-approved-remediation",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/prospect-campaign",
-      "schedule": "37 */2 * * *"
-    },
-    {
-      "path": "/api/cron/press-campaign",
-      "schedule": "47 */6 * * *"
-    },
-    {
-      "path": "/api/cron/business-intelligence-corpus-populate",
-      "schedule": "57 * * * *"
-    },
-    {
-      "path": "/api/cron/outreach-digest",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/cos-learning-continuity",
-      "schedule": "45 7 * * *"
-    }
+    { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/batch-poll", "schedule": "10 * * * *" },
+    { "path": "/api/cron/cos-video-poll", "schedule": "*/20 * * * *" },
+    { "path": "/api/cron/cos-video-queue-recovery", "schedule": "7 * * * *" },
+    { "path": "/api/cron/cyber-dependency-monitor", "schedule": "15 8 * * *" },
+    { "path": "/api/hub/cyber/prepare-github-pr", "schedule": "20 */6 * * *" },
+    { "path": "/api/cron/cos-mining", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/cos-knowledge-promotion", "schedule": "15 7 * * *" },
+    { "path": "/api/cron/cos-mining?job=weekly", "schedule": "0 5 * * 0" },
+    { "path": "/api/cron/marketing-sales-director", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/marketing-sales-video", "schedule": "12 * * * *" },
+    { "path": "/api/cron/cos-brand-video", "schedule": "22 * * * *" },
+    { "path": "/api/cron/cos-campaign-measure", "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/cos-brand-dispatch", "schedule": "32 * * * *" },
+    { "path": "/api/cron/cos-governance-watchdog", "schedule": "42 */2 * * *" },
+    { "path": "/api/cron/cos-autonomy", "schedule": "17 * * * *" },
+    { "path": "/api/cron/cos-engineering-missions", "schedule": "27 * * * *" },
+    { "path": "/api/cron/cos-auto-publish-exact", "schedule": "52 */2 * * *" },
+    { "path": "/api/cron/vercel-observation", "schedule": "2 */2 * * *" },
+    { "path": "/api/cron/native-proactive-monitoring", "schedule": "5,35 * * * *" },
+    { "path": "/api/cron/audit-approved-remediation", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/prospect-campaign", "schedule": "37 */2 * * *" },
+    { "path": "/api/cron/press-campaign", "schedule": "47 */6 * * *" },
+    { "path": "/api/cron/business-intelligence-corpus-populate", "schedule": "57 * * * *" },
+    { "path": "/api/cron/outreach-digest", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/cos-runpod-idle-stop", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/cos-learning-continuity", "schedule": "45 7 * * *" }
   ]
 }

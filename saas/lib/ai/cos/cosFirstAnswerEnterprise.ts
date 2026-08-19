@@ -1,6 +1,8 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { createHash } from 'node:crypto'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
+import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
 import { loadUserMemories } from '@/lib/ai/tools/userMemory'
 import { cosServiceDb, SupabaseAIROIMetricsSink, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
@@ -282,7 +284,6 @@ function enterpriseCandidateText(item:any):string {
     safeText(item?.payload, 1800),
   ].filter(Boolean).join(' ')
 }
-
 export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
   return [
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
@@ -551,9 +552,7 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
       const item = candidate.item
       memories.push(`[EM${memories.length + 1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)
     }
-  }
-
-  const cognitive = await retrieveValidatedCognitiveSkills(prompt).catch(error => {
+  }const cognitive = await retrieveValidatedCognitiveSkills(prompt).catch(error => {
     console.warn('[cos-cognitive-skill-context] ranking failed', error)
     return { retrieved:0, relevant:0, selected:0, items:[] }
   })
@@ -673,6 +672,10 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     context.skills.length ? `VALIDATED COGNITIVE PROCEDURAL SKILLS (HOW-TO GUIDANCE, NOT FACTUAL EVIDENCE):\n${context.skills.join('\n')}` : '',
   ].filter(Boolean).join('\n\n')
 
+  // Captured outside the .catch() so the failure path below can distinguish a RunPod capacity
+  // exhaustion from every other way a reasoner call can fail, instead of collapsing all of them
+  // into one generic "did not return an answer" message with the real cause visible only in logs.
+  let reasonerFailureMessage: string | null = null
   const reasoned = await callCosReasoner({
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
@@ -683,10 +686,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission
     // denied mid-call — produced the identical generic "did not return an answer" message with zero
     // way to tell those apart from Vercel logs. Log the real error and elapsed time before discarding it.
+    reasonerFailureMessage = error instanceof Error ? error.message : String(error)
     console.error('[cos-first-answer-reasoner-failed]', JSON.stringify({
       at: new Date().toISOString(),
       elapsedMs: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
+      error: reasonerFailureMessage,
       errorName: error instanceof Error ? error.name : null,
     }))
     return null
@@ -700,7 +704,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     cognitiveSkillFunnel:executionSkillFunnel(context, true),
   }
   if (!reasoned?.text) {
-    const reason = 'Independent COS inference did not return an answer.'
+    // The one case this exists for: RunPod had no free GPU to start the pod. Everything else keeps
+    // the exact prior wording, since escalationReason() in cosOrchestrationEnterprise.ts regex-matches
+    // it into the 'local_reasoner_no_answer' code and nothing else should silently change that mapping.
+    const capacity = reasonerFailureMessage ? classifyRunpodFailure(reasonerFailureMessage) : null
+    const reason = capacity?.capacityUnavailable
+      ? runpodCapacityUnavailableReason({ podId: configuredRunpodPodId(), originalMessage: reasonerFailureMessage! })
+      : 'Independent COS inference did not return an answer.'
     void recordKnowledgeGap(input.prompt, 0, reason)
     return { handled:false, confidence:0, reason, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
   }

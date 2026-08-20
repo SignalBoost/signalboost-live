@@ -1,4 +1,5 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { localInferenceTargetsRunpod } from '@/lib/ai/cos/runpodConfig'
 
 const LEASE_MISSION_ID = '__cos_runpod_local_compute__'
 const DEFAULT_LEASE_MS = 15 * 60_000
@@ -10,11 +11,13 @@ function leaseMs(): number {
 }
 
 /**
- * Mark legitimate local GPU work before it begins. The autonomy-state row is the explicit durable
- * lease; the zero-cost ROI timeline marker intentionally shares the existing owner-visible activity
- * clock used by the idle-stop cron, so current Qwen/learning work cannot be mistaken for old idleness.
+ * Mark legitimate RunPod GPU work before it begins. Once LOCAL_AI_BASE_URL points at another
+ * OpenAI-compatible provider, this becomes a no-op: a DeepInfra/Fireworks/customer-vLLM request is
+ * not RunPod activity and must not refresh a stale RunPod lease or distort the owner-visible cost
+ * clock.
  */
 export async function touchRunpodActivityLease(reason: string): Promise<void> {
+  if (!localInferenceTargetsRunpod()) return
   const db = cosServiceDb()
   if (!db) return
   const now = Date.now()

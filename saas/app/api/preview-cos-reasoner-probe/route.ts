@@ -2,14 +2,17 @@
 // Never expose credentials or reasoning traces. This endpoint exists only on the dedicated Preview branch.
 import { NextResponse } from 'next/server'
 import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
-import { LOCAL_EMBEDDING_DIMENSIONS } from '@/lib/ai/cos/localEmbeddings'
+import {
+  embeddingEndpointIsSeparate,
+  embeddingInferenceConfig,
+  LOCAL_EMBEDDING_DIMENSIONS,
+} from '@/lib/ai/cos/localEmbeddings'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
 
 const CHECK_TIMEOUT_MS = 8_000
-const EMBEDDING_CANDIDATE = 'BAAI/bge-base-en-v1.5'
 
 function authHeaders(apiKey?: string): Record<string, string> {
   return apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {}
@@ -30,9 +33,11 @@ export async function GET() {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
-  let config
+  let reasonerConfig
+  let embeddingConfig
   try {
-    config = localInferenceConfigFromEnv()
+    reasonerConfig = localInferenceConfigFromEnv()
+    embeddingConfig = embeddingInferenceConfig()
   } catch (error) {
     return NextResponse.json({
       ok: false,
@@ -44,14 +49,14 @@ export async function GET() {
   const reasonerStartedAt = Date.now()
   const reasonerPromise = (async () => {
     try {
-      const response = await fetchBounded(`${config.baseUrl}/chat/completions`, {
+      const response = await fetchBounded(`${reasonerConfig.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...authHeaders(config.apiKey),
+          ...authHeaders(reasonerConfig.apiKey),
         },
         body: JSON.stringify({
-          model: config.model,
+          model: reasonerConfig.model,
           max_tokens: 256,
           temperature: 0,
           reasoning_effort: 'none',
@@ -101,19 +106,18 @@ export async function GET() {
     }
   })()
 
-  // Candidate-only embedding test. Do not alter COS embedding configuration until this proves 768 dimensions.
   const embeddingStartedAt = Date.now()
   const embeddingPromise = (async () => {
     try {
-      const response = await fetchBounded(`${config.baseUrl}/embeddings`, {
+      const response = await fetchBounded(`${embeddingConfig.baseUrl}/embeddings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...authHeaders(config.apiKey),
+          ...authHeaders(embeddingConfig.apiKey),
         },
         body: JSON.stringify({
-          model: EMBEDDING_CANDIDATE,
-          input: 'COS embedding migration acceptance check',
+          model: embeddingConfig.model,
+          input: 'COS configured embedding runtime acceptance check',
           encoding_format: 'float',
         }),
       })
@@ -127,10 +131,12 @@ export async function GET() {
         ok: response.ok && dimensions === LOCAL_EMBEDDING_DIMENSIONS,
         httpStatus: response.status,
         latencyMs: Date.now() - embeddingStartedAt,
-        model: EMBEDDING_CANDIDATE,
+        model: embeddingConfig.model,
         dimensions,
         requiredDimensions: LOCAL_EMBEDDING_DIMENSIONS,
-        baseUrl: config.baseUrl,
+        separateEndpoint: embeddingEndpointIsSeparate(),
+        baseUrl: embeddingConfig.baseUrl,
+        apiKeyPresent: Boolean(embeddingConfig.apiKey),
         bodyExcerpt: response.ok ? null : raw.replace(/\s+/g, ' ').slice(0, 500),
       }
     } catch (error) {
@@ -138,30 +144,32 @@ export async function GET() {
         ok: false,
         httpStatus: null,
         latencyMs: Date.now() - embeddingStartedAt,
-        model: EMBEDDING_CANDIDATE,
+        model: embeddingConfig.model,
         dimensions: null,
         requiredDimensions: LOCAL_EMBEDDING_DIMENSIONS,
-        baseUrl: config.baseUrl,
+        separateEndpoint: embeddingEndpointIsSeparate(),
+        baseUrl: embeddingConfig.baseUrl,
+        apiKeyPresent: Boolean(embeddingConfig.apiKey),
         error: error instanceof Error ? error.message : String(error),
       }
     }
   })()
 
-  const [completion, embeddingCandidate] = await Promise.all([reasonerPromise, embeddingPromise])
-  const ok = completion.ok === true && embeddingCandidate.ok === true
+  const [completion, embeddings] = await Promise.all([reasonerPromise, embeddingPromise])
+  const ok = completion.ok === true && embeddings.ok === true
 
   return NextResponse.json({
     ok,
     previewOnly: true,
     reasoner: {
-      baseUrl: config.baseUrl,
-      model: config.model,
-      apiKeyPresent: Boolean(config.apiKey),
+      baseUrl: reasonerConfig.baseUrl,
+      model: reasonerConfig.model,
+      apiKeyPresent: Boolean(reasonerConfig.apiKey),
       completion,
     },
-    embeddingCandidate,
+    embeddings,
     note: ok
-      ? 'DeepInfra reasoner and 768-dimension embedding candidate both passed. Safe to configure Preview embedding model next.'
-      : 'No COS learning writes should run on this Preview until both checks pass.',
+      ? 'Configured DeepInfra reasoner and COS 768-dimension embedding runtime both passed.'
+      : 'No COS learning writes should run on this Preview until both configured runtime checks pass.',
   }, { status: ok ? 200 : 503 })
 }

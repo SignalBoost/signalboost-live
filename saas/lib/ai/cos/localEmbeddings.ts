@@ -11,7 +11,7 @@
 // provider migration — repoint LOCAL_AI_BASE_URL at a per-token inference host that serves chat
 // models but no 768-dimension embedding model, and completions look perfectly healthy while every
 // embedding call fails validateVector(). The semantic cache and learned-corpus retrieval stop
-// working, which means LEARNING stops working, with no error anywhere near the actual cause.
+// working, which means LEARNING stops working, with no error anywhere near the real cause.
 //
 // The two workloads have genuinely different requirements and belong on separate dials:
 //   - the reasoner is swappable by design; the whole point is that any capable model can serve it
@@ -41,6 +41,7 @@ const MAX_PULL_TIMEOUT_MS = 90_000
 const REPAIR_FAILURE_COOLDOWN_MS = 5 * 60_000
 const DEFAULT_FOREGROUND_QUERY_CACHE_TTL_MS = 30_000
 const MAX_FOREGROUND_QUERY_CACHE_ENTRIES = 64
+const MAX_EMBEDDING_WINDOW_RETRIES = 5
 
 let repairPromise: Promise<void> | null = null
 let lastRepairFailureAt = 0
@@ -153,6 +154,90 @@ async function requestEmbeddings(texts: string[], config: LocalInferenceConfig, 
   }
 }
 
+function embeddingContextWindowError(attempt: EmbeddingAttempt): attempt is EmbeddingFailure {
+  if (!('status' in attempt) || attempt.status !== 400) return false
+  const body = attempt.body.toLowerCase()
+  return body.includes('input tokens') && (body.includes('context length') || body.includes('maximum input length'))
+}
+
+function parseEmbeddingWindow(body: string): { passed: number | null; limit: number | null } {
+  const passedMatch = body.match(/passed\s+(\d+)\s+input tokens/i)
+  const contextMatch = body.match(/context length is only\s+(\d+)\s+tokens/i)
+  const maxInputMatch = body.match(/maximum input length of\s+(\d+)\s+tokens/i)
+  const passed = passedMatch ? Number(passedMatch[1]) : null
+  const limit = contextMatch ? Number(contextMatch[1]) : maxInputMatch ? Number(maxInputMatch[1]) : null
+  return {
+    passed: Number.isFinite(passed) ? passed : null,
+    limit: Number.isFinite(limit) ? limit : null,
+  }
+}
+
+function shrinkEmbeddingInput(text: string, body: string): string {
+  const { passed, limit } = parseEmbeddingWindow(body)
+  let ratio = 0.75
+  if (passed && limit && passed > limit) {
+    // Leave a small token margin so tokenizer-boundary differences do not produce a 512/513 loop.
+    ratio = Math.max(0.2, Math.min(0.95, (Math.max(1, limit - 8)) / passed))
+  }
+  let targetChars = Math.max(96, Math.floor(text.length * ratio))
+  if (targetChars >= text.length) targetChars = Math.max(1, text.length - 16)
+  if (targetChars >= text.length) return text
+
+  const marker = '\n…\n'
+  if (targetChars <= marker.length + 16) return text.slice(0, targetChars)
+  const available = targetChars - marker.length
+  const headChars = Math.max(8, Math.floor(available * 0.6))
+  const tailChars = Math.max(8, available - headChars)
+  return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`
+}
+
+async function requestSingleEmbeddingWindowSafe(
+  text: string,
+  config: LocalInferenceConfig,
+  model: string,
+  initial?: EmbeddingAttempt,
+): Promise<EmbeddingAttempt> {
+  let current = text
+  let attempt = initial ?? await requestEmbeddings([current], config, model)
+  for (let retry = 0; retry < MAX_EMBEDDING_WINDOW_RETRIES && embeddingContextWindowError(attempt); retry += 1) {
+    const next = shrinkEmbeddingInput(current, attempt.body)
+    if (next === current) return attempt
+    console.info('[cos-embedding-input-truncated]', JSON.stringify({
+      at: new Date().toISOString(),
+      model,
+      retry: retry + 1,
+      originalChars: text.length,
+      previousChars: current.length,
+      nextChars: next.length,
+      reason: 'provider_context_window',
+    }))
+    current = next
+    attempt = await requestEmbeddings([current], config, model)
+  }
+  return attempt
+}
+
+async function requestEmbeddingsWindowSafe(texts: string[], config: LocalInferenceConfig, model: string): Promise<EmbeddingAttempt> {
+  const initial = await requestEmbeddings(texts, config, model)
+  if (!embeddingContextWindowError(initial)) return initial
+
+  if (texts.length === 1) {
+    return requestSingleEmbeddingWindowSafe(texts[0], config, model, initial)
+  }
+
+  // A batch response does not reliably identify which item overflowed. Retry each item separately;
+  // only the overlong items are shortened, and vector ordering remains identical to the input order.
+  const vectors: number[][] = []
+  for (const text of texts) {
+    const single = await requestSingleEmbeddingWindowSafe(text, config, model)
+    if ('status' in single) return single
+    const vector = single.vectors[0]
+    if (!vector) throw new Error('localEmbeddings: window-safe retry returned no embedding vector')
+    vectors.push(vector)
+  }
+  return { ok: true, vectors }
+}
+
 function missingModelError(attempt: EmbeddingAttempt, model: string): boolean {
   if (!('status' in attempt) || attempt.status !== 404) return false
   const body = attempt.body.toLowerCase()
@@ -238,7 +323,7 @@ async function requestCompatibleEmbeddings(
   config: LocalInferenceConfig,
   model: string,
 ): Promise<{ attempt: EmbeddingAttempt; transport: EmbeddingTransport }> {
-  const openAiAttempt = await requestEmbeddings(texts, config, model)
+  const openAiAttempt = await requestEmbeddingsWindowSafe(texts, config, model)
   if (!openAiEmbeddingEndpointUnavailable(openAiAttempt, config, model)) {
     return { attempt: openAiAttempt, transport: 'openai' }
   }

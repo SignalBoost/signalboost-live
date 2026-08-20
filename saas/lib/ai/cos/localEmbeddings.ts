@@ -1,18 +1,40 @@
 // saas/lib/ai/cos/localEmbeddings.ts
 //
-// Local semantic-cache embeddings share the same secured Ollama/RunPod endpoint as
-// the independent COS reasoner. The pgvector schema is intentionally fixed at 768
-// dimensions for nomic-embed-text; model swaps must migrate the database rather than
-// pad/truncate vectors and silently corrupt cosine similarity.
+// Semantic-cache embeddings. The pgvector schema is intentionally fixed at 768 dimensions for
+// nomic-embed-text; model swaps must migrate the database rather than pad/truncate vectors and
+// silently corrupt cosine similarity.
+//
+// EMBEDDINGS NO LONGER RIDE THE REASONER'S ENDPOINT BY FORCE (Aug 20 2026).
+//
+// They used to: this module called localInferenceConfigFromEnv() directly, so LOCAL_AI_BASE_URL
+// pointed both the reasoner and the embedder at the same host. That coupling is a trap during any
+// provider migration — repoint LOCAL_AI_BASE_URL at a per-token inference host that serves chat
+// models but no 768-dimension embedding model, and completions look perfectly healthy while every
+// embedding call fails validateVector(). The semantic cache and learned-corpus retrieval stop
+// working, which means LEARNING stops working, with no error anywhere near the actual cause.
+//
+// The two workloads have genuinely different requirements and belong on separate dials:
+//   - the reasoner is swappable by design; the whole point is that any capable model can serve it
+//   - the embedder is PINNED by the database — 768 dims, or migrate and re-embed the corpus
+//
+// So embeddings now resolve their own endpoint via embeddingInferenceConfig(), which falls back to
+// the reasoner's config when unset. Behaviour is IDENTICAL until someone sets the new variables,
+// so this is a no-op for the current deployment and an escape hatch for the migration.
 
 import { createHash } from 'node:crypto'
 import { ensureLocalInferenceRuntimeReady, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import type { LocalInferenceConfig } from '@/lib/ai/local-inference'
 import type { EmbeddingGenerator } from '@/lib/cos-core/layers/knowledge/types'
+import {
+  LOCAL_EMBEDDING_DIMENSIONS as EMBEDDING_DIMENSIONS,
+  embeddingEndpointIsSeparate as isSeparateEmbeddingEndpoint,
+  embeddingModelName,
+  resolveEmbeddingConfig,
+} from '@/lib/ai/cos/embeddingEndpoint'
 
-/** nomic-embed-text's real output size. Must match cos_knowledge_records vector(768). */
-export const LOCAL_EMBEDDING_DIMENSIONS = 768
-export const DEFAULT_LOCAL_EMBEDDING_MODEL = 'nomic-embed-text'
+// Re-exported so existing importers keep working; the definitions live in the alias-free module
+// so they can be unit-tested without the Next.js path alias.
+export { LOCAL_EMBEDDING_DIMENSIONS, DEFAULT_LOCAL_EMBEDDING_MODEL, embeddingEndpointIsSeparate } from '@/lib/ai/cos/embeddingEndpoint'
 
 const DEFAULT_PULL_TIMEOUT_MS = 60_000
 const MAX_PULL_TIMEOUT_MS = 90_000
@@ -35,7 +57,16 @@ function authHeaders(apiKey?: string): Record<string, string> {
 }
 
 function embeddingModel(): string {
-  return (process.env.LOCAL_AI_EMBEDDING_MODEL || DEFAULT_LOCAL_EMBEDDING_MODEL).trim()
+  return embeddingModelName()
+}
+
+/**
+ * Where embedding requests go. Defaults to the reasoner's endpoint so nothing changes until
+ * LOCAL_AI_EMBEDDING_BASE_URL is set. Decision logic lives in embeddingEndpoint.ts (alias-free,
+ * unit-tested); this only supplies the reasoner config it builds on.
+ */
+export function embeddingInferenceConfig(): LocalInferenceConfig {
+  return resolveEmbeddingConfig(localInferenceConfigFromEnv())
 }
 
 function foregroundQueryCacheTtlMs(): number {
@@ -47,7 +78,9 @@ function foregroundQueryCacheTtlMs(): number {
 function foregroundQueryCacheKey(text: string): string {
   return createHash('sha256')
     .update([
-      String(process.env.LOCAL_AI_BASE_URL || '').trim().toLowerCase(),
+      // The EMBEDDING endpoint, not the reasoner's — otherwise moving the reasoner would silently
+      // invalidate (or worse, wrongly reuse) cached vectors produced by a different embedder.
+      embeddingInferenceConfig().baseUrl.toLowerCase(),
       embeddingModel(),
       text,
     ].join('\n'))
@@ -74,10 +107,10 @@ type EmbeddingFailure = Extract<EmbeddingAttempt, { ok: false }>
 type EmbeddingTransport = 'openai' | 'native'
 
 function validateVector(vector: number[], model: string): number[] {
-  if (vector.length !== LOCAL_EMBEDDING_DIMENSIONS) {
+  if (vector.length !== EMBEDDING_DIMENSIONS) {
     throw new Error(
       `localEmbeddings: model "${model}" returned a ${vector.length}-dimension vector, ` +
-        `but cos_knowledge_records.embedding is vector(${LOCAL_EMBEDDING_DIMENSIONS}). ` +
+        `but cos_knowledge_records.embedding is vector(${EMBEDDING_DIMENSIONS}). ` +
         'Either set LOCAL_AI_EMBEDDING_MODEL back to a 768-dimension model, or run a ' +
         'migration to resize the column and the cos_match_knowledge RPC to match.',
     )
@@ -279,7 +312,7 @@ async function pullEmbeddingModel(config: LocalInferenceConfig, model: string): 
 export async function generateLocalEmbeddings(texts: string[]): Promise<number[][]> {
   const normalized = texts.map(text => String(text ?? '').trim())
   if (normalized.length === 0) return []
-  const config = localInferenceConfigFromEnv()
+  const config = embeddingInferenceConfig()
   const model = embeddingModel()
   let { attempt, transport } = await requestCompatibleEmbeddings(normalized, config, model)
 
@@ -308,8 +341,11 @@ export async function generateReadyLocalEmbeddings(texts: string[]): Promise<num
   if (process.env.COS_LOCAL_FIRST_ENABLED === 'false') {
     throw new Error('localEmbeddings: COS local-first is disabled by COS_LOCAL_FIRST_ENABLED')
   }
-  const config = localInferenceConfigFromEnv()
-  await ensureLocalInferenceRuntimeReady(config)
+  // Readiness (RunPod wake) only applies to a self-hosted pod. When embeddings live on a managed
+  // endpoint there is nothing to wake, and calling this would fail on the wake-permission gate.
+  if (!isSeparateEmbeddingEndpoint()) {
+    await ensureLocalInferenceRuntimeReady(localInferenceConfigFromEnv())
+  }
   return generateLocalEmbeddings(normalized)
 }
 
@@ -379,7 +415,7 @@ export const generateReadyLocalEmbedding: EmbeddingGenerator = generateLocalEmbe
 export async function checkLocalEmbeddingHealth(): Promise<{ ok: boolean; model: string; dimensions?: number; error?: string }> {
   const model = embeddingModel()
   try {
-    const config = localInferenceConfigFromEnv()
+    const config = embeddingInferenceConfig()
     const { attempt } = await requestCompatibleEmbeddings(['health check'], config, model)
     if ('status' in attempt) return { ok: false, model, error: `HTTP ${attempt.status} — ${attempt.body}` }
     const vector = validateVector(attempt.vectors[0] ?? [], model)

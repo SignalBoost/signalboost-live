@@ -1,3 +1,4 @@
+// Preview redeploy trigger after LOCAL_AI_API_KEY rotation on 2026-08-20.
 import { NextResponse } from 'next/server'
 import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { embeddingEndpointIsSeparate, embeddingInferenceConfig, LOCAL_EMBEDDING_DIMENSIONS } from '@/lib/ai/cos/localEmbeddings'

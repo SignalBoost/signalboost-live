@@ -2,7 +2,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ensureRunpodReasonerStarted, runpodLifecycleEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
 import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
-import { configuredRunpodApiKey, configuredRunpodPodId, explicitRunpodPodId, deriveRunpodPodIdFromLocalAiBaseUrl } from '@/lib/ai/cos/runpodConfig'
+import { configuredRunpodApiKey, configuredRunpodPodId, explicitRunpodPodId, deriveRunpodPodIdFromLocalAiBaseUrl, localInferenceTargetsRunpod } from '@/lib/ai/cos/runpodConfig'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -50,6 +50,13 @@ function normalizeBaseUrl(value: string): string {
   return url.toString().replace(/\/$/, '')
 }
 function authHeaders(apiKey?: string): Record<string, string> { return apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {} }
+
+function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undefined {
+  const value = process.env.LOCAL_AI_REASONING_EFFORT?.trim().toLowerCase()
+  if (value === 'none' || value === 'low' || value === 'medium' || value === 'high') return value
+  return undefined
+}
+
 export function localInferenceConfigFromEnv(): LocalInferenceConfig {
   const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || 'http://ai-brain:8000/v1'); const model = (process.env.LOCAL_AI_MODEL || '').trim()
   if (!model) throw new Error('LOCAL_AI_MODEL is required when local inference is enabled')
@@ -117,6 +124,9 @@ async function waitForLocalInferenceHealth(config: LocalInferenceConfig, timeout
 /**
  * Shared readiness gate for every consumer of the secured RunPod runtime.
  *
+ * Managed/non-RunPod providers have no lifecycle to wake and therefore bypass this gate entirely;
+ * their availability is established by the actual completion request and by probeReasoner().
+ *
  * CRITICAL COST BOUNDARY: a stopped/unhealthy RunPod may be resumed ONLY inside a request-scoped
  * permission created from a fresh same-origin user interaction. Background jobs, cron handlers,
  * delayed server-to-server calls, stale browser replays and tests have no permission by default and
@@ -129,6 +139,8 @@ async function waitForLocalInferenceHealth(config: LocalInferenceConfig, timeout
  * share one end-to-end readiness budget so model inference and downstream response work remain reserved.
  */
 export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
+  if (!localInferenceTargetsRunpod(config.baseUrl)) return
+
   const readinessStartedAt = Date.now()
   const current = await checkLocalInferenceHealth(config)
   if (current.ok) return
@@ -267,7 +279,22 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     // consume the actual model-call timeout before the request begins.
     timeout = setTimeout(() => controller.abort(), config.timeoutMs)
     inferenceStartedAt = Date.now()
-    const response = await fetch(`${config.baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) }, signal: controller.signal, body: JSON.stringify({ model: config.model, max_tokens: args.maxTokens ?? 2048, temperature: args.temperature ?? 0.2, messages: [{ role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' }, { role: 'user', content: args.prompt }] }) })
+    const reasoningEffort = configuredReasoningEffort()
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: args.maxTokens ?? 2048,
+        temperature: args.temperature ?? 0.2,
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+        messages: [
+          { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
+          { role: 'user', content: args.prompt },
+        ],
+      }),
+    })
     httpStatus = response.status
     if (!response.ok) {
       errorText = `HTTP ${response.status}: ${await response.text()}`

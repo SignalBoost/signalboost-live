@@ -3,135 +3,382 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.11  
-**Updated:** 2026-08-16  
-**Overall engineering progress estimate:** ~98% — not an Enterprise Release Candidate declaration  
-**COS Independence / Autonomous-Intelligence Architecture:** COMPLETE  
-**COS Independent Runtime:** ACTIVE on the current local RunPod reasoner (`qwen2.5-coder:32b`); `qwen3:30b` is the intended durable default but is not yet live on the existing pod  
-**COS Cognitive Learning:** ACTIVE LEARNING / RETENTION / COMPOSITION / METACOGNITION MERGED; NORMAL-TURN EXPERIENCE CAPTURE PARTIALLY PRODUCTION-PROVEN; USER FEEDBACK MERGED WITH PRODUCTION ACCEPTANCE PENDING; VERIFIED PRODUCTION-OUTCOME WIRING IN PR #1259  
-**Marketing & Sales Core Architecture:** COMPLETE  
-**Self-Healing Supervisor:** NATIVE PROACTIVE MONITORING PRODUCTION-VERIFIED; NATIVE INCIDENT → COS → GOVERNED AGENT GATEWAY/MCP LOOP MERGED  
-**Enterprise Release Candidate:** EVIDENCE-BASED — never infer from architecture or a green deployment
+**Version:** 1.12  
+**Updated:** 2026-08-20  
+**Canonical scope:** current engineering / operations handoff; verify live state before acting  
+**Current `main` before PR #1318:** `6fd32c7f4149889b98b4726ac79b7b6435faaf50`  
+**COS provider architecture:** provider-neutral `LOCAL_AI_*` seam; RunPod lifecycle detached automatically when the live reasoner is not RunPod  
+**DeepInfra migration:** end-to-end Preview acceptance PASSED; Production cutover is gated on PR #1318 + Production Vercel environment switch + post-cutover acceptance  
+**COS learning:** active; continuity snapshot is AMBER because all learning gaps are closed, not because retention stopped  
+**Enterprise Release Candidate:** evidence-based only; never infer from a green deployment
+
+> Historical v1.11 detail remains in Git history at the pre-cutover branch base and in the dated handoffs under `docs/`. This file intentionally prioritizes the current operational state so the next engineer or agent does not have to reconcile superseded runtime statements before acting.
 
 ---
 
-## Mandatory first-read rule
+# Mandatory first-read rule
 
-This file is the canonical starting point for every developer, AI coding agent, reviewer, operator, contractor, and infrastructure assistant working on this repository.
+Every developer, AI coding agent, reviewer, operator, contractor, or infrastructure assistant working on this repository must:
 
-1. Read `ONBOARD.md`.
-2. Read `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md` for the current COS continuous-learning / independence program and its exact evidence level.
-3. Read `docs/HANDOFF-2026-08-13.md` for the broader dated engineering takeover state.
-4. For COS active learning, read `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`.
-5. For Self-Healing, read `docs/portables/self-healing-monitoring-current-state-20260813.md`.
-6. Scan current `main`.
-7. Read the exact files related to the task.
-8. Verify implementation/runtime from code and live evidence before diagnosing, changing, or reporting status.
-9. Never report behavior from memory alone.
+1. Read this `ONBOARD.md`.
+2. Read `docs/HANDOFF-COS-DEEPINFRA-2026-08-20.md` for the current reasoner migration/cutover evidence and rollback contract.
+3. Read the exact files related to the task.
+4. Scan current `main` and open PRs before changing anything.
+5. Verify implementation/runtime from code and live evidence before diagnosing or reporting status.
+6. Never report behavior from memory alone.
 
-`AGENTS.md` and `CLAUDE.md` are entry-point summaries. `docs/ONBOARD-full.md` is the deeper historical/operational reference. Current repository evidence and the newest dated handoff win over stale documentation.
+Useful deeper references:
+
+- `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`
+- `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`
+- `docs/HANDOFF-2026-08-13.md`
+- `docs/portables/self-healing-monitoring-current-state-20260813.md`
+- `docs/ONBOARD-full.md`
+
+`AGENTS.md` and `CLAUDE.md` are entry-point summaries. Current repository evidence and the newest dated handoff win over stale documentation.
 
 ---
 
-# 2026-08-16 CURRENT COS LEARNING / INDEPENDENCE OVERRIDE
+# 2026-08-20 CURRENT COS RUNTIME OVERRIDE
 
-The primary COS development objective is now **continuous independence training and capability expansion**: COS must keep learning from normal work and measurably reduce dependence on replaceable external AI teachers without weakening evidence, confidence, safety or approval gates.
+The primary runtime objective is now a **provider-neutral COS-owned reasoning/learning system** that can use a managed open-model runtime without transferring ownership of memory, evidence, governance, skills, outcomes, or learning to that provider.
 
-North-star loop:
+The durable asset is COS. The model/provider is replaceable compute.
 
 ```text
 Observe
-→ Attempt
-→ Measure
-→ Identify Gap
-→ Investigate
-→ Learn
-→ Practice
-→ Validate
-→ Use
+→ Recall / Retrieve
+→ Reason
+→ Act under governance
+→ Verify
 → Measure Outcome
-→ Retain / Strengthen / Weaken / Quarantine
-→ Compose
+→ Learn / Retain / Weaken / Quarantine
 → Repeat
 ```
 
-The underlying model is replaceable compute. **COS is the learner.** The durable asset is COS-owned memory, experiences, facts, procedural skills, metacognitive capability state, outcome history, source/provenance knowledge and governance.
+The current managed open-model migration target is:
 
-PR #1253 (`feat/cos-continuous-independence-learning-20260816`) is merged and has partial production proof. It provides:
+```text
+COS
+→ LOCAL_AI_* OpenAI-compatible transport
+→ DeepInfra
+→ Qwen/Qwen3.6-35B-A3B
+```
 
-- bounded episodic capture of meaningful normal COS turns in `cos_cognitive_experiences`;
-- explicit separation of local reasoning, answer-cache reuse, fresh verification, external-required failure and other runtime routes;
-- no model answer text automatically retained as factual truth;
-- volatile/current requests retain only routing/outcome learning, never the current answer as timeless semantic fact;
-- repeated identical turn outcomes increment occurrence evidence rather than creating unlimited duplicates;
-- owner-only read-only runtime independence report at `/api/admin/cos-learning/independence`;
-- metrics for local accepted work, cache reuse, fresh verification, external-required attempts, teacher interactions, teacher dependency and grounded reuse by problem class;
-- an isolated `COS continuous independence learning` CI gate.
+The word `openai` in DeepInfra's `/v1/openai` URL is a protocol-compatibility path. It does **not** mean OpenAI supplies the model, compute, account, API key, or billing.
 
-PR #1255 added governed explicit helpful / not-helpful / correction feedback as episodic learning evidence and was merged as `429bfd5a750ba7c6804cb13773bc0a4708cc0f7c`. Production acceptance of real feedback events remains pending; do not infer it from merge/deploy status alone.
+Embedding path validated for the existing 768-dimensional COS schema:
 
-Current increment PR #1259 (`feat/cos-verified-production-outcomes-20260816`) adds a generic, idempotent verified production/business outcome recorder, wires the already-authoritative Self-Healing tool/read-back and exact Vercel terminal-verification paths into it, and extends independence reporting with verified production success/failure/observed metrics by problem class and domain. At this point it is an open implementation PR; CI/merge/production runtime proof are still required.
-
-The runtime independence report is deliberately labeled `observed_runtime_learning_metrics_not_heldout_certification`. Runtime traffic is not a hidden benchmark. Cache reuse is useful operational independence but not new reasoning competence. A COS-gate-accepted answer is not the same thing as a verified business/production outcome.
-
-The mature target remains roughly **85% independent pass rate on a separate held-out SignalBoost workload**. Never lower the 0.72 confidence/evidence gate, inflate scores, fabricate skills, or count self-generated practice as holdout evidence to improve that number.
-
-Next COS independence increments:
-
-1. production-prove the merged explicit user feedback/correction increment (#1255);
-2. merge and production-prove verified Self-Healing production-outcome learning (#1259), then connect campaign, sales and CRM authoritative outcome producers to the same generic recorder;
-3. autonomous curriculum prioritization from repeated failures, teacher dependency/cost, business importance and weak/untested/conflicted capability areas;
-4. factual reconsolidation/pruning for stale, superseded, contradictory, duplicate and low-value knowledge;
-5. broad real skill-library expansion and composition/transfer;
-6. teacher-dependency trend by problem class;
-7. separate hidden held-out certification toward the ~85% independent target;
-8. model-swap validation proving COS intelligence survives replacement of Qwen or another underlying reasoner.
-
-Full current handoff: `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`.
-
-### 2026-08-17 Enterprise Memory / Semantic Cache correction in progress
-
-Rebased clean branch `fix/cos-memory-cache-definitions-rebased-20260817` corrects a production-observed conceptual answer that conflated the semantic answer cache with embedding storage and incorrectly described it as unscoped. The correction adds dependency-free authoritative definitions, seeds them as verified platform self-knowledge, limits diagnostic observable/falsifier instructions to diagnostic questions, prevents prompt examples from becoming evidence, bumps the answer-policy revision so the inaccurate cached answer cannot replay, and adds regression coverage. Merge, deployment, self-knowledge reseeding, and production re-verification remain pending at this line.
-
-### 2026-08-16 continuous-learning production evidence
-
-PR #1253 merged and exact production deployment `dpl_CQ5EEpGXhUU5aFpUgXc599xaxCxh` for merge `3efccc51c10630c4eabb83f5288912c2edcf02bf` reached `READY`. A real ordinary `/api/concierge` request after the merge created durable encounter `c2953516-436a-4e3e-8fa7-dfc978d272c3`; the same failed/local-escalation outcome occurred twice and reconciled to `occurrence_count = 2` rather than creating duplicate rows. The evidence is explicitly `episodic_turn_signal_not_factual_truth`, contains no `answer` or `response` key, and records local Qwen attempted / external AI not yet invoked at the COS-first decision boundary. Matching Vercel telemetry showed RunPod could not start because the host reported insufficient free GPUs, after which the governed external fallback eventually used Gemini.
-
-Therefore normal-turn capture/deduplication is production-proven for a real external-required failure path. **Accepted local/cache encounter acceptance remains pending** because the observed production request could not obtain RunPod capacity; do not claim the full #1253 acceptance matrix complete until a real accepted local/cache turn is observed.
-
-PR #1255 adds explicit helpful / not-helpful / correction signals as `feedback` episodic experiences. User correction text remains bounded unverified evidence; it cannot automatically promote a fact or skill, raise confidence, or widen execution authority. Negative/correction signals become eligible inputs for the later autonomous curriculum prioritizer only after this evidence layer is production-accepted.
-
-### 2026-08-16 verified production-outcome increment — PR #1259
-
-PR #1259 introduces `saas/lib/ai/cos/cognitiveVerifiedOutcome.ts` as the generic bridge from objective real-world evidence into `production_use` episodic memory. The recorder:
-
-- accepts only `deterministic_tool`, `production_outcome`, or `authoritative_record` source classes;
-- rejects model/Council output as verified outcome authority;
-- records `success`, `failure`, or non-terminal `observed` separately;
-- uses deterministic idempotency so duplicate delivery of one authoritative event is not counted as new proof;
-- preserves the bounded COS problem-class taxonomy and records a small domain class (`self_healing`, `campaign`, `sales`, `crm`, `governed_tool`, `workflow`, `other`);
-- bounds retained facts/summary and labels the experience `verified_production_outcome_signal_not_factual_promotion`;
-- never promotes a fact or skill, increases answer confidence, or widens execution authority merely because an outcome exists.
-
-The first real producer wiring is Self-Healing because it already has authoritative evidence boundaries: governed Agent Gateway deterministic tool/read-back results and the exact Vercel deployment terminal verifier. Specific procedural skill credit remains on the pre-existing deterministic Council prediction attribution path; a problem-class success alone is not causal proof that one skill produced it.
-
-The owner independence report now has separate verified production outcome totals, success/failure/observed counts, terminal production success rate, per-domain buckets and per-problem-class outcome counts. Observed/non-terminal rows are excluded from the success-rate denominator, and these metrics do not alter independent-answer or teacher-dependency math.
-
-**Evidence level at this line:** implementation PR only. CI, merge, deployment and real `production_use` row evidence are still required. Campaign/sales/CRM have the generic recorder contract available after merge, but their authoritative producers are not yet wired and must not be reported as such.
+```text
+COS semantic retrieval / learning
+→ LOCAL_AI embedding seam
+→ DeepInfra
+→ BAAI/bge-base-en-v1.5
+→ 768 dimensions
+→ existing pgvector schema
+```
 
 ---
 
-# Mission
+# DeepInfra Preview acceptance — PASSED
 
-SignalBoost is a Cognitive Operating System that powers specialized business modules and Portables. COS owns reusable intelligence, memory, learning, planning, governance, cost control, verification, provider selection and reusable operational knowledge.
+Dedicated test branch used for migration work:
 
-External AI/data providers are replaceable compute, teacher, or enrichment resources. They do not own SignalBoost intelligence.
+`test/deepinfra-preview-20260820`
+
+Do **not** merge that branch into `main`. It contains temporary Preview-only validation endpoints and temporary Preview provider pins.
+
+Final hardened one-shot Preview validation returned:
+
+- `ok: true`
+- reasoner verdict: `ok`
+- reasoner model: `Qwen/Qwen3.6-35B-A3B`
+- reasoner base URL: `https://api.deepinfra.com/v1/openai`
+- health response: `ready` in ~404 ms
+- embedding dimensions: `768/768`
+- capability benchmark: `2/2`, `100%`
+- tracks: `provenance`, `memory-governance`
+- `responseSource: local_cos_reasoning`
+- `localModelInvoked: true`
+- `externalAiInvoked: false`
+- migration benchmark persistence: `false`
+
+Earlier acceptance probes also proved:
+
+- DeepInfra authentication works with the Preview secret;
+- the reasoner returns HTTP 200 and final text;
+- `BAAI/bge-base-en-v1.5` returns exactly 768 dimensions;
+- the old `nomic-embed-text` model name is not available on DeepInfra and must not be used there.
+
+Do not weaken the benchmark or provenance gates to improve scores. The 2/2 result is a small migration acceptance sample, not proof of mature ~85% workload independence.
+
+---
+
+# Permanent production-cutover PR
+
+**PR #1318:** `Prepare COS DeepInfra production cutover`  
+**Branch:** `feat/cos-deepinfra-production-cutover-20260820`
+
+This is the clean production branch. It is intentionally separate from the temporary DeepInfra test branch.
+
+Permanent changes in the cutover PR include:
+
+- hard-detach RunPod lifecycle when `LOCAL_AI_BASE_URL` points outside RunPod, even if stale RunPod flags/credentials remain configured;
+- bypass RunPod wake/model-list readiness polling for managed non-RunPod reasoners;
+- optional `LOCAL_AI_REASONING_EFFORT` support for OpenAI-compatible model calls;
+- provider-neutral reasoner diagnostics where successful completion is authoritative for managed providers;
+- embedding-provider context-window handling while preserving exact 768-dimensional validation;
+- removal of provider-specific RunPod reasoner pins from `saas/vercel.json`, so the runtime provider is selected by Vercel environment rather than source-control defaults;
+- explicit managed-open-model provenance so DeepInfra is not mislabeled as self-hosted/local;
+- this updated onboarding and the dated DeepInfra handoff.
+
+Intentionally excluded from the permanent PR:
+
+- temporary Preview-only probe endpoints;
+- temporary Preview-only migration validation endpoint;
+- hard-coded DeepInfra URL/model settings;
+- API keys or other secrets.
+
+A clean Vercel Preview for the initial permanent five-file runtime commit reached `READY`. After the final provenance/docs commits, re-check the newest PR #1318 Preview/CI before merge. Never assume the earlier green deployment covers later commits.
+
+---
+
+# Provenance semantics
+
+The COS primary-reasoner seam may use either self-hosted/local open-model compute or an approved managed open-model runtime.
+
+Expected reasoner labels after the permanent provenance change:
 
 ```text
-Observe → Remember → Learn → Reason → Act → Verify → Improve
+independent-local:<model>
+managed-open-model:deepinfra:<model>
 ```
 
-The commercial asset is not Qwen, RunPod, OpenAI, Anthropic, Gemini or any single provider. The asset is the COS system, its accumulated validated memory/skills/tool competence and the governed runtime that can move between models/providers.
+For the DeepInfra cutover the target label is:
+
+```text
+managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B
+```
+
+DeepInfra must never be described as self-hosted or as OpenAI.
+
+Closed-model OpenAI/Anthropic/Gemini paths remain explicitly governed external fallback/teacher providers and must not masquerade as the COS primary reasoner.
+
+---
+
+# Production environment contract — DO NOT GUESS
+
+After PR #1318 is merged and before declaring the migration complete, configure Production explicitly in Vercel:
+
+```dotenv
+LOCAL_AI_BASE_URL=https://api.deepinfra.com/v1/openai
+LOCAL_AI_ALLOWED_HOSTS=api.deepinfra.com
+LOCAL_AI_MODEL=Qwen/Qwen3.6-35B-A3B
+LOCAL_AI_EMBEDDING_MODEL=BAAI/bge-base-en-v1.5
+LOCAL_AI_REASONING_EFFORT=none
+LOCAL_AI_MANAGED_PROVIDER=deepinfra
+LOCAL_AI_API_KEY=<DeepInfra production secret>
+```
+
+`LOCAL_AI_API_KEY` must remain a Vercel/server-side secret. Never commit, print, paste into logs, or expose it.
+
+The connected Vercel tooling used during this migration can inspect deployments and logs but cannot read or modify secret environment values. Therefore the Production secret/config switch requires the Vercel environment UI or another explicitly authorized secret-management path.
+
+Do not change Production to DeepInfra until the permanent PR is green.
+
+---
+
+# Production cutover acceptance gate
+
+The migration is **not complete** until all of the following are observed in Production after the environment switch:
+
+1. PR #1318 merged.
+2. Production deployment reaches `READY` on the merge commit.
+3. Production reasoner diagnose/probe reaches DeepInfra and returns a valid final completion.
+4. Production embedding health returns exactly 768 dimensions.
+5. A bounded capability benchmark completes with COS-local reasoning and no external AI.
+6. Normal request provenance reports `managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B`.
+7. Runtime telemetry shows RunPod lifecycle detached/false for the managed reasoner.
+8. A real COS learning/retention cycle remains operational after cutover.
+9. No temporary unauthenticated Preview validation route exists on `main`.
+
+A green Vercel build alone is not enough.
+
+---
+
+# RunPod status / rollback
+
+Historical RunPod pod id:
+
+`yvj6e9zboi7ofo`
+
+Last known pre-migration Production reasoner settings:
+
+```dotenv
+RUNPOD_POD_ID=yvj6e9zboi7ofo
+LOCAL_AI_BASE_URL=https://yvj6e9zboi7ofo-11434.proxy.runpod.net/v1
+LOCAL_AI_ALLOWED_HOSTS=yvj6e9zboi7ofo-11434.proxy.runpod.net
+LOCAL_AI_MODEL=qwen2.5-coder:32b
+```
+
+During migration validation, the RunPod pod was observed stopped (`EXITED`, `running:false`), so it was not burning the ~$0.22/hr GPU rate at that observation point.
+
+A historical configuration is **not** proof that RunPod can currently infer. Previous incidents included missing GPU device allocation, CPU fallback, model load failures, and host-capacity problems. Re-verify GPU/model health before relying on RunPod as rollback compute.
+
+Rollback if DeepInfra Production cutover fails:
+
+1. restore the prior Production `LOCAL_AI_*` RunPod values;
+2. redeploy Production;
+3. verify RunPod GPU/model health and authenticated inference;
+4. verify COS reasoner + embeddings + bounded benchmark before calling rollback healthy.
+
+Because PR #1318 removes provider-specific runtime pins from `saas/vercel.json`, rollback/provider switching is an environment operation rather than another source-code fork.
+
+---
+
+# Embedding doctrine
+
+The COS learned-corpus / semantic retrieval schema is currently pinned to **768 dimensions**.
+
+Canonical files:
+
+- `saas/lib/ai/cos/embeddingEndpoint.ts`
+- `saas/lib/ai/cos/localEmbeddings.ts`
+
+Do not silently pad/truncate vectors to fake compatibility. A model swap must either return exactly 768 dimensions or be accompanied by a deliberate database/RPC migration and re-embedding plan.
+
+DeepInfra candidate `BAAI/bge-base-en-v1.5` passed the 768-dimensional gate.
+
+Observed provider constraint: BGE rejected an input at 513 tokens because its available input length was 512. Permanent code now handles provider context-window overflow with bounded truncation/retry while preserving the exact dimension check.
+
+Follow-up optimization: the current bounded retry can still make several progressively shorter attempts for a long text. Improve it so the common oversized case usually requires at most one retry, without weakening semantic integrity or dimension validation.
+
+---
+
+# Latency / Cognitive Council finding
+
+Migration correctness passed, but full COS turn latency remains an engineering concern.
+
+Final hardened held-out case latency:
+
+- provenance: ~36.988 s
+- memory-governance: ~201.575 s
+
+The ~201 s case was **not** one 201-second DeepInfra request. Vercel telemetry showed COS activated Cognitive Council for a repeated unresolved problem class and made several additional Qwen calls, including multiple calls in roughly the 30–65 second range.
+
+Therefore:
+
+- DeepInfra authentication/connectivity is not the long-tail root cause;
+- Council/challenge/repair orchestration can dominate total turn time;
+- do not disable Council only to make benchmark latency look better;
+- make optional phases deadline-aware using measured/rolling provider latency rather than relying only on a static estimate;
+- always reserve enough wall-clock time to return the best answer already available before the 300 s route ceiling.
+
+Canonical budget file:
+
+`saas/lib/ai/cos/cosTurnBudget.ts`
+
+---
+
+# COS learning continuity — current evidence
+
+Latest migration validation read the production-backed continuity report as:
+
+- status: `amber`
+- corpus documents: 152
+- documents retained in last 7 days: 77
+- new subjects in last 7 days: 21
+- silent days in last 7 days: 1
+- last retention: ~24.5 hours before the check
+- open gaps: 0
+- finding: `no_open_gaps`
+
+This is **not evidence that DeepInfra stopped learning**. The continuity policy intentionally marks zero open gaps amber because an all-resolved gap table can indicate over-aggressive/bulk closure rather than a healthy stream of unresolved questions.
+
+Current interpretation:
+
+- retention is happening;
+- the corpus is expanding into new subjects;
+- the learning-gap generation/resolution lifecycle needs inspection;
+- preserve the amber watchdog until the cause of zero open gaps is understood.
+
+Do not lower the watchdog standard merely to make the dashboard green.
+
+---
+
+# COS learning / independence doctrine
+
+The underlying model is replaceable compute. **COS is the learner.**
+
+Durable COS assets include:
+
+- Enterprise Memory;
+- Knowledge Graph;
+- learned corpus / semantic memory;
+- cognitive experiences;
+- validated procedural skills;
+- cognitive/metacognitive capability state;
+- verified production outcomes;
+- source/provenance knowledge;
+- policy/governance;
+- benchmark and feedback evidence.
+
+A model response is not automatically learned knowledge.
+
+A source document is not automatically learned knowledge.
+
+A teacher answer is not automatically truth.
+
+A successful training example is not held-out mastery.
+
+Cache reuse is operational independence but not new reasoning competence.
+
+The mature target remains approximately **85% independent pass rate on a separate held-out SignalBoost workload**, with higher numbers only if independent evidence supports them.
+
+Never lower the 0.72 confidence/evidence gate, fabricate skills, or count self-generated practice as hidden-holdout evidence to inflate the score.
+
+---
+
+# Private capability benchmark
+
+Owner dashboard:
+
+`/dashboard/cos-capability-benchmark`
+
+API:
+
+`/api/admin/cos-capability-benchmark`
+
+Rules:
+
+- held-out cases are private and outside normal learning acquisition;
+- exact/semantic cache reuse does not count as fresh capability;
+- external AI cannot satisfy the local-COS reasoning requirement;
+- each normal web run is bounded to at most two cases;
+- infrastructure/unavailable-reasoner runs must not be recorded as capability failures;
+- benchmark history and migration acceptance probes are separate evidence classes.
+
+The temporary migration validator intentionally used `persisted:false` so its test did not pollute Production benchmark history.
+
+---
+
+# Enterprise Memory / Semantic Cache doctrine
+
+Do not conflate these systems.
+
+**Enterprise Memory** is durable, authorized organization-scoped operational knowledge: facts, decisions, history, and reusable enterprise intelligence. It is not an answer cache.
+
+**Semantic Cache** is policy-versioned, age-bounded answer reuse when a new request is sufficiently similar to a previously generated answer. Embeddings are the retrieval index, not the cached knowledge itself.
+
+Organization/user-scoped context must never be reused through an unscoped cache entry.
+
+Authoritative evidence funnel:
+
+```text
+retrieved → relevant → selected → injected → cited
+```
+
+A subsystem counts as `USED` only when it materially contributed to the answer; retrieval/injection alone is not use.
 
 ---
 
@@ -145,720 +392,181 @@ Request / Goal
 → Knowledge Graph
 → Continuous Learning / bounded context
 → validated procedural skills
-→ local/private COS reasoning
+→ COS primary open-model reasoning seam
 → confidence/evidence gate
 → bounded research or replaceable external teacher/provider only when justified and permitted
 → verification
 → learning / episodic memory / skill practice / ROI telemetry
 ```
 
-Primary answer path: `saas/lib/ai/cos/cosFirstAnswer.ts`.
+Primary enterprise answer path:
 
-Current live development reasoner at this handoff: `qwen2.5-coder:32b` on the existing RunPod pod. Do **not** report Qwen3 as live until production telemetry proves the pod was updated and `LOCAL_AI_MODEL` points to it.
+`saas/lib/ai/cos/cosFirstAnswerEnterprise.ts`
 
-Typical configuration:
+Primary reasoner seam:
 
-```dotenv
-COS_LOCAL_FIRST_ENABLED=true
-LOCAL_AI_BASE_URL=https://<private-open-model-endpoint>/v1
-LOCAL_AI_MODEL=<served-model-name>
-LOCAL_AI_API_KEY=<server-side-secret>
-LOCAL_AI_ALLOWED_HOSTS=<exact-hostname>
-LOCAL_AI_ALLOW_CLOUD_FALLBACK=false
-```
-
-Remote private inference must use HTTPS, authentication and exact-host allowlisting. The repository also contains a self-hosted open-model stack under `appliance/local-ai/`.
+- `saas/lib/ai/cos/cosReasoner.ts`
+- `saas/lib/ai/local-inference.ts`
 
 ---
 
-# Core principles
-
-- COS is the reusable intelligence/governance layer; Portables must not create provider-owned reasoning silos.
-- AI is the last resort when deterministic code, known knowledge, cache, durable reuse or validated skills suffice.
-- Prefer local/private compute before approved commercial AI providers.
-- Never pay twice for knowledge or work SignalBoost already owns with sufficient confidence and freshness.
-- Providers are replaceable edges around a provider-neutral core.
-- Preserve tenant isolation, auditability and explicit execution boundaries.
-- Consequential actions remain behind applicable approval controls.
-- A provider/model answer is not trusted truth because of provider prestige.
-- Capability/lifecycle status and answer confidence are separate quantities.
-
----
-
-# 2026-08-13 production/current-state checkpoint
-
-At the time this onboarding was refreshed:
-
-- current `main`: `85e53a2e6699837147ab816bdda1f2f540b6a62e` (PR #1160 merge) before this documentation-only update;
-- latest PR #1160 production deployment observed: `dpl_CSfDedRPuYas6SjbsdnqyGP4TC2Y`, `READY`;
-- production database snapshot: 1 Continuous Learning row, 5 Knowledge Graph facts, 5/5 facts embedded, 1 teacher lesson, 1 cognitive experience, 1 cognitive skill, 0 active-practice queue rows, 0 promotion rows at the instant queried;
-- validated skill: `diagnose-tenant-specific-tail-latency`, with 2/2 practice, 3/3 distinct holdouts and 0 failures;
-- native Self-Healing monitoring remains production-runtime-verified;
-- PR #1159 and #1160 are merged on `main`.
-
-Counts are dated operational evidence, not product guarantees. Re-query production before using them in a status report.
-
-Full takeover detail: `docs/HANDOFF-2026-08-13.md`.
-
----
-
-# COS knowledge, cache and provenance — authoritative doctrine
-
-The live COS-first answer path has distinct layers that must not be conflated:
-
-1. **Answer reuse** — exact/semantic cached answers are policy-versioned and age-bounded.
-2. **Structured Knowledge Graph / Enterprise Memory facts** — `cos_knowledge_facts` supports 768-dimensional local embeddings and nearest-neighbor retrieval through `cos_match_knowledge_facts`.
-3. **Continuous Learning corpus** — retained source material must be substantive enough to justify learning; metadata/discovery snippets are not equivalent to source content.
-4. **Procedural Cognitive Skills** — reusable methods/procedures are separate from factual evidence and use `[SK#]` provenance.
-5. **Teacher/Episodic signals** — external escalation outcomes and experiences are evidence for reflection/training, not automatically factual memory.
-
-Authoritative provenance reports the real funnel:
-
-```text
-retrieved → relevant → selected → injected → cited
-```
-
-A component is called `USED` only when the answer demonstrably cites/uses it. Retrieval or injection alone is not use.
-
-For cached answers, the current request must not claim a fresh local-model/evidence execution. Generating-turn origin evidence is retained separately.
-
-COS confidence does not receive extra factual evidence credit merely because many internal items were injected. The higher evidence ceiling is earned from cited factual grounding. Procedural skill status does not create factual evidence credit. The model-only ceiling remains 0.78, above the default 0.72 escalation gate.
-
-## Cache policy rule
-
-`saas/lib/ai/cos/cosAnswerPolicy.ts` partitions cached answers by prompt/model/threshold/gate revision. Bump the manual gate revision whenever the acceptance/citation/evidence-accounting semantics change in a way not already represented by the hashed inputs.
-
-PR #1158 exposed a real stale-cache defect during production verification: a pre-citation-policy answer could otherwise bypass the new skill-provenance contract. The answer-policy revision was bumped so old rows become unreachable instead of silently reused.
-
----
-
-# COS factual-learning pipeline — current state
-
-Production previously retained 262 low-substance rows with confidence clustered near ~0.8 and `cos_knowledge_facts = 0`. Average summary lengths strongly indicated metadata/abstract/discovery snippets rather than real source content, including `video_transcript` rows averaging roughly 161 characters.
-
-A corrective production purge removed 261/262 obsolete rows and reopened resolved learning gaps. The following existing repository migrations were applied in production:
-
-- `saas/supabase/migrations/20260813_cos_learning_fact_promotion_state.sql`
-- `saas/supabase/migrations/20260813_cos_knowledge_fact_embeddings.sql`
-- `saas/supabase/migrations/20260813_cos_teacher_lessons.sql`
-- `saas/supabase/migrations/20260813_cos_cognitive_learning_lifecycle.sql`
-- `saas/supabase/migrations/20260813_cos_active_learning_queue.sql`
-
-Current production snapshot at this handoff shows 5 structured facts and all 5 have embeddings. Do not infer that a given answer used them; inspect provenance.
-
-Primary files:
-
-- `saas/lib/ai/cos/knowledgeFactExtraction.ts`
-- `saas/lib/ai/cos/autoPromoteLearning.ts`
-- `saas/lib/ai/cos/knowledgeFactSemantic.ts`
-- `saas/app/api/cron/cos-knowledge-promotion/route.ts`
-- `saas/lib/cos-core/storage/supabase.ts`
-- `saas/lib/cos-core/layers/knowledge/persistent.ts`
-- `saas/lib/ai/cos/localEmbeddings.ts`
-
----
-
-# Real YouTube transcript doctrine
-
-PR #1140 added `saas/public/cos-runpod-transcript.sh` and transcript-runtime derivation in `liveSources.ts`.
-
-The installer is designed to:
-
-- reuse the existing `/workspace/cos-api-key` without printing/replacing it;
-- leave Ollama/Qwen untouched;
-- create an isolated transcript venv/service under `/workspace`;
-- serve authenticated transcript requests on port 8888;
-- return real caption text, not discovery metadata;
-- reject caption fragments under 200 chars;
-- distinguish datacenter/IP blocking/429 from no-caption conditions.
-
-If `YOUTUBE_TRANSCRIPT_API_URL` is absent, `liveSources.ts` may derive the transcript endpoint only from the exact trusted HTTPS RunPod reasoner proxy pattern (`-11434.proxy.runpod.net` → `-8888.proxy.runpod.net/transcript`) and reuse `LOCAL_AI_API_KEY`.
-
-**Merged code is not runtime proof.** The service must actually be running in the pod and port 8888 reachable. Do not ask the user to expose `/workspace/cos-api-key`.
-
----
-
-# COS cognitive-learning doctrine and implementation
-
-The north star is a continuously learning cognitive system, not a perfect single model.
-
-Use empirical workload-relative targets:
-
-- roughly **85% independent pass rate** is the mature target on the defined SignalBoost workload;
-- roughly **92–95%** is a longer-term ambition only if held-out evidence supports it;
-- external frontier models belong primarily in the genuinely difficult/novel/disputed/high-consequence tail.
-
-These percentages are capability targets, not confidence targets.
-
-Human-inspired learning loop:
-
-```text
-PERCEIVE
-→ RECALL
-→ THINK
-→ INVESTIGATE / USE TOOLS
-→ TEST
-→ ANSWER / ACT
-→ FEEDBACK
-→ REFLECT
-→ LEARN
-→ PRACTICE ON UNSEEN VARIANTS
-→ CONSOLIDATE
-→ FORGET / WEAKEN / QUARANTINE BAD ASSOCIATIONS
-```
-
-Canonical lifecycle:
-
-```text
-encountered
-→ evaluated
-→ understood
-→ practiced
-→ validated
-→ learned
-→ mastered
-```
-
-A source document, teacher answer, or one successful retry is not automatically learned.
-
-COS models/should model:
-
-- **episodic memory** — attempts, evidence, outcomes, corrections, disagreements;
-- **semantic memory** — validated generalized facts/concepts;
-- **procedural memory** — skills with prerequisites, observables, falsifiers and failure modes;
-- **metacognition** — strong/weak/untested/repeatedly-failed classes and escalation need;
-- **consolidation** — bounded review/cluster/contradiction resolution/practice scheduling;
-- **forgetting/reconsolidation** — weakening, expiry, supersession or quarantine of stale/misleading knowledge.
-
-External providers are teachers/escalation resources, not automatic authorities.
-
-Teacher loop:
-
-```text
-COS attempts
-→ internal tools/specialists investigate
-→ external teacher only when justified
-→ capture local attempt + teacher result + disagreement/evidence
-→ evaluate
-→ extract generalized procedural candidate
-→ practice
-→ independent unseen holdout validation
-→ promote only after evidence
-→ measure whether future external calls decline
-```
-
----
-
-# First validated cognitive-skill proof
-
-Current skill: `diagnose-tenant-specific-tail-latency`.
-
-Production DB snapshot:
-
-- status: `validated`;
-- evaluator approved: true;
-- understanding approved: true;
-- practice 2/2;
-- holdout 3/3;
-- distinct holdout variants: 3;
-- failures: 0.
-
-One holdout deliberately favored an enterprise-only SAML/audit middleware path. COS re-ranked it above the stored template, demonstrating generalization rather than rote copying.
-
-Fresh production-path proof after cache invalidation showed:
-
-- local reasoner invoked: yes;
-- reasoner: `independent-local:qwen2.5-coder:32b`;
-- confidence: 0.78;
-- external AI: no;
-- cognitive skill funnel: 1 retrieved → 1 relevant → 1 selected → 1 injected → 1 cited;
-- authoritative provenance: cognitive skill `USED`;
-- no false KG/corpus evidence credit.
-
-PR #1158 added a citation-only local-model repair. It accepts only supplied `[SK#]` labels and only if removing those labels leaves answer substance unchanged. Production telemetry confirmed the repair was attempted and accepted for `[SK1]`.
-
-`recordCitedCognitiveSkillReuse()` exists but current `reuse_count` remained 0 at this handoff. Wire reuse accounting only on actual cited use, never mere retrieval/injection.
-
----
-
-# Durable active-learning loop — PR #1160
-
-PR #1160 merged as `85e53a2e6699837147ab816bdda1f2f540b6a62e` and its production deployment was observed `READY`.
-
-Canonical files:
-
-- `saas/lib/ai/cos/cognitiveActiveLearning.ts`
-- `saas/lib/ai/cos/cognitiveSkillCandidate.ts`
-- `saas/lib/ai/cos/cognitiveLearningLifecycle.ts`
-- `saas/lib/cos/aiPort.ts`
-- `saas/app/api/cron/cos-mining/route.ts`
-- `saas/supabase/migrations/20260813_cos_active_learning_queue.sql`
-- `saas/tests/cosCognitiveActiveLearning.node.test.ts`
-
-Behavior:
-
-- captured teacher lessons can be reflected on by local COS into generalized procedural candidates;
-- candidates require procedure, discriminating signals, observables, falsifiers, failure modes and prohibited actions;
-- memorization-shaped/non-falsifiable candidates are rejected;
-- local-generated exercises are practice only and are structurally prohibited from counting as holdout evidence;
-- independent holdouts may come only from allowed independent sources (teacher/evaluator, curated, production replay);
-- `cos_active_practice_queue` stores durable work;
-- `cos_learning_promotions` stores promotion evidence;
-- `cos_record_cognitive_practice_result(...)` atomically records episodic result + counters;
-- lifecycle eligibility is recomputed by deterministic policy after exercises;
-- active learning is batched into the existing daily COS mining cron;
-- external evaluation is optional behind `COS_COGNITIVE_EXTERNAL_EVALUATION_ENABLED=true` and `CosAiPort`;
-- active learning does not change answer-confidence formulas.
-
-Full current subsystem handoff: `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`.
-
----
-
-# Qwen3 cutover — do not misreport
-
-`qwen3:30b` is the durable intended bootstrap/default model in code, but the live existing pod still serves `qwen2.5-coder:32b` at this handoff.
-
-The ~19 GB Qwen3 pull could not be completed through the current authenticated RunPod HTTPS/Ollama gateway because the intermediate gateway buffers long upstream pulls and the request path times out. Ollama streaming cannot help when the intermediary buffers the stream. RunPod's management API does not provide arbitrary remote shell execution.
-
-Remaining cutover requires legitimate pod shell access (RunPod Web Terminal or SSH/another supported shell path), then explicit verification:
-
-1. model appears in `ollama list`;
-2. authenticated direct inference succeeds;
-3. production model configuration is switched;
-4. COS health/provenance reports the new model;
-5. held-out quality/latency/cost is benchmarked before declaring improvement.
-
-Never expose local API keys while performing the cutover.
-
----
-
-# Enterprise BYOM/BYOA requirement
-
-PR #1157 made AI portability an enterprise release requirement.
+# Provider neutrality / BYOM / BYOA
 
 Required properties:
 
-- no mandatory Qwen/RunPod/OpenAI/Anthropic/Gemini dependency;
+- no mandatory Qwen, RunPod, DeepInfra, OpenAI, Anthropic, Gemini, or other provider dependency;
 - buyer-owned credentials/compute where desired;
 - replaceable model/agent adapters;
-- models are not governance authorities;
-- COS-owned memory/skills/provenance survive model swaps.
+- models/providers are not governance authorities;
+- COS-owned memory, skills, provenance, outcome history, policy, and learning survive model/provider swaps.
 
-A buyer can deploy COS alongside its existing OpenAI, Anthropic, or other agent. The development stack does not define the product identity.
+DeepInfra is the current managed open-model candidate for SignalBoost development/runtime economics. It is not part of COS product identity.
 
-Reference: `docs/portables/cos-byom-byoa-enterprise.md` and `saas/lib/release-candidate/cos-enterprise-ai.ts`.
+Reference:
 
----
-
-# Self-Healing Supervisor — authoritative doctrine
-
-The Self-Healing Supervisor is proactive, not merely reactive to incidents delivered by an external monitoring product.
-
-Native monitoring is a first-class capability and should be default-capable for a plug-and-play installation. Buyer monitoring may coexist in `hybrid` mode or intentionally replace native monitoring in `external` mode.
-
-Canonical monitoring files:
-
-- `saas/self-healing-host/native-monitoring-policy.ts`
-- `saas/self-healing-host/native-monitoring-runtime.ts`
-- `saas/self-healing-host/native-proactive-monitoring.ts`
-- `saas/app/api/cron/native-proactive-monitoring/route.ts`
-- `saas/supabase/migrations/20260812_self_healing_native_proactive_monitoring.sql`
-
-Native coverage includes:
-
-- Vercel deployment/provider health;
-- SignalBoost platform-health conditions such as queue growth, scheduler/provider failures, resource pressure, stale leases/heartbeats, verification/audit failures;
-- API p95/5xx probes with durable baselines;
-- database connection pressure/latency probes;
-- storage reachability/usage/capacity probes;
-- TLS certificate-expiry probes.
-
-Probe samples persist in `self_healing_native_probe_samples`. Database/storage collectors use bounded aggregate service-role paths rather than exposing sensitive query/object content.
-
-Existing external adapters include Datadog, PagerDuty, AWS CloudWatch/EventBridge, Prometheus Alertmanager, Splunk, Azure Monitor, Grafana Alerting and Google Cloud Operations. They remain `staged` until live-provider validation promotes them to `certified`.
-
-Native proactive monitoring was production-runtime-verified before this refresh: migration applied, scheduled cron observed, samples persisted repeatedly across all four proactive probe families.
+- `docs/portables/cos-byom-byoa-enterprise.md`
+- `saas/lib/release-candidate/cos-enterprise-ai.ts`
 
 ---
 
-# Self-Healing native anomaly → COS → governed remediation — PR #1159
+# Self-Healing Supervisor — preserve governance
 
-PR #1159 merged as `aadb940d9074c9ed19c7913b5cbea83eae37811e`.
-
-It closes the prior gap where native proactive monitoring could detect incidents but stop at the response.
+Self-Healing remains proactive and governed.
 
 Canonical loop:
 
 ```text
-Native monitor / probe
-→ detect anomaly
-→ collect bounded evidence through Portable Connector Runtime
+Native monitor / external signal
+→ bounded evidence
 → normalize incident
 → COS-first diagnosis
 → registered repair plan
 → Agent Gateway / MCP governance
-→ execute if explicitly permitted
+→ execute only if explicitly permitted
    OR stage / require approval / fail closed
 → verify
 → audit
 → learn
 ```
 
-Canonical file: `saas/self-healing-host/native-autonomous-loop.ts`.
+Automatic routine repair never means arbitrary mutation. Unknown/consequential/destructive/financial/security actions remain governed and approval-gated.
 
-`/api/cron/native-proactive-monitoring` only invokes the expensive diagnosis/remediation path when anomalies/incidents exist. It remains `CRON_SECRET` protected and fails closed when required monitoring storage/schema is unavailable.
+Current detailed handoff:
 
-PR #1159 does **not** add new mutation authority. Unknown/consequential/destructive/financial/security actions remain governed/approval-gated.
-
-Current Self-Healing handoff: `docs/portables/self-healing-monitoring-current-state-20260813.md`.
-
----
-
-# Remediation workflow
-
-```text
-Monitor / Observe
-→ detect degradation, risk or incident
-→ collect bounded evidence
-→ diagnose / reason
-→ select registered repair capability
-→ policy / risk classification
-→ routine + explicitly pre-authorized bounded repair may execute automatically
-→ consequential action requires approval
-→ verify
-→ audit
-→ learn
-```
-
-Automatic routine repair never means arbitrary mutation. The action must remain inside an explicitly registered capability with allowed provider/resource/method/parameter scope, reversibility and execution limits.
-
----
-
-# Cost / ROI governance
-
-Track provider calls avoided, cache/reuse hits, knowledge hits, local executions, external fallbacks, provider cost, avoided cost, latency, retries, successful outcomes and learning reuse/effectiveness.
-
-For cognitive learning also track:
-
-- independent pass rate;
-- external escalation rate by domain/problem class;
-- held-out validation rate;
-- retention/delayed re-test;
-- paraphrase/generalization robustness;
-- skill success/failure/revalidation/decay;
-- teacher-call avoidance after learning;
-- actual cited skill reuse;
-- verified production success/failure/observed outcomes by problem class and operating domain.
-
-The best evidence that COS learned a class is improved held-out behavior plus fewer repeat external escalations **and** stable/improving verified real-world outcomes, not more rows in a database.
+`docs/portables/self-healing-monitoring-current-state-20260813.md`
 
 ---
 
 # Marketing & Sales state
 
-Marketing & Sales core architecture is complete, including Enterprise Memory, Knowledge Graph, Continuous Learning, Goal Engine, Prospect Intelligence, Business Intelligence Corpus, Communication Hub, CRM production paths, Revenue Intelligence, Universal Adapter seams, campaign/outreach queues, approval gates, audit, telemetry, cost governance and localization guardrails.
+Core Marketing & Sales architecture is substantially complete and must remain integrated with COS rather than becoming a provider-owned silo.
 
-The 5,000-company Business Intelligence Corpus is a data-population target, not unfinished architecture. Always use live status rather than a historical count.
+Major platform layers include:
 
-Owner/admin route: `/dashboard/data/business-intelligence-corpus`  
-Status API: `/api/admin/business-intelligence-corpus/status`
+- Enterprise Memory / Knowledge Graph / Continuous Learning;
+- Prospect Intelligence;
+- Business Intelligence Corpus;
+- Communication Hub;
+- CRM integration framework and production adapters;
+- campaign/outreach queues;
+- Revenue Intelligence;
+- Universal Adapter seams;
+- approvals / audit / telemetry / cost governance;
+- localization guardrails.
 
----
-
-# Enterprise Release Candidate
-
-A green Vercel deployment is necessary but not sufficient to declare Enterprise RC. The fail-closed profiles under `saas/lib/release-candidate/` require real evidence for deployment, tenant isolation, security, resilience, load/soak, observability, end-to-end integration, documentation currency and the applicable AI portability profile.
-
-Missing evidence is `not_run`, not pass.
+The 5,000-company Business Intelligence Corpus remains a data-population/coverage target, not an architectural reason to bypass COS or use external providers first.
 
 ---
 
 # Security / secrets
 
-- Never hard-code or expose secrets.
-- Never print full provider keys/tokens.
-- Never expose `/workspace/cos-api-key`.
-- Use approved Vault/environment/server-side storage boundaries.
-- Preserve tenant/org scoping and RLS/server-role assumptions.
-- Keep owner/admin routes server-gated.
-- Keep cron routes `CRON_SECRET` protected.
-- Remote private inference must be HTTPS, authenticated and exact-host allowlisted.
-- Do not create temporary unauthenticated production triggers merely to accelerate verification.
+Non-negotiable:
 
----
-
-# Localization
-
-Core supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), Polish (`pl`), Russian (`ru`). New user-facing copy must follow repository i18n guardrails.
+- never hard-code or expose provider secrets;
+- never print full API keys/tokens;
+- never expose `/workspace/cos-api-key`;
+- use approved Vault/environment/server-side storage boundaries;
+- preserve tenant/org scoping and RLS/service-role assumptions;
+- keep owner/admin routes server-gated;
+- keep cron routes `CRON_SECRET` protected;
+- remote inference must use HTTPS, authentication, and exact-host allowlisting;
+- do not create temporary unauthenticated Production triggers for convenience;
+- temporary Preview migration endpoints must never land on `main`.
 
 ---
 
 # Build / test / deploy rules
 
-- Prefer coherent batches of related changes.
 - Read files before changing them.
+- Prefer coherent batches of related changes.
 - Preserve existing behavior unless the task requires change.
-- Reuse existing real collectors/adapters instead of duplicating them.
-- Do not add placeholders merely to increase feature/adapter counts.
-- Run/observe relevant typecheck, build and tests before calling a batch successful.
+- Run/observe relevant typecheck, build, tests, CI, and live acceptance before calling a batch successful.
 - Never claim CI/build/deployment passed unless it actually did.
-- Never call a branch commit production.
+- Never call a branch commit Production.
+- Never call a green Vercel deployment Enterprise RC acceptance.
 - Re-check current `main` after concurrent work.
-- Production database state must be verified separately from a green Vercel build.
+- Production database state must be verified separately from a green build.
+- For provider migrations, prove reasoner + embeddings + provenance + benchmark + learning continuity separately.
 
 ---
 
-# Documentation map
+# Immediate next engineering priorities
 
-**Current COS independence / continuous learning:**
-- `docs/HANDOFF-COS-INDEPENDENCE-TRAINING-2026-08-16.md`
-
-**Current master handoff:**
-- `docs/HANDOFF-2026-08-13.md`
-
-**COS cognitive/active learning:**
-- `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`
-- `docs/HANDOFF-COS-COGNITIVE-LEARNING-2026-08-12.md` — earlier design/north-star handoff; useful history, not the latest state
-
-**Self-Healing Supervisor:**
-- `docs/portables/self-healing-monitoring-current-state-20260813.md`
-- `docs/portables/self-healing-monitoring-current-state-20260812.md` — earlier verification snapshot
-- `docs/portables/self-healing-monitoring-connections.md`
-- `docs/portables/self-healing-technical-walkthrough.md`
-- `docs/portables/self-healing-operations-runbook.md`
-- `docs/portables/self-healing-integration-guide.md`
-- `docs/portables/self-healing-evaluation-brief.md`
-
-**Enterprise COS portability:**
-- `docs/portables/cos-byom-byoa-enterprise.md`
-- `saas/lib/release-candidate/cos-enterprise-ai.ts`
-
-**Marketing & Sales:**
-- `docs/marketing-sales-current-state.md`
-- `saas/docs/marketing-sales-module-design.md`
-- `docs/business-intelligence-corpus.md`
-- `docs/enterprise-release-candidate.md`
-
-**COS / enterprise architecture:**
-- `saas/lib/ai/cos/`
-- `saas/lib/ai/local-inference.ts`
-- `saas/lib/cos/`
-- `saas/lib/cos-core/`
-- `saas/lib/enterprise/`
-- `saas/lib/enterprise-ai-os/`
-- `appliance/local-ai/`
-
-**Historical/operational detail:**
-- `docs/ONBOARD-full.md`
-- `docs/HANDOFF-2026-08-12.md`
+1. Finish PR #1318 validation after the provenance/docs commits; merge only when the newest clean Preview/CI is green.
+2. Configure the Production DeepInfra `LOCAL_AI_*` environment values and secret after merge.
+3. Run Production reasoner/embedding/provenance/benchmark acceptance before declaring cutover complete.
+4. Verify a real post-cutover COS learning/retention cycle.
+5. Improve Cognitive Council / optional-phase budget decisions using measured provider latency so the system cannot spend most of the 300 s turn budget on advisory/challenge/repair work.
+6. Reduce BGE over-window handling to a predictable single truncation/retry in the common case.
+7. Investigate zero open learning gaps while preserving the amber continuity watchdog.
+8. Remove the temporary DeepInfra Preview test branch/routes after Production acceptance.
+9. Continue the broader COS continuous-learning curriculum and held-out independence program across cyber defense, software engineering/computer science, AI systems/safety, ML/data, business, marketing, sales, cloud, networking, SRE, Postgres, and other already-governed tracks.
+10. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries, and Enterprise RC evidence requirements throughout all future learning/runtime changes.
 
 ---
 
-# Recent merged sequence to know before touching COS/Self-Healing
+# Recent sequence that matters for this cutover
 
-Historical foundation:
+- PR #1311 — learning continuity watchdog.
+- PR #1312 — derived strategy-profile learning.
+- PR #1313 — benchmark feedback-loop curation.
+- PR #1314 — benchmark review queue / failure-pattern hardening.
+- PR #1316 — RunPod recovery / lifecycle hardening.
+- PR #1317 — provider-neutral COS reasoner runtime; merge `6fd32c7f4149889b98b4726ac79b7b6435faaf50`.
+- Dedicated DeepInfra Preview migration then proved Qwen reasoner + 768d BGE embeddings + 2/2 held-out cases with no external AI.
+- PR #1318 — clean permanent production-cutover runtime + provider-neutral deployment config + managed-open-model provenance + current handoff/docs.
 
-- #1132 — native proactive Self-Healing probes;
-- #1133–#1136 — evidence funnel, cache/provenance and cited-grounding confidence hardening;
-- #1138 — semantic filtering/generic diagnostic-quality repair;
-- #1140 — RunPod transcript installer + secure transcript endpoint derivation;
-- #1141 — learning-source pacing/circuit/reuse hardening;
-- #1152 — Gemini fallback + teacher lesson capture + Qwen3 durable default;
-- cognitive lifecycle/experience/skill work preceding #1156;
-- #1156 — only validated procedural skills can enter live reasoning;
-- #1157 — BYOM/BYOA enterprise release requirement;
-- #1158 — citation-safe procedural skill provenance;
-- #1159 — native Self-Healing incident-to-governed-remediation loop;
-- #1160 — durable active-learning/practice/holdout loop;
-- #1162 — retention, consolidation, weakening and quarantine;
-- subsequent composition/transfer and metacognition increments are merged and must be preserved.
-
-Current Aug-16 hardening/knowledge sequence includes the live-current-data policy, structured real-time data, source governance, cache lineage, semantic embedding transport/shared query work, reviewed prospect-history corpus seeding, verified platform self-knowledge through #1252, continuous ordinary-turn experience capture in #1253, and explicit user-feedback learning in #1255. PR #1259 is the current verified production-outcome learning increment and is not merged at this documentation point. Always scan current `main` because parallel agents continue to advance it.
-
----
-
-# Next engineering priorities
-
-1. Complete the remaining accepted local/cache production proof for #1253 when RunPod capacity permits; preserve the already verified external-required encounter evidence.
-2. Production-prove explicit user helpful / not-helpful / correction ingestion from #1255 and verify feedback appears in the independence quality report without changing capability math.
-3. Merge and production-prove #1259 verified Self-Healing outcome learning, then wire authoritative campaign, sales and CRM outcome producers to the same generic recorder rather than building parallel learning stores.
-4. Build autonomous curriculum prioritization from repeated external-required attempts, teacher cost/dependency, business importance, negative/correction feedback, verified production failures and weak/untested/conflicted metacognitive classes.
-5. Extend consistent pruning/reconsolidation from procedural skills to factual KG/corpus knowledge: staleness, supersession, contradiction, duplication, weakening/quarantine and bounded pruning.
-6. Expand the real validated skill library across SRE, Postgres, cloud, networking, security, software, AI, business, marketing and sales, then exercise composition/transfer on genuine overlapping skills.
-7. Track teacher dependency, independent completion and verified production success by problem class and verify the trend improves without reducing quality.
-8. Build/maintain a broad hidden held-out suite; only held-out evidence may establish progress toward ~85% independent pass.
-9. Validate that accumulated COS intelligence survives a model swap; Qwen3 cutover remains separate and must be runtime-proven before claiming it live.
-10. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries and Enterprise RC evidence requirements throughout learning expansion.
+Always query GitHub/Vercel for the current PR/merge/deployment state instead of assuming this sequence has not advanced.
 
 ---
 
 # Status language
 
-Use precise actual states. A plan is not execution; a queue row is not a sent email; an attempted publish is not a published asset; a branch is not production; a green deployment is not Enterprise RC acceptance; architecture support is not proof of configured runtime; a staged adapter is not certified; a policy signal is not proof that its collector exists; a captured teacher lesson is not learned knowledge; a passed training example is not held-out mastery; a validated procedural skill is not factual evidence; a repository model default is not proof that model is live.
+Use precise actual states.
 
-For continuous learning specifically: an episodic encounter is not knowledge; COS gate acceptance is not verified outcome; runtime independence is not held-out certification; cache reuse is not new reasoning competence; current-fact retrieval is not timeless memory; recurrence is not truth; a verified problem-class outcome is not causal proof of one skill; and external-teacher reduction is meaningful only if verified quality is maintained or improved.
+A plan is not execution.  
+A queue row is not a sent email.  
+An attempted publish is not a published asset.  
+A branch is not Production.  
+A green deployment is not Enterprise RC acceptance.  
+Architecture support is not configured-runtime proof.  
+A staged adapter is not certified.  
+An episodic encounter is not knowledge.  
+COS gate acceptance is not a verified real-world outcome.  
+Runtime independence is not held-out certification.  
+Cache reuse is not new reasoning competence.  
+Current-fact retrieval is not timeless memory.  
+A managed open-model provider is not self-hosted merely because it uses the `LOCAL_AI_*` seam.  
+`/v1/openai` compatibility does not mean OpenAI is the provider.
 
 ---
 
 # Definition of success
 
-The best AI call is the one that never has to happen. The best external data call is the one avoided because SignalBoost already owns sufficient verified intelligence. The best Portable teaches COS without bypassing governance. The best architecture lets providers be replaced without rewriting business intelligence or control logic. The best self-healing system detects trouble early, investigates with bounded buyer-owned evidence, resolves explicitly pre-authorized routine conditions safely, escalates consequential actions, verifies every outcome and learns from the result.
+The best external AI/data call is the one COS can safely avoid because SignalBoost already owns sufficient validated intelligence.
 
-For COS learning specifically, success means that validated experience measurably improves held-out performance, retains that improvement over time, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance rather than merely accumulating more text.
+The best architecture lets models/providers be replaced without rewriting business intelligence, memory, learning, governance, or control logic.
 
-The long-term proof is a trend: more problems completed with COS-owned memory/skills/tools and local/private compute, fewer external-teacher calls for already-learned classes, stronger verified real-world outcomes, and stable performance when the underlying model/provider is replaced.
+For COS learning, success means validated experience measurably improves held-out performance, retains that improvement, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance.
 
-
-### 2026-08-17 — latest baseline SaaS CI repair in progress
-
-- Main `a52fa47e0ec88c9b8938b8c1c83b82a2eb8fdb0c` restored `cognitiveFactConsolidation.ts`.
-- Main `5abf0fb59fd2e774dc69da7fd6a25a6ff8d9e837` then accidentally replaced `localEmbeddings.ts` with knowledge-fact code; clean branch `fix/baseline-saas-ci-latest-20260817` restores the prior governed embedding runtime.
-- Also aligns the embedding repair test with the `/v1/models` readiness probe and removes the credits comment-only `getAccess` false positive.
-- Supersedes residual repair PR #1271. Refresh COS memory/cache PR #1270 only after this baseline repair merges.
-
-- Follow-up CI inspection also aligned four pre-existing source contracts with their current intentional implementations: job-scoped prospect advancement, 120s/90s Concierge bounds, the public Self-Healing route, and comment-safe portable-browser dependency wording.
-
-- Governance diagnosis confirmed the protected Chief-of-Staff capabilities remain in delegated `routeCoreLegacy.ts`; the integrity checker now validates and hashes the wrapper plus delegated core instead of falsely scanning only the wrapper.
-
-### 2026-08-17 — orchestration action-classifier correction
-
-- `requestsExternalAction()` in `lib/ai/cos/cosOrchestrationEnterprise.ts` was over-broad: any input containing an execution verb (check/run/audit/...) plus a target noun (table/database/repo/...) matched, including plain diagnostic questions like "check why the table is slow." Matched inputs skip local reasoning entirely and route to the governed-executor action path, which has no local implementation — so a diagnostic question could fail with "Delegated requested external action to governed executor" instead of being answered.
-- Fix adds three interrogative-shape checks that short-circuit to `false` before the verb+noun test: an execution verb immediately followed by a wh-word ("check why", "audit what"), the input opening on an interrogative/auxiliary word, and the input ending in a question mark. Real imperative commands ("check the users table and report row counts", "deploy the latest commit to production") are unaffected.
-- Regression test: `tests/cosOrchestrationActionClassifier.node.test.ts`, 6/6 passing. Registered in CI as its own job, `cos-orchestration-action-classifier` in `.github/workflows/saas-ci.yml`, run via `npx tsx --test` (the file has pre-existing `@/` aliases that plain `node --test`/`npm test` cannot resolve — same reason `cos-platform-self-knowledge` uses `tsx`). A green Vercel/Next.js build only proves the app compiles; it does not prove this test runs in CI, hence the dedicated job rather than relying on build success alone.
-- Verified against current `main` at time of fix: full-repo `tsc --noEmit` exit 0, `npm run build` (the same command Vercel runs) succeeds, workflow YAML re-parses valid after the edit.
-
-
-### 2026-08-17 — COS definitional confidence and provenance
-
-- PR #1274 merged as `a2b36f3609e38407aec2970c30050999d4fedac3`: conceptual and comparison questions no longer receive the diagnostic artifact-specificity confidence cap; that cap remains for actual diagnostics.
-- Canonical Enterprise Memory and Semantic Cache definitions are now recorded as a material provenance contributor only when their distinctive definition text was used. Added the regression test to the normal SaaS test command.
-
-
-### 2026-08-17 — local-only provider routing continuity repair
-
-- PR #1276 merged as `a1389aa1597f2d3a56fe7283b76000f2c22a0f57`: no-preference provider calls and both Backup COS continuity paths now select local inference. Hosted/unknown `AI_MODEL_PROVIDER` values cannot silently select blocked external providers.
-- Added a dedicated `tsx` CI regression for provider preference; the production build, typecheck, provider regression, policy, import-extension, QA, and audit checks passed before merge.
-
-
-### 2026-08-17 — staged COS capability implementation plan
-
-**Principle:** COS continuously improves through measured outcomes, but consequential actions remain approval-governed. It may investigate, retrieve evidence, simulate, draft, test in isolation, and prepare an exact change autonomously; publishing, outreach, spending, production mutation, and self-deployment require the applicable human approval.
-
-1. **Close the learning loop first.** Every COS task must emit an outcome record: task/problem class, evidence sufficiency, confidence, result quality, reuse success/failure, cost/latency, and explicit feedback. A weak or failed turn creates a canonical learning gap rather than being silently forgotten. Promote knowledge/recipes/skills only after validation; weaken or quarantine them on repeated failure.
-
-2. **Gap → governed implementation plan.** For each validated gap, COS produces a bounded specification: objective, evidence, scope, API/schema/UI/test implications, risk classification, rollback/verification plan, and approval requirement. Low-risk read-only investigations can proceed under policy; implementation and deployment remain gated.
-
-3. **Objective decomposition and measurement.** Convert approved business objectives into measurable subgoals, dependencies, owners, evidence requirements, and review checkpoints. Initial SignalBoost objectives: qualified opportunities, approval-ready campaigns, and verified conversion/revenue outcomes.
-
-4. **Adaptive capability/recipe selection.** Select only approved tools and recipes using measured reliability, latency, cost, evidence quality, and prior outcomes. Automatically demote unhealthy paths; preserve evidence and decision provenance.
-
-5. **Scoped evidence fusion.** Combine approved internal data, CRM, analytics, live authoritative sources, and—when connected—communications signals. Preserve tenant/scope controls, citations, evidence funnels, and strict separation of durable memory from answer caches.
-
-6. **Commercial execution rollout.**
-   - Phase 1: create drafts, research, scripts, campaigns, and approval-ready work.
-   - Phase 2: publish through approved connectors and monitor outcomes.
-   - Phase 3: predictive optimization, data mining, and monetization recommendations.
-   - Phase 4: lead capture, CRM updates, approved outreach, conversion tracking, and closed-loop learning.
-
-**Immediate build priority:** implement items 1 and 2 end-to-end: low-confidence/failed COS turns must create a durable, deduplicated, measurable learning-gap plan with evidence, validation criteria, owner/approval state, and later outcome feedback.
-
-
-### 2026-08-17 — COS quality-repair decision audit
-
-- PR #1279 merged as `daa23e2237505851e6376f2f3c320a7d752f759a`: accepted and rejected diagnostic-quality and skill-citation repair decisions are now persisted best-effort in `cos_quality_repair_decisions`, with a dedicated CI regression. Database unavailability is non-blocking and never interrupts COS reasoning.
-
-
-### 2026-08-17 — COS core continuous-learning curriculum
-
-- PR #1281 merged as `d707c6d4ddcebb1aabbed3c570938fe05b28de48`: the measured-gap curriculum now has explicit tracks for cyber defense, software engineering/computer science, and agent systems. Each defines topics, isolated/holdout evaluation modes, and safety boundaries. Gaps remain selected by real weakness; the tracks determine the learning and evaluation approach.
-
-
-### 2026-08-17 — COS ML/data and AI systems/safety curriculum
-
-- PR #1283 merged as `70a302e806d8fb720e06aa8f0adf417469a80eda`: adds ML/data engineering and AI systems/safety tracks to the core curriculum. Each has bounded evaluations and explicit safety limits; AI research remains reproducible, evidence-driven work across all tracks, not unverified claims of novel theory.
-
-
-### 2026-08-17 — COS cognitive science and human decision-making curriculum
-
-- PR #1285 merged as `9fde9c214d5d4e99ef4a5bc5919912452ad0674d`: adds cognitive science, ethical behavioral economics, human-agent collaboration, and cognitive-load/accessibility learning. The manifest explicitly forbids mental-state inference, diagnosis, manipulation, and psychological profiling; it permits only consented, task-relevant behavior and aggregated outcomes.
-
-
-### 2026-08-18 — COS robotics, edge AI, and aerial sensing curriculum
-
-- PR #1287 merged as `dd1ed0708020934252f3344489a692f854b5d08d`: adds an edge-AI/robotics track covering sensor fusion, LiDAR/thermal/multispectral interpretation, digital twins, recorded datasets, and BVLOS safety planning. It is strictly simulation/dataset-only: no weaponization, target selection, harmful surveillance, or live autonomous drone control.
-
-
-### 2026-08-18 — COS space science and applied physics curriculum
-
-- PR #1289 merged as `fe496ad28bf2212d9e6feeaffe0e8f1c0e3d4366`: adds space science/scientific computing and applied physics/advanced engineering tracks. Both are research, public-data, and simulation bounded: no spacecraft or mission control; no medical diagnosis/treatment, device certification, fabrication claims, lab control, or safety-critical deployment without qualified validation.
-
-
-### 2026-08-18 — COS computational creativity, arts, and AI ethics curriculum
-
-- PR #1291 merged as `695497c94a88d9e4561ebe7acfea0f3e88d2f423`: adds art/music/aesthetics, creative collaboration, authorship, copyright, licensing, attribution, and provenance learning. It requires AI-use disclosure, rights respect, no living-artist impersonation or claims of human experience/authorship, and retains human final creative/legal/cultural judgment.
-
-
-### 2026-08-18 — COS industrial HMI, PLC, and operational-safety curriculum
-
-- PR #1293 merged as `64755bcaf03662ab0488932c64c80cac0dc57696`: adds real-time HMI/SCADA concepts, alarms, PLC/controller integration concepts, human factors, and digital-twin/operator-acceptance evaluation. COS has no direct PLC/equipment command authority; live changes require authorized engineers, approval, rollback testing, and an emergency-stop path.
-
-
-### 2026-08-18 — COS AutoML and explainable-AI curriculum
-
-- PR #1295 merged as `88ec82b9455abb20ef6b8f06f9233e506e7be01e`: expands ML/data learning with AutoML feature engineering/tuning, XAI/attribution, drift checks, reproducible evaluation, and portable deployment. High-impact use remains governed: dataset provenance/privacy, holdouts, and human review are required; AutoML scores/explanations do not prove fairness, correctness, or legal compliance.
-
-
-### 2026-08-18 — Curriculum routing and execution
-
-- Replaced positional curriculum-track lookup with explicit subject-routing rules and stable track IDs, preventing future insertions from assigning the wrong evaluation or safety boundary.
-- Added enterprise commercial and governance tracks with approval, evidence, privacy, and compliance boundaries.
-- The daily learning cycle now studies a bounded rotating set of track topics, prioritizing tracks with measured weakness, and preserves track/evaluation/safety evidence through admission and retention.
-- Added CI and hermetic end-to-end coverage proving curriculum topics reach the learning cycle and are remembered.
-
-
-### 2026-08-18 — Learning-gap hygiene
-
-- Only foundational knowledge domains may be sent to external learning sources. Legacy free-text gap subjects are re-anchored from their own question when possible; otherwise they remain capability evidence but enter terminal `unstudyable` status rather than consuming study slots.
-- Queued gaps are resolved only when admitted evidence was produced for that gap's normalized subject. The cycle now returns `acceptedSubjects` to support that exact decision.
-- Added the `unstudyable` status migration and regression coverage for the observed chat-fragment cases.
-
-
-### 2026-08-18 — Declared-versus-learned curriculum coverage
-
-- Added owner-only `GET /api/admin/cos-learning/coverage`, which compares all declared study subjects with retained corpus evidence and reports `never_studied`, `thin`, `stale`, or `learned` coverage.
-- Coverage is deliberately distinct from competence and independence: it verifies whether material arrived, not whether COS can use it well.
-- The report also exposes undeclared corpus subjects so drift and residual junk are visible rather than silently counted as learning.
-
-
-### 2026-08-18 — Dynamic-gap hygiene closure
-
-- The daily run exposed one remaining bypass: dynamic corpus-expansion gaps could reintroduce a chat-fragment subject after queued-gap filtering. Dynamic targets now pass through the same foundational-domain normalization before acquisition; unclassifiable fragments are dropped, and re-anchored targets use a bounded study question so the raw fragment cannot become an external search query.
-
-### 2026-08-18 — Tiered-admission reachability repair
-
-- Durable admissions continue to use their established source and policy floors unchanged. Candidates below those floors may enter the separate probationary store only when they clear its lower documented thresholds; they are never retrievable until corroborated.
-- Corroboration now recognizes a different durable source for the same normalized subject, and a bounded daily promotion pass copies confirmed probationary evidence into the durable corpus before marking it promoted.
-
-### 2026-08-18 — Private live capability benchmark
-
-- Private held-out benchmark cases, run history, and per-case outcomes live in dedicated RLS-protected tables and are not part of COS learning acquisition.
-- The owner-only runner invokes the normal COS path with both semantic and exact answer caches disabled; external-AI, cache, missing-provenance, or safety failures cannot pass.
-- Owner dashboard: `/dashboard/cos-capability-benchmark`. Populate active private cases in `cos_capability_benchmark_cases`, then run bounded batches through the dashboard.
-
-### 2026-08-18 — Tiered continuous-learning admission
-
-- COS now classifies candidate evidence into **high-confidence**, **probationary**, or **rejected** without altering raw relevance or confidence.
-- High-confidence evidence requires raw relevance ≥0.85, confidence ≥0.80, and source floor ≥0.75 before direct durable admission.
-- Probationary evidence requires gap-adjusted relevance ≥0.70, confidence ≥0.65, and source floor ≥0.60. Gap alignment is recorded separately as `gap_adjusted_relevance`; it never overwrites the measured raw relevance.
-- Probationary evidence is retained with provenance, source identity, content hash, publication observation time, scores, and promotion basis. It promotes only from qualifying curriculum-gap alignment or an exact claim match from a distinct source; weaker evidence is rejected and logged.
-- New CI coverage asserts strict thresholds, transparent gap adjustment, corroboration requirements, and rejection of weak evidence. Dashboard work must expose the funnel: acquired → high-confidence → probationary → promoted → rejected, per curriculum track.
-
-### 2026-08-18 — COS benchmark run reliability
-
-- Capability benchmark requests are now bounded to two held-out cases per web request and rotate through active cases across completed runs, so local-model evaluation cannot exceed the server execution budget or repeatedly test only the first cases.
-- Each case records an explicit execution failure result instead of losing the entire run; stale runs are reconciled to failed with an actionable retry message.
-- The owner dashboard now renders structured benchmark errors safely instead of showing `[object Object]`.
-
-### 2026-08-18 — SaaS CI curriculum baseline repair
-
-- Restored the independence-data regression gate by pointing the curriculum workflow at the existing `cosIndependenceMetrics.node.test.ts`; it verifies missing independence rates remain `null`, not an invented zero.
+For this runtime migration, success means COS can move from RunPod/Ollama to DeepInfra/Qwen while keeping its memory, embeddings, learning, benchmark behavior, provenance, governance, rollback path, and external-AI independence intact.

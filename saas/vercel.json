@@ -6,11 +6,7 @@
     "COS_LIVE_SOURCES_ENABLED": "true",
     "COS_LOCAL_FIRST_ENABLED": "true",
     "COS_RUNPOD_AUTO_STOP_ENABLED": "false",
-    "COS_RUNPOD_ORPHAN_GUARD_ENABLED": "true",
-    "RUNPOD_POD_ID": "yvj6e9zboi7ofo",
-    "LOCAL_AI_BASE_URL": "https://yvj6e9zboi7ofo-11434.proxy.runpod.net/v1",
-    "LOCAL_AI_ALLOWED_HOSTS": "yvj6e9zboi7ofo-11434.proxy.runpod.net",
-    "LOCAL_AI_MODEL": "qwen2.5-coder:32b"
+    "COS_RUNPOD_ORPHAN_GUARD_ENABLED": "true"
   },
   "crons": [
     { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },

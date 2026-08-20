@@ -11,6 +11,7 @@
     "LOCAL_AI_BASE_URL": "https://api.deepinfra.com/v1/openai",
     "LOCAL_AI_ALLOWED_HOSTS": "api.deepinfra.com",
     "LOCAL_AI_MODEL": "Qwen/Qwen3.6-35B-A3B",
+    "LOCAL_AI_REASONING_EFFORT": "none",
     "LOCAL_AI_EMBEDDING_MODEL": "BAAI/bge-base-en-v1.5"
   },
   "crons": [

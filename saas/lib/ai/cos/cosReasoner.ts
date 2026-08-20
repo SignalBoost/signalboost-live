@@ -3,14 +3,14 @@
 // COS'S OWN REASONER — strict independence boundary.
 //
 // The COS-first path may use only the LOCAL_AI_* inference seam. That seam can point
-// to Ollama, vLLM, TGI, or another OpenAI-compatible open/self-hosted model runtime.
-// A remote self-hosted endpoint is allowed only through local-inference.ts's explicit
-// host allow-list + API-key controls.
+// to self-hosted Ollama/vLLM/TGI or to an approved managed open-model runtime that
+// exposes an OpenAI-compatible transport. Provider ownership is provenance, not identity:
+// COS memory, evidence, governance and learning remain COS-owned regardless of runtime.
 //
-// IMPORTANT: Anthropic/OpenAI/Gemini and any generic "dedicated cloud reasoner" are
-// intentionally NOT accepted here. Those providers belong only in the external
-// escalation layer. This keeps provenance honest: if callCosReasoner() succeeds,
-// COS really used its independent model runtime.
+// IMPORTANT: Anthropic/OpenAI/Gemini closed-model fallback routes are intentionally
+// NOT accepted here. They belong only in the explicitly labelled external escalation
+// layer. A managed open-model runtime such as DeepInfra is allowed only through the
+// same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
@@ -21,11 +21,11 @@ import { runCouncilChallengeRound } from '@/lib/ai/cos/cognitiveCouncilChallenge
 import { startTurnBudget, hasBudgetFor, remainingMs, localCallEstimateMs, challengeRoundEstimateMs } from '@/lib/ai/cos/cosTurnBudget'
 import { bindCouncilSessionCorrelations } from '@/lib/ai/cos/councilObjectiveOutcome'
 
-export type CosReasonerKind = 'independent-local'
+export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
 export interface CosReasonerConfig {
   kind: CosReasonerKind
-  /** Provenance label, e.g. independent-local:qwen2.5-coder:32b. */
+  /** Provenance label, e.g. independent-local:qwen2.5-coder:32b or managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B. */
   label: string
 }
 
@@ -33,25 +33,46 @@ function localConfigured(): boolean {
   return Boolean(process.env.LOCAL_AI_BASE_URL?.trim()) && Boolean(process.env.LOCAL_AI_MODEL?.trim())
 }
 
+function managedProviderName(baseUrl: string): string | null {
+  const explicit = process.env.LOCAL_AI_MANAGED_PROVIDER?.trim().toLowerCase()
+  if (explicit) return explicit.replace(/[^a-z0-9._-]+/g, '-')
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase()
+    if (host === 'api.deepinfra.com') return 'deepinfra'
+  } catch {}
+  return null
+}
+
+function configuredReasoner(): CosReasonerConfig {
+  const inference = localInferenceConfigFromEnv()
+  const managedProvider = managedProviderName(inference.baseUrl)
+  if (managedProvider) {
+    return {
+      kind: 'managed-open-model',
+      label: `managed-open-model:${managedProvider}:${inference.model}`,
+    }
+  }
+  return {
+    kind: 'independent-local',
+    label: `independent-local:${inference.model}`,
+  }
+}
+
 /**
- * Which independent COS reasoner would answer right now.
- * Generic cloud-provider configuration is deliberately ignored here; those providers
- * are external fallbacks and must never masquerade as COS-local inference.
+ * Which COS-owned reasoner seam would answer right now.
+ * Closed-model external-fallback configuration is deliberately ignored here; those providers
+ * must never masquerade as the COS primary reasoner. Managed open-model hosting is represented
+ * explicitly in provenance while preserving the same COS-owned reasoning/memory boundary.
  */
 export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: null; reason: string } {
   if (localConfigured()) {
-    return {
-      config: {
-        kind: 'independent-local',
-        label: `independent-local:${(process.env.LOCAL_AI_MODEL || '').trim()}`,
-      },
-    }
+    return { config: configuredReasoner() }
   }
 
   return {
     config: null,
     reason:
-      'No independent COS reasoner is configured. Set LOCAL_AI_BASE_URL + LOCAL_AI_MODEL to an Ollama, vLLM, TGI, or other approved self-hosted/open-model endpoint. External cloud models are fallback providers and are not valid COS-local reasoners.',
+      'No COS primary reasoner is configured. Set LOCAL_AI_BASE_URL + LOCAL_AI_MODEL to an approved self-hosted or managed open-model endpoint. Closed-model external providers remain fallback routes and are not valid COS primary reasoners.',
   }
 }
 
@@ -113,23 +134,20 @@ function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
 }
 
 /**
- * Ask COS's independent reasoner. Success means the LOCAL_AI_* path actually answered.
+ * Ask COS's primary reasoner. Success means the LOCAL_AI_* path actually answered.
  * If unavailable or unhealthy, callers fail closed and may separately invoke the
  * explicitly-labelled external escalation gateway.
  *
- * The durable RunPod activity lease is touched before the first local model call. That protects
- * the whole bounded reasoning/repair sequence from the idle-stop cron without turning health checks
- * into activity or allowing one scheduled cost-control action to interrupt an in-flight answer.
+ * The durable RunPod activity lease is touched before the first local model call. On non-RunPod
+ * managed reasoners this is a provider-neutral no-op; on RunPod it protects the bounded
+ * reasoning/repair sequence from the idle-stop cron.
  */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig } | null> {
   if (!localConfigured()) return null
 
-  const config: CosReasonerConfig = {
-    kind: 'independent-local',
-    label: `independent-local:${(process.env.LOCAL_AI_MODEL || '').trim()}`,
-  }
+  const config = configuredReasoner()
   const inference = localInferenceConfigFromEnv()
   // One wall-clock budget for the whole turn. Optional phases below consult it so a slow run
   // degrades to a slightly less polished answer instead of being killed at the platform ceiling.

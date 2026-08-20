@@ -24,11 +24,42 @@ export function deriveRunpodPodIdFromLocalAiBaseUrl(value = process.env.LOCAL_AI
   }
 }
 
+/**
+ * Whether the reasoner endpoint COS is actually invoking is RunPod.
+ *
+ * This is the provider-neutrality boundary. RUNPOD_API_KEY/RUNPOD_POD_ID may remain configured as
+ * fallback or historical lab state, but they must never cause lifecycle control when the live
+ * reasoner has moved to DeepInfra, Fireworks, Together, a customer vLLM cluster, or any other
+ * OpenAI-compatible endpoint.
+ */
+export function localInferenceTargetsRunpod(value = process.env.LOCAL_AI_BASE_URL || ''): boolean {
+  return deriveRunpodPodIdFromLocalAiBaseUrl(value) !== null
+}
+
 let mismatchLogged = false
+let detachedEndpointLogged = false
 
 export function configuredRunpodPodId(): string | null {
-  const derived = deriveRunpodPodIdFromLocalAiBaseUrl()
+  const endpoint = process.env.LOCAL_AI_BASE_URL || ''
+  const endpointConfigured = endpoint.trim().length > 0
+  const derived = deriveRunpodPodIdFromLocalAiBaseUrl(endpoint)
   const explicit = explicitRunpodPodId()
+
+  // Once COS points at a non-RunPod endpoint, stale RunPod credentials are merely dormant lab
+  // configuration. They are NOT permission to start/stop a different compute provider in the
+  // background. The live reasoner endpoint is authoritative.
+  if (endpointConfigured && !derived) {
+    if (explicit && !detachedEndpointLogged) {
+      detachedEndpointLogged = true
+      console.info('[cos-runpod-detached]', JSON.stringify({
+        at: new Date().toISOString(),
+        explicitPodId: explicit,
+        selectedPodId: null,
+        reason: 'LOCAL_AI_BASE_URL points outside RunPod; RunPod lifecycle control is disabled for this reasoner.',
+      }))
+    }
+    return null
+  }
 
   if (derived && explicit && derived !== explicit && !mismatchLogged) {
     mismatchLogged = true
@@ -41,7 +72,8 @@ export function configuredRunpodPodId(): string | null {
     }))
   }
 
-  return derived || explicit
+  // Preserve explicit-id-only control for maintenance tooling when no reasoner endpoint is set.
+  return derived || (!endpointConfigured ? explicit : null)
 }
 
 export function runpodControlConfigured(): boolean {

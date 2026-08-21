@@ -5,6 +5,7 @@ import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveS
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
+import { autopsyGaps } from '@/lib/ai/cos/learningGapAutopsy'
 import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS, nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum.ts'
@@ -252,7 +253,7 @@ async function loadQueuedReasoningGaps(): Promise<{ ids: string[]; signals: Know
   const db = createSupabaseCOSStores() ? (await import('@/lib/cos-core/storage/supabase')).cosServiceDb() : null
   if (!db) return { ids: [], signals: [] }
   try {
-    const { data } = await db.from('cos_learning_gaps').select('*').in('status', ['pending', 'failed']).order('last_seen_at', { ascending: false }).limit(25)
+    const { data } = await db.from('cos_learning_gaps').select('*').in('status', ['pending', 'failed']).is('autopsy_at', null).order('last_seen_at', { ascending: false }).limit(25)
     const rows = data ?? []
     const usable: Array<{ row: any; subject: string }> = []
     const dropped: string[] = []
@@ -306,6 +307,73 @@ async function markQueuedReasoningGaps(
     }
     if (failedIds.length) {
       await db.from('cos_learning_gaps').update({ status: 'failed', resolved_at: null, last_seen_at: now }).in('id', failedIds)
+      // Record WHY, then decide whether this gap is still worth a study slot. Without this the same
+      // gap is re-selected every cycle forever with no memory of its own history.
+      await recordGapFailuresAndAutopsy(db, failedIds, now)
+    }
+  } catch {}
+}
+
+/**
+ * Append this cycle's failure to each gap's history and retire the ones the autopsy calls terminal.
+ *
+ * Best-effort throughout: if the autopsy migration has not been applied yet, the reads and writes
+ * fail and are swallowed, and the gap simply behaves as it did before — retried next cycle. A
+ * learning-hygiene improvement must never be able to break the learning cycle itself.
+ */
+async function recordGapFailuresAndAutopsy(db: any, failedIds: string[], now: string): Promise<void> {
+  try {
+    const { data, error } = await db
+      .from('cos_learning_gaps')
+      .select('id,subject,question,capability,repeated_count,attempt_count,failure_attempts,escalation_reason')
+      .in('id', failedIds)
+    if (error || !Array.isArray(data)) return
+
+    const findings = autopsyGaps(data.map((row: any) => ({
+      id: String(row.id),
+      subject: row.subject,
+      question: row.question,
+      capability: row.capability,
+      repeatedCount: Number(row.repeated_count || 0),
+      attemptCount: Number(row.attempt_count || 0) + 1,
+      attempts: [
+        ...(Array.isArray(row.failure_attempts) ? row.failure_attempts : []),
+        { reason: String(row.escalation_reason || 'acquisition produced no accepted evidence'), at: now },
+      ],
+      escalationReason: row.escalation_reason,
+    })))
+
+    for (const row of data as any[]) {
+      const finding = findings.retry.concat(findings.terminal).find(entry => entry.gapId === String(row.id))
+      if (!finding) continue
+      // Bounded history: the dominant reason is what the verdict rests on, not the full transcript.
+      const attempts = [
+        ...(Array.isArray(row.failure_attempts) ? row.failure_attempts : []),
+        { reason: String(row.escalation_reason || 'acquisition produced no accepted evidence').slice(0, 200), at: now },
+      ].slice(-12)
+
+      const update: Record<string, unknown> = {
+        attempt_count: Number(row.attempt_count || 0) + 1,
+        failure_attempts: attempts,
+        last_seen_at: now,
+      }
+      if (finding.terminal) {
+        // Retired, never deleted — the gap stays as capability signal.
+        update.status = 'retired'
+        update.autopsy_verdict = finding.verdict
+        update.autopsy_rationale = finding.rationale.slice(0, 1000)
+        update.autopsy_at = now
+      }
+      try { await db.from('cos_learning_gaps').update(update).eq('id', row.id) } catch {}
+    }
+
+    if (findings.terminal.length) {
+      console.warn('[cos-learning-gap-autopsy]', JSON.stringify({
+        at: now,
+        retired: findings.terminal.length,
+        byVerdict: findings.byVerdict,
+        examples: findings.terminal.slice(0, 3).map(entry => ({ gapId: entry.gapId, verdict: entry.verdict, attempts: entry.attemptCount })),
+      }))
     }
   } catch {}
 }

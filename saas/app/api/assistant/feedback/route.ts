@@ -135,7 +135,6 @@ export async function POST(request: NextRequest) {
         userFeedback: feedbackType,
         ...(feedbackType === 'negative' || feedbackType === 'correction' ? { repairNeeded: true } : {}),
         source: 'assistant_feedback',
-        occurredAt: assistantMessage?.created_at ?? undefined,
       })
     : false
 

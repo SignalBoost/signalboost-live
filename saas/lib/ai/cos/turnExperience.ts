@@ -129,7 +129,7 @@ export class TurnRecorder {
   snapshot(args: {
     turnId: string
     promptHash: string
-    problemClass: string
+    problemClass?: string
     features: TurnQueryFeatures
     reasonerLabel: string
     answered: boolean

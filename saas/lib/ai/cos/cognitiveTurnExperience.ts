@@ -4,8 +4,10 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { recordCapabilityFailure, type CapabilityFailureKind } from '@/lib/ai/cos/benchmarkCuration'
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
+import { recordTurnLearningEnrichment } from '@/lib/ai/cos/turnExperienceStore'
 
 export type CosTurnLearningProvenance = {
+  turnId?: string | null
   responseSource?: string | null
   localModelInvoked?: boolean | null
   externalAiInvoked?: boolean | null
@@ -211,6 +213,25 @@ export function decideCosTurnExperience(input: CosTurnExperienceInput): CosTurnE
   }
 }
 
+function enrichExactReasonerTurn(input: CosTurnExperienceInput, decision: CosTurnExperienceDecision): void {
+  const turnId = clean(input.provenance?.turnId, 80)
+  if (!turnId) return
+  recordTurnLearningEnrichment({
+    turnId,
+    problemClass: decision.subject,
+    predictedConfidence: Number.isFinite(Number(input.confidence)) ? Number(input.confidence) : null,
+    routeClass: decision.routeClass,
+    responseSource: clean(decision.evidence.responseSource, 120) || null,
+    evidenceSummary: asRecord(decision.evidence.utilization),
+    failureReason: clean(
+      input.failureReason
+        || input.provenance?.escalationReason
+        || input.provenance?.escalationReasonCode,
+      1200,
+    ) || null,
+  })
+}
+
 /**
  * Persist an ordinary COS turn as episodic experience. Repeated identical turn outcomes strengthen
  * occurrence evidence instead of creating duplicate rows. Failures are learning signals, but this
@@ -224,6 +245,10 @@ export async function recordCosTurnExperience(input: CosTurnExperienceInput): Pr
 
   const decision = decideCosTurnExperience(input)
   if (!decision.eligible) return { stored: false, repeated: false, decision }
+
+  // The exact reasoner turn owns phase telemetry. Enrich it with final confidence/route/evidence
+  // metadata after the answer gate so a later poor outcome can be autopsied without raw prompt text.
+  enrichExactReasonerTurn(input, decision)
 
   // Keep benchmark curation independent from episodic-memory persistence. If either store has a
   // transient problem the other can still succeed, and real COS failures remain useful learning data.

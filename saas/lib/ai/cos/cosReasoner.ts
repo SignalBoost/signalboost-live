@@ -23,6 +23,7 @@ import { startTurnBudget, hasBudgetFor, remainingMs, localCallEstimateMs, challe
 import { bindCouncilSessionCorrelations } from '@/lib/ai/cos/councilObjectiveOutcome'
 import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
 import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -156,6 +157,7 @@ export async function callCosReasoner(
   const recorder = new TurnRecorder()
   const turnId = randomUUID()
   const features = extractQueryFeatures(args.prompt)
+  const problemClass = classifyProblemClass(args.prompt)
   let answered = false
 
   try {
@@ -318,6 +320,7 @@ export async function callCosReasoner(
     const experience = recorder.snapshot({
       turnId,
       promptHash: hashPrompt(args.prompt),
+      problemClass,
       features,
       reasonerLabel: config.label,
       answered,
@@ -325,6 +328,7 @@ export async function callCosReasoner(
     console.info('[cos-reasoner-phases]', JSON.stringify({
       at: new Date().toISOString(),
       turnId,
+      problemClass,
       totalMs: experience.totalMs,
       modelCallMs: experience.modelCallMs,
       otherMs: experience.otherMs,

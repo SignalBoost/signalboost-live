@@ -72,16 +72,25 @@ function normalizedOverlapCount(query: string, candidate: string): number {
   return queryTerms.filter(term => candidateTerms.has(term)).length
 }
 
+function unknownDomainCompatible(query: string, candidate: string): boolean {
+  const queryTerms = normalizedDomainTerms(query)
+  if (!queryTerms.length) return false
+  const requiredOverlap = Math.min(2, Math.max(1, queryTerms.length))
+  return normalizedOverlapCount(query, candidate) >= requiredOverlap
+}
+
 /**
  * First-pass domain gate for durable context. Semantic similarity alone is too permissive for a
  * mixed technical corpus: unrelated healthcare, robotics, marketing and cybersecurity material can
  * all look vaguely "technical" to an embedding model. Keep candidates that share one of the query's
- * top foundational domains. If a candidate cannot be classified, require two meaningful lexical
- * anchors before allowing semantic ranking to decide.
+ * top foundational domains. If the query itself cannot be mapped to a known domain, fail
+ * conservatively: require lexical anchors instead of treating every candidate as domain-compatible.
+ * If a candidate cannot be classified, also require two meaningful lexical anchors before allowing
+ * semantic ranking to decide.
  */
 export function domainCompatibleContext(query: string, candidate: string): boolean {
   const queryDomains = foundationalDomainMatches(query, 2)
-  if (!queryDomains.length) return true
+  if (!queryDomains.length) return unknownDomainCompatible(query, candidate)
   const candidateDomains = foundationalDomainMatches(candidate, 2)
   if (candidateDomains.length) {
     const allowed = new Set(queryDomains.map(match => match.id))

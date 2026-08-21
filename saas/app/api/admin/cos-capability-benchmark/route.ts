@@ -17,6 +17,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const MAX_CASES_PER_RUN = 2
+const BENCHMARK_PROBE_TIMEOUT_MS = 90_000
 const STALE_RUN_MS = 10 * 60_000
 const terms = (value: unknown) => Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
 const errorText = (value: unknown): string => value instanceof Error ? value.message : typeof value === 'string' ? value : JSON.stringify(value) || String(value ?? 'Unknown benchmark error')
@@ -80,7 +81,10 @@ export async function POST(request: NextRequest) {
         console.warn('[cos-capability-benchmark] reasoner readiness failed; results will reflect run conditions, not capability:', reasonerError)
       }
 
-      const probe = await probeReasoner()
+      // Managed providers can legitimately exceed the general 45-second diagnostic probe while
+      // still completing benchmark answers successfully. Give owner-run acceptance a larger but
+      // bounded preflight window so slow healthy Qwen calls are not mislabeled as 0/0 failures.
+      const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
       if (probe.verdict !== 'ok') {
         blockedVerdict = probe.verdict
         blockedSummary = probe.summary.slice(0, 1200)

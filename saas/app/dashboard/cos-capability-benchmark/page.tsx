@@ -145,9 +145,9 @@ export default function CosCapabilityBenchmarkPage() {
       </div>
       <div className="mt-4 space-y-2 text-sm">
         {autopsy.rows.length ? autopsy.rows.slice(0,12).map(row => <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-          <span className="min-w-0 break-words"><strong>{row.primary_stage || 'awaiting evidence'}</strong> · {row.problem_class}</span>
-          <span>{row.status}{row.lesson_retained?' · lesson retained':''}</span>
-          {(row.source_case_id||row.retest_case_id)&&<span className="basis-full text-xs text-text-muted">source {row.source_case_id||'production turn'}{row.retest_case_id?` → retest ${row.retest_case_id}`:''}</span>}
+          <span className="min-w-0 break-words"><strong>{row.primary_stage || t('cos.benchmark.autopsyAwaitingEvidence', 'awaiting evidence')}</strong> · {row.problem_class}</span>
+          <span>{row.status}{row.lesson_retained?` · ${t('cos.benchmark.autopsyLessonRetained', 'lesson retained')}`:''}</span>
+          {(row.source_case_id||row.retest_case_id)&&<span className="basis-full text-xs text-text-muted">{t('cos.benchmark.autopsySource', 'Source')}: {row.source_case_id||t('cos.benchmark.autopsyProductionTurn', 'production turn')}{row.retest_case_id?` → ${t('cos.benchmark.autopsyRetest', 'retest')} ${row.retest_case_id}`:''}</span>}
         </div>) : <p className="text-text-muted">{t('cos.benchmark.autopsyEmpty', 'No poor outcome has produced an autopsy yet.')}</p>}
       </div>
     </section>

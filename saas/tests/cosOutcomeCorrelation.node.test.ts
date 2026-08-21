@@ -93,6 +93,8 @@ test('migration makes outcomes race-safe and keeps utilization benchmark separat
 
 test('controlled benchmark is operator-accessible, route-budget safe and resumes from actual attempts', () => {
   const route = file('../app/api/admin/cos-evidence-utilization-benchmark/route.ts')
+  assert.match(route, /BENCHMARK_PROBE_TIMEOUT_MS = 90_000/)
+  assert.match(route, /probeReasoner\(\{ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS \}\)/)
   assert.match(route, /START_NEXT_CASE_CUTOFF_MS/)
   assert.match(route, /completedAttempts/)
   assert.match(route, /start \+ attempted/)
@@ -102,4 +104,6 @@ test('controlled benchmark is operator-accessible, route-budget safe and resumes
   assert.match(page, /\/api\/admin\/cos-evidence-utilization-benchmark/)
   assert.match(page, /runUtilization/)
   assert.match(page, /Run evidence utilization/)
+  assert.match(page, /latestScoredRate/)
+  assert.match(page, /find\(item => Number\(item\.attempted\) > 0\)/)
 })

@@ -38,8 +38,8 @@ function configureLoopback() {
 }
 
 function configureRunPod() {
-  process.env.LOCAL_AI_BASE_URL = 'https://EXAMPLE-pod-11434.proxy.runpod.net/v1'
-  process.env.LOCAL_AI_ALLOWED_HOSTS = 'example-pod-11434.proxy.runpod.net'
+  process.env.LOCAL_AI_BASE_URL = 'https://EXAMPLEPOD-11434.proxy.runpod.net/v1'
+  process.env.LOCAL_AI_ALLOWED_HOSTS = 'examplepod-11434.proxy.runpod.net'
   process.env.LOCAL_AI_API_KEY = 'EXAMPLE_NOTAREAL_LOCAL_AI_KEY'
   process.env.LOCAL_AI_MODEL = 'qwen2.5-coder:32b'
   process.env.LOCAL_AI_EMBEDDING_MODEL = 'nomic-embed-text'
@@ -158,10 +158,10 @@ test('missing RunPod embedding model is pulled through the authenticated Ollama 
   assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
   assert.equal(embeddingAttempts, 2)
   assert.deepEqual(calls.map(call => call.url), [
-    'https://example-pod-11434.proxy.runpod.net/v1/models',
-    'https://example-pod-11434.proxy.runpod.net/v1/embeddings',
-    'https://example-pod-11434.proxy.runpod.net/api/pull',
-    'https://example-pod-11434.proxy.runpod.net/v1/embeddings',
+    'https://examplepod-11434.proxy.runpod.net/v1/models',
+    'https://examplepod-11434.proxy.runpod.net/v1/embeddings',
+    'https://examplepod-11434.proxy.runpod.net/api/pull',
+    'https://examplepod-11434.proxy.runpod.net/v1/embeddings',
   ])
   assert.equal(calls[2].authorization, 'Bearer EXAMPLE_NOTAREAL_LOCAL_AI_KEY')
   assert.deepEqual(calls[2].body, { model: 'nomic-embed-text', stream: false })
@@ -183,7 +183,7 @@ test('embedding health check is read-only and reports a missing model without pu
   assert.equal(health.ok, false)
   assert.equal(health.model, 'nomic-embed-text')
   assert.match(health.error || '', /404/)
-  assert.deepEqual(urls, ['https://example-pod-11434.proxy.runpod.net/v1/embeddings'])
+  assert.deepEqual(urls, ['https://examplepod-11434.proxy.runpod.net/v1/embeddings'])
 })
 
 test('COS local-first kill switch blocks foreground embedding before any network or lifecycle activity', async () => {
@@ -216,7 +216,7 @@ test('passive background embedding never calls RunPod lifecycle APIs', async () 
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input)
     urls.push(url)
-    if (url === 'https://example-pod-11434.proxy.runpod.net/v1/embeddings') {
+    if (url === 'https://examplepod-11434.proxy.runpod.net/v1/embeddings') {
       return new Response(JSON.stringify({ data: [{ embedding: vector(), index: 0 }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -227,7 +227,7 @@ test('passive background embedding never calls RunPod lifecycle APIs', async () 
 
   const result = await generatePassiveLocalEmbedding('background embedding')
   assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
-  assert.deepEqual(urls, ['https://example-pod-11434.proxy.runpod.net/v1/embeddings'])
+  assert.deepEqual(urls, ['https://examplepod-11434.proxy.runpod.net/v1/embeddings'])
 })
 
 test('stopped RunPod is made ready before the first authorized foreground embedding request', async () => {
@@ -245,7 +245,7 @@ test('stopped RunPod is made ready before the first authorized foreground embedd
     const url = String(input)
     urls.push(url)
 
-    if (url === 'https://example-pod-11434.proxy.runpod.net/v1/models') {
+    if (url === 'https://examplepod-11434.proxy.runpod.net/v1/models') {
       modelChecks += 1
       if (modelChecks === 1) return new Response('', { status: 404 })
       return new Response(JSON.stringify({ data: [{ id: 'qwen2.5-coder:32b' }] }), {
@@ -294,7 +294,7 @@ test('stopped RunPod is made ready before the first authorized foreground embedd
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
 
-    if (url === 'https://example-pod-11434.proxy.runpod.net/v1/embeddings') {
+    if (url === 'https://examplepod-11434.proxy.runpod.net/v1/embeddings') {
       return new Response(JSON.stringify({ data: [{ embedding: vector(), index: 0 }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -313,8 +313,8 @@ test('stopped RunPod is made ready before the first authorized foreground embedd
     reason: 'test_authorized_foreground_embedding',
   }, () => generateLocalEmbedding('wake before semantic retrieval'))
 
-  const embeddingsIndex = urls.indexOf('https://example-pod-11434.proxy.runpod.net/v1/embeddings')
-  const finalModelCheckIndex = urls.lastIndexOf('https://example-pod-11434.proxy.runpod.net/v1/models')
+  const embeddingsIndex = urls.indexOf('https://examplepod-11434.proxy.runpod.net/v1/embeddings')
+  const finalModelCheckIndex = urls.lastIndexOf('https://examplepod-11434.proxy.runpod.net/v1/models')
   assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
   assert.equal(resumeRequested, true)
   assert.equal(modelChecks, 2)

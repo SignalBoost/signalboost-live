@@ -8,14 +8,13 @@ import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 
 export type PrivateBenchmarkCase = CapabilityBenchmarkCase & { id: string }
 
-export async function runPrivateCapabilityCase(test: PrivateBenchmarkCase) {
+export async function runPrivateCapabilityCase(
+  test: PrivateBenchmarkCase,
+  options?: { outcomeSource?: string },
+) {
   const started = Date.now()
   beginEvidenceSourceUseTurn()
 
-  // Benchmark execution intentionally bypasses answer caches, but it must not bypass the
-  // local-inference lifecycle. Normal COS turns preflight/wake RunPod before enterprise
-  // retrieval begins; do the same here so held-out evaluation measures COS capability rather
-  // than whether a cold reasoner happened to be awake already.
   if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
     await ensureLocalInferenceRuntimeReady()
     await generateLocalEmbedding(test.prompt)
@@ -43,12 +42,10 @@ export async function runPrivateCapabilityCase(test: PrivateBenchmarkCase) {
       verifiedSuccess: score.passed,
       repairNeeded: !score.passed,
       escalated: !result.handled,
-      source: `capability_benchmark:${test.track}`,
+      source: options?.outcomeSource || `capability_benchmark:${test.track}`,
     })
   }
 
-  // Kept only in owner-only benchmark evidence tables; never returned by the public assistant path.
-  // A bounded excerpt is enough to diagnose a rubric failure without retaining unbounded output.
   return {
     score,
     replyExcerpt: reply.slice(0, 12_000),

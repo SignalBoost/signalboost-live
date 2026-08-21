@@ -12,11 +12,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const DEFAULT_LIMIT = 500
+const OUTCOME_BATCH_SIZE = 200
 
 type PhaseRow = { phase?: string; kind?: string; ms?: number; ok?: boolean }
 type SkipRow = { phase?: string; reason?: string }
 
 type Row = {
+  turn_id?: string | null
   reasoner_label?: string | null
   surface_difficulty?: string | null
   phases?: PhaseRow[] | null
@@ -27,9 +29,14 @@ type Row = {
   model_calls?: number | null
   answered?: boolean | null
   repair_needed?: boolean | null
+  escalated?: boolean | null
+  user_feedback?: string | null
   verified_success?: boolean | null
   outcome_at?: string | null
+  outcome_source?: string | null
 }
+
+type OutcomeRow = Pick<Row, 'turn_id' | 'repair_needed' | 'escalated' | 'user_feedback' | 'verified_success' | 'outcome_at' | 'outcome_source'>
 
 function median(values: number[]): number | null {
   if (!values.length) return null
@@ -44,6 +51,7 @@ function summarize(rows: Row[]) {
   const withOutcome = rows.filter(row => row.outcome_at != null).length
   const verified = rows.filter(row => row.verified_success === true).length
   const repaired = rows.filter(row => row.repair_needed === true).length
+  const escalated = rows.filter(row => row.escalated === true).length
 
   return {
     turns: rows.length,
@@ -56,8 +64,32 @@ function summarize(rows: Row[]) {
       turnsAwaitingOutcome: rows.length - withOutcome,
       verifiedSuccesses: verified,
       repairsNeeded: repaired,
+      escalations: escalated,
+      positiveFeedback: rows.filter(row => row.user_feedback === 'positive').length,
+      negativeFeedback: rows.filter(row => row.user_feedback === 'negative').length,
+      corrections: rows.filter(row => row.user_feedback === 'correction').length,
     },
   }
+}
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size) as T[])
+  return out
+}
+
+async function durableOutcomes(db: NonNullable<ReturnType<typeof cosServiceDb>>, turnIds: string[]): Promise<Map<string, OutcomeRow>> {
+  const map = new Map<string, OutcomeRow>()
+  for (const batch of chunk([...new Set(turnIds)], OUTCOME_BATCH_SIZE)) {
+    if (!batch.length) continue
+    const result = await db
+      .from('cos_turn_outcomes')
+      .select('turn_id,repair_needed,escalated,user_feedback,verified_success,outcome_at,outcome_source')
+      .in('turn_id', batch)
+    if (result.error) throw result.error
+    for (const row of (result.data ?? []) as OutcomeRow[]) if (row.turn_id) map.set(row.turn_id, row)
+  }
+  return map
 }
 
 export async function GET(request: NextRequest) {
@@ -71,19 +103,31 @@ export async function GET(request: NextRequest) {
 
   const result = await db
     .from('cos_turn_experience')
-    .select('turn_id,created_at,surface_difficulty,reasoner_label,phases,skipped,total_ms,model_call_ms,other_ms,model_calls,answered,repair_needed,verified_success,outcome_at')
+    .select('turn_id,created_at,surface_difficulty,reasoner_label,phases,skipped,total_ms,model_call_ms,other_ms,model_calls,answered')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (result.error) return NextResponse.json({ ok: false, error: result.error.message }, { status: 500 })
 
-  const rows = (result.data ?? []) as Row[]
-  if (!rows.length) {
+  const executionRows = (result.data ?? []) as Row[]
+  if (!executionRows.length) {
     return NextResponse.json({
       ok: true,
       turns: 0,
       note: 'No per-turn execution rows have been recorded yet.',
     })
   }
+
+  let outcomeMap: Map<string, OutcomeRow>
+  try {
+    outcomeMap = await durableOutcomes(db, executionRows.map(row => String(row.turn_id || '')).filter(Boolean))
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 })
+  }
+
+  const rows = executionRows.map(row => {
+    const outcome = row.turn_id ? outcomeMap.get(row.turn_id) : null
+    return outcome ? { ...row, ...outcome } : row
+  })
 
   const phaseStats = new Map<string, { runs: number; failures: number; durations: number[] }>()
   const skipStats = new Map<string, Map<string, number>>()
@@ -136,6 +180,7 @@ export async function GET(request: NextRequest) {
     }),
     interpretation: {
       modelCallAccounting: 'Direct model phases only. Council/challenge may contain additional provider calls, so model_calls/model_call_ms are lower bounds until provider-boundary correlation is added.',
+      outcomeAuthority: 'Outcome fields come from the independent cos_turn_outcomes store keyed by turn_id; this avoids races with post-response execution telemetry.',
       outcomeGate: rows.some(row => row.outcome_at != null)
         ? 'Outcomes exist. Compare like-for-like reasoner + difficulty cohorts before changing routing.'
         : 'Cost is measurable, but quality cost is not yet. Do not convert phase latency into an automatic skip rule.',

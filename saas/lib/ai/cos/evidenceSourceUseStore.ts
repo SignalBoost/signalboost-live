@@ -64,8 +64,10 @@ type TurnOutcomeSnapshot = {
   turn_id?: string | null
   repair_needed?: boolean | null
   escalated?: boolean | null
+  user_feedback?: string | null
   verified_success?: boolean | null
   outcome_at?: string | null
+  outcome_source?: string | null
 }
 
 export type SourceKindOutcomeCorrelation = {
@@ -75,6 +77,9 @@ export type SourceKindOutcomeCorrelation = {
   verifiedSuccessTurns: number
   repairNeededTurns: number
   escalatedTurns: number
+  positiveFeedbackTurns: number
+  negativeFeedbackTurns: number
+  correctionFeedbackTurns: number
 }
 
 export type EvidenceSourceUseReport = {
@@ -105,8 +110,8 @@ async function loadOutcomes(turnIds: string[]): Promise<Map<string, TurnOutcomeS
   if (!db || turnIds.length === 0) return map
   for (const batch of chunk([...new Set(turnIds)], OUTCOME_BATCH_SIZE)) {
     const result = await db
-      .from('cos_turn_experience')
-      .select('turn_id,repair_needed,escalated,verified_success,outcome_at')
+      .from('cos_turn_outcomes')
+      .select('turn_id,repair_needed,escalated,user_feedback,verified_success,outcome_at,outcome_source')
       .in('turn_id', batch)
     if (result.error) {
       console.warn('[cos-evidence-source-use] outcome join failed (non-fatal):', result.error.message)
@@ -155,6 +160,9 @@ export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{
     let verifiedSuccessTurns = 0
     let repairNeededTurns = 0
     let escalatedTurns = 0
+    let positiveFeedbackTurns = 0
+    let negativeFeedbackTurns = 0
+    let correctionFeedbackTurns = 0
     for (const turnId of turnIds) {
       const outcome = outcomes.get(turnId)
       if (!outcome?.outcome_at) continue
@@ -162,6 +170,9 @@ export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{
       if (outcome.verified_success === true) verifiedSuccessTurns += 1
       if (outcome.repair_needed === true) repairNeededTurns += 1
       if (outcome.escalated === true) escalatedTurns += 1
+      if (outcome.user_feedback === 'positive') positiveFeedbackTurns += 1
+      if (outcome.user_feedback === 'negative') negativeFeedbackTurns += 1
+      if (outcome.user_feedback === 'correction') correctionFeedbackTurns += 1
     }
     return {
       ...entry,
@@ -172,6 +183,9 @@ export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{
         verifiedSuccessTurns,
         repairNeededTurns,
         escalatedTurns,
+        positiveFeedbackTurns,
+        negativeFeedbackTurns,
+        correctionFeedbackTurns,
       },
     }
   })

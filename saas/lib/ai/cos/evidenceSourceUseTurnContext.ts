@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/evidenceSourceUseTurnContext.ts
 //
-// Request-local correlation envelope for learned-corpus source attribution.
+// Request-local correlation envelope for learned-corpus source attribution and the reasoner turn id.
 //
 // The enterprise answer path already has three pieces at different moments:
 //   1. selected learned rows (before prompt rendering),
@@ -34,10 +34,17 @@ function state(): EvidenceSourceUseTurnState {
   const existing = storage.getStore()
   if (existing) return existing
   const created = freshState()
-  // Every server request already executes in its own async resource. `enterWith` attaches this small
-  // correlation object to that execution chain; final consumption clears it before the turn ends.
   storage.enterWith(created)
   return created
+}
+
+/** Explicitly reset correlation at the start of a top-level COS or benchmark turn. */
+export function beginEvidenceSourceUseTurn(): void {
+  const current = state()
+  current.turnId = null
+  current.selectedSourceKinds = []
+  current.citedIndices = []
+  current.answerAssessed = false
 }
 
 function sourceKindFromSelectedRow(row: unknown): string {
@@ -63,6 +70,11 @@ export function captureEvidenceSourceUseTurnId(turnId: string): void {
   const value = String(turnId ?? '').trim()
   if (!value) return
   state().turnId = value
+}
+
+/** Read the active reasoner turn id without consuming source-use attribution. */
+export function peekEvidenceSourceUseTurnId(): string | null {
+  return storage.getStore()?.turnId ?? null
 }
 
 /** Mark that the final answer's learned-corpus citations were actually inspected — even if zero. */

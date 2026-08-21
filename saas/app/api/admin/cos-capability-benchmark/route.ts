@@ -4,23 +4,6 @@
 //
 // THE RUNNER MUST WAKE THE REASONER BEFORE IT SCORES ANYTHING, and that wake must be granted
 // EXPLICITLY — this route cannot rely on ensureLocalInferenceRuntimeReady()'s default gate.
-//
-// That gate reads request-scoped permission from an AsyncLocalStorage context that only
-// /api/cos-browser and /api/support ever populate (a same-origin browser POST, or an explicit
-// user-interaction token). Its own comment states the reasoning: wake permission is a COST
-// boundary, not an authentication boundary — it exists to stop cron jobs, background workers and
-// server-to-server calls from waking a paid-by-the-hour GPU on their own. A server route calling
-// ensureLocalInferenceRuntimeReady() directly, with nothing populating that context, is exactly a
-// "background_or_untrusted" caller and the gate throws every time, regardless of whether the pod is
-// actually asleep. AN EARLIER VERSION OF THIS FIX DID EXACTLY THAT and would have kept reporting
-// reasonerReady:false forever, silently, because the failure looks identical to a pod that refused
-// to wake for other reasons.
-//
-// The fix here is not to route around the gate — it is to use it correctly. requireOwner() already
-// supplies a stronger authorization than the origin check the gate approximates for anonymous
-// browser traffic, so an owner-authenticated admin action is exactly the kind of explicit,
-// person-supplied authorization the whole wake policy is built to require. This constructs that
-// permission directly and grants it only for the duration of this request.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -85,10 +68,6 @@ export async function POST(request: NextRequest) {
   let reasonerError = ''
   let passed = 0
   let attempted = 0
-  // A run that could not reach the reasoner is not a capability measurement, and recording it as
-  // 0/2 is worse than recording nothing: it is indistinguishable from COS reasoning badly, and it
-  // drags the visible pass rate down for as long as the GPU is unavailable. Aug 19 2026 produced a
-  // full day of 0% that meant "no free GPU on the host", not "COS got the answers wrong".
   let blockedVerdict: string | null = null
   let blockedSummary = ''
   try {
@@ -101,8 +80,6 @@ export async function POST(request: NextRequest) {
         console.warn('[cos-capability-benchmark] reasoner readiness failed; results will reflect run conditions, not capability:', reasonerError)
       }
 
-      // PRE-FLIGHT. Ask the reasoner one 16-token question before scoring anything. This costs a
-      // second and buys the difference between "COS failed the test" and "there was nothing to test".
       const probe = await probeReasoner()
       if (probe.verdict !== 'ok') {
         blockedVerdict = probe.verdict
@@ -116,19 +93,29 @@ export async function POST(request: NextRequest) {
         try {
           const outcome = await runPrivateCapabilityCase({ id: String(row.id), track: String(row.track), prompt: String(row.prompt), requiredTerms: terms(row.required_terms), forbiddenTerms: terms(row.forbidden_terms), requiresProvenance: true, requiresLocalReasoning: Boolean(row.requires_local_reasoning) })
           if (outcome.score.passed) passed += 1
-          const inserted = await db.from('cos_capability_benchmark_results').insert({ run_id: run.data.id, case_id: row.id, track: row.track, passed: outcome.score.passed, reasons: outcome.score.reasons, response_excerpt: outcome.replyExcerpt, response_source: outcome.provenance.responseSource, local_model_invoked: outcome.provenance.localModelInvoked, external_ai_invoked: outcome.provenance.externalAiInvoked, latency_ms: outcome.latencyMs })
+          const inserted = await db.from('cos_capability_benchmark_results').insert({
+            run_id: run.data.id,
+            case_id: row.id,
+            track: row.track,
+            passed: outcome.score.passed,
+            reasons: outcome.score.reasons,
+            response_excerpt: outcome.replyExcerpt,
+            response_source: outcome.provenance.responseSource,
+            local_model_invoked: outcome.provenance.localModelInvoked,
+            external_ai_invoked: outcome.provenance.externalAiInvoked,
+            latency_ms: outcome.latencyMs,
+            turn_id: outcome.turnId,
+          })
           if (inserted.error) throw inserted.error
         } catch (error) {
           const message = errorText(error).slice(0, 1200)
-          const inserted = await db.from('cos_capability_benchmark_results').insert({ run_id: run.data.id, case_id: row.id, track: row.track, passed: false, reasons: ['case_execution_failed', message], response_excerpt: '', response_source: 'none', local_model_invoked: false, external_ai_invoked: false, latency_ms: 0 })
+          const inserted = await db.from('cos_capability_benchmark_results').insert({ run_id: run.data.id, case_id: row.id, track: row.track, passed: false, reasons: ['case_execution_failed', message], response_excerpt: '', response_source: 'none', local_model_invoked: false, external_ai_invoked: false, latency_ms: 0, turn_id: null })
           if (inserted.error) throw inserted.error
         }
       }
     })
 
     if (blockedVerdict) {
-      // Recorded as 'failed', never 'completed': failed runs are excluded from the rotation counter
-      // and read on the dashboard as a run that did not happen, which is exactly what it was.
       const blockedError = `Reasoner unavailable (${blockedVerdict}) — no cases were scored. ${blockedSummary}`
       await db.from('cos_capability_benchmark_runs').update({ status: 'failed', completed_at: new Date().toISOString(), attempted: 0, passed: 0, error: blockedError.slice(0, 2000) }).eq('id', run.data.id)
       return NextResponse.json({ ok: false, runId: run.data.id, blocked: true, verdict: blockedVerdict, error: blockedError, reasonerReady, reasonerError: reasonerError || undefined, next: 'GET /api/admin/cos-reasoner/diagnose for the full probe.' }, { status: 503 })

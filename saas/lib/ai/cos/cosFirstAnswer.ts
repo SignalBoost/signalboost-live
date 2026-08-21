@@ -21,6 +21,7 @@ import { generateLocalEmbedding } from './localEmbeddings'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from './runpodCapacityError'
 import { configuredRunpodPodId } from './runpodConfig'
 import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
+import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import {
@@ -246,15 +247,19 @@ async function tryFreshCurrentFact(input: {
 }
 
 async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
-  const failureReason = 'reason' in result ? result.reason : null
+  const turnId = peekEvidenceSourceUseTurnId()
+  const enriched = turnId
+    ? ({ ...result, provenance: { ...(result.provenance as Record<string, unknown>), turnId } } as unknown as COSFirstAnswerResult)
+    : result
+  const failureReason = 'reason' in enriched ? enriched.reason : null
   await recordCosTurnExperience({
     prompt: input.prompt,
-    handled: result.handled,
-    confidence: result.confidence,
-    provenance: result.provenance,
+    handled: enriched.handled,
+    confidence: enriched.confidence,
+    provenance: enriched.provenance,
     failureReason,
   })
-  return result
+  return enriched
 }
 
 export async function tryCOSFirstAnswer(input: {
@@ -263,6 +268,8 @@ export async function tryCOSFirstAnswer(input: {
   language?: string
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
+  beginEvidenceSourceUseTurn()
+
   if (requiresFreshExternalEvidence(input.prompt)) {
     return learnFromTurn(input, await tryFreshCurrentFact(input))
   }

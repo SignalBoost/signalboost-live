@@ -5,6 +5,7 @@ import {
   recordCosUserFeedbackExperience,
   type CosUserFeedbackType,
 } from '@/lib/ai/cos/cognitiveUserFeedback'
+import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,10 +18,17 @@ type ConversationMessage = {
   role?: string | null
   content?: string | null
   created_at?: string | null
+  provenance?: unknown
 }
 
 function clean(value: unknown, max: number): string {
   return String(value ?? '').trim().slice(0, max)
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
 }
 
 function validFeedbackType(value: unknown): value is CosUserFeedbackType {
@@ -65,11 +73,11 @@ export async function POST(request: NextRequest) {
   }
   if (!conversation.data?.id) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
 
-  // Derive the prompt from the server-owned transcript. The client may identify the rendered answer,
-  // but it cannot supply or rewrite the learning subject/prompt that becomes durable evidence.
+  // Derive the prompt and turn correlation from the server-owned transcript. The client may identify
+  // the rendered answer, but it cannot supply or rewrite the learning subject or COS turn id.
   const transcript = await db
     .from('assistant_messages')
-    .select('role,content,created_at')
+    .select('role,content,created_at,provenance')
     .eq('conversation_id', conversationId)
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
@@ -95,6 +103,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Ambiguous assistant response; feedback target is not unique' }, { status: 409 })
   }
   const assistantIndex = matchingAssistantIndexes[0]
+  const assistantMessage = messages[assistantIndex]
+  const turnId = clean(asRecord(assistantMessage?.provenance).turnId, 80)
 
   let prompt = ''
   for (let index = assistantIndex - 1; index >= 0; index -= 1) {
@@ -120,11 +130,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Feedback could not be stored' }, { status: 503 })
   }
 
+  const outcomeAttached = turnId
+    ? await attachTurnOutcome(turnId, {
+        userFeedback: feedbackType,
+        ...(feedbackType === 'negative' || feedbackType === 'correction' ? { repairNeeded: true } : {}),
+        source: 'assistant_feedback',
+      })
+    : false
+
   return NextResponse.json({
     ok: true,
     stored: true,
     repeated: result.repeated,
     semantics: result.decision.evidence.semantics,
+    outcomeCorrelation: {
+      turnIdPresent: Boolean(turnId),
+      attached: outcomeAttached,
+    },
     promotion: {
       fact: false,
       skill: false,

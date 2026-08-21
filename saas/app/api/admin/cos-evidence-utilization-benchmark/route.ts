@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const MAX_CASES_PER_RUN = 2
+const BENCHMARK_PROBE_TIMEOUT_MS = 90_000
 const START_NEXT_CASE_CUTOFF_MS = 150_000
 const STALE_RUN_MS = 10 * 60_000
 const errorText = (value: unknown): string => value instanceof Error
@@ -113,7 +114,10 @@ export async function POST(request: NextRequest) {
         console.warn('[cos-evidence-utilization-benchmark] readiness warning:', errorText(error).slice(0, 600))
       })
 
-      const probe = await probeReasoner()
+      // Managed Qwen calls can exceed the general 45-second diagnostic probe while remaining
+      // healthy. Use a larger bounded preflight here so infrastructure slowness does not become a
+      // false 0/0 utilization failure. The route budget still prevents starting another slow case.
+      const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
       if (probe.verdict !== 'ok') {
         blockedVerdict = probe.verdict
         blockedSummary = probe.summary.slice(0, 1200)

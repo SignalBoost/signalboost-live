@@ -3,16 +3,17 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.12  
-**Updated:** 2026-08-20  
-**Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Current `main` before PR #1318:** `6fd32c7f4149889b98b4726ac79b7b6435faaf50`  
-**COS provider architecture:** provider-neutral `LOCAL_AI_*` seam; RunPod lifecycle detached automatically when the live reasoner is not RunPod  
-**DeepInfra migration:** end-to-end Preview acceptance PASSED; Production cutover is gated on PR #1318 + Production Vercel environment switch + post-cutover acceptance  
-**COS learning:** active; continuity snapshot is AMBER because all learning gaps are closed, not because retention stopped  
+**Version:** 1.13  
+**Updated:** 2026-08-20 / 2026-08-21 UTC  
+**Canonical scope:** current engineering and operations handoff; verify live state before acting  
+**Current `main`:** `d3495d3727f7728510cae5d0781272a4b965e10f` — PR #1318 merged  
+**Current Production deployment:** `dpl_GtaKzD7RJBEkTSSYLBjodgp4dXd7` — `READY`  
+**Production domain:** `https://saas.signalboostapp.com`  
+**COS primary reasoner target:** DeepInfra managed open-model runtime, `Qwen/Qwen3.6-35B-A3B`  
+**COS embedding model:** `BAAI/bge-base-en-v1.5`, validated at exactly 768 dimensions  
+**RunPod lifecycle:** detached for the active DeepInfra reasoner  
+**COS learning:** active; current continuity signal remains AMBER because there are no open learning gaps, not because retention stopped  
 **Enterprise Release Candidate:** evidence-based only; never infer from a green deployment
-
-> Historical v1.11 detail remains in Git history at the pre-cutover branch base and in the dated handoffs under `docs/`. This file intentionally prioritizes the current operational state so the next engineer or agent does not have to reconcile superseded runtime statements before acting.
 
 ---
 
@@ -20,10 +21,10 @@
 
 Every developer, AI coding agent, reviewer, operator, contractor, or infrastructure assistant working on this repository must:
 
-1. Read this `ONBOARD.md`.
-2. Read `docs/HANDOFF-COS-DEEPINFRA-2026-08-20.md` for the current reasoner migration/cutover evidence and rollback contract.
-3. Read the exact files related to the task.
-4. Scan current `main` and open PRs before changing anything.
+1. Read this `ONBOARD.md` first.
+2. Read `docs/HANDOFF-COS-DEEPINFRA-2026-08-20.md` for the detailed reasoner migration history and rollback contract.
+3. Scan current `main` and open PRs before changing anything.
+4. Read the exact files related to the task.
 5. Verify implementation/runtime from code and live evidence before diagnosing or reporting status.
 6. Never report behavior from memory alone.
 
@@ -35,140 +36,72 @@ Useful deeper references:
 - `docs/portables/self-healing-monitoring-current-state-20260813.md`
 - `docs/ONBOARD-full.md`
 
-`AGENTS.md` and `CLAUDE.md` are entry-point summaries. Current repository evidence and the newest dated handoff win over stale documentation.
+Current repository evidence and the newest dated handoff override stale documentation.
 
 ---
 
-# 2026-08-20 CURRENT COS RUNTIME OVERRIDE
+# 2026-08-20/21 CURRENT COS RUNTIME OVERRIDE
 
-The primary runtime objective is now a **provider-neutral COS-owned reasoning/learning system** that can use a managed open-model runtime without transferring ownership of memory, evidence, governance, skills, outcomes, or learning to that provider.
+COS is the durable learner and governance layer. Models/providers are replaceable compute.
 
-The durable asset is COS. The model/provider is replaceable compute.
-
-```text
-Observe
-→ Recall / Retrieve
-→ Reason
-→ Act under governance
-→ Verify
-→ Measure Outcome
-→ Learn / Retain / Weaken / Quarantine
-→ Repeat
-```
-
-The current managed open-model migration target is:
+Current production chain:
 
 ```text
 COS
-→ LOCAL_AI_* OpenAI-compatible transport
+→ provider-neutral LOCAL_AI_* seam
+→ OpenAI-compatible transport protocol
 → DeepInfra
 → Qwen/Qwen3.6-35B-A3B
 ```
 
-The word `openai` in DeepInfra's `/v1/openai` URL is a protocol-compatibility path. It does **not** mean OpenAI supplies the model, compute, account, API key, or billing.
+The `/v1/openai` segment in DeepInfra's base URL means **OpenAI-compatible API format only**. OpenAI does not supply the model, compute, account, API key, or billing for this path.
 
-Embedding path validated for the existing 768-dimensional COS schema:
+Current embedding chain:
 
 ```text
 COS semantic retrieval / learning
-→ LOCAL_AI embedding seam
+→ embedding seam
 → DeepInfra
 → BAAI/bge-base-en-v1.5
 → 768 dimensions
 → existing pgvector schema
 ```
 
----
-
-# DeepInfra Preview acceptance — PASSED
-
-Dedicated test branch used for migration work:
-
-`test/deepinfra-preview-20260820`
-
-Do **not** merge that branch into `main`. It contains temporary Preview-only validation endpoints and temporary Preview provider pins.
-
-Final hardened one-shot Preview validation returned:
-
-- `ok: true`
-- reasoner verdict: `ok`
-- reasoner model: `Qwen/Qwen3.6-35B-A3B`
-- reasoner base URL: `https://api.deepinfra.com/v1/openai`
-- health response: `ready` in ~404 ms
-- embedding dimensions: `768/768`
-- capability benchmark: `2/2`, `100%`
-- tracks: `provenance`, `memory-governance`
-- `responseSource: local_cos_reasoning`
-- `localModelInvoked: true`
-- `externalAiInvoked: false`
-- migration benchmark persistence: `false`
-
-Earlier acceptance probes also proved:
-
-- DeepInfra authentication works with the Preview secret;
-- the reasoner returns HTTP 200 and final text;
-- `BAAI/bge-base-en-v1.5` returns exactly 768 dimensions;
-- the old `nomic-embed-text` model name is not available on DeepInfra and must not be used there.
-
-Do not weaken the benchmark or provenance gates to improve scores. The 2/2 result is a small migration acceptance sample, not proof of mature ~85% workload independence.
+Do not describe DeepInfra as self-hosted, local compute, or OpenAI.
 
 ---
 
-# Permanent production-cutover PR
+# Production DeepInfra cutover — MERGED AND LIVE
 
-**PR #1318:** `Prepare COS DeepInfra production cutover`  
-**Branch:** `feat/cos-deepinfra-production-cutover-20260820`
+PR #1318, `Prepare COS DeepInfra production cutover`, merged into `main` as:
 
-This is the clean production branch. It is intentionally separate from the temporary DeepInfra test branch.
+`d3495d3727f7728510cae5d0781272a4b965e10f`
 
-Permanent changes in the cutover PR include:
+The merge removed provider-specific RunPod reasoner pins from `saas/vercel.json`. Runtime provider selection now comes from environment configuration instead of source-control defaults.
 
-- hard-detach RunPod lifecycle when `LOCAL_AI_BASE_URL` points outside RunPod, even if stale RunPod flags/credentials remain configured;
-- bypass RunPod wake/model-list readiness polling for managed non-RunPod reasoners;
-- optional `LOCAL_AI_REASONING_EFFORT` support for OpenAI-compatible model calls;
-- provider-neutral reasoner diagnostics where successful completion is authoritative for managed providers;
-- embedding-provider context-window handling while preserving exact 768-dimensional validation;
-- removal of provider-specific RunPod reasoner pins from `saas/vercel.json`, so the runtime provider is selected by Vercel environment rather than source-control defaults;
-- explicit managed-open-model provenance so DeepInfra is not mislabeled as self-hosted/local;
-- this updated onboarding and the dated DeepInfra handoff.
+The exact merge deployment:
 
-Intentionally excluded from the permanent PR:
+`dpl_GtaKzD7RJBEkTSSYLBjodgp4dXd7`
 
-- temporary Preview-only probe endpoints;
-- temporary Preview-only migration validation endpoint;
-- hard-coded DeepInfra URL/model settings;
-- API keys or other secrets.
+reached `READY` and owns `saas.signalboostapp.com`.
 
-A clean Vercel Preview for the initial permanent five-file runtime commit reached `READY`. After the final provenance/docs commits, re-check the newest PR #1318 Preview/CI before merge. Never assume the earlier green deployment covers later commits.
+Permanent runtime changes now on `main` include:
 
----
+- RunPod lifecycle hard-detaches whenever `LOCAL_AI_BASE_URL` points outside RunPod, even if stale RunPod IDs/credentials remain configured;
+- managed non-RunPod reasoners bypass RunPod wake/model-list readiness polling;
+- `LOCAL_AI_REASONING_EFFORT` support for OpenAI-compatible reasoner calls;
+- provider-neutral reasoner diagnostics, where a successful chat completion is authoritative for managed providers;
+- embedding-provider context-window handling with exact 768-dimension validation preserved;
+- managed-open-model provenance in the canonical COS reasoner path;
+- provider-specific reasoner values removed from `saas/vercel.json`.
 
-# Provenance semantics
-
-The COS primary-reasoner seam may use either self-hosted/local open-model compute or an approved managed open-model runtime.
-
-Expected reasoner labels after the permanent provenance change:
-
-```text
-independent-local:<model>
-managed-open-model:deepinfra:<model>
-```
-
-For the DeepInfra cutover the target label is:
-
-```text
-managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B
-```
-
-DeepInfra must never be described as self-hosted or as OpenAI.
-
-Closed-model OpenAI/Anthropic/Gemini paths remain explicitly governed external fallback/teacher providers and must not masquerade as the COS primary reasoner.
+Temporary Preview-only acceptance endpoints were **not** merged into `main`.
 
 ---
 
-# Production environment contract — DO NOT GUESS
+# Production environment contract
 
-After PR #1318 is merged and before declaring the migration complete, configure Production explicitly in Vercel:
+Production is expected to be configured in Vercel as:
 
 ```dotenv
 LOCAL_AI_BASE_URL=https://api.deepinfra.com/v1/openai
@@ -180,209 +113,237 @@ LOCAL_AI_MANAGED_PROVIDER=deepinfra
 LOCAL_AI_API_KEY=<DeepInfra production secret>
 ```
 
-`LOCAL_AI_API_KEY` must remain a Vercel/server-side secret. Never commit, print, paste into logs, or expose it.
+`LOCAL_AI_API_KEY` is a server-side secret. Never commit, print, log, or expose it.
 
-The connected Vercel tooling used during this migration can inspect deployments and logs but cannot read or modify secret environment values. Therefore the Production secret/config switch requires the Vercel environment UI or another explicitly authorized secret-management path.
-
-Do not change Production to DeepInfra until the permanent PR is green.
+The first post-merge Production diagnosis failed because `LOCAL_AI_API_KEY` was not scoped/configured for Production. That run returned `config_error` and **must not** be interpreted as model or COS capability failure. After the Production key was added and redeployed, the same diagnostic passed.
 
 ---
 
-# Production cutover acceptance gate
+# Production acceptance evidence — PASSED SO FAR
 
-The migration is **not complete** until all of the following are observed in Production after the environment switch:
+Owner-only Production diagnostic after the key fix returned:
 
-1. PR #1318 merged.
-2. Production deployment reaches `READY` on the merge commit.
-3. Production reasoner diagnose/probe reaches DeepInfra and returns a valid final completion.
-4. Production embedding health returns exactly 768 dimensions.
-5. A bounded capability benchmark completes with COS-local reasoning and no external AI.
-6. Normal request provenance reports `managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B`.
-7. Runtime telemetry shows RunPod lifecycle detached/false for the managed reasoner.
-8. A real COS learning/retention cycle remains operational after cutover.
-9. No temporary unauthenticated Preview validation route exists on `main`.
-
-A green Vercel build alone is not enough.
-
----
-
-# RunPod status / rollback
-
-Historical RunPod pod id:
-
-`yvj6e9zboi7ofo`
-
-Last known pre-migration Production reasoner settings:
-
-```dotenv
-RUNPOD_POD_ID=yvj6e9zboi7ofo
-LOCAL_AI_BASE_URL=https://yvj6e9zboi7ofo-11434.proxy.runpod.net/v1
-LOCAL_AI_ALLOWED_HOSTS=yvj6e9zboi7ofo-11434.proxy.runpod.net
-LOCAL_AI_MODEL=qwen2.5-coder:32b
+```text
+ok: true
+verdict: ok
+reasoner baseUrl: https://api.deepinfra.com/v1/openai
+reasoner model: Qwen/Qwen3.6-35B-A3B
+apiKeyPresent: true
+completion HTTP: 200
+completion text: ready
+completion latency: 244 ms
+embedding model: BAAI/bge-base-en-v1.5
+embedding dimensions: 768
+required dimensions: 768
 ```
 
-During migration validation, the RunPod pod was observed stopped (`EXITED`, `running:false`), so it was not burning the ~$0.22/hr GPU rate at that observation point.
+The diagnostic intentionally skipped `/models` for the managed provider and used the real completion as the authoritative health check.
 
-A historical configuration is **not** proof that RunPod can currently infer. Previous incidents included missing GPU device allocation, CPU fallback, model load failures, and host-capacity problems. Re-verify GPU/model health before relying on RunPod as rollback compute.
+Production runtime telemetry also recorded:
 
-Rollback if DeepInfra Production cutover fails:
+```text
+[cos-runpod-detached]
+selectedPodId: null
+reason: LOCAL_AI_BASE_URL points outside RunPod; RunPod lifecycle control is disabled for this reasoner.
+```
 
-1. restore the prior Production `LOCAL_AI_*` RunPod values;
-2. redeploy Production;
-3. verify RunPod GPU/model health and authenticated inference;
-4. verify COS reasoner + embeddings + bounded benchmark before calling rollback healthy.
+Therefore the following production gates are proven:
 
-Because PR #1318 removes provider-specific runtime pins from `saas/vercel.json`, rollback/provider switching is an environment operation rather than another source-code fork.
+1. PR #1318 merged — **PASS**.
+2. Exact merge deployment `READY` — **PASS**.
+3. Production reasoner reaches DeepInfra and returns final text — **PASS**.
+4. Production embedding health returns exactly 768 dimensions — **PASS**.
+5. RunPod lifecycle detached from the active reasoner — **PASS**.
+6. Temporary unauthenticated Preview acceptance route absent from `main` — **PASS by merge design**.
+
+Still pending at this exact handoff:
+
+7. A fresh **Production private held-out capability benchmark after the API-key fix**. Historical failed runs with `attempted=0` are runtime/config failures, not capability scores and must not be counted as 0% competence.
+8. A live ordinary-turn provenance sample showing `managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B` from the normal COS answer path.
+
+Do not claim the full post-cutover acceptance matrix complete until those two observations are captured.
+
+---
+
+# Preview migration acceptance — historical proof
+
+Dedicated migration branch:
+
+`test/deepinfra-preview-20260820`
+
+Do **not** merge that branch. It contains temporary Preview-only acceptance code and temporary provider pins.
+
+Final hardened Preview validation proved:
+
+- reasoner model `Qwen/Qwen3.6-35B-A3B`;
+- DeepInfra base URL `https://api.deepinfra.com/v1/openai`;
+- health completion `ready`;
+- `BAAI/bge-base-en-v1.5` exactly 768 dimensions;
+- held-out acceptance batch 2/2, 100%;
+- `responseSource: local_cos_reasoning`;
+- `localModelInvoked: true`;
+- `externalAiInvoked: false`;
+- migration benchmark persistence disabled.
+
+That 2/2 sample proves migration compatibility, not mature workload-wide independence.
+
+---
+
+# Live COS learning continuity after cutover
+
+Direct Production database snapshot after the DeepInfra reasoner became healthy:
+
+```text
+cos_continuous_learning rows: 152
+last retention: 2026-08-19T23:13:38.050675Z
+hours since last retention at query time: ~25.4
+retained documents last 7d: 77
+distinct subjects last 7d: 36
+new subjects last 7d: 21
+learning gaps: 27 resolved, 6 failed, 0 pending/learning
+```
+
+Interpretation:
+
+- The migration did **not** erase or disconnect COS-owned learned knowledge.
+- Learning volume is substantial over the last 7 days.
+- The continuity watchdog remains AMBER because there are zero open gaps; its policy intentionally treats an all-closed gap table as suspicious.
+- `failed` gaps exist and should be reviewed separately; zero `pending/learning` does not mean COS has nothing left to learn.
+- The next scheduled/explicit learning cycle should be observed under DeepInfra to prove new post-cutover retention, not merely survival of pre-cutover corpus rows.
+
+COS learning is durable system memory/knowledge/skills/outcomes. It is **not** model-weight fine-tuning on DeepInfra.
+
+---
+
+# Provenance semantics
+
+Canonical primary reasoner labels are:
+
+```text
+independent-local:<model>
+managed-open-model:deepinfra:<model>
+```
+
+For the current Production reasoner the expected canonical label is:
+
+```text
+managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B
+```
+
+The main `cosReasoner.ts` path implements this distinction.
+
+Known cleanup found during the post-cutover provenance sweep:
+
+- `saas/lib/ai/cos/freshEvidenceLocalSynthesis.ts` still constructs `independent-local:<model>` directly for the fresh-live-evidence local synthesis path;
+- `saas/app/api/cos-primary/baseRoute.ts` also has a fallback `localReasonerLabel()` that hard-codes `independent-local:` before/when fresh local synthesis declines.
+
+This does **not** change which provider is actually invoked, but it can mislabel provenance on that secondary fresh-evidence path. Fix both to use the canonical reasoner-label resolver. Until that fix is merged and production-proven, do not claim every COS path has perfect managed-provider labeling.
+
+Closed-model OpenAI/Anthropic/Gemini routes remain governed external fallback/teacher providers and must never masquerade as the COS primary reasoner.
 
 ---
 
 # Embedding doctrine
 
-The COS learned-corpus / semantic retrieval schema is currently pinned to **768 dimensions**.
+The COS semantic/learned-corpus schema is pinned to **768 dimensions**.
 
 Canonical files:
 
 - `saas/lib/ai/cos/embeddingEndpoint.ts`
 - `saas/lib/ai/cos/localEmbeddings.ts`
 
-Do not silently pad/truncate vectors to fake compatibility. A model swap must either return exactly 768 dimensions or be accompanied by a deliberate database/RPC migration and re-embedding plan.
+Do not pad/truncate vectors merely to fake compatibility. A model change must either return exactly 768 dimensions or include a deliberate database/RPC migration and full re-embedding plan.
 
-DeepInfra candidate `BAAI/bge-base-en-v1.5` passed the 768-dimensional gate.
+`BAAI/bge-base-en-v1.5` passed the exact 768-dimension gate.
 
-Observed provider constraint: BGE rejected an input at 513 tokens because its available input length was 512. Permanent code now handles provider context-window overflow with bounded truncation/retry while preserving the exact dimension check.
+Observed provider constraint: BGE's available input window is 512 tokens. Permanent code handles provider context-window overflow with bounded truncation/retry.
 
-Follow-up optimization: the current bounded retry can still make several progressively shorter attempts for a long text. Improve it so the common oversized case usually requires at most one retry, without weakening semantic integrity or dimension validation.
+Follow-up optimization: the current retry may make several progressively shorter embedding attempts for a long input. Optimize toward one bounded retry while preserving semantic integrity and exact dimension validation.
 
 ---
 
 # Latency / Cognitive Council finding
 
-Migration correctness passed, but full COS turn latency remains an engineering concern.
+DeepInfra connectivity is fast for the health probe (~244–404 ms), but full COS turns can be much slower because COS may invoke multiple model calls for Council advisory/challenge/rebuttal/repair phases.
 
-Final hardened held-out case latency:
+Preview evidence showed:
 
-- provenance: ~36.988 s
-- memory-governance: ~201.575 s
+- one provenance benchmark case around 37 seconds;
+- one memory-governance case around 202 seconds;
+- runtime logs showed several individual Qwen calls plus a Cognitive Council escalation.
 
-The ~201 s case was **not** one 201-second DeepInfra request. Vercel telemetry showed COS activated Cognitive Council for a repeated unresolved problem class and made several additional Qwen calls, including multiple calls in roughly the 30–65 second range.
+Do not diagnose a long COS turn as a single slow DeepInfra request without reading the model-call telemetry.
 
-Therefore:
-
-- DeepInfra authentication/connectivity is not the long-tail root cause;
-- Council/challenge/repair orchestration can dominate total turn time;
-- do not disable Council only to make benchmark latency look better;
-- make optional phases deadline-aware using measured/rolling provider latency rather than relying only on a static estimate;
-- always reserve enough wall-clock time to return the best answer already available before the 300 s route ceiling.
-
-Canonical budget file:
-
-`saas/lib/ai/cos/cosTurnBudget.ts`
+Follow-up: make Council/optional reasoning phases more adaptive to observed managed-provider latency and the total 300-second turn budget. Preserve quality; do not disable Council merely to improve benchmark time.
 
 ---
 
-# COS learning continuity — current evidence
+# RunPod historical state / rollback
 
-Latest migration validation read the production-backed continuity report as:
+Historical RunPod pod IDs have changed during migration work. Do not assume an old ID is current or usable merely because it exists in an environment variable or log.
 
-- status: `amber`
-- corpus documents: 152
-- documents retained in last 7 days: 77
-- new subjects in last 7 days: 21
-- silent days in last 7 days: 1
-- last retention: ~24.5 hours before the check
-- open gaps: 0
-- finding: `no_open_gaps`
+The important runtime rule is now provider-driven:
 
-This is **not evidence that DeepInfra stopped learning**. The continuity policy intentionally marks zero open gaps amber because an all-resolved gap table can indicate over-aggressive/bulk closure rather than a healthy stream of unresolved questions.
+- if `LOCAL_AI_BASE_URL` is RunPod, RunPod lifecycle logic may apply;
+- if it points outside RunPod, lifecycle control must remain detached.
 
-Current interpretation:
+A historical RunPod configuration is not proof that the pod currently has a GPU, can load the model, or can infer. Previous incidents included missing GPU device allocation, CPU fallback, model-load termination, and host-capacity failures.
 
-- retention is happening;
-- the corpus is expanding into new subjects;
-- the learning-gap generation/resolution lifecycle needs inspection;
-- preserve the amber watchdog until the cause of zero open gaps is understood.
+Rollback from DeepInfra, if ever required, is an environment operation:
 
-Do not lower the watchdog standard merely to make the dashboard green.
+1. restore a verified healthy self-hosted/RunPod `LOCAL_AI_BASE_URL`, host allowlist, model and key;
+2. redeploy;
+3. verify GPU/model health and authenticated inference;
+4. verify exact 768-dimensional embeddings;
+5. run the bounded private benchmark;
+6. verify provenance and learning continuity before calling rollback healthy.
+
+Because source-controlled provider pins were removed in #1318, provider switching no longer requires a source-code fork.
 
 ---
 
-# COS learning / independence doctrine
+# COS independence / learning doctrine
+
+North-star loop:
+
+```text
+Observe
+→ Attempt
+→ Measure
+→ Identify Gap
+→ Investigate
+→ Learn
+→ Practice
+→ Validate
+→ Use
+→ Measure Outcome
+→ Retain / Strengthen / Weaken / Quarantine
+→ Compose
+→ Repeat
+```
 
 The underlying model is replaceable compute. **COS is the learner.**
 
-Durable COS assets include:
+Durable COS-owned assets include:
 
 - Enterprise Memory;
-- Knowledge Graph;
-- learned corpus / semantic memory;
-- cognitive experiences;
-- validated procedural skills;
-- cognitive/metacognitive capability state;
-- verified production outcomes;
+- Knowledge Graph facts;
+- Continuous Learning corpus;
+- procedural cognitive skills;
+- cognitive experiences/episodic memory;
+- verified outcomes;
+- curriculum/gap state;
 - source/provenance knowledge;
-- policy/governance;
-- benchmark and feedback evidence.
+- policy/governance state;
+- answer/cache policy and reuse evidence.
 
-A model response is not automatically learned knowledge.
+A provider answer is not automatically truth. A cached answer is not new competence. A runtime pass is not held-out certification. A learning row is not mastery.
 
-A source document is not automatically learned knowledge.
-
-A teacher answer is not automatically truth.
-
-A successful training example is not held-out mastery.
-
-Cache reuse is operational independence but not new reasoning competence.
-
-The mature target remains approximately **85% independent pass rate on a separate held-out SignalBoost workload**, with higher numbers only if independent evidence supports them.
-
-Never lower the 0.72 confidence/evidence gate, fabricate skills, or count self-generated practice as hidden-holdout evidence to inflate the score.
+The mature target remains roughly **85% independent pass rate on a broad separate held-out SignalBoost workload**. Never lower evidence/confidence gates or count self-generated practice as hidden holdout evidence to improve the number.
 
 ---
 
-# Private capability benchmark
-
-Owner dashboard:
-
-`/dashboard/cos-capability-benchmark`
-
-API:
-
-`/api/admin/cos-capability-benchmark`
-
-Rules:
-
-- held-out cases are private and outside normal learning acquisition;
-- exact/semantic cache reuse does not count as fresh capability;
-- external AI cannot satisfy the local-COS reasoning requirement;
-- each normal web run is bounded to at most two cases;
-- infrastructure/unavailable-reasoner runs must not be recorded as capability failures;
-- benchmark history and migration acceptance probes are separate evidence classes.
-
-The temporary migration validator intentionally used `persisted:false` so its test did not pollute Production benchmark history.
-
----
-
-# Enterprise Memory / Semantic Cache doctrine
-
-Do not conflate these systems.
-
-**Enterprise Memory** is durable, authorized organization-scoped operational knowledge: facts, decisions, history, and reusable enterprise intelligence. It is not an answer cache.
-
-**Semantic Cache** is policy-versioned, age-bounded answer reuse when a new request is sufficiently similar to a previously generated answer. Embeddings are the retrieval index, not the cached knowledge itself.
-
-Organization/user-scoped context must never be reused through an unscoped cache entry.
-
-Authoritative evidence funnel:
-
-```text
-retrieved → relevant → selected → injected → cited
-```
-
-A subsystem counts as `USED` only when it materially contributed to the answer; retrieval/injection alone is not use.
-
----
-
-# COS execution order
+# Execution order
 
 ```text
 Request / Goal
@@ -392,181 +353,62 @@ Request / Goal
 → Knowledge Graph
 → Continuous Learning / bounded context
 → validated procedural skills
-→ COS primary open-model reasoning seam
+→ COS primary reasoner
 → confidence/evidence gate
-→ bounded research or replaceable external teacher/provider only when justified and permitted
+→ bounded live research or approved external teacher/fallback only when justified
 → verification
 → learning / episodic memory / skill practice / ROI telemetry
 ```
 
-Primary enterprise answer path:
-
-`saas/lib/ai/cos/cosFirstAnswerEnterprise.ts`
-
-Primary reasoner seam:
-
-- `saas/lib/ai/cos/cosReasoner.ts`
-- `saas/lib/ai/local-inference.ts`
+Providers are replaceable edges around a COS-owned core.
 
 ---
 
-# Provider neutrality / BYOM / BYOA
+# Immediate priorities after DeepInfra cutover
 
-Required properties:
-
-- no mandatory Qwen, RunPod, DeepInfra, OpenAI, Anthropic, Gemini, or other provider dependency;
-- buyer-owned credentials/compute where desired;
-- replaceable model/agent adapters;
-- models/providers are not governance authorities;
-- COS-owned memory, skills, provenance, outcome history, policy, and learning survive model/provider swaps.
-
-DeepInfra is the current managed open-model candidate for SignalBoost development/runtime economics. It is not part of COS product identity.
-
-Reference:
-
-- `docs/portables/cos-byom-byoa-enterprise.md`
-- `saas/lib/release-candidate/cos-enterprise-ai.ts`
-
----
-
-# Self-Healing Supervisor — preserve governance
-
-Self-Healing remains proactive and governed.
-
-Canonical loop:
-
-```text
-Native monitor / external signal
-→ bounded evidence
-→ normalize incident
-→ COS-first diagnosis
-→ registered repair plan
-→ Agent Gateway / MCP governance
-→ execute only if explicitly permitted
-   OR stage / require approval / fail closed
-→ verify
-→ audit
-→ learn
-```
-
-Automatic routine repair never means arbitrary mutation. Unknown/consequential/destructive/financial/security actions remain governed and approval-gated.
-
-Current detailed handoff:
-
-`docs/portables/self-healing-monitoring-current-state-20260813.md`
-
----
-
-# Marketing & Sales state
-
-Core Marketing & Sales architecture is substantially complete and must remain integrated with COS rather than becoming a provider-owned silo.
-
-Major platform layers include:
-
-- Enterprise Memory / Knowledge Graph / Continuous Learning;
-- Prospect Intelligence;
-- Business Intelligence Corpus;
-- Communication Hub;
-- CRM integration framework and production adapters;
-- campaign/outreach queues;
-- Revenue Intelligence;
-- Universal Adapter seams;
-- approvals / audit / telemetry / cost governance;
-- localization guardrails.
-
-The 5,000-company Business Intelligence Corpus remains a data-population/coverage target, not an architectural reason to bypass COS or use external providers first.
+1. Run one new two-case **Production private capability benchmark** after the Production API key fix; record pass/fail and latencies. Do not count `attempted=0` config/runtime failures as competence failures.
+2. Capture an ordinary Production COS answer and its authoritative provenance; confirm the main path reports `managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B`.
+3. Fix the two secondary fresh-evidence provenance labels that still hard-code `independent-local:` and add a regression test covering managed-provider fresh synthesis/failure provenance.
+4. Observe the next Production learning cycle under DeepInfra and confirm at least one new retention or an explicit healthy duplicate/saturation outcome. Separate a dead pipeline from a cycle that ran and retained nothing because all candidates were duplicates/rejected.
+5. Investigate why the learning-gap table currently has no pending/learning gaps while 6 are failed; do not bulk-resolve gaps merely to make the watchdog green.
+6. Optimize BGE oversized-input handling toward one bounded retry.
+7. Make Cognitive Council optional phases more latency-aware under managed inference while preserving answer quality and the 300-second turn budget.
+8. Continue broad COS learning/skill expansion, verified-outcome learning, hidden held-out certification, and model-swap survivability testing.
+9. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries, and evidence-based Enterprise RC requirements.
 
 ---
 
 # Security / secrets
 
-Non-negotiable:
-
-- never hard-code or expose provider secrets;
-- never print full API keys/tokens;
-- never expose `/workspace/cos-api-key`;
-- use approved Vault/environment/server-side storage boundaries;
-- preserve tenant/org scoping and RLS/service-role assumptions;
-- keep owner/admin routes server-gated;
-- keep cron routes `CRON_SECRET` protected;
-- remote inference must use HTTPS, authentication, and exact-host allowlisting;
-- do not create temporary unauthenticated Production triggers for convenience;
-- temporary Preview migration endpoints must never land on `main`.
-
----
-
-# Build / test / deploy rules
-
-- Read files before changing them.
-- Prefer coherent batches of related changes.
-- Preserve existing behavior unless the task requires change.
-- Run/observe relevant typecheck, build, tests, CI, and live acceptance before calling a batch successful.
-- Never claim CI/build/deployment passed unless it actually did.
-- Never call a branch commit Production.
-- Never call a green Vercel deployment Enterprise RC acceptance.
-- Re-check current `main` after concurrent work.
-- Production database state must be verified separately from a green build.
-- For provider migrations, prove reasoner + embeddings + provenance + benchmark + learning continuity separately.
-
----
-
-# Immediate next engineering priorities
-
-1. Finish PR #1318 validation after the provenance/docs commits; merge only when the newest clean Preview/CI is green.
-2. Configure the Production DeepInfra `LOCAL_AI_*` environment values and secret after merge.
-3. Run Production reasoner/embedding/provenance/benchmark acceptance before declaring cutover complete.
-4. Verify a real post-cutover COS learning/retention cycle.
-5. Improve Cognitive Council / optional-phase budget decisions using measured provider latency so the system cannot spend most of the 300 s turn budget on advisory/challenge/repair work.
-6. Reduce BGE over-window handling to a predictable single truncation/retry in the common case.
-7. Investigate zero open learning gaps while preserving the amber continuity watchdog.
-8. Remove the temporary DeepInfra Preview test branch/routes after Production acceptance.
-9. Continue the broader COS continuous-learning curriculum and held-out independence program across cyber defense, software engineering/computer science, AI systems/safety, ML/data, business, marketing, sales, cloud, networking, SRE, Postgres, and other already-governed tracks.
-10. Preserve BYOM/BYOA, provenance, source authority, tenant isolation, approval boundaries, and Enterprise RC evidence requirements throughout all future learning/runtime changes.
-
----
-
-# Recent sequence that matters for this cutover
-
-- PR #1311 — learning continuity watchdog.
-- PR #1312 — derived strategy-profile learning.
-- PR #1313 — benchmark feedback-loop curation.
-- PR #1314 — benchmark review queue / failure-pattern hardening.
-- PR #1316 — RunPod recovery / lifecycle hardening.
-- PR #1317 — provider-neutral COS reasoner runtime; merge `6fd32c7f4149889b98b4726ac79b7b6435faaf50`.
-- Dedicated DeepInfra Preview migration then proved Qwen reasoner + 768d BGE embeddings + 2/2 held-out cases with no external AI.
-- PR #1318 — clean permanent production-cutover runtime + provider-neutral deployment config + managed-open-model provenance + current handoff/docs.
-
-Always query GitHub/Vercel for the current PR/merge/deployment state instead of assuming this sequence has not advanced.
+- Never hard-code or expose provider secrets.
+- Never print full API keys/tokens.
+- Keep owner/admin routes server-gated.
+- Keep cron routes protected.
+- Remote inference must use HTTPS, authentication and exact-host allowlisting.
+- Consequential actions remain behind applicable governance/approval controls.
+- Do not add unauthenticated Production validation endpoints merely to accelerate acceptance.
 
 ---
 
 # Status language
 
-Use precise actual states.
+Use precise states:
 
-A plan is not execution.  
-A queue row is not a sent email.  
-An attempted publish is not a published asset.  
-A branch is not Production.  
-A green deployment is not Enterprise RC acceptance.  
-Architecture support is not configured-runtime proof.  
-A staged adapter is not certified.  
-An episodic encounter is not knowledge.  
-COS gate acceptance is not a verified real-world outcome.  
-Runtime independence is not held-out certification.  
-Cache reuse is not new reasoning competence.  
-Current-fact retrieval is not timeless memory.  
-A managed open-model provider is not self-hosted merely because it uses the `LOCAL_AI_*` seam.  
-`/v1/openai` compatibility does not mean OpenAI is the provider.
+- a green build is not Enterprise RC;
+- a branch is not Production;
+- a configured model is not a healthy model until runtime-proven;
+- a provider health probe is not a capability benchmark;
+- an `attempted=0` benchmark is a blocked run, not 0% capability;
+- a cached answer is not new reasoning competence;
+- an episodic encounter is not validated knowledge;
+- a retained document is not mastery;
+- Preview evidence is not Production evidence;
+- DeepInfra is managed open-model inference, not self-hosted and not OpenAI.
 
 ---
 
 # Definition of success
 
-The best external AI/data call is the one COS can safely avoid because SignalBoost already owns sufficient validated intelligence.
+SignalBoost succeeds when COS-owned memory, skills, evidence, governance and verified outcomes survive model/provider replacement and measurably reduce repeated external dependence without weakening quality or safety.
 
-The best architecture lets models/providers be replaced without rewriting business intelligence, memory, learning, governance, or control logic.
-
-For COS learning, success means validated experience measurably improves held-out performance, retains that improvement, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance.
-
-For this runtime migration, success means COS can move from RunPod/Ollama to DeepInfra/Qwen while keeping its memory, embeddings, learning, benchmark behavior, provenance, governance, rollback path, and external-AI independence intact.
+The long-term proof is a trend: more problems completed with COS-owned intelligence and replaceable compute, fewer unnecessary teacher/provider calls, stronger verified real-world outcomes, honest provenance/confidence, and stable capability when the underlying model/provider changes.

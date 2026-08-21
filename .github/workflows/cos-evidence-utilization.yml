@@ -1,0 +1,34 @@
+name: COS Evidence Utilization Regression
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/ai/cos/contextRelevance.ts'
+      - 'saas/lib/ai/cos/cognitiveTurnExperience.ts'
+      - 'saas/tests/contextRelevance.node.test.ts'
+      - 'saas/tests/cosEvidenceUtilization.node.test.ts'
+      - '.github/workflows/cos-evidence-utilization.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/ai/cos/contextRelevance.ts'
+      - 'saas/lib/ai/cos/cognitiveTurnExperience.ts'
+      - 'saas/tests/contextRelevance.node.test.ts'
+      - 'saas/tests/cosEvidenceUtilization.node.test.ts'
+      - '.github/workflows/cos-evidence-utilization.yml'
+
+jobs:
+  evidence-utilization:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify conservative relevance and utilization metrics
+        run: npx --yes tsx --test tests/contextRelevance.node.test.ts tests/cosEvidenceUtilization.node.test.ts

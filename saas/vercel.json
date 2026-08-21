@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run prebuild && next build",
+  "buildCommand": "node --test tests/cosOutcomeCorrelation.node.test.ts && npm run prebuild && next build",
   "ignoreCommand": "exit 1",
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",

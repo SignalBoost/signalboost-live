@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { embeddingModelName } from '@/lib/ai/cos/embeddingEndpoint'
 import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge/index.ts'
 import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent.ts'
 import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory/index.ts'
@@ -42,6 +43,7 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
       query_embedding: vector,
       match_task_id: options.taskId,
       match_count: 1,
+      match_embedding_model: embeddingModelName(),
     })
     if (error) throw error
     const row = data?.[0]
@@ -59,6 +61,7 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
       prompt_text: record.promptText,
       context_text: record.contextText,
       embedding: record.embeddingVector,
+      embedding_model: embeddingModelName(),
       response_data: record.responseData,
       created_at: record.createdAt.toISOString(),
     })
@@ -83,7 +86,10 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
       source: fact.source,
       updated_at: fact.updatedAt.toISOString(),
     }
-    if (embeddingVector?.length) payload.embedding = embeddingVector
+    if (embeddingVector?.length) {
+      payload.embedding = embeddingVector
+      payload.embedding_model = embeddingModelName()
+    }
     const { error } = await this.db.from('cos_knowledge_facts').upsert(payload, { onConflict: 'task_id,subject,predicate' })
     if (error) throw error
   }
@@ -100,6 +106,7 @@ export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
       query_embedding: vector,
       match_count: Math.max(1, Math.min(50, Math.floor(options.matchCount ?? 16))),
       min_similarity: Math.max(0, Math.min(1, options.minSimilarity ?? 0.55)),
+      match_embedding_model: embeddingModelName(),
     })
     if (error) throw error
     return (data ?? []).map((row: any) => ({

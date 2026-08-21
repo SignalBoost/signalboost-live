@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/learnedCorpusSemantic.ts
 //
 // Semantic retrieval + governed embedding backfill for the learned corpus.
+// Vector compatibility is model-specific: equal dimensions do not imply equal semantic space.
 
 type ServiceDb = NonNullable<Awaited<ReturnType<typeof import('@/lib/cos-core/storage/supabase')['cosServiceDb']>>>
 
@@ -15,6 +16,11 @@ async function serviceDb(): Promise<ServiceDb | null> {
 async function embed(text: string): Promise<number[]> {
   const { generatePassiveLocalEmbedding } = await import('@/lib/ai/cos/localEmbeddings')
   return generatePassiveLocalEmbedding(text)
+}
+
+async function activeEmbeddingModel(): Promise<string> {
+  const { embeddingModelName } = await import('@/lib/ai/cos/embeddingEndpoint')
+  return embeddingModelName()
 }
 
 function stableText(value: unknown, max: number): string {
@@ -48,6 +54,7 @@ export type LearnedCorpusBackfillResult = {
   embedded: number
   failed: number
   remaining: number | null
+  model?: string
   error?: string
 }
 
@@ -57,9 +64,9 @@ export type LearnedCorpusEmbeddingStats = {
   eligible: number | null
   eligibleEmbedded: number | null
   pending: number | null
+  model?: string | null
 }
 
-/** The exact subject + summary + structured-facts projection used for local corpus embeddings. */
 export function learnedCorpusEmbeddingText(row: {
   subject?: unknown
   summary?: unknown
@@ -71,17 +78,19 @@ export function learnedCorpusEmbeddingText(row: {
   return [stableText(row.subject, 240), stableText(row.summary, 1600), facts].filter(Boolean).join('\n')
 }
 
-/** Nearest retained corpus rows. Rejected rows are excluded by the database RPC. */
+/** Nearest retained corpus rows in the ACTIVE embedding model space only. */
 export async function queryNearestLearnedCorpus(
   vector: number[],
   options: { matchCount?: number; minSimilarity?: number } = {},
 ): Promise<LearnedCorpusRow[]> {
   const db = await serviceDb()
   if (!db) return []
+  const model = await activeEmbeddingModel()
   const { data, error } = await db.rpc('cos_match_continuous_learning', {
     query_embedding: vector,
     match_count: Math.max(1, Math.min(64, Math.floor(options.matchCount ?? 24))),
     min_similarity: Math.max(0, Math.min(1, options.minSimilarity ?? 0.45)),
+    match_embedding_model: model,
   })
   if (error) throw error
   return (data ?? []).map((row: any): LearnedCorpusRow => ({
@@ -97,19 +106,21 @@ export async function queryNearestLearnedCorpus(
   }))
 }
 
-/** Truthful learned-corpus embedding state. Total retained rows never doubles as the backlog. */
+/** Truthful learned-corpus state for the ACTIVE embedding model, not merely non-NULL vectors. */
 export async function getLearnedCorpusEmbeddingStats(): Promise<LearnedCorpusEmbeddingStats> {
   const db = await serviceDb()
-  if (!db) return { total: null, rejected: null, eligible: null, eligibleEmbedded: null, pending: null }
+  if (!db) return { total: null, rejected: null, eligible: null, eligibleEmbedded: null, pending: null, model: null }
+  const model = await activeEmbeddingModel()
 
   const [totalResult, rejectedResult, embeddedResult] = await Promise.all([
     db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true }),
     db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true }).ilike('fact_extraction_error', `${REJECTED_PREFIX}%`),
-    db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true }).not('embedding', 'is', null).or(ELIGIBLE_FILTER),
+    db.from('cos_continuous_learning').select('content_hash', { count: 'exact', head: true })
+      .not('embedding', 'is', null).eq('embedding_model', model).or(ELIGIBLE_FILTER),
   ])
 
   if (totalResult.error || rejectedResult.error || embeddedResult.error) {
-    return { total: null, rejected: null, eligible: null, eligibleEmbedded: null, pending: null }
+    return { total: null, rejected: null, eligible: null, eligibleEmbedded: null, pending: null, model }
   }
 
   const total = totalResult.count ?? 0
@@ -117,15 +128,14 @@ export async function getLearnedCorpusEmbeddingStats(): Promise<LearnedCorpusEmb
   const eligible = Math.max(0, total - rejected)
   const eligibleEmbedded = Math.max(0, Math.min(eligible, embeddedResult.count ?? 0))
   const pending = Math.max(0, eligible - eligibleEmbedded)
-  return { total, rejected, eligible, eligibleEmbedded, pending }
+  return { total, rejected, eligible, eligibleEmbedded, pending, model }
 }
 
-/** Number of useful retained rows still missing an embedding. Quarantined rows do not count. */
 export async function countPendingLearnedCorpusEmbeddings(): Promise<number | null> {
   return (await getLearnedCorpusEmbeddingStats()).pending
 }
 
-/** Best-effort embed-on-write for one accepted corpus row. This background path never wakes GPU compute. */
+/** Best-effort embed-on-write for one accepted corpus row. */
 export async function embedLearnedCorpusRow(row: {
   content_hash: string
   subject?: unknown
@@ -139,45 +149,69 @@ export async function embedLearnedCorpusRow(row: {
   const db = await serviceDb()
   if (!db) return { embedded: false, error: 'COS Supabase service store is not configured' }
   try {
+    const model = await activeEmbeddingModel()
     const vector = await embed(learnedCorpusEmbeddingText(row))
-    const { error } = await db.from('cos_continuous_learning').update({ embedding: vector }).eq('content_hash', row.content_hash)
+    const { error } = await db.from('cos_continuous_learning')
+      .update({ embedding: vector, embedding_model: model })
+      .eq('content_hash', row.content_hash)
     if (error) throw error
     return { embedded: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.warn('learnedCorpusSemantic: embedding unavailable; row stored without vector', { contentHash: row.content_hash, error: message })
+    console.warn('learnedCorpusSemantic: embedding unavailable; row stored without current-model vector', { contentHash: row.content_hash, error: message })
     return { embedded: false, error: message }
   }
 }
 
+const CORPUS_SELECT = 'content_hash,subject,summary,facts,confidence,fact_extraction_error,embedding_model'
+
 /**
- * Incrementally embed only eligible retained corpus rows. Relevance-rejected rows intentionally stay
- * unembedded so semantic retrieval and backfill status cannot mistake quarantine for usable memory.
- * The background batch is passive and never resumes stopped RunPod compute.
+ * Embed eligible rows with no vector OR a vector from a different embedding model.
+ * Relevance-rejected rows remain quarantined and are intentionally excluded.
  */
 export async function backfillLearnedCorpusEmbeddings(limit = 4): Promise<LearnedCorpusBackfillResult> {
   const db = await serviceDb()
   if (!db) return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: 'COS Supabase service store is not configured' }
 
+  const model = await activeEmbeddingModel()
   const requested = Math.max(1, Math.min(8, Math.floor(limit)))
-  const pending = await db.from('cos_continuous_learning')
-    .select('content_hash,subject,summary,facts,confidence,fact_extraction_error')
-    .is('embedding', null)
+  const missing = await db.from('cos_continuous_learning')
+    .select(CORPUS_SELECT)
+    .or('embedding.is.null,embedding_model.is.null')
     .or(ELIGIBLE_FILTER)
     .order('confidence', { ascending: false })
     .order('observed_at', { ascending: false })
     .limit(requested)
 
-  if (pending.error) {
-    const message = pending.error.message || String(pending.error)
-    console.warn('learnedCorpusSemantic: embedding backfill skipped', message)
-    return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: message }
+  if (missing.error) {
+    const message = missing.error.message || String(missing.error)
+    return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, model, error: message }
   }
 
-  const eligible = (pending.data ?? []).filter(row => !learnedCorpusRowRejected(row))
-  const attempts = await Promise.allSettled(eligible.map(async row => {
+  const rows = (missing.data ?? []).filter(row => !learnedCorpusRowRejected(row))
+  const remainingSlots = requested - rows.length
+  if (remainingSlots > 0) {
+    const stale = await db.from('cos_continuous_learning')
+      .select(CORPUS_SELECT)
+      .not('embedding', 'is', null)
+      .not('embedding_model', 'is', null)
+      .neq('embedding_model', model)
+      .or(ELIGIBLE_FILTER)
+      .order('confidence', { ascending: false })
+      .order('observed_at', { ascending: false })
+      .limit(remainingSlots)
+    if (stale.error) {
+      return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, model, error: stale.error.message }
+    }
+    rows.push(...(stale.data ?? []).filter(row => !learnedCorpusRowRejected(row)))
+  }
+
+  const unique = [...new Map(rows.map(row => [String(row.content_hash), row])).values()]
+  const attempts = await Promise.allSettled(unique.map(async row => {
     const vector = await embed(learnedCorpusEmbeddingText(row))
-    const { error } = await db.from('cos_continuous_learning').update({ embedding: vector }).eq('content_hash', row.content_hash)
+    const { error } = await db.from('cos_continuous_learning')
+      .update({ embedding: vector, embedding_model: model })
+      .eq('content_hash', row.content_hash)
     if (error) throw error
     return row.content_hash
   }))
@@ -187,8 +221,8 @@ export async function backfillLearnedCorpusEmbeddings(limit = 4): Promise<Learne
   const failed = rejected.length
   const errors = rejected.map(result => (result.reason instanceof Error ? result.reason.message : String(result.reason)))
   const remaining = await countPendingLearnedCorpusEmbeddings()
-  const attempted = eligible.length
+  const attempted = unique.length
   const status: LearnedCorpusBackfillResult['status'] = attempted === 0 ? 'skipped' : embedded === 0 && failed > 0 ? 'error' : 'backfilled'
 
-  return { status, attempted, embedded, failed, remaining, ...(errors.length ? { error: errors.join(' | ').slice(0, 1500) } : {}) }
+  return { status, attempted, embedded, failed, remaining, model, ...(errors.length ? { error: errors.join(' | ').slice(0, 1500) } : {}) }
 }

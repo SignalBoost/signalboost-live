@@ -62,6 +62,12 @@ test('ordinary COS answers enrich server-stored provenance with the request-loca
   assert.match(source, /beginEvidenceSourceUseTurn\(\)/)
 })
 
+test('authoritative provenance preserves the reasoner turn id for server-owned message persistence', () => {
+  const source = file('../lib/ai/cos/cosOrchestration.ts')
+  assert.match(source, /typeof current\?\.turnId === 'string'/)
+  assert.match(source, /provenance\.turnId = turnId/)
+})
+
 test('assistant feedback derives turn id from server-owned message provenance, never the client body', () => {
   const source = file('../app/api/assistant/feedback/route.ts')
   assert.match(source, /select\('role,content,created_at,provenance'\)/)

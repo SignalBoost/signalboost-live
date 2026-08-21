@@ -9,7 +9,14 @@ import { t } from '@/lib/i18n/t'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Message = { role: 'user' | 'assistant'; content: string }
+type FeedbackKind = 'positive' | 'negative' | 'correction'
+type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }
+type Message = {
+  role: 'user' | 'assistant'
+  content: string
+  feedbackPrompt?: string
+  feedbackEligible?: boolean
+}
 type VideoItem = { title: string; type: string; id: string }
 
 type Attachment = {
@@ -102,6 +109,7 @@ export default function Concierge() {
 
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
+  const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -240,8 +248,34 @@ export default function Concierge() {
     setInput('')
     setLoading(false)
     setMessages([])
+    setFeedbackByMessage({})
     setAttachments([])
     conversationIdRef.current = ''
+  }
+
+  async function submitFeedback(messageIndex: number, message: Message, feedbackType: FeedbackKind, correctionText?: string) {
+    const conversationId = conversationIdRef.current
+    if (!conversationId || !message.feedbackEligible || !message.feedbackPrompt || !message.content.trim()) return
+    const current = feedbackByMessage[messageIndex]
+    if (current?.status === 'saving') return
+    setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { ...prev[messageIndex], status: 'saving', kind: feedbackType } }))
+    try {
+      const response = await fetch('/api/assistant/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          assistantContent: message.content,
+          userPrompt: message.feedbackPrompt,
+          feedbackType,
+          correctionText,
+        }),
+      })
+      if (!response.ok) throw new Error(`feedback_http_${response.status}`)
+      setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { status: 'saved', kind: feedbackType, correctionOpen: false, correction: '' } }))
+    } catch {
+      setFeedbackByMessage(prev => ({ ...prev, [messageIndex]: { ...prev[messageIndex], status: 'error', kind: feedbackType } }))
+    }
   }
 
   async function ask(text: string) {
@@ -252,7 +286,7 @@ export default function Concierge() {
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
     const fileNote = staged.length ? `📎 ${staged.map(a => a.name).join(', ')}` : ''
     const displayContent = [content, fileNote].filter(Boolean).join('\n\n')
-    const nextMessages: Message[] = [...messages, { role: "user", content: displayContent }]
+    const nextMessages: Message[] = [...messages, { role: 'user', content: displayContent }]
     setMessages(nextMessages)
     setInput('')
     setAttachments([])
@@ -274,9 +308,16 @@ export default function Concierge() {
         }),
       })
       const data = await res.json()
+      const reply = data.reply || data.error || t(dict, 'concierge.fallback')
+      const turnId = data?.execution_provenance?.turnId
+      const feedbackEligible = typeof turnId === 'string' && turnId.trim().length > 0 && Boolean(data?.reply)
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.reply || data.error || t(dict, 'concierge.fallback') },
+        {
+          role: 'assistant',
+          content: reply,
+          ...(feedbackEligible ? { feedbackPrompt: content, feedbackEligible: true } : {}),
+        },
       ])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: t(dict, 'concierge.connectionError') }])
@@ -350,16 +391,48 @@ export default function Concierge() {
           </div>
 
           <div ref={logRef} role="log" aria-live="polite" className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-3.5 py-3">
-            {visibleMessages.map((message, index) => (
-              <div
-                key={`${message.role}-${index}`}
-                className={message.role === 'user'
-                  ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md border border-blue-400/35 bg-blue-500/25 px-3.5 py-2.5 text-[13px] leading-6 text-white'
-                  : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
-              >
-                {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
-              </div>
-            ))}
+            {visibleMessages.map((message, index) => {
+              const feedback = feedbackByMessage[index] || { status: 'idle' as const }
+              const busy = feedback.status === 'saving'
+              const correction = feedback.correction || ''
+              return (
+                <div
+                  key={`${message.role}-${index}`}
+                  className={message.role === 'user'
+                    ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md border border-blue-400/35 bg-blue-500/25 px-3.5 py-2.5 text-[13px] leading-6 text-white'
+                    : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
+                >
+                  {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
+                  {message.role === 'assistant' && message.feedbackEligible && message.feedbackPrompt ? (
+                    <div className="mt-2.5 border-t border-white/10 pt-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button type="button" disabled={busy || feedback.status === 'saved'} onClick={() => submitFeedback(index, message, 'positive')} className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10.5px] text-emerald-200 disabled:opacity-50">👍 {uiText('assistantFeedback.helpful')}</button>
+                        <button type="button" disabled={busy || feedback.status === 'saved'} onClick={() => submitFeedback(index, message, 'negative')} className="rounded-lg border border-red-400/30 bg-red-400/10 px-2 py-1 text-[10.5px] text-red-200 disabled:opacity-50">👎 {uiText('assistantFeedback.notHelpful')}</button>
+                        <button type="button" disabled={busy || feedback.status === 'saved'} onClick={() => setFeedbackByMessage(prev => ({ ...prev, [index]: { ...(prev[index] || { status: 'idle' }), correctionOpen: true, correction: prev[index]?.correction || '' } }))} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[10.5px] text-cyan-200 disabled:opacity-50">✎ {uiText('assistantFeedback.correctThis')}</button>
+                        {feedback.status === 'saved' ? <span className="text-[10.5px] text-emerald-200">{uiText('assistantFeedback.feedbackSaved')}</span> : null}
+                        {feedback.status === 'error' ? <span className="text-[10.5px] text-red-200">{uiText('assistantFeedback.feedbackError')}</span> : null}
+                      </div>
+                      {feedback.correctionOpen && feedback.status !== 'saved' ? (
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          <textarea
+                            value={correction}
+                            onChange={e => setFeedbackByMessage(prev => ({ ...prev, [index]: { ...(prev[index] || { status: 'idle' }), correctionOpen: true, correction: e.target.value } }))}
+                            placeholder={uiText('assistantFeedback.correctionPlaceholder')}
+                            rows={3}
+                            maxLength={4000}
+                            className="w-full resize-y rounded-lg border border-white/15 bg-slate-950/70 px-2 py-1.5 text-[11px] text-white outline-none focus:border-cyan-300/50"
+                          />
+                          <div className="flex gap-1.5">
+                            <button type="button" disabled={busy || !correction.trim()} onClick={() => submitFeedback(index, message, 'correction', correction)} className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[10.5px] font-bold text-cyan-200 disabled:opacity-50">{uiText('assistantFeedback.submitCorrection')}</button>
+                            <button type="button" disabled={busy} onClick={() => setFeedbackByMessage(prev => ({ ...prev, [index]: { ...(prev[index] || { status: 'idle' }), correctionOpen: false } }))} className="rounded-lg border border-white/15 px-2 py-1 text-[10.5px] text-white/65 disabled:opacity-50">{uiText('assistantFeedback.cancelCorrection')}</button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
             {loading && <div className="px-1 py-1 text-[13px] text-white/45">{t(dict, 'concierge.thinking')}</div>}
           </div>
 

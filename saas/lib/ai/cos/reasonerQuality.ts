@@ -81,8 +81,20 @@ export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRa
   return repaired.score > first.score
 }
 
-
 export type QualityRepairDecisionInput = { repairKind:'quality_repair'|'skill_citation_repair'; reasonerLabel:string; accepted:boolean; details:Record<string,unknown> }
+
+function qualityRepairPersistenceError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const value = error as Record<string, unknown>
+    const fields = [value.code, value.message, value.details, value.hint]
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    if (fields.length) return fields.join(' | ')
+    try { return JSON.stringify(error) } catch { /* fall through */ }
+  }
+  return String(error)
+}
+
 /** Best-effort audit persistence; never blocks COS reasoning. */
 export async function recordQualityRepairDecision(input:QualityRepairDecisionInput):Promise<void>{
   try{
@@ -91,5 +103,5 @@ export async function recordQualityRepairDecision(input:QualityRepairDecisionInp
     if(!db)return
     const result=await db.from('cos_quality_repair_decisions').insert({repair_kind:input.repairKind,reasoner_label:input.reasonerLabel,accepted:input.accepted,details:input.details})
     if(result.error)throw result.error
-  }catch(error){console.warn('cosReasonerQuality: failed to persist quality-repair decision',error instanceof Error?error.message:String(error))}
+  }catch(error){console.warn('cosReasonerQuality: failed to persist quality-repair decision',qualityRepairPersistenceError(error))}
 }

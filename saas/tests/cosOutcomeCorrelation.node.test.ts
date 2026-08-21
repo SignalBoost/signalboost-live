@@ -67,12 +67,28 @@ test('authoritative provenance preserves the reasoner turn id for server-owned m
   assert.match(source, /provenance\.turnId = turnId/)
 })
 
-test('assistant feedback derives turn id from server-owned message provenance, never the client body', () => {
+test('assistant feedback derives turn id from server-owned records and never the client body', () => {
   const source = file('../app/api/assistant/feedback/route.ts')
   assert.match(source, /select\('role,content,created_at,provenance'\)/)
   assert.match(source, /asRecord\(assistantMessage\?\.provenance\)\.turnId/)
-  assert.match(source, /attachTurnOutcome\(turnId/)
+  assert.match(source, /from\('cos_latest_turn_provenance'\)/)
+  assert.match(source, /\.eq\('assistant_content', assistantContent\)/)
+  assert.match(source, /hashPrompt\(userPrompt\) !== storedPromptHash/)
+  assert.match(source, /from\('cos_turn_experience'\)/)
+  assert.match(source, /attachTurnOutcome\(target\.turnId/)
   assert.doesNotMatch(source, /body\?\.turnId/)
+})
+
+test('concierge dock exposes outcome feedback only for correlated COS replies', () => {
+  const source = file('../components/Concierge.tsx')
+  assert.match(source, /execution_provenance\?\.turnId/)
+  assert.match(source, /feedbackEligible/)
+  assert.match(source, /\/api\/assistant\/feedback/)
+  assert.match(source, /userPrompt:\s*message\.feedbackPrompt/)
+  assert.match(source, /assistantFeedback\.helpful/)
+  assert.match(source, /assistantFeedback\.notHelpful/)
+  assert.match(source, /assistantFeedback\.correctThis/)
+  assert.doesNotMatch(source, /turnId\s*:/)
 })
 
 test('verified production outcome keeps its evidence guard and supports only explicit turn correlation', () => {
@@ -89,6 +105,21 @@ test('migration makes outcomes race-safe and keeps utilization benchmark separat
   assert.match(source, /add column if not exists turn_id uuid/i)
   assert.match(source, /cos_evidence_utilization_benchmark_runs/i)
   assert.match(source, /cos_evidence_utilization_benchmark_results/i)
+})
+
+test('quality repair persistence preserves a useful Supabase error instead of object coercion', () => {
+  const source = file('../lib/ai/cos/reasonerQuality.ts')
+  assert.match(source, /qualityRepairPersistenceError/)
+  assert.match(source, /value\.code, value\.message, value\.details, value\.hint/)
+  assert.match(source, /JSON\.stringify\(error\)/)
+})
+
+test('cache write budget cancels its timer when writes finish and no longer claims successful writes were abandoned', () => {
+  const source = file('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  assert.match(source, /waitForCacheWritesWithinBudget/)
+  assert.match(source, /if \(timer\) clearTimeout\(timer\)/)
+  assert.match(source, /cache writes exceeded response budget; response continued while writes remain best-effort/)
+  assert.doesNotMatch(source, /cache write exceeded its budget and was abandoned/)
 })
 
 test('benchmark probe override is bounded without changing the default diagnostic timeout', () => {

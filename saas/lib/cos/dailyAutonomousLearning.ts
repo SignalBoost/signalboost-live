@@ -290,7 +290,6 @@ async function loadQueuedReasoningGaps(): Promise<{ ids: string[]; signals: Know
     return { ids: [], signals: [] }
   }
 }
-
 async function markQueuedReasoningGaps(
   queued: Array<{ id: string; subject: string }>,
   acceptedSubjects: string[],

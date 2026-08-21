@@ -6,9 +6,20 @@ on:
       - 'saas/lib/ai/cos/turnExperience.ts'
       - 'saas/lib/ai/cos/turnExperienceStore.ts'
       - 'saas/lib/ai/cos/cosReasoner.ts'
+      - 'saas/lib/ai/cos/cosFirstAnswer.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUseTurnContext.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUseStore.ts'
+      - 'saas/lib/ai/cos/evidenceUtilizationBenchmark.ts'
+      - 'saas/lib/ai/cos/capabilityBenchmarkRunner.ts'
+      - 'saas/lib/ai/cos/cognitiveVerifiedOutcome.ts'
+      - 'saas/app/api/assistant/feedback/route.ts'
       - 'saas/app/api/admin/cos-turn-experience/route.ts'
+      - 'saas/app/api/admin/cos-capability-benchmark/route.ts'
+      - 'saas/app/api/admin/cos-evidence-utilization-benchmark/route.ts'
       - 'saas/tests/cosTurnExperience.node.test.ts'
+      - 'saas/tests/cosOutcomeCorrelation.node.test.ts'
       - 'saas/supabase/migrations/20260821_cos_turn_experience.sql'
+      - 'saas/supabase/migrations/20260821_cos_turn_outcomes_and_utilization_benchmark.sql'
       - '.github/workflows/cos-turn-experience.yml'
 
 permissions:
@@ -28,7 +39,7 @@ jobs:
           cache: npm
           cache-dependency-path: saas/package-lock.json
       - run: npm install --no-audit --no-fund
-      - name: Test COS turn experience
-        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts
+      - name: Test COS turn experience and outcome correlation
+        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts tests/cosOutcomeCorrelation.node.test.ts
       - name: Typecheck
         run: npm run typecheck

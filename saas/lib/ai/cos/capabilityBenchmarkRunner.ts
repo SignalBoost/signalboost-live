@@ -2,11 +2,15 @@ import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { scoreCapabilityBenchmarkCase, type CapabilityBenchmarkCase } from '@/lib/ai/cos/capabilityBenchmark'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
+import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 
 export type PrivateBenchmarkCase = CapabilityBenchmarkCase & { id: string }
 
 export async function runPrivateCapabilityCase(test: PrivateBenchmarkCase) {
   const started = Date.now()
+  beginEvidenceSourceUseTurn()
 
   // Benchmark execution intentionally bypasses answer caches, but it must not bypass the
   // local-inference lifecycle. Normal COS turns preflight/wake RunPod before enterprise
@@ -19,6 +23,7 @@ export async function runPrivateCapabilityCase(test: PrivateBenchmarkCase) {
 
   const result = await tryCOSFirstAnswer({ prompt: test.prompt, language: 'en', privileged: true, disableCache: true })
   const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+  const turnId = peekEvidenceSourceUseTurnId()
   const score = scoreCapabilityBenchmarkCase(test, {
     caseId: test.id,
     reply,
@@ -28,7 +33,27 @@ export async function runPrivateCapabilityCase(test: PrivateBenchmarkCase) {
       semanticCache: result.provenance.responseSource === 'semantic_cache' || result.provenance.responseSource === 'semantic_similarity',
     },
   })
-  // Kept only in the owner-only benchmark evidence table; never returned by the dashboard API.
+
+  // Enterprise benchmark execution bypasses the outer ordinary-turn learning wrapper, so flush the
+  // learned-source utilization envelope explicitly. This is still best-effort/post-response telemetry.
+  flushCapturedEvidenceSourceUse()
+
+  if (turnId) {
+    await attachTurnOutcome(turnId, {
+      verifiedSuccess: score.passed,
+      repairNeeded: !score.passed,
+      escalated: !result.handled,
+      source: `capability_benchmark:${test.track}`,
+    })
+  }
+
+  // Kept only in owner-only benchmark evidence tables; never returned by the public assistant path.
   // A bounded excerpt is enough to diagnose a rubric failure without retaining unbounded output.
-  return { score, replyExcerpt: reply.slice(0, 12_000), latencyMs: Date.now() - started, provenance: result.provenance }
+  return {
+    score,
+    replyExcerpt: reply.slice(0, 12_000),
+    latencyMs: Date.now() - started,
+    provenance: result.provenance,
+    turnId,
+  }
 }

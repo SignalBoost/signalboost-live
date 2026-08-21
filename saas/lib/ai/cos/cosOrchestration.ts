@@ -18,6 +18,11 @@ export function authoritativeProvenance(
 ) {
   const provenance = liveAuthoritativeProvenance(cos, external) as any
   const current = cos?.provenance ?? null
+  const turnId = typeof current?.turnId === 'string' ? current.turnId.trim() : ''
+  // The assistant-message feedback route derives correlation only from server-owned stored
+  // provenance. Preserve the exact reasoner turn UUID here so formatting cannot silently sever the
+  // learning loop. It is telemetry only and is intentionally not displayed in user-facing prose.
+  if (turnId) provenance.turnId = turnId
   const live = current?.liveExternalEvidence
   const sources = Array.isArray(live?.sources) ? live.sources : []
   const semanticCacheReplay = current?.responseSource === 'semantic_cache' || current?.responseSource === 'semantic_similarity'

@@ -599,6 +599,23 @@ async function writeCachedAnswer(key:string, value:CachedCosAnswer):Promise<void
   } catch {}
 }
 
+async function waitForCacheWritesWithinBudget(work: Promise<unknown>, budgetMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  try {
+    await Promise.race([
+      work.then(() => undefined),
+      new Promise<void>(resolve => {
+        timer = setTimeout(() => {
+          console.warn('cosFirstAnswer: cache writes exceeded response budget; response continued while writes remain best-effort', { budgetMs })
+          resolve()
+        }, budgetMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
   const startedAt = Date.now()
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged))
@@ -790,16 +807,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')
-  if (!input.disableCache) await Promise.race([
+  if (!input.disableCache) await waitForCacheWritesWithinBudget(
     Promise.allSettled([
       writeCachedAnswer(cacheKey, storedAnswer),
       knowledge ? knowledge.commitToMemory(cacheTaskId, input.prompt, contextWindow, storedAnswer) : Promise.resolve(),
     ]),
-    new Promise<void>(resolve => setTimeout(() => {
-      console.warn('cosFirstAnswer: cache write exceeded its budget and was abandoned', { budgetMs:cacheWriteBudgetMs })
-      resolve()
-    }, cacheWriteBudgetMs)),
-  ])
+    cacheWriteBudgetMs,
+  )
   recordAvoidedCost('local_reasoner', input.prompt.length, parsed.answer.length, Date.now() - startedAt)
   void resolveKnowledgeGap(input.prompt)
   return { handled:true, reply:parsed.answer, confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }

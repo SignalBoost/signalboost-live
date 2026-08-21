@@ -32,6 +32,10 @@ export function hashPrompt(prompt: string): string {
     : createHash('sha256').update(normalized).digest('hex')
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
 async function persistTurnExperience(experience: TurnExperience): Promise<void> {
   try {
     const db = cosServiceDb()
@@ -39,6 +43,7 @@ async function persistTurnExperience(experience: TurnExperience): Promise<void> 
     const result = await db.from('cos_turn_experience').insert({
       turn_id: experience.turnId,
       prompt_hash: experience.promptHash,
+      problem_class: experience.problemClass,
       features: experience.features,
       surface_difficulty: surfaceDifficulty(experience.features),
       reasoner_label: experience.reasonerLabel,
@@ -69,6 +74,51 @@ export function recordTurnExperience(experience: TurnExperience): void {
   }
 }
 
+export type TurnLearningEnrichment = {
+  turnId: string
+  problemClass: string
+  predictedConfidence: number | null
+  routeClass: string | null
+  responseSource: string | null
+  evidenceSummary: unknown
+  failureReason?: string | null
+}
+
+async function persistTurnLearningEnrichment(input: TurnLearningEnrichment): Promise<void> {
+  try {
+    const cleanTurnId = String(input.turnId ?? '').trim()
+    if (!isUuid(cleanTurnId)) return
+    const db = cosServiceDb()
+    if (!db) return
+    const confidence = Number(input.predictedConfidence)
+    const result = await db.from('cos_turn_experience').update({
+      problem_class: String(input.problemClass || 'general reasoning').slice(0, 240),
+      predicted_confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+      route_class: input.routeClass ? String(input.routeClass).slice(0, 80) : null,
+      response_source: input.responseSource ? String(input.responseSource).slice(0, 120) : null,
+      evidence_summary: input.evidenceSummary && typeof input.evidenceSummary === 'object' ? input.evidenceSummary : {},
+      failure_reason: input.failureReason ? String(input.failureReason).slice(0, 1200) : null,
+    }).eq('turn_id', cleanTurnId)
+    if (result.error) throw result.error
+  } catch (error) {
+    console.warn('[cos-turn-experience] learning enrichment failed (non-fatal):', error instanceof Error ? error.message : String(error))
+  }
+}
+
+/**
+ * Attach final confidence/route/evidence metadata after the answer gate has run. This update is
+ * post-response/best-effort and contains no raw prompt or answer. Database autopsy triggers refresh
+ * the diagnosis whenever this late enrichment arrives.
+ */
+export function recordTurnLearningEnrichment(input: TurnLearningEnrichment): void {
+  if (!isUuid(String(input?.turnId ?? '').trim())) return
+  try {
+    after(() => persistTurnLearningEnrichment(input))
+  } catch {
+    void persistTurnLearningEnrichment(input)
+  }
+}
+
 export type TurnOutcome = {
   repairNeeded?: boolean
   escalated?: boolean
@@ -76,10 +126,6 @@ export type TurnOutcome = {
   verifiedSuccess?: boolean
   source: string
   occurredAt?: string
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
 /**

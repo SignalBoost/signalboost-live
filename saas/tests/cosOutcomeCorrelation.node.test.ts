@@ -13,7 +13,6 @@ import {
   COS_EVIDENCE_UTILIZATION_BENCHMARK,
   evidenceUtilizationDomains,
 } from '../lib/ai/cos/evidenceUtilizationBenchmark.ts'
-import { reasonerProbeCompletionTimeoutMs } from '../lib/ai/cos/reasonerProbe.ts'
 
 const file = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
@@ -55,13 +54,6 @@ test('controlled evidence-utilization suite has 36 unique local-only cases acros
   }
 })
 
-test('benchmark probe timeout override remains bounded and does not weaken the default diagnostic timeout', () => {
-  assert.equal(reasonerProbeCompletionTimeoutMs(), 45_000)
-  assert.equal(reasonerProbeCompletionTimeoutMs(1_000), 5_000)
-  assert.equal(reasonerProbeCompletionTimeoutMs(90_000), 90_000)
-  assert.equal(reasonerProbeCompletionTimeoutMs(999_999), 120_000)
-})
-
 test('ordinary COS answers enrich server-stored provenance with the request-local turn id', () => {
   const source = file('../lib/ai/cos/cosFirstAnswer.ts')
   assert.match(source, /peekEvidenceSourceUseTurnId\(\)/)
@@ -97,6 +89,16 @@ test('migration makes outcomes race-safe and keeps utilization benchmark separat
   assert.match(source, /add column if not exists turn_id uuid/i)
   assert.match(source, /cos_evidence_utilization_benchmark_runs/i)
   assert.match(source, /cos_evidence_utilization_benchmark_results/i)
+})
+
+test('benchmark probe override is bounded without changing the default diagnostic timeout', () => {
+  const probe = file('../lib/ai/cos/reasonerProbe.ts')
+  assert.match(probe, /const COMPLETION_TIMEOUT_MS = 45_000/)
+  assert.match(probe, /const MIN_COMPLETION_TIMEOUT_MS = 5_000/)
+  assert.match(probe, /const MAX_COMPLETION_TIMEOUT_MS = 120_000/)
+  assert.match(probe, /export function reasonerProbeCompletionTimeoutMs/)
+  assert.match(probe, /Math\.max\(MIN_COMPLETION_TIMEOUT_MS, Math\.min\(MAX_COMPLETION_TIMEOUT_MS/)
+  assert.match(probe, /completionResponse\(config, !strictModelList, completionTimeoutMs\)/)
 })
 
 test('controlled benchmark is operator-accessible, route-budget safe and resumes from actual attempts', () => {

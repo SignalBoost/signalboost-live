@@ -1,5 +1,7 @@
 // saas/lib/ai/cos/reasonerOutput.ts
-// Parsing stays dependency-free so malformed local-model output can be tested and recovered safely.
+// Parsing stays dependency-light so malformed local-model output can be tested and recovered safely.
+
+import { captureLearnedCitationIndices } from './evidenceSourceUseTurnContext.ts'
 
 export function extractBalancedJsonObject(text:string):string|null{
   const start=text.indexOf('{')
@@ -144,11 +146,16 @@ export function citedIndexedValues<T>(answer:string,prefix:EvidenceLabelPrefix,v
  * reasoner; only a citation in the answer text shows an item informed a claim. Procedural skills
  * are tracked separately because using a validated HOW-to-reason skill is not factual grounding
  * and therefore must not raise the knowledge-evidence confidence ceiling.
+ *
+ * The CL index list is also captured request-locally for source-kind utilization telemetry. This is
+ * a side effect only for measurement; it never changes parsing, confidence, or answer acceptance.
  */
 export function citedEvidence(answer:string):{kg:number;cl:number;em:number;sk:number}{
+  const clIndices=citedLabelIndices(answer,'CL')
+  captureLearnedCitationIndices(clIndices)
   return {
     kg:citedLabelIndices(answer,'KG').length,
-    cl:citedLabelIndices(answer,'CL').length,
+    cl:clIndices.length,
     em:citedLabelIndices(answer,'EM').length,
     sk:citedLabelIndices(answer,'SK').length,
   }

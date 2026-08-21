@@ -5,16 +5,36 @@ on:
     paths:
       - 'saas/lib/ai/cos/contextRelevance.ts'
       - 'saas/lib/ai/cos/cognitiveTurnExperience.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUse.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUseStore.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUseTurnContext.ts'
+      - 'saas/lib/ai/cos/learnedEvidenceClass.ts'
+      - 'saas/lib/ai/cos/reasonerOutput.ts'
+      - 'saas/lib/ai/cos/turnExperienceStore.ts'
+      - 'saas/app/api/admin/cos-evidence-source-use/route.ts'
+      - 'saas/supabase/migrations/20260821_cos_evidence_source_use.sql'
       - 'saas/tests/contextRelevance.node.test.ts'
       - 'saas/tests/cosEvidenceUtilization.node.test.ts'
+      - 'saas/tests/cosEvidenceSourceUse.node.test.ts'
+      - 'saas/tests/cosEvidenceCitation.node.test.ts'
       - '.github/workflows/cos-evidence-utilization.yml'
   push:
     branches: [main]
     paths:
       - 'saas/lib/ai/cos/contextRelevance.ts'
       - 'saas/lib/ai/cos/cognitiveTurnExperience.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUse.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUseStore.ts'
+      - 'saas/lib/ai/cos/evidenceSourceUseTurnContext.ts'
+      - 'saas/lib/ai/cos/learnedEvidenceClass.ts'
+      - 'saas/lib/ai/cos/reasonerOutput.ts'
+      - 'saas/lib/ai/cos/turnExperienceStore.ts'
+      - 'saas/app/api/admin/cos-evidence-source-use/route.ts'
+      - 'saas/supabase/migrations/20260821_cos_evidence_source_use.sql'
       - 'saas/tests/contextRelevance.node.test.ts'
       - 'saas/tests/cosEvidenceUtilization.node.test.ts'
+      - 'saas/tests/cosEvidenceSourceUse.node.test.ts'
+      - 'saas/tests/cosEvidenceCitation.node.test.ts'
       - '.github/workflows/cos-evidence-utilization.yml'
 
 jobs:
@@ -30,5 +50,5 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify conservative relevance and utilization metrics
-        run: npx --yes tsx --test tests/contextRelevance.node.test.ts tests/cosEvidenceUtilization.node.test.ts
+      - name: Verify conservative relevance, utilization metrics and source-kind attribution
+        run: npx --yes tsx --test tests/contextRelevance.node.test.ts tests/cosEvidenceUtilization.node.test.ts tests/cosEvidenceSourceUse.node.test.ts tests/cosEvidenceCitation.node.test.ts

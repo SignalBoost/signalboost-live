@@ -1,0 +1,207 @@
+// saas/lib/ai/cos/evidenceSourceUseStore.ts
+//
+// Reliable persistence and outcome-aware rollup for learned-corpus source-kind utilization.
+// This measurement must never become an answer dependency.
+
+import { after } from 'next/server'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import {
+  attributeSourceKinds,
+  rollupSourceKindUse,
+  type EvidenceUse,
+  type SourceKindRollup,
+} from '@/lib/ai/cos/evidenceSourceUse'
+import { consumeEvidenceSourceUseTurn } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+
+const ROLLUP_ROW_LIMIT = 1000
+const OUTCOME_BATCH_SIZE = 200
+
+export type EvidenceSourceUseInput = {
+  turnId: string
+  use: EvidenceUse
+}
+
+async function persistEvidenceSourceUse(input: EvidenceSourceUseInput): Promise<void> {
+  try {
+    if (!input?.turnId || !input.use || input.use.injected <= 0) return
+    const db = cosServiceDb()
+    if (!db) return
+    const result = await db.from('cos_evidence_source_use').upsert({
+      turn_id: input.turnId,
+      evidence_system: 'learned_corpus',
+      injected: input.use.injected,
+      cited: input.use.cited,
+      by_source_kind: input.use.bySourceKind,
+    }, { onConflict: 'turn_id,evidence_system' })
+    if (result.error) throw result.error
+  } catch (error) {
+    console.warn('[cos-evidence-source-use] record failed (non-fatal):', error instanceof Error ? error.message : String(error))
+  }
+}
+
+/** Keep the telemetry write alive after a Next response, matching turnExperienceStore. */
+export function recordEvidenceSourceUse(input: EvidenceSourceUseInput): void {
+  if (!input?.turnId || !input.use || input.use.injected <= 0) return
+  try {
+    after(() => persistEvidenceSourceUse(input))
+  } catch {
+    // Background jobs/tests may run outside a Next request context.
+    void persistEvidenceSourceUse(input)
+  }
+}
+
+/** Consume the request-local correlation envelope once at the ordinary turn-learning boundary. */
+export function flushCapturedEvidenceSourceUse(): void {
+  const captured = consumeEvidenceSourceUseTurn()
+  if (!captured) return
+  recordEvidenceSourceUse({
+    turnId: captured.turnId,
+    use: attributeSourceKinds(captured.sourceKinds, captured.citedIndices),
+  })
+}
+
+type TurnOutcomeSnapshot = {
+  turn_id?: string | null
+  repair_needed?: boolean | null
+  escalated?: boolean | null
+  verified_success?: boolean | null
+  outcome_at?: string | null
+}
+
+export type SourceKindOutcomeCorrelation = {
+  sourceKind: string
+  turnsInjected: number
+  outcomeObservedTurns: number
+  verifiedSuccessTurns: number
+  repairNeededTurns: number
+  escalatedTurns: number
+}
+
+export type EvidenceSourceUseReport = {
+  evidenceSystem: 'learned_corpus'
+  turns: number
+  totalInjected: number
+  totalCited: number
+  zeroCitationTurns: number
+  /** null when nothing has been injected yet — never 0, which would read as "nothing ever helps". */
+  overallCitedRate: number | null
+  outcomeCoverage: {
+    observedTurns: number
+    rate: number | null
+  }
+  bySourceKind: Array<SourceKindRollup & { outcomes: SourceKindOutcomeCorrelation }>
+  summary: string
+}
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size) as T[])
+  return out
+}
+
+async function loadOutcomes(turnIds: string[]): Promise<Map<string, TurnOutcomeSnapshot>> {
+  const db = cosServiceDb()
+  const map = new Map<string, TurnOutcomeSnapshot>()
+  if (!db || turnIds.length === 0) return map
+  for (const batch of chunk([...new Set(turnIds)], OUTCOME_BATCH_SIZE)) {
+    const result = await db
+      .from('cos_turn_experience')
+      .select('turn_id,repair_needed,escalated,verified_success,outcome_at')
+      .in('turn_id', batch)
+    if (result.error) {
+      console.warn('[cos-evidence-source-use] outcome join failed (non-fatal):', result.error.message)
+      continue
+    }
+    for (const row of (result.data ?? []) as TurnOutcomeSnapshot[]) {
+      if (row.turn_id) map.set(row.turn_id, row)
+    }
+  }
+  return map
+}
+
+export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{ ok: true; report: EvidenceSourceUseReport } | { ok: false; error: string }> {
+  const db = cosServiceDb()
+  if (!db) return { ok: false, error: 'COS service database is not configured.' }
+
+  const result = await db
+    .from('cos_evidence_source_use')
+    .select('turn_id,injected,cited,by_source_kind,created_at')
+    .eq('evidence_system', 'learned_corpus')
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(ROLLUP_ROW_LIMIT, Math.floor(limit))))
+  if (result.error) return { ok: false, error: `cos_evidence_source_use read failed: ${result.error.message}` }
+
+  type Row = { turn_id?: string; injected?: number; cited?: number; by_source_kind?: unknown }
+  const rows = (result.data ?? []) as Row[]
+  const uses: EvidenceUse[] = rows.map(row => ({
+    injected: Number(row.injected) || 0,
+    cited: Number(row.cited) || 0,
+    bySourceKind: Array.isArray(row.by_source_kind) ? (row.by_source_kind as EvidenceUse['bySourceKind']) : [],
+  }))
+
+  const outcomes = await loadOutcomes(rows.map(row => String(row.turn_id || '')).filter(Boolean))
+  const totalInjected = uses.reduce((sum, use) => sum + use.injected, 0)
+  const totalCited = uses.reduce((sum, use) => sum + use.cited, 0)
+  const zeroCitationTurns = uses.filter(use => use.injected > 0 && use.cited === 0).length
+  const rollup = rollupSourceKindUse(uses)
+
+  const bySourceKind = rollup.map(entry => {
+    const turnIds = new Set<string>()
+    rows.forEach((row, index) => {
+      const hasKind = uses[index]?.bySourceKind.some(kind => kind.sourceKind === entry.sourceKind && kind.injected > 0)
+      if (hasKind && row.turn_id) turnIds.add(row.turn_id)
+    })
+    let outcomeObservedTurns = 0
+    let verifiedSuccessTurns = 0
+    let repairNeededTurns = 0
+    let escalatedTurns = 0
+    for (const turnId of turnIds) {
+      const outcome = outcomes.get(turnId)
+      if (!outcome?.outcome_at) continue
+      outcomeObservedTurns += 1
+      if (outcome.verified_success === true) verifiedSuccessTurns += 1
+      if (outcome.repair_needed === true) repairNeededTurns += 1
+      if (outcome.escalated === true) escalatedTurns += 1
+    }
+    return {
+      ...entry,
+      outcomes: {
+        sourceKind: entry.sourceKind,
+        turnsInjected: turnIds.size,
+        outcomeObservedTurns,
+        verifiedSuccessTurns,
+        repairNeededTurns,
+        escalatedTurns,
+      },
+    }
+  })
+
+  const observedTurns = rows.reduce((sum, row) => sum + (row.turn_id && outcomes.get(row.turn_id)?.outcome_at ? 1 : 0), 0)
+  const lowValue = bySourceKind.filter(entry => entry.verdict === 'never_cited' || entry.verdict === 'low_utilization')
+
+  const summary = uses.length === 0
+    ? 'No learned-corpus evidence has been injected since source-use measurement started.'
+    : totalCited === 0
+      ? `NONE of ${totalInjected} injected learned-corpus items across ${uses.length} turns was cited. This is a utilization finding, not proof that the citation detector is broken.`
+      : lowValue.length > 0
+        ? `${Math.round((totalCited / totalInjected) * 100)}% of injected learned-corpus evidence was cited. ${lowValue.length} source kind(s) are currently never-cited or low-utilization after the minimum sample gate.`
+        : `${Math.round((totalCited / totalInjected) * 100)}% of injected learned-corpus evidence was cited across ${uses.length} turns.`
+
+  return {
+    ok: true,
+    report: {
+      evidenceSystem: 'learned_corpus',
+      turns: uses.length,
+      totalInjected,
+      totalCited,
+      zeroCitationTurns,
+      overallCitedRate: totalInjected > 0 ? Number((totalCited / totalInjected).toFixed(4)) : null,
+      outcomeCoverage: {
+        observedTurns,
+        rate: uses.length > 0 ? Number((observedTurns / uses.length).toFixed(4)) : null,
+      },
+      bySourceKind,
+      summary,
+    },
+  }
+}

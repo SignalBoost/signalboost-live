@@ -10,6 +10,7 @@ import { createHash, createHmac } from 'node:crypto'
 import { after } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { surfaceDifficulty, type TurnExperience } from '@/lib/ai/cos/turnExperience'
+import { captureEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 
 function normalizedPrompt(prompt: string): string {
   return String(prompt ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
@@ -56,6 +57,9 @@ async function persistTurnExperience(experience: TurnExperience): Promise<void> 
 }
 
 export function recordTurnExperience(experience: TurnExperience): void {
+  // Publish the reasoner's UUID into the same request-local envelope that already captured selected
+  // learned source kinds. This is synchronous and does not depend on the telemetry insert succeeding.
+  captureEvidenceSourceUseTurnId(experience.turnId)
   try {
     after(() => persistTurnExperience(experience))
   } catch {

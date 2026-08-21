@@ -26,6 +26,7 @@
 // threshold cos-core already uses, so write-time and read-time agree on what "full" means.
 
 import { fullTextCharacters } from '@/lib/cos-core/layers/learning/cycle'
+import { captureSelectedLearnedSourceKinds } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 
 export type LearnedEvidenceClass = 'full' | 'metadata'
 
@@ -52,17 +53,25 @@ export function classifyLearnedEvidence(row: ClassifiableLearnedRow): LearnedEvi
  * remaining slots. A metadata row is never dropped merely for being metadata — when nothing
  * substantive is relevant, a pointer to a real source still beats an empty context window — but it
  * can no longer crowd out content that could actually be cited.
+ *
+ * The exact selected rows are also captured request-locally before prompt rendering so later [CL#]
+ * citations can be attributed to structured source_kind metadata without reparsing prompt strings.
  */
 export function selectLearnedCorpusRows<T extends ClassifiableLearnedRow>(rows: T[], limit: number): T[] {
   const cap = Math.max(0, Math.floor(limit))
-  if (cap === 0) return []
+  if (cap === 0) {
+    captureSelectedLearnedSourceKinds([])
+    return []
+  }
   const full: T[] = []
   const metadata: T[] = []
   for (const row of rows) {
     if (classifyLearnedEvidence(row) === 'full') full.push(row)
     else metadata.push(row)
   }
-  return [...full, ...metadata].slice(0, cap)
+  const selected = [...full, ...metadata].slice(0, cap)
+  captureSelectedLearnedSourceKinds(selected)
+  return selected
 }
 
 /**

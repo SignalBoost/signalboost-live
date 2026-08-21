@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { recordCapabilityFailure, type CapabilityFailureKind } from '@/lib/ai/cos/benchmarkCuration'
+import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 
 export type CosTurnLearningProvenance = {
   responseSource?: string | null
@@ -216,6 +217,11 @@ export function decideCosTurnExperience(input: CosTurnExperienceInput): CosTurnE
  * function never creates a skill, fact, or confidence bonus by itself.
  */
 export async function recordCosTurnExperience(input: CosTurnExperienceInput): Promise<{ stored: boolean; repeated: boolean; decision: CosTurnExperienceDecision }> {
+  // All three source-use signals (selected source kinds, reasoner turn_id, final CL citations) have
+  // been observed by this boundary. Flush them before any episodic-store early return; persistence is
+  // post-response/best-effort and cannot make the answer fail.
+  flushCapturedEvidenceSourceUse()
+
   const decision = decideCosTurnExperience(input)
   if (!decision.eligible) return { stored: false, repeated: false, decision }
 

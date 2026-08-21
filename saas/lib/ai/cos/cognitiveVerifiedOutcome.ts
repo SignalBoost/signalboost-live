@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass, knownProblemClasses } from '@/lib/ai/cos/cosProblemClass'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS } from '@/lib/cos-core/layers/learning/foundational'
+import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 
 export const COS_VERIFIED_OUTCOME_DOMAINS = [
   'self_healing',
@@ -101,13 +102,6 @@ function normalizedProblemClass(input: CosVerifiedProductionOutcomeInput, summar
   return classifyProblemClass(clean(input.prompt || provided || summary, 20_000))
 }
 
-/**
- * Convert externally verified operational/business evidence into bounded COS episodic evidence.
- *
- * This is deliberately broader than skill-specific production attribution. It lets COS learn that
- * a problem class/domain succeeded or failed even when evidence cannot safely identify one causal
- * skill. It never promotes a fact, creates a skill, changes answer confidence, or widens authority.
- */
 export function decideVerifiedCosProductionOutcome(
   input: CosVerifiedProductionOutcomeInput,
 ): CosVerifiedProductionOutcomeDecision {
@@ -176,9 +170,29 @@ export function decideVerifiedCosProductionOutcome(
   }
 }
 
+async function attachCorrelatedTurnOutcome(
+  input: CosVerifiedProductionOutcomeInput,
+  decision: CosVerifiedProductionOutcomeDecision,
+  occurredAt: string,
+): Promise<void> {
+  const kind = clean(input.correlation?.kind, 120).toLowerCase()
+  const turnId = clean(input.correlation?.value, 80)
+  if (kind !== 'cos_turn_id' || !turnId) return
+  await attachTurnOutcome(turnId, {
+    ...(decision.success === null ? {} : {
+      verifiedSuccess: decision.success,
+      repairNeeded: !decision.success,
+    }),
+    source: `verified_production_outcome:${decision.sourceClass}`,
+    occurredAt,
+  })
+}
+
 /**
  * Persist one idempotent verified production/business outcome as `production_use` episodic memory.
  * Duplicate delivery of the same authoritative event is ignored rather than treated as new proof.
+ * If the event carries `correlation.kind = cos_turn_id`, the same evidence also enriches the durable
+ * turn outcome used by metacognitive routing/source-utilization analysis.
  */
 export async function recordVerifiedCosProductionOutcome(
   input: CosVerifiedProductionOutcomeInput,
@@ -202,10 +216,13 @@ export async function recordVerifiedCosProductionOutcome(
     updated_at: occurredAt,
   })
 
+  let inserted = true
   if (insert.error) {
     const code = clean((insert.error as { code?: unknown }).code, 40)
-    if (code === '23505') return { stored: true, inserted: false, decision }
-    throw insert.error
+    if (code === '23505') inserted = false
+    else throw insert.error
   }
-  return { stored: true, inserted: true, decision }
+
+  await attachCorrelatedTurnOutcome(input, decision, occurredAt)
+  return { stored: true, inserted, decision }
 }

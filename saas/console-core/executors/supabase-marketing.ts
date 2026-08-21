@@ -1,30 +1,13 @@
 // saas/console-core/executors/supabase-marketing.ts
 //
-// Secondary Supabase project as its own console provider (read-only).
-// This card lets an operator browse a SECOND Supabase project — useful when a
-// deployment runs more than one platform/database. It is OPTIONAL: when no second
-// project is configured the card reports a clean "not connected" state instead of
-// an error, so a single-database install never looks broken.
-//
-// Configuration (Vercel > Settings > Environment Variables, Production scope):
-//   SECONDARY_SUPABASE_URL                 e.g. https://<ref>.supabase.co
-//   SECONDARY_SUPABASE_SERVICE_ROLE_KEY    the project's SERVICE_ROLE key (secret)
-//
-// Backward compatibility: the older MARKETING_SUPABASE_URL / _SERVICE_ROLE_KEY
-// names are still honoured as a fallback, so existing installs keep working.
-//
-// Importing this module registers the executors.
+// Secondary Supabase project as its own console provider and the authoritative
+// affiliate partner datastore. Generic Supabase Insert Row stays available, but
+// affiliate_partners is force-routed to secondary and can never fall back to primary.
 
 import { registerExecutor } from '../defaultHost.ts'
 import { getSecret } from '../secrets.ts'
 import type { ActionField, ActionSchema } from '../types.ts'
 
-// ─── Key inspection (never exposes the key itself) ────────────────────────────
-// Supabase keys come in two shapes:
-//   • legacy JWT — base64url payload carrying a `role` claim. 'service_role' is
-//     correct (full access); 'anon' is the WRONG key (limited / RLS-bound) and is
-//     the single most common setup mistake, since the two JWTs look near-identical.
-//   • new format — 'sb_secret_…' (correct) / 'sb_publishable_…' (wrong, public).
 function inspectKey(key: string): { role: string | null; wrong: boolean; reason: string | null } {
   if (key.startsWith('sb_secret_')) return { role: 'service', wrong: false, reason: null }
   if (key.startsWith('sb_publishable_')) {
@@ -47,28 +30,34 @@ function inspectKey(key: string): { role: string | null; wrong: boolean; reason:
 }
 
 const NOT_CONFIGURED =
-  'Secondary Supabase is not connected (optional). To enable, set SECONDARY_SUPABASE_URL and SECONDARY_SUPABASE_SERVICE_ROLE_KEY (the project\u2019s service_role key) in your environment.'
+  'Secondary Supabase is not connected. Set SECONDARY_SUPABASE_URL and SECONDARY_SUPABASE_SERVICE_ROLE_KEY (or the legacy MARKETING_* equivalents).'
 
 type Creds =
   | { ok: true; url: string; key: string; restBase: string }
   | { ok: false; error: string }
 
-function creds(): Creds {
-  const url = getSecret('SECONDARY_SUPABASE_URL') || getSecret('MARKETING_SUPABASE_URL')
-  const key = getSecret('SECONDARY_SUPABASE_SERVICE_ROLE_KEY') || getSecret('MARKETING_SUPABASE_SERVICE_ROLE_KEY')
-
-  // Optional provider: absent config is a clean "not connected" state, not a fault.
-  if (!url || !key) return { ok: false, error: NOT_CONFIGURED }
-
-  // Guard the most common mistake before any request goes out, so the card shows
-  // an actionable reason instead of a raw "Invalid API key" from PostgREST.
+function makeCreds(url: string, key: string, missingMessage: string): Creds {
+  if (!url || !key) return { ok: false, error: missingMessage }
   const info = inspectKey(key)
-  if (info.wrong && info.reason) {
-    return { ok: false, error: `Secondary Supabase key is the wrong type — ${info.reason}.` }
-  }
-
+  if (info.wrong && info.reason) return { ok: false, error: `Supabase key is the wrong type — ${info.reason}.` }
   const base = url.replace(/\/+$/, '')
   return { ok: true, url: base, key, restBase: `${base}/rest/v1` }
+}
+
+function creds(): Creds {
+  return makeCreds(
+    getSecret('SECONDARY_SUPABASE_URL') || getSecret('MARKETING_SUPABASE_URL'),
+    getSecret('SECONDARY_SUPABASE_SERVICE_ROLE_KEY') || getSecret('MARKETING_SUPABASE_SERVICE_ROLE_KEY'),
+    NOT_CONFIGURED,
+  )
+}
+
+function primaryCreds(): Creds {
+  return makeCreds(
+    getSecret('NEXT_PUBLIC_SUPABASE_URL'),
+    getSecret('SUPABASE_SERVICE_ROLE_KEY'),
+    'Primary Supabase is not configured.',
+  )
 }
 
 const schema = (id: string, label: string, verb: string, fields: ActionField[]): ActionSchema => ({ id, label, verb, fields })
@@ -78,7 +67,118 @@ const TABLE: ActionField = {
   remoteSource: { action: 'supabase_mkt.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' },
 }
 
-// List tables (PostgREST OpenAPI spec — no RPC dependency)
+async function postRows(c: Extract<Creds, { ok: true }>, table: string, row: unknown, upsert: boolean) {
+  const suffix = upsert ? '?on_conflict=id' : ''
+  const prefer = upsert ? 'resolution=merge-duplicates,return=representation' : 'return=representation'
+  const res = await fetch(`${c.restBase}/${encodeURIComponent(table)}${suffix}`, {
+    method: 'POST',
+    headers: {
+      apikey: c.key,
+      Authorization: 'Bearer ' + c.key,
+      'Content-Type': 'application/json',
+      Prefer: prefer,
+    },
+    body: JSON.stringify(row),
+  })
+  if (!res.ok) return { ok: false as const, error: (await res.text()) || 'Insert failed' }
+  const data = await res.json().catch(() => [])
+  return { ok: true as const, data }
+}
+
+// Existing Console Hub "Supabase → Insert Row" action.
+// The table decides the database: affiliate_partners -> SECONDARY; everything
+// else -> PRIMARY. The partner branch is fail-closed and has no primary fallback.
+registerExecutor({
+  providerId: 'supabase', actionId: 'insert_row', policyActionId: 'table_crud',
+  schema: schema('supabase.insert_row', 'Insert Row', 'insert', [
+    { id: 'table', label: 'Table', type: 'text', required: true },
+    { id: 'data', label: 'JSON Row Object', type: 'textarea', required: true },
+  ]),
+  async run(_ctx, input) {
+    const table = String(input.table || '').trim()
+    if (!table) return { ok: false, error: 'Table is required' }
+
+    let row: unknown
+    try { row = JSON.parse(String(input.data || '{}')) }
+    catch { return { ok: false, error: 'Data must be valid JSON' } }
+
+    const isPartner = table === 'affiliate_partners'
+    const c = isPartner ? creds() : primaryCreds()
+    if (!c.ok) return c
+
+    const result = await postRows(c, table, row, isPartner)
+    if (!result.ok) return result
+    return {
+      ok: true,
+      message: isPartner
+        ? 'Partner saved to secondary Supabase affiliate_partners'
+        : `Row inserted into primary Supabase ${table}`,
+      data: { rows: result.data, source: isPartner ? 'secondary-supabase' : 'primary-supabase' },
+    }
+  },
+})
+
+// Dedicated structured partner action. This is optional convenience; it reaches
+// the same secondary-only source of truth as the generic Insert Row path above.
+registerExecutor({
+  providerId: 'supabase_mkt', actionId: 'upsert_partner', policyActionId: 'table_crud',
+  schema: schema('supabase_mkt.upsert_partner', 'Add / Update Affiliate Partner', 'upsert', [
+    { id: 'id', label: 'Partner ID', type: 'text', required: true },
+    { id: 'name', label: 'Partner Name', type: 'text', required: true },
+    { id: 'url', label: 'Affiliate URL', type: 'text', required: true },
+    { id: 'network', label: 'Network', type: 'text', required: false },
+    { id: 'category', label: 'Category', type: 'text', required: false },
+    { id: 'category_label', label: 'Category Label', type: 'text', required: false },
+    { id: 'regions', label: 'Regions JSON', type: 'textarea', required: false },
+    { id: 'description', label: 'Description', type: 'textarea', required: false },
+  ]),
+  async run(_ctx, input) {
+    const c = creds(); if (!c.ok) return c
+
+    const id = String(input.id || '').trim()
+    const name = String(input.name || '').trim()
+    const url = String(input.url || '').trim()
+    if (!id || !name || !url) return { ok: false, error: 'Partner ID, name, and affiliate URL are required' }
+
+    const category = String(input.category || 'specialty_other').trim() || 'specialty_other'
+    const categoryLabel = String(input.category_label || '').trim()
+    const network = String(input.network || '').trim()
+    const description = String(input.description || '').trim()
+    let regions = '["ot"]'
+    if (input.regions !== undefined && input.regions !== null && String(input.regions).trim()) {
+      try {
+        const parsed = JSON.parse(String(input.regions))
+        if (!Array.isArray(parsed)) return { ok: false, error: 'Regions must be a JSON array, for example ["ot"]' }
+        regions = JSON.stringify(parsed)
+      } catch {
+        return { ok: false, error: 'Regions must be valid JSON, for example ["ot"]' }
+      }
+    }
+
+    const row = {
+      id,
+      name,
+      url,
+      network: network || null,
+      category,
+      category_key: category,
+      category_label: categoryLabel || null,
+      description: description || null,
+      regions,
+      updated_at: new Date().toISOString(),
+    }
+
+    const result = await postRows(c, 'affiliate_partners', row, true)
+    if (!result.ok) return result
+    const saved = Array.isArray(result.data) ? result.data[0] : result.data
+    return {
+      ok: true,
+      message: `Partner saved to secondary Supabase: ${name}`,
+      data: { id: saved?.id || id, name: saved?.name || name, source: 'secondary-supabase' },
+    }
+  },
+})
+
 registerExecutor({
   providerId: 'supabase_mkt', actionId: 'list_tables', policyActionId: 'read_provider_status',
   schema: schema('supabase_mkt.list_tables', 'List Tables', 'view', []),
@@ -93,7 +193,6 @@ registerExecutor({
   },
 })
 
-// List rows for a chosen table
 registerExecutor({
   providerId: 'supabase_mkt', actionId: 'list_rows', policyActionId: 'read_provider_status',
   schema: schema('supabase_mkt.list_rows', 'List Rows', 'view', [TABLE]),
@@ -113,7 +212,6 @@ registerExecutor({
   },
 })
 
-// List auth users
 registerExecutor({
   providerId: 'supabase_mkt', actionId: 'list_users', policyActionId: 'read_provider_status',
   schema: schema('supabase_mkt.list_users', 'List Users', 'view', []),
@@ -128,7 +226,6 @@ registerExecutor({
   },
 })
 
-// List storage buckets
 registerExecutor({
   providerId: 'supabase_mkt', actionId: 'list_buckets', policyActionId: 'read_provider_status',
   schema: schema('supabase_mkt.list_buckets', 'List Buckets', 'view', []),

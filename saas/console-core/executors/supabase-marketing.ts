@@ -1,10 +1,9 @@
 // saas/console-core/executors/supabase-marketing.ts
 //
-// Secondary Supabase project as its own console provider (read-only).
-// This card lets an operator browse a SECOND Supabase project — useful when a
-// deployment runs more than one platform/database. It is OPTIONAL: when no second
-// project is configured the card reports a clean "not connected" state instead of
-// an error, so a single-database install never looks broken.
+// Secondary Supabase project as its own console provider.
+// This card lets an operator browse the SECOND Supabase project and owns the
+// affiliate partner write pipeline. affiliate_partners must never be written
+// through the primary Supabase connection.
 //
 // Configuration (Vercel > Settings > Environment Variables, Production scope):
 //   SECONDARY_SUPABASE_URL                 e.g. https://<ref>.supabase.co
@@ -20,11 +19,6 @@ import { getSecret } from '../secrets.ts'
 import type { ActionField, ActionSchema } from '../types.ts'
 
 // ─── Key inspection (never exposes the key itself) ────────────────────────────
-// Supabase keys come in two shapes:
-//   • legacy JWT — base64url payload carrying a `role` claim. 'service_role' is
-//     correct (full access); 'anon' is the WRONG key (limited / RLS-bound) and is
-//     the single most common setup mistake, since the two JWTs look near-identical.
-//   • new format — 'sb_secret_…' (correct) / 'sb_publishable_…' (wrong, public).
 function inspectKey(key: string): { role: string | null; wrong: boolean; reason: string | null } {
   if (key.startsWith('sb_secret_')) return { role: 'service', wrong: false, reason: null }
   if (key.startsWith('sb_publishable_')) {
@@ -47,7 +41,7 @@ function inspectKey(key: string): { role: string | null; wrong: boolean; reason:
 }
 
 const NOT_CONFIGURED =
-  'Secondary Supabase is not connected (optional). To enable, set SECONDARY_SUPABASE_URL and SECONDARY_SUPABASE_SERVICE_ROLE_KEY (the project\u2019s service_role key) in your environment.'
+  'Secondary Supabase is not connected. Set SECONDARY_SUPABASE_URL and SECONDARY_SUPABASE_SERVICE_ROLE_KEY (or the legacy MARKETING_* equivalents).'
 
 type Creds =
   | { ok: true; url: string; key: string; restBase: string }
@@ -57,11 +51,8 @@ function creds(): Creds {
   const url = getSecret('SECONDARY_SUPABASE_URL') || getSecret('MARKETING_SUPABASE_URL')
   const key = getSecret('SECONDARY_SUPABASE_SERVICE_ROLE_KEY') || getSecret('MARKETING_SUPABASE_SERVICE_ROLE_KEY')
 
-  // Optional provider: absent config is a clean "not connected" state, not a fault.
   if (!url || !key) return { ok: false, error: NOT_CONFIGURED }
 
-  // Guard the most common mistake before any request goes out, so the card shows
-  // an actionable reason instead of a raw "Invalid API key" from PostgREST.
   const info = inspectKey(key)
   if (info.wrong && info.reason) {
     return { ok: false, error: `Secondary Supabase key is the wrong type — ${info.reason}.` }
@@ -77,6 +68,77 @@ const TABLE: ActionField = {
   id: 'table', label: 'Table', type: 'remote_select', required: true,
   remoteSource: { action: 'supabase_mkt.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' },
 }
+
+// Affiliate partner single-source-of-truth write path.
+// Uses a direct PostgREST upsert against SECONDARY only; there is no primary fallback.
+registerExecutor({
+  providerId: 'supabase_mkt', actionId: 'upsert_partner', policyActionId: 'table_crud',
+  schema: schema('supabase_mkt.upsert_partner', 'Add / Update Affiliate Partner', 'upsert', [
+    { id: 'id', label: 'Partner ID', type: 'text', required: true },
+    { id: 'name', label: 'Partner Name', type: 'text', required: true },
+    { id: 'url', label: 'Affiliate URL', type: 'text', required: true },
+    { id: 'network', label: 'Network', type: 'text', required: false },
+    { id: 'category', label: 'Category', type: 'text', required: false },
+    { id: 'category_label', label: 'Category Label', type: 'text', required: false },
+    { id: 'regions', label: 'Regions JSON', type: 'textarea', required: false },
+    { id: 'description', label: 'Description', type: 'textarea', required: false },
+  ]),
+  async run(_ctx, input) {
+    const c = creds(); if (!c.ok) return c
+
+    const id = String(input.id || '').trim()
+    const name = String(input.name || '').trim()
+    const url = String(input.url || '').trim()
+    if (!id || !name || !url) return { ok: false, error: 'Partner ID, name, and affiliate URL are required' }
+
+    const category = String(input.category || 'specialty_other').trim() || 'specialty_other'
+    const categoryLabel = String(input.category_label || '').trim()
+    const network = String(input.network || '').trim()
+    const description = String(input.description || '').trim()
+    let regions = '["ot"]'
+    if (input.regions !== undefined && input.regions !== null && String(input.regions).trim()) {
+      try {
+        const parsed = JSON.parse(String(input.regions))
+        if (!Array.isArray(parsed)) return { ok: false, error: 'Regions must be a JSON array, for example ["ot"]' }
+        regions = JSON.stringify(parsed)
+      } catch {
+        return { ok: false, error: 'Regions must be valid JSON, for example ["ot"]' }
+      }
+    }
+
+    const row = {
+      id,
+      name,
+      url,
+      network: network || null,
+      category,
+      category_key: category,
+      category_label: categoryLabel || null,
+      description: description || null,
+      regions,
+      updated_at: new Date().toISOString(),
+    }
+
+    const res = await fetch(`${c.restBase}/affiliate_partners?on_conflict=id`, {
+      method: 'POST',
+      headers: {
+        apikey: c.key,
+        Authorization: 'Bearer ' + c.key,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(row),
+    })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Partner upsert failed' }
+    const data = await res.json().catch(() => [])
+    const saved = Array.isArray(data) ? data[0] : data
+    return {
+      ok: true,
+      message: `Partner saved to secondary Supabase: ${name}`,
+      data: { id: saved?.id || id, name: saved?.name || name, source: 'secondary-supabase' },
+    }
+  },
+})
 
 // List tables (PostgREST OpenAPI spec — no RPC dependency)
 registerExecutor({

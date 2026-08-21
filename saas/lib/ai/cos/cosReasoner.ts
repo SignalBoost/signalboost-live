@@ -12,6 +12,7 @@
 // layer. A managed open-model runtime such as DeepInfra is allowed only through the
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
+import { randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
@@ -20,6 +21,8 @@ import { maybeBuildCognitiveCouncilAdvisory } from '@/lib/ai/cos/cognitiveCounci
 import { runCouncilChallengeRound } from '@/lib/ai/cos/cognitiveCouncilChallenge'
 import { startTurnBudget, hasBudgetFor, remainingMs, localCallEstimateMs, challengeRoundEstimateMs } from '@/lib/ai/cos/cosTurnBudget'
 import { bindCouncilSessionCorrelations } from '@/lib/ai/cos/councilObjectiveOutcome'
+import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
+import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -144,152 +147,191 @@ function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
  */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
-): Promise<{ text: string; reasoner: CosReasonerConfig } | null> {
+): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
   if (!localConfigured()) return null
 
   const config = configuredReasoner()
   const inference = localInferenceConfigFromEnv()
-  // One wall-clock budget for the whole turn. Optional phases below consult it so a slow run
-  // degrades to a slightly less polished answer instead of being killed at the platform ceiling.
   const budget = startTurnBudget()
-  await touchRunpodActivityLease('qwen_reasoning')
+  const recorder = new TurnRecorder()
+  const turnId = randomUUID()
+  const features = extractQueryFeatures(args.prompt)
+  let answered = false
 
-  let effectiveArgs = args
-  if (primaryCouncilEligible(args)) {
-    const council = await maybeBuildCognitiveCouncilAdvisory({
-      prompt: args.prompt,
-      reasonerLabel: config.label,
-    }).catch(error => {
-      console.warn('[cos-council] advisory failed closed', error instanceof Error ? error.message : String(error))
-      return null
-    })
-    if (council?.advisory) {
-      if (council.sessionId) {
-        await bindCouncilSessionCorrelations(council.sessionId, args.prompt).catch(error => {
-          console.warn('[cos-council-correlation] binding failed closed', error instanceof Error ? error.message : String(error))
-        })
-      }
-      const challengeRound = hasBudgetFor(budget, challengeRoundEstimateMs()) ? await runCouncilChallengeRound({
-        council,
-        governedPrompt: args.prompt,
+  try {
+    await touchRunpodActivityLease('qwen_reasoning')
+
+    let effectiveArgs = args
+    if (primaryCouncilEligible(args)) {
+      const council = await recorder.time('council', () => maybeBuildCognitiveCouncilAdvisory({
+        prompt: args.prompt,
         reasonerLabel: config.label,
-      }).catch(error => {
-        console.warn('[cos-council-challenge] challenge round failed closed', error instanceof Error ? error.message : String(error))
+      })).catch(error => {
+        console.warn('[cos-council] advisory failed closed', error instanceof Error ? error.message : String(error))
         return null
-      }) : (console.warn('[cos-turn-budget] challenge round skipped to protect the turn deadline', JSON.stringify({ remainingMs: remainingMs(budget) })), null)
-      const advisory = challengeRound?.advisory
-        ? `${council.advisory}\n\n${challengeRound.advisory}`
-        : council.advisory
-      effectiveArgs = {
-        ...args,
-        prompt: `${args.prompt}\n\n${advisory}`,
+      })
+      if (council?.advisory) {
+        if (council.sessionId) {
+          await bindCouncilSessionCorrelations(council.sessionId, args.prompt).catch(error => {
+            console.warn('[cos-council-correlation] binding failed closed', error instanceof Error ? error.message : String(error))
+          })
+        }
+        const challengeRound = hasBudgetFor(budget, challengeRoundEstimateMs())
+          ? await recorder.time('challenge', () => runCouncilChallengeRound({
+              council,
+              governedPrompt: args.prompt,
+              reasonerLabel: config.label,
+            })).catch(error => {
+              console.warn('[cos-council-challenge] challenge round failed closed', error instanceof Error ? error.message : String(error))
+              return null
+            })
+          : (recorder.skip('challenge', 'no_budget'), console.warn('[cos-turn-budget] challenge round skipped to protect the turn deadline', JSON.stringify({ remainingMs: remainingMs(budget) })), null)
+        const advisory = challengeRound?.advisory
+          ? `${council.advisory}\n\n${challengeRound.advisory}`
+          : council.advisory
+        effectiveArgs = {
+          ...args,
+          prompt: `${args.prompt}\n\n${advisory}`,
+        }
+        console.info('[cos-council]', JSON.stringify({
+          at: new Date().toISOString(),
+          sessionId: council.sessionId,
+          problemClass: council.problemClass,
+          triggerReasons: council.trigger.reasons,
+          roles: council.opinions.map(opinion => opinion.role),
+          opinions: council.opinions.length,
+          challenges: challengeRound?.challenges.length ?? 0,
+          rebuttals: challengeRound?.rebuttals.length ?? 0,
+        }))
+      } else {
+        recorder.skip('challenge', 'no_advisory')
       }
-      console.info('[cos-council]', JSON.stringify({
-        at: new Date().toISOString(),
-        sessionId: council.sessionId,
-        problemClass: council.problemClass,
-        triggerReasons: council.trigger.reasons,
-        roles: council.opinions.map(opinion => opinion.role),
-        opinions: council.opinions.length,
-        challenges: challengeRound?.challenges.length ?? 0,
-        rebuttals: challengeRound?.rebuttals.length ?? 0,
-      }))
-    }
-  }
-
-  const first = await callLocalModel(effectiveArgs, inference).catch(error => {
-    // This is the actual HTTP call to the reasoner endpoint. Every caller up the chain
-    // (callCosReasoner, then cosFirstAnswerEnterprise) only ever sees `null` from here — so a
-    // cold-start timeout, an aborted fetch, or an HTTP error from the endpoint all looked identical
-    // to "the model declined to answer" with zero way to tell them apart from Vercel logs.
-    console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
-      at: new Date().toISOString(),
-      phase: 'draft',
-      reasoner: config.label,
-      error: error instanceof Error ? error.message : String(error),
-      errorName: error instanceof Error ? error.name : null,
-    }))
-    return null
-  })
-  if (!first) return null
-
-  let text = first
-  // Optional quality-repair pass: worth a full local round-trip only if the turn can still afford
-  // one. Out of budget, the first draft stands — a slightly rougher answer beats a killed request.
-  if (reasonerDraftNeedsRepair(effectiveArgs.prompt, first) && hasBudgetFor(budget, localCallEstimateMs())) {
-    const repaired = await callLocalModel(
-      {
-        ...effectiveArgs,
-        temperature: 0,
-        prompt: buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
-      },
-      inference,
-    ).catch(error => {
-      console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
-        at: new Date().toISOString(),
-        phase: 'quality_repair',
-        reasoner: config.label,
-        error: error instanceof Error ? error.message : String(error),
-        errorName: error instanceof Error ? error.name : null,
-      }))
-      return null
-    })
-
-    if (repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired)) {
-      console.info('[cos-local-quality-repair]', JSON.stringify({
-        at: new Date().toISOString(),
-        reasoner: config.label,
-        repaired: true,
-      }))
-      void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired) } })
-      text = repaired
     } else {
-      console.warn('[cos-local-quality-repair]', JSON.stringify({
-        at: new Date().toISOString(),
-        reasoner: config.label,
-        repaired: false,
-      }))
-      void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null } })
+      recorder.skip('council', 'not_eligible')
+      recorder.skip('challenge', 'not_eligible')
     }
-  }
 
-  const allowedSkillTags = skillCitationTags(effectiveArgs.prompt)
-  const parsed = parseLocalResult(text)
-  // Optional skill-citation repair: same budget rule as the quality-repair pass above.
-  if (parsed && skillCitationRepairNeeded(effectiveArgs.prompt, parsed.answer) && hasBudgetFor(budget, localCallEstimateMs())) {
-    const audited = await callLocalModel(
-      {
-        ...effectiveArgs,
-        temperature: 0,
-        maxTokens: Math.max(2048, Math.min(Number(effectiveArgs.maxTokens ?? 4096), 6000)),
-        prompt: buildSkillCitationRepairPrompt(effectiveArgs.prompt, parsed.answer, allowedSkillTags),
-      },
-      inference,
-    ).catch(error => {
+    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, inference), 'model').catch(error => {
       console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
         at: new Date().toISOString(),
-        phase: 'skill_citation_repair',
+        phase: 'draft',
         reasoner: config.label,
         error: error instanceof Error ? error.message : String(error),
         errorName: error instanceof Error ? error.name : null,
       }))
       return null
     })
-    const auditedParsed = audited ? parseLocalResult(audited) : null
-    const accepted = Boolean(auditedParsed && validSkillCitationOnlyRepair(parsed.answer, auditedParsed.answer, allowedSkillTags))
-    if (accepted && auditedParsed) {
-      text = JSON.stringify({ answer: auditedParsed.answer, confidence: parsed.confidence })
+    if (!first) {
+      recorder.skip('quality_repair', 'no_draft')
+      recorder.skip('skill_citation_repair', 'no_draft')
+      return null
     }
-    console.info('[cos-skill-citation-repair]', JSON.stringify({
-      at: new Date().toISOString(),
-      reasoner: config.label,
-      attempted: true,
-      accepted,
-      allowedTags: allowedSkillTags,
-      citedTags: auditedParsed ? skillCitationTags(auditedParsed.answer) : [],
-    }))
-    void recordQualityRepairDecision({ repairKind:'skill_citation_repair', reasonerLabel:config.label, accepted, details:{ allowedTags:allowedSkillTags, citedTags:auditedParsed?skillCitationTags(auditedParsed.answer):[] } })
-  }
 
-  return { text, reasoner: config }
+    let text = first
+    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first)
+    const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
+    if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
+    else if (!qualityRepairAffordable) recorder.skip('quality_repair', 'no_budget')
+
+    if (qualityRepairNeeded && qualityRepairAffordable) {
+      const repaired = await recorder.time('quality_repair', () => callLocalModel(
+        {
+          ...effectiveArgs,
+          temperature: 0,
+          prompt: buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
+        },
+        inference,
+      ), 'model').catch(error => {
+        console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
+          at: new Date().toISOString(),
+          phase: 'quality_repair',
+          reasoner: config.label,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : null,
+        }))
+        return null
+      })
+
+      if (repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired)) {
+        console.info('[cos-local-quality-repair]', JSON.stringify({
+          at: new Date().toISOString(),
+          reasoner: config.label,
+          repaired: true,
+        }))
+        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired) } })
+        text = repaired
+      } else {
+        console.warn('[cos-local-quality-repair]', JSON.stringify({
+          at: new Date().toISOString(),
+          reasoner: config.label,
+          repaired: false,
+        }))
+        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null } })
+      }
+    }
+
+    const allowedSkillTags = skillCitationTags(effectiveArgs.prompt)
+    const parsed = parseLocalResult(text)
+    const citationRepairNeeded = Boolean(parsed && skillCitationRepairNeeded(effectiveArgs.prompt, parsed.answer))
+    const citationRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
+    if (!citationRepairNeeded) recorder.skip('skill_citation_repair', 'not_needed')
+    else if (!citationRepairAffordable) recorder.skip('skill_citation_repair', 'no_budget')
+
+    if (citationRepairNeeded && citationRepairAffordable && parsed) {
+      const audited = await recorder.time('skill_citation_repair', () => callLocalModel(
+        {
+          ...effectiveArgs,
+          temperature: 0,
+          maxTokens: Math.max(2048, Math.min(Number(effectiveArgs.maxTokens ?? 4096), 6000)),
+          prompt: buildSkillCitationRepairPrompt(effectiveArgs.prompt, parsed.answer, allowedSkillTags),
+        },
+        inference,
+      ), 'model').catch(error => {
+        console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
+          at: new Date().toISOString(),
+          phase: 'skill_citation_repair',
+          reasoner: config.label,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : null,
+        }))
+        return null
+      })
+      const auditedParsed = audited ? parseLocalResult(audited) : null
+      const accepted = Boolean(auditedParsed && validSkillCitationOnlyRepair(parsed.answer, auditedParsed.answer, allowedSkillTags))
+      if (accepted && auditedParsed) {
+        text = JSON.stringify({ answer: auditedParsed.answer, confidence: parsed.confidence })
+      }
+      console.info('[cos-skill-citation-repair]', JSON.stringify({
+        at: new Date().toISOString(),
+        reasoner: config.label,
+        attempted: true,
+        accepted,
+        allowedTags: allowedSkillTags,
+        citedTags: auditedParsed ? skillCitationTags(auditedParsed.answer) : [],
+      }))
+      void recordQualityRepairDecision({ repairKind:'skill_citation_repair', reasonerLabel:config.label, accepted, details:{ allowedTags:allowedSkillTags, citedTags:auditedParsed?skillCitationTags(auditedParsed.answer):[] } })
+    }
+
+    answered = true
+    return { text, reasoner: config, turnId }
+  } finally {
+    const experience = recorder.snapshot({
+      turnId,
+      promptHash: hashPrompt(args.prompt),
+      features,
+      reasonerLabel: config.label,
+      answered,
+    })
+    console.info('[cos-reasoner-phases]', JSON.stringify({
+      at: new Date().toISOString(),
+      turnId,
+      totalMs: experience.totalMs,
+      modelCallMs: experience.modelCallMs,
+      otherMs: experience.otherMs,
+      directModelCalls: experience.modelCalls,
+      phases: experience.phases,
+      skipped: experience.skipped,
+    }))
+    recordTurnExperience(experience)
+  }
 }

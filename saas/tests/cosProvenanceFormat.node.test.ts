@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { authoritativeProvenance, formatAuthoritativeProvenance } from '../lib/ai/cos/cosOrchestration.ts'
 
@@ -93,4 +94,14 @@ test('cache-hit provenance separates current retrieval from the turn that genera
   assert.equal(provenance.answer_origin.evidence_funnel?.knowledgeGraph.injected, 4)
   assert.equal(provenance.answer_origin.evidence_funnel?.learnedCorpus.injected, 6)
   assert.equal(provenance.answer_origin.model, 'independent-local:qwen2.5-coder:32b')
+})
+
+test('fresh-evidence provenance delegates provider identity to the canonical reasoner resolver', () => {
+  const freshSynthesis = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  const primaryRoute = readFileSync(new URL('../app/api/cos-primary/baseRoute.ts', import.meta.url), 'utf8')
+
+  assert.match(freshSynthesis, /resolveCosReasoner/)
+  assert.doesNotMatch(freshSynthesis, /reasonerLabel:\s*`independent-local:/)
+  assert.match(primaryRoute, /function localReasonerLabel\(\):string\{const resolved=resolveCosReasoner\(\)/)
+  assert.doesNotMatch(primaryRoute, /function localReasonerLabel\(\):string\{return`independent-local:/)
 })

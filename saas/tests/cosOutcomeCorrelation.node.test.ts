@@ -13,6 +13,7 @@ import {
   COS_EVIDENCE_UTILIZATION_BENCHMARK,
   evidenceUtilizationDomains,
 } from '../lib/ai/cos/evidenceUtilizationBenchmark.ts'
+import { reasonerProbeCompletionTimeoutMs } from '../lib/ai/cos/reasonerProbe.ts'
 
 const file = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
@@ -52,6 +53,13 @@ test('controlled evidence-utilization suite has 36 unique local-only cases acros
     assert.ok(item.requiredTerms.length >= 2)
     assert.match(item.track, /^evidence_utilization:/)
   }
+})
+
+test('benchmark probe timeout override remains bounded and does not weaken the default diagnostic timeout', () => {
+  assert.equal(reasonerProbeCompletionTimeoutMs(), 45_000)
+  assert.equal(reasonerProbeCompletionTimeoutMs(1_000), 5_000)
+  assert.equal(reasonerProbeCompletionTimeoutMs(90_000), 90_000)
+  assert.equal(reasonerProbeCompletionTimeoutMs(999_999), 120_000)
 })
 
 test('ordinary COS answers enrich server-stored provenance with the request-local turn id', () => {

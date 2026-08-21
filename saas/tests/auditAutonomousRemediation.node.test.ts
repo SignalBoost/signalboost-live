@@ -118,9 +118,9 @@ test('approval is durable and recovery does not ask the owner again', () => {
 test('ONBOARD preserves governed AI execution and truthful status doctrine', () => {
   const onboard = read('../../ONBOARD.md')
 
-  assert.match(onboard, /Consequential actions remain behind applicable approval controls/i)
-  assert.match(onboard, /EVIDENCE-BASED — never infer from architecture or a green deployment/i)
-  assert.match(onboard, /Verify implementation\/runtime from code and live evidence before diagnosing, changing, or reporting status/i)
+  assert.match(onboard, /Unknown\/consequential\/destructive\/financial\/security actions remain governed and approval-gated/i)
+  assert.match(onboard, /Enterprise Release Candidate:[^\n]*evidence-based only; never infer from a green deployment/i)
+  assert.match(onboard, /Verify implementation\/runtime from code and live evidence before diagnosing or reporting status/i)
 })
 
 test('failed GitHub checks and stalled stages never look actively pending', () => {

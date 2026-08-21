@@ -1,7 +1,7 @@
 //
-// Built from the real failure: a confident answer was cached, and every later ask of the same
-// question returned it — through a model swap, a prompt rewrite and a gate change — so no
-// quality work could ever show up in a benchmark run.
+// Built from real cache-policy and embedding-space failures. A cache partition must change when
+// either the answer-generation policy OR the semantic embedding model changes. Two embedders can
+// both emit 768 dimensions while occupying incompatible vector spaces.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -25,6 +25,19 @@ test('swapping the model changes the cache partition', () => {
   const after = cosAnswerPolicyVersion({ ...base, model: 'qwen2.5:32b-instruct' })
   assert.notEqual(before, after)
   assert.notEqual(cosCacheTaskId('cos-first-answer', before), cosCacheTaskId('cos-first-answer', after))
+})
+
+test('swapping only the embedding model changes the semantic-cache partition', () => {
+  const nomic = cosAnswerPolicyVersion({ ...base, embeddingModel: 'nomic-embed-text' })
+  const bge = cosAnswerPolicyVersion({ ...base, embeddingModel: 'BAAI/bge-base-en-v1.5' })
+  assert.notEqual(nomic, bge)
+  assert.notEqual(cosCacheTaskId('cos-first-answer', nomic), cosCacheTaskId('cos-first-answer', bge))
+})
+
+test('embedding model casing and padding do not fragment the cache', () => {
+  const a = cosAnswerPolicyVersion({ ...base, embeddingModel: ' BAAI/BGE-BASE-EN-V1.5 ' })
+  const b = cosAnswerPolicyVersion({ ...base, embeddingModel: 'baai/bge-base-en-v1.5' })
+  assert.equal(a, b)
 })
 
 test('rewriting the reasoner prompt or moving the gate changes the partition too', () => {
@@ -61,7 +74,6 @@ test('a matching entry within the age ceiling is served, past it is refused', ()
   assert.equal(fresh.ok, true)
   const stale = cachedAnswerIsCurrent({ policyVersion: 'aaaaaaaaaaaa', storedAt: '2026-07-01T00:00:00.000Z' }, 'aaaaaaaaaaaa', 7 * dayMs, now)
   assert.equal(stale.ok, false)
-  // Ageing off entirely is a supported configuration, not an accident.
   assert.equal(cachedAnswerIsCurrent({ policyVersion: 'aaaaaaaaaaaa', storedAt: '2026-01-01T00:00:00.000Z' }, 'aaaaaaaaaaaa', 0, now).ok, true)
 })
 
@@ -98,9 +110,7 @@ test('a cache hit reports the originating turn, not this turn s retrieval', () =
   assert.match(text, /2026-08-11T09:14:00\.000Z/)
   assert.match(text, /answer policy aaaaaaaaaaaa/)
   assert.match(text, /No reasoning ran on this request/)
-  // This turn's retrieval is reported as what it was: cache keying, not evidence for an answer.
   assert.match(text, /12 corpus items and 3 memories were retrieved this turn solely to key the cache/)
-  // The component lines describe the ORIGIN turn — 1 of 4, not 0 of 12.
   assert.match(text, /Learned Corpus\s+: USED — 1 cited of 4 retrieved learned items/)
   assert.match(text, /Local Reasoning Engine: NOT INVOKED/)
   assert.match(text, /no confidence gate ran on this request/)

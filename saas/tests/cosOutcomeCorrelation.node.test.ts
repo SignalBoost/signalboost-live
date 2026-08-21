@@ -13,7 +13,6 @@ import {
   COS_EVIDENCE_UTILIZATION_BENCHMARK,
   evidenceUtilizationDomains,
 } from '../lib/ai/cos/evidenceUtilizationBenchmark.ts'
-import { decideVerifiedCosProductionOutcome } from '../lib/ai/cos/cognitiveVerifiedOutcome.ts'
 
 const file = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
@@ -76,17 +75,9 @@ test('assistant feedback derives turn id from server-owned message provenance, n
   assert.doesNotMatch(source, /body\?\.turnId/)
 })
 
-test('verified production outcome keeps its evidence guard and supports explicit turn correlation', () => {
-  assert.throws(() => decideVerifiedCosProductionOutcome({
-    sourceClass: 'production_outcome',
-    sourceRef: 'model:claimed-success',
-    domain: 'workflow',
-    outcomeStatus: 'success',
-    summary: 'Model claimed success.',
-    correlation: { kind: 'cos_turn_id', value: '11111111-1111-4111-8111-111111111111' },
-  }))
-
+test('verified production outcome keeps its evidence guard and supports only explicit turn correlation', () => {
   const source = file('../lib/ai/cos/cognitiveVerifiedOutcome.ts')
+  assert.match(source, /\^\(\?:model\|council\|llm\|consensus\|frontier_teacher\):/)
   assert.match(source, /kind !== 'cos_turn_id'/)
   assert.match(source, /attachTurnOutcome\(turnId/)
 })

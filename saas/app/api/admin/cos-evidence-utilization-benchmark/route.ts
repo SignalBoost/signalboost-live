@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const MAX_CASES_PER_RUN = 2
+const START_NEXT_CASE_CUTOFF_MS = 150_000
 const STALE_RUN_MS = 10 * 60_000
 const errorText = (value: unknown): string => value instanceof Error
   ? value.message
@@ -28,7 +29,7 @@ async function reconcileStaleRuns(db: NonNullable<ReturnType<typeof cosServiceDb
     .update({
       status: 'failed',
       completed_at: new Date().toISOString(),
-      error: 'Evidence-utilization benchmark run expired before completion; retry uses a bounded two-case batch.',
+      error: 'Evidence-utilization benchmark run expired before completion; retry resumes from actual completed attempts.',
     })
     .eq('status', 'running')
     .lt('started_at', cutoff)
@@ -43,7 +44,7 @@ export async function GET() {
 
   const [runs, results] = await Promise.all([
     db.from('cos_evidence_utilization_benchmark_runs')
-      .select('id,started_at,completed_at,attempted,passed,status,error')
+      .select('id,started_at,completed_at,requested_limit,attempted,passed,status,error')
       .order('started_at', { ascending: false })
       .limit(20),
     db.from('cos_evidence_utilization_benchmark_results')
@@ -72,10 +73,14 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({})) as Record<string, unknown>
   const limit = Math.max(1, Math.min(MAX_CASES_PER_RUN, Math.floor(Number(body.limit) || MAX_CASES_PER_RUN)))
-  const completedRuns = await db.from('cos_evidence_utilization_benchmark_runs').select('id').eq('status', 'completed').limit(5000)
+  const completedRuns = await db.from('cos_evidence_utilization_benchmark_runs')
+    .select('attempted')
+    .eq('status', 'completed')
+    .limit(5000)
   if (completedRuns.error) return NextResponse.json({ error: completedRuns.error.message }, { status: 500 })
 
-  const start = ((completedRuns.data?.length ?? 0) * limit) % COS_EVIDENCE_UTILIZATION_BENCHMARK.length
+  const completedAttempts = (completedRuns.data ?? []).reduce((sum, row) => sum + Math.max(0, Number(row.attempted) || 0), 0)
+  const start = completedAttempts % COS_EVIDENCE_UTILIZATION_BENCHMARK.length
   const selected = [
     ...COS_EVIDENCE_UTILIZATION_BENCHMARK.slice(start),
     ...COS_EVIDENCE_UTILIZATION_BENCHMARK.slice(0, start),
@@ -96,8 +101,10 @@ export async function POST(request: NextRequest) {
     reason: 'owner_authenticated_evidence_utilization_benchmark',
   }
 
+  const runStartedAt = Date.now()
   let attempted = 0
   let passed = 0
+  let stoppedEarlyForBudget = false
   let blockedVerdict: string | null = null
   let blockedSummary = ''
   try {
@@ -113,7 +120,12 @@ export async function POST(request: NextRequest) {
         return
       }
 
-      for (const test of selected) {
+      for (let index = 0; index < selected.length; index += 1) {
+        if (index > 0 && Date.now() - runStartedAt >= START_NEXT_CASE_CUTOFF_MS) {
+          stoppedEarlyForBudget = true
+          break
+        }
+        const test = selected[index]
         attempted += 1
         try {
           const outcome = await runPrivateCapabilityCase(test, {
@@ -158,15 +170,18 @@ export async function POST(request: NextRequest) {
 
     await db.from('cos_evidence_utilization_benchmark_runs').update({
       status: 'completed', completed_at: new Date().toISOString(), attempted, passed,
+      error: stoppedEarlyForBudget ? 'Stopped before starting another case to preserve the 300-second route budget; the next run resumes from actual attempted cases.' : null,
     }).eq('id', run.data.id)
 
     return NextResponse.json({
       ok: true,
       runId: run.data.id,
+      requested: limit,
       attempted,
       passed,
       passRate: attempted ? passed / attempted : 0,
-      nextOffset: ((start + limit) % COS_EVIDENCE_UTILIZATION_BENCHMARK.length),
+      stoppedEarlyForBudget,
+      nextOffset: ((start + attempted) % COS_EVIDENCE_UTILIZATION_BENCHMARK.length),
       suiteSize: COS_EVIDENCE_UTILIZATION_BENCHMARK.length,
     })
   } catch (error) {

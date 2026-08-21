@@ -12,12 +12,6 @@ const ENGINE_PROVIDERS = new Set([
   'supabase_mkt',
 ])
 
-// Existing Supabase Insert Row needs the portable engine because that executor
-// inspects the selected table and force-routes affiliate_partners to secondary.
-const ENGINE_TEMPLATE_IDS = new Set([
-  'supabase.insert_row',
-])
-
 export type ProviderActionSubmission = Readonly<{
   mode: ProviderExecutionMode
   endpoint: string | null
@@ -35,7 +29,6 @@ const PRODUCT_LABELS: Record<ProviderExecutionMode, string> = {
 }
 
 function directEndpoint(templateId: string): string {
-  if (ENGINE_TEMPLATE_IDS.has(templateId)) return '/api/hub/action/engine'
   const provider = String(templateId || '').split('.')[0].toLowerCase()
   return ENGINE_PROVIDERS.has(provider) ? '/api/hub/action/engine' : '/api/hub/action'
 }

@@ -25,9 +25,11 @@ export function runpodLifecycleConfigured(): boolean {
 }
 
 function enabled() {
+  // Provider detachment is authoritative. A stale RUNPOD_LIFECYCLE_ENABLED=true must never
+  // re-enable lifecycle control when LOCAL_AI_BASE_URL points at DeepInfra or another provider.
+  if (!runpodLifecycleConfigured()) return false
   const override = booleanOverride('RUNPOD_LIFECYCLE_ENABLED')
-  if (override !== null) return override
-  return runpodLifecycleConfigured()
+  return override !== false
 }
 
 export function runpodLifecycleEnabled() {

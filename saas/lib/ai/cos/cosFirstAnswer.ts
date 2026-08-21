@@ -249,7 +249,7 @@ async function tryFreshCurrentFact(input: {
 async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
   const turnId = peekEvidenceSourceUseTurnId()
   const enriched = turnId
-    ? ({ ...result, provenance: { ...(result.provenance as Record<string, unknown>), turnId } } as COSFirstAnswerResult)
+    ? ({ ...result, provenance: { ...(result.provenance as Record<string, unknown>), turnId } } as unknown as COSFirstAnswerResult)
     : result
   const failureReason = 'reason' in enriched ? enriched.reason : null
   await recordCosTurnExperience({

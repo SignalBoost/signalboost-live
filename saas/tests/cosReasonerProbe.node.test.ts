@@ -8,7 +8,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 // Static import: the probe reads LOCAL_AI_* at call time, not at module load, so the env set below
 // still applies. (A dynamic import would need top-level await, which this test runner cannot strip.)
-import { probeReasoner } from '../lib/ai/cos/reasonerProbe'
+import { probeReasoner, reasonerProbeCompletionTimeoutMs } from '../lib/ai/cos/reasonerProbe'
 
 process.env.LOCAL_AI_BASE_URL = process.env.LOCAL_AI_BASE_URL || 'http://localhost:11434/v1'
 process.env.LOCAL_AI_MODEL = process.env.LOCAL_AI_MODEL || 'qwen2.5:32b'
@@ -38,6 +38,13 @@ test.afterEach(() => {
   globalThis.fetch = realFetch
 })
 
+test('probe completion timeout defaults to 45s and clamps explicit callers safely', () => {
+  assert.equal(reasonerProbeCompletionTimeoutMs(), 45_000)
+  assert.equal(reasonerProbeCompletionTimeoutMs(1_000), 5_000)
+  assert.equal(reasonerProbeCompletionTimeoutMs(90_000), 90_000)
+  assert.equal(reasonerProbeCompletionTimeoutMs(999_999), 120_000)
+})
+
 test('a working reasoner reports ok and echoes the reply', async () => {
   stubFetch((url) =>
     url.endsWith('/models')
@@ -48,6 +55,17 @@ test('a working reasoner reports ok and echoes the reply', async () => {
   assert.equal(result.verdict, 'ok')
   assert.equal(result.completion.text, 'ready')
   assert.equal(result.modelList.configuredModelAvailable, true)
+})
+
+test('benchmark callers can request a longer bounded completion probe', async () => {
+  stubFetch((url) =>
+    url.endsWith('/models')
+      ? { status: 200, body: modelList(['qwen2.5:32b']) }
+      : { status: 200, body: completion('ready') },
+  )
+  const result = await probeReasoner({ completionTimeoutMs: 90_000 })
+  assert.equal(result.verdict, 'ok')
+  assert.equal(result.completion.text, 'ready')
 })
 
 test('a model the endpoint does not serve is model_not_found, and names what it does serve', async () => {

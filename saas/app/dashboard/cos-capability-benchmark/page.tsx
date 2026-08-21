@@ -7,6 +7,11 @@ type CapabilityState = { cases:Array<{id:string;track:string;active:boolean}>; r
 type UtilizationState = { suiteSize:number; domains:string[]; runs:Run[] }
 type BusyMode = 'capability'|'utilization'|null
 
+function latestScoredRate(runs: Run[]): string {
+  const run = runs.find(item => Number(item.attempted) > 0)
+  return run ? `${Math.round((run.passed / run.attempted) * 100)}%` : '—'
+}
+
 export default function CosCapabilityBenchmarkPage() {
   const { t } = useTranslation()
   const displayError = (value: unknown) => typeof value === 'string' ? value : value && typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')
@@ -58,8 +63,8 @@ export default function CosCapabilityBenchmarkPage() {
   }
 
   const active = state.cases.filter(item => item.active).length
-  const latestCapabilityRate = state.runs[0]?.attempted ? `${Math.round((state.runs[0].passed/state.runs[0].attempted)*100)}%` : '—'
-  const latestUtilizationRate = utilization.runs[0]?.attempted ? `${Math.round((utilization.runs[0].passed/utilization.runs[0].attempted)*100)}%` : '—'
+  const latestCapabilityRate = latestScoredRate(state.runs)
+  const latestUtilizationRate = latestScoredRate(utilization.runs)
 
   return <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
     <header>

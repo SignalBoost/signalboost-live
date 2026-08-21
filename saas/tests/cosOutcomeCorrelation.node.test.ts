@@ -91,8 +91,20 @@ test('migration makes outcomes race-safe and keeps utilization benchmark separat
   assert.match(source, /cos_evidence_utilization_benchmark_results/i)
 })
 
+test('benchmark probe override is bounded without changing the default diagnostic timeout', () => {
+  const probe = file('../lib/ai/cos/reasonerProbe.ts')
+  assert.match(probe, /const COMPLETION_TIMEOUT_MS = 45_000/)
+  assert.match(probe, /const MIN_COMPLETION_TIMEOUT_MS = 5_000/)
+  assert.match(probe, /const MAX_COMPLETION_TIMEOUT_MS = 120_000/)
+  assert.match(probe, /export function reasonerProbeCompletionTimeoutMs/)
+  assert.match(probe, /Math\.max\(MIN_COMPLETION_TIMEOUT_MS, Math\.min\(MAX_COMPLETION_TIMEOUT_MS/)
+  assert.match(probe, /completionResponse\(config, !strictModelList, completionTimeoutMs\)/)
+})
+
 test('controlled benchmark is operator-accessible, route-budget safe and resumes from actual attempts', () => {
   const route = file('../app/api/admin/cos-evidence-utilization-benchmark/route.ts')
+  assert.match(route, /BENCHMARK_PROBE_TIMEOUT_MS = 90_000/)
+  assert.match(route, /probeReasoner\(\{ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS \}\)/)
   assert.match(route, /START_NEXT_CASE_CUTOFF_MS/)
   assert.match(route, /completedAttempts/)
   assert.match(route, /start \+ attempted/)
@@ -102,4 +114,6 @@ test('controlled benchmark is operator-accessible, route-budget safe and resumes
   assert.match(page, /\/api\/admin\/cos-evidence-utilization-benchmark/)
   assert.match(page, /runUtilization/)
   assert.match(page, /Run evidence utilization/)
+  assert.match(page, /latestScoredRate/)
+  assert.match(page, /find\(item => Number\(item\.attempted\) > 0\)/)
 })

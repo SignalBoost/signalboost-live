@@ -3,6 +3,8 @@ import { localInferenceTargetsRunpod } from '@/lib/ai/cos/runpodConfig'
 
 const MODEL_LIST_TIMEOUT_MS = 10_000
 const COMPLETION_TIMEOUT_MS = 45_000
+const MIN_COMPLETION_TIMEOUT_MS = 5_000
+const MAX_COMPLETION_TIMEOUT_MS = 120_000
 const BODY_EXCERPT = 600
 
 export type ReasonerProbeVerdict =
@@ -13,6 +15,10 @@ export type ReasonerProbeVerdict =
   | 'model_not_found'
   | 'completion_failed'
   | 'empty_completion'
+
+export type ReasonerProbeOptions = {
+  completionTimeoutMs?: number
+}
 
 export interface ReasonerProbeResult {
   verdict: ReasonerProbeVerdict
@@ -50,6 +56,12 @@ function authHeaders(apiKey?: string): Record<string, string> {
   return apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {}
 }
 
+export function reasonerProbeCompletionTimeoutMs(requested?: number): number {
+  const value = Number(requested)
+  if (!Number.isFinite(value) || value <= 0) return COMPLETION_TIMEOUT_MS
+  return Math.max(MIN_COMPLETION_TIMEOUT_MS, Math.min(MAX_COMPLETION_TIMEOUT_MS, Math.floor(value)))
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -77,7 +89,7 @@ function matchModel(configured: string, available: string[]): { available: boole
   return { available: false, near: available.filter((id) => id.toLowerCase().startsWith(base)) }
 }
 
-async function completionResponse(config: LocalInferenceConfig, includeReasoningControl: boolean): Promise<Response> {
+async function completionResponse(config: LocalInferenceConfig, includeReasoningControl: boolean, timeoutMs: number): Promise<Response> {
   const body: Record<string, unknown> = {
     model: config.model,
     max_tokens: 256,
@@ -92,11 +104,12 @@ async function completionResponse(config: LocalInferenceConfig, includeReasoning
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
       body: JSON.stringify(body),
     },
-    COMPLETION_TIMEOUT_MS,
+    timeoutMs,
   )
 }
 
-export async function probeReasoner(): Promise<ReasonerProbeResult> {
+export async function probeReasoner(options: ReasonerProbeOptions = {}): Promise<ReasonerProbeResult> {
+  const completionTimeoutMs = reasonerProbeCompletionTimeoutMs(options.completionTimeoutMs)
   const result: ReasonerProbeResult = {
     verdict: 'ok',
     summary: '',
@@ -161,13 +174,13 @@ export async function probeReasoner(): Promise<ReasonerProbeResult> {
   const startedAt = Date.now()
   result.completion.attempted = true
   try {
-    let response = await completionResponse(config, !strictModelList)
+    let response = await completionResponse(config, !strictModelList, completionTimeoutMs)
     let raw = await response.text()
 
     // Some OpenAI-compatible providers reject reasoning_effort even though others require it to
     // prevent reasoning-only health replies. Retry once without it on a 400-class compatibility error.
     if (!strictModelList && response.status === 400) {
-      response = await completionResponse(config, false)
+      response = await completionResponse(config, false, completionTimeoutMs)
       raw = await response.text()
     }
 
@@ -209,7 +222,7 @@ export async function probeReasoner(): Promise<ReasonerProbeResult> {
     result.completion.error = error instanceof Error ? error.message : String(error)
     result.verdict = 'completion_failed'
     result.summary = /abort/i.test(result.completion.error)
-      ? `The completion exceeded ${COMPLETION_TIMEOUT_MS}ms and was aborted.`
+      ? `The completion exceeded ${completionTimeoutMs}ms and was aborted.`
       : `The completion request failed: ${result.completion.error}`
     return result
   }

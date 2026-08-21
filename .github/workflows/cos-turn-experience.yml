@@ -1,0 +1,34 @@
+name: COS Turn Experience Regression
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/ai/cos/turnExperience.ts'
+      - 'saas/lib/ai/cos/turnExperienceStore.ts'
+      - 'saas/lib/ai/cos/cosReasoner.ts'
+      - 'saas/app/api/admin/cos-turn-experience/route.ts'
+      - 'saas/tests/cosTurnExperience.node.test.ts'
+      - 'saas/supabase/migrations/20260821_cos_turn_experience.sql'
+      - '.github/workflows/cos-turn-experience.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  turn-experience:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm install --no-audit --no-fund
+      - name: Test COS turn experience
+        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts
+      - name: Typecheck
+        run: npm run typecheck

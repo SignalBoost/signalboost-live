@@ -90,10 +90,10 @@ async function persistTurnLearningEnrichment(input: TurnLearningEnrichment): Pro
     if (!isUuid(cleanTurnId)) return
     const db = cosServiceDb()
     if (!db) return
-    const confidence = Number(input.predictedConfidence)
+    const confidence = input.predictedConfidence == null ? null : Number(input.predictedConfidence)
     const result = await db.from('cos_turn_experience').update({
       problem_class: String(input.problemClass || 'general reasoning').slice(0, 240),
-      predicted_confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+      predicted_confidence: confidence !== null && Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
       route_class: input.routeClass ? String(input.routeClass).slice(0, 80) : null,
       response_source: input.responseSource ? String(input.responseSource).slice(0, 120) : null,
       evidence_summary: input.evidenceSummary && typeof input.evidenceSummary === 'object' ? input.evidenceSummary : {},

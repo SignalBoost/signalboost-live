@@ -22,7 +22,7 @@ export default function CosCapabilityBenchmarkPage() {
     ])
     const [capBody, utilBody] = await Promise.all([capResponse.json(), utilResponse.json()])
     if (!capResponse.ok) throw new Error(capBody.error || t('cos.benchmark.loadFailed', 'Could not load benchmark.'))
-    if (!utilResponse.ok) throw new Error(utilBody.error || 'Could not load evidence utilization benchmark.')
+    if (!utilResponse.ok) throw new Error(utilBody.error || t('cos.benchmark.utilizationLoadFailed', 'Could not load evidence utilization benchmark.'))
     setState(capBody)
     setUtilization({
       suiteSize: Number(utilBody.suiteSize) || 0,
@@ -50,10 +50,10 @@ export default function CosCapabilityBenchmarkPage() {
     try {
       const response = await fetch('/api/admin/cos-evidence-utilization-benchmark', { method:'POST', credentials:'include', headers:{'content-type':'application/json'}, body:JSON.stringify({limit:2}) })
       const body = await response.json()
-      if (!response.ok) throw new Error(body.error || 'Evidence utilization benchmark failed.')
+      if (!response.ok) throw new Error(body.error || t('cos.benchmark.utilizationRunFailed', 'Evidence utilization benchmark failed.'))
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Evidence utilization benchmark failed.')
+      setError(e instanceof Error ? e.message : t('cos.benchmark.utilizationRunFailed', 'Evidence utilization benchmark failed.'))
     } finally { setBusy(null) }
   }
 
@@ -69,7 +69,7 @@ export default function CosCapabilityBenchmarkPage() {
 
     <div className="flex flex-wrap gap-3">
       <button className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50" disabled={busy!==null||active===0} onClick={runCapability}>{busy==='capability'?t('cos.benchmark.running', 'Running…'):t('cos.benchmark.run', 'Run benchmark')}</button>
-      <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||utilization.suiteSize===0} onClick={runUtilization}>{busy==='utilization'?'Running evidence benchmark…':'Run evidence utilization'}</button>
+      <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||utilization.suiteSize===0} onClick={runUtilization}>{busy==='utilization'?t('cos.benchmark.utilizationRunning', 'Running evidence benchmark…'):t('cos.benchmark.utilizationRun', 'Run evidence utilization')}</button>
       <button className="rounded-md border border-border px-4 py-2 text-sm" disabled={busy!==null} onClick={()=>void load().catch(e=>setError(e.message))}>{t('common.refresh', 'Refresh')}</button>
     </div>
 
@@ -78,20 +78,20 @@ export default function CosCapabilityBenchmarkPage() {
     <section className="grid gap-3 md:grid-cols-4">
       <Card label={t('cos.benchmark.activeCases', 'Active private cases')} value={String(active)} />
       <Card label={t('cos.benchmark.latestPassRate', 'Latest private pass rate')} value={latestCapabilityRate} />
-      <Card label="Evidence-utilization cases" value={String(utilization.suiteSize)} />
-      <Card label="Latest utilization pass rate" value={latestUtilizationRate} />
+      <Card label={t('cos.benchmark.utilizationCases', 'Evidence-utilization cases')} value={String(utilization.suiteSize)} />
+      <Card label={t('cos.benchmark.utilizationPassRate', 'Latest utilization pass rate')} value={latestUtilizationRate} />
     </section>
 
     <section className="rounded-md border border-border bg-surface p-4">
       <h2 className="font-semibold">{t('cos.benchmark.recentRuns', 'Recent private capability runs')}</h2>
-      <p className="mt-1 text-xs text-text-muted">These six cases remain the capability-acceptance rotation and are not diluted by the evidence-utilization suite.</p>
+      <p className="mt-1 text-xs text-text-muted">{t('cos.benchmark.privateSeparation', 'These six cases remain the capability-acceptance rotation and are not diluted by the evidence-utilization suite.')}</p>
       <RunList runs={state.runs} empty={t('cos.benchmark.noRuns', 'No runs yet. Add private benchmark cases in Supabase, then run a bounded batch.')} displayError={displayError} passedLabel={t('cos.benchmark.passed', 'passed')} />
     </section>
 
     <section className="rounded-md border border-border bg-surface p-4">
-      <h2 className="font-semibold">Evidence utilization benchmark</h2>
-      <p className="mt-1 text-xs text-text-muted">Separate controlled cohort across {utilization.domains.length || 9} domains. Slow first cases can end a batch early so the route stays inside the 300-second production ceiling; the next run resumes from actual attempted cases.</p>
-      <RunList runs={utilization.runs} empty="No evidence-utilization runs yet." displayError={displayError} passedLabel="passed" />
+      <h2 className="font-semibold">{t('cos.benchmark.utilizationTitle', 'Evidence utilization benchmark')}</h2>
+      <p className="mt-1 text-xs text-text-muted">{t('cos.benchmark.utilizationDescription', 'Separate controlled cohort across {count} domains. Slow first cases can end a batch early so the route stays inside the 300-second production ceiling; the next run resumes from actual attempted cases.').replace('{count}', String(utilization.domains.length || 9))}</p>
+      <RunList runs={utilization.runs} empty={t('cos.benchmark.utilizationNoRuns', 'No evidence-utilization runs yet.')} displayError={displayError} passedLabel={t('cos.benchmark.passed', 'passed')} />
     </section>
   </main>
 }

@@ -114,6 +114,14 @@ test('quality repair persistence preserves a useful Supabase error instead of ob
   assert.match(source, /JSON\.stringify\(error\)/)
 })
 
+test('cache write budget cancels its timer when writes finish and no longer claims successful writes were abandoned', () => {
+  const source = file('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  assert.match(source, /waitForCacheWritesWithinBudget/)
+  assert.match(source, /if \(timer\) clearTimeout\(timer\)/)
+  assert.match(source, /cache writes exceeded response budget; response continued while writes remain best-effort/)
+  assert.doesNotMatch(source, /cache write exceeded its budget and was abandoned/)
+})
+
 test('benchmark probe override is bounded without changing the default diagnostic timeout', () => {
   const probe = file('../lib/ai/cos/reasonerProbe.ts')
   assert.match(probe, /const COMPLETION_TIMEOUT_MS = 45_000/)

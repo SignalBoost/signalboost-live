@@ -3,12 +3,13 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.15  
+**Version:** 1.16  
 **Updated:** 2026-08-21 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Current `main`:** `88eec94e4880a263f25c6e05bbfdc526fe6f8c79`  
+**Current `main`:** `aa1af8f1bfb35753c1eacf52d0ab0647840cde04`  
 **Production domain:** `https://saas.signalboostapp.com`  
 **Production deployment:** READY on the current `main` above  
+**Active COS engineering:** PR #1328 `Correlate COS outcomes and benchmark evidence utilization` — IN PROGRESS; do not call complete until Preview, schema, merge, Production and runtime acceptance are all proven  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → exactly 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
@@ -31,6 +32,373 @@ Every developer, AI coding agent, reviewer, operator, contractor, or infrastruct
 6. Never report current behavior from memory alone.
 
 A branch is not Production. A green build is not capability acceptance. A provider health response is not held-out mastery.
+
+---
+
+# Finish-to-completion rule — MANDATORY
+
+The owner explicitly requires that COS learning work be finished end-to-end rather than left as a collection of partial mechanisms.
+
+**Do not call a learning feature implemented merely because code exists.** A feature is complete only when every applicable gate below is closed:
+
+```text
+architecture / contract
+→ implementation
+→ deterministic/unit regression coverage
+→ schema migration if required
+→ exact Preview compile + TypeScript + build
+→ merge to current main
+→ exact Production deployment READY
+→ live Production runtime evidence
+→ outcome/telemetry evidence showing the feature actually operates
+→ ONBOARD.md updated with the final state
+```
+
+If GitHub Actions infrastructure cannot start jobs, record that separately and never pretend the tests ran. A Vercel build may prove compile/type/build health, but it does not retroactively turn zero-step Actions failures into passing tests.
+
+When a learning layer is partial, the default priority is to **finish that layer before inventing another adjacent layer**, unless a clearly documented prerequisite must be built first.
+
+Do not leave decorative APIs, tables, dashboards, outcome columns, or telemetry that no real execution path populates. Every persisted signal must have at least one real producer and at least one intended consumer/analysis path.
+
+---
+
+# COS learning completion backlog — FINISH THESE, DO NOT RE-LABEL THEM AS DONE EARLY
+
+The following maps the current learning stack to the remaining work. Items marked COMPLETE have working mechanisms already; items marked PARTIAL must be finished end-to-end under the rule above.
+
+## 1. Agentic RAG / adaptive retrieval — PARTIAL
+
+Already present:
+
+- BGE semantic retrieval with model-space identity;
+- Knowledge Graph, Learned Corpus, Enterprise Memory, User Memory and Cognitive Skills;
+- relevance filtering and evidence funnel `retrieved → relevant → selected → injected → cited`;
+- source-kind utilization measurement from PR #1325;
+- conservative unknown-domain filtering from PR #1324;
+- provenance that distinguishes retrieval from material use.
+
+Finish:
+
+1. accumulate outcome-correlated utilization data by problem class, source kind and similarity band;
+2. calibrate BGE similarity thresholds from useful vs unused evidence instead of guessing;
+3. learn shadow retrieval recommendations for route/index, top-k, source mix and reranking by problem class;
+4. measure context waste: injected-but-unused items, characters/tokens and retrieval latency;
+5. validate proposed retrieval changes on a separate controlled/held-out cohort;
+6. only after validation allow bounded policy promotion with audit/rollback; never let one model turn change retrieval policy directly.
+
+Completion criterion: COS can demonstrate, with held-out evidence, that its adaptive retrieval policy improves usefulness/quality or cost without reducing capability, grounding, provenance or tenant isolation.
+
+## 2. Retrieval self-reflection — PARTIAL
+
+Already present:
+
+- citations identify declared material evidence use;
+- utilization records identify unused injected evidence;
+- turn telemetry records phase cost and skips.
+
+Finish:
+
+- produce a bounded post-turn retrieval assessment containing only explicit artifacts such as sufficiency, unused evidence, missing evidence class and recommended retrieval adjustment — no hidden chain-of-thought storage;
+- correlate that assessment with later outcomes;
+- score whether the recommendation would actually have helped before it can influence policy;
+- deduplicate repeated low-value reflections.
+
+Completion criterion: retrieval reflections have measured predictive value against later outcomes and can safely feed the shadow adaptive-retrieval policy.
+
+## 3. Knowledge Graph augmentation — COMPLETE MECHANISM; CONTINUE QUALITY WORK
+
+Knowledge Graph is already a first-class durable evidence layer with active/quarantined state, semantic retrieval and provenance. Continue relationship quality, contradiction handling and coverage, but do not describe KG itself as missing.
+
+## 4. Preference / feedback learning — EXPLICIT COMPLETE; IMPLICIT PARTIAL
+
+Already present:
+
+- positive, negative and correction feedback learning;
+- user feedback eligibility/governance;
+- episodic experience storage.
+
+PR #1328 is completing exact reasoner-turn correlation so feedback can be attached to the execution that generated the answer.
+
+Finish implicit signals deliberately:
+
+- repeated/rephrased question shortly after an answer;
+- user correction/edit when a server-owned event proves it;
+- accepted/useful downstream action when verifiable;
+- abandonment only when there is a defensible event definition — absence of a click is not automatically negative feedback;
+- never convert implicit behavior directly into factual truth or automatic skill promotion.
+
+Completion criterion: explicit and selected high-integrity implicit feedback are correlated to exact turns with clear semantics and are consumed by calibration/strategy analysis.
+
+## 5. Curriculum, practice and active learning — STRONG / MOSTLY COMPLETE
+
+Already present:
+
+- active practice queue;
+- locally generated practice variants;
+- independent evaluator option;
+- understanding checks;
+- independent holdout variants;
+- local-generated variants are forbidden from counting as holdouts;
+- lifecycle states and promotion evidence;
+- gap-driven/active learning machinery.
+
+Finish remaining operational proof:
+
+- show recurring weak/untested regions actually generate bounded practice;
+- prove holdout breadth increases only from independent/curated/production-replay sources;
+- prove repeated practice improves later independent holdout or verified production outcomes;
+- expose saturation/no-improvement states instead of endlessly generating exercises.
+
+Completion criterion: a documented weak capability can be observed moving through practice → independent validation → retained improvement without self-grading leakage.
+
+## 6. Cross-session consolidation / retention / forgetting — COMPLETE MECHANISM; PROVE CONTINUITY
+
+Already present:
+
+- stale validated skills weaken;
+- delayed independent retention checks;
+- weakened and quarantined states;
+- retention replay cannot count as new holdout breadth;
+- consolidation cycle.
+
+Finish runtime acceptance:
+
+- demonstrate at least one real delayed retention cycle under the current DeepInfra reasoner;
+- confirm stale/failed retention changes state correctly;
+- confirm a successful delayed replay refreshes retention without inflating holdout breadth;
+- include results in the admin learning report/handoff.
+
+## 7. Metamemory — STRONG / PARTIAL COMPLETION
+
+Already present:
+
+- capability regions such as `strong`, `developing`, `weak`, `untested`, `conflicted`;
+- recurring knowledge gaps;
+- Council trigger reads metacognitive state;
+- confidence/evidence gating.
+
+Finish:
+
+- reconcile capability-region state with real outcome-correlated turns;
+- distinguish `unknown because untested` from `weak because failed` and `conflicted because evidence disagrees` in all reports;
+- measure stale capability beliefs and refresh them from verified outcomes;
+- provide an explicit coverage map showing what COS knows, what is weak, what is stale and what has never been tested.
+
+## 8. Tool-use / procedural learning — STRONG / PARTIAL
+
+Already present:
+
+- Cognitive Skills with prerequisites, procedures, tools, observables, falsifiers, failure modes and prohibited actions;
+- practice, holdout, production-attribution and retention lifecycle;
+- governed tool/action boundaries remain separate from model prose.
+
+Finish:
+
+- record governed tool sequence, deterministic outcome, latency and failure class for eligible executions;
+- learn problem-class → tool/skill sequence recommendations in shadow mode;
+- learn repeatable tool failure patterns such as timeout/input/permission constraints from verified telemetry;
+- validate sequence recommendations before promotion;
+- never let learned tool preference widen authorization or bypass approval.
+
+Completion criterion: COS can recommend a better validated tool sequence for a problem class based on verified executions and prove improvement on a separate cohort.
+
+## 9. Multi-agent / Council learning — IMPLEMENTED; STRATEGY POLICY PARTIAL
+
+Already present:
+
+- Architect, SRE, Database, Security, Business and Skeptic Council roles;
+- independent opinions;
+- explicit claims, assumptions, observables and falsifiers;
+- challenge/rebuttal mechanisms;
+- externally verified role credibility;
+- objective-outcome and deterministic claim-resolution paths.
+
+Finish:
+
+- correlate Council invocation, selected roles, challenge use and phase cost with exact turn outcomes;
+- learn which role sets/strategies help which problem classes;
+- identify Council cases where added cognition changes no outcome and only adds latency;
+- keep learned Council routing in shadow mode until held-out quality proves it safe;
+- never optimize latency by simply disabling skepticism/verification globally.
+
+## 10. Calibration learning — PARTIAL, HIGH PRIORITY
+
+Already present:
+
+- model-reported confidence;
+- grounding/specificity ceilings;
+- escalation threshold;
+- held-out benchmark outcomes;
+- metacognitive capability state.
+
+Finish:
+
+1. persist predicted confidence with exact outcome-correlated turn ID;
+2. build calibration buckets by problem class, evidence regime and reasoner;
+3. calculate empirical success rate / calibration error for each bucket;
+4. distinguish zero-grounding general reasoning from organization/current-state factual claims;
+5. derive a shadow calibrated-confidence recommendation;
+6. validate against held-out cases before changing the live escalation threshold or confidence displayed to policy;
+7. audit and rollback every promoted calibration policy.
+
+Completion criterion: COS can show that calibrated confidence better predicts verified success than raw model confidence on a separate evaluation set.
+
+## 11. Strategy-selection / metacognitive routing — PARTIAL, HIGH PRIORITY
+
+Already present:
+
+- direct reasoning;
+- Council;
+- challenge;
+- draft/quality/citation repair phases;
+- per-phase turn timing/skips from PR #1323;
+- static/bounded turn budget;
+- Council trigger from complexity, consequence, gaps and metacognitive state.
+
+PR #1328 is completing the missing turn → outcome correlation.
+
+Finish:
+
+- classify only explicit reasoning strategy artifacts, never hidden chain-of-thought;
+- learn outcome/cost by strategy and problem class;
+- compare like-for-like difficulty/evidence cohorts to avoid selection bias;
+- produce shadow strategy recommendations;
+- validate against controlled/held-out cases;
+- promote only bounded strategy rules that improve quality/cost without reducing governance.
+
+Completion criterion: COS has an outcome-validated strategy policy for at least several problem classes and can explain which observed signals selected the strategy.
+
+## 12. Failure autopsy — PARTIAL, HIGH PRIORITY
+
+Already present:
+
+- knowledge gaps;
+- benchmark failure reasons;
+- practice/holdout failures;
+- retention failures;
+- provenance and evidence funnels;
+- Council challenges and falsifiers;
+- source-utilization data.
+
+Finish an automated bounded autopsy pipeline:
+
+```text
+verified poor outcome
+→ identify causal stage candidates
+   retrieval / evidence selection / reasoning / grounding / calibration / tool execution / stale knowledge
+→ capture explicit evidence for diagnosis
+→ propose corrective lesson/policy in shadow mode
+→ generate or select a separate retest
+→ verify improvement
+→ retain correction only if retest succeeds
+```
+
+Do not store hidden chain-of-thought. Store explicit failure class, observable evidence, falsifier, corrective action and retest result.
+
+Completion criterion: at least one real failure is automatically classified, corrected, independently retested and shown not to recur on a relevant variant.
+
+## 13. Episodic → semantic compression — PARTIAL
+
+Already present:
+
+- episodic experiences;
+- durable facts/knowledge;
+- cognitive skills;
+- consolidation/retention mechanisms.
+
+Finish:
+
+- detect repeated independently supported episodic patterns;
+- propose generalized semantic rule/skill with provenance to supporting episodes;
+- require corroboration/minimum evidence and contradiction checks;
+- keep organization/user-scoped generalizations scoped correctly;
+- independent validation before durable promotion;
+- decay/weaken/quarantine generalized rules when contradicted.
+
+Completion criterion: COS can show a generalized rule derived from multiple episodes, prove its support/validation and safely weaken it when later evidence contradicts it.
+
+## 14. Curiosity / self-play / edge-case learning — IMPLEMENTED BOUNDED; EXPAND ONLY AFTER METACOGNITION
+
+Already present:
+
+- local practice generation;
+- active learning queues;
+- weak/gap-driven learning machinery;
+- prohibition on self-generated holdouts.
+
+Finish only after outcome correlation/calibration is mature:
+
+- target practice generation to high-value weak/untested areas;
+- seek boundary/edge cases around known failures;
+- stop when marginal learning gain saturates;
+- independent grading remains mandatory for mastery.
+
+## 15. Social / observation learning — COUNCIL EXISTS; LEARNING-FROM-DEMONSTRATIONS PARTIAL
+
+Council/debate is implemented. For observation/demonstration learning, finish only through governed skill candidates:
+
+- ingest a verified expert/teacher demonstration as evidence, not truth;
+- extract a candidate procedure;
+- require independent evaluator/understanding check;
+- require independent holdout or verified production evidence before strong status;
+- preserve source/provider provenance and prevent teacher answer from becoming automatic factual authority.
+
+## 16. Outcome-based metacognitive learning — IN PROGRESS ON PR #1328
+
+PR #1328 is the current prerequisite and must be finished before calling this layer complete.
+
+Target end state:
+
+```text
+reasoning turn_id
+→ source utilization
+→ phase execution / cost
+→ user feedback
+→ held-out benchmark outcome
+→ verified production outcome
+→ calibration + strategy + retrieval analysis
+```
+
+#1328 specifically adds/targets:
+
+- race-safe durable `cos_turn_outcomes` keyed by exact reasoner `turn_id`;
+- server-owned assistant-message provenance correlation;
+- user feedback → exact turn outcome;
+- capability benchmark PASS/FAIL → exact turn outcome;
+- verified production outcome correlation through explicit `cos_turn_id`;
+- outcome-aware evidence-utilization and turn-experience reports;
+- separate 36-case controlled evidence-utilization benchmark across nine domains.
+
+Completion gates for #1328:
+
+1. exact final Preview passes compile + TypeScript + build;
+2. GitHub Actions tests execute and pass when Actions runner/account infrastructure is available — if jobs still die before checkout, keep that limitation explicit;
+3. additive Production migration is applied only after final Preview is healthy;
+4. PR is mergeable and merged without overwriting newer main work;
+5. exact Production deployment reaches READY;
+6. at least one normal Production turn stores turn correlation;
+7. at least one feedback or benchmark outcome attaches to that exact turn;
+8. evidence-utilization and turn-experience reports read the durable outcome correctly;
+9. controlled utilization benchmark produces real rows without altering the six-case private acceptance rotation;
+10. ONBOARD.md records final evidence.
+
+## 17. SFT / LoRA — NOT YET; BUILD READINESS DATASET FIRST
+
+Do not fine-tune Qwen merely because examples exist.
+
+Before SFT/LoRA, require:
+
+- sufficient volume of outcome-correlated turns;
+- high-integrity success labels from held-out/verified outcomes;
+- failure/autopsy corrections represented;
+- source/provenance and tenant-scope controls;
+- deduplication and contamination checks;
+- train/eval/held-out split that cannot leak private acceptance cases;
+- baseline base-Qwen vs candidate adapter comparison;
+- rollbackable adapter deployment behind the same provider-neutral seam;
+- proof that fine-tuning improves held-out capability without worsening calibration, grounding, governance or provider portability.
+
+Until those gates exist, COS-owned memory/skills/outcomes remain the learning substrate and Qwen weights remain replaceable compute.
 
 ---
 
@@ -300,11 +668,9 @@ Never weaken the held-out rubric to make these cases pass.
 
 # PR #1321 — managed-provider provenance cleanup — MERGED AND LIVE
 
-PR #1321 `Fix managed-provider provenance labels on fresh COS paths` merged as current `main`:
+PR #1321 `Fix managed-provider provenance labels on fresh COS paths` merged as:
 
 `88eec94e4880a263f25c6e05bbfdc526fe6f8c79`
-
-Its exact Vercel Production deployment reached `READY` and `saas.signalboostapp.com` is attached to it.
 
 #1321 closed the remaining known code-level provenance-label gaps:
 
@@ -326,26 +692,17 @@ independent-local:<model>
 
 DeepInfra must not.
 
-The exact #1321 head passed:
+---
 
-- SaaS CI;
-- TypeScript;
-- Production build;
-- unit tests;
-- COS embedding transport compatibility;
-- COS cache/provenance policy;
-- COS capability benchmark contract;
-- COS core curriculum / continuous learning checks;
-- COS Council deterministic regression;
-- Audit Remediation Regression;
-- Playwright;
-- QA Scan;
-- Pipeline Integrity;
-- Repo Targeting QA;
-- V1 Red Diagnostics;
-- Vercel Preview.
+# PR #1323 / #1324 / #1325 — metacognition and evidence utilization — MERGED AND LIVE
 
-During #1321 CI, a stale RunPod test fixture was corrected from an invalid fake host (`example-pod-11434...`) to a valid RunPod proxy shape (`examplepod-11434...`). Production runtime behavior was not weakened.
+Current Production `main` includes the following post-#1321 learning work:
+
+- **PR #1323** — per-turn metacognitive execution telemetry: phase timing, skip reasons, reasoner identity, prompt-safe correlation, later outcome fields;
+- **PR #1324** — evidence-utilization metrics plus fix for the proven `unknown domain → accept every candidate` relevance defect;
+- **PR #1325** — learned-corpus `source_kind` utilization, correlated to reasoner `turn_id`, with graded `insufficient_evidence / never_cited / low_utilization / useful / high_value` verdicts and owner report.
+
+Production schema includes `cos_turn_experience` and `cos_evidence_source_use` with RLS. These are telemetry/learning inputs; they do not by themselves authorize automatic routing changes.
 
 ---
 
@@ -366,7 +723,7 @@ managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B
 
 Closed-model OpenAI/Anthropic/Gemini paths remain separately governed fallback/teacher providers and must never masquerade as COS primary reasoning.
 
-Code-level managed-provider labeling is now complete for the known primary and fresh-evidence paths. A normal owner Production COS turn should still be captured as live runtime evidence before calling the provenance observation gate fully closed.
+Code-level managed-provider labeling is complete for the known primary and fresh-evidence paths. A normal owner Production COS turn should still be captured as live runtime evidence before calling the provenance observation gate fully closed.
 
 ---
 
@@ -642,21 +999,27 @@ Non-negotiable:
 - Re-check current `main` after concurrent work.
 - Verify Production database state separately from a green build.
 - For provider migrations, prove reasoner + embeddings + provenance + benchmark + learning continuity separately.
+- Apply the Finish-to-completion rule above to every learning mechanism.
 
 ---
 
 # Immediate next engineering priorities
 
-1. From the owner benchmark dashboard, run the next **two** Production two-case benchmark rotations.
-2. Verify the first covers `memory-governance` + `provenance` and the second covers `incident-reasoning` + the exact previously failed `learning-admission` case.
-3. Require local COS reasoning, `local_model_invoked=true`, and `external_ai_invoked=false` for acceptance.
-4. Capture a normal Production COS answer/provenance event showing `managed-open-model:deepinfra:Qwen/Qwen3.6-35B-A3B` now that #1321 is live.
-5. Observe the next Production learning cycle under DeepInfra and verify new retention or an explicit healthy duplicate/rejection outcome.
-6. Review the zero-open-gap learning state and the historical failed gaps without weakening the continuity watchdog.
-7. Optimize BGE oversized-input handling toward a predictable single bounded retry.
-8. Make Cognitive Council optional phases more latency-aware while preserving quality and governance.
-9. Continue broad COS knowledge/skill development and hidden held-out certification across cyber defense, software engineering/computer science, AI systems/safety, ML/data, business, marketing, sales, cloud, networking, SRE, Postgres, and other governed tracks.
-10. Preserve BYOM/BYOA, provider neutrality, provenance, source authority, tenant isolation, approval boundaries, and model/provider swap survivability.
+1. **Finish PR #1328 end-to-end** under its explicit completion gates above.
+2. From the owner benchmark dashboard, run the next **two** Production two-case private capability rotations after #1328 is live so their PASS/FAIL outcomes attach to exact turn IDs.
+3. Verify the first covers `memory-governance` + `provenance` and the second covers `incident-reasoning` + the exact previously failed `learning-admission` case.
+4. Require local COS reasoning, `local_model_invoked=true`, and `external_ai_invoked=false` for acceptance.
+5. Run the controlled evidence-utilization benchmark until each important source kind reaches a meaningful sample; do not lower the source-kind verdict minimum merely to get a result faster.
+6. Complete **Calibration Learning** using exact turn outcomes; keep recommendations shadow-only until held-out validation.
+7. Complete **Failure Autopsy** and prove one real failure correction through independent retest.
+8. Complete **Adaptive Retrieval / Agentic RAG** from outcome-correlated utilization, including threshold calibration and context-waste reduction.
+9. Complete **Strategy-selection learning** for direct/Council/challenge/repair phases from like-for-like cohorts.
+10. Complete **Tool-use sequence learning** from governed verified executions without widening authority.
+11. Complete **Episodic → semantic compression** with corroboration, contradiction checks and reversible promotion.
+12. Prove a current DeepInfra **consolidation/retention cycle** and update learning continuity evidence.
+13. Expand bounded active learning/curiosity only after calibration/strategy layers can measure whether the extra practice helps.
+14. Define SFT/LoRA readiness and dataset curation only after the above outcome-correlated layers are trustworthy.
+15. Preserve BYOM/BYOA, provider neutrality, provenance, source authority, tenant isolation, approval boundaries, and model/provider swap survivability throughout.
 
 ---
 
@@ -675,7 +1038,11 @@ Non-negotiable:
 - PR #1320 — model-aware vector-space migration and re-embedding support.
 - Production re-embed — 45/45 facts + 111/111 eligible corpus, zero failures/backlog.
 - First post-reembed Production held-out run — 2/2 (`learning-admission`, `security-governance`), local COS, external AI false.
-- PR #1321 — canonical managed-provider provenance on secondary fresh-evidence paths; merged as current `main` and Production READY.
+- PR #1321 — canonical managed-provider provenance on secondary fresh-evidence paths.
+- PR #1323 — per-turn metacognitive phase telemetry.
+- PR #1324 — evidence-utilization metrics + unknown-domain relevance repair.
+- PR #1325 — source-kind utilization learning; merged as current `main` `aa1af8f1bfb35753c1eacf52d0ab0647840cde04`, Production READY.
+- PR #1328 — outcome correlation + separate 36-case evidence-utilization benchmark; **active/in progress**, not yet Production at the time of this ONBOARD update.
 
 Always query GitHub/Vercel/Supabase for current state instead of assuming this sequence has not advanced.
 
@@ -699,7 +1066,10 @@ Cache reuse is not new reasoning competence.
 Equal embedding dimensions are not equal embedding spaces.  
 Current-fact retrieval is not timeless memory.  
 A managed open-model provider is not self-hosted merely because it uses the `LOCAL_AI_*` seam.  
-`/v1/openai` compatibility does not mean OpenAI is the provider.
+`/v1/openai` compatibility does not mean OpenAI is the provider.  
+Telemetry collection is not adaptive learning until a validated consumer can safely improve future behavior.  
+A shadow recommendation is not a promoted production policy.  
+A self-generated practice pass is not independent validation.
 
 ---
 
@@ -710,5 +1080,7 @@ The best external AI/data call is the one COS can safely avoid because SignalBoo
 The best architecture lets models/providers be replaced without rewriting business intelligence, memory, learning, governance, or control logic.
 
 For COS learning, success means validated experience measurably improves held-out performance, retains that improvement, generalizes to variants, lowers repeated external-teacher dependence, and preserves honest confidence/provenance.
+
+For metacognitive learning, success additionally means COS can prove which retrieval, evidence source, tool sequence and explicit reasoning strategy improved outcomes for a problem class, can detect when those lessons stop working, and can roll back safely.
 
 For the DeepInfra migration, success means COS moved from RunPod/Ollama to DeepInfra/Qwen while preserving COS-owned memory, embeddings, learning, governance, rollback control, and external-AI independence—and while making future model-space migrations explicit rather than silently mixing vectors.

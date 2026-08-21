@@ -3,6 +3,7 @@
 // rejecting a correct grounded answer merely because a local model copied a URL imperfectly.
 
 import { callLocalModel } from '@/lib/ai/local-inference'
+import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import {
   acceptFreshEvidenceSynthesis,
@@ -41,9 +42,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
 
     const accepted = acceptFreshEvidenceSynthesis({ text, input: args.input, sources: args.sources })
     if (!accepted) return null
+    const reasoner = resolveCosReasoner()
     return {
       reply: accepted.reply,
-      reasonerLabel: `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
+      reasonerLabel: reasoner.config?.label ?? `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
     }
   } catch (error) {
     console.warn('[cos-fresh-local-synthesis] failed closed; direct external fresh-synthesis fallback may handle it', error instanceof Error ? error.message : String(error))

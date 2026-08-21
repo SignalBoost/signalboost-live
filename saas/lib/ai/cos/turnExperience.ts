@@ -34,6 +34,7 @@ export type TurnSkip = {
 export type TurnExperience = {
   turnId: string
   promptHash: string
+  problemClass: string
   features: TurnQueryFeatures
   reasonerLabel: string
   phases: TurnPhase[]
@@ -128,6 +129,7 @@ export class TurnRecorder {
   snapshot(args: {
     turnId: string
     promptHash: string
+    problemClass: string
     features: TurnQueryFeatures
     reasonerLabel: string
     answered: boolean
@@ -139,6 +141,7 @@ export class TurnRecorder {
     return {
       turnId: args.turnId,
       promptHash: args.promptHash,
+      problemClass: String(args.problemClass || 'general reasoning'),
       features: args.features,
       reasonerLabel: args.reasonerLabel,
       phases: [...this.phaseRows],

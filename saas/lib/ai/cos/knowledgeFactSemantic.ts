@@ -1,4 +1,5 @@
 import { generatePassiveLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { embeddingModelName } from '@/lib/ai/cos/embeddingEndpoint'
 import { cosServiceDb, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import type { KnowledgeFact, PersistentKnowledgeStore } from '@/lib/cos-core/layers/knowledge/persistent'
 import { resolveFactContradiction, recordFactRevision } from '@/lib/ai/cos/cognitiveFactConsolidation'
@@ -14,6 +15,7 @@ export type KnowledgeFactBackfillResult = {
   embedded: number
   failed: number
   remaining: number | null
+  model?: string
   error?: string
 }
 
@@ -21,14 +23,6 @@ export function knowledgeFactEmbeddingText(fact: Pick<KnowledgeFact, 'subject' |
   return `${fact.subject}\n${fact.predicate}\n${fact.object}`
 }
 
-/**
- * A fact never silently overwrites a different existing claim for the same (task, subject,
- * predicate) — see cognitiveFactConsolidation.ts for why. This reads the existing row first,
- * resolves any contradiction (higher confidence wins, loser is penalized not deleted), and audits
- * the outcome to cos_knowledge_fact_revisions before writing. Reaffirming the same claim (no
- * material difference) or writing a brand-new subject/predicate both skip the audit — there is
- * nothing to reconcile.
- */
 async function reconcileFactForPersistence(store: PersistentKnowledgeStore, fact: KnowledgeFact): Promise<KnowledgeFact> {
   const existing = await store.getFact(fact.taskId, fact.subject, fact.predicate)
   const decision = resolveFactContradiction(existing, fact)
@@ -60,6 +54,7 @@ export async function persistKnowledgeFactWithEmbedding(
   const reconciled = await reconcileFactForPersistence(store, fact)
   try {
     const embedding = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(reconciled))
+    // SupabaseKnowledgeStore stamps the active embedding model whenever a vector is supplied.
     await store.upsertFact(reconciled, embedding)
     return { embedded: true }
   } catch (error) {
@@ -86,31 +81,65 @@ function rowToFact(row: any): KnowledgeFact {
   }
 }
 
+const FACT_SELECT = 'id,task_id,subject,predicate,object,confidence,source,updated_at,embedding_model'
+
+async function factEmbeddingBacklogCount(model: string): Promise<number | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  const [missing, stale] = await Promise.all([
+    db.from('cos_knowledge_facts').select('id', { count: 'exact', head: true })
+      .or('embedding.is.null,embedding_model.is.null'),
+    db.from('cos_knowledge_facts').select('id', { count: 'exact', head: true })
+      .not('embedding', 'is', null).not('embedding_model', 'is', null).neq('embedding_model', model),
+  ])
+  if (missing.error || stale.error) return null
+  return Number(missing.count ?? 0) + Number(stale.count ?? 0)
+}
+
 /**
- * Incrementally upgrade pre-existing facts after the vector column migration is applied.
- * The bounded batch is embedded concurrently so one slow local-model request defines the batch
- * latency instead of multiplying that latency by every row in the batch.
+ * Backfill facts that either have no vector OR were embedded by a different model.
+ *
+ * This distinction is mandatory: two models can both emit vector(768) while occupying unrelated
+ * semantic spaces. A provider/embedder migration must therefore regenerate vectors, not merely
+ * verify their length. Batches remain bounded and concurrent.
  */
 export async function backfillKnowledgeFactEmbeddings(limit = 4): Promise<KnowledgeFactBackfillResult> {
   const db = cosServiceDb()
   if (!db) return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: 'COS Supabase service store is not configured' }
 
+  const model = embeddingModelName()
   const requested = Math.max(1, Math.min(8, Math.floor(limit)))
-  const pending = await db.from('cos_knowledge_facts')
-    .select('id,task_id,subject,predicate,object,confidence,source,updated_at')
-    .is('embedding', null)
+  const missing = await db.from('cos_knowledge_facts')
+    .select(FACT_SELECT)
+    .or('embedding.is.null,embedding_model.is.null')
     .order('confidence', { ascending: false })
     .order('updated_at', { ascending: false })
     .limit(requested)
 
-  if (pending.error) {
-    const message = pending.error.message || String(pending.error)
-    console.warn('cosKnowledgeFact: embedding backfill skipped', message)
-    return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, error: message }
+  if (missing.error) {
+    const message = missing.error.message || String(missing.error)
+    return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, model, error: message }
+  }
+
+  const rows = [...(missing.data ?? [])]
+  const remainingSlots = requested - rows.length
+  if (remainingSlots > 0) {
+    const stale = await db.from('cos_knowledge_facts')
+      .select(FACT_SELECT)
+      .not('embedding', 'is', null)
+      .not('embedding_model', 'is', null)
+      .neq('embedding_model', model)
+      .order('confidence', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(remainingSlots)
+    if (stale.error) {
+      return { status: 'skipped', attempted: 0, embedded: 0, failed: 0, remaining: null, model, error: stale.error.message }
+    }
+    rows.push(...(stale.data ?? []))
   }
 
   const store = new SupabaseKnowledgeStore(db)
-  const attempts = await Promise.allSettled((pending.data ?? []).map(async row => {
+  const attempts = await Promise.allSettled(rows.map(async row => {
     const fact = rowToFact(row)
     const vector = await generatePassiveLocalEmbedding(knowledgeFactEmbeddingText(fact))
     await store.upsertFact(fact, vector)
@@ -121,12 +150,8 @@ export async function backfillKnowledgeFactEmbeddings(limit = 4): Promise<Knowle
   const rejected = attempts.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
   const failed = rejected.length
   const errors = rejected.map(result => result.reason instanceof Error ? result.reason.message : String(result.reason))
-
-  const remainingQuery = await db.from('cos_knowledge_facts')
-    .select('id', { count: 'exact', head: true })
-    .is('embedding', null)
-  const remaining = remainingQuery.error ? null : remainingQuery.count ?? 0
-  const attempted = (pending.data ?? []).length
+  const remaining = await factEmbeddingBacklogCount(model)
+  const attempted = rows.length
   const status: KnowledgeFactBackfillResult['status'] = attempted === 0 ? 'skipped' : embedded === 0 && failed > 0 ? 'error' : 'backfilled'
 
   return {
@@ -135,6 +160,7 @@ export async function backfillKnowledgeFactEmbeddings(limit = 4): Promise<Knowle
     embedded,
     failed,
     remaining,
+    model,
     ...(errors.length ? { error: errors.join(' | ').slice(0, 1500) } : {}),
   }
 }

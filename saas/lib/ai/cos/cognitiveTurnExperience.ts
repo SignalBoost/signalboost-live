@@ -57,6 +57,35 @@ function count(value: unknown): number {
   return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function injectedFromStage(value: unknown): number {
+  return count(asRecord(value).injected)
+}
+
+function utilization(injected: number, cited: number): { injected: number; cited: number; utilization: number | null; unusedInjected: number } {
+  return {
+    injected,
+    cited,
+    utilization: injected > 0 ? Math.max(0, Math.min(1, cited / injected)) : null,
+    unusedInjected: Math.max(0, injected - cited),
+  }
+}
+
+function evidenceUtilization(provenance: CosTurnLearningProvenance | null | undefined) {
+  const funnel = asRecord(provenance?.evidenceFunnel)
+  const skillFunnel = provenance?.cognitiveSkillFunnel
+  return {
+    knowledgeGraph: utilization(injectedFromStage(funnel.knowledgeGraph), count(provenance?.knowledgeFactsCited)),
+    learnedCorpus: utilization(injectedFromStage(funnel.learnedCorpus), count(provenance?.learnedItemsCited)),
+    enterpriseMemory: utilization(injectedFromStage(funnel.enterpriseMemory), count(provenance?.enterpriseMemoriesCited)),
+    userMemory: utilization(injectedFromStage(funnel.userMemory), count(provenance?.userMemoriesCited)),
+    cognitiveSkills: utilization(injectedFromStage(skillFunnel), count(provenance?.cognitiveSkillsCited)),
+  }
+}
+
 function routeClass(provenance: CosTurnLearningProvenance | null | undefined): CosTurnExperienceDecision['routeClass'] {
   const source = clean(provenance?.responseSource, 120).toLowerCase()
   if (source === 'semantic_cache' || source === 'semantic_similarity') return 'cache'
@@ -136,8 +165,16 @@ export function decideCosTurnExperience(input: CosTurnExperienceInput): CosTurnE
     }
   }
 
+  const cited = {
+    knowledgeGraph: count(provenance?.knowledgeFactsCited),
+    learnedCorpus: count(provenance?.learnedItemsCited),
+    enterpriseMemory: count(provenance?.enterpriseMemoriesCited),
+    userMemory: count(provenance?.userMemoriesCited),
+    cognitiveSkills: count(provenance?.cognitiveSkillsCited),
+  }
+
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     semantics: 'episodic_turn_signal_not_factual_truth',
     successSemantics: 'cos_gate_acceptance_not_verified_business_outcome',
     responseSource,
@@ -149,13 +186,8 @@ export function decideCosTurnExperience(input: CosTurnExperienceInput): CosTurnE
     externalAiInvoked: provenance?.externalAiInvoked === true,
     reasonerLabel: provenance?.reasonerLabel ? clean(provenance.reasonerLabel, 240) : null,
     similarityScore: Number.isFinite(Number(provenance?.similarityScore)) ? Number(provenance?.similarityScore) : null,
-    cited: {
-      knowledgeGraph: count(provenance?.knowledgeFactsCited),
-      learnedCorpus: count(provenance?.learnedItemsCited),
-      enterpriseMemory: count(provenance?.enterpriseMemoriesCited),
-      userMemory: count(provenance?.userMemoriesCited),
-      cognitiveSkills: count(provenance?.cognitiveSkillsCited),
-    },
+    cited,
+    utilization: evidenceUtilization(provenance),
     liveEvidenceSources: Array.isArray(provenance?.liveExternalEvidence?.sources)
       ? provenance?.liveExternalEvidence?.sources?.length ?? 0
       : 0,

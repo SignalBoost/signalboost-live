@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 
+// Canonical acceptance coverage for retained knowledge becoming semantically reusable.
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 
 test('continuous indexer prioritizes newest eligible retained knowledge', () => {

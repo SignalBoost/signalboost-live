@@ -43,6 +43,12 @@ const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
 const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
 
+// Advice about regulated or high-consequence public processes must be verified even when it is
+// phrased conversationally, in a language other than English, or does not begin with a lookup word.
+// This is a routing boundary only: the live-evidence authority policy still decides whether COS may answer.
+const GOVERNED_GUIDANCE_TOPIC = /\\b(?:legal|law|regulation|visa|immigration|tax|taxes|passport|identity card|driver(?:'s)? license|government (?:office|agency)|benefits|insurance|medical|health|medication|diagnos(?:is|e)|treatment|invest(?:ment|ing)|loan|mortgage|bank(?:ing)?|z[\u0142l]o[\u017cż]y[\u0107c]|urz[\u0105a]d|dokument(?:y|u)?|nazwisk(?:o|a)|dow[oó]d osobisty|paszport|zus|nfz|podat(?:ek|ki)|prawo jazdy|wiza|ubezpieczen(?:ie|ia)|zdrow(?:ie|otny)|lekarz|leczenie|medicament(?:o|os)|impuesto|visado|seguro|salud|m[eé]dico|tratamiento|documentos?|passaporte|imigra[çc][ãa]o|impost(?:o|os)|seguro|sa[uú]de|tratamento|document(?:o|os)|паспор(?:т|та)|документ(?:ы|ов)?|налог(?:и|ов)?|страхов(?:ка|ки)|здоров(?:ье|я)|лечени(?:е|я)|виза)\\b/iu
+const GUIDANCE_REQUEST = /(?:\\?|\\b(?:what|which|when|where|who|how|should|need|must|can|could|do|does|czy|co|jak|gdzie|kiedy|kt[oó]r|powinn|trzeba|musz|mog[ęe]|debo|puedo|qu[eé]|c[oó]mo|d[oó]nde|cu[aá]ndo|devo|posso|o que|como|onde|quando|долж|нужно|как|что|где|когда|могу)\\b)/iu
+
 // Public-web freshness must not hijack private/system-of-record questions just because they contain
 // words such as current/latest/still. Temporal adjectives are allowed between the possessive and
 // object because real users ask "our current pricing" and "my latest invoice".
@@ -91,6 +97,11 @@ function isLocalDeterministicUtility(text: string): boolean {
   return LOCAL_ARITHMETIC.test(text) || LOCAL_CLOCK_OR_DATE.test(text)
 }
 
+
+function isGovernedPublicGuidance(text: string): boolean {
+  return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
+}
+
 export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
 
 /**
@@ -130,6 +141,11 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
+
+  // High-stakes guidance is never answered from model memory. This occurs before the
+  // conceptual/creative exclusion because questions such as "what should I do after changing my name?"
+  // are actionable public-administration guidance, not timeless advice.
+  if (isGovernedPublicGuidance(text)) return true
 
   if (SIMPLE_NAMED_ENTITY_LOOKUP.test(text)) return true
 

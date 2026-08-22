@@ -186,6 +186,8 @@ Normal accepted knowledge is indexed in the learning flow when possible. A recur
 
 Stored knowledge helps COS reason; it does not replace live verification for mutable external facts.
 
+Owner-directed study is a gated intake channel for a specific article, document, book chapter, video transcript or notes. License and study intent are required; every chunk passes the same relevance/grounding admission gates as autonomous acquisition. It is not an owner-trust bypass.
+
 ---
 
 # Explicit feedback and reusable reasoning learning — IMPLEMENTED

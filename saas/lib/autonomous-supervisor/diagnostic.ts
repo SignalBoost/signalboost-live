@@ -11,6 +11,7 @@ import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { supervisorDiagnosticCacheKey } from './diagnostic-cache-key.ts'
+import { nativeRemediationClass, readRemediationExperience, remediationExperiencePrompt } from '@/self-healing-host/remediation-experience'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
 
 const METHODS = new Set(['api', 'code_change', 'cli', 'ui_agent', 'human_action', 'no_action'])
@@ -114,7 +115,7 @@ async function writeCachedDiagnostic(incident: NormalizedIncidentPayload, diagno
 
 export interface DiagnosticThinker {
   id: string
-  think(incident: NormalizedIncidentPayload, systemPrompt: string, responseSchema: unknown): Promise<string>
+  think(incident: NormalizedIncidentPayload, systemPrompt: string, responseSchema: unknown, experiencePrompt: string): Promise<string>
 }
 
 const THINKERS = new Map<string, DiagnosticThinker>()
@@ -178,10 +179,13 @@ async function callSupervisorLocalModelWithoutWake(
 export function createCosPrimaryDiagnosticThinker(): DiagnosticThinker {
   return {
     id: 'cos-primary',
-    async think(incident, systemPrompt, responseSchema) {
+    async think(incident, systemPrompt, responseSchema, experiencePrompt) {
       const prompt = [
         'INCIDENT EVIDENCE:',
         JSON.stringify(incident),
+        '',
+        'GOVERNED REMEDIATION EXPERIENCE:',
+        experiencePrompt,
         '',
         'REQUIRED RESPONSE SCHEMA:',
         JSON.stringify(responseSchema),
@@ -205,10 +209,10 @@ export function createGeminiThinker(): DiagnosticThinker | null {
   const model = process.env.COS_SUPERVISOR_GEMINI_MODEL || 'gemini-1.5-flash'
   return {
     id: 'gemini',
-    async think(incident, systemPrompt, responseSchema) {
+    async think(incident, systemPrompt, responseSchema, experiencePrompt) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${systemPrompt}\n\n${experiencePrompt}` }] }, contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema } }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body?.error?.message || `Gemini returned ${res.status}`)
@@ -222,8 +226,8 @@ export function createModelRouterThinker(): DiagnosticThinker | null {
   if (!preference) return null
   return {
     id: preference,
-    async think(incident, systemPrompt, responseSchema) {
-      const system = [systemPrompt, '', 'Return ONLY raw JSON — no prose, no markdown fences — matching this schema exactly:', JSON.stringify(responseSchema)].join('\n')
+    async think(incident, systemPrompt, responseSchema, experiencePrompt) {
+      const system = [systemPrompt, experiencePrompt, '', 'Return ONLY raw JSON — no prose, no markdown fences — matching this schema exactly:', JSON.stringify(responseSchema)].join('\n')
       return ai.generate({ prompt: JSON.stringify(incident), systemPrompt: system, maxTokens: 2000, modelPreference: preference as 'claude' | 'openai' })
     },
   }
@@ -239,16 +243,22 @@ export function resolveDiagnosticThinker(): DiagnosticThinker | null {
   return createGeminiThinker() || createModelRouterThinker()
 }
 
-async function runThinker(incident: NormalizedIncidentPayload, thinker: DiagnosticThinker): Promise<DiagnosticResult> {
-  const text = await thinker.think(incident, SUPERVISOR_THINKER_SYSTEM_PROMPT, SUPERVISOR_THINKER_RESPONSE_SCHEMA)
+async function runThinker(incident: NormalizedIncidentPayload, thinker: DiagnosticThinker, experiencePrompt: string): Promise<DiagnosticResult> {
+  const text = await thinker.think(incident, SUPERVISOR_THINKER_SYSTEM_PROMPT, SUPERVISOR_THINKER_RESPONSE_SCHEMA, experiencePrompt)
   return validateDiagnostic(extractJson(text), incident.incident_id)
 }
 
 async function diagnoseIncidentUncached(incident: NormalizedIncidentPayload): Promise<DiagnosticResult> {
+  const experience = await readRemediationExperience({
+    provider: incident.provider,
+    environment: 'production',
+    incidentClass: nativeRemediationClass({ source: 'native', nativeProbe: incident.context.native_probe }),
+  })
+  const experiencePrompt = remediationExperiencePrompt(experience)
   const failures: string[] = []
   for (const candidate of [createCosPrimaryDiagnosticThinker(), resolveDiagnosticThinker()].filter(Boolean) as DiagnosticThinker[]) {
     try {
-      const result = await runThinker(incident, candidate)
+      const result = await runThinker(incident, candidate, experiencePrompt)
       await writeCachedDiagnostic(incident, result)
       return result
     } catch (err) {
@@ -267,7 +277,7 @@ export async function diagnoseIncident(incident: NormalizedIncidentPayload, thin
   // An explicitly supplied thinker is deterministic test/override behavior and bypasses cache.
   if (thinker !== undefined) {
     if (!thinker) return fallbackDiagnostic(incident, 'No diagnostic thinker is configured')
-    try { return await runThinker(incident, thinker) }
+    try { return await runThinker(incident, thinker, remediationExperiencePrompt([])) }
     catch (err) { return fallbackDiagnostic(incident, `${thinker.id}: ${err instanceof Error ? err.message : 'Unknown thinker error'}`) }
   }
 

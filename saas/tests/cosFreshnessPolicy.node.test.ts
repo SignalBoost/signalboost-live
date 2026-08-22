@@ -50,6 +50,7 @@ test('life-status questions require live verification without an explicit curren
   assert.equal(requiresFreshExternalEvidence('When did George Foreman die?'), true)
   assert.equal(requiresFreshExternalEvidence('Is George Foreman alive?'), true)
   assert.equal(requiresFreshExternalEvidence('Has George Foreman passed away?'), true)
+  assert.equal(requiresFreshExternalEvidence('when Hulk Hogan died?'), true)
 })
 
 test('historical and conceptual questions do not masquerade as current-world lookups', () => {

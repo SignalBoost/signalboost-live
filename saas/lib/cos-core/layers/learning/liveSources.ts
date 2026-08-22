@@ -12,14 +12,16 @@ export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOU
 // all, and COS stayed frozen at its training cutoff: it told users that George Foreman and Hulk
 // Hogan were alive, months after both had died.
 //
-// The gate itself is sound for EXPENSIVE or NARROW sources — running Crossref, OpenAlex, Europe PMC
-// and YouTube against every daily-mining subject burns quota and returns academic papers for
-// questions that are not academic. But it must not apply to the sources whose entire job is keeping
-// general knowledge current. Those need to run on the daily pass, precisely when there is no gap.
+// The gate itself is sound for EXPENSIVE or NARROW sources — running Crossref, OpenAlex, and Europe
+// PMC against every daily-mining subject burns quota and returns academic papers for questions that
+// are not academic. YouTube is different: it is rate-limited, serialised, and circuit-broken below,
+// but it must run on the daily pass when configured so its technical learning does not stop whenever
+// the explicit gap queue is empty.
 function externalGapOnly(adapter:ContinuousLearningSourceAdapter):ContinuousLearningSourceAdapter{return{kind:adapter.kind,id:adapter.id,async acquire(gap){if(gap.id.startsWith('daily-mining-'))return[];return adapter.acquire(gap)}}}
-/** Sources that must also run on the daily pass: current general facts, news, and official docs. */
-const DAILY_CURRENCY_SOURCES=new Set(['reference','gdelt','official_docs','tech_feeds'])
-function gapScopeFor(adapter:ContinuousLearningSourceAdapter):ContinuousLearningSourceAdapter{return DAILY_CURRENCY_SOURCES.has(adapter.id??adapter.kind)?adapter:externalGapOnly(adapter)}
+/** Sources that must also run on the daily pass: current facts, current news, and configured video learning. */
+const DAILY_CURRENCY_SOURCES=new Set(['reference','gdelt','official_docs','tech_feeds','youtube_metadata','youtube_transcript','youtube_transcript_runpod'])
+export function runsOnDailyLearningPass(adapterId:string|undefined,kind?:string):boolean{return DAILY_CURRENCY_SOURCES.has(adapterId??kind??'')}
+function gapScopeFor(adapter:ContinuousLearningSourceAdapter):ContinuousLearningSourceAdapter{return runsOnDailyLearningPass(adapter.id,adapter.kind)?adapter:externalGapOnly(adapter)}
 function failureLimit(env:LiveLearningEnvironment):number{const value=Number(env.COS_LEARNING_SOURCE_FAILURE_LIMIT||'3');return Number.isFinite(value)?Math.max(1,Math.min(10,Math.round(value))):3}
 function delay(ms:number){return new Promise(resolve=>setTimeout(resolve,ms))}
 function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearningEnvironment):number{

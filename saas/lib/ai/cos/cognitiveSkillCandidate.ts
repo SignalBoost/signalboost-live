@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { extractBalancedJsonObject } from '@/lib/ai/cos/reasonerOutput'
+import { extractBalancedJsonObject } from './reasonerOutput.ts'
 
 export type CognitiveSkillDraft = {
   title: string

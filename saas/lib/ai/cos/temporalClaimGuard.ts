@@ -6,6 +6,7 @@
 // fact whose truth can change after the model weights or durable memory were written must be treated
 // as temporal. The classifier is pure and dependency-free so both routing and answer-audit code can
 // share one definition of "this may have changed".
+import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 
 export type TemporalKind =
   | 'life_status'
@@ -37,6 +38,7 @@ const RECENT_EVENT = /\b(?:today|today's|tonight|right\s+now|as\s+of\s+(?:today|
 const AS_OF_YEAR = /\bas of (?:early |mid[- ]|late )?(\d{4})\b/i
 
 export function classifyTemporalSensitivity(prompt: string): TemporalClassification {
+  prompt = englishNormalizedForClassification(prompt)
   const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
   if (!text) return { sensitive: false, kind: null, reason: 'No prompt text was supplied.' }
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { nativeRemediationClass, remediationExperiencePrompt, summarizeRemediationExperience } from '../self-healing-host/remediation-experience-pure'
+import { nativeRemediationClass, remediationExperiencePrompt, summarizeRemediationExperience } from '../self-healing-host/remediation-experience-pure.ts'
 
 const match = { provider: 'signalboost-platform', environment: 'production', incidentClass: nativeRemediationClass({ source: 'cron', nativeProbe: 'api' }) }
 

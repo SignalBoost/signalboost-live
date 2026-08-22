@@ -170,7 +170,7 @@ async function runCuratedUnderstanding(row: any, profile: CognitiveCertification
     prompt: `PROCEDURAL SKILL:\n${clean(JSON.stringify(row.procedure), 15000)}\n\nINDEPENDENT UNDERSTANDING CASE:\n${clean(testCase.prompt, 12000)}\n\nSolve the case. You cannot see the grading rubric.`,
   }).catch(() => null)
   const parsed = reasoned?.text ? parseLocalResult(reasoned.text) : null
-  const grade = evaluateAnswerAgainstRubric(parsed?.answer || '', testCase.rubric || {})
+  const grade = evaluateAnswerAgainstRubric(parsed?.answer || '', testCase.rubric)
   const passed = Boolean(parsed) && grade.pass
   const now = new Date().toISOString()
   const latest = await db.from('cos_cognitive_skills').select('metadata,failure_count').eq('id', row.id).single()
@@ -239,7 +239,7 @@ async function queueCertificationCases(
       variant_key: `cert:${profile}:${testCase.case_key}`,
       exercise_kind: kind,
       prompt: clean(testCase.prompt, 12000),
-      rubric: testCase.rubric || {},
+      rubric: testCase.rubric,
       generation_source: 'curated',
       evaluator_mode: 'deterministic_rubric',
       max_attempts: kind === 'holdout' ? 1 : 2,
@@ -309,7 +309,7 @@ async function runCertificationExercise(
       prompt: `PROCEDURAL SKILL:\n${clean(JSON.stringify(skill.procedure), 15000)}\n\n${kind.toUpperCase()} CERTIFICATION CASE:\n${clean(item.prompt, 12000)}\n\nSolve from the case itself. You cannot see the grading rubric. Do not claim the skill as factual evidence.`,
     }).catch(() => null)
     const parsed = reasoned?.text ? parseLocalResult(reasoned.text) : null
-    const grade = evaluateAnswerAgainstRubric(parsed?.answer || '', item.rubric || {})
+    const grade = evaluateAnswerAgainstRubric(parsed?.answer || '', item.rubric as CognitivePracticeRubric)
     const passed = Boolean(parsed) && grade.pass
     const rpc = await db.rpc('cos_record_cognitive_practice_result', {
       p_queue_id: item.id,

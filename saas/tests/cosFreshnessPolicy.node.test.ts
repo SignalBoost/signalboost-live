@@ -139,3 +139,17 @@ test('creation/advice requests are not hijacked by public live-data routing', ()
   assert.equal(requiresFreshExternalEvidence('Build a stock price dashboard component.'), false)
   assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
 })
+
+
+test('regulated public guidance is live-verified across supported languages', () => {
+  for (const prompt of [
+    'What documents should I change after changing my surname in Poland?',
+    'I changed my surname. What should I do and which offices must I notify?',
+    'zmieniłam nazwisko, co powinnam zrobić - jakie dokumenty zmienić, jakie instytucje powiadomić?',
+    'Quais documentos devo alterar depois de mudar meu sobrenome?',
+    '¿Qué documentos debo cambiar después de cambiar mi apellido?',
+    'Какие документы нужно изменить после смены фамилии?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+  }
+})

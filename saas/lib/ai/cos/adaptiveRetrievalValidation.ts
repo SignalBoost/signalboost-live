@@ -1,10 +1,11 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { COS_EVIDENCE_UTILIZATION_BENCHMARK, type EvidenceUtilizationBenchmarkCase } from '@/lib/ai/cos/evidenceUtilizationBenchmark'
+import { COS_EVIDENCE_UTILIZATION_BENCHMARK } from '@/lib/ai/cos/evidenceUtilizationBenchmark'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
 import {
   refreshAdaptiveRetrievalShadowCandidate,
   type AdaptiveRetrievalPolicyRow,
 } from '@/lib/ai/cos/adaptiveRetrievalPolicy'
+import { selectAdaptiveRetrievalValidationCase } from '@/lib/ai/cos/adaptiveRetrievalPolicyLogic'
 
 export type AdaptiveRetrievalValidationResult = {
   policyId: string
@@ -24,34 +25,6 @@ function candidateMaxInjected(policy: AdaptiveRetrievalPolicyRow): number {
   return Number.isFinite(raw) ? Math.max(0, Math.min(12, Math.floor(raw))) : 4
 }
 
-function trainingDomains(trainingCaseIds: readonly string[]): Set<string> {
-  const byId = new Map(COS_EVIDENCE_UTILIZATION_BENCHMARK.map(test => [test.id, test.domain]))
-  return new Set(trainingCaseIds.map(caseId => byId.get(caseId)).filter((value): value is string => Boolean(value)))
-}
-
-/**
- * Pick a controlled case that was not used to derive this policy. Prefer a domain absent from the
- * training cohort and then a domain not yet used by this policy's validation rows.
- */
-export function selectAdaptiveRetrievalValidationCase(args: {
-  trainingCaseIds: readonly string[]
-  priorValidationCaseIds: readonly string[]
-}): EvidenceUtilizationBenchmarkCase | null {
-  const training = new Set(args.trainingCaseIds)
-  const prior = new Set(args.priorValidationCaseIds)
-  const trainedDomains = trainingDomains(args.trainingCaseIds)
-  const priorDomains = new Set(
-    COS_EVIDENCE_UTILIZATION_BENCHMARK
-      .filter(test => prior.has(test.id))
-      .map(test => test.domain),
-  )
-  const available = COS_EVIDENCE_UTILIZATION_BENCHMARK.filter(test => !training.has(test.id) && !prior.has(test.id))
-  return available.find(test => !trainedDomains.has(test.domain) && !priorDomains.has(test.domain))
-    ?? available.find(test => !priorDomains.has(test.domain))
-    ?? available[0]
-    ?? null
-}
-
 function learnedInjected(result: Awaited<ReturnType<typeof runPrivateCapabilityCase>>): number {
   return Math.max(0, Number(result.provenance?.evidenceFunnel?.learnedCorpus?.injected) || 0)
 }
@@ -68,6 +41,7 @@ export async function runNextAdaptiveRetrievalValidation(): Promise<AdaptiveRetr
   if (priorResult.error) throw priorResult.error
   const priorCaseIds = (priorResult.data ?? []).map(row => String(row.case_id || '')).filter(Boolean)
   const test = selectAdaptiveRetrievalValidationCase({
+    cases: COS_EVIDENCE_UTILIZATION_BENCHMARK,
     trainingCaseIds: policy.training_case_ids ?? [],
     priorValidationCaseIds: priorCaseIds,
   })

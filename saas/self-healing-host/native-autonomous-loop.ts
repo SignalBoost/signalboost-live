@@ -7,6 +7,7 @@ import { compactDelegatedEvidence } from '@/lib/ai/cos/evidenceCompaction'
 import { NATIVE_PLATFORM_INCIDENT_RECIPE } from '@/lib/ai/cos/incidentRecipeRouter'
 import { createSignalBoostSupervisorConnectorRuntime, SIGNALBOOST_SUPERVISOR_CONNECTOR_TENANT } from './signalboost-supervisor-connectors.ts'
 import { createNativeRepairActionResolver } from './native-repair-action-resolver.ts'
+import { nativeRemediationClass } from './remediation-experience.ts'
 import { recordCouncilOutcomesFromRepairDispatch, type CouncilOutcomeBridgeSummary } from './council-outcome-bridge.ts'
 import { SELF_HEALING_GATEWAY_POLICY } from './self-healing-gateway-policy.ts'
 import { nativeIncidentToNormalized as normalizeNativeIncident } from './native-incident-normalization.ts'
@@ -66,6 +67,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         incidentId: incident.incidentId,
         provider: incident.provider,
         environment: incident.environment || 'production',
+        incidentClass: nativeRemediationClass({ source: 'native', nativeProbe: normalized.context.native_probe }),
         dispatch: dispatched,
       })
       const summary = summarizeRepairDispatch(dispatched, repairPlan.length)

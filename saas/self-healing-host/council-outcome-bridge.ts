@@ -30,6 +30,7 @@ export async function recordCouncilOutcomesFromRepairDispatch(input: {
   incidentId: string
   provider?: string | null
   environment?: string | null
+  incidentClass?: string | null
   dispatch: DispatchRepairPlanResult
 }): Promise<CouncilOutcomeBridgeSummary> {
   const summary: CouncilOutcomeBridgeSummary = {
@@ -60,6 +61,7 @@ export async function recordCouncilOutcomesFromRepairDispatch(input: {
       ...classified.facts,
       provider: safeText(input.provider || 'unknown', 120),
       environment: safeText(input.environment || 'production', 120),
+      incidentClass: safeText(input.incidentClass || 'unknown', 180),
       gatewayRequestId: safeText(outcome.requestId, 700),
       action: safeText(step.action, 500),
       resolvedTarget: safeText(step.resolvedTarget || '', 300),

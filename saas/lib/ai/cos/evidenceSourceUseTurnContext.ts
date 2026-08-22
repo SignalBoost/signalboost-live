@@ -10,7 +10,7 @@
 // threading a parallel structure through the large enterprise reasoner function.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { currentAdaptiveRetrievalShadowPolicy, type AdaptiveRetrievalShadowPolicy } from '@/lib/ai/cos/adaptiveRetrievalContext'
+import { currentAdaptiveRetrievalShadowPolicy, type AdaptiveRetrievalShadowPolicy } from './adaptiveRetrievalContext.ts'
 
 export type CapturedLearnedRetrievalItem = {
   sourceKind: string

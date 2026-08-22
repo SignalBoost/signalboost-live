@@ -1,0 +1,26 @@
+import { spawnSync } from 'node:child_process'
+
+const tests = [
+  'tests/cosTurnExperience.node.test.ts',
+  'tests/cosOutcomeCorrelation.node.test.ts',
+  'tests/cosFailureAutopsy.node.test.ts',
+  'tests/cosAdaptiveRetrieval.node.test.ts',
+  'tests/cosFreshnessPolicy.node.test.ts',
+  'tests/cosFreshLiveRouting.node.test.ts',
+  'tests/cosFreshGrounding.node.test.ts',
+  'tests/cosStructuredLiveInfo.node.test.ts',
+  'tests/cosTemporalClaimGuard.node.test.ts',
+]
+
+const result = spawnSync(process.execPath, ['--test', ...tests], {
+  cwd: process.cwd(),
+  env: process.env,
+  stdio: 'inherit',
+})
+
+if (result.error) {
+  console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
+  process.exit(1)
+}
+
+process.exit(result.status ?? 1)

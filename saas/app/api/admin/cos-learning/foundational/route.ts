@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
-import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
+import { ContinuousLearningDirector, DEFAULT_CONTINUOUS_LEARNING_POLICY } from '@/lib/cos-core/layers/learning'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { foundationalKnowledgeGaps, FOUNDATIONAL_KNOWLEDGE_DOMAINS } from '@/lib/cos-core/layers/learning/foundational'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
@@ -38,7 +38,10 @@ export async function POST(req:NextRequest){
     const requestedLimit=Number.isFinite(Number(body.limit))?Math.floor(Number(body.limit)):DEFAULT_BATCH_SIZE
     const limit=Math.max(1,Math.min(MAX_BATCH_SIZE,requestedLimit))
     const batch=allGaps.slice(offset,offset+limit)
-    const director=new ContinuousLearningDirector(stores.continuousLearning,{allowedSourceKinds:new Set(['work_experience','engineering_history','official_documentation','research_paper','scientific_journal','library_material','news_article','public_dataset','video_transcript','approved_public_web']),minimumConfidence:.72,maxCandidatesPerCycle:50,maxExternalCostUsdPerCycle:1})
+    // Keep the foundational route aligned with the shared admission policy. In particular,
+    // metadata pointers have a governed 0.60 floor; hard-coding 0.72 here silently made the
+    // configured YouTube metadata fallback impossible to retain.
+    const director=new ContinuousLearningDirector(stores.continuousLearning,DEFAULT_CONTINUOUS_LEARNING_POLICY)
     const cycle=new ContinuousLearningCycle(director,adapters)
     const result=await cycle.run(batch)
     const nextOffset=offset+batch.length

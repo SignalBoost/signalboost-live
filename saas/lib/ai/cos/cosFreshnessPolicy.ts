@@ -2,8 +2,8 @@
 // the answer can change without a code or model update.
 //
 // This classifier is intentionally about EXTERNAL world state. Internal project,
-// campaign, calendar, CRM, inventory, or workflow state belongs to its owning
-// connector/system of record rather than being blindly sent to public web search.
+// campaign, calendar, CRM, inventory, workflow, and SignalBoost self-knowledge belong
+// to their owning system of record rather than being blindly sent to public web search.
 
 import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
 
@@ -53,6 +53,20 @@ const INTERNAL_OPERATIONAL_STATE = new RegExp(
   'i',
 )
 
+// SignalBoost/COS self-description and runtime state come from repository/configuration/system-of-record
+// evidence, not the public web. This prevents the general external-fact default from breaking
+// authoritative internal self-knowledge such as "what model does COS use now?".
+const SELF_KNOWLEDGE_TOPIC = '(?:architecture|memory|cache|reasoner|model|provider|routing|retrieval|learning|benchmark|provenance|runpod|supabase|vercel|deployment|capability|knowledge|policy|enterprise memory|semantic cache)'
+const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
+  `\\b(?:signalboost|cos)\\b.{0,120}\\b${SELF_KNOWLEDGE_TOPIC}\\b|\\b${SELF_KNOWLEDGE_TOPIC}\\b.{0,120}\\b(?:signalboost|cos)\\b`,
+  'i',
+)
+
+// Pure arithmetic and local clock/date questions have deterministic utilities. They should never
+// consume a public search merely because they begin with "what".
+const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
+const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\s+)?(?:date|time|day)(?:\s+(?:today|now|is\s+it))?\s*[?!.]*\s*$/i
+
 function normalizedText(input: string): string {
   return String(input || '').replace(/\s+/g, ' ').trim()
 }
@@ -64,7 +78,11 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
 }
 
 function looksLikeInternalOperationalState(text: string): boolean {
-  return INTERNAL_OPERATIONAL_STATE.test(text)
+  return INTERNAL_OPERATIONAL_STATE.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+}
+
+function isLocalDeterministicUtility(text: string): boolean {
+  return LOCAL_ARITHMETIC.test(text) || LOCAL_CLOCK_OR_DATE.test(text)
 }
 
 export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
@@ -76,7 +94,7 @@ export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
  */
 export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
   const text = normalizedText(input)
-  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text)) return null
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text) || isLocalDeterministicUtility(text)) return null
 
   if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
   if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
@@ -85,8 +103,16 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
 }
 
 /**
- * Returns true when the request depends on mutable EXTERNAL world state or is a simple named-entity
- * reference lookup whose biography/status should be grounded in fresh public evidence.
+ * Returns true when the request depends on EXTERNAL world facts that should be verified against
+ * current evidence rather than assumed from frozen model weights or durable memory.
+ *
+ * GENERAL DEFAULT: a direct factual lookup about the external world is live-verify-by-default even
+ * when the user does not say "current", "latest", or "today". That is the key stale-world guard:
+ * "What is Poland's population?", "Where is Company X headquartered?", "Who owns Brand Y?", and
+ * "Tell me about Person Z" all get current evidence before COS answers.
+ *
+ * Explicit exclusions remain for historical questions, conceptual/creative reasoning, local
+ * deterministic utilities, and private/internal system-of-record state.
  *
  * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
  * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
@@ -97,6 +123,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (!text) return false
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
+  if (isLocalDeterministicUtility(text)) return false
 
   if (SIMPLE_NAMED_ENTITY_LOOKUP.test(text)) return true
 
@@ -123,6 +150,11 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (LOOKUP_INTENT.test(text) && PUBLIC_RULE_STATE.test(text)) return true
   if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
   if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
+
+  // General stale-world protection: any remaining direct external factual lookup is verified live by
+  // default. It is intentionally last so internal, historical, conceptual, and deterministic
+  // requests keep their correct specialized routes.
+  if (LOOKUP_INTENT.test(text)) return true
 
   return false
 }

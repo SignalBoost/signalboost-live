@@ -9,6 +9,7 @@ const OFFICE_HOLDER_ROLE_SOURCE = '(?:vice\\s+president|prime\\s+minister|chief\
 const SIMPLE_CURRENT_OFFICE_HOLDER = new RegExp(`^\\s*who\\s+(?:is|'s)\\s+(?:currently\\s+)?(?:the\\s+)?(?:current\\s+)?(${OFFICE_HOLDER_ROLE_SOURCE})(?:\\s+of\\s+(.+?))?\\s*[?.!]*\\s*$`, 'i')
 const NAME_TOKEN_SOURCE = "(?:\\p{Lu}[\\p{L}'’.-]{1,30}|\\p{Lu}\\.)"
 const NAME_SEQUENCE_SOURCE = `${NAME_TOKEN_SOURCE}(?:\\s+${NAME_TOKEN_SOURCE}){1,4}`
+const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
 
 export type DeterministicFreshOfficeHolderResolution = {
   reply: string
@@ -56,6 +57,7 @@ function requiresGovernmentAuthority(input: string): boolean {
 }
 
 function requiresIndependentCorroboration(input: string): boolean {
+  if (LIFE_STATUS_STATE.test(input)) return true
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?)\b/i.test(input)
 }
 
@@ -217,10 +219,10 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
 }
 
 /**
- * Current office-holder answers must not rely on one page. For public offices, require at least one
- * government source plus a second independent hostname. For corporate leadership, require at least
- * two independent hosts. Other volatile facts retain the normal one-source authority floor and are
- * still forced through live retrieval on every request by the caller.
+ * Current office-holder answers and life-status claims must not rely on one page. For public
+ * offices, require at least one government source plus a second independent hostname. For corporate
+ * leadership and life/death status, require at least two independent hosts. Other volatile facts
+ * retain the normal one-source authority floor and are still forced through live retrieval.
  */
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
   if (!sources.length) return false

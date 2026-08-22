@@ -1,5 +1,6 @@
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import {
   CosReasoningEngine,
   type CosReasoningRequest,
@@ -12,6 +13,8 @@ import {
   type CosReasoningRoleDecision,
   type CosSpecialistRole,
 } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
+import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
 
 const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, string>> = {
   coder: [
@@ -84,8 +87,20 @@ function createOpenModelWorker(role: CosSpecialistRole): CosReasoningWorker | nu
       // Raw execution is intentionally below the control plane. Calling callCosReasoner() here
       // would recursively re-enter the planner.
       const effective = toLocalModelCallArgs(request, role)
+      const startedAt = Date.now()
       const reasoned = await callRawCosReasoner(effective)
       if (!reasoned?.text) return null
+      const objective = selectCosReasoningWorkerRole(request.prompt).objective
+      recordReasoningWorkerMetric({
+        turnId: reasoned.turnId,
+        problemClass: classifyProblemClass(objective),
+        workerRole: role,
+        reasonerLabel: reasoned.reasoner.label,
+        latencyMs: Date.now() - startedAt,
+        prompt: request.prompt,
+        systemPrompt: effective.systemPrompt,
+        response: reasoned.text,
+      })
       return {
         text: reasoned.text,
         turnId: reasoned.turnId,
@@ -110,17 +125,32 @@ export function createDefaultCosReasoningEngine(): CosReasoningEngine {
   return new CosReasoningEngine(workers)
 }
 
-function routingDecision(args: LocalModelCallArgs, options: {
+async function routingDecision(args: LocalModelCallArgs, options: {
   requestedRole?: CosReasoningWorkerRole
   forcePrimary?: boolean
-}): CosReasoningRoleDecision {
+}): Promise<CosReasoningRoleDecision> {
   if (options.forcePrimary === true) {
     return { role: 'primary', reason: 'explicit_primary_override', objective: args.prompt }
   }
   if (options.requestedRole && options.requestedRole !== 'primary') {
     return { role: options.requestedRole, reason: 'explicit_specialist_request', objective: args.prompt }
   }
-  return selectCosReasoningWorkerRole(args.prompt)
+
+  const deterministic = selectCosReasoningWorkerRole(args.prompt)
+  const resolved = resolveCosReasoner()
+  if (!resolved.config) return deterministic
+  const learned = await learnedRoutingOverride({
+    prompt: deterministic.objective,
+    currentReasonerLabel: resolved.config.label,
+    deterministicRole: deterministic.role,
+  })
+  if (!learned || learned.workerRole === deterministic.role) return deterministic
+
+  return {
+    role: learned.workerRole,
+    reason: `outcome_learned:${deterministic.role}->${learned.workerRole}`,
+    objective: deterministic.objective,
+  }
 }
 
 /**
@@ -136,7 +166,7 @@ export async function reasonThroughCosControlPlane(
     forcePrimary?: boolean
   } = {},
 ) {
-  const decision = routingDecision(args, options)
+  const decision = await routingDecision(args, options)
   const execution = await createDefaultCosReasoningEngine().run({
     ...args,
     requestedRole: decision.role,

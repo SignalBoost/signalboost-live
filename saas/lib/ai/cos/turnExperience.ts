@@ -44,6 +44,9 @@ export type TurnExperience = {
   otherMs: number
   modelCalls: number
   answered: boolean
+  confidence: number | null
+  confidenceThreshold: number | null
+  draftSurvivedUnrepaired: boolean
 }
 
 function words(text: string): string[] {
@@ -133,6 +136,8 @@ export class TurnRecorder {
     features: TurnQueryFeatures
     reasonerLabel: string
     answered: boolean
+    confidence?: number | null
+    confidenceThreshold?: number | null
   }): TurnExperience {
     const totalMs = Math.max(0, this.now() - this.startedAt)
     const modelPhases = this.phaseRows.filter(row => row.kind === 'model')
@@ -154,6 +159,11 @@ export class TurnRecorder {
       otherMs: Math.max(0, totalMs - modelCallMs),
       modelCalls: modelPhases.length,
       answered: args.answered,
+      confidence: Number.isFinite(Number(args.confidence)) ? Math.max(0, Math.min(1, Number(args.confidence))) : null,
+      confidenceThreshold: Number.isFinite(Number(args.confidenceThreshold)) ? Number(args.confidenceThreshold) : null,
+      // A repair that ran means the original draft did not survive unrepaired. A budget-skipped
+      // repair is not evidence that the answer was bad.
+      draftSurvivedUnrepaired: !this.phaseRows.some(row => row.phase === 'quality_repair'),
     }
   }
 }

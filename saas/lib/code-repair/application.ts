@@ -6,6 +6,7 @@ import {
   serializeCodeRepairApprovalToken,
 } from './approval.ts'
 import type { CodeRepairApprovalToken } from './approval.ts'
+import type { CandidateLabHumanReviewPacket } from './candidate-lab-approval.ts'
 import type { CodeRepairPatchProposal, CodeRepairPatchValidationReport } from './patch-contracts.ts'
 import type { CodeRepairIndependentReview } from './provider-contracts.ts'
 import { parseUnifiedDiff } from './unified-diff.ts'
@@ -16,7 +17,7 @@ export const CODE_REPAIR_REPOSITORY_MUTATION_ENABLED = false
 export type CodeRepairExecutionFailure =
   | 'proposal_fingerprint_mismatch' | 'approval_token_invalid' | 'validation_report_invalid'
   | 'independent_review_invalid' | 'workspace_integrity_invalid' | 'patch_integrity_invalid'
-  | 'repository_mutation_disabled' | 'workspace_operation_failed'
+  | 'repository_mutation_disabled' | 'workspace_operation_failed' | 'candidate_lab_packet_invalid'
 
 export interface CodeRepairDisposableWorkspace {
   id: string
@@ -65,6 +66,7 @@ export interface CodeRepairDryRunRequest {
   approvalToken: CodeRepairApprovalToken
   validation: CodeRepairPatchValidationReport
   review: CodeRepairIndependentReview
+  candidateLabPacket?: CandidateLabHumanReviewPacket
 }
 
 export interface CodeRepairExecutionReport {
@@ -112,6 +114,16 @@ export class CodeRepairApplicationOrchestrator {
     const record = async (event: CodeRepairExecutionAuditRecord['event'], detail: string) => this.audit.append({ executionId: request.executionId, at: request.at, event, detail })
     const reject = async (failure: CodeRepairExecutionFailure): Promise<CodeRepairExecutionReport> => { this.metrics.record('failed'); await record('failed', failure); return frozenReport({ executionId: request.executionId, status: 'rejected', failure, verifiedSteps: steps, rollback: null, cleanupSucceeded: false, repositoryMutationEnabled: false }) }
     await record('started', 'dry_run_only')
+    if (request.candidateLabPacket && (
+      request.candidateLabPacket.proposal !== request.proposal ||
+      request.candidateLabPacket.validation !== request.validation ||
+      request.candidateLabPacket.review !== request.review ||
+      !request.candidateLabPacket.evidence.evaluation.recommendedForHumanReview ||
+      request.candidateLabPacket.evidence.automaticPromotionAllowed ||
+      !request.candidateLabPacket.humanApprovalRequired ||
+      request.candidateLabPacket.applicationAllowed ||
+      request.candidateLabPacket.mergeAllowed
+    )) return reject('candidate_lab_packet_invalid')
     if (!request.executionId.trim() || !Number.isSafeInteger(request.at) || request.at < 0) return reject('workspace_operation_failed')
     if (fingerprintCodeRepairProposal(request.proposal) !== request.expectedProposalFingerprint) return reject('proposal_fingerprint_mismatch')
     steps.push('proposal_fingerprint')

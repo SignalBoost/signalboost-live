@@ -14,6 +14,9 @@ import { nativeIncidentToNormalized as normalizeNativeIncident } from './native-
 import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
 import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-gateway-host/supervisor-actions'
+import type { RemediationMemoryStore } from '@/lib/supervisor/remediation-memory'
+import { SupabaseRemediationMemoryStore } from '@/lib/supervisor/remediation-memory-supabase'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 export function nativeIncidentToNormalized(incident: SupervisorIncident, connectorEvidence: unknown): NormalizedIncidentPayload {
   return normalizeNativeIncident(incident, connectorEvidence)
@@ -29,8 +32,9 @@ export interface NativeRemediationResult {
   objectiveOutcomes?: CouncilOutcomeBridgeSummary
 }
 
-export async function remediateNativeIncidents(incidents: readonly SupervisorIncident[], options: { maxIncidents?: number } = {}): Promise<NativeRemediationResult[]> {
+export async function remediateNativeIncidents(incidents: readonly SupervisorIncident[], options: { maxIncidents?: number; remediationMemory?: RemediationMemoryStore } = {}): Promise<NativeRemediationResult[]> {
   const max = Math.max(1, Math.min(options.maxIncidents ?? 4, 8))
+  const remediationMemory = options.remediationMemory ?? (cosServiceDb() ? new SupabaseRemediationMemoryStore(cosServiceDb()!) : undefined)
   const runtime = createSignalBoostSupervisorConnectorRuntime()
   const results: NativeRemediationResult[] = []
 
@@ -69,6 +73,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         environment: incident.environment || 'production',
         incidentClass: nativeRemediationClass({ source: 'native', nativeProbe: normalized.context.native_probe }),
         dispatch: dispatched,
+        remediationMemory,
       })
       const summary = summarizeRepairDispatch(dispatched, repairPlan.length)
       results.push({

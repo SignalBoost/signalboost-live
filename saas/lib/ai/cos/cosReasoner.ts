@@ -24,6 +24,7 @@ import { bindCouncilSessionCorrelations } from '@/lib/ai/cos/councilObjectiveOut
 import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
 import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
+import { confidenceThreshold } from '@/lib/ai/cos/cosOrchestrationEnterprise'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -157,6 +158,7 @@ export async function callRawCosReasoner(
   const features = extractQueryFeatures(args.prompt)
   const problemClass = classifyProblemClass(args.prompt)
   let answered = false
+  let finalConfidence: number | null = null
 
   try {
     await touchRunpodActivityLease('qwen_reasoning')
@@ -313,6 +315,7 @@ export async function callRawCosReasoner(
     }
 
     answered = true
+    finalConfidence = parseLocalResult(text)?.confidence ?? null
     return { text, reasoner: config, turnId }
   } finally {
     const experience = recorder.snapshot({
@@ -322,6 +325,8 @@ export async function callRawCosReasoner(
       features,
       reasonerLabel: config.label,
       answered,
+      confidence: finalConfidence,
+      confidenceThreshold: confidenceThreshold(),
     })
     console.info('[cos-reasoner-phases]', JSON.stringify({
       at: new Date().toISOString(),

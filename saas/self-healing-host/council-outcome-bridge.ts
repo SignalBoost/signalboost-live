@@ -4,6 +4,7 @@ import {
   recordCouncilObjectiveOutcome,
 } from '@/lib/ai/cos/councilObjectiveOutcome'
 import { recordVerifiedCosProductionOutcome } from '@/lib/ai/cos/cognitiveVerifiedOutcome'
+import { recordRemediationExperience, type RemediationMemoryStore } from '@/lib/supervisor/remediation-memory'
 
 export interface CouncilOutcomeBridgeSummary {
   attempted: number
@@ -12,6 +13,7 @@ export interface CouncilOutcomeBridgeSummary {
   success: number
   failure: number
   observed: number
+  remediationMemoryRecorded: number
   errors: string[]
 }
 
@@ -32,6 +34,7 @@ export async function recordCouncilOutcomesFromRepairDispatch(input: {
   environment?: string | null
   incidentClass?: string | null
   dispatch: DispatchRepairPlanResult
+  remediationMemory?: RemediationMemoryStore
 }): Promise<CouncilOutcomeBridgeSummary> {
   const summary: CouncilOutcomeBridgeSummary = {
     attempted: 0,
@@ -40,6 +43,7 @@ export async function recordCouncilOutcomesFromRepairDispatch(input: {
     success: 0,
     failure: 0,
     observed: 0,
+    remediationMemoryRecorded: 0,
     errors: [],
   }
 
@@ -96,6 +100,22 @@ export async function recordCouncilOutcomesFromRepairDispatch(input: {
           })
         } catch (learningError) {
           summary.errors.push(`cos_learning:${safeText(learningError instanceof Error ? learningError.message : learningError, 400)}`)
+        }
+      }
+      if (input.remediationMemory && (classified.status === 'success' || classified.status === 'failure')) {
+        try {
+          const incidentKey = `self-healing:${safeText(input.provider || 'unknown', 120)}:${safeText(input.environment || 'production', 120)}:${safeText(step.action, 240)}`
+          const remedyId = safeText(step.resolvedTarget || step.action, 300)
+          const memory = await recordRemediationExperience(input.remediationMemory, {
+            incidentKey,
+            remedyId,
+            verified: true,
+            succeeded: classified.status === 'success',
+            recordedAt: Date.now(),
+          })
+          if (memory) summary.remediationMemoryRecorded += 1
+        } catch (memoryError) {
+          summary.errors.push(`remediation_memory:${safeText(memoryError instanceof Error ? memoryError.message : memoryError, 400)}`)
         }
       }
     } catch (error) {

@@ -55,6 +55,9 @@ async function persistTurnExperience(experience: TurnExperience): Promise<void> 
       other_ms: experience.otherMs,
       model_calls: experience.modelCalls,
       answered: experience.answered,
+      confidence: experience.confidence,
+      confidence_threshold: experience.confidenceThreshold,
+      draft_survived_unrepaired: experience.draftSurvivedUnrepaired,
     })
     if (result.error) throw result.error
   } catch (error) {

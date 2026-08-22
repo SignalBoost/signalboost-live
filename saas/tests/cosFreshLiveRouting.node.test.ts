@@ -16,7 +16,21 @@ test('fresh/current facts retrieve live evidence before any model synthesis', ()
   assert.ok(liveSearch >= 0, 'fresh route must perform live retrieval')
   assert.ok(synthesis > liveSearch, 'external synthesis must happen only after live retrieval')
   assert.match(source, /bypassCache:\s*true/)
-  assert.match(source, /freshEvidenceMeetsAuthority\(input, sources\)/)
+  assert.match(source, /freshEvidenceMeetsQuestionAuthority\(lookupInput, sources\)/)
+})
+
+test('fresh follow-ups resolve user context before retrieval and never trust assistant text', () => {
+  const source = route()
+  assert.match(source, /resolveFreshConversationContext\(body, input\)/)
+  assert.match(source, /freshEvidenceSearchQuery\(lookupInput/)
+  assert.match(source, /assistant_text_used_for_resolution:\s*false/)
+  assert.match(source, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput/)
+})
+
+test('contextual volatile cache key uses resolved lookup input, not ambiguous surface text', () => {
+  const source = route()
+  assert.match(source, /writeVolatileAnswerCache\(\{[\s\S]*?prompt:\s*lookupInput/)
+  assert.doesNotMatch(source, /writeVolatileAnswerCache\(\{[\s\S]{0,120}?prompt:\s*input,/)
 })
 
 test('fresh/current facts never invoke local Qwen or deterministic model-memory shortcuts', () => {

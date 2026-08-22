@@ -1,8 +1,5 @@
-import {
-  freshEvidenceGroundingBlock,
-  replyCitesIndependentFreshEvidence,
-  type FreshEvidenceSource,
-} from '@/lib/ai/cos/cosFreshGrounding'
+import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
+import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 
 export type AcceptedFreshEvidenceSynthesis = {
   reply: string
@@ -32,9 +29,10 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     '1. Use ONLY facts present in the evidence block. Your own memory is assumed stale and must not contribute facts.',
     '2. Put only the natural-language answer in "answer". Do NOT place URLs, markdown citations, or evidence labels inside the answer field.',
     '3. Put every evidence label that materially supports the answer in "evidenceIds". Never invent an evidence id.',
-    '4. For current office holders or leadership claims, use at least two independent evidence ids when the supplied evidence supports them.',
-    '5. If the evidence does not establish the answer, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
-    '6. Be brief. One to three sentences is enough.',
+    '4. For life/death, current office-holder, or leadership claims, use at least two independent evidence ids when the supplied evidence supports them.',
+    '5. Resolve pronouns only from the explicit user context supplied in QUESTION; never infer a different person or entity from model memory.',
+    '6. If the evidence does not establish the answer, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
+    '7. Be brief. One to three sentences is enough.',
   ].join('\n')
 }
 
@@ -85,8 +83,7 @@ export function acceptFreshEvidenceSynthesis(args: {
   })
   const reply = `${answer}\n\nSources: ${citations.join(' and ')}`
 
-  // The server, not the model, owns citation rendering. This gate still verifies that leadership
-  // claims cite independent hosts when the generic freshness policy requires corroboration.
-  if (!replyCitesIndependentFreshEvidence(reply, args.input, args.sources)) return null
+  // The server, not the model, owns citation rendering and enforces the evidence threshold.
+  if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) return null
   return { reply, citedSourceIds }
 }

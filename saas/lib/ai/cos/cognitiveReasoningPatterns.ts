@@ -12,7 +12,10 @@ export type CognitiveReasoningTrigger = {
 const QUESTIONISH = /\?|^(?:who|what|when|where|why|how|is|are|am|do|does|did|can|could|should|would|will|which)\b/i
 const DEICTIC_LOCATION = /\b(?:here|there|nearby|around here|around there|this place|this area|that place|that area)\b/i
 const DEICTIC_PREDICATE = /^\s*(?:is|are|does|do|can|could|should|would|will)\b[\s\S]{0,140}\b(?:here|there|nearby|around here|around there|this place|this area|that place|that area)\b\s*\??\s*$/i
-const REFERENT_PRONOUN = /^(?:and\s+)?(?:when|where|why|how|what|who|is|was|were|did|does|do|can|could|should|would|will)?\s*(?:he|she|they|them|his|her|their|it|its|this|that|these|those)\b/i
+// Natural follow-ups commonly have both a question word and an auxiliary: "When did she leave?",
+// "Where has it gone?", "Why would they do that?". Detect that grammar shape rather than a list
+// of people or topics.
+const REFERENT_PRONOUN = /^(?:and\s+)?(?:(?:when|where|why|how|what|who|which)\s+)?(?:(?:is|are|was|were|did|does|do|can|could|should|would|will|has|have|had)\s+)?(?:he|she|they|them|his|her|their|it|its|this|that|these|those)\b/i
 const EXPLICIT_NAMED_REFERENT = /\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+\b/
 const COMPARATIVE = /\b(?:better|worse|best|worst|faster|slower|safer|riskier|cheaper|more expensive|easier|harder|stronger|weaker|higher|lower|larger|smaller|more|less)\b/i
 const COMPARISON_BASELINE = /\b(?:than|compared (?:with|to)|versus|vs\.?|relative to|between\s+\S+\s+and\s+\S+)\b/i

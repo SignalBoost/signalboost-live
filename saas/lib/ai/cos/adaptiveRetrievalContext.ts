@@ -13,19 +13,25 @@ type AdaptiveRetrievalState = {
 
 const storage = new AsyncLocalStorage<AdaptiveRetrievalState>()
 
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
 function normalizePolicy(policy: AdaptiveRetrievalShadowPolicy | null | undefined): AdaptiveRetrievalShadowPolicy | null {
   if (!policy) return null
-  const maxInjected = Number(policy.learnedCorpusMaxInjected)
-  const minSimilarity = Number(policy.learnedCorpusMinSimilarity)
+  const maxInjected = finiteNumber(policy.learnedCorpusMaxInjected)
+  const minSimilarity = finiteNumber(policy.learnedCorpusMinSimilarity)
   return {
     policyId: policy.policyId ? String(policy.policyId).slice(0, 120) : null,
     mode: policy.mode === 'shadow_observation' ? 'shadow_observation' : 'shadow_validation',
-    learnedCorpusMaxInjected: Number.isFinite(maxInjected)
-      ? Math.max(0, Math.min(12, Math.floor(maxInjected)))
-      : null,
-    learnedCorpusMinSimilarity: Number.isFinite(minSimilarity)
-      ? Math.max(0, Math.min(1, minSimilarity))
-      : null,
+    learnedCorpusMaxInjected: maxInjected == null
+      ? null
+      : Math.max(0, Math.min(12, Math.floor(maxInjected))),
+    learnedCorpusMinSimilarity: minSimilarity == null
+      ? null
+      : Math.max(0, Math.min(1, minSimilarity)),
   }
 }
 

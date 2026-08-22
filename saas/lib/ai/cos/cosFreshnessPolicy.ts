@@ -68,12 +68,6 @@ const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
   'i',
 )
 
-// Questions about COS/assistant self-improvement are internal reasoning and architecture questions,
-// not external-world factual lookups. Keep this bounded to explicit self references plus learning /
-// reasoning improvement vocabulary so ordinary questions about third-party AI training still use the
-// correct external-fact path when appropriate.
-const COS_SELF_IMPROVEMENT = /\b(?:cos|yourself|your)\b.{0,120}\b(?:improv(?:e|ement)|self[- ]?improvement|reasoning capabilities?|model training|training|dynamic context integration|context integration|procedural skill(?: refinement)?|code yourself)\b|\b(?:improv(?:e|ement)|self[- ]?improvement|reasoning capabilities?|model training|procedural skill(?: refinement)?)\b.{0,120}\bcos\b/i
-
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never
 // consume a public search merely because they begin with "what".
 const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i

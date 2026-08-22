@@ -5,6 +5,8 @@
 // campaign, calendar, CRM, inventory, or workflow state belongs to its owning
 // connector/system of record rather than being blindly sent to public web search.
 
+import { classifyTemporalSensitivity } from '@/lib/ai/cos/temporalClaimGuard'
+
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
 const TEMPORAL_LIVE_MARKER = /\b(?:current|currently|today|today's|tonight|now|still|latest|live|breaking|recent|recently|newest|updated|right now|at present|as of today|as of now|this morning|this afternoon|this evening|this week|this month|this year)\b/i
@@ -31,12 +33,13 @@ const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|n
 const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
 const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
-const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules)\b/i
+const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
-// A person's life status is a high-impact public fact that can change between model
-// updates. People rarely phrase this with an explicit "current" marker (for example,
-// "When did George Foreman die?"), so it needs its own live-evidence trigger.
 const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
+
+// Public-web freshness must not hijack private/system-of-record questions just because they contain
+// words such as current/latest/still. Those belong to the owning connector or internal database.
+const INTERNAL_OPERATIONAL_STATE = /\b(?:my|our)\s+(?:business|company|campaign|inventory|pricing|prices?|plan|subscription|account|invoice|order|team|crm|pipeline|leads?|customers?|metrics?|revenue|mrr|arr|credits?|usage|calendar|website|deployment|project|repository|database|sales|outreach|drafts?)\b|\b(?:status|results?|availability|schedule)\s+(?:of|for)\s+(?:my|our)\s+(?:campaign|team|account|project|deployment|website|order|subscription)\b/i
 
 function normalizedText(input: string): string {
   return String(input || '').replace(/\s+/g, ' ').trim()
@@ -46,6 +49,10 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
   if (!state.test(text)) return false
   if (LOOKUP_INTENT.test(text)) return true
   return !/[.!]\s+\w/.test(text) && text.split(/\s+/).length <= 12
+}
+
+function looksLikeInternalOperationalState(text: string): boolean {
+  return INTERNAL_OPERATIONAL_STATE.test(text)
 }
 
 export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
@@ -58,7 +65,7 @@ export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
  */
 export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
   const text = normalizedText(input)
-  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text)) return null
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text)) return null
 
   if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
   if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
@@ -67,17 +74,24 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
 }
 
 /**
- * Returns true when the request depends on rapidly changing EXTERNAL world state.
+ * Returns true when the request depends on mutable EXTERNAL world state.
  *
- * Hard rule: a positive result means model pretraining, local reasoning, durable
- * memory, semantic/exact cache, and prior conversation facts are not permitted
- * to establish the answer. COS must retrieve fresh external evidence on this turn.
+ * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
+ * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
+ * COS must retrieve fresh external evidence on this turn, or fail closed if it cannot verify it.
  */
 export function requiresFreshExternalEvidence(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
-
   if (HISTORICAL_ANCHOR.test(text)) return false
+  if (looksLikeInternalOperationalState(text)) return false
+
+  // One shared temporal classifier covers the general class: life/death, current holders, "still"
+  // status, latest/current releases and mutable values, current rules/security state, and recent
+  // events. Domain-specific checks below remain as additional safeguards for terse lookups that do
+  // not contain an explicit temporal word (for example "Who is the CEO of Apple?").
+  const temporal = classifyTemporalSensitivity(text)
+  if (temporal.sensitive) return true
 
   if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
   if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true

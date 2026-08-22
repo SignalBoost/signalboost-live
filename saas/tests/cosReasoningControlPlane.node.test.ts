@@ -16,7 +16,7 @@ function worker(input: Partial<CosReasoningWorker> & Pick<CosReasoningWorker, 'i
 
 test('COS owns the plan while the model remains a replaceable worker', () => {
   const plan = buildCosReasoningPlan({ prompt: 'Diagnose a Postgres latency regression.' })
-  assert.equal(plan.policyVersion, 'cos-reasoning-control-plane-v1')
+  assert.equal(plan.policyVersion, 'cos-reasoning-control-plane-v2')
   assert.equal(plan.requestedRole, 'primary')
   assert.equal(plan.steps[0].role, 'primary')
   assert.match(plan.objective, /Postgres latency/)
@@ -49,6 +49,27 @@ test('missing specialists fall back to the primary COS worker, not an outside pr
   const execution = await engine.run({ prompt: 'Verify the claim.', requestedRole: 'verifier' })
   assert.equal(execution?.worker.id, 'primary')
   assert.equal(execution?.fallbackUsed, true)
+})
+
+test('a failed specialist does not retry the same model under the primary role', async () => {
+  let primaryCalls = 0
+  const engine = new CosReasoningEngine([
+    worker({ id: 'primary', role: 'primary', kind: 'cos-open-model', label: 'same-qwen', execute: async () => { primaryCalls += 1; return { text: 'primary' } } }),
+    worker({ id: 'coder', role: 'coder', kind: 'cos-open-model', label: 'same-qwen', execute: async () => null }),
+  ])
+  assert.equal(await engine.run({ prompt: 'Repair code.', requestedRole: 'coder' }), null)
+  assert.equal(primaryCalls, 0)
+})
+
+test('a genuinely different primary runtime remains a bounded specialist fallback', async () => {
+  const engine = new CosReasoningEngine([
+    worker({ id: 'primary', role: 'primary', kind: 'cos-open-model', label: 'qwen-primary', execute: async () => ({ text: 'primary-fallback' }) }),
+    worker({ id: 'coder', role: 'coder', kind: 'cos-open-model', label: 'specialist-model', execute: async () => null }),
+  ])
+  const execution = await engine.run({ prompt: 'Repair code.', requestedRole: 'coder' })
+  assert.equal(execution?.worker.id, 'primary')
+  assert.equal(execution?.fallbackUsed, true)
+  assert.deepEqual(execution?.attemptedWorkerIds, ['coder', 'primary'])
 })
 
 test('external closed-model workers are excluded unless COS explicitly allows escalation', async () => {

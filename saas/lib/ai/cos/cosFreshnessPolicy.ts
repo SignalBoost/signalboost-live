@@ -6,6 +6,7 @@
 // to their owning system of record rather than being blindly sent to public web search.
 
 import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
+import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
@@ -80,7 +81,7 @@ const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
 const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\s+)?(?:date|time|day)(?:\s+(?:today|now|is\s+it))?\s*[?!.]*\s*$/i
 
 function normalizedText(input: string): string {
-  return String(input || '').replace(/\s+/g, ' ').trim()
+  return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
 }
 
 function isDirectOrTerseLookup(text: string, state: RegExp): boolean {

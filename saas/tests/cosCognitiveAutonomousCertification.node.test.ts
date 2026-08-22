@@ -41,7 +41,23 @@ test('supported ambiguity procedures can enter a private certification profile b
 test('unsupported or mixed trigger families fail closed instead of self-certifying', () => {
   assert.equal(inferCertificationProfileForDraft(ambiguityDraft, []), null)
   assert.equal(inferCertificationProfileForDraft(ambiguityDraft, ['unresolved_referent_followup', 'unknown_trigger']), null)
-  const unrelated = { ...ambiguityDraft, title: 'Tune database indexes', description: 'Measure query plans and index selectivity before changing database indexes.', problemClass: 'database indexing performance' }
+  const unrelated = {
+    title: 'Tune database indexes safely',
+    description: 'Measure query plans, selectivity and write amplification before changing a database index.',
+    problemClass: 'database indexing performance',
+    prerequisites: [],
+    procedureSteps: [
+      'Capture representative query plans and timings.',
+      'Measure selectivity and write amplification for candidate indexes.',
+      'Validate the index change against a representative workload before rollout.',
+    ],
+    discriminatingSignals: ['query plan regression', 'index selectivity'],
+    tools: [],
+    observables: ['query latency changes are measured', 'write overhead is measured'],
+    falsifiers: ['no representative plan evidence exists', 'the candidate increases cost without latency benefit'],
+    commonFailureModes: ['optimizing one query while harming writes'],
+    prohibitedActions: ['deploy an unmeasured index change'],
+  }
   assert.equal(inferCertificationProfileForDraft(unrelated, ['unresolved_referent_followup']), null)
 })
 

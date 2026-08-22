@@ -210,9 +210,12 @@ export function createGeminiThinker(): DiagnosticThinker | null {
   return {
     id: 'gemini',
     async think(incident, systemPrompt, responseSchema, experiencePrompt) {
+      // Gemini's REST schema dialect rejects parts of our portable JSON Schema. Keep JSON mode,
+      // put the contract in the prompt, and validate the returned object locally before use.
+      const contract = `Return one JSON object matching this contract exactly: ${JSON.stringify(responseSchema)}`
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${systemPrompt}\n\n${experiencePrompt}` }] }, contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${systemPrompt}\n\n${experiencePrompt}\n\n${contract}` }] }, contents: [{ role: 'user', parts: [{ text: JSON.stringify(incident) }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json' } }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body?.error?.message || `Gemini returned ${res.status}`)

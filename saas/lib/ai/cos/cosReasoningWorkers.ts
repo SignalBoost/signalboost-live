@@ -16,6 +16,7 @@ import {
 import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
+import { COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
 
 const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, string>> = {
   coder: [
@@ -49,8 +50,8 @@ const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, stri
 }
 
 function roleSystemPrompt(request: CosReasoningRequest, role: CosSpecialistRole): string | undefined {
-  if (role === 'primary') return request.systemPrompt
-  return [request.systemPrompt, ROLE_GUIDANCE[role]].filter(Boolean).join('\n\n')
+  const roleGuidance = role === 'primary' ? null : ROLE_GUIDANCE[role]
+  return [request.systemPrompt, COS_GENERAL_REASONING_DISCIPLINE, roleGuidance].filter(Boolean).join('\n\n')
 }
 
 function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistRole): LocalModelCallArgs {

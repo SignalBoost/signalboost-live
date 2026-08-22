@@ -148,6 +148,12 @@ const GROUPS: NavGroup[] = [
       { icon: '🤖', labelKey: 'nav.cosAssistant', fallbackLabel: uiText('generatedUi.u_f7186e7e576a60ad'), href: '/dashboard/assistant', requiresOwner: true },
       { icon: '👑', labelKey: 'nav.ownerAdmin', fallbackLabel: uiText('generatedUi.u_4943e64e40762052'), href: '/admin', requiresOwner: true },
 
+      // Owner-directed study intake (/dashboard/cos-directed-study) — feed COS a video, article
+      // or book chapter by hand. Label reuses the existing assistantFeedback key (present in all
+      // five locales) because a new generatedUi key would mean editing five ~3,900-key locale
+      // files, and validate:i18n-locale-keys rejects plain English strings here.
+      { icon: '📚', labelKey: 'nav.cosDirectedStudy', fallbackLabel: uiText('assistantFeedback.correctionPlaceholder'), href: '/dashboard/cos-directed-study', requiresOwner: true },
+
       // ── SELF-HEALING SUPERVISOR, IN THE ORDER THE PRODUCT IS OPERATED ──────────
       //
       // These eleven entries were previously three, scattered through this group at

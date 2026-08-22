@@ -75,6 +75,29 @@ function freshSynthesisRejectedReply(language: string): string {
   return messages[language] || messages.en
 }
 
+const LOCAL_DISCOVERY_QUERY = /\b(?:are there|where (?:can|should|do) (?:i|we)|find|recommend|recommendations?|places?|restaurants?|bars?|clubs?|classes?|events?|things to do)\b/i
+
+function cleanDiscoveryText(value: unknown, limit: number): string {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit)
+}
+
+/**
+ * A local-discovery response may safely expose the server-retrieved directory rather
+ * than discard it when the constrained model phraser fails. This is deliberately not
+ * used for office holders, laws, prices, or other claims that need a model assessment.
+ */
+function deterministicLocalDiscoveryReply(input: string, sources: FreshEvidenceSource[]): string | null {
+  if (!LOCAL_DISCOVERY_QUERY.test(input) || !sources.length) return null
+  const selected = sources.slice(0, 3)
+  const entries = selected.map(source => {
+    const title = cleanDiscoveryText(source.title, 180) || 'Live local listing'
+    const snippet = cleanDiscoveryText(source.snippet, 360)
+    return `- ${title}${snippet ? ` — ${snippet}` : ''}`
+  })
+  const citations = selected.map(source => `[${source.id}] (${source.url})`).join(' and ')
+  return `I found current local options relevant to your question:\n${entries.join('\n')}\n\nSources: ${citations}`
+}
+
 function emitFreshTelemetry(args: {
   startedAt: number
   input: string
@@ -309,6 +332,36 @@ async function handleFreshSinglePass(body: any, input: string, lookupInput: stri
   })
 
   if (!externalAccepted || !externalFresh.reply) {
+    const directoryReply = deterministicLocalDiscoveryReply(input, sources)
+    if (directoryReply) {
+      executionProvenance.answer_origin = {
+        ...(executionProvenance.answer_origin || {}),
+        from_cache: false,
+        provider: null,
+        model: null,
+        grounded_at: retrievedAt,
+        deterministic_local_discovery: true,
+      }
+      const liveTelemetry = emitFreshTelemetry({ startedAt, input, reply: directoryReply, source: 'deterministic', confidence: 1, externalAiInvoked: externalInvoked })
+      await writeCosPrimaryProvenance(userId, directoryReply, executionProvenance, 'cos-fresh-local-directory')
+      return NextResponse.json({
+        ok: true,
+        reply: directoryReply,
+        source: 'cos-fresh-local-directory',
+        confidence_score: 1,
+        confidence_threshold: confidenceThreshold(),
+        execution_provenance: executionProvenance,
+        external_ai_invoked: externalInvoked,
+        external_fallback_invoked: externalInvoked,
+        external_fallback_succeeded: false,
+        local_model_invoked: false,
+        live_evidence_retrieved_this_turn: true,
+        live_evidence_sources: sources.map(source => ({ id: source.id, title: source.title, url: source.url })),
+        live_telemetry: liveTelemetry,
+        execution_allowed: false,
+        external_action_taken: false,
+      })
+    }
     const reply = freshSynthesisRejectedReply(language)
     const liveTelemetry = emitFreshTelemetry({ startedAt, input: lookupInput, reply, source: 'failed_closed', confidence: 0, externalAiInvoked: externalInvoked })
     await writeCosPrimaryProvenance(userId, reply, executionProvenance, 'cos-fresh-evidence-synthesis-rejected')

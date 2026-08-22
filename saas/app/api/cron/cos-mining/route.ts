@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
 import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
+import { runCognitiveCertificationCycle } from '@/lib/ai/cos/cognitiveCertification'
 import { runCognitiveCompositionCycle } from '@/lib/ai/cos/cognitiveSkillComposition'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
 import { runFactConsolidationCycle } from '@/lib/ai/cos/cognitiveFactConsolidation'
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
   let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
+  let certification: Awaited<ReturnType<typeof runCognitiveCertificationCycle>> | { enabled: false; errors: string[] } | null = null
   let composition: Awaited<ReturnType<typeof runCognitiveCompositionCycle>> | { enabled: false; errors: string[] } | null = null
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let factConsolidation: Awaited<ReturnType<typeof runFactConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
@@ -44,9 +46,9 @@ export async function GET(req: NextRequest) {
   let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
-    // Daily learning, transcript acquisition, skill practice, composition/transfer, and consolidation
-    // are legitimate COS local-compute work. Lease + pre-warm the dedicated runtime once for the
-    // bounded batch; the idle-stop cron releases the GPU after the configured quiet period.
+    // Daily learning, transcript acquisition, skill practice/certification, composition/transfer, and
+    // consolidation are legitimate COS local-compute work. Lease + pre-warm the dedicated runtime
+    // once for the bounded batch; the idle-stop cron releases the GPU after the quiet period.
     await touchRunpodActivityLease('daily_learning_batch')
     try {
       await ensureLocalInferenceRuntimeReady()
@@ -68,6 +70,14 @@ export async function GET(req: NextRequest) {
       const message = error instanceof Error ? error.message : 'Cognitive active learning failed'
       console.error('cron COS cognitive active learning failed:', message)
       cognitive = { enabled: false, errors: [message] }
+    }
+
+    try {
+      certification = await runCognitiveCertificationCycle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Cognitive certification failed'
+      console.error('cron COS cognitive certification failed:', message)
+      certification = { enabled: false, errors: [message] }
     }
 
     try {
@@ -96,8 +106,8 @@ export async function GET(req: NextRequest) {
       probationaryPromotion = { enabled: false, errors: [message] }
     }
 
-    // Rebuild metacognitive state after learning/composition/consolidation so selection on the next
-    // request reflects the newest strong, weak, quarantined and unresolved capability evidence.
+    // Rebuild metacognitive state after learning/certification/composition/consolidation so selection
+    // on the next request reflects the newest strong, weak, quarantined and unresolved evidence.
     try {
       metacognition = await refreshMetacognitiveCapabilityMap()
     } catch (error) {
@@ -119,5 +129,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, summary: result.summary, learning, cognitive, composition, consolidation, factConsolidation, probationaryPromotion, metacognition, corpus })
+  return NextResponse.json({
+    ok: true,
+    summary: result.summary,
+    learning,
+    cognitive,
+    certification,
+    composition,
+    consolidation,
+    factConsolidation,
+    probationaryPromotion,
+    metacognition,
+    corpus,
+  })
 }

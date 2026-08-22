@@ -5,16 +5,17 @@ import { COS_GENERAL_REASONING_DISCIPLINE } from '../lib/ai/cos/cosGeneralReason
 
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 
-test('general reasoning discipline resolves ambiguity without exposing hidden chain of thought', () => {
-  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /unresolved referents/i)
-  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /comparison baselines/i)
-  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /ask one concise clarification/i)
-  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /never invent missing context/i)
+test('global reasoning guidance is safety-only and does not smuggle an unvalidated ambiguity skill into live prompts', () => {
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not invent missing context/i)
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /validated cognitive-skill path/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not expose hidden scratchpad or chain-of-thought/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /strict JSON/i)
+  assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /ask one concise clarification/i)
+  assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /unresolved referents/i)
+  assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /comparison baselines/i)
 })
 
-test('every reasoning worker receives the general discipline, including primary', () => {
+test('every reasoning worker receives only the lifecycle-neutral safety invariants, including primary', () => {
   const source = read('../lib/ai/cos/cosReasoningWorkers.ts')
   assert.match(source, /COS_GENERAL_REASONING_DISCIPLINE/)
   assert.match(source, /\[request\.systemPrompt, COS_GENERAL_REASONING_DISCIPLINE, roleGuidance\]/)

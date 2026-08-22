@@ -14,12 +14,19 @@ function normalized(input: string): string {
   return String(input || '').replace(/\s+/g, ' ').trim()
 }
 
+function hasNamedLocalityAfterOpeningToken(text: string): boolean {
+  const tokens = text.replace(/[?!.]+$/g, '').split(/\s+/).filter(Boolean)
+  if (tokens.length < 2) return false
+  return tokens.slice(1).some(token => /^\p{Lu}[\p{L}\p{M}'’.-]{2,}$/u.test(token))
+}
+
 export function isLocalPlaceDiscoveryQuery(input: string): boolean {
   const text = normalized(input)
   if (!text || !PLACE_CATEGORY.test(text)) return false
   if (DISCOVERY_INTENT.test(text) && LOCALITY_CUE.test(text)) return true
   // Terse local-search phrasing such as "salsa clubs Paramaribo" or "restaurants Warsaw".
-  return text.split(/\s+/).length <= 8 && /\p{Lu}[\p{L}\p{M}'’.-]{2,}/u.test(text)
+  // A capitalized sentence opener (for example "Explain") is not enough to establish locality.
+  return text.split(/\s+/).length <= 8 && hasNamedLocalityAfterOpeningToken(text)
 }
 
 function terms(input: string): string[] {

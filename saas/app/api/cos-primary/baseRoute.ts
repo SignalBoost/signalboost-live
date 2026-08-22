@@ -108,12 +108,13 @@ export async function POST(req:NextRequest){
   // Repository inspection is an owner-authorized, read-only operation. Execute it here so a model/tool-choice loop cannot skip it.
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()
-    const assessment=scan.ok&&requestsSelfHealingAssessment(input)?await assessSelfHealingSupervisor(input):null
-    const reply=assessment||(scan.ok?scan.reply:`COS could not complete the read-only repository scan: ${scan.error||'unknown repository reader failure'}`)
+    const assessmentRequested=scan.ok&&requestsSelfHealingAssessment(input)
+    const assessment=assessmentRequested?await assessSelfHealingSupervisor(input):null
+    const reply=assessment||(!scan.ok?`COS could not complete the read-only repository scan: ${scan.error||'unknown repository reader failure'}`:assessmentRequested?'COS completed the repository scan but could not produce the requested Self-Healing Supervisor assessment from the verified evidence. No scan inventory is being presented as a substitute for the report.':scan.reply)
     const executionProvenance=authoritativeProvenance(null,{invoked:false})
-    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:scan.ok?'deterministic':'failed_closed',confidence:scan.ok?1:0,externalAiInvoked:false})
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:assessment||(!assessmentRequested&&scan.ok)?'deterministic':'failed_closed',confidence:assessment||(!assessmentRequested&&scan.ok)?1:0,externalAiInvoked:false})
     await writeCosPrimaryProvenance(userId,reply,executionProvenance,assessment?'cos-self-healing-assessment':scan.ok?'cos-repository-scan':'cos-repository-scan-failed')
-    return NextResponse.json({ok:scan.ok,reply,source:assessment?'cos-self-healing-assessment':scan.ok?'cos-repository-scan':'cos-repository-scan-failed',confidence_score:scan.ok?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:Boolean(assessment),execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:scan.ok?200:503})
+    return NextResponse.json({ok:Boolean(assessment)||(!assessmentRequested&&scan.ok),reply,source:assessment?'cos-self-healing-assessment':!scan.ok?'cos-repository-scan-failed':assessmentRequested?'cos-self-healing-assessment-failed':'cos-repository-scan',confidence_score:assessment||(!assessmentRequested&&scan.ok)?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:Boolean(assessment),execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:assessment||(!assessmentRequested&&scan.ok)?200:503})
   }
 
   if(isProvenanceIntrospection(input)){

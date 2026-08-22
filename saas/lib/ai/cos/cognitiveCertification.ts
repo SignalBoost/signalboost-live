@@ -11,6 +11,10 @@ import { refreshCognitiveSkillStatus } from '@/lib/ai/cos/cognitiveActiveLearnin
 
 const CERTIFIABLE_STATUSES = ['encountered', 'evaluated', 'understood', 'practiced', 'validated'] as const
 const PRACTICED_OR_STRONGER = new Set(['practiced', 'validated', 'learned', 'mastered'])
+const DEFAULT_MODEL_CALL_ESTIMATE_MS = 75_000
+const DEFAULT_CLEANUP_RESERVE_MS = 15_000
+const DEFAULT_MAX_MODEL_CALLS = 1
+const STALE_RUNNING_AFTER_MS = 8 * 60_000
 
 function clean(value: unknown, max = 6000): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -19,6 +23,37 @@ function clean(value: unknown, max = 6000): string {
 function positiveInt(value: unknown, fallback: number, max = 10): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? Math.max(1, Math.min(max, Math.floor(parsed))) : fallback
+}
+
+function positiveMs(value: unknown, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback
+}
+
+export type CognitiveCertificationBudget = {
+  deadlineAt: number
+  maxModelCalls: number
+  modelCallsUsed: number
+}
+
+export type CognitiveCertificationOptions = {
+  deadlineAt?: number
+  maxModelCalls?: number
+}
+
+export function canStartCertificationModelCall(
+  budget: CognitiveCertificationBudget,
+  now = Date.now(),
+): boolean {
+  const estimate = positiveMs(process.env.COS_LOCAL_CALL_ESTIMATE_MS, DEFAULT_MODEL_CALL_ESTIMATE_MS)
+  const reserve = positiveMs(process.env.COS_COGNITIVE_CERTIFICATION_CLEANUP_RESERVE_MS, DEFAULT_CLEANUP_RESERVE_MS)
+  return budget.modelCallsUsed < budget.maxModelCalls && budget.deadlineAt - now >= estimate + reserve
+}
+
+function consumeModelCall(budget: CognitiveCertificationBudget, now = Date.now()): boolean {
+  if (!canStartCertificationModelCall(budget, now)) return false
+  budget.modelCallsUsed += 1
+  return true
 }
 
 type CertificationCaseKind = 'understanding' | 'practice' | 'holdout'
@@ -73,6 +108,27 @@ async function loadCases(
   return (result.data || []) as CertificationCase[]
 }
 
+async function recoverStaleCertificationExercises(): Promise<number> {
+  const db = cosServiceDb()
+  if (!db) return 0
+  const cutoff = new Date(Date.now() - STALE_RUNNING_AFTER_MS).toISOString()
+  const result = await db.from('cos_active_practice_queue').update({
+    status: 'queued',
+    started_at: null,
+    completed_at: null,
+    last_error: 'stale_running_recovered',
+    next_attempt_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })
+    .eq('status', 'running')
+    .eq('generation_source', 'curated')
+    .contains('metadata', { origin: 'autonomous_cognitive_certification' })
+    .lt('started_at', cutoff)
+    .select('id')
+  if (result.error) throw result.error
+  return result.data?.length || 0
+}
+
 async function nextCertifiableSkill(): Promise<{ row: any; profile: CognitiveCertificationProfileKey } | null> {
   const db = cosServiceDb()
   if (!db) return null
@@ -81,13 +137,63 @@ async function nextCertifiableSkill(): Promise<{ row: any; profile: CognitiveCer
     .in('status', [...CERTIFIABLE_STATUSES])
     .is('quarantined_at', null)
     .order('updated_at', { ascending: true })
-    .limit(16)
+    .limit(24)
   if (result.error) throw result.error
   for (const row of result.data || []) {
+    const certification = row?.metadata?.certification && typeof row.metadata.certification === 'object'
+      ? row.metadata.certification
+      : {}
+    if (certification.saturated === true) continue
     const profile = certificationProfileForSkill(row)
     if (profile) return { row, profile }
   }
   return null
+}
+
+async function markCertificationCycleStart(row: any, profile: CognitiveCertificationProfileKey): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  const metadata = row?.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+  const certification = metadata.certification && typeof metadata.certification === 'object' ? metadata.certification : {}
+  const now = new Date().toISOString()
+  const update = await db.from('cos_cognitive_skills').update({
+    metadata: {
+      ...metadata,
+      certification_profile: profile,
+      certification: {
+        ...certification,
+        profile,
+        last_cycle_at: now,
+      },
+    },
+    updated_at: now,
+  }).eq('id', row.id)
+  if (update.error) throw update.error
+}
+
+async function markCertificationSaturated(skillKey: string, profile: CognitiveCertificationProfileKey, reason: string): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  const current = await db.from('cos_cognitive_skills').select('metadata').eq('skill_key', skillKey).single()
+  if (current.error) throw current.error
+  const metadata = current.data?.metadata && typeof current.data.metadata === 'object' ? current.data.metadata : {}
+  const certification = metadata.certification && typeof metadata.certification === 'object' ? metadata.certification : {}
+  const now = new Date().toISOString()
+  const update = await db.from('cos_cognitive_skills').update({
+    metadata: {
+      ...metadata,
+      certification_profile: profile,
+      certification: {
+        ...certification,
+        profile,
+        saturated: true,
+        saturated_at: now,
+        saturated_reason: clean(reason, 600),
+      },
+    },
+    updated_at: now,
+  }).eq('skill_key', skillKey)
+  if (update.error) throw update.error
 }
 
 async function deterministicCuratedReview(row: any, profile: CognitiveCertificationProfileKey): Promise<boolean> {
@@ -367,6 +473,8 @@ export type CognitiveCertificationSummary = {
   holdoutRuns: Array<Record<string, unknown>>
   finalStatus: string | null
   blockedReason: string | null
+  recoveredStaleExercises: number
+  modelCallsUsed: number
   errors: string[]
 }
 
@@ -375,14 +483,27 @@ export type CognitiveCertificationSummary = {
  * candidates, but it may self-schedule independent certification only when SignalBoost owns a private
  * curated profile for that skill family. Unsupported candidates remain encountered until a separate
  * independent evaluator or curated profile exists. No closed-model evaluator is enabled here.
+ *
+ * Certification is progressive rather than bursty: callers provide a route-wide deadline and the
+ * cycle consumes at most a tiny bounded number of reasoner calls. Every selected skill is timestamped
+ * before work begins so a partially completed candidate rotates behind newer candidates instead of
+ * monopolizing the daily slot. Interrupted curated cases are recovered on a later cycle.
  */
-export async function runCognitiveCertificationCycle(): Promise<CognitiveCertificationSummary> {
+export async function runCognitiveCertificationCycle(
+  options: CognitiveCertificationOptions = {},
+): Promise<CognitiveCertificationSummary> {
   if (process.env.COS_COGNITIVE_CERTIFICATION_ENABLED === 'false') {
     return {
       enabled: false, candidate: null, profile: null, reviewed: false, understandingPassed: null,
       practiceQueued: 0, practiceRuns: [], holdoutsQueued: 0, holdoutRuns: [], finalStatus: null,
-      blockedReason: 'disabled', errors: [],
+      blockedReason: 'disabled', recoveredStaleExercises: 0, modelCallsUsed: 0, errors: [],
     }
+  }
+
+  const budget: CognitiveCertificationBudget = {
+    deadlineAt: Number.isFinite(options.deadlineAt) ? Number(options.deadlineAt) : Date.now() + 90_000,
+    maxModelCalls: positiveInt(options.maxModelCalls, DEFAULT_MAX_MODEL_CALLS, 2),
+    modelCallsUsed: 0,
   }
   const summary: CognitiveCertificationSummary = {
     enabled: true,
@@ -396,18 +517,22 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
     holdoutRuns: [],
     finalStatus: null,
     blockedReason: null,
+    recoveredStaleExercises: 0,
+    modelCallsUsed: 0,
     errors: [],
   }
 
-  const target = await nextCertifiableSkill()
-  if (!target) {
-    summary.blockedReason = 'no_candidate_with_supported_private_certification_profile'
-    return summary
-  }
-  summary.candidate = String(target.row.skill_key)
-  summary.profile = target.profile
-
   try {
+    summary.recoveredStaleExercises = await recoverStaleCertificationExercises()
+    const target = await nextCertifiableSkill()
+    if (!target) {
+      summary.blockedReason = 'no_candidate_with_supported_private_certification_profile'
+      return summary
+    }
+    summary.candidate = String(target.row.skill_key)
+    summary.profile = target.profile
+    await markCertificationCycleStart(target.row, target.profile)
+
     summary.reviewed = await deterministicCuratedReview(target.row, target.profile)
     if (!summary.reviewed) {
       summary.blockedReason = 'candidate_failed_curated_profile_review'
@@ -417,43 +542,72 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
 
     let skill = await freshSkill(target.row.skill_key)
     if (!skill) throw new Error('certification_skill_missing_after_review')
-    summary.understandingPassed = await runCuratedUnderstanding(skill, target.profile)
-    if (!summary.understandingPassed) {
-      summary.blockedReason = 'independent_understanding_not_passed'
+    if (!skill.understanding_approved) {
+      if (!consumeModelCall(budget)) {
+        summary.blockedReason = 'route_budget_exhausted_before_understanding'
+        summary.finalStatus = String(skill.status)
+        return summary
+      }
+      summary.understandingPassed = await runCuratedUnderstanding(skill, target.profile)
+      summary.modelCallsUsed = budget.modelCallsUsed
+      if (!summary.understandingPassed) {
+        summary.blockedReason = 'independent_understanding_not_passed'
+        summary.finalStatus = String((await freshSkill(target.row.skill_key))?.status || skill.status)
+        return summary
+      }
       summary.finalStatus = String((await freshSkill(target.row.skill_key))?.status || skill.status)
+      summary.blockedReason = 'progressive_cycle_call_budget_reached'
       return summary
     }
+    summary.understandingPassed = true
 
     skill = await freshSkill(target.row.skill_key)
     if (!skill) throw new Error('certification_skill_missing_after_understanding')
 
     summary.practiceQueued = await queueCertificationCases(skill.skill_key, target.profile, 'practice')
-    const practiceLimit = positiveInt(process.env.COS_COGNITIVE_CERTIFICATION_PRACTICE_PER_CYCLE, 2, 4)
-    for (let i = 0; i < practiceLimit; i += 1) {
-      const result = await runCertificationExercise(skill.skill_key, 'practice')
-      if (!result) break
-      summary.practiceRuns.push(result)
-    }
-
     let lifecycle = await refreshCognitiveSkillStatus(skill.skill_key)
     skill = await freshSkill(skill.skill_key)
-    if (!skill) throw new Error('certification_skill_missing_after_practice')
+    if (!skill) throw new Error('certification_skill_missing_before_practice')
+
     if (!PRACTICED_OR_STRONGER.has(String(lifecycle?.status || skill.status))) {
-      summary.blockedReason = 'practice_evidence_not_sufficient'
-      summary.finalStatus = String(lifecycle?.status || skill.status)
+      if (!consumeModelCall(budget)) {
+        summary.blockedReason = 'route_budget_exhausted_before_practice'
+        summary.finalStatus = String(lifecycle?.status || skill.status)
+        return summary
+      }
+      const practiceResult = await runCertificationExercise(skill.skill_key, 'practice')
+      summary.modelCallsUsed = budget.modelCallsUsed
+      if (practiceResult) summary.practiceRuns.push(practiceResult)
+      lifecycle = await refreshCognitiveSkillStatus(skill.skill_key)
+      summary.finalStatus = String(lifecycle?.status || (await freshSkill(skill.skill_key))?.status || skill.status)
+      summary.blockedReason = PRACTICED_OR_STRONGER.has(summary.finalStatus)
+        ? 'progressive_cycle_call_budget_reached'
+        : 'practice_evidence_not_sufficient'
       return summary
     }
 
     summary.holdoutsQueued = await queueCertificationCases(skill.skill_key, target.profile, 'holdout')
-    const holdoutLimit = positiveInt(process.env.COS_COGNITIVE_CERTIFICATION_HOLDOUTS_PER_CYCLE, 3, 6)
-    for (let i = 0; i < holdoutLimit; i += 1) {
-      const result = await runCertificationExercise(skill.skill_key, 'holdout')
-      if (!result) break
-      summary.holdoutRuns.push(result)
+    if (!consumeModelCall(budget)) {
+      summary.blockedReason = 'route_budget_exhausted_before_holdout'
+      summary.finalStatus = String(lifecycle?.status || skill.status)
+      return summary
     }
+    const holdoutResult = await runCertificationExercise(skill.skill_key, 'holdout')
+    summary.modelCallsUsed = budget.modelCallsUsed
+    if (holdoutResult) summary.holdoutRuns.push(holdoutResult)
 
     lifecycle = await refreshCognitiveSkillStatus(skill.skill_key)
     summary.finalStatus = String(lifecycle?.status || (await freshSkill(skill.skill_key))?.status || skill.status)
+
+    if (!holdoutResult && summary.holdoutsQueued === 0 && summary.finalStatus === 'validated') {
+      await markCertificationSaturated(skill.skill_key, target.profile, 'private_holdouts_exhausted_without_learned_threshold')
+      summary.blockedReason = 'private_holdouts_exhausted_without_learned_threshold'
+    } else {
+      summary.blockedReason = ['learned', 'mastered'].includes(summary.finalStatus)
+        ? null
+        : 'progressive_cycle_call_budget_reached'
+    }
+
     await auditCertification({
       skillKey: skill.skill_key,
       profile: target.profile,
@@ -463,6 +617,8 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
       evidence: {
         practiceRuns: summary.practiceRuns.length,
         holdoutRuns: summary.holdoutRuns.length,
+        modelCallsUsed: summary.modelCallsUsed,
+        routeDeadlineAt: new Date(budget.deadlineAt).toISOString(),
         automaticClosedModelEvaluation: false,
       },
     })
@@ -480,5 +636,6 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
       }).catch(() => undefined)
     }
   }
+  summary.modelCallsUsed = budget.modelCallsUsed
   return summary
 }

@@ -42,6 +42,23 @@ test('foundational study domains still win, so curriculum and experience share v
   )
 })
 
+test('injected evidence cannot move learning telemetry out of the user-question bucket', () => {
+  const wrapped = [
+    'DATABASE EVIDENCE: PostgreSQL query plan, pg_stat_statements, indexes, buffer cache.',
+    'MORE EVIDENCE: PostgreSQL database tenant connection pool.',
+    'USER QUESTION:',
+    'Enterprise tenant p95 latency tripled with unchanged traffic. Diagnose the incident using traces and isolation points.',
+  ].join('\n')
+  assert.match(classifyProblemClass(wrapped), /site reliability engineering/)
+
+  const freshWrapped = [
+    'Retrieved corpus: PostgreSQL database performance and connection pools.',
+    'Original question: What is the latest public office holder for this role?',
+    'Evidence follows below.',
+  ].join('\n')
+  assert.equal(classifyProblemClass(freshWrapped), 'current public facts')
+})
+
 test('ordinary turns split into real classes instead of one giant bucket', () => {
   assert.equal(classifyProblemClass('What is computer vision a subfield of?'), 'definitions and concepts')
   assert.equal(classifyProblemClass('who is the worse US president of all times?'), 'opinion and judgment')

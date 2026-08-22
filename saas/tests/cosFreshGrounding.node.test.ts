@@ -34,6 +34,19 @@ test('accepted public office-holder answer must cite the authoritative governmen
   assert.equal(replyCitesIndependentFreshEvidence(authoritative, input, sources), true)
 })
 
+test('life-status claims require two independent live hosts and citations', () => {
+  const sources = prepareFreshEvidence([
+    { title: 'Official statement', url: 'https://official.example/person', snippet: 'The person died on a stated date.' },
+    { title: 'Independent report', url: 'https://news.example/person', snippet: 'The report independently confirms the death.' },
+  ])
+  const input = 'when Hulk Hogan died?'
+
+  assert.equal(freshEvidenceMeetsAuthority(input, [sources[0]]), false)
+  assert.equal(freshEvidenceMeetsAuthority(input, sources), true)
+  assert.equal(replyCitesIndependentFreshEvidence(`[LIVE1] ${sources[0].url}`, input, sources), false)
+  assert.equal(replyCitesIndependentFreshEvidence(`[LIVE1] ${sources[0].url} [LIVE2] ${sources[1].url}`, input, sources), true)
+})
+
 test('provider source date is preserved separately from retrieval time and shown to the synthesizer', () => {
   const sources = prepareFreshEvidence([
     {

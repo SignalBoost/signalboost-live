@@ -1,6 +1,12 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { rankContextCandidates } from '@/lib/ai/cos/contextRelevance'
 import { assessSkillSelection } from '@/lib/ai/cos/cognitiveMetacognition'
+import {
+  cognitiveSkillReasoningTriggerKinds,
+  detectCognitiveReasoningTriggers,
+  matchingCognitiveReasoningTriggers,
+  type CognitiveReasoningTriggerKind,
+} from '@/lib/ai/cos/cognitiveReasoningPatterns'
 
 export type CognitiveSkillContextItem = {
   id: string
@@ -10,6 +16,7 @@ export type CognitiveSkillContextItem = {
   similarity: number
   selectionScore: number
   evidenceReliability: number
+  triggerMatches: CognitiveReasoningTriggerKind[]
 }
 
 export type CognitiveSkillContextResult = {
@@ -61,8 +68,14 @@ async function dependencyHealth(rows: any[]): Promise<Map<string, boolean>> {
  * practiced skills never enter a live answer. Composite skills also fail closed if any flattened leaf
  * dependency has weakened, been quarantined, or otherwise stopped being strong.
  *
- * Historical production/retention evidence is used only for skill SELECTION among already-eligible
- * procedures. It never becomes factual corroboration and never increases answer confidence.
+ * A strong skill can become relevant in two governed ways:
+ *   1) semantic retrieval says its procedure matches the prompt, or
+ *   2) its stored reasoningTriggers intersect a deterministic structural pattern detected in the
+ *      prompt (for example, an unresolved referent or missing comparison baseline).
+ *
+ * Structural triggers never bypass lifecycle status and never become factual corroboration. They
+ * only improve selection among already-validated procedural skills, which lets learned reasoning
+ * generalize across different wording without hard-coding every future question.
  */
 export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<CognitiveSkillContextResult> {
   const empty: CognitiveSkillContextResult = { retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] }
@@ -71,7 +84,7 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
 
   const result = await db
     .from('cos_cognitive_skills')
-    .select('id,skill_key,subject,title,description,procedure,status,last_validated_at,updated_at,provenance,production_attempts,production_successes,retention_attempts,retention_successes,failure_count')
+    .select('id,skill_key,subject,title,description,procedure,status,last_validated_at,updated_at,provenance,metadata,production_attempts,production_successes,retention_attempts,retention_successes,failure_count')
     .in('status', ['validated', 'learned', 'mastered'])
     .order('last_validated_at', { ascending: false, nullsFirst: false })
     .order('updated_at', { ascending: false })
@@ -96,13 +109,26 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
     ].filter(Boolean).join(' '),
   }))
   const ranked = await rankContextCandidates(prompt, candidates, { threshold: threshold(), limit: 8 })
+  const semanticById = new Map(ranked.relevant.map(candidate => [String((candidate.item as any).id), candidate]))
+  const detectedTriggers = detectCognitiveReasoningTriggers(prompt)
 
-  const assessed = ranked.relevant.map(candidate => {
-    const row: any = candidate.item
+  const relevant = healthyRows.flatMap((row: any) => {
+    const semantic = semanticById.get(String(row.id))
+    const configuredTriggers = cognitiveSkillReasoningTriggerKinds(row)
+    const triggerMatches = matchingCognitiveReasoningTriggers(detectedTriggers, configuredTriggers)
+    if (!semantic && !triggerMatches.length) return []
+    const semanticSimilarity = semantic?.similarity ?? 0
+    // Exact structural pattern matches are deterministic relevance signals, not factual confidence.
+    const contextRelevance = Math.max(semanticSimilarity, triggerMatches.length ? 1 : 0)
+    return [{ row, semanticSimilarity, contextRelevance, triggerMatches }]
+  })
+
+  const assessed = relevant.map(entry => {
+    const row: any = entry.row
     const status = String(row.status) as CognitiveSkillContextItem['status']
     const selection = assessSkillSelection({
       status,
-      similarity: candidate.similarity,
+      similarity: entry.contextRelevance,
       productionAttempts: Number(row.production_attempts || 0),
       productionSuccesses: Number(row.production_successes || 0),
       retentionAttempts: Number(row.retention_attempts || 0),
@@ -110,26 +136,28 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
       failureCount: Number(row.failure_count || 0),
       dependencyHealthy: dependency.get(String(row.skill_key)) !== false,
     })
-    return { candidate, status, selection }
+    return { ...entry, status, selection }
   }).filter(entry => entry.selection.eligible)
     .sort((a, b) => b.selection.selectionScore - a.selection.selectionScore)
     .slice(0, 4)
 
   return {
     retrieved: rows.length,
-    relevant: ranked.relevant.length,
+    relevant: relevant.length,
     selected: assessed.length,
     dependencyRejected,
     items: assessed.map((entry, index) => {
-      const row: any = entry.candidate.item
+      const row: any = entry.row
+      const triggerLabel = entry.triggerMatches.length ? `; structural triggers ${entry.triggerMatches.join(',')}` : ''
       return {
         id: String(row.id),
         skillKey: safe(row.skill_key, 240),
         status: entry.status,
-        similarity: entry.candidate.similarity,
+        similarity: entry.semanticSimilarity,
         selectionScore: entry.selection.selectionScore,
         evidenceReliability: entry.selection.evidenceReliability,
-        line: `[SK${index + 1}] [skill_key=${safe(row.skill_key, 240)}] ${safe(row.title, 240)} — ${safe(row.description, 900)} Procedure: ${safe(JSON.stringify(row.procedure ?? {}), 3000)} [status ${entry.status}; semantic relevance ${entry.candidate.similarity.toFixed(2)}; selection evidence ${entry.selection.evidenceReliability.toFixed(2)}; procedural guidance only, not factual evidence]`,
+        triggerMatches: entry.triggerMatches,
+        line: `[SK${index + 1}] [skill_key=${safe(row.skill_key, 240)}] ${safe(row.title, 240)} — ${safe(row.description, 900)} Procedure: ${safe(JSON.stringify(row.procedure ?? {}), 3000)} [status ${entry.status}; semantic relevance ${entry.semanticSimilarity.toFixed(2)}${triggerLabel}; selection evidence ${entry.selection.evidenceReliability.toFixed(2)}; procedural guidance only, not factual evidence]`,
       }
     }),
   }

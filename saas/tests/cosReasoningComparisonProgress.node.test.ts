@@ -3,6 +3,8 @@ import test from 'node:test'
 import {
   distinctVerifiedCaseCount,
   nextDiverseCase,
+  nextDiverseCaseForProblemClass,
+  problemClassCaseCounts,
   trackProblemClasses,
   verifiedOutcomeCountForCandidate,
 } from '../lib/ai/cos/reasoningComparisonProgress.ts'
@@ -11,6 +13,7 @@ const cases = [
   { id: 'a', track: 'incident-reasoning', problemClass: 'incident diagnosis', origin: 'private' },
   { id: 'b', track: 'incident-reasoning', problemClass: 'incident diagnosis', origin: 'private' },
   { id: 'c', track: 'provenance', problemClass: 'cos self description', origin: 'private' },
+  { id: 'd', track: 'memory-governance', problemClass: 'incident diagnosis', origin: 'private' },
 ]
 
 const results = [
@@ -35,10 +38,31 @@ test('next diverse case skips a case only after both selected workers are verifi
   })?.id, 'b')
 })
 
+test('learner-bucket rotation can use diverse cases across reporting tracks', () => {
+  assert.equal(nextDiverseCaseForProblemClass(cases, results, {
+    problemClass: 'incident diagnosis', roles: ['primary', 'critic'], reasonerLabel: 'qwen', origin: 'private',
+  })?.id, 'b')
+  const withB = [
+    ...results,
+    { case_id: 'b', worker_role: 'primary', reasoner_label: 'qwen', verified_outcome_recorded: true, problem_class: 'incident diagnosis' },
+    { case_id: 'b', worker_role: 'critic', reasoner_label: 'qwen', verified_outcome_recorded: true, problem_class: 'incident diagnosis' },
+  ]
+  assert.equal(nextDiverseCaseForProblemClass(cases, withB, {
+    problemClass: 'incident diagnosis', roles: ['primary', 'critic'], reasonerLabel: 'qwen', origin: 'private',
+  })?.id, 'd')
+})
+
 test('model migration resets diverse evidence for the new reasoner label', () => {
   assert.equal(nextDiverseCase(cases, results, {
     track: 'incident-reasoning', roles: ['primary', 'critic'], reasonerLabel: 'new-qwen', origin: 'private',
   })?.id, 'a')
+})
+
+test('problem-class counts expose which learner buckets have enough distinct cases', () => {
+  assert.deepEqual(problemClassCaseCounts(cases, { origin: 'private' }), [
+    { problemClass: 'incident diagnosis', cases: 3 },
+    { problemClass: 'cos self description', cases: 1 },
+  ])
 })
 
 test('track learner buckets remain explicit', () => {

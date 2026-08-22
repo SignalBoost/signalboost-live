@@ -68,6 +68,7 @@ export type RetrievalReflectionPredictiveAssessment = {
 }
 
 function boundedRate(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
   const number = Number(value)
   return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : null
 }

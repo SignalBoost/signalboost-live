@@ -15,6 +15,7 @@ import {
 } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
+import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 
 const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, string>> = {
   coder: [
@@ -129,6 +130,15 @@ async function routingDecision(args: LocalModelCallArgs, options: {
   requestedRole?: CosReasoningWorkerRole
   forcePrimary?: boolean
 }): Promise<CosReasoningRoleDecision> {
+  const evaluation = currentReasoningEvaluationContext()
+  if (evaluation) {
+    const objective = selectCosReasoningWorkerRole(args.prompt).objective
+    return {
+      role: evaluation.workerRole,
+      reason: `controlled_comparison:${evaluation.candidateId}`,
+      objective,
+    }
+  }
   if (options.forcePrimary === true) {
     return { role: 'primary', reason: 'explicit_primary_override', objective: args.prompt }
   }
@@ -173,11 +183,17 @@ export async function reasonThroughCosControlPlane(
     allowExternalEscalation: options.allowExternalEscalation,
   })
   if (!execution) return null
+  const evaluation = currentReasoningEvaluationContext()
   const metadata: Record<string, unknown> = {
     ...(execution.result.metadata ?? {}),
     routingRole: decision.role,
     routingReason: decision.reason,
     routingObjective: decision.objective.slice(0, 500),
+    ...(evaluation ? {
+      controlledComparison: true,
+      comparisonRunId: evaluation.runId,
+      comparisonCandidateId: evaluation.candidateId,
+    } : {}),
   }
   return {
     ...execution,

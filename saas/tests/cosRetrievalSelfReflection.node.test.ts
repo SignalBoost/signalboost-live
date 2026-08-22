@@ -102,13 +102,25 @@ test('production persistence creates reflection only after source-use persistenc
   assert.doesNotMatch(source, /callCosReasoner|callRawCosReasoner|openai|anthropic/i)
 })
 
-test('reflection schema is prompt-free, RLS protected, and correlates outcomes in either arrival order', () => {
+test('reflection schema is prompt-free, RLS protected, and correlates ordinary arrival order', () => {
   const migration = readFileSync(new URL('../supabase/migrations/20260822_cos_retrieval_self_reflection.sql', import.meta.url), 'utf8')
   assert.match(migration, /enable row level security/i)
   assert.match(migration, /revoke all on table public\.cos_retrieval_reflections from anon, authenticated/i)
   assert.match(migration, /before insert or update of predicted_failure_risk/i)
   assert.match(migration, /after insert or update of verified_success, repair_needed, outcome_source, outcome_at/i)
   assert.doesNotMatch(migration, /\bprompt\s+(?:text|jsonb)|\banswer\s+(?:text|jsonb)|chain_of_thought/i)
+})
+
+test('simultaneous outcome/reflection writes converge through post-commit reconciliation on both sides', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20260822_cos_retrieval_self_reflection.sql', import.meta.url), 'utf8')
+  const reflectionStore = readFileSync(new URL('../lib/ai/cos/retrievalSelfReflectionStore.ts', import.meta.url), 'utf8')
+  const turnStore = readFileSync(new URL('../lib/ai/cos/turnExperienceStore.ts', import.meta.url), 'utf8')
+  assert.match(migration, /cos_reconcile_retrieval_reflection\(p_turn_id uuid\)/)
+  assert.match(migration, /grant execute on function public\.cos_reconcile_retrieval_reflection\(uuid\) to service_role/i)
+  assert.match(reflectionStore, /await reconcileRetrievalReflectionOutcome\(turnId\)/)
+  assert.match(turnStore, /await reconcileRetrievalReflectionOutcome\(cleanTurnId\)/)
+  assert.match(reflectionStore, /loadAuthoritativeOutcomes/)
+  assert.match(reflectionStore, /Reporting\/predictive gates join the authoritative outcome table dynamically/)
 })
 
 test('owner report is read-only and explicitly says live retrieval is unchanged', () => {

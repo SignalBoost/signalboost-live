@@ -3,7 +3,7 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.18  
+**Version:** 1.19  
 **Updated:** 2026-08-22 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Baseline `main`:** `9bf0a5540c6cdbd409c52a20b9f4aa4587f31bd7`  
@@ -500,6 +500,41 @@ One episode remains insufficient for strong semantic promotion.
 A signed-in owner request to scan, audit, inspect, review or analyze the configured SignalBoost repository is already authorization for **read-only** repository inspection.
 
 The chat must not ask the owner to repeat the configured repository, reconfirm permission or paste files. Repository reads remain separate from write/deploy/secret authority.
+
+---
+
+# Governed remediation experience — IMPLEMENTED; runtime acceptance pending
+
+COS now retains a bounded form of operational experience from objectively recorded Self-Healing repair outcomes.
+
+```text
+incident observed
+→ COS diagnosis from current bounded evidence
+→ optional prior repair suggestions only after repeated clean objective outcomes
+→ existing Agent Gateway policy / approval evaluation
+→ execution or staging / fail closed
+→ objective outcome record
+→ future diagnostic context
+```
+
+Rules:
+
+- a prior repair is only a diagnostic suggestion, never execution authority;
+- a remedy is suggested only after at least two objective successes, zero recorded failures, and an exact match on provider, environment and bounded incident class;
+- any recorded failure disqualifies that action from the suggestion set;
+- the context excludes raw prompts, credentials and hidden chain-of-thought;
+- Agent Gateway registration, policy and approval requirements are unchanged;
+- this is retained operational experience, not provider-weight self-training.
+
+Files:
+
+- `saas/self-healing-host/remediation-experience.ts`
+- `saas/self-healing-host/native-autonomous-loop.ts`
+- `saas/self-healing-host/council-outcome-bridge.ts`
+- `saas/lib/autonomous-supervisor/diagnostic.ts`
+- `saas/tests/remediationExperience.node.test.ts`
+
+Still required before calling it production-runtime-proven: a safe controlled anomaly that produces repeated objective repair outcomes, then a later equivalent anomaly whose COS diagnosis shows the eligible prior-repair suggestion while governance remains intact.
 
 ---
 

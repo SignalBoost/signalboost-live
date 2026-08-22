@@ -47,8 +47,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 function latestUserText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role!=='user')continue;const content=messages[i]?.content;if(typeof content==='string')return content;if(Array.isArray(content))return content.map((block:any)=>String(block?.text||'')).join('\n').trim()}return''}
-function isOwnerRepoScanRequest(input:string):boolean{return /\\b(?:scan|audit|review|inspect|analy[sz]e|look through)\\b[\\s\\S]{0,80}\\b(?:repo|repository|codebase|github)\\b|\\b(?:repo|repository|codebase|github)\\b[\\s\\S]{0,80}\\b(?:scan|audit|review|inspect|analy[sz]e)\\b/i.test(input)}
-function requestsSelfHealingAssessment(input:string):boolean{return /\\bself[ -]?healing(?:\\s+supervisor)?\\b/i.test(input)&&/\\b(?:evaluate|evaluation|report|better|improve|sellable|fortune\\s*500|enterprise)\\b/i.test(input)}
+function isOwnerRepoScanRequest(input:string):boolean{return /\b(?:scan|audit|review|inspect|analy[sz]e|look through)\b[\s\S]{0,80}\b(?:repo|repository|codebase|github)\b|\b(?:repo|repository|codebase|github)\b[\s\S]{0,80}\b(?:scan|audit|review|inspect|analy[sz]e)\b/i.test(input)}
+function requestsSelfHealingAssessment(input:string):boolean{return /\bself[ -]?healing(?:\s+supervisor)?\b/i.test(input)&&/\b(?:evaluate|evaluation|report|better|improve|sellable|fortune\s*500|enterprise)\b/i.test(input)}
 async function scanRepositoryForOwner():Promise<{ok:boolean;reply:string;error?:string}>{
   const [root,app,lib,onboard,rootPackage,saasPackage]=await Promise.all([listRepoFiles(),listRepoFiles('saas/app'),listRepoFiles('saas/lib'),readRepoFile('ONBOARD.md'),readRepoFile('package.json'),readRepoFile('saas/package.json')])
   const failed=[root,app,lib,onboard,rootPackage,saasPackage].find((item:any)=>!item.ok) as any

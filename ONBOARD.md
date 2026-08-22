@@ -431,7 +431,7 @@ Migration `cos_knowledge_application` is applied and the Production deployment i
 
 ---
 
-# Evidence-triggered answer retest — IMPLEMENTATION IN PROGRESS
+# Evidence-triggered answer retest — IMPLEMENTED AND PRODUCTION; RUNTIME ACCEPTANCE PENDING
 
 New retained evidence may promote a previously failed answer prompt into one bounded active benchmark case, including a one-off failure. This is a measurement request, not a claim that COS can now answer it:
 
@@ -443,7 +443,7 @@ new retained evidence after failed answer
 → existing budgeted benchmark runner measures pass/fail
 ```
 
-The trigger is model-free and never answers, scores, resolves, or modifies confidence. Incidental overlap, stale evidence, low-confidence evidence and generic tracks are rejected. It has a separate candidate-keyed audit table; it never overloads the study-gap audit ledger.
+The trigger is model-free and never answers, scores, resolves, or modifies confidence. Incidental overlap, stale evidence, low-confidence evidence and generic tracks are rejected. It has a separate candidate-keyed audit table; it never overloads the study-gap audit ledger. Migration `cos_evidence_triggered_retest` is applied and Production is READY. Still required: a real evidence-triggered case and its later budgeted benchmark result; never manufacture either.
 
 ---
 

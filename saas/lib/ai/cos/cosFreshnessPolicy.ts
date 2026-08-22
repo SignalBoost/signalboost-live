@@ -1,9 +1,11 @@
-// Dependency-free policy for deciding when pretrained/local knowledge is not
-// sufficient because the answer can change without a code or model update.
+// Policy for deciding when pretrained/local knowledge is not sufficient because
+// the answer can change without a code or model update.
 //
 // This classifier is intentionally about EXTERNAL world state. Internal project,
 // campaign, calendar, CRM, inventory, or workflow state belongs to its owning
 // connector/system of record rather than being blindly sent to public web search.
+
+import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
@@ -31,12 +33,19 @@ const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|n
 const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
 const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
-const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules)\b/i
+const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
-// A person's life status is a high-impact public fact that can change between model
-// updates. People rarely phrase this with an explicit "current" marker (for example,
-// "When did George Foreman die?"), so it needs its own live-evidence trigger.
 const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
+
+// Public-web freshness must not hijack private/system-of-record questions just because they contain
+// words such as current/latest/still. Temporal adjectives are allowed between the possessive and
+// object because real users ask "our current pricing" and "my latest invoice".
+const INTERNAL_TEMPORAL_MODIFIER = '(?:(?:current|latest|newest|recent|active|pending|next|last)\\s+)?'
+const INTERNAL_OBJECT = '(?:business|company|campaign|inventory|pricing|prices?|plan|subscription|account|invoice|order|team|crm|pipeline|leads?|customers?|metrics?|revenue|mrr|arr|credits?|usage|calendar|website|deployment|project|repository|database|sales|outreach|drafts?)'
+const INTERNAL_OPERATIONAL_STATE = new RegExp(
+  `\\b(?:my|our)\\s+${INTERNAL_TEMPORAL_MODIFIER}${INTERNAL_OBJECT}\\b|\\b(?:status|results?|availability|schedule)\\s+(?:of|for)\\s+(?:my|our)\\s+${INTERNAL_TEMPORAL_MODIFIER}(?:sales\\s+)?${INTERNAL_OBJECT}\\b`,
+  'i',
+)
 
 function normalizedText(input: string): string {
   return String(input || '').replace(/\s+/g, ' ').trim()
@@ -48,17 +57,20 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
   return !/[.!]\s+\w/.test(text) && text.split(/\s+/).length <= 12
 }
 
+function looksLikeInternalOperationalState(text: string): boolean {
+  return INTERNAL_OPERATIONAL_STATE.test(text)
+}
+
 export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
 
 /**
- * Identifies external high-frequency values for which ordinary web snippets are not an
- * adequate source of truth. Callers should use a structured real-time provider and fail
- * closed if that provider cannot return current data; they must not silently fall back to
- * pretrained/model memory or a stale generic-search snippet.
+ * Identifies external high-frequency values for which ordinary web snippets are not an adequate
+ * source of truth. Callers should use a structured real-time provider and fail closed if that
+ * provider cannot return current data; they must not silently fall back to model memory.
  */
 export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
   const text = normalizedText(input)
-  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text)) return null
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text)) return null
 
   if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
   if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
@@ -67,17 +79,22 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
 }
 
 /**
- * Returns true when the request depends on rapidly changing EXTERNAL world state.
+ * Returns true when the request depends on mutable EXTERNAL world state.
  *
- * Hard rule: a positive result means model pretraining, local reasoning, durable
- * memory, semantic/exact cache, and prior conversation facts are not permitted
- * to establish the answer. COS must retrieve fresh external evidence on this turn.
+ * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
+ * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
+ * COS must retrieve fresh external evidence on this turn, or fail closed if it cannot verify it.
  */
 export function requiresFreshExternalEvidence(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
-
   if (HISTORICAL_ANCHOR.test(text)) return false
+  if (looksLikeInternalOperationalState(text)) return false
+
+  // Shared temporal classifier: life/death, current holders, "still" status, latest/current mutable
+  // state, current rules/security state, and recent events. Domain-specific checks below remain as
+  // additional safeguards for terse lookups without explicit temporal wording.
+  if (classifyTemporalSensitivity(text).sensitive) return true
 
   if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
   if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true

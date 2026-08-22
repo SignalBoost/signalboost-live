@@ -11,31 +11,38 @@ function position(token: string): number {
   return index
 }
 
-test('fresh facts use one bounded no-cache live search', () => {
-  assert.match(route, /getExternalInfo\(query, FRESH_SEARCH_RESULT_BUDGET, \{ bypassCache: true \}\)/)
+test('fresh facts use one bounded no-cache live search before synthesis', () => {
+  const liveSearch = position('getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })')
+  const authority = position('freshEvidenceMeetsAuthority(input, sources)')
+  const synthesis = position('synthesizeFreshEvidenceExternally({ input, sources, retrievedAt, language })')
+  assert.ok(liveSearch < authority)
+  assert.ok(authority < synthesis)
   assert.match(route, /prepareFreshEvidence\(live\.results, FRESH_SELECTED_EVIDENCE_BUDGET\)/)
 })
 
-test('fresh pipeline resolves deterministically before local and external synthesis', () => {
-  const deterministic = position('resolveDeterministicFreshOfficeHolder(input, sources)')
-  const local = position('synthesizeFreshEvidenceLocally({ input, sources, retrievedAt, language })')
-  const external = position('synthesizeFreshEvidenceExternally({ input, sources, retrievedAt, language })')
-  assert.ok(deterministic < local)
-  assert.ok(local < external)
-})
-
-test('fresh requests never re-enter the base COS route', () => {
+test('fresh requests are classified at ingress and never fall back to the ordinary model-memory route', () => {
+  assert.match(route, /requiresFreshExternalEvidence\(input\)/)
   assert.match(route, /if \(!input \|\| !requiresFreshExternalEvidence\(input\)\) return basePost/)
+  assert.match(route, /local_model_invoked:\s*false/)
   assert.doesNotMatch(route, /tryCOSFirstAnswer/)
-  assert.doesNotMatch(route, /legacyConciergePost/)
 })
 
-test('insufficient authority fails closed without cloud escalation', () => {
-  assert.match(route, /insufficient_authoritative_evidence_no_cloud_escalation/)
-  assert.match(route, /externalNecessary: false/)
+test('insufficient live authority fails closed before any synthesis model is invoked', () => {
+  const authorityFailure = position('if (!authoritySatisfied)')
+  const synthesis = position('synthesizeFreshEvidenceExternally({ input, sources, retrievedAt, language })')
+  assert.ok(authorityFailure < synthesis)
+  assert.match(route, /insufficient_authoritative_evidence_no_model_synthesis/)
+  assert.match(route, /No model-memory answer was used/)
 })
 
-test('fresh provenance records evidence budget and external necessity', () => {
-  assert.match(route, /provenance\.evidence_budget/)
-  assert.match(route, /necessary: args\.externalNecessary/)
+test('fresh synthesis receives only server-retrieved evidence and records grounded provenance', () => {
+  assert.match(route, /freshEvidenceSearchQuery\(input/)
+  assert.match(route, /fresh_live_data_grounded_external_policy/)
+  assert.match(route, /grounded_at:\s*retrievedAt/)
+  assert.match(route, /live_evidence_retrieved_this_turn:\s*true/)
+})
+
+test('fresh pipeline never silently degrades to cached evidence', () => {
+  assert.match(route, /bypassCache:\s*true/)
+  assert.doesNotMatch(route, /bypassCache:\s*false/)
 })

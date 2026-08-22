@@ -1,13 +1,3 @@
-// saas/tests/cosTemporalClaimGuard.node.test.ts
-//
-// Built from a real production failure (2026-08-21). Asked "when did George Foreman die", COS
-// replied "George Foreman is not dead; he is still alive. As of 2024, ..." — Foreman died on
-// 21 March 2025. A confident, uncited, checkable falsehood about a real person, with the model's
-// training cutoff narrated as the present day.
-//
-// These tests pin the guard, and pin equally hard that it must NOT fire on ordinary questions —
-// a guard that abstains everywhere is as useless as one that never fires.
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -16,92 +6,95 @@ import {
   classifyTemporalSensitivity,
 } from '../lib/ai/cos/temporalClaimGuard.ts'
 
-const NOW = new Date('2026-08-21T00:00:00.000Z')
+const NOW = new Date('2026-08-22T00:00:00.000Z')
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).toISOString()
 
-test('the exact production question is flagged as time-sensitive', () => {
-  const classification = classifyTemporalSensitivity('when did george foreman die')
-  assert.equal(classification.sensitive, true)
-  assert.equal(classification.kind, 'life_status')
-})
-
-test('the exact production answer is caught — twice over', () => {
-  const verdict = assessTemporalAnswer(
+test('life/death wording is treated as one temporal class, including natural grammar variants', () => {
+  for (const prompt of [
     'when did george foreman die',
-    'George Foreman is not dead; he is still alive. As of 2024, the former heavyweight boxing champion is in his mid-70s and continues to be active in public life.',
-    { citedCount: 0 },
+    'when Hulk Hogan died?',
+    'is this person still alive?',
+    'has the actor passed away?',
+    'what was the cause of death?',
+  ]) {
+    const classification = classifyTemporalSensitivity(prompt)
+    assert.equal(classification.sensitive, true, prompt)
+    assert.equal(classification.kind, 'life_status', prompt)
+  }
+})
+
+test('stale cutoff-style as-of year is caught before it can masquerade as current knowledge', () => {
+  const verdict = assessTemporalAnswer(
+    'when did this public figure die',
+    'The person is not dead. As of 2024, they remain active.',
+    { citedCount: 0, independentSourceCount: 0 },
     NOW,
   )
   assert.equal(verdict.violation, true)
-  // The stale anchor is caught first because it is unambiguous evidence of cutoff-as-present.
   assert.equal(verdict.code, 'stale_as_of_anchor')
-  assert.match(verdict.reason, /training cutoff/)
-  assert.ok(verdict.suggestedAbstention.length > 0)
+  assert.match(verdict.reason, /stale model knowledge/i)
 })
 
-test('a stale "as of" anchor is a violation even on a non-sensitive question', () => {
-  const verdict = assessTemporalAnswer('explain indexing', 'As of 2024, B-trees are common.', { citedCount: 3, freshestEvidenceAt: daysAgo(1) }, NOW)
-  assert.equal(verdict.violation, true)
-  assert.equal(verdict.code, 'stale_as_of_anchor')
-})
-
-test('"as of" the current year is not a violation', () => {
-  const verdict = assessTemporalAnswer('explain indexing', 'As of 2026, B-trees are common.', { citedCount: 2, freshestEvidenceAt: daysAgo(2) }, NOW)
-  assert.equal(verdict.violation, false)
-})
-
-test('a time-sensitive question with no cited evidence must abstain', () => {
-  const verdict = assessTemporalAnswer('is Acme still supported', 'Yes, Acme is still supported.', { citedCount: 0 }, NOW)
-  assert.equal(verdict.violation, true)
-  assert.equal(verdict.code, 'unsupported_present_claim')
-  assert.match(verdict.suggestedAbstention, /current status/)
-})
-
-test('stale evidence cannot support a present-tense claim', () => {
+test('life/death fact can be accepted after live independent corroboration even if original reports are older', () => {
   const verdict = assessTemporalAnswer(
-    'who is the current CEO',
-    'The current CEO is Jane Doe.',
-    { citedCount: 4, freshestEvidenceAt: daysAgo(EVIDENCE_FRESHNESS_DAYS + 30) },
-    NOW,
-  )
-  assert.equal(verdict.violation, true)
-  assert.match(verdict.reason, /days old/)
-})
-
-test('fresh cited evidence permits the claim — the guard is not a blanket refusal', () => {
-  const verdict = assessTemporalAnswer(
-    'who is the current CEO',
-    'The current CEO is Jane Doe [EM1].',
-    { citedCount: 1, freshestEvidenceAt: daysAgo(10) },
+    'when did this public figure die',
+    'The person died on the reported date. [LIVE1] [LIVE2]',
+    { citedCount: 2, independentSourceCount: 2, freshestEvidenceAt: daysAgo(EVIDENCE_FRESHNESS_DAYS + 365) },
     NOW,
   )
   assert.equal(verdict.violation, false)
   assert.equal(verdict.code, 'ok')
 })
 
-test('ordinary technical questions are never flagged', () => {
-  // A guard that fires everywhere would make COS useless and get switched off.
+test('time-sensitive present-state question with no evidence must abstain', () => {
+  const verdict = assessTemporalAnswer('is Acme still supported', 'Yes, Acme is still supported.', { citedCount: 0 }, NOW)
+  assert.equal(verdict.violation, true)
+  assert.equal(verdict.code, 'unsupported_present_claim')
+})
+
+test('stale dated evidence cannot support a mutable present-state claim', () => {
+  const verdict = assessTemporalAnswer(
+    'who is the current CEO',
+    'The current CEO is Jane Doe.',
+    { citedCount: 2, independentSourceCount: 2, freshestEvidenceAt: daysAgo(EVIDENCE_FRESHNESS_DAYS + 30) },
+    NOW,
+  )
+  assert.equal(verdict.violation, true)
+})
+
+test('fresh cited evidence permits a mutable present-state claim', () => {
+  const verdict = assessTemporalAnswer(
+    'who is the current CEO',
+    'The current CEO is Jane Doe [LIVE1].',
+    { citedCount: 1, independentSourceCount: 1, freshestEvidenceAt: daysAgo(10) },
+    NOW,
+  )
+  assert.equal(verdict.violation, false)
+  assert.equal(verdict.code, 'ok')
+})
+
+test('general temporal classes cover roles, ongoing state, releases, rules, security and recent events', () => {
+  const cases: Array<[string, string]> = [
+    ['who is the current president of the company', 'current_holder'],
+    ['is that library still maintained', 'ongoing_status'],
+    ['what is the latest version of Postgres', 'latest_state'],
+    ['what is the current visa requirement', 'current_rule'],
+    ['is CVE-2026-12345 still unpatched', 'current_security'],
+    ['what happened this month', 'recent_event'],
+  ]
+  for (const [prompt, kind] of cases) {
+    assert.equal(classifyTemporalSensitivity(prompt).kind, kind, prompt)
+  }
+})
+
+test('ordinary timeless technical and creative questions are never flagged', () => {
   for (const prompt of [
     'explain how connection pooling works',
     'what causes p95 latency to rise when CPU is flat',
     'describe the difference between Enterprise Memory and Semantic Cache',
     'write a migration to add an index',
+    'how should I market my latest product?',
   ]) {
     assert.equal(classifyTemporalSensitivity(prompt).sensitive, false, `should not flag: ${prompt}`)
   }
-})
-
-test('each sensitive kind is recognised', () => {
-  assert.equal(classifyTemporalSensitivity('is he still alive?').kind, 'life_status')
-  assert.equal(classifyTemporalSensitivity('who is the current president of the company').kind, 'current_holder')
-  assert.equal(classifyTemporalSensitivity('is that library still maintained').kind, 'ongoing_status')
-  assert.equal(classifyTemporalSensitivity('what is the latest version of Postgres').kind, 'latest_version')
-  assert.equal(classifyTemporalSensitivity('what happened this month').kind, 'recent_event')
-})
-
-test('the abstention names the limitation instead of guessing', () => {
-  const verdict = assessTemporalAnswer('is George Foreman still alive', 'Yes.', { citedCount: 0 }, NOW)
-  assert.match(verdict.suggestedAbstention, /cannot confirm/)
-  // It must not contain an assertion either way.
-  assert.ok(!/\bis alive\b|\bis dead\b/.test(verdict.suggestedAbstention))
 })

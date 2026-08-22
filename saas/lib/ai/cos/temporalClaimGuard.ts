@@ -1,41 +1,19 @@
 // saas/lib/ai/cos/temporalClaimGuard.ts
 //
-// STOP COS ASSERTING PRESENT-TENSE FACTS IT CANNOT KNOW.
+// CLASSIFY FACTS THAT CAN BECOME STALE AFTER MODEL TRAINING.
 //
-// Observed 2026-08-21. Asked "when did George Foreman die", COS answered:
-//
-//     "George Foreman is not dead; he is still alive. As of 2024, the former heavyweight boxing
-//      champion ... continues to be active in public life, business, and media."
-//
-// Foreman died on 21 March 2025. Three separate failures in two sentences:
-//
-//   1. FLAT WRONG on a checkable fact about a real person.
-//   2. "As of 2024" — the MODEL'S TRAINING CUTOFF surfacing as if it were the present day. COS has
-//      no concept of "now" versus "when my weights were frozen", so it narrates stale knowledge in
-//      the present tense.
-//   3. NO HEDGE, NO CITATION, HIGH CONFIDENCE. Zero evidence was cited, yet the answer asserted a
-//      living person's status without qualification.
-//
-// THIS IS A CLASS, NOT AN INCIDENT. "Is X still alive", "who is the current CEO", "is Y still
-// supported", "what is the latest version" all have the same shape: the true answer changes after
-// training, COS has no on-demand lookup, and its corpus is 137 scientific journals. It cannot be
-// right about these by construction — so the only honest behaviour is to say so.
-//
-// For a product sold on provenance, this is the worst failure mode available: not "I don't know",
-// but a confident, uncited, checkable falsehood. A buyer asking "is this vendor still supported" or
-// "is that CVE still open" gets the same answer shape.
-//
-// WHAT THIS MODULE DOES NOT DO: it does not try to know the answer. It detects that a question is
-// time-sensitive and that the supporting evidence is too old (or absent) to justify a present-tense
-// claim, and tells the caller to abstain or hedge. Abstention is correct here; guessing is not.
-//
-// PURE — no imports, no I/O, testable under plain `node --test`.
+// This module is deliberately about a failure CLASS, not a celebrity/person incident. Any public
+// fact whose truth can change after the model weights or durable memory were written must be treated
+// as temporal. The classifier is pure and dependency-free so both routing and answer-audit code can
+// share one definition of "this may have changed".
 
 export type TemporalKind =
   | 'life_status'
   | 'current_holder'
   | 'ongoing_status'
-  | 'latest_version'
+  | 'latest_state'
+  | 'current_rule'
+  | 'current_security'
   | 'recent_event'
 
 export type TemporalClassification = {
@@ -45,55 +23,53 @@ export type TemporalClassification = {
   reason: string
 }
 
-/** Mortality, and anything that resolves to "is this person still alive". */
-const LIFE_STATUS = /\b(still alive|is .{0,40}\bdead\b|did .{0,40}\b(die|pass away)\b|when did .{0,40}\bdie\b|cause of death|passed away)\b/i
-/** "Who is the current/present X" — role holders change. */
-const CURRENT_HOLDER = /\b(who is (the )?(current|present|new)|current (ceo|president|chair|head|owner|manager|champion|leader)|who (currently )?(runs|leads|owns|holds))\b/i
-/** "Is X still Y" — support status, employment, operation, marriage, incumbency. */
-const ONGOING_STATUS = /\b(still (in business|operating|supported|maintained|available|active|running|employed|married|working|the))\b/i
-/** Versions, releases, prices, models. */
-const LATEST_VERSION = /\b(latest|newest|most recent|current) (version|release|model|price|pricing|edition)\b/i
-/** Explicit recency windows. */
-const RECENT_EVENT = /\b(this (year|month|week)|right now|as of (today|now)|these days|nowadays|recently|so far this year)\b/i
+const LIFE_STATUS = /\b(?:still\s+alive|(?:is|was)\s+[^?.!]{1,80}\bdead\b|(?:has|have|did)\s+[^?.!]{1,80}\b(?:die|died|pass(?:ed)?\s+away)\b|when\s+(?:did\s+)?[^?.!]{1,80}\b(?:die|died|pass(?:ed)?\s+away)\b|cause\s+of\s+death|date\s+of\s+death|passed\s+away|deceased)\b/i
+const CURRENT_HOLDER = /\b(?:who\s+(?:is|are|['’]s)\s+(?:(?:the\s+)?(?:current|present|new)\s+)?(?:president|prime\s+minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|ceo|cfo|cio|cto|chair(?:man|woman)?|head|owner|manager|champion|leader)|current\s+(?:ceo|president|chair|head|owner|manager|champion|leader)|who\s+(?:currently\s+)?(?:runs|leads|owns|holds))\b/i
+const ONGOING_STATUS = /\b(?:still\s+(?:in\s+business|operating|supported|maintained|available|active|running|open|closed|legal|banned|employed|married|working|the)|(?:is|are|does|do|has|have)\s+[^?.!]{1,100}\bstill\b)\b/i
+const MUTABLE_STATE_NOUN = '(?:version|release|model|price|pricing|edition|status|availability|schedule|ranking|rate|guidance|policy|plan|specification|specifications)'
+const ENTITY_TOKEN = "[\\p{L}\\p{N}._+/#()'’:-]+"
+const LATEST_STATE = new RegExp(`\\b(?:latest|newest|most\\s+recent|current)\\s+(?:(?:${ENTITY_TOKEN})\\s+){0,6}${MUTABLE_STATE_NOUN}\\b`, 'iu')
+const CURRENT_RULE = /\b(?:(?:current|latest|new|updated)\s+(?:law|laws|regulation|regulations|rule|rules|requirement|requirements|visa\s+rule|entry\s+rule|tax\s+rate|policy|guidance)|(?:law|laws|regulation|regulations|rule|rules|requirements?|visa\s+requirements?|entry\s+requirements?)\s+(?:now|today|currently))\b/i
+const CURRENT_SECURITY = /\b(?:(?:current|latest|new|recent|active|open|patched|unpatched|exploited)\s+(?:cve|vulnerability|vulnerabilities|security\s+advisory|security\s+issue|exploit)|CVE-\d{4}-\d+[^?.!]{0,50}\b(?:still\s+)?(?:open|patched|unpatched|exploited|active))\b/i
+const RECENT_EVENT = /\b(?:today|today's|tonight|right\s+now|as\s+of\s+(?:today|now)|this\s+(?:week|month|year)|recently|newly|just\s+announced|breaking|latest\s+news|recent\s+news|live\s+updates?)\b/i
 
-/**
- * A year written as an "as of" anchor. Finding one in an ANSWER is the tell that the model narrated
- * its training cutoff as the present — the exact tic in the Foreman reply.
- */
+/** A stale "as of <year>" answer often exposes the model cutoff as if it were the present. */
 const AS_OF_YEAR = /\bas of (?:early |mid[- ]|late )?(\d{4})\b/i
 
 export function classifyTemporalSensitivity(prompt: string): TemporalClassification {
-  const text = String(prompt ?? '')
+  const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return { sensitive: false, kind: null, reason: 'No prompt text was supplied.' }
+
   const checks: Array<[RegExp, TemporalKind, string]> = [
-    [LIFE_STATUS, 'life_status', 'asks whether a person is alive or when they died — a fact that changes after training and is checkable, so a wrong answer is a visible falsehood'],
-    [CURRENT_HOLDER, 'current_holder', 'asks who currently holds a role — role holders change after training'],
-    [ONGOING_STATUS, 'ongoing_status', 'asks whether something is still the case — status changes after training'],
-    [LATEST_VERSION, 'latest_version', 'asks for the latest version, price or release — superseded after training'],
-    [RECENT_EVENT, 'recent_event', 'anchored to the present moment, which the model cannot observe'],
+    [LIFE_STATUS, 'life_status', 'asks about a person’s life/death status, which can change after training and must be freshly verified'],
+    [CURRENT_HOLDER, 'current_holder', 'asks who currently holds a role or position, which can change after training'],
+    [ONGOING_STATUS, 'ongoing_status', 'asks whether a state is still true, which can change after training'],
+    [CURRENT_RULE, 'current_rule', 'asks about a current law, regulation, rule, policy, or requirement'],
+    [CURRENT_SECURITY, 'current_security', 'asks about the current state of a vulnerability, advisory, CVE, or exploit'],
+    [LATEST_STATE, 'latest_state', 'asks for the latest/current version, release, price, status, availability, or similar mutable value'],
+    [RECENT_EVENT, 'recent_event', 'anchors the answer to the present or a recent time window'],
   ]
+
   for (const [pattern, kind, reason] of checks) {
     if (pattern.test(text)) return { sensitive: true, kind, reason }
   }
-  return { sensitive: false, kind: null, reason: 'No present-tense or recency anchor detected.' }
+  return { sensitive: false, kind: null, reason: 'No mutable present-state or recency signal detected.' }
 }
 
 export type TemporalVerdict = {
-  /** True when the answer must not be asserted as written. */
   violation: boolean
   code: 'stale_as_of_anchor' | 'unsupported_present_claim' | 'ok'
   reason: string
-  /** What to tell the user instead. Empty when there is no violation. */
   suggestedAbstention: string
 }
 
 export type TemporalEvidence = {
-  /** ISO date of the freshest supporting evidence, or null when nothing dated was cited. */
   freshestEvidenceAt?: string | null
-  /** How many evidence items the answer actually cited. */
   citedCount?: number | null
+  independentSourceCount?: number | null
 }
 
-/** Evidence older than this cannot support a present-tense claim about a changeable fact. */
+/** Conservative default for truly present-state claims when a dated source is available. */
 export const EVIDENCE_FRESHNESS_DAYS = 180
 
 function daysBetween(from: Date, to: Date): number {
@@ -101,11 +77,9 @@ function daysBetween(from: Date, to: Date): number {
 }
 
 /**
- * Judge whether an answer to a time-sensitive question is safe to assert.
- *
- * Deliberately strict in one direction only: it never upgrades a hedged answer, and it never claims
- * to know the true answer. The worst outcome it can produce is an unnecessary abstention, which is
- * cheap. The outcome it prevents — a confident uncited falsehood about a real person — is not.
+ * Final-claim safety audit. Routing should normally have forced temporal questions through live
+ * retrieval already; this guard is a second line of defence against an unsupported present-tense
+ * assertion or a model-cutoff year leaking into the answer.
  */
 export function assessTemporalAnswer(
   prompt: string,
@@ -116,8 +90,6 @@ export function assessTemporalAnswer(
   const classification = classifyTemporalSensitivity(prompt)
   const text = String(answer ?? '')
 
-  // A stale "as of <year>" anchor is a violation regardless of the question, because it presents the
-  // training cutoff as the present moment.
   const asOf = AS_OF_YEAR.exec(text)
   if (asOf) {
     const year = Number(asOf[1])
@@ -125,8 +97,8 @@ export function assessTemporalAnswer(
       return {
         violation: true,
         code: 'stale_as_of_anchor',
-        reason: `The answer says "as of ${year}" while the current year is ${now.getUTCFullYear()}. That is the model's training cutoff being narrated as the present, not a dated claim from evidence.`,
-        suggestedAbstention: `My information about this may end around ${year}, and it is now ${now.getUTCFullYear()}. I cannot confirm the current position without a live source.`,
+        reason: `The answer says "as of ${year}" while the current year is ${now.getUTCFullYear()}. Without explicitly dated evidence, that can be stale model knowledge narrated as the present.`,
+        suggestedAbstention: `The answer appears anchored to ${year}, while the current year is ${now.getUTCFullYear()}. I need fresh evidence before asserting the present state.`,
       }
     }
   }
@@ -135,20 +107,28 @@ export function assessTemporalAnswer(
     return { violation: false, code: 'ok', reason: classification.reason, suggestedAbstention: '' }
   }
 
-  const citedCount = Number(evidence.citedCount ?? 0) || 0
+  const citedCount = Math.max(0, Number(evidence.citedCount ?? 0) || 0)
+  const independentSourceCount = Math.max(0, Number(evidence.independentSourceCount ?? 0) || 0)
   const freshest = evidence.freshestEvidenceAt ? new Date(evidence.freshestEvidenceAt) : null
   const freshEnough = freshest !== null
     && !Number.isNaN(freshest.getTime())
     && daysBetween(freshest, now) <= EVIDENCE_FRESHNESS_DAYS
 
-  if (citedCount > 0 && freshEnough) {
-    return { violation: false, code: 'ok', reason: `Supported by ${citedCount} cited item(s), freshest within ${EVIDENCE_FRESHNESS_DAYS} days.`, suggestedAbstention: '' }
+  // Death is irreversible once independently established. A death report does not become false just
+  // because the confirming articles are older than 180 days; what matters is that the question was
+  // checked live now and the material fact is independently corroborated.
+  if (classification.kind === 'life_status' && citedCount >= 2 && independentSourceCount >= 2) {
+    return { violation: false, code: 'ok', reason: 'Life-status claim is supported by at least two independent cited sources.', suggestedAbstention: '' }
+  }
+
+  if (citedCount >= 1 && independentSourceCount >= 1 && freshEnough) {
+    return { violation: false, code: 'ok', reason: `Supported by dated evidence within ${EVIDENCE_FRESHNESS_DAYS} days.`, suggestedAbstention: '' }
   }
 
   return {
     violation: true,
     code: 'unsupported_present_claim',
-    reason: `The question ${classification.reason}, but the answer cites ${citedCount} item(s)${freshest ? ` and the freshest is ${daysBetween(freshest, now)} days old` : ' and no dated evidence'}. A present-tense claim here would rest on training data, not evidence.`,
+    reason: `The question ${classification.reason}, but the answer does not have sufficient fresh, independently grounded evidence for a present-state assertion.`,
     suggestedAbstention: abstentionFor(classification.kind),
   }
 }
@@ -156,14 +136,18 @@ export function assessTemporalAnswer(
 function abstentionFor(kind: TemporalKind | null): string {
   switch (kind) {
     case 'life_status':
-      return 'I cannot confirm this from current evidence. Whether someone is living can change after my information was compiled, and I have no dated source here — please check a current source rather than rely on me for this.'
+      return 'I cannot confirm this life/death fact from enough independent live evidence, so I will not guess.'
     case 'current_holder':
-      return 'I cannot confirm who currently holds this role from dated evidence. Role holders change, and answering from memory alone would risk naming someone who has since left.'
+      return 'I cannot confirm who currently holds this role from sufficient fresh evidence, so I will not answer from memory.'
     case 'ongoing_status':
-      return 'I cannot confirm the current status from dated evidence. This may have changed since my information was compiled.'
-    case 'latest_version':
-      return 'I cannot confirm the latest version or price from dated evidence — these are superseded frequently, and I have no current source.'
+      return 'I cannot confirm whether this is still true from sufficient fresh evidence.'
+    case 'latest_state':
+      return 'I cannot confirm the latest/current state from sufficient fresh evidence.'
+    case 'current_rule':
+      return 'I cannot confirm the current rule, law, regulation, or requirement from sufficient fresh evidence.'
+    case 'current_security':
+      return 'I cannot confirm the current security/vulnerability status from sufficient fresh evidence.'
     default:
-      return 'I cannot confirm the present state of this from dated evidence, so I will not assert it.'
+      return 'I cannot confirm the present state from sufficient fresh evidence, so I will not assert it.'
   }
 }

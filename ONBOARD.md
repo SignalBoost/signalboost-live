@@ -16,6 +16,8 @@
 **COS learning:** durable COS-owned memory/knowledge/skills/outcomes; not provider model-weight fine-tuning  
 **Enterprise Release Candidate:** evidence-based only; never infer from a green deployment
 
+**Repository-inspection correction (2026-08-22):** An explicit signed-in owner request to scan, audit, review, or inspect the repository is already authorization for read-only inspection. The COS chat now forces `listRepoFiles` first and requires canonical file reads before it responds. It must not ask the owner to specify the already configured SignalBoost repository, confirm permission again, or paste files. Repository access remains GET-only; it grants no secret, deployment, merge, or write authority.
+
 Historical detail remains in Git history and the dated handoffs under `docs/`. This file intentionally prioritizes current operational truth and the next safe actions.
 
 ---

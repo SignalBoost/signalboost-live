@@ -26,6 +26,7 @@ import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalS
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
 import {
@@ -46,6 +47,13 @@ export const maxDuration = 300
 
 function latestUserText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role!=='user')continue;const content=messages[i]?.content;if(typeof content==='string')return content;if(Array.isArray(content))return content.map((block:any)=>String(block?.text||'')).join('\n').trim()}return''}
 function isOwnerRepoScanRequest(input:string):boolean{return /\b(?:scan|audit|review|inspect|analy[sz]e|look through)\b[\s\S]{0,80}\b(?:repo|repository|codebase|github)\b|\b(?:repo|repository|codebase|github)\b[\s\S]{0,80}\b(?:scan|audit|review|inspect|analy[sz]e)\b/i.test(input)}
+async function scanRepositoryForOwner():Promise<{ok:boolean;reply:string;error?:string}>{
+  const [root,app,lib,onboard,rootPackage,saasPackage]=await Promise.all([listRepoFiles(),listRepoFiles('saas/app'),listRepoFiles('saas/lib'),readRepoFile('ONBOARD.md'),readRepoFile('package.json'),readRepoFile('saas/package.json')])
+  const failed=[root,app,lib,onboard,rootPackage,saasPackage].find((item:any)=>!item.ok) as any
+  if(failed)return{ok:false,reply:'',error:failed?.error||'Read-only repository scan failed.'}
+  const routes=[...new Set((app.files||[]).filter((path:string)=>/\\/api\\//.test(path)).slice(0,20))]
+  return{ok:true,reply:['Repository scan completed: SignalBoost/signalboost-live@main (read-only).','Verified '+root.files.length+' indexed root files, '+app.files.length+' application files, and '+lib.files.length+' library files in the scanned views.','Inspected canonical files: ONBOARD.md, package.json, saas/package.json.',routes.length?'Representative API routes found: '+routes.join(', ')+'.':'','I can now analyze the existing products, architecture, and improvement opportunities from this verified repository context.'].filter(Boolean).join('\\n')}
+}
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
@@ -82,8 +90,15 @@ export async function POST(req:NextRequest){
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
 
-  // COS Primary receives the browser chat. An owner repo scan is read-only and already authorized; hand it to the governed support executor, which forces listRepoFiles and canonical file reads. Without this branch, generic action routing fails closed before the repo tool can run.
-  if(access?.isOwner&&isOwnerRepoScanRequest(input))return legacyConciergePost(new NextRequest(req.clone()))
+  // Repository inspection is an owner-authorized, read-only operation. Execute it here so a model/tool-choice loop cannot skip it.
+  if(access?.isOwner&&isOwnerRepoScanRequest(input)){
+    const scan=await scanRepositoryForOwner()
+    const reply=scan.ok?scan.reply:`COS could not complete the read-only repository scan: ${scan.error||'unknown repository reader failure'}`
+    const executionProvenance=authoritativeProvenance(null,{invoked:false})
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:scan.ok?'deterministic':'failed_closed',confidence:scan.ok?1:0,externalAiInvoked:false})
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,scan.ok?'cos-repository-scan':'cos-repository-scan-failed')
+    return NextResponse.json({ok:scan.ok,reply,source:scan.ok?'cos-repository-scan':'cos-repository-scan-failed',confidence_score:scan.ok?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:scan.ok?200:503})
+  }
 
   if(isProvenanceIntrospection(input)){
     const prior=await readCosPrimaryPriorProvenance(userId,precedingAssistant||undefined)

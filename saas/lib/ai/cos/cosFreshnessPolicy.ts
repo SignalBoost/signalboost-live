@@ -78,7 +78,7 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
 }
 
 function looksLikeInternalOperationalState(text: string): boolean {
-  return INTERNAL_OPERATIONAL_STATE.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
 }
 
 function isLocalDeterministicUtility(text: string): boolean {

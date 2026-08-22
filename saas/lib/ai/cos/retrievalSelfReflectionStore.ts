@@ -6,6 +6,8 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   assessRetrievalReflectionPredictiveValue,
   deriveRetrievalSelfReflection,
+  retrievalPredictionBrier,
+  retrievalPredictionCorrect,
   RETRIEVAL_REFLECTION_VERSION,
   type RetrievalReflectionItem,
   type RetrievalRecommendation,
@@ -19,6 +21,21 @@ export type RecordRetrievalReflectionInput = {
   injected: number
   cited: number
   items?: RetrievalReflectionItem[]
+}
+
+/** Post-commit convergence hook used from both sides of the turn/outcome race. */
+export async function reconcileRetrievalReflectionOutcome(turnId: string): Promise<boolean> {
+  try {
+    const cleanTurnId = String(turnId || '').trim()
+    if (!cleanTurnId) return false
+    const db = cosServiceDb()
+    if (!db) return false
+    const result = await db.rpc('cos_reconcile_retrieval_reflection', { p_turn_id: cleanTurnId })
+    if (result.error) return false
+    return Number(result.data || 0) > 0
+  } catch {
+    return false
+  }
 }
 
 export async function persistRetrievalSelfReflection(input: RecordRetrievalReflectionInput): Promise<void> {
@@ -47,6 +64,9 @@ export async function persistRetrievalSelfReflection(input: RecordRetrievalRefle
       updated_at: new Date().toISOString(),
     }, { onConflict: 'turn_id,evidence_system,reflection_version' })
     if (result.error) throw result.error
+    // Supabase REST writes are committed before this next request starts. Combined with the same
+    // post-commit hook on outcome persistence, whichever side finishes second closes concurrency races.
+    await reconcileRetrievalReflectionOutcome(turnId)
   } catch (error) {
     console.warn('[cos-retrieval-reflection] record failed (non-fatal):', error instanceof Error ? error.message : String(error))
   }
@@ -71,6 +91,13 @@ type TurnContextRow = {
   response_source?: string | null
 }
 
+type OutcomeRow = {
+  turn_id?: string | null
+  verified_success?: boolean | null
+  repair_needed?: boolean | null
+  outcome_source?: string | null
+}
+
 function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []
   for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size) as T[])
@@ -91,6 +118,20 @@ async function loadTurnContexts(turnIds: string[]): Promise<Map<string, TurnCont
   return map
 }
 
+async function loadAuthoritativeOutcomes(turnIds: string[]): Promise<Map<string, OutcomeRow>> {
+  const db = cosServiceDb()
+  const map = new Map<string, OutcomeRow>()
+  if (!db || turnIds.length === 0) return map
+  for (const batch of chunk([...new Set(turnIds)], JOIN_BATCH_SIZE)) {
+    const result = await db.from('cos_turn_outcomes')
+      .select('turn_id,verified_success,repair_needed,outcome_source')
+      .in('turn_id', batch)
+    if (result.error) continue
+    for (const row of (result.data ?? []) as OutcomeRow[]) if (row.turn_id) map.set(row.turn_id, row)
+  }
+  return map
+}
+
 function round(value: number): number {
   return Number(value.toFixed(4))
 }
@@ -107,12 +148,23 @@ export async function readRetrievalSelfReflectionReport(limit = REPORT_LIMIT) {
   if (result.error) return { ok: false as const, error: `cos_retrieval_reflections read failed: ${result.error.message}` }
 
   const rows = (result.data ?? []) as ReflectionRow[]
-  const contexts = await loadTurnContexts(rows.map(row => String(row.turn_id || '')).filter(Boolean))
-  const verified = rows.filter(row => typeof row.observed_verified_success === 'boolean' && row.turn_id && row.predicted_failure_risk != null)
-  const predictive = assessRetrievalReflectionPredictiveValue(verified.map(row => ({
-    turnId: String(row.turn_id),
-    predictedFailureRisk: Number(row.predicted_failure_risk),
-    verifiedSuccess: row.observed_verified_success === true,
+  const turnIds = rows.map(row => String(row.turn_id || '')).filter(Boolean)
+  const [contexts, outcomes] = await Promise.all([
+    loadTurnContexts(turnIds),
+    loadAuthoritativeOutcomes(turnIds),
+  ])
+  // Reporting/predictive gates join the authoritative outcome table dynamically, so even an
+  // interrupted reconciliation write cannot bias the learning metric.
+  const verified = rows.flatMap(row => {
+    if (!row.turn_id || row.predicted_failure_risk == null) return []
+    const outcome = outcomes.get(row.turn_id)
+    if (typeof outcome?.verified_success !== 'boolean') return []
+    return [{ row, verifiedSuccess: outcome.verified_success }]
+  })
+  const predictive = assessRetrievalReflectionPredictiveValue(verified.map(entry => ({
+    turnId: String(entry.row.turn_id),
+    predictedFailureRisk: Number(entry.row.predicted_failure_risk),
+    verifiedSuccess: entry.verifiedSuccess,
   })))
 
   const recommendations = new Map<string, { turns: number; verified: number; successes: number; brier: number[] }>()
@@ -120,10 +172,11 @@ export async function readRetrievalSelfReflectionReport(limit = REPORT_LIMIT) {
     const key = String(row.recommendation || 'unknown')
     const bucket = recommendations.get(key) || { turns: 0, verified: 0, successes: 0, brier: [] }
     bucket.turns += 1
-    if (typeof row.observed_verified_success === 'boolean') {
+    const success = row.turn_id ? outcomes.get(row.turn_id)?.verified_success : null
+    if (typeof success === 'boolean' && row.predicted_failure_risk != null) {
       bucket.verified += 1
-      if (row.observed_verified_success) bucket.successes += 1
-      if (row.brier_score != null && Number.isFinite(Number(row.brier_score))) bucket.brier.push(Number(row.brier_score))
+      if (success) bucket.successes += 1
+      bucket.brier.push(retrievalPredictionBrier({ predictedFailureRisk: Number(row.predicted_failure_risk), verifiedSuccess: success }))
     }
     recommendations.set(key, bucket)
   }
@@ -142,9 +195,10 @@ export async function readRetrievalSelfReflectionReport(limit = REPORT_LIMIT) {
     const key = String(context?.problem_class || 'unclassified')
     const bucket = byProblemClass.get(key) || { turns: 0, verified: 0, correct: 0 }
     bucket.turns += 1
-    if (typeof row.observed_verified_success === 'boolean') {
+    const success = row.turn_id ? outcomes.get(row.turn_id)?.verified_success : null
+    if (typeof success === 'boolean' && row.predicted_failure_risk != null) {
       bucket.verified += 1
-      if (row.prediction_correct === true) bucket.correct += 1
+      if (retrievalPredictionCorrect({ predictedFailureRisk: Number(row.predicted_failure_risk), verifiedSuccess: success })) bucket.correct += 1
     }
     byProblemClass.set(key, bucket)
   }

@@ -168,6 +168,9 @@ Current contract:
 
 A model-memory assertion is never sufficient merely because the model sounds confident.
 
+
+**Governed guidance verification — IMPLEMENTED:** Legal, administrative, health, financial and similarly high-consequence public-process questions are routed to the live-evidence path even when phrased conversationally or in a supported non-English language. COS may answer only when the live authority/grounding contract accepts the evidence; otherwise it must state that verification was insufficient. Final answers must show the sources actually used and must never claim a lack of live access when live evidence was used.
+
 ---
 
 # Continuous knowledge acquisition / indexing — IMPLEMENTED AND LIVE

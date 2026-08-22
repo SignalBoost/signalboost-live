@@ -1,11 +1,17 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { COS_EVIDENCE_UTILIZATION_BENCHMARK } from '@/lib/ai/cos/evidenceUtilizationBenchmark'
+import { COS_EVIDENCE_UTILIZATION_BENCHMARK, type EvidenceUtilizationBenchmarkCase } from '@/lib/ai/cos/evidenceUtilizationBenchmark'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
+import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { queryNearestLearnedCorpus, learnedCorpusEmbeddingText } from '@/lib/ai/cos/learnedCorpusSemantic'
+import { domainCompatibleContext } from '@/lib/ai/cos/contextRelevance'
 import {
   refreshAdaptiveRetrievalShadowCandidate,
   type AdaptiveRetrievalPolicyRow,
 } from '@/lib/ai/cos/adaptiveRetrievalPolicy'
-import { selectAdaptiveRetrievalValidationCase } from '@/lib/ai/cos/adaptiveRetrievalPolicyLogic'
+import {
+  adaptiveRetrievalCaseCanExerciseCap,
+  selectAdaptiveRetrievalValidationCase,
+} from '@/lib/ai/cos/adaptiveRetrievalPolicyLogic'
 
 export type AdaptiveRetrievalValidationResult = {
   policyId: string
@@ -20,13 +26,73 @@ export type AdaptiveRetrievalValidationResult = {
   validationFailed: number
 }
 
+const PREFLIGHT_SCAN_LIMIT = 16
+
 function candidateMaxInjected(policy: AdaptiveRetrievalPolicyRow): number {
   const raw = Number(policy.candidate_policy?.learnedCorpusMaxInjected)
   return Number.isFinite(raw) ? Math.max(0, Math.min(12, Math.floor(raw))) : 4
 }
 
+function currentSimilarityThreshold(policy: AdaptiveRetrievalPolicyRow): number {
+  const raw = Number(policy.current_policy?.learnedCorpusMinSimilarity)
+  return Number.isFinite(raw) ? Math.max(0.20, Math.min(0.95, raw)) : 0.45
+}
+
 function learnedInjected(result: Awaited<ReturnType<typeof runPrivateCapabilityCase>>): number {
   return Math.max(0, Number(result.provenance?.evidenceFunnel?.learnedCorpus?.injected) || 0)
+}
+
+/**
+ * Cheap retrieval-only estimate using the same vector store, similarity threshold and domain gate as
+ * the live learned-corpus path. It does not call the reasoning model or create outcome evidence.
+ */
+async function estimateLiveLearnedCorpusCapacity(
+  test: EvidenceUtilizationBenchmarkCase,
+  similarityThreshold: number,
+): Promise<number | null> {
+  try {
+    const vector = await generateLocalEmbedding(test.prompt)
+    const rows = await queryNearestLearnedCorpus(vector, { matchCount: 40, minSimilarity: 0 })
+    const relevant = rows.filter(row =>
+      Number(row.similarity || 0) >= similarityThreshold
+      && domainCompatibleContext(test.prompt, learnedCorpusEmbeddingText(row)),
+    )
+    return Math.min(6, relevant.length)
+  } catch (error) {
+    console.warn('[cos-adaptive-retrieval] retrieval-only preflight unavailable; falling back to controlled pair',
+      error instanceof Error ? error.message : String(error))
+    return null
+  }
+}
+
+async function selectValidationCaseWithCoverage(args: {
+  policy: AdaptiveRetrievalPolicyRow
+  priorCaseIds: string[]
+}): Promise<EvidenceUtilizationBenchmarkCase | null> {
+  const skipped: string[] = []
+  const candidateCap = candidateMaxInjected(args.policy)
+  const threshold = currentSimilarityThreshold(args.policy)
+
+  for (let attempt = 0; attempt < PREFLIGHT_SCAN_LIMIT; attempt += 1) {
+    const test = selectAdaptiveRetrievalValidationCase({
+      cases: COS_EVIDENCE_UTILIZATION_BENCHMARK,
+      trainingCaseIds: args.policy.training_case_ids ?? [],
+      priorValidationCaseIds: [...args.priorCaseIds, ...skipped],
+    })
+    if (!test) return null
+
+    const estimated = await estimateLiveLearnedCorpusCapacity(test, threshold)
+    // If preflight itself is unavailable, preserve the prior behavior rather than blocking validation.
+    if (estimated == null || adaptiveRetrievalCaseCanExerciseCap(estimated, candidateCap)) return test
+    skipped.push(test.id)
+  }
+
+  console.info('[cos-adaptive-retrieval] no reducible controlled case found inside preflight scan', {
+    policyId: args.policy.id,
+    skipped: skipped.length,
+    candidateCap,
+  })
+  return null
 }
 
 export async function runNextAdaptiveRetrievalValidation(): Promise<AdaptiveRetrievalValidationResult | null> {
@@ -40,11 +106,7 @@ export async function runNextAdaptiveRetrievalValidation(): Promise<AdaptiveRetr
     .select('case_id').eq('policy_id', policy.id).order('created_at', { ascending: true })
   if (priorResult.error) throw priorResult.error
   const priorCaseIds = (priorResult.data ?? []).map(row => String(row.case_id || '')).filter(Boolean)
-  const test = selectAdaptiveRetrievalValidationCase({
-    cases: COS_EVIDENCE_UTILIZATION_BENCHMARK,
-    trainingCaseIds: policy.training_case_ids ?? [],
-    priorValidationCaseIds: priorCaseIds,
-  })
+  const test = await selectValidationCaseWithCoverage({ policy, priorCaseIds })
   if (!test) return null
 
   const sourcePrefix = `adaptive_retrieval_validation:${policy.id}:${test.id}`

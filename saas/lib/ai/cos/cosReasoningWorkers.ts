@@ -1,4 +1,4 @@
-import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { LocalModelCallArgs } from '@/lib/ai/local-inference'
 import {
   CosReasoningEngine,
@@ -20,8 +20,8 @@ function toLocalModelCallArgs(request: CosReasoningRequest): LocalModelCallArgs 
  * Adapter from the existing COS-owned reasoner seam into the control plane.
  *
  * DeepInfra/Qwen, self-hosted vLLM, Ollama, or another approved open-model runtime can all sit
- * behind callCosReasoner(). The control plane therefore depends on a worker contract, not a model
- * vendor. Closed-model escalation stays outside this default worker set.
+ * behind the raw open-model executor. The control plane therefore depends on a worker contract,
+ * not a model vendor. Closed-model escalation stays outside this default worker set.
  */
 export function createPrimaryCosReasoningWorker(): CosReasoningWorker | null {
   const resolved = resolveCosReasoner()
@@ -35,7 +35,9 @@ export function createPrimaryCosReasoningWorker(): CosReasoningWorker | null {
     label: configured.label,
     priority: 100,
     async execute(request) {
-      const reasoned = await callCosReasoner(toLocalModelCallArgs(request))
+      // Raw execution is intentionally below the control plane. Calling callCosReasoner() here
+      // would recursively re-enter the planner.
+      const reasoned = await callRawCosReasoner(toLocalModelCallArgs(request))
       if (!reasoned?.text) return null
       return {
         text: reasoned.text,
@@ -55,10 +57,9 @@ export function createDefaultCosReasoningEngine(): CosReasoningEngine {
 }
 
 /**
- * Provider-neutral entrypoint for callers migrating away from direct model invocation.
- * Phase 1 intentionally has one primary worker, so existing behavior is preserved while the
- * ownership boundary moves to COS. Specialist workers can be registered later without changing
- * the planning contract or making any provider mandatory.
+ * Provider-neutral entrypoint. Production compatibility callers now enter here before a model
+ * worker is invoked. Specialist workers can be registered later without changing callers or making
+ * any provider mandatory.
  */
 export async function reasonThroughCosControlPlane(
   args: LocalModelCallArgs,

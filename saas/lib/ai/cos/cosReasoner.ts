@@ -138,15 +138,13 @@ function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
 }
 
 /**
- * Ask COS's primary reasoner. Success means the LOCAL_AI_* path actually answered.
- * If unavailable or unhealthy, callers fail closed and may separately invoke the
- * explicitly-labelled external escalation gateway.
+ * Execute the configured open-model worker directly.
  *
- * The durable RunPod activity lease is touched before the first local model call. On non-RunPod
- * managed reasoners this is a provider-neutral no-op; on RunPod it protects the bounded
- * reasoning/repair sequence from the idle-stop cron.
+ * This is deliberately below the COS reasoning control plane. Production callers should use
+ * callCosReasoner(), which preserves the historical API while routing through COS-owned planning
+ * and worker selection. Worker adapters use this raw function to avoid recursive re-entry.
  */
-export async function callCosReasoner(
+export async function callRawCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
   if (!localConfigured()) return null
@@ -337,5 +335,52 @@ export async function callCosReasoner(
       skipped: experience.skipped,
     }))
     recordTurnExperience(experience)
+  }
+}
+
+/**
+ * Backward-compatible production entrypoint.
+ *
+ * Every existing call site now enters the COS reasoning control plane before any model worker is
+ * invoked. The default production plan is primary-only and explicitly forbids closed-model
+ * escalation; external escalation remains a separate, labelled orchestration decision.
+ */
+export async function callCosReasoner(
+  args: LocalModelCallArgs,
+): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
+  const { reasonThroughCosControlPlane } = await import('./cosReasoningWorkers.ts')
+  const execution = await reasonThroughCosControlPlane(args, {
+    requestedRole: 'primary',
+    allowExternalEscalation: false,
+  })
+  if (!execution?.result.text?.trim()) return null
+
+  const resolved = resolveCosReasoner()
+  if (!resolved.config) return null
+  const rawKind = execution.result.metadata?.reasonerKind
+  const kind: CosReasonerKind = rawKind === 'independent-local' || rawKind === 'managed-open-model'
+    ? rawKind
+    : resolved.config.kind
+
+  console.info('[cos-reasoning-control-plane]', JSON.stringify({
+    at: new Date().toISOString(),
+    policyVersion: execution.plan.policyVersion,
+    requestedRole: execution.plan.requestedRole,
+    workerId: execution.worker.id,
+    workerRole: execution.worker.role,
+    workerKind: execution.worker.kind,
+    workerLabel: execution.worker.label,
+    attemptedWorkerIds: execution.attemptedWorkerIds,
+    fallbackUsed: execution.fallbackUsed,
+    externalEscalationAllowed: false,
+  }))
+
+  return {
+    text: execution.result.text,
+    reasoner: {
+      kind,
+      label: execution.worker.label,
+    },
+    turnId: execution.result.turnId || randomUUID(),
   }
 }

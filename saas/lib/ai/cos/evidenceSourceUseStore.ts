@@ -16,6 +16,7 @@ import {
   type CapturedLearnedRetrievalItem,
 } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import type { AdaptiveRetrievalShadowPolicy } from '@/lib/ai/cos/adaptiveRetrievalContext'
+import { persistRetrievalSelfReflection } from '@/lib/ai/cos/retrievalSelfReflectionStore'
 
 const ROLLUP_ROW_LIMIT = 1000
 const OUTCOME_BATCH_SIZE = 200
@@ -47,6 +48,12 @@ async function persistEvidenceSourceUse(input: EvidenceSourceUseInput): Promise<
       retrieval_policy: input.retrievalPolicy && typeof input.retrievalPolicy === 'object' ? input.retrievalPolicy : {},
     }, { onConflict: 'turn_id,evidence_system' })
     if (result.error) throw result.error
+    await persistRetrievalSelfReflection({
+      turnId: input.turnId,
+      injected: input.use.injected,
+      cited: input.use.cited,
+      items: Array.isArray(input.items) ? input.items : [],
+    })
   } catch (error) {
     console.warn('[cos-evidence-source-use] record failed (non-fatal):', error instanceof Error ? error.message : String(error))
   }

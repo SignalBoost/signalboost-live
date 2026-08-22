@@ -11,6 +11,7 @@ import { after } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { surfaceDifficulty, type TurnExperience } from '@/lib/ai/cos/turnExperience'
 import { captureEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+import { reconcileRetrievalReflectionOutcome } from '@/lib/ai/cos/retrievalSelfReflectionStore'
 
 function normalizedPrompt(prompt: string): string {
   return String(prompt ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
@@ -171,6 +172,10 @@ export async function attachTurnOutcome(turnId: string, outcome: TurnOutcome): P
     if (outcome.verifiedSuccess !== undefined) update.verified_success = outcome.verifiedSuccess
     await db.from('cos_turn_experience').update(update).eq('turn_id', cleanTurnId)
 
+    // The outcome RPC above has committed before this independent reconciliation request starts.
+    // The reflection persistence path performs the same post-commit reconciliation, so concurrent
+    // insertion cannot permanently strand an outcome/reflection pair.
+    await reconcileRetrievalReflectionOutcome(cleanTurnId)
     return true
   } catch (error) {
     console.warn('[cos-turn-experience] outcome attach failed (non-fatal):', error instanceof Error ? error.message : String(error))

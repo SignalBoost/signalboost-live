@@ -3,7 +3,7 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.20  
+**Version:** 1.21  
 **Updated:** 2026-08-22 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Baseline `main`:** `10e6f1527dc463be35974fc219a33e0c22f9205d`  
@@ -13,7 +13,8 @@
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
 **Procedural-learning state:** autonomous certification architecture is Production; individual skills still earn lifecycle status from evidence  
-**Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning
+**Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning  
+**Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)
 
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
@@ -171,6 +172,8 @@ A model-memory assertion is never sufficient merely because the model sounds con
 
 **Governed guidance verification — IMPLEMENTED:** Legal, administrative, health, financial and similarly high-consequence public-process questions are routed to the live-evidence path even when phrased conversationally or in a supported non-English language. COS may answer only when the live authority/grounding contract accepts the evidence; otherwise it must state that verification was insufficient. Final answers must show the sources actually used and must never claim a lack of live access when live evidence was used.
 
+**Owning-authority evidence policy — IMPLEMENTED:** For authority-owned questions (government procedure, product/API behavior, medical guidance, standards), live-search evidence is ranked and labelled by who owns the fact, recognized structurally with no country or vendor tables: **first-party** (the result's domain names the entity the query is about — `docs.stripe.com` for a Stripe question), **institutional** (state/IGO/standards/health domains by convention — one pattern covers `gov.pl`, `gob.mx`, `gouv.fr`, `who.int` identically), then **secondary** (demoted and labelled, never deleted; dated pages before undated). When an authority-owned question retrieves no first-party or institutional source, the evidence carries an explicit caveat instead of presenting secondary commentary as the rule. Implementation: `lib/ai/cos/officialSourceAuthority.ts` wired into `getExternalInfo`.
+
 **Feedback freshness and evidence application — IMPLEMENTED:** Assistant-feedback matching normalizes server-stored and rendered reply text before correlation, so genuine feedback remains securely bound to the exact server-owned turn. An explicit multilingual “outdated” correction files only a bounded, current-state study gap; ordinary disagreement does not become a freshness signal. When verified owning-authority evidence explicitly mentions adjacent obligations, COS may add a short cited “Also worth checking” note. It must omit that note when the retrieved sources do not support it and must never invent related procedures from model memory.
 
 ---
@@ -191,7 +194,24 @@ Normal accepted knowledge is indexed in the learning flow when possible. A recur
 
 Stored knowledge helps COS reason; it does not replace live verification for mutable external facts.
 
-Owner-directed study is a gated intake channel for a specific article, document, book chapter, video transcript or notes. License and study intent are required; every chunk passes the same relevance/grounding admission gates as autonomous acquisition. It is not an owner-trust bypass.
+---
+
+# Owner-directed study (Feed COS) — IMPLEMENTED AND LIVE
+
+The owner can hand COS a specific piece of material — an article or documentation URL, a YouTube video, a pasted book chapter, notes, or an uploaded file — with a stated study intent, at:
+
+- **Page:** `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚, owner-only, five-language UI)
+- **API:** `POST /api/admin/cos-directed-study` (`?dry=1` assesses without storing; `GET` lists everything fed by hand)
+
+Intake modes:
+
+- **URL** — YouTube URLs resolve captions through the configured transcript runtime (they fail with an explicit message when that runtime is down — paste the transcript instead); other URLs go through the guarded document reader (https-only, public address space, byte-capped).
+- **Pasted text** — chapters and notes; paragraph-aligned chunking, ~4k chars per chunk, max 20 chunks per submission, truncation reported rather than hidden.
+- **File upload** — `.txt`/`.md` load client-side into the text box; `.pdf` is extracted server-side by a dependency-free extractor (Node zlib + PDF text operators; no package added because the owner workflow cannot regenerate the lockfile). Its limits are explicit: digitally-authored PDFs work; scanned/image PDFs (no text layer — no OCR is pretended), encrypted PDFs and undecodable subset-font PDFs are refused with the exact reason and the paste fallback. A refusal is always preferred over feeding garbage into admission scoring.
+
+Contract, unchanged from autonomous acquisition: topic, study intent, material kind and a **license declaration** are required; every chunk is scored with the autonomous cycle's own relevance/grounding admission gates and admitted or rejected individually with reasons; the channel is recorded in each record's evidence (`owner_directed_study`, operator, intent) and the material kind maps onto the existing source-kind taxonomy. Owner-supplied is never auto-trusted and there is no raw-text bypass lane.
+
+Anything admitted immediately feeds the applied-knowledge loops on the next daily cycle: it can reopen a retired study question and trigger an evidence-arrival benchmark retest — so material fed today is measured tomorrow. First live use (2026-08-22): a video-transcript chunk admitted at 0.88 confidence with license and source provenance recorded.
 
 ---
 
@@ -618,6 +638,10 @@ Non-negotiable:
 - #1376 — autonomous evidence-gated cognitive skill certification with private profiles and bounded scheduling.
 - #1384 — applied knowledge: deterministic requeue of dormant gaps only when newly retained evidence qualifies.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
+- Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
+- Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same admission gates as autonomous acquisition.
+- Cross-language freshness + owning-authority evidence — five-language live-verification triggering and first-party/institutional/secondary evidence ranking with an explicit no-authority caveat.
+- Assistant-feedback repair — normalized reply correlation on both resolution paths (fixes the silent 404 that blocked all Concierge feedback), multilingual "outdated" corrections file bounded current-state study gaps, grounded "Also worth checking" adjacent-obligation notes.
 
 Always query current state; this sequence can advance after this document is merged.
 

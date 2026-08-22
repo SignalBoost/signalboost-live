@@ -113,7 +113,7 @@ export async function POST(req:NextRequest){
     const reply=assessment||(!scan.ok?`COS could not complete the read-only repository scan: ${scan.error||'unknown repository reader failure'}`:assessmentRequested?'COS completed the repository scan but could not produce the requested Self-Healing Supervisor assessment from the verified evidence. No scan inventory is being presented as a substitute for the report.':scan.reply)
     const executionProvenance=authoritativeProvenance(null,{invoked:false})
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:assessment||(!assessmentRequested&&scan.ok)?'deterministic':'failed_closed',confidence:assessment||(!assessmentRequested&&scan.ok)?1:0,externalAiInvoked:false})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,assessment?'cos-self-healing-assessment':scan.ok?'cos-repository-scan':'cos-repository-scan-failed')
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,assessment?'cos-self-healing-assessment':scan.ok?'cos-repository-scan':'cos-repository-scan-failed',{prompt:input,answered:Boolean(assessment)||(!assessmentRequested&&scan.ok),confidence:assessment||(!assessmentRequested&&scan.ok)?1:0,branch:assessment?'self_healing_assessment':scan.ok?'repository_scan':'repository_scan_failed'})
     return NextResponse.json({ok:Boolean(assessment)||(!assessmentRequested&&scan.ok),reply,source:assessment?'cos-self-healing-assessment':!scan.ok?'cos-repository-scan-failed':assessmentRequested?'cos-self-healing-assessment-failed':'cos-repository-scan',confidence_score:assessment||(!assessmentRequested&&scan.ok)?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:Boolean(assessment),execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:assessment||(!assessmentRequested&&scan.ok)?200:503})
   }
 
@@ -125,7 +125,7 @@ export async function POST(req:NextRequest){
   }
 
   const deterministic=tryDeterministicUtility({prompt:input,timezone:body?.context?.timezone||body?.context?.timeZone,locale:language==='pt'?'pt-BR':language==='es'?'es':language==='pl'?'pl':language==='ru'?'ru':'en-US',confidenceThreshold:confidenceThreshold()})
-  if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source);return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
+  if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source,{prompt:input,answered:true,confidence:deterministic.confidence,branch:'deterministic'});return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   const requiresFreshEvidence=requiresFreshExternalEvidence(input),requestedAction=requestsExternalAction(input)
 
@@ -140,7 +140,7 @@ export async function POST(req:NextRequest){
       const reply=freshEvidenceUnavailableReply(language)
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
       logEscalation({event:'authoritative_direct_fact_miss',category:directCategory.id,source_urls:directCategory.sources.map(source=>source.url),external_ai_invoked:false,local_model_invoked:false})
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source-unavailable')
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source-unavailable',{prompt:input,answered:false,confidence:0,branch:'authoritative_source_unavailable'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-authoritative-source-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,authoritative_source_attempted:true,authoritative_source_urls:directCategory.sources.map(source=>source.url),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
     }
     const directSource:FreshEvidenceSource={id:'LIVE1',title:grounded.sourceLabel,url:grounded.sourceUrl,snippet:grounded.answer}
@@ -151,7 +151,7 @@ export async function POST(req:NextRequest){
     const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply,groundedAt:grounded.fetchedAt,liveSources:[directSource],externalProvider:null,externalModel:null}})
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'authoritative_source',confidence:1,externalAiInvoked:false})
     logEscalation({event:'authoritative_direct_fact_hit',category:grounded.categoryId,provider:'authoritative_source',model:grounded.sourceId,status:200,source_url:grounded.sourceUrl,external_ai_invoked:false,local_model_invoked:false})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source')
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source',{prompt:input,answered:true,confidence:1,branch:'authoritative_source'})
     return NextResponse.json({ok:true,reply,source:'cos-authoritative-source',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,authoritative_source:{id:grounded.sourceId,label:grounded.sourceLabel,url:grounded.sourceUrl,fetched_at:grounded.fetchedAt},volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:[{id:directSource.id,title:directSource.title,url:directSource.url}],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
 
@@ -169,7 +169,7 @@ export async function POST(req:NextRequest){
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:detail,synthesisAccepted:false})
       const reply=freshEvidenceUnavailableReply(language),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable')
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable',{prompt:input,answered:false,confidence:0,branch:'fresh_evidence_unavailable'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
     }
 
@@ -185,7 +185,7 @@ export async function POST(req:NextRequest){
         logEscalation({event:'fresh_local_synthesis_accepted',documents_acquired:freshSources.length,reasoner:localSynthesis.reasonerLabel,external_ai_invoked:false,local_model_invoked:true})
         const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:localSynthesis.reply,source:'local_cos_reasoning',confidence:1,provenance:freshTelemetryProvenance(true,localSynthesis.reasonerLabel),externalAiInvoked:false})
         const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply:localSynthesis.reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider:null,externalModel:null}})
-        await writeCosPrimaryProvenance(userId,localSynthesis.reply,executionProvenance,'cos-fresh-local-grounded')
+        await writeCosPrimaryProvenance(userId,localSynthesis.reply,executionProvenance,'cos-fresh-local-grounded',{prompt:input,answered:true,confidence:0.8,branch:'fresh_local_grounded'})
         return NextResponse.json({ok:true,reply:localSynthesis.reply,source:'cos-fresh-local-grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
       logEscalation({event:'fresh_local_synthesis_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
@@ -208,7 +208,7 @@ export async function POST(req:NextRequest){
     if(requiresFreshEvidence)baseProvenance=markFreshLocalReasoning(baseProvenance,{invoked:freshLocalAttempted,model:freshLocalModel,accepted:false})
     const executionProvenance=requiresFreshEvidence&&freshRetrievedAt?attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:'External synthesis is disabled.',synthesisAccepted:false}):baseProvenance
     const reply=requiresFreshEvidence?freshSynthesisRejectedReply(language):(lowConfidenceDraftReply(cos,reason)??'COS could not complete this request independently and external AI fallback is disabled.'),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:cos?.confidence??0,provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'failed_closed')
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'failed_closed',{prompt:input,answered:false,confidence:0,branch:'failed_closed'})
     return NextResponse.json({ok:false,reply,error:reply,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry},{status:503})
   }
 
@@ -227,7 +227,7 @@ export async function POST(req:NextRequest){
     if(!externalFresh.accepted||!externalFresh.reply){
       const reply=freshSynthesisRejectedReply(language)
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,provenance:freshTelemetryProvenance(freshLocalAttempted,freshLocalModel),externalAiInvoked:externalInvoked})
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-synthesis-rejected')
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-synthesis-rejected',{prompt:input,answered:false,confidence:0,branch:'fresh_evidence_synthesis_rejected'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-synthesis-rejected',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:externalInvoked,external_provider:externalProvider,external_model:externalFresh.model,external_provider_source:externalFresh.source,external_fallback_invoked:externalInvoked,external_fallback_succeeded:false,local_model_invoked:freshLocalAttempted,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
     }
 
@@ -235,7 +235,7 @@ export async function POST(req:NextRequest){
     ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:externalProvider,model:externalFresh.model,grounded_at:freshRetrievedAt}
     const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider,externalModel:externalFresh.model}})
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'external_fallback',confidence:1,provenance:freshTelemetryProvenance(freshLocalAttempted,freshLocalModel),externalAiInvoked:externalInvoked})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'external_fresh_grounded')
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'external_fresh_grounded',{prompt:input,answered:true,confidence:0.9,branch:'external_fresh_grounded'})
     return NextResponse.json({ok:true,reply,source:'external_fresh_grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),cos_first_attempted:freshLocalAttempted,cos_first_handled:false,cos_first_confidence:null,cos_first_reason:reason.detail,escalation_reason_code:reason.code,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:externalProvider,external_model:externalFresh.model,external_provider_source:externalFresh.source,external_fallback_invoked:externalInvoked,external_fallback_succeeded:true,local_model_invoked:freshLocalAttempted,isolation_mode:false,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
 

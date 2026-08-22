@@ -97,6 +97,9 @@ test('private operational state stays with its system of record instead of publi
     'What is the availability of our sales team?',
     'What is our current MRR?',
     'What is the status of our deployment?',
+    'Can you code yourself with iterative model training, dynamic context integration, and procedural skill refinement?',
+    'How can COS improve its reasoning?',
+    'What are your reasoning capabilities?',
   ]) {
     assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
   }

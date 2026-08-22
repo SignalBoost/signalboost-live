@@ -19,6 +19,12 @@ const TERSE_CURRENT_OFFICE_HOLDER = new RegExp(`^\\s*(?:current|currently)\\s+${
 const CURRENT_LEADER = /\bwho\s+(?:currently\s+)?(?:leads|heads|runs)\b/i
 const ROLE_STATUS_CHECK = new RegExp(`^\\s*(?:is|are)\\s+[^?.!]{1,100}\\b(?:still\\s+)?(?:the\\s+)?${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 
+// A simple "who is First Last?" request is an entity/reference lookup, not a reasoning task.
+// Route it through fresh public evidence so biographies do not silently inherit stale or fabricated
+// details from model weights. The determiner/pronoun exclusions keep conceptual and private queries
+// ("who is the...", "who is my...") out of this path.
+const SIMPLE_NAMED_ENTITY_LOOKUP = /^\s*who\s+(?:is|['’]s)\s+(?!the\b|a\b|an\b|my\b|our\b|your\b|his\b|her\b|their\b|this\b|that\b)(?:[\p{L}\p{M}'’.-]{2,50}\s+){1,4}[\p{L}\p{M}'’.-]{2,50}\s*[?.!]*\s*$/iu
+
 const NEWS_STATE = /\b(?:news|headlines?|breaking news|news updates?)\b/i
 const LIVE_NEWS = /\b(?:latest|today(?:'s)?|live|breaking|recent|updated)\s+(?:news|headlines?|updates?)\b/i
 
@@ -79,7 +85,8 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
 }
 
 /**
- * Returns true when the request depends on mutable EXTERNAL world state.
+ * Returns true when the request depends on mutable EXTERNAL world state or is a simple named-entity
+ * reference lookup whose biography/status should be grounded in fresh public evidence.
  *
  * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
  * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
@@ -90,6 +97,8 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (!text) return false
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
+
+  if (SIMPLE_NAMED_ENTITY_LOOKUP.test(text)) return true
 
   // Shared temporal classifier: life/death, current holders, "still" status, latest/current mutable
   // state, current rules/security state, and recent events. Domain-specific checks below remain as

@@ -7,6 +7,13 @@
 // COS never mistakes an ordinary web snippet for a real-time feed.
 
 import { structuredLiveDataKind } from '@/lib/ai/cos/cosFreshnessPolicy'
+import {
+  augmentQueryForOfficialSources,
+  classifyAuthoritativeSourceNeed,
+  officialCoverageNote,
+  rankByAuthority,
+  type AuthorityTier,
+} from '@/lib/ai/cos/officialSourceAuthority'
 import { getStructuredLiveInfo } from '@/lib/ai/tools/getStructuredLiveInfo'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
@@ -25,6 +32,9 @@ export type SearchResult = {
   // results leave these fields unset.
   sourceKind?: 'structured_realtime'
   observedAt?: string
+  // Government-rules/procedure queries rank official sources first; the tier is carried so the
+  // formatted evidence labels each result honestly. See officialSourceAuthority.ts.
+  authorityTier?: AuthorityTier
 }
 export type ExternalInfoOptions = { bypassCache?: boolean }
 
@@ -152,7 +162,7 @@ export async function getExternalInfo(
   query: string,
   requestedCount = DEFAULT_RESULT_COUNT,
   options: ExternalInfoOptions = {},
-): Promise<{ ok: boolean; results: SearchResult[]; error?: string }> {
+): Promise<{ ok: boolean; results: SearchResult[]; error?: string; notice?: string }> {
   const q = String(query || '').trim().slice(0, 400)
   if (!q) return { ok: false, results: [], error: 'Empty search query.' }
   const count = Math.max(1, Math.min(Number(requestedCount) || DEFAULT_RESULT_COUNT, MAX_RESULT_COUNT))
@@ -183,11 +193,20 @@ export async function getExternalInfo(
   }
 
   try {
-    const rawResults = await getWebSearchPort().search(q, count)
+    // Authority-owned questions (government procedure, product behavior, medical guidance,
+    // standards) get owner-first evidence: the same judgement a careful human applies by asking
+    // "whose fact is this?" and going there — gov.pl for a Polish procedure, docs.stripe.com for a
+    // Stripe question — recognized structurally, with no country or vendor tables. Mirrors the
+    // existing public-office policy below; secondary sources are demoted and labelled, not removed.
+    const authorityNeed = classifyAuthoritativeSourceNeed(q)
+    const searchQuery = authorityNeed.required ? augmentQueryForOfficialSources(q, authorityNeed) : q
+
+    const rawResults = await getWebSearchPort().search(searchQuery, count)
     const enforcePrimaryOfficeSources = isCurrentPublicOfficeQuery(q)
-    const results = enforcePrimaryOfficeSources
+    const filtered = enforcePrimaryOfficeSources
       ? rawResults.filter(result => !isGeneralNewsMediaResult(result))
       : rawResults
+    const results: SearchResult[] = authorityNeed.required ? rankByAuthority(filtered, authorityNeed) : filtered
 
     if (!results.length) {
       return {
@@ -209,7 +228,10 @@ export async function getExternalInfo(
       cache.set(key, { at: Date.now(), results })
     }
 
-    return { ok: true, results }
+    const coverageNote = authorityNeed.required
+      ? officialCoverageNote(results.map(result => ({ authorityTier: result.authorityTier ?? 'secondary' })), authorityNeed)
+      : null
+    return { ok: true, results, ...(coverageNote ? { notice: coverageNote } : {}) }
   } catch (e) {
     return { ok: false, results: [], error: e instanceof Error ? e.message : 'Search request failed.' }
   }
@@ -239,7 +261,13 @@ function shouldAttachCosIntelligence(query: string) {
 }
 
 export function formatExternalInfoForAI(query: string, results: SearchResult[]): string {
-  const lines = results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
+  const authorityLabel = (r: SearchResult) => r.authorityTier === 'first_party'
+    ? ' [FIRST-PARTY / OWNING AUTHORITY]'
+    : r.authorityTier === 'institutional' ? ' [OFFICIAL INSTITUTION]' : ''
+  const lines = results.map((r, i) => `${i + 1}. ${r.title}${authorityLabel(r)}\n   ${r.url}\n   ${r.snippet}`)
+  const need = classifyAuthoritativeSourceNeed(query)
+  const note = officialCoverageNote(results.map(r => ({ authorityTier: r.authorityTier ?? 'secondary' })), need)
+  if (note) lines.push(`CAVEAT: ${note}`)
   const base = `Live web search results for "${query}" (retrieved just now — treat as current external data, cite sources by URL when making claims):\n\n${lines.join('\n\n')}`
 
   if (!shouldAttachCosIntelligence(query)) return base

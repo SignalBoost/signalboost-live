@@ -6,7 +6,9 @@ import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectCosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { MINIMUM_VERIFIED_OUTCOMES_PER_CANDIDATE } from '@/lib/ai/cos/reasoningOutcomeProfile'
 import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 import {
   COS_COMPARISON_ROLES,
@@ -22,6 +24,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const COMPARISON_PROBE_TIMEOUT_MS = 90_000
+const PRIVATE_DIVERSE_SUITE_ORIGIN = 'controlled-comparison-private-v1'
 const terms = (value: unknown) => Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
 const errorText = (value: unknown): string => value instanceof Error ? value.message : typeof value === 'string' ? value : JSON.stringify(value) || String(value ?? 'Unknown comparison error')
 
@@ -33,22 +36,34 @@ export async function GET() {
 
   const [cases, runs, results] = await Promise.all([
     db.from('cos_capability_benchmark_cases')
-      .select('id,track,prompt,active,created_at')
+      .select('id,track,prompt,active,created_at,origin,difficulty_score')
       .eq('active', true)
       .order('created_at', { ascending: true })
       .limit(200),
     db.from('cos_reasoning_comparison_runs')
       .select('id,case_id,candidate_roles,started_at,completed_at,attempted,verified,passed,status,error')
       .order('started_at', { ascending: false })
-      .limit(20),
+      .limit(40),
     db.from('cos_reasoning_comparison_results')
       .select('run_id,case_id,track,candidate_id,worker_role,reasoner_label,passed,reasons,turn_id,latency_ms,verified_outcome_recorded,created_at')
       .order('created_at', { ascending: false })
-      .limit(60),
+      .limit(200),
   ])
   if (cases.error || runs.error || results.error) {
     return NextResponse.json({ error: cases.error?.message ?? runs.error?.message ?? results.error?.message }, { status: 500 })
   }
+
+  const resultRows = results.data ?? []
+  const turnIds = [...new Set(resultRows.map((row: any) => String(row.turn_id || '')).filter(Boolean))]
+  let metricRows: any[] = []
+  if (turnIds.length) {
+    const metrics = await db.from('cos_reasoning_worker_metrics')
+      .select('turn_id,problem_class,worker_role,reasoner_label')
+      .in('turn_id', turnIds)
+    if (metrics.error) return NextResponse.json({ error: metrics.error.message }, { status: 500 })
+    metricRows = metrics.data ?? []
+  }
+  const metricByTurn = new Map(metricRows.map((row: any) => [String(row.turn_id), row]))
 
   const reasoner = resolveCosReasoner()
   return NextResponse.json({
@@ -60,15 +75,25 @@ export async function GET() {
       casesPerRun: MAX_REASONING_COMPARISON_CASES,
       evaluationsPerRun: MAX_REASONING_COMPARISON_EVALUATIONS,
     },
+    learningGate: {
+      minimumVerifiedOutcomesPerCandidate: MINIMUM_VERIFIED_OUTCOMES_PER_CANDIDATE,
+    },
+    privateSuiteOrigin: PRIVATE_DIVERSE_SUITE_ORIGIN,
     cases: (cases.data ?? []).map((row: any) => ({
       id: row.id,
       track: row.track,
+      origin: row.origin ?? 'manual',
+      difficultyScore: Number(row.difficulty_score) || 1,
+      problemClass: classifyProblemClass(String(row.prompt || '')),
       suggestedRole: selectCosReasoningWorkerRole(String(row.prompt || '')).role,
       createdAt: row.created_at,
     })),
     runs: runs.data ?? [],
-    results: results.data ?? [],
-    note: 'This endpoint never runs automatically. Each POST is an owner-triggered, billable held-out comparison. It forces exactly two worker roles through the same full COS pipeline with cache disabled. Re-run the same case after a model migration to accumulate comparable evidence under the new reasoner label.',
+    results: resultRows.map((row: any) => ({
+      ...row,
+      problem_class: metricByTurn.get(String(row.turn_id || ''))?.problem_class ?? null,
+    })),
+    note: 'This endpoint never runs automatically. Each POST is an owner-triggered, billable held-out comparison. The private diverse suite exposes only case metadata, never prompt text. Phase 4 requires independently verified outcomes per worker/model candidate before learned routing may change behavior.',
   })
 }
 

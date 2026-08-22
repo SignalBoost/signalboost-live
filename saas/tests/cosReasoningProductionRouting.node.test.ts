@@ -7,7 +7,7 @@ const workerSource = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts'
 
 test('production callCosReasoner enters the COS reasoning control plane', () => {
   const entrypoint = reasonerSource.slice(reasonerSource.indexOf('export async function callCosReasoner('))
-  assert.match(entrypoint, /import\('\.\/cosReasoningWorkers'\)/)
+  assert.match(entrypoint, /import\('\.\/cosReasoningWorkers\.ts'\)/)
   assert.match(entrypoint, /reasonThroughCosControlPlane/)
   assert.match(entrypoint, /requestedRole:\s*'primary'/)
   assert.match(entrypoint, /allowExternalEscalation:\s*false/)

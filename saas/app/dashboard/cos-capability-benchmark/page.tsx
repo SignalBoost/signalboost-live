@@ -17,6 +17,8 @@ const EMPTY_ADAPTIVE: AdaptiveState = { policies:[], validations:[], livePolicyC
 const LOAD_TIMEOUT_MS = 20_000
 const AUTOPSY_ACTION_TIMEOUT_MS = 120_000
 const ADAPTIVE_ACTION_TIMEOUT_MS = 280_000
+const ADAPTIVE_POLL_INTERVAL_MS = 5_000
+const ADAPTIVE_POLL_ATTEMPTS = Math.ceil(ADAPTIVE_ACTION_TIMEOUT_MS / ADAPTIVE_POLL_INTERVAL_MS)
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = LOAD_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController()
@@ -36,6 +38,18 @@ function latestScoredRate(runs: Run[]): string {
 function numericPolicyValue(policy: Record<string,unknown>|undefined, key:string): number|null {
   const value = Number(policy?.[key])
   return Number.isFinite(value) ? value : null
+}
+
+function adaptiveStateFromBody(body: any): AdaptiveState {
+  return {
+    policies: Array.isArray(body?.policies) ? body.policies : [],
+    validations: Array.isArray(body?.validations) ? body.validations : [],
+    livePolicyChanged: body?.livePolicyChanged === true,
+  }
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, ms))
 }
 
 export default function CosCapabilityBenchmarkPage() {
@@ -76,11 +90,7 @@ export default function CosCapabilityBenchmarkPage() {
       retainedLessons: Number(report.retainedLessons) || 0,
       rows: Array.isArray(report.rows) ? report.rows : [],
     })
-    setAdaptive({
-      policies: Array.isArray(adaptiveBody.policies) ? adaptiveBody.policies : [],
-      validations: Array.isArray(adaptiveBody.validations) ? adaptiveBody.validations : [],
-      livePolicyChanged: adaptiveBody.livePolicyChanged === true,
-    })
+    setAdaptive(adaptiveStateFromBody(adaptiveBody))
   }
 
   useEffect(() => { void load().catch(e => setError(e.message)) }, [])
@@ -131,17 +141,51 @@ export default function CosCapabilityBenchmarkPage() {
 
   const runAdaptiveValidation = async () => {
     setBusy('adaptive'); setError('')
+    const startingValidationCount = adaptive.validations.length
+    let actionFinished = false
+
+    const durablePoll = (async () => {
+      for (let attempt = 0; attempt < ADAPTIVE_POLL_ATTEMPTS && !actionFinished; attempt += 1) {
+        await waitMs(ADAPTIVE_POLL_INTERVAL_MS)
+        if (actionFinished) return
+        try {
+          const statusResponse = await fetchWithTimeout('/api/admin/cos-adaptive-retrieval', { credentials:'include', cache:'no-store' })
+          const statusBody = await statusResponse.json()
+          if (!statusResponse.ok) continue
+          const nextAdaptive = adaptiveStateFromBody(statusBody)
+          const latest = nextAdaptive.policies[0]
+          const durableProgress = nextAdaptive.validations.length > startingValidationCount
+            || latest?.status === 'validated_shadow'
+            || latest?.status === 'rejected'
+          if (!durableProgress) continue
+          setAdaptive(nextAdaptive)
+          setBusy(null)
+          actionFinished = true
+          return
+        } catch {
+          // The POST remains authoritative. Poll failures must never fail the validation action.
+        }
+      }
+    })()
+
     try {
       const response = await fetchWithTimeout('/api/admin/cos-adaptive-retrieval', { method:'POST', credentials:'include' }, ADAPTIVE_ACTION_TIMEOUT_MS)
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || t('cos.benchmark.adaptiveRunFailed', 'Adaptive retrieval validation failed.'))
-      await load()
+      setAdaptive(adaptiveStateFromBody(body))
+      actionFinished = true
+      setBusy(null)
+      void load().catch(e => setError(e instanceof Error ? e.message : t('cos.benchmark.loadFailed', 'Could not load benchmark.')))
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
         setError(t('cos.benchmark.adaptiveBrowserTimeout', 'The browser stopped waiting. The server may still have completed the paired validation; refresh to read the durable result.'))
         void load().catch(() => undefined)
       } else setError(e instanceof Error ? e.message : t('cos.benchmark.adaptiveRunFailed', 'Adaptive retrieval validation failed.'))
-    } finally { setBusy(null) }
+    } finally {
+      actionFinished = true
+      setBusy(null)
+      void durablePoll
+    }
   }
 
   const active = state.cases.filter(item => item.active).length

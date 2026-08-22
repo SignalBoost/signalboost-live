@@ -34,7 +34,7 @@ export type CosReasoningPlanStep = {
 }
 
 export type CosReasoningPlan = {
-  policyVersion: 'cos-reasoning-control-plane-v1'
+  policyVersion: 'cos-reasoning-control-plane-v2'
   objective: string
   requestedRole: CosReasoningWorkerRole
   steps: CosReasoningPlanStep[]
@@ -59,7 +59,7 @@ function workerOrder(a: CosReasoningWorker, b: CosReasoningWorker): number {
 export function buildCosReasoningPlan(request: CosReasoningRequest): CosReasoningPlan {
   const requestedRole = request.requestedRole ?? 'primary'
   return {
-    policyVersion: 'cos-reasoning-control-plane-v1',
+    policyVersion: 'cos-reasoning-control-plane-v2',
     objective: cleanPrompt(request.prompt).slice(0, 500),
     requestedRole,
     steps: [{
@@ -99,10 +99,17 @@ export class CosReasoningEngine {
 
   private candidateWorkers(request: CosReasoningRequest, plan: CosReasoningPlan): CosReasoningWorker[] {
     const specialists = this.eligibleWorkers(request, plan.requestedRole)
-    if (plan.requestedRole === 'primary' || specialists.length > 0) return specialists
-    // Phase 1 is behavior-preserving: if a specialist is not installed yet, the primary open-model
-    // worker may still perform the task. This lets COS add roles without making any provider mandatory.
-    return this.eligibleWorkers(request, 'primary')
+    if (plan.requestedRole === 'primary') return specialists
+
+    const primary = this.eligibleWorkers(request, 'primary')
+    if (!specialists.length) return primary
+
+    // A specialist may fall back to primary only when primary is a genuinely different runtime/model.
+    // The default Phase 3 workers share one Qwen runtime, so retrying the same failed model under a
+    // different role would double latency/token risk without adding capability. Future specialist
+    // models with a different label automatically gain a bounded primary fallback.
+    const specialistLabels = new Set(specialists.map(worker => worker.label))
+    return [...specialists, ...primary.filter(worker => !specialistLabels.has(worker.label))]
   }
 
   async run(request: CosReasoningRequest): Promise<CosReasoningExecution | null> {

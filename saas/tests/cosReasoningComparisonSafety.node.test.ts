@@ -25,8 +25,8 @@ test('comparison endpoint is owner-only, bounded, and verifies local execution b
   assert.match(routeSource, /requireOwner\(\)/)
   assert.match(routeSource, /MAX_REASONING_COMPARISON_EVALUATIONS/)
   assert.match(routeSource, /attachOutcome:\s*false/)
-  assert.match(routeSource, /outcome\.provenance\.localModelInvoked === true/)
-  assert.match(routeSource, /outcome\.provenance\.externalAiInvoked !== true/)
+  assert.match(routeSource, /Boolean\(outcome\.provenance\.localModelInvoked\)/)
+  assert.match(routeSource, /!Boolean\(outcome\.provenance\.externalAiInvoked\)/)
   assert.match(routeSource, /verifiedOutcomeRecorded = await attachTurnOutcome/)
 })
 

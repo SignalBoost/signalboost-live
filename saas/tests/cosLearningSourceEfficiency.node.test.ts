@@ -3,7 +3,7 @@ import test from 'node:test'
 import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle'
 import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index'
 import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors'
-import { createLiveLearningAdapters, guardLearningSourceAdapter } from '../lib/cos-core/layers/learning/liveSources'
+import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass } from '../lib/cos-core/layers/learning/liveSources'
 import { createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients'
 
 const GAP: KnowledgeGap = {
@@ -114,6 +114,13 @@ test('configured transcript runtime replaces the redundant YouTube metadata adap
   const youtubeIds = adapters.map(adapter => adapter.id ?? '').filter(id => id.startsWith('youtube_'))
 
   assert.deepEqual(youtubeIds, ['youtube_transcript_runpod'])
+})
+
+test('configured YouTube learning runs on the daily pass while academic sources remain gap-only', () => {
+  assert.equal(runsOnDailyLearningPass('youtube_metadata'), true)
+  assert.equal(runsOnDailyLearningPass('youtube_transcript'), true)
+  assert.equal(runsOnDailyLearningPass('youtube_transcript_runpod'), true)
+  assert.equal(runsOnDailyLearningPass('crossref'), false)
 })
 
 test('source guard serializes a provider burst and queued calls stop after the circuit opens', async () => {

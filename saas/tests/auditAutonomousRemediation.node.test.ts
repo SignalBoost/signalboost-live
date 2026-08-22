@@ -119,7 +119,7 @@ test('ONBOARD preserves governed AI execution and truthful status doctrine', () 
   const onboard = read('../../ONBOARD.md')
 
   assert.match(onboard, /Never weaken evidence gates, private holdouts, authorization, tenant isolation or lifecycle rules merely to make a dashboard green/i)
-  assert.match(onboard, /Enterprise Release Candidate:[^\n]*evidence-based only; never infer from a green deployment/i)
+  assert.match(onboard, /A branch is not Production\. A green build is not capability acceptance/i)
   assert.match(onboard, /Verify implementation and runtime behavior from code plus live evidence before diagnosing or reporting status/i)
 })
 

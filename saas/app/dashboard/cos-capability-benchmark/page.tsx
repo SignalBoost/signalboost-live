@@ -7,11 +7,16 @@ type CapabilityState = { cases:Array<{id:string;track:string;active:boolean}>; r
 type UtilizationState = { suiteSize:number; domains:string[]; runs:Run[] }
 type AutopsyRow = { id:string; problem_class:string; primary_stage?:string|null; status:string; source_case_id?:string|null; retest_case_id?:string|null; retest_passed?:boolean|null; lesson_retained:boolean; updated_at:string }
 type AutopsyState = { turns:number; pendingRetests:number; awaitingEvidence:number; passedRetests:number; failedRetests:number; retainedLessons:number; rows:AutopsyRow[] }
-type BusyMode = 'capability'|'utilization'|'autopsy'|null
+type AdaptivePolicy = { id:string; status:string; current_policy?:Record<string,unknown>; candidate_policy?:Record<string,unknown>; training_metrics?:Record<string,unknown>; validation_required:number; validation_passed:number; validation_failed:number; updated_at:string }
+type AdaptiveValidation = { id:string; policy_id:string; case_id:string; case_domain:string; baseline_passed:boolean; candidate_passed:boolean; baseline_injected:number; candidate_injected:number; verdict:string; reasons?:string[]; created_at:string }
+type AdaptiveState = { policies:AdaptivePolicy[]; validations:AdaptiveValidation[]; livePolicyChanged:boolean }
+type BusyMode = 'capability'|'utilization'|'autopsy'|'adaptive'|null
 
 const EMPTY_AUTOPSY: AutopsyState = { turns:0, pendingRetests:0, awaitingEvidence:0, passedRetests:0, failedRetests:0, retainedLessons:0, rows:[] }
+const EMPTY_ADAPTIVE: AdaptiveState = { policies:[], validations:[], livePolicyChanged:false }
 const LOAD_TIMEOUT_MS = 20_000
 const AUTOPSY_ACTION_TIMEOUT_MS = 120_000
+const ADAPTIVE_ACTION_TIMEOUT_MS = 280_000
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = LOAD_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController()
@@ -28,25 +33,33 @@ function latestScoredRate(runs: Run[]): string {
   return run ? `${Math.round((run.passed / run.attempted) * 100)}%` : '—'
 }
 
+function numericPolicyValue(policy: Record<string,unknown>|undefined, key:string): number|null {
+  const value = Number(policy?.[key])
+  return Number.isFinite(value) ? value : null
+}
+
 export default function CosCapabilityBenchmarkPage() {
   const { t } = useTranslation()
   const displayError = (value: unknown) => typeof value === 'string' ? value : value && typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')
   const [state, setState] = useState<CapabilityState>({ cases: [], runs: [] })
   const [utilization, setUtilization] = useState<UtilizationState>({ suiteSize: 0, domains: [], runs: [] })
   const [autopsy, setAutopsy] = useState<AutopsyState>(EMPTY_AUTOPSY)
+  const [adaptive, setAdaptive] = useState<AdaptiveState>(EMPTY_ADAPTIVE)
   const [busy, setBusy] = useState<BusyMode>(null)
   const [error, setError] = useState('')
 
   const load = async () => {
-    const [capResponse, utilResponse, autopsyResponse] = await Promise.all([
+    const [capResponse, utilResponse, autopsyResponse, adaptiveResponse] = await Promise.all([
       fetchWithTimeout('/api/admin/cos-capability-benchmark', { credentials:'include', cache:'no-store' }),
       fetchWithTimeout('/api/admin/cos-evidence-utilization-benchmark', { credentials:'include', cache:'no-store' }),
       fetchWithTimeout('/api/admin/cos-failure-autopsy', { credentials:'include', cache:'no-store' }),
+      fetchWithTimeout('/api/admin/cos-adaptive-retrieval', { credentials:'include', cache:'no-store' }),
     ])
-    const [capBody, utilBody, autopsyBody] = await Promise.all([capResponse.json(), utilResponse.json(), autopsyResponse.json()])
+    const [capBody, utilBody, autopsyBody, adaptiveBody] = await Promise.all([capResponse.json(), utilResponse.json(), autopsyResponse.json(), adaptiveResponse.json()])
     if (!capResponse.ok) throw new Error(capBody.error || t('cos.benchmark.loadFailed', 'Could not load benchmark.'))
     if (!utilResponse.ok) throw new Error(utilBody.error || t('cos.benchmark.utilizationLoadFailed', 'Could not load evidence utilization benchmark.'))
     if (!autopsyResponse.ok) throw new Error(autopsyBody.error || t('cos.benchmark.autopsyLoadFailed', 'Could not load failure autopsy report.'))
+    if (!adaptiveResponse.ok) throw new Error(adaptiveBody.error || t('cos.benchmark.adaptiveLoadFailed', 'Could not load adaptive retrieval report.'))
     setState(capBody)
     setUtilization({
       suiteSize: Number(utilBody.suiteSize) || 0,
@@ -63,6 +76,11 @@ export default function CosCapabilityBenchmarkPage() {
       retainedLessons: Number(report.retainedLessons) || 0,
       rows: Array.isArray(report.rows) ? report.rows : [],
     })
+    setAdaptive({
+      policies: Array.isArray(adaptiveBody.policies) ? adaptiveBody.policies : [],
+      validations: Array.isArray(adaptiveBody.validations) ? adaptiveBody.validations : [],
+      livePolicyChanged: adaptiveBody.livePolicyChanged === true,
+    })
   }
 
   useEffect(() => { void load().catch(e => setError(e.message)) }, [])
@@ -70,11 +88,8 @@ export default function CosCapabilityBenchmarkPage() {
   const refreshStatus = async () => {
     setBusy(null)
     setError('')
-    try {
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('cos.benchmark.loadFailed', 'Could not load benchmark.'))
-    }
+    try { await load() }
+    catch (e) { setError(e instanceof Error ? e.message : t('cos.benchmark.loadFailed', 'Could not load benchmark.')) }
   }
 
   const runCapability = async () => {
@@ -84,9 +99,8 @@ export default function CosCapabilityBenchmarkPage() {
       const body=await response.json()
       if(!response.ok) throw new Error(body.error||t('cos.benchmark.runFailed', 'Benchmark failed.'))
       await load()
-    } catch(e) {
-      setError(e instanceof Error?e.message:t('cos.benchmark.runFailed', 'Benchmark failed.'))
-    } finally { setBusy(null) }
+    } catch(e) { setError(e instanceof Error?e.message:t('cos.benchmark.runFailed', 'Benchmark failed.')) }
+    finally { setBusy(null) }
   }
 
   const runUtilization = async () => {
@@ -96,9 +110,8 @@ export default function CosCapabilityBenchmarkPage() {
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || t('cos.benchmark.utilizationRunFailed', 'Evidence utilization benchmark failed.'))
       await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('cos.benchmark.utilizationRunFailed', 'Evidence utilization benchmark failed.'))
-    } finally { setBusy(null) }
+    } catch (e) { setError(e instanceof Error ? e.message : t('cos.benchmark.utilizationRunFailed', 'Evidence utilization benchmark failed.')) }
+    finally { setBusy(null) }
   }
 
   const runAutopsyRetest = async () => {
@@ -112,9 +125,22 @@ export default function CosCapabilityBenchmarkPage() {
       if (e instanceof DOMException && e.name === 'AbortError') {
         setError(t('cos.benchmark.autopsyBrowserTimeout', 'The browser stopped waiting after two minutes. The server may still have completed the retest; refresh to read the durable result.'))
         void load().catch(() => undefined)
-      } else {
-        setError(e instanceof Error ? e.message : t('cos.benchmark.autopsyRunFailed', 'Failure autopsy retest failed.'))
-      }
+      } else setError(e instanceof Error ? e.message : t('cos.benchmark.autopsyRunFailed', 'Failure autopsy retest failed.'))
+    } finally { setBusy(null) }
+  }
+
+  const runAdaptiveValidation = async () => {
+    setBusy('adaptive'); setError('')
+    try {
+      const response = await fetchWithTimeout('/api/admin/cos-adaptive-retrieval', { method:'POST', credentials:'include' }, ADAPTIVE_ACTION_TIMEOUT_MS)
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.error || t('cos.benchmark.adaptiveRunFailed', 'Adaptive retrieval validation failed.'))
+      await load()
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setError(t('cos.benchmark.adaptiveBrowserTimeout', 'The browser stopped waiting. The server may still have completed the paired validation; refresh to read the durable result.'))
+        void load().catch(() => undefined)
+      } else setError(e instanceof Error ? e.message : t('cos.benchmark.adaptiveRunFailed', 'Adaptive retrieval validation failed.'))
     } finally { setBusy(null) }
   }
 
@@ -126,6 +152,19 @@ export default function CosCapabilityBenchmarkPage() {
     : autopsy.pendingRetests === 0
       ? t('cos.benchmark.autopsyNonePending', 'No pending autopsy retests')
       : t('cos.benchmark.autopsyRun', 'Run failure autopsy retest')
+  const latestAdaptive = adaptive.policies[0]
+  const adaptiveTerminal = latestAdaptive?.status === 'validated_shadow' || latestAdaptive?.status === 'rejected'
+  const adaptiveActionLabel = busy === 'adaptive'
+    ? t('cos.benchmark.adaptiveRunning', 'Running paired adaptive validation…')
+    : latestAdaptive?.status === 'validated_shadow'
+      ? t('cos.benchmark.adaptiveValidated', 'Adaptive retrieval validated (shadow)')
+      : latestAdaptive?.status === 'rejected'
+        ? t('cos.benchmark.adaptiveRejected', 'Adaptive retrieval candidate rejected')
+        : latestAdaptive?.status === 'validation_pending'
+          ? t('cos.benchmark.adaptiveContinue', 'Validate adaptive retrieval ({passed}/{required})').replace('{passed}', String(latestAdaptive.validation_passed || 0)).replace('{required}', String(latestAdaptive.validation_required || 2))
+          : t('cos.benchmark.adaptiveRun', 'Run adaptive retrieval validation')
+  const liveInjected = numericPolicyValue(latestAdaptive?.current_policy, 'learnedCorpusMaxInjected')
+  const candidateInjected = numericPolicyValue(latestAdaptive?.candidate_policy, 'learnedCorpusMaxInjected')
 
   return <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
     <header>
@@ -137,6 +176,7 @@ export default function CosCapabilityBenchmarkPage() {
       <button className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50" disabled={busy!==null||active===0} onClick={runCapability}>{busy==='capability'?t('cos.benchmark.running', 'Running…'):t('cos.benchmark.run', 'Run benchmark')}</button>
       <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||utilization.suiteSize===0} onClick={runUtilization}>{busy==='utilization'?t('cos.benchmark.utilizationRunning', 'Running evidence benchmark…'):t('cos.benchmark.utilizationRun', 'Run evidence utilization')}</button>
       <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||autopsy.pendingRetests===0} onClick={runAutopsyRetest}>{autopsyActionLabel}</button>
+      <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||adaptiveTerminal} onClick={runAdaptiveValidation}>{adaptiveActionLabel}</button>
       <button className="rounded-md border border-border px-4 py-2 text-sm" onClick={()=>void refreshStatus()}>{t('common.refresh', 'Refresh')}</button>
     </div>
 
@@ -183,6 +223,30 @@ export default function CosCapabilityBenchmarkPage() {
         </div>) : <p className="text-text-muted">{t('cos.benchmark.autopsyEmpty', 'No poor outcome has produced an autopsy yet.')}</p>}
       </div>
     </section>
+
+    <section className="rounded-md border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">{t('cos.benchmark.adaptiveTitle', 'Adaptive retrieval — shadow validation')}</h2>
+          <p className="mt-1 text-xs text-text-muted">{t('cos.benchmark.adaptiveDescription', 'Outcome-correlated evidence use may propose a smaller retrieval context. Each candidate must preserve quality and reduce injected context on separate controlled cases before it can be called validated.')}</p>
+        </div>
+        <div className="text-xs text-text-muted">{adaptive.livePolicyChanged?t('cos.benchmark.adaptiveLiveChanged', 'Live policy changed'):t('cos.benchmark.adaptiveLiveUnchanged', 'Live policy unchanged')}</div>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-4">
+        <Card label={t('cos.benchmark.adaptiveStatus', 'Shadow policy status')} value={latestAdaptive?.status || t('cos.benchmark.adaptiveNoCandidate', 'No candidate yet')} />
+        <Card label={t('cos.benchmark.adaptiveCurrentCap', 'Current learned-corpus cap')} value={liveInjected==null?'6':String(liveInjected)} />
+        <Card label={t('cos.benchmark.adaptiveCandidateCap', 'Candidate learned-corpus cap')} value={candidateInjected==null?'—':String(candidateInjected)} />
+        <Card label={t('cos.benchmark.adaptiveValidationProgress', 'Validation passes')} value={latestAdaptive?`${latestAdaptive.validation_passed||0}/${latestAdaptive.validation_required||2}`:'0/2'} />
+      </div>
+      <p className="mt-3 text-xs text-text-muted">{t('cos.benchmark.adaptiveThresholdNote', 'Similarity threshold stays unchanged until item-level similarity/use telemetry has enough evidence. A validated shadow candidate is not automatic Production promotion.')}</p>
+      <div className="mt-4 space-y-2 text-sm">
+        {adaptive.validations.length ? adaptive.validations.slice(0,8).map(row => <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+          <span>{row.case_domain} · {row.case_id}</span>
+          <span>{row.verdict}</span>
+          <span className="basis-full text-xs text-text-muted">{t('cos.benchmark.adaptivePairSummary', 'Baseline {basePass}, {baseInjected} injected; candidate {candidatePass}, {candidateInjected} injected.').replace('{basePass}', row.baseline_passed?t('cos.benchmark.adaptivePass', 'pass'):t('cos.benchmark.adaptiveFail', 'fail')).replace('{baseInjected}', String(row.baseline_injected)).replace('{candidatePass}', row.candidate_passed?t('cos.benchmark.adaptivePass', 'pass'):t('cos.benchmark.adaptiveFail', 'fail')).replace('{candidateInjected}', String(row.candidate_injected))}</span>
+        </div>) : <p className="text-text-muted">{t('cos.benchmark.adaptiveEmpty', 'No adaptive retrieval validation pair has run yet.')}</p>}
+      </div>
+    </section>
   </main>
 }
 
@@ -190,4 +254,4 @@ function RunList({runs,empty,displayError,passedLabel}:{runs:Run[];empty:string;
   return <div className="mt-3 space-y-2 text-sm">{runs.length?runs.map(run=><div key={run.id} className="flex flex-wrap justify-between gap-2 border-b border-border pb-2"><span>{new Date(run.started_at).toLocaleString()} · {run.status}</span><span>{run.passed}/{run.attempted} {passedLabel}</span>{run.error&&<span className="basis-full break-words text-danger">{displayError(run.error)}</span>}</div>):<p className="text-text-muted">{empty}</p>}</div>
 }
 
-function Card({label,value}:{label:string;value:string}) { return <div className="rounded-md border border-border bg-surface p-4"><p className="text-xs text-text-muted">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div> }
+function Card({label,value}:{label:string;value:string}) { return <div className="rounded-md border border-border bg-surface p-4"><p className="text-xs text-text-muted">{label}</p><p className="mt-1 break-words text-2xl font-semibold">{value}</p></div> }

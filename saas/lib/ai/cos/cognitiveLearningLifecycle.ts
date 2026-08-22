@@ -27,6 +27,7 @@ export type CognitiveSkillEvidence = {
 
 export type CognitivePromotionPolicy = {
   minPracticeAttemptsForPracticed: number
+  minPracticeRateForPracticed: number
   minHoldoutAttemptsForValidated: number
   minHoldoutVariantsForValidated: number
   minHoldoutRateForValidated: number
@@ -48,6 +49,7 @@ export type CognitivePromotionPolicy = {
  */
 export const DEFAULT_COGNITIVE_PROMOTION_POLICY: CognitivePromotionPolicy = {
   minPracticeAttemptsForPracticed: 2,
+  minPracticeRateForPracticed: 0.8,
   minHoldoutAttemptsForValidated: 3,
   minHoldoutVariantsForValidated: 3,
   minHoldoutRateForValidated: 0.8,
@@ -92,8 +94,9 @@ function validationFresh(lastValidatedAt: string | null | undefined, freshnessDa
  * Determine the strongest lifecycle state supported by the supplied evidence.
  *
  * This function never changes answer confidence. It also never turns a teacher example into skill
- * mastery. Qualitative evaluator/understanding approvals are explicit prerequisites, and
- * learned/mastered require held-out variants rather than training-example reuse.
+ * mastery. Qualitative evaluator/understanding approvals are explicit prerequisites, successful
+ * practice is required before a skill is called practiced, and learned/mastered require held-out
+ * variants rather than training-example reuse.
  *
  * Explicit weakened/quarantined states are sticky. Historical success counters cannot silently
  * re-promote a skill after retention or production evidence has weakened it. A successful,
@@ -149,8 +152,12 @@ export function evaluateCognitiveSkillEligibility(
   }
   recommendedStatus = 'understood'
 
-  if (practiceAttempts < policy.minPracticeAttemptsForPracticed) {
-    reasons.push(`Needs at least ${policy.minPracticeAttemptsForPracticed} practice attempts.`)
+  if (
+    practiceAttempts < policy.minPracticeAttemptsForPracticed ||
+    practiceRate === null ||
+    practiceRate < policy.minPracticeRateForPracticed
+  ) {
+    reasons.push(`Needs at least ${policy.minPracticeAttemptsForPracticed} practice attempts with ${(policy.minPracticeRateForPracticed * 100).toFixed(0)}% success.`)
     return { recommendedStatus, practiceRate, holdoutRate, productionRate, validationFresh: fresh, reasons }
   }
   recommendedStatus = 'practiced'

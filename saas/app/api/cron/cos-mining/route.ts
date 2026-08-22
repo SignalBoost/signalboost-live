@@ -20,7 +20,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+// Certification is intentionally given only the early part of the route budget. The remaining
+// 90 seconds are reserved for composition, consolidation, metacognition, persistence and response
+// cleanup. Certification itself permits at most one new model exercise per daily cycle.
+const CERTIFICATION_ROUTE_DEADLINE_MS = 210_000
+
 export async function GET(req: NextRequest) {
+  const routeStartedAt = Date.now()
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -73,7 +79,10 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      certification = await runCognitiveCertificationCycle()
+      certification = await runCognitiveCertificationCycle({
+        deadlineAt: routeStartedAt + CERTIFICATION_ROUTE_DEADLINE_MS,
+        maxModelCalls: 1,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Cognitive certification failed'
       console.error('cron COS cognitive certification failed:', message)

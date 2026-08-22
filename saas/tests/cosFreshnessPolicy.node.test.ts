@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { requiresFreshExternalEvidence, structuredLiveDataKind } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import { classifyTemporalSensitivity } from '../lib/ai/cos/temporalClaimGuard.ts'
 
 test('current US president requires live external verification', () => {
   assert.equal(requiresFreshExternalEvidence('Who is the current President of the United States?'), true)
@@ -51,6 +52,9 @@ test('life-status questions require live verification without an explicit curren
   assert.equal(requiresFreshExternalEvidence('Is George Foreman alive?'), true)
   assert.equal(requiresFreshExternalEvidence('Has George Foreman passed away?'), true)
   assert.equal(requiresFreshExternalEvidence('when Hulk Hogan died?'), true)
+  assert.equal(classifyTemporalSensitivity('when Hulk Hogan died?').kind, 'life_status')
+  assert.equal(classifyTemporalSensitivity('Has Hulk Hogan died?').kind, 'life_status')
+  assert.equal(classifyTemporalSensitivity('Is Hulk Hogan alive?').kind, 'life_status')
 })
 
 test('historical and conceptual questions do not masquerade as current-world lookups', () => {

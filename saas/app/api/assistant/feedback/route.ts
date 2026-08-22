@@ -7,6 +7,8 @@ import {
 } from '@/lib/ai/cos/cognitiveUserFeedback'
 import { generalizeFeedbackIntoCognitiveSkill } from '@/lib/ai/cos/cognitiveFeedbackGeneralization'
 import { attachTurnOutcome, hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
+import { normalizeAssistantContent } from '@/lib/ai/cos/supportTurnProvenance'
+import { assessFreshnessMiss, recordFreshnessMissGap } from '@/lib/ai/cos/feedbackFreshnessMiss'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -76,9 +78,12 @@ async function targetFromConversation(params: {
   }
 
   const messages = (transcript.data ?? []) as ConversationMessage[]
+  // The client sends rendered reply text while the durable records normalize whitespace. Compare
+  // the same canonical representation without relaxing the server-owned-turn requirement.
+  const wantedContent = normalizeAssistantContent(assistantContent)
   const matchingAssistantIndexes: number[] = []
   for (let index = 0; index < messages.length; index += 1) {
-    if (messages[index]?.role === 'assistant' && messages[index]?.content === assistantContent) {
+    if (messages[index]?.role === 'assistant' && normalizeAssistantContent(messages[index]?.content) === wantedContent) {
       matchingAssistantIndexes.push(index)
     }
   }
@@ -121,7 +126,7 @@ async function targetFromLatestCosProvenance(params: {
     .from('cos_latest_turn_provenance')
     .select('assistant_content,provenance,updated_at')
     .eq('user_id', userId)
-    .eq('assistant_content', assistantContent)
+    .eq('assistant_content', normalizeAssistantContent(assistantContent))
     .maybeSingle()
   if (latest.error) {
     console.warn('[cos-user-feedback-learning] latest provenance lookup failed', latest.error)
@@ -243,6 +248,20 @@ export async function POST(request: NextRequest) {
       correctionText: feedbackType === 'correction' ? correctionText : null,
     } as const
     after(async () => {
+      try {
+        const staleness = assessFreshnessMiss(target.prompt, correctionText)
+        if (staleness.detected) {
+          const filed = await recordFreshnessMissGap(db, staleness)
+          console.info('[cos-user-feedback-freshness-miss]', JSON.stringify({
+            at: new Date().toISOString(),
+            marker: staleness.matchedMarker,
+            filed: filed.filed,
+            reason: filed.error || null,
+          }))
+        }
+      } catch (error) {
+        console.warn('[cos-user-feedback-freshness-miss] failed', error instanceof Error ? error.message : String(error))
+      }
       try {
         const generalized = await generalizeFeedbackIntoCognitiveSkill(feedbackInput)
         console.info('[cos-user-feedback-generalization]', JSON.stringify({

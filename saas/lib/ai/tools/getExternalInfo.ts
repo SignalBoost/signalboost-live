@@ -268,6 +268,9 @@ export function formatExternalInfoForAI(query: string, results: SearchResult[]):
   const need = classifyAuthoritativeSourceNeed(query)
   const note = officialCoverageNote(results.map(r => ({ authorityTier: r.authorityTier ?? 'secondary' })), need)
   if (note) lines.push(`CAVEAT: ${note}`)
+  if (need.required && results.some(r => r.authorityTier && r.authorityTier !== 'secondary')) {
+    lines.push('PROACTIVE: after answering the question itself, add a short "Also worth checking" note listing any ADJACENT obligations or related procedures that the retrieved sources above explicitly mention but the user did not ask about, each cited with its source URL from the results above. Only include items literally supported by the retrieved text; if the sources mention none, omit the note entirely — never invent related obligations from model memory.')
+  }
   const base = `Live web search results for "${query}" (retrieved just now — treat as current external data, cite sources by URL when making claims):\n\n${lines.join('\n\n')}`
 
   if (!shouldAttachCosIntelligence(query)) return base

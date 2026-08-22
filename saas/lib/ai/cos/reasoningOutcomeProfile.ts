@@ -94,12 +94,18 @@ function summarizeCandidate(rows: ReasoningOutcomeSample[]): ReasoningCandidateP
   }
 }
 
-function candidateOrder(a: ReasoningCandidatePerformance, b: ReasoningCandidatePerformance): number {
+function qualityOrder(a: ReasoningCandidatePerformance, b: ReasoningCandidatePerformance): number {
   const quality = b.qualityScore - a.qualityScore
   if (quality !== 0) return quality
   const aCost = a.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
   const bCost = b.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
   return aCost - bCost || a.averageLatencyMs - b.averageLatencyMs || a.workerRole.localeCompare(b.workerRole)
+}
+
+function efficiencyOrder(a: ReasoningCandidatePerformance, b: ReasoningCandidatePerformance): number {
+  const aCost = a.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
+  const bCost = b.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
+  return aCost - bCost || a.averageLatencyMs - b.averageLatencyMs || b.qualityScore - a.qualityScore || a.workerRole.localeCompare(b.workerRole)
 }
 
 function efficiencyImprovement(winner: ReasoningCandidatePerformance, runner: ReasoningCandidatePerformance): number {
@@ -117,7 +123,7 @@ function preferenceFor(problemClass: string, rows: ReasoningOutcomeSample[], opt
     if (bucket) bucket.push(row)
     else buckets.set(key, [row])
   }
-  const candidates = [...buckets.values()].map(summarizeCandidate).sort(candidateOrder)
+  const candidates = [...buckets.values()].map(summarizeCandidate).sort(qualityOrder)
   const eligible = candidates.filter(candidate => candidate.verifiedOutcomes >= options.minimumVerifiedOutcomesPerCandidate)
 
   if (eligible.length < 2) {
@@ -133,14 +139,8 @@ function preferenceFor(problemClass: string, rows: ReasoningOutcomeSample[], opt
 
   const [bestQuality] = eligible
   const nearTies = eligible.filter(candidate => bestQuality.qualityScore - candidate.qualityScore <= options.qualityTieBand)
-  let winner = bestQuality
-  let basis = 'quality'
-  if (nearTies.length > 1) {
-    winner = [...nearTies].sort(candidateOrder)[0]
-    basis = winner === bestQuality ? 'quality' : 'efficiency'
-  }
-
-  const runner = eligible.find(candidate => candidate !== winner) ?? bestQuality
+  const winner = nearTies.length > 1 ? [...nearTies].sort(efficiencyOrder)[0] : bestQuality
+  const runner = eligible.filter(candidate => candidate !== winner).sort(qualityOrder)[0] ?? bestQuality
   const qualityMargin = winner.qualityScore - runner.qualityScore
   const efficiency = efficiencyImprovement(winner, runner)
   const learnedByQuality = qualityMargin >= options.minimumQualityMargin
@@ -162,7 +162,7 @@ function preferenceFor(problemClass: string, rows: ReasoningOutcomeSample[], opt
     status: 'learned',
     recommendedWorkerRole: winner.workerRole,
     recommendedReasonerLabel: winner.reasonerLabel,
-    reason: basis === 'efficiency'
+    reason: learnedByEfficiency && !learnedByQuality
       ? `${winner.workerRole} on ${winner.reasonerLabel} is within the quality tie band and is ${round(efficiency * 100, 1)}% more efficient than the comparison alternative.`
       : `${winner.workerRole} on ${winner.reasonerLabel} leads verified quality by ${round(qualityMargin * 100, 1)} percentage points after repair/escalation penalties.`,
     candidates,

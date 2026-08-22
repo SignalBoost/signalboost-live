@@ -24,7 +24,8 @@ import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
 import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
-import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
@@ -47,12 +48,26 @@ export const maxDuration = 300
 
 function latestUserText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role!=='user')continue;const content=messages[i]?.content;if(typeof content==='string')return content;if(Array.isArray(content))return content.map((block:any)=>String(block?.text||'')).join('\n').trim()}return''}
 function isOwnerRepoScanRequest(input:string):boolean{return /\b(?:scan|audit|review|inspect|analy[sz]e|look through)\b[\s\S]{0,80}\b(?:repo|repository|codebase|github)\b|\b(?:repo|repository|codebase|github)\b[\s\S]{0,80}\b(?:scan|audit|review|inspect|analy[sz]e)\b/i.test(input)}
+function requestsSelfHealingAssessment(input:string):boolean{return /\bself[ -]?healing(?:\s+supervisor)?\b/i.test(input)&&/\b(?:evaluate|evaluation|report|better|improve|sellable|fortune\s*500|enterprise)\b/i.test(input)}
 async function scanRepositoryForOwner():Promise<{ok:boolean;reply:string;error?:string}>{
   const [root,app,lib,onboard,rootPackage,saasPackage]=await Promise.all([listRepoFiles(),listRepoFiles('saas/app'),listRepoFiles('saas/lib'),readRepoFile('ONBOARD.md'),readRepoFile('package.json'),readRepoFile('saas/package.json')])
   const failed=[root,app,lib,onboard,rootPackage,saasPackage].find((item:any)=>!item.ok) as any
   if(failed)return{ok:false,reply:'',error:failed?.error||'Read-only repository scan failed.'}
   const routes=[...new Set((app.files||[]).filter((path:string)=>path.includes('/api/')).slice(0,20))]
   return{ok:true,reply:['Repository scan completed: SignalBoost/signalboost-live@main (read-only).','Verified '+root.files.length+' indexed root files, '+app.files.length+' application files, and '+lib.files.length+' library files in the scanned views.','Inspected canonical files: ONBOARD.md, package.json, saas/package.json.',routes.length?'Representative API routes found: '+routes.join(', ')+'.':'','I can now analyze the existing products, architecture, and improvement opportunities from this verified repository context.'].filter(Boolean).join('\\n')}
+}
+async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
+  const paths=['docs/portables/self-healing-evaluation-brief.md','docs/portables/self-healing-technical-walkthrough.md','docs/portables/self-healing-security-and-data-handling.md','saas/lib/portable-products/manifests/selfHealingSupervisor.ts']
+  const files=await Promise.all(paths.map(path=>readRepoFile(path)))
+  if(files.some(file=>!file.ok))return null
+  const evidence=files.map((file,index)=>`FILE: ${paths[index]}\n${file.content.slice(0,9000)}`).join('\n\n')
+  const result=await callCosReasoner({
+    temperature:.1,maxTokens:5000,
+    systemPrompt:'You are COS performing a Fortune-500 product assessment. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Use only the supplied repository evidence. Write an executive report for the Self-Healing Supervisor: current strengths, enterprise-sale blockers, prioritized improvements, why each matters, proof required for a buyer, and a 90-day delivery sequence. Do not claim a capability unless it appears in the evidence.',
+    prompt:`OWNER REQUEST:\n${request}\n\nVERIFIED REPOSITORY EVIDENCE:\n${evidence}`,
+  }).catch(()=>null)
+  const parsed=result?.text?parseLocalResult(result.text):null
+  return parsed?.answer?.trim()||null
 }
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
@@ -93,11 +108,13 @@ export async function POST(req:NextRequest){
   // Repository inspection is an owner-authorized, read-only operation. Execute it here so a model/tool-choice loop cannot skip it.
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()
-    const reply=scan.ok?scan.reply:`COS could not complete the read-only repository scan: ${scan.error||'unknown repository reader failure'}`
+    const assessmentRequested=scan.ok&&requestsSelfHealingAssessment(input)
+    const assessment=assessmentRequested?await assessSelfHealingSupervisor(input):null
+    const reply=assessment||(!scan.ok?`COS could not complete the read-only repository scan: ${scan.error||'unknown repository reader failure'}`:assessmentRequested?'COS completed the repository scan but could not produce the requested Self-Healing Supervisor assessment from the verified evidence. No scan inventory is being presented as a substitute for the report.':scan.reply)
     const executionProvenance=authoritativeProvenance(null,{invoked:false})
-    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:scan.ok?'deterministic':'failed_closed',confidence:scan.ok?1:0,externalAiInvoked:false})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,scan.ok?'cos-repository-scan':'cos-repository-scan-failed')
-    return NextResponse.json({ok:scan.ok,reply,source:scan.ok?'cos-repository-scan':'cos-repository-scan-failed',confidence_score:scan.ok?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:scan.ok?200:503})
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:assessment||(!assessmentRequested&&scan.ok)?'deterministic':'failed_closed',confidence:assessment||(!assessmentRequested&&scan.ok)?1:0,externalAiInvoked:false})
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,assessment?'cos-self-healing-assessment':scan.ok?'cos-repository-scan':'cos-repository-scan-failed')
+    return NextResponse.json({ok:Boolean(assessment)||(!assessmentRequested&&scan.ok),reply,source:assessment?'cos-self-healing-assessment':!scan.ok?'cos-repository-scan-failed':assessmentRequested?'cos-self-healing-assessment-failed':'cos-repository-scan',confidence_score:assessment||(!assessmentRequested&&scan.ok)?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:Boolean(assessment),execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:assessment||(!assessmentRequested&&scan.ok)?200:503})
   }
 
   if(isProvenanceIntrospection(input)){

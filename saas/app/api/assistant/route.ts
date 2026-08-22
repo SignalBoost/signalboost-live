@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { getAccess } from '@/lib/auth/access'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
@@ -32,13 +32,21 @@ function withoutNestedConversationPersistence(body: any): any {
     ? { ...body.context }
     : {}
   delete context.conversationId
-  return { ...body, context }
+  return {
+    ...body,
+    context: {
+      ...context,
+      assistantSurface: 'chief_of_staff',
+      ownerMode: true,
+    },
+  }
 }
 
 function internalRequest(req: NextRequest, body: any): NextRequest {
   const headers = new Headers(req.headers)
   headers.set('content-type', 'application/json')
   headers.delete('content-length')
+  headers.set('x-signalboost-assistant-surface', 'chief-of-staff')
   return new NextRequest(new URL('/api/cos-primary', req.url), {
     method: 'POST',
     headers,
@@ -47,44 +55,45 @@ function internalRequest(req: NextRequest, body: any): NextRequest {
 }
 
 export async function POST(req: NextRequest) {
+  const access = await getAccess().catch(() => null)
+  if (!access?.userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (!access.isOwner) return NextResponse.json({ error: 'Chief of Staff is owner-only' }, { status: 403 })
+
   const body = await req.clone().json().catch(() => null)
   if (!body || typeof body !== 'object') {
-    return cosPrimaryPost(new NextRequest(req.clone()))
+    return NextResponse.json({ error: 'Invalid assistant request' }, { status: 400 })
   }
 
   const prompt = latestUserText(body)
   const conversationId = conversationIdFrom(body)
   const response = await cosPrimaryPost(internalRequest(req, body))
 
-  // The dedicated Assistant owns its own transcript. Strip conversationId before invoking
-  // COS Primary so any internal Concierge/support fallback cannot persist the same turn too.
-  // Await this one write before returning so feedback can target the just-rendered response
-  // immediately instead of racing an after() history write.
+  // The private Chief of Staff owns its transcript. Strip conversationId before invoking
+  // COS Primary so an internal Concierge/support fallback cannot persist the same turn too.
+  // Await this write before returning so feedback on the just-rendered answer cannot race
+  // an asynchronous history write and return a false 404.
   if (prompt && conversationId) {
-    const access = await getAccess().catch(() => null)
-    if (access?.userId) {
-      try {
-        const payload = await response.clone().json()
-        const reply = typeof payload?.reply === 'string'
-          ? payload.reply.trim()
-          : typeof payload?.error === 'string'
-            ? payload.error.trim()
-            : ''
-        if (reply) {
-          const provenance = payload?.execution_provenance && typeof payload.execution_provenance === 'object'
-            ? payload.execution_provenance
-            : undefined
-          await persistTurn({
-            conversationId,
-            userId: access.userId,
-            userMessage: prompt,
-            assistantReply: reply,
-            provenance,
-          })
-        }
-      } catch (error) {
-        console.warn('[cos-assistant-history] response persistence failed', error instanceof Error ? error.message : String(error))
+    try {
+      const payload = await response.clone().json()
+      const reply = typeof payload?.reply === 'string'
+        ? payload.reply.trim()
+        : typeof payload?.error === 'string'
+          ? payload.error.trim()
+          : ''
+      if (reply) {
+        const provenance = payload?.execution_provenance && typeof payload.execution_provenance === 'object'
+          ? payload.execution_provenance
+          : undefined
+        await persistTurn({
+          conversationId,
+          userId: access.userId,
+          userMessage: prompt,
+          assistantReply: reply,
+          provenance,
+        })
       }
+    } catch (error) {
+      console.warn('[cos-assistant-history] response persistence failed', error instanceof Error ? error.message : String(error))
     }
   }
 

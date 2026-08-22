@@ -3,11 +3,11 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.19  
+**Version:** 1.20  
 **Updated:** 2026-08-22 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Baseline `main`:** `9bf0a5540c6cdbd409c52a20b9f4aa4587f31bd7`  
-**Baseline Production deployment:** `dpl_483vcZK87vq9cB4ULw6pich3stua` — READY, `saas.signalboostapp.com` attached  
+**Baseline `main`:** `10e6f1527dc463be35974fc219a33e0c22f9205d`  
+**Baseline Production deployment:** `dpl_GHMu8torFb8fP8HXZNhkKvW8owpY` — READY, `saas.signalboostapp.com` attached  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
@@ -411,7 +411,7 @@ Do not rerun already accepted cases merely to increase counters. Additional late
 
 ---
 
-# Applied knowledge — IMPLEMENTED; PRODUCTION ACCEPTANCE PENDING
+# Applied knowledge — IMPLEMENTED AND PRODUCTION; RUNTIME ACCEPTANCE PENDING
 
 Newly retained evidence can reopen a question that COS previously retired as unacquirable, but only for a normal governed retest:
 
@@ -427,7 +427,7 @@ new retained evidence
 
 The scan is model-free, bounded to three requeues per cycle, runs after daily acquisition/consolidation, and never answers a question, changes confidence, or promotes a skill. Malformed/unstudyable gaps remain terminal; prior evidence and low-confidence/incidental matches do not reopen anything. Owner route: `/api/admin/cos-knowledge-application` (`POST ?dry=1` is read-only).
 
-Still required: merge, apply `20260822_cos_knowledge_application.sql`, Production deployment, and a real post-acquisition requeue trace followed by a normal governed retest. Never manufacture a requeue merely to close this gate.
+Migration `cos_knowledge_application` is applied and the Production deployment is READY. Still required: a real post-acquisition requeue trace followed by a normal governed retest. Never manufacture a requeue merely to close this gate.
 
 ---
 
@@ -458,7 +458,7 @@ Still partial:
 
 ---
 
-# Retrieval Self-Reflection — NEXT MAJOR LEARNING PHASE
+# Retrieval Self-Reflection — IMPLEMENTED AND PRODUCTION; PREDICTIVE ACCEPTANCE PENDING
 
 Already present:
 
@@ -467,15 +467,9 @@ Already present:
 - exact outcome correlation;
 - adaptive shadow policy store and controlled validation.
 
-Finish:
+Implemented: prompt-free deterministic post-turn assessments of explicit retrieval artifacts; exact-turn outcome reconciliation; owner-only read report; predictive gates (12 distinct outcomes, both labels, accuracy, Brier score and failure-risk separation). The reflection records a shadow-only recommendation and cannot change live retrieval policy.
 
-- bounded post-turn assessment containing only explicit retrieval artifacts such as sufficiency, unused evidence, missing evidence class and recommended retrieval adjustment;
-- correlate reflection predictions with later verified outcomes;
-- measure whether recommendations would have helped before they may influence policy;
-- deduplicate repeated low-value reflections;
-- never persist hidden chain-of-thought.
-
-Completion criterion: retrieval reflections predict later retrieval success/failure well enough to feed a separately validated shadow policy.
+Migration `cos_retrieval_self_reflection_20260822` is applied and Production is READY. Completion criterion: real verified outcomes must show sufficient predictive value before a separate controlled shadow-policy validation; no live policy change is permitted before then.
 
 ---
 
@@ -595,6 +589,8 @@ Non-negotiable:
 - #1363 — answer-side freshness self-reflection.
 - #1364 — governed feedback → reusable procedural candidate learning + structural triggers.
 - #1376 — autonomous evidence-gated cognitive skill certification with private profiles and bounded scheduling.
+- #1384 — applied knowledge: deterministic requeue of dormant gaps only when newly retained evidence qualifies.
+- Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 
 Always query current state; this sequence can advance after this document is merged.
 
@@ -603,7 +599,7 @@ Always query current state; this sequence can advance after this document is mer
 # Immediate next engineering priorities
 
 1. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
-2. **Retrieval Self-Reflection:** build bounded explicit retrieval assessments and prove predictive value against later outcomes.
+2. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
 3. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
 4. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
 5. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.

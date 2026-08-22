@@ -18,6 +18,7 @@ const tests = [
   'tests/cosGeneralReasoningDiscipline.node.test.ts',
   'tests/cosFeedbackReasoningGeneralization.node.test.ts',
   'tests/cosCognitiveAutonomousCertification.node.test.ts',
+  'tests/cosAssistantPipelineSeparation.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

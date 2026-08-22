@@ -1,11 +1,25 @@
-import type { ContinuousLearningSourceAdapter } from './cycle'
-import { libraryLearningConnector,newsLearningConnector,officialDocsLearningConnector,scientificLearningConnector,youtubeLearningConnector } from './connectors'
-import { crossrefScientificSearch,europePmcScientificSearch,openAlexScientificSearch,openLibrarySearch } from './publicClients'
-import { createGdeltNewsSearch,createYouTubeMetadataSearch,createYouTubeTranscriptSearch } from './mediaClients'
-import { BUILTIN_OFFICIAL_TECH_FEEDS,createFeedSearch,parseFeedList } from './feedClients'
+import type { ContinuousLearningSourceAdapter } from './cycle.ts'
+import { libraryLearningConnector,newsLearningConnector,officialDocsLearningConnector,referenceLearningConnector,scientificLearningConnector,youtubeLearningConnector } from './connectors.ts'
+import { createWikipediaSearch } from './referenceClients.ts'
+import { crossrefScientificSearch,europePmcScientificSearch,openAlexScientificSearch,openLibrarySearch } from './publicClients.ts'
+import { createGdeltNewsSearch,createYouTubeMetadataSearch,createYouTubeTranscriptSearch } from './mediaClients.ts'
+import { BUILTIN_OFFICIAL_TECH_FEEDS,createFeedSearch,parseFeedList } from './feedClients.ts'
 
 export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
+// THIS IS WHY THE CORPUS BARELY GREW. Every live adapter was wrapped so that it returns NOTHING for
+// a 'daily-mining-' gap — live sources only ever served real queued knowledge gaps. Combined with an
+// empty gap queue (33 of 33 resolved on 2026-08-21), that meant the daily cycle acquired nothing at
+// all, and COS stayed frozen at its training cutoff: it told users that George Foreman and Hulk
+// Hogan were alive, months after both had died.
+//
+// The gate itself is sound for EXPENSIVE or NARROW sources — running Crossref, OpenAlex, Europe PMC
+// and YouTube against every daily-mining subject burns quota and returns academic papers for
+// questions that are not academic. But it must not apply to the sources whose entire job is keeping
+// general knowledge current. Those need to run on the daily pass, precisely when there is no gap.
 function externalGapOnly(adapter:ContinuousLearningSourceAdapter):ContinuousLearningSourceAdapter{return{kind:adapter.kind,id:adapter.id,async acquire(gap){if(gap.id.startsWith('daily-mining-'))return[];return adapter.acquire(gap)}}}
+/** Sources that must also run on the daily pass: current general facts, news, and official docs. */
+const DAILY_CURRENCY_SOURCES=new Set(['reference','gdelt','official_docs','tech_feeds'])
+function gapScopeFor(adapter:ContinuousLearningSourceAdapter):ContinuousLearningSourceAdapter{return DAILY_CURRENCY_SOURCES.has(adapter.id??adapter.kind)?adapter:externalGapOnly(adapter)}
 function failureLimit(env:LiveLearningEnvironment):number{const value=Number(env.COS_LEARNING_SOURCE_FAILURE_LIMIT||'3');return Number.isFinite(value)?Math.max(1,Math.min(10,Math.round(value))):3}
 function delay(ms:number){return new Promise(resolve=>setTimeout(resolve,ms))}
 function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearningEnvironment):number{
@@ -79,7 +93,7 @@ export function resolveYouTubeTranscriptRuntime(env:LiveLearningEnvironment):{ur
 export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.env):ContinuousLearningSourceAdapter[]{
   if(env.COS_LIVE_SOURCES_ENABLED==='false')return[]
   const configuredTechFeeds=parseFeedList(env.COS_TECH_RSS_FEEDS);const configuredOfficialFeeds=parseFeedList(env.COS_OFFICIAL_DOC_FEEDS);const officialFeeds=[...BUILTIN_OFFICIAL_TECH_FEEDS,...configuredOfficialFeeds]
-  const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,2,'crossref'),scientificLearningConnector(openAlexScientificSearch,2,'openalex'),scientificLearningConnector(europePmcScientificSearch,2,'europe_pmc'),libraryLearningConnector(openLibrarySearch,2,'open_library'),newsLearningConnector(createGdeltNewsSearch(),2,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),3,'official_docs')]
+  const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,2,'crossref'),scientificLearningConnector(openAlexScientificSearch,2,'openalex'),scientificLearningConnector(europePmcScientificSearch,2,'europe_pmc'),libraryLearningConnector(openLibrarySearch,2,'open_library'),newsLearningConnector(createGdeltNewsSearch(),2,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),3,'official_docs'),referenceLearningConnector(createWikipediaSearch(),3,'reference')]
   if(configuredTechFeeds.length)adapters.push(newsLearningConnector(createFeedSearch(configuredTechFeeds),3,'tech_feeds'))
   if(env.YOUTUBE_API_KEY){
     const transcript=resolveYouTubeTranscriptRuntime(env)
@@ -90,5 +104,5 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
     }
   }
   const limit=failureLimit(env)
-  return adapters.map(externalGapOnly).map(adapter=>guardLearningSourceAdapter(adapter,limit,sourceIntervalMs(adapter,env)))
+  return adapters.map(gapScopeFor).map(adapter=>guardLearningSourceAdapter(adapter,limit,sourceIntervalMs(adapter,env)))
 }

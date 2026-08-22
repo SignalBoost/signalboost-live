@@ -409,6 +409,26 @@ Do not rerun already accepted cases merely to increase counters. Additional late
 
 ---
 
+# Applied knowledge — IMPLEMENTED; PRODUCTION ACCEPTANCE PENDING
+
+Newly retained evidence can reopen a question that COS previously retired as unacquirable, but only for a normal governed retest:
+
+```text
+new retained evidence
+→ deterministic subject-anchored overlap check
+→ evidence must postdate the original failure
+→ source confidence and bounded reopen-limit checks
+→ audit event
+→ requeue as pending
+→ normal governed study decides whether it can be resolved
+```
+
+The scan is model-free, bounded to three requeues per cycle, runs after daily acquisition/consolidation, and never answers a question, changes confidence, or promotes a skill. Malformed/unstudyable gaps remain terminal; prior evidence and low-confidence/incidental matches do not reopen anything. Owner route: `/api/admin/cos-knowledge-application` (`POST ?dry=1` is read-only).
+
+Still required: merge, apply `20260822_cos_knowledge_application.sql`, Production deployment, and a real post-acquisition requeue trace followed by a normal governed retest. Never manufacture a requeue merely to close this gate.
+
+---
+
 # Local discovery — IMPLEMENTED AND LIVE
 
 Real-world place queries use live discovery evidence rather than stale model memory. The route prefers deterministic grounded answers when evidence is sufficient, otherwise COS/Qwen evidence-only synthesis, with external fallback optional rather than required.

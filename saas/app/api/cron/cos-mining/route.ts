@@ -12,6 +12,7 @@ import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidat
 import { runFactConsolidationCycle } from '@/lib/ai/cos/cognitiveFactConsolidation'
 import { runProbationaryPromotionCycle } from '@/lib/ai/cos/cognitiveProbationaryPromotion'
 import { refreshMetacognitiveCapabilityMap } from '@/lib/ai/cos/cognitiveMetacognition'
+import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationStore'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest) {
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let factConsolidation: Awaited<ReturnType<typeof runFactConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let probationaryPromotion: Awaited<ReturnType<typeof runProbationaryPromotionCycle>> | { enabled: false; errors: string[] } | null = null
+  let knowledgeApplication: Awaited<ReturnType<typeof runKnowledgeApplicationScan>> | { enabled: false; errors: string[] } | null = null
   let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
@@ -115,6 +117,16 @@ export async function GET(req: NextRequest) {
       probationaryPromotion = { enabled: false, errors: [message] }
     }
 
+    // Newly retained evidence can reopen only a bounded number of evidence-terminal gaps for
+    // normal governed study. This deterministic scan never resolves a gap or calls a model.
+    try {
+      knowledgeApplication = await runKnowledgeApplicationScan()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Knowledge application scan failed'
+      console.error('cron COS knowledge application scan failed:', message)
+      knowledgeApplication = { enabled: false, errors: [message] }
+    }
+
     // Rebuild metacognitive state after learning/certification/composition/consolidation so selection
     // on the next request reflects the newest strong, weak, quarantined and unresolved evidence.
     try {
@@ -148,6 +160,7 @@ export async function GET(req: NextRequest) {
     consolidation,
     factConsolidation,
     probationaryPromotion,
+    knowledgeApplication,
     metacognition,
     corpus,
   })

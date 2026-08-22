@@ -46,7 +46,7 @@ export type TemporalClassification = {
 }
 
 /** Mortality, and anything that resolves to "is this person still alive". */
-const LIFE_STATUS = /\b(still alive|is .{0,40}\bdead\b|did .{0,40}\b(die|pass away)\b|when did .{0,40}\bdie\b|cause of death|passed away)\b/i
+const LIFE_STATUS = /\b(?:still alive|is\s+.{0,60}\b(?:alive|dead|deceased)\b|(?:did|has|have)\s+.{0,60}\b(?:die|died|pass(?:ed)? away)\b|when\s+(?:did\s+)?[^?!.]{0,60}\b(?:die|died|pass(?:ed)? away)\b|(?:date|cause) of death|passed away)\b/i
 /** "Who is the current/present X" — role holders change. */
 const CURRENT_HOLDER = /\b(who is (the )?(current|present|new)|current (ceo|president|chair|head|owner|manager|champion|leader)|who (currently )?(runs|leads|owns|holds))\b/i
 /** "Is X still Y" — support status, employment, operation, marriage, incumbency. */

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 const OPERATOR_PATH = '/dashboard/operator'
+const ASSISTANT_DASHBOARD_PATH = '/dashboard/assistant'
 const BLOCKED_ERROR = 'AI execution globally disabled by administrator override.'
 const RATE_WINDOW_MS = 10 * 60_000
 const ANONYMOUS_MAX = 8
@@ -46,15 +47,16 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // COS-FIRST LIVE ROUTING.
-  // Keep /api/concierge as the stable browser endpoint. Browser turns first enter
-  // /api/cos-browser, which establishes request-scoped RunPod wake permission and
-  // then invokes COS Primary. Direct/server calls to /api/cos-primary bypass that
-  // browser wrapper and therefore cannot start paid GPU compute.
-  if (pathname === '/api/concierge' && req.method === 'POST') {
-    const cosBrowserUrl = req.nextUrl.clone()
-    cosBrowserUrl.pathname = '/api/cos-browser'
-    return NextResponse.rewrite(cosBrowserUrl)
+  // TWO DISTINCT ASSISTANT PRODUCTS.
+  // `/api/concierge` is the public/customer-facing Concierge route.
+  // `/dashboard/assistant` is the owner's private Chief of Staff (COS) surface. The page
+  // historically posted to `/api/concierge`; keep that browser contract compatible while
+  // routing only this dashboard origin to the dedicated owner-only `/api/assistant` ingress.
+  // Public Concierge requests must never be silently rewritten into the private COS pipeline.
+  if (pathname === '/api/concierge' && req.method === 'POST' && requestCameFromAssistantDashboard(req)) {
+    const chiefOfStaffUrl = req.nextUrl.clone()
+    chiefOfStaffUrl.pathname = '/api/assistant'
+    return NextResponse.rewrite(chiefOfStaffUrl)
   }
 
   // Only guard the operator path beyond autonomous API ingress and the public spend gate.
@@ -91,6 +93,16 @@ export async function proxy(req: NextRequest) {
 
   // Not the owner -> send to the dashboard home.
   return NextResponse.redirect(new URL('/dashboard', req.url))
+}
+
+function requestCameFromAssistantDashboard(req: NextRequest): boolean {
+  const referer = req.headers.get('referer') || ''
+  if (!referer) return false
+  try {
+    return new URL(referer).pathname.startsWith(ASSISTANT_DASHBOARD_PATH)
+  } catch {
+    return false
+  }
 }
 
 function isAutonomousIngress(pathname: string) {

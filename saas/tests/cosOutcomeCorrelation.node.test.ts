@@ -100,8 +100,13 @@ test('verified production outcome keeps its evidence guard and supports only exp
 
 test('migration makes outcomes race-safe and keeps utilization benchmark separate from capability cases', () => {
   const source = file('../supabase/migrations/20260821_cos_turn_outcomes_and_utilization_benchmark.sql')
+  const chronology = file('../supabase/migrations/20260822_cos_turn_outcome_chronology.sql')
+  const store = file('../lib/ai/cos/turnExperienceStore.ts')
   assert.match(source, /create table if not exists public\.cos_turn_outcomes/i)
-  assert.match(source, /create or replace function public\.cos_merge_turn_outcome/i)
+  assert.match(chronology, /create or replace function public\.cos_merge_turn_outcome_chronological/i)
+  assert.match(chronology, /where excluded\.outcome_at >= cos_turn_outcomes\.outcome_at/i)
+  assert.match(store, /rpc\('cos_merge_turn_outcome_chronological'/)
+  assert.match(store, /if \(merged\.data !== true\) return true/)
   assert.match(source, /add column if not exists turn_id uuid/i)
   assert.match(source, /cos_evidence_utilization_benchmark_runs/i)
   assert.match(source, /cos_evidence_utilization_benchmark_results/i)

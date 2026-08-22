@@ -72,7 +72,7 @@ test('assistant feedback derives turn id from server-owned records and never the
   assert.match(source, /select\('role,content,created_at,provenance'\)/)
   assert.match(source, /asRecord\(assistantMessage\?\.provenance\)\.turnId/)
   assert.match(source, /from\('cos_latest_turn_provenance'\)/)
-  assert.match(source, /\.eq\('assistant_content', assistantContent\)/)
+  assert.match(source, /\.eq\('assistant_content', normalizeAssistantContent\(assistantContent\)\)/)
   assert.match(source, /hashPrompt\(userPrompt\) !== storedPromptHash/)
   assert.match(source, /from\('cos_turn_experience'\)/)
   assert.match(source, /attachTurnOutcome\(target\.turnId/)

@@ -7,10 +7,7 @@ import {
   reviewCuratedCertificationCandidate,
   type CognitiveCertificationProfileKey,
 } from '@/lib/ai/cos/cognitiveCertificationProfiles'
-import {
-  refreshCognitiveSkillStatus,
-  runNextCognitivePracticeForSkill,
-} from '@/lib/ai/cos/cognitiveActiveLearning'
+import { refreshCognitiveSkillStatus } from '@/lib/ai/cos/cognitiveActiveLearning'
 
 const CERTIFIABLE_STATUSES = ['encountered', 'evaluated', 'understood', 'practiced', 'validated'] as const
 const PRACTICED_OR_STRONGER = new Set(['practiced', 'validated', 'learned', 'mastered'])
@@ -143,7 +140,9 @@ async function runCuratedUnderstanding(row: any, profile: CognitiveCertification
   if (!db) return false
   const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
   const certification = metadata.certification && typeof metadata.certification === 'object' ? metadata.certification : {}
-  const priorUnderstanding = certification.understanding && typeof certification.understanding === 'object' ? certification.understanding as Record<string, unknown> : {}
+  const priorUnderstanding = certification.understanding && typeof certification.understanding === 'object'
+    ? certification.understanding as Record<string, unknown>
+    : {}
   const priorAttempts = Number(priorUnderstanding.attempts || 0)
   if (priorAttempts >= 2 && priorUnderstanding.passed !== true) {
     await auditCertification({
@@ -225,7 +224,16 @@ async function queueCertificationCases(
   const cases = await loadCases(profile, kind)
   let queued = 0
   for (const testCase of cases) {
-    const result = await db.from('cos_active_practice_queue').upsert({
+    const existing = await db.from('cos_active_practice_queue')
+      .select('id')
+      .eq('skill_key', skillKey)
+      .eq('exercise_kind', kind)
+      .eq('variant_key', `cert:${profile}:${testCase.case_key}`)
+      .maybeSingle()
+    if (existing.error) throw existing.error
+    if (existing.data?.id) continue
+
+    const result = await db.from('cos_active_practice_queue').insert({
       skill_key: skillKey,
       teacher_lesson_id: null,
       variant_key: `cert:${profile}:${testCase.case_key}`,
@@ -245,10 +253,98 @@ async function queueCertificationCases(
       },
       next_attempt_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'skill_key,exercise_kind,variant_key', ignoreDuplicates: true })
-    if (!result.error) queued += 1
+    })
+    if (result.error) throw result.error
+    queued += 1
   }
   return queued
+}
+
+async function claimCertificationExercise(skillKey: string, kind: 'practice' | 'holdout'): Promise<any | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  const result = await db.from('cos_active_practice_queue')
+    .select('*')
+    .eq('skill_key', skillKey)
+    .eq('exercise_kind', kind)
+    .eq('status', 'queued')
+    .eq('generation_source', 'curated')
+    .contains('metadata', { origin: 'autonomous_cognitive_certification' })
+    .lte('next_attempt_at', new Date().toISOString())
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (result.error) throw result.error
+  if (!result.data) return null
+  const claimed = await db.from('cos_active_practice_queue').update({
+    status: 'running',
+    started_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq('id', result.data.id).eq('status', 'queued').select('*').maybeSingle()
+  if (claimed.error) throw claimed.error
+  return claimed.data || null
+}
+
+async function runCertificationExercise(
+  skillKey: string,
+  kind: 'practice' | 'holdout',
+): Promise<Record<string, unknown> | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  const item = await claimCertificationExercise(skillKey, kind)
+  if (!item) return null
+
+  try {
+    const skillResult = await db.from('cos_cognitive_skills').select('*').eq('skill_key', skillKey).maybeSingle()
+    if (skillResult.error || !skillResult.data) throw new Error('certification_skill_missing')
+    const skill = skillResult.data as any
+    if (kind === 'holdout' && item.generation_source === 'local_generator') throw new Error('invalid_local_holdout')
+    if (kind === 'holdout' && !skill.evaluator_approved) throw new Error('holdout_requires_evaluator_approval')
+    if (kind === 'holdout' && !skill.understanding_approved) throw new Error('holdout_requires_understanding_approval')
+
+    const reasoned = await callCosReasoner({
+      temperature: 0,
+      maxTokens: 3200,
+      systemPrompt: 'Apply the procedural skill independently. Return strict JSON only: {"answer":"...","confidence":0..1}. The skill is how-to guidance, not factual evidence.',
+      prompt: `PROCEDURAL SKILL:\n${clean(JSON.stringify(skill.procedure), 15000)}\n\n${kind.toUpperCase()} CERTIFICATION CASE:\n${clean(item.prompt, 12000)}\n\nSolve from the case itself. You cannot see the grading rubric. Do not claim the skill as factual evidence.`,
+    }).catch(() => null)
+    const parsed = reasoned?.text ? parseLocalResult(reasoned.text) : null
+    const grade = evaluateAnswerAgainstRubric(parsed?.answer || '', item.rubric || {})
+    const passed = Boolean(parsed) && grade.pass
+    const rpc = await db.rpc('cos_record_cognitive_practice_result', {
+      p_queue_id: item.id,
+      p_success: passed,
+      p_score: grade.score,
+      p_answer: parsed?.answer || '',
+      p_evidence: {
+        ...grade,
+        localConfidence: parsed?.confidence ?? null,
+        localReasoner: reasoned?.reasoner.label || null,
+        certificationProfile: item.metadata?.certificationProfile || null,
+        independentPrivateCase: true,
+      },
+    })
+    if (rpc.error) throw rpc.error
+    const lifecycle = await refreshCognitiveSkillStatus(skillKey)
+    return {
+      queueId: item.id,
+      skillKey,
+      kind,
+      passed,
+      score: grade.score,
+      coverage: grade.coverage,
+      lifecycle,
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await db.from('cos_active_practice_queue').update({
+      status: 'blocked',
+      last_error: clean(message, 2000),
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', item.id)
+    return { queueId: item.id, skillKey, kind, blocked: true, error: message }
+  }
 }
 
 async function freshSkill(skillKey: string): Promise<any | null> {
@@ -334,7 +430,7 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
     summary.practiceQueued = await queueCertificationCases(skill.skill_key, target.profile, 'practice')
     const practiceLimit = positiveInt(process.env.COS_COGNITIVE_CERTIFICATION_PRACTICE_PER_CYCLE, 2, 4)
     for (let i = 0; i < practiceLimit; i += 1) {
-      const result = await runNextCognitivePracticeForSkill(skill.skill_key, 'practice')
+      const result = await runCertificationExercise(skill.skill_key, 'practice')
       if (!result) break
       summary.practiceRuns.push(result)
     }
@@ -351,7 +447,7 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
     summary.holdoutsQueued = await queueCertificationCases(skill.skill_key, target.profile, 'holdout')
     const holdoutLimit = positiveInt(process.env.COS_COGNITIVE_CERTIFICATION_HOLDOUTS_PER_CYCLE, 3, 6)
     for (let i = 0; i < holdoutLimit; i += 1) {
-      const result = await runNextCognitivePracticeForSkill(skill.skill_key, 'holdout')
+      const result = await runCertificationExercise(skill.skill_key, 'holdout')
       if (!result) break
       summary.holdoutRuns.push(result)
     }
@@ -374,13 +470,15 @@ export async function runCognitiveCertificationCycle(): Promise<CognitiveCertifi
     const message = error instanceof Error ? error.message : String(error)
     summary.errors.push(message)
     summary.blockedReason = 'certification_cycle_error'
-    await auditCertification({
-      skillKey: summary.candidate || 'unknown',
-      profile: summary.profile || 'context_ambiguity_v1',
-      phase: 'cycle_error',
-      success: false,
-      reason: message,
-    }).catch(() => undefined)
+    if (summary.candidate && summary.profile) {
+      await auditCertification({
+        skillKey: summary.candidate,
+        profile: summary.profile,
+        phase: 'cycle_error',
+        success: false,
+        reason: message,
+      }).catch(() => undefined)
+    }
   }
   return summary
 }

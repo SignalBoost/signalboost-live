@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   adaptiveRetrievalCaseCanExerciseCap,
@@ -118,4 +119,13 @@ test('controlled comparison fixtures never enter the private capability acceptan
   assert.equal(isPrivateCapabilityAcceptanceOrigin('runtime_failure'), true)
   assert.equal(isPrivateCapabilityAcceptanceOrigin(null), true)
   assert.equal(isPrivateCapabilityAcceptanceOrigin(CONTROLLED_COMPARISON_PRIVATE_ORIGIN), false)
+})
+
+test('adaptive dashboard releases busy state from durable progress instead of waiting only on the POST connection', () => {
+  const page = readFileSync(new URL('../app/dashboard/cos-capability-benchmark/page.tsx', import.meta.url), 'utf8')
+  assert.match(page, /ADAPTIVE_POLL_INTERVAL_MS\s*=\s*5_000/)
+  assert.match(page, /nextAdaptive\.validations\.length\s*>\s*startingValidationCount/)
+  assert.match(page, /latest\?\.status\s*===\s*'validated_shadow'/)
+  assert.match(page, /setAdaptive\(nextAdaptive\)[\s\S]*setBusy\(null\)/)
+  assert.match(page, /setAdaptive\(adaptiveStateFromBody\(body\)\)[\s\S]*setBusy\(null\)[\s\S]*void load\(\)/)
 })

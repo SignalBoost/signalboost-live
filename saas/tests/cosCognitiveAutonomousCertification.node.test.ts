@@ -146,9 +146,24 @@ test('private certification schema contains no committed held-out prompts and st
   assert.doesNotMatch(migration, /insert into public\.cos_cognitive_certification_cases/i)
 })
 
-test('existing daily mining cycle runs bounded certification without a new schedule', () => {
+test('daily certification shares the route deadline and launches at most one model exercise', () => {
   const cron = read('../app/api/cron/cos-mining/route.ts')
-  assert.match(cron, /runCognitiveCertificationCycle/)
-  assert.match(cron, /certification = await runCognitiveCertificationCycle\(\)/)
-  assert.match(cron, /certification,/)
+  const source = read('../lib/ai/cos/cognitiveCertification.ts')
+  assert.match(cron, /const routeStartedAt = Date\.now\(\)/)
+  assert.match(cron, /CERTIFICATION_ROUTE_DEADLINE_MS = 210_000/)
+  assert.match(cron, /deadlineAt: routeStartedAt \+ CERTIFICATION_ROUTE_DEADLINE_MS/)
+  assert.match(cron, /maxModelCalls: 1/)
+  assert.match(source, /DEFAULT_MAX_MODEL_CALLS = 1/)
+  assert.match(source, /canStartCertificationModelCall/)
+  assert.match(source, /progressive_cycle_call_budget_reached/)
+})
+
+test('certification rotates candidates, recovers interrupted work, and stops exhausted validated skills from starving the queue', () => {
+  const source = read('../lib/ai/cos/cognitiveCertification.ts')
+  assert.match(source, /last_cycle_at: now/)
+  assert.match(source, /updated_at: now/)
+  assert.match(source, /stale_running_recovered/)
+  assert.match(source, /STALE_RUNNING_AFTER_MS/)
+  assert.match(source, /certification\.saturated === true/)
+  assert.match(source, /private_holdouts_exhausted_without_learned_threshold/)
 })

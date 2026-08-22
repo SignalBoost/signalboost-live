@@ -3,17 +3,17 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.19  
+**Version:** 1.21
 **Updated:** 2026-08-22 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Baseline `main`:** `9bf0a5540c6cdbd409c52a20b9f4aa4587f31bd7`  
-**Baseline Production deployment:** `dpl_483vcZK87vq9cB4ULw6pich3stua` — READY, `saas.signalboostapp.com` attached  
+**Current `main`:** `8878be1eeff6ef2404571837aee0710feae991c8`
+**Current Production deployment:** `dpl_4GJAjRxYRJ4KhC7pSieZwno5dGyf` — READY, `saas.signalboostapp.com` attached
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
 **Procedural-learning state:** autonomous certification architecture is Production; individual skills still earn lifecycle status from evidence  
-**Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning
+**Next learning priority:** observe real certification progression, then calibration / strategy-selection learning
 
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
@@ -409,6 +409,26 @@ Do not rerun already accepted cases merely to increase counters. Additional late
 
 ---
 
+# Applied knowledge — IMPLEMENTED; PRODUCTION ACCEPTANCE PENDING
+
+Newly retained evidence can now reopen a question that COS previously retired as unacquirable, but only for a normal governed retest:
+
+```text
+new retained evidence
+→ deterministic subject-anchored overlap check
+→ evidence must postdate the original failure
+→ source confidence and bounded reopen-limit checks
+→ audit event
+→ requeue as pending
+→ normal governed study decides whether it can be resolved
+```
+
+The scan is model-free, bounded to three requeues per cycle, runs after daily acquisition/consolidation, and never answers a question, changes confidence, or promotes a skill. Malformed/unstudyable gaps remain terminal; prior evidence and low-confidence/incidental matches do not reopen anything. Owner route: `/api/admin/cos-knowledge-application` (`POST ?dry=1` is read-only).
+
+Still required: merge, apply `20260822_cos_knowledge_application.sql`, Production deployment, and a real post-acquisition requeue trace followed by a normal governed retest. Never manufacture a requeue merely to close this gate.
+
+---
+
 # Local discovery — IMPLEMENTED AND LIVE
 
 Real-world place queries use live discovery evidence rather than stale model memory. The route prefers deterministic grounded answers when evidence is sufficient, otherwise COS/Qwen evidence-only synthesis, with external fallback optional rather than required.
@@ -436,7 +456,7 @@ Still partial:
 
 ---
 
-# Retrieval Self-Reflection — NEXT MAJOR LEARNING PHASE
+# Retrieval Self-Reflection — IMPLEMENTED; RUNTIME EVIDENCE PENDING
 
 Already present:
 
@@ -445,13 +465,7 @@ Already present:
 - exact outcome correlation;
 - adaptive shadow policy store and controlled validation.
 
-Finish:
-
-- bounded post-turn assessment containing only explicit retrieval artifacts such as sufficiency, unused evidence, missing evidence class and recommended retrieval adjustment;
-- correlate reflection predictions with later verified outcomes;
-- measure whether recommendations would have helped before they may influence policy;
-- deduplicate repeated low-value reflections;
-- never persist hidden chain-of-thought.
+PR #1381 added the bounded, prompt-free retrieval assessment and its outcome correlation/reconciliation path. It remains shadow-only and must accumulate later verified outcomes before any influence on live retrieval.
 
 Completion criterion: retrieval reflections predict later retrieval success/failure well enough to feed a separately validated shadow policy.
 
@@ -536,7 +550,7 @@ Files:
 
 Still required before calling it production-runtime-proven: a safe controlled anomaly that produces repeated objective repair outcomes, then a later equivalent anomaly whose COS diagnosis shows the eligible prior-repair suggestion while governance remains intact.
 
-Supervisor diagnostic fallback note: Gemini is used in JSON mode with the portable schema expressed in the prompt and local response validation. Its REST `responseSchema` field is not used because it rejected the portable schema in real Production diagnostics.
+The remediation-memory portable regression test uses an explicit `.ts` import so it runs under the repository's direct `node --test` contract. This was independently re-verified after the Production deployment; it changes no runtime authorization or repair behavior.
 
 ---
 
@@ -575,6 +589,9 @@ Non-negotiable:
 - #1363 — answer-side freshness self-reflection.
 - #1364 — governed feedback → reusable procedural candidate learning + structural triggers.
 - #1376 — autonomous evidence-gated cognitive skill certification with private profiles and bounded scheduling.
+- #1381 — bounded retrieval self-reflection with outcome correlation; shadow-only.
+- #1382 — governed remediation experience memory; Production READY, runtime incident evidence pending.
+- Applied knowledge — deterministic dormant-gap reopening for governed retest; branch implementation awaiting merge/Production acceptance.
 
 Always query current state; this sequence can advance after this document is merged.
 
@@ -583,14 +600,16 @@ Always query current state; this sequence can advance after this document is mer
 # Immediate next engineering priorities
 
 1. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
-2. **Retrieval Self-Reflection:** build bounded explicit retrieval assessments and prove predictive value against later outcomes.
-3. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-4. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-5. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-6. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
-7. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner without inflating holdout breadth.
-8. **Episodic → semantic compression:** multi-episode corroboration and reversible promotion.
-9. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled data, contamination controls and a separate held-out comparison exist.
+2. **Observe retrieval-reflection outcomes** and prove predictive value before it may feed a separately validated shadow policy.
+3. **Obtain governed remediation-memory runtime evidence** with a safe controlled anomaly; never fabricate rows or bypass approval to satisfy this gate.
+4. **Apply and verify Applied Knowledge:** after merge, obtain a real post-acquisition requeue trace and normal governed retest without fabricating evidence.
+5. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+6. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+7. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+8. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
+9. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner without inflating holdout breadth.
+10. **Episodic → semantic compression:** multi-episode corroboration and reversible promotion.
+11. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled data, contamination controls and a separate held-out comparison exist.
 
 ---
 

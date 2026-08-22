@@ -1,14 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   recordCosUserFeedbackExperience,
   type CosUserFeedbackType,
 } from '@/lib/ai/cos/cognitiveUserFeedback'
+import { generalizeFeedbackIntoCognitiveSkill } from '@/lib/ai/cos/cognitiveFeedbackGeneralization'
 import { attachTurnOutcome, hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 const MAX_CONVERSATION_MESSAGES = 500
 const MAX_ASSISTANT_CONTENT_CHARS = 80_000
@@ -115,10 +117,6 @@ async function targetFromLatestCosProvenance(params: {
   const { db, userId, assistantContent, userPrompt } = params
   if (!userPrompt) return { target: null }
 
-  // The right-side Concierge can receive a completed COS answer even when the best-effort
-  // conversation-history write is absent. Fall back only to the user's server-owned latest COS
-  // provenance, require an exact assistant-text match, and then validate the rendered prompt
-  // against the reasoner's durable HMAC/SHA prompt_hash. The client never supplies a turn_id.
   const latest = await db
     .from('cos_latest_turn_provenance')
     .select('assistant_content,provenance,updated_at')
@@ -235,6 +233,34 @@ export async function POST(request: NextRequest) {
       })
     : false
 
+  const reasoningCandidateScheduled = feedbackType === 'negative' || feedbackType === 'correction'
+  if (reasoningCandidateScheduled) {
+    const feedbackInput = {
+      experienceHash: result.decision.experienceHash,
+      prompt: target.prompt,
+      assistantContent,
+      feedbackType,
+      correctionText: feedbackType === 'correction' ? correctionText : null,
+    } as const
+    after(async () => {
+      try {
+        const generalized = await generalizeFeedbackIntoCognitiveSkill(feedbackInput)
+        console.info('[cos-user-feedback-generalization]', JSON.stringify({
+          at: new Date().toISOString(),
+          experienceHash: result.decision.experienceHash,
+          candidateCreated: generalized.candidateCreated,
+          skillKey: generalized.skillKey,
+          localPracticeQueued: generalized.localPracticeQueued,
+          reasoningTriggers: generalized.reasoningTriggers,
+          reason: generalized.reason,
+          automaticPromotion: false,
+        }))
+      } catch (error) {
+        console.warn('[cos-user-feedback-generalization] failed', error instanceof Error ? error.message : String(error))
+      }
+    })
+  }
+
   return NextResponse.json({
     ok: true,
     stored: true,
@@ -244,6 +270,12 @@ export async function POST(request: NextRequest) {
     outcomeCorrelation: {
       turnIdPresent: Boolean(target.turnId),
       attached: outcomeAttached,
+    },
+    learning: {
+      reasoningCandidateScheduled,
+      semantics: reasoningCandidateScheduled
+        ? 'generalized_procedural_candidate_only_requires_independent_validation_before_live_use'
+        : 'positive_feedback_outcome_only',
     },
     promotion: {
       fact: false,

@@ -571,7 +571,7 @@ Non-negotiable:
 
 ---
 
-**Turn-outcome chronology integrity:** The original #1328 merge is row-safe but can accept an older delivery after a newer verified outcome. The additive chronological merge repair is pending; do not use outcome data for calibration policy promotion until live verification proves stale events are ignored.
+**Turn-outcome chronology integrity — ACCEPTED:** PR #1387 added and deployed the service-role-only chronological merge. Production migration `cos_turn_outcome_chronology` is applied. In a rolled-back Production transaction, a newer verified-success event was retained and a later-delivered older failure was ignored; the test row was confirmed absent after rollback. Outcome data is safe from stale-event regression for calibration and strategy analysis.
 
 # Recent merged sequence that matters
 

@@ -25,6 +25,12 @@ test('the exact production question is flagged as time-sensitive', () => {
   assert.equal(classification.kind, 'life_status')
 })
 
+test('natural and imperfect life-status wording is also flagged', () => {
+  assert.equal(classifyTemporalSensitivity('when Hulk Hogan died?').kind, 'life_status')
+  assert.equal(classifyTemporalSensitivity('Has Hulk Hogan died?').kind, 'life_status')
+  assert.equal(classifyTemporalSensitivity('Is Hulk Hogan alive?').kind, 'life_status')
+})
+
 test('the exact production answer is caught — twice over', () => {
   const verdict = assessTemporalAnswer(
     'when did george foreman die',

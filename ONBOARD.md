@@ -571,6 +571,8 @@ Non-negotiable:
 
 ---
 
+**Turn-outcome chronology integrity:** The original #1328 merge is row-safe but can accept an older delivery after a newer verified outcome. The additive chronological merge repair is pending; do not use outcome data for calibration policy promotion until live verification proves stale events are ignored.
+
 # Recent merged sequence that matters
 
 - #1328 — exact turn outcomes + controlled evidence-utilization benchmark.

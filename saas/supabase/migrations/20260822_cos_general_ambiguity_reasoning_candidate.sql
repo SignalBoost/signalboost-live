@@ -44,6 +44,16 @@ insert into public.cos_cognitive_skills (
       'comparatives without an explicit baseline',
       'relative time phrases whose concrete window matters'
     ),
+    'observables', jsonb_build_array(
+      'the answer explicitly resolves or conditionally branches on every ambiguity that would materially change the result',
+      'no location, identity, comparison baseline, time window, user preference, or environmental state appears unless supplied or retrieved',
+      'a clarification is asked only when the available context cannot distinguish materially different answers'
+    ),
+    'falsifiers', jsonb_build_array(
+      'the answer commits to one interpretation even though another unresolved interpretation would materially change the result',
+      'the answer invents missing context or treats a subjective standard as an objective fact',
+      'the answer asks for clarification despite the supplied context already resolving the ambiguity'
+    ),
     'commonFailureModes', jsonb_build_array(
       'guessing what here or this refers to',
       'answering one interpretation while silently ignoring another material interpretation',

@@ -1,5 +1,5 @@
-import type { KnowledgeGap } from './index'
-import type { ContinuousLearningSourceAdapter, LearningSourceDocument } from './cycle'
+import type { KnowledgeGap } from './index.ts'
+import type { ContinuousLearningSourceAdapter, LearningSourceDocument } from './cycle.ts'
 
 export type LearningConnectorResult={uri:string;title?:string;text:string;observedAt?:string;license?:string}
 export type LearningConnectorSearch=(query:string,limit:number)=>Promise<LearningConnectorResult[]>
@@ -21,3 +21,8 @@ export const scientificLearningConnector=(search:LearningConnectorSearch,maxResu
 export const newsLearningConnector=(search:LearningConnectorSearch,maxResults=5,id='news')=>new SearchLearningConnector('news_article',search,maxResults,id)
 export const officialDocsLearningConnector=(search:LearningConnectorSearch,maxResults=5,id='official_docs')=>new SearchLearningConnector('official_documentation',search,maxResults,id)
 export const datasetLearningConnector=(search:LearningConnectorSearch,maxResults=5,id='dataset')=>new SearchLearningConnector('public_dataset',search,maxResults,id)
+// General current facts (people, organisations, entities, status). Queries by SUBJECT rather than
+// subject+question: an encyclopaedia is looked up by entity name, and appending a full question
+// buries the entity among stop-words and returns nothing. The cycle still scores every returned
+// article against the full question before admission, so relevance gating stays question-specific.
+export const referenceLearningConnector=(search:LearningConnectorSearch,maxResults=3,id='reference')=>new SearchLearningConnector('approved_public_web',search,maxResults,id,(gap)=>gap.subject||gap.question)

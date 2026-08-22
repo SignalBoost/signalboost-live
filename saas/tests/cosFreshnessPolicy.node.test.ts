@@ -46,6 +46,12 @@ test('explicit freshness wording forces live verification across public volatile
   assert.equal(requiresFreshExternalEvidence('What is the latest software release?'), true)
 })
 
+test('life-status questions require live verification without an explicit current marker', () => {
+  assert.equal(requiresFreshExternalEvidence('When did George Foreman die?'), true)
+  assert.equal(requiresFreshExternalEvidence('Is George Foreman alive?'), true)
+  assert.equal(requiresFreshExternalEvidence('Has George Foreman passed away?'), true)
+})
+
 test('historical and conceptual questions do not masquerade as current-world lookups', () => {
   assert.equal(requiresFreshExternalEvidence('Who was President of the United States in 1999?'), false)
   assert.equal(requiresFreshExternalEvidence('What was the TSLA stock price in 2020?'), false)

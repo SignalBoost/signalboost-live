@@ -33,6 +33,10 @@ const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live tr
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
 const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
+// A person's life status is a high-impact public fact that can change between model
+// updates. People rarely phrase this with an explicit "current" marker (for example,
+// "When did George Foreman die?"), so it needs its own live-evidence trigger.
+const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
 
 function normalizedText(input: string): string {
   return String(input || '').replace(/\s+/g, ' ').trim()
@@ -92,6 +96,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
 
   if (LOOKUP_INTENT.test(text) && PUBLIC_RULE_STATE.test(text)) return true
   if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
 
   return false
 }

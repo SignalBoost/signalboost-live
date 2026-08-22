@@ -536,6 +536,8 @@ Files:
 
 Still required before calling it production-runtime-proven: a safe controlled anomaly that produces repeated objective repair outcomes, then a later equivalent anomaly whose COS diagnosis shows the eligible prior-repair suggestion while governance remains intact.
 
+Supervisor diagnostic fallback note: Gemini is used in JSON mode with the portable schema expressed in the prompt and local response validation. Its REST `responseSchema` field is not used because it rejected the portable schema in real Production diagnostics.
+
 ---
 
 # Security / governance invariants

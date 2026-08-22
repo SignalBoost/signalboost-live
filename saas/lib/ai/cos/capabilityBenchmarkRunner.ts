@@ -6,6 +6,10 @@ import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseSt
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/turnExperienceStore'
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
+import {
+  withAdaptiveRetrievalShadowPolicy,
+  type AdaptiveRetrievalShadowPolicy,
+} from '@/lib/ai/cos/adaptiveRetrievalContext'
 
 export type PrivateBenchmarkCase = CapabilityBenchmarkCase & { id: string }
 
@@ -13,6 +17,8 @@ type RunPrivateCapabilityCaseOptions = {
   outcomeSource?: string
   /** Explicit bounded correction used only for a failure-autopsy shadow retest. */
   shadowGuidance?: string
+  /** Request-local retrieval candidate used only by the adaptive-retrieval validation suite. */
+  adaptiveRetrievalPolicy?: AdaptiveRetrievalShadowPolicy
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -45,7 +51,10 @@ export async function runPrivateCapabilityCase(
     await generateLocalEmbedding(test.prompt)
   }
 
-  const result = await tryCOSFirstAnswer({ prompt: executionPrompt, language: 'en', privileged: true, disableCache: true })
+  const answer = () => tryCOSFirstAnswer({ prompt: executionPrompt, language: 'en', privileged: true, disableCache: true })
+  const result = options?.adaptiveRetrievalPolicy
+    ? await withAdaptiveRetrievalShadowPolicy(options.adaptiveRetrievalPolicy, answer)
+    : await answer()
   const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
   const turnId = peekEvidenceSourceUseTurnId()
   const score = scoreCapabilityBenchmarkCase(test, {

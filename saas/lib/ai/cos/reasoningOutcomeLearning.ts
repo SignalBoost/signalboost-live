@@ -3,7 +3,6 @@ import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import type { CosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningControlPlane'
 import {
   deriveReasoningOutcomeProfile,
-  learnedPreferenceFor,
   type ReasoningOutcomeSample,
   type ReasoningProblemPreference,
 } from '@/lib/ai/cos/reasoningOutcomeProfile'
@@ -31,7 +30,7 @@ function cacheKey(problemClass: string): string {
   return String(problemClass || 'general reasoning').trim().toLowerCase()
 }
 
-async function readPreference(problemClass: string): Promise<ReasoningProblemPreference | null> {
+async function readProblemPreference(problemClass: string): Promise<ReasoningProblemPreference | null> {
   const db = cosServiceDb()
   if (!db) return null
   const metrics = await db.from('cos_reasoning_worker_metrics')
@@ -66,16 +65,22 @@ async function readPreference(problemClass: string): Promise<ReasoningProblemPre
     }
   })
 
-  return learnedPreferenceFor(deriveReasoningOutcomeProfile(samples), problemClass)
+  const profile = deriveReasoningOutcomeProfile(samples)
+  return profile.preferences.find(preference => preference.problemClass === problemClass) ?? null
 }
 
-export async function loadLearnedReasoningPreference(problemClass: string): Promise<ReasoningProblemPreference | null> {
+export async function loadReasoningOutcomeStatus(
+  problemClass: string,
+  options: { fresh?: boolean } = {},
+): Promise<ReasoningProblemPreference | null> {
   const key = cacheKey(problemClass)
   const now = Date.now()
-  const cached = preferenceCache.get(key)
-  if (cached && cached.expiresAt > now) return cached.preference
+  if (!options.fresh) {
+    const cached = preferenceCache.get(key)
+    if (cached && cached.expiresAt > now) return cached.preference
+  }
   try {
-    const preference = await readPreference(problemClass)
+    const preference = await readProblemPreference(problemClass)
     preferenceCache.set(key, { expiresAt: now + CACHE_TTL_MS, preference })
     return preference
   } catch (error) {
@@ -83,6 +88,15 @@ export async function loadLearnedReasoningPreference(problemClass: string): Prom
     preferenceCache.set(key, { expiresAt: now + 30_000, preference: null })
     return null
   }
+}
+
+export function invalidateReasoningOutcomeStatus(problemClass: string): void {
+  preferenceCache.delete(cacheKey(problemClass))
+}
+
+export async function loadLearnedReasoningPreference(problemClass: string): Promise<ReasoningProblemPreference | null> {
+  const preference = await loadReasoningOutcomeStatus(problemClass)
+  return preference?.status === 'learned' ? preference : null
 }
 
 export type AppliedReasoningPreference = {

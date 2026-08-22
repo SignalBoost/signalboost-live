@@ -53,6 +53,30 @@ export function trackProblemClasses(
   return [...new Set(values)]
 }
 
+export function problemClassCaseCounts(
+  cases: readonly ComparisonProgressCase[],
+  args: { origin?: string | null } = {},
+): Array<{ problemClass: string; cases: number }> {
+  const counts = new Map<string, number>()
+  for (const item of cases) {
+    if (args.origin != null && item.origin !== args.origin) continue
+    if (!item.problemClass) continue
+    counts.set(item.problemClass, (counts.get(item.problemClass) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([problemClass, count]) => ({ problemClass, cases: count }))
+    .sort((a, b) => b.cases - a.cases || a.problemClass.localeCompare(b.problemClass))
+}
+
+function verifiedCandidateKeys(
+  results: readonly ComparisonProgressResult[],
+  reasonerLabel: string,
+): Set<string> {
+  return new Set(results
+    .filter(result => result.verified_outcome_recorded && result.reasoner_label === reasonerLabel)
+    .map(result => `${result.case_id}\u0000${result.worker_role}`))
+}
+
 export function nextDiverseCase(
   cases: readonly ComparisonProgressCase[],
   results: readonly ComparisonProgressResult[],
@@ -64,12 +88,32 @@ export function nextDiverseCase(
   },
 ): ComparisonProgressCase | null {
   if (!args.reasonerLabel || args.roles.length < 2) return null
-  const verified = new Set(results
-    .filter(result => result.verified_outcome_recorded && result.reasoner_label === args.reasonerLabel)
-    .map(result => `${result.case_id}\u0000${result.worker_role}`))
-
+  const verified = verifiedCandidateKeys(results, args.reasonerLabel)
   const trackCases = cases.filter(item =>
     item.track === args.track && (args.origin == null || item.origin === args.origin),
   )
   return trackCases.find(item => args.roles.some(role => !verified.has(`${item.id}\u0000${role}`))) ?? null
+}
+
+/**
+ * Evidence campaigns must rotate by the Phase 4 grouping key, not by a reporting track. A track
+ * may legitimately span several learner buckets; batching across those buckets would dilute the
+ * evidence floor and could never produce a valid learned preference.
+ */
+export function nextDiverseCaseForProblemClass(
+  cases: readonly ComparisonProgressCase[],
+  results: readonly ComparisonProgressResult[],
+  args: {
+    problemClass: string
+    roles: readonly string[]
+    reasonerLabel: string | null
+    origin?: string | null
+  },
+): ComparisonProgressCase | null {
+  if (!args.reasonerLabel || !args.problemClass || args.roles.length < 2) return null
+  const verified = verifiedCandidateKeys(results, args.reasonerLabel)
+  const bucketCases = cases.filter(item =>
+    item.problemClass === args.problemClass && (args.origin == null || item.origin === args.origin),
+  )
+  return bucketCases.find(item => args.roles.some(role => !verified.has(`${item.id}\u0000${role}`))) ?? null
 }

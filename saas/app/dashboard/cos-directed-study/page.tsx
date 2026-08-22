@@ -41,6 +41,7 @@ export default function CosDirectedStudyPage() {
   const [sourceUri, setSourceUri] = useState('')
   const [sourceTitle, setSourceTitle] = useState('')
   const [text, setText] = useState('')
+  const [file, setFile] = useState<{ name: string; data: string } | null>(null)
 
   const [busy, setBusy] = useState<'preview' | 'feed' | null>(null)
   const [result, setResult] = useState<ApiResult | null>(null)
@@ -50,6 +51,32 @@ export default function CosDirectedStudyPage() {
   const [error, setError] = useState('')
 
   const formReady = topic.trim().length >= 4 && studyIntent.trim().length >= 12 && license.trim().length > 0 && sourceUri.trim().length > 0
+
+  async function onFileChosen(chosen: File | null) {
+    if (!chosen) { setFile(null); return }
+    const name = chosen.name.toLowerCase()
+    if (name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.markdown')) {
+      // Plain text reads client-side straight into the paste box, so the owner can trim it first.
+      setText(await chosen.text())
+      setFile(null)
+      if (!sourceUri.trim()) setSourceUri(`owner://upload/${chosen.name}`)
+      return
+    }
+    if (name.endsWith('.pdf')) {
+      // PDFs are extracted server-side (dependency-free); send the bytes as base64.
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(new Error('read failed'))
+        reader.readAsDataURL(chosen)
+      }).catch(() => '')
+      if (!data) { setError(copy.requestFailed); return }
+      setFile({ name: chosen.name, data })
+      if (!sourceUri.trim()) setSourceUri(`owner://upload/${chosen.name}`)
+      return
+    }
+    setError(copy.unsupportedFile)
+  }
 
   async function loadHistory() {
     if (!canonicalHostAvailable()) {
@@ -85,6 +112,7 @@ export default function CosDirectedStudyPage() {
           sourceUri: sourceUri.trim(),
           sourceTitle: sourceTitle.trim() || undefined,
           text: text.trim() || undefined,
+          ...(file ? { fileName: file.name, fileData: file.data } : {}),
         }),
       })
       const body = await readResponse(response) as ApiResult
@@ -134,6 +162,10 @@ export default function CosDirectedStudyPage() {
         <Field label={copy.sourceTitle}><input value={sourceTitle} onChange={e => setSourceTitle(e.target.value)} className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm" /></Field>
       </div>
       <Field label={copy.pastedText} hint={copy.pastedTextHint}><textarea value={text} onChange={e => setText(e.target.value)} rows={8} className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm" /></Field>
+      <Field label={copy.uploadFile} hint={copy.uploadHint}>
+        <input type="file" accept=".txt,.md,.markdown,.pdf" onChange={e => void onFileChosen(e.target.files?.[0] ?? null)} className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm" />
+        {file && <div className="mt-1.5 flex items-center gap-2 text-xs text-text-muted"><span>{copy.fileAttached}: <span className="font-semibold text-text">{file.name}</span></span><button type="button" onClick={() => setFile(null)} className="rounded-md border border-border px-2 py-0.5">{copy.removeFile}</button></div>}
+      </Field>
       <p className="text-xs text-text-muted">{copy.validationHint}</p>
       <div className="flex flex-wrap gap-3">
         <button onClick={() => submit(true)} disabled={!formReady || busy !== null || hostMismatch || authRequired} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50">{busy === 'preview' ? copy.previewing : copy.preview}</button>

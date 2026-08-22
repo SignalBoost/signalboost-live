@@ -11,6 +11,8 @@ const tests = [
   'tests/cosStructuredLiveInfo.node.test.ts',
   'tests/cosTemporalClaimGuard.node.test.ts',
   'tests/cosLocalDiscovery.node.test.ts',
+  'tests/cosCurrentWorldLearning.node.test.ts',
+  'tests/cosLearnedCorpusContinuousIndexing.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

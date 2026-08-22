@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  adaptiveRetrievalCaseCanExerciseCap,
   adaptiveRetrievalTrainingCaseId,
   deriveAdaptiveRetrievalCandidate,
   selectAdaptiveRetrievalValidationCase,
@@ -10,6 +11,10 @@ import {
   effectiveLearnedCorpusInjectionLimit,
   withAdaptiveRetrievalShadowPolicy,
 } from '../lib/ai/cos/adaptiveRetrievalContext.ts'
+import {
+  CONTROLLED_COMPARISON_PRIVATE_ORIGIN,
+  isPrivateCapabilityAcceptanceOrigin,
+} from '../lib/ai/cos/capabilityBenchmarkCohort.ts'
 
 function row(caseId: string, success = true, injected = 6, cited = 0): AdaptiveRetrievalTrainingRow {
   return {
@@ -86,6 +91,13 @@ test('second validation prefers another unused domain', () => {
   assert.equal(selected?.id, 'network-a')
 })
 
+test('preflight only spends a paired reasoner run when the live context can exceed the candidate cap', () => {
+  assert.equal(adaptiveRetrievalCaseCanExerciseCap(0, 4), false)
+  assert.equal(adaptiveRetrievalCaseCanExerciseCap(4, 4), false)
+  assert.equal(adaptiveRetrievalCaseCanExerciseCap(5, 4), true)
+  assert.equal(adaptiveRetrievalCaseCanExerciseCap(6, 4), true)
+})
+
 test('ordinary traffic keeps live cap while shadow validation can only reduce it', async () => {
   assert.equal(effectiveLearnedCorpusInjectionLimit(6), 6)
   await withAdaptiveRetrievalShadowPolicy({ learnedCorpusMaxInjected: 4 }, async () => {
@@ -99,4 +111,11 @@ test('null shadow cap means no override rather than zero injected context', asyn
   await withAdaptiveRetrievalShadowPolicy({ learnedCorpusMaxInjected: null, learnedCorpusMinSimilarity: null }, async () => {
     assert.equal(effectiveLearnedCorpusInjectionLimit(6), 6)
   })
+})
+
+test('controlled comparison fixtures never enter the private capability acceptance cohort', () => {
+  assert.equal(isPrivateCapabilityAcceptanceOrigin('manual'), true)
+  assert.equal(isPrivateCapabilityAcceptanceOrigin('runtime_failure'), true)
+  assert.equal(isPrivateCapabilityAcceptanceOrigin(null), true)
+  assert.equal(isPrivateCapabilityAcceptanceOrigin(CONTROLLED_COMPARISON_PRIVATE_ORIGIN), false)
 })

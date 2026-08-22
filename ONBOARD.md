@@ -3,18 +3,19 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.17  
+**Version:** 1.18  
 **Updated:** 2026-08-22 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Baseline `main` verified immediately before this documentation-only branch:** `688448640f5b9c90cdaa6b621171c9e9baf5c83d`  
-**Baseline Production deployment:** `dpl_7RtYA3oXNwEFbCRWGSs1MydRo1uJ` — READY, `saas.signalboostapp.com` attached  
+**Baseline `main`:** `9bf0a5540c6cdbd409c52a20b9f4aa4587f31bd7`  
+**Baseline Production deployment:** `dpl_483vcZK87vq9cB4ULw6pich3stua` — READY, `saas.signalboostapp.com` attached  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
-**Next learning priority:** Retrieval Self-Reflection, then calibration / strategy-selection learning
+**Procedural-learning state:** autonomous certification architecture is Production; individual skills still earn lifecycle status from evidence  
+**Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning
 
-> This file deliberately records current operational truth and acceptance evidence, not every historical implementation detail. Git history and dated files under `docs/` preserve the longer history. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
+> This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 ---
 
@@ -50,7 +51,7 @@ architecture / contract
 → ONBOARD.md updated
 ```
 
-If GitHub Actions fail before step 1 with `steps:null` / no logs, record that as Actions infrastructure state; do not pretend tests executed. The Vercel deployment gate is an independent executable gate and currently runs the critical COS regression suite before Next.js build.
+If GitHub Actions fail before step 1 with `steps:null` / no logs, record that as Actions infrastructure state; do not pretend tests executed. The Vercel deployment gate is an independent executable gate and runs the critical COS regression suite before Next.js build.
 
 Never weaken evidence gates, private holdouts, authorization, tenant isolation or lifecycle rules merely to make a dashboard green.
 
@@ -119,70 +120,282 @@ Never commit, print or expose provider secrets.
 
 DeepInfra production cutover and model-space repair are complete.
 
-Key accepted facts:
+Accepted facts:
 
 - DeepInfra/Qwen reasoner health and real completions passed.
 - BGE embeddings return exactly 768 dimensions.
-- Historical incompatible vector space was not reused merely because dimensions matched.
-- 45/45 durable facts and 111/111 eligible corpus rows were re-embedded into the BGE model space with zero failures/backlog.
+- embedding model identity is part of the semantic schema; equal dimensions do not imply compatible vector spaces.
+- historical incompatible vector space was not reused merely because dimensions matched.
+- retained learned knowledge is continuously indexed/re-indexed into the active model space.
 - rejected/quarantined corpus rows remain excluded from governed retrieval.
 - RunPod lifecycle is detached while the active reasoner URL is outside RunPod.
-
-Doctrine: embedding model identity is part of the semantic schema. Equal dimensions do not imply compatible vector spaces.
 
 ---
 
 # Capability / evidence benchmarks
 
-Private capability acceptance and controlled evidence-utilization are separate cohorts.
+Private capability acceptance and controlled evidence-utilization are separate cohorts. Do not mix benchmark fixture classes merely to improve a headline pass rate.
 
-Current accepted dashboard semantics:
+Recent accepted architecture includes:
 
-- private acceptance rotation: **6** active cases;
-- controlled comparison fixtures: separate cohort and excluded from private acceptance counting;
-- controlled evidence-utilization suite: **36** cases across nine domains;
-- latest observed private pass rate in the Aug 21/22 acceptance period: **100%**;
-- latest observed evidence-utilization pass rate in the same period: **100%**.
+- private capability rotation protected from controlled-comparison fixtures;
+- controlled evidence-utilization suite across multiple domains;
+- exact `turn_id` outcome correlation;
+- adaptive retrieval shadow validation;
+- reasoning-worker controlled comparison and outcome learning.
 
-PR #1345 repaired a regression where 40 controlled-comparison fixtures were accidentally counted as active private cases. Production data then showed 6 private acceptance cases + 40 controlled-comparison cases; nothing useful was deleted.
-
----
-
-# Outcome correlation — COMPLETE
-
-PR #1328 merged and is live. Durable `cos_turn_outcomes` provides race-safe exact `turn_id` correlation across:
-
-- server-owned assistant provenance;
-- explicit feedback;
-- private capability benchmark outcomes;
-- controlled evidence-utilization outcomes;
-- verified Production outcomes;
-- predicted confidence / route / problem-class analysis.
-
-PR #1329 subsequently hardened benchmark preflight/reliability and latest utilization pass-rate reporting.
-
-This outcome layer is the common substrate for calibration, retrieval, failure-autopsy and strategy learning.
+Always query current tables/dashboard before quoting the latest pass rate.
 
 ---
 
-# Failure Autopsy — COMPLETE ACCEPTANCE
+# Freshness / current-world knowledge — IMPLEMENTED AND LIVE
 
-General failure autopsy is implemented and has real Production acceptance evidence.
+The stale-world fix is general, not person-specific.
 
-Accepted retained lesson:
+Current contract:
+
+- ordinary external factual lookups are live-verified by default even when the user does not say `current`, `latest` or `today`;
+- historical and conceptual questions retain local/timeless reasoning paths;
+- private SignalBoost/system-of-record questions stay internal;
+- high-frequency values such as weather, finance and sports prefer structured real-time providers;
+- present life/death, office-holder, law/rule, security/CVE, release/version and similar mutable claims use fresh evidence;
+- contextual follow-ups resolve the referent from user conversation context before retrieval;
+- answer-side freshness self-reflection removes or verifies mutable claims introduced inside otherwise timeless answers;
+- current-world background learning refreshes broad governed reference/news/official material and continuously indexes eligible learned corpus;
+- answer-time live verification remains the correctness boundary for mutable public facts.
+
+A model-memory assertion is never sufficient merely because the model sounds confident.
+
+---
+
+# Continuous knowledge acquisition / indexing — IMPLEMENTED AND LIVE
+
+Current-world background learning and semantic indexing are separate but connected stages:
 
 ```text
-autopsy id: 209b6e8b-a6ff-4e49-9bc1-54fb5d186fee
-source turn: f8044774-8c7a-460f-9deb-687b9fb6fc68
-source case: sre-memory-pressure
-classified stage: evidence_selection
-independent retest case: sre-tenant-500s
-retest turn: dbc13b25-90a6-407d-8216-ce347e92b192
-retest_passed: true
-lesson_retained: true
+acquire current evidence
+→ validate/admit
+→ durable retained knowledge
+→ embed into active model space
+→ retrieve in later COS reasoning
 ```
 
-The pipeline is bounded:
+Normal accepted knowledge is indexed in the learning flow when possible. A recurring indexer drains missing/stale vectors as repair. Empty index cycles do not keep RunPod compute active. Vectors from an old embedding model are eligible for re-embedding.
+
+Stored knowledge helps COS reason; it does not replace live verification for mutable external facts.
+
+---
+
+# Explicit feedback and reusable reasoning learning — IMPLEMENTED
+
+Explicit positive/negative/correction feedback is securely correlated to server-owned COS turns. The client cannot invent a turn ID.
+
+PR #1364 added the feedback-to-procedural-skill bridge:
+
+```text
+negative/correction feedback
+→ episodic experience (signal, not truth)
+→ local COS reflection
+→ generalized procedural candidate
+→ structural trigger metadata when applicable
+→ local-generated practice only
+→ independent certification lifecycle
+→ validated / learned / mastered only after evidence
+→ reusable future reasoning
+```
+
+Hard rules:
+
+- a user correction is not automatically factual truth;
+- one correction cannot auto-promote a skill;
+- raw conversation text is not stored inside the reusable skill;
+- generated practice cannot masquerade as independent holdout evidence;
+- structural trigger matches affect procedural relevance, never factual confidence;
+- live skill injection selects only `validated`, `learned` or `mastered` states.
+
+Seeded candidate:
+
+`reasoning.context_ambiguity_resolution.v1`
+
+Its structural trigger family includes:
+
+- `deictic_predicate_question`;
+- `unresolved_referent_followup`;
+- `underspecified_comparison`;
+- `vague_temporal_reference`.
+
+The candidate includes explicit observables and falsifiers. It is not promoted merely because the procedure looks sensible.
+
+---
+
+# Autonomous cognitive skill certification — IMPLEMENTED AND PRODUCTION
+
+PR #1376 merged as:
+
+`9bf0a5540c6cdbd409c52a20b9f4aa4587f31bd7`
+
+Production deployment:
+
+`dpl_483vcZK87vq9cB4ULw6pich3stua` — READY
+
+Exact acceptance before merge:
+
+- 10/10 GitHub workflows passed on the exact feature head;
+- Vercel Preview READY on the same head;
+- enforced COS deployment suite: 112/112 tests passed;
+- route config, strip-safety and i18n guards passed;
+- TypeScript and full Next.js build passed;
+- all substantive Codex review findings were fixed and resolved.
+
+Migration applied in Production:
+
+`cos_cognitive_autonomous_certification`
+
+Protected stores:
+
+- `cos_cognitive_certification_cases` — RLS enabled, no browser policy;
+- `cos_cognitive_certification_events` — RLS enabled, no browser policy.
+
+Private profile currently available:
+
+`context_ambiguity_v1`
+
+Production private suite geometry:
+
+```text
+understanding: 1
+practice:      2
+holdout:       7
+total:        10
+```
+
+The raw private prompts/rubrics are deliberately not committed to GitHub.
+
+Certification contract:
+
+```text
+encountered candidate
+→ deterministic profile admission
+→ private independent understanding case
+→ practice
+→ independent private holdouts
+→ deterministic lifecycle recomputation
+→ validated
+→ learned
+→ production evidence + broader holdout evidence
+→ mastered
+```
+
+Important safeguards:
+
+- unsupported skill families fail closed until an independent certification profile/evaluator exists;
+- the candidate-generating model cannot generate its own holdout evidence;
+- `generation_source='local_generator'` can never count as holdout evidence;
+- no recurring paid closed-model evaluator is automatically enabled;
+- failed practice attempts do not satisfy the `practiced` stage;
+- practice requires the configured success-rate gate (currently 0.80 minimum);
+- certification uses fair candidate rotation so an older candidate cannot monopolize the daily slot;
+- interrupted curated exercises are recovered from stale `running` state;
+- exhausted private evidence can mark a candidate saturated instead of generating endless exercises;
+- daily certification is progressive and allows at most one new model exercise per cycle;
+- the mining route gives certification a shared 210-second deadline inside the 300-second function, reserving the remaining budget for later learning/cleanup stages;
+- promotion remains deterministic from recorded evidence, never from a model saying it succeeded.
+
+Promotion policy remains evidence-based:
+
+```text
+practiced:  >=2 practice attempts AND >=0.80 practice success rate
+validated:  >=3 holdouts, >=3 distinct, >=0.80 holdout rate
+learned:    >=5 holdouts, >=4 distinct, >=0.85 holdout rate, fresh validation
+mastered:   >=20 holdouts, >=10 distinct, >=0.92 holdout rate,
+            >=5 verified production outcomes, >=0.90 production success,
+            fresh validation
+```
+
+Do not lower these thresholds merely to make a skill appear learned.
+
+Current live candidate state immediately after schema/suite installation remains intentionally unforced:
+
+```text
+skill: reasoning.context_ambiguity_resolution.v1
+status: encountered
+evaluator_approved: false
+understanding_approved: false
+practice_attempts: 0
+holdout_attempts: 0
+production_attempts: 0
+last_validated_at: null
+```
+
+That zero-evidence state is correct. The architecture is Production; the skill must earn its own status through actual certification cycles.
+
+The daily `cos-mining` cron runs at `06:30 UTC`. Its endpoint remains `CRON_SECRET` protected. Do not weaken cron authentication or expose the secret merely to force a demo run.
+
+---
+
+# Cognitive lifecycle / retention / quarantine — IMPLEMENTED
+
+Canonical lifecycle:
+
+```text
+experience
+→ reflection
+→ candidate skill
+→ evaluation
+→ understanding
+→ practice
+→ independent holdout
+→ validated
+→ learned
+→ mastered
+```
+
+Evidence semantics:
+
+- `encountered`: COS has seen/generalized the pattern;
+- `evaluated`: candidate survived an independent admission review;
+- `understood`: COS demonstrated the principle on a separate hidden case;
+- `practiced`: sufficient successful training evidence exists;
+- `validated`: minimum unseen holdout evidence passed;
+- `learned`: broader/fresh held-out evidence passed;
+- `mastered`: stronger holdout evidence plus verified production outcomes passed;
+- `weakened`: retention/production evidence degraded and fresh revalidation is required;
+- `quarantined`: explicit contradiction or governance evidence disables reuse.
+
+Retention checks are separate from holdout breadth. Replaying an old holdout may test retention but cannot inflate independent validation breadth. Repeated retention failures can weaken a strong skill. Verified production contradictions can quarantine it.
+
+Lifecycle status is capability evidence, not a factual-confidence bonus.
+
+---
+
+# Reasoning control plane / specialist workers — IMPLEMENTED
+
+The provider model is replaceable compute; COS owns routing and learning policy.
+
+Current roles include primary, coder, critic, verifier and researcher. Controlled comparison can collect outcome-gated routing evidence. Learned worker preferences require sufficient independently verified outcomes and cannot override explicit specialist selection or safety-pinned verification.
+
+No hidden chain-of-thought is stored as a learning artifact. Learn only explicit strategy / worker / evidence / outcome telemetry.
+
+---
+
+# Adaptive Retrieval / Agentic RAG — SHADOW V1 VALIDATED; OVERALL LAYER PARTIAL
+
+Adaptive retrieval shadow validation exists and has passed independent validation. Current live retrieval policy is not automatically replaced merely because a lower-context shadow candidate looked efficient.
+
+Remaining work:
+
+- similarity-threshold calibration;
+- source-mix / reranking learning;
+- explicit bounded live promotion/rollback policy;
+- outcome-linked retrieval self-reflection.
+
+A shadow recommendation is not a promoted Production policy.
+
+---
+
+# Failure autopsy — IMPLEMENTED / ACCEPTED
+
+Verified poor outcomes can produce bounded corrective lessons:
 
 ```text
 verified poor outcome
@@ -192,64 +405,38 @@ verified poor outcome
 → retain lesson only if retest passes
 ```
 
-Do not rerun the already accepted autopsy merely to increase counters. Additional later failures may create pending autopsies; that does not invalidate mechanism acceptance.
-
-Relevant work: PR #1330 learning-gap autopsy, PR #1332 general failure autopsy, PR #1335/#1336 bounded spinner/recovery and completed-autopsy UX.
+Do not rerun already accepted cases merely to increase counters. Additional later failures may create new pending autopsies; that does not invalidate the mechanism.
 
 ---
 
-# Reasoning control plane / specialist workers — IMPLEMENTED
+# Local discovery — IMPLEMENTED AND LIVE
 
-The provider model is replaceable compute; COS owns routing and learning policy.
+Real-world place queries use live discovery evidence rather than stale model memory. The route prefers deterministic grounded answers when evidence is sufficient, otherwise COS/Qwen evidence-only synthesis, with external fallback optional rather than required.
 
-Relevant merged work:
-
-- PR #1333 — provider-neutral reasoning plan/worker control plane and governed escalation boundary;
-- PR #1334 — Production routing through the control plane;
-- PR #1337 — deterministic specialist workers: primary, coder, critic, verifier, researcher;
-- PR #1338 — outcome-gated worker/model preference learning from verified quality, latency and configured cost;
-- PR #1339 — controlled held-out reasoning comparison harness.
-
-No hidden chain-of-thought is stored as a learning artifact. Learn only explicit strategy / worker / evidence / outcome telemetry.
+Conceptual questions must not be hijacked by local-place discovery.
 
 ---
 
-# Adaptive Retrieval / Agentic RAG — SHADOW V1 VALIDATED; OVERALL LAYER PARTIAL
+# Preference / feedback learning — EXPLICIT STRONG; IMPLICIT PARTIAL
 
-PR #1341 added outcome-derived, request-local adaptive retrieval shadow validation.
+Already present:
 
-Production policy:
+- positive / negative / correction feedback;
+- exact turn correlation;
+- episodic evidence semantics;
+- generalized procedural-candidate bridge for negative/correction feedback;
+- autonomous certification for supported private profiles.
 
-```text
-current learned-corpus cap: 6
-candidate shadow cap: 4
-similarity threshold: 0.45 unchanged
-live policy: unchanged
-```
+Still partial:
 
-Training evidence at candidate derivation:
-
-```text
-distinct outcome-labelled cases: 7
-injected items: 41
-verified successes: 6
-verified failures: 1
-success rate: 0.8571
-unused rate: 1.0
-```
-
-Independent validations:
-
-1. `cloud-regional-asymmetry` — baseline PASS with 6 injected; candidate PASS with 4 injected; verdict PASS.
-2. `business-stalled-pipeline` — baseline PASS with 6 injected; candidate PASS with 4 injected; verdict PASS.
-
-Policy status reached **`validated_shadow` = 2/2 passes, 0 failures**. Zero-evidence cases such as networking/security/software were correctly inconclusive rather than counted as failures. PR #1345 later added retrieval preflight so cases that cannot exceed the candidate cap are skipped before spending a paired reasoner run. PR #1347 fixed the browser busy-state recovery so durable completion releases the UI even if the original long POST connection stalls.
-
-Do **not** automatically promote cap 4 to live Production. Overall Agentic RAG remains PARTIAL until threshold calibration, source-mix/reranking learning and an explicit bounded promotion/rollback policy are accepted.
+- carefully defined repeated/rephrased-question signals;
+- verified downstream acceptance/use signals;
+- abandonment only if there is a defensible event definition;
+- no implicit signal may become factual truth or bypass skill validation.
 
 ---
 
-# Retrieval Self-Reflection — NEXT PRIORITY / PARTIAL
+# Retrieval Self-Reflection — NEXT MAJOR LEARNING PHASE
 
 Already present:
 
@@ -266,140 +453,7 @@ Finish:
 - deduplicate repeated low-value reflections;
 - never persist hidden chain-of-thought.
 
-Completion criterion: retrieval reflections predict later retrieval success/failure well enough to safely feed shadow policy selection.
-
----
-
-# Freshness / current-world knowledge — IMPLEMENTED AND LIVE
-
-A factual error about a public figure exposed the general stale-world problem. The fix is deliberately **not person-specific**.
-
-Current contract:
-
-- ordinary external factual lookups are live-verified by default even when the user does not say `current`, `latest` or `today`;
-- historical and conceptual questions retain local/timeless reasoning paths;
-- private SignalBoost/system-of-record questions stay internal;
-- high-frequency values such as weather, finance and sports prefer structured real-time providers;
-- present-life/death, office-holder, law/rule, security/CVE, release/version and similar mutable claims use fresh evidence;
-- answer-side freshness self-reflection removes or verifies mutable claims introduced inside otherwise timeless/normative answers;
-- current-world background learning refreshes broad governed reference/news/official material and continuously indexes eligible learned corpus, while answer-time verification remains the correctness boundary.
-
-Relevant merged sequence includes PR #1348/#1349 and the subsequent general-current-knowledge work through #1355, plus PR #1363 answer-side freshness self-reflection.
-
-A model-memory assertion is never sufficient merely because the model sounds confident.
-
----
-
-# Local discovery — IMPLEMENTED AND LIVE
-
-Queries for real-world places such as clubs, restaurants, hotels, stores, classes and venues use live discovery evidence rather than stale model memory.
-
-A Production failure on `Are there salsa clubs in Paramaribo?` showed that live evidence had been retrieved successfully but the route then required an external Gemini synthesis that local-only governance blocked.
-
-The repair:
-
-- deterministic grounded directory answer when evidence is sufficient;
-- otherwise COS/Qwen evidence-only local synthesis;
-- governed external fallback remains optional rather than required;
-- conceptual questions such as `Explain how salsa dancing works` are not misclassified as local discovery.
-
-PR #1360 introduced grounded local discovery; PR #1362 completed the local-first synthesis and classifier hardening.
-
----
-
-# Explicit feedback and reusable reasoning learning — IMPLEMENTED; FIRST POST-MERGE REAL FEEDBACK ACCEPTANCE PENDING
-
-Explicit positive/negative/correction feedback is securely correlated to server-owned COS turns. The client cannot invent a turn ID.
-
-PR #1364 added the missing bridge from feedback to **generalized procedural reasoning candidates**:
-
-```text
-verified negative/correction feedback
-→ episodic experience (signal, not truth)
-→ local COS reflection
-→ generalized procedural candidate
-→ structural trigger metadata when applicable
-→ local-generated practice only
-→ evaluator + understanding + independent holdout lifecycle
-→ validated / learned / mastered only after independent evidence
-→ reusable future reasoning
-```
-
-Hard rules:
-
-- a user correction is not automatically factual truth;
-- one correction cannot auto-promote a skill;
-- raw conversation text is not stored inside the reusable skill;
-- generated practice cannot masquerade as independent holdout evidence;
-- structural trigger matches affect procedural relevance, never factual confidence;
-- live skill injection selects only `validated`, `learned` or `mastered` states.
-
-Production schema seed is applied for:
-
-`reasoning.context_ambiguity_resolution.v1`
-
-Verified Production state after migration:
-
-```text
-status: encountered
-evaluator_approved: false
-understanding_approved: false
-encounter_count: 1
-activation_rule: never inject until status is validated, learned, or mastered
-origin: governed_reasoning_candidate
-automaticSkillPromotionAllowed: false
-requiresIndependentHoldouts: true
-```
-
-Its procedure includes structural trigger kinds:
-
-- `deictic_predicate_question`;
-- `unresolved_referent_followup`;
-- `underspecified_comparison`;
-- `vague_temporal_reference`.
-
-It also includes explicit observables and falsifiers. This seeded candidate is intentionally **not live learned behavior**.
-
-As of this ONBOARD update, no post-merge `user_feedback_reflection` skill row exists yet. Do not fabricate one. The first real negative/correction feedback after #1364 must be used as runtime acceptance: verify it creates/refreshes an `encountered` candidate and queues practice while leaving promotion false.
-
----
-
-# Preference / feedback learning — EXPLICIT STRONG; IMPLICIT PARTIAL
-
-Already present:
-
-- positive / negative / correction feedback;
-- exact turn correlation;
-- episodic evidence semantics;
-- generalized reasoning candidate bridge for negative/correction feedback.
-
-Still partial:
-
-- carefully defined repeated/rephrased-question signals;
-- verified downstream acceptance/use signals;
-- abandonment only if there is a defensible event definition;
-- no implicit signal may become factual truth or bypass skill validation.
-
----
-
-# Curriculum / active learning / retention — STRONG, CONTINUE RUNTIME PROOF
-
-Already present:
-
-- active practice queue;
-- local practice generation;
-- evaluator / understanding checks;
-- independent holdout variants;
-- local-generated practice forbidden from holdout breadth;
-- retention / weakening / quarantine lifecycle;
-- consolidation machinery.
-
-Still prove under the current reasoner:
-
-- at least one delayed retention cycle that refreshes a valid skill without inflating holdout breadth;
-- a failed/stale retention event that weakens state correctly;
-- recurring weak/untested regions create bounded practice and can reach independent improvement;
-- saturation/no-improvement is surfaced instead of endless exercise generation.
+Completion criterion: retrieval reflections predict later retrieval success/failure well enough to feed a separately validated shadow policy.
 
 ---
 
@@ -413,7 +467,7 @@ Do not conflate zero-grounding general reasoning with current-state factual clai
 
 # Strategy-selection learning — PARTIAL / HIGH PRIORITY
 
-Outcome correlation, the control plane, specialist workers and controlled comparison harness now exist.
+Outcome correlation, the control plane, specialist workers and controlled comparison harness exist.
 
 Finish:
 
@@ -429,7 +483,7 @@ Finish:
 
 Cognitive Skills already include prerequisites, procedure, tools, observables, falsifiers, common failure modes and prohibited actions.
 
-Finish outcome-based problem-class → tool/skill sequence recommendations from governed executions. Learned preferences must never widen authorization or bypass approvals.
+Finish outcome-based problem-class → governed tool/skill sequence recommendations. Learned preferences must never widen authorization or bypass approvals.
 
 ---
 
@@ -437,25 +491,7 @@ Finish outcome-based problem-class → tool/skill sequence recommendations from 
 
 Repeated independently supported episodes may propose generalized facts/rules/skills, but require corroboration, contradiction checks, correct scope and independent validation before durable promotion. Contradicted generalized knowledge must be weakenable/quarantinable.
 
-PR #1364 provides a concrete governed pattern for procedural generalization from feedback, but one episode remains insufficient for strong semantic promotion.
-
----
-
-# Current-world / live-data doctrine
-
-Stored knowledge helps COS reason. It does not guarantee that an external-world fact is still true.
-
-```text
-historical / conceptual / internal state
-→ appropriate local/system-of-record reasoning
-
-current or ordinary external factual lookup
-→ fresh evidence on this turn
-→ grounded synthesis or deterministic answer
-→ fail closed if evidence is insufficient
-```
-
-Do not use freshness routing for private operational state merely because a prompt includes words like `current`, `latest` or `still`.
+One episode remains insufficient for strong semantic promotion.
 
 ---
 
@@ -464,8 +500,6 @@ Do not use freshness routing for private operational state merely because a prom
 A signed-in owner request to scan, audit, inspect, review or analyze the configured SignalBoost repository is already authorization for **read-only** repository inspection.
 
 The chat must not ask the owner to repeat the configured repository, reconfirm permission or paste files. Repository reads remain separate from write/deploy/secret authority.
-
-Recent fixes route owner/browser repo scans to the repository reader and repaired the resulting build. Baseline verified Production for this handoff is commit `688448640f5b9c90cdaa6b621171c9e9baf5c83d`, deployment `dpl_7RtYA3oXNwEFbCRWGSs1MydRo1uJ`, READY.
 
 ---
 
@@ -481,7 +515,8 @@ Non-negotiable:
 - external/managed providers never become governance authority;
 - unknown/consequential/destructive/financial/security actions fail closed or require the applicable approval boundary;
 - learned retrieval/worker/tool/skill preference cannot widen authorization;
-- no hidden chain-of-thought persistence.
+- no hidden chain-of-thought persistence;
+- private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need.
 
 ---
 
@@ -492,19 +527,17 @@ Non-negotiable:
 - #1330 / #1332 — learning-gap + general failure autopsy.
 - #1331 — Concierge explicit feedback controls / secure turn correlation.
 - #1333 / #1334 — provider-neutral reasoning control plane and Production routing.
-- #1335 / #1336 — failure-autopsy spinner recovery / terminal UX.
 - #1337 — specialist reasoning workers.
 - #1338 — reasoning outcome learning.
 - #1339 — controlled reasoning comparison harness.
 - #1341 — adaptive retrieval shadow validation.
-- #1345 — private six-case cohort protection + adaptive preflight.
-- #1347 — durable adaptive-validation UI recovery.
+- #1345 — private benchmark cohort protection + adaptive preflight.
 - #1348 / #1349 onward — temporal/current-world freshness generalization.
 - #1355 — general external factual lookups live-verify by default.
 - #1360 / #1362 — local discovery grounded/local-first synthesis.
 - #1363 — answer-side freshness self-reflection.
 - #1364 — governed feedback → reusable procedural candidate learning + structural triggers.
-- subsequent repo-reader / repository-scan fixes culminated in baseline Production `688448640f5b9c90cdaa6b621171c9e9baf5c83d`.
+- #1376 — autonomous evidence-gated cognitive skill certification with private profiles and bounded scheduling.
 
 Always query current state; this sequence can advance after this document is merged.
 
@@ -512,15 +545,15 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
-1. **Run one real post-#1364 negative/correction feedback acceptance** and verify: episodic row → encountered generalized candidate → local practice queue; no automatic promotion.
+1. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
 2. **Retrieval Self-Reflection:** build bounded explicit retrieval assessments and prove predictive value against later outcomes.
 3. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
 4. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-5. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback. Keep cap 4 shadow-only until separately promoted.
-6. **Tool-use sequence learning:** verified problem-class → governed tool sequence recommendations.
-7. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner.
+5. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+6. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
+7. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner without inflating holdout breadth.
 8. **Episodic → semantic compression:** multi-episode corroboration and reversible promotion.
-9. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled dataset, contamination controls and separate held-out comparison exist.
+9. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled data, contamination controls and a separate held-out comparison exist.
 
 ---
 
@@ -541,6 +574,7 @@ Current-fact retrieval is not timeless memory.
 Telemetry collection is not adaptive learning until a validated consumer can safely improve future behavior.  
 A shadow recommendation is not a promoted Production policy.  
 A self-generated practice pass is not independent validation.  
+A private certification case is evidence only after it is actually executed and recorded.  
 A current-world page retrieved now can itself contain stale content; source date and authority still matter.
 
 ---
@@ -551,4 +585,4 @@ The model/provider is replaceable compute. **COS is the learner.**
 
 Success means validated experience measurably improves held-out or verified Production performance, transfers to materially different variants, retains the improvement, lowers repeated teacher/fallback dependence, and preserves honest confidence, provenance, tenant scope and governance.
 
-For metacognitive learning, COS must be able to prove which retrieval policy, evidence class, procedural skill, tool sequence or explicit reasoning strategy improved outcomes for a problem class, detect when that lesson stops working, and safely weaken or roll it back.
+For metacognitive learning, COS must prove which retrieval policy, evidence class, procedural skill, tool sequence or explicit reasoning strategy improved outcomes for a problem class, detect when that lesson stops working, and safely weaken, quarantine or roll it back.

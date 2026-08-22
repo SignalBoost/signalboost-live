@@ -40,13 +40,15 @@ export function classifyTemporalSensitivity(prompt: string): TemporalClassificat
   const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
   if (!text) return { sensitive: false, kind: null, reason: 'No prompt text was supplied.' }
 
+  // Specific temporal domains must win before the generic "still" classifier. Otherwise a security
+  // question such as "is CVE-... still unpatched?" is technically fresh but loses its security class.
   const checks: Array<[RegExp, TemporalKind, string]> = [
     [LIFE_STATUS, 'life_status', 'asks about a person’s life/death status, which can change after training and must be freshly verified'],
     [CURRENT_HOLDER, 'current_holder', 'asks who currently holds a role or position, which can change after training'],
-    [ONGOING_STATUS, 'ongoing_status', 'asks whether a state is still true, which can change after training'],
     [CURRENT_RULE, 'current_rule', 'asks about a current law, regulation, rule, policy, or requirement'],
     [CURRENT_SECURITY, 'current_security', 'asks about the current state of a vulnerability, advisory, CVE, or exploit'],
     [LATEST_STATE, 'latest_state', 'asks for the latest/current version, release, price, status, availability, or similar mutable value'],
+    [ONGOING_STATUS, 'ongoing_status', 'asks whether a state is still true, which can change after training'],
     [RECENT_EVENT, 'recent_event', 'anchors the answer to the present or a recent time window'],
   ]
 

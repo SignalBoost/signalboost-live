@@ -27,3 +27,15 @@ test('life-status synthesis must cite two independent sources', () => {
 test('ordinary fresh facts preserve the existing one-source floor', () => {
   assert.equal(freshEvidenceMeetsQuestionAuthority('What is the current software version?', sources.slice(0, 1)), true)
 })
+
+test('regulated guidance rejects secondary-only live evidence', () => {
+  const secondary = prepareFreshEvidence([
+    { title: 'Commercial legal explainer', url: 'https://example.com/gdpr-breach', snippet: 'Summary', authorityTier: 'secondary' },
+  ])
+  assert.equal(freshEvidenceMeetsQuestionAuthority('What are the current GDPR breach notification requirements?', secondary), false)
+
+  const institutional = prepareFreshEvidence([
+    { title: 'EDPB guidance', url: 'https://edpb.europa.eu/guidance', snippet: 'Summary', authorityTier: 'institutional' },
+  ])
+  assert.equal(freshEvidenceMeetsQuestionAuthority('What are the current GDPR breach notification requirements?', institutional), true)
+})

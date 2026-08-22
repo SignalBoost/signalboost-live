@@ -20,6 +20,11 @@ import { parseLocalResult } from './reasonerOutput'
 import { generateLocalEmbedding } from './localEmbeddings'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from './runpodCapacityError'
 import { configuredRunpodPodId } from './runpodConfig'
+import {
+  answerFreshnessSignals,
+  answerNeedsFreshnessReflection,
+  stripUnsupportedCurrentClaimSentences,
+} from './answerFreshnessSelfReflection'
 import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
@@ -246,6 +251,77 @@ async function tryFreshCurrentFact(input: {
   return { handled: true, reply: parsed.answer, confidence, provenance: { ...provenance, externalAiNecessary: false, escalationReasonCode: null, escalationReason: null } as any }
 }
 
+async function reflectOrdinaryAnswerFreshness(
+  input: { prompt: string; language?: string },
+  result: COSFirstAnswerResult,
+): Promise<COSFirstAnswerResult> {
+  if (!result.handled) return result
+  const signals = answerFreshnessSignals(result.reply)
+  if (!signals.length) return result
+
+  const repair = await callCosReasoner({
+    temperature: 0,
+    maxTokens: 1400,
+    systemPrompt: [
+      'You are COS answer-side freshness self-reflection.',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+      'The original question was not a live current-fact lookup, but the draft introduced mutable present-world claims that were not live-verified.',
+      'Rewrite the draft so it answers the timeless, conceptual, normative, or hypothetical question without asserting current industry practice, current law, current regulation, current leadership, current market behavior, or other mutable present-world facts.',
+      'Do not add new factual claims. Do not claim what most companies, regulators, courts, governments, or industries currently do.',
+      'Preserve useful ethical/logical reasoning and clearly separate competing principles when relevant.',
+    ].join(' '),
+    prompt: [
+      `ORIGINAL QUESTION:\n${input.prompt}`,
+      `UNVERIFIED CURRENT-WORLD SIGNALS:\n${signals.map(signal => `${signal.code}: ${signal.excerpt}`).join('\n')}`,
+      `DRAFT ANSWER:\n${result.reply}`,
+      'Rewrite the answer now.',
+    ].join('\n\n'),
+  }).catch(() => null)
+
+  const parsed = repair?.text ? parseLocalResult(repair.text) : null
+  const locallyRepaired = parsed && !parsed.truncated && parsed.answer.trim() && !answerNeedsFreshnessReflection(parsed.answer)
+    ? parsed.answer.trim()
+    : null
+  const deterministicRepair = locallyRepaired ? null : stripUnsupportedCurrentClaimSentences(result.reply)
+  const reply = locallyRepaired || deterministicRepair
+
+  if (!reply || answerNeedsFreshnessReflection(reply)) {
+    const reason = 'COS draft introduced unverified mutable current-world claims and the local self-reflection pass could not remove them safely.'
+    return {
+      handled: false,
+      confidence: 0,
+      reason,
+      bestEffortReply: stripUnsupportedCurrentClaimSentences(result.reply) || undefined,
+      provenance: {
+        ...(result.provenance as Record<string, unknown>),
+        answerFreshnessReflection: {
+          triggered: true,
+          repaired: false,
+          signals: signals.map(signal => signal.code),
+        },
+      } as any,
+    }
+  }
+
+  const repairedConfidence = locallyRepaired && parsed
+    ? Math.max(0, Math.min(result.confidence, parsed.confidence))
+    : Math.min(result.confidence, 0.8)
+  return {
+    handled: true,
+    reply,
+    confidence: repairedConfidence,
+    provenance: {
+      ...(result.provenance as Record<string, unknown>),
+      answerFreshnessReflection: {
+        triggered: true,
+        repaired: true,
+        method: locallyRepaired ? 'local_reasoner_rewrite' : 'deterministic_sentence_strip',
+        signals: signals.map(signal => signal.code),
+      },
+    } as any,
+  }
+}
+
 async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
   const turnId = peekEvidenceSourceUseTurnId()
   const enriched = turnId
@@ -302,9 +378,10 @@ export async function tryCOSFirstAnswer(input: {
         }
         return learnFromTurn(input, failedResult)
       }
-      return learnFromTurn(input, result)
+      return learnFromTurn(input, await reflectOrdinaryAnswerFreshness(input, result))
     }
   }
 
-  return learnFromTurn(input, await tryEnterpriseCOSFirstAnswer(input))
+  const result = await tryEnterpriseCOSFirstAnswer(input)
+  return learnFromTurn(input, await reflectOrdinaryAnswerFreshness(input, result))
 }

@@ -53,6 +53,12 @@ const INTERNAL_OPERATIONAL_STATE = new RegExp(
   'i',
 )
 
+
+// COS may improve its application code, prompts, retrieval, tools, workflows, and validated
+// procedures through governed tests and approved changes. It cannot autonomously retrain or alter
+// its provider/base-model weights.
+const COS_SELF_IMPROVEMENT = /\b(?:can|could|how\s+(?:can|could|would|should)|what)\b.{0,80}\b(?:cos|yourself|you)\b.{0,140}\b(?:improve|learn|reason(?:ing)?|code|train(?:ing)?|model|retrieval|context|skill|procedure|capabilit(?:y|ies))\b|\b(?:improve|learn|reason(?:ing)?|code|train(?:ing)?|model|retrieval|context|skill|procedure|capabilit(?:y|ies))\b.{0,140}\b(?:cos|yourself)\b/i
+
 // SignalBoost/COS self-description and runtime state come from repository/configuration/system-of-record
 // evidence, not the public web. This prevents the general external-fact default from breaking
 // authoritative internal self-knowledge such as "what model does COS use now?".

@@ -1,51 +1,23 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import {
+  ADAPTIVE_RETRIEVAL_REQUIRED_VALIDATIONS,
+  deriveAdaptiveRetrievalCandidate,
+  type AdaptiveRetrievalDerivedCandidate,
+  type AdaptiveRetrievalTrainingRow,
+} from '@/lib/ai/cos/adaptiveRetrievalPolicyLogic'
 
-export const ADAPTIVE_RETRIEVAL_MIN_TRAINING_CASES = 6
-export const ADAPTIVE_RETRIEVAL_MIN_INJECTED_ITEMS = 36
-export const ADAPTIVE_RETRIEVAL_MIN_SUCCESS_RATE = 0.80
-export const ADAPTIVE_RETRIEVAL_MIN_UNUSED_RATE = 0.85
-export const ADAPTIVE_RETRIEVAL_REQUIRED_VALIDATIONS = 2
-export const LIVE_LEARNED_CORPUS_MAX_INJECTED = 6
-
-export type AdaptiveRetrievalTrainingRow = {
-  turnId: string
-  injected: number
-  cited: number
-  items?: Array<{ similarity?: number | null; cited?: boolean }>
-  verifiedSuccess: boolean | null
-  repairNeeded: boolean | null
-  outcomeSource: string | null
-}
-
-export type AdaptiveRetrievalDerivedCandidate = {
-  eligible: boolean
-  reason: string
-  trainingCaseIds: string[]
-  trainingTurnIds: string[]
-  metrics: {
-    distinctCases: number
-    outcomeTurns: number
-    verifiedSuccesses: number
-    verifiedFailures: number
-    successRate: number | null
-    injected: number
-    cited: number
-    unusedRate: number | null
-    itemSimilaritySamples: number
-    citedSimilaritySamples: number
-  }
-  currentPolicy: {
-    learnedCorpusMaxInjected: number
-    learnedCorpusMinSimilarity: number
-  }
-  candidatePolicy: {
-    learnedCorpusMaxInjected: number
-    learnedCorpusMinSimilarity: number
-    sourceMix: 'unchanged'
-    similarityThresholdStatus: 'unchanged_until_item_level_evidence'
-  }
-}
+export {
+  ADAPTIVE_RETRIEVAL_MIN_TRAINING_CASES,
+  ADAPTIVE_RETRIEVAL_MIN_INJECTED_ITEMS,
+  ADAPTIVE_RETRIEVAL_MIN_SUCCESS_RATE,
+  ADAPTIVE_RETRIEVAL_MIN_UNUSED_RATE,
+  ADAPTIVE_RETRIEVAL_REQUIRED_VALIDATIONS,
+  LIVE_LEARNED_CORPUS_MAX_INJECTED,
+  deriveAdaptiveRetrievalCandidate,
+  adaptiveRetrievalTrainingCaseId,
+} from '@/lib/ai/cos/adaptiveRetrievalPolicyLogic'
+export type { AdaptiveRetrievalDerivedCandidate, AdaptiveRetrievalTrainingRow } from '@/lib/ai/cos/adaptiveRetrievalPolicyLogic'
 
 export type AdaptiveRetrievalPolicyRow = {
   id: string
@@ -69,92 +41,6 @@ function learnedCorpusMinSimilarity(): number {
 
 function cleanCount(value: unknown): number {
   return Math.max(0, Math.floor(Number(value) || 0))
-}
-
-function trainingCaseId(source: string | null): string | null {
-  const value = String(source ?? '').trim()
-  if (!value || value.startsWith('failure_autopsy_retest:') || value.startsWith('adaptive_retrieval_validation:')) return null
-  if (value.startsWith('evidence_utilization_benchmark:')) return value.slice('evidence_utilization_benchmark:'.length) || null
-  if (value.startsWith('capability_benchmark:')) return `private:${value.slice('capability_benchmark:'.length)}`
-  return null
-}
-
-/**
- * Produce a conservative context-waste hypothesis only. Zero citations are NOT interpreted as proof
- * that evidence was useless. The only automatic proposal here is a smaller injection cap, and it
- * remains request-local shadow policy until independent controlled validation succeeds.
- */
-export function deriveAdaptiveRetrievalCandidate(
-  rows: readonly AdaptiveRetrievalTrainingRow[],
-): AdaptiveRetrievalDerivedCandidate {
-  const latestByCase = new Map<string, AdaptiveRetrievalTrainingRow>()
-  for (const row of rows) {
-    if (row.verifiedSuccess == null) continue
-    const caseId = trainingCaseId(row.outcomeSource)
-    if (!caseId || latestByCase.has(caseId)) continue
-    latestByCase.set(caseId, row)
-  }
-
-  const cohort = [...latestByCase.entries()]
-  const trainingCaseIds = cohort.map(([caseId]) => caseId).sort()
-  const trainingTurnIds = cohort.map(([, row]) => row.turnId).filter(Boolean).sort()
-  const outcomeTurns = cohort.length
-  const verifiedSuccesses = cohort.filter(([, row]) => row.verifiedSuccess === true).length
-  const verifiedFailures = cohort.filter(([, row]) => row.verifiedSuccess === false).length
-  const injected = cohort.reduce((sum, [, row]) => sum + cleanCount(row.injected), 0)
-  const cited = cohort.reduce((sum, [, row]) => sum + Math.min(cleanCount(row.injected), cleanCount(row.cited)), 0)
-  const similarityItems = cohort.flatMap(([, row]) => Array.isArray(row.items) ? row.items : [])
-    .filter(item => item.similarity != null && Number.isFinite(Number(item.similarity)))
-  const citedSimilarityItems = similarityItems.filter(item => item.cited === true)
-  const successRate = outcomeTurns > 0 ? verifiedSuccesses / outcomeTurns : null
-  const unusedRate = injected > 0 ? 1 - (cited / injected) : null
-
-  const enoughCases = outcomeTurns >= ADAPTIVE_RETRIEVAL_MIN_TRAINING_CASES
-  const enoughContext = injected >= ADAPTIVE_RETRIEVAL_MIN_INJECTED_ITEMS
-  const qualityStrong = successRate != null && successRate >= ADAPTIVE_RETRIEVAL_MIN_SUCCESS_RATE
-  const wasteHigh = unusedRate != null && unusedRate >= ADAPTIVE_RETRIEVAL_MIN_UNUSED_RATE
-  const eligible = enoughCases && enoughContext && qualityStrong && wasteHigh
-
-  const reason = !enoughCases
-    ? `Need at least ${ADAPTIVE_RETRIEVAL_MIN_TRAINING_CASES} distinct outcome-labelled cases.`
-    : !enoughContext
-      ? `Need at least ${ADAPTIVE_RETRIEVAL_MIN_INJECTED_ITEMS} injected learned-corpus items in the training cohort.`
-      : !qualityStrong
-        ? `Verified success rate is below the ${Math.round(ADAPTIVE_RETRIEVAL_MIN_SUCCESS_RATE * 100)}% shadow-candidate floor.`
-        : !wasteHigh
-          ? `Injected-but-uncited rate is below the ${Math.round(ADAPTIVE_RETRIEVAL_MIN_UNUSED_RATE * 100)}% context-waste trigger.`
-          : 'Context-waste hypothesis is eligible for shadow validation; no live retrieval policy changes are authorized.'
-
-  const currentSimilarity = learnedCorpusMinSimilarity()
-  return {
-    eligible,
-    reason,
-    trainingCaseIds,
-    trainingTurnIds,
-    metrics: {
-      distinctCases: trainingCaseIds.length,
-      outcomeTurns,
-      verifiedSuccesses,
-      verifiedFailures,
-      successRate: successRate == null ? null : Number(successRate.toFixed(4)),
-      injected,
-      cited,
-      unusedRate: unusedRate == null ? null : Number(unusedRate.toFixed(4)),
-      itemSimilaritySamples: similarityItems.length,
-      citedSimilaritySamples: citedSimilarityItems.length,
-    },
-    currentPolicy: {
-      learnedCorpusMaxInjected: LIVE_LEARNED_CORPUS_MAX_INJECTED,
-      learnedCorpusMinSimilarity: currentSimilarity,
-    },
-    candidatePolicy: {
-      // First candidate is deliberately conservative: reduce context by one third, not one half.
-      learnedCorpusMaxInjected: Math.max(3, LIVE_LEARNED_CORPUS_MAX_INJECTED - 2),
-      learnedCorpusMinSimilarity: currentSimilarity,
-      sourceMix: 'unchanged',
-      similarityThresholdStatus: 'unchanged_until_item_level_evidence',
-    },
-  }
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
@@ -208,7 +94,7 @@ export async function refreshAdaptiveRetrievalShadowCandidate(): Promise<{
   candidate: AdaptiveRetrievalDerivedCandidate
   policy: AdaptiveRetrievalPolicyRow | null
 }> {
-  const candidate = deriveAdaptiveRetrievalCandidate(await trainingRows())
+  const candidate = deriveAdaptiveRetrievalCandidate(await trainingRows(), learnedCorpusMinSimilarity())
   if (!candidate.eligible) return { candidate, policy: null }
   const db = cosServiceDb()
   if (!db) return { candidate, policy: null }

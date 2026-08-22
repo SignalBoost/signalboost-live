@@ -28,14 +28,17 @@ test('validated skill retrieval can use structural triggers but never bypasses l
   assert.doesNotMatch(source, /\.in\('status', \[[^\]]*'encountered'/)
 })
 
-test('seeded generalized ambiguity procedure is a candidate, not fake learned knowledge', () => {
+test('seeded generalized ambiguity procedure is falsifiable candidate, not fake learned knowledge', () => {
   const migration = read('../supabase/migrations/20260822_cos_general_ambiguity_reasoning_candidate.sql')
   assert.match(migration, /reasoning\.context_ambiguity_resolution\.v1/)
   assert.match(migration, /'deictic_predicate_question'/)
   assert.match(migration, /'unresolved_referent_followup'/)
   assert.match(migration, /'underspecified_comparison'/)
   assert.match(migration, /'vague_temporal_reference'/)
+  assert.match(migration, /'observables'/)
+  assert.match(migration, /'falsifiers'/)
   assert.match(migration, /'encountered'/)
   assert.match(migration, /automaticSkillPromotionAllowed', false/)
+  assert.match(migration, /requiresIndependentHoldouts', true/)
   assert.doesNotMatch(migration, /'validated'\s*,\s*true/)
 })

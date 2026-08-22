@@ -10,6 +10,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
+import { isPrivateCapabilityAcceptanceOrigin } from '@/lib/ai/cos/capabilityBenchmarkCohort'
 import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 
 export const runtime = 'nodejs'
@@ -34,11 +35,12 @@ export async function GET() {
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   await reconcileStaleRuns(db)
   const [cases, runs] = await Promise.all([
-    db.from('cos_capability_benchmark_cases').select('id,track,active,created_at').order('created_at', { ascending: false }).limit(200),
+    db.from('cos_capability_benchmark_cases').select('id,track,active,origin,created_at').order('created_at', { ascending: false }).limit(200),
     db.from('cos_capability_benchmark_runs').select('id,started_at,completed_at,attempted,passed,status,error').order('started_at', { ascending: false }).limit(20),
   ])
   if (cases.error || runs.error) return NextResponse.json({ error: cases.error?.message ?? runs.error?.message }, { status: 500 })
-  return NextResponse.json({ ok: true, maxCasesPerRun: MAX_CASES_PER_RUN, cases: cases.data ?? [], runs: runs.data ?? [] })
+  const privateCases = (cases.data ?? []).filter(row => isPrivateCapabilityAcceptanceOrigin(row.origin))
+  return NextResponse.json({ ok: true, maxCasesPerRun: MAX_CASES_PER_RUN, cases: privateCases, runs: runs.data ?? [] })
 }
 
 export async function POST(request: NextRequest) {
@@ -46,11 +48,11 @@ export async function POST(request: NextRequest) {
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   const body = await request.json().catch(() => ({}))
   const limit = Math.max(1, Math.min(MAX_CASES_PER_RUN, Math.floor(Number(body.limit) || MAX_CASES_PER_RUN)))
-  const cases = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning').eq('active', true).order('created_at', { ascending: true }).limit(200)
+  const cases = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning,origin').eq('active', true).order('created_at', { ascending: true }).limit(200)
   if (cases.error) return NextResponse.json({ error: cases.error.message }, { status: 500 })
   const completedRuns = await db.from('cos_capability_benchmark_runs').select('id').eq('status', 'completed').limit(2000)
   if (completedRuns.error) return NextResponse.json({ error: completedRuns.error.message }, { status: 500 })
-  const activeCases = cases.data ?? []
+  const activeCases = (cases.data ?? []).filter(row => isPrivateCapabilityAcceptanceOrigin(row.origin))
   const start = activeCases.length ? ((completedRuns.data?.length ?? 0) * limit) % activeCases.length : 0
   const selected = [...activeCases.slice(start), ...activeCases.slice(0, start)].slice(0, limit)
   const run = await db.from('cos_capability_benchmark_runs').insert({ requested_limit: limit }).select('id').single()

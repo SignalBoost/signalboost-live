@@ -13,6 +13,7 @@ import { runFactConsolidationCycle } from '@/lib/ai/cos/cognitiveFactConsolidati
 import { runProbationaryPromotionCycle } from '@/lib/ai/cos/cognitiveProbationaryPromotion'
 import { refreshMetacognitiveCapabilityMap } from '@/lib/ai/cos/cognitiveMetacognition'
 import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationStore'
+import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetestStore'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
   let factConsolidation: Awaited<ReturnType<typeof runFactConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
   let probationaryPromotion: Awaited<ReturnType<typeof runProbationaryPromotionCycle>> | { enabled: false; errors: string[] } | null = null
   let knowledgeApplication: Awaited<ReturnType<typeof runKnowledgeApplicationScan>> | { enabled: false; errors: string[] } | null = null
+  let evidenceRetest: Awaited<ReturnType<typeof runEvidenceTriggeredRetest>> | { enabled: false; errors: string[] } | null = null
   let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
   let corpus: unknown = null
   if (job === 'daily') {
@@ -127,6 +129,16 @@ export async function GET(req: NextRequest) {
       knowledgeApplication = { enabled: false, errors: [message] }
     }
 
+    // New retained evidence may justify one bounded benchmark retest of a prior failed answer.
+    // This only creates a case for the existing runner; it never declares the answer improved.
+    try {
+      evidenceRetest = await runEvidenceTriggeredRetest()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Evidence-triggered retest failed'
+      console.error('cron COS evidence-triggered retest failed:', message)
+      evidenceRetest = { enabled: false, errors: [message] }
+    }
+
     // Rebuild metacognitive state after learning/certification/composition/consolidation so selection
     // on the next request reflects the newest strong, weak, quarantined and unresolved evidence.
     try {
@@ -161,6 +173,7 @@ export async function GET(req: NextRequest) {
     factConsolidation,
     probationaryPromotion,
     knowledgeApplication,
+    evidenceRetest,
     metacognition,
     corpus,
   })

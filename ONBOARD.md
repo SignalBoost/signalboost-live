@@ -431,6 +431,22 @@ Migration `cos_knowledge_application` is applied and the Production deployment i
 
 ---
 
+# Evidence-triggered answer retest — IMPLEMENTATION IN PROGRESS
+
+New retained evidence may promote a previously failed answer prompt into one bounded active benchmark case, including a one-off failure. This is a measurement request, not a claim that COS can now answer it:
+
+```text
+new retained evidence after failed answer
+→ deterministic track-anchored lexical gate
+→ source-confidence and freshness checks
+→ bounded, one-per-track benchmark promotion
+→ existing budgeted benchmark runner measures pass/fail
+```
+
+The trigger is model-free and never answers, scores, resolves, or modifies confidence. Incidental overlap, stale evidence, low-confidence evidence and generic tracks are rejected. It has a separate candidate-keyed audit table; it never overloads the study-gap audit ledger.
+
+---
+
 # Local discovery — IMPLEMENTED AND LIVE
 
 Real-world place queries use live discovery evidence rather than stale model memory. The route prefers deterministic grounded answers when evidence is sufficient, otherwise COS/Qwen evidence-only synthesis, with external fallback optional rather than required.

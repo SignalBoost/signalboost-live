@@ -51,7 +51,7 @@ async function scanRepositoryForOwner():Promise<{ok:boolean;reply:string;error?:
   const [root,app,lib,onboard,rootPackage,saasPackage]=await Promise.all([listRepoFiles(),listRepoFiles('saas/app'),listRepoFiles('saas/lib'),readRepoFile('ONBOARD.md'),readRepoFile('package.json'),readRepoFile('saas/package.json')])
   const failed=[root,app,lib,onboard,rootPackage,saasPackage].find((item:any)=>!item.ok) as any
   if(failed)return{ok:false,reply:'',error:failed?.error||'Read-only repository scan failed.'}
-  const routes=[...new Set((app.files||[]).filter((path:string)=>/\\/api\\//.test(path)).slice(0,20))]
+  const routes=[...new Set((app.files||[]).filter((path:string)=>path.includes('/api/')).slice(0,20))]
   return{ok:true,reply:['Repository scan completed: SignalBoost/signalboost-live@main (read-only).','Verified '+root.files.length+' indexed root files, '+app.files.length+' application files, and '+lib.files.length+' library files in the scanned views.','Inspected canonical files: ONBOARD.md, package.json, saas/package.json.',routes.length?'Representative API routes found: '+routes.join(', ')+'.':'','I can now analyze the existing products, architecture, and improvement opportunities from this verified repository context.'].filter(Boolean).join('\\n')}
 }
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}

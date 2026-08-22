@@ -40,6 +40,45 @@ alter table public.cos_retrieval_reflections enable row level security;
 -- Service-role only. Intentionally no user-facing RLS policy.
 revoke all on table public.cos_retrieval_reflections from anon, authenticated;
 
+-- Durable reconciliation authority. Call this after either side has committed. If reflection and
+-- outcome transactions overlap, the second post-commit caller necessarily sees both durable rows.
+create or replace function public.cos_reconcile_retrieval_reflection(p_turn_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  changed integer := 0;
+begin
+  update public.cos_retrieval_reflections r
+     set observed_verified_success = o.verified_success,
+         observed_repair_needed = o.repair_needed,
+         outcome_source = o.outcome_source,
+         prediction_correct = case
+           when o.verified_success is null then r.prediction_correct
+           else ((r.predicted_failure_risk >= 0.5) = (not o.verified_success))
+         end,
+         brier_score = case
+           when o.verified_success is null then r.brier_score
+           else power(r.predicted_failure_risk - (case when o.verified_success then 0.0 else 1.0 end), 2)
+         end,
+         outcome_correlated_at = case
+           when o.verified_success is null then r.outcome_correlated_at
+           else coalesce(o.outcome_at, now())
+         end,
+         updated_at = now()
+    from public.cos_turn_outcomes o
+   where r.turn_id = p_turn_id
+     and o.turn_id = p_turn_id;
+  get diagnostics changed = row_count;
+  return changed;
+end;
+$$;
+
+revoke all on function public.cos_reconcile_retrieval_reflection(uuid) from public, anon, authenticated;
+grant execute on function public.cos_reconcile_retrieval_reflection(uuid) to service_role;
+
 create or replace function public.cos_fill_retrieval_reflection_existing_outcome()
 returns trigger
 language plpgsql
@@ -77,28 +116,8 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  observed_failure double precision;
 begin
-  if new.verified_success is null then
-    update public.cos_retrieval_reflections
-       set observed_repair_needed = new.repair_needed,
-           outcome_source = new.outcome_source,
-           updated_at = now()
-     where turn_id = new.turn_id;
-    return new;
-  end if;
-
-  observed_failure := case when new.verified_success then 0.0 else 1.0 end;
-  update public.cos_retrieval_reflections
-     set observed_verified_success = new.verified_success,
-         observed_repair_needed = new.repair_needed,
-         outcome_source = new.outcome_source,
-         prediction_correct = ((predicted_failure_risk >= 0.5) = (not new.verified_success)),
-         brier_score = power(predicted_failure_risk - observed_failure, 2),
-         outcome_correlated_at = coalesce(new.outcome_at, now()),
-         updated_at = now()
-   where turn_id = new.turn_id;
+  perform public.cos_reconcile_retrieval_reflection(new.turn_id);
   return new;
 end;
 $$;

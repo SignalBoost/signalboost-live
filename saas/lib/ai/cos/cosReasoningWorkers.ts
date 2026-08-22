@@ -143,16 +143,17 @@ export async function reasonThroughCosControlPlane(
     allowExternalEscalation: options.allowExternalEscalation,
   })
   if (!execution) return null
+  const metadata: Record<string, unknown> = {
+    ...(execution.result.metadata ?? {}),
+    routingRole: decision.role,
+    routingReason: decision.reason,
+    routingObjective: decision.objective.slice(0, 500),
+  }
   return {
     ...execution,
     result: {
       ...execution.result,
-      metadata: {
-        ...execution.result.metadata,
-        routingRole: decision.role,
-        routingReason: decision.reason,
-        routingObjective: decision.objective.slice(0, 500),
-      },
+      metadata,
     },
   }
 }

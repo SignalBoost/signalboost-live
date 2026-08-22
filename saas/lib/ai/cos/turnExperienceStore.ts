@@ -152,7 +152,7 @@ export async function attachTurnOutcome(turnId: string, outcome: TurnOutcome): P
     const source = String(outcome.source || 'unknown').slice(0, 120)
     const feedback = outcome.userFeedback === undefined ? null : String(outcome.userFeedback).slice(0, 400)
 
-    const merged = await db.rpc('cos_merge_turn_outcome', {
+    const merged = await db.rpc('cos_merge_turn_outcome_chronological', {
       p_turn_id: cleanTurnId,
       p_repair_needed: outcome.repairNeeded ?? null,
       p_escalated: outcome.escalated ?? null,
@@ -165,6 +165,8 @@ export async function attachTurnOutcome(turnId: string, outcome: TurnOutcome): P
 
     // Backward-compatible mirror only. It is allowed to affect zero rows when the post-response
     // execution insert has not happened yet; cos_turn_outcomes remains the durable authority.
+    // Do not let a stale event overwrite this mirror after the authoritative chronological merge rejected it.
+    if (merged.data !== true) return true
     const update: Record<string, unknown> = {
       outcome_at: occurredAt,
       outcome_source: source,

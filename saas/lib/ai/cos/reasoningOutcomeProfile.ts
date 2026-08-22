@@ -94,6 +94,14 @@ function summarizeCandidate(rows: ReasoningOutcomeSample[]): ReasoningCandidateP
   }
 }
 
+function candidateOrder(a: ReasoningCandidatePerformance, b: ReasoningCandidatePerformance): number {
+  const quality = b.qualityScore - a.qualityScore
+  if (quality !== 0) return quality
+  const aCost = a.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
+  const bCost = b.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
+  return aCost - bCost || a.averageLatencyMs - b.averageLatencyMs || a.workerRole.localeCompare(b.workerRole)
+}
+
 function efficiencyImprovement(winner: ReasoningCandidatePerformance, runner: ReasoningCandidatePerformance): number {
   const costComparable = winner.averageEstimatedCostUsd !== null && runner.averageEstimatedCostUsd !== null && runner.averageEstimatedCostUsd > 0
   if (costComparable) return Math.max(0, (runner.averageEstimatedCostUsd! - winner.averageEstimatedCostUsd!) / runner.averageEstimatedCostUsd!)
@@ -109,9 +117,7 @@ function preferenceFor(problemClass: string, rows: ReasoningOutcomeSample[], opt
     if (bucket) bucket.push(row)
     else buckets.set(key, [row])
   }
-  const candidates = [...buckets.values()]
-    .map(summarizeCandidate)
-    .sort((a, b) => b.qualityScore - a.qualityScore || a.averageEstimatedCostUsd! - b.averageEstimatedCostUsd! || a.averageLatencyMs - b.averageLatencyMs)
+  const candidates = [...buckets.values()].map(summarizeCandidate).sort(candidateOrder)
   const eligible = candidates.filter(candidate => candidate.verifiedOutcomes >= options.minimumVerifiedOutcomesPerCandidate)
 
   if (eligible.length < 2) {
@@ -130,11 +136,7 @@ function preferenceFor(problemClass: string, rows: ReasoningOutcomeSample[], opt
   let winner = bestQuality
   let basis = 'quality'
   if (nearTies.length > 1) {
-    winner = [...nearTies].sort((a, b) => {
-      const aCost = a.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
-      const bCost = b.averageEstimatedCostUsd ?? Number.POSITIVE_INFINITY
-      return aCost - bCost || a.averageLatencyMs - b.averageLatencyMs
-    })[0]
+    winner = [...nearTies].sort(candidateOrder)[0]
     basis = winner === bestQuality ? 'quality' : 'efficiency'
   }
 

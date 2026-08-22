@@ -348,7 +348,7 @@ export async function callRawCosReasoner(
 export async function callCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
-  const { reasonThroughCosControlPlane } = await import('./cosReasoningWorkers')
+  const { reasonThroughCosControlPlane } = await import('./cosReasoningWorkers.ts')
   const execution = await reasonThroughCosControlPlane(args, {
     requestedRole: 'primary',
     allowExternalEscalation: false,

@@ -62,6 +62,18 @@ export function adaptiveRetrievalTrainingCaseId(source: string | null): string |
 }
 
 /**
+ * A paired 6 -> 4 validation can only prove context reduction when the live retrieval path has more
+ * items available than the candidate cap. Zero/low-evidence cases are useful capability checks but
+ * cannot validate this retrieval candidate and should be skipped before an expensive reasoner pair.
+ */
+export function adaptiveRetrievalCaseCanExerciseCap(
+  estimatedLiveRelevant: unknown,
+  candidateMaxInjected: unknown,
+): boolean {
+  return cleanCount(estimatedLiveRelevant) > cleanCount(candidateMaxInjected)
+}
+
+/**
  * Produce a conservative context-waste hypothesis only. Zero citations are NOT interpreted as proof
  * that evidence was useless. The only automatic proposal here is a smaller injection cap, and it
  * remains request-local shadow policy until independent controlled validation succeeds.

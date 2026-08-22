@@ -7,6 +7,10 @@ import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/a
 import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/turnExperienceStore'
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import {
+  withReasoningEvaluationContext,
+  type CosReasoningEvaluationContext,
+} from '@/lib/ai/cos/reasoningEvaluationContext'
+import {
   withAdaptiveRetrievalShadowPolicy,
   type AdaptiveRetrievalShadowPolicy,
 } from '@/lib/ai/cos/adaptiveRetrievalContext'
@@ -17,6 +21,10 @@ type RunPrivateCapabilityCaseOptions = {
   outcomeSource?: string
   /** Explicit bounded correction used only for a failure-autopsy shadow retest. */
   shadowGuidance?: string
+  /** Controlled Phase 5 worker-role override. Never set by ordinary production traffic. */
+  evaluation?: CosReasoningEvaluationContext
+  /** Comparators attach verified outcomes only after confirming a valid local execution. */
+  attachOutcome?: boolean
   /** Request-local retrieval candidate used only by the adaptive-retrieval validation suite. */
   adaptiveRetrievalPolicy?: AdaptiveRetrievalShadowPolicy
 }
@@ -38,7 +46,7 @@ function guidedPrompt(prompt: string, guidance?: string): string {
   ].join('\n')
 }
 
-export async function runPrivateCapabilityCase(
+async function executePrivateCapabilityCase(
   test: PrivateBenchmarkCase,
   options?: RunPrivateCapabilityCaseOptions,
 ) {
@@ -67,8 +75,6 @@ export async function runPrivateCapabilityCase(
     },
   })
 
-  // Enterprise benchmark execution bypasses the outer ordinary-turn learning wrapper, so flush the
-  // learned-source utilization envelope explicitly. This is still best-effort/post-response telemetry.
   flushCapturedEvidenceSourceUse()
 
   if (turnId) {
@@ -89,12 +95,14 @@ export async function runPrivateCapabilityCase(
       failureReason: score.passed ? null : score.reasons.join('; ').slice(0, 1200),
     })
 
-    await attachTurnOutcome(turnId, {
-      verifiedSuccess: score.passed,
-      repairNeeded: !score.passed,
-      escalated: !result.handled,
-      source: options?.outcomeSource || `capability_benchmark:${test.track}`,
-    })
+    if (options?.attachOutcome !== false) {
+      await attachTurnOutcome(turnId, {
+        verifiedSuccess: score.passed,
+        repairNeeded: !score.passed,
+        escalated: !result.handled,
+        source: options?.outcomeSource || `capability_benchmark:${test.track}`,
+      })
+    }
   }
 
   return {
@@ -103,5 +111,15 @@ export async function runPrivateCapabilityCase(
     latencyMs: Date.now() - started,
     provenance: result.provenance,
     turnId,
+    handled: result.handled,
+    confidence: result.confidence,
   }
+}
+
+export async function runPrivateCapabilityCase(
+  test: PrivateBenchmarkCase,
+  options?: RunPrivateCapabilityCaseOptions,
+) {
+  if (!options?.evaluation) return executePrivateCapabilityCase(test, options)
+  return withReasoningEvaluationContext(options.evaluation, () => executePrivateCapabilityCase(test, options))
 }

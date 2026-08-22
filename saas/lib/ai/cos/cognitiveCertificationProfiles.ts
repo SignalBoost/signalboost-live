@@ -1,8 +1,8 @@
 import {
   validateCognitiveSkillDraft,
   type CognitiveSkillDraft,
-} from '@/lib/ai/cos/cognitiveSkillCandidate'
-import type { CognitiveReasoningTriggerKind } from '@/lib/ai/cos/cognitiveReasoningPatterns'
+} from './cognitiveSkillCandidate.ts'
+import type { CognitiveReasoningTriggerKind } from './cognitiveReasoningPatterns.ts'
 
 export type CognitiveCertificationProfileKey = 'context_ambiguity_v1'
 

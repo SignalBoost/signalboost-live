@@ -1893,7 +1893,7 @@ ${ev.summary}`
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
     // while time remains, so a recoverable blip never hard-freezes the assistant.
-    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect' | 'press' | 'pressQueue') => {
+    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign' | 'prospect' | 'press' | 'pressQueue' | 'repoScan') => {
       let lastErr: any = null
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -1905,7 +1905,7 @@ ${ev.summary}`
               system: cachedSystem(systemContent) as any, // ephemeral prompt cache: caches the tools+system prefix across the multi-turn tool loop
               messages: convo as any,
               tools: anthropicTools as any,
-              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'press' ? { type: 'tool', name: 'findPublications' } : choiceMode === 'pressQueue' ? { type: 'tool', name: 'proposePressCampaign' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'prospect' ? { type: 'tool', name: 'startProspectCampaign' } : choiceMode === 'press' ? { type: 'tool', name: 'findPublications' } : choiceMode === 'pressQueue' ? { type: 'tool', name: 'proposePressCampaign' } : choiceMode === 'repoScan' ? { type: 'tool', name: 'listRepoFiles' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
           // Meter every model call (owner Chief of Staff vs external Concierge),
@@ -1936,6 +1936,10 @@ ${ev.summary}`
     if (forceAction) {
       systemContent += '\n\nOWNER COMMAND: an affirmation ("continue"/"go"/"yes" or similar) was received. Immediately perform the next pending action — for multi-page tasks, read the next queued page file and COMMIT it within this reply. Do not output a plan, do not ask anything, do not repeat instructions to say continue.'
     }
+
+    // An explicit owner repo scan is an authorized read-only action. Force the tree listing so the model cannot answer from memory or claim it lacks repository access.
+    const forceRepoScan = isOwner && /\b(?:scan|audit|review|inspect|analy[sz]e|look through)\b[\s\S]{0,80}\b(?:repo|repository|codebase|github)\b|\b(?:repo|repository|codebase|github)\b[\s\S]{0,80}\b(?:scan|audit|review|inspect|analy[sz]e)\b/i.test(latestUserMessage)
+    if (forceRepoScan) systemContent += '\n\nOWNER REPOSITORY-SCAN REQUEST: the owner has already authorized this read-only scan. Start NOW with listRepoFiles, then read ONBOARD.md, package.json, saas/package.json, and the most relevant application/manifest files before answering. This access is read-only on SignalBoost/signalboost-live@main. Do not say you cannot access or scan the repository, do not ask the owner to provide a repo, directory, permission confirmation, or pasted files, and do not give a generic answer. State which files you actually inspected; separate verified facts from recommendations.'
 
     // Owner campaign-request forcer. When the owner asks to create a campaign or
     // video (any of the 5 platform languages), the FIRST model call is forced to
@@ -2003,7 +2007,7 @@ ${ev.summary}`
       systemContent += '\n\nOWNER CAMPAIGN REQUEST: the owner asked for a campaign/video in this message. You MUST call proposeMarketingCampaign now. Pass the owner\'s FULL message verbatim as sourceMaterial, and extract goal, audience, channel, offer, and language from it. Do NOT answer a campaign request with campaign copy in prose: a reply that describes a campaign but contains no campaign id from the tool is a failure.'
     }
 
-    let msg        = await callModel(forcePress ? 'press' : forceProspect ? 'prospect' : forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
+    let msg        = await callModel(forceRepoScan ? 'repoScan' : forcePress ? 'press' : forceProspect ? 'prospect' : forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
     let toolRounds = 0
     let timedOut   = msg === null
 

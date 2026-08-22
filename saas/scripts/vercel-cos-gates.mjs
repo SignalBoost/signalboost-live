@@ -14,6 +14,7 @@ const tests = [
   'tests/cosCurrentWorldLearning.node.test.ts',
   'tests/cosLearnedCorpusContinuousIndexing.node.test.ts',
   'tests/cosAnswerFreshnessSelfReflection.node.test.ts',
+  'tests/cosFeedbackReasoningGeneralization.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

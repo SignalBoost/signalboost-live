@@ -29,7 +29,7 @@ const ONGOING_STATUS = /\b(?:still\s+(?:in\s+business|operating|supported|mainta
 const MUTABLE_STATE_NOUN = '(?:version|release|model|price|pricing|edition|status|availability|schedule|ranking|rate|guidance|policy|plan|specification|specifications)'
 const ENTITY_TOKEN = "[\\p{L}\\p{N}._+/#()'’:-]+"
 const LATEST_STATE = new RegExp(`\\b(?:latest|newest|most\\s+recent|current)\\s+(?:(?:${ENTITY_TOKEN})\\s+){0,6}${MUTABLE_STATE_NOUN}\\b`, 'iu')
-const CURRENT_RULE = /\b(?:(?:current|latest|new|updated)\s+(?:law|laws|regulation|regulations|rule|rules|requirement|requirements|visa\s+rule|entry\s+rule|tax\s+rate|policy|guidance)|(?:law|laws|regulation|regulations|rule|rules|requirements?|visa\s+requirements?|entry\s+requirements?)\s+(?:now|today|currently))\b/i
+const CURRENT_RULE = /\b(?:(?:current|latest|new|updated)\s+(?:law|laws|regulation|regulations|rule|rules|requirement|requirements|visa\s+rule|visa\s+requirements?|entry\s+rule|entry\s+requirements?|passport\s+requirements?|tax\s+rate|policy|guidance)|(?:law|laws|regulation|regulations|rule|rules|requirements?|visa\s+requirements?|entry\s+requirements?|passport\s+requirements?)\s+(?:now|today|currently))\b/i
 const CURRENT_SECURITY = /\b(?:(?:current|latest|new|recent|active|open|patched|unpatched|exploited)\s+(?:cve|vulnerability|vulnerabilities|security\s+advisory|security\s+issue|exploit)|CVE-\d{4}-\d+[^?.!]{0,50}\b(?:still\s+)?(?:open|patched|unpatched|exploited|active))\b/i
 const RECENT_EVENT = /\b(?:today|today's|tonight|right\s+now|as\s+of\s+(?:today|now)|this\s+(?:week|month|year)|recently|newly|just\s+announced|breaking|latest\s+news|recent\s+news|live\s+updates?)\b/i
 

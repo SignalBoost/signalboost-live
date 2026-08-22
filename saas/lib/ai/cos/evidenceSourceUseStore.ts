@@ -11,14 +11,25 @@ import {
   type EvidenceUse,
   type SourceKindRollup,
 } from '@/lib/ai/cos/evidenceSourceUse'
-import { consumeEvidenceSourceUseTurn } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+import {
+  consumeEvidenceSourceUseTurn,
+  type CapturedLearnedRetrievalItem,
+} from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+import type { AdaptiveRetrievalShadowPolicy } from '@/lib/ai/cos/adaptiveRetrievalContext'
 
 const ROLLUP_ROW_LIMIT = 1000
 const OUTCOME_BATCH_SIZE = 200
 
+export type LearnedRetrievalItemUse = CapturedLearnedRetrievalItem & {
+  index: number
+  cited: boolean
+}
+
 export type EvidenceSourceUseInput = {
   turnId: string
   use: EvidenceUse
+  items?: LearnedRetrievalItemUse[]
+  retrievalPolicy?: AdaptiveRetrievalShadowPolicy | null
 }
 
 async function persistEvidenceSourceUse(input: EvidenceSourceUseInput): Promise<void> {
@@ -32,6 +43,8 @@ async function persistEvidenceSourceUse(input: EvidenceSourceUseInput): Promise<
       injected: input.use.injected,
       cited: input.use.cited,
       by_source_kind: input.use.bySourceKind,
+      items: Array.isArray(input.items) ? input.items : [],
+      retrieval_policy: input.retrievalPolicy && typeof input.retrievalPolicy === 'object' ? input.retrievalPolicy : {},
     }, { onConflict: 'turn_id,evidence_system' })
     if (result.error) throw result.error
   } catch (error) {
@@ -54,9 +67,16 @@ export function recordEvidenceSourceUse(input: EvidenceSourceUseInput): void {
 export function flushCapturedEvidenceSourceUse(): void {
   const captured = consumeEvidenceSourceUseTurn()
   if (!captured) return
+  const citedIndices = new Set(captured.citedIndices)
   recordEvidenceSourceUse({
     turnId: captured.turnId,
     use: attributeSourceKinds(captured.sourceKinds, captured.citedIndices),
+    items: captured.items.map((item, offset) => ({
+      ...item,
+      index: offset + 1,
+      cited: citedIndices.has(offset + 1),
+    })),
+    retrievalPolicy: captured.retrievalPolicy,
   })
 }
 
@@ -94,6 +114,16 @@ export type EvidenceSourceUseReport = {
     observedTurns: number
     rate: number | null
   }
+  itemTelemetry: {
+    items: number
+    withSimilarity: number
+    citedItems: number
+    unusedItems: number
+    avgSimilarity: number | null
+    citedAvgSimilarity: number | null
+    unusedAvgSimilarity: number | null
+    shadowTurns: number
+  }
   bySourceKind: Array<SourceKindRollup & { outcomes: SourceKindOutcomeCorrelation }>
   summary: string
 }
@@ -102,6 +132,11 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size) as T[])
   return out
+}
+
+function mean(values: number[]): number | null {
+  if (!values.length) return null
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(4))
 }
 
 async function loadOutcomes(turnIds: string[]): Promise<Map<string, TurnOutcomeSnapshot>> {
@@ -130,13 +165,20 @@ export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{
 
   const result = await db
     .from('cos_evidence_source_use')
-    .select('turn_id,injected,cited,by_source_kind,created_at')
+    .select('turn_id,injected,cited,by_source_kind,items,retrieval_policy,created_at')
     .eq('evidence_system', 'learned_corpus')
     .order('created_at', { ascending: false })
     .limit(Math.max(1, Math.min(ROLLUP_ROW_LIMIT, Math.floor(limit))))
   if (result.error) return { ok: false, error: `cos_evidence_source_use read failed: ${result.error.message}` }
 
-  type Row = { turn_id?: string; injected?: number; cited?: number; by_source_kind?: unknown }
+  type Row = {
+    turn_id?: string
+    injected?: number
+    cited?: number
+    by_source_kind?: unknown
+    items?: unknown
+    retrieval_policy?: unknown
+  }
   const rows = (result.data ?? []) as Row[]
   const uses: EvidenceUse[] = rows.map(row => ({
     injected: Number(row.injected) || 0,
@@ -149,6 +191,23 @@ export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{
   const totalCited = uses.reduce((sum, use) => sum + use.cited, 0)
   const zeroCitationTurns = uses.filter(use => use.injected > 0 && use.cited === 0).length
   const rollup = rollupSourceKindUse(uses)
+
+  const itemRows = rows.flatMap(row => Array.isArray(row.items) ? row.items as Array<Record<string, unknown>> : [])
+  const similarities = itemRows
+    .map(item => item.similarity == null ? null : Number(item.similarity))
+    .filter((value): value is number => value != null && Number.isFinite(value))
+  const citedSimilarities = itemRows
+    .filter(item => item.cited === true)
+    .map(item => item.similarity == null ? null : Number(item.similarity))
+    .filter((value): value is number => value != null && Number.isFinite(value))
+  const unusedSimilarities = itemRows
+    .filter(item => item.cited !== true)
+    .map(item => item.similarity == null ? null : Number(item.similarity))
+    .filter((value): value is number => value != null && Number.isFinite(value))
+  const shadowTurns = rows.filter(row => {
+    const policy = row.retrieval_policy
+    return Boolean(policy && typeof policy === 'object' && Object.keys(policy as Record<string, unknown>).length > 0)
+  }).length
 
   const bySourceKind = rollup.map(entry => {
     const turnIds = new Set<string>()
@@ -213,6 +272,16 @@ export async function readEvidenceSourceUse(limit = ROLLUP_ROW_LIMIT): Promise<{
       outcomeCoverage: {
         observedTurns,
         rate: uses.length > 0 ? Number((observedTurns / uses.length).toFixed(4)) : null,
+      },
+      itemTelemetry: {
+        items: itemRows.length,
+        withSimilarity: similarities.length,
+        citedItems: itemRows.filter(item => item.cited === true).length,
+        unusedItems: itemRows.filter(item => item.cited !== true).length,
+        avgSimilarity: mean(similarities),
+        citedAvgSimilarity: mean(citedSimilarities),
+        unusedAvgSimilarity: mean(unusedSimilarities),
+        shadowTurns,
       },
       bySourceKind,
       summary,

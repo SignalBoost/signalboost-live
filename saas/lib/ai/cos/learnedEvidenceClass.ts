@@ -22,11 +22,12 @@
 //   2. metadata rows fill leftover slots only, and are LABELLED as pointers so the reasoner treats
 //      them as leads ("this source exists and is relevant") rather than as evidence to quote.
 //
-// No schema change: substance is derived from the row's own summary using the same character
-// threshold cos-core already uses, so write-time and read-time agree on what "full" means.
+// Adaptive retrieval experiments are allowed to reduce the selection cap only inside an explicit
+// request-local shadow context. Ordinary Production traffic keeps the caller's existing limit.
 
 import { fullTextCharacters } from '@/lib/cos-core/layers/learning/cycle'
-import { captureSelectedLearnedSourceKinds } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+import { captureSelectedLearnedRows } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
+import { effectiveLearnedCorpusInjectionLimit } from '@/lib/ai/cos/adaptiveRetrievalContext'
 
 export type LearnedEvidenceClass = 'full' | 'metadata'
 
@@ -55,12 +56,14 @@ export function classifyLearnedEvidence(row: ClassifiableLearnedRow): LearnedEvi
  * can no longer crowd out content that could actually be cited.
  *
  * The exact selected rows are also captured request-locally before prompt rendering so later [CL#]
- * citations can be attributed to structured source_kind metadata without reparsing prompt strings.
+ * citations can be attributed to structured source_kind and similarity metadata without reparsing
+ * prompt strings. A shadow validation policy may reduce the cap; it can never increase it.
  */
 export function selectLearnedCorpusRows<T extends ClassifiableLearnedRow>(rows: T[], limit: number): T[] {
-  const cap = Math.max(0, Math.floor(limit))
+  const requestedCap = Math.max(0, Math.floor(limit))
+  const cap = effectiveLearnedCorpusInjectionLimit(requestedCap)
   if (cap === 0) {
-    captureSelectedLearnedSourceKinds([])
+    captureSelectedLearnedRows([])
     return []
   }
   const full: T[] = []
@@ -70,7 +73,7 @@ export function selectLearnedCorpusRows<T extends ClassifiableLearnedRow>(rows: 
     else metadata.push(row)
   }
   const selected = [...full, ...metadata].slice(0, cap)
-  captureSelectedLearnedSourceKinds(selected)
+  captureSelectedLearnedRows(selected)
   return selected
 }
 

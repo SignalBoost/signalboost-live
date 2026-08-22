@@ -10,6 +10,10 @@ import {
   withReasoningEvaluationContext,
   type CosReasoningEvaluationContext,
 } from '@/lib/ai/cos/reasoningEvaluationContext'
+import {
+  withAdaptiveRetrievalShadowPolicy,
+  type AdaptiveRetrievalShadowPolicy,
+} from '@/lib/ai/cos/adaptiveRetrievalContext'
 
 export type PrivateBenchmarkCase = CapabilityBenchmarkCase & { id: string }
 
@@ -21,6 +25,8 @@ type RunPrivateCapabilityCaseOptions = {
   evaluation?: CosReasoningEvaluationContext
   /** Comparators attach verified outcomes only after confirming a valid local execution. */
   attachOutcome?: boolean
+  /** Request-local retrieval candidate used only by the adaptive-retrieval validation suite. */
+  adaptiveRetrievalPolicy?: AdaptiveRetrievalShadowPolicy
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -53,7 +59,10 @@ async function executePrivateCapabilityCase(
     await generateLocalEmbedding(test.prompt)
   }
 
-  const result = await tryCOSFirstAnswer({ prompt: executionPrompt, language: 'en', privileged: true, disableCache: true })
+  const answer = () => tryCOSFirstAnswer({ prompt: executionPrompt, language: 'en', privileged: true, disableCache: true })
+  const result = options?.adaptiveRetrievalPolicy
+    ? await withAdaptiveRetrievalShadowPolicy(options.adaptiveRetrievalPolicy, answer)
+    : await answer()
   const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
   const turnId = peekEvidenceSourceUseTurnId()
   const score = scoreCapabilityBenchmarkCase(test, {
@@ -66,8 +75,6 @@ async function executePrivateCapabilityCase(
     },
   })
 
-  // Enterprise benchmark execution bypasses the outer ordinary-turn learning wrapper, so flush the
-  // learned-source utilization envelope explicitly. This is still best-effort/post-response telemetry.
   flushCapturedEvidenceSourceUse()
 
   if (turnId) {

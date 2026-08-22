@@ -158,6 +158,13 @@ function structuredProviderQuery(query: string): string {
   return stripped || String(query || '').trim()
 }
 
+function clampSearchQuery(query: string): string {
+  const collapsed = String(query || '').replace(/\s+/g, ' ').trim()
+  const words = collapsed.split(' ')
+  const bounded = words.length > 45 ? words.slice(0, 45).join(' ') : collapsed
+  return bounded.length > 380 ? bounded.slice(0, 380).replace(/\s+\S*$/, '') : bounded
+}
+
 export async function getExternalInfo(
   query: string,
   requestedCount = DEFAULT_RESULT_COUNT,
@@ -199,7 +206,11 @@ export async function getExternalInfo(
     // Stripe question — recognized structurally, with no country or vendor tables. Mirrors the
     // existing public-office policy below; secondary sources are demoted and labelled, not removed.
     const authorityNeed = classifyAuthoritativeSourceNeed(q)
-    const searchQuery = authorityNeed.required ? augmentQueryForOfficialSources(q, authorityNeed) : q
+    // Provider hard limits enforced at the boundary: the search API rejects queries over ~400
+    // characters or ~50 words with HTTP 422 (observed in production 2026-08-22 — a paragraph-length
+    // legal question 422'd, returned zero sources, and made the fail-closed path abstain on a
+    // question the open web answers easily). No caller should need to know provider limits.
+    const searchQuery = clampSearchQuery(authorityNeed.required ? augmentQueryForOfficialSources(q, authorityNeed) : q)
 
     const rawResults = await getWebSearchPort().search(searchQuery, count)
     const enforcePrimaryOfficeSources = isCurrentPublicOfficeQuery(q)

@@ -500,6 +500,8 @@ Use exact `turn_id` outcomes to build calibration buckets by problem class, evid
 
 Do not conflate zero-grounding general reasoning with current-state factual claims.
 
+An owner-only cohort report is being added over exact verified turn outcomes, grouped by problem class, reasoner and evidence regime. It is shadow-only and cannot modify live confidence or escalation policy.
+
 ---
 
 # Strategy-selection learning — PARTIAL / HIGH PRIORITY

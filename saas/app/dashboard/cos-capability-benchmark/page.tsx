@@ -10,6 +10,18 @@ type AutopsyState = { turns:number; pendingRetests:number; awaitingEvidence:numb
 type BusyMode = 'capability'|'utilization'|'autopsy'|null
 
 const EMPTY_AUTOPSY: AutopsyState = { turns:0, pendingRetests:0, awaitingEvidence:0, passedRetests:0, failedRetests:0, retainedLessons:0, rows:[] }
+const LOAD_TIMEOUT_MS = 20_000
+const AUTOPSY_ACTION_TIMEOUT_MS = 120_000
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = LOAD_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
 
 function latestScoredRate(runs: Run[]): string {
   const run = runs.find(item => Number(item.attempted) > 0)
@@ -27,9 +39,9 @@ export default function CosCapabilityBenchmarkPage() {
 
   const load = async () => {
     const [capResponse, utilResponse, autopsyResponse] = await Promise.all([
-      fetch('/api/admin/cos-capability-benchmark', { credentials:'include', cache:'no-store' }),
-      fetch('/api/admin/cos-evidence-utilization-benchmark', { credentials:'include', cache:'no-store' }),
-      fetch('/api/admin/cos-failure-autopsy', { credentials:'include', cache:'no-store' }),
+      fetchWithTimeout('/api/admin/cos-capability-benchmark', { credentials:'include', cache:'no-store' }),
+      fetchWithTimeout('/api/admin/cos-evidence-utilization-benchmark', { credentials:'include', cache:'no-store' }),
+      fetchWithTimeout('/api/admin/cos-failure-autopsy', { credentials:'include', cache:'no-store' }),
     ])
     const [capBody, utilBody, autopsyBody] = await Promise.all([capResponse.json(), utilResponse.json(), autopsyResponse.json()])
     if (!capResponse.ok) throw new Error(capBody.error || t('cos.benchmark.loadFailed', 'Could not load benchmark.'))
@@ -82,12 +94,17 @@ export default function CosCapabilityBenchmarkPage() {
   const runAutopsyRetest = async () => {
     setBusy('autopsy'); setError('')
     try {
-      const response = await fetch('/api/admin/cos-failure-autopsy', { method:'POST', credentials:'include' })
+      const response = await fetchWithTimeout('/api/admin/cos-failure-autopsy', { method:'POST', credentials:'include' }, AUTOPSY_ACTION_TIMEOUT_MS)
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || t('cos.benchmark.autopsyRunFailed', 'Failure autopsy retest failed.'))
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('cos.benchmark.autopsyRunFailed', 'Failure autopsy retest failed.'))
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setError(t('cos.benchmark.autopsyBrowserTimeout', 'The browser stopped waiting after two minutes. The server may still have completed the retest; refresh to read the durable result.'))
+        void load().catch(() => undefined)
+      } else {
+        setError(e instanceof Error ? e.message : t('cos.benchmark.autopsyRunFailed', 'Failure autopsy retest failed.'))
+      }
     } finally { setBusy(null) }
   }
 

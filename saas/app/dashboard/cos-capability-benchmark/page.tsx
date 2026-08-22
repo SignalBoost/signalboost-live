@@ -67,6 +67,16 @@ export default function CosCapabilityBenchmarkPage() {
 
   useEffect(() => { void load().catch(e => setError(e.message)) }, [])
 
+  const refreshStatus = async () => {
+    setBusy(null)
+    setError('')
+    try {
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('cos.benchmark.loadFailed', 'Could not load benchmark.'))
+    }
+  }
+
   const runCapability = async () => {
     setBusy('capability'); setError('')
     try {
@@ -111,6 +121,11 @@ export default function CosCapabilityBenchmarkPage() {
   const active = state.cases.filter(item => item.active).length
   const latestCapabilityRate = latestScoredRate(state.runs)
   const latestUtilizationRate = latestScoredRate(utilization.runs)
+  const autopsyActionLabel = busy === 'autopsy'
+    ? t('cos.benchmark.autopsyRunning', 'Running autopsy retest…')
+    : autopsy.pendingRetests === 0
+      ? t('cos.benchmark.autopsyNonePending', 'No pending autopsy retests')
+      : t('cos.benchmark.autopsyRun', 'Run failure autopsy retest')
 
   return <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
     <header>
@@ -121,8 +136,8 @@ export default function CosCapabilityBenchmarkPage() {
     <div className="flex flex-wrap gap-3">
       <button className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50" disabled={busy!==null||active===0} onClick={runCapability}>{busy==='capability'?t('cos.benchmark.running', 'Running…'):t('cos.benchmark.run', 'Run benchmark')}</button>
       <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||utilization.suiteSize===0} onClick={runUtilization}>{busy==='utilization'?t('cos.benchmark.utilizationRunning', 'Running evidence benchmark…'):t('cos.benchmark.utilizationRun', 'Run evidence utilization')}</button>
-      <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||autopsy.pendingRetests===0} onClick={runAutopsyRetest}>{busy==='autopsy'?t('cos.benchmark.autopsyRunning', 'Running autopsy retest…'):t('cos.benchmark.autopsyRun', 'Run failure autopsy retest')}</button>
-      <button className="rounded-md border border-border px-4 py-2 text-sm" disabled={busy!==null} onClick={()=>void load().catch(e=>setError(e.message))}>{t('common.refresh', 'Refresh')}</button>
+      <button className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy!==null||autopsy.pendingRetests===0} onClick={runAutopsyRetest}>{autopsyActionLabel}</button>
+      <button className="rounded-md border border-border px-4 py-2 text-sm" onClick={()=>void refreshStatus()}>{t('common.refresh', 'Refresh')}</button>
     </div>
 
     {error&&<p className="rounded-md border border-danger/40 p-3 text-sm text-danger">{error}</p>}

@@ -41,6 +41,23 @@ test('general mutable external facts route live even when the user does not say 
   }
 })
 
+test('ordinary external factual lookups are live-verified by default', () => {
+  for (const prompt of [
+    "What is Poland's population?",
+    'Where is OpenAI headquartered?',
+    'Who owns Volvo Cars?',
+    'What is the capital of Kazakhstan?',
+    'Which country has the largest population?',
+    'Tell me about Nvidia.',
+    'How many people live in Warsaw?',
+    'What languages are officially recognized in South Africa?',
+    'When was SpaceX founded?',
+    'Is Lufthansa a member of Star Alliance?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+  }
+})
+
 test('explicit freshness wording forces live verification across volatile public domains', () => {
   for (const prompt of [
     'Who is the current CEO of Apple?',
@@ -58,7 +75,7 @@ test('explicit freshness wording forces live verification across volatile public
   }
 })
 
-test('historical and timeless conceptual questions do not masquerade as current-world lookups', () => {
+test('historical and conceptual questions keep their non-live reasoning route', () => {
   assert.equal(requiresFreshExternalEvidence('Who was President of the United States in 1999?'), false)
   assert.equal(requiresFreshExternalEvidence('What was the TSLA stock price in 2020?'), false)
   assert.equal(structuredLiveDataKind('What was the TSLA stock price in 2020?'), null)
@@ -80,6 +97,31 @@ test('private operational state stays with its system of record instead of publi
     'What is the availability of our sales team?',
     'What is our current MRR?',
     'What is the status of our deployment?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+  }
+})
+
+test('SignalBoost and COS self-knowledge stays on authoritative internal sources', () => {
+  for (const prompt of [
+    'What model does COS use now?',
+    'What is SignalBoost COS architecture?',
+    'How does COS Enterprise Memory work?',
+    'What is the COS Semantic Cache policy?',
+    'What is the current COS reasoner provider?',
+    'Show me COS execution provenance policy.',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+  }
+})
+
+test('local deterministic utilities do not consume public freshness search', () => {
+  for (const prompt of [
+    'What is 24 * 17?',
+    '2 + 2',
+    'What is the current date?',
+    'What is the time now?',
+    'What day is it?',
   ]) {
     assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
   }

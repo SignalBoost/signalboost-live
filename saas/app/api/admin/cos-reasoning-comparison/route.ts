@@ -168,8 +168,8 @@ export async function POST(request: NextRequest) {
 
           const validLocalExecution = Boolean(
             turnId
-            && outcome.provenance.localModelInvoked === true
-            && outcome.provenance.externalAiInvoked !== true,
+            && Boolean(outcome.provenance.localModelInvoked)
+            && !Boolean(outcome.provenance.externalAiInvoked),
           )
           if (validLocalExecution && turnId) {
             verifiedOutcomeRecorded = await attachTurnOutcome(turnId, {

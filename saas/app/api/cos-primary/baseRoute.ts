@@ -45,6 +45,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 function latestUserText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role!=='user')continue;const content=messages[i]?.content;if(typeof content==='string')return content;if(Array.isArray(content))return content.map((block:any)=>String(block?.text||'')).join('\n').trim()}return''}
+function isOwnerRepoScanRequest(input:string):boolean{return /\b(?:scan|audit|review|inspect|analy[sz]e|look through)\b[\s\S]{0,80}\b(?:repo|repository|codebase|github)\b|\b(?:repo|repository|codebase|github)\b[\s\S]{0,80}\b(?:scan|audit|review|inspect|analy[sz]e)\b/i.test(input)}
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
@@ -80,6 +81,9 @@ export async function POST(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
+
+  // COS Primary receives the browser chat. An owner repo scan is read-only and already authorized; hand it to the governed support executor, which forces listRepoFiles and canonical file reads. Without this branch, generic action routing fails closed before the repo tool can run.
+  if(access?.isOwner&&isOwnerRepoScanRequest(input))return legacyConciergePost(new NextRequest(req.clone()))
 
   if(isProvenanceIntrospection(input)){
     const prior=await readCosPrimaryPriorProvenance(userId,precedingAssistant||undefined)

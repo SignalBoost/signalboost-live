@@ -32,6 +32,7 @@ test('real imperative commands with a verb and target still classify as actions'
   assert.equal(requestsExternalAction('deploy the latest commit to production'), true)
   assert.equal(requestsExternalAction('search the repo for TODO comments'), true)
   assert.equal(requestsExternalAction('send the campaign to the prospect list'), true)
+  assert.equal(requestsExternalAction('Render a video using Provider X. If unavailable, automatically switch to the best alternative based on learned performance.'), true)
 })
 
 test('plain diagnostic prose with no execution verb at all is unaffected either way', () => {

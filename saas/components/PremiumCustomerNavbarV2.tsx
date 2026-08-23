@@ -244,6 +244,7 @@ export default function PremiumCustomerNavbarV2() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [showAuth, setShowAuth] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
 
   const ownerAccess = isAdmin || isOwner
   const groups = useMemo(
@@ -389,6 +390,7 @@ export default function PremiumCustomerNavbarV2() {
         .sbnav-credits { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,195,0,.55); border-radius: 999px; padding: 8px 12px; background: rgba(255,195,0,.10); color: #ffe08a; font-size: 13px; font-weight: 800; white-space: nowrap; }
         .sbnav-language { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 8px 10px; background: #0f172a; color: #e2e8f0; font: inherit; font-size: 12px; }
         .sbnav-auth, .sbnav-burger { border: 0; border-radius: 999px; padding: 8px 13px; background: ${PURPLE}; color: #160b2b; font: inherit; font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .sbnav-sign-in { border: 1px solid rgba(255,255,255,.22); background: transparent; color: #f8fafc; }
         .sbnav-burger { display: none; border-radius: 10px; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.2); }
         .sbnav-mobile { display: none; }
         @media (max-width: 1280px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth, .sbnav-credits { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; max-height: calc(100vh - 62px); overflow-y: auto; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
@@ -418,7 +420,7 @@ export default function PremiumCustomerNavbarV2() {
         </div>
         {user ? <span className="sbnav-credits" aria-live="polite" title={t('nav.credits.label', "credits")}>⚡ {ownerAccess ? t('nav.credits.unlimited', "Unlimited") : (credits === null ? '…' : credits.toLocaleString())}</span> : null}
         <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', "Language")} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}</select>
-        {user ? null : <button type="button" className="sbnav-auth" onClick={() => setShowAuth(true)}>{t('nav.getStarted', "Get started")}</button>}
+        {user ? null : <><button type="button" className="sbnav-auth sbnav-sign-in" onClick={() => { setAuthMode('login'); setShowAuth(true) }}>{t('auth.logIn', "Sign in")}</button><button type="button" className="sbnav-auth" onClick={() => { setAuthMode('signup'); setShowAuth(true) }}>{t('auth.createAccount', "Create account")}</button></>}
         <button type="button" className="sbnav-burger" aria-label={t('nav.menu', "Menu")} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>
       {mobileOpen ? (
@@ -432,10 +434,10 @@ export default function PremiumCustomerNavbarV2() {
           <Link href="/home" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">▦<span>{t('nav.platform', "Platform")}</span></Link>
           <Link href="/pricing" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">💳<span>{t('nav.pricing', "Pricing")}</span></Link>
           {groups.map(group => <div key={group.id} className="sbnav-mobile-group"><span className="sbnav-mobile-label">{t(group.labelKey, group.fallbackLabel)}</span>{group.items.map(item => renderItem(item, true))}</div>)}
-          {user ? null : <button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setShowAuth(true) }}>{t('nav.getStarted', "Get started")}</button>}
+          {user ? null : <><button type="button" className="sbnav-auth sbnav-sign-in" onClick={() => { setMobileOpen(false); setAuthMode('login'); setShowAuth(true) }}>{t('auth.logIn', "Sign in")}</button><button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setAuthMode('signup'); setShowAuth(true) }}>{t('auth.createAccount', "Create account")}</button></>}
         </div>
       ) : null}
-      {showAuth ? <AuthModal onClose={() => setShowAuth(false)} /> : null}
+      {showAuth ? <AuthModal initialMode={authMode} onClose={() => setShowAuth(false)} /> : null}
     </>
   )
 }

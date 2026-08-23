@@ -4258,19 +4258,19 @@
       "greeting": "Hello — I’m COS.",
       "headline": "What would you like to accomplish today?",
       "subhead": "Ask a question, describe a goal, or tell me where you want to go. I will help you find the right SignalBoost workspace and provide an evidence-grounded answer when one is available.",
-      "placeholder": "Ask COS anything…",
-      "suggested": "Suggested questions",
-      "cosLabel": "COS",
-      "send": "Ask COS",
-      "thinking": "COS is thinking…",
-      "continue": "Continue the conversation",
       "workspace": "Explore the platform",
-      "trust": "COS uses governed reasoning, respects approval boundaries, and does not present uncertain information as fact.",
-      "error": "I could not reach COS just now. You can continue in the Concierge workspace.",
+      "placeholder": "Ask COS anything…",
+      "thinking": "Thinking…",
+      "send": "Ask COS",
+      "suggested": "Suggested questions",
       "grow": "Help me grow my business",
       "review": "Review my website",
       "campaign": "Plan a campaign",
-      "show": "Show me what SignalBoost can do"
+      "show": "Show me what SignalBoost can do",
+      "cosLabel": "COS response",
+      "continue": "Continue with COS",
+      "error": "COS is temporarily unavailable. Please try again or continue in the full assistant.",
+      "trust": "COS uses governed reasoning, respects approval boundaries, and does not present uncertain information as fact."
     }
   }
 }

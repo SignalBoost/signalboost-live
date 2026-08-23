@@ -29,21 +29,47 @@ test('the directive applies to intentionally generic code too, not just well-def
   assert.match(ANSWER_PATH, /whether the entity being coded is well-defined or ambiguous/)
 })
 
-test('given facts and inferred business meaning must be distinguishable sentence by sentence', () => {
-  // Incident (2026-08-23): an answer restated two GIVEN MAU definitions, then asserted the gap was
-  // "dormant or exploratory" users, labelled the figures top/bottom-of-funnel, and stated what
-  // "investors care about" — none of it supplied, all of it in the same declarative register as
-  // the given definitions.
-  assert.match(ANSWER_PATH, /SEPARATE WHAT YOU WERE GIVEN FROM WHAT YOU INFERRED/)
-  assert.match(ANSWER_PATH, /Mark it in the prose, not in a footnote/)
-  assert.match(ANSWER_PATH, /which claims they can hold you to and which are judgement/)
+test('given facts and the model own reading are separated by grammar, not by disclaimers', () => {
+  // Three production answers in a row (2026-08-23) asserted unsupplied business meaning as fact:
+  // the MAU gap was "dormant or exploratory" users, then "free-tier and trial users", then
+  // evidence of a "freemium/usage-based model" — none of it in the request.
+  //
+  // The first two attempts at this rule were written as prohibitions, and each time the model
+  // complied by TELLING THE READER what it was declining to say ("Do not label this gap as
+  // dormant..."), which is the same failure wearing different clothes. The rule is therefore
+  // phrased as a positive instruction: put your reading in the first person.
+  assert.match(ANSWER_PATH, /GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY/)
+  assert.match(ANSWER_PATH, /Write your reading in the first person and keep it there/)
+  assert.match(ANSWER_PATH, /That single grammatical move is the whole rule/)
 })
 
-test('the fix is labelling, not suppression — interpretation must still be offered', () => {
-  // Banning interpretation would turn an advisory system into a calculator. The rule must say so
-  // explicitly, or it will be over-applied into refusing to analyse.
-  assert.match(ANSWER_PATH, /Do NOT solve this by removing the interpretation/)
-  assert.match(ANSWER_PATH, /unmarked interpretation is the defect/)
+test('the reading is required, not suppressed', () => {
+  // Banning interpretation would turn an advisory system into a calculator.
+  assert.match(ANSWER_PATH, /Give the reading\. It is usually the most useful part/)
+  assert.match(ANSWER_PATH, /what would confirm or refute it/)
+})
+
+test('derived arithmetic counts as given only when the relationship was stated', () => {
+  // 250,000 - 82,000 = 168,000 is only a meaningful "gap" if one count is a subset of the other
+  // for the same period and population — which that request never established. A production
+  // answer asserted the subtraction as fact in one sentence and warned it was unestablished in
+  // the next.
+  assert.match(ANSWER_PATH, /Arithmetic on given numbers is given ONLY when the relationship is stated/)
+  assert.match(ANSWER_PATH, /say what the relationship would need to be/)
+})
+
+test('the writing rules never appear in the answer, and are corrected by rewriting not disclaiming', () => {
+  assert.match(ANSWER_PATH, /Your writing rules are not part of the answer/)
+  assert.match(ANSWER_PATH, /no narration of your own compliance/)
+  assert.match(ANSWER_PATH, /the correct action is to write your supported reading instead/)
+})
+
+test('the rule carries a worked example of given versus reading versus invention', () => {
+  // An abstract rule about registers is easy to satisfy superficially; the example pins what each
+  // category actually looks like on the exact production case.
+  assert.match(ANSWER_PATH, /is GIVEN/)
+  assert.match(ANSWER_PATH, /is READING, correctly marked/)
+  assert.match(ANSWER_PATH, /states as fact what the request never supplied/)
 })
 
 test('an opening recommendation must be rewritten to match the conclusion it reasoned to', () => {

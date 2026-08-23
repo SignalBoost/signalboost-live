@@ -6,6 +6,7 @@
 
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemory'
+import { strategyGenerationDefaultsFromSnapshot, type StrategyGenerationDefaults } from '@/lib/ai/cos/strategyGenerationDefaults'
 import {
   deriveStrategyProfile,
   type CampaignOutcomeRow,
@@ -16,8 +17,13 @@ import {
 /** Deliberately generous: derivation is cheap and a truncated read would silently bias the winner. */
 const CAMPAIGN_ROW_LIMIT = 2000
 
+export type StrategyProfileGenerationView = StrategyProfile & {
+  generationDefaults: StrategyGenerationDefaults
+  generationRule: string
+}
+
 export type StrategyProfileReadResult =
-  | { ok: true; organizationId: string; profile: StrategyProfile }
+  | { ok: true; organizationId: string; profile: StrategyProfileGenerationView }
   | { ok: false; error: string; scopeStatus?: string }
 
 export async function readStrategyProfile(args: {
@@ -50,10 +56,49 @@ export async function readStrategyProfile(args: {
 
   if (result.error) return { ok: false, error: `enterprise_campaign_memory read failed: ${result.error.message}` }
 
+  const requestedWorkspace = String(args.workspace ?? resolution.scope.workspace ?? '').trim()
+  let baselineQuery = admin
+    .from('enterprise_intelligence_snapshots')
+    .select('snapshot,workspace,analyzed_at')
+    .eq('organization_id', resolution.scope.organizationId)
+    .order('analyzed_at', { ascending: false })
+    .limit(1)
+  if (requestedWorkspace) baselineQuery = baselineQuery.eq('workspace', requestedWorkspace)
+  let baselineResult = await baselineQuery.maybeSingle()
+
+  // A caller can omit workspace, or ask from a workspace without its own intelligence snapshot.
+  // In that case use the organization's most recent baseline rather than discarding known defaults.
+  if (!baselineResult.data && requestedWorkspace) {
+    baselineResult = await admin
+      .from('enterprise_intelligence_snapshots')
+      .select('snapshot,workspace,analyzed_at')
+      .eq('organization_id', resolution.scope.organizationId)
+      .order('analyzed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  }
+
+  const defaults = strategyGenerationDefaultsFromSnapshot({
+    snapshot: baselineResult.data?.snapshot,
+    workspace: baselineResult.data?.workspace,
+    analyzedAt: baselineResult.data?.analyzed_at,
+  })
   const rows = (result.data ?? []) as CampaignOutcomeRow[]
+  const derived = deriveStrategyProfile(rows, args.options ?? {})
+  const fallbackSummary = derived.changesBehavior
+    ? derived.summary
+    : `${derived.summary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation.`
+
   return {
     ok: true,
     organizationId: resolution.scope.organizationId,
-    profile: deriveStrategyProfile(rows, args.options ?? {}),
+    profile: {
+      ...derived,
+      summary: fallbackSummary,
+      generationDefaults: defaults,
+      generationRule: defaults.status === 'available'
+        ? 'Overlay learned dimensions on generationDefaults. If no learned override exists, generationDefaults remain active and content generation MUST proceed; lack of measured weights is not a reason to refuse.'
+        : 'If no learned override exists and no baseline snapshot is available, generate using ordinary judgement and say that no measured override was applied. Lack of measured weights alone is never a reason to refuse generation.',
+    },
   }
 }

@@ -65,8 +65,17 @@ export function stripInternalEvidenceIds(answer: string): string {
   // become "While shows…". Replace those with a neutral, accurate phrase; markers that merely
   // trail a clause are removed outright.
   cleaned = cleaned.replace(EVIDENCE_MARKER, (match, offset: number, whole: string) => {
-    const after = String(whole).slice(offset + String(match).length)
-    return /^\s*[\p{L}\p{N}]/u.test(after) ? 'the retrieved evidence' : ''
+    const text = String(whole)
+    const after = text.slice(offset + String(match).length)
+    if (!/^\s*[\p{L}\p{N}]/u.test(after)) return ''
+    // A marker in APPOSITION after a noun ("The strategy profile [OEM1] instructs…") is removed —
+    // the noun is the subject and replacement would double it ("the profile the retrieved evidence
+    // instructs", observed in production 2026-08-23). Only a marker that IS the subject — sentence
+    // start or right after a conjunction/preposition ("While [OEM1] shows…") — takes the neutral
+    // phrase.
+    const before = text.slice(Math.max(0, offset - 40), offset)
+    const markerIsSubject = /(?:^|[.!?:;]\s*|\n\s*|\b(?:while|because|since|although|though|whereas|and|but|or|as|if|when|per|according\s+to|from|in|of|by|that)\s+)$/iu.test(before)
+    return markerIsSubject ? 'the retrieved evidence' : ''
   })
   cleaned = cleaned
     // A removed trailing marker can strand its conjunction: "Point two X and ." → "Point two X."

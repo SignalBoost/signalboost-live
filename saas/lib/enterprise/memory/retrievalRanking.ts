@@ -10,6 +10,7 @@ export type EnterpriseMemoryKind =
   | 'confidence'
   | 'audience'
   | 'product'
+  | 'strategy_profile'
 
 export type EnterpriseMemoryCandidate = {
   id: string

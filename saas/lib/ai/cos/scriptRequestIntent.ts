@@ -14,6 +14,8 @@
 // into invented savings percentages, blanket freezes, accusations about department leaders, or
 // simplistic "cost center = expendable" recommendations.
 
+import { regulatedOperationalScenarioDirective } from './regulatedOperationalScenarioIntent.ts'
+
 export type ScriptRequestMode = 'content' | 'code' | 'none'
 
 const SCRIPT_AUTHORING =
@@ -91,6 +93,10 @@ function pureScriptDirective(input: string): string | null {
 
 export function scriptRequestDirective(prompt: string): string | null {
   const input = userQuestionOnly(prompt)
-  const directives = [pureScriptDirective(input), executiveDecisionDirective(input)].filter(Boolean)
+  const directives = [
+    pureScriptDirective(input),
+    executiveDecisionDirective(input),
+    regulatedOperationalScenarioDirective(input),
+  ].filter(Boolean)
   return directives.length ? directives.join('\n\n') : null
 }

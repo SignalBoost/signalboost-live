@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createEnterpriseMemoryCandidates } from '../lib/enterprise/memory/retriever.ts'
 import { rankEnterpriseMemoryCandidates } from '../lib/enterprise/memory/retrievalRanking.ts'
+import { deriveStrategyProfile } from '../lib/ai/cos/strategyProfile.ts'
 
 const NOW = Date.parse('2026-07-18T12:00:00.000Z')
 
@@ -125,4 +126,65 @@ test('intelligence snapshots remain bounded sanitized payloads', () => {
   assert.equal(candidates[0].kind, 'intelligence')
   assert.equal(candidates[0].confidence, 0.75)
   assert.equal(candidates[0].payload.schemaVersion, 2)
+})
+
+test('current strategy profile becomes auditable generation context', () => {
+  const measured = [
+    ...Array.from({ length: 5 }, (_, index) => ({
+      campaign_id: `winner-${index}`,
+      channel: 'email',
+      cta: 'book-demo',
+      creative: 'proof-led',
+      execution_status: 'measured',
+      human_edits: {},
+      performance_data: {
+        performanceScore: 0.9,
+        metrics: { impressions: 100, clicks: 20, revenue: 1000 },
+      },
+    })),
+    ...Array.from({ length: 5 }, (_, index) => ({
+      campaign_id: `runner-${index}`,
+      channel: 'linkedin',
+      cta: 'learn-more',
+      creative: 'brand-led',
+      execution_status: 'measured',
+      human_edits: {},
+      performance_data: {
+        performanceScore: 0.5,
+        metrics: { impressions: 100, clicks: 10, revenue: 500 },
+      },
+    })),
+  ]
+  const profile = deriveStrategyProfile(measured, { now: new Date('2026-07-18T12:00:00.000Z') })
+  const candidates = createEnterpriseMemoryCandidates({ strategyProfile: profile })
+  const strategy = candidates.find(candidate => candidate.kind === 'strategy_profile')
+
+  assert.ok(strategy)
+  assert.equal(strategy.payload.status, 'available')
+  assert.deepEqual(strategy.payload.appliedOverrides, {
+    channel: 'email',
+    cta: 'book-demo',
+    creative: 'proof-led',
+  })
+  assert.deepEqual(strategy.payload.heuristics, {
+    minimumCampaignsPerVariant: 5,
+    minimumRelativeMargin: 0.2,
+    minimumApprovedForReworkRate: 8,
+    rule: 'Apply only dimensions whose status is learned. For insufficient_evidence or no_clear_winner, keep the existing generation default.',
+  })
+
+  const ranked = rankEnterpriseMemoryCandidates(candidates, {
+    taskTags: ['strategy', 'profile', 'weights', 'heuristics'],
+    now: NOW,
+  })
+  assert.equal(ranked[0].kind, 'strategy_profile')
+})
+
+test('strategy profile read failures become concrete context rather than invented missing weights', () => {
+  const candidates = createEnterpriseMemoryCandidates({
+    strategyProfileError: 'enterprise_campaign_memory read failed: timeout',
+  })
+  const strategy = candidates.find(candidate => candidate.kind === 'strategy_profile')
+  assert.equal(strategy?.payload.status, 'unavailable')
+  assert.equal(strategy?.payload.error, 'enterprise_campaign_memory read failed: timeout')
 })

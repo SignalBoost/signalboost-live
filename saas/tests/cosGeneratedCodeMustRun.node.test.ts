@@ -58,6 +58,13 @@ test('derived arithmetic counts as given only when the relationship was stated',
   assert.match(ANSWER_PATH, /say what the relationship would need to be/)
 })
 
+test('named laws and standards are not asserted as applicable without establishing facts', () => {
+  assert.match(ANSWER_PATH, /Named laws, regulations, standards and contractual obligations are the sharpest case/)
+  assert.match(ANSWER_PATH, /unless the request established the jurisdiction, industry, data types and circumstances/)
+  assert.match(ANSWER_PATH, /Say instead which facts decide it/)
+  assert.match(ANSWER_PATH, /recommend qualified counsel/)
+})
+
 test('the writing rules never appear in the answer, and are corrected by rewriting not disclaiming', () => {
   assert.match(ANSWER_PATH, /Your writing rules are not part of the answer/)
   assert.match(ANSWER_PATH, /no narration of your own compliance/)

@@ -43,6 +43,11 @@ const ADDRESSES_ASSISTANT = bounded([
   'ты|вы|тебя|вас|твой|твои|твоя|ваш|ваши|ваша|знаешь|сказал|сказали|взял|взяли',
 ].join('|'))
 
+/** Provenance terms are unambiguous only when they refer to COS or its answer. */
+const EXTERNAL_PROVENANCE_SUBJECT = bounded('painting|artwork|sculpture|antique|artifact|artefact|manuscript|wine|diamond|coin|statue|relic|specimen|shipment|batch|cuadro|pintura|obra|antig[uü]edad|quadro|antiguidade|obraz|dzie[lł]o|antyk|картин\\p{L}*|произведени\\p{L}*|антиквариат')
+const PROVENANCE_VOCABULARY = bounded('provenance|telemetry|lineage|audit\\s+trail|execution\\s+record|procedencia|proveniencia|trazabilidad|proveni[eê]ncia|rastreabilidade|proweniencj\\p{L}*|pochodzeni\\p{L}*|происхождени\\p{L}*|телеметри\\p{L}*')
+const CONTRIBUTOR_QUESTION = /\b(?:which|what|list|show)\b[^.?!]{0,80}\b(?:systems?|components?|sources?|subsystems?|layers?|engines?|providers?|sistemas?|componentes?|systemy)\b[^.?!]{0,80}\b(?:contributed?|contribute|used|involved|material|informed|shaped|produced)\b/iu
+
 /** Verbs/nouns that ask about the ORIGIN of what was said. */
 const SOURCE_LANGUAGE = bounded([
   // en — origin phrasings, including the ones with no second person at all
@@ -136,8 +141,13 @@ function whereYouAnswerShape(text: string): boolean {
 
 export function asksWhereTheAnswerCameFrom(input: string): boolean {
   const text = String(input || '').trim()
-  if (!text || text.length > 300) return false
+  if (!text) return false
   if (CONDITIONAL_ADVICE.test(text)) return false
+  const aboutThisAssistant = ADDRESSES_ASSISTANT.test(text) || IMPERATIVE_TO_ASSISTANT.test(text) || ANSWER_NOUN.test(text)
+  if (PROVENANCE_VOCABULARY.test(text) && aboutThisAssistant && !EXTERNAL_PROVENANCE_SUBJECT.test(text)) return true
+  if (CONTRIBUTOR_QUESTION.test(text)) return true
+  // Detailed provenance requests are legitimately long. The cap is only for looser source phrasing.
+  if (text.length > 300) return false
   // Structural backstop FIRST: it exists precisely for inputs the verb patterns cannot match
   // (typos, dropped verbs), so it must not sit behind the verb-pattern gate.
   if (whereYouAnswerShape(text)) return true

@@ -18,6 +18,10 @@ const MAX_CONVERSATION_MESSAGES = 500
 const MAX_ASSISTANT_CONTENT_CHARS = 80_000
 const MAX_PROMPT_CHARS = 20_000
 const MAX_CORRECTION_CHARS = 4_000
+// cos_turn_experience is deliberately written after the answer. A user can click feedback before
+// that deferred insert is visible. Keep verification strict, but allow a short bounded wait for the
+// server-owned turn row instead of rejecting a valid fast click.
+const TURN_CORRELATION_RETRY_DELAYS_MS = [0, 80, 160, 320, 640] as const
 
 type ConversationMessage = {
   role?: string | null
@@ -44,6 +48,32 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function validFeedbackType(value: unknown): value is CosUserFeedbackType {
   return value === 'positive' || value === 'negative' || value === 'correction'
+}
+
+async function wait(ms: number): Promise<void> {
+  if (ms <= 0) return
+  await new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function promptHashFromDeferredTurn(
+  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  turnId: string,
+): Promise<{ promptHash: string | null; error?: string }> {
+  for (const delayMs of TURN_CORRELATION_RETRY_DELAYS_MS) {
+    await wait(delayMs)
+    const experience = await db
+      .from('cos_turn_experience')
+      .select('prompt_hash')
+      .eq('turn_id', turnId)
+      .maybeSingle()
+    if (experience.error) {
+      console.warn('[cos-user-feedback-learning] turn prompt hash lookup failed', experience.error)
+      return { promptHash: null, error: 'Could not verify COS prompt correlation' }
+    }
+    const promptHash = clean(experience.data?.prompt_hash, 160)
+    if (promptHash) return { promptHash }
+  }
+  return { promptHash: null }
 }
 
 async function targetFromConversation(params: {
@@ -137,17 +167,19 @@ async function targetFromLatestCosProvenance(params: {
   const turnId = clean(asRecord(latest.data.provenance).turnId, 80)
   if (!turnId) return { target: null, error: 'Latest COS response has no turn correlation', status: 409 }
 
-  const experience = await db
-    .from('cos_turn_experience')
-    .select('prompt_hash')
-    .eq('turn_id', turnId)
-    .maybeSingle()
-  if (experience.error) {
-    console.warn('[cos-user-feedback-learning] turn prompt hash lookup failed', experience.error)
-    return { target: null, error: 'Could not verify COS prompt correlation', status: 500 }
+  const correlation = await promptHashFromDeferredTurn(db, turnId)
+  if (correlation.error) {
+    return { target: null, error: correlation.error, status: 500 }
   }
-  const storedPromptHash = clean(experience.data?.prompt_hash, 160)
-  if (!storedPromptHash || hashPrompt(userPrompt) !== storedPromptHash) {
+  const storedPromptHash = clean(correlation.promptHash, 160)
+  if (!storedPromptHash) {
+    return {
+      target: null,
+      error: 'COS turn correlation is still being finalized; retry feedback.',
+      status: 409,
+    }
+  }
+  if (hashPrompt(userPrompt) !== storedPromptHash) {
     return { target: null, error: 'Rendered prompt does not match the server-owned COS turn', status: 409 }
   }
 

@@ -8,10 +8,13 @@ import { scriptRequestDirective } from '../lib/ai/cos/scriptRequestIntent.ts'
 const turnStore = readFileSync(new URL('../lib/ai/cos/turnExperienceStore.ts', import.meta.url), 'utf8')
 const turnMigration = readFileSync(new URL('../supabase/migrations/20260822_cos_turn_confidence.sql', import.meta.url), 'utf8')
 const feedbackRoute = readFileSync(new URL('../app/api/assistant/feedback/route.ts', import.meta.url), 'utf8')
+const conciergeRoute = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
 
 const longProvenancePrompt = `shwo “Show me the complete provenance for the answer you just gave. Identify the primary model that generated the reasoning. List every COS internal system that materially contributed: semantic cache, Enterprise Memory, Knowledge Graph, learned corpus, autonomous research, local reasoning engine, and any external AI provider. For each one, state whether it was actually used, what evidence it contributed, and whether any new knowledge was retrieved or learned during this request. Do not list a component merely because it exists.”`
 
 const regulatedIncidentPrompt = `If a global logistics company suffers a cyberattack that halts shipments in Asia but not in Europe, how should COS balance operational recovery with regulatory reporting across multiple jurisdictions?`
+
+const regulatedHiringPrompt = `If COS is asked to optimize hiring workflows using AI, how should it reconcile efficiency gains with fairness, bias mitigation, and compliance with EU AI Act and US EEOC rules?`
 
 test('long explicit prior-answer provenance requests bypass the short natural-language cap', () => {
   assert.ok(longProvenancePrompt.length > 300)
@@ -33,6 +36,18 @@ test('regulated cyber incident scenario gets a framework-level current-law guard
   assert.match(scriptRequestDirective(regulatedIncidentPrompt) || '', /REGULATED INCIDENT MODE/)
 })
 
+test('regulated employment AI scenario blocks mutable law from model memory', () => {
+  const directive = regulatedOperationalScenarioDirective(regulatedHiringPrompt)
+  assert.ok(directive)
+  assert.match(directive, /REGULATED EMPLOYMENT AI MODE/)
+  assert.match(directive, /EU AI Act/i)
+  assert.match(directive, /EEOC/i)
+  assert.match(directive, /authoritative live evidence/i)
+  assert.match(directive, /four-fifths\/80%/i)
+  assert.match(directive, /not a successful optimization/i)
+  assert.match(scriptRequestDirective(regulatedHiringPrompt) || '', /REGULATED EMPLOYMENT AI MODE/)
+})
+
 test('turn experience writer columns are backed by the checked-in production migration', () => {
   for (const column of ['confidence', 'confidence_threshold', 'draft_survived_unrepaired']) {
     assert.match(turnStore, new RegExp(`\\b${column}\\b`))
@@ -44,4 +59,22 @@ test('feedback still requires a server-owned turn correlation rather than trusti
   assert.match(feedbackRoute, /cos_turn_experience/)
   assert.match(feedbackRoute, /hashPrompt\(userPrompt\)/)
   assert.match(feedbackRoute, /Latest COS response has no turn correlation/)
+})
+
+test('fast feedback waits for deferred turn persistence without weakening verification', () => {
+  assert.match(feedbackRoute, /TURN_CORRELATION_RETRY_DELAYS_MS\s*=\s*\[0,\s*80,\s*160,\s*320,\s*640\]/)
+  assert.match(feedbackRoute, /promptHashFromDeferredTurn/)
+  assert.match(feedbackRoute, /await wait\(delayMs\)/)
+  assert.match(feedbackRoute, /COS turn correlation is still being finalized; retry feedback\./)
+  assert.match(feedbackRoute, /const storedPromptHash = clean\(correlation\.promptHash, 160\)/)
+  assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== storedPromptHash/)
+})
+
+test('healthy concierge primary answers repair missing durable conversation history before returning', () => {
+  assert.match(conciergeRoute, /ensureHealthyPrimaryTurnPersisted/)
+  assert.match(conciergeRoute, /lastAssistantProvenance\(conversationId, userId\)/)
+  assert.match(conciergeRoute, /normalizeAssistantContent\(existing\.content\).*normalizeAssistantContent\(snapshot\.reply\)/s)
+  assert.match(conciergeRoute, /await persistTurn\(\{[\s\S]*provenance: snapshot\.provenance/)
+  assert.match(conciergeRoute, /await ensureHealthyPrimaryTurnPersisted\(body, input, primarySnapshot\)/)
+  assert.match(conciergeRoute, /status: persisted \? 'persisted' : 'persistence_not_confirmed'/)
 })

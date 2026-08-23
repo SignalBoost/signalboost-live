@@ -4251,5 +4251,26 @@
     "cancelCorrection": "Cancelar",
     "feedbackSaved": "Feedback salvo para o aprendizado do COS.",
     "feedbackError": "Não foi possível salvar o feedback."
+  },
+  "homepage": {
+    "concierge": {
+      "eyebrow": "SEU CONCIERGE SIGNALBOOST",
+      "greeting": "Olá — sou COS.",
+      "headline": "O que você gostaria de realizar hoje?",
+      "subhead": "Faça uma pergunta, descreva um objetivo ou diga para onde quer ir. Vou ajudar você a encontrar o espaço certo do SignalBoost e, quando disponível, dar uma resposta baseada em evidências.",
+      "placeholder": "Pergunte qualquer coisa ao COS…",
+      "suggested": "Perguntas sugeridas",
+      "cosLabel": "COS",
+      "send": "Perguntar ao COS",
+      "thinking": "COS está pensando…",
+      "continue": "Continuar a conversa",
+      "workspace": "Explorar a plataforma",
+      "trust": "O COS usa raciocínio governado, respeita limites de aprovação e não apresenta informação incerta como fato.",
+      "error": "Não consegui conectar ao COS agora. Você pode continuar no espaço do Concierge.",
+      "grow": "Ajude a crescer meu negócio",
+      "review": "Analise meu site",
+      "campaign": "Planeje uma campanha",
+      "show": "Mostre o que o SignalBoost pode fazer"
+    }
   }
 }

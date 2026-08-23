@@ -76,6 +76,13 @@ test('strategy payload exposes learned overrides and the exact behavior-change h
   })
   assert.match(String(strategy.payload.sourceOfTruth), /not provider\/base-model weights/i)
   assert.match(String(strategy.payload.generationInstruction), /generate the content now/i)
+
+  const directive = String(strategy.payload.directive)
+  assert.ok(directive.length <= 850, `strategy directive must survive the 850-character Enterprise Memory injection cap; got ${directive.length}`)
+  assert.match(directive, /Generate the requested content now/i)
+  assert.match(directive, /channel=email/)
+  assert.match(directive, />=5 measured campaigns/)
+  assert.match(directive, /winner margin >=20%/)
 })
 
 test('a strategy-profile read error is surfaced as the real failure instead of invented missing configuration', () => {
@@ -86,5 +93,6 @@ test('a strategy-profile read error is surfaced as the real failure instead of i
   assert.ok(strategy)
   assert.equal(strategy.payload.status, 'unavailable')
   assert.equal(strategy.payload.error, 'enterprise_campaign_memory read failed: timeout')
+  assert.match(String(strategy.payload.directive), /CURRENT STRATEGY PROFILE UNAVAILABLE/)
   assert.match(String(strategy.payload.generationInstruction), /do not invent strategy weights/i)
 })

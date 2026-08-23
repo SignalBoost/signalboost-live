@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
@@ -162,11 +163,16 @@ function formatBytes(bytes: number): string {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AssistantPage() {
   const { lang } = useI18n()
+  const searchParams = useSearchParams()
   const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
 
   const [messages, setMessages] = useState<Msg[]>([])
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
+  useEffect(() => {
+    const prompt = searchParams.get('prompt')?.trim()
+    if (prompt) setInput(prompt.slice(0, 8000))
+  }, [searchParams])
   const [loading, setLoading] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>('')

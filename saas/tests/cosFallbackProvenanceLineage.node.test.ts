@@ -74,7 +74,18 @@ test('all latest-turn persistence normalizes source from actual recorded lineage
   assert.match(supportPersistenceSource, /source:recordedSource/)
 })
 
-test('regression documents the legacy wrapper mislabel that the persistence invariant neutralizes', () => {
-  assert.match(baseRouteSource, /responseSource=continuityFailed\?'cos-independent-reasoner-unavailable':'external_fallback'/)
-  assert.match(baseRouteSource, /external_fallback_invoked:true/)
+test('outer wrapper binds final response to embedded generator provenance and confidence', () => {
+  assert.match(baseRouteSource, /embeddedExecutionProvenance/)
+  assert.match(baseRouteSource, /embeddedMatchesGenerator/)
+  assert.match(baseRouteSource, /confidence_score:finalConfidence/)
+  assert.match(baseRouteSource, /execution_provenance:executionProvenance/)
+  assert.match(baseRouteSource, /external_fallback_invoked:externalInvoked/)
+  assert.match(baseRouteSource, /external_fallback_succeeded:externalInvoked&&!continuityFailed/)
+  assert.match(baseRouteSource, /externalInvoked\?'external_fallback':innerSource/)
+  assert.doesNotMatch(baseRouteSource, /external_fallback_invoked:true/)
+  assert.doesNotMatch(baseRouteSource, /responseSource=continuityFailed\?'cos-independent-reasoner-unavailable':'external_fallback'/)
+})
+
+test('local retry telemetry is labeled local when the external trace says no provider ran', () => {
+  assert.match(baseRouteSource, /externalInvoked\?'external_fallback':'local_cos_reasoning'/)
 })

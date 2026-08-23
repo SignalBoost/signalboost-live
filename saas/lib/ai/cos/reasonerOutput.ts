@@ -106,10 +106,32 @@ export function recommendationIntegrityConflict(answer:string):boolean{
     ||(STRONG_REJECT_RECOMMENDATION.test(text)&&POSITIVE_APPROVAL_CONCLUSION.test(text))
 }
 
+const DISCLAIMS_POPULATION_INFERENCE = /\b(?:do\s+not|don't|must\s+not)\b[\s\S]{0,220}\b(?:label|characterize|infer|assume)\b[\s\S]{0,220}\b(?:gap|population|users?|cohort|dormant|exploratory|top[- ]of[- ]funnel|bottom[- ]of[- ]funnel)\b/i
+const ASSERTS_GAP_COHORT = /\b(?:gap|difference)\b[\s\S]{0,180}\b(?:represents?|consists?\s+of|is\s+made\s+up\s+of)\b[\s\S]{0,180}\b(?:active[- ]but[- ]not[- ]billable|active\s+but\s+not\s+(?:yet\s+)?billable|free[- ]tier|trial\s+users?|non[- ]core\s+users?)\b/i
+const DISCLAIMS_SUBSET_CONVERSION = /\b(?:do\s+not|don't|must\s+not)\b[\s\S]{0,220}\bconversion\s+rate\b[\s\S]{0,220}\b(?:unless|without|subset)\b/i
+const ASSERTS_CONVERSION_RATE = /\b(?:conversion\s+rate\s+(?:is|of)|\d+(?:\.\d+)?%\s+conversion\s+rate)\b/i
+const UNRESOLVED_METRIC_AUTHORITY = /\b(?:no\s+single\s+governance\s+source|governance\s+authority\s+(?:is|remains)\s+unresolved|authority\s+must\s+be\s+resolved|until\s+(?:the\s+)?(?:company\s+)?(?:designates?|resolves?)\s+[^.]{0,80}\bauthority)\b/i
+const ASSIGNS_UNESTABLISHED_AUTHORITY = /\b(?:Board|CFO|Finance|Product|Investor\s+Relations)\b[\s\S]{0,120}\b(?:designate|decide|determine|set|own|official|canonical|authority)\b/i
+const DISCLAIMS_BUSINESS_MODEL_INFERENCE = /\b(?:do\s+not|don't|must\s+not)\b[\s\S]{0,220}\b(?:infer|assume|claim)\b[\s\S]{0,120}\bbusiness\s+model\b/i
+const ASSERTS_BUSINESS_MODEL_FROM_GAP = /\b(?:gap|discrepancy|difference)\b[\s\S]{0,180}\b(?:feature\s+of|reflects?|shows?|demonstrates?)\b[\s\S]{0,140}\b(?:freemium|usage[- ]based|business\s+model)\b/i
+
+/**
+ * Metric reconciliation answers often contain their own safety qualifiers. If the same answer then
+ * violates those qualifiers, it is internally inconsistent regardless of the hidden prompt context.
+ * Such an answer must not clear the normal COS confidence threshold.
+ */
+export function metricReconciliationIntegrityConflict(answer:string):boolean{
+  const text=String(answer??'')
+  return (DISCLAIMS_POPULATION_INFERENCE.test(text)&&ASSERTS_GAP_COHORT.test(text))
+    ||(DISCLAIMS_SUBSET_CONVERSION.test(text)&&ASSERTS_CONVERSION_RATE.test(text))
+    ||(UNRESOLVED_METRIC_AUTHORITY.test(text)&&ASSIGNS_UNESTABLISHED_AUTHORITY.test(text))
+    ||(DISCLAIMS_BUSINESS_MODEL_INFERENCE.test(text)&&ASSERTS_BUSINESS_MODEL_FROM_GAP.test(text))
+}
+
 export type LocalResult={answer:string;confidence:number;truncated?:boolean;recovered?:boolean;integrityConflict?:boolean}
 
 function applyIntegrityCap<T extends {answer:string;confidence:number}>(result:T):T&{integrityConflict?:boolean}{
-  if(!recommendationIntegrityConflict(result.answer))return result
+  if(!recommendationIntegrityConflict(result.answer)&&!metricReconciliationIntegrityConflict(result.answer))return result
   return{...result,confidence:Math.min(result.confidence,.2),integrityConflict:true}
 }
 

@@ -1,10 +1,11 @@
 // Enterprise Memory-aware COS orchestration/provenance implementation.
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { isProvenanceIntrospection } from './provenanceIntrospection'
+export { isProvenanceIntrospection }
 
 export function confidenceThreshold(): number { const value=Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72'); return Number.isFinite(value)?Math.max(.5,Math.min(.98,value)):.72 }
 export function externalFallbackEnabled(): boolean { return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED!=='false' }
-export function isProvenanceIntrospection(input:string):boolean{const provenance=/\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|cognitive skill|cognitive skills|procedural skill|procedural skills|autonomous research|external ai|external provider|internal systems?)\b/i,referent=/\b(previous|preceding|prior|last|just|that|this|answer|response|request|execution|used|invoked|contributed|generated|reasoning)\b/i;return provenance.test(input)&&referent.test(input)}
 export function requestsExternalAction(input:string):boolean{if(isProvenanceIntrospection(input))return false;const explicitExecution=/\b(run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|fix|repair|change|modify|call the tool|use (?:the )?tools?)\b/i,target=/\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|campaign|prospect)\b/i,
   diagnosticVerbThenQuestionWord=/\b(?:run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research)\s+(?:why|what|how|whether|if|when|where)\b/i,
   diagnosticOpener=/^\s*(why|what|how|when|where|which|who|explain|describe|tell me|is|are|was|were|does|did|do|could|would|should)\b/i,

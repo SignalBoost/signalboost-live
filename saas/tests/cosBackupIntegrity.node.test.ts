@@ -175,6 +175,18 @@ test('unqualified script authoring is content, while explicit computational scri
   assert.match(generatedDirective, /Do not expose private chain-of-thought/)
 })
 
+test('request-specific script sense is bound into the system prompt before the first draft', async () => {
+  const source = await readFile(path.resolve(process.cwd(), 'lib/ai/cos/cosReasoner.ts'), 'utf8').then(hydrateLocalizedSource)
+  const binding = source.indexOf('const scriptDirective = scriptRequestDirective(args.prompt)')
+  const systemBinding = source.indexOf('REQUEST-SPECIFIC SCRIPT INTERPRETATION')
+  const draft = source.indexOf("recorder.time('draft'")
+  assert.ok(binding >= 0)
+  assert.ok(systemBinding > binding)
+  assert.ok(draft > systemBinding)
+  assert.match(source, /systemPrompt:[\s\S]*REQUEST-SPECIFIC SCRIPT INTERPRETATION/)
+  assert.match(source, /\.\.\.effectiveArgs,[\s\S]*prompt: `\$\{effectiveArgs\.prompt\}\\n\\n\$\{advisory\}`/)
+})
+
 test('the exact Nova production failure is rejected and repaired as narrative content', () => {
   const prompt = "Produce a script for ‘Nova’ without assuming whether it’s a person, product, or company."
   const bad = JSON.stringify({

@@ -8,7 +8,7 @@ test.describe('Unified SignalBoost public shell', () => {
     await expect(page.getByRole('banner', { name: /Owner Console/i })).toHaveCount(0)
   })
 
-  test('concierge supports keyboard-driven prompts without a live AI dependency', async ({ page }) => {
+  test('the COS-first home accepts keyboard prompts without the duplicate dock', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('signalboost_language', 'en'))
     await page.route('**/api/concierge', async route => {
       await route.fulfill({
@@ -19,12 +19,11 @@ test.describe('Unified SignalBoost public shell', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('button', { name: /Concierge/i }).click()
+    await expect(page.getByRole('complementary', { name: /Concierge/i })).toHaveCount(0)
 
-    const concierge = page.getByRole('complementary', { name: /Concierge/i })
-    await expect(concierge).toBeVisible()
-    await concierge.getByLabel(/Ask anything/i).fill('Show outreach campaign forecasts for marketplace partners')
+    const prompt = page.getByLabel(/Ask COS/i)
+    await prompt.fill('Show outreach campaign forecasts for marketplace partners')
     await page.keyboard.press('Enter')
-    await expect(concierge.getByRole('log')).toContainText(/Marketplace outreach forecast/i)
+    await expect(page.getByRole('main')).toContainText(/Marketplace outreach forecast/i)
   })
 })

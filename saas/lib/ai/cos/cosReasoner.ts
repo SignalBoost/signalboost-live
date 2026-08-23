@@ -25,6 +25,7 @@ import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
 import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { confidenceThreshold } from '@/lib/ai/cos/cosOrchestrationEnterprise'
+import { scriptRequestDirective } from './scriptRequestIntent.ts'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -164,6 +165,14 @@ export async function callRawCosReasoner(
     await touchRunpodActivityLease('qwen_reasoning')
 
     let effectiveArgs = args
+    const scriptDirective = scriptRequestDirective(args.prompt)
+    if (scriptDirective) {
+      effectiveArgs = {
+        ...effectiveArgs,
+        systemPrompt: `${String(effectiveArgs.systemPrompt ?? '').trim()}\n\nREQUEST-SPECIFIC SCRIPT INTERPRETATION:\n${scriptDirective}`.trim(),
+      }
+    }
+
     if (primaryCouncilEligible(args)) {
       const council = await recorder.time('council', () => maybeBuildCognitiveCouncilAdvisory({
         prompt: args.prompt,
@@ -192,8 +201,8 @@ export async function callRawCosReasoner(
           ? `${council.advisory}\n\n${challengeRound.advisory}`
           : council.advisory
         effectiveArgs = {
-          ...args,
-          prompt: `${args.prompt}\n\n${advisory}`,
+          ...effectiveArgs,
+          prompt: `${effectiveArgs.prompt}\n\n${advisory}`,
         }
         console.info('[cos-council]', JSON.stringify({
           at: new Date().toISOString(),

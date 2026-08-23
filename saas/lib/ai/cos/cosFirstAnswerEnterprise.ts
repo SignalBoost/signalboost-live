@@ -58,6 +58,9 @@ export type COSProvenance = {
   userMemoriesCited?:number
   cognitiveSkillsCited?:number
   canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
+  // Facts the user stated inline in the prompt. Provenance previously accounted only for
+  // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
+  // its lone contributor — implying the facts came from nowhere (2026-08-23).
   userSuppliedPremises?:{present:boolean; labelledCount:number; signals:string[]}
   cacheOrigin?:{
     storedAt:string|null
@@ -84,6 +87,9 @@ type CachedAnswerOrigin = {
   evidenceFunnel?:COSEvidenceFunnel
   cognitiveSkillFunnel?:EvidenceFunnelStage
   canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
+  // Facts the user stated inline in the prompt. Provenance previously accounted only for
+  // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
+  // its lone contributor — implying the facts came from nowhere (2026-08-23).
   userSuppliedPremises?:{present:boolean; labelledCount:number; signals:string[]}
 }
 
@@ -321,6 +327,15 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',
     '- If you cannot name specific observables, say so plainly and set confidence low.',
     '',
+    'SEPARATE WHAT YOU WERE GIVEN FROM WHAT YOU INFERRED:',
+    '- Definitions, figures and constraints stated in the request are GIVEN. Everything you add on top — what a number means commercially, what a segment of users is doing, what a stakeholder cares about, which stage of a funnel something represents — is YOUR INFERENCE, and must be marked as such in the answer.',
+    '- Mark it in the prose, not in a footnote: "the request defines X as ...", versus "my read is that ...", "this likely reflects ...", "a common interpretation is ...". A reader must be able to tell, sentence by sentence, which claims they can hold you to and which are judgement.',
+    '- A production answer restated two given MAU definitions and then asserted that the gap was "dormant or exploratory" users, called the figures "top-of-funnel" and "bottom-of-funnel", and stated what "investors care about" — none of which was in the request, all presented in the same declarative register as the given definitions (2026-08-23).',
+    '- Do NOT solve this by removing the interpretation. The interpretation is usually the useful part; unmarked interpretation is the defect. Offer it, label it, and say what would confirm or refute it where that is cheap to state.',
+    'YOUR OPENING RECOMMENDATION MUST MATCH YOUR CONCLUSION:',
+    '- If you state a recommendation before working through the reasoning, re-read it once the reasoning is done and REWRITE it to match what you actually concluded. Do not leave the initial position standing when the analysis reversed it.',
+    '- A production answer opened with "approve the renewal, subject to CFO signature" and concluded "the VP of Finance should not approve this and the CFO is not required" — every element reversed (2026-08-23). Readers act on the first line of a decision memo; a contradicted opening is worse than no recommendation at all.',
+    '- When rules or records conflict, say which one governs and why before recommending, so the recommendation follows from the resolution rather than preceding it.',
     'NEVER INVENT A DATE OR DEADLINE:',
     '- Do not write a specific calendar date unless it was given to you or you can derive it from something given to you. A production memo was dated "October 11, 2025" — roughly ten months in the past — in a document whose SLA windows and quarter boundaries depended on it (2026-08-23).',
     '- When a document needs a date you were not given, write a clearly marked placeholder such as [DATE] or [DECISION DEADLINE], exactly as you already do for unknown figures like [Amount]. A visible placeholder is honest; a plausible wrong date silently corrupts every deadline derived from it.',
@@ -648,8 +663,9 @@ async function waitForCacheWritesWithinBudget(work: Promise<unknown>, budgetMs: 
 export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
   const startedAt = Date.now()
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged))
+  const userSuppliedPremises = detectUserSuppliedPremises(input.prompt)
   const base = {
-    userSuppliedPremises: detectUserSuppliedPremises(input.prompt),
+    userSuppliedPremises,
     externalAiInvoked:false as const,
     localModelInvoked:false,
     reasonerLabel:null as string|null,
@@ -839,7 +855,6 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       cognitiveSkillsCited:cited.sk,
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
-      userSuppliedPremises: citedProvenance.userSuppliedPremises,
       ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition } } : {}),
     },
   }

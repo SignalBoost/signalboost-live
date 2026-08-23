@@ -174,6 +174,8 @@ A model-memory assertion is never sufficient merely because the model sounds con
 
 **Regulated-claims generation guard — IMPLEMENTED:** A request to generate marketing or other persuasive content is not a factual lookup. For unsupported medical efficacy claims, COS preserves the useful writing task but omits the claim, provides an evidence-bounded compliant template, and names the clinical, labeling, jurisdictional, and regulatory-review evidence required before publication. It must not be diverted into live-search failure solely because the content mentions a medical topic.
 
+**Video-provider execution routing — IMPLEMENTED:** Imperative video render and provider-failover requests are governed external actions, never corpus questions. COS routes them to the execution path, which must check configured providers, authorization, and recorded performance evidence before rendering or selecting an alternative.
+
 For any owner-authoritative topic, secondary web results alone are not sufficient evidence. COS must retrieve at least one first-party or institutional source, or fail closed. This applies to legal and regulatory guidance, medical guidance, standards, and product documentation.
 
 **Owning-authority evidence policy — IMPLEMENTED:** For authority-owned questions (government procedure, product/API behavior, medical guidance, standards), live-search evidence is ranked and labelled by who owns the fact, recognized structurally with no country or vendor tables: **first-party** (the result's domain names the entity the query is about — `docs.stripe.com` for a Stripe question), **institutional** (state/IGO/standards/health domains by convention — one pattern covers `gov.pl`, `gob.mx`, `gouv.fr`, `who.int` identically), then **secondary** (demoted and labelled, never deleted; dated pages before undated). When an authority-owned question retrieves no first-party or institutional source, the evidence carries an explicit caveat instead of presenting secondary commentary as the rule. Implementation: `lib/ai/cos/officialSourceAuthority.ts` wired into `getExternalInfo`.
@@ -646,6 +648,7 @@ Non-negotiable:
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same admission gates as autonomous acquisition.
 - Cross-language freshness + owning-authority evidence — five-language live-verification triggering and first-party/institutional/secondary evidence ranking with an explicit no-authority caveat.
 - Assistant-feedback repair — normalized reply correlation on both resolution paths (fixes the silent 404 that blocked all Concierge feedback), multilingual "outdated" corrections file bounded current-state study gaps, grounded "Also worth checking" adjacent-obligation notes.
+- Answer evidence hygiene — COS retrieval labels such as `[CL1]` and `[LIVE2]` are internal prompt scaffolding. They are removed from user-facing replies unless a real source URL accompanies them; corpus-gap commentary is never presented as an answer.
 
 Always query current state; this sequence can advance after this document is merged.
 

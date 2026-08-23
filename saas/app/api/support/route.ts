@@ -123,7 +123,7 @@ async function directStrategyProfileResponse(body: any, prompt: string, isPrivil
     workspace: body?.context?.workspace,
   })
 
-  if (!result.ok) {
+  if ('error' in result) {
     return NextResponse.json({
       ok: false,
       reply: `COS could not read the current strategy profile: ${result.error}`,

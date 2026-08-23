@@ -526,6 +526,8 @@ Migration `cos_retrieval_self_reflection_20260822` is applied and Production is 
 
 Use exact `turn_id` outcomes to build calibration buckets by problem class, evidence regime and reasoner. Compare predicted confidence with empirical verified success, derive shadow calibration recommendations, and validate on a separate cohort before changing live confidence/escalation thresholds.
 
+**Authoritative calibration correlation — IMPLEMENTED:** Calibration reads outcome truth from `cos_turn_outcomes`, not the best-effort `cos_turn_experience` mirror, so an outcome recorded before deferred experience insertion is retained in the report. Evidence regimes are classified from positive observed learned-corpus utilization plus route/response metadata, never merely because a JSON object contains an empty field. The report remains shadow-only; live thresholds cannot change without balanced, independently verified held-out evidence.
+
 Do not conflate zero-grounding general reasoning with current-state factual claims.
 
 An owner-only cohort report is being added over exact verified turn outcomes, grouped by problem class, reasoner and evidence regime. It is shadow-only and cannot modify live confidence or escalation policy.

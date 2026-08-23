@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection, requestsExternalAction } from '@/lib/ai/cos/cosOrchestration'
+import { isDirectStrategyGenerationRequest, renderDirectStrategyGeneration } from '@/lib/ai/cos/strategyProfileDirectGeneration'
+import { readStrategyProfile } from '@/lib/ai/cos/strategyProfileReport'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import {
   attachRecordedTurnProvenance,
@@ -53,7 +55,7 @@ function noPriorProvenanceReply(languageCode: string): string {
   if (languageCode === 'es') return 'No tengo un registro de procedencia real para la respuesta inmediatamente anterior de esta conversación. No voy a reconstruirlo ni inventarlo después de los hechos.'
   if (languageCode === 'pt') return 'Não tenho um registro de proveniência real para a resposta imediatamente anterior desta conversa. Não vou reconstruí-lo nem inventá-lo depois do fato.'
   if (languageCode === 'pl') return 'Nie mam prawdziwego zapisu proweniencji bezpośrednio poprzedniej odpowiedzi w tej rozmowie. Nie będę go odtwarzać ani wymyślać po fakcie.'
-  if (languageCode === 'ru') return 'У меня нет реальной записи происхождения непосредственно предыдущего ответа в этом разговоре. Я не буду восстанавливать или придумывать её постфактум.'
+  if (languageCode === 'ru') return 'У меня нет реальной записи происхождения непосредственно предыдущего ответа в этой беседе. Я не буду восстанавливать или придумывать её постфактум.'
   return "I don't have a real provenance record for the immediately preceding answer in this conversation. I won't reconstruct or fabricate it after the fact."
 }
 
@@ -112,6 +114,83 @@ async function persistResponseTurn(params: {
   await persistTurn({ conversationId, userId, userMessage, assistantReply, provenance })
 }
 
+async function directStrategyProfileResponse(body: any, prompt: string, isPrivileged: boolean): Promise<NextResponse | null> {
+  if (!isDirectStrategyGenerationRequest(prompt)) return null
+
+  const result = await readStrategyProfile({
+    privileged: isPrivileged,
+    organizationId: body?.context?.organizationId,
+    workspace: body?.context?.workspace,
+  })
+
+  if (!result.ok) {
+    return NextResponse.json({
+      ok: false,
+      reply: `COS could not read the current strategy profile: ${result.error}`,
+      error: result.error,
+      source: 'cos-strategy-profile-unavailable',
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      local_model_invoked: false,
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 503 })
+  }
+
+  const reply = renderDirectStrategyGeneration(prompt, result.profile)
+  const provenance = authoritativeProvenance(null, { invoked: false }) as any
+  const baselineCount = result.profile.generationDefaults?.status === 'available' ? 1 : 0
+  const learnedCampaignIds = new Set(
+    result.profile.dimensions
+      .filter(dimension => dimension.status === 'learned')
+      .flatMap(dimension => dimension.variants.flatMap(variant => variant.campaignIds)),
+  )
+  const retrievedCount = result.profile.totalCampaigns + baselineCount
+  const evidenceCount = baselineCount + learnedCampaignIds.size
+
+  provenance.semantic_cache = { used: false, evidence_count: 0 }
+  provenance.enterprise_memory = {
+    used: true,
+    retrieved_count: retrievedCount,
+    relevant_count: retrievedCount,
+    selected_count: retrievedCount,
+    injected_count: retrievedCount,
+    evidence_count: Math.max(1, evidenceCount),
+    status: 'connected_scope',
+    organization_id: result.organizationId,
+  }
+  provenance.deterministic_utility = {
+    used: true,
+    utility: 'strategy_profile_generation',
+  }
+  provenance.strategy_profile = {
+    generated_at: result.profile.generatedAt,
+    measured_campaigns: result.profile.measuredCampaigns,
+    learned_dimensions: result.profile.dimensions.filter(dimension => dimension.status === 'learned').map(dimension => dimension.dimension),
+    baseline_source: result.profile.generationDefaults?.status === 'available' ? result.profile.generationDefaults.source : null,
+  }
+  provenance.answer_origin = {
+    ...(provenance.answer_origin || {}),
+    from_cache: false,
+    stored_at: null,
+    policy_version: null,
+  }
+
+  return NextResponse.json({
+    ok: true,
+    reply,
+    source: 'cos-strategy-profile-direct',
+    confidence_score: 1,
+    external_ai_invoked: false,
+    external_fallback_invoked: false,
+    local_model_invoked: false,
+    strategy_profile_direct: true,
+    execution_provenance: provenance,
+    execution_allowed: false,
+    external_action_taken: false,
+  })
+}
+
 export async function POST(req: NextRequest) {
   let body: any = null
   try {
@@ -152,23 +231,30 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const wakePermission = evaluateRunpodWakePermission({
-    body,
-    interactionHeader: req.headers.get('x-signalboost-user-interaction'),
-    requestOrigin: req.headers.get('origin'),
-    expectedOrigin: req.nextUrl.origin,
-    secFetchSite: req.headers.get('sec-fetch-site'),
-  })
-  console.info('[cos-runpod-wake-permission]', JSON.stringify({
-    at: new Date().toISOString(),
-    allowed: wakePermission.allowed,
-    source: wakePermission.source,
-    interactionId: wakePermission.interactionId,
-    ageMs: wakePermission.ageMs,
-    reason: wakePermission.reason,
-  }))
+  let response: Response
+  const directStrategy = prompt ? await directStrategyProfileResponse(body, prompt, isPrivileged) : null
+  if (directStrategy) {
+    response = directStrategy
+  } else {
+    const wakePermission = evaluateRunpodWakePermission({
+      body,
+      interactionHeader: req.headers.get('x-signalboost-user-interaction'),
+      requestOrigin: req.headers.get('origin'),
+      expectedOrigin: req.nextUrl.origin,
+      secFetchSite: req.headers.get('sec-fetch-site'),
+    })
+    console.info('[cos-runpod-wake-permission]', JSON.stringify({
+      at: new Date().toISOString(),
+      allowed: wakePermission.allowed,
+      source: wakePermission.source,
+      interactionId: wakePermission.interactionId,
+      ageMs: wakePermission.ageMs,
+      reason: wakePermission.reason,
+    }))
 
-  const response = await withRunpodWakePermission(wakePermission, () => legacyPOST(req))
+    response = await withRunpodWakePermission(wakePermission, () => legacyPOST(req))
+  }
+
   if (!response.ok || !prompt || !userId) return response
 
   try {

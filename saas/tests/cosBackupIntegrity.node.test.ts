@@ -177,7 +177,7 @@ test('Concierge queues owner multi-prospect campaigns before the long model tran
 
 test('Concierge bounds long Primary work and returns verified partial research', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
-  assert.match(source, /const PRIMARY_TIMEOUT_MS = 120_000/)
+  assert.match(source, /const PRIMARY_TIMEOUT_MS = 180_000/)
   assert.match(source, /const RESEARCH_LIFELINE_START_MS = 90_000/)
   assert.match(source, /function boundedPrimary/)
   assert.match(source, /function createResearchLifeline/)

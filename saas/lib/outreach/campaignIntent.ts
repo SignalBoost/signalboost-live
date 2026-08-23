@@ -23,10 +23,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // THE RULE THAT FOLLOWS, AND IT IS NOT A REGEX RULE
 //
-// PROHIBITIONS ARE READ FIRST AND THEY WIN. A clause that forbids something is removed
-// from the evidence used to decide what was requested, and the thing it forbids is
-// recorded. Positive intent is then read only from what remains. An instruction not to do
-// X can never again be the reason X happened.
+// PROHIBITIONS ARE READ FIRST AND THEY WIN — BUT ONLY WHEN THE NEGATION ACTUALLY TARGETS
+// THE PIPELINE. A modifier such as "write a video without assuming the update details"
+// constrains the writing task; it does not forbid video production merely because the two
+// phrases share a clause. An instruction not to do X can never be the reason X happened,
+// and an instruction to do X without Y can never be rewritten as "do not do X".
 //
 // AMBIGUITY REFUSES RATHER THAN GUESSES. If a brief carries live signals for two
 // pipelines, nothing starts. A sales email to a journalist cannot be unsent, and an
@@ -85,29 +86,69 @@ const PIPELINE_TERMS: Record<CampaignPipeline, RegExp> = {
   // VIDEO IS A PRODUCTION PIPELINE, NOT A CHANNEL. It renders, voices, brands and only
   // then publishes — which is why it could not be folded into `social`: the work, the
   // failure modes and the approval gate are entirely different from posting text.
-  // It was missing entirely, so a video brief was claimed by whichever text parser
-  // matched first, and both of those run before any model call.
+  //
+  // Bare words such as "video" are intentionally NOT enough. "Write a video", "review a
+  // video", and "where is Video Studio?" are content/support requests, not authority to
+  // start a production pipeline. Production requires either an explicit production noun
+  // or a production verb bound to the video object.
   video:
-    /\b(?:video campaign|video ad\w*|promo(?:tional)? video|explainer video|short video|video studio|(?:make|create|produce|generate|render)s? (?:a |an |the )?(?:new )?videos?|videos? (?:campaign|production|series)|v[íi]deo|wideo|видео|cosa)\b/i,
+    /\b(?:video campaign|video ad\w*|promo(?:tional)? video|explainer video|short video|(?:make|create|produce|generate|render)s? (?:a |an |the )?(?:new )?videos?|videos? (?:campaign|production|series)|(?:criar|fazer|produzir|gerar|renderizar) (?:um |uma |o |a )?v[íi]deo|(?:crear|hacer|producir|generar|renderizar) (?:un |una |el |la )?v[íi]deo|(?:stw[oó]rz|utw[oó]rz|wygeneruj|wyprodukuj|renderuj) (?:film|wideo)|(?:создай|сгенерируй|произведи|отрендери) видео|cosa)\b/i,
 }
 
 /**
- * A clause is a prohibition when it forbids, excludes or denies. Both shapes matter, and
- * the second is the one that was missing:
- *   · "do not run an outreach campaign"     — an instruction
- *   · "this is not a sales prospecting campaign" — a definition of what the brief is not
+ * Content authoring is not execution. These forms must fall through to ordinary COS writing
+ * unless the same clause also explicitly asks to render/produce/publish the asset.
+ */
+const VIDEO_WRITING_REQUEST =
+  /\b(?:write|draft|script|outline|storyboard|redact|escribe|redacta|escreva|redija|napisz|rozpisz|напиши|составь)\b[^.!?;\n\r]{0,140}\b(?:video|v[íi]deo|wideo|видео)\b/i
+const VIDEO_SCRIPT_TARGET =
+  /\b(?:video script|script for (?:a |an |the )?video|storyboard|voiceover script|guion(?: de)? v[íi]deo|roteiro(?: de)? v[íi]deo|scenariusz(?: do)? wideo|сценарий(?: для)? видео)\b/i
+const VIDEO_HARD_EXECUTION =
+  /\b(?:render|produce|generate|publish|post|launch|start|run|make|renderizar|produzir|gerar|publicar|lanzar|producir|generar|publicar|renderuj|wyprodukuj|opublikuj|запусти|сгенерируй|опубликуй|отрендери)\b/i
+
+function isWritingOnlyVideoClause(clause: string): boolean {
+  if (!VIDEO_WRITING_REQUEST.test(clause) && !VIDEO_SCRIPT_TARGET.test(clause)) return false
+  return !VIDEO_HARD_EXECUTION.test(clause)
+}
+
+/**
+ * A prohibition marker does not automatically negate every noun in the same sentence. We only
+ * bind it to a pipeline when the words between the marker and pipeline are ordinary execution /
+ * article fillers. This preserves "do not run a video campaign" while rejecting the false parse
+ * in "write a video without assuming what the update contains".
  */
 const PROHIBITION = new RegExp(
   [
-    // Imperative: do not / never / avoid / exclude / no …
     String.raw`\b(?:do not|don't|do não|n[aã]o |never|avoid|exclude|excluding|without|nie |не )\b`,
-    // Declarative: this is not a … / it is not a … / not a …
     String.raw`\b(?:is not|isn't|are not|aren't|это не|no es|n[aã]o [ée]|to nie)\b`,
-    // Standalone negative framing at the head of a clause.
     String.raw`^\s*not\b`,
   ].join('|'),
   'i',
 )
+
+const PROHIBITION_FILLER = /^(?:\s+(?:run|start|create|launch|build|prepare|generate|draft|execute|set|up|use|include|make|produce|render|send|publish|post|a|an|the|this|that|any|all|another|customer|sales|email|press|media|paid|social|campaign|production|criar|iniciar|gerar|produzir|crear|generar|producir|uruchom|stw[oó]rz|wygeneruj|создай|запусти|сгенерируй)){0,8}\s*$/i
+const PROHIBITION_SUFFIX = /^\s*(?:(?:is|are|was|were)\s+(?:not|never)|isn't|aren't|wasn't|weren't)\b/i
+
+function pipelineTermMatch(clause: string, pipeline: CampaignPipeline): RegExpMatchArray | null {
+  if (pipeline === 'video' && isWritingOnlyVideoClause(clause)) return null
+  return clause.match(PIPELINE_TERMS[pipeline])
+}
+
+function pipelineIsProhibited(clause: string, term: RegExpMatchArray): boolean {
+  const termIndex = term.index ?? -1
+  if (termIndex < 0) return false
+
+  const before = clause.slice(0, termIndex)
+  const marker = before.match(PROHIBITION)
+  if (marker && marker.index !== undefined) {
+    const markerEnd = marker.index + marker[0].length
+    const between = before.slice(markerEnd)
+    if (PROHIBITION_FILLER.test(between)) return true
+  }
+
+  const after = clause.slice(termIndex + term[0].length)
+  return PROHIBITION_SUFFIX.test(after)
+}
 
 /** Splits a brief into clauses so a prohibition can be scoped to the sentence that carries it. */
 function clausesOf(text: string): string[] {
@@ -162,9 +203,9 @@ const PIPELINE_LABEL: Record<CampaignPipeline, string> = {
 /**
  * Classify a brief.
  *
- * Reads prohibitions first, removes those clauses from the evidence, then reads what
- * remains. Returns `not-a-brief` when the message never asked for a campaign at all — the
- * caller must answer it normally rather than reporting a failure at it.
+ * Reads prohibitions first, removes the prohibited pipeline from positive evidence, then reads what
+ * remains. Returns `not-a-brief` when the message never asked for a campaign at all — the caller
+ * must answer it normally rather than reporting a failure at it.
  */
 export function classifyCampaignIntent(text: string): CampaignIntentResult {
   const input = String(text || '').slice(0, 12_000)
@@ -184,13 +225,25 @@ export function classifyCampaignIntent(text: string): CampaignIntentResult {
   const allowedClauses: string[] = []
 
   for (const clause of clausesOf(input)) {
-    const isProhibition = PROHIBITION.test(clause)
+    let clauseHasLiveSignal = false
+    let clauseHasPipelineProhibition = false
+
     for (const pipeline of Object.keys(PIPELINE_TERMS) as CampaignPipeline[]) {
-      if (!PIPELINE_TERMS[pipeline].test(clause)) continue
-      if (isProhibition) prohibited.add(pipeline)
-      else signalled.add(pipeline)
+      const term = pipelineTermMatch(clause, pipeline)
+      if (!term) continue
+      if (pipelineIsProhibited(clause, term)) {
+        prohibited.add(pipeline)
+        clauseHasPipelineProhibition = true
+      } else {
+        signalled.add(pipeline)
+        clauseHasLiveSignal = true
+      }
     }
-    if (!isProhibition) allowedClauses.push(clause)
+
+    // Modifier constraints such as "without assuming details" remain ordinary positive text.
+    // Clauses that contain both a positive pipeline and a different prohibition also remain usable
+    // for typed-count extraction; only the prohibited pipeline itself is removed below.
+    if (clauseHasLiveSignal || !clauseHasPipelineProhibition) allowedClauses.push(clause)
   }
 
   // A pipeline forbidden anywhere is forbidden everywhere in this message. Saying "not a

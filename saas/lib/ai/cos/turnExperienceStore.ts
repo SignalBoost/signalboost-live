@@ -17,6 +17,17 @@ function normalizedPrompt(prompt: string): string {
   return String(prompt ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
+function structuredError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    try {
+      const value = JSON.stringify(error)
+      if (value && value !== '{}') return value.slice(0, 2000)
+    } catch {}
+  }
+  return String(error)
+}
+
 function promptHashKey(): string | null {
   return process.env.COS_TURN_EXPERIENCE_HASH_KEY?.trim()
     || process.env.NEXTAUTH_SECRET?.trim()
@@ -61,7 +72,7 @@ async function persistTurnExperience(experience: TurnExperience): Promise<void> 
     })
     if (result.error) throw result.error
   } catch (error) {
-    console.warn('[cos-turn-experience] record failed (non-fatal):', error instanceof Error ? error.message : String(error))
+    console.warn('[cos-turn-experience] record failed (non-fatal):', structuredError(error))
   }
 }
 
@@ -105,7 +116,7 @@ async function persistTurnLearningEnrichment(input: TurnLearningEnrichment): Pro
     }).eq('turn_id', cleanTurnId)
     if (result.error) throw result.error
   } catch (error) {
-    console.warn('[cos-turn-experience] learning enrichment failed (non-fatal):', error instanceof Error ? error.message : String(error))
+    console.warn('[cos-turn-experience] learning enrichment failed (non-fatal):', structuredError(error))
   }
 }
 
@@ -183,7 +194,7 @@ export async function attachTurnOutcome(turnId: string, outcome: TurnOutcome): P
     await reconcileRetrievalReflectionOutcome(cleanTurnId)
     return true
   } catch (error) {
-    console.warn('[cos-turn-experience] outcome attach failed (non-fatal):', error instanceof Error ? error.message : String(error))
+    console.warn('[cos-turn-experience] outcome attach failed (non-fatal):', structuredError(error))
     return false
   }
 }

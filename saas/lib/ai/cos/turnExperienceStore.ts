@@ -14,7 +14,11 @@ import { captureEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTu
 import { reconcileRetrievalReflectionOutcome } from '@/lib/ai/cos/retrievalSelfReflectionStore'
 
 function normalizedPrompt(prompt: string): string {
-  return String(prompt ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+  const full = String(prompt ?? '')
+  const marker = 'USER QUESTION:'
+  const markerIndex = full.lastIndexOf(marker)
+  const userQuestion = markerIndex >= 0 ? full.slice(markerIndex + marker.length) : full
+  return userQuestion.replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
 function structuredError(error: unknown): string {

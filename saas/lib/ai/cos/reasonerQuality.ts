@@ -3,7 +3,7 @@ import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { classifyScriptRequest, scriptRequestDirective } from '@/lib/ai/cos/scriptRequestIntent'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
-const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!/(?:usr/bin/env\s+)?(?:bash|sh|python))\b/m
+const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
 const PROGRAMMING_REDIRECT = /\b(?:programming language|source code|python|javascript|typescript|bash|powershell|choose (?:a |the )?(?:language|runtime)|specify (?:a |the )?(?:language|runtime|format))\b/i
 const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot write (?:a |the )?script|can't write (?:a |the )?script|unable to write (?:a |the )?script|need you to specify|need more information before (?:i can |i )?(?:write|produce|draft|create))\b/i
 

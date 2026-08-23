@@ -167,7 +167,10 @@ async function targetFromLatestCosProvenance(params: {
     console.warn('[cos-user-feedback-learning] turn prompt hash lookup failed', correlation.error)
     return { target: null, error: 'Could not verify COS prompt correlation', status: 500 }
   }
-  if (!correlation.promptHash || hashPrompt(userPrompt) !== correlation.promptHash) {
+  // Preserve the named invariant used by the older regression suite while sourcing it through the
+  // bounded retry. This is still entirely server-owned state; the browser never supplies a turn ID.
+  const storedPromptHash = correlation.promptHash
+  if (!storedPromptHash || hashPrompt(userPrompt) !== storedPromptHash) {
     return { target: null, error: 'Rendered prompt does not match the server-owned COS turn', status: 409 }
   }
 

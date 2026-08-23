@@ -4,12 +4,24 @@ import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemor
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { independentReasonerHealth, externalFallbackEnabled } from '@/lib/ai/cos/cosOrchestrationEnterprise'
+import { autonomousLearningReadiness } from '@/lib/cos/dailyAutonomousLearning'
+import { autonomousLearningRunFresh, readAutonomousLearningHealth, type AutonomousLearningRunHealth } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 
 export type CosLiveSystemState = {
   generatedAt:string
   deployment:{commitSha:string|null;environment:string|null}
   localReasoner:{configured:boolean;healthy:boolean;model:string|null;error:string|null}
   externalFallbackEnabled:boolean
+  autonomousLearning:{
+    enabled:boolean
+    ready:boolean
+    liveSourcesEnabled:boolean
+    liveAdapters:number
+    approvedUrls:number
+    warnings:string[]
+    currentWorld:{run:AutonomousLearningRunHealth|null;fresh:boolean|null}
+    daily:{run:AutonomousLearningRunHealth|null;fresh:boolean|null}
+  }
   enterpriseMemory:{status:string;organizationId:string|null;organizationRows:number|null;intelligenceSnapshots:number|null;repositorySnapshots:number|null;campaignMemories:number|null;confidenceHistory:number|null;retrievableItems:number|null;kinds:Record<string,number>}
   knowledgeGraph:{activeFacts:number|null;quarantinedFacts:number|null;latestUpdatedAt:string|null}
   learnedCorpus:{total:number|null;relevanceRejected:number|null;bySourceKind:Record<string,number>;latestObservedAt:string|null}
@@ -25,6 +37,8 @@ function s(value:unknown):string|null{const v=String(value??'').trim();return v|
 export async function buildCosLiveSystemState(args:{userId?:string|null;privileged:boolean}):Promise<CosLiveSystemState>{
   const generatedAt=new Date().toISOString(),db=cosServiceDb()
   const reasonerPromise=independentReasonerHealth().catch(error=>({configured:false,healthy:false,model:null,error:error instanceof Error?error.message:String(error)}))
+  const readiness=autonomousLearningReadiness()
+  const runHealthPromise=readAutonomousLearningHealth()
   let knowledgeGraph:CosLiveSystemState['knowledgeGraph']={activeFacts:null,quarantinedFacts:null,latestUpdatedAt:null}
   let learnedCorpus:CosLiveSystemState['learnedCorpus']={total:null,relevanceRejected:null,bySourceKind:{},latestObservedAt:null}
   let cognitiveSkills:CosLiveSystemState['cognitiveSkills']={validated:null,latestUpdatedAt:null}
@@ -72,11 +86,32 @@ export async function buildCosLiveSystemState(args:{userId?:string|null;privileg
     }
   }
   const memories=args.userId?await loadUserMemories(args.userId).catch(()=>[]):[]
-  return{generatedAt,deployment:{commitSha:s(process.env.VERCEL_GIT_COMMIT_SHA),environment:s(process.env.VERCEL_ENV)},localReasoner:await reasonerPromise,externalFallbackEnabled:externalFallbackEnabled(),enterpriseMemory,knowledgeGraph,learnedCorpus,cognitiveSkills,cache,userMemory:{available:Boolean(args.userId),records:args.userId?memories.length:null},lastTurnRecord}
+  const runHealth=await runHealthPromise
+  const autonomousLearning:CosLiveSystemState['autonomousLearning']={
+    enabled:readiness.autonomousEnabled,
+    ready:readiness.ready,
+    liveSourcesEnabled:readiness.liveSourcesEnabled,
+    liveAdapters:readiness.liveAdapters,
+    approvedUrls:readiness.approvedUrls,
+    warnings:readiness.warnings,
+    currentWorld:{run:runHealth.currentWorld,fresh:autonomousLearningRunFresh('current_world',runHealth.currentWorld)},
+    daily:{run:runHealth.daily,fresh:autonomousLearningRunFresh('daily',runHealth.daily)},
+  }
+  return{generatedAt,deployment:{commitSha:s(process.env.VERCEL_GIT_COMMIT_SHA),environment:s(process.env.VERCEL_ENV)},localReasoner:await reasonerPromise,externalFallbackEnabled:externalFallbackEnabled(),autonomousLearning,enterpriseMemory,knowledgeGraph,learnedCorpus,cognitiveSkills,cache,userMemory:{available:Boolean(args.userId),records:args.userId?memories.length:null},lastTurnRecord}
+}
+
+function automaticRunLine(label:string,item:{run:AutonomousLearningRunHealth|null;fresh:boolean|null}):string{
+  const run=item.run
+  if(!run)return`${label.padEnd(23)}: NO DURABLE RUN RECORD YET`
+  const sourceErrorTotal=Object.values(run.sourceErrors).reduce((sum,value)=>sum+Number(value||0),0)
+  const health=item.fresh===false?'STALE':!run.succeeded?'FAILED':sourceErrorTotal>0?'DEGRADED':'HEALTHY'
+  const errors=sourceErrorTotal?`; source errors ${Object.entries(run.sourceErrors).map(([k,v])=>`${k} ${v}`).join(', ')}`:''
+  return`${label.padEnd(23)}: ${health} — ${run.status}; finished ${run.finishedAt||run.recordedAt||'unknown'}; acquired ${run.documentsAcquired}; accepted ${run.accepted}; probationary ${run.probationary}; indexed ${run.indexed}; indexing failed ${run.indexingFailed}${errors}`
 }
 
 export function formatCosLiveSystemState(state:CosLiveSystemState):string{
   const sources=Object.entries(state.learnedCorpus.bySourceKind).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k} ${v}`).join(', ')||'none'
   const emKinds=Object.entries(state.enterpriseMemory.kinds).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k} ${v}`).join(', ')||'none'
-  return['LIVE SYSTEM STATE — queried now; independent of prior-answer provenance',`Generated              : ${state.generatedAt}`,`Deployment             : ${state.deployment.environment||'unknown'} @ ${state.deployment.commitSha||'unknown commit'}`,`Local Reasoner         : ${state.localReasoner.healthy?'HEALTHY':state.localReasoner.configured?'UNHEALTHY':'NOT CONFIGURED'}${state.localReasoner.model?` — ${state.localReasoner.model}`:''}${state.localReasoner.error?`; ${state.localReasoner.error}`:''}`,`Enterprise Memory      : ${state.enterpriseMemory.status} — org ${state.enterpriseMemory.organizationId||'none'}; organization ${state.enterpriseMemory.organizationRows??'unknown'}, intelligence ${state.enterpriseMemory.intelligenceSnapshots??'unknown'}, repository ${state.enterpriseMemory.repositorySnapshots??'unknown'}, campaign ${state.enterpriseMemory.campaignMemories??'unknown'}, confidence ${state.enterpriseMemory.confidenceHistory??'unknown'}; retrievable ${state.enterpriseMemory.retrievableItems??'unknown'} (${emKinds})`,`Knowledge Graph        : ${state.knowledgeGraph.activeFacts??'unknown'} active; ${state.knowledgeGraph.quarantinedFacts??'unknown'} quarantined; latest ${state.knowledgeGraph.latestUpdatedAt||'unknown'}`,`Learned Corpus         : ${state.learnedCorpus.total??'unknown'} total; ${state.learnedCorpus.relevanceRejected??'unknown'} relevance-rejected; sources ${sources}; latest observed ${state.learnedCorpus.latestObservedAt||'unknown'}`,`Cognitive Skills       : ${state.cognitiveSkills.validated??'unknown'} validated; latest ${state.cognitiveSkills.latestUpdatedAt||'unknown'}`,`Cache                  : ${state.cache.semanticRecords??'unknown'} semantic records; ${state.cache.exactRecords??'unknown'} exact records`,`User Memory            : ${state.userMemory.available?`${state.userMemory.records??'unknown'} records`:'no authenticated user scope'}`,`Last Provenance Record : ${state.lastTurnRecord?.updatedAt||'none'}${state.lastTurnRecord?.source?` — ${state.lastTurnRecord.source}`:''}`].join('\n')
+  const autoWarnings=state.autonomousLearning.warnings.length?`; warnings ${state.autonomousLearning.warnings.join(' | ')}`:''
+  return['LIVE SYSTEM STATE — queried now; independent of prior-answer provenance',`Generated              : ${state.generatedAt}`,`Deployment             : ${state.deployment.environment||'unknown'} @ ${state.deployment.commitSha||'unknown commit'}`,`Local Reasoner         : ${state.localReasoner.healthy?'HEALTHY':state.localReasoner.configured?'UNHEALTHY':'NOT CONFIGURED'}${state.localReasoner.model?` — ${state.localReasoner.model}`:''}${state.localReasoner.error?`; ${state.localReasoner.error}`:''}`,`Automatic Learning     : ${state.autonomousLearning.ready?'READY':state.autonomousLearning.enabled?'NOT READY':'DISABLED'} — live sources ${state.autonomousLearning.liveSourcesEnabled?'enabled':'disabled'}; adapters ${state.autonomousLearning.liveAdapters}; approved URLs ${state.autonomousLearning.approvedUrls}${autoWarnings}`,automaticRunLine('Auto Current-World',state.autonomousLearning.currentWorld),automaticRunLine('Auto Daily Learning',state.autonomousLearning.daily),`Enterprise Memory      : ${state.enterpriseMemory.status} — org ${state.enterpriseMemory.organizationId||'none'}; organization ${state.enterpriseMemory.organizationRows??'unknown'}, intelligence ${state.enterpriseMemory.intelligenceSnapshots??'unknown'}, repository ${state.enterpriseMemory.repositorySnapshots??'unknown'}, campaign ${state.enterpriseMemory.campaignMemories??'unknown'}, confidence ${state.enterpriseMemory.confidenceHistory??'unknown'}; retrievable ${state.enterpriseMemory.retrievableItems??'unknown'} (${emKinds})`,`Knowledge Graph        : ${state.knowledgeGraph.activeFacts??'unknown'} active; ${state.knowledgeGraph.quarantinedFacts??'unknown'} quarantined; latest ${state.knowledgeGraph.latestUpdatedAt||'unknown'}`,`Learned Corpus         : ${state.learnedCorpus.total??'unknown'} total; ${state.learnedCorpus.relevanceRejected??'unknown'} relevance-rejected; sources ${sources}; latest observed ${state.learnedCorpus.latestObservedAt||'unknown'}`,`Cognitive Skills       : ${state.cognitiveSkills.validated??'unknown'} validated; latest ${state.cognitiveSkills.latestUpdatedAt||'unknown'}`,`Cache                  : ${state.cache.semanticRecords??'unknown'} semantic records; ${state.cache.exactRecords??'unknown'} exact records`,`User Memory            : ${state.userMemory.available?`${state.userMemory.records??'unknown'} records`:'no authenticated user scope'}`,`Last Provenance Record : ${state.lastTurnRecord?.updatedAt||'none'}${state.lastTurnRecord?.source?` — ${state.lastTurnRecord.source}`:''}`].join('\n')
 }

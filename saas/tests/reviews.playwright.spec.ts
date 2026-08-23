@@ -11,7 +11,7 @@ test.describe('Reviews module responsive SaaS page', () => {
 
       await expect(page.getByRole('heading', { name: /Review collector|Recolector|Colector|Central|Centrum|Центр/i })).toBeVisible()
       await expect(page.getByRole('region', { name: /Review filters and sorting/i })).toBeVisible()
-      await expect(page.getByText(guestNotice)).toBeVisible()
+      await expect(page.locator('.sb-review-alert').getByText(guestNotice)).toBeVisible()
       await expect(page.getByLabel(/Admin Console reviews telemetry/i)).toHaveCount(0)
     })
   }
@@ -24,7 +24,7 @@ test.describe('Reviews module responsive SaaS page', () => {
     await expect(page.getByRole('region', { name: /Review filters and sorting/i })).toBeVisible()
     const reviewCards = page.getByRole('region', { name: /Review cards/i })
     await expect(reviewCards).toBeVisible()
-    await expect(page.getByText(guestNotice)).toBeVisible()
+    await expect(page.locator('.sb-review-alert').getByText(guestNotice)).toBeVisible()
     await expect(reviewCards.getByRole('button', { name: /Approve|Clear flag|Flag/i })).toHaveCount(0)
   })
 })

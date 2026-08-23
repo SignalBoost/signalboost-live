@@ -3,7 +3,7 @@ import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle.ts
 import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib/cos-core/layers/learning/index.ts'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources.ts'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase.ts'
-import { currentWorldKnowledgeGaps, isCurrentWorldLearningAdapter } from '@/lib/ai/cos/currentWorldLearning.ts'
+import { currentWorldKnowledgeGaps, currentWorldAdapterDue } from '@/lib/ai/cos/currentWorldLearning.ts'
 import { indexRecentUnembeddedLearnedCorpus } from '@/lib/ai/cos/learnedCorpusIndexing.ts'
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease.ts'
@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const startedAt = new Date().toISOString()
+  const now = new Date()
+  const startedAt = now.toISOString()
   if (process.env.COS_AUTONOMOUS_LEARNING_ENABLED !== 'true') {
     await recordAutonomousLearningRun({
       mode: 'current_world', status: 'skipped', succeeded: false, startedAt,
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
   const stores = createSupabaseCOSStores()
   if (!stores) return NextResponse.json({ ok: false, error: 'COS Supabase service store is not configured.' }, { status: 503 })
 
-  const adapters = createLiveLearningAdapters().filter(isCurrentWorldLearningAdapter)
+  const adapters = createLiveLearningAdapters().filter(adapter => currentWorldAdapterDue(adapter, now))
   if (!adapters.length) {
     await recordAutonomousLearningRun({
       mode: 'current_world', status: 'error', succeeded: false, startedAt,
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const gaps = currentWorldKnowledgeGaps(new Date())
+    const gaps = currentWorldKnowledgeGaps(now)
     const director = new ContinuousLearningDirector(stores.continuousLearning, CURRENT_WORLD_POLICY)
     const cycle = new ContinuousLearningCycle(director, adapters)
     const learning = await cycle.run(gaps, 0)
@@ -77,9 +78,10 @@ export async function GET(req: NextRequest) {
     }
 
     const ok = learning.accepted === 0 || Boolean(indexing && indexing.failed === 0)
+    const status = ok ? (learning.accepted > 0 ? 'learned' : 'no_new_knowledge') : 'indexing_failed'
     const healthRecorded = await recordAutonomousLearningRun({
       mode: 'current_world',
-      status: ok ? 'learned' : 'indexing_failed',
+      status,
       succeeded: ok,
       startedAt,
       documentsAcquired: learning.documentsAcquired,
@@ -87,11 +89,12 @@ export async function GET(req: NextRequest) {
       probationary: learning.probationary,
       indexed: indexing?.embedded ?? 0,
       indexingFailed: indexing?.failed ?? 0,
+      rejected: learning.rejected,
       sourceErrors: learning.sourceErrors,
     })
     return NextResponse.json({
       ok,
-      status: 'learned',
+      status,
       gaps: gaps.map(gap => ({ id: gap.id, subject: gap.subject })),
       sourceAdapters: adapters.map(adapter => adapter.id ?? adapter.kind),
       learning,

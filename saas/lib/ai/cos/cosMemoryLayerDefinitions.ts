@@ -10,7 +10,7 @@ export const SEMANTIC_ANSWER_CACHE_DEFINITION =
   'Semantic Cache is policy-versioned, age-bounded reuse of a previously generated answer when a new request is sufficiently similar. Embeddings are only the retrieval index, not the cached knowledge itself. Organization- or user-scoped context must never be reused through an unscoped cache entry.'
 
 export const MEMORY_LAYER_COMPARISON_GUARDRAIL =
-  'When defining or comparing COS components, explain their purpose, scope, lifetime, and authority. Do not force incident-diagnostic observables, falsifiers, database wait events, or prompt examples into a conceptual answer unless the user asks for diagnosis or verification.'
+  'When defining or comparing COS components, explain their purpose, scope, lifetime, and authority. Do not force incident-diagnostic observables, falsifiers, database wait events, or prompt examples into a conceptual answer unless the user asks for diagnosis or verification. When the user supplies multiple dated policy or context records, treat them as task premises: a later record with explicit scope or an effective-immediately directive supersedes conflicting older rules within that scope, while older rules remain only where they do not conflict. Never recommend an action that violates the controlling newer record unless the prompt explicitly supplies exception authority.'
 
 
 /** Detect when the recorded answer materially used a canonical COS definition. */

@@ -185,8 +185,19 @@ function recordedInfluenceInterpretation(provenance: any): string {
   return lines.join('\n')
 }
 
+function correctBackupContinuityConfidence(text: string, provenance: any): string {
+  if (provenance?.continuity_mode !== 'backup_read_only') return text
+  const confidence = provenance?.local_reasoning?.confidence
+  if (confidence == null) return text.replace(/COS Confidence\s*:[^\n]*/g, 'Backup Confidence      : not recorded — Primary confidence gate was not run in read-only continuity mode.')
+  return text.replace(
+    /COS Confidence\s*:[^\n]*/g,
+    `Backup Confidence      : ${Number(confidence).toFixed(2)} — advisory self-report; Primary acceptance threshold N/A in read-only continuity mode.`,
+  )
+}
+
 export function formatAuthoritativeProvenance(provenance: any, language: string): string {
   let formatted = liveFormatAuthoritativeProvenance(provenance, language)
+  formatted = correctBackupContinuityConfidence(formatted, provenance)
   const canonical = provenance?.canonical_self_knowledge ?? {}
   const canonicalLine = canonical.used
     ? `Canonical Self-Knowledge: USED — ${[canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null, canonical.semantic_cache_definition ? 'Semantic Cache definition' : null].filter(Boolean).join(', ')} contributed material to the answer.`

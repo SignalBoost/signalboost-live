@@ -14,6 +14,7 @@ import { runProbationaryPromotionCycle } from '@/lib/ai/cos/cognitiveProbationar
 import { refreshMetacognitiveCapabilityMap } from '@/lib/ai/cos/cognitiveMetacognition'
 import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationStore'
 import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetestStore'
+import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -22,9 +23,6 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// Certification is intentionally given only the early part of the route budget. The remaining
-// 90 seconds are reserved for composition, consolidation, metacognition, persistence and response
-// cleanup. Certification itself permits at most one new model exercise per daily cycle.
 const CERTIFICATION_ROUTE_DEADLINE_MS = 210_000
 
 export async function GET(req: NextRequest) {
@@ -37,10 +35,17 @@ export async function GET(req: NextRequest) {
 
   const jobParam = new URL(req.url).searchParams.get('job')
   const job = jobParam === 'weekly' ? 'weekly' : 'daily'
+  const dailyStartedAt = new Date().toISOString()
 
   const result = await runMiningPipeline({ job, actor: 'cron' })
   if (!result.ok || !result.summary) {
     console.error('cron cos-mining failed:', result.error)
+    if (job === 'daily') {
+      await recordAutonomousLearningRun({
+        mode: 'daily', status: 'error', succeeded: false, startedAt: dailyStartedAt,
+        skipReason: `mining_prerequisite_failed:${String(result.error || 'unknown').slice(0, 400)}`,
+      })
+    }
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
   }
 
@@ -55,10 +60,9 @@ export async function GET(req: NextRequest) {
   let evidenceRetest: Awaited<ReturnType<typeof runEvidenceTriggeredRetest>> | { enabled: false; errors: string[] } | null = null
   let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
   let corpus: unknown = null
+  let automaticLearningHealthRecorded: boolean | null = null
+
   if (job === 'daily') {
-    // Daily learning, transcript acquisition, skill practice/certification, composition/transfer, and
-    // consolidation are legitimate COS local-compute work. Lease + pre-warm the dedicated runtime
-    // once for the bounded batch; the idle-stop cron releases the GPU after the quiet period.
     await touchRunpodActivityLease('daily_learning_batch')
     try {
       await ensureLocalInferenceRuntimeReady()
@@ -72,6 +76,25 @@ export async function GET(req: NextRequest) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'
       console.error('cron cos daily learning failed:', message)
       learning = { status: 'error', error: message }
+    }
+
+    if (learning && 'error' in learning) {
+      automaticLearningHealthRecorded = await recordAutonomousLearningRun({
+        mode: 'daily', status: 'error', succeeded: false, startedAt: dailyStartedAt,
+        skipReason: learning.error,
+      })
+    } else if (learning) {
+      automaticLearningHealthRecorded = await recordAutonomousLearningRun({
+        mode: 'daily',
+        status: learning.status,
+        succeeded: learning.status === 'learned',
+        startedAt: dailyStartedAt,
+        documentsAcquired: learning.documentsAcquired,
+        accepted: learning.accepted,
+        probationary: learning.probationary,
+        sourceErrors: learning.sourceErrors,
+        skipReason: learning.skipReason ?? null,
+      })
     }
 
     try {
@@ -119,8 +142,6 @@ export async function GET(req: NextRequest) {
       probationaryPromotion = { enabled: false, errors: [message] }
     }
 
-    // Newly retained evidence can reopen only a bounded number of evidence-terminal gaps for
-    // normal governed study. This deterministic scan never resolves a gap or calls a model.
     try {
       knowledgeApplication = await runKnowledgeApplicationScan()
     } catch (error) {
@@ -129,8 +150,6 @@ export async function GET(req: NextRequest) {
       knowledgeApplication = { enabled: false, errors: [message] }
     }
 
-    // New retained evidence may justify one bounded benchmark retest of a prior failed answer.
-    // This only creates a case for the existing runner; it never declares the answer improved.
     try {
       evidenceRetest = await runEvidenceTriggeredRetest()
     } catch (error) {
@@ -139,8 +158,6 @@ export async function GET(req: NextRequest) {
       evidenceRetest = { enabled: false, errors: [message] }
     }
 
-    // Rebuild metacognitive state after learning/certification/composition/consolidation so selection
-    // on the next request reflects the newest strong, weak, quarantined and unresolved evidence.
     try {
       metacognition = await refreshMetacognitiveCapabilityMap()
     } catch (error) {
@@ -166,6 +183,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     summary: result.summary,
     learning,
+    automaticLearningHealthRecorded,
     cognitive,
     certification,
     composition,

@@ -46,6 +46,13 @@ test('the recorded provenance is honest that backup mode retrieves no evidence a
   assert.match(BACKUP_BRANCH, /status: 'not_available_in_backup_mode'/)
 })
 
+test('backup provenance records no primary threshold rather than inventing one', () => {
+  assert.match(BACKUP_BRANCH, /threshold: null/)
+  const formatter = readFileSync(new URL('../lib/ai/cos/cosOrchestration.ts', import.meta.url), 'utf8')
+  assert.match(formatter, /Primary acceptance threshold N\/A in read-only continuity mode/)
+  assert.match(formatter, /continuity_mode !== 'backup_read_only'/)
+})
+
 test('the escalation reason names quarantine explicitly rather than implying a normal answer', () => {
   assert.match(BACKUP_BRANCH, /escalation_reason_code: 'primary_quarantined_backup_continuity'/)
   assert.match(BACKUP_BRANCH, /quarantined by continuity policy/)

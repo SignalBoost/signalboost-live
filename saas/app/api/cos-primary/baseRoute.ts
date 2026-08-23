@@ -21,6 +21,7 @@ import {
 import { writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
+import { asksWhereTheAnswerCameFrom } from '@/lib/ai/cos/provenanceIntrospectionIntent'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
 import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
@@ -117,7 +118,7 @@ export async function POST(req:NextRequest){
     return NextResponse.json({ok:Boolean(assessment)||(!assessmentRequested&&scan.ok),reply,source:assessment?'cos-self-healing-assessment':!scan.ok?'cos-repository-scan-failed':assessmentRequested?'cos-self-healing-assessment-failed':'cos-repository-scan',confidence_score:assessment||(!assessmentRequested&&scan.ok)?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:Boolean(assessment),execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:assessment||(!assessmentRequested&&scan.ok)?200:503})
   }
 
-  if(isProvenanceIntrospection(input)){
+  if(isProvenanceIntrospection(input) || asksWhereTheAnswerCameFrom(input)){
     const prior=await readCosPrimaryPriorProvenance(userId,precedingAssistant||undefined)
     const reply=prior?formatAuthoritativeProvenance(prior as any,language):noPriorReply(language)
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'deterministic',confidence:1,externalAiInvoked:false})

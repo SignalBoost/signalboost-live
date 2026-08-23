@@ -26,6 +26,35 @@ export type StrategyProfileReadResult =
   | { ok: true; organizationId: string; profile: StrategyProfileGenerationView }
   | { ok: false; error: string; scopeStatus?: string }
 
+function activeBaselineSummary(defaults: StrategyGenerationDefaults): string {
+  if (defaults.status !== 'available') return 'No Enterprise Intelligence baseline is currently available.'
+  return [
+    `goal=${defaults.goal || 'unspecified'}`,
+    `tone=${defaults.tone || 'unspecified'}`,
+    `format=${defaults.format || 'unspecified'}`,
+    `offer=${defaults.offerType || 'unspecified'}`,
+    `cta=${defaults.ctaStrategy || 'unspecified'}`,
+    defaults.description ? `subject=${defaults.description}` : '',
+  ].filter(Boolean).join('; ')
+}
+
+export function strategyGenerationRule(defaults: StrategyGenerationDefaults): string {
+  if (defaults.status !== 'available') {
+    return 'If no learned override exists and no baseline snapshot is available, still generate the requested artifact using ordinary judgement and say that no measured override was applied. Lack of measured weights alone is never a reason to refuse generation. Do not substitute a measurement plan, pilot-campaign checklist, or placeholder for the requested artifact.'
+  }
+
+  const subject = defaults.description || 'the organization/product described by Enterprise Memory'
+  return [
+    'CURRENT ACTIVE STRATEGY CONTRACT:',
+    `Start from the Enterprise Intelligence baseline and overlay only dimensions whose measured profile status is learned. Baseline: ${activeBaselineSummary(defaults)}.`,
+    `If the user supplies no content topic, use this organization/product context as the subject: ${subject}.`,
+    `Produce the actual requested artifact in the baseline format (${defaults.format || 'the configured format'}) and tone (${defaults.tone || 'the configured tone'}), pursuing the baseline goal (${defaults.goal || 'the configured goal'}), offer (${defaults.offerType || 'the configured offer'}), and CTA (${defaults.ctaStrategy || 'the configured CTA'}).`,
+    'Do NOT replace the artifact with a strategy placeholder, campaign setup plan, pilot-campaign recommendations, KPI/tracking checklist, or measurement-delay discussion merely because measured campaigns are zero.',
+    'Do NOT mention internal variables such as COS_MEASURE_DELAY_HOURS unless they are explicitly present in the current evidence and directly requested by the user.',
+    'After the artifact, explain which learned heuristics changed the baseline. If there are no learned overrides, say so plainly and identify the baseline defaults that were used; do not call baseline defaults learned weights or learned heuristics.',
+  ].join(' ')
+}
+
 export async function readStrategyProfile(args: {
   privileged: boolean
   organizationId?: unknown
@@ -87,7 +116,7 @@ export async function readStrategyProfile(args: {
   const derived = deriveStrategyProfile(rows, args.options ?? {})
   const fallbackSummary = derived.changesBehavior
     ? derived.summary
-    : `${derived.summary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation.`
+    : `${derived.summary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation. ACTIVE BASELINE — ${activeBaselineSummary(defaults)}.`
 
   return {
     ok: true,
@@ -96,9 +125,7 @@ export async function readStrategyProfile(args: {
       ...derived,
       summary: fallbackSummary,
       generationDefaults: defaults,
-      generationRule: defaults.status === 'available'
-        ? 'Overlay learned dimensions on generationDefaults. If no learned override exists, generationDefaults remain active and content generation MUST proceed; lack of measured weights is not a reason to refuse.'
-        : 'If no learned override exists and no baseline snapshot is available, generate using ordinary judgement and say that no measured override was applied. Lack of measured weights alone is never a reason to refuse generation.',
+      generationRule: strategyGenerationRule(defaults),
     },
   }
 }

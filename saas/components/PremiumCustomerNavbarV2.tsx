@@ -371,7 +371,7 @@ export default function PremiumCustomerNavbarV2() {
     <>
       <style>{`
         .sbnav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 14px; padding: 11px 22px; background: rgba(4, 8, 18, .95); border-bottom: 1px solid rgba(167, 139, 250, .35); backdrop-filter: blur(14px); }
-        .sbnav-brand, .sbnav-trigger, .sbnav-row, .sbnav-mobile-row { color: #f8fafc; text-decoration: none; font: inherit; }
+        .sbnav-brand, .sbnav-trigger, .sbnav-row, .sbnav-mobile-row, .sbnav-compact-platform { color: #f8fafc; text-decoration: none; font: inherit; }
         .sbnav-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; white-space: nowrap; }
         .sbnav-brand-mark { color: ${PURPLE}; font-size: 24px; }
         .sbnav-desktop { display: flex; align-items: center; gap: 5px; min-width: 0; }
@@ -393,12 +393,15 @@ export default function PremiumCustomerNavbarV2() {
         .sbnav-sign-in { border: 1px solid rgba(255,255,255,.22); background: transparent; color: #f8fafc; }
         .sbnav-burger { display: none; border-radius: 10px; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.2); }
         .sbnav-mobile { display: none; }
+        .sbnav-compact-platform { display: none; border: 1px solid rgba(167,139,250,.55); border-radius: 999px; padding: 8px 11px; font-size: 13px; font-weight: 800; white-space: nowrap; }
         @media (min-width: 1651px) and (max-width: 2050px) { .sbnav { gap: 9px; padding-inline: 16px; } .sbnav-desktop { gap: 1px; } .sbnav-trigger { padding-inline: 7px; } .sbnav-search { width: 180px; flex-basis: 180px; } }
-        @media (min-width: 1281px) and (max-width: 1650px) { .sbnav { gap: 9px; padding-inline: 16px; } .sbnav-desktop { display: flex; gap: 1px; } .sbnav-trigger { padding-inline: 7px; } .sbnav-search { width: 180px; flex-basis: 180px; } .sbnav-platform-link { display: none; } }
-        @media (max-width: 1280px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-auth, .sbnav-credits { display: none; } .sbnav-burger { display: inline-flex; margin-left: auto; } .sbnav-mobile { display: grid; gap: 13px; max-height: calc(100vh - 62px); overflow-y: auto; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
+        @media (min-width: 1281px) and (max-width: 1650px) { .sbnav { gap: 8px; padding-inline: 16px; } .sbnav-desktop { display: flex; gap: 0; } .sbnav-trigger { padding-inline: 6px; } .sbnav-search { display: none; } }
+        @media (max-width: 1280px) { .sbnav-desktop, .sbnav-search, .sbnav-language, .sbnav-credits { display: none; } .sbnav-compact-platform { display: inline-flex; align-items: center; } .sbnav-burger { display: inline-flex; margin-left: auto; }
+          @media (max-width: 700px) { .sbnav-auth { display: none; } } .sbnav-mobile { display: grid; gap: 13px; max-height: calc(100vh - 62px); overflow-y: auto; padding: 14px 20px 20px; background: #070d1c; border-bottom: 1px solid rgba(167,139,250,.35); } .sbnav-mobile-group { display: grid; gap: 4px; } .sbnav-mobile-label { color: ${PURPLE}; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; } .sbnav-mobile-search { width: 100%; } .sbnav-mobile-search .sbnav-dropdown { position: static; margin-top: 8px; } }
       `}</style>
       <nav className="sbnav" ref={navRef}>
         <Link href="/" className="sbnav-brand"><span className="sbnav-brand-mark" aria-hidden>⌁</span><span>{uiText('generatedUi.u_7bc314f625464478')}</span></Link>
+        <Link href="/home" className="sbnav-compact-platform">{t('nav.platform', "Platform")}</Link>
         <div className="sbnav-desktop">
           <Link href="/" className={`sbnav-trigger ${itemIsActive(pathname, '/') ? 'sbnav-trigger-active' : ''}`}>{t('nav.home', "Home")}</Link>
           <Link href="/home" className={`sbnav-trigger sbnav-platform-link ${itemIsActive(pathname, '/home') ? 'sbnav-trigger-active' : ''}`}>{t('nav.platform', "Platform")}</Link>

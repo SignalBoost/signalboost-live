@@ -1,4 +1,5 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { recordedSourceForProvenance } from './responseLineage.ts'
 
 export type RecordedTurnProvenance = Record<string, unknown>
 
@@ -63,8 +64,9 @@ export async function recordLatestUserTurnProvenance(userId:string,assistantCont
   const normalized=normalize(provenance); const content=normalizeAssistantContent(assistantContent)
   if(!normalized||!content)return false
   const db=cosServiceDb(); if(!db)return false
+  const recordedSource=recordedSourceForProvenance(source,normalized)
   try{
-    const {error}=await db.from('cos_latest_turn_provenance').upsert({user_id:userId,assistant_content:content,provenance:normalized,source:source||null,updated_at:new Date().toISOString()},{onConflict:'user_id'})
+    const {error}=await db.from('cos_latest_turn_provenance').upsert({user_id:userId,assistant_content:content,provenance:normalized,source:recordedSource,updated_at:new Date().toISOString()},{onConflict:'user_id'})
     if(error)throw error
     return true
   }catch(error){console.error('supportTurnProvenance: latest-user provenance write failed',error);return false}

@@ -1,4 +1,5 @@
-import * as base from './cosOrchestrationEnterprise.ts'
+// saas/lib/ai/cos/cosOrchestrationLive.ts
+import * as base from './cosOrchestrationEnterprise'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
@@ -73,6 +74,20 @@ function formatMaterialProvenance(provenance:any):string{
     '─────────────',
   ]
 
+  // CONTINUITY MODE MUST BE DECLARED FIRST. When the primary COS response is quarantined, the
+  // read-only Backup COS answers instead — no evidence retrieval, no memory, no learning, and a
+  // flat default confidence rather than a calibrated score. Backup turns are now persisted (so
+  // feedback and introspection work), but the report rendered them as ordinary telemetry:
+  // "COS Confidence 1.00 — threshold 0.00" with every layer listed as NOT USED, indistinguishable
+  // from a healthy answer that simply needed no retrieval (2026-08-23). A reader must never have
+  // to infer degraded mode from a suspicious threshold.
+  if(provenance?.continuity_mode==='backup_read_only'){
+    lines.push('Continuity Mode        : BACKUP (read-only). The primary COS response was quarantined by continuity policy and the backup answered instead.')
+    const reasons=Array.isArray(provenance.divergence_reasons)?provenance.divergence_reasons.filter(Boolean):[]
+    if(reasons.length)lines.push(`Quarantine Reason      : ${reasons.join('; ')}.`)
+    lines.push('Backup Limitations     : no evidence retrieval, no memory or corpus access, and no learning. Confidence below is a fixed backup default, NOT a calibrated score.')
+  }
+
   if(origin?.from_cache){
     const written=origin.stored_at?` written ${origin.stored_at}`:' written on an earlier turn'
     const model=origin.model?` by ${origin.model}`:''
@@ -103,6 +118,8 @@ function formatMaterialProvenance(provenance:any):string{
     if(contributed(provenance?.learned_corpus))lines.push(`Learned Corpus         : USED — ${funnel(provenance.learned_corpus)}.`)
     if(contributed(provenance?.cognitive_skills))lines.push(`Cognitive Skills       : USED — ${funnel(provenance.cognitive_skills)}. Procedural guidance; not factual grounding.`)
     if(contributed(provenance?.user_memory))lines.push(`User Memory            : USED — ${funnel(provenance.user_memory)}.`)
+    // The user's own stated premises rank as a material contributor: when the prompt carries the
+    // facts, they ARE the grounding, and a report that omits them implies the model invented them.
     if(provenance?.user_supplied_premises?.used){
       const labelled=Number(provenance.user_supplied_premises.labelled_count||0)
       const detail=labelled>0?`${labelled} labelled premise${labelled===1?'':'s'} stated in your request`:'factual premises stated in your request'
@@ -157,7 +174,17 @@ function formatMaterialProvenance(provenance:any):string{
   const acquired=count(provenance?.autonomous_research?.documents_acquired)
   lines.push('','Request Learning','────────────────',learned>0?`${acquired} documents acquired; ${learned} new knowledge items retained.`:acquired>0?`${acquired} live documents were retrieved for this request; 0 new knowledge items were retained.`:'No new knowledge was acquired or retained during this request.')
 
-  if(!origin?.from_cache&&provenance?.local_reasoning?.confidence!=null)lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(provenance.local_reasoning.threshold??0).toFixed(2)}.`)
+  if(!origin?.from_cache&&provenance?.local_reasoning?.confidence!=null){
+    const backupMode=provenance?.continuity_mode==='backup_read_only'
+    const threshold=provenance.local_reasoning.threshold
+    if(backupMode){
+      // A backup answer carries a fixed default, and its threshold is null — rendering that as
+      // "threshold 0.00" invented a gate that was never evaluated.
+      lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — fixed backup default; no confidence gate was evaluated for this answer.`)
+    }else{
+      lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(threshold??0).toFixed(2)}.`)
+    }
+  }
   return lines.join('\n')
 }
 

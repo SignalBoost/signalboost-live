@@ -28,3 +28,15 @@ export function responseLineageStrength(provenance:any):number{
   if(provenance.answer_origin?.model||provenance.external_ai?.model||provenance.local_reasoning?.model)score+=1
   return score
 }
+
+/** Never persist a source label that contradicts its own execution telemetry. */
+export function recordedSourceForProvenance(requestedSource:string|undefined|null,provenance:any):string|null{
+  const source=String(requestedSource??'').trim()
+  if(source==='external_fallback'&&!provenance?.external_ai?.invoked){
+    if(provenance?.answer_origin?.from_cache)return'cos-semantic-cache'
+    if(provenance?.deterministic_utility?.used||provenance?.authoritative_source?.used)return'cos-deterministic'
+    if(provenance?.local_reasoning?.invoked)return'cos-local-retry'
+    return'cos-response-lineage-unknown'
+  }
+  return source||null
+}

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const RUNTIME = readFileSync(new URL('../lib/cos-backup/runtime.ts', import.meta.url), 'utf8')
+const BRAIN = readFileSync(new URL('../../cos-core/brain.md', import.meta.url), 'utf8')
 
 test('backup mode retains reasoning-honesty safeguards', () => {
   assert.match(RUNTIME, /const BACKUP_REASONING_RULES = \[/)
@@ -19,6 +20,12 @@ test('backup distinguishes request facts, legal uncertainty, and its own reading
   assert.match(RUNTIME, /recommend qualified review/)
   assert.match(RUNTIME, /Do not state a specific calendar date, deadline or quarter that was not given/)
   assert.match(RUNTIME, /rewrite it to match what you actually concluded/)
+})
+
+test('backup brain requires complete requested artifacts instead of preambles', () => {
+  assert.match(BRAIN, /provide the complete requested artifact with every named section/i)
+  assert.match(BRAIN, /An introduction, disclaimer, or summary alone is not completion/i)
+  assert.match(BRAIN, /Never promise that material appears "below" unless that material actually follows/i)
 })
 
 test('backup retains read-only operational boundaries', () => {

@@ -12,6 +12,12 @@ const MUTABLE_GENERALIZATION = /\b(?:most|many|major|leading|industry|regulatory
 const PRACTICE_ASSERTION = /\b(?:generally|typically|usually|commonly|widely|mostly)\s+(?:prioriti[sz]e|require|follow|use|adopt|prohibit|allow|prefer|treat|consider)\b/i
 const PREVAILING_ASSERTION = /\b(?:prevailing|dominant|standard|industry[- ]wide)\s+(?:approach|practice|view|policy|rule|standard)\b/i
 
+// Explicit uncertainty about legal applicability is not itself a mutable current-world claim.
+// Example: "I cannot confirm a notification deadline without the affected jurisdictions." That is
+// an epistemic boundary, not an assertion that a particular law currently applies.
+const CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT = /\b(?:cannot|can't|could\s+not|unable\s+to)\s+(?:confirm|determine|establish|verify)\b|\b(?:depends?\s+on|depending\s+on)\b|\b(?:if|where)\s+(?:legally\s+)?(?:required|applicable)\b|\b(?:legal|privacy|compliance)(?:\/(?:privacy|compliance))*\s+(?:assessment|review|determination|decision)\b|\b(?:determine|assess|confirm)\s+(?:the\s+)?(?:applicable|governing)\s+(?:law|regulation|obligations?|requirements?|jurisdiction)\b/i
+const DIRECT_LEGAL_MANDATE = /\b(?:gdpr|ccpa|cpra|law|regulation|regulations|statute|jurisdiction)\b[^.!?]{0,90}\b(?:requires?|mandates?|prohibits?|imposes?|sets?)\b|\b(?:requires?|mandates?)\b[^.!?]{0,90}\b(?:customer\s+notification|notification\s+deadline|within\s+\d+\s+hours?)\b/i
+
 export type AnswerFreshnessSignal = {
   code: 'explicit_current_marker' | 'mutable_institutional_claim' | 'mutable_generalization' | 'practice_assertion' | 'prevailing_assertion'
   excerpt: string
@@ -25,20 +31,39 @@ function excerpt(text: string): string {
   return compact(text).slice(0, 220)
 }
 
-export function answerFreshnessSignals(answer: string): AnswerFreshnessSignal[] {
-  const text = compact(answer)
+function sentencesOf(answer: string): string[] {
+  const text = String(answer || '').trim()
   if (!text) return []
+  return text
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .map(sentence => compact(sentence))
+    .filter(Boolean)
+}
+
+function isPureLegalUncertainty(sentence: string): boolean {
+  return CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT.test(sentence)
+    && !EXPLICIT_CURRENT_MARKER.test(sentence)
+    && !DIRECT_LEGAL_MANDATE.test(sentence)
+}
+
+function signalsForSentence(sentence: string): AnswerFreshnessSignal[] {
+  if (!sentence || isPureLegalUncertainty(sentence)) return []
+
   const out: AnswerFreshnessSignal[] = []
-  if (EXPLICIT_CURRENT_MARKER.test(text) && MUTABLE_INSTITUTIONAL_TOPIC.test(text)) {
-    out.push({ code: 'explicit_current_marker', excerpt: excerpt(text) })
+  if (EXPLICIT_CURRENT_MARKER.test(sentence) && MUTABLE_INSTITUTIONAL_TOPIC.test(sentence)) {
+    out.push({ code: 'explicit_current_marker', excerpt: excerpt(sentence) })
   }
-  if (MUTABLE_INSTITUTIONAL_TOPIC.test(text) && /\b(?:prioriti[sz]e|require|follow|use|adopt|prohibit|allow|prefer|govern|regulat|approach|practice)\w*\b/i.test(text)) {
-    out.push({ code: 'mutable_institutional_claim', excerpt: excerpt(text) })
+  if (MUTABLE_INSTITUTIONAL_TOPIC.test(sentence) && /\b(?:prioriti[sz]e|require|follow|use|adopt|prohibit|allow|prefer|govern|regulat|approach|practice)\w*\b/i.test(sentence)) {
+    out.push({ code: 'mutable_institutional_claim', excerpt: excerpt(sentence) })
   }
-  if (MUTABLE_GENERALIZATION.test(text)) out.push({ code: 'mutable_generalization', excerpt: excerpt(text) })
-  if (PRACTICE_ASSERTION.test(text)) out.push({ code: 'practice_assertion', excerpt: excerpt(text) })
-  if (PREVAILING_ASSERTION.test(text)) out.push({ code: 'prevailing_assertion', excerpt: excerpt(text) })
+  if (MUTABLE_GENERALIZATION.test(sentence)) out.push({ code: 'mutable_generalization', excerpt: excerpt(sentence) })
+  if (PRACTICE_ASSERTION.test(sentence)) out.push({ code: 'practice_assertion', excerpt: excerpt(sentence) })
+  if (PREVAILING_ASSERTION.test(sentence)) out.push({ code: 'prevailing_assertion', excerpt: excerpt(sentence) })
   return out
+}
+
+export function answerFreshnessSignals(answer: string): AnswerFreshnessSignal[] {
+  return sentencesOf(answer).flatMap(signalsForSentence)
 }
 
 export function answerNeedsFreshnessReflection(answer: string): boolean {

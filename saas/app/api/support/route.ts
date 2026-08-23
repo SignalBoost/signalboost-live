@@ -16,9 +16,9 @@ import {
 } from '@/lib/ai/cos/supportTurnProvenance'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 import { withRunpodWakePermission } from '@/lib/ai/local-inference'
-import { POST as legacyPOST } from './routeCoreLegacy'
+import { POST as legacyPOST } from './routeCoreLegacy.ts'
 
-export { guardConfabulatedAction } from './routeCoreLegacy'
+export { guardConfabulatedAction } from './routeCoreLegacy.ts'
 export const maxDuration = 300
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }

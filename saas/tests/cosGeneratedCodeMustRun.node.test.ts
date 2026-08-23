@@ -28,3 +28,15 @@ test('the directive applies to intentionally generic code too, not just well-def
   // (the exact situation the incident happened in — an undefined "Nova").
   assert.match(ANSWER_PATH, /whether the entity being coded is well-defined or ambiguous/)
 })
+
+test('a low-stakes underspecified task shape must be produced with a stated default, not blocked on a question', () => {
+  // Incident (2026-08-23): "Generate a script and then explain the reasoning behind each line" —
+  // no language, no purpose, nothing destructive or high-stakes about a wrong guess — was met
+  // with a request for clarification instead of a labeled default. Distinguished from genuinely
+  // high-stakes ambiguity (production systems, real money, real personal data, irreversible
+  // actions), which still warrants asking first.
+  assert.match(ANSWER_PATH, /AN UNSPECIFIED TASK SHAPE IS NOT A REASON TO ASK BEFORE PRODUCING/)
+  assert.match(ANSWER_PATH, /pick the most reasonable default yourself, STATE the assumption/)
+  assert.match(ANSWER_PATH, /which production system to modify, real financial figures, real personal data/)
+  assert.match(ANSWER_PATH, /do not ask which language first/)
+})

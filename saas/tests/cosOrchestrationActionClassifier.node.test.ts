@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { requestsExternalAction } from '../lib/ai/cos/cosOrchestrationEnterprise.ts'
+import { isProvenanceIntrospection, requestsExternalAction } from '../lib/ai/cos/cosOrchestrationEnterprise.ts'
 
 test('a diagnostic question with a verb immediately followed by a wh-word is not an action', () => {
   assert.equal(requestsExternalAction('check why the table is slow'), false)
@@ -40,4 +40,10 @@ test('plain diagnostic prose with no execution verb at all is unaffected either 
 
 test('provenance introspection still short-circuits before the action check, unchanged', () => {
   assert.equal(requestsExternalAction('which model generated that previous answer'), false)
+})
+
+test('plain-language source follow-ups are provenance introspection, not fresh factual lookups', () => {
+  assert.equal(isProvenanceIntrospection('Show me where from you got the answer for the question?'), true)
+  assert.equal(isProvenanceIntrospection('Where did you get that answer from?'), true)
+  assert.equal(isProvenanceIntrospection('What sources did you use for your previous response?'), true)
 })

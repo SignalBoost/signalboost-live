@@ -4251,5 +4251,26 @@
     "cancelCorrection": "Cancelar",
     "feedbackSaved": "Comentarios guardados para el aprendizaje de COS.",
     "feedbackError": "No se pudieron guardar los comentarios."
+  },
+  "homepage": {
+    "concierge": {
+      "eyebrow": "TU CONCIERGE DE SIGNALBOOST",
+      "greeting": "Hola — soy COS.",
+      "headline": "¿Qué te gustaría lograr hoy?",
+      "subhead": "Haz una pregunta, describe un objetivo o dime adónde quieres ir. Te ayudaré a encontrar el espacio de SignalBoost adecuado y, cuando sea posible, daré una respuesta basada en evidencia.",
+      "placeholder": "Pregúntale cualquier cosa a COS…",
+      "suggested": "Preguntas sugeridas",
+      "cosLabel": "COS",
+      "send": "Preguntar a COS",
+      "thinking": "COS está pensando…",
+      "continue": "Continuar la conversación",
+      "workspace": "Explorar la plataforma",
+      "trust": "COS usa razonamiento gobernado, respeta los límites de aprobación y no presenta información incierta como un hecho.",
+      "error": "No pude conectar con COS ahora. Puedes continuar en el espacio de Concierge.",
+      "grow": "Ayúdame a crecer mi negocio",
+      "review": "Revisa mi sitio web",
+      "campaign": "Planifica una campaña",
+      "show": "Muéstrame qué puede hacer SignalBoost"
+    }
   }
 }

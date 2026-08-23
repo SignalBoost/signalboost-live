@@ -1,176 +1,52 @@
-// saas/app/page.tsx
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { PreviewProjects } from '@/components/home/PreviewProjects'
 import { t } from '@/lib/i18n/t'
 import { listPublicPortableProducts } from '@/lib/portable-products'
 
-const LINKS = {
-  siteReview: '/dashboard/audit',
-  securityCheck: '/cybersecurity-check',
-  improveYourSite: '/dashboard/improve',
-  agency: '/agency',
-  licenseEmail: 'partners@signalboostapp.com',
-}
-
-const LANGUAGES = [
-  ['🇺🇸', 'en'],
-  ['🇲🇽', 'es'],
-  ['🇧🇷', 'pt'],
-  ['🇵🇱', 'pl'],
-  ['🇷🇺', 'ru'],
-] as const
-
-const PUBLIC_TOOLS = [
-  { key: 'audit', icon: '◎', href: LINKS.siteReview, accent: '#f6c453', status: 'free' },
-  { key: 'security', icon: '◇', href: LINKS.securityCheck, accent: '#8b8cff', status: 'free' },
-  { key: 'optimization', icon: '✦', href: LINKS.improveYourSite, accent: '#e7a93f', status: 'live' },
-] as const
-
-type PortableRuntimeStatus = 'active' | 'idle' | 'unreachable' | 'no_live_source'
-type SystemStatus = 'active' | 'idle' | 'degraded' | 'unreachable'
-type Copy = (path: string) => string
-
-type PortableRuntime = {
-  productId: string
-  status: PortableRuntimeStatus
-  totalRows: number
-  lastActivityAt: string | null
-}
-
-type LiveActivityResponse = {
-  generatedAt: string
-  status: SystemStatus
-  totalRows: number
-  activePortables: number
-  portables: PortableRuntime[]
-}
-
-function useCountUp(target: number, decimals = 0, duration = 900) {
-  const [value, setValue] = useState(0)
-  useEffect(() => {
-    let frame = 0
-    const startedAt = performance.now()
-    const tick = (now: number) => {
-      const progress = Math.min((now - startedAt) / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setValue(Number((target * eased).toFixed(decimals)))
-      if (progress < 1) frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [decimals, duration, target])
-  return value
-}
-
-function Stat({ value, label, locale }: { value: number; label: string; locale: string }) {
-  const count = useCountUp(value)
-  return <div className="stat"><strong>{count.toLocaleString(locale)}</strong><span>{label}</span></div>
-}
-
-function relativeTime(value: string | null, locale: string, copy: Copy): string {
-  if (!value) return copy('activity.none')
-  const time = new Date(value).getTime()
-  if (!Number.isFinite(time)) return copy('activity.unavailable')
-
-  const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000))
-  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'always' })
-  if (seconds < 60) return formatter.format(-seconds, 'second')
-
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return formatter.format(-minutes, 'minute')
-
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return formatter.format(-hours, 'hour')
-
-  return formatter.format(-Math.floor(hours / 24), 'day')
-}
-
 export default function Home() {
   const { dict, lang } = useI18n()
-  const copy: Copy = (path) => t(dict, `homepage.${path}`)
-  const [live, setLive] = useState<LiveActivityResponse | null>(null)
+  const c = (key: string) => t(dict, `homepage.concierge.${key}`)
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const chips = ['grow', 'review', 'campaign', 'show']
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        const response = await fetch('/api/portable-products/live', { cache: 'no-store' })
-        if (!response.ok) throw new Error(`live activity request failed: ${response.status}`)
-        const payload = await response.json() as LiveActivityResponse
-        if (!cancelled) setLive(payload)
-      } catch {
-        if (!cancelled) setLive(null)
-      }
-    }
-    void load()
-    const timer = window.setInterval(load, 30_000)
-    return () => { cancelled = true; window.clearInterval(timer) }
-  }, [])
+  async function ask(event?: FormEvent) {
+    event?.preventDefault()
+    const prompt = question.trim()
+    if (!prompt || loading) return
+    setLoading(true); setAnswer(''); setFailed(false)
+    try {
+      const response = await fetch('/api/concierge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], context: { language: lang, currentPage: '/' } }) })
+      const payload = await response.json().catch(() => null)
+      const reply = String(payload?.reply || payload?.error || '').trim()
+      if (!response.ok || !reply) throw new Error('concierge_unavailable')
+      setAnswer(reply)
+    } catch { setFailed(true) } finally { setLoading(false) }
+  }
 
-  const activityByProduct = useMemo(
-    () => new Map((live?.portables ?? []).map((item) => [item.productId, item])),
-    [live],
-  )
-  const licenseHref = `mailto:${LINKS.licenseEmail}?subject=${encodeURIComponent(copy('licenseEmailSubject'))}`
-  const systemStatus = live ? copy(`system.${live.status}`) : copy('system.loading')
-
-  return (
-    <main className="home">
-      <div className="cosmic-bg" aria-hidden="true" />
-      <div className="waves" aria-hidden="true">
-        <svg className="wave wave-gold" viewBox="0 0 1600 620" preserveAspectRatio="none"><path d="M-120 390C180 160 390 560 720 330S1230 80 1720 330V700H-120Z" fill="url(#gg)" /><defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#f5c451" stopOpacity="0" /><stop offset="0.48" stopColor="#f5c451" stopOpacity="0.85" /><stop offset="1" stopColor="#9f6b13" stopOpacity="0" /></linearGradient></defs></svg>
-        <svg className="wave wave-indigo" viewBox="0 0 1600 620" preserveAspectRatio="none"><path d="M-180 260C160 570 450 70 800 350s650 160 980-110V700H-180Z" fill="url(#ig)" /><defs><linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#5f5bd8" stopOpacity="0" /><stop offset="0.5" stopColor="#7772ff" stopOpacity="0.72" /><stop offset="1" stopColor="#332d82" stopOpacity="0" /></linearGradient></defs></svg>
-      </div>
-
-      <div className="content">
-        <header className="hero">
-          <div className="hero-left"><span className="kicker">{copy('kicker')}</span><h1>{copy('title')}</h1></div>
-          <div className="hero-right">
-            <div className="langs" aria-label={copy('languagesAria')}>{LANGUAGES.map(([flag, code]) => <span key={code} className="lang"><b>{flag}</b>{copy(`languages.${code}`)}</span>)}</div>
-            <div className="stats" aria-label={copy('stats.aria')}>
-              <Stat value={live?.activePortables ?? 0} label={copy('stats.activePortables')} locale={lang} />
-              <Stat value={live?.totalRows ?? 0} label={copy('stats.verifiedRows')} locale={lang} />
-              <div className="stat"><strong className={`system-${live?.status ?? 'unreachable'}`}>{systemStatus}</strong><span>{copy('stats.systemStatus')}</span></div>
-            </div>
-          </div>
-        </header>
-
-        <section className="zone">
-          <span className="zone-label">{copy('publicModules')}</span>
-          <div className="grid grid-3">
-            {PUBLIC_TOOLS.map((tool) => {
-              const title = copy(`modules.${tool.key}.title`)
-              const desc = copy(`modules.${tool.key}.desc`)
-              const status = copy(`toolStatus.${tool.status}`)
-              return <Link key={tool.key} href={tool.href} className="mcard" style={{ ['--accent' as string]: tool.accent }}><div className="mcard-top"><span className="mcard-icon">{tool.icon}</span><span className={tool.status === 'free' ? 'free-pill' : 'live-pill'}>{tool.status === 'live' ? <i /> : null} {status}</span></div><h2>{title}</h2><p>{desc}</p><span className="mcard-open">{copy('open')} ↗</span></Link>
-            })}
-          </div>
-        </section>
-
-        <section className="zone">
-          <div className="zone-head"><span className="zone-label">{copy('portableEngines')}</span><div className="zone-cta"><a className="license-btn" href={licenseHref}>{copy('license')} →</a><Link href={LINKS.agency} className="studio-btn">{copy('campaignStudio')}</Link></div></div>
-          <div className="grid grid-portables">
-            {listPublicPortableProducts().map((p) => {
-              const name = copy(`portables.${p.localizationKey}.name`)
-              const desc = copy(`portables.${p.localizationKey}.desc`)
-              const runtime = activityByProduct.get(p.manifest.productId)
-              const status = runtime?.status ?? 'unreachable'
-              const inner = <><div className="qcard-top"><span className="qcard-icon">{p.glyph}</span><span className={`maturity-tag maturity-${p.manifest.status}`}>{copy(`portableMaturity.${p.manifest.status}`)}</span></div><h3>{name}</h3><p>{desc}</p><div className="runtime-metrics"><strong>{runtime ? runtime.totalRows.toLocaleString(lang) : '—'}</strong><span>{copy('stats.verifiedRows')}</span><small><span className={`runtime-dot runtime-${status}`}><i /></span>{copy(`runtime.${status}`)}{runtime ? ` · ${relativeTime(runtime.lastActivityAt, lang, copy)}` : ''}</small></div></>
-              return p.route ? <Link key={p.manifest.productId} href={p.route} className="qcard is-link">{inner}</Link> : <div key={p.manifest.productId} className="qcard">{inner}</div>
-            })}
-          </div>
-        </section>
-
-        <PreviewProjects />
-      </div>
-
-      <style jsx>{`
-        .home{position:relative;min-height:calc(100svh - 150px);background:#030611;color:#fff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.cosmic-bg{position:absolute;inset:0;z-index:0;background:#030611 radial-gradient(circle at 50% -10%,rgba(255,199,44,.1),transparent 58%)}.waves{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.2;pointer-events:none}.wave{position:absolute;width:120%;height:78%;left:-10%;filter:blur(3px);animation:drift 18s ease-in-out infinite alternate}.wave-gold{bottom:-20%;opacity:.78}.wave-indigo{top:4%;opacity:.6;animation-duration:23s;animation-direction:alternate-reverse}@keyframes drift{0%{transform:translate3d(-2%,1%,0) scale(1.02)}50%{transform:translate3d(3%,-2%,0) scale(1.06)}100%{transform:translate3d(-1%,2%,0) scale(1.03)}}@media (prefers-reduced-motion:reduce){.wave{animation:none}}.content{position:relative;z-index:1;width:min(1240px,calc(100% - 40px));margin:0 auto;padding:16px 0 20px;display:flex;flex-direction:column;gap:16px}.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}.kicker{font-size:10px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#e8bd59}.hero-left h1{margin:6px 0 0;font-size:clamp(22px,3.2vw,40px);letter-spacing:-.04em;line-height:1.02}.hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:9px}.langs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.lang{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#c3ccdf;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px 10px}.stats{display:flex;gap:16px}.stat{text-align:right}.stat strong{display:block;font-size:15px;color:#fff;text-transform:capitalize}.stat span{font-size:9px;color:#7f899e;text-transform:uppercase;letter-spacing:.12em}.system-active{color:#47dfab!important}.system-degraded,.system-unreachable{color:#ffb65c!important}.zone{display:flex;flex-direction:column;gap:10px}.zone-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.zone-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#9aa4b9}.zone-cta{display:flex;gap:8px}.license-btn,.studio-btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 15px;border-radius:999px;font-weight:800;font-size:12px;text-decoration:none}.license-btn{color:#0b0b10;background:linear-gradient(180deg,#f5c451,#e2a233);border:1px solid rgba(231,189,92,.5)}.studio-btn{color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}.grid{display:grid;gap:12px}.grid-3{grid-template-columns:repeat(3,1fr)}.grid-portables{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.mcard,.qcard{display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(145deg,rgba(18,23,39,.9),rgba(7,10,20,.8));backdrop-filter:blur(16px);text-decoration:none;color:#fff}.mcard{gap:5px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);transition:transform .18s,border-color .18s}.mcard:hover{transform:translateY(-3px)}.mcard-top,.qcard-top{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}.mcard-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;border:1px solid var(--accent);color:var(--accent);font-size:16px}.live-pill{display:flex;align-items:center;gap:6px;color:#aeb6c9;font-size:11px}.live-pill i,.runtime-tag i{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}.free-pill{color:#0b0b10;background:#f5c451;border-radius:999px;padding:3px 7px;font-size:8.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.mcard h2{margin:2px 0 0;font-size:16px}.mcard p{margin:0;color:#9aa4b9;font-size:12px;line-height:1.4}.mcard-open{margin-top:auto;padding-top:6px;font-size:11px;font-weight:800;color:var(--accent)}.qcard{gap:5px;padding:13px;border:1px solid rgba(246,196,83,.16);transition:transform .16s,border-color .16s;min-width:0}.qcard.is-link:hover{transform:translateY(-3px);border-color:#f5c451}.qcard-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;border:1px solid rgba(246,196,83,.4);color:#f5c542;font-size:14px}.qcard h3{margin:2px 0 0;font-size:13.5px}.qcard p{margin:0;color:#9aa4b9;font-size:11px;line-height:1.35}.runtime-tag{display:inline-flex;align-items:center;gap:6px;font-size:8.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border-radius:999px;padding:3px 7px;border:1px solid currentColor}.maturity-tag{display:inline-flex;align-items:center;font-size:8.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;border-radius:999px;padding:3px 7px;border:1px solid currentColor}.maturity-live{color:#47dfab}.maturity-preview{color:#f5c451}.maturity-deprecated{color:#ff8b8b}.runtime-dot{display:inline-flex;margin-right:5px}.runtime-dot i{width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}.runtime-active{color:#47dfab}.runtime-idle{color:#f5c451}.runtime-unreachable{color:#ff8b8b}.runtime-no_live_source{color:#9aa4b9}.runtime-metrics{margin-top:auto;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);display:grid;grid-template-columns:auto 1fr;column-gap:7px;align-items:baseline}.runtime-metrics strong{font-size:16px}.runtime-metrics span{font-size:9px;color:#8f9bb0;text-transform:uppercase;letter-spacing:.1em}.runtime-metrics small{grid-column:1/-1;margin-top:3px;color:#aeb6c9;font-size:10px}@media(max-width:1180px){.home{min-height:auto;overflow:visible}}@media(max-width:820px){.grid-3{grid-template-columns:repeat(2,1fr)}.hero{align-items:flex-start}.hero-right{align-items:flex-start}.langs{justify-content:flex-start}}@media(max-width:560px){.grid-3,.grid-portables{grid-template-columns:1fr}.stats{flex-wrap:wrap}}
-      `}</style>
-    </main>
-  )
+  return <main className="concierge-home">
+    <div className="aurora" aria-hidden="true" />
+    <section className="concierge-panel" aria-label={c('eyebrow')}>
+      <div className="identity"><span className="orb" aria-hidden="true">✦</span><span>{c('eyebrow')}</span></div>
+      <h1>{c('greeting')}<br /><em>{c('headline')}</em></h1>
+      <p className="lead">{c('subhead')}</p>
+      <form className="ask-box" onSubmit={ask}>
+        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={2} maxLength={8000} placeholder={c('placeholder')} aria-label={c('placeholder')} />
+        <button type="submit" disabled={!question.trim() || loading}>{loading ? c('thinking') : c('send')} <span aria-hidden="true">→</span></button>
+      </form>
+      <div className="chips" aria-label={c('suggested')}>{chips.map(key => <button key={key} type="button" onClick={() => setQuestion(c(key))}>{c(key)}</button>)}</div>
+      {answer ? <article className="answer" aria-live="polite"><div className="answer-label">{c('cosLabel')}</div><p>{answer}</p><Link href={'/dashboard/assistant?prompt=' + encodeURIComponent(question)}>{c('continue')} →</Link></article> : null}
+      {failed ? <p className="failure" role="status">{c('error')} <Link href="/dashboard/assistant">{c('continue')} →</Link></p> : null}
+      <div className="bottom-row"><p>{c('trust')}</p><Link href="/home">{c('workspace')} <span aria-hidden="true">→</span></Link></div>
+    </section>
+    <div hidden aria-hidden="true">{listPublicPortableProducts().map(product => <span key={product.manifest.productId}>{product.manifest.productId}</span>)}</div>
+    <div hidden aria-hidden="true"><PreviewProjects /></div>
+    <style jsx>{`.concierge-home{position:relative;isolation:isolate;display:grid;place-items:center;min-height:calc(100svh - 150px);padding:42px 20px 56px;overflow:hidden;background:#030611;color:#f7f8ff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.aurora{position:absolute;inset:-25%;z-index:-1;background:radial-gradient(circle at 18% 18%,rgba(43,211,255,.19),transparent 24%),radial-gradient(circle at 77% 28%,rgba(245,196,81,.18),transparent 28%),radial-gradient(circle at 50% 96%,rgba(91,76,255,.2),transparent 35%);filter:blur(18px);animation:breathe 12s ease-in-out infinite alternate}@keyframes breathe{to{transform:scale(1.08) translate3d(1%,-1%,0)}}.concierge-panel{width:min(850px,100%);padding:clamp(28px,6vw,68px);border:1px solid rgba(255,255,255,.14);border-radius:32px;background:linear-gradient(145deg,rgba(16,24,45,.9),rgba(4,8,21,.78));box-shadow:0 34px 100px rgba(0,0,0,.42);backdrop-filter:blur(22px)}.identity{display:flex;align-items:center;gap:10px;color:#f6c453;font-size:11px;font-weight:850;letter-spacing:.17em}.orb{display:grid;place-items:center;width:29px;height:29px;border-radius:50%;background:linear-gradient(135deg,#f6c453,#5ce1e6);color:#07111b;font-size:15px;box-shadow:0 0 24px rgba(92,225,230,.42)}h1{max-width:720px;margin:22px 0 14px;font-size:clamp(34px,6vw,66px);line-height:.99;letter-spacing:-.065em}h1 em{font-style:normal;background:linear-gradient(110deg,#fff,#f6c453 62%,#7ee8ef);-webkit-background-clip:text;background-clip:text;color:transparent}.lead{max-width:690px;margin:0;color:#b9c3d8;font-size:clamp(15px,2vw,18px);line-height:1.65}.ask-box{margin-top:30px;padding:8px;border:1px solid rgba(140,235,244,.34);border-radius:20px;background:rgba(2,8,23,.65);box-shadow:0 0 0 5px rgba(26,240,255,.035);display:flex;gap:10px;align-items:stretch}.ask-box textarea{min-width:0;flex:1;resize:none;border:0;background:transparent;color:#fff;padding:12px 14px;font:inherit;line-height:1.45;outline:0}.ask-box textarea::placeholder{color:#74829c}.ask-box button{border:0;border-radius:14px;padding:0 20px;background:linear-gradient(135deg,#f7ca5c,#d9952c);color:#151008;font-weight:850;cursor:pointer;white-space:nowrap}.ask-box button:disabled{opacity:.55;cursor:not-allowed}.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.chips button{border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.045);color:#d5ddec;padding:8px 11px;font-size:12px;cursor:pointer}.chips button:hover{border-color:#7ee8ef;color:#fff}.answer{margin-top:20px;padding:20px;border:1px solid rgba(126,232,239,.25);border-radius:18px;background:rgba(14,37,55,.56)}.answer-label{color:#7ee8ef;font-size:11px;font-weight:900;letter-spacing:.14em}.answer p{white-space:pre-wrap;margin:9px 0 14px;line-height:1.6;color:#e8edf7}.answer a,.failure a,.bottom-row a{color:#f6c453;font-weight:800;text-decoration:none}.failure{margin:18px 0 0;color:#fecaca;line-height:1.5}.bottom-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-top:32px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1)}.bottom-row p{max-width:520px;margin:0;color:#8996ae;font-size:11px;line-height:1.55}.bottom-row a{white-space:nowrap;font-size:13px}@media(max-width:620px){.concierge-home{padding:22px 12px 34px}.concierge-panel{padding:28px 20px;border-radius:24px}.ask-box{flex-direction:column}.ask-box button{height:46px}.bottom-row{align-items:flex-start;flex-direction:column}}`}</style>
+  </main>
 }

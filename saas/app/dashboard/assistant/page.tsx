@@ -167,6 +167,10 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
+  useEffect(() => {
+    const prompt = new URLSearchParams(window.location.search).get('prompt')?.trim()
+    if (prompt) setInput(prompt.slice(0, 8000))
+  }, [])
   const [loading, setLoading] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>('')

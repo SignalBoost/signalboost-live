@@ -4257,20 +4257,20 @@
       "eyebrow": "TWÓJ CONCIERGE SIGNALBOOST",
       "greeting": "Cześć — jestem COS.",
       "headline": "Co chcesz dziś osiągnąć?",
-      "subhead": "Zadaj pytanie, opisz cel albo powiedz, dokąd chcesz przejść. Pomogę Ci znaleźć właściwy obszar SignalBoost i udzielę odpowiedzi opartej na dowodach, gdy będzie dostępna.",
-      "workspace": "Poznaj platformę",
+      "subhead": "Zadaj pytanie, opisz cel lub powiedz, dokąd chcesz przejść. Pomogę znaleźć właściwy obszar SignalBoost i, gdy to możliwe, podam odpowiedź opartą na dowodach.",
       "placeholder": "Zapytaj COS o cokolwiek…",
-      "thinking": "Myślę…",
+      "suggested": "Sugerowane pytania",
+      "cosLabel": "COS",
       "send": "Zapytaj COS",
-      "suggested": "Proponowane pytania",
+      "thinking": "COS myśli…",
+      "continue": "Kontynuuj rozmowę",
+      "workspace": "Odkryj platformę",
+      "trust": "COS stosuje kontrolowane wnioskowanie, respektuje granice zatwierdzania i nie przedstawia niepewnych informacji jako faktów.",
+      "error": "Nie udało się teraz połączyć z COS. Możesz kontynuować w obszarze Concierge.",
       "grow": "Pomóż mi rozwinąć firmę",
-      "review": "Przeanalizuj moją stronę",
+      "review": "Oceń moją stronę",
       "campaign": "Zaplanuj kampanię",
-      "show": "Pokaż, co potrafi SignalBoost",
-      "cosLabel": "Odpowiedź COS",
-      "continue": "Kontynuuj z COS",
-      "error": "COS jest tymczasowo niedostępny. Spróbuj ponownie lub przejdź do pełnego asystenta.",
-      "trust": "COS korzysta z zarządzanego wnioskowania, respektuje granice zatwierdzania i nie przedstawia niepewnych informacji jako faktów."
+      "show": "Pokaż, co potrafi SignalBoost"
     }
   }
 }

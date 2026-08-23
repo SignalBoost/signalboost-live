@@ -28,7 +28,7 @@ test('regulated cyber incident scenario gets a framework-level current-law guard
   assert.ok(directive)
   assert.match(directive, /parallel recovery and compliance/i)
   assert.match(directive, /Do not assert a current statutory deadline/i)
-  assert.match(directive, /requires jurisdiction-specific verification/i)
+  assert.match(directive, /require(?:s)? jurisdiction-specific verification/i)
   assert.match(directive, /Do not collapse the whole answer to a refusal/i)
   assert.match(scriptRequestDirective(regulatedIncidentPrompt) || '', /REGULATED INCIDENT MODE/)
 })

@@ -154,7 +154,9 @@ test('bounded research partials cannot authorize or claim external action', () =
 
 test('unqualified script authoring is content, while explicit computational scripts remain code', () => {
   const exact = "Produce a script for ‘Nova’ without assuming whether it’s a person, product, or company."
+  const generated = 'Generate a script and then explain the reasoning behind each line.'
   assert.equal(classifyScriptRequest(exact), 'content')
+  assert.equal(classifyScriptRequest(generated), 'content')
   assert.equal(classifyScriptRequest('Write a video script for Nova without inventing what Nova is.'), 'content')
   assert.equal(classifyScriptRequest('Draft a script about Nova.'), 'content')
   assert.equal(classifyScriptRequest('Write a Python script to parse JSON files.'), 'code')
@@ -166,6 +168,11 @@ test('unqualified script authoring is content, while explicit computational scri
   assert.ok(directive)
   assert.match(directive, /WRITTEN\/NARRATIVE CONTENT, NOT SOURCE CODE/)
   assert.match(directive, /type-neutral wording/)
+
+  const generatedDirective = scriptRequestDirective(generated)
+  assert.ok(generatedDirective)
+  assert.match(generatedDirective, /concise purpose or design rationale/)
+  assert.match(generatedDirective, /Do not expose private chain-of-thought/)
 })
 
 test('the exact Nova production failure is rejected and repaired as narrative content', () => {
@@ -185,6 +192,26 @@ test('the exact Nova production failure is rejected and repaired as narrative co
   assert.match(repair, /requested meaning of "script"/)
   assert.match(repair, /ambiguity is a constraint on wording/i)
   assert.match(repair, /Do not provide a programming template/)
+  assert.equal(contentScriptSemanticMismatch(prompt, good), false)
+  assert.equal(preferRepairedDraft(prompt, bad, good), true)
+})
+
+test('generate-a-script programming redirect is rejected and repaired as narrative content', () => {
+  const prompt = 'Generate a script and then explain the reasoning behind each line.'
+  const bad = JSON.stringify({
+    answer: 'I need to know the specific programming language, intended functionality, and context before I can generate the script.',
+    confidence: 0.78,
+  })
+  const good = JSON.stringify({
+    answer: 'SCRIPT\\nLine one sets the scene.\\nLine two introduces the central idea.\\n\\nLINE-BY-LINE RATIONALE\\n1. Sets context.\\n2. Advances the idea.',
+    confidence: 0.8,
+  })
+
+  assert.equal(contentScriptSemanticMismatch(prompt, bad), true)
+  assert.equal(reasonerDraftNeedsRepair(prompt, bad), true)
+  const repair = buildDiagnosticRepairPrompt(prompt, bad)
+  assert.match(repair, /WRITTEN\/NARRATIVE CONTENT, NOT SOURCE CODE/)
+  assert.match(repair, /concise purpose or design rationale/)
   assert.equal(contentScriptSemanticMismatch(prompt, good), false)
   assert.equal(preferRepairedDraft(prompt, bad, good), true)
 })

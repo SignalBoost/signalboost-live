@@ -25,6 +25,7 @@ export default function Home() {
   const c = (key: string) => t(dict, `homepage.concierge.${key}`)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
+  const [sentPrompt, setSentPrompt] = useState('')
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -92,6 +93,7 @@ export default function Home() {
       const reply = String(payload?.reply || payload?.error || '').trim()
       if (!response.ok || !reply) throw new Error('concierge_unavailable')
       setAnswer(reply)
+      setSentPrompt(displayContent)
       setQuestion('')
       setAttachments([])
     } catch { setFailed(true) } finally { setLoading(false) }
@@ -123,7 +125,7 @@ export default function Home() {
       </div> : <p className="drop-hint">📎 {t(dict, 'concierge.dropHint')}</p>}
       {dragOver ? <div className="drop-overlay" aria-live="polite"><strong>{t(dict, 'concierge.dropHere')}</strong><span>{t(dict, 'concierge.dropHint')}</span></div> : null}
       <div className="chips" aria-label={c('suggested')}>{chips.map(key => <button key={key} type="button" onClick={() => setQuestion(c(key))}>{c(key)}</button>)}</div>
-      {answer ? <article className="answer" aria-live="polite"><div className="answer-label">{c('cosLabel')}</div><p>{answer}</p><Link href={'/dashboard/assistant?prompt=' + encodeURIComponent(question)}>{c('continue')} →</Link></article> : null}
+      {answer ? <article className="answer" aria-live="polite"><div className="answer-label">{c('cosLabel')}</div><p>{answer}</p><Link href={'/dashboard/assistant?prompt=' + encodeURIComponent(sentPrompt)}>{c('continue')} →</Link></article> : null}
       {failed ? <p className="failure" role="status">{c('error')} <Link href="/dashboard/assistant">{c('continue')} →</Link></p> : null}
       <div className="bottom-row"><p>{c('trust')}</p><Link href="/home">{c('workspace')} <span aria-hidden="true">→</span></Link></div>
     </section>

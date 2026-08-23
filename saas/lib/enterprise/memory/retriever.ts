@@ -3,6 +3,8 @@ import {
   type EnterpriseMemoryCandidate,
   type RankedEnterpriseMemory,
 } from './retrievalRanking.ts'
+import { deriveStrategyProfile, type CampaignOutcomeRow } from '../../ai/cos/strategyProfile.ts'
+import { isStrategyProfileRequest, strategyProfileEvidenceBlock } from '../../ai/cos/strategyProfileRequest.ts'
 
 export type EnterpriseMemoryContext = {
   source: 'enterprise_memory'
@@ -213,6 +215,56 @@ export async function retrieveEnterpriseMemoryContext(args: {
   if (!organizationId) return null
   const { getAdminSupabase } = await import('../../../utils/supabase/server.ts')
   const admin = getAdminSupabase()
+
+  // Strategy-profile questions are a special live evidence read, not ordinary durable memory.
+  // The answer path already calls this retriever before cache lookup. Returning this one scoped
+  // memory makes semantic cache ineligible, while the freshly generated evidence changes the exact
+  // cache fingerprint on every request. This preserves the current COS core/cache hygiene code.
+  const strategyProfileRequested = isStrategyProfileRequest((args.taskTags || []).join(' '))
+  if (strategyProfileRequested) {
+    const generatedAt = new Date().toISOString()
+    const campaignsResult = await admin.from('enterprise_campaign_memory')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false })
+      .limit(2000)
+
+    const evidence = campaignsResult.error
+      ? [
+          'CURRENT STRATEGY PROFILE — REQUESTED BUT UNAVAILABLE.',
+          `Reason: ${campaignsResult.error.message}`,
+          'Say plainly that the live profile could not be read, and do not substitute invented weights or heuristics.',
+        ].join('\n')
+      : strategyProfileEvidenceBlock(deriveStrategyProfile(
+          (Array.isArray(campaignsResult.data) ? campaignsResult.data : []) as CampaignOutcomeRow[],
+        ))
+
+    const memories = rankEnterpriseMemoryCandidates([{
+      id: `derived-strategy-profile:${organizationId}:${generatedAt}`,
+      kind: 'intelligence',
+      workspace: args.workspace || null,
+      confidence: 1,
+      performanceScore: 1,
+      occurredAt: generatedAt,
+      taskTags: [...(args.taskTags || []), 'strategy', 'profile', 'weights', 'heuristics'],
+      payload: {
+        strategyProfileEvidence: evidence,
+        readLive: true,
+        derivedFrom: 'enterprise_campaign_memory',
+      },
+    }], {
+      workspace: args.workspace,
+      taskTags: args.taskTags,
+      limit: 1,
+    })
+
+    return memories.length ? {
+      source: 'enterprise_memory',
+      organizationId,
+      generatedAt,
+      memories,
+    } : null
+  }
 
   const [organizationResult, intelligenceResult, repositoriesResult, campaignsResult, confidenceResult] = await Promise.all([
     admin.from('enterprise_organizations').select('*').eq('id', organizationId).maybeSingle(),

@@ -787,7 +787,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       ? `COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}. ${specificityReason(specificity)}`
       : `COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`
     void recordKnowledgeGap(input.prompt, confidence, reason)
-    return { handled:false, confidence, reason, bestEffortReply:parsed.answer, provenance:{ responseSource:'external_fallback_required', ...citedProvenance } }
+    return { handled:false, confidence, reason, bestEffortReply:stripInternalEvidenceIds(parsed.answer), provenance:{ responseSource:'external_fallback_required', ...citedProvenance } }
   }
 
   const citedSkillIds = citedIndexedValues(parsed.answer, 'SK', context.skillIds)
@@ -828,7 +828,10 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   )
   recordAvoidedCost('local_reasoner', input.prompt.length, parsed.answer.length, Date.now() - startedAt)
   void resolveKnowledgeGap(input.prompt)
-  return { handled:true, reply:parsed.answer, confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
+  // The LIVE return, not only the cached copy: an earlier fix stripped `storedAnswer.reply`
+  // (what gets cached) but left this path raw, so fresh answers leaked [OEM1] while replays were
+  // clean — backwards. Both paths strip now.
+  return { handled:true, reply:stripInternalEvidenceIds(parsed.answer), confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult, language='en'):string {

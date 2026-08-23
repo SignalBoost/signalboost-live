@@ -85,6 +85,25 @@
       "live": "Live",
       "preview": "Preview",
       "deprecated": "Deprecated"
+    },
+    "concierge": {
+      "eyebrow": "YOUR SIGNALBOOST CONCIERGE",
+      "greeting": "Hello — I’m COS.",
+      "headline": "What would you like to accomplish today?",
+      "subhead": "Ask a question, describe a goal, or tell me where you want to go. I will help you find the right SignalBoost workspace and provide an evidence-grounded answer when one is available.",
+      "workspace": "Explore the platform",
+      "placeholder": "Ask COS anything…",
+      "thinking": "Thinking…",
+      "send": "Ask COS",
+      "suggested": "Suggested questions",
+      "grow": "Help me grow my business",
+      "review": "Review my website",
+      "campaign": "Plan a campaign",
+      "show": "Show me what SignalBoost can do",
+      "cosLabel": "COS response",
+      "continue": "Continue with COS",
+      "error": "COS is temporarily unavailable. Please try again or continue in the full assistant.",
+      "trust": "COS uses governed reasoning, respects approval boundaries, and does not present uncertain information as fact."
     }
   },
   "es": {
@@ -172,6 +191,25 @@
       "live": "Activo",
       "preview": "Vista previa",
       "deprecated": "Obsoleto"
+    },
+    "concierge": {
+      "eyebrow": "TU CONCIERGE SIGNALBOOST",
+      "greeting": "Hola — soy COS.",
+      "headline": "¿Qué te gustaría lograr hoy?",
+      "subhead": "Haz una pregunta, describe un objetivo o dime a dónde quieres ir. Te ayudaré a encontrar el espacio de SignalBoost adecuado y proporcionaré una respuesta basada en evidencia cuando esté disponible.",
+      "workspace": "Explorar la plataforma",
+      "placeholder": "Pregúntale cualquier cosa a COS…",
+      "thinking": "Pensando…",
+      "send": "Preguntar a COS",
+      "suggested": "Preguntas sugeridas",
+      "grow": "Ayúdame a hacer crecer mi negocio",
+      "review": "Revisa mi sitio web",
+      "campaign": "Planifica una campaña",
+      "show": "Muéstrame lo que puede hacer SignalBoost",
+      "cosLabel": "Respuesta de COS",
+      "continue": "Continuar con COS",
+      "error": "COS no está disponible temporalmente. Inténtalo de nuevo o continúa en el asistente completo.",
+      "trust": "COS utiliza razonamiento gobernado, respeta los límites de aprobación y no presenta información incierta como hechos."
     }
   },
   "pt": {
@@ -259,6 +297,25 @@
       "live": "Ativo",
       "preview": "Pré-visualização",
       "deprecated": "Descontinuado"
+    },
+    "concierge": {
+      "eyebrow": "SEU CONCIERGE SIGNALBOOST",
+      "greeting": "Olá — eu sou o COS.",
+      "headline": "O que você gostaria de realizar hoje?",
+      "subhead": "Faça uma pergunta, descreva um objetivo ou diga para onde quer ir. Vou ajudar você a encontrar o espaço certo do SignalBoost e fornecer uma resposta baseada em evidências quando houver uma disponível.",
+      "workspace": "Explorar a plataforma",
+      "placeholder": "Pergunte qualquer coisa ao COS…",
+      "thinking": "Pensando…",
+      "send": "Perguntar ao COS",
+      "suggested": "Perguntas sugeridas",
+      "grow": "Ajude-me a expandir meu negócio",
+      "review": "Analise meu site",
+      "campaign": "Planeje uma campanha",
+      "show": "Mostre o que o SignalBoost pode fazer",
+      "cosLabel": "Resposta do COS",
+      "continue": "Continuar com o COS",
+      "error": "O COS está temporariamente indisponível. Tente novamente ou continue no assistente completo.",
+      "trust": "O COS usa raciocínio governado, respeita limites de aprovação e não apresenta informações incertas como fatos."
     }
   },
   "pl": {
@@ -346,6 +403,25 @@
       "live": "Dostępne",
       "preview": "Podgląd",
       "deprecated": "Wycofane"
+    },
+    "concierge": {
+      "eyebrow": "TWÓJ CONCIERGE SIGNALBOOST",
+      "greeting": "Cześć — jestem COS.",
+      "headline": "Co chcesz dziś osiągnąć?",
+      "subhead": "Zadaj pytanie, opisz cel albo powiedz, dokąd chcesz przejść. Pomogę Ci znaleźć właściwy obszar SignalBoost i udzielę odpowiedzi opartej na dowodach, gdy będzie dostępna.",
+      "workspace": "Poznaj platformę",
+      "placeholder": "Zapytaj COS o cokolwiek…",
+      "thinking": "Myślę…",
+      "send": "Zapytaj COS",
+      "suggested": "Proponowane pytania",
+      "grow": "Pomóż mi rozwinąć firmę",
+      "review": "Przeanalizuj moją stronę",
+      "campaign": "Zaplanuj kampanię",
+      "show": "Pokaż, co potrafi SignalBoost",
+      "cosLabel": "Odpowiedź COS",
+      "continue": "Kontynuuj z COS",
+      "error": "COS jest tymczasowo niedostępny. Spróbuj ponownie lub przejdź do pełnego asystenta.",
+      "trust": "COS korzysta z zarządzanego wnioskowania, respektuje granice zatwierdzania i nie przedstawia niepewnych informacji jako faktów."
     }
   },
   "ru": {
@@ -433,6 +509,25 @@
       "live": "Доступно",
       "preview": "Предпросмотр",
       "deprecated": "Устарело"
+    },
+    "concierge": {
+      "eyebrow": "ВАШ КОНСЬЕРЖ SIGNALBOOST",
+      "greeting": "Здравствуйте — я COS.",
+      "headline": "Чего вы хотите достичь сегодня?",
+      "subhead": "Задайте вопрос, опишите цель или скажите, куда хотите перейти. Я помогу найти подходящее рабочее пространство SignalBoost и дам ответ, основанный на доказательствах, когда он доступен.",
+      "workspace": "Изучить платформу",
+      "placeholder": "Спросите COS о чём угодно…",
+      "thinking": "Думаю…",
+      "send": "Спросить COS",
+      "suggested": "Предлагаемые вопросы",
+      "grow": "Помогите развить мой бизнес",
+      "review": "Проверьте мой сайт",
+      "campaign": "Спланируйте кампанию",
+      "show": "Покажите, что умеет SignalBoost",
+      "cosLabel": "Ответ COS",
+      "continue": "Продолжить с COS",
+      "error": "COS временно недоступен. Попробуйте ещё раз или перейдите к полному помощнику.",
+      "trust": "COS использует управляемое рассуждение, соблюдает границы одобрения и не представляет неопределённую информацию как факты."
     }
   }
 }

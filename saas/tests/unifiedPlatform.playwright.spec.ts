@@ -26,4 +26,20 @@ test.describe('Unified SignalBoost public shell', () => {
     await page.keyboard.press('Enter')
     await expect(page.getByRole('main')).toContainText(/Marketplace outreach forecast/i)
   })
+  test('the COS-first home is localized in all five supported languages', async ({ page }) => {
+    const cases = [
+      ['en', /What would you like to accomplish today\?/],
+      ['pt', /O que você gostaria de realizar hoje\?/],
+      ['es', /¿Qué te gustaría lograr hoy\?/],
+      ['pl', /Co chcesz dziś osiągnąć\?/],
+      ['ru', /Чего вы хотите достичь сегодня\?/],
+    ] as const
+
+    for (const [lang, headline] of cases) {
+      await page.addInitScript((value) => localStorage.setItem('signalboost_language', value), lang)
+      await page.goto('/')
+      await expect(page.getByRole('main')).toContainText(headline)
+    }
+  })
+
 })

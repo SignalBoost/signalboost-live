@@ -29,7 +29,8 @@ test('feedback route waits for deferred server-owned turn correlation instead of
   assert.match(feedbackRoute, /TURN_CORRELATION_ATTEMPTS\s*=\s*5/)
   assert.match(feedbackRoute, /TURN_CORRELATION_RETRY_MS\s*=\s*125/)
   assert.match(feedbackRoute, /readTurnPromptHashWithRetry/)
-  assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== correlation\.promptHash/)
+  assert.match(feedbackRoute, /const storedPromptHash = correlation\.promptHash/)
+  assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== storedPromptHash/)
 })
 
 test('regulated hiring question is routed to fresh authoritative evidence before conceptual fallback', () => {

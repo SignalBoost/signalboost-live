@@ -55,6 +55,21 @@ function normalizeProvider(value: string | null): string | null {
   return value === 'claude' ? 'anthropic' : value
 }
 
+const CONTENT_GENERATION_INTENT = /^\s*(?:write|draft|create|generate|design|produce)\b/i
+const REGULATED_MEDICAL_CLAIM = /\b(?:medical\s+device|device)\b[\s\S]{0,120}\b(?:increase|extend|lengthen|improve)\b[\s\S]{0,80}\b(?:lifespan|life\s+span|longevity|live\s+longer)\b|\b(?:lifespan|life\s+span|longevity|live\s+longer)\b[\s\S]{0,120}\b(?:medical\s+device|device)\b/i
+
+function regulatedMedicalClaimReply(): string {
+  return [
+    'I cannot substantiate a claim that a medical device increases lifespan without supplied, applicable clinical and regulatory evidence. I have omitted that claim.',
+    '',
+    'Compliant script template',
+    'Title: [Device Name] — Intended Use',
+    'Narrator: [Device Name] is intended for [cleared or approved indication] in [defined population]. Use it only as described in its authorized labeling and instructions for use. Discuss suitability, risks, and alternatives with a qualified clinician. Do not imply outcomes beyond validated evidence.',
+    '',
+    'Before publication, provide the authorized indication, jurisdiction, evidence references, risk information, and required review approval. Then COS can draft claims that stay within that evidence.',
+  ].join('\n')
+}
+
 function freshEvidenceUnavailableReply(language: string): string {
   const messages: Record<string, string> = {
     en: 'COS requires live authoritative evidence for this current fact, but live verification is unavailable or insufficient right now. No model-memory answer was used.',
@@ -434,6 +449,14 @@ export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   if (!input) return basePost(new NextRequest(req.clone()))
+  if (CONTENT_GENERATION_INTENT.test(input) && REGULATED_MEDICAL_CLAIM.test(input)) {
+    const reply = regulatedMedicalClaimReply()
+    const access = await getAccess().catch(() => null)
+    const provenance = authoritativeProvenance(null, { invoked: false }) as any
+    provenance.regulated_claims_guard = { category: 'medical_efficacy', unsupported_claim_omitted: true, evidence_required: ['authorized indication', 'applicable clinical evidence', 'regulatory review'] }
+    await writeCosPrimaryProvenance(access?.userId || null, reply, provenance, 'cos-regulated-claims-guard', { prompt: input, answered: true, confidence: 1, branch: 'regulated_medical_claim_omitted' })
+    return NextResponse.json({ ok: true, reply, source: 'cos-regulated-claims-guard', confidence_score: 1, external_ai_invoked: false, external_fallback_invoked: false, local_model_invoked: false, execution_provenance: provenance, execution_allowed: false, external_action_taken: false })
+  }
   // Provenance is a request for server-owned prior-turn telemetry, never a new factual lookup.
   // Route it before freshness classification so paraphrases such as "where did you get that
   // answer?" cannot be sent to live evidence and fail closed.

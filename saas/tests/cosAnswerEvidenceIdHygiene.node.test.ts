@@ -74,3 +74,11 @@ test('hygiene is applied to the user-facing reply, and citation accounting still
   assert.match(source, /const cited = citedEvidence\(parsed\.answer\)/)
   assert.match(source, /organizationMemoryCitationCount\(parsed\.answer\)/)
 })
+
+test('cached replies are cleaned on replay, not only at generation time', () => {
+  // A cached leak reads exactly like a live one. An [OEM1] answer written before this guard
+  // existed replayed verbatim to a user on 2026-08-23; both replay paths now strip.
+  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(source, /reply:stripInternalEvidenceIds\(payload\.reply\)/)
+  assert.match(source, /reply:stripInternalEvidenceIds\(cached\.reply\)/)
+})

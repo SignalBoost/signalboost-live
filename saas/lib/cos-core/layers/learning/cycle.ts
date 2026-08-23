@@ -6,8 +6,6 @@ import { classifyTieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 
 export type LearningSourceDocument = { sourceKind:ContinuousLearningSourceKind; sourceUri:string; sourceTitle?:string; observedAt?:string; subject:string; text:string; license?:string|null; evidence?:string[] }
 export interface ContinuousLearningSourceAdapter { readonly kind:ContinuousLearningSourceKind; readonly id?:string; acquire(gap:KnowledgeGap):Promise<LearningSourceDocument[]> }
-// acceptedSubjects records WHICH gaps actually produced admitted evidence. Without it a caller can
-// only see that the cycle accepted something overall, which is not enough to close the right gaps.
 export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; probationary:number; acceptedSubjects:string[]; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
 
 const STOP_WORDS=new Set(['about','above','after','again','against','because','been','before','being','below','between','both','cannot','could','does','doing','down','during','each','from','further','have','having','here','into','itself','more','most','only','other','over','same','should','some','such','than','that','their','them','then','there','these','they','this','those','through','under','until','very','were','what','when','where','which','while','with','would','your'])
@@ -28,42 +26,11 @@ export function groundedConfidence(coverage:number,substance:number):number{cons
 function evidenceClass(document:LearningSourceDocument):'metadata'|'full'{
   const license=String(document.license??'').toLowerCase()
   if(license.includes('metadata')||license.includes('discovery'))return'metadata'
-  // Length decides too: a two-line "document" IS discovery metadata whatever its license field
-  // says. Without this, sources that never set a license (most of them) had their blurbs scored
-  // as full evidence — the very hole the license check was meant to close.
   return document.text.replace(/\s+/g,' ').trim().length<fullTextCharacters()*0.4?'metadata':'full'
 }
-/**
- * A candidate's stored confidence is its HONEST grounding — how well it matches the question and
- * how much real content it holds — for every evidence class alike.
- *
- * The previous version raised metadata-class candidates to the very floor they were about to be
- * tested against (Math.max(raw, kindFloor) + a title boost, capped at 0.82). The intent — keep
- * useful trusted-source metadata — was sound; the mechanism neutralised the floor gate and stamped
- * every surviving blurb ~0.82, so a robotics question retrieved an obstetrics paper, an economics
- * paper and a 2017 heat-transfer tutorial all "0.82-confident". Retrieval, the reasoner's evidence
- * ranking, and the provenance report all consume this number; inflating it lies to all three.
- * The admit-good-metadata intent now lives in metadataAdmissionFloor(), which lowers the BAR for
- * that class instead of raising the NUMBER.
- */
 export function metadataConfidenceCeiling():number{return envNumber('COS_METADATA_CONFIDENCE_CEILING',0.7,0,1)}
-
-export function calibratedConfidence(document:LearningSourceDocument,score:RelevanceScore,normalized:string):number{
-  const raw=groundedConfidence(score.coverage,substanceOf(normalized))
-  // Caps go DOWN, never up: a blurb can be perfectly on topic and still never be more than
-  // moderately confident knowledge, because there is almost nothing of it to be confident IN.
-  return evidenceClass(document)==='metadata'?Number(Math.min(raw,metadataConfidenceCeiling()).toFixed(2)):raw
-}
-
-/**
- * The floor a metadata-class candidate must clear. Deliberately below the full-text floors: a
- * relevant abstract or documentation blurb is worth keeping AS WHAT IT IS — a well-attributed
- * pointer with modest confidence — and its honest grounding score rarely exceeds ~0.7 because
- * substance is low by definition. Env-tunable; raising it toward 0.72 makes learning full-text-only.
- */
+export function calibratedConfidence(document:LearningSourceDocument,score:RelevanceScore,normalized:string):number{const raw=groundedConfidence(score.coverage,substanceOf(normalized));return evidenceClass(document)==='metadata'?Number(Math.min(raw,metadataConfidenceCeiling()).toFixed(2)):raw}
 export function metadataAdmissionFloor():number{return envNumber('COS_METADATA_ADMISSION_FLOOR',0.6,0,1)}
-
-/** The floor THIS document must clear: the catalogue floor for full evidence, the metadata floor otherwise — never a number invented per document. */
 export function candidate0Confidence(document:LearningSourceDocument,score:RelevanceScore):number{const normalized=document.text.replace(/\s+/g,' ').trim();return normalized?calibratedConfidence(document,score,normalized):0}
 export function admissionFloorFor(document:LearningSourceDocument):number|null{const kindFloor=minimumConfidenceForKind(document.sourceKind);if(evidenceClass(document)==='full')return kindFloor??0.72;return kindFloor===null?metadataAdmissionFloor():Math.min(kindFloor,metadataAdmissionFloor())}
 export function sourceAwareRelevant(document:LearningSourceDocument,score:RelevanceScore,terms:{anchors:string[];supporting:string[]},floor=minimumRelevance(),minMatches=minimumTermMatches()):boolean{
@@ -72,16 +39,23 @@ export function sourceAwareRelevant(document:LearningSourceDocument,score:Releva
   const discriminative=discriminativeDomainAnchors(terms.anchors)
   const discriminativeHits=discriminative.filter(term=>matchesTerm(haystack,term)).length
   const trustedLongForm=['research_paper','scientific_journal','library_material','official_documentation'].includes(document.sourceKind)
-  // Long authoritative documents are especially prone to accidental lexical matches because a
-  // paper can mention generic words like "database", "performance" and "tenant" somewhere in
-  // thousands of words. Require either a discriminative domain term (postgresql, kubernetes, dns,
-  // llm, etc.) or several question-specific signals before such a document may enter durable memory.
   if(trustedLongForm&&discriminative.length>0&&discriminativeHits===0&&score.supportingMatched.length<3)return false
   if(score.anchorsMatched.length>0&&score.coverage>=floor)return true
   const title=String(document.sourceTitle??'').toLowerCase(),titleHits=[...terms.anchors,...terms.supporting].filter(term=>matchesTerm(title,term)).length
   if(titleHits>=1&&score.totalMatched>=2)return true
   if(trustedLongForm&&score.totalMatched>=2)return true
   return false
+}
+
+function learningErrorMessage(error:unknown):string{
+  if(error instanceof Error)return error.message
+  if(error&&typeof error==='object'){
+    const value=error as Record<string,unknown>
+    const parts=['message','code','details','hint'].map(key=>value[key]?`${key}=${String(value[key])}`:'').filter(Boolean)
+    if(parts.length)return parts.join('; ').slice(0,800)
+    try{return JSON.stringify(error).slice(0,800)}catch{}
+  }
+  return String(error)
 }
 
 export class ContinuousLearningCycle{
@@ -91,6 +65,7 @@ export class ContinuousLearningCycle{
     const prioritized=this.director.prioritizeGaps(gaps)
     const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,probationary:0,acceptedSubjects:[],rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
     const acceptedSubjects=new Set<string>()
+    const attemptedContentHashes=new Set<string>()
     const floor=minimumRelevance(),minMatches=minimumTermMatches()
     const startedAt=Date.now()
     const cycleBudgetMs=Math.round(envNumber('COS_LEARNING_CYCLE_BUDGET_MS',240000,30000,290000))
@@ -108,26 +83,38 @@ export class ContinuousLearningCycle{
         const {gap,adapter}=tasks[index]
         const terms=gapStudyTerms(gap),allTerms=[...terms.anchors,...terms.supporting]
         let documents:LearningSourceDocument[]=[]
-        try{documents=await adapter.acquire(gap)}catch(error){const key=adapter.id??adapter.kind;result.sourceErrors[key]=(result.sourceErrors[key]??0)+1;console.warn('cosLearning: source acquisition failed',{source:key,gapId:gap.id,error:error instanceof Error?error.message:String(error)});continue}
+        try{documents=await adapter.acquire(gap)}catch(error){const key=adapter.id??adapter.kind;result.sourceErrors[key]=(result.sourceErrors[key]??0)+1;console.warn('cosLearning: source acquisition failed',{source:key,gapId:gap.id,error:learningErrorMessage(error)});continue}
         result.documentsAcquired+=documents.length
         for(const document of documents){
           if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'});continue}
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
           if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){result.rejected.not_relevant=(result.rejected.not_relevant??0)+1;continue}
           const kindFloor=admissionFloorFor(document)
-          // Classify every candidate and attach the result. This does NOT tighten anything: the
-          // director only consults tier metadata for candidates that fail its policy confidence
-          // floor, so a strong candidate is admitted as before whatever its tier says. Attaching it
-          // unconditionally is what lets the director defer the band that passes the source-kind
-          // floor (metadata: 0.6) but fails the policy floor (0.72) — the band that produced 112
-          // confidence_too_low rejections in production run cb84fe69 with zero probationary catches.
           const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate0Confidence(document,score), sourceFloor: kindFloor ?? 0, gapAligned: gap.id.startsWith('curriculum:') })
           const candidate={...this.toCandidate(document,allTerms,score),admission}
           if(kindFloor!==null&&candidate.confidence<kindFloor&&admission.tier!=='probationary'){
             result.rejected.below_source_confidence_floor=(result.rejected.below_source_confidence_floor??0)+1
             continue
           }
-          try{const decision=await this.director.admit(candidate,result.externalCostUsd);this.recordDecision(result,decision);if(decision.accepted){const learned=String(gap.subject??'').trim();if(learned)acceptedSubjects.add(learned)}}catch(error){result.sourceErrors.storage=(result.sourceErrors.storage??0)+1;console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:error instanceof Error?error.message:String(error)})}
+          // Several gaps can independently retrieve the same document. Without a cycle-local hash
+          // guard, concurrent workers can both pass store.hasContent() and then race the primary-key
+          // insert. That production race appeared as dozens of opaque "storage" errors even though
+          // the winning copy was retained. Reserve the hash before the first awaited admission.
+          if(attemptedContentHashes.has(candidate.contentHash)){
+            result.rejected.duplicate=(result.rejected.duplicate??0)+1
+            continue
+          }
+          attemptedContentHashes.add(candidate.contentHash)
+          try{
+            const decision=await this.director.admit(candidate,result.externalCostUsd)
+            this.recordDecision(result,decision)
+            if(decision.accepted){const learned=String(gap.subject??'').trim();if(learned)acceptedSubjects.add(learned)}
+          }catch(error){
+            // A real failed write is retryable if another gap discovers the same content later.
+            attemptedContentHashes.delete(candidate.contentHash)
+            result.sourceErrors.storage=(result.sourceErrors.storage??0)+1
+            console.warn('cosLearning: candidate admission failed',{source,gapId:gap.id,error:learningErrorMessage(error)})
+          }
         }
       }
     }

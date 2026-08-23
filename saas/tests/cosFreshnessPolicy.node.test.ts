@@ -164,6 +164,31 @@ test('an authoring verb buried mid-clause does not fake a creation request', () 
   }
 })
 
+test('a question about COS own prior answer can never become a public web search', () => {
+  // Structural safeguard independent of the introspection classifier's accuracy: when that
+  // classifier misses, the failure must degrade to a plain answer, never to searching the web and
+  // citing unrelated sources as the origin of COS's own reasoning (2026-08-23: an introspection
+  // question was answered from E-Verify and FAFSA pages).
+  for (const query of [
+    'show me where did you get the answert from?',
+    'where did you get this answer?',
+    'show me your sources',
+    'which rules shaped your previous answer?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(query), false, query)
+  }
+})
+
+test('the introspection exclusion does not disable genuine lookups about verification topics', () => {
+  for (const query of [
+    'what are the E-Verify requirements for employers?',
+    'where can I find answers about visas?',
+    'who is the current president of France?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(query), true, query)
+  }
+})
+
 test('creation/advice requests are not hijacked by public live-data routing', () => {
   assert.equal(requiresFreshExternalEvidence('How should I market my latest product?'), false)
   assert.equal(requiresFreshExternalEvidence('How should I price my latest product?'), false)

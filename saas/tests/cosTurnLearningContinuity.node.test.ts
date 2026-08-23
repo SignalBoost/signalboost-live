@@ -66,7 +66,8 @@ test('fast feedback waits for deferred turn persistence without weakening verifi
   assert.match(feedbackRoute, /promptHashFromDeferredTurn/)
   assert.match(feedbackRoute, /await wait\(delayMs\)/)
   assert.match(feedbackRoute, /COS turn correlation is still being finalized; retry feedback\./)
-  assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== correlation\.promptHash/)
+  assert.match(feedbackRoute, /const storedPromptHash = clean\(correlation\.promptHash, 160\)/)
+  assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== storedPromptHash/)
 })
 
 test('healthy concierge primary answers repair missing durable conversation history before returning', () => {

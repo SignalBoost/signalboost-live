@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { executiveDecisionDirective } from '../lib/ai/cos/scriptRequestIntent.ts'
 import { ContinuousLearningCycle, type ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle.ts'
 import { ContinuousLearningDirector, type ContinuousLearningStore, type KnowledgeGap, type LearningCandidate } from '../lib/cos-core/layers/learning/index.ts'
 
+const mediaClientsSource = readFileSync(new URL('../lib/cos-core/layers/learning/mediaClients.ts', import.meta.url), 'utf8')
 const leadershipPrompt = `The leadership team needs to cut operating expenses by 15% across all departments within two weeks to extend runway by nine months. Every department lead claims their budget is already bare-bones. How do you design and facilitate the triage process to decide where cuts are made?`
 
 test('executive cost triage uses evidence-bounded decision discipline', () => {
@@ -18,6 +20,12 @@ test('executive cost triage uses evidence-bounded decision discipline', () => {
 
 test('ordinary non-executive questions do not get the executive directive', () => {
   assert.equal(executiveDecisionDirective('Explain how DNS recursion works.'), null)
+})
+
+test('learning HTTP retries honor Retry-After and use a stronger 429 backoff', () => {
+  assert.match(mediaClientsSource, /headers\.get\('retry-after'\)/)
+  assert.match(mediaClientsSource, /response\.status === 429 \? 1500 \* \(attempt \+ 1\)/)
+  assert.match(mediaClientsSource, /from '\.\/connectors\.ts'/)
 })
 
 test('concurrent autonomous gaps dedupe the same document before storage', async () => {

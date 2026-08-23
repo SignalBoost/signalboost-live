@@ -1,6 +1,8 @@
+// saas/tests/cosFreshnessPolicy.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { requiresFreshExternalEvidence, structuredLiveDataKind } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
 
 test('current public role holders require live external verification', () => {
   assert.equal(requiresFreshExternalEvidence('Who is the current President of the United States?'), true)
@@ -131,6 +133,37 @@ test('local deterministic utilities do not consume public freshness search', () 
   }
 })
 
+test('a design request that states its situation FIRST is still creation, not a live lookup', () => {
+  // Production failure (2026-08-23): the authoring verb was required to be the first word of the
+  // whole prompt, so an executive brief that gives three sentences of context before "Design a
+  // 90-day..." missed the creation exclusion. The word "current" — describing the company's OWN
+  // premium tier, not a current-world fact — then routed it to live evidence, which was
+  // unavailable, and the user got a refusal instead of a strategy.
+  const brief = 'Gross margins have declined from 74% to 61% over the last two quarters due to soaring third-party inference and API costs. The Head of AI wants to maintain the current premium model tier to protect benchmark leadership, while the CFO demands an immediate migration to quantized open-source weights to restore margins to 70%. Design a 90-day phased optimization strategy that balances latency, model performance, and unit economics.'
+  assert.equal(isContentGenerationRequest(brief), true)
+  assert.equal(requiresFreshExternalEvidence(brief), false)
+
+  for (const trailing of [
+    'Our costs are up. Draft a memo to the board.',
+    'Margins fell this quarter. So write me a recovery plan.',
+    'The board meets Friday — draft the executive summary.',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(trailing), false, trailing)
+  }
+})
+
+test('an authoring verb buried mid-clause does not fake a creation request', () => {
+  // The verb must still LEAD its own clause, or ordinary lookups containing "designed"/"created"
+  // would stop being live-verified.
+  for (const lookup of [
+    'who designed the Eiffel Tower?',
+    'who created Python?',
+    'which company produces the most lithium?',
+  ]) {
+    assert.equal(isContentGenerationRequest(lookup), false, lookup)
+  }
+})
+
 test('creation/advice requests are not hijacked by public live-data routing', () => {
   assert.equal(requiresFreshExternalEvidence('How should I market my latest product?'), false)
   assert.equal(requiresFreshExternalEvidence('How should I price my latest product?'), false)
@@ -140,13 +173,6 @@ test('creation/advice requests are not hijacked by public live-data routing', ()
   assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
 })
 
-test('scenario facts followed by an authoring task are treated as supplied context', () => {
-  const prompt = 'Gross margins have declined from 74% to 61% over the last two quarters due to soaring third-party inference and API costs. The Head of AI wants to maintain the current premium model tier to protect benchmark leadership, while the CFO demands an immediate migration to quantized open-source weights to restore margins to 70%. Design a 90-day phased optimization strategy that balances latency, model performance, and unit economics.'
-  assert.equal(requiresFreshExternalEvidence(prompt), false)
-
-  const factualLookupThenTask = 'Who is the current CEO of Apple? Design a succession plan around that person.'
-  assert.equal(requiresFreshExternalEvidence(factualLookupThenTask), true)
-})
 
 test('regulated public guidance is live-verified across supported languages', () => {
   for (const prompt of [

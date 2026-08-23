@@ -11,10 +11,22 @@ import { asksWhereTheAnswerCameFrom } from '../lib/ai/cos/provenanceIntrospectio
 import { asksWhichHeuristicsInfluencedPriorAnswer } from '../lib/ai/cos/priorAnswerHeuristicIntent.ts'
 import { isProvenanceIntrospection } from '../lib/ai/cos/provenanceIntrospection.ts'
 
-test('all three verbatim source-origin production failures are recognized', () => {
+test('all verbatim source-origin production failures are recognized', () => {
   assert.equal(asksWhereTheAnswerCameFrom('skąd masz te informacje?'), true)
   assert.equal(asksWhereTheAnswerCameFrom('show me where from you got the answer for the question?'), true)
   assert.equal(asksWhereTheAnswerCameFrom('show me where the answers came from?'), true)
+  assert.equal(asksWhereTheAnswerCameFrom('show me where did you get the answert from?'), true)
+})
+
+test('common answer-typo provenance follow-ups remain introspection', () => {
+  for (const query of [
+    'where did you get the answert from?',
+    'where did you get the anwser from?',
+    'where did you get the asnwer from?',
+  ]) {
+    assert.equal(asksWhereTheAnswerCameFrom(query), true, query)
+    assert.equal(isProvenanceIntrospection(query), true, query)
+  }
 })
 
 test('origin phrasings with no second-person address are recognized', () => {
@@ -75,6 +87,7 @@ test('content questions that borrow source words stay content questions', () => 
     'what are the best sources of vitamin D?',
     'how do banks source liquidity overnight?',
     'where did the Roman empire get its silver?',
+    'where did you get your sweater from?',
   ]) {
     assert.equal(asksWhereTheAnswerCameFrom(query), false, query)
   }

@@ -49,6 +49,7 @@ const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|
 // phrased conversationally, in a language other than English, or does not begin with a lookup word.
 // This is a routing boundary only: the live-evidence authority policy still decides whether COS may answer.
 const GOVERNED_GUIDANCE_TOPIC = /(?:legal|law|regulation|visa|immigration|tax|taxes|passport|identity card|driver(?:'s)? license|government (?:office|agency)|name change|change(?:d|ing)? (?:my|your|their)? ?(?:name|surname)|surname|benefits|insurance|medical|health|medication|diagnos(?:is|e)|treatment|invest(?:ment|ing)|loan|mortgage|bank(?:ing)?|z[\u0142l]o[\u017cż]y[\u0107c]|urz[\u0105a]d|dokument(?:y|u)?|nazwisk(?:o|a)|dow[oó]d osobisty|paszport|zus|nfz|podat(?:ek|ki)|prawo jazdy|wiza|ubezpieczen(?:ie|ia)|zdrow(?:ie|otny)|lekarz|leczenie|medicament(?:o|os)|impuesto|visado|seguro|salud|m[eé]dico|tratamiento|documentos?|passaporte|imigra[çc][ãa]o|impost(?:o|os)|seguro|sa[uú]de|tratamento|document(?:o|os)|паспор(?:т|та)|документ(?:ы|ов)?|налог(?:и|ов)?|страхов(?:ка|ки)|здоров(?:ье|я)|лечени(?:е|я)|виза)/iu
+const REGULATED_EMPLOYMENT_AI_GUIDANCE = /(?:\b(?:hiring|recruit(?:ing|ment)?|candidate\s+screening|employment|selection\s+workflow|automated\s+employment)\b.{0,180}\b(?:eu\s+ai\s+act|artificial\s+intelligence\s+act|eeoc|title\s+vii|employment\s+law|anti[- ]discrimination|compliance|regulatory\s+requirements?)\b|\b(?:eu\s+ai\s+act|artificial\s+intelligence\s+act|eeoc|title\s+vii)\b.{0,180}\b(?:hiring|recruit(?:ing|ment)?|candidate|employment|selection)\b)/i
 const GUIDANCE_REQUEST = /(?:[?]|\b(?:what|which|when|where|who|how|should|need|must|can|could|do|does|czy|co|jak|gdzie|kiedy|kt[oó]r|powinn|trzeba|musz|mog[ęe]|debo|puedo|qu[eé]|c[oó]mo|d[oó]nde|cu[aá]ndo|devo|posso|o que|como|onde|quando|долж|нужно|как|что|где|когда|какие|могу)\b)/iu
 
 // Public-web freshness must not hijack private/system-of-record questions just because they contain
@@ -99,9 +100,8 @@ function isLocalDeterministicUtility(text: string): boolean {
   return LOCAL_ARITHMETIC.test(text) || LOCAL_CLOCK_OR_DATE.test(text)
 }
 
-
 function isGovernedPublicGuidance(text: string): boolean {
-  return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
+  return (GOVERNED_GUIDANCE_TOPIC.test(text) || REGULATED_EMPLOYMENT_AI_GUIDANCE.test(text)) && GUIDANCE_REQUEST.test(text)
 }
 
 export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'

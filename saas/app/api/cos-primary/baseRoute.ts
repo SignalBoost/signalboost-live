@@ -199,7 +199,7 @@ export async function POST(req:NextRequest){
   const strategyProfileRequest=/\\b(?:generate|write|create|draft)\\b[\\s\\S]{0,100}\\b(?:current )?strategy profile(?: weights?| heuristics?)?\\b/i.test(input)
   if(strategyProfileRequest){
     const profile=await readStrategyProfile({privileged:isPrivileged,organizationId:body?.context?.organizationId,workspace:body?.context?.workspace})
-    if(!profile.ok){const reply=`COS could not read the current strategy profile: ${profile.error}`;return NextResponse.json({ok:false,reply,error:reply,source:'cos-strategy-profile-unavailable',external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_allowed:false,external_action_taken:false},{status:503})}
+    if('error' in profile){const reply=`COS could not read the current strategy profile: ${profile.error}`;return NextResponse.json({ok:false,reply,error:reply,source:'cos-strategy-profile-unavailable',external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_allowed:false,external_action_taken:false},{status:503})}
     const overrides=appliedStrategyOverrides(profile.profile)
     reasoningPrompt=`${input}\\n\\nCURRENT DERIVED STRATEGY PROFILE (internal system of record): ${JSON.stringify(profile.profile)}\\nAPPLIED OVERRIDES: ${JSON.stringify(overrides)}\\nGenerate the requested content. Then add an Evidence Used section: for every learned override, name its dimension, winning value, performance score, measured-campaign count, runner-up comparison, and supporting campaign IDs from the profile. If overrides is empty, state that measured outcomes did not justify changing defaults; do not claim missing configuration.`
   }

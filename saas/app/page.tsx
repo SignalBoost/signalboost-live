@@ -16,6 +16,8 @@ const TEXT = {
   headline: { en: 'What would you like to accomplish today?', es: '¿Qué te gustaría lograr hoy?', pt: 'O que você gostaria de realizar hoje?', pl: 'Co chcesz dziś osiągnąć?', ru: 'Чего вы хотите достичь сегодня?' },
   subhead: { en: 'Ask a question, describe a goal, or tell me where you want to go. I will help you find the right SignalBoost workspace and provide an evidence-grounded answer when one is available.', es: 'Haz una pregunta, describe un objetivo o dime adónde quieres ir. Te ayudaré a encontrar el espacio de SignalBoost adecuado y, cuando sea posible, daré una respuesta basada en evidencia.', pt: 'Faça uma pergunta, descreva um objetivo ou diga para onde quer ir. Vou ajudar você a encontrar o espaço certo do SignalBoost e, quando disponível, dar uma resposta baseada em evidências.', pl: 'Zadaj pytanie, opisz cel lub powiedz, dokąd chcesz przejść. Pomogę znaleźć właściwy obszar SignalBoost i, gdy to możliwe, podam odpowiedź opartą na dowodach.', ru: 'Задайте вопрос, опишите цель или скажите, куда хотите перейти. Я помогу найти нужный раздел SignalBoost и, когда это возможно, дам ответ, основанный на доказательствах.' },
   placeholder: { en: 'Ask COS anything…', es: 'Pregúntale cualquier cosa a COS…', pt: 'Pergunte qualquer coisa ao COS…', pl: 'Zapytaj COS o cokolwiek…', ru: 'Спросите COS о чём угодно…' },
+  suggested: { en: 'Suggested questions', es: 'Preguntas sugeridas', pt: 'Perguntas sugeridas', pl: 'Sugerowane pytania', ru: 'Предлагаемые вопросы' },
+  cosLabel: { en: 'COS', es: 'COS', pt: 'COS', pl: 'COS', ru: 'COS' },
   send: { en: 'Ask COS', es: 'Preguntar a COS', pt: 'Perguntar ao COS', pl: 'Zapytaj COS', ru: 'Спросить COS' },
   thinking: { en: 'COS is thinking…', es: 'COS está pensando…', pt: 'COS está pensando…', pl: 'COS myśli…', ru: 'COS думает…' },
   continue: { en: 'Continue the conversation', es: 'Continuar la conversación', pt: 'Continuar a conversa', pl: 'Kontynuuj rozmowę', ru: 'Продолжить разговор' },
@@ -78,13 +80,13 @@ export default function Home() {
           <button type="submit" disabled={!question.trim() || loading}>{loading ? copy(TEXT.thinking, language) : copy(TEXT.send, language)} <span aria-hidden="true">→</span></button>
         </form>
 
-        <div className="chips" aria-label="Suggested questions">
+        <div className="chips" aria-label={copy(TEXT.suggested, language)}>
           {TEXT.chips.map((chip) => <button key={chip.en} type="button" onClick={() => setQuestion(copy(chip, language))}>{copy(chip, language)}</button>)}
         </div>
 
         {answer ? (
           <article className="answer" aria-live="polite">
-            <div className="answer-label">COS</div>
+            <div className="answer-label">{copy(TEXT.cosLabel, language)}</div>
             <p>{answer}</p>
             <Link href={'/dashboard/assistant?prompt=' + encodeURIComponent(question)}>{copy(TEXT.continue, language)} →</Link>
           </article>

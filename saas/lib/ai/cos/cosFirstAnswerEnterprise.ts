@@ -655,7 +655,10 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       if (payload?.reply && !current.ok) console.warn('cosFirstAnswer: semantic cache entry refused as stale', { reason:current.reason, similarity:nearest.similarityScore })
       if (payload?.reply && current.ok && payload.confidence >= threshold()) {
         recordAvoidedCost('semantic_similarity', input.prompt.length, payload.reply.length, Date.now() - startedAt)
-        return { handled:true, reply:payload.reply, confidence:payload.confidence, provenance:cacheHitProvenance(payload, base, 'semantic_similarity', nearest.similarityScore) }
+        // Cache replay must be cleaned too: entries written before answer hygiene existed still
+        // carry internal markers, and a cached leak is indistinguishable to the reader from a live
+        // one (observed 2026-08-23 — an [OEM1] answer cached at 01:28 replayed verbatim).
+        return { handled:true, reply:stripInternalEvidenceIds(payload.reply), confidence:payload.confidence, provenance:cacheHitProvenance(payload, base, 'semantic_similarity', nearest.similarityScore) }
       }
     }
   }
@@ -672,7 +675,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
   if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold()) {
     recordAvoidedCost('exact_cache', input.prompt.length, cached.reply.length, Date.now() - startedAt)
-    return { handled:true, reply:cached.reply, confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
+    return { handled:true, reply:stripInternalEvidenceIds(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
   }
 
   if (process.env.COS_LOCAL_FIRST_ENABLED === 'false') {

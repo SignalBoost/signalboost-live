@@ -15,6 +15,28 @@ test('global reasoning guidance is safety-only and does not smuggle an unvalidat
   assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /comparison baselines/i)
 })
 
+test('crisis and compliance scenarios do not manufacture legal obligations', () => {
+  const rule = COS_GENERAL_REASONING_DISCIPLINE
+  assert.match(rule, /do not turn prudent governance advice into a claimed legal obligation/i)
+  assert.match(rule, /do not name statutes or regulatory regimes such as GDPR or CCPA/i)
+  assert.match(rule, /Legal\/Privacy\/Compliance must determine the notification duties, scope, recipients, and deadlines/i)
+  assert.match(rule, /Customer disclosure is a decision point unless the supplied facts or verified authority establish a mandatory notice/i)
+  assert.match(rule, /do not invent a requirement that a particular executive or Legal must approve/i)
+})
+
+test('a stakeholder secrecy proposal does not cause COS to refuse a legitimate crisis protocol request', () => {
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /not a request to conceal misconduct merely because one stakeholder in the scenario proposes secrecy/i)
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /Draft the protocol directly/i)
+})
+
+test('backup brain carries the same crisis legal-grounding invariants', () => {
+  const brain = read('../../cos-core/brain.md')
+  assert.match(brain, /never claim that a statute, regulation, customer-notification duty, approval authority, or legal deadline applies/i)
+  assert.match(brain, /Do not name GDPR, CCPA/i)
+  assert.match(brain, /Legal\/Privacy\/Compliance assessment a decision gate/i)
+  assert.match(brain, /proposal to keep an incident quiet does not make a request for a crisis-response protocol improper/i)
+})
+
 test('every reasoning worker receives only the lifecycle-neutral safety invariants, including primary', () => {
   const source = read('../lib/ai/cos/cosReasoningWorkers.ts')
   assert.match(source, /COS_GENERAL_REASONING_DISCIPLINE/)

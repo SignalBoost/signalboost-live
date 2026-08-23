@@ -47,4 +47,5 @@ test('plain-language source follow-ups are provenance introspection, not fresh f
   assert.equal(isProvenanceIntrospection('Show me where from you got the answer for the question?'), true)
   assert.equal(isProvenanceIntrospection('Where did you get that answer from?'), true)
   assert.equal(isProvenanceIntrospection('What sources did you use for your previous response?'), true)
+  assert.equal(isProvenanceIntrospection('show me where the answers came from?'), true)
 })

@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       learning = { status: 'error', error: message }
     }
 
-    if (learning && 'error' in learning) {
+    if (learning?.status === 'error') {
       automaticLearningHealthRecorded = await recordAutonomousLearningRun({
         mode: 'daily', status: 'error', succeeded: false, startedAt: dailyStartedAt,
         skipReason: learning.error,

@@ -29,6 +29,20 @@ test('every internal marker family is stripped, including OEM and MEMBER and ran
   assert.match(cleaned, /Point two\./)
 })
 
+test('a marker in apposition after a noun is removed, not doubled into a second subject', () => {
+  // "The strategy profile [OEM1] instructs…" must become "The strategy profile instructs…" —
+  // replacement here produced "the profile the retrieved evidence instructs" in production
+  // (2026-08-23). Replacement is reserved for markers that ARE the subject.
+  assert.equal(
+    stripInternalEvidenceIds('The strategy profile [OEM1] explicitly instructs to keep defaults.'),
+    'The strategy profile explicitly instructs to keep defaults.',
+  )
+  assert.equal(
+    stripInternalEvidenceIds('According to [CL3] the deadline moved.'),
+    'According to the retrieved evidence the deadline moved.',
+  )
+})
+
 test('the verbatim OEM leak keeps its grammar — subject markers become a neutral phrase', () => {
   // 2026-08-22: OEM was missing from the first marker list and reached a user verbatim.
   const leaked = 'The provided Organization Enterprise Memory ([OEM1], [OEM2]) contains high-level business intelligence. While [OEM1] shows a campaignPlan with a Technical & Precise tone, these are static attributes.'

@@ -55,6 +55,16 @@ function normalizeProvider(value: string | null): string | null {
   return value === 'claude' ? 'anthropic' : value
 }
 
+const UNSUPPORTED_MEDICAL_LIFESPAN_CLAIM = /\b(?:medical\s+device|device)\b[\s\S]{0,100}\b(?:increase|extend|lengthen|improve)\b[\s\S]{0,80}\b(?:lifespan|life\s+span|longevity|live\s+longer)\b|\b(?:lifespan|life\s+span|longevity|live\s+longer)\b[\s\S]{0,100}\b(?:medical\s+device|device)\b/i
+
+function medicalClaimRefusal(language: string): string {
+  if (language === 'es') return 'No puedo crear una afirmación de que un dispositivo médico aumenta la esperanza de vida. Puedo ayudar a redactar un guion profesional y conforme que describa únicamente el uso previsto y los beneficios validados, con revisión regulatoria y clínica.'
+  if (language === 'pt') return 'Não posso criar uma alegação de que um dispositivo médico aumenta a expectativa de vida. Posso ajudar a redigir um roteiro profissional e conforme que descreva somente o uso pretendido e benefícios validados, sujeito a revisão regulatória e clínica.'
+  if (language === 'pl') return 'Nie mogę tworzyć twierdzenia, że wyrób medyczny wydłuża życie. Mogę pomóc przygotować profesjonalny, zgodny z wymogami scenariusz opisujący wyłącznie przeznaczenie i potwierdzone korzyści, po przeglądzie regulacyjnym i klinicznym.'
+  if (language === 'ru') return 'Я не могу создавать заявление о том, что медицинское устройство увеличивает продолжительность жизни. Я могу помочь подготовить профессиональный сценарий, соответствующий требованиям: только назначение и подтверждённые преимущества после регуляторной и клинической проверки.'
+  return 'I cannot create a claim that a medical device increases lifespan. I can help write a professional, compliant script that describes only the intended use and validated benefits, subject to regulatory and clinical review.'
+}
+
 function freshEvidenceUnavailableReply(language: string): string {
   const messages: Record<string, string> = {
     en: 'COS requires live authoritative evidence for this current fact, but live verification is unavailable or insufficient right now. No model-memory answer was used.',
@@ -434,6 +444,15 @@ export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   if (!input) return basePost(new NextRequest(req.clone()))
+  const language = languageFrom(body)
+  if (UNSUPPORTED_MEDICAL_LIFESPAN_CLAIM.test(input)) {
+    const reply = medicalClaimRefusal(language)
+    const access = await getAccess().catch(() => null)
+    const provenance = authoritativeProvenance(null, { invoked: false }) as any
+    provenance.safety_refusal = { category: 'unsupported_medical_lifespan_claim', redirected: true }
+    await writeCosPrimaryProvenance(access?.userId || null, reply, provenance, 'cos-safety-refusal', { prompt: input, answered: false, confidence: 0, branch: 'medical_lifespan_claim_refusal' })
+    return NextResponse.json({ ok: false, reply, source: 'cos-safety-refusal', confidence_score: 0, external_ai_invoked: false, external_fallback_invoked: false, local_model_invoked: false, execution_provenance: provenance, execution_allowed: false, external_action_taken: false })
+  }
   // Provenance is a request for server-owned prior-turn telemetry, never a new factual lookup.
   // Route it before freshness classification so paraphrases such as "where did you get that
   // answer?" cannot be sent to live evidence and fail closed.

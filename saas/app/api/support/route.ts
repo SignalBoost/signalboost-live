@@ -1,3 +1,4 @@
+// saas/app/api/support/route.ts
 // Durable multi-turn provenance wrapper for the production support route.
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
@@ -57,6 +58,17 @@ function noPriorProvenanceReply(languageCode: string): string {
   if (languageCode === 'pl') return 'Nie mam prawdziwego zapisu proweniencji bezpośrednio poprzedniej odpowiedzi w tej rozmowie. Nie będę go odtwarzać ani wymyślać po fakcie.'
   if (languageCode === 'ru') return 'У меня нет реальной записи происхождения непосредственно предыдущего ответа в этой беседе. Я не буду восстанавливать или придумывать её постфактум.'
   return "I don't have a real provenance record for the immediately preceding answer in this conversation. I won't reconstruct or fabricate it after the fact."
+}
+
+// Used only when the exact preceding turn could not be identified — neither the conversation ID
+// nor the preceding-answer text was available to verify against, so the record below is the most
+// recent one on file for this account, not a confirmed match to the specific answer just given.
+function unverifiedProvenanceCaveat(languageCode: string): string {
+  if (languageCode === 'es') return '⚠️ No pude confirmar que este registro corresponda exactamente a la respuesta anterior (no había ID de conversación ni texto de la respuesta previa para verificarlo) — muestro el registro de procedencia más reciente de esta cuenta. Si algo no coincide, esa es la razón.'
+  if (languageCode === 'pt') return '⚠️ Não consegui confirmar que este registro corresponde exatamente à resposta anterior (não havia ID de conversa nem texto da resposta anterior para verificar) — mostrando o registro de proveniência mais recente desta conta. Se algo não bater, essa é a razão.'
+  if (languageCode === 'pl') return '⚠️ Nie udało się potwierdzić, że ten zapis dokładnie odpowiada poprzedniej odpowiedzi (brak ID rozmowy i tekstu poprzedniej odpowiedzi do weryfikacji) — pokazuję najnowszy zapis proweniencji dla tego konta. Jeśli coś się nie zgadza, to właśnie dlatego.'
+  if (languageCode === 'ru') return '⚠️ Не удалось подтвердить, что эта запись точно соответствует предыдущему ответу (не было ID беседы или текста предыдущего ответа для проверки) — показана самая последняя запись происхождения для этого аккаунта. Если что-то не сходится, вот причина.'
+  return "⚠️ I could not confirm this record matches the immediately preceding answer exactly — no conversation ID or prior-answer text was available to verify against, so this is the most recent provenance record on file for this account, not a confirmed match to the specific answer just given. If something looks off, that mismatch is why."
 }
 
 function deterministicProvenance(body: any, prompt: string): RecordedTurnProvenance | null {
@@ -212,10 +224,25 @@ export async function POST(req: NextRequest) {
   } catch {}
 
   if (prompt && isProvenanceIntrospection(prompt) && userId) {
-    const recorded = (conversationId ? await latestRecordedTurnProvenance(conversationId, userId) : null)
-      ?? (precedingAssistant ? await recordedTurnProvenanceByContent(userId, precedingAssistant) : null)
-      ?? (precedingAssistant ? await latestUserTurnProvenance(userId, precedingAssistant) : null)
-      ?? (!precedingAssistant ? await latestUserTurnProvenance(userId) : null)
+    // FOUR fallback levels, in decreasing order of certainty. The first two are verified against
+    // either the exact conversation or the exact preceding-answer text, so a match there is
+    // trustworthy. The LAST level is not: cos_latest_turn_provenance is one row per user,
+    // overwritten by every successful turn, and this call omits the content check entirely (no
+    // precedingAssistant text was available to check against) — so it returns WHATEVER was most
+    // recently written for this user, with no verification it is the turn the person is actually
+    // asking about. During rapid back-to-back testing this can and did surface a genuinely
+    // different turn's confidence/telemetry while the reply claimed unconditional certainty
+    // ("real, recorded provenance... not a model-generated reconstruction") — confirmed 2026-08-23
+    // by comparing the introspection answer against the actual stored row for the same content,
+    // which held a materially different confidence score.
+    let verified = true
+    let recorded = conversationId ? await latestRecordedTurnProvenance(conversationId, userId) : null
+    if (!recorded && precedingAssistant) recorded = await recordedTurnProvenanceByContent(userId, precedingAssistant)
+    if (!recorded && precedingAssistant) recorded = await latestUserTurnProvenance(userId, precedingAssistant)
+    if (!recorded && !precedingAssistant) {
+      recorded = await latestUserTurnProvenance(userId)
+      verified = false
+    }
     if (!recorded) {
       return NextResponse.json({
         reply: noPriorProvenanceReply(languageCode),
@@ -223,11 +250,14 @@ export async function POST(req: NextRequest) {
         external_ai_invoked: false,
       })
     }
+    const formatted = formatAuthoritativeProvenance(recorded as any, languageCode)
+    const reply = verified ? formatted : [unverifiedProvenanceCaveat(languageCode), '', formatted].join('\n')
     return NextResponse.json({
-      reply: formatAuthoritativeProvenance(recorded as any, languageCode),
+      reply,
       source: 'cos-authoritative-provenance',
       execution_provenance: recorded,
       external_ai_invoked: false,
+      provenance_match_verified: verified,
     })
   }
 

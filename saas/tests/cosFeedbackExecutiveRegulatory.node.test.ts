@@ -50,7 +50,7 @@ test('executive decision mode covers the enterprise tenant trade-off and forbids
   assert.ok(directive)
   assert.match(directive, /Do not invent savings ranges, budget impacts, utilization levels/i)
   assert.match(directive, /Do not invent a workaround such as a phased\/MVP\/MVT delivery/i)
-  assert.match(directive, /CEO wanting mutually constrained outcomes/i)
+  assert.match(directive, /CEO wants mutually constrained outcomes, treat that as a goal/i)
 })
 
 test('server quality gate detects the exact unsupported numbers from the bad executive memo', () => {

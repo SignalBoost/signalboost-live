@@ -1,7 +1,7 @@
 // Enterprise Memory-aware COS orchestration/provenance implementation.
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
-import { isProvenanceIntrospection } from './provenanceIntrospection'
+import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 export { isProvenanceIntrospection }
 
 export function confidenceThreshold(): number { const value=Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72'); return Number.isFinite(value)?Math.max(.5,Math.min(.98,value)):.72 }

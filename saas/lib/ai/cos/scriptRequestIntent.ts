@@ -1,4 +1,4 @@
-// COS script-intent disambiguation.
+// COS request-specific intent disambiguation.
 //
 // "Script" is polysemous: it can mean authored prose/dialogue or executable source code.
 // The production failure on 2026-08-23 was an ordinary writing request:
@@ -8,6 +8,11 @@
 // The local reasoner guessed the programming sense and asked for a language. This module keeps
 // that decision deterministic. An unqualified authoring request is content; executable code
 // requires an explicit programming signal or a clearly computational behavior.
+//
+// The same request-specific seam also carries a narrow executive-decision discipline for high-
+// stakes management scenarios. That prevents a generic model instinct from turning sparse facts
+// into invented savings percentages, blanket freezes, accusations about department leaders, or
+// simplistic "cost center = expendable" recommendations.
 
 export type ScriptRequestMode = 'content' | 'code' | 'none'
 
@@ -23,6 +28,12 @@ const COMPUTATIONAL_SCRIPT_BEHAVIOR =
 const LINE_RATIONALE_REQUEST =
   /\b(?:explain|describe|give)\b[^.!?;\n]{0,80}\b(?:reason(?:ing)?|rationale|purpose|why)\b[^.!?;\n]{0,80}\b(?:each|every)\s+line\b|\bline[- ]by[- ]line\b[^.!?;\n]{0,80}\b(?:reason(?:ing)?|rationale|purpose|explanation)\b/i
 
+const EXECUTIVE_DECISION_SCENARIO =
+  /\b(?:leadership\s+team|ceo|cfo|coo|board|department\s+lead|operating\s+expenses?|opex|runway|budget\s+cuts?|cost\s+reduction|headcount|layoffs?|restructur(?:e|ing)|acquisition|due\s+diligence|merger|triage\s+process)\b/i
+
+const EXECUTIVE_DECISION_VERB =
+  /\b(?:decide|design|facilitate|triage|cut|reduce|prioriti[sz]e|allocate|restructure|acquire|handle|recommend|approve|protect|extend|save|freeze|cancel)\b/i
+
 function userQuestionOnly(prompt: string): string {
   const full = String(prompt || '').slice(0, 24_000)
   const marker = 'USER QUESTION:'
@@ -37,8 +48,23 @@ export function classifyScriptRequest(prompt: string): ScriptRequestMode {
   return 'content'
 }
 
-export function scriptRequestDirective(prompt: string): string | null {
+export function executiveDecisionDirective(prompt: string): string | null {
   const input = userQuestionOnly(prompt)
+  if (!EXECUTIVE_DECISION_SCENARIO.test(input) || !EXECUTIVE_DECISION_VERB.test(input)) return null
+  return [
+    'EXECUTIVE DECISION MODE: EVIDENCE-BOUNDED, REVERSIBLE-FIRST, AND GOVERNANCE-AWARE.',
+    'Do not assume an across-the-board percentage cut, dishonesty by budget owners, or that a cost center is less important merely because revenue attribution is indirect unless the user explicitly supplied that fact.',
+    'Do not invent savings ranges, rework costs, headcount percentages, contractor reductions, deal structures, or other numeric targets. If a number is useful only as an example, label it clearly as illustrative and keep it separate from the recommendation.',
+    'Separate known facts from hypotheses and from decisions still requiring data. State what evidence would change the decision.',
+    'For resource cuts, evaluate each spend line by criticality, customer/revenue dependency, regulatory/security obligation, reversibility, time-to-cash, switching cost, and downstream dependency. Do not use "revenue center" versus "cost center" as a shortcut.',
+    'Sequence actions from reversible to irreversible: freeze new commitments and obvious duplication first; then renegotiate, consolidate, resize, or defer; use headcount or structural cuts only after the required savings gap is quantified and decision rights are explicit.',
+    'Define a central target and a comparable decision template across departments, but do not force equal departmental percentages unless the facts justify equal elasticity.',
+    'Include an auditable decision process: owner, evidence, recommendation, impact, dependency, reversibility, implementation date, and metric that would trigger reconsideration.',
+    'Use neutral professional language. Do not call a person a liability, accuse leaders of hiding spend, threaten disclosure, or recommend coercion when escalation through normal governance is sufficient.',
+  ].join(' ')
+}
+
+function pureScriptDirective(input: string): string | null {
   const mode = classifyScriptRequest(input)
   if (mode === 'none') return null
 
@@ -61,4 +87,10 @@ export function scriptRequestDirective(prompt: string): string | null {
     'Ambiguity about the subject does not make the writing task impossible; satisfy the request with neutral language instead of refusing or substituting a software template.',
     rationaleRule,
   ].filter(Boolean).join(' ')
+}
+
+export function scriptRequestDirective(prompt: string): string | null {
+  const input = userQuestionOnly(prompt)
+  const directives = [pureScriptDirective(input), executiveDecisionDirective(input)].filter(Boolean)
+  return directives.length ? directives.join('\n\n') : null
 }

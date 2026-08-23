@@ -1,22 +1,17 @@
 // saas/lib/ai/cos/provenanceIntrospection.ts
 //
-// Compatibility surface for provenance-introspection detection.
+// Compatibility surface for prior-answer introspection detection.
 //
-// `cosOrchestrationEnterprise` and the cos-primary routes import `isProvenanceIntrospection` from
-// this path; the recognition logic itself lives in provenanceIntrospectionIntent.ts. This file
-// exists only to keep that import path stable, so the classifier can be rewritten without touching
-// every caller.
-//
-// It previously re-exported a symbol (`isProvenanceIntrospectionIntent`) that the intent module
-// does not define, which failed the Turbopack build on 2026-08-23. The intent module exports
-// exactly one predicate — `asksWhereTheAnswerCameFrom` — and this shim maps the legacy name onto
-// it. Keep it that way: one predicate, two names, no drift.
+// Source-origin questions and questions about which heuristics/rules shaped the prior answer both
+// belong on the same server-recorded provenance path. Neither may be reconstructed by a fresh model
+// turn, because a new retrieval or prompt can differ from what actually produced the earlier answer.
 
 import { asksWhereTheAnswerCameFrom } from './provenanceIntrospectionIntent.ts'
+import { asksWhichHeuristicsInfluencedPriorAnswer } from './priorAnswerHeuristicIntent.ts'
 
-export { asksWhereTheAnswerCameFrom }
+export { asksWhereTheAnswerCameFrom, asksWhichHeuristicsInfluencedPriorAnswer }
 
-/** True only for a request to reveal the recorded origin of a prior answer. */
+/** True only for a request to introspect the recorded origin or influences of a prior answer. */
 export function isProvenanceIntrospection(input: string): boolean {
-  return asksWhereTheAnswerCameFrom(input)
+  return asksWhereTheAnswerCameFrom(input) || asksWhichHeuristicsInfluencedPriorAnswer(input)
 }

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { isStrategyProfileRequest, strategyProfileEvidenceBlock } from '../lib/ai/cos/strategyProfileRequest.ts'
+import { isStrategyProfileRequest, strategyProfileEvidenceBlock, type StrategyProfileEvidenceView } from '../lib/ai/cos/strategyProfileRequest.ts'
 import type { StrategyProfile } from '../lib/ai/cos/strategyProfile.ts'
 
 const RETRIEVER_PATH = readFileSync(new URL('../lib/enterprise/memory/retriever.ts', import.meta.url), 'utf8')
@@ -41,15 +41,35 @@ function profile(overrides: Partial<StrategyProfile> = {}): StrategyProfile {
   }
 }
 
+function baselineView(overrides: Partial<StrategyProfile> = {}): StrategyProfileEvidenceView {
+  return {
+    ...profile(overrides),
+    generationDefaults: {
+      status: 'available',
+      source: 'enterprise_intelligence_snapshot',
+      workspace: 'signalboost',
+      analyzedAt: '2026-08-22T20:00:00.000Z',
+      description: 'AI-powered websites and reviews for businesses.',
+      goal: 'Educational/Training',
+      tone: 'Technical & Precise',
+      format: 'Landing Page',
+      offerType: 'Download Resource',
+      platforms: ['LinkedIn'],
+      ctaStrategy: 'Download',
+      audiences: ['Business owners'],
+      industry: 'Media & Entertainment',
+      creativeSuggestions: [],
+      fallbackRule: 'Apply learned strategy overrides only where the measured profile has status learned. For every other dimension, keep these baseline defaults. Empty learned overrides are NOT a refusal condition: generate the requested content using these defaults and then explain that measured outcomes did not change them.',
+    },
+    generationRule: 'Overlay learned dimensions on generationDefaults. If no learned override exists, generationDefaults remain active and content generation MUST proceed; lack of measured weights is not a reason to refuse.',
+  }
+}
+
 test('the verbatim production request is recognized', () => {
   assert.equal(isStrategyProfileRequest('Generate content using the current strategy profile weights and explain which heuristics influenced the output.'), true)
 })
 
 test('retrieval terms preserve enough intent for the Enterprise Memory boundary', () => {
-  // relevanceTerms() strips stopwords before the retriever classifies; the surviving content terms
-  // must still trigger. Asserted on the reduced form directly rather than by importing
-  // contextRelevance, which pulls '@/' path aliases the bare test runner cannot resolve — an
-  // import that silently made this whole suite unrunnable.
   assert.equal(isStrategyProfileRequest('generate content current strategy profile weights explain heuristics influenced output'), true)
 })
 
@@ -73,41 +93,53 @@ test('ordinary business talk about strategy does not trigger a profile read', ()
   ]) assert.equal(isStrategyProfileRequest(prompt), false, prompt)
 })
 
-test('Enterprise Memory retrieval reads campaign outcomes live and returns strategy evidence', () => {
+test('Enterprise Memory strategy retrieval uses the canonical generation-view reader', () => {
   assert.match(RETRIEVER_PATH, /isStrategyProfileRequest\(\(args\.taskTags \|\| \[\]\)\.join\(' '\)\)/)
-  assert.match(RETRIEVER_PATH, /enterprise_campaign_memory/)
-  assert.match(RETRIEVER_PATH, /\.limit\(2000\)/)
-  assert.match(RETRIEVER_PATH, /strategyProfileEvidenceBlock\(deriveStrategyProfile\(/)
+  assert.match(RETRIEVER_PATH, /import\('\.\.\/\.\.\/ai\/cos\/strategyProfileReport\.ts'\)/)
+  assert.match(RETRIEVER_PATH, /strategyProfileEvidenceBlock\(profileResult\.profile\)/)
+  assert.match(RETRIEVER_PATH, /enterprise_campaign_memory\+enterprise_intelligence_snapshots/)
+  assert.doesNotMatch(RETRIEVER_PATH, /strategyProfileEvidenceBlock\(deriveStrategyProfile\(/)
   assert.match(RETRIEVER_PATH, /REQUESTED BUT UNAVAILABLE/)
   assert.match(RETRIEVER_PATH, /readLive: true/)
 })
 
-test('a learned profile renders recommendation evidence and forbids invented weights', () => {
-  const block = strategyProfileEvidenceBlock(profile())
+test('a learned profile renders recommendation evidence and keeps baseline for non-learned dimensions', () => {
+  const block = strategyProfileEvidenceBlock(baselineView())
   assert.match(block, /DIMENSION CTA — status learned; recommended "Book a demo"/)
   assert.match(block, /Margin over runner-up: 42\.0%/)
   assert.match(block, /"Book a demo" — 8 measured campaigns; CTR 4\.0%/)
   assert.match(block, /"Learn more" — 6 measured campaigns; CTR 2\.8%/)
-  assert.match(block, /Do NOT apply a dimension whose status is "no_clear_winner"/)
+  assert.match(block, /BASELINE GENERATION DEFAULTS — ACTIVE/)
+  assert.match(block, /Keep the corresponding baseline default when available/)
   assert.match(block, /Do NOT invent numeric weights/)
 })
 
 test('an unmeasurable variant is reported as such, never as a zero rate', () => {
-  const sample = profile()
+  const sample = baselineView()
   sample.dimensions[0].variants[0].clickThroughRate = null
   assert.match(strategyProfileEvidenceBlock(sample), /CTR not measurable/)
 })
 
-test('a profile that learned nothing says so and forbids invented weights', () => {
-  const block = strategyProfileEvidenceBlock(profile({
+test('zero measured campaigns still inject the current baseline and require generation', () => {
+  const block = strategyProfileEvidenceBlock(baselineView({
+    totalCampaigns: 0,
+    measuredCampaigns: 0,
+    unmeasuredCampaigns: 0,
     changesBehavior: false,
-    measuredCampaigns: 2,
-    summary: 'NO CHANGE RECOMMENDED — 2 measured campaigns.',
-    dimensions: [{ dimension: 'cta', status: 'insufficient_evidence', recommended: null, reason: 'Only 2 measured campaigns.', relativeMargin: null, variants: [] }],
+    summary: 'NO CHANGE RECOMMENDED — 0 measured campaigns.',
+    dimensions: [
+      { dimension: 'channel', status: 'insufficient_evidence', recommended: null, reason: 'No value reached 5 measured campaigns.', relativeMargin: null, variants: [] },
+      { dimension: 'cta', status: 'insufficient_evidence', recommended: null, reason: 'No value reached 5 measured campaigns.', relativeMargin: null, variants: [] },
+      { dimension: 'creative', status: 'insufficient_evidence', recommended: null, reason: 'No value reached 5 measured campaigns.', relativeMargin: null, variants: [] },
+    ],
   }))
-  // The block DESCRIBES the empty state; the produce-anyway rule is enforced from the system
-  // prompt (pinned separately above), because evidence is data, not instructions.
-  assert.match(block, /YOU MUST STILL PRODUCE THE REQUESTED CONTENT/)
-  assert.match(block, /the strategy profile did not influence it, and why/u)
-  assert.match(block, /Do NOT invent weights, heuristics, or performance claims/)
+
+  assert.match(block, /Campaigns: 0 total, 0 measured/)
+  assert.match(block, /Goal: Educational\/Training/)
+  assert.match(block, /Tone: Technical & Precise/)
+  assert.match(block, /Format: Landing Page/)
+  assert.match(block, /Offer type: Download Resource/)
+  assert.match(block, /CTA strategy: Download/)
+  assert.match(block, /Write the content first using the BASELINE GENERATION DEFAULTS above unchanged/)
+  assert.match(block, /Never answer this request only with an insufficient-data explanation/)
 })

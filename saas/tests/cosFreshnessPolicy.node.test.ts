@@ -140,6 +140,13 @@ test('creation/advice requests are not hijacked by public live-data routing', ()
   assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
 })
 
+test('scenario facts followed by an authoring task are treated as supplied context', () => {
+  const prompt = 'Gross margins have declined from 74% to 61% over the last two quarters due to soaring third-party inference and API costs. The Head of AI wants to maintain the current premium model tier to protect benchmark leadership, while the CFO demands an immediate migration to quantized open-source weights to restore margins to 70%. Design a 90-day phased optimization strategy that balances latency, model performance, and unit economics.'
+  assert.equal(requiresFreshExternalEvidence(prompt), false)
+
+  const factualLookupThenTask = 'Who is the current CEO of Apple? Design a succession plan around that person.'
+  assert.equal(requiresFreshExternalEvidence(factualLookupThenTask), true)
+})
 
 test('regulated public guidance is live-verified across supported languages', () => {
   for (const prompt of [

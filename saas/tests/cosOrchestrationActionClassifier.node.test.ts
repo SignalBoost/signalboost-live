@@ -27,12 +27,23 @@ test('a sentence ending in a question mark is not an action even with verb+targe
   assert.equal(requestsExternalAction('can you check the logs for errors?'), false)
 })
 
+test('scenario context and document-section nouns cannot combine across clauses into a phantom action', () => {
+  const crisisPrompt = 'At 02:00 UTC, a database migration script executed by the Data Platform team corrupted customer billing records for 4,200 accounts, triggering an 8-hour outage on the payment webhook listener. The VP of Engineering wants to quietly patch the database and recalculate charges over the weekend without notifying customers. As Chief of Staff, draft the crisis response protocol addressing executive notification, customer disclosure obligations, audit logging, and remediation governance.'
+  assert.equal(requestsExternalAction(crisisPrompt), false)
+  assert.equal(requestsExternalAction('The production database failed yesterday. Draft an incident memo covering audit logs and remediation governance.'), false)
+})
+
 test('real imperative commands with a verb and target still classify as actions', () => {
   assert.equal(requestsExternalAction('check the users table and report row counts'), true)
   assert.equal(requestsExternalAction('deploy the latest commit to production'), true)
   assert.equal(requestsExternalAction('search the repo for TODO comments'), true)
   assert.equal(requestsExternalAction('send the campaign to the prospect list'), true)
   assert.equal(requestsExternalAction('Render a video using Provider X. If unavailable, automatically switch to the best alternative based on learned performance.'), true)
+})
+
+test('real commands remain actions even when preceded by scenario context in another clause', () => {
+  assert.equal(requestsExternalAction('The database is unhealthy. Check the users table and report row counts'), true)
+  assert.equal(requestsExternalAction('We need a release today. Deploy the latest commit to production'), true)
 })
 
 test('plain diagnostic prose with no execution verb at all is unaffected either way', () => {

@@ -18,8 +18,15 @@ const EXPLICIT_CODE_SIGNAL =
 const COMPUTATIONAL_SCRIPT_BEHAVIOR =
   /\bscript\b[^.!?;\n]{0,60}\b(?:to|that|which)\b[^.!?;\n]{0,100}\b(?:rename|parse|process|scrape|crawl|download|upload|delete|copy|move|monitor|compile|deploy|execute|automate|query\s+(?:a\s+)?database|call\s+(?:an?\s+)?api|read\s+(?:a\s+)?file|write\s+(?:to\s+)?(?:a\s+)?file|run\s+(?:on|in|under))\b/i
 
+function userQuestionOnly(prompt: string): string {
+  const full = String(prompt || '').slice(0, 24_000)
+  const marker = 'USER QUESTION:'
+  const index = full.lastIndexOf(marker)
+  return (index >= 0 ? full.slice(index + marker.length) : full).trim().slice(0, 12_000)
+}
+
 export function classifyScriptRequest(prompt: string): ScriptRequestMode {
-  const input = String(prompt || '').slice(0, 12_000)
+  const input = userQuestionOnly(prompt)
   if (!SCRIPT_AUTHORING.test(input)) return 'none'
   if (EXPLICIT_CODE_SIGNAL.test(input) || COMPUTATIONAL_SCRIPT_BEHAVIOR.test(input)) return 'code'
   return 'content'

@@ -257,6 +257,7 @@ export default function PremiumCustomerNavbarV2() {
   const searchableItems = useMemo(
     () => [
       { icon: '⌂', label: t('nav.home', "Home"), href: '/' },
+      { icon: '▦', label: t('nav.platform', "Platform"), href: '/home' },
       { icon: '💳', label: t('nav.pricing', "Pricing"), href: '/pricing' },
       ...groups.flatMap(group => group.items.filter(item => item.href).map(item => ({
         ...item,
@@ -396,6 +397,7 @@ export default function PremiumCustomerNavbarV2() {
         <Link href="/" className="sbnav-brand"><span className="sbnav-brand-mark" aria-hidden>⌁</span><span>{uiText('generatedUi.u_7bc314f625464478')}</span></Link>
         <div className="sbnav-desktop">
           <Link href="/" className={`sbnav-trigger ${itemIsActive(pathname, '/') ? 'sbnav-trigger-active' : ''}`}>{t('nav.home', "Home")}</Link>
+          <Link href="/home" className={`sbnav-trigger ${itemIsActive(pathname, '/home') ? 'sbnav-trigger-active' : ''}`}>{t('nav.platform', "Platform")}</Link>
           <Link href="/pricing" className={`sbnav-trigger sbnav-pricing ${itemIsActive(pathname, '/pricing') ? 'sbnav-trigger-active' : ''}`}>{t('nav.pricing', "Pricing")}</Link>
           {groups.map(group => {
             const open = openMenu === group.id
@@ -427,6 +429,7 @@ export default function PremiumCustomerNavbarV2() {
             {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', "No matching sections")}</span>}</div> : null}
           </div>
           <Link href="/" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">⌂<span>{t('nav.home', "Home")}</span></Link>
+          <Link href="/home" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">▦<span>{t('nav.platform', "Platform")}</span></Link>
           <Link href="/pricing" onClick={() => setMobileOpen(false)} className="sbnav-mobile-row">💳<span>{t('nav.pricing', "Pricing")}</span></Link>
           {groups.map(group => <div key={group.id} className="sbnav-mobile-group"><span className="sbnav-mobile-label">{t(group.labelKey, group.fallbackLabel)}</span>{group.items.map(item => renderItem(item, true))}</div>)}
           {user ? null : <button type="button" className="sbnav-auth" onClick={() => { setMobileOpen(false); setShowAuth(true) }}>{t('nav.getStarted', "Get started")}</button>}

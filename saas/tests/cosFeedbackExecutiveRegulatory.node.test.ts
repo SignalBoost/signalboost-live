@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 import { hashPrompt } from '../lib/ai/cos/turnExperienceStore.ts'
 import {
   executiveDecisionDirective,
@@ -29,6 +30,10 @@ test('feedback route waits for deferred server-owned turn correlation instead of
   assert.match(feedbackRoute, /TURN_CORRELATION_RETRY_MS\s*=\s*125/)
   assert.match(feedbackRoute, /readTurnPromptHashWithRetry/)
   assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== correlation\.promptHash/)
+})
+
+test('regulated hiring question is routed to fresh authoritative evidence before conceptual fallback', () => {
+  assert.equal(requiresFreshExternalEvidence(hiringPrompt), true)
 })
 
 test('regulated hiring guidance forbids reconstructing current EU AI Act or EEOC duties from model memory', () => {

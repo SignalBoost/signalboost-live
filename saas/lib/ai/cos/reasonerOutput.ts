@@ -90,7 +90,28 @@ export function recoverLooseAnswerAndConfidence(raw:string):{answer:string;confi
   return{answer,confidence:Math.max(0,Math.min(1,confidence))}
 }
 
-export type LocalResult={answer:string;confidence:number;truncated?:boolean;recovered?:boolean}
+const STRONG_APPROVE_RECOMMENDATION = /\b(?:approval\s+recommendation|recommendation)\s+(?:is|:)\s+(?:to\s+)?(?:\*\*)?approve\b/i
+const STRONG_REJECT_RECOMMENDATION = /\b(?:approval\s+recommendation|recommendation)\s+(?:is|:)\s+(?:to\s+)?(?:\*\*)?(?:reject|not\s+approve)\b/i
+const NEGATIVE_APPROVAL_CONCLUSION = /\b(?:conclusion|final\s+recommendation)\b[\s\S]{0,260}\b(?:should|must)\s+(?:\*\*)?not\s+(?:\*\*)?approve\b|\b(?:conclusion|final\s+recommendation)\b[\s\S]{0,260}\b(?:should|must)\s+reject\b/i
+const POSITIVE_APPROVAL_CONCLUSION = /\b(?:conclusion|final\s+recommendation)\b[\s\S]{0,260}\b(?:should|must)\s+(?:\*\*)?approve\b/i
+
+/**
+ * A recommendation cannot begin by explicitly recommending approval and end by explicitly
+ * recommending rejection (or the reverse). This narrow gate intentionally ignores conditional
+ * branches such as "approve if X; reject if Y" and catches only conflicting top-level recommendations.
+ */
+export function recommendationIntegrityConflict(answer:string):boolean{
+  const text=String(answer??'')
+  return (STRONG_APPROVE_RECOMMENDATION.test(text)&&NEGATIVE_APPROVAL_CONCLUSION.test(text))
+    ||(STRONG_REJECT_RECOMMENDATION.test(text)&&POSITIVE_APPROVAL_CONCLUSION.test(text))
+}
+
+export type LocalResult={answer:string;confidence:number;truncated?:boolean;recovered?:boolean;integrityConflict?:boolean}
+
+function applyIntegrityCap<T extends {answer:string;confidence:number}>(result:T):T&{integrityConflict?:boolean}{
+  if(!recommendationIntegrityConflict(result.answer))return result
+  return{...result,confidence:Math.min(result.confidence,.2),integrityConflict:true}
+}
 
 export function parseLocalResult(raw:string):LocalResult|null{
   const stripFences=(t:string)=>t.trim().replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim()
@@ -99,7 +120,7 @@ export function parseLocalResult(raw:string):LocalResult|null{
       const p=JSON.parse(t) as {answer?:unknown;confidence?:unknown}
       const answer=typeof p.answer==='string'?p.answer.trim():''
       const confidence=Number(p.confidence)
-      return answer&&Number.isFinite(confidence)?{answer,confidence:Math.max(0,Math.min(1,confidence))}:null
+      return answer&&Number.isFinite(confidence)?applyIntegrityCap({answer,confidence:Math.max(0,Math.min(1,confidence))}):null
     }catch{return null}
   }
   const cleaned=stripFences(raw)
@@ -108,7 +129,7 @@ export function parseLocalResult(raw:string):LocalResult|null{
   const extracted=extractBalancedJsonObject(cleaned)
   if(extracted){const recovered=tryParse(extracted);if(recovered)return recovered}
   const loose=recoverLooseAnswerAndConfidence(cleaned)
-  if(loose)return{...loose,recovered:true}
+  if(loose)return applyIntegrityCap({...loose,recovered:true})
   const salvaged=salvageTruncatedAnswer(cleaned)
   // No confidence was emitted, so a genuinely truncated answer still cannot enter the confident path.
   if(salvaged)return{answer:salvaged,confidence:0,truncated:true}

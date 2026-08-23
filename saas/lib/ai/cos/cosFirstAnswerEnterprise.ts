@@ -22,6 +22,8 @@ import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriev
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
 import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { isContentGenerationRequest } from '@/lib/ai/cos/contentGenerationIntent'
+import { regulatedClaimsContract, regulatedDomainsOf } from '@/lib/ai/cos/regulatedClaimsGuard'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -698,11 +700,12 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // exhaustion from every other way a reasoner call can fail, instead of collapsing all of them
   // into one generic "did not return an answer" message with the real cause visible only in logs.
   let reasonerFailureMessage: string | null = null
+  const regulatedContract = isContentGenerationRequest(input.prompt) ? regulatedClaimsContract(regulatedDomainsOf(input.prompt)) : ''
   const reasoned = await callCosReasoner({
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English'),
-    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this question.'}\n\nUSER QUESTION:\n${input.prompt}`,
+    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this question.'}${regulatedContract ? `\n\n${regulatedContract}` : ''}\n\nUSER QUESTION:\n${input.prompt}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission

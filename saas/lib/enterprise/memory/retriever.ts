@@ -3,6 +3,15 @@ import {
   type EnterpriseMemoryCandidate,
   type RankedEnterpriseMemory,
 } from './retrievalRanking.ts'
+import {
+  appliedStrategyOverrides,
+  deriveStrategyProfile,
+  MINIMUM_APPROVED_FOR_REWORK_RATE,
+  MINIMUM_CAMPAIGNS_PER_VARIANT,
+  MINIMUM_RELATIVE_MARGIN,
+  type CampaignOutcomeRow,
+  type StrategyProfile,
+} from '../../ai/cos/strategyProfile.ts'
 
 export type EnterpriseMemoryContext = {
   source: 'enterprise_memory'
@@ -18,6 +27,8 @@ type MemoryRows = {
   campaigns?: readonly Record<string, unknown>[]
   approvals?: readonly Record<string, unknown>[]
   confidence?: readonly Record<string, unknown>[]
+  strategyProfile?: StrategyProfile | null
+  strategyProfileError?: string | null
 }
 
 function text(value: unknown): string {
@@ -59,6 +70,45 @@ function compositeIdentity(separator: string, ...parts: unknown[]): string {
   return cleaned.every(Boolean) ? cleaned.join(separator) : ''
 }
 
+function strategyProfileRequested(taskTags?: readonly string[]): boolean {
+  const wanted = new Set((taskTags || []).map(value => text(value).toLowerCase()).filter(Boolean))
+  return ['strategy', 'strategic', 'weight', 'weights', 'heuristic', 'heuristics'].some(value => wanted.has(value))
+}
+
+function compactStrategyProfile(profile: StrategyProfile): Record<string, unknown> {
+  return {
+    status: 'available',
+    sourceOfTruth: 'Derived on read from measured enterprise_campaign_memory outcomes. These are not provider/base-model weights and there is no mutable strategy-weight table.',
+    summary: profile.summary,
+    totalCampaigns: profile.totalCampaigns,
+    measuredCampaigns: profile.measuredCampaigns,
+    unmeasuredCampaigns: profile.unmeasuredCampaigns,
+    changesBehavior: profile.changesBehavior,
+    appliedOverrides: appliedStrategyOverrides(profile),
+    heuristics: {
+      minimumCampaignsPerVariant: MINIMUM_CAMPAIGNS_PER_VARIANT,
+      minimumRelativeMargin: MINIMUM_RELATIVE_MARGIN,
+      minimumApprovedForReworkRate: MINIMUM_APPROVED_FOR_REWORK_RATE,
+      rule: 'Apply only dimensions whose status is learned. For insufficient_evidence or no_clear_winner, keep the existing generation default.',
+    },
+    dimensions: profile.dimensions.map(dimension => ({
+      dimension: dimension.dimension,
+      status: dimension.status,
+      recommended: dimension.recommended,
+      reason: dimension.reason,
+      relativeMargin: dimension.relativeMargin,
+      variants: dimension.variants.slice(0, 6).map(variant => ({
+        variant: variant.variant,
+        measuredCampaigns: variant.measuredCampaigns,
+        averagePerformanceScore: variant.averagePerformanceScore,
+        clickThroughRate: variant.clickThroughRate,
+      })),
+    })),
+    rework: profile.rework,
+    generationInstruction: 'When the user asks to generate content using the current strategy profile, generate the content now. Apply appliedOverrides where present, keep normal defaults where no learned override exists, and explain which listed heuristics/dimension reasons materially influenced the output. Do not claim the profile is missing merely because it is derived rather than stored as numeric weights.',
+  }
+}
+
 export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMemoryCandidate[] {
   const candidates: EnterpriseMemoryCandidate[] = []
   const organization = rows.organization
@@ -74,6 +124,30 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
         industry: text(organization.industry),
         profile: object(organization.profile),
         canonicalDomain: text(organization.canonical_domain),
+      },
+    })
+  }
+
+  if (rows.strategyProfile) {
+    candidates.push({
+      id: 'current-strategy-profile',
+      kind: 'strategy_profile',
+      confidence: 1,
+      occurredAt: rows.strategyProfile.generatedAt,
+      taskTags: ['strategy', 'strategic', 'profile', 'weight', 'weights', 'heuristic', 'heuristics', 'generation', 'content', 'campaign', 'channel', 'cta', 'creative', 'rework'],
+      payload: compactStrategyProfile(rows.strategyProfile),
+    })
+  } else if (text(rows.strategyProfileError)) {
+    candidates.push({
+      id: 'current-strategy-profile',
+      kind: 'strategy_profile',
+      confidence: 1,
+      taskTags: ['strategy', 'strategic', 'profile', 'weight', 'weights', 'heuristic', 'heuristics', 'generation', 'content'],
+      payload: {
+        status: 'unavailable',
+        sourceOfTruth: 'enterprise_campaign_memory',
+        error: text(rows.strategyProfileError),
+        generationInstruction: 'Do not invent strategy weights. State that the current derived strategy profile could not be read and report this concrete read error.',
       },
     })
   }
@@ -222,12 +296,27 @@ export async function retrieveEnterpriseMemoryContext(args: {
     admin.from('enterprise_confidence_history').select('*').eq('organization_id', organizationId).order('recorded_at', { ascending: false }).limit(20),
   ])
 
+  let strategyProfile: StrategyProfile | null = null
+  let strategyProfileError: string | null = null
+  if (strategyProfileRequested(args.taskTags)) {
+    const result = await admin
+      .from('enterprise_campaign_memory')
+      .select('campaign_id,channel,cta,creative,execution_status,human_edits,approved_version,performance_data,updated_at')
+      .eq('organization_id', organizationId)
+      .order('updated_at', { ascending: false })
+      .limit(2000)
+    if (result.error) strategyProfileError = `enterprise_campaign_memory read failed: ${result.error.message}`
+    else strategyProfile = deriveStrategyProfile((result.data ?? []) as CampaignOutcomeRow[])
+  }
+
   const candidates = createEnterpriseMemoryCandidates({
     organization: organizationResult.data || null,
     intelligence: Array.isArray(intelligenceResult.data) ? intelligenceResult.data : [],
     repositories: Array.isArray(repositoriesResult.data) ? repositoriesResult.data : [],
     campaigns: Array.isArray(campaignsResult.data) ? campaignsResult.data : [],
     confidence: Array.isArray(confidenceResult.data) ? confidenceResult.data : [],
+    strategyProfile,
+    strategyProfileError,
   })
 
   const memories = rankEnterpriseMemoryCandidates(candidates, {

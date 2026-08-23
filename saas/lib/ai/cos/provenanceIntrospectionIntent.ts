@@ -7,7 +7,7 @@ export function asksWhereTheAnswerCameFrom(input: string): boolean {
   const portuguese = /(?:de onde(?:\\s+(?:veio|vem|saiu))?\\s+(?:essa|esta|a)?\\s*(?:resposta|informação)|(?:mostre|mostra|diga|explique)[\\s\\S]{0,70}(?:de onde|fontes?|citação)[\\s\\S]{0,70}(?:resposta|informação)|(?:quais são suas fontes?|em que você se baseia))/iu
   const polish = /(?:skąd(?:\\s+(?:pochodzi|wzięła się))?\\s+(?:ta|te)?\\s*(?:odpowiedź|odpowiedzi|informacja)|(?:pokaż|powiedz|wyjaśnij)[\\s\\S]{0,70}(?:skąd|źródł[oa]|źródeł)[\\s\\S]{0,70}(?:odpowiedź|odpowiedzi|informacj)|(?:jakie są twoje źródła?|skąd masz))/iu
   const russian = /(?:откуда(?:\\s+(?:взялся|взялась|появился|появилась))?\\s+(?:эт(?:от|а|и))?\\s*(?:ответ|информац)|(?:покажи|скажите|объясните)[\\s\\S]{0,70}(?:откуда|источник)[\\s\\S]{0,70}(?:ответ|информац)|(?:какие у вас источники?))/iu
-  return english || spanish || portuguese || polish || russian
+  return english.test(text) || spanish.test(text) || portuguese.test(text) || polish.test(text) || russian.test(text)
 }
 export function isProvenanceIntrospectionIntent(input: string): boolean {
   const text = String(input || '')

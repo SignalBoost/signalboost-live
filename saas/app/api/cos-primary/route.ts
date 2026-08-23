@@ -22,6 +22,7 @@ import { writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { getAccess } from '@/lib/auth/access'
+import { asksWhereTheAnswerCameFrom } from '@/lib/ai/cos/provenanceIntrospection'
 import {
   authoritativeProvenance,
   confidenceThreshold,
@@ -436,7 +437,7 @@ export async function POST(req: NextRequest) {
   // Provenance is a request for server-owned prior-turn telemetry, never a new factual lookup.
   // Route it before freshness classification so paraphrases such as "where did you get that
   // answer?" cannot be sent to live evidence and fail closed.
-  if (isProvenanceIntrospection(input)) return basePost(new NextRequest(req.clone()))
+  if (isProvenanceIntrospection(input) || asksWhereTheAnswerCameFrom(input)) return basePost(new NextRequest(req.clone()))
 
   const resolved = resolveFreshConversationContext(body, input)
   const freshRequired = requiresFreshExternalEvidence(input) || requiresFreshExternalEvidence(resolved.lookupInput)

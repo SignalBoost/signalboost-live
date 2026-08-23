@@ -98,6 +98,16 @@ const ANSWER_NOUN = bounded([
 ].join('|'))
 
 /**
+ * Normalize a very small allowlist of observed/common English typos in the provenance referent.
+ * This is intentionally narrow: fuzzy-matching arbitrary words at the routing boundary would create
+ * false positives. The 2026-08-23 production failure "answert" otherwise sent a provenance follow-up
+ * into live web search and caused unrelated LIVE sources to be presented as the prior answer's origin.
+ */
+function normalizeProvenanceReferentTypos(text: string): string {
+  return text.replace(/\b(?:answert|anwser|asnwer)\b/giu, 'answer')
+}
+
+/**
  * True when the user is asking where the ASSISTANT's own previous answer came from. Callers should
  * answer from the stored provenance record for that turn — never from a live search, and never
  * from model memory about what models generally are.
@@ -129,7 +139,7 @@ function whereYouAnswerShape(text: string): boolean {
 }
 
 export function asksWhereTheAnswerCameFrom(input: string): boolean {
-  const text = String(input || '').trim()
+  const text = normalizeProvenanceReferentTypos(String(input || '').trim())
   if (!text || text.length > 300) return false
   if (CONDITIONAL_ADVICE.test(text)) return false
   // Structural backstop FIRST: it exists precisely for inputs the verb patterns cannot match

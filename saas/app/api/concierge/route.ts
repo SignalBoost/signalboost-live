@@ -29,7 +29,11 @@ export const maxDuration = 300
 // Keep a large recovery margin inside Vercel's 300 s invocation ceiling. The previous
 // 260 s primary deadline left only ~40 s for bounded research/backup/serialization and
 // could let the platform cut the socket before the browser received any JSON at all.
-const PRIMARY_TIMEOUT_MS = 120_000
+// 120 s then over-corrected: once the produce-anyway rule landed (2026-08-23), content-generation
+// turns — live profile read + full artifact + heuristics explanation — legitimately exceeded it
+// and hit the continuity watchdog on the FIRST attempt. 180 s fits those turns while keeping
+// 120 s of recovery margin, triple what the 260 s version left.
+const PRIMARY_TIMEOUT_MS = 180_000
 const RESEARCH_LIFELINE_START_MS = 90_000
 const RESEARCH_RESULT_LIMIT = 12
 

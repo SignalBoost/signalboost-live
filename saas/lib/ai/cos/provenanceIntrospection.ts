@@ -6,12 +6,15 @@
 // belong on the same server-recorded provenance path. Neither may be reconstructed by a fresh model
 // turn, because a new retrieval or prompt can differ from what actually produced the earlier answer.
 
+import { asksForExplicitPriorAnswerProvenance } from './explicitProvenanceIntent.ts'
 import { asksWhereTheAnswerCameFrom } from './provenanceIntrospectionIntent.ts'
 import { asksWhichHeuristicsInfluencedPriorAnswer } from './priorAnswerHeuristicIntent.ts'
 
-export { asksWhereTheAnswerCameFrom, asksWhichHeuristicsInfluencedPriorAnswer }
+export { asksForExplicitPriorAnswerProvenance, asksWhereTheAnswerCameFrom, asksWhichHeuristicsInfluencedPriorAnswer }
 
 /** True only for a request to introspect the recorded origin or influences of a prior answer. */
 export function isProvenanceIntrospection(input: string): boolean {
-  return asksWhereTheAnswerCameFrom(input) || asksWhichHeuristicsInfluencedPriorAnswer(input)
+  return asksForExplicitPriorAnswerProvenance(input)
+    || asksWhereTheAnswerCameFrom(input)
+    || asksWhichHeuristicsInfluencedPriorAnswer(input)
 }

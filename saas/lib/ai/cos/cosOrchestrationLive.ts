@@ -1,4 +1,4 @@
-import * as base from './cosOrchestrationEnterprise'
+import * as base from './cosOrchestrationEnterprise.ts'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled

@@ -6,6 +6,7 @@
 // to their owning system of record rather than being blindly sent to public web search.
 
 import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
+import { isContentGenerationRequest } from './contentGenerationIntent.ts'
 import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
@@ -142,6 +143,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
+  if (isContentGenerationRequest(text)) return false
 
   // High-stakes guidance is never answered from model memory. This occurs before the
   // conceptual/creative exclusion because questions such as "what should I do after changing my name?"

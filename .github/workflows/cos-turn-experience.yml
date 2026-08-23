@@ -15,17 +15,24 @@ on:
       - 'saas/lib/ai/cos/cognitiveVerifiedOutcome.ts'
       - 'saas/lib/ai/cos/failureAutopsyPolicy.ts'
       - 'saas/lib/ai/cos/turnFailureAutopsy.ts'
+      - 'saas/lib/ai/cos/explicitProvenanceIntent.ts'
+      - 'saas/lib/ai/cos/provenanceIntrospection.ts'
+      - 'saas/lib/ai/cos/provenanceIntrospectionIntent.ts'
+      - 'saas/lib/ai/cos/regulatedOperationalScenarioIntent.ts'
+      - 'saas/lib/ai/cos/scriptRequestIntent.ts'
       - 'saas/app/api/assistant/feedback/route.ts'
       - 'saas/app/api/admin/cos-turn-experience/route.ts'
       - 'saas/app/api/admin/cos-capability-benchmark/route.ts'
       - 'saas/app/api/admin/cos-evidence-utilization-benchmark/route.ts'
       - 'saas/app/api/admin/cos-failure-autopsy/route.ts'
       - 'saas/tests/cosTurnExperience.node.test.ts'
+      - 'saas/tests/cosTurnLearningContinuity.node.test.ts'
       - 'saas/tests/cosOutcomeCorrelation.node.test.ts'
       - 'saas/tests/cosFailureAutopsy.node.test.ts'
       - 'saas/supabase/migrations/20260821_cos_turn_experience.sql'
       - 'saas/supabase/migrations/20260821_cos_turn_outcomes_and_utilization_benchmark.sql'
       - 'saas/supabase/migrations/20260821_cos_general_failure_autopsy.sql'
+      - 'saas/supabase/migrations/20260822_cos_turn_confidence.sql'
       - '.github/workflows/cos-turn-experience.yml'
 
 permissions:
@@ -45,7 +52,7 @@ jobs:
           cache: npm
           cache-dependency-path: saas/package-lock.json
       - run: npm install --no-audit --no-fund
-      - name: Test COS turn experience, outcome correlation and failure autopsy
-        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts tests/cosOutcomeCorrelation.node.test.ts tests/cosFailureAutopsy.node.test.ts
+      - name: Test COS turn experience, continuity, outcome correlation and failure autopsy
+        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts tests/cosTurnLearningContinuity.node.test.ts tests/cosOutcomeCorrelation.node.test.ts tests/cosFailureAutopsy.node.test.ts
       - name: Typecheck
         run: npm run typecheck

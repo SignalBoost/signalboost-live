@@ -6,6 +6,8 @@ import { compareCosDecisions, createCosSyncLog } from '../lib/cos-backup/index.t
 import { detectPrimaryCorruption } from '../lib/cos-backup/policy.ts'
 import { runCosReasoning } from '../lib/ai/cos/reasoningCore.ts'
 import { buildBoundedResearchPartial, planResearchTask } from '../lib/ai/cos/researchBudget.ts'
+import { classifyScriptRequest, scriptRequestDirective } from '../lib/ai/cos/scriptRequestIntent.ts'
+import { buildDiagnosticRepairPrompt, contentScriptSemanticMismatch, preferRepairedDraft, reasonerDraftNeedsRepair } from '../lib/ai/cos/reasonerQuality.ts'
 import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
 const backup = {
@@ -148,6 +150,43 @@ test('bounded research partials cannot authorize or claim external action', () =
   assert.equal(partial.externalActionTaken, false)
   assert.match(partial.reply, /No one was contacted\. No email was sent\. No form was submitted/)
   assert.match(partial.continuationPrompt || '', /Do not contact anyone, send email, submit forms, or take any external action/)
+})
+
+test('unqualified script authoring is content, while explicit computational scripts remain code', () => {
+  const exact = "Produce a script for ‘Nova’ without assuming whether it’s a person, product, or company."
+  assert.equal(classifyScriptRequest(exact), 'content')
+  assert.equal(classifyScriptRequest('Write a video script for Nova without inventing what Nova is.'), 'content')
+  assert.equal(classifyScriptRequest('Draft a script about Nova.'), 'content')
+  assert.equal(classifyScriptRequest('Write a Python script to parse JSON files.'), 'code')
+  assert.equal(classifyScriptRequest('Create a Bash script that renames files.'), 'code')
+  assert.equal(classifyScriptRequest('Write a script to rename files in this directory.'), 'code')
+  assert.equal(classifyScriptRequest('Explain what the word script means.'), 'none')
+
+  const directive = scriptRequestDirective(exact)
+  assert.ok(directive)
+  assert.match(directive, /WRITTEN\/NARRATIVE CONTENT, NOT SOURCE CODE/)
+  assert.match(directive, /type-neutral wording/)
+})
+
+test('the exact Nova production failure is rejected and repaired as narrative content', () => {
+  const prompt = "Produce a script for ‘Nova’ without assuming whether it’s a person, product, or company."
+  const bad = JSON.stringify({
+    answer: 'Since Nova is undefined, a single script cannot be written. Specify the format, such as Python, Bash, or JavaScript. ```python\\nclass Nova:\\n    pass\\n```',
+    confidence: 0.78,
+  })
+  const good = JSON.stringify({
+    answer: 'NOVA — SCRIPT\\n\\nMeet Nova. No labels. No assumptions. Just a name worth noticing. Whatever Nova turns out to be, the next step is simple: discover it on its own terms.',
+    confidence: 0.8,
+  })
+
+  assert.equal(contentScriptSemanticMismatch(prompt, bad), true)
+  assert.equal(reasonerDraftNeedsRepair(prompt, bad), true)
+  const repair = buildDiagnosticRepairPrompt(prompt, bad)
+  assert.match(repair, /requested meaning of "script"/)
+  assert.match(repair, /ambiguity is a constraint on wording/i)
+  assert.match(repair, /Do not provide a programming template/)
+  assert.equal(contentScriptSemanticMismatch(prompt, good), false)
+  assert.equal(preferRepairedDraft(prompt, bad, good), true)
 })
 
 test('Concierge preserves Primary denials and returns healthy Primary without waiting for Backup COS', async () => {

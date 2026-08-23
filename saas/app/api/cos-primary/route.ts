@@ -26,6 +26,7 @@ import {
   authoritativeProvenance,
   confidenceThreshold,
   externalFallbackEnabled,
+  isProvenanceIntrospection,
   logEscalation,
 } from '@/lib/ai/cos/cosOrchestration'
 
@@ -432,6 +433,10 @@ export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   if (!input) return basePost(new NextRequest(req.clone()))
+  // Provenance is a request for server-owned prior-turn telemetry, never a new factual lookup.
+  // Route it before freshness classification so paraphrases such as "where did you get that
+  // answer?" cannot be sent to live evidence and fail closed.
+  if (isProvenanceIntrospection(input)) return basePost(new NextRequest(req.clone()))
 
   const resolved = resolveFreshConversationContext(body, input)
   const freshRequired = requiresFreshExternalEvidence(input) || requiresFreshExternalEvidence(resolved.lookupInput)

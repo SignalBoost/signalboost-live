@@ -343,6 +343,7 @@ export async function tryCOSFirstAnswer(input: {
   userId?: string | null
   language?: string
   privileged?: boolean
+  disableCache?: boolean
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
 

@@ -5,6 +5,7 @@ import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, t
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
+import { attachRecordedTurnProvenance, recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance'
 import { getAccess } from '@/lib/auth/access'
 import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
@@ -442,6 +443,66 @@ export async function POST(req: NextRequest) {
   })
 
   if (recovered && backup) {
+    // PERSIST BACKUP-SERVED TURNS. Persistence normally happens inside /api/support, which this
+    // failover path bypasses entirely — so a Backup-served answer left NO row in
+    // assistant_messages. Confirmed 2026-08-23 by querying the three most recent assistant rows
+    // after a Backup-served turn: the turn was simply absent. Two user-visible failures followed
+    // from that single gap:
+    //   1. "Could not save feedback" — feedback resolves against a stored row, and there was none.
+    //   2. Provenance introspection answered "this is the start of our conversation" — accurate
+    //      for what it was given, since neither a stored turn nor conversation history existed.
+    // The provenance recorded here is deliberately honest about what Backup is: read-only,
+    // advisory-only, no evidence retrieval, no learning. It must never be mistaken for a Primary
+    // lineage record.
+    const backupProvenance = {
+      authority: 'server_execution_telemetry',
+      schema_version: 4,
+      continuity_mode: 'backup_read_only',
+      primary_quarantined: true,
+      divergence_reasons: reasons,
+      source_commit: commit,
+      external_ai: {
+        invoked: Boolean(backup.externalAiInvoked),
+        provider: backup.provider ?? null,
+        model: backup.model ?? null,
+        necessary: false,
+        escalation_reason_code: 'primary_quarantined_backup_continuity',
+        escalation_reason: 'The primary COS response was quarantined by continuity policy; the read-only Backup COS answered instead.',
+      },
+      local_reasoning: {
+        invoked: backup.reasoningSource === 'configured_reasoner' || backup.reasoningSource === 'provider',
+        model: backup.model ?? null,
+        confidence: backup.confidence,
+        threshold: null,
+      },
+      semantic_cache: { used: backup.reasoningSource === 'cache', evidence_count: 0 },
+      enterprise_memory: { used: false, status: 'not_available_in_backup_mode', evidence_count: 0 },
+      learned_corpus: { used: false, evidence_count: 0 },
+      knowledge_graph: { used: false, evidence_count: 0 },
+      cognitive_skills: { used: false, evidence_count: 0 },
+      user_memory: { used: false, evidence_count: 0 },
+      autonomous_research: { used: false, documents_acquired: 0, new_knowledge_retained: 0 },
+      canonical_self_knowledge: { used: false },
+      model_generated: false,
+    }
+
+    const backupAccess = await getAccess().catch(() => null)
+    const backupUserId = backupAccess?.userId || null
+    const backupConversationId = conversationIdFrom(body)
+    if (backupUserId) {
+      after(async () => {
+        await Promise.allSettled([
+          recordLatestUserTurnProvenance(backupUserId, backup.answer, backupProvenance, 'backup-cos-continuity'),
+          ...(backupConversationId
+            ? [
+                persistTurn({ conversationId: backupConversationId, userId: backupUserId, userMessage: input, assistantReply: backup.answer })
+                  .then(() => attachRecordedTurnProvenance(backupConversationId, backupUserId, backup.answer, backupProvenance)),
+              ]
+            : []),
+        ])
+      })
+    }
+
     return NextResponse.json({
       reply: backup.answer,
       source: 'backup-cos-continuity',
@@ -451,6 +512,7 @@ export async function POST(req: NextRequest) {
       sourceCommit: commit,
       execution_allowed: false,
       approval_required: backup.requiresApproval,
+      execution_provenance: backupProvenance,
     })
   }
 

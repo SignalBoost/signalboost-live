@@ -20,6 +20,7 @@ on:
       - 'saas/lib/ai/cos/provenanceIntrospectionIntent.ts'
       - 'saas/lib/ai/cos/regulatedOperationalScenarioIntent.ts'
       - 'saas/lib/ai/cos/scriptRequestIntent.ts'
+      - 'saas/lib/ai/cos/reasonerQuality.ts'
       - 'saas/app/api/assistant/feedback/route.ts'
       - 'saas/app/api/admin/cos-turn-experience/route.ts'
       - 'saas/app/api/admin/cos-capability-benchmark/route.ts'
@@ -27,6 +28,7 @@ on:
       - 'saas/app/api/admin/cos-failure-autopsy/route.ts'
       - 'saas/tests/cosTurnExperience.node.test.ts'
       - 'saas/tests/cosTurnLearningContinuity.node.test.ts'
+      - 'saas/tests/cosFeedbackExecutiveRegulatory.node.test.ts'
       - 'saas/tests/cosOutcomeCorrelation.node.test.ts'
       - 'saas/tests/cosFailureAutopsy.node.test.ts'
       - 'saas/supabase/migrations/20260821_cos_turn_experience.sql'
@@ -52,7 +54,7 @@ jobs:
           cache: npm
           cache-dependency-path: saas/package-lock.json
       - run: npm install --no-audit --no-fund
-      - name: Test COS turn experience, continuity, outcome correlation and failure autopsy
-        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts tests/cosTurnLearningContinuity.node.test.ts tests/cosOutcomeCorrelation.node.test.ts tests/cosFailureAutopsy.node.test.ts
+      - name: Test COS turn experience, continuity, feedback, executive/regulatory discipline and failure autopsy
+        run: npx --yes tsx --test tests/cosTurnExperience.node.test.ts tests/cosTurnLearningContinuity.node.test.ts tests/cosFeedbackExecutiveRegulatory.node.test.ts tests/cosOutcomeCorrelation.node.test.ts tests/cosFailureAutopsy.node.test.ts
       - name: Typecheck
         run: npm run typecheck

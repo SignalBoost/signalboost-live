@@ -63,6 +63,20 @@ async function recentResponseBoundLineage(userId:string,reply:string):Promise<Re
   }
 }
 
+function supersededAttempt(provenance:any,source:string){
+  return{
+    turn_id:provenance?.turnId??null,
+    source,
+    local_reasoning_invoked:Boolean(provenance?.local_reasoning?.invoked),
+    local_confidence:Number.isFinite(Number(provenance?.local_reasoning?.confidence))?Number(provenance.local_reasoning.confidence):null,
+    local_threshold:Number.isFinite(Number(provenance?.local_reasoning?.threshold))?Number(provenance.local_reasoning.threshold):null,
+    external_ai_invoked:Boolean(provenance?.external_ai?.invoked),
+    external_provider:provenance?.external_ai?.provider??null,
+    external_model:provenance?.external_ai?.model??null,
+    disposition:'superseded_same_response_weaker_lineage',
+  }
+}
+
 export async function writeCosPrimaryProvenance(userId:string|null,reply:string,provenance:unknown,source:string,turn?:OutOfPipelineTurn):Promise<void>{
   if(!userId||!reply||!provenance)return
   if(turn){
@@ -77,6 +91,12 @@ export async function writeCosPrimaryProvenance(userId:string|null,reply:string,
   const candidateStrength=responseLineageStrength(provenance)
   const existingStrength=responseLineageStrength(existing?.provenance)
   if(existing&&existingStrength>candidateStrength){
+    const previous=Array.isArray((existing.provenance as any).superseded_attempts)?(existing.provenance as any).superseded_attempts:[]
+    const enriched={
+      ...existing.provenance,
+      superseded_attempts:[...previous,supersededAttempt(provenance,source)].slice(-4),
+    }
+    await recordLatestUserTurnProvenance(userId,reply,enriched,existing.source||'cos-response-lineage-preserved')
     console.warn('[cos-primary-provenance] preserved stronger response-bound lineage',JSON.stringify({
       existingSource:existing.source,
       existingStrength,

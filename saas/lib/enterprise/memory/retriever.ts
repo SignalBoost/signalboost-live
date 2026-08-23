@@ -3,7 +3,6 @@ import {
   type EnterpriseMemoryCandidate,
   type RankedEnterpriseMemory,
 } from './retrievalRanking.ts'
-import { deriveStrategyProfile, type CampaignOutcomeRow } from '../../ai/cos/strategyProfile.ts'
 import { isStrategyProfileRequest, strategyProfileEvidenceBlock } from '../../ai/cos/strategyProfileRequest.ts'
 
 export type EnterpriseMemoryContext = {
@@ -217,27 +216,32 @@ export async function retrieveEnterpriseMemoryContext(args: {
   const admin = getAdminSupabase()
 
   // Strategy-profile questions are a special live evidence read, not ordinary durable memory.
-  // The answer path already calls this retriever before cache lookup. Returning this one scoped
-  // memory makes semantic cache ineligible, while the freshly generated evidence changes the exact
-  // cache fingerprint on every request. This preserves the current COS core/cache hygiene code.
+  // Use the canonical reader here: it combines measured campaign outcomes with the current
+  // Enterprise Memory generation baseline. Re-deriving only campaign outcomes caused the live
+  // answer path to bypass generationDefaults and refuse when measuredCampaigns === 0.
   const strategyProfileRequested = isStrategyProfileRequest((args.taskTags || []).join(' '))
   if (strategyProfileRequested) {
-    const generatedAt = new Date().toISOString()
-    const campaignsResult = await admin.from('enterprise_campaign_memory')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false })
-      .limit(2000)
+    // Lazy loading preserves this retriever's dependency-light candidate helpers for plain Node
+    // tests while the Next.js runtime can resolve the canonical reader's application aliases.
+    const { readStrategyProfile } = await import('../../ai/cos/strategyProfileReport.ts')
+    const profileResult = await readStrategyProfile({
+      privileged: true,
+      organizationId,
+      workspace: args.workspace,
+    })
 
-    const evidence = campaignsResult.error
-      ? [
-          'CURRENT STRATEGY PROFILE — REQUESTED BUT UNAVAILABLE.',
-          `Reason: ${campaignsResult.error.message}`,
-          'Say plainly that the live profile could not be read, and do not substitute invented weights or heuristics.',
-        ].join('\n')
-      : strategyProfileEvidenceBlock(deriveStrategyProfile(
-          (Array.isArray(campaignsResult.data) ? campaignsResult.data : []) as CampaignOutcomeRow[],
-        ))
+    let generatedAt = new Date().toISOString()
+    let evidence: string
+    if (profileResult.ok) {
+      generatedAt = profileResult.profile.generatedAt
+      evidence = strategyProfileEvidenceBlock(profileResult.profile)
+    } else {
+      evidence = [
+        'CURRENT STRATEGY PROFILE — REQUESTED BUT UNAVAILABLE.',
+        `Reason: ${profileResult.error}`,
+        'Say plainly that the live profile could not be read, and do not substitute invented weights or heuristics.',
+      ].join('\n')
+    }
 
     const memories = rankEnterpriseMemoryCandidates([{
       id: `derived-strategy-profile:${organizationId}:${generatedAt}`,
@@ -250,7 +254,7 @@ export async function retrieveEnterpriseMemoryContext(args: {
       payload: {
         strategyProfileEvidence: evidence,
         readLive: true,
-        derivedFrom: 'enterprise_campaign_memory',
+        derivedFrom: 'enterprise_campaign_memory+enterprise_intelligence_snapshots',
       },
     }], {
       workspace: args.workspace,

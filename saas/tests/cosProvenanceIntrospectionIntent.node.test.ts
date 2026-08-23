@@ -1,18 +1,17 @@
 // saas/tests/cosProvenanceIntrospectionIntent.node.test.ts
 //
-// Both production failures are pinned verbatim as the first two fixtures. The negative cases carry
-// equal weight: this classifier routes a question AWAY from live evidence and toward the stored
-// provenance record, so a false positive would answer a real content question with a telemetry
-// dump. Content questions that merely borrow source words must stay content questions.
+// Production provenance/introspection failures are pinned verbatim. Negative cases carry equal
+// weight: these classifiers route a question AWAY from fresh reasoning and toward the stored prior
+// record, so a false positive would answer a real content question with telemetry.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { asksWhereTheAnswerCameFrom } from '../lib/ai/cos/provenanceIntrospectionIntent.ts'
+import { asksWhichHeuristicsInfluencedPriorAnswer } from '../lib/ai/cos/priorAnswerHeuristicIntent.ts'
+import { isProvenanceIntrospection } from '../lib/ai/cos/provenanceIntrospection.ts'
 
-test('all three verbatim production failures are recognized', () => {
-  // 1) after a name-change answer, in Polish; 2) after a funnel sequence; 3) after an alphabet
-  // script — the third had NO second-person word at all, which the first version required.
+test('all three verbatim source-origin production failures are recognized', () => {
   assert.equal(asksWhereTheAnswerCameFrom('skąd masz te informacje?'), true)
   assert.equal(asksWhereTheAnswerCameFrom('show me where from you got the answer for the question?'), true)
   assert.equal(asksWhereTheAnswerCameFrom('show me where the answers came from?'), true)
@@ -54,7 +53,7 @@ test('ordinary English phrasings of "where did that come from" are recognized', 
   }
 })
 
-test('the same question in every platform language is recognized', () => {
+test('the same source question in every platform language is recognized', () => {
   for (const query of [
     '¿de dónde sacaste esta respuesta?',
     '¿cuáles son tus fuentes?',
@@ -92,6 +91,38 @@ test('conditional advice questions are not hijacked', () => {
   }
 })
 
+test('verbatim heuristic-influence production failure routes to prior-answer introspection', () => {
+  const exact = 'Explain which heuristics influenced your output and why.'
+  assert.equal(asksWhichHeuristicsInfluencedPriorAnswer(exact), true)
+  assert.equal(isProvenanceIntrospection(exact), true)
+})
+
+test('natural prior-answer rule and policy questions are recognized', () => {
+  for (const query of [
+    'Which rules shaped your previous answer?',
+    'What instructions influenced your response?',
+    'What policy determined your last reply and why?',
+    'Which criteria were behind your answer?',
+    '¿Qué reglas influyeron en tu respuesta y por qué?',
+    'Quais regras influenciaram sua resposta e por quê?',
+    'Które zasady wpłynęły na twoją odpowiedź i dlaczego?',
+    'Какие правила влияли на ваш ответ и почему?',
+  ]) {
+    assert.equal(asksWhichHeuristicsInfluencedPriorAnswer(query), true, query)
+  }
+})
+
+test('general heuristic questions remain ordinary content questions', () => {
+  for (const query of [
+    'What heuristics should I use for debugging distributed systems?',
+    'Explain decision-making heuristics in behavioral economics.',
+    'Which rules should you use when reviewing code?',
+    'What policy should a company use for password rotation?',
+  ]) {
+    assert.equal(asksWhichHeuristicsInfluencedPriorAnswer(query), false, query)
+  }
+})
+
 test('ordinary requests are untouched', () => {
   for (const query of [
     'write me a 5-video funnel sequence',
@@ -101,12 +132,12 @@ test('ordinary requests are untouched', () => {
     '',
   ]) {
     assert.equal(asksWhereTheAnswerCameFrom(query), false, query)
+    assert.equal(asksWhichHeuristicsInfluencedPriorAnswer(query), false, query)
   }
 })
 
-test('the classifier is wired into the cos-primary introspection gate', () => {
+test('the classifiers are wired into the cos-primary introspection gate', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/baseRoute.ts', import.meta.url), 'utf8')
   assert.match(route, /asksWhereTheAnswerCameFrom/)
-  // It must widen the EXISTING introspection branch, not create a second answer path.
   assert.match(route, /isProvenanceIntrospection\(input\)\s*\|\|\s*asksWhereTheAnswerCameFrom\(input\)/)
 })

@@ -24,6 +24,7 @@ import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel 
 import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 import { isContentGenerationRequest } from '@/lib/ai/cos/contentGenerationIntent'
 import { regulatedClaimsContract, regulatedDomainsOf } from '@/lib/ai/cos/regulatedClaimsGuard'
+import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -656,7 +657,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       if (payload?.reply && !current.ok) console.warn('cosFirstAnswer: semantic cache entry refused as stale', { reason:current.reason, similarity:nearest.similarityScore })
       if (payload?.reply && current.ok && payload.confidence >= threshold()) {
         recordAvoidedCost('semantic_similarity', input.prompt.length, payload.reply.length, Date.now() - startedAt)
-        return { handled:true, reply:payload.reply, confidence:payload.confidence, provenance:cacheHitProvenance(payload, base, 'semantic_similarity', nearest.similarityScore) }
+        return { handled:true, reply:stripInternalEvidenceIds(payload.reply), confidence:payload.confidence, provenance:cacheHitProvenance(payload, base, 'semantic_similarity', nearest.similarityScore) }
       }
     }
   }
@@ -673,7 +674,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
   if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold()) {
     recordAvoidedCost('exact_cache', input.prompt.length, cached.reply.length, Date.now() - startedAt)
-    return { handled:true, reply:cached.reply, confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
+    return { handled:true, reply:stripInternalEvidenceIds(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
   }
 
   if (process.env.COS_LOCAL_FIRST_ENABLED === 'false') {
@@ -793,7 +794,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if (citedSkillIds.length) void recordCitedCognitiveSkillReuse(citedSkillIds)
 
   const storedAnswer:CachedCosAnswer = {
-    reply:parsed.answer,
+    reply:stripInternalEvidenceIds(parsed.answer),
     confidence,
     reasonerLabel:citedProvenance.reasonerLabel,
     policyVersion,
@@ -824,7 +825,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   )
   recordAvoidedCost('local_reasoner', input.prompt.length, parsed.answer.length, Date.now() - startedAt)
   void resolveKnowledgeGap(input.prompt)
-  return { handled:true, reply:parsed.answer, confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
+  return { handled:true, reply:stripInternalEvidenceIds(parsed.answer), confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult, language='en'):string {

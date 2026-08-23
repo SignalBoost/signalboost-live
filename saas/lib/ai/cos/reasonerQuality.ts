@@ -1,11 +1,42 @@
 import { assessAnswerSpecificity } from './answerSpecificity.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
-import { classifyScriptRequest, scriptRequestDirective } from './scriptRequestIntent.ts'
+import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
 const PROGRAMMING_REDIRECT = /\b(?:programming language|source code|python|javascript|typescript|bash|powershell|choose (?:a |the )?(?:language|runtime)|specify (?:a |the )?(?:language|runtime|format))\b/i
 const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot write (?:a |the )?script|can't write (?:a |the )?script|unable to write (?:a |the )?script|need you to specify|need more information before (?:i can |i )?(?:write|produce|draft|create))\b/i
+
+function userQuestionOnly(prompt: string): string {
+  const full = String(prompt || '').slice(0, 24_000)
+  const marker = 'USER QUESTION:'
+  const index = full.lastIndexOf(marker)
+  return (index >= 0 ? full.slice(index + marker.length) : full).trim().slice(0, 12_000)
+}
+
+function quantitativeDecisionClaims(text: string): string[] {
+  const input = String(text || '')
+  const claims = [
+    ...input.matchAll(/\b\d+(?:\.\d+)?\s*%/g),
+    ...input.matchAll(/\bQ[1-4]\b/gi),
+    ...input.matchAll(/\b(?:19|20)\d{2}\b/g),
+    ...input.matchAll(/\b\d+(?:\.\d+)?\s*(?:hours?|days?|weeks?|months?|years?)\b/gi),
+  ].map(match => match[0].toLowerCase().replace(/\s+/g, ' ').trim())
+  return [...new Set(claims)]
+}
+
+/**
+ * Executive decision answers may reuse quantitative facts supplied by the user, but they must not
+ * manufacture percentages, schedule periods, quarters, or dates to make a memo appear complete.
+ * This is intentionally narrow: ordinary calculations and non-executive answers are untouched.
+ */
+export function unsupportedExecutiveQuantitativeClaims(prompt: string, raw: string): string[] {
+  if (!executiveDecisionDirective(prompt)) return []
+  const parsed = parseLocalResult(String(raw ?? ''))
+  if (!parsed) return []
+  const supplied = new Set(quantitativeDecisionClaims(userQuestionOnly(prompt)))
+  return quantitativeDecisionClaims(parsed.answer).filter(claim => !supplied.has(claim))
+}
 
 /** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
 export function promptAppearsDiagnostic(prompt: string): boolean {
@@ -60,13 +91,37 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
  */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
   if (contentScriptSemanticMismatch(prompt, raw)) return true
+  if (unsupportedExecutiveQuantitativeClaims(prompt, raw).length > 0) return true
   const quality = assessReasonerDraft(prompt, raw)
   if (!quality.parseable || !quality.diagnostic) return false
   if (quality.cap < 0.72) return true
   return quality.genericBuckets >= 2 && quality.mechanisms < 3
 }
 
-export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: string): string {
+export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
+  const executiveDirective = executiveDecisionDirective(originalPrompt)
+  const unsupportedExecutiveClaims = unsupportedExecutiveQuantitativeClaims(originalPrompt, firstRaw)
+  if (executiveDirective && unsupportedExecutiveClaims.length) {
+    return [
+      originalPrompt,
+      '',
+      'EXECUTIVE QUALITY REPAIR — the previous draft added quantitative or contractual certainty that was not present in the original facts.',
+      executiveDirective,
+      '',
+      `Unsupported quantitative claims detected by the server gate: ${unsupportedExecutiveClaims.join(', ')}.`,
+      'Rewrite the executive memo from the original user facts only.',
+      '- Preserve exactly the supplied figures and timelines; do not add a current date, new quarter, new utilization percentage, new budget percentage, new duration, probability, outage cost, or staffing estimate.',
+      '- Do not claim that a Minimum Viable Tenant, phased rollout, waiver, or other workaround satisfies the contract unless the original facts establish that condition.',
+      '- Treat customer acceptance, contract flexibility, security readiness, additional staffing, outsourcing, budget contingency, and compliance status as UNKNOWN unless supplied.',
+      '- Separate KNOWN FACTS from UNKNOWNS/VALIDATION NEEDED before presenting options.',
+      '- For each option, show only consequences supported by the prompt. Use placeholders such as [Finance estimate required] rather than fabricated values.',
+      '- If recommending a path, make it conditional on the unresolved facts that must be verified. Do not label an option low-risk without evidence.',
+      '- The CEO wanting both outcomes is a goal; state what additional resource, scope change, schedule change, or explicit risk acceptance would be required to make both feasible.',
+      '',
+      'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
+    ].join('\n')
+  }
+
   const scriptDirective = scriptRequestDirective(originalPrompt)
   if (scriptDirective && classifyScriptRequest(originalPrompt) === 'content') {
     return [
@@ -114,6 +169,14 @@ export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRa
   const repairedScriptMismatch = contentScriptSemanticMismatch(prompt, repairedRaw)
   if (firstScriptMismatch !== repairedScriptMismatch) return !repairedScriptMismatch
   if (firstScriptMismatch && repairedScriptMismatch) return false
+
+  const firstExecutiveClaims = unsupportedExecutiveQuantitativeClaims(prompt, firstRaw)
+  const repairedExecutiveClaims = unsupportedExecutiveQuantitativeClaims(prompt, repairedRaw)
+  if (firstExecutiveClaims.length || repairedExecutiveClaims.length) {
+    if (repairedExecutiveClaims.length === 0 && firstExecutiveClaims.length > 0) return true
+    if (repairedExecutiveClaims.length !== firstExecutiveClaims.length) return repairedExecutiveClaims.length < firstExecutiveClaims.length
+    return false
+  }
 
   const first = assessReasonerDraft(prompt, firstRaw)
   const repaired = assessReasonerDraft(prompt, repairedRaw)

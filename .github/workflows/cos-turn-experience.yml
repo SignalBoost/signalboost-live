@@ -7,6 +7,7 @@ on:
       - 'saas/lib/ai/cos/turnExperienceStore.ts'
       - 'saas/lib/ai/cos/cosReasoner.ts'
       - 'saas/lib/ai/cos/cosFirstAnswer.ts'
+      - 'saas/lib/ai/cos/cosFreshnessPolicy.ts'
       - 'saas/lib/ai/cos/cognitiveTurnExperience.ts'
       - 'saas/lib/ai/cos/evidenceSourceUseTurnContext.ts'
       - 'saas/lib/ai/cos/evidenceSourceUseStore.ts'

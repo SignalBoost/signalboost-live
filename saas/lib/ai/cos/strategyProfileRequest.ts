@@ -16,14 +16,19 @@
 //   2. EVIDENCE, NOT ASSERTION. Each recommendation is rendered with the campaigns behind it —
 //      variant, measured campaign count, CTR, margin over the runner-up. The answer contract
 //      requires citing that evidence per heuristic and forbids inventing weights.
-//   3. HONEST EMPTINESS. When no dimension reached 'learned', the block says so plainly and
-//      instructs the reasoner to generate from its ordinary judgement while stating that the
-//      profile taught nothing yet. "Not enough campaigns" is a real answer; fabricated weights
-//      are not.
+//   3. BASELINE NEVER DISAPPEARS. Learned dimensions overlay the current Enterprise Memory
+//      generation defaults. An empty learned profile means "use the baseline unchanged", never
+//      "refuse to generate".
 //
-// Pure and dependency-free apart from the profile types.
+// Pure and dependency-free apart from the profile/default types.
 
-import type { StrategyProfile } from './strategyProfile'
+import type { StrategyProfile } from './strategyProfile.ts'
+import type { StrategyGenerationDefaults } from './strategyGenerationDefaults.ts'
+
+export type StrategyProfileEvidenceView = StrategyProfile & {
+  generationDefaults?: StrategyGenerationDefaults
+  generationRule?: string
+}
 
 const B0 = '(?<![\\p{L}\\p{M}])'
 const B1 = '(?![\\p{L}\\p{M}])'
@@ -62,11 +67,18 @@ function percent(value: number | null): string {
   return value === null ? 'not measurable' : `${(value * 100).toFixed(1)}%`
 }
 
+function shown(value: string | null | undefined): string {
+  return String(value ?? '').trim() || 'not specified'
+}
+
 /**
- * Render the profile as evidence the reasoner can cite. Every recommendation carries its campaign
- * count, click-through rate and margin; nothing is stated that the derivation did not compute.
+ * Render the live generation view as evidence the reasoner can cite. Every learned recommendation
+ * carries its campaign evidence, while the current non-learned baseline is rendered explicitly so
+ * an empty profile cannot accidentally turn into a refusal.
  */
-export function strategyProfileEvidenceBlock(profile: StrategyProfile): string {
+export function strategyProfileEvidenceBlock(profile: StrategyProfileEvidenceView): string {
+  const defaults = profile.generationDefaults
+  const baselineAvailable = defaults?.status === 'available'
   const lines: string[] = [
     'CURRENT STRATEGY PROFILE — derived from this organization\'s measured campaign outcomes, read live for this request.',
     `Generated: ${profile.generatedAt}`,
@@ -87,18 +99,40 @@ export function strategyProfileEvidenceBlock(profile: StrategyProfile): string {
   lines.push('')
   lines.push(`REWORK SIGNAL — status ${profile.rework.status}; ${profile.rework.approvedCampaigns} approved campaigns, ${profile.rework.campaignsRequiringEdits} required edits.`)
   lines.push('')
+
+  if (baselineAvailable && defaults) {
+    lines.push('BASELINE GENERATION DEFAULTS — ACTIVE unless an evidence-qualified learned dimension overrides the corresponding choice.')
+    lines.push(`  Goal: ${shown(defaults.goal)}`)
+    lines.push(`  Tone: ${shown(defaults.tone)}`)
+    lines.push(`  Format: ${shown(defaults.format)}`)
+    lines.push(`  Offer type: ${shown(defaults.offerType)}`)
+    lines.push(`  Platforms: ${defaults.platforms.length ? defaults.platforms.join(', ') : 'not specified'}`)
+    lines.push(`  CTA strategy: ${shown(defaults.ctaStrategy)}`)
+    if (defaults.audiences.length) lines.push(`  Audiences: ${defaults.audiences.join(', ')}`)
+    if (defaults.industry) lines.push(`  Industry: ${defaults.industry}`)
+    if (defaults.description) lines.push(`  Organization/product context: ${defaults.description}`)
+    lines.push(`  Fallback rule: ${defaults.fallbackRule}`)
+    if (profile.generationRule) lines.push(`  Generation rule: ${profile.generationRule}`)
+    lines.push('')
+  } else if (profile.generationRule) {
+    lines.push(`GENERATION RULE: ${profile.generationRule}`)
+    lines.push('')
+  }
+
   lines.push('HOW TO USE THIS EVIDENCE:')
 
   if (profile.changesBehavior) {
-    lines.push('1. Generate the requested content, applying every dimension whose status is "learned".')
-    lines.push('2. After the content, list each heuristic you applied and cite its evidence from above — the variant, its measured campaign count, and its margin. One line each.')
-    lines.push('3. Do NOT apply a dimension whose status is "no_clear_winner" or "insufficient_evidence"; use your ordinary judgement there and say so.')
+    lines.push('1. GENERATE THE REQUESTED CONTENT. Start from the baseline defaults above when available, then overlay every dimension whose status is "learned".')
+    lines.push('2. After the content, list each learned heuristic you applied and cite its evidence from above — the variant, its measured campaign count, and its margin. One line each.')
+    lines.push('3. Do NOT apply a dimension whose status is "no_clear_winner" or "insufficient_evidence". Keep the corresponding baseline default when available; use ordinary judgement only when no baseline value exists.')
     lines.push('4. Do NOT invent numeric weights. The profile contains rates and margins, not weights; describe what it actually measured.')
   } else {
-    lines.push('1. YOU MUST STILL PRODUCE THE REQUESTED CONTENT. An empty profile is a reason the content is not yet performance-tuned; it is NOT a reason to refuse. Refusing leaves the user with nothing, which is worse than unoptimized content.')
-    lines.push('2. Write the content first, using ordinary judgement and any organization context available.')
-    lines.push('3. After the content, add a short note: the strategy profile did not influence it, and why — give the measured-campaign count and the minimum required from the evidence above.')
-    lines.push('4. Do NOT invent weights, heuristics, or performance claims to fill the gap, and do NOT present ordinary judgement as learned performance.')
+    lines.push('1. YOU MUST STILL PRODUCE THE REQUESTED CONTENT. An empty profile means there is no measured override; it is NOT a refusal condition.')
+    lines.push(baselineAvailable
+      ? '2. Write the content first using the BASELINE GENERATION DEFAULTS above unchanged. Zero learned overrides means the baseline remains the current strategy.'
+      : '2. Write the content first using ordinary judgement and any organization context available because no baseline snapshot is available.')
+    lines.push('3. After the content, add a short note that no measured heuristic overrode the baseline, and give the measured-campaign count / evidence threshold as the reason.')
+    lines.push('4. Do NOT invent numeric weights, heuristics, or performance claims to fill the gap. Never answer this request only with an insufficient-data explanation.')
   }
   return lines.join('\n')
 }

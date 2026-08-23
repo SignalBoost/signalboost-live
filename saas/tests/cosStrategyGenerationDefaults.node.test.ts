@@ -48,10 +48,18 @@ test('empty snapshots remain explicit but still do not turn missing learned weig
   assert.match(defaults.fallbackRule, /NOT a refusal condition/)
 })
 
-test('strategy profile reader attaches baseline defaults and a mandatory generation fallback', () => {
+test('strategy profile reader attaches baseline defaults and generates the actual artifact', () => {
   assert.match(REPORT_SOURCE, /enterprise_intelligence_snapshots/)
   assert.match(REPORT_SOURCE, /strategyGenerationDefaultsFromSnapshot/)
   assert.match(REPORT_SOURCE, /generationDefaults: defaults/)
-  assert.match(REPORT_SOURCE, /content generation MUST proceed/)
+  assert.match(REPORT_SOURCE, /CURRENT ACTIVE STRATEGY CONTRACT/)
+  assert.match(REPORT_SOURCE, /If the user supplies no content topic, use this organization\/product context as the subject/)
+  assert.match(REPORT_SOURCE, /Produce the actual requested artifact in the baseline format/)
+  assert.match(REPORT_SOURCE, /Do NOT replace the artifact with a strategy placeholder/)
+  assert.match(REPORT_SOURCE, /pilot-campaign recommendations/)
+  assert.match(REPORT_SOURCE, /KPI\/tracking checklist/)
+  assert.match(REPORT_SOURCE, /COS_MEASURE_DELAY_HOURS/)
+  assert.match(REPORT_SOURCE, /do not call baseline defaults learned weights or learned heuristics/)
+  assert.match(REPORT_SOURCE, /ACTIVE BASELINE/)
   assert.match(REPORT_SOURCE, /does NOT mean refuse generation/)
 })

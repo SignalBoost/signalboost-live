@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosFreshnessPolicy.ts
 // Policy for deciding when pretrained/local knowledge is not sufficient because
 // the answer can change without a code or model update.
 //
@@ -7,6 +8,7 @@
 
 import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
+import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
@@ -144,6 +146,15 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
   if (isContentGenerationRequest(text)) return false
+
+  // A question about COS's OWN previous answer is never a public-web lookup. This is a structural
+  // safeguard, not a duplicate of the introspection routing: when the introspection classifier
+  // misses (a typo like "the answert from", a phrasing nobody anticipated), the question used to
+  // fall through to live search — and on 2026-08-23 COS answered "where did you get the answer
+  // from?" using retrieved pages about E-Verify and FAFSA verification, because it searched the
+  // web for the word "verification". Failing to recognize introspection should degrade to a plain
+  // answer, never to confidently citing unrelated sources as the origin of its own reasoning.
+  if (isProvenanceIntrospection(text)) return false
 
   // High-stakes guidance is never answered from model memory. This occurs before the
   // conceptual/creative exclusion because questions such as "what should I do after changing my name?"

@@ -89,23 +89,19 @@ const IMPERATIVE_TO_ASSISTANT = bounded([
 ].join('|'))
 
 /** A definite reference to the answer just given — assistant-referring on its own. */
+// TYPO TOLERANCE. A production miss (2026-08-23) was "show me where did you get the ANSWERT
+// from?" — one stray letter. The consequence is severe and asymmetric: an unrecognized
+// introspection question falls through to LIVE WEB SEARCH, and COS then answered a question about
+// its own provenance using retrieved pages about E-Verify and FAFSA verification. A short trailing
+// letter run is therefore allowed on the answer nouns. The risk of over-matching is low because
+// this noun never fires alone — it is always combined with a where-word and second-person address.
 const ANSWER_NOUN = bounded([
-  'answers?|responses?|replies|reply',
+  'answer\\p{L}{0,2}|responses?|replies|reply',
   'respuestas?',
   'respostas?',
-  'odpowied[zź]|odpowiedzi',
-  'ответ|ответы|ответа',
+  'odpowied[zź]\\p{L}{0,2}|odpowiedzi',
+  'ответ\\p{L}{0,2}',
 ].join('|'))
-
-/**
- * Normalize a very small allowlist of observed/common English typos in the provenance referent.
- * This is intentionally narrow: fuzzy-matching arbitrary words at the routing boundary would create
- * false positives. The 2026-08-23 production failure "answert" otherwise sent a provenance follow-up
- * into live web search and caused unrelated LIVE sources to be presented as the prior answer's origin.
- */
-function normalizeProvenanceReferentTypos(text: string): string {
-  return text.replace(/\b(?:answert|anwser|asnwer)\b/giu, 'answer')
-}
 
 /**
  * True when the user is asking where the ASSISTANT's own previous answer came from. Callers should
@@ -139,7 +135,7 @@ function whereYouAnswerShape(text: string): boolean {
 }
 
 export function asksWhereTheAnswerCameFrom(input: string): boolean {
-  const text = normalizeProvenanceReferentTypos(String(input || '').trim())
+  const text = String(input || '').trim()
   if (!text || text.length > 300) return false
   if (CONDITIONAL_ADVICE.test(text)) return false
   // Structural backstop FIRST: it exists precisely for inputs the verb patterns cannot match

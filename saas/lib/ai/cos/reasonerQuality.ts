@@ -1,7 +1,11 @@
 import { assessAnswerSpecificity } from '@/lib/ai/cos/answerSpecificity'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { classifyScriptRequest, scriptRequestDirective } from '@/lib/ai/cos/scriptRequestIntent'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
+const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!/(?:usr/bin/env\s+)?(?:bash|sh|python))\b/m
+const PROGRAMMING_REDIRECT = /\b(?:programming language|source code|python|javascript|typescript|bash|powershell|choose (?:a |the )?(?:language|runtime)|specify (?:a |the )?(?:language|runtime|format))\b/i
+const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot write (?:a |the )?script|can't write (?:a |the )?script|unable to write (?:a |the )?script|need you to specify|need more information before (?:i can |i )?(?:write|produce|draft|create))\b/i
 
 /** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
 export function promptAppearsDiagnostic(prompt: string): boolean {
@@ -35,11 +39,27 @@ export function assessReasonerDraft(prompt: string, raw: string): ReasonerDraftQ
 }
 
 /**
- * One local rewrite is allowed when a diagnostic draft is structurally generic. This is not a
- * second opinion and it does not involve an external provider; it is the same independent COS
- * runtime being told exactly why its first draft failed the deterministic quality gate.
+ * A written-script request must not silently drift into executable code merely because the named
+ * subject is underspecified. The prompt already tells us which sense of "script" the user asked
+ * for; this gate checks whether the draft violated that deterministic interpretation.
+ */
+export function contentScriptSemanticMismatch(prompt: string, raw: string): boolean {
+  if (classifyScriptRequest(prompt) !== 'content') return false
+  const parsed = parseLocalResult(String(raw ?? ''))
+  if (!parsed) return false
+  const answer = parsed.answer
+  const opening = answer.slice(0, 1200)
+  return CODE_SHAPED_ANSWER.test(answer) || PROGRAMMING_REDIRECT.test(opening) || CONTENT_SCRIPT_REFUSAL.test(opening)
+}
+
+/**
+ * One local rewrite is allowed when a draft violates a deterministic semantic boundary or when a
+ * diagnostic answer is structurally generic. This is not a second opinion and it does not involve
+ * an external provider; it is the same independent COS runtime being told exactly why its first
+ * draft failed the deterministic quality gate.
  */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
+  if (contentScriptSemanticMismatch(prompt, raw)) return true
   const quality = assessReasonerDraft(prompt, raw)
   if (!quality.parseable || !quality.diagnostic) return false
   if (quality.cap < 0.72) return true
@@ -47,6 +67,25 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 }
 
 export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: string): string {
+  const scriptDirective = scriptRequestDirective(originalPrompt)
+  if (scriptDirective && classifyScriptRequest(originalPrompt) === 'content') {
+    return [
+      originalPrompt,
+      '',
+      'QUALITY REPAIR — your previous draft violated the requested meaning of "script".',
+      scriptDirective,
+      '',
+      'Produce the requested written script now.',
+      '- Keep every unknown attribute unknown; use wording that remains valid whether the named subject is a person, product, company, service, project, or something else.',
+      '- Do not explain that the ambiguity prevents writing. The ambiguity is a constraint on wording, not a reason to refuse.',
+      '- Do not provide a programming template, source code, classes, functions, APIs, or a choice of programming language.',
+      '- Do not invent factual attributes, features, roles, capabilities, dates, or identity details that the user did not supply.',
+      '- Return the actual script first. A short note about what was intentionally left unspecified is allowed only after the script.',
+      '',
+      'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
+    ].join('\n')
+  }
+
   return [
     originalPrompt,
     '',
@@ -71,6 +110,11 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: s
 }
 
 export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRaw: string): boolean {
+  const firstScriptMismatch = contentScriptSemanticMismatch(prompt, firstRaw)
+  const repairedScriptMismatch = contentScriptSemanticMismatch(prompt, repairedRaw)
+  if (firstScriptMismatch !== repairedScriptMismatch) return !repairedScriptMismatch
+  if (firstScriptMismatch && repairedScriptMismatch) return false
+
   const first = assessReasonerDraft(prompt, firstRaw)
   const repaired = assessReasonerDraft(prompt, repairedRaw)
   if (!repaired.parseable) return false

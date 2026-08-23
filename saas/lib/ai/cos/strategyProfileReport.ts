@@ -85,12 +85,16 @@ export async function readStrategyProfile(args: {
   })
   const rows = (result.data ?? []) as CampaignOutcomeRow[]
   const derived = deriveStrategyProfile(rows, args.options ?? {})
+  const fallbackSummary = derived.changesBehavior
+    ? derived.summary
+    : `${derived.summary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation.`
 
   return {
     ok: true,
     organizationId: resolution.scope.organizationId,
     profile: {
       ...derived,
+      summary: fallbackSummary,
       generationDefaults: defaults,
       generationRule: defaults.status === 'available'
         ? 'Overlay learned dimensions on generationDefaults. If no learned override exists, generationDefaults remain active and content generation MUST proceed; lack of measured weights is not a reason to refuse.'

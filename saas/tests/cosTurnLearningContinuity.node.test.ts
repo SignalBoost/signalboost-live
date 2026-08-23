@@ -8,6 +8,7 @@ import { scriptRequestDirective } from '../lib/ai/cos/scriptRequestIntent.ts'
 const turnStore = readFileSync(new URL('../lib/ai/cos/turnExperienceStore.ts', import.meta.url), 'utf8')
 const turnMigration = readFileSync(new URL('../supabase/migrations/20260822_cos_turn_confidence.sql', import.meta.url), 'utf8')
 const feedbackRoute = readFileSync(new URL('../app/api/assistant/feedback/route.ts', import.meta.url), 'utf8')
+const conciergeRoute = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
 
 const longProvenancePrompt = `shwo “Show me the complete provenance for the answer you just gave. Identify the primary model that generated the reasoning. List every COS internal system that materially contributed: semantic cache, Enterprise Memory, Knowledge Graph, learned corpus, autonomous research, local reasoning engine, and any external AI provider. For each one, state whether it was actually used, what evidence it contributed, and whether any new knowledge was retrieved or learned during this request. Do not list a component merely because it exists.”`
 
@@ -66,4 +67,13 @@ test('fast feedback waits for deferred turn persistence without weakening verifi
   assert.match(feedbackRoute, /await wait\(delayMs\)/)
   assert.match(feedbackRoute, /COS turn correlation is still being finalized; retry feedback\./)
   assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== correlation\.promptHash/)
+})
+
+test('healthy concierge primary answers repair missing durable conversation history before returning', () => {
+  assert.match(conciergeRoute, /ensureHealthyPrimaryTurnPersisted/)
+  assert.match(conciergeRoute, /lastAssistantProvenance\(conversationId, userId\)/)
+  assert.match(conciergeRoute, /normalizeAssistantContent\(existing\.content\).*normalizeAssistantContent\(snapshot\.reply\)/s)
+  assert.match(conciergeRoute, /await persistTurn\(\{[\s\S]*provenance: snapshot\.provenance/)
+  assert.match(conciergeRoute, /await ensureHealthyPrimaryTurnPersisted\(body, input, primarySnapshot\)/)
+  assert.match(conciergeRoute, /status: persisted \? 'persisted' : 'persistence_not_confirmed'/)
 })

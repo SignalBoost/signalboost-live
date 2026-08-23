@@ -15,6 +15,7 @@ export type AutonomousLearningRunHealth = {
   probationary: number
   indexed: number
   indexingFailed: number
+  rejected: Record<string, number>
   sourceErrors: Record<string, number>
   skipReason: string | null
   deploymentSha: string | null
@@ -31,7 +32,7 @@ function text(value: unknown): string | null {
   return normalized || null
 }
 
-function cleanErrors(value: unknown): Record<string, number> {
+function cleanCounts(value: unknown): Record<string, number> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: Record<string, number> = {}
   for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
@@ -53,6 +54,7 @@ export async function recordAutonomousLearningRun(input: {
   probationary?: number
   indexed?: number
   indexingFailed?: number
+  rejected?: Record<string, number>
   sourceErrors?: Record<string, number>
   skipReason?: string | null
 }): Promise<boolean> {
@@ -75,7 +77,8 @@ export async function recordAutonomousLearningRun(input: {
     probationary: count(input.probationary),
     indexed: count(input.indexed),
     indexingFailed: count(input.indexingFailed),
-    sourceErrors: cleanErrors(input.sourceErrors),
+    rejected: cleanCounts(input.rejected),
+    sourceErrors: cleanCounts(input.sourceErrors),
     skipReason: text(input.skipReason),
     deploymentSha: text(process.env.VERCEL_GIT_COMMIT_SHA),
   }
@@ -114,7 +117,8 @@ function parseRow(row: any): AutonomousLearningRunHealth | null {
       probationary: count(parsed.probationary),
       indexed: count(parsed.indexed),
       indexingFailed: count(parsed.indexingFailed),
-      sourceErrors: cleanErrors(parsed.sourceErrors),
+      rejected: cleanCounts(parsed.rejected),
+      sourceErrors: cleanCounts(parsed.sourceErrors),
       skipReason: text(parsed.skipReason),
       deploymentSha: text(parsed.deploymentSha),
       recordedAt: text(row?.created_at),

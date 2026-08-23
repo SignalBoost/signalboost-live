@@ -4254,23 +4254,23 @@
   },
   "homepage": {
     "concierge": {
-      "eyebrow": "TU CONCIERGE SIGNALBOOST",
+      "eyebrow": "TU CONCIERGE DE SIGNALBOOST",
       "greeting": "Hola — soy COS.",
       "headline": "¿Qué te gustaría lograr hoy?",
-      "subhead": "Haz una pregunta, describe un objetivo o dime a dónde quieres ir. Te ayudaré a encontrar el espacio de SignalBoost adecuado y proporcionaré una respuesta basada en evidencia cuando esté disponible.",
-      "workspace": "Explorar la plataforma",
+      "subhead": "Haz una pregunta, describe un objetivo o dime adónde quieres ir. Te ayudaré a encontrar el espacio de SignalBoost adecuado y, cuando sea posible, daré una respuesta basada en evidencia.",
       "placeholder": "Pregúntale cualquier cosa a COS…",
-      "thinking": "Pensando…",
-      "send": "Preguntar a COS",
       "suggested": "Preguntas sugeridas",
-      "grow": "Ayúdame a hacer crecer mi negocio",
+      "cosLabel": "COS",
+      "send": "Preguntar a COS",
+      "thinking": "COS está pensando…",
+      "continue": "Continuar la conversación",
+      "workspace": "Explorar la plataforma",
+      "trust": "COS usa razonamiento gobernado, respeta los límites de aprobación y no presenta información incierta como un hecho.",
+      "error": "No pude conectar con COS ahora. Puedes continuar en el espacio de Concierge.",
+      "grow": "Ayúdame a crecer mi negocio",
       "review": "Revisa mi sitio web",
       "campaign": "Planifica una campaña",
-      "show": "Muéstrame lo que puede hacer SignalBoost",
-      "cosLabel": "Respuesta de COS",
-      "continue": "Continuar con COS",
-      "error": "COS no está disponible temporalmente. Inténtalo de nuevo o continúa en el asistente completo.",
-      "trust": "COS utiliza razonamiento gobernado, respeta los límites de aprobación y no presenta información incierta como hechos."
+      "show": "Muéstrame qué puede hacer SignalBoost"
     }
   }
 }

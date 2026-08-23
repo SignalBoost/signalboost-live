@@ -18,6 +18,8 @@ const MAX_CONVERSATION_MESSAGES = 500
 const MAX_ASSISTANT_CONTENT_CHARS = 80_000
 const MAX_PROMPT_CHARS = 20_000
 const MAX_CORRECTION_CHARS = 4_000
+const TURN_CORRELATION_ATTEMPTS = 5
+const TURN_CORRELATION_RETRY_MS = 125
 
 type ConversationMessage = {
   role?: string | null
@@ -44,6 +46,28 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function validFeedbackType(value: unknown): value is CosUserFeedbackType {
   return value === 'positive' || value === 'negative' || value === 'correction'
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function readTurnPromptHashWithRetry(
+  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  turnId: string,
+): Promise<{ promptHash: string; error?: unknown }> {
+  for (let attempt = 0; attempt < TURN_CORRELATION_ATTEMPTS; attempt += 1) {
+    const experience = await db
+      .from('cos_turn_experience')
+      .select('prompt_hash')
+      .eq('turn_id', turnId)
+      .maybeSingle()
+    if (experience.error) return { promptHash: '', error: experience.error }
+    const promptHash = clean(experience.data?.prompt_hash, 160)
+    if (promptHash) return { promptHash }
+    if (attempt + 1 < TURN_CORRELATION_ATTEMPTS) await wait(TURN_CORRELATION_RETRY_MS)
+  }
+  return { promptHash: '' }
 }
 
 async function targetFromConversation(params: {
@@ -78,8 +102,6 @@ async function targetFromConversation(params: {
   }
 
   const messages = (transcript.data ?? []) as ConversationMessage[]
-  // The client sends rendered reply text while the durable records normalize whitespace. Compare
-  // the same canonical representation without relaxing the server-owned-turn requirement.
   const wantedContent = normalizeAssistantContent(assistantContent)
   const matchingAssistantIndexes: number[] = []
   for (let index = 0; index < messages.length; index += 1) {
@@ -137,17 +159,15 @@ async function targetFromLatestCosProvenance(params: {
   const turnId = clean(asRecord(latest.data.provenance).turnId, 80)
   if (!turnId) return { target: null, error: 'Latest COS response has no turn correlation', status: 409 }
 
-  const experience = await db
-    .from('cos_turn_experience')
-    .select('prompt_hash')
-    .eq('turn_id', turnId)
-    .maybeSingle()
-  if (experience.error) {
-    console.warn('[cos-user-feedback-learning] turn prompt hash lookup failed', experience.error)
+  // The reasoner publishes turnId synchronously, but the durable phase row is deliberately written
+  // after the response. A user can click feedback before that post-response insert commits. Wait for
+  // a short bounded window rather than rejecting valid feedback or trusting client-supplied identity.
+  const correlation = await readTurnPromptHashWithRetry(db, turnId)
+  if (correlation.error) {
+    console.warn('[cos-user-feedback-learning] turn prompt hash lookup failed', correlation.error)
     return { target: null, error: 'Could not verify COS prompt correlation', status: 500 }
   }
-  const storedPromptHash = clean(experience.data?.prompt_hash, 160)
-  if (!storedPromptHash || hashPrompt(userPrompt) !== storedPromptHash) {
+  if (!correlation.promptHash || hashPrompt(userPrompt) !== correlation.promptHash) {
     return { target: null, error: 'Rendered prompt does not match the server-owned COS turn', status: 409 }
   }
 

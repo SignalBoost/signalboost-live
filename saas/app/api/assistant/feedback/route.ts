@@ -171,14 +171,15 @@ async function targetFromLatestCosProvenance(params: {
   if (correlation.error) {
     return { target: null, error: correlation.error, status: 500 }
   }
-  if (!correlation.promptHash) {
+  const storedPromptHash = clean(correlation.promptHash, 160)
+  if (!storedPromptHash) {
     return {
       target: null,
       error: 'COS turn correlation is still being finalized; retry feedback.',
       status: 409,
     }
   }
-  if (hashPrompt(userPrompt) !== correlation.promptHash) {
+  if (hashPrompt(userPrompt) !== storedPromptHash) {
     return { target: null, error: 'Rendered prompt does not match the server-owned COS turn', status: 409 }
   }
 

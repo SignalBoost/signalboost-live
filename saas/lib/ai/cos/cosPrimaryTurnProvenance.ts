@@ -1,10 +1,10 @@
-import { normalizeAssistantContent, recordLatestUserTurnProvenance } from './supportTurnProvenance'
-import { buildCosLiveSystemState } from './cosLiveSystemState'
+import { normalizeAssistantContent, recordLatestUserTurnProvenance } from './supportTurnProvenance.ts'
+import { buildCosLiveSystemState } from './cosLiveSystemState.ts'
 import { responseLineageStrength } from './responseLineage.ts'
 import { getAccess } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { hashPrompt } from './turnExperienceStore'
-import { buildOutOfPipelineExperienceRow, ensureProvenanceTurnId, type OutOfPipelineTurn } from './outOfPipelineTurn'
+import { hashPrompt } from './turnExperienceStore.ts'
+import { buildOutOfPipelineExperienceRow, ensureProvenanceTurnId, type OutOfPipelineTurn } from './outOfPipelineTurn.ts'
 
 export async function readCosPrimaryPriorProvenance(userId:string|null,precedingAssistant?:string):Promise<Record<string,unknown>|null>{
   if(!userId)return null

@@ -38,6 +38,11 @@ function activeBaselineSummary(defaults: StrategyGenerationDefaults): string {
   ].filter(Boolean).join('; ')
 }
 
+function safeEvidenceSummary(profile: StrategyProfile): string {
+  if (profile.measuredCampaigns !== 0) return profile.summary
+  return `NO MEASURED OUTCOMES — ${profile.totalCampaigns} campaign rows exist and 0 currently carry usable measured performance. No learned campaign dimension can change behavior yet, so the current baseline defaults remain active.`
+}
+
 export function strategyGenerationRule(defaults: StrategyGenerationDefaults): string {
   if (defaults.status !== 'available') {
     return 'If no learned override exists and no baseline snapshot is available, still generate the requested artifact using ordinary judgement and say that no measured override was applied. Lack of measured weights alone is never a reason to refuse generation. Do not substitute a measurement plan, pilot-campaign checklist, or placeholder for the requested artifact.'
@@ -114,9 +119,10 @@ export async function readStrategyProfile(args: {
   })
   const rows = (result.data ?? []) as CampaignOutcomeRow[]
   const derived = deriveStrategyProfile(rows, args.options ?? {})
+  const evidenceSummary = safeEvidenceSummary(derived)
   const fallbackSummary = derived.changesBehavior
-    ? derived.summary
-    : `${derived.summary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation. ACTIVE BASELINE — ${activeBaselineSummary(defaults)}.`
+    ? evidenceSummary
+    : `${evidenceSummary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation. ACTIVE BASELINE — ${activeBaselineSummary(defaults)}.`
 
   return {
     ok: true,

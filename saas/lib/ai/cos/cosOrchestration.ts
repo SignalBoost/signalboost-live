@@ -133,6 +133,11 @@ function recordedInfluenceInterpretation(provenance: any): string {
   }
 
   const originFromCache = Boolean(provenance?.answer_origin?.from_cache)
+  if (!originFromCache) {
+    material.unshift('User-Supplied Task Context — MATERIAL: the current user prompt supplied the question and any explicit scenario facts or constraints. Those supplied premises are task input, not retrieved external evidence, and must not be attributed to web, memory, or corpus sources.')
+  } else {
+    consultedOnly.unshift('Current User Prompt — used to select the cached answer, but the cached answer was not freshly synthesized from the current prompt.')
+  }
   const externalMaterial = Boolean(provenance?.external_ai?.invoked) && provenance?.external_ai?.accepted !== false
   if (!originFromCache && provenance?.local_reasoning?.invoked && !externalMaterial) {
     material.push(`Local Reasoning Engine — MATERIAL: ${provenance.local_reasoning.model || 'local model'} generated the fresh recorded answer.`)
@@ -180,6 +185,11 @@ export function formatAuthoritativeProvenance(provenance: any, language: string)
     ? `Canonical Self-Knowledge: USED — ${[canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null, canonical.semantic_cache_definition ? 'Semantic Cache definition' : null].filter(Boolean).join(', ')} contributed material to the answer.`
     : 'Canonical Self-Knowledge: NOT USED.'
   formatted = insertBeforeLiveSystemState(formatted, canonicalLine)
+  const originFromCache = Boolean(provenance?.answer_origin?.from_cache)
+  const suppliedContextLine = originFromCache
+    ? 'User-Supplied Task Context: CACHE LOOKUP INPUT — the current prompt selected a previously generated answer; it was not fresh factual grounding for that cached text.'
+    : 'User-Supplied Task Context: MATERIAL — the current prompt supplied the question and any explicit scenario facts or constraints; those premises were task input and were not independently sourced from the web or COS memory.'
+  formatted = insertBeforeLiveSystemState(formatted, suppliedContextLine)
   const external = provenance?.external_ai ?? {}
   const necessary = external?.necessary === true
   const invoked = external?.invoked === true

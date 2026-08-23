@@ -50,6 +50,9 @@ function signalsForSentence(sentence: string): AnswerFreshnessSignal[] {
   if (!sentence || isPureLegalUncertainty(sentence)) return []
 
   const out: AnswerFreshnessSignal[] = []
+  if (DIRECT_LEGAL_MANDATE.test(sentence)) {
+    out.push({ code: 'mutable_institutional_claim', excerpt: excerpt(sentence) })
+  }
   if (EXPLICIT_CURRENT_MARKER.test(sentence) && MUTABLE_INSTITUTIONAL_TOPIC.test(sentence)) {
     out.push({ code: 'explicit_current_marker', excerpt: excerpt(sentence) })
   }

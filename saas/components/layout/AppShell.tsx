@@ -10,8 +10,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isConciergeHome = pathname === '/'
 
   return (
-    <div className="sb-ai-app-shell" style={AI_DOCK_CSS_VARS}>
-      <style>{"\n        @media (min-width: 861px) {\n          .sb-ai-app-shell {\n            transition: grid-template-columns 180ms ease;\n          }\n\n          .sb-ai-app-shell:has(> .sb-ai-dock.is-collapsed) {\n            grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-collapsed-width);\n          }\n\n          .sb-ai-app-shell > .sb-ai-dock.is-collapsed {\n            width: var(--sb-ai-dock-collapsed-width);\n          }\n        }\n      "}</style>
+    <div className={isConciergeHome ? "sb-ai-app-shell sb-ai-app-shell--home" : "sb-ai-app-shell"} style={AI_DOCK_CSS_VARS}>
+      <style>{"\n        @media (min-width: 861px) {\n          .sb-ai-app-shell {\n            transition: grid-template-columns 180ms ease;\n          }\n\n          .sb-ai-app-shell:not(.sb-ai-app-shell--home):has(> .sb-ai-dock.is-collapsed) {\n            grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-collapsed-width);\n          }\n\n          .sb-ai-app-shell:not(.sb-ai-app-shell--home) > .sb-ai-dock.is-collapsed {\n            width: var(--sb-ai-dock-collapsed-width);\n          }\n          .sb-ai-app-shell--home { display: block; padding-right: 0; }\n        }\n      "}</style>
       <div className="sb-ai-workspace" role="presentation">
         {children}
       </div>

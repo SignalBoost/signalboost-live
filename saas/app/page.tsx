@@ -112,7 +112,7 @@ export default function Home() {
       <p className="lead">{c('subhead')}</p>
       <form className="ask-box" onSubmit={ask}>
         <input ref={fileInputRef} type="file" multiple accept={ATTACH_INPUT_ACCEPT} onChange={(event) => { void addFiles(event.target.files); event.target.value = '' }} className="file-input" />
-        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={2} maxLength={8000} placeholder={c('placeholder')} aria-label={c('placeholder')} />
+        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void ask() } }} rows={2} maxLength={8000} placeholder={c('placeholder')} aria-label={c('placeholder')} />
         <button type="button" className="attach-button" onClick={() => fileInputRef.current?.click()} disabled={loading || attachments.length >= ATTACH_MAX_FILES} aria-label={t(dict, 'concierge.attach')} title={t(dict, 'concierge.attach')}>📎</button>
         <button type="submit" disabled={(!question.trim() && attachments.length === 0) || loading}>{loading ? c('thinking') : c('send')} <span aria-hidden="true">→</span></button>
       </form>

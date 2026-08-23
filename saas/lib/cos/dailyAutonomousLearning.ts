@@ -1,3 +1,4 @@
+// saas/lib/cos/dailyAutonomousLearning.ts
 import type { ContinuousLearningSourceAdapter } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningStore, type KnowledgeGap } from '@/lib/cos-core/layers/learning'
@@ -107,6 +108,16 @@ export function recurringTechnologyCurriculum(): KnowledgeGap[] {
     ['distributed-systems', 'Distributed systems architecture', 'What current patterns and failure modes matter for queues, caches, concurrency control, backpressure, rate limiting, sharding, consistency, retries, and tail latency?', 86],
     ['cybersecurity', 'Enterprise cybersecurity', 'What current defensive security, identity, authorization, supply-chain, cloud, container, and AI-agent security practices should enterprise software reason about?', 84],
     ['ai-agent-engineering', 'AI agents and local inference', 'What current techniques improve autonomous agents, retrieval quality, memory, provenance, semantic caching, local open-model inference, evaluation, and safe tool execution?', 83],
+    // BUSINESS AND REVENUE DOMAINS — added 2026-08-23. The curriculum was eight infrastructure
+    // topics with zero business coverage, even though 'business strategy enterprise SaaS economics
+    // operations' and 'B2B enterprise sales marketing revenue operations' are both already
+    // permitted study domains in FOUNDATIONAL_KNOWLEDGE_DOMAINS. The result was a corpus that grew
+    // steadily (155 of 225 items scientific journals) while citing ~0 of it on real questions,
+    // because real questions are about campaigns, positioning, pricing and operations — not
+    // Kubernetes. These are ranked above generic tech news deliberately: acquisition should follow
+    // demand, and demand here is commercial.
+    ['saas-business-strategy', 'business strategy enterprise SaaS economics operations', 'What durable principles govern enterprise SaaS pricing, unit economics, retention, procurement, security review, buyer control, ROI demonstration, and adoption — and what current evidence supports them?', 91],
+    ['b2b-revenue-operations', 'B2B enterprise sales marketing revenue operations', 'What evidence-based practices improve B2B prospecting, qualification, outreach, positioning, campaign measurement, marketing attribution, lifecycle messaging, pipeline conversion, and retention?', 89],
     ['enterprise-tech-news', 'Enterprise technology developments', 'What recent developments in enterprise software, databases, cloud infrastructure, DevOps, SRE, cybersecurity, and AI materially change engineering practice?', 78],
   ]
   return topics.map(([id, subject, question, urgency]) => ({
@@ -455,7 +466,13 @@ export async function runDailyAutonomousLearning(input: {
     prioritySubjects: weaknessCurriculumSignals.map(signal => signal.subject),
   })
   const curriculum = [...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
-  const gaps = [miningGap(input.miningSummary), ...curriculum, ...autonomousGaps]
+  // ORDER IS THE POLICY. Acquisition budget is finite (maxCandidatesPerCycle), and whatever sits
+  // first consumes it. The fixed curriculum used to lead, so a static list of infra topics spent
+  // the budget every cycle while `autonomousGaps` — built from the questions COS actually FAILED
+  // on real work, ranked by how often they repeated — trailed behind and frequently never ran.
+  // That is precisely backwards: demand should outrank a hardcoded syllabus. Real observed gaps
+  // now lead, the curriculum fills whatever budget remains (2026-08-23).
+  const gaps = [miningGap(input.miningSummary), ...autonomousGaps, ...curriculum]
   const liveAdapters = createLiveLearningAdapters()
   const adapters = [
     miningAdapter(input.miningSummary),

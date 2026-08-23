@@ -95,9 +95,10 @@ export function strategyProfileEvidenceBlock(profile: StrategyProfile): string {
     lines.push('3. Do NOT apply a dimension whose status is "no_clear_winner" or "insufficient_evidence"; use your ordinary judgement there and say so.')
     lines.push('4. Do NOT invent numeric weights. The profile contains rates and margins, not weights; describe what it actually measured.')
   } else {
-    lines.push('1. The profile has learned NOTHING actionable yet — no dimension met the campaign-count and margin minimums.')
-    lines.push('2. Generate the requested content using ordinary judgement, and state plainly that the strategy profile did not yet influence it, giving the campaign counts above as the reason.')
-    lines.push('3. Do NOT invent weights, heuristics, or performance claims to fill the gap.')
+    lines.push('1. YOU MUST STILL PRODUCE THE REQUESTED CONTENT. An empty profile is a reason the content is not yet performance-tuned; it is NOT a reason to refuse. Refusing leaves the user with nothing, which is worse than unoptimized content.')
+    lines.push('2. Write the content first, using ordinary judgement and any organization context available.')
+    lines.push('3. After the content, add a short note: the strategy profile did not influence it, and why — give the measured-campaign count and the minimum required from the evidence above.')
+    lines.push('4. Do NOT invent weights, heuristics, or performance claims to fill the gap, and do NOT present ordinary judgement as learned performance.')
   }
   return lines.join('\n')
 }

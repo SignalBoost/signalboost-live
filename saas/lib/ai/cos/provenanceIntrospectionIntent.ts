@@ -46,7 +46,7 @@ const ADDRESSES_ASSISTANT = bounded([
 /** Provenance terms are unambiguous only when they refer to COS or its answer. */
 const EXTERNAL_PROVENANCE_SUBJECT = bounded('painting|artwork|sculpture|antique|artifact|artefact|manuscript|wine|diamond|coin|statue|relic|specimen|shipment|batch|cuadro|pintura|obra|antig[uü]edad|quadro|antiguidade|obraz|dzie[lł]o|antyk|картин\\p{L}*|произведени\\p{L}*|антиквариат')
 const PROVENANCE_VOCABULARY = bounded('provenance|telemetry|lineage|audit\\s+trail|execution\\s+record|procedencia|proveniencia|trazabilidad|proveni[eê]ncia|rastreabilidade|proweniencj\\p{L}*|pochodzeni\\p{L}*|происхождени\\p{L}*|телеметри\\p{L}*')
-const CONTRIBUTOR_QUESTION = /(?:which|what|list|show)\\b[^.?!]{0,80}\\b(?:systems?|components?|sources?|subsystems?|layers?|engines?|providers?|sistemas?|componentes?|systemy|komponent\\p{L}*|систем\\p{L}*|компонент\\p{L}*)\\b[^.?!]{0,80}\\b(?:contributed?|contribute|used|involved|material|informed|shaped|produced|contribuy\\p{L}*|contribu[ií]\\p{L}*|przyczyni\\p{L}*|u[zż]y\\p{L}*|использов\\p{L}*|участв\\p{L}*)\\b/iu
+const CONTRIBUTOR_QUESTION = /\b(?:which|what|list|show)\b[^.?!]{0,80}\b(?:systems?|components?|sources?|subsystems?|layers?|engines?|providers?|sistemas?|componentes?|systemy)\b[^.?!]{0,80}\b(?:contributed?|contribute|used|involved|material|informed|shaped|produced)\b/iu
 
 /** Verbs/nouns that ask about the ORIGIN of what was said. */
 const SOURCE_LANGUAGE = bounded([

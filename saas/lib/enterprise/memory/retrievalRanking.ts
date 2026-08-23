@@ -128,6 +128,14 @@ export function rankEnterpriseMemoryCandidates(
       score += taskMatch * 5
       if (taskMatch > 0) reasons.push(`task_match:${taskMatch.toFixed(2)}`)
 
+      // A requested current strategy profile is not merely another historical memory row. It is the
+      // derived control input the caller explicitly asked COS to use. Give it deterministic priority
+      // only when its task tags actually match this query; never fake approval/performance signals.
+      if (candidate.kind === 'strategy_profile' && taskMatch > 0) {
+        score += 60
+        reasons.push('current_strategy_profile')
+      }
+
       return {
         ...candidate,
         score: Math.round(score * 100) / 100,

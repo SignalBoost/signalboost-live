@@ -17,12 +17,14 @@ test('hourly and daily automatic learning schedules are both deployed', () => {
   assert.match(vercel, /"COS_LIVE_SOURCES_ENABLED":\s*"true"/)
 })
 
-test('current-world cron records autonomous health and indexes newly accepted evidence', () => {
+test('current-world cron records autonomous health, rejection reasons, and indexes newly accepted evidence', () => {
   assert.match(currentWorld, /recordAutonomousLearningRun/)
   assert.match(currentWorld, /mode:\s*'current_world'/)
   assert.match(currentWorld, /documentsAcquired:\s*learning\.documentsAcquired/)
   assert.match(currentWorld, /accepted:\s*learning\.accepted/)
+  assert.match(currentWorld, /rejected:\s*learning\.rejected/)
   assert.match(currentWorld, /sourceErrors:\s*learning\.sourceErrors/)
+  assert.match(currentWorld, /no_new_knowledge/)
   assert.match(currentWorld, /indexRecentUnembeddedLearnedCorpus/)
   assert.match(currentWorld, /indexed:\s*indexing\?\.embedded\s*\?\?\s*0/)
   assert.match(currentWorld, /indexingFailed:\s*indexing\?\.failed\s*\?\?\s*0/)
@@ -37,10 +39,11 @@ test('daily mining cron records the broad autonomous-learning cycle separately f
   assert.match(mining, /mining_prerequisite_failed/)
 })
 
-test('autonomous health is persisted independently of corpus-size growth', () => {
+test('autonomous health is persisted independently of corpus-size growth and explains zero-yield runs', () => {
   assert.match(health, /cos-autonomous-learning-health/)
   assert.match(health, /cos_learning_observations/)
   assert.match(health, /capability:\s*input\.mode/)
+  assert.match(health, /rejected/)
   assert.match(health, /sourceErrors/)
   assert.doesNotMatch(health, /cos_continuous_learning.*count/i)
 })

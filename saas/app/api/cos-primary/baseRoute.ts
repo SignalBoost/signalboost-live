@@ -22,6 +22,8 @@ import { writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { asksWhereTheAnswerCameFrom } from '@/lib/ai/cos/provenanceIntrospectionIntent'
+import { readStrategyProfile } from '@/lib/ai/cos/strategyProfileReport'
+import { appliedStrategyOverrides } from '@/lib/ai/cos/strategyProfile'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
 import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
@@ -193,11 +195,19 @@ export async function POST(req:NextRequest){
     }
   }
 
+  let reasoningPrompt=input
+  const strategyProfileRequest=/\\b(?:generate|write|create|draft)\\b[\\s\\S]{0,100}\\b(?:current )?strategy profile(?: weights?| heuristics?)?\\b/i.test(input)
+  if(strategyProfileRequest){
+    const profile=await readStrategyProfile({privileged:isPrivileged,organizationId:body?.context?.organizationId,workspace:body?.context?.workspace})
+    if(!profile.ok){const reply=`COS could not read the current strategy profile: ${profile.error}`;return NextResponse.json({ok:false,reply,error:reply,source:'cos-strategy-profile-unavailable',external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_allowed:false,external_action_taken:false},{status:503})}
+    const overrides=appliedStrategyOverrides(profile.profile)
+    reasoningPrompt=`${input}\\n\\nCURRENT DERIVED STRATEGY PROFILE (internal system of record): ${JSON.stringify(profile.profile)}\\nAPPLIED OVERRIDES: ${JSON.stringify(overrides)}\\nGenerate the requested content. Then state exactly which learned overrides influenced it. If overrides is empty, state that measured outcomes did not justify changing defaults; do not claim missing configuration.`
+  }
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   // Fresh facts already completed live retrieval plus their one local synthesis attempt above.
   // Re-entering generic COS here caused a second search and a second local call on the same turn.
   if(!requestedAction&&!requiresFreshEvidence){
-    try{cos=await tryCOSFirstAnswer({prompt:input,userId,language,privileged:isPrivileged})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,userId,language,privileged:isPrivileged})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 

@@ -649,6 +649,7 @@ Non-negotiable:
 - Cross-language freshness + owning-authority evidence — five-language live-verification triggering and first-party/institutional/secondary evidence ranking with an explicit no-authority caveat.
 - Assistant-feedback repair — normalized reply correlation on both resolution paths (fixes the silent 404 that blocked all Concierge feedback), multilingual "outdated" corrections file bounded current-state study gaps, grounded "Also worth checking" adjacent-obligation notes.
 - Answer evidence hygiene — COS retrieval labels such as `[CL1]` and `[LIVE2]` are internal prompt scaffolding. They are removed from user-facing replies unless a real source URL accompanies them; corpus-gap commentary is never presented as an answer.
+- Provenance-intent routing — answer-origin follow-ups work with singular or plural references and do not require a second-person pronoun. Ordinary research/source questions remain content requests.
 
 Always query current state; this sequence can advance after this document is merged.
 

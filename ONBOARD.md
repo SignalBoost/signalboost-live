@@ -650,6 +650,7 @@ Non-negotiable:
 - Assistant-feedback repair — normalized reply correlation on both resolution paths (fixes the silent 404 that blocked all Concierge feedback), multilingual "outdated" corrections file bounded current-state study gaps, grounded "Also worth checking" adjacent-obligation notes.
 - Answer evidence hygiene — COS retrieval labels such as `[CL1]` and `[LIVE2]` are internal prompt scaffolding. They are removed from user-facing replies unless a real source URL accompanies them; corpus-gap commentary is never presented as an answer.
 - Provenance-intent routing — answer-origin follow-ups work with singular or plural references and do not require a second-person pronoun. Ordinary research/source questions remain content requests.
+- Strategy-profile generation — current measured campaign outcomes are read on each strategy-profile request (semantic cache bypassed). Only evidence-qualified overrides may affect content; the reply must expose supporting campaign IDs, counts, and performance comparisons.
 
 Always query current state; this sequence can advance after this document is merged.
 

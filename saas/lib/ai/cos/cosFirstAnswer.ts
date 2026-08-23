@@ -3,8 +3,8 @@
 // any model is allowed to answer. No answer cache, Knowledge Graph, learned corpus, Enterprise
 // Memory, user memory, or pretrained/model memory is authoritative for this path.
 
-import { callCosReasoner, resolveCosReasoner } from './cosReasoner'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy'
+import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
+import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import {
   FRESH_SEARCH_RESULT_BUDGET,
   FRESH_SELECTED_EVIDENCE_BUDGET,
@@ -15,16 +15,16 @@ import {
   replyCitesIndependentFreshEvidence,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
-} from './cosFreshGrounding'
-import { parseLocalResult } from './reasonerOutput'
-import { generateLocalEmbedding } from './localEmbeddings'
-import { classifyRunpodFailure, runpodCapacityUnavailableReason } from './runpodCapacityError'
-import { configuredRunpodPodId } from './runpodConfig'
+} from './cosFreshGrounding.ts'
+import { parseLocalResult } from './reasonerOutput.ts'
+import { generateLocalEmbedding } from './localEmbeddings.ts'
+import { classifyRunpodFailure, runpodCapacityUnavailableReason } from './runpodCapacityError.ts'
+import { configuredRunpodPodId } from './runpodConfig.ts'
 import {
   answerFreshnessSignals,
   answerNeedsFreshnessReflection,
   stripUnsupportedCurrentClaimSentences,
-} from './answerFreshnessSelfReflection'
+} from './answerFreshnessSelfReflection.ts'
 import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
@@ -32,9 +32,9 @@ import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/li
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
   type COSFirstAnswerResult,
-} from './cosFirstAnswerEnterprise'
+} from './cosFirstAnswerEnterprise.ts'
 
-export * from './cosFirstAnswerEnterprise'
+export * from './cosFirstAnswerEnterprise.ts'
 
 function confidenceThreshold(): number {
   const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
@@ -343,6 +343,7 @@ export async function tryCOSFirstAnswer(input: {
   userId?: string | null
   language?: string
   privileged?: boolean
+  disableCache?: boolean
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
 

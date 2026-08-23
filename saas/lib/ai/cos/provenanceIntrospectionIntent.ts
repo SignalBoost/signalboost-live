@@ -1,17 +1,143 @@
-/** Recognizes requests for the recorded origin of the immediately prior answer. */
+// saas/lib/ai/cos/provenanceIntrospectionIntent.ts
+//
+// RECOGNIZE "WHERE DID YOU GET THAT?" IN THE WAY PEOPLE ACTUALLY ASK IT.
+//
+// COS stores real execution provenance for every turn and can answer source questions from that
+// record instead of guessing. The gate deciding whether a question IS a source question required
+// technical vocabulary — provenance, execution telemetry, which model, reasoner, semantic cache.
+// Nobody asks that way. Two production failures, both the natural phrasing:
+//
+//   2026-08-22  "skąd masz te informacje?" (Polish, after a name-change answer) → not recognized →
+//               answered from model memory with a generic "I am a language model trained on..."
+//               boilerplate rather than the stored provenance for that exact turn.
+//   2026-08-22  "show me where from you got the answer for the question?" (after a reasoned funnel
+//               sequence) → not recognized → routed to the CURRENT-FACT path → COS searched the web
+//               for evidence supporting an answer it had just reasoned out, found nothing
+//               groundable, and refused. The provenance record was sitting unused.
+//
+// This module adds the natural-language half in all five platform languages. Two hard constraints:
+//
+//   1. IT MUST BE ABOUT THE ASSISTANT'S OWN PRIOR ANSWER. Second-person address plus a
+//      source/knowledge verb plus a referent to the answer. "Where do plants get their energy?"
+//      is a content question about plants and must stay one.
+//   2. IT MUST NOT SWALLOW CONDITIONAL "how do you know WHEN/IF ..." questions, which are ordinary
+//      advice ("how do you know when bread is done?"). A trailing when/if/whether clause disqualifies.
+//
+// Pure, deterministic, no imports — this sits at the routing boundary and must never be the thing
+// that breaks a build or costs a model call.
+
+/** Second-person address, per language (Polish/Russian encode it in the verb, hence the verb lists). */
+// NOTE ON BOUNDARIES: JavaScript's \b is ASCII-word-based, so it does not work around accented or
+// Cyrillic letters ("\bvocê\b" and "\bоткуда\b" never match). Boundaries here are Unicode letter
+// lookarounds, which is what makes the non-English fixtures pass.
+const B0 = '(?<![\\p{L}\\p{M}])'
+const B1 = '(?![\\p{L}\\p{M}])'
+const bounded = (alternatives: string) => new RegExp(`${B0}(?:${alternatives})${B1}`, 'iu')
+
+/** Second-person address, per language (Polish/Russian also encode it in the verb). */
+const ADDRESSES_ASSISTANT = bounded([
+  'you|your|yours',
+  'usted|tú|tu|tus|su|sus|sacaste|dijiste|basas|sabes',
+  'você|voce|teu|tua|teus|tuas|seu|sua|seus|suas|tirou|disse|baseia|sabe',
+  'masz|wiesz|twoje|twoja|twój|twoich|twoim|wziąłeś|wzięłaś|znalazłeś|znalazłaś|podałeś|podałaś',
+  'ты|вы|тебя|вас|твой|твои|твоя|ваш|ваши|ваша|знаешь|сказал|сказали|взял|взяли',
+].join('|'))
+
+/** Verbs/nouns that ask about the ORIGIN of what was said. */
+const SOURCE_LANGUAGE = bounded([
+  // en — origin phrasings, including the ones with no second person at all
+  'where\\s+(?:did|do|does)\\s+\\w+\\s+(?:get|find|obtain|source)|where\\s+from|where\\s+\\w+\\s+(?:came|come|comes)\\s+from|(?:came|come|comes)\\s+from|got\\s+(?:this|that|the)|sources?|citations?|references?|based\\s+on|base\\s+(?:this|that|it)\\s+on|arrive[d]?\\s+at|how\\s+do\\s+you\\s+know|how\\s+did\\s+you\\s+know|according\\s+to\\s+what|on\\s+what\\s+basis|evidence\\s+for|did\\s+you\\s+use',
+  // es
+  'de\\s+d[oó]nde|vino|proviene|fuentes?|citas?|en\\s+qu[eé]\\s+te\\s+basas|c[oó]mo\\s+lo\\s+sabes|seg[uú]n\\s+qu[eé]',
+  // pt
+  'de\\s+onde|veio|prov[eé]m|fontes?|cita[cç][aã]o|em\\s+que\\s+voc[eê]\\s+se\\s+baseia|como\\s+voc[eê]\\s+sabe|segundo\\s+o\\s+qu[eê]',
+  // pl
+  'sk[aą]d|pochodzi|[zź]r[oó]d[lł][aoe]?|[zź]r[oó]de[lł]|na\\s+jakiej\\s+podstawie',
+  // ru
+  'откуда|источник[иаов]?|на\\s+основании\\s+чего',
+].join('|'))
+
+/** A referent to the thing that was just said. */
+const ANSWER_REFERENT = bounded([
+  'answer|response|reply|information|info|claim|statement|data|figures?|numbers?|this|that|it|above|previous|prior|last',
+  'respuesta|informaci[oó]n|datos?|esto|eso|esta|anterior',
+  'resposta|informa[cç][aã]o|dados?|isso|isto|essa|esse|anterior',
+  'odpowied[zź]|odpowiedzi|informacj[eięa]|to|te|tę|poprzedni',
+  'ответ|ответа|информаци[юяи]|это|эта|эти|предыдущ\\w*',
+].join('|'))
+
+/**
+ * Conditional/advice shapes that merely borrow the words: "how do you know WHEN the bread is done",
+ * "where do you get IF you need a permit". These are ordinary questions, not source questions.
+ */
+const CONDITIONAL_ADVICE = /\b(?:how\s+do\s+you\s+know|c[oó]mo\s+lo\s+sabes|como\s+voc[eê]\s+sabe|sk[aą]d\s+wiesz|как\s+(?:ты|вы)\s+знаешь)\b[^?]*\b(?:when|whether|if|cu[aá]ndo|si|quando|se|kiedy|czy|когда|если|ли)\b/iu
+
+/** Third-person content questions that happen to use source words ("where do plants get energy"). */
+const THIRD_PERSON_SUBJECT = /\bwhere\s+(?:do|does|did)\s+(?!you\b|u\b)(?:the\s+|a\s+|an\s+)?\w+/i
+
+/**
+ * Imperatives aimed at the assistant. "show me where the answers came from" addresses COS without
+ * ever saying "you" — the 2026-08-22 second miss, which routed an introspection question to live
+ * search and answered it with an unrelated FAFSA page and a crossword puzzle.
+ */
+const IMPERATIVE_TO_ASSISTANT = bounded([
+  'show\\s+me|tell\\s+me|give\\s+me|list|display',
+  'mu[eé]strame|dime|dame|ense[nñ][aá]me',
+  'me\\s+mostre|me\\s+diga|mostre|diga',
+  'poka[zż]\\s+mi|powiedz\\s+mi|podaj',
+  'покажи|скажи|дай',
+].join('|'))
+
+/** A definite reference to the answer just given — assistant-referring on its own. */
+const ANSWER_NOUN = bounded([
+  'answers?|responses?|replies|reply',
+  'respuestas?',
+  'respostas?',
+  'odpowied[zź]|odpowiedzi',
+  'ответ|ответы|ответа',
+].join('|'))
+
+/**
+ * True when the user is asking where the ASSISTANT's own previous answer came from. Callers should
+ * answer from the stored provenance record for that turn — never from a live search, and never
+ * from model memory about what models generally are.
+ *
+ * Structure: ORIGIN language + a reference to the assistant or its answer, minus the shapes that
+ * merely borrow the vocabulary (conditional advice, third-person content questions, and topical
+ * source requests such as "show me the best sources of vitamin D").
+ */
 export function asksWhereTheAnswerCameFrom(input: string): boolean {
   const text = String(input || '').trim()
-  if (!text || text.length > 360) return false
-  const english = /\\b(?:where(?:\\s+(?:did|do|does))?\\s+(?:the |this |that )?(?:answers?|response|reply|information)\\s+(?:come|came|comes|originated|derived)\\s+from|(?:show|tell|explain)\\b[\\s\\S]{0,70}\\bwhere\\b[\\s\\S]{0,55}\\b(?:answers?|response|reply|information)\\b[\\s\\S]{0,35}\\b(?:come|came|comes|got|derived|generated)\\b|\\b(?:where did you get|where from|what sources? did you use|show me your sources?|how do you know (?:this|that|it)|on what basis did you say|citations? for)\\b)/i
-  const spanish = /(?:de dónde(?:\\s+(?:vino|viene|salió|sale))?\\s+(?:esta|esa|la)?\\s*(?:respuesta|información)|(?:muestra|dime|explica)[\\s\\S]{0,70}(?:de dónde|fuentes?|citas?)[\\s\\S]{0,70}(?:respuesta|información)|(?:cuáles son tus fuentes?|en qué te basas))/iu
-  const portuguese = /(?:de onde(?:\\s+(?:veio|vem|saiu))?\\s+(?:essa|esta|a)?\\s*(?:resposta|informação)|(?:mostre|mostra|diga|explique)[\\s\\S]{0,70}(?:de onde|fontes?|citação)[\\s\\S]{0,70}(?:resposta|informação)|(?:quais são suas fontes?|em que você se baseia))/iu
-  const polish = /(?:skąd(?:\\s+(?:pochodzi|wzięła się))?\\s+(?:ta|te)?\\s*(?:odpowiedź|odpowiedzi|informacja)|(?:pokaż|powiedz|wyjaśnij)[\\s\\S]{0,70}(?:skąd|źródł[oa]|źródeł)[\\s\\S]{0,70}(?:odpowiedź|odpowiedzi|informacj)|(?:jakie są twoje źródła?|skąd masz))/iu
-  const russian = /(?:откуда(?:\\s+(?:взялся|взялась|появился|появилась))?\\s+(?:эт(?:от|а|и))?\\s*(?:ответ|информац)|(?:покажи|скажите|объясните)[\\s\\S]{0,70}(?:откуда|источник)[\\s\\S]{0,70}(?:ответ|информац)|(?:какие у вас источники?))/iu
-  return english.test(text) || spanish.test(text) || portuguese.test(text) || polish.test(text) || russian.test(text)
-}
-export function isProvenanceIntrospectionIntent(input: string): boolean {
-  const text = String(input || '')
-  const explicit = /\\b(provenance|introspection|execution provenance|execution telemetry|audit trail|model contribution|model contributions|which model|what model|primary model|reasoner|semantic cache|enterprise memory|knowledge graph|learned corpus|learning corpus|cognitive skill|cognitive skills|procedural skill|procedural skills|autonomous research|external ai|external provider|internal systems?)\\b/i
-  const referent = /\\b(previous|preceding|prior|last|just|that|this|answers?|response|reply|request|execution|used|invoked|contributed|generated|reasoning)\\b/i
-  return asksWhereTheAnswerCameFrom(text) || (explicit.test(text) && referent.test(text))
+  if (!text || text.length > 300) return false
+  if (CONDITIONAL_ADVICE.test(text)) return false
+  if (!SOURCE_LANGUAGE.test(text)) return false
+  const addressed = ADDRESSES_ASSISTANT.test(text)
+  const imperative = IMPERATIVE_TO_ASSISTANT.test(text)
+  const answerNoun = ANSWER_NOUN.test(text)
+
+  // The third-person content-question exclusion ("where does the Nile get its water") must not
+  // swallow "where does this ANSWER come from" — an answer noun makes the subject the assistant's
+  // own output, not a topic in the world.
+  if (!answerNoun && THIRD_PERSON_SUBJECT.test(text)) return false
+
+  // An explicit source noun needs to be tied to the assistant or its answer, or it is a topical
+  // request for sources ABOUT something ("the best sources of vitamin D").
+  const explicitSourceNoun = bounded('sources?|citations?|references?|fuentes?|citas?|fontes?|[zź]r[oó]d[lł][aoe]?|[zź]r[oó]de[lł]|источник[иаов]?').test(text)
+  if (explicitSourceNoun) {
+    const possessive = bounded('your|yours|tus|tu|sus|suas|seus|twoje|twoich|ваши|ваш|твои').test(text)
+    if (possessive || answerNoun) return true
+    // "what sources did you use?" — addressed, and the sources are tied to the assistant by verb.
+    // Second-person address is itself the tie: "what sources did you use", "какие у вас источники".
+    if (addressed) return true
+    return false
+  }
+
+  if (answerNoun) return true
+  if (addressed && ANSWER_REFERENT.test(text)) return true
+  // No second person and no answer noun: an origin question about "this information" / "esta
+  // información" still refers to what was just said, provided it is short and demonstrative.
+  const demonstrative = bounded('this|that|these|those|esta|esto|eso|essa|isso|ta|te|to|эта|это|эти').test(text)
+  const informationNoun = bounded('information|info|data|claim|statement|informaci[oó]n|informa[cç][aã]o|informacj[eaię]|информаци[яию]').test(text)
+  if ((imperative || demonstrative) && informationNoun) return true
+  return false
 }

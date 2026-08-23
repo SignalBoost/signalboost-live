@@ -26,6 +26,19 @@ export type StrategyProfileReadResult =
   | { ok: true; organizationId: string; profile: StrategyProfileGenerationView }
   | { ok: false; error: string; scopeStatus?: string }
 
+function baselineSummary(defaults: StrategyGenerationDefaults): string {
+  if (defaults.status !== 'available') return 'No Enterprise Memory baseline snapshot is currently available.'
+  const values = [
+    defaults.goal ? `goal=${defaults.goal}` : '',
+    defaults.tone ? `tone=${defaults.tone}` : '',
+    defaults.format ? `format=${defaults.format}` : '',
+    defaults.offerType ? `offer=${defaults.offerType}` : '',
+    defaults.ctaStrategy ? `cta=${defaults.ctaStrategy}` : '',
+    defaults.platforms.length ? `platforms=${defaults.platforms.join(', ')}` : '',
+  ].filter(Boolean)
+  return values.length ? `Active baseline: ${values.join('; ')}.` : 'Enterprise Memory baseline exists but contains no named generation fields.'
+}
+
 export async function readStrategyProfile(args: {
   privileged: boolean
   organizationId?: unknown
@@ -85,9 +98,10 @@ export async function readStrategyProfile(args: {
   })
   const rows = (result.data ?? []) as CampaignOutcomeRow[]
   const derived = deriveStrategyProfile(rows, args.options ?? {})
+  const currentBaseline = baselineSummary(defaults)
   const fallbackSummary = derived.changesBehavior
-    ? derived.summary
-    : `${derived.summary} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation.`
+    ? `${derived.summary} ${currentBaseline}`
+    : `${derived.summary} ${currentBaseline} GENERATION FALLBACK — no learned override means keep the current baseline defaults and generate the requested content; it does NOT mean refuse generation.`
 
   return {
     ok: true,
@@ -97,7 +111,7 @@ export async function readStrategyProfile(args: {
       summary: fallbackSummary,
       generationDefaults: defaults,
       generationRule: defaults.status === 'available'
-        ? 'Overlay learned dimensions on generationDefaults. If no learned override exists, generationDefaults remain active and content generation MUST proceed; lack of measured weights is not a reason to refuse.'
+        ? `Overlay learned dimensions on generationDefaults. ${currentBaseline} If no learned override exists, generationDefaults remain active and content generation MUST proceed; lack of measured weights is not a reason to refuse.`
         : 'If no learned override exists and no baseline snapshot is available, generate using ordinary judgement and say that no measured override was applied. Lack of measured weights alone is never a reason to refuse generation.',
     },
   }

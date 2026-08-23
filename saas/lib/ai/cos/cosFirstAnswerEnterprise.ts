@@ -23,6 +23,7 @@ import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
 import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
+import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -57,6 +58,7 @@ export type COSProvenance = {
   userMemoriesCited?:number
   cognitiveSkillsCited?:number
   canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
+  userSuppliedPremises?:{present:boolean; labelledCount:number; signals:string[]}
   cacheOrigin?:{
     storedAt:string|null
     policyVersion:string|null
@@ -82,6 +84,7 @@ type CachedAnswerOrigin = {
   evidenceFunnel?:COSEvidenceFunnel
   cognitiveSkillFunnel?:EvidenceFunnelStage
   canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
+  userSuppliedPremises?:{present:boolean; labelledCount:number; signals:string[]}
 }
 
 type CachedCosAnswer = {
@@ -646,6 +649,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const startedAt = Date.now()
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged))
   const base = {
+    userSuppliedPremises: detectUserSuppliedPremises(input.prompt),
     externalAiInvoked:false as const,
     localModelInvoked:false,
     reasonerLabel:null as string|null,
@@ -835,6 +839,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       cognitiveSkillsCited:cited.sk,
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
+      userSuppliedPremises: citedProvenance.userSuppliedPremises,
       ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition } } : {}),
     },
   }

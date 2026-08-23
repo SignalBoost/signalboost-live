@@ -31,6 +31,13 @@ export function authoritativeProvenance(
     semantic_cache_definition: Boolean(canonical?.semanticCacheDefinition),
   }
 
+  const premises = current?.userSuppliedPremises ?? null
+  provenance.user_supplied_premises = {
+    used: Boolean(premises?.present),
+    labelled_count: Number(premises?.labelledCount ?? 0),
+    signals: Array.isArray(premises?.signals) ? premises.signals : [],
+  }
+
   provenance.external_ai = {
     ...(provenance.external_ai || {}),
     necessary: external.invoked ? current?.externalAiNecessary !== false : false,

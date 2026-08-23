@@ -1,4 +1,4 @@
-import * as base from './cosOrchestrationEnterprise'
+import * as base from './cosOrchestrationEnterprise.ts'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
@@ -103,6 +103,11 @@ function formatMaterialProvenance(provenance:any):string{
     if(contributed(provenance?.learned_corpus))lines.push(`Learned Corpus         : USED — ${funnel(provenance.learned_corpus)}.`)
     if(contributed(provenance?.cognitive_skills))lines.push(`Cognitive Skills       : USED — ${funnel(provenance.cognitive_skills)}. Procedural guidance; not factual grounding.`)
     if(contributed(provenance?.user_memory))lines.push(`User Memory            : USED — ${funnel(provenance.user_memory)}.`)
+    if(provenance?.user_supplied_premises?.used){
+      const labelled=Number(provenance.user_supplied_premises.labelled_count||0)
+      const detail=labelled>0?`${labelled} labelled premise${labelled===1?'':'s'} stated in your request`:'factual premises stated in your request'
+      lines.push(`User-Supplied Premises : USED — ${detail}. Reasoned over directly; not retrieved from any store.`)
+    }
   }
 
   if(volatileCache?.used){

@@ -104,7 +104,88 @@ function insertBeforeLiveSystemState(text: string, addition: string): string {
   return `${text.slice(0, index)}\n${addition}${text.slice(index)}`
 }
 
-/** Append the machine-recorded escalation decision and evidence budget to the existing truthful formatter. */
+function count(value: unknown): number {
+  const numeric = Number(value ?? 0)
+  return Number.isFinite(numeric) ? Math.max(0, numeric) : 0
+}
+
+function evidenceWhy(item: any): string {
+  const selected = count(item?.selected_count)
+  const injected = count(item?.injected_count)
+  const cited = count(item?.evidence_count)
+  return `${selected} selected → ${injected} injected → ${cited} cited in the recorded answer path`
+}
+
+/**
+ * Explain influence only to the precision that server telemetry supports. This deliberately does
+ * not infer that a generic system-prompt instruction (for example "senior practitioner" style or
+ * an honesty rule) changed a particular answer merely because that instruction was present.
+ */
+function recordedInfluenceInterpretation(provenance: any): string {
+  const material: string[] = []
+  const consultedOnly: string[] = []
+
+  const evidenceRows: Array<[string, any]> = [
+    ['Enterprise Memory', provenance?.enterprise_memory],
+    ['Knowledge Graph', provenance?.knowledge_graph],
+    ['Learned Corpus', provenance?.learned_corpus],
+    ['Cognitive Skills', provenance?.cognitive_skills],
+    ['User Memory', provenance?.user_memory],
+  ]
+
+  if (provenance?.semantic_cache?.used) {
+    material.push(`Semantic Cache — MATERIAL: the recorded answer was reused from cache (${count(provenance.semantic_cache.evidence_count)} cached result${count(provenance.semantic_cache.evidence_count) === 1 ? '' : 's'} contributed).`)
+  }
+
+  for (const [label, item] of evidenceRows) {
+    const used = Boolean(item?.used) || count(item?.evidence_count) > 0
+    const consulted = count(item?.retrieved_count) > 0 || count(item?.selected_count) > 0 || count(item?.injected_count) > 0
+    if (used) material.push(`${label} — MATERIAL: ${evidenceWhy(item)}.`)
+    else if (consulted) consultedOnly.push(`${label} — consulted, but the record does not mark it as material (${evidenceWhy(item)}).`)
+  }
+
+  const originFromCache = Boolean(provenance?.answer_origin?.from_cache)
+  const externalMaterial = Boolean(provenance?.external_ai?.invoked) && provenance?.external_ai?.accepted !== false
+  if (!originFromCache && provenance?.local_reasoning?.invoked && !externalMaterial) {
+    material.push(`Local Reasoning Engine — MATERIAL: ${provenance.local_reasoning.model || 'local model'} generated the fresh recorded answer.`)
+  }
+  if (externalMaterial) {
+    material.push(`External AI Provider — MATERIAL: ${provenance.external_ai.provider || 'provider'}${provenance.external_ai.model ? ` / ${provenance.external_ai.model}` : ''} generated the accepted recorded answer.`)
+  }
+  if (provenance?.deterministic_utility?.used) {
+    material.push(`Deterministic Utility — MATERIAL: ${String(provenance.deterministic_utility.utility || 'server utility')} directly produced or constrained the answer.`)
+  }
+  if (provenance?.live_external_evidence?.used) {
+    const sources = Array.isArray(provenance.live_external_evidence.sources) ? provenance.live_external_evidence.sources.length : 0
+    material.push(`Live External Evidence — MATERIAL: ${sources} live source${sources === 1 ? '' : 's'} grounded the answer.`)
+  }
+
+  const canonical = provenance?.canonical_self_knowledge ?? {}
+  if (canonical.used) {
+    const definitions = [
+      canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null,
+      canonical.semantic_cache_definition ? 'Semantic Cache definition' : null,
+    ].filter(Boolean).join(', ')
+    material.push(`Canonical Self-Knowledge — MATERIAL: ${definitions || 'recorded canonical definitions'} contributed.`)
+  }
+
+  const lines = [
+    '',
+    'Recorded Influence Interpretation',
+    '─────────────────────────────────',
+    material.length
+      ? `Machine-recorded material influences: ${material.join(' ')}`
+      : 'Machine-recorded material influences: none were recorded beyond the answer origin itself.',
+  ]
+
+  if (consultedOnly.length) lines.push(`Consulted but not proven material: ${consultedOnly.join(' ')}`)
+  if (!provenance?.semantic_cache?.used) lines.push('Semantic Cache was NOT an influence on this answer; the server recorded it as NOT USED.')
+  if (!canonical.used) lines.push('Canonical Self-Knowledge was NOT an influence on this answer; the server recorded it as NOT USED.')
+  lines.push('Generic prompt heuristics or style rules may have been active policy, but their per-answer materiality is not individually traced. COS must not claim that a specific generic rule influenced this answer unless telemetry records that contribution.')
+  return lines.join('\n')
+}
+
+/** Append the machine-recorded escalation decision, evidence budget, and influence boundary. */
 export function formatAuthoritativeProvenance(provenance: any, language: string): string {
   let formatted = liveFormatAuthoritativeProvenance(provenance, language)
   const canonical = provenance?.canonical_self_knowledge ?? {}
@@ -135,5 +216,6 @@ export function formatAuthoritativeProvenance(provenance: any, language: string)
       `Evidence Budget        : limit ${limit}; ${received} received → ${selected} material; stop ${stop}.`,
     )
   }
+  formatted = insertBeforeLiveSystemState(formatted, recordedInfluenceInterpretation(provenance))
   return formatted
 }

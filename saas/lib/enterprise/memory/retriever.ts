@@ -5,13 +5,12 @@ import {
 } from './retrievalRanking.ts'
 import {
   appliedStrategyOverrides,
-  deriveStrategyProfile,
   MINIMUM_APPROVED_FOR_REWORK_RATE,
   MINIMUM_CAMPAIGNS_PER_VARIANT,
   MINIMUM_RELATIVE_MARGIN,
-  type CampaignOutcomeRow,
   type StrategyProfile,
 } from '../../ai/cos/strategyProfile.ts'
+import { readStrategyProfile } from '../../ai/cos/strategyProfileReport.ts'
 
 export type EnterpriseMemoryContext = {
   source: 'enterprise_memory'
@@ -75,8 +74,29 @@ function strategyProfileRequested(taskTags?: readonly string[]): boolean {
   return ['strategy', 'strategic', 'weight', 'weights', 'heuristic', 'heuristics'].some(value => wanted.has(value))
 }
 
+function strategyDirective(profile: StrategyProfile): string {
+  const overrides = appliedStrategyOverrides(profile)
+  const applied = Object.entries(overrides)
+    .map(([dimension, value]) => `${dimension}=${value}`)
+    .join(', ') || 'none'
+  const dimensions = profile.dimensions
+    .map(dimension => `${dimension.dimension}:${dimension.status}${dimension.recommended ? `→${dimension.recommended}` : ''}${dimension.relativeMargin === null ? '' : ` margin=${Math.round(dimension.relativeMargin * 1000) / 10}%`}`)
+    .join('; ')
+  return [
+    'CURRENT STRATEGY PROFILE: derive from measured campaign outcomes; these are not provider/base-model weights or a mutable weight table.',
+    `Generate the requested content now. Apply learned overrides: ${applied}. Keep normal generation defaults for every non-learned dimension.`,
+    `Behavior-change heuristics: >=${MINIMUM_CAMPAIGNS_PER_VARIANT} measured campaigns per compared variant; winner margin >=${Math.round(MINIMUM_RELATIVE_MARGIN * 100)}%; rework rate requires >=${MINIMUM_APPROVED_FOR_REWORK_RATE} approved campaigns.`,
+    `Dimension evidence: ${dimensions}.`,
+    'Explain only the heuristics and dimension evidence that materially influenced the output; never call the profile missing merely because it is derived rather than stored as numeric weights.',
+  ].join(' ')
+}
+
 function compactStrategyProfile(profile: StrategyProfile): Record<string, unknown> {
   return {
+    // Keep this first: COS currently bounds each Enterprise Memory payload before injection. The
+    // complete action contract therefore remains available even when the structured detail below is
+    // truncated for prompt-budget safety.
+    directive: strategyDirective(profile),
     status: 'available',
     sourceOfTruth: 'Derived on read from measured enterprise_campaign_memory outcomes. These are not provider/base-model weights and there is no mutable strategy-weight table.',
     summary: profile.summary,
@@ -144,6 +164,7 @@ export function createEnterpriseMemoryCandidates(rows: MemoryRows): EnterpriseMe
       confidence: 1,
       taskTags: ['strategy', 'strategic', 'profile', 'weight', 'weights', 'heuristic', 'heuristics', 'generation', 'content'],
       payload: {
+        directive: `CURRENT STRATEGY PROFILE UNAVAILABLE: ${text(rows.strategyProfileError)} Do not invent strategy weights; report this concrete read failure.`,
         status: 'unavailable',
         sourceOfTruth: 'enterprise_campaign_memory',
         error: text(rows.strategyProfileError),
@@ -299,14 +320,15 @@ export async function retrieveEnterpriseMemoryContext(args: {
   let strategyProfile: StrategyProfile | null = null
   let strategyProfileError: string | null = null
   if (strategyProfileRequested(args.taskTags)) {
-    const result = await admin
-      .from('enterprise_campaign_memory')
-      .select('campaign_id,channel,cta,creative,execution_status,human_edits,approved_version,performance_data,updated_at')
-      .eq('organization_id', organizationId)
-      .order('updated_at', { ascending: false })
-      .limit(2000)
-    if (result.error) strategyProfileError = `enterprise_campaign_memory read failed: ${result.error.message}`
-    else strategyProfile = deriveStrategyProfile((result.data ?? []) as CampaignOutcomeRow[])
+    // Keep one canonical profile reader. The owner endpoint and COS generation must never derive
+    // different answers from different row limits, scopes or SQL projections.
+    const result = await readStrategyProfile({
+      privileged: true,
+      organizationId,
+      workspace: args.workspace,
+    })
+    if (result.ok) strategyProfile = result.profile
+    else strategyProfileError = result.error
   }
 
   const candidates = createEnterpriseMemoryCandidates({

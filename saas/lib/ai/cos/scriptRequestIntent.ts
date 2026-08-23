@@ -9,10 +9,9 @@
 // that decision deterministic. An unqualified authoring request is content; executable code
 // requires an explicit programming signal or a clearly computational behavior.
 //
-// The same request-specific seam also carries a narrow executive-decision discipline for high-
-// stakes management scenarios. That prevents a generic model instinct from turning sparse facts
-// into invented savings percentages, blanket freezes, accusations about department leaders, or
-// simplistic "cost center = expendable" recommendations.
+// The same request-specific seam also carries narrow high-stakes disciplines for executive
+// decisions and regulated guidance. Sparse business facts must not become invented precision, and
+// named legal regimes must not be reconstructed from model memory as if they were current law.
 
 import { regulatedOperationalScenarioDirective } from './regulatedOperationalScenarioIntent.ts'
 
@@ -31,10 +30,16 @@ const LINE_RATIONALE_REQUEST =
   /\b(?:explain|describe|give)\b[^.!?;\n]{0,80}\b(?:reason(?:ing)?|rationale|purpose|why)\b[^.!?;\n]{0,80}\b(?:each|every)\s+line\b|\bline[- ]by[- ]line\b[^.!?;\n]{0,80}\b(?:reason(?:ing)?|rationale|purpose|explanation)\b/i
 
 const EXECUTIVE_DECISION_SCENARIO =
-  /\b(?:leadership\s+team|ceo|cfo|coo|board|department\s+lead|operating\s+expenses?|opex|runway|budget\s+cuts?|cost\s+reduction|headcount|layoffs?|restructur(?:e|ing)|acquisition|due\s+diligence|merger|triage\s+process)\b/i
+  /\b(?:leadership\s+team|ceo|cfo|coo|board|head\s+of\s+sales|vp\s+of\s+infrastructure|department\s+lead|operating\s+expenses?|opex|runway|budget\s+cuts?|budget\s+breach|cost\s+reduction|headcount|layoffs?|restructur(?:e|ing)|acquisition|due\s+diligence|merger|enterprise\s+contract|arr|sre\s+capacity|triage\s+process)\b/i
 
 const EXECUTIVE_DECISION_VERB =
-  /\b(?:decide|design|facilitate|triage|cut|reduce|prioriti[sz]e|allocate|restructure|acquire|handle|recommend|approve|protect|extend|save|freeze|cancel)\b/i
+  /\b(?:decide|design|facilitate|triage|cut|reduce|prioriti[sz]e|allocate|restructure|acquire|handle|recommend|approve|protect|extend|save|freeze|cancel|deliver|provision|frame|quantif(?:y|ies)|propose)\b/i
+
+const REGULATED_HIRING_TOPIC =
+  /\b(?:hiring|recruit(?:ing|ment)?|candidate\s+screening|employment|selection\s+workflow|automated\s+employment|workforce\s+screening)\b/i
+
+const REGULATED_HIRING_REGIME =
+  /\b(?:eu\s+ai\s+act|artificial\s+intelligence\s+act|eeoc|title\s+vii|employment\s+law|anti[- ]discrimination|disparate\s+impact|compliance|regulatory\s+requirements?)\b/i
 
 function userQuestionOnly(prompt: string): string {
   const full = String(prompt || '').slice(0, 24_000)
@@ -55,14 +60,28 @@ export function executiveDecisionDirective(prompt: string): string | null {
   if (!EXECUTIVE_DECISION_SCENARIO.test(input) || !EXECUTIVE_DECISION_VERB.test(input)) return null
   return [
     'EXECUTIVE DECISION MODE: EVIDENCE-BOUNDED, REVERSIBLE-FIRST, AND GOVERNANCE-AWARE.',
-    'Do not assume an across-the-board percentage cut, dishonesty by budget owners, or that a cost center is less important merely because revenue attribution is indirect unless the user explicitly supplied that fact.',
-    'Do not invent savings ranges, rework costs, headcount percentages, contractor reductions, deal structures, or other numeric targets. If a number is useful only as an example, label it clearly as illustrative and keep it separate from the recommendation.',
-    'Separate known facts from hypotheses and from decisions still requiring data. State what evidence would change the decision.',
-    'For resource cuts, evaluate each spend line by criticality, customer/revenue dependency, regulatory/security obligation, reversibility, time-to-cash, switching cost, and downstream dependency. Do not use "revenue center" versus "cost center" as a shortcut.',
-    'Sequence actions from reversible to irreversible: freeze new commitments and obvious duplication first; then renegotiate, consolidate, resize, or defer; use headcount or structural cuts only after the required savings gap is quantified and decision rights are explicit.',
-    'Define a central target and a comparable decision template across departments, but do not force equal departmental percentages unless the facts justify equal elasticity.',
-    'Include an auditable decision process: owner, evidence, recommendation, impact, dependency, reversibility, implementation date, and metric that would trigger reconsideration.',
-    'Use neutral professional language. Do not call a person a liability, accuse leaders of hiding spend, threaten disclosure, or recommend coercion when escalation through normal governance is sufficient.',
+    'Treat every number, date, capacity statement, contractual condition, compliance status, and feasibility claim that the user did not explicitly supply as UNKNOWN unless it is mechanically derivable from supplied facts.',
+    'Do not invent savings ranges, budget impacts, utilization levels, staffing percentages, dates, quarters, probabilities, outage costs, contract penalties, implementation effort, headcount changes, or other numeric targets. Do not manufacture precision to make a decision matrix look complete.',
+    'Do not invent a workaround such as a phased/MVP/MVT delivery and then state that it satisfies the contract. Contract acceptance, customer consent, security readiness, and SLA compliance remain conditions to verify unless the user supplied them.',
+    'Separate KNOWN FACTS, UNKNOWN/NEEDS-VALIDATION items, OPTIONS, and DECISION CONSEQUENCES. State what evidence would change the recommendation.',
+    'When the CEO wants mutually constrained outcomes, treat that as a goal, not proof that both are simultaneously feasible. Show the resource/budget/operational constraint explicitly and identify what additional resource, scope change, schedule change, or risk acceptance would be required to make both possible.',
+    'For resource conflicts, evaluate customer/revenue dependency, regulatory/security obligation, reversibility, time-to-cash, switching cost, reliability exposure, downstream dependency, and contractual flexibility. Do not use revenue attribution or executive preference as a shortcut.',
+    'A recommendation may be conditional. Never claim that an option is low risk, contract-compliant, security-compliant, or budget-compliant until the facts establish that conclusion.',
+    'Include an auditable decision matrix with: option, known upside, known downside, unresolved assumptions, required approval, owner, and decision trigger. Use placeholders rather than fabricated numbers for unknown quantities.',
+    'Use neutral professional language and preserve the facts exactly as supplied.',
+  ].join(' ')
+}
+
+export function regulatedHiringComplianceDirective(prompt: string): string | null {
+  const input = userQuestionOnly(prompt)
+  if (!REGULATED_HIRING_TOPIC.test(input) || !REGULATED_HIRING_REGIME.test(input)) return null
+  return [
+    'REGULATED HIRING AI MODE: FAIRNESS/COMPLIANCE FRAMEWORK IS ALLOWED; CURRENT LEGAL CLAIMS REQUIRE AUTHORITATIVE EVIDENCE.',
+    'Answer the governance design question directly: explain how to combine efficiency, bias testing, human oversight, auditability, appeal/recourse, monitoring, and deployment controls.',
+    'Do not state that the EU AI Act, EEOC, Title VII, or another named regime currently classifies, mandates, prohibits, or requires a specific practice, threshold, timeline, formula, or human-review rule unless authoritative current evidence for that exact claim is present in the prompt.',
+    'Do not present the four-fifths/80% rule, demographic parity, equalized odds, feature-importance output, or any single metric as a universal legal compliance threshold. Distinguish statistical screening signals, engineering fairness metrics, policy choices, and legal conclusions.',
+    'If current legal obligations are not live-verified, clearly label them as requiring jurisdiction-specific verification from the relevant authoritative regulator/statute and qualified counsel; do not fill the gap from model memory.',
+    'Separate: (1) timeless control design, (2) facts that require current legal verification, and (3) organization-specific policy decisions. Never turn a best practice into a claimed legal mandate.',
   ].join(' ')
 }
 
@@ -97,6 +116,7 @@ export function scriptRequestDirective(prompt: string): string | null {
     pureScriptDirective(input),
     executiveDecisionDirective(input),
     regulatedOperationalScenarioDirective(input),
+    regulatedHiringComplianceDirective(input),
   ].filter(Boolean)
   return directives.length ? directives.join('\n\n') : null
 }

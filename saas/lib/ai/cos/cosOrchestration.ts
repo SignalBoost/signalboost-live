@@ -3,9 +3,9 @@
 import {
   authoritativeProvenance as liveAuthoritativeProvenance,
   formatAuthoritativeProvenance as liveFormatAuthoritativeProvenance,
-} from './cosOrchestrationLive'
+} from './cosOrchestrationLive.ts'
 
-export * from './cosOrchestrationLive'
+export * from './cosOrchestrationLive.ts'
 
 /**
  * Fresh-current-fact local synthesis is still local reasoning, but its factual authority came from
@@ -19,9 +19,6 @@ export function authoritativeProvenance(
   const provenance = liveAuthoritativeProvenance(cos, external) as any
   const current = cos?.provenance ?? null
   const turnId = typeof current?.turnId === 'string' ? current.turnId.trim() : ''
-  // The assistant-message feedback route derives correlation only from server-owned stored
-  // provenance. Preserve the exact reasoner turn UUID here so formatting cannot silently sever the
-  // learning loop. It is telemetry only and is intentionally not displayed in user-facing prose.
   if (turnId) provenance.turnId = turnId
   const live = current?.liveExternalEvidence
   const sources = Array.isArray(live?.sources) ? live.sources : []
@@ -41,10 +38,6 @@ export function authoritativeProvenance(
     escalation_reason: current?.escalationReason ?? null,
   }
 
-  // Context retrieval can occur before a semantic-cache lookup resolves. On a cache replay that
-  // context was never consumed by a reasoner, so it is retrieval telemetry only: never injected,
-  // never cited, and never USED. The original generation funnel remains preserved separately under
-  // answer_origin.evidence_funnel and is not modified here.
   if (semanticCacheReplay) {
     for (const key of ['enterprise_memory', 'knowledge_graph', 'learned_corpus', 'cognitive_skills', 'user_memory']) {
       const item = provenance?.[key]
@@ -116,11 +109,6 @@ function evidenceWhy(item: any): string {
   return `${selected} selected → ${injected} injected → ${cited} cited in the recorded answer path`
 }
 
-/**
- * Explain influence only to the precision that server telemetry supports. This deliberately does
- * not infer that a generic system-prompt instruction (for example "senior practitioner" style or
- * an honesty rule) changed a particular answer merely because that instruction was present.
- */
 function recordedInfluenceInterpretation(provenance: any): string {
   const material: string[] = []
   const consultedOnly: string[] = []
@@ -185,7 +173,6 @@ function recordedInfluenceInterpretation(provenance: any): string {
   return lines.join('\n')
 }
 
-/** Append the machine-recorded escalation decision, evidence budget, and influence boundary. */
 export function formatAuthoritativeProvenance(provenance: any, language: string): string {
   let formatted = liveFormatAuthoritativeProvenance(provenance, language)
   const canonical = provenance?.canonical_self_knowledge ?? {}

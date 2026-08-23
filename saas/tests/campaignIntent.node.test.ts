@@ -59,6 +59,64 @@ test('naming a video destination does not make the brief ambiguous', () => {
   assert.deepEqual(intent.signalled, ['video'])
 })
 
+// Regression from Production: "without" constrained what the writer may assume, but the old
+// clause-wide negation rule attached it to the word "video" and invented a prohibition.
+test('writing a video without assuming unknown update details is content authoring, not a forbidden production brief', () => {
+  const prompt = 'Write a video about ‘the new update’ without assuming what the update contains.'
+  const intent = classifyCampaignIntent(prompt)
+  assert.equal(intent.decision, 'not-a-brief')
+  assert.equal(intent.pipeline, null)
+  assert.deepEqual(intent.prohibited, [])
+  assert.deepEqual(intent.signalled, [])
+})
+
+test('an uncertainty modifier before the writing request also does not become a video prohibition', () => {
+  const intent = classifyCampaignIntent('Without assuming what the update contains, write a video about the new update.')
+  assert.equal(intent.decision, 'not-a-brief')
+  assert.equal(intent.pipeline, null)
+  assert.deepEqual(intent.prohibited, [])
+})
+
+test('writing explicit script artifacts stays outside the production pipeline', () => {
+  for (const prompt of [
+    'Draft an explainer video without inventing product details.',
+    'Write a video script about the launch.',
+    'Create a video script that uses placeholders for facts we do not know yet.',
+    'Storyboard a video about the announcement without assuming features.',
+  ]) {
+    const intent = classifyCampaignIntent(prompt)
+    assert.equal(intent.decision, 'not-a-brief', prompt)
+    assert.equal(intent.pipeline, null, prompt)
+    assert.deepEqual(intent.prohibited, [], prompt)
+  }
+})
+
+test('negative modifiers after a real video-production request constrain the asset instead of cancelling production', () => {
+  for (const prompt of [
+    'Create a video campaign without assuming what the update contains.',
+    'Create a video without showing people.',
+    'Produce a video without customer testimonials.',
+  ]) {
+    const intent = classifyCampaignIntent(prompt)
+    assert.equal(intent.decision, 'proceed', prompt)
+    assert.equal(intent.pipeline, 'video', prompt)
+    assert.deepEqual(intent.prohibited, [], prompt)
+  }
+})
+
+test('an actual video prohibition still wins', () => {
+  for (const prompt of [
+    'Do not create a video campaign.',
+    'This is not a video campaign.',
+    'Without a video campaign, prepare the written announcement.',
+  ]) {
+    const intent = classifyCampaignIntent(prompt)
+    assert.equal(intent.decision, 'refuse', prompt)
+    assert.equal(intent.pipeline, null, prompt)
+    assert.ok(intent.prohibited.includes('video'), prompt)
+  }
+})
+
 // "press outreach campaign" contains the bare phrase the sales parser matches on.
 test('press outreach is press, not a sales/press collision', () => {
   const intent = classifyCampaignIntent('Run a press outreach campaign to 15 trade publications about the Supervisor.')

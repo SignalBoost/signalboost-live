@@ -4,8 +4,8 @@ import { POST as supportPost } from '@/app/api/support/route'
 import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, type VerifiedResearchResult } from '@/lib/ai/cos/researchBudget'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
-import { persistTurn } from '@/lib/ai/tools/conversationHistory'
-import { attachRecordedTurnProvenance, recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance'
+import { lastAssistantProvenance, persistTurn } from '@/lib/ai/tools/conversationHistory'
+import { attachRecordedTurnProvenance, normalizeAssistantContent, recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance'
 import { getAccess } from '@/lib/auth/access'
 import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
@@ -160,19 +160,77 @@ async function directProspectCampaign(
   }
 }
 
-async function responseSnapshot(response: Response): Promise<{ reply: string; source: string }> {
+async function responseSnapshot(response: Response): Promise<{ reply: string; source: string; provenance: Record<string, unknown> | null }> {
   try {
     const payload = await response.clone().json()
+    const provenance = payload?.execution_provenance && typeof payload.execution_provenance === 'object' && !Array.isArray(payload.execution_provenance)
+      ? payload.execution_provenance as Record<string, unknown>
+      : null
     return {
       reply: String(payload?.reply || payload?.message || ''),
       source: String(payload?.source || payload?.telemetry?.source || ''),
+      provenance,
     }
   } catch {
     try {
-      return { reply: await response.clone().text(), source: '' }
+      return { reply: await response.clone().text(), source: '', provenance: null }
     } catch {
-      return { reply: '', source: '' }
+      return { reply: '', source: '', provenance: null }
     }
+  }
+}
+
+async function ensureHealthyPrimaryTurnPersisted(
+  body: any,
+  input: string,
+  snapshot: { reply: string; source: string; provenance: Record<string, unknown> | null },
+): Promise<void> {
+  const conversationId = conversationIdFrom(body)
+  if (!conversationId || !input.trim() || !snapshot.reply.trim()) return
+  const access = await getAccess().catch(() => null)
+  const userId = access?.userId || null
+  if (!userId) return
+
+  try {
+    const existing = await lastAssistantProvenance(conversationId, userId)
+    const alreadyStored = Boolean(
+      existing?.content
+      && normalizeAssistantContent(existing.content) === normalizeAssistantContent(snapshot.reply),
+    )
+    if (alreadyStored) {
+      console.info('[cos-concierge-primary-persistence]', JSON.stringify({
+        at: new Date().toISOString(),
+        status: 'already_persisted',
+        source: snapshot.source || null,
+        turnId: snapshot.provenance?.turnId ?? null,
+      }))
+      return
+    }
+
+    await persistTurn({
+      conversationId,
+      userId,
+      userMessage: input,
+      assistantReply: snapshot.reply,
+      provenance: snapshot.provenance,
+    })
+    if (snapshot.provenance) {
+      await recordLatestUserTurnProvenance(userId, snapshot.reply, snapshot.provenance, snapshot.source)
+    }
+
+    const confirmed = await lastAssistantProvenance(conversationId, userId)
+    const persisted = Boolean(
+      confirmed?.content
+      && normalizeAssistantContent(confirmed.content) === normalizeAssistantContent(snapshot.reply),
+    )
+    console.info('[cos-concierge-primary-persistence]', JSON.stringify({
+      at: new Date().toISOString(),
+      status: persisted ? 'persisted' : 'persistence_not_confirmed',
+      source: snapshot.source || null,
+      turnId: snapshot.provenance?.turnId ?? null,
+    }))
+  } catch (error) {
+    console.warn('[cos-concierge-primary-persistence] failed', error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -239,12 +297,8 @@ async function directPressCampaign(
     after(async () => {
       const tasks: Promise<unknown>[] = [advancePressCampaigns()]
       if (access.userId && conversationId) {
-        tasks.push(persistTurn({
-          conversationId,
-          userId: access.userId,
-          userMessage: input,
-          assistantReply: reply,
-        }).then(() => undefined).catch(() => undefined))
+        tasks.push(persistTurn({ conversationId, userId: access.userId, userMessage: input, assistantReply: reply })
+          .then(() => undefined).catch(() => undefined))
       }
       await Promise.allSettled(tasks)
     })
@@ -389,7 +443,7 @@ export async function POST(req: NextRequest) {
 
   const primarySnapshot = primary
     ? await responseSnapshot(primary)
-    : { reply: '', source: '' }
+    : { reply: '', source: '', provenance: null }
   const immediateReasons = detectPrimaryCorruption({
     status: primary?.status ?? 500,
     reply: primarySnapshot.reply,
@@ -398,6 +452,13 @@ export async function POST(req: NextRequest) {
 
   if (primary && immediateReasons.length === 0) {
     const healthyPrimary = primary
+
+    // The inner support route is expected to persist healthy turns, but production telemetry on
+    // 2026-08-23 showed assistant_messages stopped advancing while answers and latest provenance
+    // continued. The outer continuity boundary has the original browser conversation id, user
+    // request, exact returned text, and exact execution provenance, so it verifies the last stored
+    // assistant turn and fills the gap before the browser can submit feedback.
+    await ensureHealthyPrimaryTurnPersisted(body, input, primarySnapshot)
 
     after(async () => {
       const backup = await runBackupCos(input, language).catch(() => null)

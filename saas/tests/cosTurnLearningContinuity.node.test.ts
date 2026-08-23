@@ -13,6 +13,8 @@ const longProvenancePrompt = `shwo “Show me the complete provenance for the an
 
 const regulatedIncidentPrompt = `If a global logistics company suffers a cyberattack that halts shipments in Asia but not in Europe, how should COS balance operational recovery with regulatory reporting across multiple jurisdictions?`
 
+const regulatedHiringPrompt = `If COS is asked to optimize hiring workflows using AI, how should it reconcile efficiency gains with fairness, bias mitigation, and compliance with EU AI Act and US EEOC rules?`
+
 test('long explicit prior-answer provenance requests bypass the short natural-language cap', () => {
   assert.ok(longProvenancePrompt.length > 300)
   assert.equal(asksForExplicitPriorAnswerProvenance(longProvenancePrompt), true)
@@ -33,6 +35,18 @@ test('regulated cyber incident scenario gets a framework-level current-law guard
   assert.match(scriptRequestDirective(regulatedIncidentPrompt) || '', /REGULATED INCIDENT MODE/)
 })
 
+test('regulated employment AI scenario blocks mutable law from model memory', () => {
+  const directive = regulatedOperationalScenarioDirective(regulatedHiringPrompt)
+  assert.ok(directive)
+  assert.match(directive, /REGULATED EMPLOYMENT AI MODE/)
+  assert.match(directive, /EU AI Act/i)
+  assert.match(directive, /EEOC/i)
+  assert.match(directive, /authoritative live evidence/i)
+  assert.match(directive, /four-fifths\/80%/i)
+  assert.match(directive, /not a successful optimization/i)
+  assert.match(scriptRequestDirective(regulatedHiringPrompt) || '', /REGULATED EMPLOYMENT AI MODE/)
+})
+
 test('turn experience writer columns are backed by the checked-in production migration', () => {
   for (const column of ['confidence', 'confidence_threshold', 'draft_survived_unrepaired']) {
     assert.match(turnStore, new RegExp(`\\b${column}\\b`))
@@ -44,4 +58,12 @@ test('feedback still requires a server-owned turn correlation rather than trusti
   assert.match(feedbackRoute, /cos_turn_experience/)
   assert.match(feedbackRoute, /hashPrompt\(userPrompt\)/)
   assert.match(feedbackRoute, /Latest COS response has no turn correlation/)
+})
+
+test('fast feedback waits for deferred turn persistence without weakening verification', () => {
+  assert.match(feedbackRoute, /TURN_CORRELATION_RETRY_DELAYS_MS\s*=\s*\[0,\s*80,\s*160,\s*320,\s*640\]/)
+  assert.match(feedbackRoute, /promptHashFromDeferredTurn/)
+  assert.match(feedbackRoute, /await wait\(delayMs\)/)
+  assert.match(feedbackRoute, /COS turn correlation is still being finalized; retry feedback\./)
+  assert.match(feedbackRoute, /hashPrompt\(userPrompt\) !== correlation\.promptHash/)
 })

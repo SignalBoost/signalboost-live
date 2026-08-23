@@ -7,9 +7,9 @@ import { uiText } from '@/lib/i18n/uiText'
 
 type Mode = 'login' | 'signup'
 
-export default function AuthModal({ onClose }: { onClose: () => void }) {
+export default function AuthModal({ onClose, initialMode = 'login' }: { onClose: () => void; initialMode?: Mode }) {
   const { dict } = useI18n()
-  const [mode, setMode] = useState<Mode>('login')
+  const [mode, setMode] = useState<Mode>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

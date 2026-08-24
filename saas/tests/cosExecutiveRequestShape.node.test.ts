@@ -23,3 +23,8 @@ test('ordinary questions and narration remain outside executive mode', () => {
   assert.equal(executiveDecisionDirective('What time is the CEO meeting?'), null)
   assert.equal(executiveDecisionDirective('The board was informed that we plan to keep operating expenses flat through the next two quarters.'), null)
 })
+
+test('SaaS tier arbitration is an executive decision scenario', () => {
+  const prompt = 'The company is launching a self-serve, lower-cost SaaS tier. Enterprise Sales fears contracted renewals will downgrade, while Product says feature limits will harm PLG conversion. Design the arbitration memo and rollout framework for executive alignment.'
+  assert.ok(executiveDecisionDirective(prompt))
+})

@@ -34,15 +34,35 @@ export function detectDirectTextTransformation(prompt: string): DirectTextTransf
   const intent = stripped.match(TRANSFORM_INTENT_RE)
   if (!intent || intent.index === undefined || intent.index > 100) return null
 
-  const absoluteIntentEnd = raw.length - stripped.length + intent.index + intent[0].length
+  const absoluteIntentStart = raw.length - stripped.length + intent.index
+  const absoluteIntentEnd = absoluteIntentStart + intent[0].length
   const delimiter = delimiterAfterIntent(raw, absoluteIntentEnd)
-  if (!delimiter || delimiter.index - absoluteIntentEnd > 180) return null
 
-  const instruction = raw.slice(0, delimiter.index).trim()
-  const sourceText = raw.slice(delimiter.index + delimiter.length).trim()
-  if (sourceText.length < 8) return null
+  if (delimiter && delimiter.index - absoluteIntentEnd <= 180) {
+    const instruction = raw.slice(0, delimiter.index).trim()
+    const sourceText = raw.slice(delimiter.index + delimiter.length).trim()
+    if (sourceText.length >= 8) return { instruction, sourceText }
+  }
 
-  return { instruction, sourceText }
+  // Natural shorthand such as "edit Hi Dwight, thank you..." is common in the
+  // Concierge. Treat the long tail as source text when the transformation verb is
+  // effectively the opening command. This prevents pasted email/document content
+  // from falling through into current-fact search merely because the user omitted
+  // a dash, colon, or newline after "edit".
+  if (intent.index <= 12) {
+    const sourceText = raw
+      .slice(absoluteIntentEnd)
+      .replace(/^[\s:;,.\-–—]+/, '')
+      .trim()
+    if (sourceText.length >= 40) {
+      return {
+        instruction: raw.slice(0, absoluteIntentEnd).trim(),
+        sourceText,
+      }
+    }
+  }
+
+  return null
 }
 
 function emptyStage() {
@@ -97,7 +117,17 @@ export async function tryDirectTextTransformation(input: {
   if (!request) return null
 
   const resolved = resolveCosReasoner()
-  if (!resolved.config) return null
+  if (!resolved.config) {
+    // The intent is already known to be a text transformation. Return a bounded
+    // COS failure so the caller may use its governed assistant fallback; never
+    // reclassify the pasted text as a live/current factual lookup.
+    return {
+      handled: false,
+      confidence: 0,
+      reason: 'The configured COS reasoner is unavailable for the direct text-transformation request.',
+      provenance: provenance(null, false) as any,
+    }
+  }
 
   const reasoned = await callCosReasoner({
     temperature: 0.15,

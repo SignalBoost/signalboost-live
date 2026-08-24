@@ -3,6 +3,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { cookies } from 'next/headers'
 
 export type Role = 'owner' | 'admin' | 'member' | 'guest'
@@ -90,6 +91,11 @@ export function accessFromVerifiedIdentity(
 }
 
 export async function getAccess(): Promise<AccessContext> {
+  // Concierge is a public delivery surface. Even if the browser belongs to the
+  // owner, public-delivery execution must never inherit owner/admin identity,
+  // private memory, internal tools, metrics, repo access, or Chief-of-Staff mode.
+  if (isPublicDeliveryScope()) return buildContext(null, null, 'guest')
+
   const supabase = await getServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
 

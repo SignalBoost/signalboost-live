@@ -8,6 +8,7 @@ const tests = [
   'tests/executiveCommunication.node.test.ts',
   'tests/assistantComposerReset.node.test.ts',
   'tests/dataCenterOperations.node.test.ts',
+  'tests/cosDataCenterCapabilityBenchmark.node.test.ts',
   'tests/cosTurnExperience.node.test.ts',
   'tests/cosOutcomeCorrelation.node.test.ts',
   'tests/cosFailureAutopsy.node.test.ts',

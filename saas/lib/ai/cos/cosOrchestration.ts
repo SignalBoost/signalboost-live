@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosOrchestration.ts
 // Compatibility entrypoint. Keep all existing imports stable while per-answer provenance remains
 // authoritative and live system state is appended independently at introspection time.
 import {
@@ -150,7 +151,7 @@ function recordedInfluenceInterpretation(provenance: any): string {
     material.push(`Local Reasoning Engine — MATERIAL: ${provenance.local_reasoning.model || 'local model'} generated the fresh recorded answer.`)
   }
   if (externalMaterial) {
-    material.push(`External AI Provider — MATERIAL: ${provenance.external_ai.provider || 'provider'}${provenance.external_ai.model ? ` / ${provenance.external_ai.model}` : ''} generated the accepted recorded answer.`)
+    material.push(`External Fallback / Teacher — MATERIAL: ${provenance.external_ai.provider || 'provider'}${provenance.external_ai.model ? ` / ${provenance.external_ai.model}` : ''} generated the accepted recorded answer.`)
   }
   if (provenance?.deterministic_utility?.used) {
     material.push(`Deterministic Utility — MATERIAL: ${String(provenance.deterministic_utility.utility || 'server utility')} directly produced or constrained the answer.`)
@@ -188,9 +189,9 @@ function recordedInfluenceInterpretation(provenance: any): string {
 function correctBackupContinuityConfidence(text: string, provenance: any): string {
   if (provenance?.continuity_mode !== 'backup_read_only') return text
   const confidence = provenance?.local_reasoning?.confidence
-  if (confidence == null) return text.replace(/COS Confidence\s*:[^\n]*/g, 'Backup Confidence      : not recorded — Primary confidence gate was not run in read-only continuity mode.')
+  if (confidence == null) return text.replace(/COS Answer Confidence\s*:[^\n]*/g, 'Backup Confidence      : not recorded — Primary confidence gate was not run in read-only continuity mode.')
   return text.replace(
-    /COS Confidence\s*:[^\n]*/g,
+    /COS Answer Confidence\s*:[^\n]*/g,
     `Backup Confidence      : ${Number(confidence).toFixed(2)} — advisory self-report; Primary acceptance threshold N/A in read-only continuity mode.`,
   )
 }

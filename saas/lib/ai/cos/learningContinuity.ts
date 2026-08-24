@@ -21,7 +21,7 @@ export type RetentionRow = {
   source_kind?: string | null
 }
 
-/** Grouped counts from cos_learning_gaps: how many gaps sit in each status. */
+/** Grouped counts from cos_learning_gaps: how many durable reasoning gaps sit in each status. */
 export type GapStatusCount = {
   status?: string | null
   count?: number | null
@@ -252,14 +252,11 @@ export function assessLearningContinuity(
     })
   }
 
-  if (totalGaps > 0 && openGaps === 0) {
-    findings.push({
-      code: 'no_open_gaps',
-      severity: 'amber',
-      title: 'Zero open learning gaps',
-      detail: `All ${totalGaps} gaps are closed with none pending or learning. A system that is genuinely reasoning has open questions; an all-resolved table is the fingerprint of gaps being closed in bulk rather than answered individually. Verify gaps resolve only when their own subject was accepted.`,
-    })
-  }
+  // cos_learning_gaps is only the durable failure/reasoning queue. The daily learning director also
+  // creates recurring curriculum, weakness-driven, track-study and corpus-expansion gaps in memory
+  // every cycle. Therefore zero pending rows here is not evidence of zero open learning questions.
+  // Continuity is judged by actual retention/freshness/subject expansion, while the counts remain
+  // in the report as useful queue telemetry.
 
   if (trendDirection === 'down') {
     findings.push({

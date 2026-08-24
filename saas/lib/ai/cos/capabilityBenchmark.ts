@@ -1,3 +1,5 @@
+import { scoreDataCenterCapabilityReply } from './dataCenterCapabilityBenchmark.ts'
+
 /**
  * Hermetic capability-benchmark contract. Fixtures are deliberately never acquired by the learning
  * pipeline: a green result proves only an evaluator supplied an acceptable result for a held-out
@@ -11,6 +13,7 @@ export type CapabilityBenchmarkCase = {
   forbiddenTerms?: string[]
   requiresProvenance: boolean
   requiresLocalReasoning: boolean
+  evaluationProfile?: string
 }
 
 export type CapabilityBenchmarkResult = {
@@ -58,6 +61,7 @@ export function scoreCapabilityBenchmarkCase(test: CapabilityBenchmarkCase, resu
   if (test.requiresLocalReasoning && !result.provenance?.localReasoning) reasons.push('local_reasoning_not_recorded')
   if (result.provenance?.externalAi) reasons.push('external_ai_used')
   if (result.provenance?.semanticCache) reasons.push('semantic_cache_used')
+  reasons.push(...scoreDataCenterCapabilityReply(test.evaluationProfile, result.reply))
   return { caseId: test.id, passed: reasons.length === 0, reasons }
 }
 

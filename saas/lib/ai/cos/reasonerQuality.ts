@@ -15,13 +15,14 @@ const UNSUPPORTED_SECURITY_FRAMEWORK = /\b(?:IL[2456]|impact\s+level\s*[2456]|au
  * into facts or introduce numeric targets that the scenario never supplied.
  */
 export function executiveDecisionUnsupportedClaims(prompt: string, raw: string): string[] {
-  if (!executiveDecisionDirective(prompt)) return []
+  const securityScenario = SECURITY_SCENARIO.test(prompt)
+  if (!executiveDecisionDirective(prompt) && !securityScenario) return []
   const parsed = parseLocalResult(String(raw ?? ''))
   if (!parsed) return []
   const answer = parsed.answer
   const signals: string[] = []
   if (EXECUTIVE_UNSUPPORTED_CERTAINTY.test(answer)) signals.push('unsupported_certainty')
-  if (SECURITY_SCENARIO.test(prompt) && UNSUPPORTED_SECURITY_FRAMEWORK.test(answer) && !UNSUPPORTED_SECURITY_FRAMEWORK.test(prompt)) signals.push('unsupported_security_framework')
+  if (securityScenario && UNSUPPORTED_SECURITY_FRAMEWORK.test(answer) && !UNSUPPORTED_SECURITY_FRAMEWORK.test(prompt)) signals.push('unsupported_security_framework')
   const suppliedNumbers = new Set((String(prompt).match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')))
   const novelNumber = (answer.match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')).find(value => !suppliedNumbers.has(value))
   if (novelNumber) signals.push('novel_numeric_target')

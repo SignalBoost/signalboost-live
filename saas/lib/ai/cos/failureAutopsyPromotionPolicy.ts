@@ -23,9 +23,8 @@ export type AutopsySkillCandidate = {
   failureRows: AutopsyPromotionRow[]
 }
 
-export const AUTOPSY_PRACTICE_SUCCESSES = 2
-export const AUTOPSY_HOLDOUT_SUCCESSES = 3
-export const AUTOPSY_TOTAL_CLEAN_RETESTS = AUTOPSY_PRACTICE_SUCCESSES + AUTOPSY_HOLDOUT_SUCCESSES
+export const AUTOPSY_MIN_PRACTICE_ATTEMPTS = 2
+export const AUTOPSY_MIN_PRACTICE_RATE = 0.8
 
 function clean(value: unknown, max = 2400): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -36,23 +35,41 @@ function skillKey(problemClass: string, stage: string, guidance: string): string
   return `reasoning.failure_autopsy.${digest}.v1`
 }
 
-/** Keep only one successful evidence row per independent controlled retest case. */
-export function distinctSuccessfulRetestRows(rows: readonly AutopsyPromotionRow[]): AutopsyPromotionRow[] {
-  const seen = new Set<string>()
-  const out: AutopsyPromotionRow[] = []
-  for (const row of [...rows].sort((a, b) => Date.parse(a.updated_at) - Date.parse(b.updated_at))) {
-    const caseId = clean(row.retest_case_id, 240)
-    if (!caseId || seen.has(caseId)) continue
-    seen.add(caseId)
-    out.push(row)
-  }
-  return out
+function rowTime(row: AutopsyPromotionRow): number {
+  const parsed = Date.parse(row.updated_at)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 /**
- * Build exact problem-class/stage/guidance cohorts. The original failed prompt is not part of the
- * key or output. Runtime promotion requires five DISTINCT clean independent retest cases and zero
- * failures for the exact cohort.
+ * One controlled fixture can never become multiple pieces of independent evidence. If the same
+ * retest case appears again, retain only its latest objective outcome for this exact guidance cohort.
+ */
+export function distinctLatestRetestRows(rows: readonly AutopsyPromotionRow[]): AutopsyPromotionRow[] {
+  const latest = new Map<string, AutopsyPromotionRow>()
+  for (const row of rows) {
+    const caseId = clean(row.retest_case_id, 240)
+    if (!caseId) continue
+    const prior = latest.get(caseId)
+    if (!prior || rowTime(row) >= rowTime(prior)) latest.set(caseId, row)
+  }
+  return [...latest.values()].sort((a, b) => rowTime(a) - rowTime(b))
+}
+
+export function autopsyPracticeRate(candidate: Pick<AutopsySkillCandidate, 'successRows' | 'failureRows'>): number | null {
+  const attempts = candidate.successRows.length + candidate.failureRows.length
+  return attempts ? candidate.successRows.length / attempts : null
+}
+
+export function autopsyPracticeReady(candidate: Pick<AutopsySkillCandidate, 'successRows' | 'failureRows'>): boolean {
+  const attempts = candidate.successRows.length + candidate.failureRows.length
+  const rate = autopsyPracticeRate(candidate)
+  return attempts >= AUTOPSY_MIN_PRACTICE_ATTEMPTS && rate != null && rate >= AUTOPSY_MIN_PRACTICE_RATE
+}
+
+/**
+ * Build exact problem-class/stage/guidance cohorts. These outcomes come only from the controlled,
+ * non-held-out evidence-utilization suite. They are PRACTICE/SHADOW evidence only. They can prepare
+ * a cognitive-skill candidate but can never populate holdout counters or make it live-eligible.
  */
 export function deriveAutopsySkillCandidates(rows: readonly AutopsyPromotionRow[]): AutopsySkillCandidate[] {
   const groups = new Map<string, AutopsyPromotionRow[]>()
@@ -72,9 +89,9 @@ export function deriveAutopsySkillCandidates(rows: readonly AutopsyPromotionRow[
     const problemClass = clean(first.problem_class, 320)
     const stage = clean(first.primary_stage, 120)
     const guidance = clean(first.corrective_guidance, 2400)
-    const cleanSuccesses = group.filter(row => row.retest_passed === true && row.lesson_retained === true && row.status === 'retest_passed')
-    const successRows = distinctSuccessfulRetestRows(cleanSuccesses)
-    const failureRows = group.filter(row => row.retest_passed === false || row.status === 'retest_failed')
+    const latestByCase = distinctLatestRetestRows(group)
+    const successRows = latestByCase.filter(row => row.retest_passed === true && row.lesson_retained === true && row.status === 'retest_passed')
+    const failureRows = latestByCase.filter(row => row.retest_passed === false || row.status === 'retest_failed')
     return {
       skillKey: skillKey(problemClass, stage, guidance),
       problemClass,

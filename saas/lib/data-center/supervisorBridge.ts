@@ -1,4 +1,4 @@
-import { incidentSchema, type SupervisorIncident } from '@/lib/supervisor/incident-schema.ts'
+import { incidentSchema, type SupervisorIncident } from '../supervisor/incident-schema.ts'
 import type { DataCenterIncidentCluster } from './correlation.ts'
 
 function unique(values: string[]): string[] {

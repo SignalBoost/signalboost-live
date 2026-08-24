@@ -1,10 +1,10 @@
-// Answer-side freshness self-reflection.
+// Answer-side freshness and scenario-premise self-reflection.
 //
 // A prompt can be timeless/normative while the draft answer quietly introduces mutable present-day
-// claims ("current industry standards", "most regulators", "the prevailing approach"). Prompt-only
-// freshness routing cannot catch that class. This module is deliberately pure: it detects those
-// answer-side claims and provides a conservative deterministic fallback that removes them if a local
-// repair pass cannot produce a clean answer.
+// claims ("current industry standards", "most regulators", "the prevailing approach") or turns
+// plausible scenario assumptions into asserted facts. Prompt-only routing cannot catch either class.
+// This module is deliberately pure: it detects those answer-side claims and provides a conservative
+// deterministic fallback that removes them if a local repair pass cannot produce a clean answer.
 
 const EXPLICIT_CURRENT_MARKER = /\b(?:current(?:ly)?|latest|today|right\s+now|present[- ]day|modern[- ]day|recent(?:ly)?|as\s+of\s+20\d{2})\b/i
 const MUTABLE_INSTITUTIONAL_TOPIC = /\b(?:industry\s+standards?|legal\s+frameworks?|regulatory\s+frameworks?|regulatory\s+bodies|regulators?|engineering\s+priorities|industry\s+practice|standard\s+practice|prevailing\s+approach|prevailing\s+practice|manufacturers?|companies|agencies|jurisdictions|courts|governments?)\b/i
@@ -21,6 +21,20 @@ const DIRECT_LEGAL_MANDATE = /\b(?:gdpr|ccpa|cpra|law|regulation|regulations|sta
 const NAMED_REGIME_APPLICABILITY_ASSERTION = /\b(?:gdpr|ccpa|cpra|pci(?:[- ]?dss)?)\b[^.!?]{0,150}\b(?:trigger|require|mandate|impose|create|apply)\w*[^.!?]{0,80}\b(?:notification|disclosure|obligation|requirement|penalt|liabilit)\w*|\b(?:under|pursuant\s+to|subject\s+to|frameworks?\s+such\s+as)\b[^.!?]{0,80}\b(?:gdpr|ccpa|cpra|pci(?:[- ]?dss)?)\b[^.!?]{0,150}\b(?:notification|disclosure|obligation|requirement|penalt|liabilit)\w*/i
 const UNVERIFIED_LEGAL_CONSEQUENCE = /\b(?:legal\s+liabilit(?:y|ies)|regulatory\s+(?:penalt(?:y|ies)|fines?)|mandatory\s+(?:customer\s+)?(?:notification|disclosure)|(?:notification|disclosure)\s+obligations?)\b/i
 const UNSUPPLIED_SENSITIVE_DATA_INFERENCE = /\b(?:billing|customer|account)\s+records?\b[^.!?]{0,120}\b(?:likely|probably|presumably)\b[^.!?]{0,100}\b(?:pii|personally\s+identifiable|personal\s+data|financial\s+data|payment\s+data)\b/i
+
+// Scenario advice can sound persuasive while silently promoting assumptions to facts. These are
+// high-value failure signatures from real COS answers: invented competitor loss, insolvency,
+// product-market-fit deadlines, completed discovery, market shifts, and unqualified derived
+// projections. Explicitly conditional/modelled statements remain allowed.
+const EXPLICIT_PROJECTION_ASSUMPTION = /\b(?:if|assuming|assume|under\s+the\s+assumption|holding\b[^.!?]{0,40}\bconstant|with\s+no\b|without\s+(?:offsetting|new|additional)|illustrative|for\s+illustration|not\s+a\s+forecast|scenario\s+only)\b/i
+const EXPLICIT_CAUSAL_UNCERTAINTY = /\b(?:could|may|might|depends?\s+on|subject\s+to|would\s+need\s+to\s+model|requires?\s+(?:a\s+)?(?:revenue|burn|unit[- ]economics?)\s+model)\b/i
+const UNSUPPLIED_SEVERE_OUTCOME_ASSERTION = /\bmathematically\s+incompatible\b[^.!?]{0,120}\b(?:survival|runway)\b|\b(?:likely|will|would)\s+(?:lead|leading|result)\s+(?:to|in)\s+(?:insolvency|bankruptcy|collapse)\b|\bexistential\s+threat\b/i
+const UNSUPPLIED_COMPETITOR_ASSERTION = /\b(?:bleed(?:ing)?|los(?:e|ing)|driv(?:e|ing))\s+(?:users?|customers?|accounts?)\s+to\s+competitors?\b/i
+const UNSUPPLIED_STRATEGIC_DEADLINE = /\b(?:we|you|the\s+company)\s+(?:have|has)\s+\d+\s+months?\s+to\s+(?:prove|reach|achieve|find)\s+(?:product[- ]market\s+fit|pmf)\b|\b\d+\s+months?\s+to\s+(?:prove|reach|achieve|find)\s+(?:product[- ]market\s+fit|pmf)\b/i
+const UNSUPPLIED_MARKET_SHIFT = /\b(?:market\s+conditions?|the\s+market)\s+(?:has|have)\s+(?:shifted|changed)\b/i
+const UNSUPPLIED_PROJECT_STATUS = /\b(?:we(?:'ve|\s+have)|you(?:'ve|\s+have)|the\s+(?:team|company|project)\s+has)\b[^.!?]{0,100}\b(?:extracted|captured|learned|completed|finished)\b[^.!?]{0,120}\b(?:insights?|discovery|phase|prototype|work)\b|\b(?:discovery|exploratory|prototype)\s+phase\s+(?:is|has\s+been)\s+(?:done|complete|completed|finished)\b/i
+const UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME = /\b(?:retains?|preserves?)\s+(?:significantly\s+)?more\s+revenue\b|\bextends?\s+(?:the\s+)?(?:effective\s+)?runway\b/i
+const UNQUALIFIED_TIME_PROJECTION = /\b(?:in|over)\s+\d+\s+months?\b[^.!?]{0,180}\b(?:reduces?|shrinks?|cuts?|loses?|declines?)\b[^.!?]{0,140}\b\d+(?:\.\d+)?%|\b(?:company|user\s+base|customer\s+base|cohort)\b[^.!?]{0,100}\b(?:loses?|declines?|shrinks?)\b[^.!?]{0,70}\b~?\d+(?:\.\d+)?%[^.!?]{0,100}\b(?:over|in)\s+\d+\s+months?\b/i
 
 export type AnswerFreshnessSignal = {
   code: 'explicit_current_marker' | 'mutable_institutional_claim' | 'mutable_generalization' | 'practice_assertion' | 'prevailing_assertion' | 'unsupported_scenario_inference'
@@ -55,6 +69,19 @@ function isPureLegalUncertainty(sentence: string): boolean {
     && !NAMED_REGIME_APPLICABILITY_ASSERTION.test(sentence)
 }
 
+function isUnsupportedScenarioInference(sentence: string): boolean {
+  if (
+    UNSUPPLIED_SEVERE_OUTCOME_ASSERTION.test(sentence)
+    || UNSUPPLIED_COMPETITOR_ASSERTION.test(sentence)
+    || UNSUPPLIED_STRATEGIC_DEADLINE.test(sentence)
+    || UNSUPPLIED_MARKET_SHIFT.test(sentence)
+    || UNSUPPLIED_PROJECT_STATUS.test(sentence)
+  ) return true
+
+  if (UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME.test(sentence) && !EXPLICIT_CAUSAL_UNCERTAINTY.test(sentence)) return true
+  return UNQUALIFIED_TIME_PROJECTION.test(sentence) && !EXPLICIT_PROJECTION_ASSUMPTION.test(sentence)
+}
+
 function signalsForSentence(sentence: string): AnswerFreshnessSignal[] {
   if (!sentence || isPureLegalUncertainty(sentence)) return []
 
@@ -65,7 +92,7 @@ function signalsForSentence(sentence: string): AnswerFreshnessSignal[] {
   if (UNVERIFIED_LEGAL_CONSEQUENCE.test(sentence) && !CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT.test(sentence)) {
     out.push({ code: 'mutable_institutional_claim', excerpt: excerpt(sentence) })
   }
-  if (UNSUPPLIED_SENSITIVE_DATA_INFERENCE.test(sentence)) {
+  if (UNSUPPLIED_SENSITIVE_DATA_INFERENCE.test(sentence) || isUnsupportedScenarioInference(sentence)) {
     out.push({ code: 'unsupported_scenario_inference', excerpt: excerpt(sentence) })
   }
   if (EXPLICIT_CURRENT_MARKER.test(sentence) && MUTABLE_INSTITUTIONAL_TOPIC.test(sentence)) {

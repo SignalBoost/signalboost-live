@@ -13,6 +13,10 @@ const CRISIS_LEGAL_CAVEAT = `I have analyzed the incident involving the database
 
 const CRISIS_OVERREACH = `Billing records for 4,200 accounts likely contain Personal Identifiable Information (PII) and financial data. Under frameworks such as GDPR (Article 33/34) and CCPA, unauthorized alteration or loss of integrity of personal data may trigger mandatory disclosure obligations. Concealing such an event increases regulatory penalties.`
 
+const CEO_RESOURCE_OVERREACH = `The current resource allocation is mathematically incompatible with the company's survival timeline. I believe we've extracted the key technical insights we needed from the Web3/AR prototype. In 8 months, a 4% monthly churn rate reduces your user base by approximately 28% compounded. We have 8 months to prove product-market fit or pivot. Every week spent on Web3/AR is a week we are bleeding users to competitors. Reallocating the engineers retains significantly more revenue and extends effective runway. The risk is a 28% user base loss in 8 months, likely leading to insolvency.`
+
+const CEO_RESOURCE_CONDITIONAL = `If 4% monthly churn applied to a fixed cohort with no offsetting acquisition for 8 months, that cohort would decline by about 28%; this is an illustrative retention scenario, not a forecast of total users, revenue, or runway. A four-week blocker sprint and a churn target below 2% can be proposed as decision gates rather than predicted outcomes. Revisit the Web3/AR allocation after measuring blocker completion and retention impact.`
+
 test('answer-side guard catches mutable claims introduced by a normative autonomous-car answer', () => {
   assert.equal(answerNeedsFreshnessReflection(AV_DRAFT), true)
   const codes = new Set(answerFreshnessSignals(AV_DRAFT).map(signal => signal.code))
@@ -45,6 +49,21 @@ test('named-regime applicability, legal consequences, and unsupplied data classi
   assert.equal(codes.has('unsupported_scenario_inference'), true)
 })
 
+test('CEO resource-allocation advice cannot promote plausible assumptions into asserted outcomes', () => {
+  assert.equal(answerNeedsFreshnessReflection(CEO_RESOURCE_OVERREACH), true)
+  const signals = answerFreshnessSignals(CEO_RESOURCE_OVERREACH)
+  assert.equal(signals.some(signal => signal.code === 'unsupported_scenario_inference'), true)
+  const excerpts = signals.map(signal => signal.excerpt).join(' ')
+  assert.match(excerpts, /survival timeline/i)
+  assert.match(excerpts, /technical insights/i)
+  assert.match(excerpts, /competitors/i)
+  assert.match(excerpts, /insolvency/i)
+})
+
+test('explicitly modelled churn arithmetic and proposed targets remain allowed', () => {
+  assert.equal(answerNeedsFreshnessReflection(CEO_RESOURCE_CONDITIONAL), false)
+})
+
 test('mutable topic and assertion in separate sentences do not combine into a phantom freshness signal', () => {
   const answer = 'The applicable jurisdictions are not yet established. The remediation plan should require peer review before execution.'
   assert.equal(answerNeedsFreshnessReflection(answer), false)
@@ -66,6 +85,16 @@ test('deterministic fallback removes crisis legal/data overreach while preservin
   assert.doesNotMatch(stripped, /likely contain/i)
   assert.doesNotMatch(stripped, /Under frameworks such as GDPR/i)
   assert.doesNotMatch(stripped, /regulatory penalties/i)
+})
+
+test('deterministic fallback removes CEO scenario overreach but preserves actionable resource governance', () => {
+  const answer = `Use a reversible two-to-four-week reallocation with explicit review gates. ${CEO_RESOURCE_OVERREACH} Preserve the Web3/AR prototype and define the conditions for restarting research.`
+  const stripped = stripUnsupportedCurrentClaimSentences(answer)
+  assert.match(stripped, /reversible two-to-four-week reallocation/i)
+  assert.match(stripped, /conditions for restarting research/i)
+  assert.doesNotMatch(stripped, /survival timeline/i)
+  assert.doesNotMatch(stripped, /competitors/i)
+  assert.doesNotMatch(stripped, /insolvency/i)
 })
 
 test('ordinary COS answers are freshness-reflected before turn learning and release', () => {

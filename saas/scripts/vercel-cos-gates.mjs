@@ -5,6 +5,8 @@ const tests = [
   'tests/cosTurnExperience.node.test.ts',
   'tests/cosOutcomeCorrelation.node.test.ts',
   'tests/cosFailureAutopsy.node.test.ts',
+  'tests/cosFailureAutopsyPromotion.node.test.ts',
+  'tests/cosAutomaticQualityControl.node.test.ts',
   'tests/cosAdaptiveRetrieval.node.test.ts',
   'tests/cosRetrievalSelfReflection.node.test.ts',
   'tests/cosFreshnessPolicy.node.test.ts',

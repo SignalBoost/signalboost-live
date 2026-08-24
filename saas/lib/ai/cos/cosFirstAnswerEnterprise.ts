@@ -13,7 +13,7 @@ import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
-import { promptAppearsDiagnostic } from '@/lib/ai/cos/reasonerQuality'
+import { executiveDecisionUnsupportedClaims, promptAppearsDiagnostic } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
 import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
 import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/cos/groundingConfidence'
@@ -797,7 +797,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     return { handled:false, confidence:0, reason, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
   }
 
-  const parsed = parseLocalResult(reasoned.text)
+  let parsed = parseLocalResult(reasoned.text)
   if (!parsed) {
     console.error('cosFirstAnswer: unparseable reasoner output', { characters:reasoned.text.length, raw:reasoned.text })
     const reason = `Independent COS inference returned an unparseable result after ${reasoned.text.length} characters. Raw output started: "${safeText(reasoned.text,240)}"`
@@ -809,6 +809,26 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     const reason = `Independent COS inference stopped mid-answer after ${reasoned.text.length} characters, so it never produced a confidence value. ${parsed.answer.length} characters were recoverable. Near the token ceiling, raise COS_REASONER_MAX_TOKENS (currently ${maxTokens}); far short of it, the call was cut off before the model finished.`
     void recordKnowledgeGap(input.prompt, 0, reason)
     return { handled:false, confidence:0, reason, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
+  }
+
+  // Worker adapters can bypass the raw-reasoner draft-repair seam. Enforce the same executive
+  // claim boundary immediately before evidence accounting, caching, and release.
+  const executiveSignals = executiveDecisionUnsupportedClaims(input.prompt, reasoned.text)
+  if (executiveSignals.length) {
+    const repair = await callCosReasoner({
+      temperature: 0,
+      maxTokens: Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
+      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only supplied facts. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, or forecasts. Replace them with hypotheses, decision gates, bounded experiments, and evidence required for a decision. Deliver the complete memo; do not mention this repair.',
+      prompt: `ORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
+    }).catch(() => null)
+    const repairText = repair?.text ?? ''
+    const repaired = repairText ? parseLocalResult(repairText) : null
+    if (!repaired || repaired.truncated || executiveDecisionUnsupportedClaims(input.prompt, repairText).length) {
+      const reason = `Executive answer release rejected: unsupported claim signals (${executiveSignals.join(', ')}) remained after local repair.`
+      void recordKnowledgeGap(input.prompt, 0, reason)
+      return { handled:false, confidence:0, reason, bestEffortReply:undefined, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
+    }
+    parsed = repaired
   }
 
   const cited = citedEvidence(parsed.answer)

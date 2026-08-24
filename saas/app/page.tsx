@@ -25,14 +25,8 @@ const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,applicati
 // The COS response card previously showed only the generated answer. When COS is asked to
 // edit or rewrite a draft, the owner could not see what was actually submitted, so a wording
 // change was impossible to audit against the original. The card now echoes the submitted
-// request above the response.
-const REQUEST_LABEL: Record<string, string> = {
-  en: 'YOUR REQUEST',
-  es: 'TU SOLICITUD',
-  pt: 'SUA SOLICITAÇÃO',
-  pl: 'TWOJE ZAPYTANIE',
-  ru: 'ВАШ ЗАПРОС',
-}
+// request above the response. Its label is a locale key (concierge.yourRequest in
+// lib/i18n/homepageLocales.json), never an inline English copy table — prebuild rejects those.
 
 export default function Home() {
   const { dict, lang } = useI18n()
@@ -151,7 +145,7 @@ export default function Home() {
 
       <article className={'answer' + (loading ? ' is-loading' : '') + (failed ? ' is-failed' : '')} aria-live="polite" aria-busy={loading}>
         {sentPrompt ? <div className="answer-request">
-          <div className="answer-request-label">{REQUEST_LABEL[lang] || REQUEST_LABEL.en}</div>
+          <div className="answer-request-label">{c('yourRequest')}</div>
           <p>{sentPrompt}</p>
         </div> : null}
         <div className="answer-label">{c('cosLabel')}</div>

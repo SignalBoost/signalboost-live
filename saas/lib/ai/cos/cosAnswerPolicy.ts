@@ -17,7 +17,7 @@
 import { createHash } from 'node:crypto'
 import { answerNeedsFreshnessReflection } from './answerFreshnessSelfReflection.ts'
 
-export const COS_ANSWER_GATE_REVISION = '2026-08-24.cache-replay-output-gate.v8'
+export const COS_ANSWER_GATE_REVISION = '2026-08-24.cache-replay-output-gate.v9-executive-claim-guard'
 
 export type CosAnswerPolicyInputs = {
   reasonerSystemPrompt: string

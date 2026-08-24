@@ -30,6 +30,8 @@ import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
+import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
   type COSFirstAnswerResult,
@@ -104,6 +106,117 @@ function freshProvenance(args: {
       retrievedAt: args.retrievedAt,
       sources: args.sources.map(source => ({ id: source.id, title: source.title, url: source.url })),
     },
+  }
+}
+
+function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolean) {
+  return {
+    responseSource: invoked ? 'local_cos_reasoning' : 'external_fallback_required',
+    externalAiInvoked: false as const,
+    externalAiNecessary: !invoked,
+    escalationReasonCode: invoked ? null : 'public_reasoner_unavailable',
+    escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for public-only stateless reasoning.',
+    localModelInvoked: invoked,
+    reasonerLabel,
+    internalSystemsConsulted: invoked ? ['Public Product Catalog', 'Independent Local Reasoner'] : ['Public Product Catalog'],
+    knowledgeFactsUsed: 0,
+    learnedItemsUsed: 0,
+    enterpriseMemoriesUsed: 0,
+    userMemoriesUsed: 0,
+    cognitiveSkillsUsed: 0,
+    enterpriseMemoryStatus: 'not_available_public_delivery',
+    enterpriseMemoryOrganizationId: null,
+    evidenceFunnel: {
+      knowledgeGraph: emptyStage(),
+      learnedCorpus: emptyStage(),
+      enterpriseMemory: emptyStage(),
+      userMemory: emptyStage(),
+    },
+    cognitiveSkillFunnel: emptyStage(),
+    knowledgeFactsCited: 0,
+    learnedItemsCited: 0,
+    enterpriseMemoriesCited: 0,
+    userMemoriesCited: 0,
+    cognitiveSkillsCited: 0,
+    autonomousResearchAttempted: false,
+    researchDocumentsAcquired: 0,
+    knowledgeNewlyRetained: 0,
+    publicDeliveryOnly: true,
+  }
+}
+
+async function tryPublicStatelessAnswer(input: {
+  prompt: string
+  language?: string
+}): Promise<COSFirstAnswerResult> {
+  const resolved = resolveCosReasoner()
+  if (!resolved.config) {
+    return {
+      handled: false,
+      confidence: 0,
+      reason: 'The configured COS reasoner is unavailable for public-only stateless reasoning.',
+      provenance: publicStatelessProvenance(null, false) as any,
+    }
+  }
+
+  const publicCatalog = buildProductCatalogSummary()
+  const reasoned = await callCosReasoner({
+    temperature: 0.2,
+    maxTokens: 2600,
+    systemPrompt: [
+      'You are COS, the reasoning engine behind the public SignalBoost Concierge.',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+      'PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
+      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public company information.',
+      'For SignalBoost-specific claims, use ONLY the PUBLIC PRODUCT CATALOG supplied in the prompt. If the requested company fact is not in that public catalog or live evidence supplied this turn, say it is not public information rather than inferring or guessing.',
+      'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
+      'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
+      'You may edit, rewrite, summarize, explain, brainstorm, reason, draft, and help with ordinary public tasks just like a general assistant, subject to the public-only boundary.',
+      input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
+    ].join(' '),
+    prompt: [
+      `PUBLIC PRODUCT CATALOG:\n${publicCatalog}`,
+      `USER REQUEST:\n${input.prompt}`,
+      'Answer the public user now.',
+    ].join('\n\n'),
+  }).catch(() => null)
+
+  const provenance = publicStatelessProvenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text))
+  if (!reasoned?.text) {
+    return {
+      handled: false,
+      confidence: 0,
+      reason: 'The configured COS reasoner returned no public-only answer.',
+      provenance: provenance as any,
+    }
+  }
+
+  const parsed = parseLocalResult(reasoned.text)
+  if (!parsed || parsed.truncated || !parsed.answer.trim()) {
+    return {
+      handled: false,
+      confidence: 0,
+      reason: 'The public-only COS result was empty, truncated, or unparseable.',
+      provenance: provenance as any,
+    }
+  }
+
+  const confidence = Math.max(0, Math.min(1, parsed.confidence))
+  if (confidence < confidenceThreshold()) {
+    return {
+      handled: false,
+      confidence,
+      reason: `Public-only COS confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`,
+      bestEffortReply: parsed.answer.trim(),
+      provenance: provenance as any,
+    }
+  }
+
+  return {
+    handled: true,
+    reply: parsed.answer.trim(),
+    confidence,
+    provenance: provenance as any,
   }
 }
 
@@ -355,6 +468,10 @@ export async function tryCOSFirstAnswer(input: {
 
   if (requiresFreshExternalEvidence(input.prompt)) {
     return learnFromTurn(input, await tryFreshCurrentFact(input))
+  }
+
+  if (isPublicDeliveryScope()) {
+    return learnFromTurn(input, await tryPublicStatelessAnswer(input))
   }
 
   if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {

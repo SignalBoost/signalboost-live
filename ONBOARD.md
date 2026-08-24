@@ -3,18 +3,19 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.21  
-**Updated:** 2026-08-22 UTC  
+**Version:** 1.22  
+**Updated:** 2026-08-24 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Baseline `main`:** `10e6f1527dc463be35974fc219a33e0c22f9205d`  
-**Baseline Production deployment:** `dpl_GHMu8torFb8fP8HXZNhkKvW8owpY` — READY, `saas.signalboostapp.com` attached  
+**Baseline `main`:** `3a3dc7a8c0d246f5b6b884b820ddab89e3811947`  
+**Baseline Production deployment:** `dpl_7RMTmwRwCrSjPkyhVY8F8cpbiYrX` — READY, `saas.signalboostapp.com` attached  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
 **Procedural-learning state:** autonomous certification architecture is Production; individual skills still earn lifecycle status from evidence  
 **Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning  
-**Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)
+**Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  
+**Concierge/COS public-assistant state:** public/private execution boundary and five-language text transformation are Production; additional semantic-edit + conversation-handoff hardening is Preview READY on `fix/cos-semantic-edit-and-conversation-handoff-20260824` and is **not yet Production**
 
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
@@ -132,6 +133,121 @@ Accepted facts:
 - retained learned knowledge is continuously indexed/re-indexed into the active model space.
 - rejected/quarantined corpus rows remain excluded from governed retrieval.
 - RunPod lifecycle is detached while the active reasoner URL is outside RunPod.
+
+---
+
+# Public Concierge / COS general-assistant boundary and text transformation — IMPLEMENTED; HARDENING BRANCH PENDING MERGE
+
+Architectural role is explicit:
+
+- **COS is the engine / brain.**
+- **Concierge is the public face / delivery layer.**
+- Public Concierge may use COS reasoning and general-assistant capabilities, but it must never inherit or disclose private SignalBoost owner/admin/company context merely because the browser session belongs to the owner.
+
+Actual browser ingress matters. The stable public path is:
+
+```text
+browser POST /api/concierge
+→ proxy
+→ /api/cos-browser
+→ /api/cos-primary
+→ COS
+```
+
+The public scope is therefore enforced at the real browser ingress, not only in a homepage route or prompt. Production rules include:
+
+- public Concierge execution is downgraded to public/guest AI context even when the signed-in user is the owner;
+- no Enterprise Memory, learned internal corpus, private Knowledge Graph, user memory, private business metrics, repository/admin tools, internal strategy, provider configuration or secrets may be exposed to the public face;
+- public SignalBoost product answers must come from the canonical public-visible product/catalog surface plus allowed verified public evidence;
+- public failure must fail safe instead of invoking an internal Backup COS brain that can load private operational material;
+- this boundary is server-enforced, not merely a system-prompt request.
+
+General-assistant transformation capability is Production:
+
+- edit, rewrite, proofread, polish, rephrase, shorten/tighten, summarize and translate requests are recognized as transformation work before public freshness/web-search classification;
+- the actual `/api/cos-browser` → `/api/cos-primary` ingress is covered, so transformation requests cannot silently fall through to external current-fact search;
+- English, Brazilian Portuguese, Spanish, Polish and Russian are supported, including Unicode-safe Polish/Cyrillic intent recognition;
+- editing preserves the source language unless a target language is requested; translation uses the requested target language, or the UI locale when the target is omitted;
+- pure user-supplied text transformation does not browse, verify or add outside facts;
+- the public homepage has a permanent COS response card and uses the rich `AssistantMessage` renderer instead of a disappearing/plain-text result slot;
+- quoted/forwarded mail is separated into **EDITABLE SOURCE** and **read-only REFERENCE CONTEXT**; the old thread may inform referents and reply intent but must never be echoed into the finished edit unless explicitly requested;
+- professional correspondence defaults to natural, concise, businesslike human writing rather than literal grammar cleanup;
+- five-language executive communication modules plus a silent reasoning/quality discipline are wired into the direct transformation path;
+- a second local COS copy-editing pass reviews the first candidate for semantic drift, vague referents, stiffness, missing direct answers, awkward literal translations and unnecessary formality before release;
+- the public/private governance boundary is not weakened by the executive-writing layer.
+
+Relevant merged sequence on 2026-08-24:
+
+- **#1472** — homepage rich response rendering + direct text-transformation lane;
+- **#1473** — server-enforced public/guest Concierge isolation and fail-safe behavior;
+- **#1474** — permanent homepage response card and broader edit-request recognition;
+- **#1475** — real browser-ingress routing fix so text transformations run before freshness and public scope begins at `/api/cos-browser`;
+- **#1476** — businesslike editing, quoted-thread exclusion, five-locale transformation contract;
+- **#1478** — executive communication framework across EN/PT-BR/ES/PL/RU;
+- **#1479** — quoted email retained as read-only context, second-pass professional copy editing, and initial composer-reset work.
+
+Current Production baseline after #1479 plus the first deterministic contextual guard is `main` `3a3dc7a8c0d246f5b6b884b820ddab89e3811947`, deployment `dpl_7RMTmwRwCrSjPkyhVY8F8cpbiYrX` — READY.
+
+## Known Production defect discovered after #1479
+
+Two issues remained observable after the first Production fixes:
+
+1. A malformed draft phrase such as `person post` could still drift through model editing as `personal post`, even though the quoted email makes the intended meaning `one-person post`. The same class of problem can leave vague phrases such as `cancelling this` instead of binding them to `the outbound shipment`, or fail to answer the sender's direct question explicitly.
+2. The homepage **Continue with COS** link still reinjects the entire previous request as `/dashboard/assistant?prompt=<old request>`. The assistant page then intentionally hydrates `?prompt=` into the composer. This is why the large old request can remain at the bottom even after reset logic appears correct. It is a handoff-design issue, not merely a textarea reset issue.
+
+Do not report those two items as fully fixed in Production until the hardening branch is merged and the exact Production deployment is verified.
+
+## Active hardening branch — Preview READY, NOT PRODUCTION
+
+Branch:
+
+`fix/cos-semantic-edit-and-conversation-handoff-20260824`
+
+Current head:
+
+`22ac1d453da641ba3df405cb9eb69c90f00b9a3a`
+
+Exact Vercel Preview:
+
+`dpl_9b6p2pgimgZHViyrnTSMEozoP4ui` — READY
+
+The branch adds deterministic controls around the model rather than relying on prompt tuning alone:
+
+```text
+raw user draft + quoted reply context
+→ deterministic semantic preparation / anchors
+→ first COS writing pass
+→ second COS professional editorial pass
+→ deterministic final semantic-drift repair
+→ release
+```
+
+For the observed Dwight-style email case, the branch explicitly protects the following grounded meanings:
+
+- `person post` means **one-person post**, never `personal post`;
+- `cancelling it/this` is bound to **the outbound shipment** when the quoted message identifies that referent;
+- the sender asks whether the user will support the outbound flight, and the rough draft indicates **yes**, so the final response must state that answer explicitly rather than leave it implied.
+
+The branch also replaces the stale-prompt handoff design:
+
+- homepage creates/passes a conversation ID with the COS request;
+- after an answer, **Continue with COS** uses `?conversation=<id>` instead of `?prompt=<entire old request>`;
+- the full assistant loads that persisted conversation with an empty composer;
+- legacy `?prompt=` no longer repopulates the composer unless an explicit draft mode opts into it;
+- Send/New Chat reset is owned by the assistant's React state and textarea ref rather than an external DOM click guard;
+- the obsolete DOM-level `AssistantComposerResetGuard` workaround is removed.
+
+Exact branch acceptance on `22ac1d45…`:
+
+- Vercel Preview READY;
+- enforced COS gate: **178/178 tests passed, 0 failed**;
+- exact regressions pass for React-owned composer reset, persisted conversation handoff, legacy prompt suppression, the live Dwight edit shape, semantic `one-person post` normalization and final vague-cancellation repair;
+- route-config guard passed;
+- strip-safety guard passed;
+- i18n copy/locale checks passed across EN/ES/PT/PL/RU;
+- optimized Next.js compile, TypeScript, page generation and deployment completed successfully.
+
+Next action for this workstream: review/merge the branch, wait for the exact merged Production deployment to be READY, then retest the real homepage → Continue with COS flow and the original Dwight email before declaring completion.
 
 ---
 
@@ -620,7 +736,8 @@ Non-negotiable:
 - unknown/consequential/destructive/financial/security actions fail closed or require the applicable approval boundary;
 - learned retrieval/worker/tool/skill preference cannot widen authorization;
 - no hidden chain-of-thought persistence;
-- private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need.
+- private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need;
+- public Concierge must never inherit owner/admin/private-company context simply because the requesting browser is authenticated as owner.
 
 ---
 
@@ -645,6 +762,10 @@ Non-negotiable:
 - #1364 — governed feedback → reusable procedural candidate learning + structural triggers.
 - #1376 — autonomous evidence-gated cognitive skill certification with private profiles and bounded scheduling.
 - #1384 — applied knowledge: deterministic requeue of dormant gaps only when newly retained evidence qualifies.
+- #1472–#1476 — public Concierge general-assistant text transformation, rich/persistent homepage answer rendering, real browser-ingress routing and public/private isolation.
+- #1478 — five-language executive communication framework wired into direct COS transformation.
+- #1479 — context-aware quoted-mail editing, second-pass professional copy editing and first composer-reset implementation.
+- `3a3dc7a8…` — first deterministic contextual edit quality guard landed on `main`; additional semantic binding and handoff hardening remains on the pending branch documented above.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same admission gates as autonomous acquisition.
@@ -660,15 +781,16 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
-1. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
-2. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
-3. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-4. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-5. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-6. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
-7. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner without inflating holdout breadth.
-8. **Episodic → semantic compression:** multi-episode corroboration and reversible promotion.
-9. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled data, contamination controls and a separate held-out comparison exist.
+1. **Finish the active Concierge semantic/handoff hardening branch:** review/merge `fix/cos-semantic-edit-and-conversation-handoff-20260824` only from the exact green head (or a revalidated successor), wait for merged Production READY, then verify the real homepage → Continue with COS flow has an empty composer and the original Dwight edit resolves `one-person post`, `outbound shipment`, and the explicit outbound-flight answer correctly.
+2. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
+3. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
+4. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+5. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+6. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+7. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
+8. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner without inflating holdout breadth.
+9. **Episodic → semantic compression:** multi-episode corroboration and reversible promotion.
+10. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled data, contamination controls and a separate held-out comparison exist.
 
 ---
 
@@ -690,7 +812,8 @@ Telemetry collection is not adaptive learning until a validated consumer can saf
 A shadow recommendation is not a promoted Production policy.  
 A self-generated practice pass is not independent validation.  
 A private certification case is evidence only after it is actually executed and recorded.  
-A current-world page retrieved now can itself contain stale content; source date and authority still matter.
+A current-world page retrieved now can itself contain stale content; source date and authority still matter.  
+A Preview fix is not a Production fix, even when the exact Preview test gate is fully green.
 
 ---
 

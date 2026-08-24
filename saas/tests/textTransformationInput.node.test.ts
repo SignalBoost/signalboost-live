@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   detectDirectTextTransformation,
+  splitQuotedEmailThread,
   stripQuotedEmailThread,
   transformationLanguageInstruction,
 } from '../lib/ai/cos/textTransformationInput.ts'
@@ -31,7 +32,7 @@ test('editing, summarizing and translation are recognized across all five Signal
   }
 })
 
-test('quoted email history is removed in English Portuguese Spanish Polish and Russian', () => {
+test('quoted email history is removed from output but retained as read-only reference context', () => {
   const cases = [
     ['From: Dwight <dwight@example.com>', 'Sent: Monday', 'To: Luis <luis@example.com>', 'Subject: Mission'],
     ['De: Dwight <dwight@example.com>', 'Enviado: segunda-feira', 'Para: Luis <luis@example.com>', 'Assunto: Missão'],
@@ -42,8 +43,33 @@ test('quoted email history is removed in English Portuguese Spanish Polish and R
 
   for (const headers of cases) {
     const source = ['Hi Dwight,', '', 'Thank you for your message. I will support the mission.', '', 'Regards,', 'Luis', '', ...headers, '', 'Older quoted message'].join('\n')
-    assert.equal(stripQuotedEmailThread(source), 'Hi Dwight,\n\nThank you for your message. I will support the mission.\n\nRegards,\nLuis')
+    const split = splitQuotedEmailThread(source)
+    assert.equal(split.editableSource, 'Hi Dwight,\n\nThank you for your message. I will support the mission.\n\nRegards,\nLuis')
+    assert.match(split.referenceContext || '', /Dwight/)
+    assert.match(split.referenceContext || '', /Older quoted message/)
+    assert.equal(stripQuotedEmailThread(source), split.editableSource)
   }
+})
+
+test('the Dwight-style reply keeps the question context available while isolating the draft', () => {
+  const source = [
+    'Hi Dwight, thank you for letting me know and for your concern. If you are thinking about cancelling it because of me, do not worry. At the end of the day, this is at the moment a person post, if I do not do it you will have to do it. We do what we have to do, and whatever is needed to support the mission.',
+    '',
+    'Regards,',
+    'Luis',
+    '',
+    'From: Dwight <dwight@example.com>',
+    'Sent: Monday',
+    'To: Luis <luis@example.com>',
+    'Subject: Courier mission',
+    '',
+    'Let me know if you want me to cancel the outbound shipment for this month.',
+  ].join('\n')
+
+  const split = splitQuotedEmailThread(source)
+  assert.match(split.editableSource, /person post/)
+  assert.doesNotMatch(split.editableSource, /cancel the outbound shipment for this month/)
+  assert.match(split.referenceContext || '', /cancel the outbound shipment for this month/)
 })
 
 test('five locale codes produce explicit full language instructions', () => {
@@ -56,10 +82,17 @@ test('five locale codes produce explicit full language instructions', () => {
   }
 })
 
-test('direct editor contract requires polished business correspondence and forbids quoted-thread echo', () => {
+test('direct editor uses context plus a second professional editorial pass', () => {
   const source = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
-  assert.match(source, /polished, concise, businesslike tone/i)
-  assert.match(source, /rough, fragmented, misspelled, or non-native wording/i)
-  assert.match(source, /Never reproduce, rewrite, summarize, or append a prior message thread/i)
-  assert.match(source, /stripQuotedEmailThread\(request\.sourceText\)/)
+  assert.match(source, /capable human colleague/i)
+  assert.match(source, /Resolve ambiguous references/i)
+  assert.match(source, /direct question or requested decision/i)
+  assert.match(source, /make the finished reply answer that question explicitly/i)
+  assert.match(source, /REFERENCE CONTEXT — READ ONLY, DO NOT ECHO/)
+  assert.match(source, /splitQuotedEmailThread\(request\.sourceText\)/)
+  assert.match(source, /async function refineProfessionalDraft/)
+  assert.match(source, /FINAL COS professional copy editor/)
+  assert.match(source, /FIRST-PASS CANDIDATE/)
+  assert.match(source, /'Editorial Quality Pass'/)
+  assert.doesNotMatch(source, /const editableSource = stripQuotedEmailThread\(request\.sourceText\)/)
 })

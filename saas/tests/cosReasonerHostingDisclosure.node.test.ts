@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { classifyInferenceHost, describeReasoner, reasonerProvenanceLine } from '../lib/ai/cos/reasonerHostingDisclosure.ts'
+test('managed open-weight inference is disclosed as third-party hosting',()=>{const d=describeReasoner('managed-open-model:deepinfra:Qwen/Qwen3-30B-A3B');assert.equal(d.hosting,'managed_open_weight');assert.equal(d.provider,'deepinfra');assert.equal(d.label,'Primary Reasoner');assert.match(d.note,/third-party host deepinfra/)})
+test('self-hosted inference retains the local label',()=>{const d=describeReasoner('independent-local:qwen2.5-coder:32b');assert.equal(d.hosting,'self_hosted');assert.equal(d.label,'Local Reasoning Engine');assert.equal(d.note,'')})
+test('public hosts are managed and internal hosts are self-hosted',()=>{for(const [url,provider] of [['https://api.deepinfra.com/v1','deepinfra'],['https://abc.proxy.runpod.net/v1','runpod'],['https://api.fireworks.ai/v1','fireworks'],['https://ai.example.co.uk/v1','example']] as const){const c=classifyInferenceHost(url);assert.equal(c.selfHosted,false);assert.equal(c.provider,provider)} for(const url of ['http://localhost:11434/v1','http://10.4.2.9:8000/v1','http://reasoner.internal/v1'])assert.equal(classifyInferenceHost(url).selfHosted,true)})
+test('unrecorded hosting does not certify a boundary',()=>{assert.equal(describeReasoner('').hosting,'unrecorded');assert.equal(reasonerProvenanceLine('managed-open-model:deepinfra:model').indexOf(': INVOKED'),23)})

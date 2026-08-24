@@ -39,6 +39,8 @@ test('financing and governance scenarios are recognized as user-supplied task pr
   const transport = conciergePromptWithScenarioRule(financing)
   assert.match(transport, /task premises/i)
   assert.match(transport, /Do not refuse merely because the scenario describes a private company/i)
+  assert.match(transport, /Do not say that you cannot access, disclose, or analyze facts that are already written in the current user request/i)
+  assert.match(transport, /begin directly with the analysis/i)
   assert.match(transport, /never overrides authoritative SignalBoost product catalog/i)
   assert.match(transport, /USER REQUEST:/)
 })
@@ -65,10 +67,12 @@ test('user premises cannot override authoritative SignalBoost product truth', ()
   assert.match(catalogSummarySource, /current status\/runtime evidence/)
 })
 
-test('observed private-data refusal wording triggers one bounded corrective retry', () => {
+test('observed private-data refusal wording triggers bounded corrective handling', () => {
   const refusal = `The specific financial metrics are not public information. As a public-facing assistant, I do not have access to the company's private financial records. Therefore, I cannot provide a factual analysis of this specific scenario without private data.`
+  const observedFinancingRefusal = `The specific financial metrics, investor identities, and valuation details regarding your company's runway and term sheets are private business information and are not part of the public SignalBoost product catalog. As COS, I cannot access or disclose private company data, internal strategy, or specific financial negotiations.`
   assert.equal(looksLikePrivateDataRefusal(refusal), true)
-  assert.equal(looksLikePrivateDataRefusal('I would compare dilution, governance control, retention, and solvency using the supplied terms.'), false)
+  assert.equal(looksLikePrivateDataRefusal(observedFinancingRefusal), true)
+  assert.equal(looksLikePrivateDataRefusal('Using the facts you supplied as scenario premises, I would compare dilution, governance control, retention, and solvency.'), false)
 })
 
 test('homepage restores a welcome-first front door and retains the assistant-style conversation shell', () => {

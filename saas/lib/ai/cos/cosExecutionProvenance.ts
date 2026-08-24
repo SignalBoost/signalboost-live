@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosExecutionProvenance.ts
 export type CosExecutionSnapshot = {
   at: string
   prompt: string
@@ -64,7 +65,7 @@ export function formatCosExecutionProvenance(snapshot: CosExecutionSnapshot): st
     ['User Memory', p.user_memory],
     ['Autonomous Research', p.autonomous_research],
     ['Local Reasoning Engine', p.local_reasoning],
-    ['External AI Provider', p.external_ai],
+    ['External Fallback / Teacher', p.external_ai],
   ] as const
   const local = p.local_reasoning || {}
   const primary = local.invoked ? (local.model || 'local reasoning engine') : p.external_ai?.invoked ? (p.external_ai.model || p.external_ai.provider || 'external AI') : snapshot.source

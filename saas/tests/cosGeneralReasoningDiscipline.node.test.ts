@@ -19,6 +19,8 @@ test('scenario strategy advice keeps supplied metrics separate from modeled outc
   const rule = COS_GENERAL_REASONING_DISCIPLINE
   assert.match(rule, /supplied metrics as premises, not as permission to invent downstream outcomes/i)
   assert.match(rule, /Do not infer competitor losses, insolvency, bankruptcy, product-market-fit deadlines, market shifts/i)
+  assert.match(rule, /Do not assign probability or impact labels such as low-probability, high-probability, high-impact, existential, or survival-critical/i)
+  assert.match(rule, /Cash exhaustion, revenue change, funding timing, profitability timing, and runway extension require the relevant financial mechanics/i)
   assert.match(rule, /fixed-cohort illustration from a forecast of total users, revenue, or runway/i)
   assert.match(rule, /do not silently assume zero acquisition, constant pricing, constant burn, or unchanged cohort mix/i)
   assert.match(rule, /Label proposed timelines, staffing moves, phase gates, and KPI thresholds as proposals or decision gates/i)
@@ -51,6 +53,8 @@ test('backup brain carries scenario-premise and modeled-outcome boundaries too',
   const brain = read('../../cos-core/brain.md')
   assert.match(brain, /supplied metrics are premises, not downstream outcomes/i)
   assert.match(brain, /Do not invent competitor losses, insolvency or bankruptcy, product-market-fit deadlines, market shifts/i)
+  assert.match(brain, /Do not assign probability or impact labels such as low-probability, high-probability, high-impact, existential, or survival-critical/i)
+  assert.match(brain, /Cash exhaustion, revenue change, funding timing, profitability timing, and runway extension require the relevant financial mechanics/i)
   assert.match(brain, /Distinguish fixed-cohort illustrations from forecasts of total users, revenue, or runway/i)
   assert.match(brain, /Never say a prototype or discovery phase is complete or that sufficient insights were extracted/i)
 })

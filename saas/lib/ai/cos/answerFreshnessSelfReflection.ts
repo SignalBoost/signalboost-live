@@ -23,18 +23,24 @@ const UNVERIFIED_LEGAL_CONSEQUENCE = /\b(?:legal\s+liabilit(?:y|ies)|regulatory\
 const UNSUPPLIED_SENSITIVE_DATA_INFERENCE = /\b(?:billing|customer|account)\s+records?\b[^.!?]{0,120}\b(?:likely|probably|presumably)\b[^.!?]{0,100}\b(?:pii|personally\s+identifiable|personal\s+data|financial\s+data|payment\s+data)\b/i
 
 // Scenario advice can sound persuasive while silently promoting assumptions to facts. These are
-// high-value failure signatures from real COS answers: invented competitor loss, insolvency,
-// product-market-fit deadlines, completed discovery, market shifts, and unqualified derived
-// projections. Explicitly conditional/modelled statements remain allowed.
+// structural categories rather than one-off phrases: unsupported probability labels, survival/cash
+// forecasts, competitor effects, project maturity, financial causality, and unqualified projections.
 const EXPLICIT_PROJECTION_ASSUMPTION = /\b(?:if|assuming|assume|under\s+the\s+assumption|holding\b[^.!?]{0,40}\bconstant|with\s+no\b|without\s+(?:offsetting|new|additional)|illustrative|for\s+illustration|not\s+a\s+forecast|scenario\s+only)\b/i
-const EXPLICIT_CAUSAL_UNCERTAINTY = /\b(?:could|may|might|depends?\s+on|subject\s+to|would\s+need\s+to\s+model|requires?\s+(?:a\s+)?(?:revenue|burn|unit[- ]economics?)\s+model)\b/i
+const EXPLICIT_CAUSAL_UNCERTAINTY = /\b(?:could|may|might|depends?\s+on|subject\s+to|would\s+need\s+to\s+model|requires?\s+(?:a\s+)?(?:revenue|burn|unit[- ]economics?)\s+model|estimate(?:d)?\s+separately)\b/i
 const UNSUPPLIED_SEVERE_OUTCOME_ASSERTION = /\bmathematically\s+incompatible\b[^.!?]{0,120}\b(?:survival|runway)\b|\b(?:likely|will|would)\s+(?:lead|leading|result)\s+(?:to|in)\s+(?:insolvency|bankruptcy|collapse)\b|\bexistential\s+threat\b/i
+const UNSUPPLIED_SURVIVAL_OR_CASH_ASSERTION = /\b(?:necessary|strategic|critical|essential)\s+(?:defen[cs]e|necessity|move|step|measure)\s+(?:of|for)\s+(?:the\s+)?(?:company(?:['’]s)?\s+)?(?:survival|runway)\b|\b(?:likely|probably)\s+to\s+run\s+out\s+of\s+cash\b|\b(?:will|would)\s+run\s+out\s+of\s+cash\b/i
+const UNSUPPLIED_PROBABILITY_OR_IMPACT_ASSERTION = /\b(?:low|high)[ -]probability\b|\b(?:low|high)[ -](?:impact|certainty)\b/i
 const UNSUPPLIED_COMPETITOR_ASSERTION = /\b(?:bleed(?:ing)?|los(?:e|ing)|driv(?:e|ing))\s+(?:users?|customers?|accounts?)\s+to\s+competitors?\b/i
 const UNSUPPLIED_STRATEGIC_DEADLINE = /\b(?:we|you|the\s+company)\s+(?:have|has)\s+\d+\s+months?\s+to\s+(?:prove|reach|achieve|find)\s+(?:product[- ]market\s+fit|pmf)\b|\b\d+\s+months?\s+to\s+(?:prove|reach|achieve|find)\s+(?:product[- ]market\s+fit|pmf)\b/i
 const UNSUPPLIED_MARKET_SHIFT = /\b(?:market\s+conditions?|the\s+market)\s+(?:has|have)\s+(?:shifted|changed)\b/i
 const UNSUPPLIED_PROJECT_STATUS = /\b(?:we(?:'ve|\s+have)|you(?:'ve|\s+have)|the\s+(?:team|company|project)\s+has)\b[^.!?]{0,100}\b(?:extracted|captured|learned|completed|finished)\b[^.!?]{0,120}\b(?:insights?|discovery|phase|prototype|work)\b|\b(?:discovery|exploratory|prototype)\s+phase\s+(?:is|has\s+been)\s+(?:done|complete|completed|finished)\b/i
-const UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME = /\b(?:retains?|preserves?)\s+(?:significantly\s+)?more\s+revenue\b|\bextends?\s+(?:the\s+)?(?:effective\s+)?runway\b/i
-const UNQUALIFIED_TIME_PROJECTION = /\b(?:in|over)\s+\d+\s+months?\b[^.!?]{0,180}\b(?:reduces?|shrinks?|cuts?|loses?|declines?)\b[^.!?]{0,140}\b\d+(?:\.\d+)?%|\b(?:company|user\s+base|customer\s+base|cohort)\b[^.!?]{0,100}\b(?:loses?|declines?|shrinks?)\b[^.!?]{0,70}\b~?\d+(?:\.\d+)?%[^.!?]{0,100}\b(?:over|in)\s+\d+\s+months?\b/i
+const UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME = /\b(?:retains?|preserves?)\s+(?:significantly\s+)?more\s+revenue\b|\bextends?\s+(?:the\s+)?(?:effective\s+)?runway\b|\b(?:directly|necessarily)\s+(?:reduces?|cuts?|increases?|decreases?)\s+revenue\b|\b(?:extends?|delays?|shortens?)\s+(?:the\s+)?(?:time\s+to\s+)?(?:profitability|next\s+funding\s+round)\b|\bburn(?:s|ing)?\s+through\s+(?:the\s+)?(?:remaining\s+)?runway\s+faster\b|\bdirect(?:ly)?(?:,\s*)?(?:measurable\s+)?impact\s+on\s+(?:retention|revenue)\b|\b(?:churn|retention)\s+(?:reduction|improvement)\b[^.!?]{0,120}\b(?:extends?|increases?)\s+(?:the\s+)?(?:company(?:['’]s)?\s+life|runway)\b/i
+const UNQUALIFIED_TIME_PROJECTION = /\b(?:in|over)\s+\d+\s+months?\b[^.!?]{0,180}\b(?:reduces?|shrinks?|cuts?|loses?|declines?)\b[^.!?]{0,140}\b\d+(?:\.\d+)?%|\b(?:company|user\s+base|customer\s+base|cohort)\b[^.!?]{0,100}\b(?:loses?|declines?|shrinks?)\b[^.!?]{0,70}\b~?\d+(?:\.\d+)?%[^.!?]{0,100}\b(?:over|in)\s+\d+\s+months?\b|\b(?:user|customer|account)\s+base\s+(?:halves?|falls?|drops?|declines?|shrinks?)\s+(?:in|over)\s+(?:roughly|about|approximately)?\s*\d+(?:\s*[-–]\s*\d+)?\s+months?\b|\b(?:you|we|the\s+company)\s+(?:will|would)\s+lose\s+~?\d+(?:\.\d+)?%\s+(?:of\s+)?(?:your|the)?\s*(?:user|customer|account)\s+base\s+(?:in|over)\s+\d+\s+months?\b/i
+
+const SCENARIO_ADVICE_REQUEST = /\b(?:how\s+(?:do|should|would)|construct|design|draft|formulate|recommend|propose|build|create)\b|\b(?:framework|strategy|plan|protocol|resource[- ]reallocation|one[- ]on[- ]one|1:1)\b/i
+const SCENARIO_BUSINESS_CONTEXT = /\b(?:runway|churn|revenue|margin|cash|burn|roadmap|blockers?|engineers?|staff(?:ing)?|resources?|founder|ceo|cfo|vp|board|investor|enterprise|customer|billing|contract|vendor|product|prototype|research|retention|pricing|funding|profitability|incident|outage)\b/i
+const SCENARIO_QUANTIFIED_CONTEXT = /\b\d+(?:\.\d+)?\s*%|\b\d+\s+(?:months?|weeks?|days?|hours?|engineers?|accounts?|blockers?|customers?|users?|quarters?)\b/i
+const SCENARIO_STRUCTURAL_CONTEXT = /\b(?:constraint|trade[- ]?off|reallocation|allocation|incident|discrepancy|conflict|blocker|outage|runway)\b/i
 
 export type AnswerFreshnessSignal = {
   code: 'explicit_current_marker' | 'mutable_institutional_claim' | 'mutable_generalization' | 'practice_assertion' | 'prevailing_assertion' | 'unsupported_scenario_inference'
@@ -58,6 +64,18 @@ function sentencesOf(answer: string): string[] {
     .filter(Boolean)
 }
 
+/**
+ * High-value scenario/advice prompts get a second prompt-vs-draft premise audit even when no
+ * deterministic answer signature fires. This prevents paraphrases from bypassing the guard.
+ */
+export function promptNeedsScenarioPremiseReview(prompt: string): boolean {
+  const text = compact(prompt)
+  if (text.length < 120) return false
+  return SCENARIO_ADVICE_REQUEST.test(text)
+    && SCENARIO_BUSINESS_CONTEXT.test(text)
+    && (SCENARIO_QUANTIFIED_CONTEXT.test(text) || SCENARIO_STRUCTURAL_CONTEXT.test(text))
+}
+
 function isPureLegalUncertainty(sentence: string): boolean {
   // A narrow decision-gate construction is non-assertive even if its subordinate clause contains
   // words such as "law requires". Example: "Legal must determine whether applicable law requires
@@ -72,6 +90,8 @@ function isPureLegalUncertainty(sentence: string): boolean {
 function isUnsupportedScenarioInference(sentence: string): boolean {
   if (
     UNSUPPLIED_SEVERE_OUTCOME_ASSERTION.test(sentence)
+    || UNSUPPLIED_SURVIVAL_OR_CASH_ASSERTION.test(sentence)
+    || UNSUPPLIED_PROBABILITY_OR_IMPACT_ASSERTION.test(sentence)
     || UNSUPPLIED_COMPETITOR_ASSERTION.test(sentence)
     || UNSUPPLIED_STRATEGIC_DEADLINE.test(sentence)
     || UNSUPPLIED_MARKET_SHIFT.test(sentence)

@@ -104,7 +104,7 @@ function formatMaterialProvenance(provenance:any):string{
     }else{
       lines.push('Original Evidence       : origin evidence funnel was not recorded for this cached answer.')
     }
-    if(provenance?.local_reasoning?.confidence!=null)lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(provenance.local_reasoning.threshold??0).toFixed(2)} (based on original lineage).`)
+    if(provenance?.local_reasoning?.confidence!=null)lines.push(`COS Answer Confidence  : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(provenance.local_reasoning.threshold??0).toFixed(2)} (based on original lineage). This is COS's own confidence in this answer, not any confidence or threshold value that may appear within the answer's content.`)
 
     const replayRows=currentRetrievalRows(provenance).filter(([,item])=>consulted(item))
     if(replayRows.length){
@@ -146,7 +146,7 @@ function formatMaterialProvenance(provenance:any):string{
   }
   if(researchUsed)lines.push(`Autonomous Research    : USED — ${count(provenance.autonomous_research.documents_acquired)} live documents acquired; ${count(provenance.autonomous_research.new_knowledge_retained)} retained as new durable knowledge.`)
   if(!origin?.from_cache&&localInvoked&&!externalMaterial)lines.push(reasonerProvenanceLine(provenance.local_reasoning.model))
-  if(externalMaterial)lines.push(`External AI Provider   : INVOKED — ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''}.`)
+  if(externalMaterial)lines.push(`External Fallback / Teacher: INVOKED — ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''}.`)
 
   if(!origin?.from_cache){
     const consultedOnly:string[]=[]
@@ -158,7 +158,7 @@ function formatMaterialProvenance(provenance:any):string{
       ['User Memory',provenance?.user_memory],
     ] as const){if(!contributed(item)&&consulted(item))consultedOnly.push(`${label}: ${funnel(item)}`)}
     if(localInvoked&&externalMaterial){const d=describeReasoner(provenance.local_reasoning.model);consultedOnly.push(`${d.label}: ${d.model||'model not recorded'} invoked, but its draft was superseded and did not generate the recorded answer`)}
-    if(externalInvoked&&!externalAccepted)consultedOnly.push(`External AI Provider: ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} invoked, but its synthesis was rejected by the freshness grounding gate`)
+    if(externalInvoked&&!externalAccepted)consultedOnly.push(`External Fallback / Teacher: ${provenance.external_ai.provider||'unknown'}${provenance.external_ai.model?` / ${provenance.external_ai.model}`:''} invoked, but its synthesis was rejected by the freshness grounding gate`)
     if(consultedOnly.length)lines.push('','Consulted but not material','──────────────────────────',consultedOnly.join('; ')+'.')
   }
 
@@ -169,9 +169,9 @@ function formatMaterialProvenance(provenance:any):string{
   if(!contributed(provenance?.learned_corpus)&&!consulted(provenance?.learned_corpus))notUsed.push('Learned Corpus')
   if(!researchUsed)notUsed.push('Autonomous Research')
   if(!localInvoked)notUsed.push(origin?.from_cache?'Local Reasoning Engine (current replay)':'Local Reasoning Engine')
-  if(!externalInvoked)notUsed.push(origin?.from_cache?'External AI Provider (current replay)':'External AI Provider')
+  if(!externalInvoked)notUsed.push(origin?.from_cache?'External Fallback / Teacher (current replay)':'External Fallback / Teacher')
   const externalQualifier=localInvoked?describeReasoner(provenance?.local_reasoning?.model).externalNotUsedQualifier:''
-  if(notUsed.length)lines.push('','Explicitly Not Used','───────────────────',notUsed.map(label=>label==='External AI Provider'?`${label}: NOT USED.${externalQualifier}`:`${label}: NOT USED.`).join(' '))
+  if(notUsed.length)lines.push('','Explicitly Not Used','───────────────────',notUsed.map(label=>label==='External Fallback / Teacher'?`${label}: NOT USED.${externalQualifier}`:`${label}: NOT USED.`).join(' '))
 
   const learned=count(provenance?.autonomous_research?.new_knowledge_retained)
   const acquired=count(provenance?.autonomous_research?.documents_acquired)
@@ -183,9 +183,9 @@ function formatMaterialProvenance(provenance:any):string{
     if(backupMode){
       // A backup answer carries a fixed default, and its threshold is null — rendering that as
       // "threshold 0.00" invented a gate that was never evaluated.
-      lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — fixed backup default; no confidence gate was evaluated for this answer.`)
+      lines.push(`COS Answer Confidence  : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — fixed backup default; no confidence gate was evaluated for this answer.`)
     }else{
-      lines.push(`COS Confidence         : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(threshold??0).toFixed(2)}.`)
+      lines.push(`COS Answer Confidence  : ${Number(provenance.local_reasoning.confidence).toFixed(2)} — threshold ${Number(threshold??0).toFixed(2)}. This is COS's own confidence in this answer, not any confidence or threshold value that may appear within the answer's content.`)
     }
   }
   return lines.join('\n')

@@ -15,6 +15,10 @@ function sourceSignalsOnePersonPost(source: string, context: string): boolean {
   return soleStaffing || handoff
 }
 
+function contextNamesOutboundShipmentCancellation(context: string): boolean {
+  return /\bcancel(?:ing|ling)?\s+(?:the\s+)?outbound\s+shipment\b/i.test(context)
+}
+
 function sourceSignalsOutboundSupportYes(source: string, context: string): boolean {
   const asksSupport = /\b(?:still\s+)?want(?:ed)?\s+to\s+support\s+the\s+outbound\s+flight\b/i.test(context)
   if (!asksSupport) return false
@@ -36,7 +40,7 @@ export function prepareContextualEdit(editableSource: string, referenceContext?:
     anchors.push('The rough phrase "person post" means "one-person post" (a post being covered by one person), NOT "personal post".')
   }
 
-  if (/\bcancel(?:ing|ling)\s+(?:the\s+)?outbound\s+shipment\b/i.test(context)) {
+  if (contextNamesOutboundShipmentCancellation(context)) {
     anchors.push('The cancellation being discussed is the outbound shipment; do not replace that concrete referent with vague wording such as "this".')
   }
 
@@ -79,7 +83,7 @@ export function repairContextualEditDrift(input: {
     answer = answer.replace(/\b(?:a\s+)?personal\s+post\b/gi, match => /^a\s/i.test(match) ? 'a one-person post' : 'one-person post')
   }
 
-  if (/\bcancel(?:ing|ling)\s+(?:the\s+)?outbound\s+shipment\b/i.test(context)) {
+  if (contextNamesOutboundShipmentCancellation(context)) {
     answer = answer.replace(/\bcancell?ing\s+(?:this|it)\b/gi, match => /cancelling/i.test(match) ? 'cancelling the outbound shipment' : 'canceling the outbound shipment')
   }
 

@@ -68,5 +68,6 @@ test('direct COS editor is wired to the executive framework and records its use'
   assert.match(source, /import \{ executiveCommunicationBlock \} from '\.\/executiveCommunication\.ts'/)
   assert.match(source, /executiveCommunicationBlock\(input\.language\)/)
   assert.match(source, /'Executive Communication Framework'/)
-  assert.match(source, /Quoted or forwarded email history is context only/)
+  assert.match(source, /REFERENCE CONTEXT is read-only/)
+  assert.match(source, /splitQuotedEmailThread\(request\.sourceText\)/)
 })

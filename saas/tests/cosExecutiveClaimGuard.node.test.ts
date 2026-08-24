@@ -19,3 +19,11 @@ test('evidence-bounded executive memo is not rejected', () => {
   assert.deepEqual(executiveDecisionUnsupportedClaims(PROMPT, BOUNDED), [])
   assert.equal(reasonerDraftNeedsRepair(PROMPT, BOUNDED), false)
 })
+
+
+test('unstated security frameworks trigger release repair', () => {
+  const scenario = 'An InfoSec lead found a high-severity zero-day that may expose tenant metadata. Deliver risk triage and a go/no-go recommendation.'
+  const invented = JSON.stringify({ answer: 'This is an IL5 environment, so notify the Authorizing Official and update the System Security Plan.', confidence: .8 })
+  assert.deepEqual(executiveDecisionUnsupportedClaims(scenario, invented), ['unsupported_security_framework'])
+  assert.equal(reasonerDraftNeedsRepair(scenario, invented), true)
+})

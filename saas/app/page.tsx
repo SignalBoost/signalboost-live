@@ -26,7 +26,7 @@ export default function Home() {
   const c = (key: string) => t(dict, `homepage.concierge.${key}`)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
-  const [sentPrompt, setSentPrompt] = useState('')
+  const [handoffConversationId, setHandoffConversationId] = useState('')
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -79,10 +79,11 @@ export default function Home() {
     const staged = attachments
     if ((!prompt && staged.length === 0) || loading) return
     const displayContent = [prompt, staged.length ? `📎 ${staged.map((attachment) => attachment.name).join(', ')}` : ''].filter(Boolean).join('\n\n')
+    const conversationId = crypto.randomUUID()
     setLoading(true)
     setAnswer('')
     setFailed(false)
-    setSentPrompt(displayContent)
+    setHandoffConversationId(conversationId)
     try {
       const response = await fetch('/api/concierge', {
         method: 'POST',
@@ -90,7 +91,7 @@ export default function Home() {
         body: JSON.stringify({
           messages: [{ role: 'user', content: displayContent }],
           attachments: staged.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
-          context: { language: lang, currentPage: '/', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+          context: { language: lang, currentPage: '/', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, conversationId },
         }),
       })
       const payload = await response.json().catch(() => null)
@@ -103,6 +104,7 @@ export default function Home() {
       setAttachments([])
     } catch {
       setFailed(true)
+      setHandoffConversationId('')
     } finally {
       setLoading(false)
     }
@@ -149,7 +151,8 @@ export default function Home() {
             <div className="answer-placeholder" aria-hidden="true"><i /><i /><i /></div>
           )}
         </div>
-        {(answer || failed) && sentPrompt ? <Link href={'/dashboard/assistant?prompt=' + encodeURIComponent(sentPrompt)}>{c('continue')} →</Link> : null}
+        {answer && handoffConversationId ? <Link href={'/dashboard/assistant?conversation=' + encodeURIComponent(handoffConversationId)}>{c('continue')} →</Link> : null}
+        {failed ? <Link href="/dashboard/assistant">{c('continue')} →</Link> : null}
       </article>
 
       <div className="bottom-row"><p>{c('trust')}</p><Link href="/home">{c('workspace')} <span aria-hidden="true">→</span></Link></div>

@@ -25,7 +25,7 @@ function provenance(reasonerLabel: string | null, invoked: boolean) {
     escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for the direct text-transformation request.',
     localModelInvoked: invoked,
     reasonerLabel,
-    internalSystemsConsulted: ['Direct Text Transformation', 'Executive Communication Framework', ...(invoked ? ['Independent Local Reasoner'] : [])],
+    internalSystemsConsulted: ['Direct Text Transformation', 'Executive Communication Framework', 'Editorial Quality Pass', ...(invoked ? ['Independent Local Reasoner'] : [])],
     knowledgeFactsUsed: 0,
     learnedItemsUsed: 0,
     enterpriseMemoriesUsed: 0,
@@ -54,6 +54,47 @@ function provenance(reasonerLabel: string | null, invoked: boolean) {
       signals: ['direct_text_transformation_source'],
     },
   }
+}
+
+async function refineProfessionalDraft(input: {
+  instruction: string
+  editableSource: string
+  referenceContext: string | null
+  candidate: string
+  language?: string
+}) {
+  const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
+  const reasoned = await callCosReasoner({
+    temperature: 0.08,
+    maxTokens: 1800,
+    systemPrompt: [
+      'You are the FINAL COS professional copy editor. The candidate below has already been drafted once. Your job is to release a better final version, not to explain it.',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+      'Write like an excellent human business correspondent: natural, idiomatic, concise, confident, and context-aware. Routine email should not sound ceremonial, robotic, legalistic, or like a generic executive memo.',
+      'Prefer concrete wording over vague substitutes. If the reference context identifies what "it", "this", a shipment, a flight, a post, or another shorthand refers to, use the concrete referent where that makes the reply clearer.',
+      'If the incoming message asks a direct question and the original draft clearly indicates the answer, ensure the final reply answers that question explicitly.',
+      'Preserve the user\'s intended meaning and first-person voice. Preserve all names, numbers, dates, commitments, uncertainty, and factual constraints supplied by the user or reference context.',
+      'Do not introduce new facts or commitments. Do not browse or verify externally.',
+      'REFERENCE CONTEXT is read-only. Never reproduce or append the quoted thread.',
+      'Use contractions and ordinary professional phrasing when they sound more natural in the target language and do not change tone or meaning.',
+      'Silently compare the candidate against the original editable source. Fix literal translations, awkward noun phrases, missing direct answers, unnecessary formality, repetition, and vague wording before returning.',
+      transformationLanguageInstruction(input.language),
+    ].join('\n\n'),
+    prompt: [
+      `USER INSTRUCTION:\n${input.instruction}`,
+      `ORIGINAL EDITABLE SOURCE:\n<<<SOURCE\n${input.editableSource}\nSOURCE`,
+      context ? `REFERENCE CONTEXT — READ ONLY, DO NOT ECHO:\n<<<CONTEXT\n${context}\nCONTEXT` : '',
+      `FIRST-PASS CANDIDATE:\n<<<CANDIDATE\n${input.candidate}\nCANDIDATE`,
+      'Return the final polished version now.',
+    ].filter(Boolean).join('\n\n'),
+  }).catch(() => null)
+
+  if (!reasoned?.text) return null
+  const parsed = parseLocalResult(reasoned.text)
+  if (!parsed || parsed.truncated || !parsed.answer.trim()) return null
+  const confidence = Math.max(0, Math.min(1, parsed.confidence))
+  if (confidence < 0.45) return null
+  return { answer: parsed.answer.trim(), confidence }
 }
 
 export async function tryDirectTextTransformation(input: {
@@ -102,7 +143,7 @@ export async function tryDirectTextTransformation(input: {
     prompt: [
       `USER INSTRUCTION:\n${request.instruction}`,
       `EDITABLE SOURCE TEXT:\n<<<SOURCE\n${editableSource}\nSOURCE`,
-      referenceContext ? `REFERENCE CONTEXT — READ ONLY, DO NOT ECHO:\n<<<CONTEXT\n${referenceContext}\nCONTEXT` : '',
+      referenceContext ? `REFERENCE CONTEXT — READ ONLY, DO NOT ECHO:\n<<<CONTEXT\n${referenceContext.slice(0, 12_000)}\nCONTEXT` : '',
       'Produce the finished version now.',
     ].filter(Boolean).join('\n\n'),
   }).catch(() => null)
@@ -127,21 +168,35 @@ export async function tryDirectTextTransformation(input: {
     }
   }
 
-  const confidence = Math.max(0, Math.min(1, parsed.confidence))
-  if (confidence < 0.45) {
+  let finalAnswer = parsed.answer.trim()
+  let finalConfidence = Math.max(0, Math.min(1, parsed.confidence))
+
+  const refined = await refineProfessionalDraft({
+    instruction: request.instruction,
+    editableSource,
+    referenceContext,
+    candidate: finalAnswer,
+    language: input.language,
+  })
+  if (refined) {
+    finalAnswer = refined.answer
+    finalConfidence = refined.confidence
+  }
+
+  if (finalConfidence < 0.45) {
     return {
       handled: false,
-      confidence,
-      reason: `Direct COS text-transformation confidence ${confidence.toFixed(2)} was below the 0.45 acceptance floor.`,
-      bestEffortReply: parsed.answer.trim(),
+      confidence: finalConfidence,
+      reason: `Direct COS text-transformation confidence ${finalConfidence.toFixed(2)} was below the 0.45 acceptance floor.`,
+      bestEffortReply: finalAnswer,
       provenance: baseProvenance as any,
     }
   }
 
   return {
     handled: true,
-    reply: parsed.answer.trim(),
-    confidence,
+    reply: finalAnswer,
+    confidence: finalConfidence,
     provenance: baseProvenance as any,
   }
 }

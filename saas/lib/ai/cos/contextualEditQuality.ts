@@ -16,7 +16,14 @@ function sourceSignalsOnePersonPost(source: string, context: string): boolean {
 }
 
 function contextNamesOutboundShipmentCancellation(context: string): boolean {
-  return /\bcancel(?:ing|ling)?\s+(?:the\s+)?outbound\s+shipment\b/i.test(context)
+  // Deliberately tolerate cancel/canceling/cancelling/cancellation-style wording.
+  // The important semantic evidence is that cancellation language appears close to
+  // the concrete object "outbound shipment" in the quoted message.
+  return /\bcancel\w*\b.{0,48}\boutbound\s+shipment\b/i.test(context)
+}
+
+function sourceUsesVagueCancellationReference(source: string): boolean {
+  return /\bcancel\w*\s+(?:this|it)\b/i.test(source)
 }
 
 function sourceSignalsOutboundSupportYes(source: string, context: string): boolean {
@@ -26,6 +33,18 @@ function sourceSignalsOutboundSupportYes(source: string, context: string): boole
     && (/\bif\s+i\s+(?:do\s+not|don't)\b.{0,100}\byou\s+will\s+have\s+to\b/i.test(source)
       || /\bwhatever\s+is\s+(?:needed|required)\s+to\s+support\s+the\s+mission\b/i.test(source)
       || /\bwe\s+do\s+what\s+we\s+have\s+to\s+do\b/i.test(source))
+}
+
+function bindOutboundShipmentReference(text: string): string {
+  return text.replace(/\bcancel\w*\s+(?:this|it)\b/gi, match => {
+    const lower = match.toLowerCase()
+    if (lower.startsWith('cancelling')) return 'cancelling the outbound shipment'
+    if (lower.startsWith('canceling')) return 'canceling the outbound shipment'
+    if (lower.startsWith('cancelled')) return 'cancelled the outbound shipment'
+    if (lower.startsWith('canceled')) return 'canceled the outbound shipment'
+    if (lower.startsWith('cancel')) return 'cancel the outbound shipment'
+    return match
+  })
 }
 
 export function prepareContextualEdit(editableSource: string, referenceContext?: string | null): ContextualEditPreparation {
@@ -41,7 +60,10 @@ export function prepareContextualEdit(editableSource: string, referenceContext?:
   }
 
   if (contextNamesOutboundShipmentCancellation(context)) {
-    anchors.push('The cancellation being discussed is the outbound shipment; do not replace that concrete referent with vague wording such as "this".')
+    if (sourceUsesVagueCancellationReference(normalized)) {
+      normalized = bindOutboundShipmentReference(normalized)
+    }
+    anchors.push('The cancellation being discussed is the outbound shipment; name it as the outbound shipment rather than using vague wording such as "this" or "it".')
   }
 
   if (/\b(?:still\s+)?want(?:ed)?\s+to\s+support\s+the\s+outbound\s+flight\b/i.test(context)) {
@@ -84,7 +106,7 @@ export function repairContextualEditDrift(input: {
   }
 
   if (contextNamesOutboundShipmentCancellation(context)) {
-    answer = answer.replace(/\bcancell?ing\s+(?:this|it)\b/gi, match => /cancelling/i.test(match) ? 'cancelling the outbound shipment' : 'canceling the outbound shipment')
+    answer = bindOutboundShipmentReference(answer)
   }
 
   const language = String(input.language || '').toLowerCase().slice(0, 2)

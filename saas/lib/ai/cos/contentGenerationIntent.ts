@@ -13,15 +13,13 @@
 //    premium model tier ... Design a 90-day phased optimization strategy ..."
 //
 // The verb "Design" sits in the third sentence, so the exclusion never fired; the word "current" —
-// a possessive adjective describing the company's OWN internal tier, not a request for current
-// world facts — then routed the whole thing to live evidence, which came back unavailable and the
-// user got a refusal instead of a strategy. The same prompt with only the final sentence was
-// classified correctly, which is what isolated the anchor as the cause.
+// a possessive adjective describing the company's OWN internal tier, not a current-world fact —
+// then routed the whole thing to live evidence, which came back unavailable and the user got a
+// refusal instead of a strategy.
 //
-// The verb must still LEAD ITS OWN CLAUSE — that is what separates a real instruction ("design a
-// strategy") from an incidental mention ("who designed the Eiffel Tower", "the report writes
-// well"). So instead of anchoring to the prompt, anchor to each sentence/clause and accept if any
-// one of them opens with an authoring/transformation verb.
+// The verb must still LEAD ITS OWN CLAUSE — that separates a real instruction ("design a strategy")
+// from an incidental mention ("who designed the Eiffel Tower"). Unicode-aware boundaries are used
+// so Polish and Russian commands are treated the same way as English, Spanish, and Portuguese.
 
 const AUTHORING_VERB = [
   // English
@@ -38,7 +36,7 @@ const AUTHORING_VERB = [
 ].join('|')
 
 /** Matches an authoring/transformation verb at the start of the string. */
-const GENERATION = new RegExp(`^\\s*(?:${AUTHORING_VERB})\\b`, 'iu')
+const GENERATION = new RegExp(`^\\s*(?:${AUTHORING_VERB})(?![\\p{L}\\p{N}_])`, 'iu')
 
 /**
  * Split on sentence terminators and on clause boundaries that commonly precede an instruction
@@ -51,7 +49,7 @@ function clausesOf(input: string): string[] {
     .map(part => part.trim())
     // A role prefix frames the requested artifact; it must not hide the authoring verb.
     .flatMap(part => {
-      const stripped = part.replace(/^(?:as|acting\s+as|in\s+(?:your|the)\s+role\s+as|in\s+your\s+capacity\s+as|como|na\s+qualidade\s+de|jako|как)\b[^,]{0,60},\s*/iu, '')
+      const stripped = part.replace(/^(?:as|acting\s+as|in\s+(?:your|the)\s+role\s+as|in\s+your\s+capacity\s+as|como|na\s+qualidade\s+de|jako|как)(?![\p{L}\p{N}_])[^,]{0,60},\s*/iu, '')
       return stripped !== part ? [part, stripped] : [part]
     })
     .filter(Boolean)

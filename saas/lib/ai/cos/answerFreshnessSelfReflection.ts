@@ -17,9 +17,12 @@ const PREVAILING_ASSERTION = /\b(?:prevailing|dominant|standard|industry[- ]wide
 // an epistemic boundary, not an assertion that a particular law currently applies.
 const CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT = /\b(?:cannot|can't|could\s+not|unable\s+to)\s+(?:confirm|determine|establish|verify)\b|\b(?:depends?\s+on|depending\s+on)\b|\b(?:if|where)\s+(?:legally\s+)?(?:required|applicable)\b|\b(?:legal|privacy|compliance)(?:\/(?:privacy|compliance))*\s+(?:assessment|review|determination|decision)\b|\b(?:determine|assess|confirm)\s+(?:the\s+)?(?:applicable|governing)\s+(?:law|regulation|obligations?|requirements?|jurisdiction)\b/i
 const DIRECT_LEGAL_MANDATE = /\b(?:gdpr|ccpa|cpra|law|regulation|regulations|statute|jurisdiction)\b[^.!?]{0,90}\b(?:requires?|mandates?|prohibits?|imposes?|sets?)\b|\b(?:requires?|mandates?)\b[^.!?]{0,90}\b(?:customer\s+notification|notification\s+deadline|within\s+\d+\s+hours?)\b/i
+const NAMED_REGIME_APPLICABILITY_ASSERTION = /\b(?:gdpr|ccpa|cpra|pci(?:[- ]?dss)?)\b[^.!?]{0,150}\b(?:trigger|require|mandate|impose|create|apply)\w*[^.!?]{0,80}\b(?:notification|disclosure|obligation|requirement|penalt|liabilit)\w*|\b(?:under|pursuant\s+to|subject\s+to|frameworks?\s+such\s+as)\b[^.!?]{0,80}\b(?:gdpr|ccpa|cpra|pci(?:[- ]?dss)?)\b[^.!?]{0,150}\b(?:notification|disclosure|obligation|requirement|penalt|liabilit)\w*/i
+const UNVERIFIED_LEGAL_CONSEQUENCE = /\b(?:legal\s+liabilit(?:y|ies)|regulatory\s+(?:penalt(?:y|ies)|fines?)|mandatory\s+(?:customer\s+)?(?:notification|disclosure)|(?:notification|disclosure)\s+obligations?)\b/i
+const UNSUPPLIED_SENSITIVE_DATA_INFERENCE = /\b(?:billing|customer|account)\s+records?\b[^.!?]{0,120}\b(?:likely|probably|presumably)\b[^.!?]{0,100}\b(?:pii|personally\s+identifiable|personal\s+data|financial\s+data|payment\s+data)\b/i
 
 export type AnswerFreshnessSignal = {
-  code: 'explicit_current_marker' | 'mutable_institutional_claim' | 'mutable_generalization' | 'practice_assertion' | 'prevailing_assertion'
+  code: 'explicit_current_marker' | 'mutable_institutional_claim' | 'mutable_generalization' | 'practice_assertion' | 'prevailing_assertion' | 'unsupported_scenario_inference'
   excerpt: string
 }
 
@@ -44,14 +47,21 @@ function isPureLegalUncertainty(sentence: string): boolean {
   return CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT.test(sentence)
     && !EXPLICIT_CURRENT_MARKER.test(sentence)
     && !DIRECT_LEGAL_MANDATE.test(sentence)
+    && !NAMED_REGIME_APPLICABILITY_ASSERTION.test(sentence)
 }
 
 function signalsForSentence(sentence: string): AnswerFreshnessSignal[] {
   if (!sentence || isPureLegalUncertainty(sentence)) return []
 
   const out: AnswerFreshnessSignal[] = []
-  if (DIRECT_LEGAL_MANDATE.test(sentence)) {
+  if (DIRECT_LEGAL_MANDATE.test(sentence) || NAMED_REGIME_APPLICABILITY_ASSERTION.test(sentence)) {
     out.push({ code: 'mutable_institutional_claim', excerpt: excerpt(sentence) })
+  }
+  if (UNVERIFIED_LEGAL_CONSEQUENCE.test(sentence) && !CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT.test(sentence)) {
+    out.push({ code: 'mutable_institutional_claim', excerpt: excerpt(sentence) })
+  }
+  if (UNSUPPLIED_SENSITIVE_DATA_INFERENCE.test(sentence)) {
+    out.push({ code: 'unsupported_scenario_inference', excerpt: excerpt(sentence) })
   }
   if (EXPLICIT_CURRENT_MARKER.test(sentence) && MUTABLE_INSTITUTIONAL_TOPIC.test(sentence)) {
     out.push({ code: 'explicit_current_marker', excerpt: excerpt(sentence) })
@@ -79,8 +89,8 @@ function sentenceNeedsRemoval(sentence: string): boolean {
 
 /**
  * Last-resort safety fallback. Local self-reflection should normally rewrite the answer coherently.
- * If it cannot, remove only sentences that assert mutable present-world institutional practice and
- * keep the timeless/normative reasoning. Never invent replacement facts.
+ * If it cannot, remove only sentences that assert mutable present-world institutional practice or
+ * unsupported scenario facts and keep the timeless/normative reasoning. Never invent replacements.
  */
 export function stripUnsupportedCurrentClaimSentences(answer: string): string {
   const paragraphs = String(answer || '').split(/\n{2,}/)

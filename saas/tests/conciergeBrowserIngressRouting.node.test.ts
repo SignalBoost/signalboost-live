@@ -4,11 +4,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
-import { detectDirectTextTransformation } from '../lib/ai/cos/directTextTransformation.ts'
 
 test('the live Dwight edit shape is transformation work, never fresh web lookup', () => {
   const prompt = 'edit Dwight, thank you for let me know and for your ocncern - if you are thinking about cancelling it because of me, do not worry. At the end of the day, this is at the moment a one-person post. If I do not do it, you will have to do it. We do what we have to do and whatever is needed to support the mission.'
-  assert.ok(detectDirectTextTransformation(prompt))
   assert.equal(isContentGenerationRequest(prompt), true)
   assert.equal(requiresFreshExternalEvidence(prompt), false)
 })

@@ -3,6 +3,11 @@ import { parseLocalResult } from './reasonerOutput.ts'
 import type { COSFirstAnswerResult } from './cosFirstAnswerEnterprise.ts'
 import { executiveCommunicationBlock } from './executiveCommunication.ts'
 import {
+  contextualEditAnchorBlock,
+  prepareContextualEdit,
+  repairContextualEditDrift,
+} from './contextualEditQuality.ts'
+import {
   detectDirectTextTransformation,
   splitQuotedEmailThread,
   stripQuotedEmailThread,
@@ -25,7 +30,7 @@ function provenance(reasonerLabel: string | null, invoked: boolean) {
     escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for the direct text-transformation request.',
     localModelInvoked: invoked,
     reasonerLabel,
-    internalSystemsConsulted: ['Direct Text Transformation', 'Executive Communication Framework', 'Editorial Quality Pass', ...(invoked ? ['Independent Local Reasoner'] : [])],
+    internalSystemsConsulted: ['Direct Text Transformation', 'Executive Communication Framework', 'Contextual Edit Quality Guard', 'Editorial Quality Pass', ...(invoked ? ['Independent Local Reasoner'] : [])],
     knowledgeFactsUsed: 0,
     learnedItemsUsed: 0,
     enterpriseMemoriesUsed: 0,
@@ -60,6 +65,7 @@ async function refineProfessionalDraft(input: {
   instruction: string
   editableSource: string
   referenceContext: string | null
+  semanticAnchors: string
   candidate: string
   language?: string
 }) {
@@ -71,18 +77,20 @@ async function refineProfessionalDraft(input: {
       'You are the FINAL COS professional copy editor. The candidate below has already been drafted once. Your job is to release a better final version, not to explain it.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'Write like an excellent human business correspondent: natural, idiomatic, concise, confident, and context-aware. Routine email should not sound ceremonial, robotic, legalistic, or like a generic executive memo.',
+      'SEMANTIC ANCHORS supplied by the system are mandatory interpretations grounded in the user draft and quoted context. Do not contradict or weaken them.',
       'Prefer concrete wording over vague substitutes. If the reference context identifies what "it", "this", a shipment, a flight, a post, or another shorthand refers to, use the concrete referent where that makes the reply clearer.',
       'If the incoming message asks a direct question and the original draft clearly indicates the answer, ensure the final reply answers that question explicitly.',
       'Preserve the user\'s intended meaning and first-person voice. Preserve all names, numbers, dates, commitments, uncertainty, and factual constraints supplied by the user or reference context.',
       'Do not introduce new facts or commitments. Do not browse or verify externally.',
       'REFERENCE CONTEXT is read-only. Never reproduce or append the quoted thread.',
       'Use contractions and ordinary professional phrasing when they sound more natural in the target language and do not change tone or meaning.',
-      'Silently compare the candidate against the original editable source. Fix literal translations, awkward noun phrases, missing direct answers, unnecessary formality, repetition, and vague wording before returning.',
+      'Silently compare the candidate against the original editable source. Fix literal translations, semantic drift, awkward noun phrases, missing direct answers, unnecessary formality, repetition, and vague wording before returning.',
       transformationLanguageInstruction(input.language),
     ].join('\n\n'),
     prompt: [
       `USER INSTRUCTION:\n${input.instruction}`,
       `ORIGINAL EDITABLE SOURCE:\n<<<SOURCE\n${input.editableSource}\nSOURCE`,
+      input.semanticAnchors,
       context ? `REFERENCE CONTEXT — READ ONLY, DO NOT ECHO:\n<<<CONTEXT\n${context}\nCONTEXT` : '',
       `FIRST-PASS CANDIDATE:\n<<<CANDIDATE\n${input.candidate}\nCANDIDATE`,
       'Return the final polished version now.',
@@ -105,8 +113,11 @@ export async function tryDirectTextTransformation(input: {
   if (!request) return null
 
   const sourceSplit = splitQuotedEmailThread(request.sourceText)
-  const editableSource = sourceSplit.editableSource || request.sourceText
+  const originalEditableSource = sourceSplit.editableSource || request.sourceText
   const referenceContext = sourceSplit.referenceContext
+  const prepared = prepareContextualEdit(originalEditableSource, referenceContext)
+  const editableSource = prepared.editableSource
+  const semanticAnchors = contextualEditAnchorBlock(prepared.anchors)
   const resolved = resolveCosReasoner()
   if (!resolved.config) {
     return {
@@ -124,6 +135,7 @@ export async function tryDirectTextTransformation(input: {
       'You are COS Direct Text Editor, the professional writing and transformation capability behind the public SignalBoost Concierge.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'Perform the user instruction on the supplied EDITABLE SOURCE TEXT.',
+      'SEMANTIC ANCHORS supplied by the system are mandatory interpretations grounded in the user draft and quoted context. Do not contradict or weaken them.',
       'Preserve the user\'s intended meaning, names, factual content, numbers, dates, links, commitments, and level of certainty unless the user explicitly asks to change them.',
       'Do not make a clumsy sentence merely grammatical. Reconstruct rough, fragmented, misspelled, or non-native wording into natural fluent prose while preserving the intended message.',
       'For ordinary professional correspondence, write like a capable human colleague, not like a memo template: natural, polished, concise, warm when appropriate, and direct. Do not make routine email sound stiff, ceremonial, or artificially executive.',
@@ -143,6 +155,7 @@ export async function tryDirectTextTransformation(input: {
     prompt: [
       `USER INSTRUCTION:\n${request.instruction}`,
       `EDITABLE SOURCE TEXT:\n<<<SOURCE\n${editableSource}\nSOURCE`,
+      semanticAnchors,
       referenceContext ? `REFERENCE CONTEXT — READ ONLY, DO NOT ECHO:\n<<<CONTEXT\n${referenceContext.slice(0, 12_000)}\nCONTEXT` : '',
       'Produce the finished version now.',
     ].filter(Boolean).join('\n\n'),
@@ -175,6 +188,7 @@ export async function tryDirectTextTransformation(input: {
     instruction: request.instruction,
     editableSource,
     referenceContext,
+    semanticAnchors,
     candidate: finalAnswer,
     language: input.language,
   })
@@ -182,6 +196,13 @@ export async function tryDirectTextTransformation(input: {
     finalAnswer = refined.answer
     finalConfidence = refined.confidence
   }
+
+  finalAnswer = repairContextualEditDrift({
+    originalSource: originalEditableSource,
+    referenceContext,
+    answer: finalAnswer,
+    language: input.language,
+  })
 
   if (finalConfidence < 0.45) {
     return {

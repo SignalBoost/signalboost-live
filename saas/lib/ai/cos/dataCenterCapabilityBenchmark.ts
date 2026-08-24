@@ -33,7 +33,10 @@ function containsUnqualifiedRootCauseClaim(text: string): boolean {
   if (!match) return false
   const start = match.index
   const prefix = source.slice(Math.max(0, start - 45), start)
-  return !NEGATION.test(prefix) && !/\b(not|isn't|is not|cannot be)\b/i.test(prefix)
+  const suffix = source.slice(start + match[0].length, start + match[0].length + 35)
+  if (NEGATION.test(prefix) || /\b(not|isn't|is not|cannot be)\b/i.test(prefix)) return false
+  if (/^\s*(?:not|unproven|unknown|uncertain|not established|not confirmed)\b/i.test(suffix)) return false
+  return true
 }
 
 export function scoreDataCenterCapabilityReply(profile: string | undefined, reply: string): string[] {

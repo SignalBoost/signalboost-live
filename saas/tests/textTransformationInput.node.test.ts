@@ -82,7 +82,7 @@ test('five locale codes produce explicit full language instructions', () => {
   }
 })
 
-test('direct editor uses context to resolve the reply while forbidding thread echo', () => {
+test('direct editor uses context plus a second professional editorial pass', () => {
   const source = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
   assert.match(source, /capable human colleague/i)
   assert.match(source, /Resolve ambiguous references/i)
@@ -90,5 +90,9 @@ test('direct editor uses context to resolve the reply while forbidding thread ec
   assert.match(source, /make the finished reply answer that question explicitly/i)
   assert.match(source, /REFERENCE CONTEXT — READ ONLY, DO NOT ECHO/)
   assert.match(source, /splitQuotedEmailThread\(request\.sourceText\)/)
+  assert.match(source, /async function refineProfessionalDraft/)
+  assert.match(source, /FINAL COS professional copy editor/)
+  assert.match(source, /FIRST-PASS CANDIDATE/)
+  assert.match(source, /'Editorial Quality Pass'/)
   assert.doesNotMatch(source, /const editableSource = stripQuotedEmailThread\(request\.sourceText\)/)
 })

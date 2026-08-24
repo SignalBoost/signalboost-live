@@ -19,6 +19,7 @@
     { "path": "/api/cron/cos-knowledge-promotion", "schedule": "15 7 * * *" },
     { "path": "/api/cron/cos-learning-indexer", "schedule": "3,18,33,48 * * * *" },
     { "path": "/api/cron/cos-current-world-learning", "schedule": "14 * * * *" },
+    { "path": "/api/cron/cos-quality-control", "schedule": "20 8 * * *" },
     { "path": "/api/cron/cos-mining?job=weekly", "schedule": "0 5 * * 0" },
     { "path": "/api/cron/marketing-sales-director", "schedule": "0 7 * * *" },
     { "path": "/api/cron/marketing-sales-video", "schedule": "12 * * * *" },

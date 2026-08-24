@@ -1,11 +1,29 @@
 import { assessAnswerSpecificity } from './answerSpecificity.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
-import { classifyScriptRequest, scriptRequestDirective } from './scriptRequestIntent.ts'
+import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
 const PROGRAMMING_REDIRECT = /\b(?:programming language|source code|python|javascript|typescript|bash|powershell|choose (?:a |the )?(?:language|runtime)|specify (?:a |the )?(?:language|runtime|format))\b/i
 const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot write (?:a |the )?script|can't write (?:a |the )?script|unable to write (?:a |the )?script|need you to specify|need more information before (?:i can |i )?(?:write|produce|draft|create))\b/i
+const EXECUTIVE_UNSUPPORTED_CERTAINTY = /\b(?:risk of (?:cannibali[sz]ation|downgrad(?:e|ing)) is low|(?:renewals?|contracts?) (?:are|is) safe|(?:clients?|customers?) will not (?:downgrade|leave)|must (?:stay|remain) on (?:enterprise|the enterprise tier)|cannot (?:practically )?(?:move|downgrade)|is (?:safe|manageable) because)\b/i
+
+/**
+ * Executive recommendations may state user-supplied facts, but must not turn uncertain outcomes
+ * into facts or introduce numeric targets that the scenario never supplied.
+ */
+export function executiveDecisionUnsupportedClaims(prompt: string, raw: string): string[] {
+  if (!executiveDecisionDirective(prompt)) return []
+  const parsed = parseLocalResult(String(raw ?? ''))
+  if (!parsed) return []
+  const answer = parsed.answer
+  const signals: string[] = []
+  if (EXECUTIVE_UNSUPPORTED_CERTAINTY.test(answer)) signals.push('unsupported_certainty')
+  const suppliedNumbers = new Set((String(prompt).match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')))
+  const novelNumber = (answer.match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')).find(value => !suppliedNumbers.has(value))
+  if (novelNumber) signals.push('novel_numeric_target')
+  return signals
+}
 
 /** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
 export function promptAppearsDiagnostic(prompt: string): boolean {
@@ -60,6 +78,7 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
  */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
   if (contentScriptSemanticMismatch(prompt, raw)) return true
+  if (executiveDecisionUnsupportedClaims(prompt, raw).length) return true
   const quality = assessReasonerDraft(prompt, raw)
   if (!quality.parseable || !quality.diagnostic) return false
   if (quality.cap < 0.72) return true
@@ -68,6 +87,22 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 
 export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
+  if (executiveDecisionDirective(originalPrompt)) {
+    return [
+      originalPrompt,
+      '',
+      'QUALITY REPAIR — the prior executive recommendation stated unsupported outcomes or numeric targets.',
+      executiveDecisionDirective(originalPrompt),
+      '',
+      'Rewrite the memo from the supplied facts only.',
+      '- Do not say that renewals are safe, cannibalization is low, customers will or will not downgrade, or that a contract guarantees a commercial outcome unless the supplied evidence establishes it.',
+      '- Do not add feature limits, timelines, savings targets, percentages, user counts, legal conclusions, or price points that are not in the request.',
+      '- Convert unsupported predictions into risks, hypotheses, decision gates, experiments, and measurements; state what evidence would confirm or falsify them.',
+      '- Preserve the useful arbitration framework and deliver the complete requested memo.',
+      '',
+      'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
+    ].join('\n')
+  }
   if (scriptDirective && classifyScriptRequest(originalPrompt) === 'content') {
     return [
       originalPrompt,
@@ -114,6 +149,11 @@ export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRa
   const repairedScriptMismatch = contentScriptSemanticMismatch(prompt, repairedRaw)
   if (firstScriptMismatch !== repairedScriptMismatch) return !repairedScriptMismatch
   if (firstScriptMismatch && repairedScriptMismatch) return false
+
+  const firstExecutiveSignals = executiveDecisionUnsupportedClaims(prompt, firstRaw)
+  const repairedExecutiveSignals = executiveDecisionUnsupportedClaims(prompt, repairedRaw)
+  if (firstExecutiveSignals.length !== repairedExecutiveSignals.length) return repairedExecutiveSignals.length < firstExecutiveSignals.length
+  if (firstExecutiveSignals.length && repairedExecutiveSignals.length) return false
 
   const first = assessReasonerDraft(prompt, firstRaw)
   const repaired = assessReasonerDraft(prompt, repairedRaw)

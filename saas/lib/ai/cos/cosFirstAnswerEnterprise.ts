@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { createHash } from 'node:crypto'
+import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
 import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
@@ -701,7 +702,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const cacheMaxAgeMs = cosCacheMaxAgeMs()
   const knowledge = semanticKnowledgeLayer()
 
-  if (!input.disableCache && knowledge && !scopedMemorySelected) {
+  const cacheAllowed = !input.disableCache && semanticCacheAllowedForPrompt(input.prompt)
+  if (cacheAllowed && knowledge && !scopedMemorySelected) {
     const nearest = await knowledge.lookupSemanticCache(cacheTaskId, input.prompt, contextWindow)
     if (nearest) {
       const payload = nearest.responsePayload as CachedCosAnswer|null
@@ -724,7 +726,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     policyVersion,
     knowledgeVersion:null,
   })
-  const cached = input.disableCache ? null : await readCachedAnswer(cacheKey)
+  const cached = cacheAllowed ? await readCachedAnswer(cacheKey) : null
   const cachedCurrent = cachedAnswerIsCurrent(cached, policyVersion, cacheMaxAgeMs)
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
   if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold()) {

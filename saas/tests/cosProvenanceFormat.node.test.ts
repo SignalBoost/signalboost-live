@@ -1,3 +1,4 @@
+// saas/tests/cosProvenanceFormat.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -34,8 +35,8 @@ test('complete provenance reports retrieved, relevant, selected, injected and ci
     'User Memory',
     'Autonomous Research',
     'Local Reasoning Engine',
-    'External AI Provider',
-    'COS Confidence',
+    'External Fallback / Teacher',
+    'COS Answer Confidence',
   ]) assert.ok(formatted.includes(label), `missing ${label}`)
 
   assert.match(formatted, /Answer Origin\s+: FRESH — generated during this request/)
@@ -43,8 +44,8 @@ test('complete provenance reports retrieved, relevant, selected, injected and ci
   assert.match(formatted, /Knowledge Graph: 32 retrieved → 7 relevant → 4 selected → 4 injected → 0 cited/)
   assert.match(formatted, /User Memory: 15 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited/)
   assert.match(formatted, /Local Reasoning Engine\s+: INVOKED — independent-local:qwen2\.5-coder:32b/)
-  assert.match(formatted, /External AI Provider: NOT USED/)
-  assert.match(formatted, /COS Confidence\s+: 0\.85 — threshold 0\.72/)
+  assert.match(formatted, /External Fallback \/ Teacher: NOT USED/)
+  assert.match(formatted, /COS Answer Confidence\s+: 0\.85 — threshold 0\.72/)
   assert.equal(provenance.schema_version, 4)
 })
 
@@ -88,7 +89,7 @@ test('cache-hit provenance separates current retrieval from the turn that genera
   assert.match(formatted, /Current Retrieval Attempt/)
   assert.match(formatted, /Knowledge Graph\s+: 18 retrieved → 3 relevant → 3 selected → 0 injected — NOT INJECTED into the cached answer/)
   assert.match(formatted, /Learned Corpus\s+: 9 retrieved → 9 relevant → 2 selected → 0 injected — NOT INJECTED into the cached answer/)
-  assert.match(formatted, /COS Confidence\s+: 0\.90 — threshold 0\.72 \(based on original lineage\)/)
+  assert.match(formatted, /COS Answer Confidence\s+: 0\.90 — threshold 0\.72 \(based on original lineage\)/)
   assert.equal(provenance.knowledge_graph.injected_count, 0)
   assert.equal(provenance.learned_corpus.injected_count, 0)
   assert.equal(provenance.answer_origin.evidence_funnel?.knowledgeGraph.injected, 4)

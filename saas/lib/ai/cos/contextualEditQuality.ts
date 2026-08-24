@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/contextualEditQuality.ts
 export type ContextualEditPreparation = {
   editableSource: string
   anchors: string[]
@@ -30,9 +31,10 @@ export function prepareContextualEdit(editableSource: string, referenceContext?:
   const anchors: string[] = []
 
   if (sourceSignalsOnePersonPost(normalized, context)) {
-    normalized = normalized
-      .replace(/\ba\s+person\s+post\b/gi, 'a one-person post')
-      .replace(/\bperson\s+post\b/gi, 'one-person post')
+    // One idempotent pass. The previous two-step chain rewrote "a person post" to
+    // "a one-person post" and then matched "person post" again inside it, emitting
+    // "a one-one-person post". The optional one- prefix makes re-application a no-op.
+    normalized = normalized.replace(/\b(?:one-)?person\s+post\b/gi, 'one-person post')
     anchors.push('The rough phrase "person post" means "one-person post" (a post being covered by one person), NOT "personal post".')
   }
 

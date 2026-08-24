@@ -2,23 +2,24 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
-  AUTOPSY_HOLDOUT_SUCCESSES,
-  AUTOPSY_PRACTICE_SUCCESSES,
-  AUTOPSY_TOTAL_CLEAN_RETESTS,
+  AUTOPSY_MIN_PRACTICE_ATTEMPTS,
+  AUTOPSY_MIN_PRACTICE_RATE,
+  autopsyPracticeReady,
   deriveAutopsySkillCandidates,
+  distinctLatestRetestRows,
   type AutopsyPromotionRow,
 } from '../lib/ai/cos/failureAutopsyPromotionPolicy.ts'
 
 const file = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
-function row(index: number, passed = true, problemClass = 'incident diagnosis', retestCaseId = `case-${index}`): AutopsyPromotionRow {
+function row(index: number, passed = true, problemClass = 'incident diagnosis', caseId = `case-${index}`): AutopsyPromotionRow {
   return {
     id: `a-${index}`,
     problem_class: problemClass,
     primary_stage: 'reasoning',
     corrective_guidance: 'Compare candidate explanations against the supplied facts and state concrete falsifiers.',
     falsifier: 'A separate comparable case still fails after the procedure is applied.',
-    retest_case_id: retestCaseId,
+    retest_case_id: caseId,
     retest_passed: passed,
     lesson_retained: passed,
     status: passed ? 'retest_passed' : 'retest_failed',
@@ -26,58 +27,56 @@ function row(index: number, passed = true, problemClass = 'incident diagnosis', 
   }
 }
 
-test('autopsy promotion requires the full practice plus independent holdout evidence budget', () => {
-  assert.equal(AUTOPSY_PRACTICE_SUCCESSES, 2)
-  assert.equal(AUTOPSY_HOLDOUT_SUCCESSES, 3)
-  assert.equal(AUTOPSY_TOTAL_CLEAN_RETESTS, 5)
-  const candidate = deriveAutopsySkillCandidates(Array.from({ length: 4 }, (_, i) => row(i)))[0]
-  assert.equal(candidate.successRows.length, 4)
+test('controlled autopsy evidence is only enough to establish practice readiness', () => {
+  assert.equal(AUTOPSY_MIN_PRACTICE_ATTEMPTS, 2)
+  assert.equal(AUTOPSY_MIN_PRACTICE_RATE, 0.8)
+  const candidate = deriveAutopsySkillCandidates([row(0), row(1)])[0]
+  assert.equal(candidate.successRows.length, 2)
   assert.equal(candidate.failureRows.length, 0)
-  assert.ok(candidate.skillKey.startsWith('reasoning.failure_autopsy.'))
+  assert.equal(autopsyPracticeReady(candidate), true)
 })
 
-test('five clean independent retests form one exact problem-class/stage cohort', () => {
-  const candidate = deriveAutopsySkillCandidates(Array.from({ length: 5 }, (_, i) => row(i)))[0]
-  assert.equal(candidate.successRows.length, 5)
-  assert.equal(new Set(candidate.successRows.map(item => item.retest_case_id)).size, 5)
-  assert.equal(candidate.problemClass, 'incident diagnosis')
-  assert.equal(candidate.stage, 'reasoning')
+test('the same controlled retest case can count only once and its latest outcome wins', () => {
+  const selected = distinctLatestRetestRows([
+    row(0, true, 'incident diagnosis', 'same-case'),
+    row(1, false, 'incident diagnosis', 'same-case'),
+  ])
+  assert.equal(selected.length, 1)
+  assert.equal(selected[0].retest_passed, false)
 })
 
-test('duplicate controlled retest cases count only once toward promotion', () => {
-  const candidate = deriveAutopsySkillCandidates([
-    row(0), row(1), row(2), row(3), row(4),
-    row(8, true, 'incident diagnosis', 'case-4'),
-    row(9, true, 'incident diagnosis', 'case-4'),
-  ])[0]
-  assert.equal(candidate.successRows.length, 5)
-  assert.equal(new Set(candidate.successRows.map(item => item.retest_case_id)).size, 5)
-})
-
-test('any failed retest remains attached to the exact cohort so runtime reconciliation can weaken it', () => {
-  const candidate = deriveAutopsySkillCandidates([
-    ...Array.from({ length: 5 }, (_, i) => row(i)),
-    row(7, false),
-  ])[0]
-  assert.equal(candidate.successRows.length, 5)
+test('controlled practice failures reduce practice readiness rather than becoming fake holdouts', () => {
+  const candidate = deriveAutopsySkillCandidates([row(0), row(1, false), row(2)])[0]
+  assert.equal(candidate.successRows.length, 2)
   assert.equal(candidate.failureRows.length, 1)
+  assert.equal(autopsyPracticeReady(candidate), false)
 })
 
-test('different problem classes never share promotion evidence', () => {
+test('different problem classes never share practice evidence', () => {
   const candidates = deriveAutopsySkillCandidates([
-    ...Array.from({ length: 3 }, (_, i) => row(i, true, 'incident diagnosis')),
-    ...Array.from({ length: 3 }, (_, i) => row(i + 4, true, 'database performance')),
+    row(0, true, 'incident diagnosis'),
+    row(1, true, 'incident diagnosis'),
+    row(2, true, 'database performance'),
+    row(3, true, 'database performance'),
   ])
   assert.equal(candidates.length, 2)
   assert.notEqual(candidates[0].skillKey, candidates[1].skillKey)
 })
 
-test('runtime promotion writes only generic procedural guidance and supports automatic weakening rollback', () => {
+test('runtime preparation never populates holdout counters or validates a skill from controlled retests', () => {
   const source = file('../lib/ai/cos/failureAutopsyPromotion.ts')
-  assert.match(source, /status: 'validated'/)
-  assert.match(source, /practice_attempts: AUTOPSY_PRACTICE_SUCCESSES/)
-  assert.match(source, /holdout_attempts: AUTOPSY_HOLDOUT_SUCCESSES/)
-  assert.match(source, /weakened_at: now/)
-  assert.match(source, /original_prompt_stored: false/)
-  assert.match(source, /Do not use benchmark fixture wording as factual evidence/)
+  assert.match(source, /source_kind: 'failure_autopsy_controlled_practice'/)
+  assert.match(source, /evidenceRole: 'controlled_practice_only'/)
+  assert.match(source, /status: 'practiced'/)
+  assert.match(source, /holdout_attempts: 0/)
+  assert.match(source, /private_holdout_required: true/)
+  assert.doesNotMatch(source, /status: 'validated'/)
+  assert.doesNotMatch(source, /experience_kind: 'holdout'/)
+})
+
+test('practice reconciliation preserves strong and sticky weakened lifecycle states', () => {
+  const source = file('../lib/ai/cos/failureAutopsyPromotion.ts')
+  assert.match(source, /\['validated', 'learned', 'mastered', 'weakened', 'quarantined'\]/)
+  assert.match(source, /weakened_at is sticky until fresh separately recorded private holdout revalidation clears it/)
+  assert.doesNotMatch(source, /weakened_at: null/)
 })

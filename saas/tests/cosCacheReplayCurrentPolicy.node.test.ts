@@ -39,8 +39,27 @@ test('cached crisis answer with unsupported GDPR and data-classification claims 
   assert.match(verdict.reason, /current answer-side freshness\/integrity policy/i)
 })
 
+test('cached CEO resource answer with unsupported strategic outcomes is refused before replay', () => {
+  const reply = [
+    'The current allocation is mathematically incompatible with the company survival timeline.',
+    'We have 8 months to prove product-market fit or pivot.',
+    'Every week on the prototype means bleeding users to competitors.',
+    'The resulting loss is likely leading to insolvency.',
+  ].join(' ')
+  const verdict = cachedAnswerIsCurrent(stamp(reply), policyVersion, 24 * 60 * 60 * 1000, now)
+  assert.equal(verdict.ok, false)
+  if (verdict.ok) return
+  assert.match(verdict.reason, /current answer-side freshness\/integrity policy/i)
+})
+
 test('cached governance advice that leaves legal applicability to Legal Privacy remains replay-compatible', () => {
   const reply = 'Preserve evidence, pause risky billing changes, and have Legal/Privacy determine whether applicable law requires customer notification before release.'
+  const verdict = cachedAnswerIsCurrent(stamp(reply), policyVersion, 24 * 60 * 60 * 1000, now)
+  assert.equal(verdict.ok, true)
+})
+
+test('cached strategic advice with explicit modeling assumptions remains replay-compatible', () => {
+  const reply = 'If 4% monthly churn applied to a fixed cohort with no offsetting acquisition for 8 months, that cohort would decline by about 28%; treat this as an illustrative scenario, not a forecast of total users, revenue, or runway.'
   const verdict = cachedAnswerIsCurrent(stamp(reply), policyVersion, 24 * 60 * 60 * 1000, now)
   assert.equal(verdict.ok, true)
 })

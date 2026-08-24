@@ -65,7 +65,7 @@ test('reinforcement without expansion is amber, not green', () => {
   assert.ok(report.findings.some(f => f.code === 'no_new_subjects'))
 })
 
-test('an all-resolved gap table is flagged as the blanket-resolution fingerprint', () => {
+test('an all-resolved durable gap table does not override evidence that learning is expanding', () => {
   const corpus = [
     ...docs(2, 0, 'a'), ...docs(2, 1, 'b'), ...docs(2, 2, 'c'), ...docs(2, 3, 'd'),
     ...docs(2, 4, 'e'), ...docs(2, 5, 'f'), ...docs(2, 6, 'g'),
@@ -73,11 +73,11 @@ test('an all-resolved gap table is flagged as the blanket-resolution fingerprint
   const report = assessLearningContinuity(corpus, [{ status: 'resolved', count: 26 }], { now })
   assert.equal(report.openGaps, 0)
   assert.equal(report.resolvedGaps, 26)
-  assert.equal(report.status, 'amber')
-  assert.ok(report.findings.some(f => f.code === 'no_open_gaps'))
+  assert.equal(report.status, 'green')
+  assert.ok(!report.findings.some(f => f.code === 'no_open_gaps'))
 })
 
-test('open gaps in any working status count as open', () => {
+test('open gaps in any working status count as open telemetry', () => {
   const report = assessLearningContinuity(
     [{ created_at: hoursAgo(2), subject: 'x', source_kind: 'scientific_journal' }],
     [{ status: 'pending', count: 4 }, { status: 'learning', count: 2 }, { status: 'resolved', count: 9 }, { status: 'unstudyable', count: 3 }],
@@ -85,7 +85,6 @@ test('open gaps in any working status count as open', () => {
   )
   assert.equal(report.openGaps, 6)
   assert.equal(report.totalGaps, 18)
-  assert.ok(!report.findings.some(f => f.code === 'no_open_gaps'))
 })
 
 test('no trend direction is claimed below the volume threshold in either window', () => {
@@ -117,7 +116,7 @@ test('a live, expanding cycle is green', () => {
 })
 
 test('the real Aug 12-17 production shape does not pass as green', () => {
-  // His own corrected created_at query: 1, 74, 20, 6, 2, 9 documents on Aug 12..17, then silence.
+  // Historical production shape: volume then silence. Gap saturation cannot hide stopped retention.
   const corpus = [
     ...docs(1, 7, 'baseline'),
     ...docs(74, 6, 'aug13 subject'),

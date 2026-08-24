@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupervisorIncident } from '@/lib/supervisor/incident-schema'
 import {
   countPendingFailureAutopsyRetests,
   qualityBacklogIncident,
@@ -25,6 +26,10 @@ function authorized(req: NextRequest): boolean {
 
 function skippedSample(kind: AutomaticQualitySample['kind'], reason: string): AutomaticQualitySample {
   return { kind, runId: null, caseId: null, attempted: 0, passed: 0, scored: false, reasons: [], turnId: null, latencyMs: 0, error: reason }
+}
+
+function isIncident(value: SupervisorIncident | null): value is SupervisorIncident {
+  return value !== null
 }
 
 async function maybeAdvanceAdaptiveRetrieval(elapsedMs: number) {
@@ -57,13 +62,13 @@ export async function GET(req: NextRequest) {
   const pendingBefore = await countPendingFailureAutopsyRetests().catch(() => 0)
   const sampleIncidents = [privateCapability, evidenceUtilization]
     .map(sample => qualityIncidentForSample(sample, runAt))
-    .filter(Boolean)
+    .filter(isIncident)
 
   // One registered recovery can advance up to two retests. Do not create a second equivalent
   // backlog incident when a scored regression already carries the same pre-authorized action.
-  const hasRegressionRecovery = sampleIncidents.some(incident => incident?.metadata?.recoveryPreauthorized === true)
+  const hasRegressionRecovery = sampleIncidents.some(incident => incident.metadata.recoveryPreauthorized === true)
   const backlogIncident = hasRegressionRecovery ? null : qualityBacklogIncident(pendingBefore, runAt)
-  const incidents = [...sampleIncidents, ...(backlogIncident ? [backlogIncident] : [])]
+  const incidents: SupervisorIncident[] = [...sampleIncidents, ...(backlogIncident ? [backlogIncident] : [])]
   const remediation = incidents.length
     ? await remediateNativeIncidents(incidents, { maxIncidents: 1 }).catch(error => [{
         incidentId: incidents[0].incidentId,

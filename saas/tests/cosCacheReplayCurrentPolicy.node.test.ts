@@ -23,8 +23,8 @@ function stamp(reply: string) {
   }
 }
 
-test('cache policy revision invalidates the pre-output-gate partition', () => {
-  assert.match(COS_ANSWER_GATE_REVISION, /2026-08-24\.cache-replay-output-gate\.v8/)
+test('cache policy revision includes the executive-claim guard partition', () => {
+  assert.match(COS_ANSWER_GATE_REVISION, /2026-08-24\.cache-replay-output-gate\.v9-executive-claim-guard/)
 })
 
 test('cached crisis answer with unsupported GDPR and data-classification claims is refused before replay', () => {

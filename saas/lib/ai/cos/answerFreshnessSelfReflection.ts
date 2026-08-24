@@ -16,6 +16,7 @@ const PREVAILING_ASSERTION = /\b(?:prevailing|dominant|standard|industry[- ]wide
 // Example: "I cannot confirm a notification deadline without the affected jurisdictions." That is
 // an epistemic boundary, not an assertion that a particular law currently applies.
 const CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT = /\b(?:cannot|can't|could\s+not|unable\s+to)\s+(?:confirm|determine|establish|verify)\b|\b(?:depends?\s+on|depending\s+on)\b|\b(?:if|where)\s+(?:legally\s+)?(?:required|applicable)\b|\b(?:legal|privacy|compliance)(?:\/(?:privacy|compliance))*\s+(?:assessment|review|determination|decision)\b|\b(?:determine|assess|confirm)\s+(?:the\s+)?(?:applicable|governing)\s+(?:law|regulation|obligations?|requirements?|jurisdiction)\b/i
+const LEGAL_APPLICABILITY_DECISION_GATE = /\b(?:have\s+)?(?:legal|privacy|compliance)(?:\/(?:privacy|compliance))*\s+(?:(?:must|should|will)\s+)?(?:determine|assess|confirm|review)\s+(?:(?:whether|if)\b|(?:the\s+)?(?:applicable|governing)\b|(?:notification|disclosure)\s+(?:obligations?|requirements?)\b)/i
 const DIRECT_LEGAL_MANDATE = /\b(?:gdpr|ccpa|cpra|law|regulation|regulations|statute|jurisdiction)\b[^.!?]{0,90}\b(?:requires?|mandates?|prohibits?|imposes?|sets?)\b|\b(?:requires?|mandates?)\b[^.!?]{0,90}\b(?:customer\s+notification|notification\s+deadline|within\s+\d+\s+hours?)\b/i
 const NAMED_REGIME_APPLICABILITY_ASSERTION = /\b(?:gdpr|ccpa|cpra|pci(?:[- ]?dss)?)\b[^.!?]{0,150}\b(?:trigger|require|mandate|impose|create|apply)\w*[^.!?]{0,80}\b(?:notification|disclosure|obligation|requirement|penalt|liabilit)\w*|\b(?:under|pursuant\s+to|subject\s+to|frameworks?\s+such\s+as)\b[^.!?]{0,80}\b(?:gdpr|ccpa|cpra|pci(?:[- ]?dss)?)\b[^.!?]{0,150}\b(?:notification|disclosure|obligation|requirement|penalt|liabilit)\w*/i
 const UNVERIFIED_LEGAL_CONSEQUENCE = /\b(?:legal\s+liabilit(?:y|ies)|regulatory\s+(?:penalt(?:y|ies)|fines?)|mandatory\s+(?:customer\s+)?(?:notification|disclosure)|(?:notification|disclosure)\s+obligations?)\b/i
@@ -44,6 +45,10 @@ function sentencesOf(answer: string): string[] {
 }
 
 function isPureLegalUncertainty(sentence: string): boolean {
+  // A narrow decision-gate construction is non-assertive even if its subordinate clause contains
+  // words such as "law requires". Example: "Legal must determine whether applicable law requires
+  // customer notification." The sentence does not assert that the law applies; it assigns review.
+  if (LEGAL_APPLICABILITY_DECISION_GATE.test(sentence) && !EXPLICIT_CURRENT_MARKER.test(sentence)) return true
   return CONDITIONAL_OR_UNCERTAIN_LEGAL_CAVEAT.test(sentence)
     && !EXPLICIT_CURRENT_MARKER.test(sentence)
     && !DIRECT_LEGAL_MANDATE.test(sentence)

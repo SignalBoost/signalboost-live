@@ -1,12 +1,13 @@
 // Pre-authorized, bounded recovery for COS quality-control incidents.
 //
-// This action does not edit code, prompts, provider configuration, credentials, data, billing, or
-// authorization. It advances the existing failure-autopsy retest queue only. A retest itself runs
-// through the same governed COS reasoning path and can retain procedural guidance only when an
-// independent controlled case passes. Live reuse remains separately gated by repeated clean retests.
+// This action does not edit application code, provider configuration, credentials, billing,
+// authorization, or factual stores. It advances independent failure-autopsy retests, then reconciles
+// only the existing cognitive-skill lifecycle. Five clean independent retests are required before a
+// procedural repair can become validated live guidance; any later failed retest weakens it again.
 import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import { runNextFailureAutopsyRetest } from '@/lib/ai/cos/turnFailureAutopsy'
+import { reconcileFailureAutopsySkills } from '@/lib/ai/cos/failureAutopsyPromotion'
 
 export const COS_QUALITY_REGRESSION_ERROR_CODE = 'cos_quality_benchmark_regression'
 export const COS_QUALITY_AUTOPSY_BACKLOG_ERROR_CODE = 'cos_quality_autopsy_backlog'
@@ -17,7 +18,7 @@ export const COS_QUALITY_RECOVERY_TARGET = 'platform.advance_cos_quality_recover
 export const COS_QUALITY_RECOVERY_ALLOWLIST_ENTRY: AllowlistEntry = Object.freeze({
   actionKind: COS_QUALITY_RECOVERY_KIND,
   target: COS_QUALITY_RECOVERY_TARGET,
-  rollback: 'none required — this action only advances independent shadow retests and records their objective outcomes; it does not mutate live policy, code, credentials, billing, or production data',
+  rollback: 'automatic — a later failed retest weakens any skill promoted from this exact failure-autopsy cohort, which removes it from live validated-skill retrieval',
 })
 
 export type CosQualityRecoveryOutcome = {
@@ -26,6 +27,7 @@ export type CosQualityRecoveryOutcome = {
   failed: number
   retained: number
   results: Array<Record<string, unknown>>
+  skillReconciliation: Awaited<ReturnType<typeof reconcileFailureAutopsySkills>>
 }
 
 export async function advanceCosQualityRecovery(maxRetests = 2): Promise<CosQualityRecoveryOutcome> {
@@ -58,7 +60,8 @@ export async function advanceCosQualityRecovery(maxRetests = 2): Promise<CosQual
     })
   }
 
-  return { attempted, passed, failed, retained, results }
+  const skillReconciliation = await reconcileFailureAutopsySkills()
+  return { attempted, passed, failed, retained, results, skillReconciliation }
 }
 
 export function createCosQualityRecoveryExecutor(options: {

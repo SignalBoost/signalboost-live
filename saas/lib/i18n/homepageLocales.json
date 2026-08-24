@@ -101,6 +101,7 @@
       "campaign": "Plan a campaign",
       "show": "Show me what SignalBoost can do",
       "cosLabel": "COS response",
+      "yourRequest": "YOUR REQUEST",
       "continue": "Continue with COS",
       "error": "COS is temporarily unavailable. Please try again or continue in the full assistant.",
       "trust": "COS uses governed reasoning, respects approval boundaries, and does not present uncertain information as fact."
@@ -207,6 +208,7 @@
       "campaign": "Planifica una campaña",
       "show": "Muéstrame lo que puede hacer SignalBoost",
       "cosLabel": "Respuesta de COS",
+      "yourRequest": "TU SOLICITUD",
       "continue": "Continuar con COS",
       "error": "COS no está disponible temporalmente. Inténtalo de nuevo o continúa en el asistente completo.",
       "trust": "COS utiliza razonamiento gobernado, respeta los límites de aprobación y no presenta información incierta como hechos."
@@ -313,6 +315,7 @@
       "campaign": "Planeje uma campanha",
       "show": "Mostre o que o SignalBoost pode fazer",
       "cosLabel": "Resposta do COS",
+      "yourRequest": "SUA SOLICITAÇÃO",
       "continue": "Continuar com o COS",
       "error": "O COS está temporariamente indisponível. Tente novamente ou continue no assistente completo.",
       "trust": "O COS usa raciocínio governado, respeita limites de aprovação e não apresenta informações incertas como fatos."
@@ -419,6 +422,7 @@
       "campaign": "Zaplanuj kampanię",
       "show": "Pokaż, co potrafi SignalBoost",
       "cosLabel": "Odpowiedź COS",
+      "yourRequest": "TWOJE ZAPYTANIE",
       "continue": "Kontynuuj z COS",
       "error": "COS jest tymczasowo niedostępny. Spróbuj ponownie lub przejdź do pełnego asystenta.",
       "trust": "COS korzysta z zarządzanego wnioskowania, respektuje granice zatwierdzania i nie przedstawia niepewnych informacji jako faktów."
@@ -525,6 +529,7 @@
       "campaign": "Спланируйте кампанию",
       "show": "Покажите, что умеет SignalBoost",
       "cosLabel": "Ответ COS",
+      "yourRequest": "ВАШ ЗАПРОС",
       "continue": "Продолжить с COS",
       "error": "COS временно недоступен. Попробуйте ещё раз или перейдите к полному помощнику.",
       "trust": "COS использует управляемое рассуждение, соблюдает границы одобрения и не представляет неопределённую информацию как факты."

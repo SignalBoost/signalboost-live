@@ -45,7 +45,7 @@ export default function Home() {
   const [copiedTarget, setCopiedTarget] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
-  const [salutation, setSalutation] = useState(copy.welcomeHello)
+  const [salutation, setSalutation] = useState<string>(copy.welcomeHello)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const threadRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef('')

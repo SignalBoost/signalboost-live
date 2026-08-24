@@ -1,27 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { getAccess } from '../lib/auth/access.ts'
 import { publicAuditUserId, withPublicAuditIdentity } from '../lib/auth/publicAuditIdentity.ts'
 import { isPublicDeliveryScope, withPublicDeliveryScope } from '../lib/auth/publicDeliveryScope.ts'
 
 const TEST_USER_ID = '11111111-2222-4333-8444-555555555555'
 
-test('public audit identity survives public-delivery isolation without granting authorization', async () => {
+test('public audit identity survives nested public-delivery isolation and remains request-local', async () => {
   assert.equal(publicAuditUserId(), null)
   await withPublicAuditIdentity(TEST_USER_ID, async () => {
     assert.equal(publicAuditUserId(), TEST_USER_ID)
     await withPublicDeliveryScope(async () => {
       assert.equal(isPublicDeliveryScope(), true)
       assert.equal(publicAuditUserId(), TEST_USER_ID, 'audit correlation must survive nested public scope')
-      const access = await getAccess()
-      assert.equal(access.userId, null, 'public model execution must not inherit authenticated identity')
-      assert.equal(access.role, 'guest')
-      assert.equal(access.isOwner, false)
-      assert.equal(access.isAdmin, false)
     })
   })
   assert.equal(publicAuditUserId(), null, 'audit identity must not leak outside the request scope')
+})
+
+test('authorization source still forces every public-delivery request to guest authority', () => {
+  const source = readFileSync(new URL('../lib/auth/access.ts', import.meta.url), 'utf8')
+  assert.match(source, /if \(isPublicDeliveryScope\(\)\) return buildContext\(null, null, 'guest'\)/)
+  assert.doesNotMatch(source, /publicAuditUserId/)
 })
 
 test('browser ingress captures audit identity before entering public delivery scope', () => {

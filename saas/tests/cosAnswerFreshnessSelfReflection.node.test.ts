@@ -11,6 +11,8 @@ const AV_DRAFT = `This is a classic ethical dilemma. However, current industry s
 
 const CRISIS_LEGAL_CAVEAT = `I have analyzed the incident involving the database migration error affecting 4,200 accounts and the subsequent payment webhook outage. My read is that the VP of Engineering’s proposal to patch quietly over the weekend is operationally risky and potentially non-compliant, depending on jurisdictional factors not yet established. I cannot confirm specific legal notification deadlines (e.g., GDPR 72-hour rule, CCPA/CPRA requirements) without knowing the geographic distribution of the affected customers and the specific data fields compromised. Therefore, I recommend treating this as a high-severity incident requiring immediate containment, evidence preservation, and a formal Legal/Privacy assessment before any customer communication or permanent remediation is finalized.`
 
+const CRISIS_OVERREACH = `Billing records for 4,200 accounts likely contain Personal Identifiable Information (PII) and financial data. Under frameworks such as GDPR (Article 33/34) and CCPA, unauthorized alteration or loss of integrity of personal data may trigger mandatory disclosure obligations. Concealing such an event increases regulatory penalties.`
+
 test('answer-side guard catches mutable claims introduced by a normative autonomous-car answer', () => {
   assert.equal(answerNeedsFreshnessReflection(AV_DRAFT), true)
   const codes = new Set(answerFreshnessSignals(AV_DRAFT).map(signal => signal.code))
@@ -28,11 +30,19 @@ test('explicit legal uncertainty and applicability gates are not rejected as cur
   assert.equal(answerNeedsFreshnessReflection(CRISIS_LEGAL_CAVEAT), false)
   assert.equal(answerFreshnessSignals(CRISIS_LEGAL_CAVEAT).length, 0)
   assert.equal(answerNeedsFreshnessReflection('Notify affected customers if legally required after Legal/Privacy determines the applicable obligations.'), false)
+  assert.equal(answerNeedsFreshnessReflection('Legal must determine whether applicable law requires customer notification and what deadline applies.'), false)
 })
 
 test('direct current legal mandates still trigger freshness reflection', () => {
   const answer = 'Current GDPR requirements mandate customer notification within 72 hours.'
   assert.equal(answerNeedsFreshnessReflection(answer), true)
+})
+
+test('named-regime applicability, legal consequences, and unsupplied data classifications are rejected', () => {
+  assert.equal(answerNeedsFreshnessReflection(CRISIS_OVERREACH), true)
+  const codes = new Set(answerFreshnessSignals(CRISIS_OVERREACH).map(signal => signal.code))
+  assert.equal(codes.has('mutable_institutional_claim'), true)
+  assert.equal(codes.has('unsupported_scenario_inference'), true)
 })
 
 test('mutable topic and assertion in separate sentences do not combine into a phantom freshness signal', () => {
@@ -46,6 +56,16 @@ test('deterministic fallback removes unsupported current-practice sentences with
   assert.match(stripped, /utilitarian view/i)
   assert.match(stripped, /deontological view/i)
   assert.doesNotMatch(stripped, /current industry standards/i)
+})
+
+test('deterministic fallback removes crisis legal/data overreach while preserving operational guidance', () => {
+  const answer = `Preserve the migration script and billing snapshots. ${CRISIS_OVERREACH} Have Legal/Privacy determine the applicable notification obligations before release.`
+  const stripped = stripUnsupportedCurrentClaimSentences(answer)
+  assert.match(stripped, /Preserve the migration script/i)
+  assert.match(stripped, /Legal\/Privacy determine/i)
+  assert.doesNotMatch(stripped, /likely contain/i)
+  assert.doesNotMatch(stripped, /Under frameworks such as GDPR/i)
+  assert.doesNotMatch(stripped, /regulatory penalties/i)
 })
 
 test('ordinary COS answers are freshness-reflected before turn learning and release', () => {

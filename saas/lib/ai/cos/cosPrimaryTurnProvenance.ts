@@ -1,4 +1,4 @@
-import { normalizeAssistantContent, recordLatestUserTurnProvenance } from './supportTurnProvenance.ts'
+import { assistantContentMatchesForProvenance, recordLatestUserTurnProvenance } from './supportTurnProvenance.ts'
 import { buildCosLiveSystemState } from './cosLiveSystemState.ts'
 import { responseLineageStrength } from './responseLineage.ts'
 import { getAccess } from '@/lib/auth/access'
@@ -10,12 +10,11 @@ export async function readCosPrimaryPriorProvenance(userId:string|null,preceding
   if(!userId)return null
   const db=cosServiceDb()
   if(!db)return null
-  const expected=precedingAssistant?normalizeAssistantContent(precedingAssistant):''
   let prior:Record<string,unknown>|null=null
   try{
     const {data,error}=await db.from('cos_latest_turn_provenance').select('assistant_content,provenance').eq('user_id',userId).maybeSingle()
     if(error)throw error
-    if(data?.provenance&&(!expected||normalizeAssistantContent(data.assistant_content)===expected))prior=data.provenance as Record<string,unknown>
+    if(data?.provenance&&(!precedingAssistant||assistantContentMatchesForProvenance(data.assistant_content,precedingAssistant)))prior=data.provenance as Record<string,unknown>
   }catch(error){
     console.error('cosPrimaryTurnProvenance: prior provenance read failed',error)
   }
@@ -52,7 +51,7 @@ async function recentResponseBoundLineage(userId:string,reply:string):Promise<Re
       .eq('user_id',userId)
       .maybeSingle()
     if(error||!data?.provenance)return null
-    if(normalizeAssistantContent(data.assistant_content)!==normalizeAssistantContent(reply))return null
+    if(!assistantContentMatchesForProvenance(data.assistant_content,reply))return null
     const updatedAt=String(data.updated_at||'')
     const age=Date.now()-Date.parse(updatedAt)
     if(!Number.isFinite(age)||age<0||age>30_000)return null

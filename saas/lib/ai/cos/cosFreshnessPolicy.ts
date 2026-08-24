@@ -45,6 +45,7 @@ const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live tr
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
 const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
+const HIGH_STAKES_SECURITY_RELEASE = /\b(?:zero[- ]day|high[- ]severity\s+vulnerabilit|unauthorized\s+(?:read|access)|tenant\s+(?:metadata|data)|infosec|security\s+lead)\b/i
 const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
 
 // Advice about regulated or high-consequence public processes must be verified even when it is
@@ -145,6 +146,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
+  if (HIGH_STAKES_SECURITY_RELEASE.test(text)) return true
   if (isContentGenerationRequest(text)) return false
 
   // A question about COS's OWN previous answer is never a public-web lookup. This is a structural

@@ -36,6 +36,11 @@ function clausesOf(input: string): string[] {
   return input
     .split(/(?:[.!?;:]|\n+|—|--|\band then\b|\bso\b(?=\s)|\bthen\b(?=\s)|^\s*[-*•]\s*)/iu)
     .map(part => part.trim())
+    // A role prefix frames the requested artifact; it must not hide the authoring verb.
+    .flatMap(part => {
+      const stripped = part.replace(/^(?:as|acting\s+as|in\s+(?:your|the)\s+role\s+as|in\s+your\s+capacity\s+as|como|na\s+qualidade\s+de|jako|как)\b[^,]{0,60},\s*/iu, '')
+      return stripped !== part ? [part, stripped] : [part]
+    })
     .filter(Boolean)
 }
 

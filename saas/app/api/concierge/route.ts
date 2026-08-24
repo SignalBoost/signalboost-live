@@ -160,18 +160,19 @@ async function directProspectCampaign(
   }
 }
 
-async function responseSnapshot(response: Response): Promise<{ reply: string; source: string }> {
+async function responseSnapshot(response: Response): Promise<{ reply: string; source: string; errorDetail: string }> {
   try {
     const payload = await response.clone().json()
     return {
       reply: String(payload?.reply || payload?.message || ''),
       source: String(payload?.source || payload?.telemetry?.source || ''),
+      errorDetail: String(payload?.error_detail || payload?.telemetry?.error_detail || ''),
     }
   } catch {
     try {
-      return { reply: await response.clone().text(), source: '' }
+      return { reply: await response.clone().text(), source: '', errorDetail: '' }
     } catch {
-      return { reply: '', source: '' }
+      return { reply: '', source: '', errorDetail: '' }
     }
   }
 }
@@ -389,7 +390,7 @@ export async function POST(req: NextRequest) {
 
   const primarySnapshot = primary
     ? await responseSnapshot(primary)
-    : { reply: '', source: '' }
+    : { reply: '', source: '', errorDetail: '' }
   const immediateReasons = detectPrimaryCorruption({
     status: primary?.status ?? 500,
     reply: primarySnapshot.reply,
@@ -461,6 +462,7 @@ export async function POST(req: NextRequest) {
       primary_quarantined: true,
       divergence_reasons: reasons,
       source_commit: commit,
+      primary_error_detail: primarySnapshot.errorDetail || null,
       external_ai: {
         invoked: Boolean(backup.externalAiInvoked),
         provider: backup.provider ?? null,

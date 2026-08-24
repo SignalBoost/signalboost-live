@@ -85,6 +85,7 @@ function formatMaterialProvenance(provenance:any):string{
     lines.push('Continuity Mode        : BACKUP (read-only). The primary COS response was quarantined by continuity policy and the backup answered instead.')
     const reasons=Array.isArray(provenance.divergence_reasons)?provenance.divergence_reasons.filter(Boolean):[]
     if(reasons.length)lines.push(`Quarantine Reason      : ${reasons.join('; ')}.`)
+    if(provenance.primary_error_detail)lines.push(`Primary Failure Detail : ${String(provenance.primary_error_detail).slice(0,300)}`)
     lines.push('Backup Limitations     : no evidence retrieval, no memory or corpus access, and no learning. Confidence below is a fixed backup default, NOT a calibrated score.')
   }
 

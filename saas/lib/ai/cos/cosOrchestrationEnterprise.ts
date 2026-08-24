@@ -2,12 +2,15 @@
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
+import { isContentGenerationRequest } from './contentGenerationIntent'
 export { isProvenanceIntrospection }
 
 export function confidenceThreshold(): number { const value=Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72'); return Number.isFinite(value)?Math.max(.5,Math.min(.98,value)):.72 }
 export function externalFallbackEnabled(): boolean { return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED!=='false' }
 export function requestsExternalAction(input:string):boolean{
   if(isProvenanceIntrospection(input))return false
+  // AUTHORING IS NEVER EXECUTION: writing about a system is not a request to alter it.
+  if(isContentGenerationRequest(input))return false
   const executionVerb='(?:run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|render|rendering|fix|repair|change|modify|call the tool|use (?:the )?tools?)'
   const actionOpener=new RegExp(`^\\s*(?:(?:please|kindly)\\s+|i\\s+(?:need|want)\\s+you\\s+to\\s+)?${executionVerb}\\b`,'i')
   const target=/\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|video|render(?:ing)?|campaign|prospect)\b/i

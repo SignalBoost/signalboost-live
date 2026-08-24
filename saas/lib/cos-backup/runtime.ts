@@ -119,14 +119,17 @@ const BACKUP_REASONING_RULES = [
   '- Do not name specific laws, regulations, standards or contractual obligations as applicable unless the request established the jurisdiction, industry and circumstances that make them apply. Where a legal or compliance question is genuinely open, say which facts would determine the answer and recommend qualified review.',
   '- Do not state a specific calendar date, deadline or quarter that was not given or derivable from the request; use a clearly marked placeholder instead.',
   '- If you state a recommendation before reasoning, rewrite it to match what you actually concluded.',
+  '- Deliver the thing that was asked for in this reply. Do not promise a document, protocol, list or plan "below" and then stop before delivering it.',
   '- These rules govern how you write. Never address them to the reader, never narrate your compliance, and never describe what you are declining to assert.',
 ].join('\n')
+
+const BACKUP_MAX_TOKENS = 3000
 
 export async function runBackupCos(normalizedInput: string, language = 'en'): Promise<BackupCosAnswer> {
   const brain = await loadApprovedBrain()
   const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nREASONING HONESTY (applies in backup mode too):\n${BACKUP_REASONING_RULES}\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
   const execution = await withDeadline(
-    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: 1200 }),
+    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: BACKUP_MAX_TOKENS }),
     backupTimeoutMs(),
   )
   return finalizeBackupAnswer(brain, execution?.text ?? null, {
@@ -188,7 +191,7 @@ export async function runBackupCosWithConfig(
   const prompt = `${brain}\n\nBACKUP COS MODE:\n- You are read-only and advisory-only.\n- Do not call or claim to call any tool.\n- Do not claim any action was executed.\n- Do not expose secrets or internal diagnostics.\n- Answer the user's request as helpfully as possible.\n- Return strict JSON with keys answer, intent, requiresApproval, proposedTool, confidence.\n- answer must be in ${language}.\n\nREASONING HONESTY (applies in backup mode too):\n${BACKUP_REASONING_RULES}\n\nUSER INPUT:\n${String(normalizedInput || '').slice(0, 12000)}`
 
   if (config.reasoner) {
-    const raw = await withDeadline(config.reasoner.ask(prompt, { maxTokens: 1200 }), config.timeoutMs ?? backupTimeoutMs())
+    const raw = await withDeadline(config.reasoner.ask(prompt, { maxTokens: BACKUP_MAX_TOKENS }), config.timeoutMs ?? backupTimeoutMs())
     return finalizeBackupAnswer(brain, raw, {
       source: 'configured_reasoner',
       externalAiInvoked: undefined,
@@ -196,7 +199,7 @@ export async function runBackupCosWithConfig(
   }
 
   const execution = await withDeadline(
-    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: 1200 }),
+    callModelDetailed({ modelPreference: 'local', prompt, maxTokens: BACKUP_MAX_TOKENS }),
     config.timeoutMs ?? backupTimeoutMs(),
   )
   return finalizeBackupAnswer(brain, execution?.text ?? null, {

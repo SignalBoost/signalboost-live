@@ -2242,6 +2242,6 @@ ${ev.summary}`
     const base = GENERIC[errLangCode] || GENERIC.en
     // The owner/admin gets the real error to debug; customers never see internals.
     const reply = errIsPrivileged ? `${base}\n\n(Diagnostic — owner only: ${detail})` : base
-    return NextResponse.json({ reply, telemetry: { source: 'error-degraded' }, source: 'error-degraded' })
+    return NextResponse.json({ reply, telemetry: { source: 'error-degraded', error_detail: detail }, source: 'error-degraded', error_detail: detail })
   }
 }

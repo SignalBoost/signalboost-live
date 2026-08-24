@@ -813,17 +813,24 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
 
   // Worker adapters can bypass the raw-reasoner draft-repair seam. Enforce the same executive
   // claim boundary immediately before evidence accounting, caching, and release.
-  const executiveSignals = executiveDecisionUnsupportedClaims(input.prompt, reasoned.text)
+  const requiresLearnedSecurityEvidence = /\b(?:zero[- ]day|vulnerabilit|tenant\s+metadata|infosec|security\s+lead)\b/i.test(input.prompt)
+    && context.learned.some(item => item.includes('retrieved content'))
+  const releaseSignals = (raw: string) => [
+    ...executiveDecisionUnsupportedClaims(input.prompt, raw),
+    ...(requiresLearnedSecurityEvidence && citedEvidence(parseLocalResult(raw)?.answer || '').cl === 0
+      ? ['relevant_learned_security_evidence_not_used'] : []),
+  ]
+  const executiveSignals = releaseSignals(reasoned.text)
   if (executiveSignals.length) {
     const repair = await callCosReasoner({
       temperature: 0,
       maxTokens: Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
-      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only supplied facts. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, or forecasts. Replace them with hypotheses, decision gates, bounded experiments, and evidence required for a decision. Deliver the complete memo; do not mention this repair.',
-      prompt: `ORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
+      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. If relevant learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. Deliver the complete memo; do not mention this repair.',
+      prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)
     const repairText = repair?.text ?? ''
     const repaired = repairText ? parseLocalResult(repairText) : null
-    if (!repaired || repaired.truncated || executiveDecisionUnsupportedClaims(input.prompt, repairText).length) {
+    if (!repaired || repaired.truncated || releaseSignals(repairText).length) {
       const reason = `Executive answer release rejected: unsupported claim signals (${executiveSignals.join(', ')}) remained after local repair.`
       void recordKnowledgeGap(input.prompt, 0, reason)
       return { handled:false, confidence:0, reason, bestEffortReply:undefined, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }

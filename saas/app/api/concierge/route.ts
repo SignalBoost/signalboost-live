@@ -7,6 +7,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { attachRecordedTurnProvenance, recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance'
 import { getAccess } from '@/lib/auth/access'
+import { isPublicDeliveryScope, withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
 import { advanceProspectCampaigns, createProspectCampaignJob } from '@/lib/outreach/prospectCampaign'
@@ -312,6 +313,14 @@ function timeoutReply(language: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // Concierge is the public face of COS. Run the entire request (including
+  // fallbacks and any nested support-route calls) inside a public-only scope so
+  // an owner/admin browser session can never promote this endpoint into an
+  // internal Chief-of-Staff channel.
+  if (!isPublicDeliveryScope()) {
+    return withPublicDeliveryScope(() => POST(req))
+  }
+
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)

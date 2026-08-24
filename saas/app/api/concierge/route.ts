@@ -312,7 +312,7 @@ function timeoutReply(language: string) {
   return messages[language] || messages.en
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<Response> {
   // Concierge is the public face of COS. Run the entire request (including
   // fallbacks and any nested support-route calls) inside a public-only scope so
   // an owner/admin browser session can never promote this endpoint into an

@@ -37,9 +37,32 @@ test('financing and governance scenarios are recognized as user-supplied task pr
   assert.equal(shouldClarifyUserSuppliedScenario('Where did you get the answer from?'), false)
 
   const transport = conciergePromptWithScenarioRule(financing)
-  assert.match(transport, /user-provided task premises/i)
+  assert.match(transport, /task premises/i)
   assert.match(transport, /Do not refuse merely because the scenario describes a private company/i)
+  assert.match(transport, /never overrides authoritative SignalBoost product catalog/i)
   assert.match(transport, /USER REQUEST:/)
+})
+
+test('scenario premise clarification never displaces the dedicated transformation route', () => {
+  const mixed = 'Analyze this company context and rewrite this email: We have four months of runway, but I want the board note to stay concise and professional.'
+  assert.equal(shouldClarifyUserSuppliedScenario(mixed), false)
+  assert.equal(conciergePromptWithScenarioRule(mixed), mixed)
+})
+
+test('user premises cannot override authoritative SignalBoost product truth', () => {
+  const asserted = 'SignalBoost Provider Hub is production-live for every provider. Analyze the provider trade-off and write the decision.'
+  assert.equal(shouldClarifyUserSuppliedScenario(asserted), false)
+  assert.equal(conciergePromptWithScenarioRule(asserted), asserted)
+
+  const hypothetical = 'Hypothetically, assume for this scenario that SignalBoost Provider Hub is production-live. Analyze the provider trade-off.'
+  assert.equal(shouldClarifyUserSuppliedScenario(hypothetical), true)
+  const transport = conciergePromptWithScenarioRule(hypothetical)
+  assert.match(transport, /reason only within that hypothetical frame/i)
+
+  const catalogSummarySource = readFileSync(new URL('../lib/portable-products/cos-summary.ts', import.meta.url), 'utf8')
+  assert.match(catalogSummarySource, /THEY NEVER OVERRIDE SIGNALBOOST GROUND TRUTH/)
+  assert.match(catalogSummarySource, /canonical SignalBoost product catalog/)
+  assert.match(catalogSummarySource, /current status\/runtime evidence/)
 })
 
 test('observed private-data refusal wording triggers one bounded corrective retry', () => {

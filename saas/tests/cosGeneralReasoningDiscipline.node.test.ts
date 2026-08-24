@@ -15,6 +15,16 @@ test('global reasoning guidance is safety-only and does not smuggle an unvalidat
   assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /comparison baselines/i)
 })
 
+test('scenario strategy advice keeps supplied metrics separate from modeled outcomes', () => {
+  const rule = COS_GENERAL_REASONING_DISCIPLINE
+  assert.match(rule, /supplied metrics as premises, not as permission to invent downstream outcomes/i)
+  assert.match(rule, /Do not infer competitor losses, insolvency, bankruptcy, product-market-fit deadlines, market shifts/i)
+  assert.match(rule, /fixed-cohort illustration from a forecast of total users, revenue, or runway/i)
+  assert.match(rule, /do not silently assume zero acquisition, constant pricing, constant burn, or unchanged cohort mix/i)
+  assert.match(rule, /Label proposed timelines, staffing moves, phase gates, and KPI thresholds as proposals or decision gates/i)
+  assert.match(rule, /Do not say a project is complete or that sufficient insights were extracted/i)
+})
+
 test('crisis and compliance scenarios do not manufacture legal obligations', () => {
   const rule = COS_GENERAL_REASONING_DISCIPLINE
   assert.match(rule, /do not turn prudent governance advice into a claimed legal obligation/i)
@@ -35,6 +45,14 @@ test('backup brain carries the same crisis legal-grounding invariants', () => {
   assert.match(brain, /Do not name GDPR, CCPA/i)
   assert.match(brain, /Legal\/Privacy\/Compliance assessment a decision gate/i)
   assert.match(brain, /proposal to keep an incident quiet does not make a request for a crisis-response protocol improper/i)
+})
+
+test('backup brain carries scenario-premise and modeled-outcome boundaries too', () => {
+  const brain = read('../../cos-core/brain.md')
+  assert.match(brain, /supplied metrics are premises, not downstream outcomes/i)
+  assert.match(brain, /Do not invent competitor losses, insolvency or bankruptcy, product-market-fit deadlines, market shifts/i)
+  assert.match(brain, /Distinguish fixed-cohort illustrations from forecasts of total users, revenue, or runway/i)
+  assert.match(brain, /Never say a prototype or discovery phase is complete or that sufficient insights were extracted/i)
 })
 
 test('every reasoning worker receives only the lifecycle-neutral safety invariants, including primary', () => {

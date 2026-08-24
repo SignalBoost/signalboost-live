@@ -5,6 +5,7 @@
 
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
+import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import {
   FRESH_SEARCH_RESULT_BUDGET,
   FRESH_SELECTED_EVIDENCE_BUDGET,
@@ -346,6 +347,11 @@ export async function tryCOSFirstAnswer(input: {
   disableCache?: boolean
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
+
+  const directTextTransformation = await tryDirectTextTransformation(input)
+  if (directTextTransformation) {
+    return learnFromTurn(input, directTextTransformation)
+  }
 
   if (requiresFreshExternalEvidence(input.prompt)) {
     return learnFromTurn(input, await tryFreshCurrentFact(input))

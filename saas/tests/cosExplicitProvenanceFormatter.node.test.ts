@@ -1,3 +1,4 @@
+// saas/tests/cosExplicitProvenanceFormatter.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { authoritativeProvenance, formatAuthoritativeProvenance } from '../lib/ai/cos/cosOrchestration.ts'
@@ -30,8 +31,8 @@ test('provenance formatter always names every subsystem and does not equate retr
   assert.match(text, /User Memory\s+: NOT USED — 20 retrieved → 5 relevant → 5 selected → 5 injected → 0 cited/)
   assert.match(text, /Autonomous Research\s+: NOT USED/)
   assert.match(text, /Local Reasoning Engine: INVOKED — independent-local:qwen2\.5-coder:32b/)
-  assert.match(text, /External AI Provider\s+: NOT INVOKED/)
-  assert.match(text, /COS Confidence\s+: 0\.65 — threshold 0\.72/)
+  assert.match(text, /External Fallback \/ Teacher\s+: NOT INVOKED/)
+  assert.match(text, /COS Answer Confidence\s+: 0\.65 — threshold 0\.72/)
   assert.match(text, /Recorded Influence Interpretation/)
   assert.match(text, /Local Reasoning Engine — MATERIAL/)
   assert.match(text, /Semantic Cache was NOT an influence on this answer/)

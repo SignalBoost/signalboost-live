@@ -126,6 +126,7 @@ export default function CosLearningPage() {
 
   useEffect(() => { void load() }, [])
   const r = result?.result
+  const embeddingsComplete = embeddingStatus?.remaining === 0
 
   return <div className="min-h-[calc(100vh-80px)] bg-bg px-6 pb-16 pt-8 text-text"><div className="mx-auto max-w-6xl space-y-5">
     <div><h1 className="text-2xl font-semibold">{copy.title}</h1><p className="mt-1 text-sm text-text-muted">{copy.subtitle}</p></div>
@@ -143,7 +144,9 @@ export default function CosLearningPage() {
     <p className="text-xs text-text-muted">{copy.embeddingScope}</p>
     <div className="flex flex-wrap gap-3">
       <button onClick={run} disabled={busy || embeddingBusy || hostMismatch || authRequired || !status?.enabled} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{busy ? copy.running : copy.run}</button>
-      <button onClick={embedAll} disabled={busy || embeddingBusy || hostMismatch || authRequired || embeddingStatus?.remaining == null || embeddingStatus.remaining === 0} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{embeddingBusy ? copy.embedding : copy.embedAll}</button>
+      {embeddingsComplete
+        ? <div role="status" className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-text">{copy.embeddingComplete}</div>
+        : <button onClick={embedAll} disabled={busy || embeddingBusy || hostMismatch || authRequired || embeddingStatus?.remaining == null} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{embeddingBusy ? copy.embedding : copy.embedAll}</button>}
       <button onClick={load} disabled={busy || embeddingBusy} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold">{copy.refresh}</button>
     </div>
     {embeddingRun && <section className="rounded-md border border-border bg-surface p-4"><div className="grid gap-3 md:grid-cols-3"><Card label={copy.embeddingsCompleted} value={String(embeddingRun.embedded ?? 0)} /><Card label={copy.embeddingsRemaining} value={String(embeddingRun.remaining ?? '—')} /><Card label={copy.embeddingsFailed} value={String(embeddingRun.failed ?? 0)} /></div></section>}

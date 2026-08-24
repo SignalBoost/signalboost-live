@@ -31,7 +31,7 @@ const LINE_RATIONALE_REQUEST =
   /\b(?:explain|describe|give)\b[^.!?;\n]{0,80}\b(?:reason(?:ing)?|rationale|purpose|why)\b[^.!?;\n]{0,80}\b(?:each|every)\s+line\b|\bline[- ]by[- ]line\b[^.!?;\n]{0,80}\b(?:reason(?:ing)?|rationale|purpose|explanation)\b/i
 
 const EXECUTIVE_DECISION_SCENARIO =
-  /\b(?:leadership\s+team|ceo|cfo|coo|board|department\s+lead|operating\s+expenses?|opex|runway|budget\s+cuts?|cost\s+reduction|headcount|layoffs?|restructur(?:e|ing)|acquisition|due\s+diligence|merger|triage\s+process)\b/i
+  /\b(?:leadership\s+team|ceo|cfo|coo|board|department\s+lead|operating\s+expenses?|opex|runway|budget\s+cuts?|cost\s+reduction|headcount|layoffs?|restructur(?:e|ing)|acquisition|due\s+diligence|merger|triage\s+process|head\s+of\s+enterprise\s+sales|enterprise\s+sales|product\s+lead|self[- ]serve|product[- ]led\s+growth|\bplg\b|contracted\s+renewals?)\b/i
 
 const EXECUTIVE_DECISION_VERB =
   /\b(?:decide|design|facilitate|triage|cut|reduce|prioriti[sz]e|allocate|restructure|acquire|handle|recommend|approve|protect|extend|save|freeze|cancel)\b/i

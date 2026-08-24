@@ -10,11 +10,14 @@
 // without destructive cleanup. A reasoner-model, system-prompt, confidence-gate, manual policy, or
 // embedding-model change makes older cache vectors unreachable by construction.
 //
-// Dependency-free ON PURPOSE so this policy remains directly testable under node --test.
+// Cache entries are also revalidated against the CURRENT answer-side freshness/integrity policy
+// before replay. This prevents an answer generated under an older guard from bypassing a newer
+// output-safety rule merely because its cache stamp still matches.
 
 import { createHash } from 'node:crypto'
+import { answerNeedsFreshnessReflection } from './answerFreshnessSelfReflection.ts'
 
-export const COS_ANSWER_GATE_REVISION = '2026-08-17.memory-cache-definition-guardrail.v7'
+export const COS_ANSWER_GATE_REVISION = '2026-08-24.cache-replay-output-gate.v8'
 
 export type CosAnswerPolicyInputs = {
   reasonerSystemPrompt: string
@@ -51,6 +54,7 @@ export function cosCacheMaxAgeMs(env: Record<string, string | undefined> = proce
 export type CachedAnswerStamp = {
   policyVersion?: string | null
   storedAt?: string | null
+  reply?: string | null
 }
 
 export function cachedAnswerIsCurrent(
@@ -65,6 +69,12 @@ export function cachedAnswerIsCurrent(
   if (stamped !== policyVersion) {
     return { ok: false, reason: `cached answer was generated under answer policy ${stamped}, current policy is ${policyVersion}` }
   }
+
+  const reply = String(entry.reply ?? '').trim()
+  if (reply && answerNeedsFreshnessReflection(reply)) {
+    return { ok: false, reason: 'cached answer fails the current answer-side freshness/integrity policy' }
+  }
+
   if (maxAgeMs > 0) {
     const storedAt = entry.storedAt ? Date.parse(String(entry.storedAt)) : NaN
     if (!Number.isFinite(storedAt)) return { ok: false, reason: 'cached answer carries no usable stored-at timestamp' }

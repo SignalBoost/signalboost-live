@@ -15,6 +15,7 @@ const tests = [
   'tests/cosCurrentWorldLearning.node.test.ts',
   'tests/cosLearnedCorpusContinuousIndexing.node.test.ts',
   'tests/cosAnswerFreshnessSelfReflection.node.test.ts',
+  'tests/cosCacheReplayCurrentPolicy.node.test.ts',
   'tests/cosReusableReasoningPatterns.node.test.ts',
   'tests/cosGeneralReasoningDiscipline.node.test.ts',
   'tests/cosFeedbackReasoningGeneralization.node.test.ts',

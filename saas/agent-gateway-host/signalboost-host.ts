@@ -13,6 +13,7 @@ import { createPrEngineApprovalPort } from './pr-engine-approvals.ts'
 import type { ApprovableAction } from './pr-engine-approvals.ts'
 import { SUPERVISOR_REPAIR_ACTIONS } from './supervisor-actions.ts'
 import { createRetryDeploymentExecutor } from './deployment-recovery.ts'
+import { createCosQualityRecoveryExecutor } from './cos-quality-recovery.ts'
 import {
   createObservationPolicyRecoveryExecutor,
   reconcileObservationPolicy,
@@ -33,6 +34,7 @@ export function createSignalBoostGatewayHost(): GatewayHost {
   return {
     execution: createExecutionChain({
       executors: [
+        createCosQualityRecoveryExecutor(),
         createObservationPolicyRecoveryExecutor({
           reconcile: () => reconcileObservationPolicy(getAdminSupabase()),
         }),

@@ -3,6 +3,11 @@ export type DirectTextTransformationRequest = {
   sourceText: string
 }
 
+export type TextTransformationSourceSplit = {
+  editableSource: string
+  referenceContext: string | null
+}
+
 const TRANSFORM_INTENT_RE = /(?<![\p{L}\p{N}_])(?:edit|rewrite|proofread|polish|rephrase|shorten|tighten|clean\s*up|summari[sz]e|translate|correct\s+(?:the\s+)?grammar|fix\s+(?:the\s+)?grammar|improve\s+(?:the\s+)?wording|make\s+(?:this|it)\s+(?:clearer|more\s+professional)|editar|edite|reescrev(?:a|er)|revis(?:e|ar)|corrig(?:a|ir)|melhor(?:e|ar)|encurt(?:e|ar)|resum(?:a|ir)|traduz(?:a|ir)|edita|reescrib(?:e|ir)|revisa|revisar|corrig(?:e|ir)|mejora|mejorar|acorta|acortar|resume|resumir|traduce|traducir|edytuj|przeredaguj|zredaguj|popraw|skr[oó][ćc]|stre[sś][ćc]|streszcz|przet[lł]umacz|отредактируй|редактировать|перепиши|исправь|улучши|сократи|резюмируй|суммируй|переведи)(?![\p{L}\p{N}_])/iu
 
 const LEADING_REQUEST_RE = /^(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|por\s+favor\s+|proszę\s+|пожалуйста\s+)?/iu
@@ -69,31 +74,44 @@ export function detectDirectTextTransformation(prompt: string): DirectTextTransf
   return null
 }
 
-/**
- * Remove quoted email history from an edit target while retaining the user's draft and signature.
- * We cut only on a strong mail-thread boundary: an explicit original-message separator, a reply
- * attribution ("On ... wrote:" and localized equivalents), or a From:/De:/Od:/От: header followed
- * shortly by at least two other mail headers. This avoids treating an incidental "From:" sentence
- * as quoted history.
- */
-export function stripQuotedEmailThread(sourceText: string): string {
-  const source = String(sourceText || '').replace(/\r\n?/g, '\n').trim()
-  if (!source) return ''
-
-  const lines = source.split('\n')
+function quotedThreadBoundary(lines: string[]): number | null {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
-    if (ORIGINAL_MESSAGE_SEPARATOR_RE.test(line) || REPLY_ATTRIBUTION_RE.test(line)) {
-      return lines.slice(0, index).join('\n').trim()
-    }
+    if (ORIGINAL_MESSAGE_SEPARATOR_RE.test(line) || REPLY_ATTRIBUTION_RE.test(line)) return index
 
     if (!FROM_HEADER_RE.test(line)) continue
     const lookahead = lines.slice(index + 1, Math.min(lines.length, index + 13))
     const headerCount = lookahead.filter(candidate => THREAD_HEADER_RE.test(candidate)).length
-    if (headerCount >= 2) return lines.slice(0, index).join('\n').trim()
+    if (headerCount >= 2) return index
   }
+  return null
+}
 
-  return source
+/**
+ * Separate the user's draft from quoted/forwarded mail. The draft is the only text that may be
+ * rewritten. The quoted thread is retained as read-only reference context so the editor can
+ * resolve phrases such as "this", "because of me", "one-person post", or a reply to a direct
+ * question without echoing the old thread back to the user.
+ */
+export function splitQuotedEmailThread(sourceText: string): TextTransformationSourceSplit {
+  const source = String(sourceText || '').replace(/\r\n?/g, '\n').trim()
+  if (!source) return { editableSource: '', referenceContext: null }
+
+  const lines = source.split('\n')
+  const boundary = quotedThreadBoundary(lines)
+  if (boundary === null) return { editableSource: source, referenceContext: null }
+
+  const editableSource = lines.slice(0, boundary).join('\n').trim()
+  const referenceContext = lines.slice(boundary).join('\n').trim()
+  return {
+    editableSource,
+    referenceContext: referenceContext || null,
+  }
+}
+
+/** Backward-compatible helper for callers that need only the draft. */
+export function stripQuotedEmailThread(sourceText: string): string {
+  return splitQuotedEmailThread(sourceText).editableSource
 }
 
 export function transformationLanguageInstruction(language?: string): string {

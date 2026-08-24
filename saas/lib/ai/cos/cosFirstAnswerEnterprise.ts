@@ -328,7 +328,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     'CITING INTERNAL EVIDENCE:',
     '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill. Cite a label inline only when it genuinely informed the answer.',
     '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
-    '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge.',
+    '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: make it materially support a claim and cite it, or state that it does not answer the question; never silently ignore it.',
     '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.',
     '',
     'HONESTY:',
@@ -813,19 +813,20 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
 
   // Worker adapters can bypass the raw-reasoner draft-repair seam. Enforce the same executive
   // claim boundary immediately before evidence accounting, caching, and release.
-  const requiresLearnedSecurityEvidence = /\b(?:zero[- ]day|vulnerabilit|tenant\s+metadata|infosec|security\s+lead)\b/i.test(input.prompt)
-    && context.learned.some(item => item.includes('retrieved content'))
+  // Owner-fed documents, transcripts, papers, and other full-content corpus rows must be
+  // demonstrably used when retrieval selected them as relevant. Metadata pointers remain optional.
+  const requiresRelevantLearnedEvidenceUse = context.learned.some(item => item.includes('retrieved content'))
   const releaseSignals = (raw: string) => [
     ...executiveDecisionUnsupportedClaims(input.prompt, raw),
-    ...(requiresLearnedSecurityEvidence && citedEvidence(parseLocalResult(raw)?.answer || '').cl === 0
-      ? ['relevant_learned_security_evidence_not_used'] : []),
+    ...(requiresRelevantLearnedEvidenceUse && citedEvidence(parseLocalResult(raw)?.answer || '').cl === 0
+      ? ['relevant_learned_evidence_not_used'] : []),
   ]
   const executiveSignals = releaseSignals(reasoned.text)
   if (executiveSignals.length) {
     const repair = await callCosReasoner({
       temperature: 0,
       maxTokens: Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
-      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. If relevant learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. Deliver the complete memo; do not mention this repair.',
+      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Deliver the complete memo; do not mention this repair.',
       prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)
     const repairText = repair?.text ?? ''

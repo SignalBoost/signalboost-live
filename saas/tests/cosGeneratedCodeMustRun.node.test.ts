@@ -58,6 +58,16 @@ test('derived arithmetic counts as given only when the relationship was stated',
   assert.match(ANSWER_PATH, /say what the relationship would need to be/)
 })
 
+test('hedging a named regulation does not license naming it', () => {
+  // The first version of the regulation guard cut outright assertions, and the model moved to
+  // hedged ones instead: "under frameworks such as GDPR and CCPA", "may trigger", "likely contain
+  // PII" — still naming the governing law and its clock on facts never supplied (2026-08-23).
+  assert.match(ANSWER_PATH, /Hedging a named regulation is not the same as not naming it/)
+  assert.match(ANSWER_PATH, /still tell the reader which law governs and which clock is running/)
+  assert.match(ANSWER_PATH, /state the question, not the answer/)
+  assert.match(ANSWER_PATH, /what data fields the records actually contain/)
+})
+
 test('named laws and standards are not asserted as applicable without establishing facts', () => {
   assert.match(ANSWER_PATH, /Named laws, regulations, standards and contractual obligations are the sharpest case/)
   assert.match(ANSWER_PATH, /unless the request established the jurisdiction, industry, data types and circumstances/)
@@ -79,14 +89,33 @@ test('the rule carries a worked example of given versus reading versus invention
   assert.match(ANSWER_PATH, /states as fact what the request never supplied/)
 })
 
-test('an opening recommendation must be rewritten to match the conclusion it reasoned to', () => {
-  // Incident (2026-08-23): a vendor-approval memo opened with "approve the renewal, subject to CFO
-  // signature" and concluded "the VP of Finance should not approve this and the CFO is not
-  // required" — every element reversed. The reasoning in between was correct; the committed-to
-  // opening was simply never revisited. Readers act on the first line of a decision memo.
-  assert.match(ANSWER_PATH, /YOUR OPENING RECOMMENDATION MUST MATCH YOUR CONCLUSION/)
-  assert.match(ANSWER_PATH, /REWRITE it to match what you actually concluded/)
-  assert.match(ANSWER_PATH, /say which one governs and why before recommending/)
+test('the answer must be re-read for self-consistency: recommendation, numbers, dates and marking', () => {
+  // Two production failures merged into one rule rather than two, to stop the prompt growing a
+  // directive per observation:
+  //   - a vendor memo opened "approve, subject to CFO signature" and concluded the opposite (2026-08-23)
+  //   - a reallocation plan specified a 4-week sprint and then a closing script saying 8 weeks (2026-08-24)
+  assert.match(ANSWER_PATH, /RE-READ YOUR OWN ANSWER BEFORE RETURNING IT/)
+  assert.match(ANSWER_PATH, /REWRITE it once the reasoning is done to match what you actually concluded/)
+  assert.match(ANSWER_PATH, /Figures, durations and deadlines must be the same everywhere they appear/)
+  // The superseded narrower heading must be gone, not sitting alongside its replacement.
+  assert.equal(ANSWER_PATH.includes('YOUR OPENING RECOMMENDATION MUST MATCH YOUR CONCLUSION'), false)
+})
+
+test('summaries and closing scripts may not promote marked reading into flat fact', () => {
+  // The precise mechanism (2026-08-24): the body hedged "even if they only reduce churn by half",
+  // and the summary asserted "Risk: 28% user base loss, likely leading to insolvency". Competitors,
+  // a product-market-fit deadline, and a completed discovery phase appeared the same way — framing
+  // in the body, fact in the recap. None was supplied by the request.
+  assert.match(ANSWER_PATH, /A SUMMARY, RECAP OR CLOSING SCRIPT MUST NOT PROMOTE YOUR READING INTO FACT/)
+  assert.match(ANSWER_PATH, /This is where marked reasoning silently hardens/)
+  assert.match(ANSWER_PATH, /Carry the first-person marking into every restatement/)
+})
+
+test('projections from a given figure are the model estimate, marked in the same sentence', () => {
+  // 4% monthly compounded over 8 months is 27.9%, so the arithmetic was right — but it assumes the
+  // rate holds and the base is what the model thinks it is, neither of which was given.
+  assert.match(ANSWER_PATH, /Compounding, extrapolating or projecting a given figure produces YOUR estimate/)
+  assert.match(ANSWER_PATH, /if the rate holds/)
 })
 
 test('a low-stakes underspecified task shape must be produced with a stated default, not blocked on a question', () => {

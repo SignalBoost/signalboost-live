@@ -320,6 +320,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     '- Lead with the mechanism the stated facts actually point at. If an observation rules something in or out, say so and say why.',
     '- For diagnostic or troubleshooting questions, every cause you name must carry the SPECIFIC OBSERVABLE that would confirm it: the exact metric, view, log field, query or counter someone would look at.',
     '- For diagnostic or troubleshooting questions, every cause must also carry what would FALSIFY it. A cause nothing could disprove is not a diagnosis.',
+    '- Before writing a diagnosis, check whether the request identifies an actual, specific system, incident, or deployment under investigation (named service, real error report, an incident someone is currently experiencing) versus a generic, hypothetical, or architecture-design question with no real system named. For the latter, this observable/falsifier discipline still applies, but frame the causes as illustrative reasoning about the class of problem — do not label a cause "primary" or "most likely" and do not present it as a finding about a real system that was never described.',
     '- Examples in this prompt illustrate answer quality only. They are never evidence and must not appear in an answer unless independently relevant to the user question.',
     '- When asked to rank, rank by fit to the stated facts and justify the order. Do not renumber a list of equals.',
     '- Three causes named precisely beat six named vaguely.',

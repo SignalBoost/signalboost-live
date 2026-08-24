@@ -36,9 +36,23 @@ function skillKey(problemClass: string, stage: string, guidance: string): string
   return `reasoning.failure_autopsy.${digest}.v1`
 }
 
+/** Keep only one successful evidence row per independent controlled retest case. */
+export function distinctSuccessfulRetestRows(rows: readonly AutopsyPromotionRow[]): AutopsyPromotionRow[] {
+  const seen = new Set<string>()
+  const out: AutopsyPromotionRow[] = []
+  for (const row of [...rows].sort((a, b) => Date.parse(a.updated_at) - Date.parse(b.updated_at))) {
+    const caseId = clean(row.retest_case_id, 240)
+    if (!caseId || seen.has(caseId)) continue
+    seen.add(caseId)
+    out.push(row)
+  }
+  return out
+}
+
 /**
  * Build exact problem-class/stage/guidance cohorts. The original failed prompt is not part of the
- * key or output. Runtime promotion requires five clean independent retests and zero failures.
+ * key or output. Runtime promotion requires five DISTINCT clean independent retest cases and zero
+ * failures for the exact cohort.
  */
 export function deriveAutopsySkillCandidates(rows: readonly AutopsyPromotionRow[]): AutopsySkillCandidate[] {
   const groups = new Map<string, AutopsyPromotionRow[]>()
@@ -58,8 +72,8 @@ export function deriveAutopsySkillCandidates(rows: readonly AutopsyPromotionRow[
     const problemClass = clean(first.problem_class, 320)
     const stage = clean(first.primary_stage, 120)
     const guidance = clean(first.corrective_guidance, 2400)
-    const successRows = group.filter(row => row.retest_passed === true && row.lesson_retained === true && row.status === 'retest_passed')
-      .sort((a, b) => Date.parse(a.updated_at) - Date.parse(b.updated_at))
+    const cleanSuccesses = group.filter(row => row.retest_passed === true && row.lesson_retained === true && row.status === 'retest_passed')
+    const successRows = distinctSuccessfulRetestRows(cleanSuccesses)
     const failureRows = group.filter(row => row.retest_passed === false || row.status === 'retest_failed')
     return {
       skillKey: skillKey(problemClass, stage, guidance),

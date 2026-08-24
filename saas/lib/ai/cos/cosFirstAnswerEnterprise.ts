@@ -24,6 +24,7 @@ import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel 
 import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
+import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -150,6 +151,12 @@ function knowledgeFactRetrievalBudgetMs():number {
   const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '5000')
   return Number.isFinite(value) ? Math.max(500, Math.min(15000, value)) : 5000
 }
+
+/** Apply deterministic corrections to checkable answer arithmetic before returning it. */
+function cleanAnswerText(answer: string): string {
+  return correctCompoundingArithmetic(stripInternalEvidenceIds(answer)).text
+}
+
 function answerPolicyVersion():string {
   return cosAnswerPolicyVersion({
     reasonerSystemPrompt:COS_REASONER_SYSTEM_PROMPT('English'),
@@ -705,7 +712,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
         // Cache replay must be cleaned too: entries written before answer hygiene existed still
         // carry internal markers, and a cached leak is indistinguishable to the reader from a live
         // one (observed 2026-08-23 — an [OEM1] answer cached at 01:28 replayed verbatim).
-        return { handled:true, reply:stripInternalEvidenceIds(payload.reply), confidence:payload.confidence, provenance:cacheHitProvenance(payload, base, 'semantic_similarity', nearest.similarityScore) }
+        return { handled:true, reply:cleanAnswerText(payload.reply), confidence:payload.confidence, provenance:cacheHitProvenance(payload, base, 'semantic_similarity', nearest.similarityScore) }
       }
     }
   }
@@ -722,7 +729,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
   if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold()) {
     recordAvoidedCost('exact_cache', input.prompt.length, cached.reply.length, Date.now() - startedAt)
-    return { handled:true, reply:stripInternalEvidenceIds(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
+    return { handled:true, reply:cleanAnswerText(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
   }
 
   if (process.env.COS_LOCAL_FIRST_ENABLED === 'false') {
@@ -834,7 +841,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       ? `COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}. ${specificityReason(specificity)}`
       : `COS confidence ${confidence.toFixed(2)} is below escalation threshold ${threshold().toFixed(2)}.`
     void recordKnowledgeGap(input.prompt, confidence, reason)
-    return { handled:false, confidence, reason, bestEffortReply:stripInternalEvidenceIds(parsed.answer), provenance:{ responseSource:'external_fallback_required', ...citedProvenance } }
+    return { handled:false, confidence, reason, bestEffortReply:cleanAnswerText(parsed.answer), provenance:{ responseSource:'external_fallback_required', ...citedProvenance } }
   }
 
   const citedSkillIds = citedIndexedValues(parsed.answer, 'SK', context.skillIds)
@@ -844,7 +851,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     // User-facing prose only: internal retrieval identifiers ([CL1], [LIVE2]) are prompt
     // scaffolding, and citation accounting above already ran against the raw answer. Leaked ids
     // confused a real user on 2026-08-22; see answerEvidenceIdHygiene.ts.
-    reply:stripInternalEvidenceIds(parsed.answer),
+    reply:cleanAnswerText(parsed.answer),
     confidence,
     reasonerLabel:citedProvenance.reasonerLabel,
     policyVersion,
@@ -878,7 +885,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   // The LIVE return, not only the cached copy: an earlier fix stripped `storedAnswer.reply`
   // (what gets cached) but left this path raw, so fresh answers leaked [OEM1] while replays were
   // clean — backwards. Both paths strip now.
-  return { handled:true, reply:stripInternalEvidenceIds(parsed.answer), confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
+  return { handled:true, reply:cleanAnswerText(parsed.answer), confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult, language='en'):string {

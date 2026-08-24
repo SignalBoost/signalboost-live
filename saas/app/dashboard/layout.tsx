@@ -1,5 +1,4 @@
 import React from 'react'
-import AssistantComposerResetGuard from '@/components/AssistantComposerResetGuard'
 
 export default function DashboardLayout({
   children,
@@ -8,7 +7,6 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="sb-app-shell">
-      <AssistantComposerResetGuard />
       {children}
     </div>
   )

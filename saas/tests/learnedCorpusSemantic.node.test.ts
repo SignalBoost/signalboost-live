@@ -52,3 +52,15 @@ test('embedding text projects subject + summary + facts, matching what the reaso
   // Title-only rows (the old 161-char blurbs) still embed, just with little content — no throw.
   assert.doesNotThrow(() => learnedCorpusEmbeddingText({ subject: 'x' }))
 })
+
+test('embedding text is bounded so dense malformed source text cannot loop forever at a 512-token provider limit', async () => {
+  const { learnedCorpusEmbeddingText } = await import('../lib/ai/cos/learnedCorpusSemantic')
+  const text = learnedCorpusEmbeddingText({
+    subject: 'Retrieval-Augmented Generation (RAG)',
+    summary: 'LessonsfromtheLLMTrenches'.repeat(200),
+    facts: ['GraphRAG'.repeat(200), 'long-tail-knowledge'.repeat(200)],
+  })
+  assert.ok(text.length <= 1000)
+  assert.match(text, /Retrieval-Augmented Generation/)
+  assert.match(text, /long-tail-knowledge/)
+})

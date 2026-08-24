@@ -36,6 +36,19 @@ const EXECUTIVE_DECISION_SCENARIO =
 const EXECUTIVE_DECISION_VERB =
   /\b(?:decide|design|facilitate|triage|cut|reduce|prioriti[sz]e|allocate|restructure|acquire|handle|recommend|approve|protect|extend|save|freeze|cancel)\b/i
 
+// Executive requests may use an unlimited variety of verbs (for example, "outline"), so the
+// gate keys on the request shape rather than an ever-growing verb list.
+const EXECUTIVE_DELIVERABLE =
+  /\b(?:roadmap|(?:the|a|an|our|your|my)\s+plan|action\s+plan|playbook|proposal|recommendations?|next\s+steps|course\s+of\s+action|strategy|framework|memo|briefing|agenda|trade[-\s]?offs?|decision\s+(?:process|framework|memo|rights))\b/i
+const EXECUTIVE_DECISION_QUESTION = /\b(?:how|what|which|who|should|would)\b[^?]{0,400}\?/i
+const EXECUTIVE_SUBSTANCE_MIN_CHARS = 160
+
+function executiveRequestShape(input: string): boolean {
+  if (EXECUTIVE_DECISION_VERB.test(input)) return true
+  if (input.length < EXECUTIVE_SUBSTANCE_MIN_CHARS) return false
+  return EXECUTIVE_DELIVERABLE.test(input) || EXECUTIVE_DECISION_QUESTION.test(input)
+}
+
 function userQuestionOnly(prompt: string): string {
   const full = String(prompt || '').slice(0, 24_000)
   const marker = 'USER QUESTION:'
@@ -52,7 +65,7 @@ export function classifyScriptRequest(prompt: string): ScriptRequestMode {
 
 export function executiveDecisionDirective(prompt: string): string | null {
   const input = userQuestionOnly(prompt)
-  if (!EXECUTIVE_DECISION_SCENARIO.test(input) || !EXECUTIVE_DECISION_VERB.test(input)) return null
+  if (!EXECUTIVE_DECISION_SCENARIO.test(input) || !executiveRequestShape(input)) return null
   return [
     'EXECUTIVE DECISION MODE: EVIDENCE-BOUNDED, REVERSIBLE-FIRST, AND GOVERNANCE-AWARE.',
     'Do not assume an across-the-board percentage cut, dishonesty by budget owners, or that a cost center is less important merely because revenue attribution is indirect unless the user explicitly supplied that fact.',

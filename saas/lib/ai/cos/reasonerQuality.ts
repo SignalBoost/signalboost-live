@@ -7,6 +7,8 @@ const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|
 const PROGRAMMING_REDIRECT = /\b(?:programming language|source code|python|javascript|typescript|bash|powershell|choose (?:a |the )?(?:language|runtime)|specify (?:a |the )?(?:language|runtime|format))\b/i
 const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot write (?:a |the )?script|can't write (?:a |the )?script|unable to write (?:a |the )?script|need you to specify|need more information before (?:i can |i )?(?:write|produce|draft|create))\b/i
 const EXECUTIVE_UNSUPPORTED_CERTAINTY = /\b(?:risk of (?:cannibali[sz]ation|downgrad(?:e|ing)) is low|(?:renewals?|contracts?) (?:are|is) safe|(?:clients?|customers?) will not (?:downgrade|leave)|must (?:stay|remain) on (?:enterprise|the enterprise tier)|cannot (?:practically )?(?:move|downgrade)|is (?:safe|manageable) because)\b/i
+const SECURITY_SCENARIO = /\b(?:zero[- ]day|vulnerabilit|tenant\s+metadata|infosec|security\s+lead)\b/i
+const UNSUPPORTED_SECURITY_FRAMEWORK = /\b(?:IL[2456]|impact\s+level\s*[2456]|authorizing\s+official|system\s+security\s+plan|\bSSP\b|fedramp|rmf|nist\s*800[- ]53)\b/i
 
 /**
  * Executive recommendations may state user-supplied facts, but must not turn uncertain outcomes
@@ -19,6 +21,7 @@ export function executiveDecisionUnsupportedClaims(prompt: string, raw: string):
   const answer = parsed.answer
   const signals: string[] = []
   if (EXECUTIVE_UNSUPPORTED_CERTAINTY.test(answer)) signals.push('unsupported_certainty')
+  if (SECURITY_SCENARIO.test(prompt) && UNSUPPORTED_SECURITY_FRAMEWORK.test(answer) && !UNSUPPORTED_SECURITY_FRAMEWORK.test(prompt)) signals.push('unsupported_security_framework')
   const suppliedNumbers = new Set((String(prompt).match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')))
   const novelNumber = (answer.match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')).find(value => !suppliedNumbers.has(value))
   if (novelNumber) signals.push('novel_numeric_target')

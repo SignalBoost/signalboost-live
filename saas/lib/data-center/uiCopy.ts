@@ -24,9 +24,20 @@ export const DATA_CENTER_OPERATIONS_COPY = {
   missing: { en: 'Missing evidence', es: 'Evidencia faltante', pt: 'Evidência ausente', pl: 'Brakujące dane', ru: 'Недостающие данные' },
   none: { en: 'None reported', es: 'Ninguno informado', pt: 'Nenhum informado', pl: 'Brak', ru: 'Не указано' },
   failed: { en: 'Simulation failed', es: 'La simulación falló', pt: 'A simulação falhou', pl: 'Symulacja nie powiodła się', ru: 'Симуляция не удалась' },
-  rootCause: { en: 'Root cause status', es: 'Estado de causa raíz', pt: 'Status da causa raiz', pl: 'Status przyczyny źródłowej', ru: 'Статус первопричины' },
+  rootCause: { en: 'Root cause status', es: 'Estado de causa raíz', pt: 'Status de causa raiz', pl: 'Status przyczyny źródłowej', ru: 'Статус первопричины' },
   control: { en: 'Facility control', es: 'Control de instalaciones', pt: 'Controle da instalação', pl: 'Sterowanie obiektem', ru: 'Управление объектом' },
   disabled: { en: 'Disabled', es: 'Deshabilitado', pt: 'Desativado', pl: 'Wyłączone', ru: 'Отключено' },
+  benchmarkTitle: { en: 'Private data-center capability benchmark', es: 'Evaluación privada de capacidad de centros de datos', pt: 'Benchmark privado de capacidade de data center', pl: 'Prywatny benchmark zdolności centrum danych', ru: 'Закрытый тест возможностей для дата-центров' },
+  benchmarkBody: { en: 'Runs the 14 hidden data-center cases in bounded two-case batches. Holdout prompts stay server-side and facility control remains disabled.', es: 'Ejecuta los 14 casos ocultos de centros de datos en lotes limitados de dos casos. Los prompts de evaluación permanecen en el servidor y el control de instalaciones sigue deshabilitado.', pt: 'Executa os 14 casos ocultos de data center em lotes limitados de dois casos. Os prompts de holdout permanecem no servidor e o controle da instalação continua desativado.', pl: 'Uruchamia 14 ukrytych przypadków centrum danych w ograniczonych partiach po dwa. Prompty holdout pozostają po stronie serwera, a sterowanie obiektem pozostaje wyłączone.', ru: 'Запускает 14 скрытых тестовых случаев дата-центра ограниченными пакетами по два. Holdout-промпты остаются на сервере, управление объектом отключено.' },
+  benchmarkRun: { en: 'Run 14-case private benchmark', es: 'Ejecutar benchmark privado de 14 casos', pt: 'Executar benchmark privado de 14 casos', pl: 'Uruchom prywatny benchmark 14 przypadków', ru: 'Запустить закрытый тест из 14 случаев' },
+  benchmarkRunning: { en: 'Running private benchmark…', es: 'Ejecutando benchmark privado…', pt: 'Executando benchmark privado…', pl: 'Uruchamianie prywatnego benchmarku…', ru: 'Выполняется закрытый тест…' },
+  benchmarkCases: { en: 'Hidden cases', es: 'Casos ocultos', pt: 'Casos ocultos', pl: 'Ukryte przypadki', ru: 'Скрытые случаи' },
+  benchmarkProgress: { en: 'Completed', es: 'Completados', pt: 'Concluídos', pl: 'Ukończono', ru: 'Завершено' },
+  benchmarkPassed: { en: 'Passed', es: 'Aprobados', pt: 'Aprovados', pl: 'Zaliczone', ru: 'Пройдено' },
+  benchmarkPassRate: { en: 'Pass rate', es: 'Tasa de aprobación', pt: 'Taxa de aprovação', pl: 'Wskaźnik zaliczeń', ru: 'Доля успешных' },
+  benchmarkComplete: { en: 'Private benchmark completed.', es: 'Benchmark privado completado.', pt: 'Benchmark privado concluído.', pl: 'Prywatny benchmark zakończony.', ru: 'Закрытый тест завершён.' },
+  benchmarkFailed: { en: 'Private benchmark failed', es: 'Falló el benchmark privado', pt: 'O benchmark privado falhou', pl: 'Prywatny benchmark nie powiódł się', ru: 'Закрытый тест завершился ошибкой' },
+  benchmarkKeepOpen: { en: 'Keep this page open while the bounded batches run.', es: 'Mantén esta página abierta mientras se ejecutan los lotes limitados.', pt: 'Mantenha esta página aberta enquanto os lotes limitados são executados.', pl: 'Pozostaw tę stronę otwartą podczas wykonywania ograniczonych partii.', ru: 'Оставьте эту страницу открытой, пока выполняются ограниченные пакеты.' },
 } satisfies Record<string, Record<DataCenterUiLang, string>>
 
 export function dataCenterUiText(key: keyof typeof DATA_CENTER_OPERATIONS_COPY, language: string): string {

@@ -26,7 +26,8 @@ const UNSUPPLIED_SENSITIVE_DATA_INFERENCE = /\b(?:billing|customer|account)\s+re
 // high-value failure signatures from real COS answers: invented competitor loss, insolvency,
 // product-market-fit deadlines, completed discovery, market shifts, and unqualified derived
 // projections. Explicitly conditional/modelled statements remain allowed.
-const EXPLICIT_MODEL_ASSUMPTION = /\b(?:if|assuming|assume|under\s+the\s+assumption|holding\b[^.!?]{0,40}\bconstant|with\s+no\b|without\s+(?:offsetting|new|additional)|illustrative|for\s+illustration|not\s+a\s+forecast|scenario\s+only|could|may|might|depends?\s+on)\b/i
+const EXPLICIT_PROJECTION_ASSUMPTION = /\b(?:if|assuming|assume|under\s+the\s+assumption|holding\b[^.!?]{0,40}\bconstant|with\s+no\b|without\s+(?:offsetting|new|additional)|illustrative|for\s+illustration|not\s+a\s+forecast|scenario\s+only)\b/i
+const EXPLICIT_CAUSAL_UNCERTAINTY = /\b(?:could|may|might|depends?\s+on|subject\s+to|would\s+need\s+to\s+model|requires?\s+(?:a\s+)?(?:revenue|burn|unit[- ]economics?)\s+model)\b/i
 const UNSUPPLIED_SEVERE_OUTCOME_ASSERTION = /\bmathematically\s+incompatible\b[^.!?]{0,120}\b(?:survival|runway)\b|\b(?:likely|will|would)\s+(?:lead|leading|result)\s+(?:to|in)\s+(?:insolvency|bankruptcy|collapse)\b|\bexistential\s+threat\b/i
 const UNSUPPLIED_COMPETITOR_ASSERTION = /\b(?:bleed(?:ing)?|los(?:e|ing)|driv(?:e|ing))\s+(?:users?|customers?|accounts?)\s+to\s+competitors?\b/i
 const UNSUPPLIED_STRATEGIC_DEADLINE = /\b(?:we|you|the\s+company)\s+(?:have|has)\s+\d+\s+months?\s+to\s+(?:prove|reach|achieve|find)\s+(?:product[- ]market\s+fit|pmf)\b|\b\d+\s+months?\s+to\s+(?:prove|reach|achieve|find)\s+(?:product[- ]market\s+fit|pmf)\b/i
@@ -77,8 +78,8 @@ function isUnsupportedScenarioInference(sentence: string): boolean {
     || UNSUPPLIED_PROJECT_STATUS.test(sentence)
   ) return true
 
-  if (EXPLICIT_MODEL_ASSUMPTION.test(sentence)) return false
-  return UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME.test(sentence) || UNQUALIFIED_TIME_PROJECTION.test(sentence)
+  if (UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME.test(sentence) && !EXPLICIT_CAUSAL_UNCERTAINTY.test(sentence)) return true
+  return UNQUALIFIED_TIME_PROJECTION.test(sentence) && !EXPLICIT_PROJECTION_ASSUMPTION.test(sentence)
 }
 
 function signalsForSentence(sentence: string): AnswerFreshnessSignal[] {

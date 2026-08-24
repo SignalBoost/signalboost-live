@@ -1,4 +1,4 @@
-import { incidentSchema, type SerializableValue, type SupervisorIncident } from '@/lib/supervisor/incident-schema.ts'
+import { incidentSchema, type SerializableValue, type SupervisorIncident } from '../supervisor/incident-schema.ts'
 
 export const dataCenterAssetClasses = [
   'ups',

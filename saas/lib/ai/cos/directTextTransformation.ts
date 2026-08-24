@@ -38,7 +38,8 @@ const MEANING_FIDELITY_RULES = [
 
 const BUSINESS_REGISTER_RULES = [
   'REGISTER — PROFESSIONAL BUSINESS CORRESPONDENCE:',
-  '- Write as a competent business professional writing to a colleague, client, or counterpart: clear purpose, measured tone, complete sentences, no filler.',
+  '- Edit as a capable human colleague: clear purpose, measured tone, complete sentences, no filler.',
+  '- Write as a competent business professional writing to a colleague, client, or counterpart.',
   '- Courtesy is expressed through precise, respectful wording, not through casual reassurance. Do not add phrases such as "don\'t worry", "no problem", slogans, or mission language the user did not write.',
   '- Be concise and direct. Avoid stiff ceremonial memo language and avoid chatty informality alike.',
   '- Ordinary professional phrasing is expected; contractions are acceptable only where they read naturally and do not lower the register.',
@@ -101,7 +102,7 @@ async function refineProfessionalDraft(input: {
     temperature: 0.05,
     maxTokens: 1800,
     systemPrompt: [
-      'You are the FINAL COS business copy editor. The candidate below has already been drafted once. Release a better final version; do not explain it.',
+      'You are the FINAL COS professional copy editor. The candidate below has already been drafted once. Release a better final version; do not explain it.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'MEANING FIDELITY OUTRANKS POLISH. Before improving anything, silently compare the candidate against the ORIGINAL EDITABLE SOURCE and repair these regressions first:',
       '- If the candidate replaced any of the user\'s nouns, roles, titles, or terms of art with a different-meaning word, restore the user\'s term and fix only its grammar, hyphenation, or spelling.',
@@ -110,6 +111,7 @@ async function refineProfessionalDraft(input: {
       '- Preserve all names, numbers, dates, commitments, uncertainty, and factual constraints supplied by the user or reference context.',
       'Only then improve the text: grammar, agreement, punctuation, flow, repetition, unnecessary formality, and vague wording. Do not substitute the user\'s terminology while doing so.',
       BUSINESS_REGISTER_RULES,
+      'Resolve ambiguous references from REFERENCE CONTEXT only when the referent is unambiguous; otherwise preserve the user\'s wording.',
       'Prefer concrete wording over vague substitutes when the reference context identifies what "it", "this", a shipment, a flight, a post, or another shorthand refers to.',
       'If the incoming message asks a direct question and the original draft clearly indicates the answer, ensure the final reply answers that question explicitly.',
       'Do not introduce new facts or commitments. Do not browse or verify externally.',
@@ -164,6 +166,7 @@ export async function tryDirectTextTransformation(input: {
       'Rebuild rough, fragmented, misspelled, or non-native wording into fluent professional prose. Rebuilding means repairing the sentence around the user\'s own terms, not replacing those terms.',
       BUSINESS_REGISTER_RULES,
       'REFERENCE CONTEXT HANDLING:',
+      '- Resolve ambiguous references from REFERENCE CONTEXT only when the referent is unambiguous; otherwise preserve the user\'s wording.',
       '- Use REFERENCE CONTEXT only to understand what the draft is replying to, and to resolve shorthand such as this, it, that, because of me, the shipment, the flight, or the post when the referent is unambiguous there.',
       '- When the reference context contains a direct question or requested decision, and the editable draft clearly indicates the user\'s answer, make the finished reply answer that question explicitly rather than leaving it implicit.',
       '- REFERENCE CONTEXT is read-only. Never reproduce, rewrite, summarize, quote, or append the prior message thread unless the user explicitly asks you to edit that quoted history too.',

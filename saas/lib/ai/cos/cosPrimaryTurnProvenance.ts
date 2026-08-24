@@ -2,26 +2,52 @@ import { assistantContentMatchesForProvenance, recordLatestUserTurnProvenance } 
 import { buildCosLiveSystemState } from './cosLiveSystemState.ts'
 import { responseLineageStrength } from './responseLineage.ts'
 import { getAccess } from '@/lib/auth/access'
+import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { hashPrompt } from './turnExperienceStore.ts'
 import { buildOutOfPipelineExperienceRow, ensureProvenanceTurnId, type OutOfPipelineTurn } from './outOfPipelineTurn.ts'
 
+function effectiveProvenanceUserId(userId: string | null): string | null {
+  return userId || publicAuditUserId()
+}
+
+function publicScopedProvenance(provenance: unknown): unknown {
+  if (!isPublicDeliveryScope() || !provenance || typeof provenance !== 'object' || Array.isArray(provenance)) return provenance
+  return {
+    ...(provenance as Record<string, unknown>),
+    delivery_scope: 'public_concierge',
+    audit_identity: {
+      binding: 'server_authenticated_user_id',
+      authorization_authority: false,
+      exposed_to_reasoning: false,
+    },
+  }
+}
+
+function publicScopeCompatible(provenance: unknown): boolean {
+  if (!isPublicDeliveryScope()) return true
+  return Boolean(provenance && typeof provenance === 'object' && !Array.isArray(provenance)
+    && (provenance as Record<string, unknown>).delivery_scope === 'public_concierge')
+}
+
 export async function readCosPrimaryPriorProvenance(userId:string|null,precedingAssistant?:string):Promise<Record<string,unknown>|null>{
-  if(!userId)return null
+  const effectiveUserId=effectiveProvenanceUserId(userId)
+  if(!effectiveUserId)return null
   const db=cosServiceDb()
   if(!db)return null
   let prior:Record<string,unknown>|null=null
   try{
-    const {data,error}=await db.from('cos_latest_turn_provenance').select('assistant_content,provenance').eq('user_id',userId).maybeSingle()
+    const {data,error}=await db.from('cos_latest_turn_provenance').select('assistant_content,provenance').eq('user_id',effectiveUserId).maybeSingle()
     if(error)throw error
-    if(data?.provenance&&(!precedingAssistant||assistantContentMatchesForProvenance(data.assistant_content,precedingAssistant)))prior=data.provenance as Record<string,unknown>
+    if(data?.provenance&&publicScopeCompatible(data.provenance)&&(!precedingAssistant||assistantContentMatchesForProvenance(data.assistant_content,precedingAssistant)))prior=data.provenance as Record<string,unknown>
   }catch(error){
     console.error('cosPrimaryTurnProvenance: prior provenance read failed',error)
   }
   if(!prior)return null
   const access=await getAccess().catch(()=>null)
   if(!access?.isOwner&&!access?.isAdmin)return prior
-  const liveSystemState=await buildCosLiveSystemState({userId,privileged:true}).catch(()=>null)
+  const liveSystemState=await buildCosLiveSystemState({userId:effectiveUserId,privileged:true}).catch(()=>null)
   return liveSystemState?{...prior,live_system_state:liveSystemState}:prior
 }
 
@@ -50,7 +76,7 @@ async function recentResponseBoundLineage(userId:string,reply:string):Promise<Re
       .select('assistant_content,provenance,source,updated_at')
       .eq('user_id',userId)
       .maybeSingle()
-    if(error||!data?.provenance)return null
+    if(error||!data?.provenance||!publicScopeCompatible(data.provenance))return null
     if(!assistantContentMatchesForProvenance(data.assistant_content,reply))return null
     const updatedAt=String(data.updated_at||'')
     const age=Date.now()-Date.parse(updatedAt)
@@ -77,35 +103,39 @@ function supersededAttempt(provenance:any,source:string){
 }
 
 export async function writeCosPrimaryProvenance(userId:string|null,reply:string,provenance:unknown,source:string,turn?:OutOfPipelineTurn):Promise<void>{
-  if(!userId||!reply||!provenance)return
+  const effectiveUserId=effectiveProvenanceUserId(userId)
+  if(!effectiveUserId||!reply||!provenance)return
+  const recordedProvenance=publicScopedProvenance(provenance)
   if(turn){
-    const turnId=ensureProvenanceTurnId(provenance)
+    const turnId=ensureProvenanceTurnId(recordedProvenance)
     if(turnId)await recordOutOfPipelineTurnExperience(turnId,turn)
   }
 
   // The COS-primary wrapper can make attempt A, then call the legacy/support path which makes
   // attempt B. The support path persists B before control returns here. Never let a rejected A
-  // overwrite B merely because the outer wrapper completes a few milliseconds later.
-  const existing=await recentResponseBoundLineage(userId,reply)
-  const candidateStrength=responseLineageStrength(provenance)
+  // overwrite B merely because the outer wrapper completes a few milliseconds later. Public
+  // requests compare only against public-scoped lineage so internal owner provenance cannot leak.
+  const existing=await recentResponseBoundLineage(effectiveUserId,reply)
+  const candidateStrength=responseLineageStrength(recordedProvenance)
   const existingStrength=responseLineageStrength(existing?.provenance)
   if(existing&&existingStrength>candidateStrength){
     const previous=Array.isArray((existing.provenance as any).superseded_attempts)?(existing.provenance as any).superseded_attempts:[]
     const enriched={
       ...existing.provenance,
-      superseded_attempts:[...previous,supersededAttempt(provenance,source)].slice(-4),
+      superseded_attempts:[...previous,supersededAttempt(recordedProvenance,source)].slice(-4),
     }
-    await recordLatestUserTurnProvenance(userId,reply,enriched,existing.source||'cos-response-lineage-preserved')
+    await recordLatestUserTurnProvenance(effectiveUserId,reply,enriched,existing.source||'cos-response-lineage-preserved')
     console.warn('[cos-primary-provenance] preserved stronger response-bound lineage',JSON.stringify({
       existingSource:existing.source,
       existingStrength,
       candidateSource:source,
       candidateStrength,
       existingTurnId:(existing.provenance as any)?.turnId??null,
-      candidateTurnId:(provenance as any)?.turnId??null,
+      candidateTurnId:(recordedProvenance as any)?.turnId??null,
+      deliveryScope:isPublicDeliveryScope()?'public_concierge':'internal',
     }))
     return
   }
 
-  await recordLatestUserTurnProvenance(userId,reply,provenance,source)
+  await recordLatestUserTurnProvenance(effectiveUserId,reply,recordedProvenance,source)
 }

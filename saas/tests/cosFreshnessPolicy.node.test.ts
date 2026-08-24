@@ -211,3 +211,10 @@ test('regulated public guidance is live-verified across supported languages', ()
     assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
   }
 })
+
+
+test('supplied security launch scenarios stay on the reasoning route', () => {
+  const scenario = 'It is T-minus 24 hours before the launch of the company\'s flagship product. The InfoSec lead discovers a high-severity zero-day vulnerability in an open-source dependency that could allow unauthorized read access to tenant metadata. Marketing has spent $250k on non-refundable event sponsorships. The VP of Product wants to launch on time and patch the exploit next week. Deliver your risk triage and go/no-go recommendation.'
+  assert.equal(requiresFreshExternalEvidence(scenario), false)
+  assert.equal(requiresFreshExternalEvidence('Is CVE-2026-12345 still unpatched?'), true)
+})

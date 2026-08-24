@@ -46,6 +46,10 @@ const ELECTION_STATE = /\b(?:election result|election results|election returns|v
 const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
 const HIGH_STAKES_SECURITY_RELEASE = /\b(?:zero[- ]day|high[- ]severity\s+vulnerabilit|unauthorized\s+(?:read|access)|tenant\s+(?:metadata|data)|infosec|security\s+lead)\b/i
+// A supplied incident scenario asks COS to assess stated facts, not discover a real-world incident.
+// Live research is appropriate only when the user asks COS to establish an external fact or supplies
+// a concrete identifier (for example a CVE or dependency) that needs verification.
+const SECURITY_DECISION_SCENARIO = /\b(?:risk\s+triage|go\s*\/\s*no-?go|go\s+or\s+no-?go|launch\s+(?:decision|recommendation)|t-minus|launch\s+on\s+time)\b/i
 const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
 
 // Advice about regulated or high-consequence public processes must be verified even when it is
@@ -146,7 +150,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
-  if (HIGH_STAKES_SECURITY_RELEASE.test(text)) return true
+  if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
   if (isContentGenerationRequest(text)) return false
 
   // A question about COS's OWN previous answer is never a public-web lookup. This is a structural

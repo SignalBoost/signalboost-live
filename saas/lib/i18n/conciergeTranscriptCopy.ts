@@ -2,6 +2,11 @@ export type ConciergeTranscriptLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY = {
   en: {
+    chatTitle: 'Your SignalBoost concierge',
+    chatSubtitle: 'Ask anything about building, promoting, reviews, audio, video, or what you want to accomplish.',
+    empty: 'Ask me anything, or start with one of the suggested questions below.',
+    newChat: 'New chat',
+    openFullAssistant: 'Open full assistant',
     title: 'Conversation transcript',
     retained: 'The complete exchange stays visible here so you can review or copy it.',
     turn: 'Exchange',
@@ -11,6 +16,11 @@ const COPY = {
     copied: 'Copied',
   },
   es: {
+    chatTitle: 'Tu concierge de SignalBoost',
+    chatSubtitle: 'Pregunta sobre creación, promoción, reseñas, audio, video o cualquier objetivo que quieras lograr.',
+    empty: 'Pregúntame lo que quieras o empieza con una de las preguntas sugeridas.',
+    newChat: 'Nuevo chat',
+    openFullAssistant: 'Abrir asistente completo',
     title: 'Transcripción de la conversación',
     retained: 'El intercambio completo permanece visible aquí para que puedas revisarlo o copiarlo.',
     turn: 'Intercambio',
@@ -20,6 +30,11 @@ const COPY = {
     copied: 'Copiado',
   },
   pt: {
+    chatTitle: 'Seu concierge SignalBoost',
+    chatSubtitle: 'Pergunte sobre criação, promoção, avaliações, áudio, vídeo ou qualquer objetivo que queira alcançar.',
+    empty: 'Pergunte qualquer coisa ou comece com uma das perguntas sugeridas abaixo.',
+    newChat: 'Novo chat',
+    openFullAssistant: 'Abrir assistente completo',
     title: 'Transcrição da conversa',
     retained: 'A conversa completa permanece visível aqui para você revisar ou copiar.',
     turn: 'Troca',
@@ -29,6 +44,11 @@ const COPY = {
     copied: 'Copiado',
   },
   pl: {
+    chatTitle: 'Twój concierge SignalBoost',
+    chatSubtitle: 'Pytaj o tworzenie, promocję, opinie, audio, wideo albo dowolny cel, który chcesz osiągnąć.',
+    empty: 'Zapytaj mnie o cokolwiek albo zacznij od jednej z sugerowanych pytań.',
+    newChat: 'Nowy czat',
+    openFullAssistant: 'Otwórz pełnego asystenta',
     title: 'Zapis rozmowy',
     retained: 'Cała rozmowa pozostaje tutaj widoczna, aby można ją było przejrzeć lub skopiować.',
     turn: 'Wymiana',
@@ -38,6 +58,11 @@ const COPY = {
     copied: 'Skopiowano',
   },
   ru: {
+    chatTitle: 'Ваш консьерж SignalBoost',
+    chatSubtitle: 'Спрашивайте о создании, продвижении, отзывах, аудио, видео или любой цели, которую хотите достичь.',
+    empty: 'Спросите меня о чём угодно или начните с одного из предложенных вопросов.',
+    newChat: 'Новый чат',
+    openFullAssistant: 'Открыть полного помощника',
     title: 'История разговора',
     retained: 'Весь диалог остаётся здесь видимым, чтобы его можно было просмотреть или скопировать.',
     turn: 'Обмен',

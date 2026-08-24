@@ -52,6 +52,21 @@ test('cached CEO resource answer with unsupported strategic outcomes is refused 
   assert.match(verdict.reason, /current answer-side freshness\/integrity policy/i)
 })
 
+test('cached paraphrased CEO answer with unsupported probabilities and financial consequences is refused', () => {
+  const reply = [
+    'This reallocation is a necessary defense of the company’s survival and runway.',
+    'You are trading a low-probability speculative bet for a high-probability, high-impact retention fix.',
+    'At 4% monthly churn, the user base halves in roughly 17-18 months.',
+    'With only 8 months of runway, the company is likely to run out of cash before churn is stabilized.',
+    'You will lose ~27.4% of your user base in 8 months.',
+    'This directly reduces revenue and extends the time to profitability or the next funding round, effectively burning through the remaining runway faster.',
+  ].join(' ')
+  const verdict = cachedAnswerIsCurrent(stamp(reply), policyVersion, 24 * 60 * 60 * 1000, now)
+  assert.equal(verdict.ok, false)
+  if (verdict.ok) return
+  assert.match(verdict.reason, /current answer-side freshness\/integrity policy/i)
+})
+
 test('cached governance advice that leaves legal applicability to Legal Privacy remains replay-compatible', () => {
   const reply = 'Preserve evidence, pause risky billing changes, and have Legal/Privacy determine whether applicable law requires customer notification before release.'
   const verdict = cachedAnswerIsCurrent(stamp(reply), policyVersion, 24 * 60 * 60 * 1000, now)

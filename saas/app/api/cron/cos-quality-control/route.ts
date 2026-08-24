@@ -8,6 +8,7 @@ import {
   runAutomaticPrivateCapabilitySample,
   type AutomaticQualitySample,
 } from '@/lib/ai/cos/automaticQualityControl'
+import { countPendingFailureAutopsyPrivateValidations } from '@/lib/ai/cos/failureAutopsyPrivateValidation'
 import { refreshAdaptiveRetrievalShadowCandidate } from '@/lib/ai/cos/adaptiveRetrievalPolicy'
 import { runNextAdaptiveRetrievalValidation } from '@/lib/ai/cos/adaptiveRetrievalValidation'
 import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
@@ -30,6 +31,13 @@ function skippedSample(kind: AutomaticQualitySample['kind'], reason: string): Au
 
 function isIncident(value: SupervisorIncident | null): value is SupervisorIncident {
   return value !== null
+}
+
+function actionableIncidentPriority(incident: SupervisorIncident): number {
+  if (incident.metadata.recoveryPreauthorized !== true) return 99
+  if (incident.errorCode === 'cos_quality_benchmark_regression') return 0
+  if (incident.errorCode === 'cos_quality_autopsy_backlog') return 1
+  return 2
 }
 
 async function maybeAdvanceAdaptiveRetrieval(elapsedMs: number) {
@@ -59,19 +67,30 @@ export async function GET(req: NextRequest) {
         skippedSample('evidence_utilization', error instanceof Error ? error.message : String(error)))
     : skippedSample('evidence_utilization', 'Skipped to preserve the bounded 300-second quality-control route budget.')
 
-  const pendingBefore = await countPendingFailureAutopsyRetests().catch(() => 0)
+  const [pendingRetestsBefore, pendingPrivateBefore] = await Promise.all([
+    countPendingFailureAutopsyRetests().catch(() => 0),
+    countPendingFailureAutopsyPrivateValidations().catch(() => 0),
+  ])
+  const pendingBefore = pendingRetestsBefore + pendingPrivateBefore
+
   const sampleIncidents = [privateCapability, evidenceUtilization]
     .map(sample => qualityIncidentForSample(sample, runAt))
     .filter(isIncident)
 
-  // One registered recovery can advance up to two retests. Do not create a second equivalent
-  // backlog incident when a scored regression already carries the same pre-authorized action.
-  const hasRegressionRecovery = sampleIncidents.some(incident => incident.metadata.recoveryPreauthorized === true)
+  // A scored regression already carries the same registered recovery action. Otherwise, practice
+  // retests OR practiced/weakened skills awaiting genuine private validation create a backlog incident.
+  const hasRegressionRecovery = sampleIncidents.some(incident =>
+    incident.errorCode === 'cos_quality_benchmark_regression' && incident.metadata.recoveryPreauthorized === true)
   const backlogIncident = hasRegressionRecovery ? null : qualityBacklogIncident(pendingBefore, runAt)
   const incidents: SupervisorIncident[] = [...sampleIncidents, ...(backlogIncident ? [backlogIncident] : [])]
-  const remediation = incidents.length
-    ? await remediateNativeIncidents(incidents, { maxIncidents: 1 }).catch(error => [{
-        incidentId: incidents[0].incidentId,
+
+  // Actionable pre-authorized repair must never be starved by an earlier unscored runtime incident.
+  // All incidents remain visible in telemetry, but the single bounded remediation slot goes first to
+  // scored regression, then quality backlog, then a non-actionable runtime incident for diagnosis.
+  const remediationIncident = [...incidents].sort((a, b) => actionableIncidentPriority(a) - actionableIncidentPriority(b))[0] ?? null
+  const remediation = remediationIncident
+    ? await remediateNativeIncidents([remediationIncident], { maxIncidents: 1 }).catch(error => [{
+        incidentId: remediationIncident.incidentId,
         diagnosisConfidence: 0,
         diagnosis: 'Self-Healing remediation call failed before a governed outcome was returned.',
         repairSteps: 0,
@@ -80,7 +99,11 @@ export async function GET(req: NextRequest) {
       }])
     : []
 
-  const pendingAfter = await countPendingFailureAutopsyRetests().catch(() => pendingBefore)
+  const [pendingRetestsAfter, pendingPrivateAfter] = await Promise.all([
+    countPendingFailureAutopsyRetests().catch(() => pendingRetestsBefore),
+    countPendingFailureAutopsyPrivateValidations().catch(() => pendingPrivateBefore),
+  ])
+  const pendingAfter = pendingRetestsAfter + pendingPrivateAfter
   const adaptiveRetrieval = incidents.length === 0
     ? await maybeAdvanceAdaptiveRetrieval(Date.now() - startedAt)
     : { status: 'skipped_while_repairing' as const }
@@ -90,17 +113,23 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    schemaVersion: 'cos-automatic-quality-control-v1',
+    schemaVersion: 'cos-automatic-quality-control-v2',
     runAt,
     automatic: true,
     healthy: scoredFailures === 0 && runtimeFailures === 0 && pendingAfter === 0,
     samples: { privateCapability, evidenceUtilization },
     incidents,
+    remediationTarget: remediationIncident?.incidentId ?? null,
     remediation,
-    failureAutopsy: { pendingBefore, pendingAfter },
+    failureAutopsy: {
+      pendingBefore,
+      pendingAfter,
+      controlledRetests: { before: pendingRetestsBefore, after: pendingRetestsAfter },
+      privateHoldoutValidations: { before: pendingPrivateBefore, after: pendingPrivateAfter },
+    },
     adaptiveRetrieval,
     durationMs: Date.now() - startedAt,
-    semantics: 'Benchmarks run unattended. Scored regressions and autopsy backlogs enter the existing Self-Healing Supervisor. Only the exact registered reversible recovery may auto-execute; consequential actions remain governed by the existing Agent Gateway policy.',
+    semantics: 'Benchmarks run unattended. Scored regressions and quality-recovery backlogs enter the existing Self-Healing Supervisor. Controlled autopsy retests are practice-only; live reuse requires separate private capability holdouts. Sticky weakened state requires fresh private revalidation. Consequential actions remain governed by the existing Agent Gateway policy.',
   })
 }
 

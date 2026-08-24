@@ -26,6 +26,7 @@ import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceSto
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { confidenceThreshold } from '@/lib/ai/cos/cosOrchestrationEnterprise'
 import { scriptRequestDirective } from './scriptRequestIntent.ts'
+import { classifyInferenceHost } from './reasonerHostingDisclosure.ts'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -42,11 +43,8 @@ function localConfigured(): boolean {
 function managedProviderName(baseUrl: string): string | null {
   const explicit = process.env.LOCAL_AI_MANAGED_PROVIDER?.trim().toLowerCase()
   if (explicit) return explicit.replace(/[^a-z0-9._-]+/g, '-')
-  try {
-    const host = new URL(baseUrl).hostname.toLowerCase()
-    if (host === 'api.deepinfra.com') return 'deepinfra'
-  } catch {}
-  return null
+  const classification = classifyInferenceHost(baseUrl)
+  return classification.selfHosted ? null : classification.provider
 }
 
 function configuredReasoner(): CosReasonerConfig {

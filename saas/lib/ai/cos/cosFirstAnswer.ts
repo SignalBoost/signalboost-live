@@ -34,6 +34,11 @@ import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/li
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
+  isSignalBoostSpecificPublicRequest,
+  publicScenarioScopeViolations,
+  publicUserRequestText,
+} from './publicScenarioScope.ts'
+import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
   type COSFirstAnswerResult,
 } from './cosFirstAnswerEnterprise.ts'
@@ -110,7 +115,7 @@ function freshProvenance(args: {
   }
 }
 
-function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolean) {
+function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolean, catalogConsulted: boolean) {
   return {
     responseSource: invoked ? 'local_cos_reasoning' : 'external_fallback_required',
     externalAiInvoked: false as const,
@@ -119,7 +124,10 @@ function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolea
     escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for public-only stateless reasoning.',
     localModelInvoked: invoked,
     reasonerLabel,
-    internalSystemsConsulted: invoked ? ['Public Product Catalog', 'Independent Local Reasoner'] : ['Public Product Catalog'],
+    internalSystemsConsulted: [
+      ...(catalogConsulted ? ['Public Product Catalog'] : []),
+      ...(invoked ? ['Independent Local Reasoner'] : []),
+    ],
     knowledgeFactsUsed: 0,
     learnedItemsUsed: 0,
     enterpriseMemoriesUsed: 0,
@@ -150,17 +158,19 @@ async function tryPublicStatelessAnswer(input: {
   prompt: string
   language?: string
 }): Promise<COSFirstAnswerResult> {
+  const userRequest = publicUserRequestText(input.prompt)
+  const signalBoostSpecific = isSignalBoostSpecificPublicRequest(input.prompt)
   const resolved = resolveCosReasoner()
   if (!resolved.config) {
     return {
       handled: false,
       confidence: 0,
       reason: 'The configured COS reasoner is unavailable for public-only stateless reasoning.',
-      provenance: publicStatelessProvenance(null, false) as any,
+      provenance: publicStatelessProvenance(null, false, signalBoostSpecific) as any,
     }
   }
 
-  const publicCatalog = buildProductCatalogSummary()
+  const publicCatalog = signalBoostSpecific ? buildProductCatalogSummary() : null
   const reasoned = await callCosReasoner({
     temperature: 0.2,
     maxTokens: 2600,
@@ -168,8 +178,12 @@ async function tryPublicStatelessAnswer(input: {
       'You are COS, the reasoning engine behind the public SignalBoost Concierge.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
-      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public company information.',
-      'For SignalBoost-specific claims, use ONLY the PUBLIC PRODUCT CATALOG supplied in the prompt. If the requested company fact is not in that public catalog or live evidence supplied this turn, say it is not public information rather than inferring or guessing.',
+      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public SignalBoost company information.',
+      'The public-only boundary protects SignalBoost private systems; it does NOT make facts typed by the user inaccessible. Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises. Analyze them directly without claiming they were independently verified or retrieved from a private system.',
+      'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", "the investor", or other business in the request means SignalBoost. Treat it as third-party or hypothetical unless the actual user request explicitly names SignalBoost or a SignalBoost product.',
+      signalBoostSpecific
+        ? 'THIS REQUEST IS SIGNALBOOST-SPECIFIC. For SignalBoost-specific claims, use ONLY the PUBLIC SIGNALBOOST PRODUCT CATALOG supplied in the prompt. If a requested SignalBoost fact is absent from that catalog or live evidence supplied this turn, say it is not public information rather than inferring or guessing.'
+        : 'THIS REQUEST IS NOT SIGNALBOOST-SPECIFIC. Do not mention SignalBoost products, its public catalog, its private financials, its roadmap, or its internal constraints. Answer the third-party or hypothetical scenario from the user-supplied premises and ordinary general reasoning.',
       'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
       'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
       'You may edit, rewrite, summarize, explain, brainstorm, reason, draft, and help with ordinary public tasks just like a general assistant, subject to the public-only boundary.',
@@ -177,13 +191,13 @@ async function tryPublicStatelessAnswer(input: {
       input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
     ].join(' '),
     prompt: [
-      `PUBLIC PRODUCT CATALOG:\n${publicCatalog}`,
-      `USER REQUEST:\n${input.prompt}`,
+      ...(publicCatalog ? [`PUBLIC SIGNALBOOST PRODUCT CATALOG:\n${publicCatalog}`] : []),
+      `USER REQUEST:\n${userRequest}`,
       'Answer the public user now.',
     ].join('\n\n'),
   }).catch(() => null)
 
-  const provenance = publicStatelessProvenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text))
+  const provenance = publicStatelessProvenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text), signalBoostSpecific)
   if (!reasoned?.text) {
     return {
       handled: false,
@@ -193,7 +207,7 @@ async function tryPublicStatelessAnswer(input: {
     }
   }
 
-  const parsed = parseLocalResult(reasoned.text)
+  let parsed = parseLocalResult(reasoned.text)
   if (!parsed || parsed.truncated || !parsed.answer.trim()) {
     return {
       handled: false,
@@ -201,6 +215,38 @@ async function tryPublicStatelessAnswer(input: {
       reason: 'The public-only COS result was empty, truncated, or unparseable.',
       provenance: provenance as any,
     }
+  }
+
+  const scopeViolations = publicScenarioScopeViolations(input.prompt, parsed.answer)
+  if (scopeViolations.length) {
+    const repair = await callCosReasoner({
+      temperature: 0,
+      maxTokens: 2600,
+      systemPrompt: [
+        'You are COS repairing a public generic-business answer. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'The actual user request does not identify SignalBoost. Remove every SignalBoost-specific product, catalog, roadmap, financial, customer, or internal-company reference from the draft.',
+        'Do not say you cannot access, disclose, or analyze facts that are already written in the user request. Treat those facts as user-supplied premises and analyze them directly.',
+        'Do not claim the premises were independently verified. Do not add private-system claims or current-world facts that require live evidence.',
+        'Answer the requested business decision or analysis directly using ordinary general reasoning. Do not mention this repair.',
+        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
+      ].join(' '),
+      prompt: [
+        `USER REQUEST:\n${userRequest}`,
+        `REJECTED DRAFT:\n${parsed.answer}`,
+        `SCOPE VIOLATIONS:\n${scopeViolations.join(', ')}`,
+        'Return the corrected answer now.',
+      ].join('\n\n'),
+    }).catch(() => null)
+    const repaired = repair?.text ? parseLocalResult(repair.text) : null
+    if (!repaired || repaired.truncated || !repaired.answer.trim() || publicScenarioScopeViolations(input.prompt, repaired.answer).length) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: `Public generic-scenario answer violated scope isolation (${scopeViolations.join(', ')}) and the bounded repair did not clear it.`,
+        provenance: provenance as any,
+      }
+    }
+    parsed = repaired
   }
 
   const confidence = Math.max(0, Math.min(1, parsed.confidence))

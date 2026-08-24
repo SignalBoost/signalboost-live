@@ -34,7 +34,7 @@ const UNSUPPLIED_STRATEGIC_DEADLINE = /\b(?:we|you|the\s+company)\s+(?:have|has)
 const UNSUPPLIED_MARKET_SHIFT = /\b(?:market\s+conditions?|the\s+market)\s+(?:has|have)\s+(?:shifted|changed)\b/i
 const UNSUPPLIED_PROJECT_STATUS = /\b(?:we(?:'ve|\s+have)|you(?:'ve|\s+have)|the\s+(?:team|company|project)\s+has)\b[^.!?]{0,100}\b(?:extracted|captured|learned|completed|finished)\b[^.!?]{0,120}\b(?:insights?|discovery|phase|prototype|work)\b|\b(?:discovery|exploratory|prototype)\s+phase\s+(?:is|has\s+been)\s+(?:done|complete|completed|finished)\b/i
 const UNSUPPLIED_CAUSAL_FINANCIAL_OUTCOME = /\b(?:retains?|preserves?)\s+(?:significantly\s+)?more\s+revenue\b|\bextends?\s+(?:the\s+)?(?:effective\s+)?runway\b/i
-const UNQUALIFIED_TIME_PROJECTION = /\b(?:in|over)\s+\d+\s+months?\b[^.!?]{0,180}\b(?:reduces?|shrinks?|cuts?|loses?|declines?)\b[^.!?]{0,140}\b\d+(?:\.\d+)?%\b|\b(?:company|user\s+base|customer\s+base|cohort)\b[^.!?]{0,100}\b(?:loses?|declines?|shrinks?)\b[^.!?]{0,70}\b~?\d+(?:\.\d+)?%\b[^.!?]{0,100}\b(?:over|in)\s+\d+\s+months?\b/i
+const UNQUALIFIED_TIME_PROJECTION = /\b(?:in|over)\s+\d+\s+months?\b[^.!?]{0,180}\b(?:reduces?|shrinks?|cuts?|loses?|declines?)\b[^.!?]{0,140}\b\d+(?:\.\d+)?%|\b(?:company|user\s+base|customer\s+base|cohort)\b[^.!?]{0,100}\b(?:loses?|declines?|shrinks?)\b[^.!?]{0,70}\b~?\d+(?:\.\d+)?%[^.!?]{0,100}\b(?:over|in)\s+\d+\s+months?\b/i
 
 export type AnswerFreshnessSignal = {
   code: 'explicit_current_marker' | 'mutable_institutional_claim' | 'mutable_generalization' | 'practice_assertion' | 'prevailing_assertion' | 'unsupported_scenario_inference'

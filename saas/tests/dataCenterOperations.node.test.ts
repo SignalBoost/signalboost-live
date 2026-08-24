@@ -6,6 +6,10 @@ import {
   normalizeDataCenterObservation,
 } from '../lib/data-center/observation.ts'
 import { createDataCenterSimulation } from '../lib/data-center/simulator.ts'
+import {
+  dataCenterClusterToSupervisorIncident,
+  dataCenterDiagnosticEvidenceBlock,
+} from '../lib/data-center/supervisorBridge.ts'
 
 test('data-center observation maps into the existing Supervisor incident contract as advisory-only evidence', () => {
   const observation = createDataCenterSimulation('pdu-overload')[0]
@@ -57,6 +61,22 @@ test('concurrent alerts are not merged merely because they occur at the same sit
   assert.equal(observations.length, 2)
   assert.equal(clusters.length, 2)
   assert.ok(clusters.every(cluster => cluster.observations.length === 1))
+})
+
+test('correlated data-center evidence enters Supervisor with root cause explicitly unproven', () => {
+  const cluster = clusterDataCenterObservations(createDataCenterSimulation('cooling-loop-degradation'))[0]
+  const incident = dataCenterClusterToSupervisorIncident(cluster)
+  const evidenceBlock = dataCenterDiagnosticEvidenceBlock(cluster)
+
+  assert.equal(incident.metadata.domain, 'data_center_operations')
+  assert.equal(incident.metadata.rootCauseStatus, 'unproven')
+  assert.equal(incident.metadata.facilityControlAllowed, false)
+  assert.equal(incident.metadata.observationCount, 3)
+  assert.match(incident.errorMessage, /Root cause is not yet established/)
+  assert.match(evidenceBlock, /correlation is not proof of physical root cause/i)
+  assert.match(evidenceBlock, /Facility-control authority: NONE/i)
+  assert.match(evidenceBlock, /cdu-2/i)
+  assert.match(evidenceBlock, /rack-b17/i)
 })
 
 test('simulation fixtures are explicitly sandbox evidence and never imply facility-control authority', () => {

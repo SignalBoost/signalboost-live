@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { clusterDataCenterObservations } from '../lib/data-center/correlation.ts'
 import { diagnoseDataCenterCluster } from '../lib/data-center/diagnostic.ts'
@@ -124,6 +125,17 @@ test('COS diagnostic rejects incomplete model output instead of fabricating an a
     diagnoseDataCenterCluster(cluster, { async generate() { return '{"summary":"Looks bad"}' } }),
     /data_center_diagnostic_incomplete/,
   )
+})
+
+test('owner-only simulation route keeps the first executable product surface sandboxed and non-controlling', () => {
+  const route = readFileSync(new URL('../app/api/admin/data-center-operations/simulate/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /getAccess/)
+  assert.match(route, /!access\?\.isOwner/)
+  assert.match(route, /sandbox-simulation/)
+  assert.match(route, /advisoryOnly:\s*true/)
+  assert.match(route, /facilityControlAllowed:\s*false/)
+  assert.match(route, /createLocalApplianceAiPort/)
+  assert.doesNotMatch(route, /createExternalTeacherAiPort/)
 })
 
 test('simulation fixtures are explicitly sandbox evidence and never imply facility-control authority', () => {
